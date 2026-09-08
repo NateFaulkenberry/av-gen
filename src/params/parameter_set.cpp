@@ -2,6 +2,7 @@
 
 #include "core/log.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 
 namespace avgen::params {
@@ -41,6 +42,20 @@ void ParameterSet::registerParameter(std::unique_ptr<IParameter> param) {
     storage_.push_back(std::move(param));
     ordered_.push_back(raw);
     index_.emplace(path, raw);
+}
+
+bool ParameterSet::remove(std::string_view path) {
+    const auto it = index_.find(std::string(path));
+    if (it == index_.end()) {
+        return false;
+    }
+    IParameter* raw = it->second;
+    index_.erase(it);
+    ordered_.erase(std::remove(ordered_.begin(), ordered_.end(), raw), ordered_.end());
+    storage_.erase(std::remove_if(storage_.begin(), storage_.end(),
+                                  [raw](const std::unique_ptr<IParameter>& p) { return p.get() == raw; }),
+                   storage_.end());
+    return true;
 }
 
 void ParameterSet::clear() {

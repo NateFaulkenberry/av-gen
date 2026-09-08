@@ -202,3 +202,34 @@ TEST_CASE("ParameterSet resetFinals and resetAllToDefault", "[params][set]") {
     CHECK(a.value() == 1.0f);
     CHECK(b.value() == 2.0f);
 }
+
+TEST_CASE("ParameterSet remove erases one parameter and keeps the rest", "[params][set]") {
+    ParameterSet set;
+    set.add(ParamDesc<float>{.path = "a", .defaultValue = 1.0f, .hardMin = 0.0f, .hardMax = 10.0f});
+    auto& b = set.add(ParamDesc<float>{.path = "b", .defaultValue = 2.0f, .hardMin = 0.0f, .hardMax = 10.0f});
+    auto& c = set.add(ParamDesc<int>{.path = "c", .defaultValue = 3, .hardMin = 0, .hardMax = 10});
+
+    CHECK_FALSE(set.remove("missing"));
+    CHECK(set.remove("a"));
+    CHECK_FALSE(set.remove("a"));
+    CHECK(set.size() == 2);
+    CHECK(set.find("a") == nullptr);
+    CHECK(set.find("b") == &b);
+    CHECK(set.find("c") == &c);
+    REQUIRE(set.ordered().size() == 2);
+    CHECK(set.ordered()[0] == &b);
+    CHECK(set.ordered()[1] == &c);
+    CHECK(b.base() == 2.0f); // untouched
+
+    // The path can be registered again, with a different type if desired.
+    auto& again = set.add(ParamDesc<int>{.path = "a", .defaultValue = 5, .hardMin = 0, .hardMax = 10});
+    CHECK(set.size() == 3);
+    CHECK(set.findAs<int>("a") == &again);
+    CHECK(set.ordered().back() == &again);
+
+    set.remove("b");
+    set.remove("c");
+    set.remove("a");
+    CHECK(set.size() == 0);
+    CHECK(set.ordered().empty());
+}

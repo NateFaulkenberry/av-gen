@@ -3,14 +3,19 @@
 Decision: ADR-010 (serialisation) and ADR-011 (what is serialised). Implemented in
 `src/params/serialization.cpp`; used by tests today and by the project system in 0.9.
 
+Version 2 (milestone 0.3) adds modulation sources, presets and per-route polarity. Version 1
+documents (no `sources`/`presets`, routes without `polarity`) load unchanged.
+
 ```json
 {
   "format": "avgen-project",
-  "version": 1,
+  "version": 2,
   "parameters": {
     "orb/scale": 1.0,
     "orb/baseColor": [0.75, 0.2, 0.9],
-    "scene/brightness": 1.0
+    "scene/brightness": 1.0,
+    "sources/wobble/rate": 0.5,
+    "macros/energy": 0.7
   },
   "routes": [
     {
@@ -19,6 +24,7 @@ Decision: ADR-010 (serialisation) and ADR-011 (what is serialised). Implemented 
       "component": -1,
       "amount": 1.2,
       "op": "add",
+      "polarity": "unipolar",
       "enabled": true,
       "chain": {
         "gain": 1.0, "offset": 0.0,
@@ -29,19 +35,52 @@ Decision: ADR-010 (serialisation) and ADR-011 (what is serialised). Implemented 
         "envelope": "none", "envelopeHoldMs": 0.0, "envelopeFallPerSecond": 4.0,
         "remapEnabled": false, "remapInMin": 0.0, "remapInMax": 1.0, "remapOutMin": 0.0, "remapOutMax": 1.0
       }
-    }
+    },
+    { "source": "lfo.wobble.bipolar", "target": "orb/rotationSpeed", "polarity": "bipolar", "amount": 0.5 }
+  ],
+  "sources": [
+    { "kind": "lfo",      "name": "wobble", "settings": { "shape": "sine" } },
+    { "kind": "envelope", "name": "hit",    "settings": { "trigger": "audio.onset" } },
+    { "kind": "noise",    "name": "drift",  "settings": { "seed": 1 } },
+    { "kind": "random",   "name": "pick",   "settings": { "trigger": "audio.onset", "seed": 1 } },
+    { "kind": "timeline", "name": "intro",  "settings": {
+        "keys": [ { "time": 0.0, "value": 0.0, "interp": "smooth" }, { "time": 8.0, "value": 1.0, "interp": "linear" } ],
+        "loopLength": 0.0 } },
+    { "kind": "macro",    "name": "macros", "settings": { "knobs": [ { "name": "energy", "default": 0.7 } ] } }
+  ],
+  "presets": [
+    { "name": "calm", "values": { "orb/scale": [1.0], "orb/baseColor": [0.2, 0.3, 0.9], "macros/energy": [0.2] } }
   ]
 }
 ```
 
 Rules:
 - `parameters` holds base values only (finals are derived every frame); numbers for float/int,
-  booleans for bool, arrays for vectors and colours. Only parameters flagged `serialized`.
+  booleans for bool, arrays for vectors and colours. Only parameters flagged `serialized`. Source
+  settings that are parameters (`sources/<name>/rate`, `macros/<knob>`, ...) live here, not in
+  `sources`.
 - Enums are lower-case strings: curve `linear|power|log|exp|scurve`; threshold
   `none|gate|binary|subtract`; envelope `none|peakhold|linearfall`; op
-  `add|multiply|replace|min|max`.
+  `add|multiply|replace|min|max`; polarity `unipolar|bipolar` (missing = `unipolar`; `bipolar`
+  maps the source 0..1 to -1..1 before the chain); LFO shape
+  `sine|triangle|saw|square|samplehold`; keyframe interp `step|linear|smooth` (declared on the
+  left key of each segment).
 - Missing chain keys take defaults; unknown enum strings are errors.
-- Loading validates everything first and changes nothing on failure. Unknown parameter paths are
-  skipped with a warning (forward compatibility); a type mismatch is an error. `version` greater
-  than the reader's is rejected; older versions will be migrated in order.
+- `sources` is an ordered array of `{ kind, name, settings }`. `kind` is one of
+  `lfo|envelope|noise|random|timeline|macro`; `name` is unique per kind. `settings` holds only the
+  non-parameter settings of that kind (see the example); a missing `settings` uses defaults.
+  Unknown kinds are skipped with a warning (forward compatibility); malformed settings are errors.
+  Loading replaces the whole rack; the caller attaches it again and re-binds the modulator.
+- `presets` is an array of `{ name, values }` where `values` maps parameter paths to arrays of
+  components (a bare number or boolean is accepted as one component). Presets store base values
+  only; paths unknown to the current parameter set are kept and ignored on apply. Loading
+  replaces the bank.
+- Load order: `sources` (rack replaced, and attached when it already was, so their parameters
+  exist), `parameters`, `routes` (replaced), `presets` (bank replaced). A document without a
+  `sources` or `presets` section (e.g. version 1) leaves an empty rack / bank when the caller
+  passes them; a caller that passes no rack / bank keeps its own untouched.
+- Loading validates everything first (including `sources` and `presets`, whether or not the
+  caller loads them) and changes nothing on failure. Unknown parameter paths are skipped with a
+  warning (forward compatibility); a type mismatch is an error. `version` greater than the
+  reader's is rejected; older versions will be migrated in order.
 - Paths are the identity for parameters everywhere: UI, presets, OSC addresses (`/orb/scale`).

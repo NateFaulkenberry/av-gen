@@ -16,6 +16,7 @@
 #include "params/modulation.hpp"
 #include "params/parameter.hpp"
 #include "params/parameter_set.hpp"
+#include "params/preset.hpp"
 #include "params/processor.hpp"
 #include "params/serialization.hpp"
 #include "scene/mesh_generators.hpp"
@@ -23,6 +24,7 @@
 #include "scene/scene.hpp"
 #include "signals/audio_signals.hpp"
 #include "signals/signal_bus.hpp"
+#include "signals/source.hpp"
 #include "support/synth.hpp"
 
 #include <catch2/catch_test_macros.hpp>

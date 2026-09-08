@@ -37,6 +37,8 @@ constexpr std::array<EnumName<ModOp>, 5> kOpNames{{{ModOp::Add, "add"},
                                                    {ModOp::Replace, "replace"},
                                                    {ModOp::Min, "min"},
                                                    {ModOp::Max, "max"}}};
+constexpr std::array<EnumName<Polarity>, 2> kPolarityNames{
+    {{Polarity::Unipolar, "unipolar"}, {Polarity::Bipolar, "bipolar"}}};
 
 template <typename E, std::size_t N>
 std::string_view enumToString(const std::array<EnumName<E>, N>& table, E value) {
@@ -254,6 +256,7 @@ json routeToJson(const ModRoute& route) {
     j["component"] = route.component;
     j["amount"] = static_cast<double>(route.amount);
     j["op"] = enumToString(kOpNames, route.op);
+    j["polarity"] = enumToString(kPolarityNames, route.polarity);
     j["enabled"] = route.enabled;
     j["chain"] = chainToJson(route.chain);
     return j;
@@ -270,10 +273,11 @@ Result<ModRoute> routeFromJson(const json& j) {
     if (auto r = readString(j, "target", route.target); !r) {
         return fail("route: {}", r.error().message);
     }
-    std::array<Result<void>, 4> results{
+    std::array<Result<void>, 5> results{
         readInt(j, "component", route.component),
         readFloat(j, "amount", route.amount),
         readEnum(j, "op", kOpNames, route.op),
+        readEnum(j, "polarity", kPolarityNames, route.polarity), // absent (v1) = unipolar
         readBool(j, "enabled", route.enabled),
     };
     for (const auto& r : results) {
@@ -291,8 +295,8 @@ Result<ModRoute> routeFromJson(const json& j) {
     return route;
 }
 
-json saveProject(const ParameterSet& params, const Modulator& modulator, const signals::SourceRack* /*sources*/,
-                 const PresetBank* /*presets*/) {
+json saveProject(const ParameterSet& params, const Modulator& modulator, const signals::SourceRack* sources,
+                 const PresetBank* presets) {
     json doc;
     doc["format"] = kProjectFormatName;
     doc["version"] = kProjectFormatVersion;
@@ -308,11 +312,17 @@ json saveProject(const ParameterSet& params, const Modulator& modulator, const s
         routes.push_back(routeToJson(route));
     }
     doc["routes"] = std::move(routes);
+    if (sources != nullptr) {
+        doc["sources"] = sources->toJson();
+    }
+    if (presets != nullptr) {
+        doc["presets"] = presets->toJson();
+    }
     return doc;
 }
 
-Result<void> loadProject(const json& doc, ParameterSet& params, Modulator& modulator, signals::SourceRack* /*sources*/,
-                         PresetBank* /*presets*/) {
+Result<void> loadProject(const json& doc, ParameterSet& params, Modulator& modulator,
+                         signals::SourceRack* sources, PresetBank* presets) {
     if (!doc.is_object()) {
         return fail("project document must be a JSON object");
     }
@@ -328,15 +338,43 @@ Result<void> loadProject(const json& doc, ParameterSet& params, Modulator& modul
         return fail("project version {} is newer than supported version {}", version->get<int>(),
                     kProjectFormatVersion);
     }
+    if (version->get<int>() < 1) {
+        return fail("project version {} is not valid", version->get<int>());
+    }
 
     // Validate everything before mutating anything so a bad file leaves the state untouched.
-    std::vector<std::pair<IParameter*, const json*>> pending;
+    // Sources and presets are parsed into temporaries even when the caller does not want them, so
+    // a malformed document is rejected consistently. The scratch rack is attached to a scratch
+    // parameter set so the document's source parameters are checked against the parameters the
+    // new rack will register (the current rack's ones disappear when it is replaced).
+    const auto sourcesJson = doc.find("sources");
+    signals::SignalBus scratchBus;
+    ParameterSet scratchParams;
+    if (sourcesJson != doc.end()) {
+        signals::SourceRack scratch;
+        scratch.attach(scratchBus, scratchParams);
+        if (auto parsed = scratch.fromJson(*sourcesJson); !parsed) {
+            return parsed;
+        }
+    }
+    PresetBank parsedPresets;
+    const auto presetsJson = doc.find("presets");
+    if (presetsJson != doc.end()) {
+        if (auto parsed = parsedPresets.fromJson(*presetsJson); !parsed) {
+            return parsed;
+        }
+    }
+    // Pending values are kept by path: replacing the rack invalidates parameter pointers.
+    std::vector<std::pair<std::string, const json*>> pending;
     if (const auto parameters = doc.find("parameters"); parameters != doc.end()) {
         if (!parameters->is_object()) {
             return fail("'parameters' must be an object");
         }
         for (const auto& [path, value] : parameters->items()) {
-            IParameter* param = params.find(path);
+            const IParameter* param = sources != nullptr ? scratchParams.find(path) : nullptr;
+            if (param == nullptr) {
+                param = params.find(path);
+            }
             if (param == nullptr) {
                 log::warn("project references unknown parameter '{}'; ignored", path);
                 continue;
@@ -344,7 +382,7 @@ Result<void> loadProject(const json& doc, ParameterSet& params, Modulator& modul
             if (auto check = validateParameterJson(*param, value); !check) {
                 return check;
             }
-            pending.emplace_back(param, &value);
+            pending.emplace_back(path, &value);
         }
     }
     std::vector<ModRoute> routes;
@@ -362,7 +400,24 @@ Result<void> loadProject(const json& doc, ParameterSet& params, Modulator& modul
         }
     }
 
-    for (auto& [param, value] : pending) {
+    // Commit, in document order: sources, parameter values, routes, presets. A section that is
+    // absent from the document means "none" for the sections that describe the project as a whole.
+    if (sources != nullptr) {
+        if (sourcesJson != doc.end()) {
+            if (auto replaced = sources->fromJson(*sourcesJson); !replaced) {
+                return replaced; // validated above; cannot fail
+            }
+        } else {
+            sources->clear();
+        }
+    }
+    for (const auto& [path, value] : pending) {
+        IParameter* param = params.find(path);
+        if (param == nullptr) {
+            // Belonged to the replaced rack, or the new rack is attached elsewhere.
+            log::warn("project parameter '{}' no longer exists after loading sources; ignored", path);
+            continue;
+        }
         if (auto applied = parameterFromJson(*param, *value); !applied) {
             return applied;
         }
@@ -371,11 +426,15 @@ Result<void> loadProject(const json& doc, ParameterSet& params, Modulator& modul
     for (auto& route : routes) {
         modulator.addRoute(std::move(route));
     }
+    if (presets != nullptr) {
+        *presets = std::move(parsedPresets);
+    }
     return {};
 }
 
-Result<void> saveProjectFile(const std::filesystem::path& path, const ParameterSet& params, const Modulator& modulator,
-                             const signals::SourceRack* sources, const PresetBank* presets) {
+Result<void> saveProjectFile(const std::filesystem::path& path, const ParameterSet& params,
+                             const Modulator& modulator, const signals::SourceRack* sources,
+                             const PresetBank* presets) {
     std::ofstream out(path);
     if (!out) {
         return fail("cannot open '{}' for writing", path.string());

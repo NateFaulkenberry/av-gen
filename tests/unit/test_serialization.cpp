@@ -1,6 +1,8 @@
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
+#include "params/preset.hpp"
 #include "params/serialization.hpp"
+#include "signals/source.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -8,6 +10,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <nlohmann/json.hpp>
 
 using namespace avgen;
@@ -350,4 +353,219 @@ TEST_CASE("Project files round-trip on disk and malformed files are errors", "[s
         loadProjectFile(tempPath("missing-dir") / "x" / "nope.json", h.params, h.modulator).has_value());
     CHECK_FALSE(
         saveProjectFile(tempPath("missing-dir") / "x" / "nope.json", h.params, h.modulator).has_value());
+}
+
+// ---- version 2: polarity, sources, presets --------------------------------------------------
+
+TEST_CASE("Route polarity round-trips and defaults to unipolar", "[serialization][v2]") {
+    ModRoute route;
+    route.source = "lfo.a";
+    route.target = "orb/scale";
+    route.polarity = Polarity::Bipolar;
+    const json j = routeToJson(route);
+    CHECK(j["polarity"] == "bipolar");
+    auto back = routeFromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->polarity == Polarity::Bipolar);
+
+    auto v1 = routeFromJson(json{{"source", "s"}, {"target", "t"}}); // v1 documents have no key
+    REQUIRE(v1.has_value());
+    CHECK(v1->polarity == Polarity::Unipolar);
+    auto uni = routeFromJson(json{{"source", "s"}, {"target", "t"}, {"polarity", "unipolar"}});
+    REQUIRE(uni.has_value());
+    CHECK(uni->polarity == Polarity::Unipolar);
+    CHECK_FALSE(routeFromJson(json{{"source", "s"}, {"target", "t"}, {"polarity", "Bipolar"}}).has_value());
+    CHECK_FALSE(routeFromJson(json{{"source", "s"}, {"target", "t"}, {"polarity", 1}}).has_value());
+}
+
+namespace {
+struct V2Fixture : Fixture {
+    signals::SignalBus bus;
+    signals::SourceRack rack;
+    PresetBank bank;
+
+    V2Fixture() {
+        rack.attach(bus, params);
+        rack.add(std::make_unique<signals::LfoSource>("wobble", signals::LfoShape::Triangle));
+        auto timeline = std::make_unique<signals::TimelineSource>("intro");
+        timeline->addKey(signals::Keyframe{0.0, 0.0f, signals::KeyInterpolation::Smooth});
+        timeline->addKey(signals::Keyframe{2.0, 1.0f, signals::KeyInterpolation::Step});
+        rack.add(std::move(timeline));
+        auto macro = std::make_unique<signals::MacroSource>();
+        macro->addKnob("energy", 0.7f);
+        rack.add(std::move(macro));
+        scale.setBase(2.0f);
+        bank.add(capturePreset(params, "calm"));
+        scale.setBase(3.5f);
+        bank.add(capturePreset(params, "wild"));
+    }
+};
+} // namespace
+
+TEST_CASE("Version 2 project round-trips sources, presets and source parameters", "[serialization][v2]") {
+    V2Fixture f;
+    f.params.findAs<float>("sources/wobble/rate")->setBase(4.0f);
+    f.params.findAs<float>("macros/energy")->setBase(0.2f);
+    ModRoute r;
+    r.source = "lfo.wobble.bipolar";
+    r.target = "sources/intro/scale";
+    r.polarity = Polarity::Bipolar;
+    f.modulator.addRoute(r);
+
+    const json doc = saveProject(f.params, f.modulator, &f.rack, &f.bank);
+    CHECK(doc["version"] == 2);
+    REQUIRE(doc["sources"].is_array());
+    CHECK(doc["sources"].size() == 3);
+    REQUIRE(doc["presets"].is_array());
+    CHECK(doc["presets"].size() == 2);
+    CHECK(doc["parameters"]["sources/wobble/rate"] == 4.0);
+    CHECK_THAT(doc["parameters"]["macros/energy"].get<double>(), WithinAbs(0.2, 1e-6));
+    CHECK(doc["routes"][0]["polarity"] == "bipolar");
+    // Omitted pointers omit the sections.
+    const json bare = saveProject(f.params, f.modulator);
+    CHECK_FALSE(bare.contains("sources"));
+    CHECK_FALSE(bare.contains("presets"));
+
+    Fixture g;
+    signals::SignalBus bus;
+    signals::SourceRack rack;
+    PresetBank bank;
+    rack.attach(bus, g.params);
+    rack.add(std::make_unique<signals::NoiseSource>("stale"));
+    bank.add(Preset{.name = "stale", .values = {}});
+    REQUIRE(loadProject(doc, g.params, g.modulator, &rack, &bank).has_value());
+
+    // Rack replaced and attached, so the source parameters existed when values were applied.
+    CHECK(rack.sources().size() == 3);
+    CHECK(rack.find("noise", "stale") == nullptr);
+    CHECK(g.params.find("sources/stale/rate") == nullptr);
+    REQUIRE(g.params.findAs<float>("sources/wobble/rate") != nullptr);
+    CHECK_THAT(d(g.params.findAs<float>("sources/wobble/rate")->base()), WithinAbs(4.0, 1e-6));
+    CHECK_THAT(d(g.params.findAs<float>("macros/energy")->base()), WithinAbs(0.2, 1e-6));
+    CHECK(dynamic_cast<signals::LfoSource*>(rack.find("lfo", "wobble"))->shape() ==
+          signals::LfoShape::Triangle);
+    CHECK(dynamic_cast<signals::TimelineSource*>(rack.find("timeline", "intro"))->keys().size() == 2);
+    CHECK(rack.toJson() == doc["sources"]);
+    CHECK_THAT(d(g.scale.base()), WithinAbs(3.5, 1e-6));
+    REQUIRE(g.modulator.routes().size() == 1);
+    CHECK(g.modulator.routes()[0].polarity == Polarity::Bipolar);
+    CHECK(bank.presets().size() == 2);
+    CHECK(bank.find("stale") == nullptr);
+    REQUIRE(bank.find("calm") != nullptr);
+    CHECK(bank.find("calm")->values.at("orb/scale")[0] == 2.0f);
+    CHECK(bank.toJson() == doc["presets"]);
+    // Presets apply to the rebuilt parameter set.
+    CHECK(applyPreset(g.params, *bank.find("calm")) > 0);
+    CHECK_THAT(d(g.scale.base()), WithinAbs(2.0, 1e-6));
+}
+
+TEST_CASE("Version 1 documents still load and clear the optional sections", "[serialization][v2]") {
+    V2Fixture f;
+    json doc = saveProject(f.params, f.modulator);
+    doc["version"] = 1;
+    doc["parameters"]["orb/scale"] = 1.25;
+    doc["routes"] = json::array({json{{"source", "audio.bass"}, {"target", "orb/scale"}}});
+    REQUIRE(loadProject(doc, f.params, f.modulator, &f.rack, &f.bank).has_value());
+    CHECK_THAT(d(f.scale.base()), WithinAbs(1.25, 1e-6));
+    REQUIRE(f.modulator.routes().size() == 1);
+    CHECK(f.modulator.routes()[0].polarity == Polarity::Unipolar);
+    CHECK(f.rack.sources().empty()); // a project without sources has none
+    CHECK(f.params.find("sources/wobble/rate") == nullptr);
+    CHECK(f.bank.presets().empty());
+
+    // Null pointers leave the rack and bank alone.
+    V2Fixture h;
+    REQUIRE(loadProject(doc, h.params, h.modulator).has_value());
+    CHECK(h.rack.sources().size() == 3);
+    CHECK(h.bank.presets().size() == 2);
+}
+
+TEST_CASE("Version 3 documents are rejected", "[serialization][v2]") {
+    V2Fixture f;
+    json doc = saveProject(f.params, f.modulator, &f.rack, &f.bank);
+    doc["version"] = 3;
+    auto result = loadProject(doc, f.params, f.modulator, &f.rack, &f.bank);
+    REQUIRE_FALSE(result.has_value());
+    CHECK_THAT(result.error().message, ContainsSubstring("version 3"));
+    doc["version"] = 0;
+    CHECK_FALSE(loadProject(doc, f.params, f.modulator, &f.rack, &f.bank).has_value());
+    CHECK(f.rack.sources().size() == 3);
+}
+
+TEST_CASE("A failed version 2 load leaves parameters, routes, sources and presets unchanged",
+          "[serialization][v2]") {
+    V2Fixture f;
+    f.modulator.addRoute(ModRoute{.source = "audio.bass", .target = "orb/scale"});
+    const json paramsBefore = saveProject(f.params, f.modulator)["parameters"];
+    const json sourcesBefore = f.rack.toJson();
+    const json presetsBefore = f.bank.toJson();
+
+    json good = saveProject(f.params, f.modulator, &f.rack, &f.bank);
+    good["parameters"]["orb/scale"] = 0.5;
+    good["sources"] = json::array({json{{"kind", "noise"}, {"name", "n"}}});
+    good["presets"] = json::array({json{{"name", "p"}}});
+    good["routes"] = json::array();
+
+    auto check = [&](json doc, const char* what) {
+        INFO(what);
+        auto result = loadProject(doc, f.params, f.modulator, &f.rack, &f.bank);
+        CHECK_FALSE(result.has_value());
+        CHECK(saveProject(f.params, f.modulator)["parameters"] == paramsBefore);
+        CHECK(f.modulator.routes().size() == 1);
+        CHECK(f.rack.toJson() == sourcesBefore);
+        CHECK(f.params.find("sources/wobble/rate") != nullptr);
+        CHECK(f.params.find("sources/n/rate") == nullptr);
+        CHECK(f.bank.toJson() == presetsBefore);
+    };
+    json bad = good;
+    bad["sources"] = 7;
+    check(bad, "sources not an array");
+    bad = good;
+    bad["sources"].push_back(json{{"kind", "lfo"}, {"name", "x"}, {"settings", json{{"shape", "blob"}}}});
+    check(bad, "malformed source settings");
+    bad = good;
+    bad["presets"] = json::object();
+    check(bad, "presets not an array");
+    bad = good;
+    bad["presets"].push_back(json{{"values", json::object()}});
+    check(bad, "preset without a name");
+    bad = good;
+    bad["routes"].push_back(json{{"source", "s"}, {"target", "t"}, {"polarity", "sideways"}});
+    check(bad, "bad polarity");
+    bad = good;
+    bad["parameters"]["orb/flag"] = "yes";
+    check(bad, "parameter type mismatch");
+    // Malformed optional sections are rejected even when the caller does not load them.
+    bad = good;
+    bad["sources"] = 7;
+    CHECK_FALSE(loadProject(bad, f.params, f.modulator).has_value());
+
+    // The good document then loads.
+    REQUIRE(loadProject(good, f.params, f.modulator, &f.rack, &f.bank).has_value());
+    CHECK_THAT(d(f.scale.base()), WithinAbs(0.5, 1e-6));
+    CHECK(f.modulator.routes().empty());
+    CHECK(f.rack.sources().size() == 1);
+    CHECK(f.params.find("sources/n/rate") != nullptr);
+    CHECK(f.params.find("sources/wobble/rate") == nullptr);
+    CHECK(f.bank.presets().size() == 1);
+}
+
+TEST_CASE("Version 2 project files round-trip on disk", "[serialization][v2][file]") {
+    const auto path = tempPath("project_v2.json");
+    {
+        V2Fixture f;
+        REQUIRE(saveProjectFile(path, f.params, f.modulator, &f.rack, &f.bank).has_value());
+    }
+    {
+        Fixture g;
+        signals::SignalBus bus;
+        signals::SourceRack rack;
+        PresetBank bank;
+        rack.attach(bus, g.params);
+        REQUIRE(loadProjectFile(path, g.params, g.modulator, &rack, &bank).has_value());
+        CHECK(rack.sources().size() == 3);
+        CHECK(bank.presets().size() == 2);
+        CHECK_THAT(d(g.scale.base()), WithinAbs(3.5, 1e-6));
+    }
+    std::filesystem::remove(path);
 }

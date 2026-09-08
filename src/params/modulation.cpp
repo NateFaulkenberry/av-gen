@@ -107,7 +107,10 @@ void Modulator::evaluate(const signals::SignalBus& bus, ParameterSet& params, do
                 route.sourceId == signals::kInvalidSignal) {
                 continue;
             }
-            const float x = bus.value(route.sourceId);
+            float x = bus.value(route.sourceId);
+            if (route.polarity == Polarity::Bipolar) {
+                x = x * 2.0f - 1.0f; // 0..1 -> -1..1 before the chain
+            }
             const bool event = bus.event(route.sourceId);
             const float y = route.chain.process(x, event, dt, route.state) * route.amount * masterGain;
             route.lastOutput = y;

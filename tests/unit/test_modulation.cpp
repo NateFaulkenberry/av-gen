@@ -309,3 +309,45 @@ TEST_CASE("addRoute invalidates the binding until bind is called again", "[modul
     CHECK(f.modulator.routes().empty());
     CHECK_FALSE(f.modulator.bound());
 }
+
+TEST_CASE("Route polarity maps a unipolar source to -1..1 before the chain", "[modulation][polarity]") {
+    Fixture f;
+    f.bus.set(f.bass, 0.25f);
+    const double dt = 0.01;
+
+    SECTION("unipolar (default) passes the raw value") {
+        ModRoute r = f.route("audio.bass", "orb/scale", ModOp::Add);
+        CHECK(r.polarity == Polarity::Unipolar);
+        f.modulator.addRoute(r);
+        REQUIRE(f.modulator.bind(f.bus, f.params).has_value());
+        f.modulator.evaluate(f.bus, f.params, dt);
+        CHECK_THAT(d(f.scale.value()), WithinAbs(1.25, 1e-6));
+    }
+    SECTION("bipolar maps 0.25 to -0.5") {
+        ModRoute r = f.route("audio.bass", "orb/scale", ModOp::Add);
+        r.polarity = Polarity::Bipolar;
+        f.modulator.addRoute(r);
+        REQUIRE(f.modulator.bind(f.bus, f.params).has_value());
+        f.modulator.evaluate(f.bus, f.params, dt);
+        CHECK_THAT(d(f.scale.value()), WithinAbs(0.5, 1e-6));
+        CHECK_THAT(d(f.modulator.routes()[0].lastOutput), WithinAbs(-0.5, 1e-6));
+        f.bus.set(f.bass, 1.0f);
+        f.modulator.evaluate(f.bus, f.params, dt);
+        CHECK_THAT(d(f.scale.value()), WithinAbs(2.0, 1e-6));
+        f.bus.set(f.bass, 0.5f);
+        f.modulator.evaluate(f.bus, f.params, dt);
+        CHECK_THAT(d(f.scale.value()), WithinAbs(1.0, 1e-6)); // centre maps to 0
+    }
+    SECTION("bipolar happens before the chain (gain and clamp see -1..1)") {
+        ModRoute r = f.route("audio.bass", "orb/scale", ModOp::Add);
+        r.polarity = Polarity::Bipolar;
+        r.chain.gain = 2.0f;
+        r.chain.clampEnabled = true;
+        r.chain.clampMin = -0.75f;
+        r.chain.clampMax = 0.75f;
+        f.modulator.addRoute(r);
+        REQUIRE(f.modulator.bind(f.bus, f.params).has_value());
+        f.modulator.evaluate(f.bus, f.params, dt); // -0.5 * 2 = -1 -> clamped to -0.75
+        CHECK_THAT(d(f.scale.value()), WithinAbs(0.25, 1e-6));
+    }
+}
