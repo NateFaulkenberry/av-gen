@@ -19,6 +19,11 @@ struct AudioSignals {
     SignalId flux = kInvalidSignal;          // audio.spectralFlux
     SignalId onsetStrength = kInvalidSignal; // audio.onsetStrength
     SignalId onset = kInvalidSignal;         // audio.onset (event)
+    SignalId tempo = kInvalidSignal;         // audio.tempo (BPM, 0 unknown)
+    SignalId tempoConfidence = kInvalidSignal; // audio.tempoConfidence 0..1
+    SignalId beat = kInvalidSignal;          // audio.beat (event)
+    SignalId beatPhase = kInvalidSignal;     // audio.beatPhase 0..1 (hop rate)
+    SignalId beatCount = kInvalidSignal;     // audio.beatCount
 
     static AudioSignals declare(SignalBus& bus);
 

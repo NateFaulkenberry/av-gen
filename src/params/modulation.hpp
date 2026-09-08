@@ -14,6 +14,7 @@
 namespace avgen::params {
 
 enum class ModOp : std::uint8_t { Add, Multiply, Replace, Min, Max };
+enum class Polarity : std::uint8_t { Unipolar, Bipolar }; // Bipolar maps the source 0..1 -> -1..1 before the chain
 
 struct ModRoute {
     std::string source;            // signal name, e.g. "audio.bass"
@@ -21,6 +22,7 @@ struct ModRoute {
     int component = -1;            // -1 = all components
     float amount = 1.0f;           // bipolar; negative inverts
     ModOp op = ModOp::Add;
+    Polarity polarity = Polarity::Unipolar;
     ProcessorChain chain{};
     bool enabled = true;
 

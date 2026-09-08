@@ -4,6 +4,7 @@
 // thread calls latest() once per frame. Also keeps a short ring of recent frames for the debug UI.
 
 #include "analysis/analyzer.hpp"
+#include "analysis/beat_tracker.hpp"
 #include "audio/analysis_stream.hpp"
 #include "core/triple_buffer.hpp"
 
@@ -17,7 +18,7 @@ namespace avgen::analysis {
 
 class AnalysisRunner {
 public:
-    AnalysisRunner(AnalyzerConfig config, audio::AnalysisStream& stream);
+    AnalysisRunner(AnalyzerConfig config, audio::AnalysisStream& stream, BeatTrackerConfig beatConfig = {});
     ~AnalysisRunner();
     AnalysisRunner(const AnalysisRunner&) = delete;
     AnalysisRunner& operator=(const AnalysisRunner&) = delete;
@@ -43,6 +44,7 @@ private:
     AnalyzerConfig config_;
     audio::AnalysisStream& stream_;
     Analyzer analyzer_;
+    BeatTracker beatTracker_; // fills the beat fields of every frame
     TripleBuffer<AnalysisFrame> frames_;
     std::jthread thread_;
     std::atomic<bool> running_{false};

@@ -7,7 +7,7 @@
 
 namespace avgen::analysis {
 
-AnalysisTrack AnalysisTrack::analyze(const audio::AudioFile& file, AnalyzerConfig config) {
+AnalysisTrack AnalysisTrack::analyze(const audio::AudioFile& file, AnalyzerConfig config, BeatTrackerConfig /*beatConfig*/) {
     config.sampleRate = file.sampleRate();
     AnalysisTrack track;
     track.config_ = config;

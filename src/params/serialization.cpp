@@ -291,7 +291,8 @@ Result<ModRoute> routeFromJson(const json& j) {
     return route;
 }
 
-json saveProject(const ParameterSet& params, const Modulator& modulator) {
+json saveProject(const ParameterSet& params, const Modulator& modulator, const signals::SourceRack* /*sources*/,
+                 const PresetBank* /*presets*/) {
     json doc;
     doc["format"] = kProjectFormatName;
     doc["version"] = kProjectFormatVersion;
@@ -310,7 +311,8 @@ json saveProject(const ParameterSet& params, const Modulator& modulator) {
     return doc;
 }
 
-Result<void> loadProject(const json& doc, ParameterSet& params, Modulator& modulator) {
+Result<void> loadProject(const json& doc, ParameterSet& params, Modulator& modulator, signals::SourceRack* /*sources*/,
+                         PresetBank* /*presets*/) {
     if (!doc.is_object()) {
         return fail("project document must be a JSON object");
     }
@@ -372,20 +374,21 @@ Result<void> loadProject(const json& doc, ParameterSet& params, Modulator& modul
     return {};
 }
 
-Result<void> saveProjectFile(const std::filesystem::path& path, const ParameterSet& params,
-                             const Modulator& modulator) {
+Result<void> saveProjectFile(const std::filesystem::path& path, const ParameterSet& params, const Modulator& modulator,
+                             const signals::SourceRack* sources, const PresetBank* presets) {
     std::ofstream out(path);
     if (!out) {
         return fail("cannot open '{}' for writing", path.string());
     }
-    out << saveProject(params, modulator).dump(2) << '\n';
+    out << saveProject(params, modulator, sources, presets).dump(2) << '\n';
     if (!out) {
         return fail("failed while writing '{}'", path.string());
     }
     return {};
 }
 
-Result<void> loadProjectFile(const std::filesystem::path& path, ParameterSet& params, Modulator& modulator) {
+Result<void> loadProjectFile(const std::filesystem::path& path, ParameterSet& params, Modulator& modulator,
+                             signals::SourceRack* sources, PresetBank* presets) {
     std::ifstream in(path);
     if (!in) {
         return fail("cannot open '{}' for reading", path.string());
@@ -394,7 +397,7 @@ Result<void> loadProjectFile(const std::filesystem::path& path, ParameterSet& pa
     if (doc.is_discarded()) {
         return fail("'{}' is not valid JSON", path.string());
     }
-    if (auto loaded = loadProject(doc, params, modulator); !loaded) {
+    if (auto loaded = loadProject(doc, params, modulator, sources, presets); !loaded) {
         return fail("'{}': {}", path.string(), loaded.error().message);
     }
     return {};

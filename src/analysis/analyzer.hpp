@@ -55,6 +55,12 @@ struct AnalysisFrame {
     float flux = 0.0f;              // half-wave-rectified spectral flux, 0..~1
     float onsetStrength = 0.0f;     // flux relative to adaptive threshold (>=1 means over)
     bool onset = false;             // peak-picked onset event in this hop
+    // Beat tracking (filled by AnalysisRunner live / AnalysisTrack offline, not by Analyzer).
+    float tempoBpm = 0.0f;          // 0 while unknown
+    float tempoConfidence = 0.0f;   // 0..1
+    bool beat = false;              // a beat lands in this hop
+    float beatPhase = 0.0f;         // 0..1 since the last beat
+    std::uint32_t beatCount = 0;    // beats since the last reset
     std::vector<float> magnitude;   // binCount linear magnitudes, sine-normalised
     std::vector<float> spectrum;    // binCount log-compressed 0..1 for display
 };

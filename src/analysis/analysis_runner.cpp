@@ -8,10 +8,11 @@
 
 namespace avgen::analysis {
 
-AnalysisRunner::AnalysisRunner(AnalyzerConfig config, audio::AnalysisStream& stream)
+AnalysisRunner::AnalysisRunner(AnalyzerConfig config, audio::AnalysisStream& stream, BeatTrackerConfig beatConfig)
     : config_(std::move(config))
     , stream_(stream)
-    , analyzer_(config_) {
+    , analyzer_(config_),
+      beatTracker_(beatConfig, static_cast<float>(config.hopSize) / static_cast<float>(config.sampleRate)) {
     history_.reserve(kHistorySize);
 }
 
