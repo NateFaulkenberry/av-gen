@@ -25,6 +25,8 @@ std::string usageText() {
            "  --audio <file>      load an audio file at start-up\n"
            "  --scene <file>      load a glTF/GLB scene (default: built-in orb)\n"
            "  --env <file>        load an equirectangular .hdr environment map\n"
+           "  --project <file>    load a project (parameters, routes, sources, presets) at start-up\n"
+           "  --save-project <f>  write the project on exit\n"
            "  --play              start playback immediately\n"
            "  --frames <n>        exit after n frames\n"
            "  --stress <seed>     apply random slider-like actions every frame (seek, params, routes, volume)\n"
@@ -66,6 +68,16 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--env");
             if (!v) return std::unexpected(v.error());
             options.environment = *v;
+            ++i;
+        } else if (arg == "--project") {
+            auto v = need(i, "--project");
+            if (!v) return std::unexpected(v.error());
+            options.project = *v;
+            ++i;
+        } else if (arg == "--save-project") {
+            auto v = need(i, "--save-project");
+            if (!v) return std::unexpected(v.error());
+            options.saveProject = *v;
             ++i;
         } else if (arg == "--capture") {
             auto v = need(i, "--capture");
@@ -184,6 +196,20 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->onOpenScene = dialog(platform::Window::DialogKind::Scene);
         panel_->onOpenEnvironment = dialog(platform::Window::DialogKind::Environment);
         panel_->onOrbScene = [this] { engine_->loadOrbScene(); };
+        panel_->onOpenProject = dialog(platform::Window::DialogKind::Any);
+        panel_->onSaveProject = [this] {
+            window_->saveFileDialog([this](std::string path) {
+                if (path.empty()) {
+                    return;
+                }
+                if (auto r = engine_->saveProject(path); !r) {
+                    log::error("save project: {}", r.error().message);
+                    panel_->setStatus(r.error().message);
+                } else {
+                    panel_->setStatus("saved " + std::filesystem::path(path).filename().string());
+                }
+            });
+        };
     }
 
     if (options.scene) {
@@ -209,6 +235,15 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         loadAudio(*options.audio);
         if (!engine_->hasAudio() && options.headless) {
             return fail("headless run requires a loadable audio file");
+        }
+    }
+    if (options.project) {
+        if (auto r = engine_->loadProject(*options.project); !r) {
+            log::error("project: {}", r.error().message);
+            if (options.headless) {
+                return std::unexpected(r.error());
+            }
+            if (panel_) panel_->setStatus(r.error().message);
         }
     }
     if (options.autoplay && engine_->hasAudio()) {
@@ -305,14 +340,24 @@ void stressStep(Engine& engine, Rng& rng, std::uint64_t frame) {
             log::debug("stress play: {}", r.error().message);
         }
     } else if (roll < 0.96f) {
-        engine.seekSeconds(engine.positionSeconds() + (rng.nextFloat() - 0.5) * 10.0);
+        engine.seekSeconds(engine.positionSeconds() + (static_cast<double>(rng.nextFloat()) - 0.5) * 10.0);
     } else if (frame % 97 == 0) {
         engine.seekSeconds(engine.durationSeconds()); // jump to the very end
     }
 }
 } // namespace
 
-int Application::run() { return options_.headless ? runHeadless() : runLive(); }
+int Application::run() {
+    const int code = options_.headless ? runHeadless() : runLive();
+    if (options_.saveProject) {
+        if (auto r = engine_->saveProject(*options_.saveProject); !r) {
+            log::error("save project: {}", r.error().message);
+            return code == 0 ? 6 : code;
+        }
+        log::info("project saved to {}", options_.saveProject->string());
+    }
+    return code;
+}
 
 int Application::runLive() {
     RealtimeClock clock;

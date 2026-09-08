@@ -34,6 +34,8 @@ struct AppOptions {
     std::optional<std::filesystem::path> audio;
     std::optional<std::filesystem::path> scene;
     std::optional<std::filesystem::path> environment;
+    std::optional<std::filesystem::path> project;      // load at start-up
+    std::optional<std::filesystem::path> saveProject;  // write on exit
     bool autoplay = false;
     int frames = -1; // exit after this many frames (-1 = run until closed)
     std::uint64_t stressSeed = 0; // > 0: apply random UI-like actions every frame (crash reproduction)

@@ -55,6 +55,8 @@ public:
     // Opens a native file-open dialog asynchronously; `onChosen` runs on the main thread from
     // pollEvents() with the selected path (empty string on cancel).
     void openFileDialog(DialogKind kind, std::function<void(std::string)> onChosen);
+    // Native save dialog (JSON projects). Same delivery contract as openFileDialog.
+    void saveFileDialog(std::function<void(std::string)> onChosen);
 
 private:
     Window() = default;

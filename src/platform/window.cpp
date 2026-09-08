@@ -163,4 +163,14 @@ void Window::openFileDialog(DialogKind kind, std::function<void(std::string)> on
     SDL_ShowOpenFileDialog(dialogCallback, &dialogState(), window_, filters, 2, nullptr, false);
 }
 
+void Window::saveFileDialog(std::function<void(std::string)> onChosen) {
+    if (pendingDialog_) {
+        log::warn("a file dialog is already open");
+        return;
+    }
+    pendingDialog_ = std::move(onChosen);
+    static const SDL_DialogFileFilter filters[] = {{"avgen project", "json"}};
+    SDL_ShowSaveFileDialog(dialogCallback, &dialogState(), window_, filters, 1, nullptr);
+}
+
 } // namespace avgen::platform

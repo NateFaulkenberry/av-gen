@@ -33,6 +33,8 @@ public:
     std::function<void()> onOpenScene;
     std::function<void()> onOpenEnvironment;
     std::function<void()> onOrbScene;
+    std::function<void()> onOpenProject;
+    std::function<void()> onSaveProject;
 
     void draw(app::Engine& engine, const FrameStats& stats);
 
@@ -46,10 +48,23 @@ private:
     void drawParameters(app::Engine& engine);
     void drawAnalysis(app::Engine& engine);
     void drawPerformance(app::Engine& engine, const FrameStats& stats);
+    void drawModulation(app::Engine& engine);
+    void drawRoutesTab(app::Engine& engine);
+    void drawSourcesTab(app::Engine& engine);
+    void drawPresetsTab(app::Engine& engine);
 
     bool showDemo_ = false;
     bool showParameters_ = true;
     bool showAnalysis_ = true;
+    bool showModulation_ = true;
+    int newRouteSource_ = 0;
+    int newRouteTarget_ = 0;
+    int newSourceKind_ = 0;
+    char newSourceName_[64] = "wobble";
+    char presetName_[64] = "preset";
+    int morphA_ = 0;
+    int morphB_ = 0;
+    float morphT_ = 0.0f;
     std::string status_;
     std::vector<float> plotX_;
     std::vector<float> plotY_;

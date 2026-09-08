@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <vector>
 
 namespace avgen::ui {
 
@@ -50,11 +51,19 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
             if (ImGui::MenuItem("Built-in Orb Scene") && onOrbScene) {
                 onOrbScene();
             }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Open Project...") && onOpenProject) {
+                onOpenProject();
+            }
+            if (ImGui::MenuItem("Save Project As...") && onSaveProject) {
+                onSaveProject();
+            }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("View")) {
             ImGui::MenuItem("Parameters", nullptr, &showParameters_);
             ImGui::MenuItem("Analysis", nullptr, &showAnalysis_);
+            ImGui::MenuItem("Modulation", nullptr, &showModulation_);
             ImGui::MenuItem("ImGui Demo", nullptr, &showDemo_);
             ImGui::EndMenu();
         }
@@ -89,8 +98,238 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
         }
         ImGui::End();
     }
+    if (showModulation_) {
+        ImGui::SetNextWindowSize(ImVec2(560, 420), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(stats.width > 0 ? std::max(16.0f, stats.width / 2.0f + 20.0f) : 1000.0f, 40),
+                                ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Modulation", &showModulation_)) {
+            drawModulation(engine);
+        }
+        ImGui::End();
+    }
     if (showDemo_) {
         ImGui::ShowDemoWindow(&showDemo_);
+    }
+}
+
+void ControlPanel::drawModulation(app::Engine& engine) {
+    if (ImGui::BeginTabBar("modtabs")) {
+        if (ImGui::BeginTabItem("Routes")) {
+            drawRoutesTab(engine);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Sources")) {
+            drawSourcesTab(engine);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Presets")) {
+            drawPresetsTab(engine);
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
+    }
+}
+
+void ControlPanel::drawRoutesTab(app::Engine& engine) {
+    using namespace params;
+    auto& bus = engine.signals();
+    auto& paramSet = engine.params();
+    auto& modulator = engine.modulator();
+
+    // ---- add route ----
+    std::vector<const char*> signalNames;
+    signalNames.reserve(bus.size());
+    for (const auto& info : bus.infos()) {
+        signalNames.push_back(info.name.c_str());
+    }
+    std::vector<const char*> targetNames;
+    for (const auto* p : paramSet.ordered()) {
+        if (p->flags().modulatable) {
+            targetNames.push_back(p->path().c_str());
+        }
+    }
+    newRouteSource_ = std::clamp(newRouteSource_, 0, std::max(0, static_cast<int>(signalNames.size()) - 1));
+    newRouteTarget_ = std::clamp(newRouteTarget_, 0, std::max(0, static_cast<int>(targetNames.size()) - 1));
+    ImGui::SetNextItemWidth(200);
+    ImGui::Combo("##src", &newRouteSource_, signalNames.data(), static_cast<int>(signalNames.size()));
+    ImGui::SameLine();
+    ImGui::TextUnformatted("->");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(200);
+    ImGui::Combo("##dst", &newRouteTarget_, targetNames.data(), static_cast<int>(targetNames.size()));
+    ImGui::SameLine();
+    if (ImGui::Button("Add route") && !signalNames.empty() && !targetNames.empty()) {
+        ModRoute r;
+        r.source = signalNames[static_cast<std::size_t>(newRouteSource_)];
+        r.target = targetNames[static_cast<std::size_t>(newRouteTarget_)];
+        r.amount = 1.0f;
+        r.chain.attackMs = 20.0f;
+        r.chain.decayMs = 200.0f;
+        modulator.addRoute(r);
+        engine.rebind();
+    }
+    ImGui::Separator();
+
+    // ---- route list ----
+    static const char* ops[] = {"add", "multiply", "replace", "min", "max"};
+    static const char* curves[] = {"linear", "power", "log", "exp", "scurve"};
+    static const char* envelopes[] = {"none", "peak hold", "linear fall"};
+    int removeIndex = -1;
+    auto& routes = modulator.routes();
+    for (std::size_t i = 0; i < routes.size(); ++i) {
+        auto& route = routes[i];
+        ImGui::PushID(static_cast<int>(i));
+        const std::string header = route.source + " -> " + route.target;
+        const bool open = ImGui::TreeNodeEx(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60);
+        ImGui::Checkbox("##on", &route.enabled);
+        ImGui::SameLine();
+        if (ImGui::SmallButton("x")) {
+            removeIndex = static_cast<int>(i);
+        }
+        if (open) {
+            route.amount = sanitiseFinite(route.amount);
+            const auto [lo, hi] = routeAmountBounds(route);
+            ImGui::SliderFloat("amount", &route.amount, lo, hi);
+            ImGui::SameLine();
+            ImGui::TextDisabled("= %+.3f", static_cast<double>(route.lastOutput));
+            int op = static_cast<int>(route.op);
+            ImGui::SetNextItemWidth(110);
+            if (ImGui::Combo("op", &op, ops, 5)) {
+                route.op = static_cast<ModOp>(op);
+                engine.rebind();
+            }
+            ImGui::SameLine();
+            bool bipolar = route.polarity == Polarity::Bipolar;
+            if (ImGui::Checkbox("bipolar", &bipolar)) {
+                route.polarity = bipolar ? Polarity::Bipolar : Polarity::Unipolar;
+            }
+            ImGui::SetNextItemWidth(140);
+            ImGui::SliderFloat("attack ms", &route.chain.attackMs, 0.0f, 2000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(140);
+            ImGui::SliderFloat("decay ms", &route.chain.decayMs, 0.0f, 5000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
+            int curve = static_cast<int>(route.chain.curve);
+            ImGui::SetNextItemWidth(110);
+            if (ImGui::Combo("curve", &curve, curves, 5)) {
+                route.chain.curve = static_cast<CurveType>(curve);
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(100);
+            ImGui::SliderFloat("k", &route.chain.curveAmount, 0.1f, 5.0f);
+            int env = static_cast<int>(route.chain.envelope);
+            ImGui::SetNextItemWidth(110);
+            if (ImGui::Combo("envelope", &env, envelopes, 3)) {
+                route.chain.envelope = static_cast<EnvelopeMode>(env);
+            }
+            if (route.chain.envelope != EnvelopeMode::None) {
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(100);
+                ImGui::SliderFloat("fall/s", &route.chain.envelopeFallPerSecond, 0.1f, 20.0f);
+            }
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+    if (removeIndex >= 0) {
+        routes.erase(routes.begin() + removeIndex);
+        engine.rebind();
+    }
+}
+
+void ControlPanel::drawSourcesTab(app::Engine& engine) {
+    static const char* kinds[] = {"lfo", "envelope", "noise", "random", "timeline", "macro"};
+    ImGui::SetNextItemWidth(110);
+    ImGui::Combo("##kind", &newSourceKind_, kinds, 6);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(140);
+    ImGui::InputText("##name", newSourceName_, sizeof(newSourceName_));
+    ImGui::SameLine();
+    if (ImGui::Button("Add source")) {
+        engine.addSource(kinds[newSourceKind_], newSourceName_[0] ? newSourceName_ : "source");
+    }
+    ImGui::Separator();
+    auto& bus = engine.signals();
+    std::string removeKind;
+    std::string removeName;
+    for (const auto& source : engine.sources().sources()) {
+        ImGui::PushID(source.get());
+        const std::string header = source->kind() + " " + source->name();
+        const bool open = ImGui::TreeNodeEx(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 24);
+        if (ImGui::SmallButton("x")) {
+            removeKind = source->kind();
+            removeName = source->name();
+        }
+        if (open) {
+            for (const auto& out : source->outputs()) {
+                if (auto id = bus.find(out)) {
+                    ImGui::ProgressBar(std::clamp(bus.value(*id), 0.0f, 1.0f), ImVec2(160, 0), out.c_str());
+                }
+            }
+            if (source->kind() == "lfo") {
+                auto* lfo = dynamic_cast<signals::LfoSource*>(source.get());
+                int shape = static_cast<int>(lfo->shape());
+                static const char* shapes[] = {"sine", "triangle", "saw", "square", "sample&hold"};
+                ImGui::SetNextItemWidth(140);
+                if (ImGui::Combo("shape", &shape, shapes, 5)) {
+                    lfo->setShape(static_cast<signals::LfoShape>(shape));
+                }
+            }
+            ImGui::TextDisabled("settings: Parameters window, group 'sources'");
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+    if (!removeName.empty()) {
+        engine.removeSource(removeKind, removeName);
+    }
+}
+
+void ControlPanel::drawPresetsTab(app::Engine& engine) {
+    ImGui::SetNextItemWidth(200);
+    ImGui::InputText("##preset", presetName_, sizeof(presetName_));
+    ImGui::SameLine();
+    if (ImGui::Button("Store")) {
+        engine.storePreset(presetName_[0] ? presetName_ : "preset");
+    }
+    ImGui::Separator();
+    auto& bank = engine.presets();
+    std::string removeName;
+    std::vector<const char*> names;
+    for (const auto& preset : bank.presets()) {
+        names.push_back(preset.name.c_str());
+    }
+    for (const auto& preset : bank.presets()) {
+        ImGui::PushID(preset.name.c_str());
+        if (ImGui::Button("Recall") && !engine.recallPreset(preset.name)) {
+            status_ = "preset not found: " + preset.name;
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("x")) {
+            removeName = preset.name;
+        }
+        ImGui::SameLine();
+        ImGui::Text("%s (%zu values)", preset.name.c_str(), preset.values.size());
+        ImGui::PopID();
+    }
+    if (!removeName.empty()) {
+        bank.remove(removeName);
+    }
+    if (names.size() >= 2) {
+        ImGui::Separator();
+        ImGui::TextUnformatted("Morph");
+        morphA_ = std::clamp(morphA_, 0, static_cast<int>(names.size()) - 1);
+        morphB_ = std::clamp(morphB_, 0, static_cast<int>(names.size()) - 1);
+        ImGui::SetNextItemWidth(140);
+        ImGui::Combo("A", &morphA_, names.data(), static_cast<int>(names.size()));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(140);
+        ImGui::Combo("B", &morphB_, names.data(), static_cast<int>(names.size()));
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::SliderFloat("##morph", &morphT_, 0.0f, 1.0f, "A %.2f B")) {
+            engine.morphPresets(names[static_cast<std::size_t>(morphA_)], names[static_cast<std::size_t>(morphB_)], morphT_);
+        }
     }
 }
 

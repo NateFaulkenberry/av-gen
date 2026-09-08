@@ -14,11 +14,13 @@
 #include "core/time.hpp"
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
+#include "params/preset.hpp"
 #include "scene/gltf_scene.hpp"
 #include "scene/orb_scene.hpp"
 #include "scene/scene_controller.hpp"
 #include "signals/audio_signals.hpp"
 #include "signals/signal_bus.hpp"
+#include "signals/source.hpp"
 
 #include <filesystem>
 #include <memory>
@@ -55,8 +57,42 @@ public:
     // Loads an equirectangular HDR and installs it as the current scene's environment map.
     [[nodiscard]] Result<void> loadEnvironment(const std::filesystem::path& path);
     [[nodiscard]] const std::filesystem::path& environmentPath() const { return environmentPath_; }
-    // Routes any supported file by extension: audio, .gltf/.glb, .hdr.
+    // Routes any supported file by extension: audio, .gltf/.glb, .hdr, .json (project).
     [[nodiscard]] Result<void> loadFile(const std::filesystem::path& path);
+
+    // ---- project (parameters, routes, sources, presets) ----
+    [[nodiscard]] Result<void> saveProject(const std::filesystem::path& path) const;
+    [[nodiscard]] Result<void> loadProject(const std::filesystem::path& path);
+    [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
+
+    // ---- modulation sources and presets ----
+    [[nodiscard]] signals::SourceRack& sources() { return sources_; }
+    [[nodiscard]] params::PresetBank& presets() { return presets_; }
+    // Adds a source of the given kind with a unique name derived from `baseName`; attaches and
+    // re-binds. Returns the source.
+    signals::Source& addSource(const std::string& kind, const std::string& baseName);
+    void removeSource(const std::string& kind, const std::string& name);
+    // Rebinds routes after routes/sources/parameters changed (UI edits).
+    void rebind();
+    // Preset helpers: capture the current base values, apply one, or morph between two.
+    params::Preset& storePreset(const std::string& name);
+    [[nodiscard]] bool recallPreset(const std::string& name);
+    void morphPresets(const std::string& a, const std::string& b, float t);
+
+    // Built-in signals published every frame: time.seconds, time.progress, time.playing,
+    // beat.phase (per-frame extrapolated), beat.pulse (event), beat.count, beat.bpm, beat.bar.
+    struct TimeSignals {
+        signals::SignalId seconds = signals::kInvalidSignal;
+        signals::SignalId progress = signals::kInvalidSignal;
+        signals::SignalId playing = signals::kInvalidSignal;
+        signals::SignalId beatPhase = signals::kInvalidSignal;
+        signals::SignalId beatPulse = signals::kInvalidSignal;
+        signals::SignalId beatCount = signals::kInvalidSignal;
+        signals::SignalId bpm = signals::kInvalidSignal;
+        signals::SignalId barPhase = signals::kInvalidSignal;
+    };
+    [[nodiscard]] const TimeSignals& timeSignals() const { return timeSignals_; }
+    [[nodiscard]] const signals::SourceContext& sourceContext() const { return sourceContext_; }
     [[nodiscard]] bool hasAudio() const { return audioFile_ != nullptr; }
     [[nodiscard]] const std::filesystem::path& audioPath() const { return audioPath_; }
     [[nodiscard]] std::shared_ptr<const audio::AudioFile> audioFile() const { return audioFile_; }
@@ -104,14 +140,24 @@ private:
     void publishFrame(const analysis::AnalysisFrame& frame);
     void installController(std::unique_ptr<scene::SceneController> controller);
     Result<void> reapplyEnvironment();
+    void updateTimeSignals(const FrameTime& time, bool newAnalysisFrame);
 
     EngineMode mode_;
     params::ParameterSet params_;
     signals::SignalBus bus_;
     signals::AudioSignals audioSignals_;
     params::Modulator modulator_;
+    signals::SourceRack sources_;
+    params::PresetBank presets_;
+    TimeSignals timeSignals_;
+    signals::SourceContext sourceContext_;
     std::unique_ptr<scene::SceneController> controller_;
     std::filesystem::path environmentPath_;
+    std::filesystem::path projectPath_;
+    // Beat clock extrapolated per render frame from the analysis tempo (ADR-012).
+    double beatClockPhase_ = 0.0;
+    std::uint32_t beatClockCount_ = 0;
+    std::uint32_t lastAnalysisBeatCount_ = 0;
 
     std::shared_ptr<const audio::AudioFile> audioFile_;
     std::filesystem::path audioPath_;
