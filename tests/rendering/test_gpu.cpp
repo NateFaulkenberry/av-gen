@@ -1,0 +1,210 @@
+// GPU tests: require a WebGPU adapter. Skipped (not failed) when none is available.
+#include "core/log.hpp"
+#include "gpu/context.hpp"
+#include "gpu/readback.hpp"
+#include "gpu/render_target.hpp"
+#include "gpu/shader_library.hpp"
+#include "rendering/scene_renderer.hpp"
+#include "scene/scene.hpp"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <cmath>
+#include <cstdlib>
+#include <filesystem>
+#include <memory>
+
+using namespace avgen;
+
+namespace {
+
+std::unique_ptr<gpu::Context> makeContext() {
+    static bool logInit = false;
+    if (!logInit) {
+        log::init(log::Level::Warn);
+        logInit = true;
+    }
+    gpu::ContextDesc desc{};
+    desc.metalLayer = nullptr;
+    auto ctx = gpu::Context::create(desc);
+    if (!ctx) {
+        SKIP("no GPU adapter available: " << ctx.error().message);
+    }
+    return std::move(*ctx);
+}
+
+gpu::ShaderLibrary makeShaders(gpu::Context& ctx) {
+    return gpu::ShaderLibrary(ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+}
+
+// A unit cube built inline so this test does not depend on the scene generators.
+scene::MeshData cubeMesh(float h) {
+    scene::MeshData m;
+    const glm::vec3 n[6] = {{0, 0, 1}, {0, 0, -1}, {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}};
+    for (int f = 0; f < 6; ++f) {
+        const glm::vec3 normal = n[f];
+        const glm::vec3 u = std::abs(normal.y) > 0.5f ? glm::vec3(1, 0, 0) : glm::cross(glm::vec3(0, 1, 0), normal);
+        const glm::vec3 v = glm::cross(normal, u);
+        const auto base = static_cast<std::uint32_t>(m.vertices.size());
+        m.vertices.push_back({normal * h - u * h - v * h, normal, {0, 0}});
+        m.vertices.push_back({normal * h + u * h - v * h, normal, {1, 0}});
+        m.vertices.push_back({normal * h + u * h + v * h, normal, {1, 1}});
+        m.vertices.push_back({normal * h - u * h + v * h, normal, {0, 1}});
+        m.indices.insert(m.indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
+    }
+    return m;
+}
+
+scene::Scene cubeScene() {
+    scene::Scene s;
+    const auto mesh = s.addMesh(cubeMesh(1.0f));
+    auto& e = s.addEntity("cube", mesh);
+    e.transform.position = {0.0f, 1.0f, 0.0f};
+    e.material.baseColor = {0.9f, 0.3f, 0.2f};
+    e.material.emissiveIntensity = 0.5f;
+    s.camera.position = {0.0f, 1.5f, 5.0f};
+    s.camera.target = {0.0f, 1.0f, 0.0f};
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("Headless context reports capabilities", "[gpu]") {
+    auto ctx = makeContext();
+    CHECK_FALSE(ctx->capabilities().adapterName.empty());
+    CHECK_FALSE(ctx->capabilities().backendName.empty());
+    CHECK(ctx->capabilities().limits.maxColorAttachments >= 4);
+    CHECK_FALSE(ctx->hasSurface());
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Shader compilation reports errors with diagnostics and succeeds on valid WGSL", "[gpu][shader]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto bad = shaders.compile("@vertex fn vs() -> @builtin(position) vec4<f32> { return oops; }", "bad.wgsl");
+    REQUIRE_FALSE(bad.has_value());
+    CHECK(bad.error().message.find("bad.wgsl") != std::string::npos);
+    CHECK(bad.error().message.find("oops") != std::string::npos);
+    ctx->clearErrors();
+
+    auto good = shaders.compile("@vertex fn vs() -> @builtin(position) vec4<f32> { return vec4<f32>(0.0); }",
+                                "good.wgsl");
+    REQUIRE(good.has_value());
+    CHECK(ctx->errorCount() == 0);
+
+    auto missing = shaders.load("does_not_exist.wgsl");
+    REQUIRE_FALSE(missing.has_value());
+    CHECK(missing.error().message.find("not found") != std::string::npos);
+
+    for (const char* name : {"common.wgsl", "mesh.wgsl", "grid.wgsl", "tonemap.wgsl"}) {
+        auto src = shaders.loadSource(name);
+        REQUIRE(src.has_value());
+    }
+    auto mesh = shaders.load("mesh.wgsl");
+    REQUIRE(mesh.has_value());
+}
+
+TEST_CASE("Clearing a texture and reading it back yields the clear colour", "[gpu][readback]") {
+    auto ctx = makeContext();
+    gpu::RenderTargetDesc desc{};
+    desc.width = 8;
+    desc.height = 8;
+    desc.colorFormat = wgpu::TextureFormat::RGBA8Unorm;
+    desc.depthFormat = wgpu::TextureFormat::Undefined;
+    desc.extraColorUsage = wgpu::TextureUsage::CopySrc;
+    auto target = gpu::RenderTarget::create(*ctx, desc);
+    REQUIRE(target.has_value());
+
+    wgpu::RenderPassColorAttachment color{};
+    color.view = target->colorView();
+    color.loadOp = wgpu::LoadOp::Clear;
+    color.storeOp = wgpu::StoreOp::Store;
+    color.clearValue = {0.25, 0.5, 0.75, 1.0};
+    wgpu::RenderPassDescriptor pass{};
+    pass.colorAttachmentCount = 1;
+    pass.colorAttachments = &color;
+    wgpu::CommandEncoder encoder = ctx->device().CreateCommandEncoder();
+    encoder.BeginRenderPass(&pass).End();
+    wgpu::CommandBuffer commands = encoder.Finish();
+    ctx->queue().Submit(1, &commands);
+
+    auto image = gpu::readTexture8(*ctx, target->colorTexture(), 8, 8, false);
+    REQUIRE(image.has_value());
+    const auto* px = image->pixel(3, 5);
+    CHECK(std::abs(int(px[0]) - 64) <= 1);
+    CHECK(std::abs(int(px[1]) - 128) <= 1);
+    CHECK(std::abs(int(px[2]) - 191) <= 1);
+    CHECK(px[3] == 255);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("SceneRenderer renders a lit cube deterministically", "[gpu][renderer]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    auto scene = cubeScene();
+    FrameTime time{};
+    auto image = renderer.renderToImage(scene, time, 96, 64);
+    REQUIRE(image.has_value());
+    CHECK(ctx->errorCount() == 0);
+    CHECK(image->width == 96);
+    CHECK(image->height == 64);
+
+    // The cube covers the centre; the corner shows the (very dark) background.
+    const auto* centre = image->pixel(48, 32);
+    const auto* corner = image->pixel(1, 1);
+    const int centreSum = centre[0] + centre[1] + centre[2];
+    const int cornerSum = corner[0] + corner[1] + corner[2];
+    // Background 0.012 linear encodes to ~19/255 in sRGB, so the corner is dark but not black.
+    CHECK(centreSum > cornerSum + 60);
+    CHECK(cornerSum < 90);
+    CHECK(centre[0] > centre[2]); // reddish material
+    if (const char* dumpDir = std::getenv("AVGEN_DUMP_DIR")) {
+        REQUIRE(gpu::writePpm(*image, std::filesystem::path(dumpDir) / "cube.ppm").has_value());
+    }
+
+    auto again = renderer.renderToImage(scene, time, 96, 64);
+    REQUIRE(again.has_value());
+    CHECK(gpu::hashImage(*image) == gpu::hashImage(*again));
+
+    // Changing the scene changes the image.
+    scene.entities[0].material.baseColor = {0.1f, 0.2f, 0.9f};
+    auto changed = renderer.renderToImage(scene, time, 96, 64);
+    REQUIRE(changed.has_value());
+    CHECK(gpu::hashImage(*image) != gpu::hashImage(*changed));
+
+    CHECK(renderer.stats().drawCalls == 2);
+    CHECK(renderer.stats().triangles == 13);
+    CHECK(renderer.stats().entities == 1);
+    if (ctx->capabilities().timestampQuery) {
+        CHECK(renderer.stats().gpuFrameMs >= 0.0);
+    }
+}
+
+TEST_CASE("SceneRenderer survives resizes and invalid meshes", "[gpu][renderer]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    auto scene = cubeScene();
+    scene.entities.push_back(scene::Entity{.name = "broken", .mesh = 42});
+    scene::MeshData bad;
+    bad.vertices.push_back({{0, 0, 0}, {0, 1, 0}, {0, 0}});
+    bad.indices = {0, 1, 2}; // out-of-range indices
+    const auto badMesh = scene.addMesh(std::move(bad));
+    scene.addEntity("invalid-mesh", badMesh);
+
+    FrameTime time{};
+    for (auto [w, h] : {std::pair{32u, 32u}, std::pair{128u, 16u}, std::pair{7u, 9u}}) {
+        auto image = renderer.renderToImage(scene, time, w, h);
+        REQUIRE(image.has_value());
+        CHECK(image->width == w);
+        CHECK(image->height == h);
+        CHECK(renderer.stats().entities == 1);
+    }
+    CHECK(ctx->errorCount() == 0);
+    CHECK_FALSE(renderer.resize(0, 10).has_value());
+}
