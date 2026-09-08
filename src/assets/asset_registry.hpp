@@ -56,6 +56,8 @@ public:
     [[nodiscard]] std::vector<std::filesystem::path> loadedPaths() const;
 
 private:
+    [[nodiscard]] std::filesystem::path absoluteBase() const; // base (or cwd), absolute and canonical
+
     std::filesystem::path base_;
     std::map<std::string, std::shared_ptr<const SceneAsset>> scenes_;
     std::map<std::string, std::shared_ptr<const ImageAsset>> images_; // key: path + "|srgb"

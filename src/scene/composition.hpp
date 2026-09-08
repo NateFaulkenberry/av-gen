@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -106,15 +107,37 @@ public:
 
 private:
     void rebuild();          // flattens nodes into scene_ (meshes/textures/entities/particles)
+    void ensureBuilt();      // rebuild() when dirty
     void applyParameters();  // node finals -> transforms/materials/particles; camera; environment
     void registerNodeParameters(CompositionNode& node);
     void unregisterNodeParameters(CompositionNode& node);
+    void unregisterParameters(); // removes every parameter this composition registered, then detach()
     std::string uniqueName(const std::string& base) const;
+    [[nodiscard]] Transform nodeTransform(const CompositionNode& node) const; // params or authored values
+    [[nodiscard]] static bool nodeVisible(const CompositionNode& node);
+    [[nodiscard]] float fitDistance() const;
+    // Loads a nested scene file for a Scene node (cycle and depth checks against this chain).
+    [[nodiscard]] Result<std::unique_ptr<Composition>> loadChild(const std::filesystem::path& asset) const;
+    static Result<std::unique_ptr<Composition>> fromJsonImpl(const nlohmann::json& j,
+                                                             assets::AssetRegistry& registry, int depth,
+                                                             std::vector<std::filesystem::path> ancestors,
+                                                             std::filesystem::path sourcePath);
+    static Result<std::unique_ptr<Composition>> loadNested(const std::filesystem::path& path,
+                                                           assets::AssetRegistry& registry, int depth,
+                                                           std::vector<std::filesystem::path> ancestors);
 
     assets::AssetRegistry& registry_;
     std::string name_;
     std::filesystem::path sourcePath_;
+    std::vector<std::filesystem::path> ancestors_; // enclosing scene files, outermost first
+    int depth_ = 0;
     std::filesystem::path environmentPath_;
+    // Authored camera/environment settings (used when unattached and as parameter defaults).
+    std::optional<float> cameraDistanceSetting_; // empty = fitted to the bounds
+    std::optional<float> cameraHeightSetting_;
+    float cameraOrbitSpeedSetting_ = 0.12f;
+    float cameraFovSetting_ = 50.0f;
+    float envIntensitySetting_ = 1.0f;
     Scene scene_;
     std::vector<std::unique_ptr<CompositionNode>> nodes_;
     bool dirty_ = true;
@@ -129,7 +152,12 @@ private:
         std::vector<Transform> restTransforms;       // entity transforms inside the asset
         std::vector<float> restEmissive;
         std::vector<float> restRoughness;
-        int particleIndex = -1;                      // index into scene_.particles
+        int particleIndex = -1;                      // index into scene_.particles (Particles kind)
+        std::size_t firstParticle = 0;               // particle range (Particles and Scene kinds)
+        std::size_t particleCount = 0;
+        std::uint64_t childMeshVersion = 0;          // Scene kind: what was flattened
+        std::size_t childEntityCount = 0;
+        std::size_t childParticleCount = 0;
     };
     std::vector<NodeRange> ranges_;
 
