@@ -18,6 +18,7 @@
 #include "scene/gltf_scene.hpp"
 #include "scene/orb_scene.hpp"
 #include "scene/scene_controller.hpp"
+#include "shaders/shader_layers.hpp"
 #include "signals/audio_signals.hpp"
 #include "signals/signal_bus.hpp"
 #include "signals/source.hpp"
@@ -64,6 +65,12 @@ public:
     [[nodiscard]] Result<void> saveProject(const std::filesystem::path& path) const;
     [[nodiscard]] Result<void> loadProject(const std::filesystem::path& path);
     [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
+
+    // ---- user shader layers ----
+    [[nodiscard]] shaders::ShaderLayerSet& shaderLayers() { return shaderLayers_; }
+    [[nodiscard]] const shaders::ShaderLayerSet& shaderLayers() const { return shaderLayers_; }
+    [[nodiscard]] Result<std::uint32_t> addShaderLayer(const std::filesystem::path& path, shaders::LayerStage stage);
+    void removeShaderLayer(std::uint32_t id);
 
     // ---- modulation sources and presets ----
     [[nodiscard]] signals::SourceRack& sources() { return sources_; }
@@ -149,6 +156,7 @@ private:
     params::Modulator modulator_;
     signals::SourceRack sources_;
     params::PresetBank presets_;
+    shaders::ShaderLayerSet shaderLayers_;
     TimeSignals timeSignals_;
     signals::SourceContext sourceContext_;
     std::unique_ptr<scene::SceneController> controller_;

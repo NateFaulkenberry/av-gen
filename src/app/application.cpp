@@ -1,6 +1,7 @@
 #include "app/application.hpp"
 
 #include "assets/image.hpp"
+#include "rendering/shader_layer.hpp"
 #include "core/rng.hpp"
 #include "core/time.hpp"
 #include "gpu/context.hpp"
@@ -25,7 +26,9 @@ std::string usageText() {
            "  --audio <file>      load an audio file at start-up\n"
            "  --scene <file>      load a glTF/GLB scene (default: built-in orb)\n"
            "  --env <file>        load an equirectangular .hdr environment map\n"
-           "  --project <file>    load a project (parameters, routes, sources, presets) at start-up\n"
+           "  --shader <file>     add a user shader layer behind the scene (repeatable)\n"
+           "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
+           "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
            "  --save-project <f>  write the project on exit\n"
            "  --play              start playback immediately\n"
            "  --frames <n>        exit after n frames\n"
@@ -68,6 +71,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--env");
             if (!v) return std::unexpected(v.error());
             options.environment = *v;
+            ++i;
+        } else if (arg == "--shader" || arg == "--post") {
+            auto v = need(i, arg.c_str());
+            if (!v) return std::unexpected(v.error());
+            options.shaders.emplace_back(*v, arg == "--post");
             ++i;
         } else if (arg == "--project") {
             auto v = need(i, "--project");
@@ -197,6 +205,19 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->onOpenEnvironment = dialog(platform::Window::DialogKind::Environment);
         panel_->onOrbScene = [this] { engine_->loadOrbScene(); };
         panel_->onOpenProject = dialog(platform::Window::DialogKind::Any);
+        panel_->onOpenShader = dialog(platform::Window::DialogKind::Shader);
+        panel_->onOpenPostShader = [this] {
+            window_->openFileDialog(platform::Window::DialogKind::Shader, [this](std::string path) {
+                if (path.empty()) {
+                    return;
+                }
+                if (auto id = engine_->addShaderLayer(path, shaders::LayerStage::Post); !id) {
+                    log::error("shader: {}", id.error().message);
+                    panel_->setStatus(id.error().message);
+                }
+            });
+        };
+        panel_->shaderErrorFor = [this](std::uint32_t id) { return renderer_->shaderStack().errorFor(id); };
         panel_->onSaveProject = [this] {
             window_->saveFileDialog([this](std::string path) {
                 if (path.empty()) {
@@ -235,6 +256,22 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         loadAudio(*options.audio);
         if (!engine_->hasAudio() && options.headless) {
             return fail("headless run requires a loadable audio file");
+        }
+    }
+    for (const auto& [file, isPost] : options.shaders) {
+        auto id = engine_->addShaderLayer(file, isPost ? shaders::LayerStage::Post : shaders::LayerStage::Background);
+        if (!id) {
+            log::error("shader: {}", id.error().message);
+            if (options.headless) {
+                return std::unexpected(id.error());
+            }
+            if (panel_) panel_->setStatus(id.error().message);
+        }
+    }
+    // Hot reload of the engine's own shaders.
+    for (const char* name : {"common.wgsl", "pbr.wgsl", "grid.wgsl", "skybox.wgsl", "tonemap.wgsl"}) {
+        if (auto located = shaders_->locate(name)) {
+            engineShaderWatcher_.watch(*located);
         }
     }
     if (options.project) {
@@ -300,7 +337,9 @@ Result<void> writeCapture(const gpu::Image8& image, const std::filesystem::path&
 Result<void> Application::captureFrame(const FrameTime& time, const std::filesystem::path& path) {
     const std::uint32_t w = window_ ? window_->pixelWidth() : 1280;
     const std::uint32_t h = window_ ? window_->pixelHeight() : 720;
-    auto image = renderer_->renderToImage(engine_->scene(), time, w, h);
+    const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
+                                                    engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+    auto image = renderer_->renderToImage(engine_->scene(), time, w, h, &shaderInputs);
     if (!image) {
         return std::unexpected(image.error());
     }
@@ -413,6 +452,13 @@ int Application::runLive() {
                 stressStep(*engine_, stressRng, static_cast<std::uint64_t>(framesRendered));
             }
         }
+        if (!engineShaderWatcher_.poll().empty()) {
+            if (auto r = renderer_->reloadEngineShaders(); !r) {
+                panel_->setStatus(r.error().message);
+            } else {
+                panel_->setStatus("engine shaders reloaded");
+            }
+        }
         const FrameTime time = engine_->tick(clock);
         lastTime = time;
         engine_->update(time);
@@ -437,7 +483,9 @@ int Application::runLive() {
         }
         gpu::TargetView target{*view, context_->surfaceFormat(), window_->pixelWidth(), window_->pixelHeight()};
         wgpu::CommandEncoder encoder = context_->device().CreateCommandEncoder();
-        if (auto r = renderer_->render(encoder, engine_->scene(), time, target); !r) {
+        const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
+                                                        engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+        if (auto r = renderer_->render(encoder, engine_->scene(), time, target, &shaderInputs); !r) {
             log::error("render: {}", r.error().message);
             return 2;
         }
@@ -502,7 +550,9 @@ int Application::runHeadless() {
     for (int i = 0; i < frames; ++i) {
         time = engine_->tick(clock);
         engine_->update(time);
-        auto image = renderer_->renderToImage(engine_->scene(), time, w, h);
+        const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
+                                                        engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+        auto image = renderer_->renderToImage(engine_->scene(), time, w, h, &shaderInputs);
         if (!image) {
             log::error("render: {}", image.error().message);
             return 2;

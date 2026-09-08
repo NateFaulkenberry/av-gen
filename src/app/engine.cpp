@@ -4,13 +4,17 @@
 #include "core/log.hpp"
 #include "params/serialization.hpp"
 
+#include <nlohmann/json.hpp>
+
+#include <fstream>
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
 
 namespace avgen::app {
 
-Engine::Engine(EngineMode mode) : mode_(mode) {
+Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     audioSignals_ = signals::AudioSignals::declare(bus_);
     timeSignals_.seconds = bus_.declare("time.seconds", 0.0f, 3600.0f);
     timeSignals_.progress = bus_.declare("time.progress");
@@ -29,8 +33,9 @@ Engine::Engine(EngineMode mode) : mode_(mode) {
 
 void Engine::installController(std::unique_ptr<scene::SceneController> controller) {
     controller_ = std::move(controller);
-    // Scene swaps clear the parameter set, so sources must re-register their parameters.
+    // Scene swaps clear the parameter set, so sources and shader layers must re-register.
     sources_.attach(bus_, params_);
+    shaderLayers_.reattach();
     rebind();
     modulator_.resetState();
 }
@@ -84,18 +89,54 @@ void Engine::morphPresets(const std::string& a, const std::string& b, float t) {
     params::applyPresetBlend(params_, *pa, *pb, t);
 }
 
+Result<std::uint32_t> Engine::addShaderLayer(const std::filesystem::path& path, shaders::LayerStage stage) {
+    auto id = shaderLayers_.add(path, stage);
+    if (id) {
+        rebind();
+    }
+    return id;
+}
+
+void Engine::removeShaderLayer(std::uint32_t id) {
+    if (shaderLayers_.remove(id)) {
+        rebind();
+    }
+}
+
 Result<void> Engine::saveProject(const std::filesystem::path& path) const {
-    return params::saveProjectFile(path, params_, modulator_, &sources_, &presets_);
+    nlohmann::json doc = params::saveProject(params_, modulator_, &sources_, &presets_);
+    doc["shaders"] = shaderLayers_.toJson();
+    std::ofstream out(path);
+    if (!out) {
+        return fail("cannot write '{}'", path.string());
+    }
+    out << doc.dump(2) << '\n';
+    return {};
 }
 
 Result<void> Engine::loadProject(const std::filesystem::path& path) {
-    if (auto r = params::loadProjectFile(path, params_, modulator_, &sources_, &presets_); !r) {
+    std::ifstream in(path);
+    if (!in) {
+        return fail("cannot open '{}'", path.string());
+    }
+    nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
+    if (doc.is_discarded()) {
+        return fail("'{}' is not valid JSON", path.string());
+    }
+    if (auto r = params::loadProject(doc, params_, modulator_, &sources_, &presets_); !r) {
         return r;
     }
     sources_.attach(bus_, params_);
-    // Parameter values for sources arrive in the same document; apply them again now that the
-    // sources' parameters exist (unknown-at-first-pass paths were skipped).
-    if (auto r = params::loadProjectFile(path, params_, modulator_, nullptr, nullptr); !r) {
+    if (doc.contains("shaders")) {
+        if (auto r = shaderLayers_.fromJson(doc["shaders"]); !r) {
+            return r;
+        }
+    } else {
+        shaderLayers_.clear();
+    }
+    // Parameter values for sources and shader inputs arrive in the same document; apply them
+    // again now that those parameters exist (unknown-at-first-pass paths were skipped).
+    if (auto r = params::loadProject(doc, params_, modulator_, nullptr, nullptr); !r) {
         return r;
     }
     rebind();
@@ -172,6 +213,13 @@ Result<void> Engine::loadFile(const std::filesystem::path& path) {
     }
     if (ext == ".json") {
         return loadProject(path);
+    }
+    if (ext == ".wgsl" || ext == ".isf") {
+        auto id = addShaderLayer(path, shaders::LayerStage::Background);
+        if (!id) {
+            return std::unexpected(id.error());
+        }
+        return {};
     }
     auto duration = loadAudio(path);
     if (!duration) {
@@ -383,6 +431,23 @@ void Engine::update(const FrameTime& time) {
     sources_.update(bus_, sourceContext_);
     modulator_.evaluate(bus_, params_, time.deltaTime);
     controller_->update(time);
+    {
+        shaders::StdUniforms base;
+        const auto& f = latest_;
+        base.audio[0] = hasFrame_ ? f.rms : 0.0f;
+        base.audio[1] = hasFrame_ ? f.bands[0] : 0.0f;
+        base.audio[2] = hasFrame_ ? f.bands[2] : 0.0f;
+        base.audio[3] = hasFrame_ ? f.bands[4] : 0.0f;
+        base.audio2[0] = hasFrame_ ? f.bands[1] : 0.0f;
+        base.audio2[1] = hasFrame_ ? f.bands[3] : 0.0f;
+        base.audio2[2] = hasFrame_ ? std::min(1.0f, f.onsetStrength / 2.0f) : 0.0f;
+        base.audio2[3] = static_cast<float>(beatClockPhase_);
+        base.beat[0] = sourceContext_.tempoBpm;
+        base.beat[1] = static_cast<float>(beatClockCount_);
+        base.beat[2] = bus_.value(timeSignals_.barPhase);
+        base.beat[3] = bus_.value(timeSignals_.progress);
+        shaderLayers_.update(time, base);
+    }
     bus_.clearEvents();
 
     const auto end = std::chrono::steady_clock::now();

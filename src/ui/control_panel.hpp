@@ -34,6 +34,10 @@ public:
     std::function<void()> onOpenEnvironment;
     std::function<void()> onOrbScene;
     std::function<void()> onOpenProject;
+    std::function<void()> onOpenShader;
+    std::function<void()> onOpenPostShader;
+    // Compile error lookup for a shader layer id (from the GPU side); may be empty.
+    std::function<std::string(std::uint32_t)> shaderErrorFor;
     std::function<void()> onSaveProject;
 
     void draw(app::Engine& engine, const FrameStats& stats);
@@ -52,6 +56,7 @@ private:
     void drawRoutesTab(app::Engine& engine);
     void drawSourcesTab(app::Engine& engine);
     void drawPresetsTab(app::Engine& engine);
+    void drawShadersTab(app::Engine& engine);
 
     bool showDemo_ = false;
     bool showParameters_ = true;

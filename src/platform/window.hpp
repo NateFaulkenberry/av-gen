@@ -51,7 +51,7 @@ public:
 
     void setTitle(const std::string& title);
 
-    enum class DialogKind { Audio, Scene, Environment, Any };
+    enum class DialogKind { Audio, Scene, Environment, Shader, Any };
     // Opens a native file-open dialog asynchronously; `onChosen` runs on the main thread from
     // pollEvents() with the selected path (empty string on cancel).
     void openFileDialog(DialogKind kind, std::function<void(std::string)> onChosen);

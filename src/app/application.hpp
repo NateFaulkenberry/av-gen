@@ -5,6 +5,7 @@
 
 #include "app/engine.hpp"
 #include "core/error.hpp"
+#include "core/file_watcher.hpp"
 #include "core/log.hpp"
 
 #include <cstdint>
@@ -12,6 +13,8 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace avgen::gpu {
 class Context;
@@ -34,6 +37,7 @@ struct AppOptions {
     std::optional<std::filesystem::path> audio;
     std::optional<std::filesystem::path> scene;
     std::optional<std::filesystem::path> environment;
+    std::vector<std::pair<std::filesystem::path, bool>> shaders; // (file, isPost)
     std::optional<std::filesystem::path> project;      // load at start-up
     std::optional<std::filesystem::path> saveProject;  // write on exit
     bool autoplay = false;
@@ -73,6 +77,7 @@ private:
     std::unique_ptr<ui::ImGuiLayer> imgui_;
     std::unique_ptr<ui::ControlPanel> panel_;
     std::unique_ptr<Engine> engine_;
+    FileWatcher engineShaderWatcher_{0.5};
 };
 
 } // namespace avgen::app

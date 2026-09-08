@@ -11,7 +11,11 @@
 #include "gpu/readback.hpp"
 #include "gpu/render_target.hpp"
 #include "gpu/texture.hpp"
+#include "rendering/shader_layer.hpp"
 #include "scene/scene.hpp"
+#include "shaders/shader_layers.hpp"
+
+#include "analysis/analyzer.hpp"
 
 #include <glm/glm.hpp>
 #include <webgpu/webgpu_cpp.h>
@@ -29,6 +33,12 @@ class ShaderLibrary;
 namespace avgen::rendering {
 
 class EnvironmentProcessor;
+
+// Optional per-frame inputs for user shader layers.
+struct ShaderFrameInputs {
+    const shaders::ShaderLayerSet* layers = nullptr;
+    const analysis::AnalysisFrame* frame = nullptr; // for the audio spectrum texture (may be null)
+};
 
 struct RenderStats {
     double gpuFrameMs = -1.0; // -1 when timestamp queries are unavailable
@@ -100,11 +110,19 @@ public:
 
     // Encodes the scene and tonemap passes. `target` must match the size passed to resize().
     [[nodiscard]] Result<void> render(wgpu::CommandEncoder& encoder, const scene::Scene& scene,
-                                      const FrameTime& time, const gpu::TargetView& target);
+                                      const FrameTime& time, const gpu::TargetView& target,
+                                      const ShaderFrameInputs* shaderInputs = nullptr);
 
     // Full frame into a fresh RGBA8 texture, submitted and read back. For tests and offline use.
     [[nodiscard]] Result<gpu::Image8> renderToImage(const scene::Scene& scene, const FrameTime& time,
-                                                    std::uint32_t width, std::uint32_t height);
+                                                    std::uint32_t width, std::uint32_t height,
+                                                    const ShaderFrameInputs* shaderInputs = nullptr);
+
+    // Hot reload of the engine's own WGSL files: rebuilds every pipeline whose shader compiles,
+    // keeps the previous pipeline for any that fails, and returns the first error.
+    [[nodiscard]] Result<void> reloadEngineShaders();
+    [[nodiscard]] std::uint32_t engineShaderReloads() const { return engineReloads_; }
+    [[nodiscard]] ShaderStack& shaderStack() { return *shaderStack_; }
 
     // Installs image-based lighting (normally driven automatically from scene.environment).
     void setIbl(const IblResources& ibl);
@@ -138,6 +156,9 @@ private:
     void uploadMeshes(const scene::Scene& scene);
     void uploadTextures(const scene::Scene& scene);
     void updateEnvironment(const scene::Scene& scene);
+    void updateSpectrum(const analysis::AnalysisFrame* frame);
+    Result<void> ensurePostTargets(std::uint32_t width, std::uint32_t height);
+    wgpu::BindGroup tonemapBindGroupFor(const wgpu::TextureView& view);
     void ensureTonemapBindGroup();
     void rebuildIblBindGroup();
     const wgpu::BindGroup& materialBindGroup(const scene::Material& material);
@@ -148,6 +169,12 @@ private:
     std::unique_ptr<gpu::GpuTimer> timer_;
     std::unique_ptr<gpu::SamplerCache> samplers_;
     std::unique_ptr<EnvironmentProcessor> environment_;
+    std::unique_ptr<ShaderStack> shaderStack_;
+    gpu::RenderTarget post_[2];      // ping-pong HDR colour targets for post layers
+    gpu::GpuTexture spectrum_;       // binCount x 1 RGBA16F audio spectrum for user shaders
+    std::size_t spectrumBins_ = 0;
+    std::vector<std::uint16_t> spectrumStaging_;
+    std::uint32_t engineReloads_ = 0;
     scene::TextureId environmentTexture_ = scene::kInvalidTexture;
     std::uint64_t environmentVersion_ = ~0ull;
     bool initialised_ = false;
@@ -176,6 +203,7 @@ private:
     wgpu::BindGroup tonemapBindGroup_;
     wgpu::BindGroup iblBindGroup_;
     wgpu::TextureView tonemapBoundView_;
+    std::unordered_map<WGPUTextureView, wgpu::BindGroup> tonemapGroups_;
 
     // Defaults for absent textures and IBL.
     gpu::GpuTexture whiteSrgb_;

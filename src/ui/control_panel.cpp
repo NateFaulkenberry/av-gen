@@ -48,6 +48,12 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
             if (ImGui::MenuItem("Open Environment (HDR)...", "E") && onOpenEnvironment) {
                 onOpenEnvironment();
             }
+            if (ImGui::MenuItem("Add Background Shader...") && onOpenShader) {
+                onOpenShader();
+            }
+            if (ImGui::MenuItem("Add Post Shader...") && onOpenPostShader) {
+                onOpenPostShader();
+            }
             if (ImGui::MenuItem("Built-in Orb Scene") && onOrbScene) {
                 onOrbScene();
             }
@@ -124,6 +130,10 @@ void ControlPanel::drawModulation(app::Engine& engine) {
         }
         if (ImGui::BeginTabItem("Presets")) {
             drawPresetsTab(engine);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Shaders")) {
+            drawShadersTab(engine);
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
@@ -577,6 +587,74 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
                 stats.height, stats.drawCalls, stats.triangles, engine.stats().analysisHopMicros,
                 static_cast<unsigned long long>(engine.stats().analysisFrames), engine.stats().modulationMicros);
     ImGui::TextDisabled("%s (%s)", stats.adapter.c_str(), stats.backend.c_str());
+}
+
+
+void ControlPanel::drawShadersTab(app::Engine& engine) {
+    if (ImGui::Button("Add background...") && onOpenShader) {
+        onOpenShader();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Add post...") && onOpenPostShader) {
+        onOpenPostShader();
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%zu reload(s) this session", engine.shaderLayers().reloadsThisSession());
+    ImGui::Separator();
+    auto& layers = engine.shaderLayers();
+    std::uint32_t removeId = 0;
+    std::uint32_t moveId = 0;
+    int moveDelta = 0;
+    std::uint32_t reloadId = 0;
+    for (const auto& layer : layers.layers()) {
+        ImGui::PushID(static_cast<int>(layer->id));
+        ImGui::Checkbox("##on", &layer->enabled);
+        ImGui::SameLine();
+        ImGui::Text("%s  [%s]  %zu inputs, %zu passes", layer->name.c_str(), shaders::layerStageName(layer->stage),
+                    layer->parsed.description.inputs.size(), layer->parsed.description.passes.size());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("^")) {
+            moveId = layer->id;
+            moveDelta = -1;
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("v")) {
+            moveId = layer->id;
+            moveDelta = 1;
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("reload")) {
+            reloadId = layer->id;
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("x")) {
+            removeId = layer->id;
+        }
+        ImGui::TextDisabled("%s", layer->path.string().c_str());
+        std::string error = layer->parseError;
+        if (error.empty() && shaderErrorFor) {
+            error = shaderErrorFor(layer->id);
+        }
+        if (!error.empty()) {
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", error.c_str());
+            ImGui::PopTextWrapPos();
+        }
+        ImGui::PopID();
+    }
+    if (removeId != 0) {
+        engine.removeShaderLayer(removeId);
+    }
+    if (moveId != 0) {
+        layers.move(moveId, moveDelta);
+    }
+    if (reloadId != 0) {
+        (void)layers.reload(reloadId);
+    }
+    if (layers.size() == 0) {
+        ImGui::TextDisabled("no user shaders; drop a .wgsl file on the window or use Add");
+    }
+    ImGui::TextDisabled("inputs appear in the Parameters window under 'shader'");
 }
 
 } // namespace avgen::ui

@@ -8,6 +8,8 @@
 
 #include <glm/gtc/matrix_inverse.hpp>
 
+#include "gpu/texture.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -37,7 +39,8 @@ std::uint64_t materialKey(const scene::Material& m) {
 SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
     : context_(context), shaders_(shaders), timer_(std::make_unique<gpu::GpuTimer>(context)),
       samplers_(std::make_unique<gpu::SamplerCache>(context)),
-      environment_(std::make_unique<EnvironmentProcessor>(context, shaders)) {
+      environment_(std::make_unique<EnvironmentProcessor>(context, shaders)),
+      shaderStack_(std::make_unique<ShaderStack>(context, shaders)) {
     objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
 }
 
@@ -463,6 +466,7 @@ Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
     hdr_ = std::move(*target);
     tonemapBindGroup_ = nullptr;
     tonemapBoundView_ = nullptr;
+    tonemapGroups_.clear();
     stats_.width = width;
     stats_.height = height;
     log::debug("HDR target resized to {}x{}", width, height);
@@ -509,6 +513,136 @@ void SceneRenderer::rebuildIblBindGroup() {
     desc.entryCount = entries.size();
     desc.entries = entries.data();
     iblBindGroup_ = context_.device().CreateBindGroup(&desc);
+}
+
+Result<void> SceneRenderer::reloadEngineShaders() {
+    Result<void> first{};
+    auto keep = [&](const char* what, Result<void> r) {
+        if (!r && first) {
+            first = std::unexpected(Error{std::string(what) + ": " + r.error().message});
+        }
+    };
+    if (auto pbr = shaders_.load("pbr.wgsl")) {
+        auto a = createLitPipeline(*pbr, LitVariant::OpaqueCull);
+        auto b = createLitPipeline(*pbr, LitVariant::OpaqueNoCull);
+        auto c = createLitPipeline(*pbr, LitVariant::Blend);
+        if (a && b && c) {
+            litOpaqueCull_ = *a;
+            litOpaqueNoCull_ = *b;
+            litBlend_ = *c;
+        } else {
+            keep("pbr.wgsl", std::unexpected((!a ? a : !b ? b : c).error()));
+        }
+    } else {
+        keep("pbr.wgsl", std::unexpected(pbr.error()));
+    }
+    if (auto grid = shaders_.load("grid.wgsl")) {
+        if (auto g = createGridPipeline(*grid)) {
+            gridPipeline_ = *g;
+        } else {
+            keep("grid.wgsl", std::unexpected(g.error()));
+        }
+    } else {
+        keep("grid.wgsl", std::unexpected(grid.error()));
+    }
+    if (auto sky = shaders_.load("skybox.wgsl")) {
+        if (auto sp = createSkyboxPipeline(*sky)) {
+            skyboxPipeline_ = *sp;
+        } else {
+            keep("skybox.wgsl", std::unexpected(sp.error()));
+        }
+    } else {
+        keep("skybox.wgsl", std::unexpected(sky.error()));
+    }
+    if (auto tonemap = shaders_.load("tonemap.wgsl")) {
+        tonemapModule_ = *tonemap;
+        tonemapPipelines_.clear();
+    } else {
+        keep("tonemap.wgsl", std::unexpected(tonemap.error()));
+    }
+    ++engineReloads_;
+    if (first) {
+        log::info("engine shaders reloaded");
+    } else {
+        log::error("engine shader reload kept previous pipelines: {}", first.error().message);
+    }
+    return first;
+}
+
+void SceneRenderer::updateSpectrum(const analysis::AnalysisFrame* frame) {
+    if (frame == nullptr || frame->spectrum.empty()) {
+        return;
+    }
+    const std::size_t bins = frame->spectrum.size();
+    if (!spectrum_.valid() || spectrumBins_ != bins) {
+        wgpu::TextureDescriptor desc{};
+        desc.label = "audio-spectrum";
+        desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+        desc.dimension = wgpu::TextureDimension::e2D;
+        desc.size = {static_cast<std::uint32_t>(bins), 1, 1};
+        desc.format = wgpu::TextureFormat::RGBA16Float;
+        spectrum_.texture = context_.device().CreateTexture(&desc);
+        spectrum_.view = spectrum_.texture.CreateView();
+        spectrum_.width = static_cast<std::uint32_t>(bins);
+        spectrum_.height = 1;
+        spectrum_.format = desc.format;
+        spectrumBins_ = bins;
+        spectrumStaging_.resize(bins * 4);
+    }
+    for (std::size_t i = 0; i < bins; ++i) {
+        spectrumStaging_[i * 4 + 0] = gpu::floatToHalf(frame->spectrum[i]);
+        spectrumStaging_[i * 4 + 1] = gpu::floatToHalf(i < frame->magnitude.size() ? frame->magnitude[i] : 0.0f);
+        spectrumStaging_[i * 4 + 2] = gpu::floatToHalf(0.0f);
+        spectrumStaging_[i * 4 + 3] = gpu::floatToHalf(1.0f);
+    }
+    wgpu::TexelCopyTextureInfo dst{};
+    dst.texture = spectrum_.texture;
+    wgpu::TexelCopyBufferLayout layout{};
+    layout.bytesPerRow = static_cast<std::uint32_t>(bins * 8);
+    layout.rowsPerImage = 1;
+    wgpu::Extent3D extent{static_cast<std::uint32_t>(bins), 1, 1};
+    context_.queue().WriteTexture(&dst, spectrumStaging_.data(), spectrumStaging_.size() * 2, &layout, &extent);
+}
+
+Result<void> SceneRenderer::ensurePostTargets(std::uint32_t width, std::uint32_t height) {
+    for (auto& t : post_) {
+        if (t.valid() && t.width() == width && t.height() == height) {
+            continue;
+        }
+        gpu::RenderTargetDesc desc{};
+        desc.width = width;
+        desc.height = height;
+        desc.colorFormat = kHdrFormat;
+        desc.depthFormat = wgpu::TextureFormat::Undefined;
+        desc.label = "post-target";
+        auto made = gpu::RenderTarget::create(context_, desc);
+        if (!made) {
+            return std::unexpected(made.error());
+        }
+        t = std::move(*made);
+    }
+    return {};
+}
+
+wgpu::BindGroup SceneRenderer::tonemapBindGroupFor(const wgpu::TextureView& view) {
+    auto it = tonemapGroups_.find(view.Get());
+    if (it != tonemapGroups_.end()) {
+        return it->second;
+    }
+    std::array<wgpu::BindGroupEntry, 2> entries{};
+    entries[0].binding = 0;
+    entries[0].textureView = view;
+    entries[1].binding = 1;
+    entries[1].buffer = tonemapUniforms_;
+    entries[1].size = sizeof(TonemapUniforms);
+    wgpu::BindGroupDescriptor desc{};
+    desc.label = "tonemap-bind-group";
+    desc.layout = tonemapLayout_;
+    desc.entryCount = entries.size();
+    desc.entries = entries.data();
+    wgpu::BindGroup group = context_.device().CreateBindGroup(&desc);
+    tonemapGroups_[view.Get()] = group;
+    return group;
 }
 
 void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
@@ -603,7 +737,7 @@ const wgpu::BindGroup& SceneRenderer::materialBindGroup(const scene::Material& m
 }
 
 Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
-                                   const gpu::TargetView& target) {
+                                   const gpu::TargetView& target, const ShaderFrameInputs* shaderInputs) {
     if (!initialised_) {
         return fail("renderer not initialised");
     }
@@ -616,6 +750,25 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     uploadTextures(scene);
     updateEnvironment(scene);
     ensureTonemapBindGroup();
+
+    // ---- user shader layers: sync GPU objects, spectrum texture, background intermediate passes ----
+    const shaders::ShaderLayerSet* layerSet = shaderInputs ? shaderInputs->layers : nullptr;
+    ShaderFrameContext shaderCtx;
+    shaderCtx.width = hdr_.width();
+    shaderCtx.height = hdr_.height();
+    shaderCtx.frameIndex = time.frameIndex;
+    if (layerSet != nullptr) {
+        shaderStack_->sync(*layerSet);
+        updateSpectrum(shaderInputs->frame);
+        shaderCtx.audioSpectrum = spectrum_.view;
+        for (const auto& layer : layerSet->layers()) {
+            if (layer->enabled && layer->stage == shaders::LayerStage::Background) {
+                if (auto* gpuLayer = shaderStack_->find(layer->id)) {
+                    gpuLayer->renderPasses(encoder, *layer, shaderCtx);
+                }
+            }
+        }
+    }
 
     const auto& queue = context_.queue();
     const float aspect = static_cast<float>(hdr_.width()) / static_cast<float>(hdr_.height());
@@ -737,6 +890,17 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.timestampWrites = timer_->beginWrites();
 
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        // Background user shaders first (fullscreen, no depth write), then the scene on top.
+        if (layerSet != nullptr) {
+            for (const auto& layer : layerSet->layers()) {
+                if (layer->enabled && layer->stage == shaders::LayerStage::Background) {
+                    if (auto* gpuLayer = shaderStack_->find(layer->id)) {
+                        gpuLayer->drawOutput(rp, kHdrFormat, true, *layer, shaderCtx);
+                        ++stats_.drawCalls;
+                    }
+                }
+            }
+        }
         rp.SetBindGroup(0, frameBindGroup_);
         rp.SetBindGroup(3, iblBindGroup_);
         auto drawItems = [&](const std::vector<DrawItem>& items, bool lit) {
@@ -775,6 +939,41 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         rp.End();
     }
 
+    // ---- post layers: HDR -> ping-pong HDR ----
+    wgpu::TextureView finalHdr = hdr_.colorView();
+    if (layerSet != nullptr) {
+        int ping = 0;
+        for (const auto& layer : layerSet->layers()) {
+            if (!layer->enabled || layer->stage != shaders::LayerStage::Post) {
+                continue;
+            }
+            auto* gpuLayer = shaderStack_->find(layer->id);
+            if (gpuLayer == nullptr) {
+                continue;
+            }
+            if (auto r = ensurePostTargets(hdr_.width(), hdr_.height()); !r) {
+                return r;
+            }
+            ShaderFrameContext postCtx = shaderCtx;
+            postCtx.inputImage = finalHdr;
+            gpuLayer->renderPasses(encoder, *layer, postCtx);
+            wgpu::RenderPassColorAttachment color{};
+            color.view = post_[ping].colorView();
+            color.loadOp = wgpu::LoadOp::Clear;
+            color.storeOp = wgpu::StoreOp::Store;
+            wgpu::RenderPassDescriptor pass{};
+            pass.label = "post-layer-pass";
+            pass.colorAttachmentCount = 1;
+            pass.colorAttachments = &color;
+            wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+            gpuLayer->drawOutput(rp, kHdrFormat, false, *layer, postCtx);
+            rp.End();
+            ++stats_.drawCalls;
+            finalHdr = post_[ping].colorView();
+            ping = 1 - ping;
+        }
+    }
+
     // ---- pass 2: tonemap -> target ----
     {
         auto pipeline = tonemapPipelineFor(target.format);
@@ -793,7 +992,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.timestampWrites = timer_->endWrites();
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetPipeline(*pipeline);
-        rp.SetBindGroup(0, tonemapBindGroup_);
+        rp.SetBindGroup(0, finalHdr.Get() == hdr_.colorView().Get() ? tonemapBindGroup_ : tonemapBindGroupFor(finalHdr));
         rp.Draw(3);
         rp.End();
         ++stats_.drawCalls;
@@ -804,7 +1003,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
 }
 
 Result<gpu::Image8> SceneRenderer::renderToImage(const scene::Scene& scene, const FrameTime& time,
-                                                 std::uint32_t width, std::uint32_t height) {
+                                                 std::uint32_t width, std::uint32_t height,
+                                                 const ShaderFrameInputs* shaderInputs) {
     wgpu::TextureDescriptor desc{};
     desc.label = "render-to-image";
     desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc;
@@ -820,7 +1020,7 @@ Result<gpu::Image8> SceneRenderer::renderToImage(const scene::Scene& scene, cons
         return std::unexpected(r.error());
     }
     wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
-    if (auto r = render(encoder, scene, time, target); !r) {
+    if (auto r = render(encoder, scene, time, target, shaderInputs); !r) {
         return std::unexpected(r.error());
     }
     wgpu::CommandBuffer commands = encoder.Finish();

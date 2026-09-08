@@ -156,10 +156,12 @@ void Window::openFileDialog(DialogKind kind, std::function<void(std::string)> on
     static const SDL_DialogFileFilter audioFilters[] = {{"Audio files", "wav;flac;mp3;ogg;aif;aiff"}, {"All files", "*"}};
     static const SDL_DialogFileFilter sceneFilters[] = {{"glTF scenes", "glb;gltf"}, {"All files", "*"}};
     static const SDL_DialogFileFilter envFilters[] = {{"HDR environments", "hdr"}, {"All files", "*"}};
-    static const SDL_DialogFileFilter anyFilters[] = {{"Supported files", "wav;flac;mp3;ogg;glb;gltf;hdr"}, {"All files", "*"}};
+    static const SDL_DialogFileFilter shaderFilters[] = {{"WGSL shaders", "wgsl;isf"}, {"All files", "*"}};
+    static const SDL_DialogFileFilter anyFilters[] = {{"Supported files", "wav;flac;mp3;ogg;glb;gltf;hdr;json;wgsl"}, {"All files", "*"}};
     const SDL_DialogFileFilter* filters = kind == DialogKind::Audio ? audioFilters
                                           : kind == DialogKind::Scene ? sceneFilters
-                                          : kind == DialogKind::Environment ? envFilters : anyFilters;
+                                          : kind == DialogKind::Environment ? envFilters
+                                          : kind == DialogKind::Shader ? shaderFilters : anyFilters;
     SDL_ShowOpenFileDialog(dialogCallback, &dialogState(), window_, filters, 2, nullptr, false);
 }
 
