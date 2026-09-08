@@ -8,6 +8,17 @@
 
 namespace avgen::platform {
 
+std::filesystem::path preferencesDirectory() {
+    char* pref = SDL_GetPrefPath("avgen", "avgen");
+    if (pref == nullptr) {
+        return {};
+    }
+    std::filesystem::path dir(pref);
+    SDL_free(pref);
+    return dir;
+}
+
+
 namespace {
 // SDL's dialog callback may run on any thread; results are marshalled to the main thread by
 // pushing a user event and reading the stored results in pollEvents().

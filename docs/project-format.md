@@ -164,3 +164,25 @@ Parameters a composition registers (all saveable in a project and modulatable):
 | `nodes/<name>/nodes/<child>/…` | the same for nodes of a nested scene |
 | `particles/<name>/…` | the particle node's system (see `docs/rendering.md`) |
 | `camera/distance`, `height`, `orbitSpeed`, `fov`; `env/intensity`, `env/rotation`; `scene/brightness`, `scene/gridIntensity`; `root/scale`, `root/rotationSpeed`, `root/impulse` | as in the orb and glTF scenes |
+
+
+## Assets and app blocks (milestone 0.9, ADR-019)
+
+```json
+"app": { "name": "avgen", "version": "0.1.0" },
+"assets": {
+  "audio": "media/track.wav",
+  "environment": "../hdr/studio.hdr",
+  "scene": { "kind": "composition", "path": "scenes/stage.json" }
+}
+```
+
+`assets.scene.kind` is `orb`, `gltf` (with `path`) or `composition` (with `path`, or `inline`
+holding a whole scene document when the composition was never saved to a file). Every path,
+including `shaders[].path`, is relative to the project file (`..` allowed; absolute only across
+roots). On load the assets are restored first; a missing one is reported in
+`Engine::projectWarnings()` and the rest of the document still applies.
+
+`avgen --export-bundle <dir>` (or File > Export Bundle) copies every referenced file into
+`<dir>/assets/` (scene files are rewritten so their node assets point into the bundle, glTF
+sidecar `.bin`/image files next to a `.gltf` come along) and writes `<dir>/project.json`.

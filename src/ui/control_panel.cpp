@@ -61,11 +61,32 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
                 onSaveScene();
             }
             ImGui::Separator();
+            ImGui::Separator();
+            if (ImGui::MenuItem("New Project") && onNewProject) {
+                onNewProject();
+            }
             if (ImGui::MenuItem("Open Project...") && onOpenProject) {
                 onOpenProject();
             }
+            if (ImGui::BeginMenu("Open Recent", !recentProjects.empty())) {
+                for (const auto& recent : recentProjects) {
+                    if (ImGui::MenuItem(recent.filename().string().c_str()) && onOpenRecent) {
+                        onOpenRecent(recent);
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s", recent.string().c_str());
+                    }
+                }
+                ImGui::EndMenu();
+            }
+            if (ImGui::MenuItem("Save Project", "Cmd+S", false, !engine.projectPath().empty()) && onSaveProjectHere) {
+                onSaveProjectHere();
+            }
             if (ImGui::MenuItem("Save Project As...") && onSaveProject) {
                 onSaveProject();
+            }
+            if (ImGui::MenuItem("Export Bundle...") && onExportBundle) {
+                onExportBundle();
             }
             ImGui::EndMenu();
         }
@@ -355,6 +376,20 @@ void ControlPanel::drawPresetsTab(app::Engine& engine) {
 }
 
 void ControlPanel::drawTransport(app::Engine& engine) {
+    if (!engine.projectPath().empty()) {
+        ImGui::TextDisabled("project: %s", engine.projectPath().filename().string().c_str());
+        if (!engine.projectWarnings().empty()) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "(%zu warning(s))", engine.projectWarnings().size());
+            if (ImGui::IsItemHovered()) {
+                std::string all;
+                for (const auto& w : engine.projectWarnings()) {
+                    all += w + "\n";
+                }
+                ImGui::SetTooltip("%s", all.c_str());
+            }
+        }
+    }
     if (ImGui::Button("Open Audio") && onOpenAudio) {
         onOpenAudio();
     }

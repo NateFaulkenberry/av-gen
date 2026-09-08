@@ -27,6 +27,7 @@ std::string usageText() {
            "  --scene <file>      load a glTF/GLB scene (default: built-in orb)\n"
            "  --env <file>        load an equirectangular .hdr environment map\n"
            "  --composition <f>   load a scene composition file (avgen-scene JSON)\n"
+           "  --export-bundle <d> copy every referenced asset into <d>/assets and write <d>/project.json\n"
            "  --shader <file>     add a user shader layer behind the scene (repeatable)\n"
            "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
            "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
@@ -67,6 +68,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--scene");
             if (!v) return std::unexpected(v.error());
             options.scene = *v;
+            ++i;
+        } else if (arg == "--export-bundle") {
+            auto v = need(i, "--export-bundle");
+            if (!v) return std::unexpected(v.error());
+            options.bundle = *v;
             ++i;
         } else if (arg == "--composition") {
             auto v = need(i, "--composition");
@@ -157,6 +163,12 @@ Application::~Application() {
 }
 
 Result<void> Application::init(const AppOptions& options, const std::filesystem::path& executablePath) {
+    if (!options.headless) {
+        recent_ = RecentFiles(platform::preferencesDirectory() / "recent.json");
+        if (auto r = recent_.load(); !r) {
+            log::warn("recent files: {}", r.error().message);
+        }
+    }
     options_ = options;
     engine_ = std::make_unique<Engine>(options.headless ? EngineMode::Offline : EngineMode::Live);
 
@@ -250,21 +262,67 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         panel_->onAddGltfNode = addAssetNode(scene::NodeKind::Gltf, platform::Window::DialogKind::Scene);
         panel_->onAddSceneNode = addAssetNode(scene::NodeKind::Scene, platform::Window::DialogKind::Any);
-        panel_->onSaveProject = [this] {
+        auto saveTo = [this](const std::filesystem::path& path) {
+            if (auto r = engine_->saveProject(path); !r) {
+                log::error("save project: {}", r.error().message);
+                panel_->setStatus(r.error().message);
+            } else {
+                panel_->setStatus("saved " + path.filename().string());
+                rememberProject(path);
+            }
+        };
+        panel_->onSaveProject = [this, saveTo] {
+            window_->saveFileDialog([saveTo](std::string path) {
+                if (!path.empty()) {
+                    saveTo(path);
+                }
+            });
+        };
+        panel_->onSaveProjectHere = [this, saveTo] {
+            if (!engine_->projectPath().empty()) {
+                saveTo(engine_->projectPath());
+            }
+        };
+        panel_->onNewProject = [this] {
+            engine_->newProject();
+            panel_->setStatus("new project");
+        };
+        panel_->onOpenRecent = [this](const std::filesystem::path& path) { loadAny(path); };
+        panel_->onExportBundle = [this] {
             window_->saveFileDialog([this](std::string path) {
                 if (path.empty()) {
                     return;
                 }
-                if (auto r = engine_->saveProject(path); !r) {
-                    log::error("save project: {}", r.error().message);
+                // The dialog picks a file name; the bundle is the folder of that name.
+                std::filesystem::path dir(path);
+                if (dir.extension() == ".json") {
+                    dir.replace_extension();
+                }
+                if (auto r = engine_->exportBundle(dir); !r) {
+                    log::error("bundle: {}", r.error().message);
                     panel_->setStatus(r.error().message);
                 } else {
-                    panel_->setStatus("saved " + std::filesystem::path(path).filename().string());
+                    panel_->setStatus("bundle exported to " + dir.filename().string());
+                    rememberProject(dir / "project.json");
                 }
             });
         };
+        recent_.pruneMissing();
+        panel_->recentProjects = recent_.entries();
     }
 
+    // The project restores its own audio/scene/environment; explicit flags below override it.
+    if (options.project) {
+        if (auto r = engine_->loadProject(*options.project); !r) {
+            log::error("project: {}", r.error().message);
+            if (options.headless) {
+                return std::unexpected(r.error());
+            }
+            if (panel_) panel_->setStatus(r.error().message);
+        } else if (!options.headless) {
+            rememberProject(*options.project);
+        }
+    }
     if (options.scene) {
         if (auto r = engine_->loadScene(*options.scene); !r) {
             log::error("scene: {}", r.error().message);
@@ -315,15 +373,6 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             engineShaderWatcher_.watch(*located);
         }
     }
-    if (options.project) {
-        if (auto r = engine_->loadProject(*options.project); !r) {
-            log::error("project: {}", r.error().message);
-            if (options.headless) {
-                return std::unexpected(r.error());
-            }
-            if (panel_) panel_->setStatus(r.error().message);
-        }
-    }
     if (options.autoplay && engine_->hasAudio()) {
         if (auto r = engine_->play(); !r) {
             log::warn("autoplay: {}", r.error().message);
@@ -361,8 +410,27 @@ void Application::loadAny(const std::filesystem::path& path) {
     if (panel_) {
         panel_->setStatus({});
     }
+    if (!engine_->projectPath().empty() && std::filesystem::absolute(engine_->projectPath()) == std::filesystem::absolute(path)) {
+        rememberProject(path);
+    } else if (window_) {
+        window_->setTitle("avgen " + std::string(app::Engine::kAppVersion) + " - " + path.filename().string());
+    }
+}
+
+void Application::rememberProject(const std::filesystem::path& path) {
+    recent_.add(path);
+    if (auto r = recent_.save(); !r) {
+        log::warn("recent files: {}", r.error().message);
+    }
+    if (panel_) {
+        panel_->recentProjects = recent_.entries();
+        if (!engine_->projectWarnings().empty()) {
+            panel_->setStatus(std::to_string(engine_->projectWarnings().size()) + " project warning(s): " +
+                              engine_->projectWarnings().front());
+        }
+    }
     if (window_) {
-        window_->setTitle("avgen 0.2 - " + path.filename().string());
+        window_->setTitle("avgen " + std::string(app::Engine::kAppVersion) + " - " + path.filename().string());
     }
 }
 
@@ -435,6 +503,12 @@ int Application::run() {
             return code == 0 ? 6 : code;
         }
         log::info("project saved to {}", options_.saveProject->string());
+    }
+    if (options_.bundle) {
+        if (auto r = engine_->exportBundle(*options_.bundle); !r) {
+            log::error("bundle: {}", r.error().message);
+            return code == 0 ? 6 : code;
+        }
     }
     return code;
 }

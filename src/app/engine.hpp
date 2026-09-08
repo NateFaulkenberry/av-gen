@@ -31,6 +31,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace avgen::app {
 
@@ -76,10 +77,25 @@ public:
     // Routes any supported file by extension: audio, .gltf/.glb, .hdr, .json (project).
     [[nodiscard]] Result<void> loadFile(const std::filesystem::path& path);
 
-    // ---- project (parameters, routes, sources, presets) ----
-    [[nodiscard]] Result<void> saveProject(const std::filesystem::path& path) const;
+    // ---- project (milestone 0.9, ADR-019): parameters, routes, sources, presets, shaders,
+    // timeline, plus the asset references (audio, scene, environment) that make a project a
+    // complete session. Paths are written relative to the project file. ----
+    static constexpr const char* kAppVersion = "0.1.0";
+    [[nodiscard]] Result<void> saveProject(const std::filesystem::path& path);
+    // Restores the assets first (a missing one is a warning, see projectWarnings()), then the
+    // rest. Fails only when the document itself is invalid.
     [[nodiscard]] Result<void> loadProject(const std::filesystem::path& path);
     [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
+    [[nodiscard]] const std::vector<std::string>& projectWarnings() const { return projectWarnings_; }
+    // Resets everything but the audio: orb scene, no sources/presets/timeline/shaders/environment,
+    // default post settings, no project path.
+    void newProject();
+    // Every file the current session references (audio, environment, scene files and their
+    // assets recursively, shader layers), absolute, without duplicates.
+    [[nodiscard]] std::vector<std::filesystem::path> referencedFiles() const;
+    // Copies every referenced file into <dir>/assets (scene files rewritten with relative
+    // references) and writes <dir>/project.json pointing at the copies.
+    [[nodiscard]] Result<void> exportBundle(const std::filesystem::path& dir);
 
     // ---- built-in post-processing ----
     [[nodiscard]] scene::PostSettings& post() { return post_; }
@@ -207,6 +223,7 @@ private:
     std::filesystem::path environmentPath_;
     std::filesystem::path compositionPath_;
     std::filesystem::path projectPath_;
+    std::vector<std::string> projectWarnings_;
     // Beat clock extrapolated per render frame from the analysis tempo (ADR-012).
     double beatClockPhase_ = 0.0;
     std::uint32_t beatClockCount_ = 0;

@@ -7,6 +7,7 @@
 #include "app/engine.hpp"
 #include "rendering/scene_renderer.hpp"
 
+#include <filesystem>
 #include <functional>
 #include <string>
 #include <vector>
@@ -41,7 +42,12 @@ public:
     std::function<void()> onOpenPostShader;
     // Compile error lookup for a shader layer id (from the GPU side); may be empty.
     std::function<std::string(std::uint32_t)> shaderErrorFor;
-    std::function<void()> onSaveProject;
+    std::function<void()> onSaveProject;      // Save As
+    std::function<void()> onSaveProjectHere;  // Save to the current project path
+    std::function<void()> onNewProject;
+    std::function<void()> onExportBundle;
+    std::function<void(const std::filesystem::path&)> onOpenRecent;
+    std::vector<std::filesystem::path> recentProjects; // shown in File > Open Recent
 
     void draw(app::Engine& engine, const FrameStats& stats);
 

@@ -569,3 +569,65 @@ recordKey through the engine).
 Milestone 0.9 (project system): asset references relative to the project, versioning and
 migration, presets and scene files bundled, recent files; then 1.0 offline rendering with the
 particle determinism fix.
+
+## 2026-09-08 — Milestone 0.9: project system
+
+### What was implemented and why
+
+- Project format version 4 (ADR-019): `"assets"` (audio, environment, scene = orb | glTF path |
+  composition path | inline composition) and `"app"`. Every path, shader layers included, is
+  written relative to the project file and resolved against it, so a project folder can move.
+  `Engine::loadProject` restores the assets first (they define the parameter surface), then the
+  rest; a missing asset is a warning (`projectWarnings()`, shown in the transport window) rather
+  than a failure. `--project` now recalls a whole session; explicit flags override it.
+- Explicit migration: `params::migrateProject` upgrades one version at a time with a report of
+  the steps (1→2 route polarity and empty sections, 2→3 shaders, 3→4 assets/app); the loader
+  works on a migrated copy.
+- Bundles: `Engine::exportBundle(dir)` / `--export-bundle` / File > Export Bundle copy every
+  referenced file (audio, environment, glTF with `.bin`/image sidecars, scene files rewritten
+  recursively, shaders) into `<dir>/assets` and write `<dir>/project.json`.
+- `Engine::newProject` (everything but the audio), `referencedFiles()`, `RecentFiles` persisted
+  in the SDL preferences directory with File > Open Recent, Save Project (to the current path),
+  Save Project As, New Project.
+- Split as before: migration and recent files (GPU-free) in a worktree by a subagent; engine,
+  CLI, UI, docs and the integration test on main.
+
+### Bugs found during the milestone
+
+- A splice error while rewriting the engine's project code duplicated a block of functions;
+  caught by the compiler (redefinitions) before anything ran.
+- The timeline's "unknown targets" warning is logged twice on a project load (bind runs on the
+  scene swap and again after the document is applied); harmless, left as is.
+
+### Tests
+
+296 cases (was 280): migration (5: v1 to v4 in three recorded steps, v2 gains sections without
+overwriting, current documents report nothing, too-new and malformed envelopes rejected, the
+caller's document is untouched), recent files (6), and five engine integration cases (relative
+references and full session restore after moving the folder, missing assets as warnings with
+parameters still applied, composition projects by path or inline, bundle export that reopens
+after the originals are deleted, new project resets everything but the audio).
+
+### Results
+
+- `--save-project` from a composition + HDRI + audio + timeline session wrote a v4 project with
+  `../track.wav`, `../assets/…hdr` and `../scenes/stage.json` references; `--project` alone
+  recalled all of it (113 parameters, 6 routes, 3 tracks, 2 cues, 0 warnings, 0 GPU errors).
+- `--export-bundle` copied 7 files (audio, HDRI, three glTFs, two scene files rewritten to
+  bundle-relative references) and the moved bundle loaded with 0 warnings.
+- A hand-written version 1 project migrated in three logged steps and loaded.
+- Windowed Release from the project alone: 120 fps; the recent-files store was written under
+  the SDL preferences directory.
+- Debug and Release: 296/296 tests pass; zero warnings.
+
+### Known limitations
+
+- glTF sidecars are collected by extension from the `.gltf`'s folder, not by parsing the file;
+  no content hashes (a renamed asset is reported missing rather than relinked); no autosave or
+  unsaved-changes flag; recent files are per machine.
+
+### Next step
+
+Milestone 1.0 (offline rendering): frame sequences and video export from the timeline range,
+a render queue, render settings in the project, and the particle determinism fix (stable
+compaction) so headless hashes stay bit-identical with particles on.

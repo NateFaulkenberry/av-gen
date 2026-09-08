@@ -4,6 +4,7 @@
 // frame loop in offline mode (ADR-012). Both modes drive the same Engine and SceneRenderer.
 
 #include "app/engine.hpp"
+#include "app/recent_files.hpp"
 #include "core/error.hpp"
 #include "core/file_watcher.hpp"
 #include "core/log.hpp"
@@ -38,6 +39,7 @@ struct AppOptions {
     std::optional<std::filesystem::path> scene;
     std::optional<std::filesystem::path> environment;
     std::optional<std::filesystem::path> composition; // scene file (avgen-scene JSON)
+    std::optional<std::filesystem::path> bundle;      // --export-bundle <dir>
     std::vector<std::pair<std::filesystem::path, bool>> shaders; // (file, isPost)
     std::optional<std::filesystem::path> project;      // load at start-up
     std::optional<std::filesystem::path> saveProject;  // write on exit
@@ -68,9 +70,11 @@ private:
     int runHeadless();
     void loadAudio(const std::filesystem::path& path);
     void loadAny(const std::filesystem::path& path);
+    void rememberProject(const std::filesystem::path& path); // recent list + window title
     Result<void> captureFrame(const FrameTime& time, const std::filesystem::path& path);
 
     AppOptions options_;
+    RecentFiles recent_{{}};
     std::unique_ptr<platform::Window> window_;
     std::unique_ptr<gpu::Context> context_;
     std::unique_ptr<gpu::ShaderLibrary> shaders_;

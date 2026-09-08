@@ -1,5 +1,9 @@
 #include "app/engine.hpp"
 
+#include <functional>
+#include <map>
+#include <set>
+
 #include "assets/image.hpp"
 #include "core/log.hpp"
 #include "params/serialization.hpp"
@@ -154,17 +158,123 @@ void Engine::removeShaderLayer(std::uint32_t id) {
     }
 }
 
-Result<void> Engine::saveProject(const std::filesystem::path& path) const {
+namespace {
+
+// Project-relative path policy: relative when on the same root (".." allowed so a project can sit
+// beside its assets), absolute otherwise.
+std::string relativeTo(const std::filesystem::path& file, const std::filesystem::path& baseDir) {
+    std::error_code ec;
+    auto abs = std::filesystem::weakly_canonical(file, ec);
+    if (ec) {
+        abs = std::filesystem::absolute(file).lexically_normal();
+    }
+    auto base = std::filesystem::weakly_canonical(baseDir, ec);
+    if (ec) {
+        base = std::filesystem::absolute(baseDir).lexically_normal();
+    }
+    if (abs.root_name() != base.root_name()) {
+        return abs.generic_string();
+    }
+    const auto rel = abs.lexically_relative(base);
+    return rel.empty() ? abs.generic_string() : rel.generic_string();
+}
+
+std::filesystem::path resolveFrom(const std::string& stored, const std::filesystem::path& baseDir) {
+    std::filesystem::path p(stored);
+    if (p.is_absolute()) {
+        return p.lexically_normal();
+    }
+    return (baseDir / p).lexically_normal();
+}
+
+// Files a glTF may reference next to itself (external buffers and images); copied with bundles.
+bool isGltfSidecar(const std::filesystem::path& p) {
+    std::string ext = p.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return ext == ".bin" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".ktx2" || ext == ".webp";
+}
+
+// Walks a scene file's node assets (recursively through nested scene files) and its environment
+// map, calling `visit(absolutePath, isSceneFile)` for each.
+void visitSceneFileAssets(const std::filesystem::path& sceneFile,
+                          const std::function<void(const std::filesystem::path&, bool)>& visit, int depth = 0) {
+    if (depth > scene::Composition::kMaxNestingDepth) {
+        return;
+    }
+    std::ifstream in(sceneFile);
+    nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
+    if (!doc.is_object()) {
+        return;
+    }
+    const auto dir = sceneFile.parent_path();
+    if (doc.contains("environment") && doc["environment"].is_object() && doc["environment"].contains("map") &&
+        doc["environment"]["map"].is_string()) {
+        visit(resolveFrom(doc["environment"]["map"].get<std::string>(), dir), false);
+    }
+    if (doc.contains("nodes") && doc["nodes"].is_array()) {
+        for (const auto& node : doc["nodes"]) {
+            if (!node.is_object() || !node.contains("asset") || !node["asset"].is_string()) {
+                continue;
+            }
+            const auto asset = resolveFrom(node["asset"].get<std::string>(), dir);
+            const bool nested = node.value("kind", std::string()) == "scene";
+            visit(asset, nested);
+            if (nested && asset != sceneFile) {
+                visitSceneFileAssets(asset, visit, depth + 1);
+            }
+        }
+    }
+}
+
+} // namespace
+
+Result<void> Engine::saveProject(const std::filesystem::path& path) {
     nlohmann::json doc = params::saveProject(params_, modulator_, &sources_, &presets_);
-    doc["shaders"] = shaderLayers_.toJson();
+    const auto dir = std::filesystem::absolute(path).parent_path();
+    doc["app"] = {{"name", "avgen"}, {"version", kAppVersion}};
+    // Shader layer paths relative to the project.
+    nlohmann::json shaders = shaderLayers_.toJson();
+    for (auto& entry : shaders) {
+        if (entry.is_object() && entry.contains("path") && entry["path"].is_string()) {
+            entry["path"] = relativeTo(entry["path"].get<std::string>(), dir);
+        }
+    }
+    doc["shaders"] = std::move(shaders);
     if (!timeline_.empty()) {
         doc["timeline"] = timeline_.toJson();
     }
+    nlohmann::json assets = nlohmann::json::object();
+    if (!audioPath_.empty()) {
+        assets["audio"] = relativeTo(audioPath_, dir);
+    }
+    if (!environmentPath_.empty()) {
+        assets["environment"] = relativeTo(environmentPath_, dir);
+    }
+    nlohmann::json sceneRef = nlohmann::json::object();
+    if (auto* comp = composition()) {
+        if (compositionPath_.empty()) {
+            // An unsaved composition: keep it inline so the project stays self-contained.
+            sceneRef["kind"] = "composition";
+            sceneRef["inline"] = comp->toJson();
+        } else {
+            sceneRef["kind"] = "composition";
+            sceneRef["path"] = relativeTo(compositionPath_, dir);
+        }
+    } else if (auto* gltf = gltfScene()) {
+        sceneRef["kind"] = "gltf";
+        sceneRef["path"] = relativeTo(gltf->path(), dir);
+    } else {
+        sceneRef["kind"] = "orb";
+    }
+    assets["scene"] = std::move(sceneRef);
+    doc["assets"] = std::move(assets);
+
     std::ofstream out(path);
     if (!out) {
         return fail("cannot write '{}'", path.string());
     }
     out << doc.dump(2) << '\n';
+    projectPath_ = path;
     return {};
 }
 
@@ -177,6 +287,98 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     if (doc.is_discarded()) {
         return fail("'{}' is not valid JSON", path.string());
     }
+    if (!doc.is_object() || doc.value("format", std::string()) != params::kProjectFormatName) {
+        return fail("'{}' is not an avgen project", path.string());
+    }
+    // Migrate once here so the two parameter passes below see a current document.
+    auto migrated = params::migrateProject(doc);
+    if (!migrated) {
+        return std::unexpected(migrated.error());
+    }
+    for (const auto& step : migrated->steps) {
+        log::info("project '{}' migrated: {}", path.filename().string(), step);
+    }
+    const auto dir = std::filesystem::absolute(path).parent_path();
+    projectWarnings_.clear();
+    auto warn = [&](std::string message) {
+        log::warn("project: {}", message);
+        projectWarnings_.push_back(std::move(message));
+    };
+
+    // ---- assets first: they define the parameter surface the rest of the document targets ----
+    if (const auto assets = doc.find("assets"); assets != doc.end() && assets->is_object()) {
+        if (assets->contains("audio") && (*assets)["audio"].is_string()) {
+            const auto audio = resolveFrom((*assets)["audio"].get<std::string>(), dir);
+            if (audio != audioPath_) {
+                if (auto r = loadAudio(audio); !r) {
+                    warn("audio: " + r.error().message);
+                }
+            }
+        }
+        if (assets->contains("scene") && (*assets)["scene"].is_object()) {
+            const auto& sceneRef = (*assets)["scene"];
+            const std::string kind = sceneRef.value("kind", std::string("orb"));
+            if (kind == "orb") {
+                if (orbScene() == nullptr) {
+                    loadOrbScene();
+                }
+            } else if (kind == "gltf" && sceneRef.contains("path")) {
+                const auto scenePath = resolveFrom(sceneRef["path"].get<std::string>(), dir);
+                if (gltfScene() == nullptr || gltfScene()->path() != scenePath) {
+                    if (auto r = loadScene(scenePath); !r) {
+                        warn("scene: " + r.error().message);
+                    }
+                }
+            } else if (kind == "composition" && sceneRef.contains("path")) {
+                const auto scenePath = resolveFrom(sceneRef["path"].get<std::string>(), dir);
+                if (composition() == nullptr || compositionPath_ != scenePath) {
+                    if (auto r = loadComposition(scenePath); !r) {
+                        warn("scene: " + r.error().message);
+                    }
+                }
+            } else if (kind == "composition" && sceneRef.contains("inline")) {
+                registry_.setBaseDirectory(dir);
+                auto comp = scene::Composition::fromJson(sceneRef["inline"], registry_);
+                if (!comp) {
+                    warn("scene: " + comp.error().message);
+                } else {
+                    const float masterGain = modulator_.masterGain;
+                    detachSceneParameters();
+                    params_.clear();
+                    modulator_.clearRoutes();
+                    modulator_.masterGain = masterGain;
+                    (*comp)->attach(params_, modulator_);
+                    compositionPath_.clear();
+                    installController(std::move(*comp));
+                }
+            } else {
+                warn("scene: unknown kind '" + kind + "'");
+            }
+        }
+        if (assets->contains("environment") && (*assets)["environment"].is_string()) {
+            const auto env = resolveFrom((*assets)["environment"].get<std::string>(), dir);
+            if (env != environmentPath_) {
+                if (auto r = loadEnvironment(env); !r) {
+                    warn("environment: " + r.error().message);
+                }
+            }
+        } else if (!environmentPath_.empty()) {
+            environmentPath_.clear();
+            controller_->scene().environment.environmentMap = scene::kInvalidTexture;
+            if (auto* comp = composition()) {
+                comp->setEnvironmentMap({});
+            }
+        }
+    }
+    // Shader layer paths are project-relative on disk.
+    if (doc.contains("shaders") && doc["shaders"].is_array()) {
+        for (auto& entry : doc["shaders"]) {
+            if (entry.is_object() && entry.contains("path") && entry["path"].is_string()) {
+                entry["path"] = resolveFrom(entry["path"].get<std::string>(), dir).string();
+            }
+        }
+    }
+
     if (auto r = params::loadProject(doc, params_, modulator_, &sources_, &presets_); !r) {
         return r;
     }
@@ -205,9 +407,235 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     rebind();
     modulator_.resetState();
     projectPath_ = path;
-    log::info("project '{}' loaded: {} parameters, {} routes, {} sources, {} presets, {} timeline tracks, {} cues",
+    log::info("project '{}' loaded: {} parameters, {} routes, {} sources, {} presets, {} timeline tracks, {} cues, {} warning(s)",
               path.filename().string(), params_.size(), modulator_.routes().size(), sources_.sources().size(),
-              presets_.presets().size(), timeline_.tracks().size(), timeline_.cues().size());
+              presets_.presets().size(), timeline_.tracks().size(), timeline_.cues().size(), projectWarnings_.size());
+    return {};
+}
+
+void Engine::newProject() {
+    timeline_.clear();
+    cueState_ = {};
+    cueApplied_ = false;
+    presets_.clear();
+    sources_.clear();
+    shaderLayers_.clear();
+    environmentPath_.clear();
+    loadOrbScene(); // clears the parameter set and routes, re-registers sources/post/shaders
+    for (auto* p : params_.ordered()) {
+        if (p->path().rfind("post/", 0) == 0) {
+            p->resetToDefault();
+        }
+    }
+    post_ = scene::PostSettings{};
+    modulator_.masterGain = 1.0f;
+    projectPath_.clear();
+    projectWarnings_.clear();
+}
+
+std::vector<std::filesystem::path> Engine::referencedFiles() const {
+    std::vector<std::filesystem::path> files;
+    auto add = [&](const std::filesystem::path& p) {
+        if (p.empty()) {
+            return;
+        }
+        const auto abs = std::filesystem::absolute(p).lexically_normal();
+        if (std::find(files.begin(), files.end(), abs) == files.end()) {
+            files.push_back(abs);
+        }
+    };
+    add(audioPath_);
+    add(environmentPath_);
+    if (const auto* gltf = dynamic_cast<const scene::GltfScene*>(controller_.get())) {
+        add(gltf->path());
+    }
+    if (!compositionPath_.empty()) {
+        add(compositionPath_);
+        visitSceneFileAssets(std::filesystem::absolute(compositionPath_), [&](const auto& p, bool) { add(p); });
+    } else if (const auto* comp = dynamic_cast<const scene::Composition*>(controller_.get())) {
+        for (const auto& node : comp->nodes()) {
+            if (!node->asset.empty()) {
+                const auto asset = registry_.resolve(node->asset);
+                add(asset);
+                if (node->kind == scene::NodeKind::Scene) {
+                    visitSceneFileAssets(asset, [&](const auto& p, bool) { add(p); });
+                }
+            }
+        }
+    }
+    for (const auto& layer : shaderLayers_.layers()) {
+        add(layer->path);
+    }
+    return files;
+}
+
+Result<void> Engine::exportBundle(const std::filesystem::path& dir) {
+    std::error_code ec;
+    const auto assetsDir = dir / "assets";
+    std::filesystem::create_directories(assetsDir, ec);
+    if (ec) {
+        return fail("cannot create '{}': {}", assetsDir.string(), ec.message());
+    }
+    // Unique destination names: keep the file name, suffix on collision between different sources.
+    std::map<std::filesystem::path, std::filesystem::path> placed; // source -> destination
+    std::set<std::string> usedNames;
+    auto place = [&](const std::filesystem::path& source) -> std::filesystem::path {
+        if (const auto it = placed.find(source); it != placed.end()) {
+            return it->second;
+        }
+        std::string name = source.filename().string();
+        const std::string stem = source.stem().string();
+        const std::string ext = source.extension().string();
+        for (int i = 2; usedNames.count(name) != 0; ++i) {
+            name = stem + "_" + std::to_string(i) + ext;
+        }
+        usedNames.insert(name);
+        const auto dest = assetsDir / name;
+        placed[source] = dest;
+        return dest;
+    };
+    auto copyFile = [&](const std::filesystem::path& source) -> Result<std::filesystem::path> {
+        const auto dest = place(source);
+        if (!std::filesystem::exists(source)) {
+            return fail("missing file '{}'", source.string());
+        }
+        std::filesystem::copy_file(source, dest, std::filesystem::copy_options::overwrite_existing, ec);
+        if (ec) {
+            return fail("cannot copy '{}' to '{}': {}", source.string(), dest.string(), ec.message());
+        }
+        std::string ext = source.extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (ext == ".gltf") {
+            // External buffers and images live next to the file; bring the plausible ones along.
+            for (const auto& entry : std::filesystem::directory_iterator(source.parent_path(), ec)) {
+                if (entry.is_regular_file() && isGltfSidecar(entry.path())) {
+                    std::filesystem::copy_file(entry.path(), assetsDir / entry.path().filename(),
+                                               std::filesystem::copy_options::overwrite_existing, ec);
+                }
+            }
+        }
+        return dest;
+    };
+    // Scene files are rewritten so their references point into the bundle.
+    std::function<Result<std::filesystem::path>(const std::filesystem::path&, int)> bundleScene;
+    bundleScene = [&](const std::filesystem::path& sceneFile, int depth) -> Result<std::filesystem::path> {
+        if (depth > scene::Composition::kMaxNestingDepth) {
+            return fail("scene files nest too deeply at '{}'", sceneFile.string());
+        }
+        if (const auto it = placed.find(sceneFile); it != placed.end()) {
+            return it->second;
+        }
+        std::ifstream in(sceneFile);
+        nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
+        if (!doc.is_object()) {
+            return fail("'{}' is not a valid scene file", sceneFile.string());
+        }
+        const auto dest = place(sceneFile);
+        const auto srcDir = sceneFile.parent_path();
+        if (doc.contains("environment") && doc["environment"].is_object() && doc["environment"].contains("map") &&
+            doc["environment"]["map"].is_string()) {
+            auto copied = copyFile(resolveFrom(doc["environment"]["map"].get<std::string>(), srcDir));
+            if (!copied) {
+                return std::unexpected(copied.error());
+            }
+            doc["environment"]["map"] = copied->filename().generic_string();
+        }
+        if (doc.contains("nodes") && doc["nodes"].is_array()) {
+            for (auto& node : doc["nodes"]) {
+                if (!node.is_object() || !node.contains("asset") || !node["asset"].is_string()) {
+                    continue;
+                }
+                const auto asset = resolveFrom(node["asset"].get<std::string>(), srcDir);
+                Result<std::filesystem::path> copied =
+                    node.value("kind", std::string()) == "scene" ? bundleScene(asset, depth + 1) : copyFile(asset);
+                if (!copied) {
+                    return std::unexpected(copied.error());
+                }
+                node["asset"] = copied->filename().generic_string();
+            }
+        }
+        std::ofstream out(dest);
+        if (!out) {
+            return fail("cannot write '{}'", dest.string());
+        }
+        out << doc.dump(2) << '\n';
+        return dest;
+    };
+
+    // Save the project first (captures the current state), then rewrite its references.
+    const auto projectFile = dir / "project.json";
+    if (auto r = saveProject(projectFile); !r) {
+        return r;
+    }
+    std::ifstream in(projectFile);
+    nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
+    in.close();
+    auto& assets = doc["assets"];
+    if (assets.contains("audio")) {
+        auto copied = copyFile(resolveFrom(assets["audio"].get<std::string>(), dir));
+        if (!copied) {
+            return std::unexpected(copied.error());
+        }
+        assets["audio"] = relativeTo(*copied, dir);
+    }
+    if (assets.contains("environment")) {
+        auto copied = copyFile(resolveFrom(assets["environment"].get<std::string>(), dir));
+        if (!copied) {
+            return std::unexpected(copied.error());
+        }
+        assets["environment"] = relativeTo(*copied, dir);
+    }
+    if (assets.contains("scene") && assets["scene"].contains("path")) {
+        const auto scenePath = resolveFrom(assets["scene"]["path"].get<std::string>(), dir);
+        auto copied = assets["scene"]["kind"] == "composition" ? bundleScene(scenePath, 0) : copyFile(scenePath);
+        if (!copied) {
+            return std::unexpected(copied.error());
+        }
+        assets["scene"]["path"] = relativeTo(*copied, dir);
+    } else if (assets.contains("scene") && assets["scene"].contains("inline")) {
+        // Inline compositions: write them out as a scene file in the bundle so nodes' assets can
+        // be rewritten like any other scene file.
+        const auto tmp = assetsDir / "composition.json";
+        {
+            std::ofstream out(tmp);
+            // Node assets are relative to the composition's registry base; make them absolute.
+            nlohmann::json inlineScene = assets["scene"]["inline"];
+            for (auto& node : inlineScene["nodes"]) {
+                if (node.contains("asset") && node["asset"].is_string()) {
+                    node["asset"] = registry_.resolve(node["asset"].get<std::string>()).string();
+                }
+            }
+            if (inlineScene.contains("environment") && inlineScene["environment"].contains("map")) {
+                inlineScene["environment"]["map"] =
+                    registry_.resolve(inlineScene["environment"]["map"].get<std::string>()).string();
+            }
+            out << inlineScene.dump(2) << '\n';
+        }
+        placed.erase(tmp);
+        usedNames.erase("composition.json");
+        auto bundled = bundleScene(tmp, 0);
+        if (!bundled) {
+            return std::unexpected(bundled.error());
+        }
+        assets["scene"] = {{"kind", "composition"}, {"path", relativeTo(*bundled, dir)}};
+    }
+    if (doc.contains("shaders")) {
+        for (auto& entry : doc["shaders"]) {
+            if (entry.is_object() && entry.contains("path") && entry["path"].is_string()) {
+                auto copied = copyFile(resolveFrom(entry["path"].get<std::string>(), dir));
+                if (!copied) {
+                    return std::unexpected(copied.error());
+                }
+                entry["path"] = relativeTo(*copied, dir);
+            }
+        }
+    }
+    std::ofstream out(projectFile);
+    if (!out) {
+        return fail("cannot write '{}'", projectFile.string());
+    }
+    out << doc.dump(2) << '\n';
+    log::info("bundle exported to '{}': {} file(s)", dir.string(), placed.size());
     return {};
 }
 

@@ -6,6 +6,7 @@
 #include "core/error.hpp"
 
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <string>
@@ -15,6 +16,10 @@ struct SDL_Window;
 union SDL_Event;
 
 namespace avgen::platform {
+
+// Per-user writable directory for avgen settings (SDL_GetPrefPath); empty when unavailable.
+[[nodiscard]] std::filesystem::path preferencesDirectory();
+
 
 struct WindowDesc {
     std::string title = "avgen";

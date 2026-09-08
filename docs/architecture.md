@@ -45,7 +45,7 @@ with `FixedStepClock`. Everything from `SignalBus` downwards is identical.
 | `rendering` | avgen_gpu | `SceneRenderer` (pass list, PBR/grid/skybox/tonemap pipelines, material bind groups, lights, background/post user layers, engine shader reload), `EnvironmentProcessor` (IBL), `ShaderStack`/`ShaderLayerGpu` (user layers), `ParticleRenderer` (compute pools, indirect draw), `PostProcessor` (built-in effect chain over `gpu::TransientPool`) | gpu, scene, shaders |
 | `platform` | avgen_platform | `Window` (SDL3, Metal layer, events, file dialog) | SDL3 |
 | `ui` | avgen_platform | `ImGuiLayer` (SDL3 + WebGPU backends), `ControlPanel` (transport, response, generated parameter panel, analysis plots, performance) | ImGui, ImPlot |
-| `app` | avgen | `Engine` (the pipeline; also compiled into the test binary), `Application` (live/headless loops, CLI) | everything |
+| `app` | avgen | `Engine` (the pipeline; also compiled into the test binary), `Application` (live/headless loops, CLI), `RecentFiles` | everything |
 
 Rules enforced by the target graph: `avgen_core` has no GPU or windowing dependency and is what
 most tests link; only `src/gpu/` includes `webgpu/*.h`; only `src/platform/` and `src/ui/`
@@ -96,7 +96,8 @@ the scene each frame for the renderer's built-in chain.
 
 **Presets and projects.** `params::Preset` is a path-keyed snapshot of base values; the
 `PresetBank` stores, recalls and morphs them. A project (`docs/project-format.md`, version 2)
-holds parameters, routes, sources and presets; `Engine::loadProject` validates everything before
+holds parameters, routes, sources, presets, shader layers, the timeline and, since 0.9, the asset
+references (audio, scene, environment) relative to the file (ADR-019); `Engine::loadProject` validates everything before
 mutating and re-attaches the rack. Growth path: MIDI/OSC sources, per-route blend, keyframe
 editing UI.
 
