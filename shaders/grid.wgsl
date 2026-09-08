@@ -15,7 +15,8 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     let major = gridLine(p, 1.0, 1.0);
     let minor = gridLine(p, 0.25, 0.8) * 0.35;
     let dist = length(p);
-    let fade = exp(-dist * dist * 0.012);
+    // Fade with distance so unresolved far lines do not alias into noise (no MSAA in 0.1).
+    let fade = exp(-dist * dist * 0.03);
     let intensity = frame.params.y;
     let tint = vec3<f32>(0.35, 0.55, 1.0);
     let glow = object.emissive.rgb * object.emissive.w * exp(-dist * dist * 0.6) * 0.15;

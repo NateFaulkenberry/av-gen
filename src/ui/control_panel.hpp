@@ -15,7 +15,8 @@ namespace avgen::ui {
 
 struct FrameStats {
     double fps = 0.0;
-    double cpuFrameMs = 0.0;
+    double cpuFrameMs = 0.0;      // work only (excludes vsync wait)
+    double frameIntervalMs = 0.0; // wall time between frames
     double gpuFrameMs = -1.0;
     std::uint32_t drawCalls = 0;
     std::uint32_t triangles = 0;

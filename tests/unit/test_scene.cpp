@@ -199,7 +199,7 @@ TEST_CASE("OrbScene registers all parameters and default routes", "[scene][orb]"
     CHECK(orb.scale().softMax(0) == 3.0f);
     CHECK(orb.scale().hardMax(0) == 8.0f);
     CHECK(orb.baseColor().kind() == params::ParamKind::Color);
-    CHECK(orb.cameraDistance().base() == 6.0f);
+    CHECK(orb.cameraDistance().base() == 7.0f);
 
     REQUIRE(modulator.routes().size() == 5);
     for (const params::ModRoute& route : modulator.routes()) {
@@ -232,7 +232,7 @@ TEST_CASE("OrbScene registers all parameters and default routes", "[scene][orb]"
     REQUIRE(scene.entities.size() == 2);
     CHECK(scene.entities[0].name == "orb");
     CHECK(scene.entities[0].style == MeshStyle::Lit);
-    CHECK(scene.entities[0].transform.position.y == 1.0f);
+    CHECK(scene.entities[0].transform.position.y == 1.5f); // 0.5 above the grid + default scale 1
     CHECK(scene.entities[1].name == "grid");
     CHECK(scene.entities[1].style == MeshStyle::Grid);
     CHECK(scene.entities[1].transform.position.y == 0.0f);
@@ -272,10 +272,10 @@ TEST_CASE("OrbScene integrates rotation from rotationSpeed", "[scene][orb]") {
     CHECK_THAT(d(orb.currentAngle()), WithinAbs(1.0, 1e-4));
     CHECK_THAT(d(orb.currentCameraAngle()), WithinAbs(0.25, 1e-4));
     const glm::vec3 pos = orb.scene().camera.position;
-    CHECK_THAT(d(pos.x), WithinAbs(std::sin(0.25) * 6.0, 1e-4));
-    CHECK_THAT(d(pos.z), WithinAbs(std::cos(0.25) * 6.0, 1e-4));
-    CHECK_THAT(d(pos.y), WithinAbs(1.6, 1e-6));
-    CHECK(orb.scene().camera.target == glm::vec3(0.0f, 0.8f, 0.0f));
+    CHECK_THAT(d(pos.x), WithinAbs(std::sin(0.25) * 7.0, 1e-4));
+    CHECK_THAT(d(pos.z), WithinAbs(std::cos(0.25) * 7.0, 1e-4));
+    CHECK_THAT(d(pos.y), WithinAbs(2.2, 1e-6));
+    CHECK(orb.scene().camera.target == glm::vec3(0.0f, 1.2f, 0.0f)); // orb centre (0.5 + scale 1) - 0.3
 }
 
 TEST_CASE("OrbScene writes parameters into the scene", "[scene][orb]") {

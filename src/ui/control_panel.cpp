@@ -319,7 +319,7 @@ void ControlPanel::drawAnalysis(app::Engine& engine) {
 }
 
 void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats) {
-    ImGui::Text("%.1f fps  cpu %.2f ms  gpu %s", stats.fps, stats.cpuFrameMs,
+    ImGui::Text("%.1f fps (%.1f ms)  cpu work %.2f ms  gpu %s", stats.fps, stats.frameIntervalMs, stats.cpuFrameMs,
                 stats.gpuFrameMs >= 0.0 ? (std::to_string(stats.gpuFrameMs).substr(0, 5) + " ms").c_str() : "n/a");
     ImGui::Text("%ux%u  %u draws  %u tris  analysis %.0f us/hop (%llu frames)  modulation %.0f us", stats.width,
                 stats.height, stats.drawCalls, stats.triangles, engine.stats().analysisHopMicros,

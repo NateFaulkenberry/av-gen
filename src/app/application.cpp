@@ -263,7 +263,9 @@ int Application::runLive() {
         imgui_->newFrame();
         panel_->draw(*engine_, stats);
 
+        const auto workBeforeAcquire = std::chrono::steady_clock::now();
         auto view = context_->acquireSurfaceView();
+        const auto workAfterAcquire = std::chrono::steady_clock::now();
         if (!view) {
             log::warn("frame skipped: {}", view.error().message);
             ImGui::EndFrame();
@@ -280,11 +282,15 @@ int Application::runLive() {
         wgpu::CommandBuffer commands = encoder.Finish();
         context_->queue().Submit(1, &commands);
         renderer_->timer().collect();
+        const auto workEnd = std::chrono::steady_clock::now();
         context_->present();
         context_->processEvents();
 
         const auto frameEnd = std::chrono::steady_clock::now();
-        stats.cpuFrameMs = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
+        // CPU work excludes the swapchain wait inside acquire and the present call.
+        stats.cpuFrameMs = std::chrono::duration<double, std::milli>((workBeforeAcquire - frameStart) +
+                                                                     (workEnd - workAfterAcquire)).count();
+        stats.frameIntervalMs = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
         ++fpsFrames;
         fpsAccum = std::chrono::duration<double>(frameEnd - fpsStart).count();
         if (fpsAccum >= 0.5) {

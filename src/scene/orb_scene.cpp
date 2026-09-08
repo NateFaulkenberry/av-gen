@@ -43,14 +43,14 @@ bool hasRouteTo(const params::Modulator& modulator, const std::string& target) {
 OrbScene::OrbScene(params::ParameterSet& params, params::Modulator& modulator) {
     scale_ = &params.add(floatDesc("orb/scale", 1.0f, 0.05f, 8.0f, 0.2f, 3.0f));
     rotationSpeed_ = &params.add(floatDesc("orb/rotationSpeed", 0.4f, -20.0f, 20.0f, -3.0f, 3.0f));
-    emissive_ = &params.add(floatDesc("orb/emissive", 0.25f, 0.0f, 40.0f, 0.0f, 8.0f));
+    emissive_ = &params.add(floatDesc("orb/emissive", 0.15f, 0.0f, 40.0f, 0.0f, 8.0f));
     impulse_ = &params.add(floatDesc("orb/impulse", 0.0f, 0.0f, 4.0f, 0.0f, 1.0f));
     baseColor_ = &params.add(colorDesc("orb/baseColor", glm::vec3(0.75f, 0.2f, 0.9f)));
     emissiveColor_ = &params.add(colorDesc("orb/emissiveColor", glm::vec3(0.9f, 0.45f, 1.0f)));
     brightness_ = &params.add(floatDesc("scene/brightness", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f));
     gridIntensity_ = &params.add(floatDesc("scene/gridIntensity", 0.6f, 0.0f, 4.0f));
-    cameraDistance_ = &params.add(floatDesc("camera/distance", 6.0f, 1.0f, 40.0f, 2.0f, 15.0f));
-    cameraHeight_ = &params.add(floatDesc("camera/height", 1.6f, -5.0f, 15.0f));
+    cameraDistance_ = &params.add(floatDesc("camera/distance", 7.0f, 1.0f, 40.0f, 2.0f, 15.0f));
+    cameraHeight_ = &params.add(floatDesc("camera/height", 2.2f, -5.0f, 15.0f));
     cameraOrbitSpeed_ = &params.add(floatDesc("camera/orbitSpeed", 0.08f, -3.0f, 3.0f));
 
     const MeshId orbMesh = scene_.addMesh(makeIcosphere(1.0f, 3));
@@ -59,7 +59,7 @@ OrbScene::OrbScene(params::ParameterSet& params, params::Modulator& modulator) {
     orbEntity_ = scene_.entities.size();
     Entity& orb = scene_.addEntity("orb", orbMesh);
     orb.style = MeshStyle::Lit;
-    orb.transform.position = glm::vec3(0.0f, 1.0f, 0.0f);
+    orb.transform.position = glm::vec3(0.0f, 1.5f, 0.0f);
 
     gridEntity_ = scene_.entities.size();
     Entity& grid = scene_.addEntity("grid", gridMesh);
@@ -81,7 +81,7 @@ void OrbScene::addDefaultRoutes(params::Modulator& modulator) {
     };
 
     {
-        ModRoute r{.source = "audio.bass", .target = "orb/scale", .amount = 1.2f};
+        ModRoute r{.source = "audio.bass", .target = "orb/scale", .amount = 0.9f};
         r.chain.curve = params::CurveType::Power;
         r.chain.curveAmount = 0.8f;
         r.chain.attackMs = 15.0f;
@@ -95,13 +95,13 @@ void OrbScene::addDefaultRoutes(params::Modulator& modulator) {
         addIfMissing(std::move(r));
     }
     {
-        ModRoute r{.source = "audio.treble", .target = "orb/emissive", .amount = 6.0f};
+        ModRoute r{.source = "audio.treble", .target = "orb/emissive", .amount = 2.0f};
         r.chain.attackMs = 10.0f;
         r.chain.decayMs = 250.0f;
         addIfMissing(std::move(r));
     }
     {
-        ModRoute r{.source = "audio.rms", .target = "scene/brightness", .amount = 1.0f};
+        ModRoute r{.source = "audio.rms", .target = "scene/brightness", .amount = 0.5f};
         r.chain.attackMs = 30.0f;
         r.chain.decayMs = 500.0f;
         addIfMissing(std::move(r));
@@ -122,6 +122,8 @@ void OrbScene::update(const FrameTime& time) {
 
     Entity& orb = scene_.entities[orbEntity_];
     orb.transform.scale = glm::vec3(scale_->value() + impulse_->value());
+    // Float above the grid: the orb's bottom stays 0.5 m over the floor however large it gets.
+    orb.transform.position.y = 0.5f + orb.transform.scale.y;
     orb.transform.rotation = glm::angleAxis(angle_, glm::normalize(glm::vec3(0.3f, 1.0f, 0.2f)));
     orb.material.baseColor = baseColor_->value();
     orb.material.emissiveColor = emissiveColor_->value();
@@ -133,7 +135,7 @@ void OrbScene::update(const FrameTime& time) {
     const float distance = cameraDistance_->value();
     scene_.camera.position = glm::vec3(std::sin(cameraAngle_) * distance, cameraHeight_->value(),
                                        std::cos(cameraAngle_) * distance);
-    scene_.camera.target = glm::vec3(0.0f, 0.8f, 0.0f);
+    scene_.camera.target = glm::vec3(0.0f, orb.transform.position.y - 0.3f, 0.0f);
 }
 
 } // namespace avgen::scene

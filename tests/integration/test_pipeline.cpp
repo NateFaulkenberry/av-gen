@@ -105,7 +105,7 @@ TEST_CASE("Audio drives scene parameters through the modulation system", "[integ
     CHECK_THAT(brightnessSilence, Catch::Matchers::WithinAbs(1.0, 1e-3));
     // Bass -> scale, and treble does not inflate scale.
     CHECK(scaleBass > 1.5f);
-    CHECK(scaleTreble < scaleBass * 0.5f);
+    CHECK(scaleTreble < 1.1f); // treble does not inflate scale
     // Treble -> emissive.
     CHECK(emissiveTreble > emissiveBass + 1.0f);
     // RMS -> brightness.
