@@ -24,15 +24,15 @@ Result<std::unique_ptr<ImGuiLayer>> ImGuiLayer::create(platform::Window& window,
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_NavEnableKeyboard;
     io.IniFilename = nullptr; // no layout persistence in 0.1
 
+    // SDL3 reports logical points on macOS; ImGui 1.92's dynamic fonts rasterise at the
+    // framebuffer scale automatically, so styles and font sizes stay in points.
     const float scale = window.pixelScale();
     ImGui::StyleColorsDark();
     ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(scale);
-    style.WindowRounding = 6.0f * scale;
-    style.FrameRounding = 4.0f * scale;
-    io.FontGlobalScale = 1.0f;
+    style.WindowRounding = 6.0f;
+    style.FrameRounding = 4.0f;
     ImFontConfig fontConfig;
-    fontConfig.SizePixels = 15.0f * scale;
+    fontConfig.SizePixels = 15.0f;
     io.Fonts->AddFontDefault(&fontConfig);
 
     if (!ImGui_ImplSDL3_InitForOther(window.handle())) {

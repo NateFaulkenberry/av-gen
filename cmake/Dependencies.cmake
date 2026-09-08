@@ -137,7 +137,8 @@ add_library(imgui STATIC EXCLUDE_FROM_ALL
     "${implot_SOURCE_DIR}/implot.cpp"
     "${implot_SOURCE_DIR}/implot_items.cpp")
 target_include_directories(imgui SYSTEM PUBLIC "${imgui_SOURCE_DIR}" "${imgui_SOURCE_DIR}/backends" "${implot_SOURCE_DIR}")
-target_compile_definitions(imgui PUBLIC IMGUI_IMPL_WEBGPU_BACKEND_DAWN IMGUI_DISABLE_OBSOLETE_FUNCTIONS)
+# ImPlot v1.0 still uses ImDrawList overloads that IMGUI_DISABLE_OBSOLETE_FUNCTIONS deletes.
+target_compile_definitions(imgui PUBLIC IMGUI_IMPL_WEBGPU_BACKEND_DAWN)
 target_link_libraries(imgui PUBLIC SDL3::SDL3-static dawn::webgpu_dawn)
 target_compile_features(imgui PUBLIC cxx_std_20)
 if(APPLE)

@@ -66,8 +66,6 @@ private:
     std::uint32_t pixelHeight_ = 0;
     float pixelScale_ = 1.0f;
     std::function<void(std::string)> pendingDialog_;
-    std::vector<std::string> dialogResults_;
-    bool dialogCancelled_ = false;
     std::uint32_t dialogEventType_ = 0;
 };
 
