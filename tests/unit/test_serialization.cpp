@@ -486,7 +486,8 @@ TEST_CASE("Documents newer than the supported version are rejected", "[serializa
     doc["version"] = kProjectFormatVersion + 1;
     auto result = loadProject(doc, f.params, f.modulator, &f.rack, &f.bank);
     REQUIRE_FALSE(result.has_value());
-    CHECK_THAT(result.error().message, ContainsSubstring("version " + std::to_string(kProjectFormatVersion + 1)));
+    CHECK_THAT(result.error().message,
+               ContainsSubstring("version " + std::to_string(kProjectFormatVersion + 1)));
     doc["version"] = 0;
     CHECK_FALSE(loadProject(doc, f.params, f.modulator, &f.rack, &f.bank).has_value());
     CHECK(f.rack.sources().size() == 3);
@@ -568,4 +569,143 @@ TEST_CASE("Version 2 project files round-trip on disk", "[serialization][v2][fil
         CHECK_THAT(d(g.scale.base()), WithinAbs(3.5, 1e-6));
     }
     std::filesystem::remove(path);
+}
+
+// ---- version 4: explicit migration ------------------------------------------------------------
+
+namespace {
+json v1Document() {
+    return json{
+        {"format", kProjectFormatName},
+        {"version", 1},
+        {"parameters", json{{"orb/scale", 1.25}, {"orb/count", 4}}},
+        {"routes", json::array({json{{"source", "audio.bass"}, {"target", "orb/scale"}},
+                                json{{"source", "audio.mid"}, {"target", "orb/count"}, {"amount", 0.5}}})},
+        {"customTool", json{{"note", "kept"}}}};
+}
+} // namespace
+
+TEST_CASE("A version 1 document migrates to the current version in three steps", "[serialization][v4]") {
+    json doc = v1Document();
+    auto report = migrateProject(doc);
+    REQUIRE(report.has_value());
+    CHECK(report->fromVersion == 1);
+    CHECK(report->toVersion == kProjectFormatVersion);
+    REQUIRE(report->steps.size() == 3);
+    CHECK_THAT(report->steps[0], ContainsSubstring("1 -> 2"));
+    CHECK_THAT(report->steps[1], ContainsSubstring("2 -> 3"));
+    CHECK_THAT(report->steps[2], ContainsSubstring("3 -> 4"));
+
+    CHECK(doc["version"] == kProjectFormatVersion);
+    CHECK(doc["format"] == kProjectFormatName);
+    REQUIRE(doc["routes"].size() == 2);
+    CHECK(doc["routes"][0]["polarity"] == "unipolar");
+    CHECK(doc["routes"][1]["polarity"] == "unipolar");
+    CHECK(doc["routes"][1]["amount"] == 0.5);
+    CHECK(doc["sources"] == json::array());
+    CHECK(doc["presets"] == json::array());
+    CHECK(doc["shaders"] == json::array());
+    CHECK_FALSE(doc.contains("timeline"));
+    CHECK(doc["assets"] == json::object());
+    CHECK(doc["app"]["name"] == "avgen");
+    CHECK(doc["app"]["version"] == "unknown");
+    CHECK(doc["customTool"]["note"] == "kept"); // unknown keys survive
+    CHECK(doc["parameters"]["orb/scale"] == 1.25);
+
+    // The migrated document loads with the polarity the migration wrote.
+    Fixture f;
+    REQUIRE(loadProject(doc, f.params, f.modulator).has_value());
+    CHECK_THAT(d(f.scale.base()), WithinAbs(1.25, 1e-6));
+    REQUIRE(f.modulator.routes().size() == 2);
+    CHECK(f.modulator.routes()[0].polarity == Polarity::Unipolar);
+    CHECK(f.modulator.routes()[1].polarity == Polarity::Unipolar);
+}
+
+TEST_CASE("A version 2 document gains shaders, assets and app", "[serialization][v4]") {
+    json doc =
+        json{{"format", kProjectFormatName},
+             {"version", 2},
+             {"parameters", json::object()},
+             {"routes", json::array({json{{"source", "s"}, {"target", "t"}, {"polarity", "bipolar"}}})},
+             {"sources", json::array({json{{"kind", "noise"}, {"name", "n"}}})},
+             {"presets", json::array()}};
+    auto report = migrateProject(doc);
+    REQUIRE(report.has_value());
+    CHECK(report->fromVersion == 2);
+    CHECK(report->steps.size() == 2);
+    CHECK(doc["version"] == kProjectFormatVersion);
+    CHECK(doc["shaders"] == json::array());
+    CHECK(doc["assets"] == json::object());
+    CHECK(doc["app"]["name"] == "avgen");
+    CHECK(doc["routes"][0]["polarity"] == "bipolar"); // existing values are not overwritten
+    CHECK(doc["sources"].size() == 1);
+
+    // Existing keys are kept on every hop.
+    json custom = json{{"format", kProjectFormatName},
+                       {"version", 3},
+                       {"shaders", json::array({json{{"name", "x"}}})},
+                       {"assets", json{{"audio", "a.wav"}}},
+                       {"app", json{{"name", "other"}, {"version", "9"}}}};
+    REQUIRE(migrateProject(custom).has_value());
+    CHECK(custom["shaders"].size() == 1);
+    CHECK(custom["assets"]["audio"] == "a.wav");
+    CHECK(custom["app"]["name"] == "other");
+}
+
+TEST_CASE("A current document reports no migration steps", "[serialization][v4]") {
+    Fixture f;
+    json doc = saveProject(f.params, f.modulator);
+    REQUIRE(doc["version"] == kProjectFormatVersion);
+    const json before = doc;
+    auto report = migrateProject(doc);
+    REQUIRE(report.has_value());
+    CHECK(report->fromVersion == kProjectFormatVersion);
+    CHECK(report->toVersion == kProjectFormatVersion);
+    CHECK(report->steps.empty());
+    CHECK(doc == before);
+}
+
+TEST_CASE("migrateProject rejects newer versions, bad envelopes and non-objects", "[serialization][v4]") {
+    json newer = json{{"format", kProjectFormatName}, {"version", 5}};
+    auto result = migrateProject(newer);
+    REQUIRE_FALSE(result.has_value());
+    CHECK_THAT(result.error().message, ContainsSubstring("version 5"));
+    CHECK(newer["version"] == 5); // untouched on failure
+
+    json array = json::array();
+    CHECK_FALSE(migrateProject(array).has_value());
+    json number = json(3);
+    CHECK_FALSE(migrateProject(number).has_value());
+    json wrongFormat = json{{"format", "avgen-scene"}, {"version", 1}};
+    auto wrong = migrateProject(wrongFormat);
+    REQUIRE_FALSE(wrong.has_value());
+    CHECK_THAT(wrong.error().message, ContainsSubstring("format"));
+    json noVersion = json{{"format", kProjectFormatName}};
+    CHECK_FALSE(migrateProject(noVersion).has_value());
+    json stringVersion = json{{"format", kProjectFormatName}, {"version", "1"}};
+    CHECK_FALSE(migrateProject(stringVersion).has_value());
+    json zero = json{{"format", kProjectFormatName}, {"version", 0}};
+    CHECK_FALSE(migrateProject(zero).has_value());
+}
+
+TEST_CASE("loadProject migrates a copy and leaves the caller's document unchanged", "[serialization][v4]") {
+    const json doc = v1Document();
+    const json before = doc;
+    Fixture f;
+    REQUIRE(loadProject(doc, f.params, f.modulator).has_value());
+    CHECK(doc == before);
+    CHECK(doc["version"] == 1);
+    CHECK_FALSE(doc.contains("shaders"));
+    CHECK_FALSE(doc["routes"][0].contains("polarity"));
+    CHECK_THAT(d(f.scale.base()), WithinAbs(1.25, 1e-6));
+    CHECK(f.count.base() == 4);
+    REQUIRE(f.modulator.routes().size() == 2);
+    CHECK(f.modulator.routes()[0].polarity == Polarity::Unipolar);
+
+    // A version 5 document is rejected with the same message as before.
+    json newer = saveProject(f.params, f.modulator);
+    newer["version"] = 5;
+    auto rejected = loadProject(newer, f.params, f.modulator);
+    REQUIRE_FALSE(rejected.has_value());
+    CHECK_THAT(rejected.error().message, ContainsSubstring("version 5"));
 }

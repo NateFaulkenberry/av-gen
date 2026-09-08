@@ -4,13 +4,22 @@ Decision: ADR-010 (serialisation) and ADR-011 (what is serialised). Implemented 
 `src/params/serialization.cpp`; used by tests today and by the project system in 0.9.
 
 Version 2 (milestone 0.3) adds modulation sources, presets and per-route polarity. Version 3
-(milestone 0.8) adds `"shaders"` (written by the engine since 0.4) and `"timeline"`. Older
-documents load unchanged.
+(milestone 0.8) adds `"shaders"` (written by the engine since 0.4) and `"timeline"`. Version 4
+(milestone 0.9) adds `"assets"` (audio / scene / environment references) and `"app"`
+(`{ "name", "version" }` of the writer); both are filled in by the engine.
+
+Older documents are upgraded in memory by `params::migrateProject`, one version at a time,
+before loading (the file on disk is only rewritten on save, at the current version); every step
+is logged at info level. 1 -> 2: routes without `polarity` get `"unipolar"`, empty `sources` /
+`presets` are added. 2 -> 3: an empty `shaders` array is added (`timeline` stays absent, meaning
+none). 3 -> 4: `"assets": {}` and `"app": { "name": "avgen", "version": "unknown" }` are added.
+Keys that already exist are kept, and unknown keys survive. A `version` newer than the reader's
+is rejected.
 
 ```json
 {
   "format": "avgen-project",
-  "version": 2,
+  "version": 4,
   "parameters": {
     "orb/scale": 1.0,
     "orb/baseColor": [0.75, 0.2, 0.9],
@@ -83,7 +92,7 @@ Rules:
 - Loading validates everything first (including `sources` and `presets`, whether or not the
   caller loads them) and changes nothing on failure. Unknown parameter paths are skipped with a
   warning (forward compatibility); a type mismatch is an error. `version` greater than the
-  reader's is rejected; older versions will be migrated in order.
+  reader's is rejected; older versions are migrated in order (see above).
 - Paths are the identity for parameters everywhere: UI, presets, OSC addresses (`/orb/scale`).
 
 

@@ -321,8 +321,10 @@ json saveProject(const ParameterSet& params, const Modulator& modulator, const s
     return doc;
 }
 
-Result<void> loadProject(const json& doc, ParameterSet& params, Modulator& modulator,
-                         signals::SourceRack* sources, PresetBank* presets) {
+namespace {
+
+// Validates the envelope shared by migrateProject and loadProject and returns the version.
+Result<int> readEnvelope(const json& doc) {
     if (!doc.is_object()) {
         return fail("project document must be a JSON object");
     }
@@ -334,12 +336,98 @@ Result<void> loadProject(const json& doc, ParameterSet& params, Modulator& modul
     if (version == doc.end() || !version->is_number_integer()) {
         return fail("project is missing an integer 'version'");
     }
-    if (version->get<int>() > kProjectFormatVersion) {
-        return fail("project version {} is newer than supported version {}", version->get<int>(),
-                    kProjectFormatVersion);
+    const int v = version->get<int>();
+    if (v > kProjectFormatVersion) {
+        return fail("project version {} is newer than supported version {}", v, kProjectFormatVersion);
     }
-    if (version->get<int>() < 1) {
-        return fail("project version {} is not valid", version->get<int>());
+    if (v < 1) {
+        return fail("project version {} is not valid", v);
+    }
+    return v;
+}
+
+// Inserts `value` under `key` when absent. Returns true when it was added.
+bool addDefault(json& doc, const char* key, json value) {
+    if (doc.contains(key)) {
+        return false;
+    }
+    doc[key] = std::move(value);
+    return true;
+}
+
+// 1 -> 2: routes gain an explicit polarity; sources and presets become explicit (empty) sections.
+std::string migrate1To2(json& doc) {
+    std::size_t routesFixed = 0;
+    if (const auto routes = doc.find("routes"); routes != doc.end() && routes->is_array()) {
+        for (json& route : *routes) {
+            if (route.is_object() && addDefault(route, "polarity", "unipolar")) {
+                ++routesFixed;
+            }
+        }
+    }
+    std::string added;
+    if (addDefault(doc, "sources", json::array())) {
+        added += " 'sources'";
+    }
+    if (addDefault(doc, "presets", json::array())) {
+        added += " 'presets'";
+    }
+    return fmt::format("1 -> 2: set polarity 'unipolar' on {} route(s); added empty{}", routesFixed,
+                       added.empty() ? " (nothing)" : added.c_str());
+}
+
+// 2 -> 3: "shaders" is declared (the engine has written it since 0.4); "timeline" stays optional.
+std::string migrate2To3(json& doc) {
+    const bool added = addDefault(doc, "shaders", json::array());
+    return fmt::format("2 -> 3: {} 'shaders'; 'timeline' left absent (none)",
+                       added ? "added empty" : "kept existing");
+}
+
+// 3 -> 4: asset references and the writing application, both filled in by the engine on save.
+std::string migrate3To4(json& doc) {
+    const bool assets = addDefault(doc, "assets", json::object());
+    const bool app = addDefault(doc, "app", json{{"name", "avgen"}, {"version", "unknown"}});
+    return fmt::format("3 -> 4: {} 'assets'; {} 'app'", assets ? "added empty" : "kept existing",
+                       app ? "added placeholder" : "kept existing");
+}
+
+} // namespace
+
+Result<MigrationReport> migrateProject(json& doc) {
+    const auto version = readEnvelope(doc);
+    if (!version) {
+        return std::unexpected(version.error());
+    }
+    MigrationReport report{.fromVersion = *version, .toVersion = kProjectFormatVersion};
+    for (int v = *version; v < kProjectFormatVersion; ++v) {
+        switch (v) {
+        case 1:
+            report.steps.push_back(migrate1To2(doc));
+            break;
+        case 2:
+            report.steps.push_back(migrate2To3(doc));
+            break;
+        case 3:
+            report.steps.push_back(migrate3To4(doc));
+            break;
+        default:
+            return fail("no migration from project version {}", v);
+        }
+    }
+    doc["version"] = kProjectFormatVersion;
+    return report;
+}
+
+Result<void> loadProject(const json& original, ParameterSet& params, Modulator& modulator,
+                         signals::SourceRack* sources, PresetBank* presets) {
+    // Work on an upgraded copy so the caller's document (and its version) stays as it was.
+    json doc = original;
+    const auto migration = migrateProject(doc);
+    if (!migration) {
+        return std::unexpected(migration.error());
+    }
+    for (const std::string& step : migration->steps) {
+        log::info("project migrated: {}", step);
     }
 
     // Validate everything before mutating anything so a bad file leaves the state untouched.
