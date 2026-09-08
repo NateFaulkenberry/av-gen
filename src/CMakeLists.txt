@@ -1,6 +1,6 @@
-# ---- avgen_core: GPU-free engine logic (core, audio, analysis, signals, params, scene, assets) ---
+# ---- avgen_core: GPU-free engine logic (core, audio, analysis, signals, params, scene, assets, shaders)
 file(GLOB_RECURSE AVGEN_CORE_SOURCES CONFIGURE_DEPENDS
-    core/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp assets/*.cpp)
+    core/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp assets/*.cpp shaders/*.cpp)
 add_library(avgen_core STATIC ${AVGEN_CORE_SOURCES})
 target_include_directories(avgen_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(avgen_core
