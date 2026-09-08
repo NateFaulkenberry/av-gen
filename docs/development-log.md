@@ -65,8 +65,9 @@ v20260907.201642):
 - gpu (5): headless context, shader diagnostics, clear + exact readback, deterministic lit-cube
   render (hash equality, stats), resize and invalid-mesh robustness.
 
-Sanitizers: the `asan` preset (ASan + UBSan) was built and run at the end of the milestone (see
-"Results" below for the outcome recorded at commit time).
+Sanitizers: the `asan` preset (ASan + UBSan) builds warning-free and passes all 132 tests with
+no sanitizer reports (includes the concurrent ring-buffer, analysis-stream, runner-thread and
+audio-device tests).
 
 ### Results (Task 9 verification)
 
