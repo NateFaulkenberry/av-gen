@@ -43,4 +43,10 @@ void ParameterSet::registerParameter(std::unique_ptr<IParameter> param) {
     index_.emplace(path, raw);
 }
 
+void ParameterSet::clear() {
+    index_.clear();
+    ordered_.clear();
+    storage_.clear();
+}
+
 } // namespace avgen::params

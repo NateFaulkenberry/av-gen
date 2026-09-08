@@ -39,6 +39,15 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
             if (ImGui::MenuItem("Open Audio...", "O") && onOpenAudio) {
                 onOpenAudio();
             }
+            if (ImGui::MenuItem("Open Scene (glTF)...", "S") && onOpenScene) {
+                onOpenScene();
+            }
+            if (ImGui::MenuItem("Open Environment (HDR)...", "E") && onOpenEnvironment) {
+                onOpenEnvironment();
+            }
+            if (ImGui::MenuItem("Built-in Orb Scene") && onOrbScene) {
+                onOrbScene();
+            }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("View")) {
@@ -124,31 +133,27 @@ void ControlPanel::drawTransport(app::Engine& engine) {
 }
 
 void ControlPanel::drawResponse(app::Engine& engine) {
-    ImGui::TextUnformatted("Audio response (modulation route amounts)");
+    ImGui::Text("Scene: %s", engine.controller().name().c_str());
+    if (!engine.environmentPath().empty()) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("env: %s", engine.environmentPath().filename().string().c_str());
+    }
+    ImGui::TextUnformatted("Audio response (modulation routes)");
     auto& modulator = engine.modulator();
     ImGui::SetNextItemWidth(-1);
     ImGui::SliderFloat("Master gain", &modulator.masterGain, 0.0f, 3.0f);
-    struct Row {
-        const char* label;
-        const char* target;
-        float max;
-    };
-    const Row rows[] = {{"Bass -> scale", "orb/scale", 4.0f},
-                        {"Mid -> rotation", "orb/rotationSpeed", 10.0f},
-                        {"High -> emission", "orb/emissive", 20.0f},
-                        {"RMS -> brightness", "scene/brightness", 3.0f},
-                        {"Onset -> impulse", "orb/impulse", 2.0f}};
-    for (const auto& row : rows) {
-        if (auto* route = engine.routeForTarget(row.target)) {
-            ImGui::PushID(row.target);
-            ImGui::Checkbox("##on", &route->enabled);
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(-90);
-            ImGui::SliderFloat(row.label, &route->amount, 0.0f, row.max);
-            ImGui::SameLine();
-            ImGui::Text("%+.2f", static_cast<double>(route->lastOutput));
-            ImGui::PopID();
-        }
+    int id = 0;
+    for (auto& route : modulator.routes()) {
+        ImGui::PushID(id++);
+        ImGui::Checkbox("##on", &route.enabled);
+        ImGui::SameLine();
+        const std::string label = route.source + " -> " + route.target;
+        const float maxAmount = std::max(1.0f, std::abs(route.amount) * 3.0f);
+        ImGui::SetNextItemWidth(-90);
+        ImGui::SliderFloat(label.c_str(), &route.amount, -maxAmount, maxAmount);
+        ImGui::SameLine();
+        ImGui::Text("%+.2f", static_cast<double>(route.lastOutput));
+        ImGui::PopID();
     }
 }
 

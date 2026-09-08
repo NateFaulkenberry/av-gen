@@ -41,6 +41,7 @@ public:
 
     void resetFinals();       // final = base for every parameter (start of modulation pass)
     void resetAllToDefault();
+    void clear();             // removes every parameter (scene switch); invalidates all pointers
 
 private:
     void registerParameter(std::unique_ptr<IParameter> param);

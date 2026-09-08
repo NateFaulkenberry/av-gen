@@ -10,19 +10,21 @@
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/scene.hpp"
+#include "scene/scene_controller.hpp"
 
 namespace avgen::scene {
 
-class OrbScene {
+class OrbScene final : public SceneController {
 public:
     // Registers parameters in `params` and default routes in `modulator`. The caller binds the
     // modulator once signals are declared.
     OrbScene(params::ParameterSet& params, params::Modulator& modulator);
 
+    [[nodiscard]] std::string name() const override { return "orb"; }
     // Reads parameter finals and writes the Scene. Rotation integrates rotationSpeed * dt.
-    void update(const FrameTime& time);
-    [[nodiscard]] const Scene& scene() const { return scene_; }
-    [[nodiscard]] Scene& scene() { return scene_; }
+    void update(const FrameTime& time) override;
+    [[nodiscard]] const Scene& scene() const override { return scene_; }
+    [[nodiscard]] Scene& scene() override { return scene_; }
 
     // Adds the five default modulation routes (idempotent by target).
     static void addDefaultRoutes(params::Modulator& modulator);

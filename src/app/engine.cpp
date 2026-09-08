@@ -1,20 +1,107 @@
 #include "app/engine.hpp"
 
+#include "assets/image.hpp"
 #include "core/log.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 
 namespace avgen::app {
 
-Engine::Engine(EngineMode mode) : mode_(mode), orbScene_(params_, modulator_) {
+Engine::Engine(EngineMode mode) : mode_(mode) {
     audioSignals_ = signals::AudioSignals::declare(bus_);
-    if (auto r = modulator_.bind(bus_, params_); !r) {
-        log::error("modulation bind: {}", r.error().message);
-    }
+    installController(std::make_unique<scene::OrbScene>(params_, modulator_));
     if (mode_ == EngineMode::Live) {
         player_ = std::make_unique<audio::AudioPlayer>();
     }
+}
+
+void Engine::installController(std::unique_ptr<scene::SceneController> controller) {
+    controller_ = std::move(controller);
+    if (auto r = modulator_.bind(bus_, params_); !r) {
+        log::error("modulation bind: {}", r.error().message);
+    }
+    modulator_.resetState();
+}
+
+Result<void> Engine::loadScene(const std::filesystem::path& path) {
+    // Build the new controller into fresh parameter/route sets so a failed load leaves the
+    // current scene untouched.
+    params::ParameterSet freshParams;
+    params::Modulator freshModulator;
+    freshModulator.masterGain = modulator_.masterGain;
+    auto ctrl = scene::GltfScene::load(path, freshParams, freshModulator);
+    if (!ctrl) {
+        return std::unexpected(ctrl.error());
+    }
+    params_.clear();
+    modulator_.clearRoutes();
+    // Re-register into the engine's own sets (the loader registered into the temporaries).
+    std::unique_ptr<scene::GltfScene> owned = std::move(*ctrl);
+    auto rebuilt = scene::GltfScene::load(path, params_, modulator_);
+    if (!rebuilt) {
+        installController(std::make_unique<scene::OrbScene>(params_, modulator_));
+        return std::unexpected(rebuilt.error());
+    }
+    installController(std::move(*rebuilt));
+    return reapplyEnvironment();
+}
+
+void Engine::loadOrbScene() {
+    params_.clear();
+    modulator_.clearRoutes();
+    installController(std::make_unique<scene::OrbScene>(params_, modulator_));
+    if (auto r = reapplyEnvironment(); !r) {
+        log::warn("environment: {}", r.error().message);
+    }
+}
+
+Result<void> Engine::reapplyEnvironment() {
+    if (environmentPath_.empty()) {
+        return {};
+    }
+    auto image = assets::loadImage(environmentPath_, false);
+    if (!image) {
+        return std::unexpected(image.error());
+    }
+    if (!image->isHdr()) {
+        return fail("'{}' is not an HDR image", environmentPath_.string());
+    }
+    auto& sc = controller_->scene();
+    sc.environment.environmentMap = sc.addTexture(std::move(*image));
+    return {};
+}
+
+Result<void> Engine::loadEnvironment(const std::filesystem::path& path) {
+    auto image = assets::loadImage(path, false);
+    if (!image) {
+        return std::unexpected(image.error());
+    }
+    if (!image->isHdr()) {
+        return fail("'{}' is not an HDR (Radiance .hdr) image", path.string());
+    }
+    auto& sc = controller_->scene();
+    sc.environment.environmentMap = sc.addTexture(std::move(*image));
+    environmentPath_ = path;
+    log::info("environment map '{}' installed", path.filename().string());
+    return {};
+}
+
+Result<void> Engine::loadFile(const std::filesystem::path& path) {
+    std::string ext = path.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (ext == ".gltf" || ext == ".glb") {
+        return loadScene(path);
+    }
+    if (ext == ".hdr") {
+        return loadEnvironment(path);
+    }
+    auto duration = loadAudio(path);
+    if (!duration) {
+        return std::unexpected(duration.error());
+    }
+    return {};
 }
 
 Engine::~Engine() {
@@ -171,7 +258,7 @@ void Engine::update(const FrameTime& time) {
     }
 
     modulator_.evaluate(bus_, params_, time.deltaTime);
-    orbScene_.update(time);
+    controller_->update(time);
     bus_.clearEvents();
 
     const auto end = std::chrono::steady_clock::now();

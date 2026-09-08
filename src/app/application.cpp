@@ -1,5 +1,6 @@
 #include "app/application.hpp"
 
+#include "assets/image.hpp"
 #include "core/time.hpp"
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
@@ -21,6 +22,8 @@ namespace avgen::app {
 std::string usageText() {
     return "usage: avgen [options]\n"
            "  --audio <file>      load an audio file at start-up\n"
+           "  --scene <file>      load a glTF/GLB scene (default: built-in orb)\n"
+           "  --env <file>        load an equirectangular .hdr environment map\n"
            "  --play              start playback immediately\n"
            "  --frames <n>        exit after n frames\n"
            "  --capture <file>    write the last frame as a PPM image\n"
@@ -51,6 +54,16 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--audio");
             if (!v) return std::unexpected(v.error());
             options.audio = *v;
+            ++i;
+        } else if (arg == "--scene") {
+            auto v = need(i, "--scene");
+            if (!v) return std::unexpected(v.error());
+            options.scene = *v;
+            ++i;
+        } else if (arg == "--env") {
+            auto v = need(i, "--env");
+            if (!v) return std::unexpected(v.error());
+            options.environment = *v;
             ++i;
         } else if (arg == "--capture") {
             auto v = need(i, "--capture");
@@ -115,7 +128,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
 
     if (!options.headless) {
         platform::WindowDesc wdesc;
-        wdesc.title = "avgen 0.1";
+        wdesc.title = "avgen 0.2";
         wdesc.width = options.width;
         wdesc.height = options.height;
         auto window = platform::Window::create(wdesc);
@@ -150,13 +163,38 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         }
         imgui_ = std::move(*imgui);
         panel_ = std::make_unique<ui::ControlPanel>();
-        panel_->onOpenAudio = [this] {
-            window_->openFileDialog([this](std::string path) {
-                if (!path.empty()) {
-                    loadAudio(path);
-                }
-            });
+        auto dialog = [this](platform::Window::DialogKind kind) {
+            return [this, kind] {
+                window_->openFileDialog(kind, [this](std::string path) {
+                    if (!path.empty()) {
+                        loadAny(path);
+                    }
+                });
+            };
         };
+        panel_->onOpenAudio = dialog(platform::Window::DialogKind::Audio);
+        panel_->onOpenScene = dialog(platform::Window::DialogKind::Scene);
+        panel_->onOpenEnvironment = dialog(platform::Window::DialogKind::Environment);
+        panel_->onOrbScene = [this] { engine_->loadOrbScene(); };
+    }
+
+    if (options.scene) {
+        if (auto r = engine_->loadScene(*options.scene); !r) {
+            log::error("scene: {}", r.error().message);
+            if (options.headless) {
+                return std::unexpected(r.error());
+            }
+            if (panel_) panel_->setStatus(r.error().message);
+        }
+    }
+    if (options.environment) {
+        if (auto r = engine_->loadEnvironment(*options.environment); !r) {
+            log::error("environment: {}", r.error().message);
+            if (options.headless) {
+                return std::unexpected(r.error());
+            }
+            if (panel_) panel_->setStatus(r.error().message);
+        }
     }
 
     if (options.audio) {
@@ -190,6 +228,32 @@ void Application::loadAudio(const std::filesystem::path& path) {
     }
 }
 
+void Application::loadAny(const std::filesystem::path& path) {
+    auto r = engine_->loadFile(path);
+    if (!r) {
+        log::error("open '{}': {}", path.string(), r.error().message);
+        if (panel_) {
+            panel_->setStatus(r.error().message);
+        }
+        return;
+    }
+    if (panel_) {
+        panel_->setStatus({});
+    }
+    if (window_) {
+        window_->setTitle("avgen 0.2 - " + path.filename().string());
+    }
+}
+
+namespace {
+Result<void> writeCapture(const gpu::Image8& image, const std::filesystem::path& path) {
+    if (path.extension() == ".png") {
+        return assets::writePng(path, image.width, image.height, image.rgba);
+    }
+    return gpu::writePpm(image, path);
+}
+} // namespace
+
 Result<void> Application::captureFrame(const FrameTime& time, const std::filesystem::path& path) {
     const std::uint32_t w = window_ ? window_->pixelWidth() : 1280;
     const std::uint32_t h = window_ ? window_->pixelHeight() : 720;
@@ -197,7 +261,7 @@ Result<void> Application::captureFrame(const FrameTime& time, const std::filesys
     if (!image) {
         return std::unexpected(image.error());
     }
-    if (auto r = gpu::writePpm(*image, path); !r) {
+    if (auto r = writeCapture(*image, path); !r) {
         return r;
     }
     log::info("captured frame {} ({}x{}) to {}", time.frameIndex, w, h, path.string());
@@ -226,6 +290,10 @@ int Application::runLive() {
                     engine_->togglePlay();
                 } else if (event.key.key == SDLK_O && panel_ && panel_->onOpenAudio) {
                     panel_->onOpenAudio();
+                } else if (event.key.key == SDLK_S && panel_ && panel_->onOpenScene) {
+                    panel_->onOpenScene();
+                } else if (event.key.key == SDLK_E && panel_ && panel_->onOpenEnvironment) {
+                    panel_->onOpenEnvironment();
                 } else if (event.key.key == SDLK_LEFT) {
                     engine_->seekSeconds(engine_->positionSeconds() - 5.0);
                 } else if (event.key.key == SDLK_RIGHT) {
@@ -237,7 +305,7 @@ int Application::runLive() {
             break;
         }
         for (const auto& dropped : events.droppedFiles) {
-            loadAudio(dropped);
+            loadAny(dropped);
         }
         if (window_->minimised()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -303,7 +371,8 @@ int Application::runLive() {
             const auto& f = engine_->latestFrame();
             log::debug("frame {} t={:.2f}s fps={:.1f} cpu={:.2f}ms gpu={:.2f}ms bass={:.2f} mid={:.2f} treble={:.2f} scale={:.2f}",
                        framesRendered, time.renderTime, stats.fps, stats.cpuFrameMs, stats.gpuFrameMs,
-                       f.bands[0], f.bands[2], f.bands[4], engine_->orbScene().scale().value());
+                       f.bands[0], f.bands[2], f.bands[4],
+                       engine_->params().ordered().empty() ? 0.0f : engine_->params().ordered().front()->finalComponent(0));
         }
         if (options_.frames >= 0 && framesRendered >= options_.frames) {
             break;
@@ -349,11 +418,14 @@ int Application::runHeadless() {
             log::info("offline frame {:4d} t={:7.3f}s bass={:.2f} mid={:.2f} treble={:.2f} rms={:.2f} onset={} scale={:.3f} "
                       "emissive={:.2f} gpu={:.2f}ms hash={:016x}",
                       i, time.renderTime, f.bands[0], f.bands[2], f.bands[4], f.rms, f.onset ? 1 : 0,
-                      engine_->orbScene().scale().value(), engine_->orbScene().emissive().value(),
+                      engine_->params().find("orb/scale") ? engine_->params().find("orb/scale")->finalComponent(0)
+                                                          : engine_->params().find("root/scale")->finalComponent(0),
+                      engine_->params().find("orb/emissive") ? engine_->params().find("orb/emissive")->finalComponent(0)
+                                                             : engine_->params().find("material/emissiveBoost")->finalComponent(0),
                       renderer_->stats().gpuFrameMs, lastHash);
         }
         if (options_.capture && i == frames - 1) {
-            if (auto r = gpu::writePpm(*image, *options_.capture); !r) {
+            if (auto r = writeCapture(*image, *options_.capture); !r) {
                 log::error("capture: {}", r.error().message);
                 return 4;
             }

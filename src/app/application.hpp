@@ -32,6 +32,8 @@ namespace avgen::app {
 
 struct AppOptions {
     std::optional<std::filesystem::path> audio;
+    std::optional<std::filesystem::path> scene;
+    std::optional<std::filesystem::path> environment;
     bool autoplay = false;
     int frames = -1; // exit after this many frames (-1 = run until closed)
     bool headless = false;
@@ -57,6 +59,7 @@ private:
     int runLive();
     int runHeadless();
     void loadAudio(const std::filesystem::path& path);
+    void loadAny(const std::filesystem::path& path);
     Result<void> captureFrame(const FrameTime& time, const std::filesystem::path& path);
 
     AppOptions options_;

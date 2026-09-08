@@ -28,8 +28,11 @@ struct FrameStats {
 
 class ControlPanel {
 public:
-    // Called when the user presses "Open Audio". The host shows the dialog and loads the file.
+    // Called when the user asks to open a file. The host shows the dialog and loads the file.
     std::function<void()> onOpenAudio;
+    std::function<void()> onOpenScene;
+    std::function<void()> onOpenEnvironment;
+    std::function<void()> onOrbScene;
 
     void draw(app::Engine& engine, const FrameStats& stats);
 

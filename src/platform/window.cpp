@@ -147,16 +147,19 @@ FrameEvents Window::pollEvents(const std::function<void(const SDL_Event&)>& sink
 
 void Window::setTitle(const std::string& title) { SDL_SetWindowTitle(window_, title.c_str()); }
 
-void Window::openFileDialog(std::function<void(std::string)> onChosen) {
+void Window::openFileDialog(DialogKind kind, std::function<void(std::string)> onChosen) {
     if (pendingDialog_) {
         log::warn("a file dialog is already open");
         return;
     }
     pendingDialog_ = std::move(onChosen);
-    static const SDL_DialogFileFilter filters[] = {
-        {"Audio files", "wav;flac;mp3;ogg;aif;aiff"},
-        {"All files", "*"},
-    };
+    static const SDL_DialogFileFilter audioFilters[] = {{"Audio files", "wav;flac;mp3;ogg;aif;aiff"}, {"All files", "*"}};
+    static const SDL_DialogFileFilter sceneFilters[] = {{"glTF scenes", "glb;gltf"}, {"All files", "*"}};
+    static const SDL_DialogFileFilter envFilters[] = {{"HDR environments", "hdr"}, {"All files", "*"}};
+    static const SDL_DialogFileFilter anyFilters[] = {{"Supported files", "wav;flac;mp3;ogg;glb;gltf;hdr"}, {"All files", "*"}};
+    const SDL_DialogFileFilter* filters = kind == DialogKind::Audio ? audioFilters
+                                          : kind == DialogKind::Scene ? sceneFilters
+                                          : kind == DialogKind::Environment ? envFilters : anyFilters;
     SDL_ShowOpenFileDialog(dialogCallback, &dialogState(), window_, filters, 2, nullptr, false);
 }
 

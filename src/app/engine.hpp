@@ -14,7 +14,9 @@
 #include "core/time.hpp"
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
+#include "scene/gltf_scene.hpp"
 #include "scene/orb_scene.hpp"
+#include "scene/scene_controller.hpp"
 #include "signals/audio_signals.hpp"
 #include "signals/signal_bus.hpp"
 
@@ -45,6 +47,16 @@ public:
     // Decodes the file. Live: installs it in the player and starts the analysis thread.
     // Offline: precomputes the analysis track. Returns the decoded duration.
     [[nodiscard]] Result<double> loadAudio(const std::filesystem::path& path);
+
+    // Replaces the scene controller with a glTF scene (parameters and routes are rebuilt).
+    [[nodiscard]] Result<void> loadScene(const std::filesystem::path& path);
+    // Restores the built-in orb scene.
+    void loadOrbScene();
+    // Loads an equirectangular HDR and installs it as the current scene's environment map.
+    [[nodiscard]] Result<void> loadEnvironment(const std::filesystem::path& path);
+    [[nodiscard]] const std::filesystem::path& environmentPath() const { return environmentPath_; }
+    // Routes any supported file by extension: audio, .gltf/.glb, .hdr.
+    [[nodiscard]] Result<void> loadFile(const std::filesystem::path& path);
     [[nodiscard]] bool hasAudio() const { return audioFile_ != nullptr; }
     [[nodiscard]] const std::filesystem::path& audioPath() const { return audioPath_; }
     [[nodiscard]] std::shared_ptr<const audio::AudioFile> audioFile() const { return audioFile_; }
@@ -68,8 +80,11 @@ public:
     void update(const FrameTime& time);
 
     // ---- accessors for UI / renderer / tests ----
-    [[nodiscard]] const scene::Scene& scene() const { return orbScene_.scene(); }
-    [[nodiscard]] scene::OrbScene& orbScene() { return orbScene_; }
+    [[nodiscard]] const scene::Scene& scene() const { return controller_->scene(); }
+    [[nodiscard]] scene::SceneController& controller() { return *controller_; }
+    // The orb preset when it is the active controller (nullptr otherwise).
+    [[nodiscard]] scene::OrbScene* orbScene() { return dynamic_cast<scene::OrbScene*>(controller_.get()); }
+    [[nodiscard]] scene::GltfScene* gltfScene() { return dynamic_cast<scene::GltfScene*>(controller_.get()); }
     [[nodiscard]] params::ParameterSet& params() { return params_; }
     [[nodiscard]] params::Modulator& modulator() { return modulator_; }
     [[nodiscard]] signals::SignalBus& signals() { return bus_; }
@@ -87,13 +102,16 @@ public:
 
 private:
     void publishFrame(const analysis::AnalysisFrame& frame);
+    void installController(std::unique_ptr<scene::SceneController> controller);
+    Result<void> reapplyEnvironment();
 
     EngineMode mode_;
     params::ParameterSet params_;
     signals::SignalBus bus_;
     signals::AudioSignals audioSignals_;
     params::Modulator modulator_;
-    scene::OrbScene orbScene_;
+    std::unique_ptr<scene::SceneController> controller_;
+    std::filesystem::path environmentPath_;
 
     std::shared_ptr<const audio::AudioFile> audioFile_;
     std::filesystem::path audioPath_;
