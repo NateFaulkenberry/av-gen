@@ -212,3 +212,77 @@ TEST_CASE("SceneRenderer survives resizes and invalid meshes", "[gpu][renderer]"
     CHECK(ctx->errorCount() == 0);
     CHECK_FALSE(renderer.resize(0, 10).has_value());
 }
+
+namespace {
+// Synthetic equirect: bright warm sky above the horizon, dark cool ground below.
+scene::TextureData syntheticSky(std::uint32_t w, std::uint32_t h) {
+    scene::TextureData tex;
+    tex.name = "synthetic-sky";
+    tex.width = w;
+    tex.height = h;
+    tex.format = scene::TextureFormat::Rgba32Float;
+    tex.data.resize(static_cast<std::size_t>(w) * h * 16);
+    auto* px = reinterpret_cast<float*>(tex.data.data());
+    for (std::uint32_t y = 0; y < h; ++y) {
+        const float t = static_cast<float>(y) / static_cast<float>(h - 1); // 0 top .. 1 bottom
+        const bool sky = t < 0.5f;
+        for (std::uint32_t x = 0; x < w; ++x) {
+            float* p = px + (static_cast<std::size_t>(y) * w + x) * 4;
+            p[0] = sky ? 4.0f : 0.05f;
+            p[1] = sky ? 3.5f : 0.05f;
+            p[2] = sky ? 2.5f : 0.08f;
+            p[3] = 1.0f;
+        }
+    }
+    return tex;
+}
+} // namespace
+
+TEST_CASE("Image-based lighting lights a rough white sphere from above", "[gpu][ibl]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    scene::Scene s;
+    const auto mesh = s.addMesh(cubeMesh(1.0f));
+    auto& e = s.addEntity("cube", mesh);
+    e.material.baseColor = {1.0f, 1.0f, 1.0f};
+    e.material.emissiveIntensity = 0.0f;
+    e.material.roughness = 0.9f;
+    e.material.metallic = 0.0f;
+    s.camera.position = {0.0f, 0.0f, 5.0f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.environment.showSkybox = false;
+    // No punctual lights: everything comes from the environment.
+    FrameTime time{};
+
+    auto noEnv = renderer.renderToImage(s, time, 64, 64);
+    REQUIRE(noEnv.has_value());
+    CHECK_FALSE(renderer.stats().ibl);
+
+    s.environment.environmentMap = s.addTexture(syntheticSky(64, 32));
+    auto withEnv = renderer.renderToImage(s, time, 64, 64);
+    REQUIRE(withEnv.has_value());
+    CHECK(ctx->errorCount() == 0);
+    CHECK(renderer.stats().ibl);
+
+    // The front face (+Z) sees half sky, half ground: brighter than the hemispheric fallback.
+    const auto* frontEnv = withEnv->pixel(32, 32);
+    const auto* frontNo = noEnv->pixel(32, 32);
+    CHECK(int(frontEnv[0]) > int(frontNo[0]) + 40);
+    // Warm sky tint: red channel above blue.
+    CHECK(frontEnv[0] > frontEnv[2]);
+
+    // Skybox on: a background pixel now shows the sky colour instead of black.
+    s.environment.showSkybox = true;
+    auto sky = renderer.renderToImage(s, time, 64, 64);
+    REQUIRE(sky.has_value());
+    const auto* corner = sky->pixel(2, 2);
+    CHECK(int(corner[0]) + int(corner[1]) + int(corner[2]) > 300);
+    CHECK(gpu::hashImage(*sky) == gpu::hashImage(*renderer.renderToImage(s, time, 64, 64)));
+    if (const char* dumpDir = std::getenv("AVGEN_DUMP_DIR")) {
+        REQUIRE(gpu::writePpm(*sky, std::filesystem::path(dumpDir) / "ibl.ppm").has_value());
+    }
+}

@@ -29,6 +29,11 @@ struct GpuTexture {
 // Rgba32Float textures get no mips unless `mips` is true.
 Result<GpuTexture> uploadTexture(Context& context, const scene::TextureData& data, bool mips = true);
 
+// Uploads an Rgba32Float image as RGBA16Float (filterable on every backend) with a mip chain.
+Result<GpuTexture> uploadTextureAsHalf(Context& context, const scene::TextureData& data, bool mips = true);
+
+std::uint16_t floatToHalf(float value);
+
 // Solid 1x1 texture of the given 8-bit colour (used for missing material textures).
 GpuTexture solidTexture(Context& context, std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a,
                         bool srgb, const char* label);

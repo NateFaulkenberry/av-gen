@@ -1,5 +1,7 @@
 #include "rendering/scene_renderer.hpp"
 
+#include "rendering/environment.hpp"
+
 #include "core/log.hpp"
 #include "gpu/context.hpp"
 #include "gpu/shader_library.hpp"
@@ -34,7 +36,8 @@ std::uint64_t materialKey(const scene::Material& m) {
 
 SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
     : context_(context), shaders_(shaders), timer_(std::make_unique<gpu::GpuTimer>(context)),
-      samplers_(std::make_unique<gpu::SamplerCache>(context)) {
+      samplers_(std::make_unique<gpu::SamplerCache>(context)),
+      environment_(std::make_unique<EnvironmentProcessor>(context, shaders)) {
     objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
 }
 
@@ -196,12 +199,39 @@ Result<void> SceneRenderer::init() {
     if (auto r = createPipelines(); !r) {
         return r;
     }
+    if (auto r = environment_->init(); !r) {
+        return r;
+    }
     if (context_.errorCount() > 0) {
         return fail("renderer initialisation raised {} GPU error(s): {}", context_.errorCount(),
                     context_.lastError());
     }
     initialised_ = true;
     return {};
+}
+
+void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
+    const scene::TextureId id = scene.environment.environmentMap;
+    const bool valid = id != scene::kInvalidTexture && id < scene.textures.size() && scene.textures[id].isHdr();
+    if (!valid) {
+        if (ibl_.valid) {
+            setIbl(IblResources{});
+        }
+        environmentTexture_ = scene::kInvalidTexture;
+        return;
+    }
+    if (id == environmentTexture_ && scene.textureVersion == environmentVersion_) {
+        return;
+    }
+    auto ibl = environment_->process(scene.textures[id]);
+    if (!ibl) {
+        log::error("environment: {}", ibl.error().message);
+        setIbl(IblResources{});
+    } else {
+        setIbl(*ibl);
+    }
+    environmentTexture_ = id;
+    environmentVersion_ = scene.textureVersion;
 }
 
 Result<void> SceneRenderer::createPipelines() {
@@ -584,6 +614,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     }
     uploadMeshes(scene);
     uploadTextures(scene);
+    updateEnvironment(scene);
     ensureTonemapBindGroup();
 
     const auto& queue = context_.queue();

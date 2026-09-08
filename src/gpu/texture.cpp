@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <vector>
 
 namespace avgen::gpu {
@@ -148,6 +149,88 @@ Result<GpuTexture> uploadTexture(Context& context, const scene::TextureData& dat
         w = dw;
         h = dh;
         writeLevel(context, out.texture, mip, w, h, bpp, level);
+    }
+    wgpu::TextureViewDescriptor viewDesc{};
+    viewDesc.label = data.name.c_str();
+    viewDesc.dimension = wgpu::TextureViewDimension::e2D;
+    viewDesc.mipLevelCount = out.mipLevels;
+    out.view = out.texture.CreateView(&viewDesc);
+    return out;
+}
+
+std::uint16_t floatToHalf(float value) {
+    std::uint32_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    const std::uint32_t sign = (bits >> 16) & 0x8000u;
+    std::int32_t exponent = static_cast<std::int32_t>((bits >> 23) & 0xFFu) - 127 + 15;
+    std::uint32_t mantissa = bits & 0x7FFFFFu;
+    if (((bits >> 23) & 0xFFu) == 0xFFu) { // inf / nan
+        return static_cast<std::uint16_t>(sign | 0x7C00u | (mantissa ? 0x200u : 0u));
+    }
+    if (exponent >= 31) {
+        return static_cast<std::uint16_t>(sign | 0x7C00u); // overflow -> inf
+    }
+    if (exponent <= 0) {
+        if (exponent < -10) {
+            return static_cast<std::uint16_t>(sign);
+        }
+        mantissa |= 0x800000u;
+        const std::uint32_t shift = static_cast<std::uint32_t>(14 - exponent);
+        std::uint32_t half = mantissa >> shift;
+        const std::uint32_t rem = mantissa & ((1u << shift) - 1u);
+        if (rem > (1u << (shift - 1)) || (rem == (1u << (shift - 1)) && (half & 1u))) {
+            ++half;
+        }
+        return static_cast<std::uint16_t>(sign | half);
+    }
+    std::uint32_t half = (static_cast<std::uint32_t>(exponent) << 10) | (mantissa >> 13);
+    const std::uint32_t rem = mantissa & 0x1FFFu;
+    if (rem > 0x1000u || (rem == 0x1000u && (half & 1u))) {
+        ++half; // may carry into the exponent, which is the correct rounding behaviour
+    }
+    return static_cast<std::uint16_t>(sign | half);
+}
+
+Result<GpuTexture> uploadTextureAsHalf(Context& context, const scene::TextureData& data, bool mips) {
+    if (!data.valid() || !data.isHdr()) {
+        return fail("uploadTextureAsHalf requires a valid Rgba32Float image ('{}')", data.name);
+    }
+    GpuTexture out;
+    out.width = data.width;
+    out.height = data.height;
+    out.format = wgpu::TextureFormat::RGBA16Float;
+    out.mipLevels = mips ? mipLevelCount(data.width, data.height) : 1;
+    wgpu::TextureDescriptor desc{};
+    desc.label = data.name.c_str();
+    desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+    desc.dimension = wgpu::TextureDimension::e2D;
+    desc.size = {data.width, data.height, 1};
+    desc.format = out.format;
+    desc.mipLevelCount = out.mipLevels;
+    out.texture = context.device().CreateTexture(&desc);
+    if (!out.texture) {
+        return fail("failed to create half-float texture '{}'", data.name);
+    }
+    std::vector<std::uint8_t> level = data.data;
+    std::uint32_t w = data.width;
+    std::uint32_t h = data.height;
+    auto upload = [&](std::uint32_t mip, std::uint32_t lw, std::uint32_t lh, const std::vector<std::uint8_t>& floats) {
+        std::vector<std::uint8_t> halves(static_cast<std::size_t>(lw) * lh * 8);
+        const float* in = reinterpret_cast<const float*>(floats.data());
+        std::uint16_t* outHalf = reinterpret_cast<std::uint16_t*>(halves.data());
+        for (std::size_t i = 0; i < static_cast<std::size_t>(lw) * lh * 4; ++i) {
+            outHalf[i] = floatToHalf(in[i]);
+        }
+        writeLevel(context, out.texture, mip, lw, lh, 8, halves);
+    };
+    upload(0, w, h, level);
+    for (std::uint32_t mip = 1; mip < out.mipLevels; ++mip) {
+        const std::uint32_t dw = std::max(1u, w / 2);
+        const std::uint32_t dh = std::max(1u, h / 2);
+        level = downsampleF(level, w, h, dw, dh);
+        w = dw;
+        h = dh;
+        upload(mip, w, h, level);
     }
     wgpu::TextureViewDescriptor viewDesc{};
     viewDesc.label = data.name.c_str();

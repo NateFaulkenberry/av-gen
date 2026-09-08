@@ -106,8 +106,9 @@ public:
     [[nodiscard]] Result<gpu::Image8> renderToImage(const scene::Scene& scene, const FrameTime& time,
                                                     std::uint32_t width, std::uint32_t height);
 
-    // Installs image-based lighting produced by EnvironmentProcessor (or clears it).
+    // Installs image-based lighting (normally driven automatically from scene.environment).
     void setIbl(const IblResources& ibl);
+    [[nodiscard]] EnvironmentProcessor& environment() { return *environment_; }
     [[nodiscard]] const IblResources& ibl() const { return ibl_; }
 
     [[nodiscard]] const RenderStats& stats() const { return stats_; }
@@ -136,6 +137,7 @@ private:
     Result<wgpu::RenderPipeline> finishPipeline(const wgpu::RenderPipelineDescriptor& desc, const char* label);
     void uploadMeshes(const scene::Scene& scene);
     void uploadTextures(const scene::Scene& scene);
+    void updateEnvironment(const scene::Scene& scene);
     void ensureTonemapBindGroup();
     void rebuildIblBindGroup();
     const wgpu::BindGroup& materialBindGroup(const scene::Material& material);
@@ -145,6 +147,9 @@ private:
     gpu::ShaderLibrary& shaders_;
     std::unique_ptr<gpu::GpuTimer> timer_;
     std::unique_ptr<gpu::SamplerCache> samplers_;
+    std::unique_ptr<EnvironmentProcessor> environment_;
+    scene::TextureId environmentTexture_ = scene::kInvalidTexture;
+    std::uint64_t environmentVersion_ = ~0ull;
     bool initialised_ = false;
 
     gpu::RenderTarget hdr_;
