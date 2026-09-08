@@ -28,7 +28,7 @@
 // Generated WGSL (available to the body):
 //   struct Std { time, timeDelta, frameIndex, passIndex: f32; renderSize, passSize: vec2<f32>;
 //                audio: vec4<f32> (rms, bass, mid, treble); audio2: vec4<f32> (lowMid, highMid, onset, beatPhase);
-//                beat: vec4<f32> (bpm, beatCount, barPhase, progress) }  @group(0) @binding(0) var<uniform> std: Std;
+//                beat: vec4<f32> (bpm, beatCount, barPhase, progress) }  @group(0) @binding(0) var<uniform> sys: Std;
 //   struct Inputs { <one field per INPUT, in declared order> }             @group(0) @binding(1) var<uniform> inputs: Inputs;
 //   @group(0) @binding(2) var linearSampler: sampler;   (clamp, linear, mipless)
 //   @group(0) @binding(3) var inputImage: texture_2d<f32>;   (post stage: the scene; else 1x1 black)

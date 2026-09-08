@@ -37,7 +37,8 @@ struct ShaderLayer {
     InputsLayout layout;
     std::string moduleSource;     // generated WGSL (all passes share it)
     std::string parseError;       // non-empty when the latest file version failed to parse
-    std::vector<params::IParameter*> inputParams; // one per input, in order
+    std::vector<params::IParameter*> inputParams; // one per input, in order (null while detached)
+    std::vector<std::vector<float>> savedValues;   // base values captured by detach()
     std::vector<std::uint8_t> packedInputs;       // this frame's uniform bytes
     StdUniforms std;                              // this frame's standard uniforms (pass fields patched by GPU side)
 };
@@ -67,7 +68,9 @@ public:
     // skipped with a warning so a project still loads.
     Result<void> fromJson(const nlohmann::json& j);
 
-    // Re-registers every layer's parameters (after the parameter set was cleared by a scene swap).
+    // Scene swaps clear the parameter set: call detach() before the clear (captures values and
+    // forgets the pointers) and reattach() afterwards (re-registers with the captured values).
+    void detach();
     void reattach();
 
 private:

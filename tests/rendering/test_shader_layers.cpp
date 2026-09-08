@@ -60,7 +60,7 @@ const char* kFeedback = R"(/*{
 }*/
 fn mainImage(uv: vec2<f32>, fragCoord: vec2<f32>) -> vec4<f32> {
     let previous = textureSample(acc, linearSampler, uv);
-    if (std.passIndex < 0.5) {
+    if (sys.passIndex < 0.5) {
         return vec4<f32>(previous.rgb + vec3<f32>(inputs.add), 1.0);
     }
     return vec4<f32>(previous.rgb, 1.0);

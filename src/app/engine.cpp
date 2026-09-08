@@ -154,6 +154,7 @@ Result<void> Engine::loadScene(const std::filesystem::path& path) {
         return std::unexpected(ctrl.error());
     }
     const float masterGain = modulator_.masterGain;
+    shaderLayers_.detach();
     params_.clear();
     modulator_.clearRoutes();
     modulator_.masterGain = masterGain;
@@ -163,6 +164,7 @@ Result<void> Engine::loadScene(const std::filesystem::path& path) {
 }
 
 void Engine::loadOrbScene() {
+    shaderLayers_.detach();
     params_.clear();
     modulator_.clearRoutes();
     installController(std::make_unique<scene::OrbScene>(params_, modulator_));

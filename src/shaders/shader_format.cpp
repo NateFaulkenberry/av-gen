@@ -58,7 +58,7 @@ constexpr std::string_view kBodyMarker = "// ---- user body ----";
 // clang-format off
 constexpr auto kReservedIdentifiers = std::to_array<std::string_view>({
     // generated declarations
-    "Std", "Inputs", "VsOut", "std", "inputs", "linearSampler", "inputImage", "audioSpectrum",
+    "Std", "Inputs", "VsOut", "sys", "std", "inputs", "linearSampler", "inputImage", "audioSpectrum",
     "mainImage", "vs_main", "fs_main",
     // keywords
     "alias", "break", "case", "const", "const_assert", "continue", "continuing", "default",
@@ -714,7 +714,7 @@ std::string generateModuleSource(const ShaderDescription& description, const std
     line("    beat: vec4<f32>,");
     line("    pad: vec4<f32>,");
     line("};");
-    line("@group(0) @binding(0) var<uniform> std: Std;");
+    line("@group(0) @binding(0) var<uniform> sys: Std;");
     line("struct Inputs {");
     if (description.inputs.empty()) {
         line("    _pad0: vec4<f32>,");
@@ -763,7 +763,7 @@ std::string generateModuleSource(const ShaderDescription& description, const std
               "    return out;\n"
               "}\n"
               "@fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32> {\n"
-              "    return mainImage(in.uv, in.uv * std.passSize);\n"
+              "    return mainImage(in.uv, in.uv * sys.passSize);\n"
               "}\n";
     return module;
 }

@@ -258,17 +258,27 @@ void ShaderLayerSet::update(const FrameTime& time, const StdUniforms& base) {
     }
 }
 
-void ShaderLayerSet::reattach() {
+void ShaderLayerSet::detach() {
     for (auto& layer : layers_) {
-        std::vector<std::vector<float>> previous;
+        layer->savedValues.clear();
         for (auto* p : layer->inputParams) {
             std::vector<float> v;
             for (std::size_t c = 0; c < p->componentCount(); ++c) {
                 v.push_back(p->baseComponent(c));
             }
-            previous.push_back(std::move(v));
+            layer->savedValues.push_back(std::move(v));
         }
-        registerInputs(*layer, previous.empty() ? nullptr : &previous);
+        layer->inputParams.clear(); // the parameter set is about to be cleared; pointers die with it
+    }
+}
+
+void ShaderLayerSet::reattach() {
+    for (auto& layer : layers_) {
+        if (!layer->inputParams.empty()) {
+            continue; // still attached
+        }
+        registerInputs(*layer, layer->savedValues.empty() ? nullptr : &layer->savedValues);
+        layer->savedValues.clear();
     }
 }
 

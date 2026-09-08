@@ -12,7 +12,7 @@
 }*/
 
 // Available from the generated prologue: std (Std), inputs (Inputs), linearSampler, inputImage,
-// audioSpectrum. std.audio = (rms, bass, mid, treble).
+// audioSpectrum. sys.audio = (rms, bass, mid, treble).
 
 fn palette(t: f32) -> vec3<f32> {
     // Cosine palette (Inigo Quilez) tinted by the user colour.
@@ -24,12 +24,12 @@ fn palette(t: f32) -> vec3<f32> {
 }
 
 fn mainImage(uv: vec2<f32>, fragCoord: vec2<f32>) -> vec4<f32> {
-    let aspect = std.passSize.x / max(std.passSize.y, 1.0);
+    let aspect = sys.passSize.x / max(sys.passSize.y, 1.0);
     let p = (uv - vec2<f32>(0.5, 0.5)) * vec2<f32>(aspect, 1.0) * inputs.scale;
-    let t = std.time * inputs.speed;
+    let t = sys.time * inputs.speed;
 
     // Bass (0..1) pushes the pattern outward for a pulsing feel.
-    let bass = std.audio.y;
+    let bass = sys.audio.y;
     let pulse = 1.0 + bass * inputs.bassPulse;
 
     var v = 0.0;

@@ -242,7 +242,7 @@ TEST_CASE("parseShaderSource validates input and target identifiers", "[shaders]
         CHECK_FALSE(r.has_value());
     }
     SECTION("WGSL keyword") {
-        for (const char* keyword : {"fn", "var", "let", "struct", "std", "inputs"}) {
+        for (const char* keyword : {"fn", "var", "let", "struct", "sys", "std", "inputs"}) {
             const auto r = parseShaderSource(
                 headerWithInputs(std::string("{\"NAME\": \"") + keyword + "\", \"TYPE\": \"float\"}"), "x");
             REQUIRE_FALSE(r.has_value());
@@ -406,7 +406,7 @@ TEST_CASE("generateModuleSource emits the binding contract in order", "[shaders]
         "    audio2: vec4<f32>,",
         "    beat: vec4<f32>,",
         "    pad: vec4<f32>,",
-        "@group(0) @binding(0) var<uniform> std: Std;",
+        "@group(0) @binding(0) var<uniform> sys: Std;",
         "struct Inputs {",
         "    speed: f32,",
         "    tint: vec4<f32>,",
@@ -423,7 +423,7 @@ TEST_CASE("generateModuleSource emits the binding contract in order", "[shaders]
         "fn mainImage(uv: vec2<f32>, fragCoord: vec2<f32>) -> vec4<f32> {",
         "@vertex fn vs_main(@builtin(vertex_index) i: u32) -> VsOut",
         "@fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32>",
-        "return mainImage(in.uv, in.uv * std.passSize);",
+        "return mainImage(in.uv, in.uv * sys.passSize);",
     };
     std::size_t cursor = 0;
     for (const std::string& needle : expected) {

@@ -12,7 +12,7 @@ namespace avgen::rendering {
 namespace {
 constexpr const char* kErrorBody = R"(
 fn mainImage(uv: vec2<f32>, fragCoord: vec2<f32>) -> vec4<f32> {
-    let stripe = step(0.5, fract((uv.x + uv.y) * 8.0 + std.time * 0.5));
+    let stripe = step(0.5, fract((uv.x + uv.y) * 8.0 + sys.time * 0.5));
     return vec4<f32>(mix(vec3<f32>(1.0, 0.0, 1.0), vec3<f32>(0.1, 0.0, 0.1), stripe), 1.0);
 }
 )";
