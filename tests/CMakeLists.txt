@@ -3,6 +3,8 @@ include(Catch)
 file(GLOB_RECURSE AVGEN_UNIT_TEST_SOURCES CONFIGURE_DEPENDS unit/*.cpp integration/*.cpp support/*.cpp)
 add_executable(avgen_tests ${AVGEN_UNIT_TEST_SOURCES})
 target_include_directories(avgen_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+# Integration tests drive app::Engine, which lives in the app sources; compile the GPU-free part in.
+target_sources(avgen_tests PRIVATE "${CMAKE_SOURCE_DIR}/src/app/engine.cpp")
 target_link_libraries(avgen_tests PRIVATE avgen_core Catch2::Catch2WithMain)
 avgen_set_warnings(avgen_tests)
 catch_discover_tests(avgen_tests
