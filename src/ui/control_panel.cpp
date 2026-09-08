@@ -1,5 +1,7 @@
 #include "ui/control_panel.hpp"
 
+#include "ui/ui_logic.hpp"
+
 #include <imgui.h>
 #include <implot.h>
 
@@ -148,9 +150,11 @@ void ControlPanel::drawResponse(app::Engine& engine) {
         ImGui::Checkbox("##on", &route.enabled);
         ImGui::SameLine();
         const std::string label = route.source + " -> " + route.target;
-        const float maxAmount = std::max(1.0f, std::abs(route.amount) * 3.0f);
+        route.amount = sanitiseFinite(route.amount);
+        const auto [lo, hi] = routeAmountBounds(route);
         ImGui::SetNextItemWidth(-90);
-        ImGui::SliderFloat(label.c_str(), &route.amount, -maxAmount, maxAmount);
+        // Ctrl+click still allows typing values beyond the slider range.
+        ImGui::SliderFloat(label.c_str(), &route.amount, lo, hi);
         ImGui::SameLine();
         ImGui::Text("%+.2f", static_cast<double>(route.lastOutput));
         ImGui::PopID();
@@ -203,10 +207,14 @@ void ControlPanel::drawParameters(app::Engine& engine) {
         case ParamKind::Float:
             changed = ImGui::SliderFloat(param->label().c_str(), values, param->softMin(0), param->softMax(0));
             break;
-        default:
+        default: {
+            // ImGui dereferences the range pointers; use the component-0 soft range for all lanes.
+            const float lo = param->softMin(0);
+            const float hi = param->softMax(0);
             changed = ImGui::SliderScalarN(param->label().c_str(), ImGuiDataType_Float, values, static_cast<int>(n),
-                                           nullptr, nullptr);
+                                           &lo, &hi);
             break;
+        }
         }
         if (changed) {
             for (std::size_t i = 0; i < n && i < 4; ++i) {

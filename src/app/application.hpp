@@ -36,6 +36,7 @@ struct AppOptions {
     std::optional<std::filesystem::path> environment;
     bool autoplay = false;
     int frames = -1; // exit after this many frames (-1 = run until closed)
+    std::uint64_t stressSeed = 0; // > 0: apply random UI-like actions every frame (crash reproduction)
     bool headless = false;
     double offlineFps = 60.0;
     std::optional<std::filesystem::path> capture; // PPM written after the last frame

@@ -15,6 +15,10 @@ class Context;
 class GpuTimer {
 public:
     explicit GpuTimer(Context& context);
+    // Waits for in-flight readbacks so no map callback can fire into a destroyed slot.
+    ~GpuTimer();
+    GpuTimer(const GpuTimer&) = delete;
+    GpuTimer& operator=(const GpuTimer&) = delete;
     [[nodiscard]] bool available() const { return available_; }
 
     // Timestamp writes to attach to the first and last pass of the frame. Null when unavailable.
@@ -31,6 +35,7 @@ private:
     struct Slot {
         wgpu::Buffer resolve;
         wgpu::Buffer read;
+        wgpu::Future mapFuture{};
         bool inFlight = false;
         bool ready = false;
         bool failed = false;

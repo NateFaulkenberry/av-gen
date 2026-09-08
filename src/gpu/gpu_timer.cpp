@@ -37,6 +37,17 @@ GpuTimer::GpuTimer(Context& context) : context_(context) {
     available_ = true;
 }
 
+GpuTimer::~GpuTimer() {
+    // A MapAsync callback carries a raw Slot pointer; make every pending one complete (or fail)
+    // while the slots still exist. WaitAny works for AllowProcessEvents futures.
+    for (auto& slot : slots_) {
+        if (slot.inFlight) {
+            context_.waitFor(slot.mapFuture, 2'000'000'000ull);
+            slot.inFlight = false;
+        }
+    }
+}
+
 void GpuTimer::resolve(wgpu::CommandEncoder& encoder) {
     if (!available_) {
         return;
@@ -62,7 +73,7 @@ double GpuTimer::collect() {
         slot.ready = false;
         slot.failed = false;
         Slot* raw = &slot;
-        slot.read.MapAsync(
+        slot.mapFuture = slot.read.MapAsync(
             wgpu::MapMode::Read, 0, 16, wgpu::CallbackMode::AllowProcessEvents,
             [](wgpu::MapAsyncStatus status, wgpu::StringView, Slot* s) {
                 s->ready = status == wgpu::MapAsyncStatus::Success;

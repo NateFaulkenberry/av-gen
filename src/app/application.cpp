@@ -1,6 +1,7 @@
 #include "app/application.hpp"
 
 #include "assets/image.hpp"
+#include "core/rng.hpp"
 #include "core/time.hpp"
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
@@ -26,6 +27,7 @@ std::string usageText() {
            "  --env <file>        load an equirectangular .hdr environment map\n"
            "  --play              start playback immediately\n"
            "  --frames <n>        exit after n frames\n"
+           "  --stress <seed>     apply random slider-like actions every frame (seek, params, routes, volume)\n"
            "  --capture <file>    write the last frame as a PPM image\n"
            "  --headless          no window: offline mode, fixed-step clock, precomputed analysis\n"
            "  --fps <n>           offline frame rate (default 60)\n"
@@ -69,6 +71,12 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--capture");
             if (!v) return std::unexpected(v.error());
             options.capture = *v;
+            ++i;
+        } else if (arg == "--stress") {
+            auto v = need(i, "--stress");
+            if (!v) return std::unexpected(v.error());
+            options.stressSeed = static_cast<std::uint64_t>(std::atoll(v->c_str()));
+            if (options.stressSeed == 0) return fail("--stress seed must be > 0");
             ++i;
         } else if (arg == "--frames") {
             auto v = need(i, "--frames");
@@ -268,6 +276,42 @@ Result<void> Application::captureFrame(const FrameTime& time, const std::filesys
     return {};
 }
 
+namespace {
+// Mimics a user dragging controls: the same calls the ControlPanel makes, chosen at random.
+void stressStep(Engine& engine, Rng& rng, std::uint64_t frame) {
+    const float roll = rng.nextFloat();
+    auto& params = engine.params();
+    if (roll < 0.35f && params.size() > 0) {
+        auto* p = params.ordered()[static_cast<std::size_t>(rng.nextFloat() * static_cast<float>(params.size())) % params.size()];
+        for (std::size_t c = 0; c < p->componentCount(); ++c) {
+            p->setBaseComponent(c, rng.range(p->softMin(c), p->softMax(c)));
+        }
+    } else if (roll < 0.50f) {
+        engine.seekSeconds(static_cast<double>(rng.nextFloat()) * engine.durationSeconds());
+    } else if (roll < 0.60f) {
+        engine.setVolume(rng.nextFloat());
+    } else if (roll < 0.80f && !engine.modulator().routes().empty()) {
+        auto& routes = engine.modulator().routes();
+        auto& r = routes[static_cast<std::size_t>(rng.nextFloat() * static_cast<float>(routes.size())) % routes.size()];
+        r.amount = rng.range(-3.0f, 6.0f);
+        r.enabled = rng.nextFloat() > 0.2f;
+    } else if (roll < 0.85f) {
+        engine.modulator().masterGain = rng.range(0.0f, 3.0f);
+    } else if (roll < 0.90f) {
+        engine.togglePlay();
+    } else if (roll < 0.93f) {
+        engine.stop();
+        if (auto r = engine.play(); !r) {
+            log::debug("stress play: {}", r.error().message);
+        }
+    } else if (roll < 0.96f) {
+        engine.seekSeconds(engine.positionSeconds() + (rng.nextFloat() - 0.5) * 10.0);
+    } else if (frame % 97 == 0) {
+        engine.seekSeconds(engine.durationSeconds()); // jump to the very end
+    }
+}
+} // namespace
+
 int Application::run() { return options_.headless ? runHeadless() : runLive(); }
 
 int Application::runLive() {
@@ -280,6 +324,7 @@ int Application::runLive() {
     auto fpsStart = std::chrono::steady_clock::now();
     int framesRendered = 0;
     FrameTime lastTime{};
+    Rng stressRng(options_.stressSeed);
 
     for (;;) {
         const auto frameStart = std::chrono::steady_clock::now();
@@ -318,6 +363,11 @@ int Application::runLive() {
             }
         }
 
+        if (options_.stressSeed != 0) {
+            for (int i = 0; i < 3; ++i) {
+                stressStep(*engine_, stressRng, static_cast<std::uint64_t>(framesRendered));
+            }
+        }
         const FrameTime time = engine_->tick(clock);
         lastTime = time;
         engine_->update(time);

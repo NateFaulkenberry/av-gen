@@ -24,6 +24,7 @@ endif()
 option(AVGEN_BUILD_TESTS "Build the test suite" ON)
 option(AVGEN_DAWN_FROM_SOURCE "Build Dawn from source instead of using the prebuilt archive" OFF)
 option(AVGEN_ENABLE_ASAN "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(AVGEN_ENABLE_TSAN "Enable ThreadSanitizer" OFF)
 option(AVGEN_WARNINGS_AS_ERRORS "Treat warnings as errors for engine targets" OFF)
 
 if(APPLE)
