@@ -1,17 +1,20 @@
 #include "scene/scene.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+
+#include <utility>
 
 namespace avgen::scene {
 
 glm::mat4 Transform::matrix() const {
-    const glm::mat4 t = glm::translate(glm::mat4(1.0f), position);
-    const glm::mat4 r = glm::mat4_cast(rotation);
-    const glm::mat4 s = glm::scale(glm::mat4(1.0f), scale);
-    return t * r * s;
+    return glm::translate(glm::mat4(1.0f), position) * glm::mat4_cast(rotation) *
+           glm::scale(glm::mat4(1.0f), scale);
 }
 
-glm::mat4 Camera::view() const { return glm::lookAtRH(position, target, up); }
+glm::mat4 Camera::view() const {
+    return glm::lookAtRH(position, target, up);
+}
 
 glm::mat4 Camera::projection(float aspect) const {
     return glm::perspectiveRH_ZO(fovYRadians, aspect, nearPlane, farPlane);
@@ -22,7 +25,7 @@ bool MeshData::valid() const {
         return false;
     }
     const auto count = static_cast<std::uint32_t>(vertices.size());
-    for (const auto index : indices) {
+    for (const std::uint32_t index : indices) {
         if (index >= count) {
             return false;
         }
@@ -31,9 +34,10 @@ bool MeshData::valid() const {
 }
 
 MeshId Scene::addMesh(MeshData mesh) {
+    const auto id = static_cast<MeshId>(meshes.size());
     meshes.push_back(std::move(mesh));
     ++meshVersion;
-    return static_cast<MeshId>(meshes.size() - 1);
+    return id;
 }
 
 Entity& Scene::addEntity(std::string name, MeshId mesh) {
