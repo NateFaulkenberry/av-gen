@@ -187,3 +187,72 @@ shader files and for lights being scene data.
 
 Milestone 0.3 (modulation): LFO, envelope, noise and timeline sources on the `SignalBus`;
 per-route polarity; macros; presets; beat tracking and tempo signals from the analyser.
+
+## 2026-09-08 — Runtime crash fix (reported by the user)
+
+**Symptom.** Crash while adjusting sliders during playback. The macOS crash report showed an
+ImGui assertion in `SliderBehavior` from `ControlPanel::drawResponse`.
+**Cause.** The route-amount slider's range was derived from the value being dragged (±3×|amount|),
+so dragging to the end enlarged the range each frame and the value grew exponentially until it
+exceeded `FLT_MAX/2` (ImGui asserts in Debug; Release would reach infinity).
+**Fix.** Constant range (`ui::routeAmountBounds`), non-finite sanitising, regression test
+`test_ui_logic.cpp` that replays 10,000 drag-to-the-end frames.
+**Also found** by AddressSanitizer while reproducing: `GpuTimer`'s asynchronous readback callback
+could fire into a destroyed slot when the app closed with a readback in flight; the destructor
+now waits for in-flight mappings. **Tooling added:** `--stress <seed>` (random slider-like
+actions every frame in the real app), an engine stress test, a `tsan` preset. Debug, Release,
+ASan and TSan stress runs are clean.
+
+## 2026-09-08 — Milestone 0.3: general modulation
+
+### What was implemented and why
+
+The roadmap's "Source → Processor → Modulator → Parameter" generalisation, so visuals can be
+driven by more than raw audio features and a project can be saved and recalled.
+
+- **Sources** (`src/signals/source.*`): LFO (five shapes, free-running as a function of render
+  time or beat-synced), envelope (ADSR with hold, any event trigger), noise (seeded value noise),
+  random (sample-and-hold with slew), timeline (keyframes, interpolation, loop), macros. Settings
+  are parameters under `sources/<name>/...`, so sources modulate each other through routes. The
+  `SourceRack` serialises and survives scene swaps.
+- **Beat and tempo** (`src/analysis/beat_tracker.*`): live tempogram + phase-locked predictor and
+  the offline Ellis 2007 DP tracker; frames carry tempo/beat fields; `audio.tempo`, `audio.beat`,
+  `audio.beatPhase`, `audio.beatCount` on the bus; the engine extrapolates a per-frame beat clock
+  (`beat.phase`, `beat.pulse`, `beat.count`, `beat.bpm`, `beat.bar`) and publishes `time.*`.
+- **Routes**: polarity (bipolar); editable in a new Modulation window (add/remove, op, polarity,
+  attack/decay, curve, envelope).
+- **Presets** (`src/params/preset.*`): capture, recall, blend/morph; bank in the project.
+- **Projects**: format version 2 with sources and presets; `--project`, `--save-project`, File
+  menu open/save dialogs; loads validate everything before mutating.
+- Developed in two parallel worktrees (beat tracking; sources/presets/serialisation) against fixed
+  headers, plus the engine/UI integration on main.
+
+### Tests
+
+208 cases (was 152), all passing in Debug and Release: 13 beat-tracker cases, 30 source/preset
+cases, serialisation v2, parameter removal, UI regression, engine stress, and 4 integration
+cases (LFO without audio, modulators of modulators, project round trip, beat clock).
+
+### Results
+
+- Beat tracking on a 120 BPM click track: offline 119.94 BPM with beats within 10 ms; live locks
+  at 2 s, 119.97 BPM, beats within 20 ms; a 120→150 BPM change is followed within 3 s.
+- Project round trip through the CLI: `--save-project` then `--project` reload, 20 parameters,
+  5 routes, sources and presets restored.
+- Windowed runs with the Modulation window and `--stress` are clean.
+
+### Known limitations
+
+- Source parameter modulation has one frame of latency by design.
+- Bus signals of removed sources stay declared and hold their last value.
+- The timeline source has no keyframe editing UI yet (JSON only); macros have knobs but no
+  mapping UI beyond ordinary routes.
+- The live tracker holds the last tempo for about 9 s after onsets stop and handles octave
+  ambiguity only through the prior.
+- A project's source parameter values are skipped with a warning if the rack is attached to a
+  different parameter set than the one loaded into.
+
+### Next step
+
+Milestone 0.4 (shader system): runtime WGSL hot reload, the ISF-style user shader contract with
+parameters exposed from the header, render-to-texture passes.

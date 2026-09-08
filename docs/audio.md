@@ -54,12 +54,32 @@ transient, so they lead the physical impulse by up to half a window (~10-20 ms) 
 early rather than late. Per-band running-max normalisation makes any steady tone tend towards 1
 in its band, which is intended for visual use (auto-gain); use `bandsRaw` for absolute levels.
 
+## Beat and tempo (milestone 0.3, `analysis::BeatTracker`)
+
+Two paths share the analyser's onset strength at hop rate:
+
+- Live (`BeatTracker`, run by `AnalysisRunner`): an autocorrelation tempogram over a 6 s window
+  with the Ellis log-Gaussian prior (centre 120 BPM), re-evaluated every 0.5 s; a phase-locked
+  predictor that snaps predicted beats to nearby picked onsets. Requires at least four picked
+  onsets before trusting a tempo, free-runs through breaks and forgets the tempo after roughly
+  9 s without onsets. Measured: 120 BPM click track locks at 2 s, 119.97 BPM, beats within 20 ms
+  (mean 15 ms early, following the analyser's early onset stamps); a 120→150 BPM jump is followed
+  within 3 s.
+- Offline (`trackBeatsOffline`, run by `AnalysisTrack`): Ellis 2007 dynamic programming with a
+  global tempo from the median of windowed estimates. Measured: 119.94 BPM, beats within 10 ms of
+  the clicks.
+
+Frames carry `tempoBpm`, `tempoConfidence`, `beat`, `beatPhase`, `beatCount`. Octave errors are
+only mitigated by the prior; tempo changes inside an offline track get one global tempo.
+
 ## Signals (`signals::AudioSignals`)
 
 `audio.rms`, `audio.peak`, `audio.bass`, `audio.lowMid`, `audio.mid`, `audio.highMid`,
-`audio.treble`, `audio.spectralCentroid`, `audio.spectralFlux`, `audio.onsetStrength`, and the
-event `audio.onset` (strength = min(1, onsetStrength / 2)). No smoothing is applied at this
-level; each modulation route smooths independently.
+`audio.treble`, `audio.spectralCentroid`, `audio.spectralFlux`, `audio.onsetStrength`, the event
+`audio.onset` (strength = min(1, onsetStrength / 2)), and from 0.3 `audio.tempo`,
+`audio.tempoConfidence`, `audio.beat` (event), `audio.beatPhase`, `audio.beatCount`. The engine
+derives a per-frame beat clock from these (`beat.*`, see `docs/architecture.md` §4). No smoothing
+is applied at this level; each modulation route smooths independently.
 
 ## Lifecycle and threading
 

@@ -1,6 +1,6 @@
 # ADR-011: Parameter and modulation model
 
-- Status: Accepted (2026-09-08)
+- Status: Accepted (2026-09-08); extended in milestone 0.3 with sources (LFO, envelope, noise, random, timeline, macro), route polarity, presets and the v2 project format
 - Research: `docs/research/audiovisual-systems.md` §20-21, `docs/research/audio-analysis.md` §5
 
 ## Problem

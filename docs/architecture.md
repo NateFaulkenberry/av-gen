@@ -72,9 +72,23 @@ gain, offset, curve, clamp, threshold, attack/decay smoothing, envelope, remap. 
 enter as impulses and become envelopes in the chain. The 0.1 scene declares five routes; the
 "response" sliders in the UI are those routes' amounts, and "master gain" scales all of them.
 
-Growth path: more sources (LFO, envelope, timeline, MIDI/OSC) publish onto the same `SignalBus`;
-more processors extend `ProcessorChain`; macros and presets are path-keyed snapshots; the
-serialiser already writes routes and parameters as a versioned JSON document.
+**Sources (milestone 0.3).** `signals::Source` implementations publish onto the same bus every
+frame and register their settings as parameters under `sources/<name>/...`, so routes can target
+them (modulators of modulators, with one frame of latency): `LfoSource` (sine/triangle/saw/
+square/sample-hold, free-running as a pure function of render time or beat-synced),
+`EnvelopeSource` (ADSR with hold, triggered by any event signal), `NoiseSource` (seeded value
+noise over time), `RandomSource` (sample-and-hold per trigger with slew), `TimelineSource`
+(keyframes with step/linear/smooth interpolation and looping), `MacroSource` (UI knobs
+`macros/<knob>` mirrored as `macro.<knob>`). The `SourceRack` owns them and survives scene swaps.
+The engine also publishes `time.seconds`, `time.progress`, `time.playing` and a per-frame beat
+clock extrapolated from the analyser's tempo: `beat.phase`, `beat.pulse` (event), `beat.count`,
+`beat.bpm`, `beat.bar`. Routes have a polarity (bipolar maps 0..1 to -1..1 before the chain).
+
+**Presets and projects.** `params::Preset` is a path-keyed snapshot of base values; the
+`PresetBank` stores, recalls and morphs them. A project (`docs/project-format.md`, version 2)
+holds parameters, routes, sources and presets; `Engine::loadProject` validates everything before
+mutating and re-attaches the rack. Growth path: MIDI/OSC sources, per-route blend, keyframe
+editing UI.
 
 ## 5. Rendering (ADR-001, ADR-006)
 

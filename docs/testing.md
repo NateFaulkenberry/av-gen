@@ -7,6 +7,9 @@ Strategy: ADR-009. Tests are Catch2 v3, discovered into CTest with labels `unit`
 ctest --preset debug                 # everything
 ctest --preset debug -L unit         # GPU-free only
 ctest --preset debug -L gpu          # rendering tests
+cmake --preset asan && cmake --build --preset asan && ctest --preset asan   # ASan + UBSan
+cmake --preset tsan && cmake --build --preset tsan && ctest --preset tsan   # ThreadSanitizer
+./build/debug/src/avgen --audio track.wav --play --frames 900 --stress 7    # random UI-like actions
 ./build/debug/tests/avgen_tests "[analysis]"   # Catch2 tag filter
 ./build/debug/tests/avgen_tests "[audio][device]"  # tests needing an output device (SKIP if none)
 ```
@@ -22,6 +25,11 @@ ctest --preset debug -L gpu          # rendering tests
 | signals/params | `test_signal_bus.cpp`, `test_parameters.cpp`, `test_processor.cpp`, `test_modulation.cpp`, `test_serialization.cpp` | defaults, clamping, soft ranges, duplicates; every chain stage, time-constant accuracy, frame-rate independence, envelopes; route binding errors, all ops, priority, component targeting, master gain, reset; JSON round trips, version/format validation, unknown paths, malformed files |
 | scene | `test_scene.cpp`, `test_scene_model.cpp` | mesh generator validity and counts, normals, TRS order and matrix decomposition, projection depth range 0..1, bounds, textures/lights/clear, OrbScene registration/routes/determinism |
 | assets | `test_image.cpp`, `test_gltf_loader.cpp` | PNG/HDR round trips, sRGB tagging, error paths; in-memory GLB fixture: hierarchy transforms, vertex data, material factors and texture refs, embedded PNG decode, punctual lights, cameras, bounds, failure leaves the scene untouched, id offsets on repeated loads; Khronos samples when `AVGEN_SAMPLE_ASSETS` is set |
+| beat tracking | `test_beat_tracker.cpp` | tempo estimation on synthetic envelopes (120/90/160 BPM, flat input), offline Ellis tracker accuracy on a click track, live tracker convergence, tempo-change following, determinism, reset; AnalysisTrack stamping |
+| sources/presets | `test_sources.cpp`, `test_presets.cpp` | LFO shapes and seek exactness, beat sync, ADSR timing, noise determinism/continuity, random sample-and-hold sequences, timeline interpolation and looping, macros, rack JSON round trips, modulators of modulators; preset capture/apply/blend, bank JSON |
+| ui logic | `test_ui_logic.cpp` | regression: route slider bounds independent of the value (0.2 crash) |
+| stress | `test_engine_stress.cpp` (`[device][stress]`) | rapid seeks/param/route/volume/transport edits during live playback; run under ASan and TSan |
+| modulation integration | `tests/integration/test_modulation_sources.cpp` | LFO drives the orb without audio, seek exactness, modulators of modulators, project round trip through the engine (sources, routes, presets, values, morph), beat clock from a click track |
 | scene controllers | `tests/integration/test_gltf_scene.cpp` | GltfScene import + parameter surface + root transform maths; engine scene swap keeps audio driving the new surface; failed loads keep the old scene |
 | integration | `tests/integration/test_pipeline.cpp` | synthetic audio → Engine (offline) → scene: bass raises scale, treble raises emissive, RMS raises brightness, onsets pulse impulse, bit-identical across runs, rotation integrates modulated speed, error path |
 | rendering (GPU) | `tests/rendering/test_gpu.cpp` | headless context; shader errors with file/line; clear + readback exact; lit cube renders deterministically (hash equal), differs when the scene changes; resize; invalid meshes skipped without GPU errors; image-based lighting from a synthetic sky brightens and tints a rough white cube, skybox shows the sky, deterministic |
