@@ -40,7 +40,7 @@ TEST_CASE("An LFO source modulates the orb without any audio", "[integration][so
 
     // Sources are functions of time: seeking back reproduces the same value.
     engine.seekSeconds(0.0);
-    clock.seek(0.25);
+    clock.seek(0.24); // tick() advances one 10 ms step, landing exactly on 0.25 s
     engine.update(engine.tick(clock));
     const float atQuarter = engine.signals().value(*engine.signals().find("lfo.wobble"));
     CHECK_THAT(static_cast<double>(atQuarter), WithinAbs(0.5, 1e-3));
@@ -122,14 +122,18 @@ TEST_CASE("Beat clock signals follow a click track offline", "[integration][beat
     REQUIRE(engine.loadAudio(wav).has_value());
     const auto& ts = engine.timeSignals();
     FixedStepClock clock(60.0);
+    // Events are cleared at the end of update() (they are for routes); observe the beat counter.
     int pulses = 0;
+    float lastCount = 0.0f;
     float lastPhase = 0.0f;
     int wraps = 0;
     for (int i = 0; i < 60 * 12; ++i) {
         engine.update(engine.tick(clock));
-        if (engine.signals().event(ts.beatPulse)) {
+        const float count = engine.signals().value(ts.beatCount);
+        if (count > lastCount) {
             ++pulses;
         }
+        lastCount = count;
         const float phase = engine.signals().value(ts.beatPhase);
         if (phase < lastPhase - 0.5f) {
             ++wraps;
