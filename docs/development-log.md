@@ -317,3 +317,55 @@ accumulation, broken → fallback → fixed reload, engine reload).
 Milestone 0.5 (GPU particles): compute-driven particle systems with indirect draw, emitters
 and force fields as parameters; the renderer already exposes storage buffers, indirect dispatch
 and 3D textures through WebGPU.
+
+## 2026-09-08 — Milestone 0.5: GPU particles
+
+### What was implemented and why
+
+Roadmap 0.5: particle systems that live on the GPU and are driven by the parameter system, the
+first "millions of particles" building block for festival-scale visuals.
+
+- **Model** (`src/scene/particles.*`, ADR-015): `ParticleSystem` (emitter shape/extent/rate/
+  burst/lifetime/direction/spread/speed, gravity/drag/curl turbulence/attractor/orbit, size/
+  colour/emissive/blend) plus `registerParticleParameters` exposing 20 `particles/<name>/…`
+  parameters with rest-relative scaling.
+- **Simulation and drawing** (`shaders/particles.wgsl`, `src/rendering/particle_renderer.*`):
+  fixed pool, dead-list stack, per-frame alive list, indirect draw args written by compute;
+  `cs_reset → cs_emit → cs_simulate` in one compute pass per system; camera-facing quads with
+  soft falloff, additive premultiplied or alpha blend, depth-tested; pcg3d hashing for
+  deterministic emission; curl of value-noise potentials for divergence-free turbulence.
+- **Scenes**: the orb gains "sparks" (bass → spawn rate, treble → turbulence, onset → burst);
+  glTF scenes gain "dust" sized from the bounds (bass → spawn, onset → repulsion).
+- Hooked into `SceneRenderer` (compute before the scene pass, draw after the grid) and into the
+  engine shader reload path.
+
+### Bugs found during the milestone
+
+- WGSL rejects `read_write` storage in the vertex stage; the draw entry point now uses read-only
+  declarations at the same bindings (caught by the renderer-init check in the GPU tests).
+- My first GPU test used a point emitter with near-zero speed, so every particle landed on the
+  same two pixels and the average-brightness assertion could not move; the test now spreads them.
+
+### Tests
+
+241 cases (was 238): parameter registration/application (1), GPU emission/lifetime/disable and
+burst/capacity clamping (2), route/parameter counts updated in the scene tests, plus a hidden
+`[.perf]` one-million-particle probe.
+
+### Results
+
+- Sparks orbiting the orb and dust around the helmet render with 0 GPU errors; 120 fps at
+  2880x1800 with GPU 0.79 ms in the Debug window.
+- 1M-particle pool: 3.4 ms GPU per frame at 1280x720.
+
+### Known limitations
+
+- Alpha-blended systems are unsorted; no collisions, trails or sub-frame emission; soft-particle
+  depth fade is parameterised but not applied; alive-list order is not bit-stable across runs
+  (additive blending makes this invisible in practice); pools reset when capacity changes.
+
+### Next step
+
+Milestone 0.6 (post-processing): bloom, tone-mapping options, colour grading, distortion, motion
+blur and depth of field as built-in post layers on the existing post chain, and the transient
+resource pool / frame graph that comes with them.

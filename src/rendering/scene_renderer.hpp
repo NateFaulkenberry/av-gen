@@ -11,6 +11,7 @@
 #include "gpu/readback.hpp"
 #include "gpu/render_target.hpp"
 #include "gpu/texture.hpp"
+#include "rendering/particle_renderer.hpp"
 #include "rendering/shader_layer.hpp"
 #include "scene/scene.hpp"
 #include "shaders/shader_layers.hpp"
@@ -50,6 +51,7 @@ struct RenderStats {
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     bool ibl = false;
+    ParticleStats particles;
 };
 
 constexpr std::uint32_t kMaxLights = 8;
@@ -123,6 +125,7 @@ public:
     [[nodiscard]] Result<void> reloadEngineShaders();
     [[nodiscard]] std::uint32_t engineShaderReloads() const { return engineReloads_; }
     [[nodiscard]] ShaderStack& shaderStack() { return *shaderStack_; }
+    [[nodiscard]] ParticleRenderer& particles() { return *particles_; }
 
     // Installs image-based lighting (normally driven automatically from scene.environment).
     void setIbl(const IblResources& ibl);
@@ -170,6 +173,7 @@ private:
     std::unique_ptr<gpu::SamplerCache> samplers_;
     std::unique_ptr<EnvironmentProcessor> environment_;
     std::unique_ptr<ShaderStack> shaderStack_;
+    std::unique_ptr<ParticleRenderer> particles_;
     gpu::RenderTarget post_[2];      // ping-pong HDR colour targets for post layers
     gpu::GpuTexture spectrum_;       // binCount x 1 RGBA16F audio spectrum for user shaders
     std::size_t spectrumBins_ = 0;

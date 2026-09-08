@@ -43,6 +43,7 @@ public:
     params::Parameter<float>& gridIntensity() { return *gridIntensity_; }
 
     [[nodiscard]] float currentAngle() const { return angle_; }
+    [[nodiscard]] const ParticleParameters& sparks() const { return sparks_; }
     [[nodiscard]] float currentCameraAngle() const { return cameraAngle_; }
 
 private:
@@ -63,6 +64,8 @@ private:
     params::Parameter<float>* cameraHeight_ = nullptr;
     params::Parameter<float>* cameraOrbitSpeed_ = nullptr;
     params::Parameter<float>* gridIntensity_ = nullptr;
+    ParticleParameters sparks_;
+    ParticleSystem sparksRest_;
 };
 
 } // namespace avgen::scene

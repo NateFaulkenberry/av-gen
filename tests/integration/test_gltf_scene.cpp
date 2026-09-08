@@ -89,7 +89,7 @@ TEST_CASE("GltfScene imports, exposes parameters and applies the root transform"
         INFO(p);
         CHECK(params.find(p) != nullptr);
     }
-    CHECK(modulator.routes().size() == 5);
+    CHECK(modulator.routes().size() == 7); // five scene routes + two dust routes
     CHECK(params.findAs<float>("lights/lamp/intensity")->value() == 7.0f);
 
     FixedStepClock clock(60.0);

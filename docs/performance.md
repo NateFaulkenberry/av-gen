@@ -36,6 +36,14 @@ All of these are displayed in the Control window and logged every 120 frames at 
 | Helmet + IBL + skybox, 2880x1800 window | 120 fps (vsync), CPU work 0.3 ms, GPU 1.0-1.2 ms |
 | Helmet headless 1280x720 incl. readback | ~6 ms per frame |
 
+## Milestone 0.5 numbers (Apple M2 Max)
+
+| Metric | Value |
+|---|---|
+| Orb scene + 131k-capacity sparks, 2880x1800 window | 120 fps, GPU 0.79 ms (was 0.4 ms without particles), CPU work 1.2 ms (Debug) |
+| One-million-particle pool, ~1M alive, 1280x720 headless (`[.perf]` probe) | 3.4 ms GPU per frame (emit + simulate + indirect draw) |
+| Particle uniform update per system | one 288-byte write; no readback |
+
 ## Budget and revisit triggers
 
 - Analysis: switch FFT backend (pffft/vDSP) if hop time exceeds 10% of the hop period.

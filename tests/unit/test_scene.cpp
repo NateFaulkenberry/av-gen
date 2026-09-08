@@ -194,14 +194,14 @@ TEST_CASE("OrbScene registers all parameters and default routes", "[scene][orb]"
         INFO(path);
         CHECK(params.find(path) != nullptr);
     }
-    CHECK(params.size() == 11);
+    CHECK(params.size() == 31); // 11 orb/scene/camera + 20 particles/sparks
     CHECK(orb.scale().value() == 1.0f);
     CHECK(orb.scale().softMax(0) == 3.0f);
     CHECK(orb.scale().hardMax(0) == 8.0f);
     CHECK(orb.baseColor().kind() == params::ParamKind::Color);
     CHECK(orb.cameraDistance().base() == 7.0f);
 
-    REQUIRE(modulator.routes().size() == 5);
+    REQUIRE(modulator.routes().size() == 8); // five orb routes + three sparks routes
     for (const params::ModRoute& route : modulator.routes()) {
         INFO(route.source << " -> " << route.target);
         CHECK(params.find(route.target) != nullptr);
@@ -214,14 +214,14 @@ TEST_CASE("OrbScene registers all parameters and default routes", "[scene][orb]"
 
     // Idempotent by target.
     OrbScene::addDefaultRoutes(modulator);
-    CHECK(modulator.routes().size() == 5);
+    CHECK(modulator.routes().size() == 8); // idempotent: still eight
     modulator.clearRoutes();
     params::ModRoute custom;
     custom.source = "audio.rms";
     custom.target = "orb/scale";
     modulator.addRoute(custom);
     OrbScene::addDefaultRoutes(modulator);
-    CHECK(modulator.routes().size() == 5); // existing orb/scale route kept, four added
+    CHECK(modulator.routes().size() == 8); // idempotent: still eight // existing orb/scale route kept, four added
     CHECK(modulator.routes()[0].source == "audio.rms");
 
     // Scene content.

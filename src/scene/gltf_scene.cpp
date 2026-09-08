@@ -74,6 +74,36 @@ Result<std::unique_ptr<GltfScene>> GltfScene::load(const std::filesystem::path& 
     if (!ctrl->scene_.cameras.empty()) {
         ctrl->scene_.camera = ctrl->scene_.cameras.front();
     }
+    // Ambient dust sized to the scene: slow drifting motes that react to bass/onsets by default.
+    {
+        ParticleSystem dust;
+        dust.name = "dust";
+        dust.capacity = 65536;
+        dust.shape = EmitterShape::Box;
+        dust.position = ctrl->center_;
+        dust.extent = glm::vec3(ctrl->radius_ * 1.5f);
+        dust.spawnRate = 400.0f;
+        dust.lifetimeMin = 4.0f;
+        dust.lifetimeMax = 8.0f;
+        dust.spread = 1.0f;
+        dust.speedMin = 0.0f;
+        dust.speedMax = ctrl->radius_ * 0.05f;
+        dust.gravity = glm::vec3(0.0f);
+        dust.drag = 0.5f;
+        dust.turbulence = ctrl->radius_ * 0.3f;
+        dust.turbulenceScale = 1.0f / std::max(ctrl->radius_, 0.1f);
+        dust.turbulenceSpeed = 0.2f;
+        dust.attractorPosition = ctrl->center_;
+        dust.attractorStrength = 0.0f;
+        dust.attractorRadius = ctrl->radius_ * 3.0f;
+        dust.sizeStart = ctrl->radius_ * 0.006f;
+        dust.sizeEnd = ctrl->radius_ * 0.002f;
+        dust.colorStart = glm::vec4(1.0f, 0.95f, 0.85f, 0.8f);
+        dust.colorEnd = glm::vec4(0.8f, 0.85f, 1.0f, 0.0f);
+        dust.emissive = 1.5f;
+        ctrl->dustRest_ = dust;
+        ctrl->scene_.particles.push_back(dust);
+    }
     ctrl->scene_.environment.gridIntensity = 0.0f;
     ctrl->scene_.environment.backgroundColor = glm::vec3(0.02f, 0.02f, 0.03f);
 
@@ -84,6 +114,9 @@ Result<std::unique_ptr<GltfScene>> GltfScene::load(const std::filesystem::path& 
 
 void GltfScene::attach(params::ParameterSet& params, params::Modulator& modulator) {
     registerParameters(params);
+    if (!scene_.particles.empty()) {
+        dust_ = registerParticleParameters(params, dustRest_);
+    }
     addDefaultRoutes(modulator);
 }
 
@@ -150,6 +183,19 @@ void GltfScene::addDefaultRoutes(params::Modulator& modulator) {
         r.chain.decayMs = 500.0f;
         modulator.addRoute(r);
     }
+    if (!hasTarget("particles/dust/spawnRate")) {
+        ModRoute r{.source = "audio.bass", .target = "particles/dust/spawnRate", .amount = 3000.0f};
+        r.chain.attackMs = 30.0f;
+        r.chain.decayMs = 400.0f;
+        modulator.addRoute(r);
+    }
+    if (!hasTarget("particles/dust/attractorStrength")) {
+        ModRoute r{.source = "audio.onset", .target = "particles/dust/attractorStrength", .amount = -6.0f};
+        r.chain.envelope = EnvelopeMode::PeakHold;
+        r.chain.envelopeHoldMs = 50.0f;
+        r.chain.envelopeFallPerSecond = 6.0f;
+        modulator.addRoute(r);
+    }
     if (!hasTarget("root/impulse")) {
         ModRoute r{.source = "audio.onset", .target = "root/impulse", .amount = 0.25f};
         r.chain.envelope = EnvelopeMode::PeakHold;
@@ -195,6 +241,9 @@ void GltfScene::update(const FrameTime& time) {
     scene_.camera.nearPlane = std::max(radius_ * 0.01f, 0.01f);
     scene_.camera.farPlane = std::max(radius_ * 50.0f, 100.0f);
 
+    if (!scene_.particles.empty() && dust_.spawnRate != nullptr) {
+        applyParticleParameters(dust_, dustRest_, scene_.particles[0]);
+    }
     scene_.environment.brightness = brightness_->value();
     scene_.environment.gridIntensity = gridIntensity_->value();
     scene_.environment.environmentIntensity = envIntensity_->value();

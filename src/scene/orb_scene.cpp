@@ -73,6 +73,38 @@ OrbScene::OrbScene(params::ParameterSet& params, params::Modulator& modulator) {
     key.intensity = 3.0f;
     scene_.addLight(key);
 
+    // Sparks: an orbiting spark cloud around the orb, driven by bass (spawn), highs (turbulence)
+    // and onsets (bursts) through the default routes.
+    ParticleSystem sparks;
+    sparks.name = "sparks";
+    sparks.capacity = 131072;
+    sparks.shape = EmitterShape::Sphere;
+    sparks.position = glm::vec3(0.0f, 1.5f, 0.0f);
+    sparks.extent = glm::vec3(1.1f);
+    sparks.spawnRate = 1500.0f;
+    sparks.lifetimeMin = 1.5f;
+    sparks.lifetimeMax = 3.5f;
+    sparks.direction = glm::vec3(0.0f, 1.0f, 0.0f);
+    sparks.spread = 1.0f;
+    sparks.speedMin = 0.2f;
+    sparks.speedMax = 0.8f;
+    sparks.gravity = glm::vec3(0.0f, 0.15f, 0.0f);
+    sparks.drag = 0.6f;
+    sparks.turbulence = 1.2f;
+    sparks.turbulenceScale = 0.8f;
+    sparks.attractorPosition = glm::vec3(0.0f, 1.5f, 0.0f);
+    sparks.attractorStrength = 0.6f;
+    sparks.attractorRadius = 4.0f;
+    sparks.orbit = 1.2f;
+    sparks.sizeStart = 0.022f;
+    sparks.sizeEnd = 0.0f;
+    sparks.colorStart = glm::vec4(1.0f, 0.45f, 0.85f, 0.9f);
+    sparks.colorEnd = glm::vec4(0.3f, 0.5f, 1.0f, 0.0f);
+    sparks.emissive = 1.2f;
+    sparksRest_ = sparks;
+    scene_.particles.push_back(sparks);
+    sparks_ = registerParticleParameters(params, sparksRest_);
+
     addDefaultRoutes(modulator);
     update(FrameTime{});
 }
@@ -107,6 +139,7 @@ void OrbScene::addDefaultRoutes(params::Modulator& modulator) {
         r.chain.decayMs = 250.0f;
         addIfMissing(std::move(r));
     }
+
     {
         ModRoute r{.source = "audio.rms", .target = "scene/brightness", .amount = 0.5f};
         r.chain.attackMs = 30.0f;
@@ -118,6 +151,24 @@ void OrbScene::addDefaultRoutes(params::Modulator& modulator) {
         r.chain.envelope = params::EnvelopeMode::PeakHold;
         r.chain.envelopeHoldMs = 30.0f;
         r.chain.envelopeFallPerSecond = 4.0f;
+        addIfMissing(std::move(r));
+    }
+    {
+        ModRoute r{.source = "audio.bass", .target = "particles/sparks/spawnRate", .amount = 12000.0f};
+        r.chain.curve = params::CurveType::Power;
+        r.chain.curveAmount = 1.5f;
+        r.chain.attackMs = 20.0f;
+        r.chain.decayMs = 250.0f;
+        addIfMissing(std::move(r));
+    }
+    {
+        ModRoute r{.source = "audio.treble", .target = "particles/sparks/turbulence", .amount = 4.0f};
+        r.chain.attackMs = 10.0f;
+        r.chain.decayMs = 300.0f;
+        addIfMissing(std::move(r));
+    }
+    {
+        ModRoute r{.source = "audio.onset", .target = "particles/sparks/burst", .amount = 400.0f};
         addIfMissing(std::move(r));
     }
 }
@@ -136,6 +187,13 @@ void OrbScene::update(const FrameTime& time) {
     orb.material.emissiveColor = emissiveColor_->value();
     orb.material.emissiveIntensity = emissive_->value();
 
+    if (!scene_.particles.empty()) {
+        applyParticleParameters(sparks_, sparksRest_, scene_.particles[0]);
+        // Sparks follow the orb.
+        scene_.particles[0].position = orb.transform.position;
+        scene_.particles[0].attractorPosition = orb.transform.position;
+        scene_.particles[0].extent = sparksRest_.extent * sparks_.extent->value() * orb.transform.scale.x;
+    }
     scene_.environment.brightness = brightness_->value();
     scene_.environment.gridIntensity = gridIntensity_->value();
 

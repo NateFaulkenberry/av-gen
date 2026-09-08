@@ -78,6 +78,8 @@ private:
     params::Parameter<float>* skyboxBlur_ = nullptr;
     params::Parameter<float>* brightness_ = nullptr;
     params::Parameter<float>* gridIntensity_ = nullptr;
+    ParticleParameters dust_;
+    ParticleSystem dustRest_;
 };
 
 } // namespace avgen::scene

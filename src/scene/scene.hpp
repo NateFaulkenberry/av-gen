@@ -5,6 +5,8 @@
 // Conventions: right-handed, +Y up, metres, glTF 2.0 semantics (ADR-005): metallic-roughness
 // materials, punctual lights that shine down -Z, cameras that look down -Z.
 
+#include "scene/particles.hpp"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -161,6 +163,7 @@ struct Scene {
     std::vector<MeshData> meshes;
     std::vector<TextureData> textures;
     std::vector<Entity> entities;
+    std::vector<ParticleSystem> particles;
     std::uint64_t meshVersion = 0;    // incremented when meshes change (renderer re-uploads)
     std::uint64_t textureVersion = 0; // incremented when textures change
 

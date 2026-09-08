@@ -40,7 +40,8 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
     : context_(context), shaders_(shaders), timer_(std::make_unique<gpu::GpuTimer>(context)),
       samplers_(std::make_unique<gpu::SamplerCache>(context)),
       environment_(std::make_unique<EnvironmentProcessor>(context, shaders)),
-      shaderStack_(std::make_unique<ShaderStack>(context, shaders)) {
+      shaderStack_(std::make_unique<ShaderStack>(context, shaders)),
+      particles_(std::make_unique<ParticleRenderer>(context, shaders)) {
     objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
 }
 
@@ -203,6 +204,9 @@ Result<void> SceneRenderer::init() {
         return r;
     }
     if (auto r = environment_->init(); !r) {
+        return r;
+    }
+    if (auto r = particles_->init(); !r) {
         return r;
     }
     if (context_.errorCount() > 0) {
@@ -560,6 +564,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     } else {
         keep("tonemap.wgsl", std::unexpected(tonemap.error()));
     }
+    if (auto r = particles_->reload(); !r) {
+        keep("particles.wgsl", r);
+    }
     ++engineReloads_;
     if (first) {
         log::info("engine shaders reloaded");
@@ -869,6 +876,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     stats_.lights = lightCount;
     stats_.ibl = ibl;
 
+    // ---- particle simulation (compute) ----
+    particles_->update(encoder, scene, time, view, proj);
+    stats_.particles = particles_->stats();
+
     // ---- pass 1: scene -> HDR ----
     {
         wgpu::RenderPassColorAttachment color{};
@@ -935,6 +946,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             ++stats_.triangles;
         }
         drawItems(grid, false);
+        particles_->draw(rp, scene);
+        stats_.drawCalls += particles_->stats().systems;
         drawItems(blended, true);
         rp.End();
     }
