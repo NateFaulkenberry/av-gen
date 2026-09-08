@@ -63,6 +63,24 @@ target_compile_definitions(kissfft PUBLIC kiss_fft_scalar=float KISS_FFT_SHARED=
 set_target_properties(kissfft PROPERTIES C_STANDARD 99)
 add_library(kissfft::kissfft ALIAS kissfft)
 
+# ---- fastgltf (glTF 2.0 loader) -----------------------------------------------------------------
+CPMAddPackage(
+    NAME fastgltf
+    GITHUB_REPOSITORY spnda/fastgltf
+    GIT_TAG v0.9.0
+    SYSTEM YES EXCLUDE_FROM_ALL YES
+    OPTIONS "FASTGLTF_COMPILE_AS_CPP20 ON" "FASTGLTF_ENABLE_TESTS OFF" "FASTGLTF_ENABLE_EXAMPLES OFF")
+
+# ---- stb (image decode/encode), header-only, implementation in src/assets --------------------------
+CPMAddPackage(
+    NAME stb
+    GITHUB_REPOSITORY nothings/stb
+    GIT_TAG 2c980bb59875b0d32144a71867fbdebb2f77cd20
+    DOWNLOAD_ONLY YES)
+add_library(stb INTERFACE)
+target_include_directories(stb SYSTEM INTERFACE "${stb_SOURCE_DIR}")
+add_library(stb::stb ALIAS stb)
+
 # ---- Catch2 (tests) ---------------------------------------------------------------------------
 if(AVGEN_BUILD_TESTS)
     CPMAddPackage(

@@ -374,8 +374,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     FrameUniforms frame{};
     frame.viewProj = scene.camera.projection(aspect) * scene.camera.view();
     frame.cameraPos = glm::vec4(scene.camera.position, 1.0f);
-    frame.lightDir = glm::vec4(glm::normalize(scene.light.direction), 0.0f);
-    frame.lightColor = glm::vec4(scene.light.color * scene.light.intensity, 1.0f);
+    // Interim until the multi-light path lands: the first enabled directional light is the key.
+    frame.lightDir = glm::vec4(glm::normalize(glm::vec3(-0.4f, -1.0f, -0.35f)), 0.0f);
+    frame.lightColor = glm::vec4(3.0f, 2.85f, 2.7f, 1.0f);
+    for (const auto& light : scene.lights) {
+        if (light.enabled && light.type == scene::PunctualLight::Type::Directional) {
+            frame.lightDir = glm::vec4(glm::normalize(light.direction), 0.0f);
+            frame.lightColor = glm::vec4(light.color * light.intensity, 1.0f);
+            break;
+        }
+    }
     frame.params = glm::vec4(static_cast<float>(time.renderTime), scene.environment.gridIntensity,
                              scene.environment.brightness, 0.0f);
     queue.WriteBuffer(frameUniforms_, 0, &frame, sizeof(frame));

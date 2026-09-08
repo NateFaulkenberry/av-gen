@@ -65,6 +65,13 @@ OrbScene::OrbScene(params::ParameterSet& params, params::Modulator& modulator) {
     Entity& grid = scene_.addEntity("grid", gridMesh);
     grid.style = MeshStyle::Grid;
     grid.transform.position = glm::vec3(0.0f);
+    // Key light (glTF directional semantics: `direction` is the way the light travels).
+    scene::PunctualLight key;
+    key.name = "key";
+    key.direction = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.35f));
+    key.color = glm::vec3(1.0f, 0.95f, 0.9f);
+    key.intensity = 3.0f;
+    scene_.addLight(key);
 
     addDefaultRoutes(modulator);
     update(FrameTime{});
