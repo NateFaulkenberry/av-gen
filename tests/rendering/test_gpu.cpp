@@ -64,6 +64,10 @@ scene::Scene cubeScene() {
     e.material.emissiveIntensity = 0.5f;
     s.camera.position = {0.0f, 1.5f, 5.0f};
     s.camera.target = {0.0f, 1.0f, 0.0f};
+    scene::PunctualLight key;
+    key.direction = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.6f));
+    key.intensity = 3.0f;
+    s.addLight(key);
     return s;
 }
 
@@ -96,12 +100,12 @@ TEST_CASE("Shader compilation reports errors with diagnostics and succeeds on va
     REQUIRE_FALSE(missing.has_value());
     CHECK(missing.error().message.find("not found") != std::string::npos);
 
-    for (const char* name : {"common.wgsl", "mesh.wgsl", "grid.wgsl", "tonemap.wgsl"}) {
+    for (const char* name : {"common.wgsl", "pbr.wgsl", "grid.wgsl", "skybox.wgsl", "tonemap.wgsl"}) {
         auto src = shaders.loadSource(name);
         REQUIRE(src.has_value());
     }
-    auto mesh = shaders.load("mesh.wgsl");
-    REQUIRE(mesh.has_value());
+    auto pbr = shaders.load("pbr.wgsl");
+    REQUIRE(pbr.has_value());
 }
 
 TEST_CASE("Clearing a texture and reading it back yields the clear colour", "[gpu][readback]") {
