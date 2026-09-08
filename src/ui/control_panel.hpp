@@ -35,6 +35,9 @@ public:
     std::function<void()> onOrbScene;
     std::function<void()> onOpenProject;
     std::function<void()> onOpenShader;
+    std::function<void()> onSaveScene;
+    std::function<void()> onAddGltfNode;
+    std::function<void()> onAddSceneNode;
     std::function<void()> onOpenPostShader;
     // Compile error lookup for a shader layer id (from the GPU side); may be empty.
     std::function<std::string(std::uint32_t)> shaderErrorFor;
@@ -57,6 +60,7 @@ private:
     void drawSourcesTab(app::Engine& engine);
     void drawPresetsTab(app::Engine& engine);
     void drawShadersTab(app::Engine& engine);
+    void drawSceneTab(app::Engine& engine);
 
     bool showDemo_ = false;
     bool showParameters_ = true;
@@ -67,6 +71,8 @@ private:
     int newSourceKind_ = 0;
     char newSourceName_[64] = "wobble";
     char presetName_[64] = "preset";
+    char nodeName_[64] = "node";
+    int newNodeKind_ = 1;
     int morphA_ = 0;
     int morphB_ = 0;
     float morphT_ = 0.0f;

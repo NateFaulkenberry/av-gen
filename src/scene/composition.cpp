@@ -1210,7 +1210,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             if (!v) {
                 return std::unexpected(v.error());
             }
-            comp->cameraDistanceSetting_ = *v;
+            if (*v > 0.0f) { // 0 (or negative) means "fit to the bounds"
+                comp->cameraDistanceSetting_ = *v;
+            }
         }
         if (c.contains("height")) {
             auto v = readFloat(c, "height", 0.0f);

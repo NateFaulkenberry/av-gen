@@ -37,6 +37,7 @@ struct AppOptions {
     std::optional<std::filesystem::path> audio;
     std::optional<std::filesystem::path> scene;
     std::optional<std::filesystem::path> environment;
+    std::optional<std::filesystem::path> composition; // scene file (avgen-scene JSON)
     std::vector<std::pair<std::filesystem::path, bool>> shaders; // (file, isPost)
     std::optional<std::filesystem::path> project;      // load at start-up
     std::optional<std::filesystem::path> saveProject;  // write on exit

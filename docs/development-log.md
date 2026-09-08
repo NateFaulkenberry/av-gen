@@ -421,3 +421,82 @@ transient pool (4). Scene route counts updated (post routes moved to the engine)
 ### Next step
 
 Milestone 0.7 (scene composition): reusable scenes, nested scenes, presets and asset management.
+
+## 2026-09-08 — Milestone 0.7: scene composition
+
+### What was implemented and why
+
+- `assets::AssetRegistry` (`src/assets/asset_registry.*`): cached, versioned glTF and image
+  loads keyed by resolved path, base-directory path resolution and relativisation, `reload`.
+  One decode per asset however many instances reference it; the version counter is the hook for
+  asset hot reload later.
+- `scene::Composition` (`src/scene/composition.*`, ADR-017): a `SceneController` made of nodes
+  (`gltf`, `orb`, `grid`, `particles`, `scene`) flattened into one `scene::Scene`: meshes and
+  textures shared per asset, one entity per instance with pre-multiplied transforms, particle
+  systems and lights appended, a key light when none exists, camera fitted to the bounds. Every
+  node registers `nodes/<name>/position|rotation|scale|visible|emissiveBoost|roughnessScale`;
+  nested scene files prefix their parameters with `nodes/<name>/`; particle nodes expose
+  `particles/<name>/…`. The camera, environment, brightness, grid and root parameters and default
+  audio routes match the orb and glTF scenes, so projects and presets carry over.
+- Scene files: `"format": "avgen-scene"` v1 (`docs/project-format.md`), nested up to four
+  levels, self-inclusion refused, missing assets skipped with a warning so a scene still opens.
+  Asset paths are written relative to the scene file.
+- Engine: `loadComposition` / `saveComposition` / `newComposition` / `addNode` / `removeNode`;
+  `.json` files are routed by their `format` field (project vs scene) for `--project`, drag and
+  drop and the File menu; `--composition <file>`; environment maps go through the composition
+  (which owns its texture list) instead of being appended to the scene.
+- UI: a Scene tab (node list, add glTF/scene/orb/grid/particle nodes, remove) and File > Save
+  Scene As.
+- Implementation was split: the registry and composition (GPU-free, ~1400 lines + 900 lines of
+  tests) were written in a worktree by a subagent against fixed headers; engine, UI, CLI, docs
+  and ADR on main; merged with private-member header changes only.
+
+### Bugs found during the milestone
+
+- Headless progress logging dereferenced `root/scale` / `material/emissiveBoost` unconditionally
+  and crashed (SIGSEGV) for compositions, which have neither `orb/*` nor `material/*` parameters;
+  now reads whichever headline parameter exists.
+- `camera.distance: 0` in a scene file was taken literally (camera inside the model); 0 or
+  negative now means "fit to the bounds" as documented.
+- The dark blurred shape that appeared while orbiting a composition turned out to be a softbox
+  in the studio HDRI's skybox, not geometry (verified by rendering without the environment).
+- Euler-angle round trips through quaternions lost ~0.02° at 90° with `glm::eulerAngles`; the
+  composition uses an `atan2` extraction matching `glm::quat(vec3)`.
+- macOS temp paths (`/var` vs `/private/var`) broke relative-path expectations until the registry
+  canonicalised its base directory.
+
+### Tests
+
+260 cases (was 246): asset registry (6), composition (7: flattening of every node kind with
+shared assets, key light and particle framing, parameters driving instances/materials/particles,
+JSON and file round trips, malformed files and missing assets, nested scene files with prefixed
+parameters, cycle and depth refusal, determinism, kind names) and an engine integration test
+(format-routed `.json` open, audio driving `root/scale`, node add/remove keeps the modulator
+bound, save with relative asset paths then reopen, broken file leaves the scene, fresh
+composition from the orb scene). The GLB fixture writer moved to `tests/support/gltf_fixture.hpp`.
+
+### Results
+
+- Sample scene (`stage.json`: two DamagedHelmet instances, orb, grid, BoxTextured, a nested
+  `backdrop.json` with MetalRoughSpheres at 0.12 scale and a particle node, studio HDRI):
+  headless 1280x720 renders with 0 GPU errors and a bit-identical hash across runs
+  (`7eb2d99fa8271618` at frame 59); one helmet decode is shared by both instances.
+- Windowed 2880x1800 Release: 120 fps (vsync), GPU 1.9 ms, CPU work ~2 ms with the default
+  post chain.
+- Self-including scene file: refused at load with a clear error; `--stress 7` headless against
+  the composition: 0 GPU errors.
+- Debug and Release: 260/260 tests pass; zero warnings.
+
+### Known limitations
+
+- No node parenting inside one composition (use a nested scene file to group); bounds and the
+  camera fit are computed at rebuild, not when node parameters move things; lights from glTF
+  instances and nested scenes are placed at rebuild and do not follow per-frame node motion;
+  particle settings edited via parameters are saved as authored values, not the edited ones.
+- The bright studio HDRI at intensity 1 renders near-white with the default exposure in both
+  the glTF scene and compositions (a look setting, not a composition issue).
+
+### Next step
+
+Milestone 0.8 (timeline): keyframes and automation curves alongside modulation, scene switching
+over time, and per-section presets.

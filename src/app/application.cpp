@@ -26,6 +26,7 @@ std::string usageText() {
            "  --audio <file>      load an audio file at start-up\n"
            "  --scene <file>      load a glTF/GLB scene (default: built-in orb)\n"
            "  --env <file>        load an equirectangular .hdr environment map\n"
+           "  --composition <f>   load a scene composition file (avgen-scene JSON)\n"
            "  --shader <file>     add a user shader layer behind the scene (repeatable)\n"
            "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
            "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
@@ -66,6 +67,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--scene");
             if (!v) return std::unexpected(v.error());
             options.scene = *v;
+            ++i;
+        } else if (arg == "--composition") {
+            auto v = need(i, "--composition");
+            if (!v) return std::unexpected(v.error());
+            options.composition = *v;
             ++i;
         } else if (arg == "--env") {
             auto v = need(i, "--env");
@@ -218,6 +224,32 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             });
         };
         panel_->shaderErrorFor = [this](std::uint32_t id) { return renderer_->shaderStack().errorFor(id); };
+        panel_->onSaveScene = [this] {
+            window_->saveFileDialog([this](std::string path) {
+                if (path.empty()) return;
+                if (auto r = engine_->saveComposition(path); !r) {
+                    panel_->setStatus(r.error().message);
+                } else {
+                    panel_->setStatus("scene saved " + std::filesystem::path(path).filename().string());
+                }
+            });
+        };
+        auto addAssetNode = [this](scene::NodeKind kind, platform::Window::DialogKind dialogKind) {
+            return [this, kind, dialogKind] {
+                window_->openFileDialog(dialogKind, [this, kind](std::string path) {
+                    if (path.empty()) return;
+                    scene::CompositionNode node;
+                    node.kind = kind;
+                    node.asset = path;
+                    node.name = std::filesystem::path(path).stem().string();
+                    if (auto r = engine_->addNode(std::move(node)); !r) {
+                        panel_->setStatus(r.error().message);
+                    }
+                });
+            };
+        };
+        panel_->onAddGltfNode = addAssetNode(scene::NodeKind::Gltf, platform::Window::DialogKind::Scene);
+        panel_->onAddSceneNode = addAssetNode(scene::NodeKind::Scene, platform::Window::DialogKind::Any);
         panel_->onSaveProject = [this] {
             window_->saveFileDialog([this](std::string path) {
                 if (path.empty()) {
@@ -236,6 +268,15 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     if (options.scene) {
         if (auto r = engine_->loadScene(*options.scene); !r) {
             log::error("scene: {}", r.error().message);
+            if (options.headless) {
+                return std::unexpected(r.error());
+            }
+            if (panel_) panel_->setStatus(r.error().message);
+        }
+    }
+    if (options.composition) {
+        if (auto r = engine_->loadComposition(*options.composition); !r) {
+            log::error("composition: {}", r.error().message);
             if (options.headless) {
                 return std::unexpected(r.error());
             }
@@ -560,13 +601,16 @@ int Application::runHeadless() {
         lastHash = gpu::hashImage(*image);
         if (i % 30 == 0 || i == frames - 1) {
             const auto& f = engine_->latestFrame();
+            // The headline parameters differ per scene kind; a missing one reads as 0.
+            auto valueOf = [&](const char* a, const char* b) {
+                if (const auto* p = engine_->params().find(a)) return p->finalComponent(0);
+                if (const auto* p = engine_->params().find(b)) return p->finalComponent(0);
+                return 0.0f;
+            };
             log::info("offline frame {:4d} t={:7.3f}s bass={:.2f} mid={:.2f} treble={:.2f} rms={:.2f} onset={} scale={:.3f} "
                       "emissive={:.2f} gpu={:.2f}ms hash={:016x}",
                       i, time.renderTime, f.bands[0], f.bands[2], f.bands[4], f.rms, f.onset ? 1 : 0,
-                      engine_->params().find("orb/scale") ? engine_->params().find("orb/scale")->finalComponent(0)
-                                                          : engine_->params().find("root/scale")->finalComponent(0),
-                      engine_->params().find("orb/emissive") ? engine_->params().find("orb/emissive")->finalComponent(0)
-                                                             : engine_->params().find("material/emissiveBoost")->finalComponent(0),
+                      valueOf("orb/scale", "root/scale"), valueOf("orb/emissive", "material/emissiveBoost"),
                       renderer_->stats().gpuFrameMs, lastHash);
         }
         if (options_.capture && i == frames - 1) {

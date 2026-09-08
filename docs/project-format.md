@@ -84,3 +84,48 @@ Rules:
   warning (forward compatibility); a type mismatch is an error. `version` greater than the
   reader's is rejected; older versions will be migrated in order.
 - Paths are the identity for parameters everywhere: UI, presets, OSC addresses (`/orb/scale`).
+
+
+## Scene composition files (milestone 0.7, ADR-017)
+
+A scene file is a separate document (`"format": "avgen-scene"`, version 1) describing a
+`scene::Composition`: a list of nodes flattened into one renderable scene. Asset paths are
+relative to the scene file's folder (the engine relativises them on save). A project file
+continues to hold parameters, routes, sources, presets and shader layers; a scene file holds
+*what* is in the scene, so a project can drive any scene and a scene can be reused in another
+scene (`"kind": "scene"`, nested up to four levels; a file that includes itself is refused).
+
+```json
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "stage",
+  "camera": { "distance": 0.0, "height": 0.35, "orbitSpeed": 0.15, "fov": 45.0 },
+  "environment": { "map": "hdr/studio.hdr", "intensity": 1.0 },
+  "nodes": [
+    { "name": "helmet", "kind": "gltf", "asset": "models/DamagedHelmet.glb",
+      "position": [0, 0, 0], "rotation": [0, 90, 0], "scale": [1, 1, 1],
+      "visible": true, "emissiveBoost": 1.0, "roughnessScale": 1.0 },
+    { "name": "orb", "kind": "orb", "position": [2.5, 0.5, 0], "scale": [0.4, 0.4, 0.4] },
+    { "name": "floor", "kind": "grid" },
+    { "name": "dust", "kind": "particles",
+      "particles": { "maxParticles": 20000, "spawnRate": 400, "shape": "sphere", "blend": "additive" } },
+    { "name": "backdrop", "kind": "scene", "asset": "scenes/backdrop.json", "position": [0, 0, -6] }
+  ]
+}
+```
+
+Node kinds: `gltf` (a glTF 2.0 file; instances of the same file share meshes and textures),
+`orb` (the built-in orb mesh and material), `grid` (the reference floor), `particles` (a GPU
+particle system, every `ParticleSystem` field optional with the defaults from `docs/rendering.md`),
+`scene` (another scene file). `camera.distance` 0 means "fit to the scene bounds".
+
+Parameters a composition registers (all saveable in a project and modulatable):
+
+| Path | Meaning |
+|---|---|
+| `nodes/<name>/position`, `rotation` (degrees), `scale` | offset from the node's rest transform |
+| `nodes/<name>/visible`, `emissiveBoost`, `roughnessScale` | per-instance overrides |
+| `nodes/<name>/nodes/<child>/…` | the same for nodes of a nested scene |
+| `particles/<name>/…` | the particle node's system (see `docs/rendering.md`) |
+| `camera/distance`, `height`, `orbitSpeed`, `fov`; `env/intensity`, `env/rotation`; `scene/brightness`, `scene/gridIntensity`; `root/scale`, `root/rotationSpeed`, `root/impulse` | as in the orb and glTF scenes |

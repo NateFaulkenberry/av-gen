@@ -57,6 +57,9 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
             if (ImGui::MenuItem("Built-in Orb Scene") && onOrbScene) {
                 onOrbScene();
             }
+            if (ImGui::MenuItem("Save Scene As...") && onSaveScene) {
+                onSaveScene();
+            }
             ImGui::Separator();
             if (ImGui::MenuItem("Open Project...") && onOpenProject) {
                 onOpenProject();
@@ -134,6 +137,10 @@ void ControlPanel::drawModulation(app::Engine& engine) {
         }
         if (ImGui::BeginTabItem("Shaders")) {
             drawShadersTab(engine);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Scene")) {
+            drawSceneTab(engine);
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
@@ -655,6 +662,69 @@ void ControlPanel::drawShadersTab(app::Engine& engine) {
         ImGui::TextDisabled("no user shaders; drop a .wgsl file on the window or use Add");
     }
     ImGui::TextDisabled("inputs appear in the Parameters window under 'shader'");
+}
+
+
+void ControlPanel::drawSceneTab(app::Engine& engine) {
+    auto* comp = engine.composition();
+    if (comp == nullptr) {
+        ImGui::TextDisabled("current scene: %s (not a composition)", engine.controller().name().c_str());
+        if (ImGui::Button("New composition")) {
+            engine.newComposition();
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("or add a node to convert");
+    } else {
+        ImGui::Text("composition '%s': %zu nodes, radius %.2f", comp->name().c_str(), comp->nodeCount(),
+                    static_cast<double>(comp->boundsRadius()));
+        if (!engine.compositionPath().empty()) {
+            ImGui::TextDisabled("%s", engine.compositionPath().string().c_str());
+        }
+    }
+    ImGui::Separator();
+    static const char* kinds[] = {"gltf", "orb", "grid", "particles", "scene"};
+    ImGui::SetNextItemWidth(110);
+    ImGui::Combo("##nodekind", &newNodeKind_, kinds, 5);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(140);
+    ImGui::InputText("##nodename", nodeName_, sizeof(nodeName_));
+    ImGui::SameLine();
+    const auto kind = static_cast<scene::NodeKind>(newNodeKind_);
+    if (kind == scene::NodeKind::Gltf) {
+        if (ImGui::Button("Add glTF node...") && onAddGltfNode) {
+            onAddGltfNode();
+        }
+    } else if (kind == scene::NodeKind::Scene) {
+        if (ImGui::Button("Add scene node...") && onAddSceneNode) {
+            onAddSceneNode();
+        }
+    } else if (ImGui::Button("Add node")) {
+        scene::CompositionNode node;
+        node.name = nodeName_[0] ? nodeName_ : "node";
+        node.kind = kind;
+        if (auto r = engine.addNode(std::move(node)); !r) {
+            status_ = r.error().message;
+        }
+    }
+    if (comp == nullptr) {
+        return;
+    }
+    ImGui::Separator();
+    std::string removeName;
+    for (const auto& node : comp->nodes()) {
+        ImGui::PushID(node->name.c_str());
+        ImGui::Text("%s  [%s]%s", node->name.c_str(), scene::nodeKindName(node->kind),
+                    node->asset.empty() ? "" : (std::string("  ") + node->asset.filename().string()).c_str());
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 24);
+        if (ImGui::SmallButton("x")) {
+            removeName = node->name;
+        }
+        ImGui::PopID();
+    }
+    if (!removeName.empty()) {
+        engine.removeNode(removeName);
+    }
+    ImGui::TextDisabled("node transforms and overrides: Parameters window, group 'nodes'");
 }
 
 } // namespace avgen::ui

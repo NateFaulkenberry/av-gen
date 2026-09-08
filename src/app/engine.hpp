@@ -15,6 +15,8 @@
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "params/preset.hpp"
+#include "assets/asset_registry.hpp"
+#include "scene/composition.hpp"
 #include "scene/gltf_scene.hpp"
 #include "scene/orb_scene.hpp"
 #include "scene/post_settings.hpp"
@@ -56,6 +58,17 @@ public:
     [[nodiscard]] Result<void> loadScene(const std::filesystem::path& path);
     // Restores the built-in orb scene.
     void loadOrbScene();
+    // Scene composition (milestone 0.7): a new empty composition, a composition from a scene
+    // file, saving the current composition, and node editing.
+    void newComposition();
+    [[nodiscard]] Result<void> loadComposition(const std::filesystem::path& path);
+    [[nodiscard]] Result<void> saveComposition(const std::filesystem::path& path);
+    [[nodiscard]] scene::Composition* composition() { return dynamic_cast<scene::Composition*>(controller_.get()); }
+    // Adds a node to the current composition (converting the orb/glTF controller into one first).
+    [[nodiscard]] Result<scene::CompositionNode*> addNode(scene::CompositionNode node);
+    void removeNode(const std::string& name);
+    [[nodiscard]] assets::AssetRegistry& assets() { return registry_; }
+    [[nodiscard]] const std::filesystem::path& compositionPath() const { return compositionPath_; }
     // Loads an equirectangular HDR and installs it as the current scene's environment map.
     [[nodiscard]] Result<void> loadEnvironment(const std::filesystem::path& path);
     [[nodiscard]] const std::filesystem::path& environmentPath() const { return environmentPath_; }
@@ -167,8 +180,10 @@ private:
     scene::PostParameters postParams_;
     TimeSignals timeSignals_;
     signals::SourceContext sourceContext_;
+    assets::AssetRegistry registry_;
     std::unique_ptr<scene::SceneController> controller_;
     std::filesystem::path environmentPath_;
+    std::filesystem::path compositionPath_;
     std::filesystem::path projectPath_;
     // Beat clock extrapolated per render frame from the analysis tempo (ADR-012).
     double beatClockPhase_ = 0.0;

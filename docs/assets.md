@@ -31,6 +31,24 @@ Nothing binary is committed; `tools/make_test_audio.py` generates the test track
 build GLB and image fixtures in memory. Khronos sample assets (DamagedHelmet, MetalRoughSpheres,
 BoxTextured) and Poly Haven HDRIs were used for manual verification.
 
+## Milestone 0.7: asset registry and scene files
+
+`assets::AssetRegistry` is the one place that loads glTF scenes and images for compositions:
+
+- Loads are cached by resolved path (images also by their sRGB/linear tag) and handed out as
+  `shared_ptr<const SceneAsset>` / `shared_ptr<const ImageAsset>` with a `version` counter, so
+  ten instances of a model share one decode and one set of GPU meshes and textures.
+- Paths are resolved against a base directory (set to the folder of the scene file being loaded)
+  and `relativise`d on save, so a scene file and its assets can be moved together. Absolute paths
+  outside the base stay absolute.
+- `reload(path)` re-reads a file and bumps its version; holders keep the old object until they
+  rebuild, which is the hook for asset hot reload.
+- Failed loads are not cached: fix the file and retry.
+
+Scene composition files (`"format": "avgen-scene"`, see `docs/project-format.md`) are the second
+asset type introduced by 0.7: a composition can reference another scene file as a node, up to
+four levels deep; self-inclusion is refused.
+
 ## Measured (Apple M2 Max, Debug)
 
 | Asset | Result |
@@ -43,5 +61,5 @@ BoxTextured) and Poly Haven HDRIs were used for manual verification.
 ## Later
 
 meshoptimizer (vertex cache, LOD, `EXT_meshopt_compression`), KTX2/Basis via libktx, EXR via
-tinyexr, ozz-animation for skins and animations, an asset registry with GUID + path references
-and async loading with placeholders, hot reload via efsw.
+tinyexr, ozz-animation for skins and animations, GUIDs next to path references, async loading
+with placeholders, hot reload of glTF/images via the registry version and `FileWatcher`.

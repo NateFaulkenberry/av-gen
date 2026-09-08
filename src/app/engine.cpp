@@ -185,6 +185,9 @@ Result<void> Engine::loadScene(const std::filesystem::path& path) {
         return std::unexpected(ctrl.error());
     }
     const float masterGain = modulator_.masterGain;
+    if (auto* comp = composition()) {
+        comp->detach();
+    }
     shaderLayers_.detach();
     params_.clear();
     modulator_.clearRoutes();
@@ -194,7 +197,101 @@ Result<void> Engine::loadScene(const std::filesystem::path& path) {
     return reapplyEnvironment();
 }
 
+void Engine::newComposition() {
+    if (auto* comp = composition()) {
+        comp->detach();
+    }
+    const float masterGain = modulator_.masterGain;
+    shaderLayers_.detach();
+    params_.clear();
+    modulator_.clearRoutes();
+    modulator_.masterGain = masterGain;
+    auto comp = std::make_unique<scene::Composition>(registry_, "composition");
+    comp->attach(params_, modulator_);
+    compositionPath_.clear();
+    installController(std::move(comp));
+    if (auto r = reapplyEnvironment(); !r) {
+        log::warn("environment: {}", r.error().message);
+    }
+}
+
+Result<void> Engine::loadComposition(const std::filesystem::path& path) {
+    registry_.setBaseDirectory(path.parent_path());
+    auto comp = scene::Composition::loadFile(path, registry_);
+    if (!comp) {
+        return std::unexpected(comp.error());
+    }
+    if (auto* current = composition()) {
+        current->detach();
+    }
+    const float masterGain = modulator_.masterGain;
+    shaderLayers_.detach();
+    params_.clear();
+    modulator_.clearRoutes();
+    modulator_.masterGain = masterGain;
+    (*comp)->attach(params_, modulator_);
+    compositionPath_ = path;
+    // A scene file may carry its own environment map.
+    if (!(*comp)->environmentMap().empty()) {
+        environmentPath_ = registry_.resolve((*comp)->environmentMap());
+    }
+    installController(std::move(*comp));
+    return reapplyEnvironment();
+}
+
+Result<void> Engine::saveComposition(const std::filesystem::path& path) {
+    auto* comp = composition();
+    if (comp == nullptr) {
+        return fail("the current scene is not a composition (use New Composition or add a node first)");
+    }
+    // Rebase every asset path on the scene file's folder so the file can move with its assets:
+    // absolute first (against the current base), then relative to the new base.
+    for (auto& node : comp->nodes()) {
+        if (!node->asset.empty()) {
+            node->asset = registry_.resolve(node->asset);
+        }
+    }
+    registry_.setBaseDirectory(path.parent_path());
+    for (auto& node : comp->nodes()) {
+        if (!node->asset.empty()) {
+            node->asset = registry_.relativise(node->asset);
+        }
+    }
+    comp->setEnvironmentMap(environmentPath_.empty() ? std::filesystem::path()
+                                                     : registry_.relativise(registry_.resolve(environmentPath_)));
+    if (auto r = comp->saveFile(path); !r) {
+        return r;
+    }
+    if (!environmentPath_.empty()) {
+        comp->setEnvironmentMap(environmentPath_);
+    }
+    compositionPath_ = path;
+    return {};
+}
+
+Result<scene::CompositionNode*> Engine::addNode(scene::CompositionNode node) {
+    if (composition() == nullptr) {
+        newComposition();
+    }
+    auto added = composition()->addNode(std::move(node));
+    if (added) {
+        rebind();
+    }
+    return added;
+}
+
+void Engine::removeNode(const std::string& name) {
+    if (auto* comp = composition()) {
+        if (comp->removeNode(name)) {
+            rebind();
+        }
+    }
+}
+
 void Engine::loadOrbScene() {
+    if (auto* comp = composition()) {
+        comp->detach();
+    }
     shaderLayers_.detach();
     params_.clear();
     modulator_.clearRoutes();
@@ -206,6 +303,12 @@ void Engine::loadOrbScene() {
 
 Result<void> Engine::reapplyEnvironment() {
     if (environmentPath_.empty()) {
+        return {};
+    }
+    if (auto* comp = composition()) {
+        // A composition rebuilds its texture list, so it owns its environment map (loaded
+        // through the registry on rebuild).
+        comp->setEnvironmentMap(environmentPath_);
         return {};
     }
     auto image = assets::loadImage(environmentPath_, false);
@@ -228,8 +331,12 @@ Result<void> Engine::loadEnvironment(const std::filesystem::path& path) {
     if (!image->isHdr()) {
         return fail("'{}' is not an HDR (Radiance .hdr) image", path.string());
     }
-    auto& sc = controller_->scene();
-    sc.environment.environmentMap = sc.addTexture(std::move(*image));
+    if (auto* comp = composition()) {
+        comp->setEnvironmentMap(path);
+    } else {
+        auto& sc = controller_->scene();
+        sc.environment.environmentMap = sc.addTexture(std::move(*image));
+    }
     environmentPath_ = path;
     log::info("environment map '{}' installed", path.filename().string());
     return {};
@@ -245,6 +352,11 @@ Result<void> Engine::loadFile(const std::filesystem::path& path) {
         return loadEnvironment(path);
     }
     if (ext == ".json") {
+        std::ifstream in(path);
+        nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
+        if (doc.is_object() && doc.value("format", std::string()) == scene::Composition::kFormatName) {
+            return loadComposition(path);
+        }
         return loadProject(path);
     }
     if (ext == ".wgsl" || ext == ".isf") {

@@ -4,9 +4,10 @@ A native C++ real-time GPU audiovisual engine. Not a waveform visualizer: the go
 scene engine in which audio analysis drives a general parameter/modulation system that in turn
 drives GPU-rendered 3D scenes, in real time and as deterministic offline frame sequences.
 
-Milestone 0.6 (current): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
-and render either the built-in orb scene or any glTF 2.0 scene with PBR materials, textures,
-punctual lights, an HDR environment and GPU particle systems, behind or on top of user-written
+Milestone 0.7 (current): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
+and render the built-in orb scene, any glTF 2.0 scene, or a composition of nodes (glTF instances,
+orbs, grids, particle systems, nested scene files) saved as a scene file, with PBR materials,
+textures, punctual lights, an HDR environment and GPU particle systems, behind or on top of user-written
 WGSL shader layers, through a built-in post chain (bloom, colour grading, lens distortion and
 chromatic aberration, depth of field, camera motion blur, five tone-mapping operators, vignette,
 grain). Every parameter, including
@@ -43,10 +44,13 @@ python3 tools/make_test_audio.py /tmp/track.wav        # deterministic 120 BPM t
 ./build/debug/src/avgen --headless --audio /tmp/track.wav --frames 300 --fps 30 --capture out.png
 ./build/debug/src/avgen --audio /tmp/track.wav --project my.json --save-project my.json
 ./build/debug/src/avgen --audio /tmp/track.wav --shader shaders/examples/feedback.wgsl --post my_post.wgsl
+./build/debug/src/avgen --composition scenes/stage.json --audio /tmp/track.wav --play   # scene file (ADR-017)
 ```
 
 Keys: Space play/pause, O open audio, S open scene, E open environment, Left/Right seek 5 s.
-Drop an audio, .glb/.gltf or .hdr file on the window to load it. `--help` lists every flag.
+Drop an audio, .glb/.gltf, .hdr, .wgsl, project or scene .json file on the window to load it.
+The Modulation window's Scene tab adds and removes composition nodes; File > Save Scene As
+writes a scene file. `--help` lists every flag.
 
 ## Documentation
 
@@ -61,5 +65,5 @@ Drop an audio, .glb/.gltf or .hdr file on the window to load it. `--help` lists 
 
 ## Status
 
-Milestones 0.1 to 0.6 complete on macOS 26 / Apple silicon. Windows and Linux are
+Milestones 0.1 to 0.7 complete on macOS 26 / Apple silicon. Windows and Linux are
 architecturally supported (WebGPU via Dawn, SDL3) but not yet built or tested. Licence: MIT.

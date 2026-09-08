@@ -54,6 +54,15 @@ All of these are displayed in the Control window and logged every 120 frames at 
 Bloom at native Retina resolution dominates; starting the chain at quarter resolution is the
 obvious optimisation when the budget tightens.
 
+## Milestone 0.7 numbers (Apple M2 Max, Release)
+
+| Metric | Value |
+|---|---|
+| Six-node composition (2x DamagedHelmet, orb, grid, BoxTextured, nested MetalRoughSpheres + particles, studio HDRI), 2880x1800 window | 120 fps (vsync), GPU 1.9 ms, CPU work 1.8-2.4 ms |
+| Same composition headless 1280x720 | GPU 0.59 ms per frame |
+| Scene file load (three glTF assets, one nested scene) | 163 ms Release, of which DamagedHelmet decode 153 ms; second helmet instance free (registry cache) |
+| Composition rebuild (flatten) | structural changes only; per-frame cost is one TRS compose per entity |
+
 ## Budget and revisit triggers
 
 - Analysis: switch FFT backend (pffft/vDSP) if hop time exceeds 10% of the hop period.
