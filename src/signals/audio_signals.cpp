@@ -23,6 +23,11 @@ AudioSignals AudioSignals::declare(SignalBus& bus) {
     s.flux = bus.declare("audio.spectralFlux");
     s.onsetStrength = bus.declare("audio.onsetStrength", 0.0f, 4.0f);
     s.onset = bus.declare("audio.onset", 0.0f, 1.0f, true);
+    s.tempo = bus.declare("audio.tempo", 0.0f, 300.0f);
+    s.tempoConfidence = bus.declare("audio.tempoConfidence");
+    s.beat = bus.declare("audio.beat", 0.0f, 1.0f, true);
+    s.beatPhase = bus.declare("audio.beatPhase");
+    s.beatCount = bus.declare("audio.beatCount", 0.0f, 100000.0f);
     return s;
 }
 
@@ -38,13 +43,20 @@ void AudioSignals::publish(SignalBus& bus, const analysis::AnalysisFrame& frame)
     bus.set(flux, frame.flux);
     bus.set(onsetStrength, frame.onsetStrength);
     bus.setEvent(onset, frame.onset, std::min(1.0f, frame.onsetStrength * 0.5f));
+    bus.set(tempo, frame.tempoBpm);
+    bus.set(tempoConfidence, frame.tempoConfidence);
+    bus.setEvent(beat, frame.beat, 1.0f);
+    bus.set(beatPhase, frame.beatPhase);
+    bus.set(beatCount, static_cast<float>(frame.beatCount));
 }
 
 void AudioSignals::publishSilence(SignalBus& bus) const {
-    for (const SignalId id : {rms, peak, bass, lowMid, mid, highMid, treble, centroid, flux, onsetStrength}) {
+    for (const SignalId id : {rms, peak, bass, lowMid, mid, highMid, treble, centroid, flux, onsetStrength,
+                              tempo, tempoConfidence, beatPhase, beatCount}) {
         bus.set(id, 0.0f);
     }
     bus.setEvent(onset, false);
+    bus.setEvent(beat, false);
 }
 
 } // namespace avgen::signals

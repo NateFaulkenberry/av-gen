@@ -63,15 +63,20 @@ TEST_CASE("SignalBus events carry strength for one frame and clear", "[signals]"
 TEST_CASE("AudioSignals declares the fixed vocabulary and publishes frames", "[signals][audio]") {
     SignalBus bus;
     const AudioSignals audio = AudioSignals::declare(bus);
-    CHECK(bus.size() == 11);
+    CHECK(bus.size() == 16);
     for (const char* name : {"audio.rms", "audio.peak", "audio.bass", "audio.lowMid", "audio.mid",
                              "audio.highMid", "audio.treble", "audio.spectralCentroid", "audio.spectralFlux",
-                             "audio.onsetStrength", "audio.onset"}) {
+                             "audio.onsetStrength", "audio.onset", "audio.tempo", "audio.tempoConfidence",
+                             "audio.beat", "audio.beatPhase", "audio.beatCount"}) {
         INFO(name);
         CHECK(bus.find(name).has_value());
     }
     CHECK(bus.info(audio.onset).isEvent);
     CHECK(bus.info(audio.onsetStrength).maxValue == 4.0f);
+    CHECK(bus.info(audio.beat).isEvent);
+    CHECK(bus.info(audio.tempo).maxValue == 300.0f);
+    CHECK(bus.info(audio.beatCount).maxValue == 100000.0f);
+    CHECK_FALSE(bus.info(audio.beatPhase).isEvent);
 
     analysis::AnalysisFrame frame;
     frame.rms = 0.3f;
@@ -82,6 +87,11 @@ TEST_CASE("AudioSignals declares the fixed vocabulary and publishes frames", "[s
     frame.flux = 0.15f;
     frame.onsetStrength = 3.0f;
     frame.onset = true;
+    frame.tempoBpm = 124.5f;
+    frame.tempoConfidence = 0.8f;
+    frame.beat = true;
+    frame.beatPhase = 0.25f;
+    frame.beatCount = 37;
     audio.publish(bus, frame);
 
     CHECK(bus.value(audio.rms) == 0.3f);
@@ -96,12 +106,22 @@ TEST_CASE("AudioSignals declares the fixed vocabulary and publishes frames", "[s
     CHECK(bus.value(audio.onsetStrength) == 3.0f);
     CHECK(bus.event(audio.onset));
     CHECK(bus.value(audio.onset) == 1.0f); // min(1, 3/2)
+    CHECK(bus.value(audio.tempo) == 124.5f);
+    CHECK(bus.value(audio.tempoConfidence) == 0.8f);
+    CHECK(bus.event(audio.beat));
+    CHECK(bus.value(audio.beat) == 1.0f);
+    CHECK(bus.value(audio.beatPhase) == 0.25f);
+    CHECK(bus.value(audio.beatCount) == 37.0f);
 
     // Fewer bands than signals: missing bands publish zero.
     frame.bandCount = 2;
     frame.onset = false;
     frame.onsetStrength = 1.0f;
+    frame.beat = false;
     audio.publish(bus, frame);
+    CHECK_FALSE(bus.event(audio.beat));
+    CHECK(bus.value(audio.beat) == 0.0f);
+    CHECK(bus.value(audio.beatCount) == 37.0f); // non-event values persist
     CHECK(bus.value(audio.bass) == 0.1f);
     CHECK(bus.value(audio.lowMid) == 0.2f);
     CHECK(bus.value(audio.mid) == 0.0f);
@@ -120,4 +140,5 @@ TEST_CASE("AudioSignals declares the fixed vocabulary and publishes frames", "[s
         CHECK(bus.value(*bus.find(info.name)) == 0.0f);
     }
     CHECK_FALSE(bus.event(audio.onset));
+    CHECK_FALSE(bus.event(audio.beat));
 }
