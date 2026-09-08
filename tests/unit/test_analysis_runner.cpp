@@ -113,6 +113,41 @@ TEST_CASE("AnalysisRunner restamps frames after a discontinuity", "[analysis][ru
     CHECK(history[1].frameIndex == 5000 + config.windowSize / 2);
 }
 
+TEST_CASE("AnalysisRunner frames carry tempo and beats for a click track", "[analysis][runner]") {
+    audio::AnalysisStream stream(1u << 16);
+    AnalyzerConfig config;
+    config.sampleRate = kRate;
+    AnalysisRunner runner(config, stream);
+    runner.start();
+
+    const auto signal = testsupport::clickTrack(120.0f, kRate, kRate * 8);
+    stream.markDiscontinuity(0);
+    REQUIRE(feed(stream, signal, std::chrono::seconds(4)));
+    const auto expectedFrames = (signal.size() - config.windowSize) / config.hopSize + 1;
+    REQUIRE(waitForFrames(runner, expectedFrames, std::chrono::seconds(4)));
+    REQUIRE(runner.acquire());
+    const auto& latest = runner.latest();
+    CHECK_THAT(static_cast<double>(latest.tempoBpm), WithinAbs(120.0, 2.0));
+    CHECK(latest.tempoConfidence > 0.15f);
+    CHECK(latest.beatCount >= 8); // beats emitted from the first estimate (~2 s) onwards
+    CHECK(latest.beatPhase >= 0.0f);
+    CHECK(latest.beatPhase <= 1.0f);
+    const auto history = runner.history(200);
+    std::size_t beats = 0;
+    for (const auto& f : history) {
+        beats += f.beat ? 1 : 0;
+    }
+    CHECK(beats >= 3); // 200 hops = 2.1 s at 2 beats/s
+
+    // A seek resets the tracker: tempo is unknown until enough new audio has been analysed.
+    stream.markDiscontinuity(0);
+    REQUIRE(feed(stream, std::span<const float>(signal.data(), config.windowSize), std::chrono::seconds(2)));
+    REQUIRE(waitForFrames(runner, expectedFrames + 1, std::chrono::seconds(2)));
+    REQUIRE(runner.acquire());
+    CHECK(runner.latest().tempoBpm == 0.0f);
+    CHECK(runner.latest().beatCount == 0);
+}
+
 TEST_CASE("AnalysisRunner stops cleanly from its destructor", "[analysis][runner]") {
     audio::AnalysisStream stream(1u << 12);
     {

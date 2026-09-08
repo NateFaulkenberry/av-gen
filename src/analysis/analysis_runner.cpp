@@ -8,11 +8,12 @@
 
 namespace avgen::analysis {
 
-AnalysisRunner::AnalysisRunner(AnalyzerConfig config, audio::AnalysisStream& stream, BeatTrackerConfig beatConfig)
+AnalysisRunner::AnalysisRunner(AnalyzerConfig config, audio::AnalysisStream& stream,
+                               BeatTrackerConfig beatConfig)
     : config_(std::move(config))
     , stream_(stream)
-    , analyzer_(config_),
-      beatTracker_(beatConfig, static_cast<float>(config.hopSize) / static_cast<float>(config.sampleRate)) {
+    , analyzer_(config_)
+    , beatTracker_(beatConfig, static_cast<float>(config_.hopSize) / static_cast<float>(config_.sampleRate)) {
     history_.reserve(kHistorySize);
 }
 
@@ -70,12 +71,20 @@ void AnalysisRunner::threadMain(std::stop_token token) {
         }
         const auto started = clock::now();
         if (result.discontinuity) {
+            // Seek or restart: the analyser restamps and the beat tracker starts from unknown.
             analyzer_.reset(result.startFrame);
+            beatTracker_.reset();
         }
         analyzer_.push(std::span<const float>(chunk.data(), result.count));
 
         std::size_t producedNow = 0;
         while (analyzer_.pop(frame)) {
+            const BeatState beat = beatTracker_.push(frame.onsetStrength, frame.onset);
+            frame.tempoBpm = beat.tempoBpm;
+            frame.tempoConfidence = beat.confidence;
+            frame.beat = beat.beat;
+            frame.beatPhase = beat.phase;
+            frame.beatCount = beat.beatCount;
             {
                 const std::lock_guard lock(historyMutex_);
                 if (history_.size() < kHistorySize) {
