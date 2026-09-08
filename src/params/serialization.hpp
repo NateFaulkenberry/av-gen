@@ -1,9 +1,10 @@
 #pragma once
 
-// JSON serialisation for parameters and modulation (ADR-010). Document envelope (version 2):
-//   { "format": "avgen-project", "version": 2, "parameters": { path: value }, "routes": [...],
-//     "sources": [...], "presets": [...] }
-// Version 1 documents (no sources/presets) load unchanged.
+// JSON serialisation for parameters and modulation (ADR-010). Document envelope (version 3):
+//   { "format": "avgen-project", "version": 3, "parameters": { path: value }, "routes": [...],
+//     "sources": [...], "presets": [...], "shaders": [...], "timeline": {...} }
+// Version 1 documents (no sources/presets) and version 2 documents (no shaders/timeline; both
+// are added by the engine) load unchanged.
 
 #include "core/error.hpp"
 #include "params/modulation.hpp"
@@ -18,7 +19,7 @@
 
 namespace avgen::params {
 
-constexpr int kProjectFormatVersion = 2;
+constexpr int kProjectFormatVersion = 3;
 constexpr const char* kProjectFormatName = "avgen-project";
 
 nlohmann::json parameterToJson(const IParameter& param);        // base value only

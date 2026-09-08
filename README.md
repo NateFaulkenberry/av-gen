@@ -4,7 +4,7 @@ A native C++ real-time GPU audiovisual engine. Not a waveform visualizer: the go
 scene engine in which audio analysis drives a general parameter/modulation system that in turn
 drives GPU-rendered 3D scenes, in real time and as deterministic offline frame sequences.
 
-Milestone 0.7 (current): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
+Milestone 0.8 (current): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
 and render the built-in orb scene, any glTF 2.0 scene, or a composition of nodes (glTF instances,
 orbs, grids, particle systems, nested scene files) saved as a scene file, with PBR materials,
 textures, punctual lights, an HDR environment and GPU particle systems, behind or on top of user-written
@@ -12,8 +12,9 @@ WGSL shader layers, through a built-in post chain (bloom, colour grading, lens d
 chromatic aberration, depth of field, camera motion blur, five tone-mapping operators, vignette,
 grain). Every parameter, including
 shader inputs, can be driven by data-driven modulation routes from audio signals, the beat clock,
-LFOs, envelopes, noise, random and timeline sources, and macros; presets snapshot and morph
-parameters; projects save all of it as JSON.
+LFOs, envelopes, noise, random and timeline sources, and macros; a timeline keys any parameter
+in seconds or beats and fires preset cues; presets snapshot and morph parameters; projects save
+all of it as JSON.
 
 ```
 Audio file -> AudioPlayer -> AnalysisRunner -> SignalBus -> Modulator -> ParameterSet
@@ -65,5 +66,5 @@ writes a scene file. `--help` lists every flag.
 
 ## Status
 
-Milestones 0.1 to 0.7 complete on macOS 26 / Apple silicon. Windows and Linux are
+Milestones 0.1 to 0.8 complete on macOS 26 / Apple silicon. Windows and Linux are
 architecturally supported (WebGPU via Dawn, SDL3) but not yet built or tested. Licence: MIT.

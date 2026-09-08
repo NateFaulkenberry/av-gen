@@ -98,6 +98,11 @@ Result<void> Modulator::bind(const signals::SignalBus& bus, ParameterSet& params
 
 void Modulator::evaluate(const signals::SignalBus& bus, ParameterSet& params, double dt) {
     params.resetFinals();
+    applyRoutes(bus, params, dt);
+}
+
+void Modulator::applyRoutes(const signals::SignalBus& bus, ParameterSet& params, double dt) {
+    (void)params;
     if (!bound_) {
         return;
     }

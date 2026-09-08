@@ -27,6 +27,7 @@ cmake --preset tsan && cmake --build --preset tsan && ctest --preset tsan   # Th
 | assets | `test_image.cpp`, `test_gltf_loader.cpp` | PNG/HDR round trips, sRGB tagging, error paths; in-memory GLB fixture: hierarchy transforms, vertex data, material factors and texture refs, embedded PNG decode, punctual lights, cameras, bounds, failure leaves the scene untouched, id offsets on repeated loads; Khronos samples when `AVGEN_SAMPLE_ASSETS` is set |
 | beat tracking | `test_beat_tracker.cpp` | tempo estimation on synthetic envelopes (120/90/160 BPM, flat input), offline Ellis tracker accuracy on a click track, live tracker convergence, tempo-change following, determinism, reset; AnalysisTrack stamping |
 | sources/presets | `test_sources.cpp`, `test_presets.cpp` | LFO shapes and seek exactness, beat sync, ADSR timing, noise determinism/continuity, random sample-and-hold sequences, timeline interpolation and looping, macros, rack JSON round trips, modulators of modulators; preset capture/apply/blend, bank JSON |
+| timeline | `test_timeline.cpp`, `tests/integration/test_timeline_engine.cpp` | key insertion and sorting, every interpolation, looping, vector and single-component tracks, apply modes write finals not base, bind/unbind and unknown targets, recordKey, cues and morph progress, JSON round trip and malformed input, determinism; engine: offline keyed values at exact times, routes add on top of automation, beat-based loop follows the click track, cue recalls a preset and morphs, seek re-syncs cues, project v3 round trip, scene swap rebinds tracks |
 | ui logic | `test_ui_logic.cpp` | regression: route slider bounds independent of the value (0.2 crash) |
 | stress | `test_engine_stress.cpp` (`[device][stress]`) | rapid seeks/param/route/volume/transport edits during live playback; run under ASan and TSan |
 | modulation integration | `tests/integration/test_modulation_sources.cpp` | LFO drives the orb without audio, seek exactness, modulators of modulators, project round trip through the engine (sources, routes, presets, values, morph), beat clock from a click track |
@@ -46,6 +47,10 @@ click track). Test WAV fixtures are generated at test time into the temp directo
 recordings are needed.
 
 ## Determinism requirements
+
+Known gap (found in 0.8, scheduled for 1.0): GPU particle systems compact their dead/alive
+lists with atomics, so slot assignment, seeds and draw order vary between runs; headless hashes
+are bit-identical only with particles disabled, or for the first ~100 frames before slots recycle.
 
 - `Analyzer`: bit-identical output for identical samples regardless of chunking or run.
 - Offline `Engine` runs: bit-identical parameter values and matrices across runs (tested).

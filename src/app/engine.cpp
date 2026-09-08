@@ -75,6 +75,26 @@ void Engine::rebind() {
     if (auto r = modulator_.bind(bus_, params_); !r) {
         log::warn("modulation bind: {}", r.error().message);
     }
+    if (auto r = timeline_.bind(params_); !r) {
+        log::warn("{}", r.error().message);
+    }
+}
+
+void Engine::detachSceneParameters() {
+    if (auto* comp = composition()) {
+        comp->detach();
+    }
+    shaderLayers_.detach();
+    timeline_.unbind();
+}
+
+params::Track* Engine::recordKey(const std::string& path, int component, params::KeyInterp interp,
+                                 params::TimeBase base) {
+    auto* track = timeline_.recordKey(params_, path, component, timelineClock_.at(base), interp, base);
+    if (track == nullptr) {
+        log::warn("timeline: cannot key unknown parameter '{}'", path);
+    }
+    return track;
 }
 
 signals::Source& Engine::addSource(const std::string& kind, const std::string& baseName) {
@@ -137,6 +157,9 @@ void Engine::removeShaderLayer(std::uint32_t id) {
 Result<void> Engine::saveProject(const std::filesystem::path& path) const {
     nlohmann::json doc = params::saveProject(params_, modulator_, &sources_, &presets_);
     doc["shaders"] = shaderLayers_.toJson();
+    if (!timeline_.empty()) {
+        doc["timeline"] = timeline_.toJson();
+    }
     std::ofstream out(path);
     if (!out) {
         return fail("cannot write '{}'", path.string());
@@ -165,6 +188,15 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     } else {
         shaderLayers_.clear();
     }
+    if (doc.contains("timeline")) {
+        if (auto r = timeline_.fromJson(doc["timeline"]); !r) {
+            return r;
+        }
+    } else {
+        timeline_.clear();
+    }
+    cueState_ = {};
+    cueApplied_ = false;
     // Parameter values for sources and shader inputs arrive in the same document; apply them
     // again now that those parameters exist (unknown-at-first-pass paths were skipped).
     if (auto r = params::loadProject(doc, params_, modulator_, nullptr, nullptr); !r) {
@@ -173,8 +205,9 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     rebind();
     modulator_.resetState();
     projectPath_ = path;
-    log::info("project '{}' loaded: {} parameters, {} routes, {} sources, {} presets", path.filename().string(),
-              params_.size(), modulator_.routes().size(), sources_.sources().size(), presets_.presets().size());
+    log::info("project '{}' loaded: {} parameters, {} routes, {} sources, {} presets, {} timeline tracks, {} cues",
+              path.filename().string(), params_.size(), modulator_.routes().size(), sources_.sources().size(),
+              presets_.presets().size(), timeline_.tracks().size(), timeline_.cues().size());
     return {};
 }
 
@@ -185,10 +218,7 @@ Result<void> Engine::loadScene(const std::filesystem::path& path) {
         return std::unexpected(ctrl.error());
     }
     const float masterGain = modulator_.masterGain;
-    if (auto* comp = composition()) {
-        comp->detach();
-    }
-    shaderLayers_.detach();
+    detachSceneParameters();
     params_.clear();
     modulator_.clearRoutes();
     modulator_.masterGain = masterGain;
@@ -198,11 +228,8 @@ Result<void> Engine::loadScene(const std::filesystem::path& path) {
 }
 
 void Engine::newComposition() {
-    if (auto* comp = composition()) {
-        comp->detach();
-    }
     const float masterGain = modulator_.masterGain;
-    shaderLayers_.detach();
+    detachSceneParameters();
     params_.clear();
     modulator_.clearRoutes();
     modulator_.masterGain = masterGain;
@@ -221,11 +248,8 @@ Result<void> Engine::loadComposition(const std::filesystem::path& path) {
     if (!comp) {
         return std::unexpected(comp.error());
     }
-    if (auto* current = composition()) {
-        current->detach();
-    }
     const float masterGain = modulator_.masterGain;
-    shaderLayers_.detach();
+    detachSceneParameters();
     params_.clear();
     modulator_.clearRoutes();
     modulator_.masterGain = masterGain;
@@ -289,10 +313,7 @@ void Engine::removeNode(const std::string& name) {
 }
 
 void Engine::loadOrbScene() {
-    if (auto* comp = composition()) {
-        comp->detach();
-    }
-    shaderLayers_.detach();
+    detachSceneParameters();
     params_.clear();
     modulator_.clearRoutes();
     installController(std::make_unique<scene::OrbScene>(params_, modulator_));
@@ -445,6 +466,8 @@ void Engine::seekSeconds(double seconds) {
     sources_.reset();
     beatClockPhase_ = 0.0;
     lastAnalysisBeatCount_ = 0;
+    cueState_ = {};   // cues re-sync from the new position on the next frame
+    cueApplied_ = false;
 }
 
 bool Engine::isPlaying() const { return player_ && player_->isPlaying(); }
@@ -523,6 +546,49 @@ void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
     sourceContext_.beatEvent = pulse;
 }
 
+void Engine::updateTimelineClock(const FrameTime& time) {
+    timelineClock_.seconds = audioFile_ ? positionSeconds() : time.renderTime;
+    timelineClock_.beats = static_cast<double>(beatClockCount_) + beatClockPhase_;
+}
+
+void Engine::applyCues() {
+    if (!timeline_.enabled) {
+        return;
+    }
+    const auto state = timeline_.cueAt(timelineClock_);
+    if (state.index != cueState_.index) {
+        // A new cue took effect (forward playback, a seek, or an edit): remember where the
+        // morph starts from and apply the preset from scratch.
+        cueFrom_ = params::capturePreset(params_, "cue-from");
+        cueApplied_ = false;
+    }
+    cueState_ = state;
+    if (state.index < 0 || cueApplied_) {
+        return;
+    }
+    const auto& cues = timeline_.cues();
+    if (static_cast<std::size_t>(state.index) >= cues.size()) {
+        return;
+    }
+    const auto& cue = cues[static_cast<std::size_t>(state.index)];
+    if (cue.preset.empty()) {
+        cueApplied_ = true; // a marker only
+        return;
+    }
+    const auto* preset = presets_.find(cue.preset);
+    if (preset == nullptr) {
+        log::warn("timeline cue '{}': preset '{}' not found", cue.name, cue.preset);
+        cueApplied_ = true;
+        return;
+    }
+    if (state.progress >= 1.0f) {
+        params::applyPreset(params_, *preset);
+        cueApplied_ = true;
+    } else {
+        params::applyPresetBlend(params_, cueFrom_, *preset, state.progress);
+    }
+}
+
 void Engine::update(const FrameTime& time) {
     const auto start = std::chrono::steady_clock::now();
     bool newFrame = false;
@@ -573,8 +639,12 @@ void Engine::update(const FrameTime& time) {
     }
 
     updateTimeSignals(time, newFrame);
+    updateTimelineClock(time);
+    applyCues();
     sources_.update(bus_, sourceContext_);
-    modulator_.evaluate(bus_, params_, time.deltaTime);
+    params_.resetFinals();
+    timeline_.apply(timelineClock_); // automation: the first modulation layer (ADR-018)
+    modulator_.applyRoutes(bus_, params_, time.deltaTime);
     controller_->update(time);
     scene::applyPostParameters(postParams_, post_);
     controller_->scene().post = post_;

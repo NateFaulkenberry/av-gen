@@ -413,7 +413,7 @@ TEST_CASE("Version 2 project round-trips sources, presets and source parameters"
     f.modulator.addRoute(r);
 
     const json doc = saveProject(f.params, f.modulator, &f.rack, &f.bank);
-    CHECK(doc["version"] == 2);
+    CHECK(doc["version"] == kProjectFormatVersion);
     REQUIRE(doc["sources"].is_array());
     CHECK(doc["sources"].size() == 3);
     REQUIRE(doc["presets"].is_array());
@@ -480,13 +480,13 @@ TEST_CASE("Version 1 documents still load and clear the optional sections", "[se
     CHECK(h.bank.presets().size() == 2);
 }
 
-TEST_CASE("Version 3 documents are rejected", "[serialization][v2]") {
+TEST_CASE("Documents newer than the supported version are rejected", "[serialization][v2]") {
     V2Fixture f;
     json doc = saveProject(f.params, f.modulator, &f.rack, &f.bank);
-    doc["version"] = 3;
+    doc["version"] = kProjectFormatVersion + 1;
     auto result = loadProject(doc, f.params, f.modulator, &f.rack, &f.bank);
     REQUIRE_FALSE(result.has_value());
-    CHECK_THAT(result.error().message, ContainsSubstring("version 3"));
+    CHECK_THAT(result.error().message, ContainsSubstring("version " + std::to_string(kProjectFormatVersion + 1)));
     doc["version"] = 0;
     CHECK_FALSE(loadProject(doc, f.params, f.modulator, &f.rack, &f.bank).has_value());
     CHECK(f.rack.sources().size() == 3);

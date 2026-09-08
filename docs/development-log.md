@@ -500,3 +500,72 @@ composition from the orb scene). The GLB fixture writer moved to `tests/support/
 
 Milestone 0.8 (timeline): keyframes and automation curves alongside modulation, scene switching
 over time, and per-section presets.
+
+## 2026-09-08 — Milestone 0.8: timeline
+
+### What was implemented and why
+
+- `params::Timeline` (`src/params/timeline.*`, ADR-018): tracks key one parameter (all
+  components or one) against audio seconds or beats with step, linear, smooth (clamped
+  Catmull-Rom), ease-in/out/in-out and Bezier (Hermite tangent) interpolation, optional looping
+  (a 4-beat pattern), and replace/add/multiply modes. Evaluation is a pure function of a
+  `TimelineClock`, so offline renders are deterministic and seeks are exact.
+- Evaluation order: `resetFinals` → `Timeline::apply` → `Modulator::applyRoutes` (the modulator
+  gained the route-only half of `evaluate`). Automation writes *finals*, so the user's base
+  values are never overwritten and audio routes still add on top. The parameter panel marks
+  automated parameters with `[A]` and offers "Key at current time".
+- Cues: time-stamped preset recalls with a morph length (from the values current at that moment).
+  The engine owns the cue state (`cueState()`), applies the preset once at full weight so later
+  user edits stick, and re-syncs after seeks.
+- Project format version 3 adds `"timeline"` (and documents `"shaders"`); older projects load.
+- UI: Timeline tab (add key for any parameter at the current time in seconds or beats, per-track
+  enable/mode/loop, key table with time/value/interp, ImPlot curve preview with a play head, cue
+  list with preset and morph).
+- Implementation split as in 0.7: the GPU-free timeline and its unit tests in a worktree by a
+  subagent against a fixed header; engine, UI, docs and integration test on main.
+
+### Bugs found during the milestone
+
+- The two serialization tests that pinned the project version to 2 (and rejected 3) now use
+  `kProjectFormatVersion`.
+- While checking determinism over 240 frames (previous milestones checked 60-90) the orb scene
+  diverged between runs from about frame 100 even *without* a project. Bisected to the sparks
+  particle system: with `particles/sparks/enabled = false` two runs are bit-identical for all
+  240 frames; with it, they are not. Cause: the dead/alive lists are compacted with atomics, so
+  slot assignment (and with it the per-slot random seeds) and draw order depend on GPU
+  scheduling. Not a timeline issue; recorded as a 1.0 (deterministic offline rendering) task:
+  stable stream compaction (prefix sums) for emit and simulate.
+
+### Tests
+
+280 cases (was 260): timeline unit tests (19: names, sorted insert and epsilon replace, every
+interpolation, looping, vector and single-component tracks, apply modes write finals only,
+bind/unbind and unknown targets, recordKey, isAutomated, cues and morph progress in both time
+bases, JSON round trip and malformed input, determinism and purity) and four engine integration
+tests (keyed values at exact times with routes/add tracks stacking and disable restoring the
+base; a beat-based 1-beat loop follows the click track; cues morph a preset, keep later user
+edits, and re-sync after a seek; project v3 round trip, scene swap unbinds then rebinds tracks,
+recordKey through the engine).
+
+### Results
+
+- Project with three tracks (easeInOut/smooth/bezier/step scale curve, a colour ramp, a
+  beat-looped add on rotation speed) and two cues, headless 240 frames at 30 fps: scale hits
+  1.2 / 1.8 / 1.45 / 1.0 / 1.2 / 1.4 at whole seconds as authored; emissive 4.0 after the
+  "drop" cue morph and 0.3 after "calm"; 0 GPU errors; frames 0-90 bit-identical across runs
+  (the later divergence is the particle issue above).
+- Windowed 2880x1800 Release with the same project: 120 fps, GPU 1.4 ms; Debug `--stress 3`
+  headless: 0 GPU errors.
+- Debug and Release: 280/280 tests pass; zero warnings.
+
+### Known limitations
+
+- No curve editor beyond the key table and preview; keys are recorded one at a time (no live
+  automation recording); cues morph from the values at the moment they take effect (after a
+  backward seek that is the seek-time state); smooth curves are not C1 across a loop wrap.
+
+### Next step
+
+Milestone 0.9 (project system): asset references relative to the project, versioning and
+migration, presets and scene files bundled, recent files; then 1.0 offline rendering with the
+particle determinism fix.

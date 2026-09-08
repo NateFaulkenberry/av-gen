@@ -37,7 +37,7 @@ with `FixedStepClock`. Everything from `SignalBus` downwards is identical.
 | `audio` | avgen_core | `AudioFile` (decode to float32 in memory), `AudioPlayer` (miniaudio device, atomic play-head), `AnalysisStream` (SPSC samples + discontinuity markers) | miniaudio |
 | `analysis` | avgen_core | `RealFFT` (KissFFT), Hann window, `Analyzer` (streaming STFT features), `AnalysisTrack` (offline), `AnalysisRunner` (thread) | KissFFT |
 | `signals` | avgen_core | `SignalBus` (named float channels + events), `AudioSignals` (the `audio.*` vocabulary) | analysis (struct only) |
-| `params` | avgen_core | `Parameter<T>`/`IParameter`, `ParameterSet`, `ProcessorChain`, `ModRoute`/`Modulator`, JSON serialisation | glm, nlohmann/json |
+| `params` | avgen_core | `Parameter<T>`/`IParameter`, `ParameterSet`, `ProcessorChain`, `ModRoute`/`Modulator`, presets, `Timeline` (keyframe tracks + cues, ADR-018), JSON serialisation | glm, nlohmann/json |
 | `assets` | avgen_core | image decode/encode (stb), glTF 2.0 import (fastgltf) into a `Scene`, `AssetRegistry` (cached, versioned, path-resolving loads) | fastgltf, stb |
 | `shaders` | avgen_core | user shader contract: ISF-style header parsing, WGSL module generation, inputs layout/packing, `ShaderLayerSet` (layers, parameters, hot-reload watching, project JSON) | params, core |
 | `scene` | avgen_core | `Scene` data model (cameras, punctual lights, materials with textures, meshes, entities, environment, particle systems), mesh generators, particle parameter registration, `SceneController` interface with `OrbScene` (built-in preset + sparks), `GltfScene` (imported file + curated parameters + dust) and `Composition` (nodes of any kind, nested scene files, flattened into one `Scene`; ADR-017) | glm, params, assets |
@@ -99,6 +99,14 @@ the scene each frame for the renderer's built-in chain.
 holds parameters, routes, sources and presets; `Engine::loadProject` validates everything before
 mutating and re-attaches the rack. Growth path: MIDI/OSC sources, per-route blend, keyframe
 editing UI.
+
+**Timeline (milestone 0.8, ADR-018).** `params::Timeline` keys parameters against audio time
+or beats. Per frame the engine runs `resetFinals` → `Timeline::apply` (writes finals: replace,
+add or multiply) → `Modulator::applyRoutes`, so automation is the first modulation layer and the
+user's base values stay untouched. Cues recall presets (base values) at a time, morphing from the
+current values; the engine keeps the cue state and re-syncs it after seeks. Tracks bind to
+parameter paths and rebind after scene swaps, so a track on a path the new scene does not have
+simply waits.
 
 ## 5. Rendering (ADR-001, ADR-006)
 

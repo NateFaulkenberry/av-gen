@@ -3,8 +3,9 @@
 Decision: ADR-010 (serialisation) and ADR-011 (what is serialised). Implemented in
 `src/params/serialization.cpp`; used by tests today and by the project system in 0.9.
 
-Version 2 (milestone 0.3) adds modulation sources, presets and per-route polarity. Version 1
-documents (no `sources`/`presets`, routes without `polarity`) load unchanged.
+Version 2 (milestone 0.3) adds modulation sources, presets and per-route polarity. Version 3
+(milestone 0.8) adds `"shaders"` (written by the engine since 0.4) and `"timeline"`. Older
+documents load unchanged.
 
 ```json
 {
@@ -85,6 +86,31 @@ Rules:
   reader's is rejected; older versions will be migrated in order.
 - Paths are the identity for parameters everywhere: UI, presets, OSC addresses (`/orb/scale`).
 
+
+## Timeline (milestone 0.8, ADR-018)
+
+```json
+"timeline": {
+  "enabled": true,
+  "tracks": [
+    { "target": "orb/scale", "component": -1, "timeBase": "seconds", "mode": "replace",
+      "loopLength": 0.0, "enabled": true,
+      "keys": [ { "time": 0.0, "value": [1.0], "interp": "easeInOut" },
+                { "time": 4.0, "value": [2.0], "interp": "bezier", "tangentOut": [0.0], "tangentIn": [-1.0] } ] },
+    { "target": "orb/emissive", "timeBase": "beats", "loopLength": 4.0,
+      "keys": [ { "time": 0.0, "value": [3.0], "interp": "easeOut" }, { "time": 1.0, "value": [0.5], "interp": "step" } ] }
+  ],
+  "cues": [ { "time": 16.0, "name": "drop", "preset": "big", "morphSeconds": 0.5, "timeBase": "seconds" } ]
+}
+```
+
+Tracks write the target's final value (after the base, before modulation routes) with
+`replace`, `add` or `multiply`; `component` -1 keys every component (one `value` entry per
+component), otherwise a single component. `timeBase` `beats` reads the beat clock and pairs
+with `loopLength` for repeating patterns. Interpolations: `step`, `linear`, `smooth`, `easeIn`,
+`easeOut`, `easeInOut`, `bezier` (tangents in value units per time unit). Cues recall a preset
+from the project's bank at their time, morphing over `morphSeconds` (beats for beat-based cues);
+an empty `preset` is a marker.
 
 ## Scene composition files (milestone 0.7, ADR-017)
 

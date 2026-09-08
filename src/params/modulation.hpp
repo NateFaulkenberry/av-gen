@@ -47,6 +47,9 @@ public:
     // params.resetFinals(), then applies every enabled bound route in op-priority order
     // (Replace, Multiply, Add, Min, Max).
     void evaluate(const signals::SignalBus& bus, ParameterSet& params, double dt);
+    // The route half of evaluate() without the reset, so a caller can run automation (the
+    // timeline) between resetFinals() and the routes.
+    void applyRoutes(const signals::SignalBus& bus, ParameterSet& params, double dt);
 
     void resetState(); // clears smoothing/envelope state (on seek)
 

@@ -15,6 +15,7 @@
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "params/preset.hpp"
+#include "params/timeline.hpp"
 #include "assets/asset_registry.hpp"
 #include "scene/composition.hpp"
 #include "scene/gltf_scene.hpp"
@@ -104,6 +105,19 @@ public:
     [[nodiscard]] bool recallPreset(const std::string& name);
     void morphPresets(const std::string& a, const std::string& b, float t);
 
+    // ---- timeline (milestone 0.8) ----
+    [[nodiscard]] params::Timeline& timeline() { return timeline_; }
+    [[nodiscard]] const params::Timeline& timeline() const { return timeline_; }
+    // The clock the timeline is evaluated against this frame: audio time (render time without
+    // audio) and beats from the beat clock.
+    [[nodiscard]] const params::TimelineClock& timelineClock() const { return timelineClock_; }
+    // Records a key for `path` at the current timeline time with the parameter's base value.
+    params::Track* recordKey(const std::string& path, int component = -1,
+                             params::KeyInterp interp = params::KeyInterp::Linear,
+                             params::TimeBase base = params::TimeBase::Seconds);
+    // Index of the cue currently in effect (-1 = none) and its morph progress.
+    [[nodiscard]] params::Timeline::CueState cueState() const { return cueState_; }
+
     // Built-in signals published every frame: time.seconds, time.progress, time.playing,
     // beat.phase (per-frame extrapolated), beat.pulse (event), beat.count, beat.bpm, beat.bar.
     struct TimeSignals {
@@ -167,6 +181,9 @@ private:
     Result<void> reapplyEnvironment();
     void updateTimeSignals(const FrameTime& time, bool newAnalysisFrame);
     void addDefaultPostRoutes();
+    void updateTimelineClock(const FrameTime& time);
+    void applyCues();
+    void detachSceneParameters(); // before params_.clear(): composition, shader layers, timeline
 
     EngineMode mode_;
     params::ParameterSet params_;
@@ -175,6 +192,11 @@ private:
     params::Modulator modulator_;
     signals::SourceRack sources_;
     params::PresetBank presets_;
+    params::Timeline timeline_;
+    params::TimelineClock timelineClock_;
+    params::Timeline::CueState cueState_;
+    params::Preset cueFrom_;      // base values captured when the current cue started (morphs)
+    bool cueApplied_ = false;     // the current cue's preset has been applied at full weight
     shaders::ShaderLayerSet shaderLayers_;
     scene::PostSettings post_;
     scene::PostParameters postParams_;

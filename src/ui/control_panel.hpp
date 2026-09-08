@@ -61,6 +61,7 @@ private:
     void drawPresetsTab(app::Engine& engine);
     void drawShadersTab(app::Engine& engine);
     void drawSceneTab(app::Engine& engine);
+    void drawTimelineTab(app::Engine& engine);
 
     bool showDemo_ = false;
     bool showParameters_ = true;
@@ -73,6 +74,12 @@ private:
     char presetName_[64] = "preset";
     char nodeName_[64] = "node";
     int newNodeKind_ = 1;
+    int keyTarget_ = 0;
+    int keyInterp_ = 1;
+    int keyBase_ = 0;
+    int cuePreset_ = 0;
+    float cueMorph_ = 0.5f;
+    char cueName_[64] = "cue";
     int morphA_ = 0;
     int morphB_ = 0;
     float morphT_ = 0.0f;

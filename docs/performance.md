@@ -63,6 +63,13 @@ obvious optimisation when the budget tightens.
 | Scene file load (three glTF assets, one nested scene) | 163 ms Release, of which DamagedHelmet decode 153 ms; second helmet instance free (registry cache) |
 | Composition rebuild (flatten) | structural changes only; per-frame cost is one TRS compose per entity |
 
+## Milestone 0.8 numbers (Apple M2 Max, Release)
+
+| Metric | Value |
+|---|---|
+| Orb scene + 3 timeline tracks + 2 cues, 2880x1800 window | 120 fps, GPU 1.4 ms, CPU work ~1 ms |
+| Timeline evaluation | binary search per track per frame; negligible next to modulation |
+
 ## Budget and revisit triggers
 
 - Analysis: switch FFT backend (pffft/vDSP) if hop time exceeds 10% of the hop period.

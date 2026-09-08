@@ -143,6 +143,10 @@ void ControlPanel::drawModulation(app::Engine& engine) {
             drawSceneTab(engine);
             ImGui::EndTabItem();
         }
+        if (ImGui::BeginTabItem("Timeline")) {
+            drawTimelineTab(engine);
+            ImGui::EndTabItem();
+        }
         ImGui::EndTabBar();
     }
 }
@@ -482,9 +486,19 @@ void ControlPanel::drawParameters(app::Engine& engine) {
             ImGui::SameLine();
             ImGui::TextDisabled("= %.3f", static_cast<double>(param->finalComponent(0)));
         }
+        if (engine.timeline().isAutomated(param->path())) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "[A]");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("automated by the timeline; the slider is the base value");
+            }
+        }
         if (ImGui::BeginPopupContextItem("reset")) {
             if (ImGui::MenuItem("Reset to default")) {
                 param->resetToDefault();
+            }
+            if (ImGui::MenuItem("Key at current time")) {
+                engine.recordKey(param->path());
             }
             ImGui::EndPopup();
         }
@@ -725,6 +739,189 @@ void ControlPanel::drawSceneTab(app::Engine& engine) {
         engine.removeNode(removeName);
     }
     ImGui::TextDisabled("node transforms and overrides: Parameters window, group 'nodes'");
+}
+
+
+void ControlPanel::drawTimelineTab(app::Engine& engine) {
+    using namespace params;
+    auto& timeline = engine.timeline();
+    const auto& clock = engine.timelineClock();
+    ImGui::Checkbox("enabled", &timeline.enabled);
+    ImGui::SameLine();
+    ImGui::Text("t = %.2f s, beat %.2f", clock.seconds, clock.beats);
+    if (const auto cue = engine.cueState(); cue.index >= 0 &&
+                                            static_cast<std::size_t>(cue.index) < timeline.cues().size()) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("cue '%s' %.0f%%", timeline.cues()[static_cast<std::size_t>(cue.index)].name.c_str(),
+                            static_cast<double>(cue.progress) * 100.0);
+    }
+    ImGui::Separator();
+
+    // ---- add a key for a parameter at the current time ----
+    static const char* interps[] = {"step", "linear", "smooth", "easeIn", "easeOut", "easeInOut", "bezier"};
+    static const char* bases[] = {"seconds", "beats"};
+    std::vector<const char*> targets;
+    for (const auto* p : engine.params().ordered()) {
+        if (p->flags().modulatable) {
+            targets.push_back(p->path().c_str());
+        }
+    }
+    keyTarget_ = std::clamp(keyTarget_, 0, std::max(0, static_cast<int>(targets.size()) - 1));
+    ImGui::SetNextItemWidth(220);
+    ImGui::Combo("##keytarget", &keyTarget_, targets.data(), static_cast<int>(targets.size()));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(90);
+    ImGui::Combo("##keyinterp", &keyInterp_, interps, 7);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(80);
+    ImGui::Combo("##keybase", &keyBase_, bases, 2);
+    ImGui::SameLine();
+    if (ImGui::Button("Add key") && !targets.empty()) {
+        engine.recordKey(targets[static_cast<std::size_t>(keyTarget_)], -1, static_cast<KeyInterp>(keyInterp_),
+                         static_cast<TimeBase>(keyBase_));
+    }
+
+    // ---- tracks ----
+    int removeTrack = -1;
+    auto& tracks = timeline.tracks();
+    for (std::size_t i = 0; i < tracks.size(); ++i) {
+        auto& track = tracks[i];
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::Checkbox("##on", &track.enabled);
+        ImGui::SameLine();
+        const bool open = ImGui::TreeNodeEx("track", ImGuiTreeNodeFlags_None, "%s%s  (%zu keys, %s%s)",
+                                            track.target.c_str(), track.param == nullptr ? " [unbound]" : "",
+                                            track.keys.size(), timeBaseName(track.timeBase),
+                                            track.loopLength > 0.0 ? ", loop" : "");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 24);
+        if (ImGui::SmallButton("x")) {
+            removeTrack = static_cast<int>(i);
+        }
+        if (open) {
+            static const char* modes[] = {"replace", "add", "multiply"};
+            int mode = static_cast<int>(track.mode);
+            ImGui::SetNextItemWidth(90);
+            if (ImGui::Combo("mode", &mode, modes, 3)) {
+                track.mode = static_cast<TrackMode>(mode);
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(90);
+            auto loop = static_cast<float>(track.loopLength);
+            if (ImGui::DragFloat("loop", &loop, 0.1f, 0.0f, 3600.0f, "%.2f")) {
+                track.loopLength = static_cast<double>(std::max(0.0f, loop));
+            }
+            // Curve preview over the key span (component 0).
+            if (!track.keys.empty() && ImPlot::BeginPlot("##curve", ImVec2(-1, 90), ImPlotFlags_NoLegend | ImPlotFlags_NoMenus)) {
+                const double t0 = track.firstKeyTime();
+                const double t1 = std::max(track.lastKeyTime(), t0 + 1e-3);
+                const double span = track.loopLength > 0.0 ? std::max(track.loopLength, t1 - t0) : (t1 - t0);
+                constexpr int kSamples = 128;
+                plotX_.resize(kSamples);
+                std::vector<float> ys(kSamples);
+                for (int k = 0; k < kSamples; ++k) {
+                    const double t = t0 + span * k / (kSamples - 1);
+                    plotX_[static_cast<std::size_t>(k)] = static_cast<float>(t);
+                    ys[static_cast<std::size_t>(k)] = track.evaluate(t)[0];
+                }
+                ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_AutoFit);
+                ImPlot::SetupAxisLimits(ImAxis_X1, t0, t0 + span, ImPlotCond_Always);
+                ImPlot::PlotLine("value", plotX_.data(), ys.data(), kSamples);
+                const double now = track.localTime(clock.at(track.timeBase));
+                const double nowX[1] = {now};
+                ImPlot::PlotInfLines("now", nowX, 1);
+                ImPlot::EndPlot();
+            }
+            int removeKey = -1;
+            bool resort = false;
+            const std::size_t comps = track.keyedComponents();
+            for (std::size_t k = 0; k < track.keys.size(); ++k) {
+                auto& key = track.keys[k];
+                ImGui::PushID(static_cast<int>(k));
+                ImGui::SetNextItemWidth(70);
+                auto t = static_cast<float>(key.time);
+                if (ImGui::DragFloat("##t", &t, 0.01f, 0.0f, 0.0f, "%.2f")) {
+                    key.time = static_cast<double>(std::max(0.0f, t));
+                    resort = true;
+                }
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(160);
+                ImGui::DragScalarN("##v", ImGuiDataType_Float, key.value.data(), static_cast<int>(std::min<std::size_t>(comps, 4)), 0.01f);
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(90);
+                int interp = static_cast<int>(key.interp);
+                if (ImGui::Combo("##i", &interp, interps, 7)) {
+                    key.interp = static_cast<KeyInterp>(interp);
+                }
+                ImGui::SameLine();
+                if (ImGui::SmallButton("x")) {
+                    removeKey = static_cast<int>(k);
+                }
+                ImGui::PopID();
+            }
+            if (removeKey >= 0) {
+                track.keys.erase(track.keys.begin() + removeKey);
+            }
+            if (resort && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                track.sortKeys();
+            }
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+    if (removeTrack >= 0) {
+        timeline.removeTrack(static_cast<std::size_t>(removeTrack));
+    }
+
+    // ---- cues ----
+    ImGui::Separator();
+    ImGui::TextUnformatted("Cues");
+    std::vector<const char*> presetNames;
+    presetNames.push_back("(marker)");
+    for (const auto& preset : engine.presets().presets()) {
+        presetNames.push_back(preset.name.c_str());
+    }
+    cuePreset_ = std::clamp(cuePreset_, 0, static_cast<int>(presetNames.size()) - 1);
+    ImGui::SetNextItemWidth(100);
+    ImGui::InputText("##cuename", cueName_, sizeof(cueName_));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(120);
+    ImGui::Combo("##cuepreset", &cuePreset_, presetNames.data(), static_cast<int>(presetNames.size()));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(70);
+    ImGui::DragFloat("morph s", &cueMorph_, 0.05f, 0.0f, 60.0f, "%.2f");
+    ImGui::SameLine();
+    if (ImGui::Button("Add cue at t")) {
+        Cue cue;
+        cue.time = clock.seconds;
+        cue.name = cueName_[0] ? cueName_ : "cue";
+        cue.preset = cuePreset_ > 0 ? presetNames[static_cast<std::size_t>(cuePreset_)] : "";
+        cue.morphSeconds = static_cast<double>(cueMorph_);
+        timeline.addCue(std::move(cue));
+    }
+    int removeCue = -1;
+    auto& cues = timeline.cues();
+    for (std::size_t i = 0; i < cues.size(); ++i) {
+        auto& cue = cues[i];
+        ImGui::PushID(static_cast<int>(i) + 10000);
+        ImGui::SetNextItemWidth(70);
+        auto t = static_cast<float>(cue.time);
+        if (ImGui::DragFloat("##ct", &t, 0.01f, 0.0f, 0.0f, "%.2f")) {
+            cue.time = static_cast<double>(std::max(0.0f, t));
+        }
+        ImGui::SameLine();
+        ImGui::Text("%s -> %s (%.2f s morph, %s)", cue.name.c_str(), cue.preset.empty() ? "marker" : cue.preset.c_str(),
+                    cue.morphSeconds, timeBaseName(cue.timeBase));
+        ImGui::SameLine();
+        if (ImGui::SmallButton("x")) {
+            removeCue = static_cast<int>(i);
+        }
+        ImGui::PopID();
+    }
+    if (removeCue >= 0) {
+        timeline.removeCue(static_cast<std::size_t>(removeCue));
+    } else if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        timeline.sortCues();
+    }
 }
 
 } // namespace avgen::ui
