@@ -1,0 +1,21 @@
+# Warning flags applied to engine targets only (never to dependencies).
+function(avgen_set_warnings target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+        if(AVGEN_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE /WX)
+        endif()
+    else()
+        target_compile_options(${target} PRIVATE
+            -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wold-style-cast
+            -Wcast-align -Woverloaded-virtual -Wnull-dereference -Wdouble-promotion
+            -Wno-unused-parameter)
+        if(AVGEN_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE -Werror)
+        endif()
+    endif()
+    if(AVGEN_ENABLE_ASAN AND NOT MSVC)
+        target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+        target_link_options(${target} PRIVATE -fsanitize=address,undefined)
+    endif()
+endfunction()
