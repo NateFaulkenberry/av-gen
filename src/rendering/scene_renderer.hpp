@@ -11,7 +11,9 @@
 #include "gpu/readback.hpp"
 #include "gpu/render_target.hpp"
 #include "gpu/texture.hpp"
+#include "gpu/transient_pool.hpp"
 #include "rendering/particle_renderer.hpp"
+#include "rendering/post_processor.hpp"
 #include "rendering/shader_layer.hpp"
 #include "scene/scene.hpp"
 #include "shaders/shader_layers.hpp"
@@ -52,6 +54,8 @@ struct RenderStats {
     std::uint32_t height = 0;
     bool ibl = false;
     ParticleStats particles;
+    PostStats post;
+    std::uint32_t transientTextures = 0;
 };
 
 constexpr std::uint32_t kMaxLights = 8;
@@ -88,9 +92,14 @@ static_assert(sizeof(ObjectUniforms) == 192);
 
 struct TonemapUniforms {
     float exposure;
-    float pad[3];
+    float operatorId;
+    float vignette;
+    float grain;
+    float size[2];
+    float seed;
+    float pad;
 };
-static_assert(sizeof(TonemapUniforms) == 16);
+static_assert(sizeof(TonemapUniforms) == 32);
 
 // Image-based-lighting inputs shared by the PBR and skybox passes.
 struct IblResources {
@@ -126,6 +135,8 @@ public:
     [[nodiscard]] std::uint32_t engineShaderReloads() const { return engineReloads_; }
     [[nodiscard]] ShaderStack& shaderStack() { return *shaderStack_; }
     [[nodiscard]] ParticleRenderer& particles() { return *particles_; }
+    [[nodiscard]] PostProcessor& post() { return *postProcessor_; }
+    [[nodiscard]] gpu::TransientPool& transientPool() { return *pool_; }
 
     // Installs image-based lighting (normally driven automatically from scene.environment).
     void setIbl(const IblResources& ibl);
@@ -174,6 +185,10 @@ private:
     std::unique_ptr<EnvironmentProcessor> environment_;
     std::unique_ptr<ShaderStack> shaderStack_;
     std::unique_ptr<ParticleRenderer> particles_;
+    std::unique_ptr<PostProcessor> postProcessor_;
+    std::unique_ptr<gpu::TransientPool> pool_;
+    glm::mat4 prevViewProj_{1.0f};
+    bool havePrevViewProj_ = false;
     gpu::RenderTarget post_[2];      // ping-pong HDR colour targets for post layers
     gpu::GpuTexture spectrum_;       // binCount x 1 RGBA16F audio spectrum for user shaders
     std::size_t spectrumBins_ = 0;

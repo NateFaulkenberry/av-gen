@@ -42,7 +42,7 @@ with `FixedStepClock`. Everything from `SignalBus` downwards is identical.
 | `shaders` | avgen_core | user shader contract: ISF-style header parsing, WGSL module generation, inputs layout/packing, `ShaderLayerSet` (layers, parameters, hot-reload watching, project JSON) | params, core |
 | `scene` | avgen_core | `Scene` data model (cameras, punctual lights, materials with textures, meshes, entities, environment, particle systems), mesh generators, particle parameter registration, `SceneController` interface with `OrbScene` (built-in preset + sparks) and `GltfScene` (imported file + curated parameters + dust) | glm, params, assets |
 | `gpu` | avgen_gpu | `Context` (Dawn instance/adapter/device/surface), `ShaderLibrary` (WGSL files + includes + diagnostics), `RenderTarget`, `GpuTimer`, readback | Dawn |
-| `rendering` | avgen_gpu | `SceneRenderer` (pass list, PBR/grid/skybox/tonemap pipelines, material bind groups, lights, background/post user layers, engine shader reload), `EnvironmentProcessor` (IBL), `ShaderStack`/`ShaderLayerGpu` (user layers), `ParticleRenderer` (compute pools, indirect draw) | gpu, scene, shaders |
+| `rendering` | avgen_gpu | `SceneRenderer` (pass list, PBR/grid/skybox/tonemap pipelines, material bind groups, lights, background/post user layers, engine shader reload), `EnvironmentProcessor` (IBL), `ShaderStack`/`ShaderLayerGpu` (user layers), `ParticleRenderer` (compute pools, indirect draw), `PostProcessor` (built-in effect chain over `gpu::TransientPool`) | gpu, scene, shaders |
 | `platform` | avgen_platform | `Window` (SDL3, Metal layer, events, file dialog) | SDL3 |
 | `ui` | avgen_platform | `ImGuiLayer` (SDL3 + WebGPU backends), `ControlPanel` (transport, response, generated parameter panel, analysis plots, performance) | ImGui, ImPlot |
 | `app` | avgen | `Engine` (the pipeline; also compiled into the test binary), `Application` (live/headless loops, CLI) | everything |
@@ -89,6 +89,10 @@ clock extrapolated from the analyser's tempo: `beat.phase`, `beat.pulse` (event)
 `shader/<layer>/<input>`, so shaders are modulated exactly like scene properties. Layers survive
 scene swaps (values captured by `detach()` and restored by `reattach()`), reload on file change,
 and are stored in projects as `{path, stage, enabled}`.
+
+**Post-processing (milestone 0.6).** `scene::PostSettings` lives in the Engine, is exposed as
+`post/*` parameters (re-registered across scene swaps with their values kept), and is copied into
+the scene each frame for the renderer's built-in chain.
 
 **Presets and projects.** `params::Preset` is a path-keyed snapshot of base values; the
 `PresetBank` stores, recalls and morphs them. A project (`docs/project-format.md`, version 2)

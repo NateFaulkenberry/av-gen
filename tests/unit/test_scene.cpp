@@ -214,14 +214,14 @@ TEST_CASE("OrbScene registers all parameters and default routes", "[scene][orb]"
 
     // Idempotent by target.
     OrbScene::addDefaultRoutes(modulator);
-    CHECK(modulator.routes().size() == 8); // idempotent: still eight
+    CHECK(modulator.routes().size() == 8); // idempotent
     modulator.clearRoutes();
     params::ModRoute custom;
     custom.source = "audio.rms";
     custom.target = "orb/scale";
     modulator.addRoute(custom);
     OrbScene::addDefaultRoutes(modulator);
-    CHECK(modulator.routes().size() == 8); // idempotent: still eight // existing orb/scale route kept, four added
+    CHECK(modulator.routes().size() == 8); // idempotent // existing orb/scale route kept, four added
     CHECK(modulator.routes()[0].source == "audio.rms");
 
     // Scene content.

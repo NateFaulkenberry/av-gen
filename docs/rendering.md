@@ -71,6 +71,16 @@ Pools: particle AoS buffer, dead list + atomic counter, alive list, indirect arg
 (system, capacity), reset on creation and on `resetAll()`. Emission uses a fractional carry so
 low rates emit evenly; bursts add particles for one frame. All settings are per-frame uniforms.
 
+## Post-processing (milestone 0.6, ADR-016)
+
+`PostProcessor` runs the built-in chain on `gpu::TransientPool` textures: depth of field
+(view distance reconstructed from depth, CoC gather), camera motion blur (reprojection with the
+previous view-projection, neighbourhood-max velocity), bloom (soft-knee prefilter, 13-tap
+downsample chain, tent upsample chain), and a composite pass (distortion, chromatic aberration,
+white balance, hue, contrast, saturation, lift/gamma/gain). The output pass tone-maps with the
+selected operator and applies vignette and seeded grain. All settings come from `Scene::post`
+(`post/*` parameters). Disabled effects add no passes; a full chain is 13 passes at 1280x720.
+
 ## Lifecycle
 
 `Context::create` → `SceneRenderer::init` (layouts, buffers, pipelines) → `resize(w, h)` (HDR

@@ -41,7 +41,8 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       samplers_(std::make_unique<gpu::SamplerCache>(context)),
       environment_(std::make_unique<EnvironmentProcessor>(context, shaders)),
       shaderStack_(std::make_unique<ShaderStack>(context, shaders)),
-      particles_(std::make_unique<ParticleRenderer>(context, shaders)) {
+      particles_(std::make_unique<ParticleRenderer>(context, shaders)),
+      postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
     objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
 }
 
@@ -207,6 +208,9 @@ Result<void> SceneRenderer::init() {
         return r;
     }
     if (auto r = particles_->init(); !r) {
+        return r;
+    }
+    if (auto r = postProcessor_->init(); !r) {
         return r;
     }
     if (context_.errorCount() > 0) {
@@ -567,6 +571,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     if (auto r = particles_->reload(); !r) {
         keep("particles.wgsl", r);
     }
+    if (auto r = postProcessor_->reload(); !r) {
+        keep("post.wgsl", r);
+    }
     ++engineReloads_;
     if (first) {
         log::info("engine shaders reloaded");
@@ -868,6 +875,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
 
     TonemapUniforms tonemap{};
     tonemap.exposure = scene.environment.brightness;
+    tonemap.operatorId = static_cast<float>(scene.post.tonemap);
+    tonemap.vignette = scene.post.vignette;
+    tonemap.grain = scene.post.grain;
+    tonemap.size[0] = static_cast<float>(hdr_.width());
+    tonemap.size[1] = static_cast<float>(hdr_.height());
+    tonemap.seed = static_cast<float>(time.frameIndex % 1024);
     queue.WriteBuffer(tonemapUniforms_, 0, &tonemap, sizeof(tonemap));
 
     stats_.drawCalls = 0;
@@ -987,6 +1000,25 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
     }
 
+    // ---- built-in post chain: DoF, motion blur, bloom, grading ----
+    {
+        PostFrameInputs postIn;
+        postIn.sceneHdr = finalHdr;
+        postIn.depth = hdr_.depthView();
+        postIn.width = hdr_.width();
+        postIn.height = hdr_.height();
+        postIn.prevViewProj = havePrevViewProj_ ? prevViewProj_ : frame.viewProj;
+        postIn.invViewProj = frame.invViewProj;
+        postIn.cameraPos = scene.camera.position;
+        postIn.frameIndex = time.frameIndex;
+        postIn.settings = &scene.post;
+        finalHdr = postProcessor_->run(encoder, postIn, *pool_);
+        stats_.post = postProcessor_->stats();
+        stats_.transientTextures = static_cast<std::uint32_t>(pool_->size());
+    }
+    prevViewProj_ = frame.viewProj;
+    havePrevViewProj_ = true;
+
     // ---- pass 2: tonemap -> target ----
     {
         auto pipeline = tonemapPipelineFor(target.format);
@@ -1012,6 +1044,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         ++stats_.triangles;
     }
     timer_->resolve(encoder);
+    pool_->endFrame();
     return {};
 }
 

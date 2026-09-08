@@ -44,6 +44,16 @@ All of these are displayed in the Control window and logged every 120 frames at 
 | One-million-particle pool, ~1M alive, 1280x720 headless (`[.perf]` probe) | 3.4 ms GPU per frame (emit + simulate + indirect draw) |
 | Particle uniform update per system | one 288-byte write; no readback |
 
+## Milestone 0.6 numbers (Apple M2 Max, Debug window 2880x1800)
+
+| Metric | Value |
+|---|---|
+| Orb scene + sparks + default post chain (bloom 6 levels + composite + tone map) | 120 fps, GPU 3.3 ms (2.5 ms is the post chain at full 2880x1800) |
+| Post chain passes at 1280x720 with DoF + motion blur + bloom | 13 passes, ~13 transient textures reused every frame |
+
+Bloom at native Retina resolution dominates; starting the chain at quarter resolution is the
+obvious optimisation when the budget tightens.
+
 ## Budget and revisit triggers
 
 - Analysis: switch FFT backend (pffft/vDSP) if hop time exceeds 10% of the hop period.

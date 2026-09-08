@@ -26,7 +26,7 @@ Result<RenderTarget> RenderTarget::create(Context& context, const RenderTargetDe
     if (desc.depthFormat != wgpu::TextureFormat::Undefined) {
         wgpu::TextureDescriptor depthDesc{};
         depthDesc.label = "render-target-depth";
-        depthDesc.usage = wgpu::TextureUsage::RenderAttachment;
+        depthDesc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
         depthDesc.dimension = wgpu::TextureDimension::e2D;
         depthDesc.size = {desc.width, desc.height, 1};
         depthDesc.format = desc.depthFormat;

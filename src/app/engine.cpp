@@ -25,6 +25,7 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     timeSignals_.bpm = bus_.declare("beat.bpm", 0.0f, 300.0f);
     timeSignals_.barPhase = bus_.declare("beat.bar");
     sources_.attach(bus_, params_);
+    postParams_ = scene::registerPostParameters(params_, post_);
     installController(std::make_unique<scene::OrbScene>(params_, modulator_));
     if (mode_ == EngineMode::Live) {
         player_ = std::make_unique<audio::AudioPlayer>();
@@ -33,11 +34,41 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
 
 void Engine::installController(std::unique_ptr<scene::SceneController> controller) {
     controller_ = std::move(controller);
-    // Scene swaps clear the parameter set, so sources and shader layers must re-register.
+    // Scene swaps clear the parameter set, so sources, post settings and shader layers must
+    // re-register. Post parameters keep their current base values (post_ holds them).
     sources_.attach(bus_, params_);
+    if (params_.find("post/bloom/intensity") == nullptr) {
+        scene::PostSettings keep = post_;
+        postParams_ = scene::registerPostParameters(params_, keep);
+    }
     shaderLayers_.reattach();
+    addDefaultPostRoutes();
     rebind();
     modulator_.resetState();
+}
+
+void Engine::addDefaultPostRoutes() {
+    auto has = [&](const char* target) {
+        for (const auto& r : modulator_.routes()) {
+            if (r.target == target) {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (!has("post/bloom/intensity")) {
+        params::ModRoute r{.source = "audio.rms", .target = "post/bloom/intensity", .amount = 0.6f};
+        r.chain.attackMs = 30.0f;
+        r.chain.decayMs = 400.0f;
+        modulator_.addRoute(r);
+    }
+    if (!has("post/lens/chromaticAberration")) {
+        params::ModRoute r{.source = "audio.onset", .target = "post/lens/chromaticAberration", .amount = 0.35f};
+        r.chain.envelope = params::EnvelopeMode::PeakHold;
+        r.chain.envelopeHoldMs = 20.0f;
+        r.chain.envelopeFallPerSecond = 6.0f;
+        modulator_.addRoute(r);
+    }
 }
 
 void Engine::rebind() {
@@ -433,6 +464,8 @@ void Engine::update(const FrameTime& time) {
     sources_.update(bus_, sourceContext_);
     modulator_.evaluate(bus_, params_, time.deltaTime);
     controller_->update(time);
+    scene::applyPostParameters(postParams_, post_);
+    controller_->scene().post = post_;
     {
         shaders::StdUniforms base;
         const auto& f = latest_;

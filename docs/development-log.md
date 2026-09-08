@@ -369,3 +369,55 @@ burst/capacity clamping (2), route/parameter counts updated in the scene tests, 
 Milestone 0.6 (post-processing): bloom, tone-mapping options, colour grading, distortion, motion
 blur and depth of field as built-in post layers on the existing post chain, and the transient
 resource pool / frame graph that comes with them.
+
+## 2026-09-08 — Milestone 0.6: post-processing
+
+### What was implemented and why
+
+Roadmap 0.6: the built-in effects that shape the final image, parameterised like everything else,
+and the transient-resource machinery that a multi-pass pipeline needs.
+
+- **Settings** (`src/scene/post_settings.*`): `PostSettings` with 23 `post/*` parameters
+  (bloom, grading, lens, DoF, motion blur, tone operator, vignette, grain); owned by the Engine,
+  re-registered across scene swaps, copied into `Scene::post`; default routes RMS → bloom
+  intensity and onset → chromatic aberration are added by the engine.
+- **Transient pool** (`src/gpu/transient_pool.*`, ADR-016): scratch textures by (size, format,
+  usage), reused across passes and frames, aged out after 60 idle frames.
+- **Chain** (`shaders/post.wgsl`, `src/rendering/post_processor.*`): depth of field (CoC from
+  reconstructed view distance, 24-tap gather), camera motion blur (depth reprojection with the
+  previous view-projection, neighbourhood-max velocity), bloom (soft knee, 13-tap down, tent
+  up), composite (distortion, chromatic aberration, white balance, hue, contrast, saturation,
+  lift/gamma/gain). Output pass (`tonemap.wgsl`): ACES fitted, AgX, extended Reinhard, Khronos
+  PBR Neutral, clamp; vignette; seeded grain.
+- Renderer order: user post layers → built-in chain → tone map; depth targets are now
+  sampleable; the previous view-projection is tracked per frame.
+
+### Bugs found during the milestone
+
+- WGSL has no ternary operator (`select`), `textureSample` is forbidden in non-uniform control
+  flow (`textureSampleLevel`), and depth targets needed texture-binding usage; all caught by the
+  GPU tests' renderer-init check and validation-error counting.
+- First motion blur only smeared inside moving silhouettes because static background pixels
+  returned early; replaced with neighbourhood-max velocity gathering (test: edge sharpness).
+- A member name clash (`post_`) with the existing ping-pong targets.
+
+### Tests
+
+246 cases (was 241): post settings (1), GPU bloom / grading + operators / DoF + motion blur /
+transient pool (4). Scene route counts updated (post routes moved to the engine).
+
+### Results
+
+- Orb + sparks + bloom + onset chromatic aberration, and DamagedHelmet with DoF, AgX, vignette and
+  grain via a project file: both captured headless with 0 GPU errors.
+- 2880x1800 window: 120 fps, GPU 3.3 ms with the default chain (bloom at native resolution).
+
+### Known limitations
+
+- Motion blur is camera-only (no per-object velocity); DoF is single-layer (background bleeds
+  onto in-focus edges); bloom runs at native resolution and dominates GPU time on Retina;
+  the pass list is explicit code, the pool is the only frame-graph piece so far.
+
+### Next step
+
+Milestone 0.7 (scene composition): reusable scenes, nested scenes, presets and asset management.

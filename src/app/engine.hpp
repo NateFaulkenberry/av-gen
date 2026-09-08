@@ -17,6 +17,7 @@
 #include "params/preset.hpp"
 #include "scene/gltf_scene.hpp"
 #include "scene/orb_scene.hpp"
+#include "scene/post_settings.hpp"
 #include "scene/scene_controller.hpp"
 #include "shaders/shader_layers.hpp"
 #include "signals/audio_signals.hpp"
@@ -65,6 +66,10 @@ public:
     [[nodiscard]] Result<void> saveProject(const std::filesystem::path& path) const;
     [[nodiscard]] Result<void> loadProject(const std::filesystem::path& path);
     [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
+
+    // ---- built-in post-processing ----
+    [[nodiscard]] scene::PostSettings& post() { return post_; }
+    [[nodiscard]] const scene::PostSettings& post() const { return post_; }
 
     // ---- user shader layers ----
     [[nodiscard]] shaders::ShaderLayerSet& shaderLayers() { return shaderLayers_; }
@@ -148,6 +153,7 @@ private:
     void installController(std::unique_ptr<scene::SceneController> controller);
     Result<void> reapplyEnvironment();
     void updateTimeSignals(const FrameTime& time, bool newAnalysisFrame);
+    void addDefaultPostRoutes();
 
     EngineMode mode_;
     params::ParameterSet params_;
@@ -157,6 +163,8 @@ private:
     signals::SourceRack sources_;
     params::PresetBank presets_;
     shaders::ShaderLayerSet shaderLayers_;
+    scene::PostSettings post_;
+    scene::PostParameters postParams_;
     TimeSignals timeSignals_;
     signals::SourceContext sourceContext_;
     std::unique_ptr<scene::SceneController> controller_;
