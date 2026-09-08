@@ -4,11 +4,13 @@ A native C++ real-time GPU audiovisual engine. Not a waveform visualizer: the go
 scene engine in which audio analysis drives a general parameter/modulation system that in turn
 drives GPU-rendered 3D scenes, in real time and as deterministic offline frame sequences.
 
-Milestone 0.3 (current): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
+Milestone 0.4 (current): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
 and render either the built-in orb scene or any glTF 2.0 scene with PBR materials, textures,
-punctual lights and an HDR environment. Every scene parameter can be driven by data-driven
-modulation routes from audio signals, the beat clock, LFOs, envelopes, noise, random and timeline
-sources, and macros; presets snapshot and morph parameters; projects save all of it as JSON.
+punctual lights and an HDR environment, behind or on top of user-written WGSL shader layers
+(ISF-style headers, multi-pass with feedback buffers, hot reload). Every parameter, including
+shader inputs, can be driven by data-driven modulation routes from audio signals, the beat clock,
+LFOs, envelopes, noise, random and timeline sources, and macros; presets snapshot and morph
+parameters; projects save all of it as JSON.
 
 ```
 Audio file -> AudioPlayer -> AnalysisRunner -> SignalBus -> Modulator -> ParameterSet
@@ -38,6 +40,7 @@ python3 tools/make_test_audio.py /tmp/track.wav        # deterministic 120 BPM t
 ./build/debug/src/avgen --scene DamagedHelmet.glb --env studio.hdr --audio /tmp/track.wav --play
 ./build/debug/src/avgen --headless --audio /tmp/track.wav --frames 300 --fps 30 --capture out.png
 ./build/debug/src/avgen --audio /tmp/track.wav --project my.json --save-project my.json
+./build/debug/src/avgen --audio /tmp/track.wav --shader shaders/examples/feedback.wgsl --post my_post.wgsl
 ```
 
 Keys: Space play/pause, O open audio, S open scene, E open environment, Left/Right seek 5 s.
@@ -56,5 +59,5 @@ Drop an audio, .glb/.gltf or .hdr file on the window to load it. `--help` lists 
 
 ## Status
 
-Milestones 0.1 to 0.3 complete on macOS 26 / Apple silicon. Windows and Linux are
+Milestones 0.1 to 0.4 complete on macOS 26 / Apple silicon. Windows and Linux are
 architecturally supported (WebGPU via Dawn, SDL3) but not yet built or tested. Licence: MIT.

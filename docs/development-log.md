@@ -256,3 +256,64 @@ cases (LFO without audio, modulators of modulators, project round trip, beat clo
 
 Milestone 0.4 (shader system): runtime WGSL hot reload, the ISF-style user shader contract with
 parameters exposed from the header, render-to-texture passes.
+
+## 2026-09-08 — Milestone 0.4: shader system
+
+### What was implemented and why
+
+Custom shaders as a first-class feature (roadmap 0.4): drop a shader into the project, expose
+its parameters, modulate them, hot reload, render to texture.
+
+- **User shader contract** (`src/shaders/shader_format.*`, ADR-014): ISF-style JSON header
+  (INPUTS float/long/bool/color/point2D/event with DEFAULT/MIN/MAX/LABEL; PASSES with TARGET,
+  PERSISTENT, FLOAT, WIDTH/HEIGHT expressions) + WGSL body defining `mainImage`. The engine
+  generates the module: `sys` standard uniforms (time, sizes, audio levels, beat clock), the
+  `Inputs` struct with WGSL layout rules, sampler, input image, audio spectrum texture, one texture
+  per named target, and the entry points. Developed by an agent against the fixed header with 21
+  parser/layout/generator tests and two example shaders.
+- **Layers** (`src/shaders/shader_layers.*`): inputs become parameters at
+  `shader/<layer>/<input>`; values survive reloads and scene swaps; project JSON `shaders` array.
+- **GPU side** (`src/rendering/shader_layer.*`): per-layer pipelines cached by target format,
+  named pass targets (persistent ones double-buffered for feedback), bind groups per pass, error
+  fallback (magenta stripes) with Tint diagnostics, `ShaderStack` mirroring the set by version.
+- **Renderer**: background layers draw inside the scene pass before geometry; post layers chain
+  through ping-pong HDR targets before tone mapping; an RGBA16F spectrum texture is uploaded per
+  frame; `reloadEngineShaders()` rebuilds engine pipelines individually.
+- **Hot reload**: `core::FileWatcher` (polling mtimes) for user and engine shaders.
+- **App/UI**: `--shader`, `--post`, `.wgsl` file drop, Shaders tab (enable, reorder, reload,
+  remove, errors), File menu entries.
+
+### Bugs found and fixed during the milestone
+
+- `std` is a WGSL reserved word: the original contract named the standard uniform `std`, so every
+  generated module failed to parse (caught by the GPU tests on first run). Renamed to `sys`.
+- Scene swaps cleared the parameter set while shader layers still held parameter pointers
+  (segfault in the project round-trip test). Layers now `detach()` before the clear.
+
+### Tests
+
+238 cases (was 208), all passing in Debug and Release: 21 shader-format, 2 file-watcher, 2 layer
+set/integration, 5 GPU shader-layer cases (background input colour, post inversion, persistent
+accumulation, broken → fallback → fixed reload, engine reload).
+
+### Results
+
+- `shaders/examples/plasma.wgsl` as background behind the orb, `feedback.wgsl` trails driven by
+  the beat clock, a post vignette over DamagedHelmet: all captured headless with 0 GPU errors.
+- Live window with a shader edited twice mid-run: both reloads applied within the polling
+  interval, 0 GPU errors, 120 fps maintained.
+
+### Known limitations
+
+- WGSL bodies only (no GLSL/ISF translation yet); full-screen `mainImage` shaders only.
+- Background layers ignore depth; non-persistent targets keep stale content between their passes.
+- Post layers run at full HDR resolution with no size expression for the output pass.
+- The polling watcher checks mtimes; editors that write via rename are detected as
+  removed+recreated (handled) but a change within the same second on coarse filesystems may be
+  missed.
+
+### Next step
+
+Milestone 0.5 (GPU particles): compute-driven particle systems with indirect draw, emitters
+and force fields as parameters; the renderer already exposes storage buffers, indirect dispatch
+and 3D textures through WebGPU.

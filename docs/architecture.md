@@ -39,9 +39,10 @@ with `FixedStepClock`. Everything from `SignalBus` downwards is identical.
 | `signals` | avgen_core | `SignalBus` (named float channels + events), `AudioSignals` (the `audio.*` vocabulary) | analysis (struct only) |
 | `params` | avgen_core | `Parameter<T>`/`IParameter`, `ParameterSet`, `ProcessorChain`, `ModRoute`/`Modulator`, JSON serialisation | glm, nlohmann/json |
 | `assets` | avgen_core | image decode/encode (stb), glTF 2.0 import (fastgltf) into a `Scene` | fastgltf, stb |
+| `shaders` | avgen_core | user shader contract: ISF-style header parsing, WGSL module generation, inputs layout/packing, `ShaderLayerSet` (layers, parameters, hot-reload watching, project JSON) | params, core |
 | `scene` | avgen_core | `Scene` data model (cameras, punctual lights, materials with textures, meshes, entities, environment), mesh generators, `SceneController` interface with `OrbScene` (built-in preset) and `GltfScene` (imported file + curated parameters) | glm, params, assets |
 | `gpu` | avgen_gpu | `Context` (Dawn instance/adapter/device/surface), `ShaderLibrary` (WGSL files + includes + diagnostics), `RenderTarget`, `GpuTimer`, readback | Dawn |
-| `rendering` | avgen_gpu | `SceneRenderer` (pass list, PBR/grid/skybox/tonemap pipelines, material bind groups, lights), `EnvironmentProcessor` (IBL preprocessing) | gpu, scene |
+| `rendering` | avgen_gpu | `SceneRenderer` (pass list, PBR/grid/skybox/tonemap pipelines, material bind groups, lights, background/post user layers, engine shader reload), `EnvironmentProcessor` (IBL), `ShaderStack`/`ShaderLayerGpu` (user layer pipelines, pass targets, feedback) | gpu, scene, shaders |
 | `platform` | avgen_platform | `Window` (SDL3, Metal layer, events, file dialog) | SDL3 |
 | `ui` | avgen_platform | `ImGuiLayer` (SDL3 + WebGPU backends), `ControlPanel` (transport, response, generated parameter panel, analysis plots, performance) | ImGui, ImPlot |
 | `app` | avgen | `Engine` (the pipeline; also compiled into the test binary), `Application` (live/headless loops, CLI) | everything |
@@ -83,6 +84,11 @@ noise over time), `RandomSource` (sample-and-hold per trigger with slew), `Timel
 The engine also publishes `time.seconds`, `time.progress`, `time.playing` and a per-frame beat
 clock extrapolated from the analyser's tempo: `beat.phase`, `beat.pulse` (event), `beat.count`,
 `beat.bpm`, `beat.bar`. Routes have a polarity (bipolar maps 0..1 to -1..1 before the chain).
+
+**User shader layers (milestone 0.4).** Each layer's INPUTS are parameters at
+`shader/<layer>/<input>`, so shaders are modulated exactly like scene properties. Layers survive
+scene swaps (values captured by `detach()` and restored by `reattach()`), reload on file change,
+and are stored in projects as `{path, stage, enabled}`.
 
 **Presets and projects.** `params::Preset` is a path-keyed snapshot of base values; the
 `PresetBank` stores, recalls and morphs them. A project (`docs/project-format.md`, version 2)
