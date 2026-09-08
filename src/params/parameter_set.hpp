@@ -15,8 +15,9 @@ namespace avgen::params {
 
 class ParameterSet {
 public:
-    // Registers a parameter. Duplicate paths are a programming error (asserted, then the existing
-    // parameter is returned if the type matches).
+    // Registers a parameter. Re-adding a path with the same type returns the existing parameter
+    // (the new description is ignored). A different type at the same path is a programming error:
+    // registerParameter throws std::logic_error and nothing is registered.
     template <typename T>
     Parameter<T>& add(ParamDesc<T> desc) {
         if (auto* existing = findAs<T>(desc.path)) {
