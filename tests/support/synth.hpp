@@ -17,7 +17,7 @@ inline std::vector<float> sine(float frequencyHz, std::uint32_t sampleRate, std:
     std::vector<float> out(frames);
     const double w = 2.0 * std::numbers::pi * static_cast<double>(frequencyHz) / static_cast<double>(sampleRate);
     for (std::size_t i = 0; i < frames; ++i) {
-        out[i] = amplitude * static_cast<float>(std::sin(w * static_cast<double>(i) + phase));
+        out[i] = amplitude * static_cast<float>(std::sin(w * static_cast<double>(i) + static_cast<double>(phase)));
     }
     return out;
 }
