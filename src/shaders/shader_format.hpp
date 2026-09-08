@@ -106,6 +106,9 @@ void packInputs(const ShaderDescription& description, const InputsLayout& layout
 // Generates the complete WGSL module for one pass: standard declarations, the Inputs struct,
 // bindings for every target of `description`, the user body, and the entry points
 // `vs_main` (fullscreen triangle) and `fs_main` (calls mainImage; flips uv so 0,0 is top-left).
+// Every generated declaration precedes the body and the prologue ends with the line
+// `// ---- user body ----`; its first line reads `... N prologue lines; body starts at line N+1`,
+// so a compiler line L maps to body line L - N and to source line bodyLineOffset + (L - N) - 1.
 std::string generateModuleSource(const ShaderDescription& description, const std::string& body);
 
 // Resolves a pass size expression against the layer size. Errors on malformed expressions.
