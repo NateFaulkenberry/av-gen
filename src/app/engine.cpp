@@ -26,25 +26,17 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
 }
 
 Result<void> Engine::loadScene(const std::filesystem::path& path) {
-    // Build the new controller into fresh parameter/route sets so a failed load leaves the
-    // current scene untouched.
-    params::ParameterSet freshParams;
-    params::Modulator freshModulator;
-    freshModulator.masterGain = modulator_.masterGain;
-    auto ctrl = scene::GltfScene::load(path, freshParams, freshModulator);
+    // Import first so a failed load leaves the current scene, parameters and routes untouched.
+    auto ctrl = scene::GltfScene::load(path);
     if (!ctrl) {
         return std::unexpected(ctrl.error());
     }
+    const float masterGain = modulator_.masterGain;
     params_.clear();
     modulator_.clearRoutes();
-    // Re-register into the engine's own sets (the loader registered into the temporaries).
-    std::unique_ptr<scene::GltfScene> owned = std::move(*ctrl);
-    auto rebuilt = scene::GltfScene::load(path, params_, modulator_);
-    if (!rebuilt) {
-        installController(std::make_unique<scene::OrbScene>(params_, modulator_));
-        return std::unexpected(rebuilt.error());
-    }
-    installController(std::move(*rebuilt));
+    modulator_.masterGain = masterGain;
+    (*ctrl)->attach(params_, modulator_);
+    installController(std::move(*ctrl));
     return reapplyEnvironment();
 }
 

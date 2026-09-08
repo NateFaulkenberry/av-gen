@@ -18,24 +18,39 @@ Decision: ADR-001 (WebGPU via Dawn). Research: `docs/research/rendering.md`,
 - `gpu::readTexture8`, `hashImage`, `writePpm`: synchronous readback for tests and captures.
 - `rendering::SceneRenderer`: the frame's pass list for a `scene::Scene`.
 
-## Frame
+## Frame (milestone 0.2)
 
 ```
 encoder = device.CreateCommandEncoder()
+  [environment passes: only when scene.environment.environmentMap changed; see ADR-013]
   pass "scene-pass"  : HDR RGBA16Float + Depth24Plus, clear to environment.backgroundColor
-                       lit entities (mesh.wgsl, back-face cull, depth write)
-                       grid entities (grid.wgsl, additive blend, depth test only)
+                       opaque PBR entities (pbr.wgsl; back-face cull, or none for doubleSided)
+                       skybox (skybox.wgsl, far plane, LessEqual) when an environment is set
+                       grid entities (grid.wgsl, additive, depth test only)
+                       alpha-blended PBR entities, sorted back to front
   pass "tonemap-pass": fullscreen triangle, textureLoad HDR, ACES fitted, sRGB encode -> target
   [pass "ui-pass"    : Dear ImGui, LoadOp::Load]           (added by the application)
 timer.resolve(encoder); queue.Submit; timer.collect(); surface.Present()
 ```
 
-Uniforms: `FrameUniforms` (128 B: viewProj, cameraPos, lightDir, lightColor, params{time,
-gridIntensity, brightness}) in bind group 0; `ObjectUniforms` (176 B: model, normalMatrix,
-baseColor, emissive rgb+intensity, material roughness/metallic) in one buffer with 256-byte
-dynamic offsets in bind group 1 (up to 256 objects); `TonemapUniforms` (exposure). The C++
+Bind groups: 0 `FrameUniforms` (704 B: viewProj, invViewProj, cameraPos, params, envParams,
+skyParams, 8 `LightUniform`s); 1 `ObjectUniforms` (192 B: model, normalMatrix, baseColor+opacity,
+emissive rgb+intensity, material roughness/metallic/normalScale/occlusion, flags alphaMode/
+cutoff/unlit/textureMask) in one buffer with 256-byte dynamic offsets (up to 256 objects);
+2 material (one filtering sampler + baseColor, metallicRoughness, normal, emissive, occlusion
+textures; 1x1 defaults fill absent slots; bind groups cached per texture combination);
+3 image-based lighting (clamp sampler, irradiance cube, prefiltered cube, BRDF LUT). The C++
 structs are `static_assert`ed against the WGSL layouts. Vertex layout: position, normal, uv
-(32 bytes, `scene::Vertex`).
+(32 bytes, `scene::Vertex`); tangents are derived per fragment.
+
+Materials follow glTF metallic-roughness: textures multiply factors; normal maps are applied
+through a derivative-based cotangent frame; alpha mask discards below the cutoff; blend
+materials draw last without depth write. Lights: up to 8 enabled `PunctualLight`s per frame
+(directional, point with inverse-square and range window, spot with smooth cone). Ambient comes
+from the environment (split sum) or a hemispheric fallback when no map is set.
+
+Textures are uploaded with CPU-generated mip chains (sRGB filtered in linear space); HDR maps as
+RGBA16Float. Uploads happen when `Scene::textureVersion` changes.
 
 Conventions: right-handed, +Y up, CCW front faces, clip depth 0..1 (`GLM_FORCE_DEPTH_ZERO_TO_ONE`,
 `glm::perspectiveRH_ZO`). Scene-linear HDR until the tone map; `environment.brightness` is the
@@ -59,8 +74,8 @@ Everything GPU-related runs on the main thread. Dawn callbacks are delivered fro
 
 ## Performance (see docs/performance.md)
 
-Scene + tone map on the M2 Max at 1280x720: ~0.13 ms GPU. Two draw calls plus one fullscreen
-triangle. CPU cost per frame is dominated by ImGui and the uniform writes.
+Orb scene at 1280x720: ~0.1 ms GPU. DamagedHelmet with IBL and skybox at 2880x1800: ~1.0 ms
+GPU, 0.3 ms CPU work per frame (Release). Environment preprocessing: 18 ms Release for a 1k HDRI.
 
 ## Debugging
 
@@ -72,5 +87,6 @@ are logged with the `[wgpu]` prefix and counted; a headless run exits non-zero i
 - Pass list → frame graph with transient resources (0.6 post-processing).
 - Compute passes in the same encoder; storage buffers/textures, indirect draw/dispatch, 3D
   storage textures are plain WebGPU features (particles, 0.5).
-- MSAA and HDR/EDR swapchains are Dawn features not yet requested.
+- MSAA, shadows, specular occlusion and multi-scatter compensation are not implemented.
+- HDR/EDR swapchains are Dawn features not yet requested.
 - `dawn/native/*` headers are forbidden outside `src/gpu/` so wgpu-native remains a drop-in.

@@ -59,10 +59,10 @@ RunResult runOffline(const std::filesystem::path& path, double fps, int frames) 
     for (int i = 0; i < frames; ++i) {
         const FrameTime time = engine.tick(clock);
         engine.update(time);
-        result.scale.push_back(engine.orbScene().scale().value());
-        result.emissive.push_back(engine.orbScene().emissive().value());
-        result.brightness.push_back(engine.orbScene().brightness().value());
-        result.impulse.push_back(engine.orbScene().impulse().value());
+        result.scale.push_back(engine.orbScene()->scale().value());
+        result.emissive.push_back(engine.orbScene()->emissive().value());
+        result.brightness.push_back(engine.orbScene()->brightness().value());
+        result.impulse.push_back(engine.orbScene()->impulse().value());
         result.orbMatrix.push_back(engine.scene().entities[0].transform.matrix());
         result.bass.push_back(engine.signals().value(sig.bass));
         result.treble.push_back(engine.signals().value(sig.treble));
@@ -145,11 +145,11 @@ TEST_CASE("Rotation integrates the modulated speed with the injected clock", "[i
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadAudio(path).has_value());
     FixedStepClock clock(50.0);
-    float previous = engine.orbScene().currentAngle();
+    float previous = engine.orbScene()->currentAngle();
     bool monotonic = true;
     for (int i = 0; i < 100; ++i) {
         engine.update(engine.tick(clock));
-        const float angle = engine.orbScene().currentAngle();
+        const float angle = engine.orbScene()->currentAngle();
         if (angle < previous) {
             monotonic = false;
         }
@@ -157,8 +157,8 @@ TEST_CASE("Rotation integrates the modulated speed with the injected clock", "[i
     }
     CHECK(monotonic);
     // Base speed is 0.4 rad/s; with modulation over 2 s the angle must exceed the unmodulated value.
-    CHECK(engine.orbScene().currentAngle() > 0.4f * 2.0f * 0.98f);
-    CHECK(engine.orbScene().rotationSpeed().value() > 0.4f);
+    CHECK(engine.orbScene()->currentAngle() > 0.4f * 2.0f * 0.98f);
+    CHECK(engine.orbScene()->rotationSpeed().value() > 0.4f);
     std::filesystem::remove(path);
 }
 
@@ -171,5 +171,5 @@ TEST_CASE("Engine reports errors for missing audio and stays usable", "[integrat
     for (int i = 0; i < 5; ++i) {
         engine.update(engine.tick(clock)); // silence path
     }
-    CHECK_THAT(engine.orbScene().scale().value(), Catch::Matchers::WithinAbs(1.0, 1e-6));
+    CHECK_THAT(engine.orbScene()->scale().value(), Catch::Matchers::WithinAbs(1.0, 1e-6));
 }

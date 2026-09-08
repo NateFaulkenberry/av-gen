@@ -17,9 +17,11 @@ research conclusion; details and alternatives are in `docs/research/`.
 | nlohmann/json | v3.12.0 | MIT | project/parameter serialisation | ergonomic, `ordered_json`, migrations via JSON Pointer |
 | Catch2 | v3.16.0 | BSL-1.0 | tests and benchmarks | best CTest integration; ADR-009 |
 | CPM.cmake | v0.43.1 (vendored `cmake/CPM.cmake`) | MIT | dependency management | pinning + source cache without a second tool |
+| fastgltf | v0.9.0 (C++20 build; downloads simdjson) | MIT | glTF 2.0 / GLB import | fastest maintained C++ loader, extensions we need (lights, emissive strength); ADR-005 |
+| stb (stb_image, stb_image_write) | commit 2c980bb (2026) | MIT / public domain | PNG/JPEG/HDR decode, PNG/HDR encode | single-header, ubiquitous, HDR radiance support |
 
 Maintenance status and release dates were verified against the projects' GitHub APIs on
 2026-09-08 (`docs/research/tooling.md`, `docs/research/rendering.md`).
 
-Planned, not yet added: fastgltf, meshoptimizer, stb_image, tinyexr, libktx, ozz-animation (0.2);
+Planned, not yet added: meshoptimizer, tinyexr, libktx, ozz-animation (0.3+);
 efsw (0.4 hot reload); libebur128, pffft (analysis extras); Tracy (profiling).

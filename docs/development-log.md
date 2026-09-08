@@ -118,3 +118,72 @@ grid regardless of scale so it never sinks into the floor.
 Milestone 0.2 (scene system): glTF loading via fastgltf, multiple entities, PBR materials with an
 HDR environment, camera/light parameters; then 0.3 generalised modulation (LFO, envelope, timeline
 sources; macros; presets) on the existing `SignalBus`/`Modulator`.
+
+## 2026-09-08 — Milestone 0.2: scene system (glTF, PBR, lights, image-based lighting)
+
+### What was implemented and why
+
+The roadmap's "better scene system": imported assets instead of one procedural orb, so the
+engine renders real content and every later milestone (modulation sources, particles, post) has
+something worth looking at.
+
+- **Scene model** (`src/scene/scene.hpp`): CPU textures (RGBA8 sRGB/linear, RGBA32Float),
+  glTF metallic-roughness materials with five texture slots, alpha modes, double-sided and unlit
+  flags; punctual lights (directional/point/spot); imported cameras; an environment block
+  (equirect map, intensity, rotation, skybox blur); matrix decomposition, bounds, smooth normals.
+- **Assets** (`src/assets/`): stb_image/stb_image_write wrappers and a fastgltf 0.9 importer
+  (external buffers/images, hierarchy flattening, materials, samplers, `KHR_lights_punctual`,
+  `KHR_materials_emissive_strength`, cameras) that builds into a local scene and merges only on
+  success. Developed by a parallel agent against the fixed headers, with an in-memory GLB fixture
+  and Khronos sample checks.
+- **Rendering**: PBR shader (GGX, height-correlated Smith, Schlick; derivative-based normal
+  mapping; occlusion; emissive; alpha mask/blend; unlit), material bind groups with 1x1 defaults,
+  CPU mip generation, up to 8 lights, blended draw sorting, skybox; `EnvironmentProcessor`
+  (ADR-013) producing irradiance and GGX-prefiltered cubes and the BRDF LUT from an HDRI on the
+  GPU in fragment passes with fixed Hammersley sequences; HDR uploads as RGBA16Float.
+- **Controllers**: `SceneController` interface; `OrbScene` (0.1 preset) and `GltfScene`
+  (orbit camera framed from bounds, root transform, emissive/roughness scaling, per-light
+  intensity, env parameters, default routes). `Engine::loadScene`/`loadOrbScene`/
+  `loadEnvironment`/`loadFile` rebuild parameters and routes; a failed load changes nothing.
+- **App/UI**: `--scene`, `--env`, PNG capture, File menu entries and S/E keys, file drop by
+  extension, route list generated from the modulator, scene/environment readout.
+
+### Files changed
+
+`src/scene/{scene.hpp,scene.cpp,scene_controller.hpp,gltf_scene.*,orb_scene.*}`,
+`src/assets/*` (new), `src/gpu/texture.*` (new), `src/rendering/{scene_renderer.*,environment.*}`,
+`shaders/{common,pbr,grid,skybox,environment}.wgsl` (`mesh.wgsl` removed), `src/app/{engine.*,
+application.*}`, `src/ui/control_panel.*`, `src/platform/window.*`, `cmake/Dependencies.cmake`
+(fastgltf, stb), `src/CMakeLists.txt`.
+
+### Tests
+
+146 cases (was 132), all passing in Debug and Release. New: scene model (3), image I/O and glTF
+loader (9 incl. 2 sample-asset tests that skip without `AVGEN_SAMPLE_ASSETS`), GltfScene
+controller and engine scene swap (3), IBL GPU test (1). Existing GPU tests updated for the new
+shader files and for lights being scene data.
+
+### Results
+
+- DamagedHelmet + studio HDRI + test track, headless: 0 GPU errors, deterministic hashes; textures,
+  normal map, metallic reflections, emissive HUD and IBL all visible in the capture.
+- MetalRoughSpheres: the metal/roughness grid reads correctly from mirror-like to diffuse.
+- Live window (Release, 2880x1800): 120 fps, CPU work 0.3 ms, GPU 1.0-1.2 ms; helmet load 161 ms;
+  environment preprocessing 18 ms; 0 GPU errors.
+- Debug: helmet load 835 ms (PNG decode), environment 127 ms.
+
+### Known limitations
+
+- No MSAA; no shadows; no specular occlusion or multi-scatter compensation; single UV set;
+  `KHR_texture_transform` parsed but ignored; no animation/skinning; no KTX2/WebP.
+- Per-entity parameters are not registered (only the curated root/material/camera/env/light
+  surface), which keeps large scenes manageable but means individual objects are not yet
+  addressable by modulation.
+- Environment preprocessing blocks the main thread at load time.
+- Blended materials are sorted per entity, not per triangle.
+- Large HDRIs (4k+) cost noticeable CPU time in the half-float conversion and mip generation.
+
+### Next step
+
+Milestone 0.3 (modulation): LFO, envelope, noise and timeline sources on the `SignalBus`;
+per-route polarity; macros; presets; beat tracking and tempo signals from the analyser.

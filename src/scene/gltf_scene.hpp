@@ -21,9 +21,10 @@ namespace avgen::scene {
 
 class GltfScene final : public SceneController {
 public:
-    // Loads the file; registers parameters and routes on success.
-    static Result<std::unique_ptr<GltfScene>> load(const std::filesystem::path& path, params::ParameterSet& params,
-                                                   params::Modulator& modulator);
+    // Imports the file (no parameters registered yet). Then call attach() to register the
+    // parameter surface and default routes into the engine's sets.
+    static Result<std::unique_ptr<GltfScene>> load(const std::filesystem::path& path);
+    void attach(params::ParameterSet& params, params::Modulator& modulator);
 
     [[nodiscard]] std::string name() const override { return name_; }
     void update(const FrameTime& time) override;

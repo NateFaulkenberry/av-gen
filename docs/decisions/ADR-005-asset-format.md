@@ -1,6 +1,6 @@
 # ADR-005: Asset format
 
-- Status: Accepted (2026-09-08)
+- Status: Accepted (2026-09-08); glTF loading implemented in milestone 0.2 (fastgltf 0.9.0, stb_image)
 - Research: `docs/research/assets.md`
 
 ## Problem

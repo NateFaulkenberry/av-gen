@@ -12,9 +12,12 @@ Decision: ADR-006. Research: `docs/research/shaders.md` and the WGSL re-routing 
   stay meaningful.
 - Diagnostics: compile errors return an `Error` with `file:line:col: error: message`; warnings are
   logged. `SceneRenderer::init` fails (and the app exits with a message) on any shader error.
-- Files: `common.wgsl` (uniform structs, vertex stage, hash noise), `mesh.wgsl` (Lambert + GGX
-  specular + hemispheric ambient + fresnel rim + emissive), `grid.wgsl` (procedural anti-aliased
-  grid with radial fade, additive), `tonemap.wgsl` (fullscreen triangle, ACES fitted, sRGB).
+- Files: `common.wgsl` (uniform structs incl. lights, vertex stage, env rotation, hash noise),
+  `pbr.wgsl` (glTF metallic-roughness: GGX + height-correlated Smith + Schlick, punctual lights,
+  split-sum IBL, derivative-based normal mapping, occlusion, emissive, alpha mask/blend, unlit),
+  `grid.wgsl` (procedural anti-aliased grid, additive), `skybox.wgsl` (far-plane fullscreen
+  triangle sampling the prefiltered cube), `environment.wgsl` (IBL preprocessing passes:
+  equirect→cube, irradiance, GGX prefilter, BRDF LUT), `tonemap.wgsl` (ACES fitted, sRGB).
 
 ## Binding contract
 
@@ -22,7 +25,10 @@ Decision: ADR-006. Research: `docs/research/shaders.md` and the WGSL re-routing 
 |---|---|---|---|
 | 0 | 0 | vertex+fragment | `FrameUniforms` (uniform) |
 | 1 | 0 | vertex+fragment | `ObjectUniforms` (uniform, dynamic offset) |
+| 2 | 0..5 | fragment | material sampler; baseColor, metallicRoughness, normal, emissive, occlusion `texture_2d<f32>` |
+| 3 | 0..3 | fragment | IBL sampler; irradiance `texture_cube`, prefiltered `texture_cube`, BRDF LUT `texture_2d` |
 | tonemap 0 | 0 / 1 | fragment | HDR `texture_2d<f32>` (unfilterable, `textureLoad`) / `TonemapUniforms` |
+| env 0 | 0..3 | fragment | `EnvUniforms` (dynamic offset); sampler; source equirect `texture_2d`; source `texture_cube` |
 
 Vertex inputs: `@location(0) position vec3`, `@location(1) normal vec3`, `@location(2) uv vec2`.
 

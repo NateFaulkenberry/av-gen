@@ -25,7 +25,16 @@ All of these are displayed in the Control window and logged every 120 frames at 
 | Analysis per hop (N=2048, H=512) | ~100 µs Debug, ~17 µs Release (0.16% of the hop period) |
 | Offline frame incl. synchronous readback, 1280x720 | ~6 ms Release (250 frames in 1.53 s wall), ~43 ms Debug |
 | Decode 24 s stereo 48 kHz WAV | ~100-150 ms |
-| Test suite | 132 tests, ~4 s Debug |
+| Test suite | 146 tests, ~5 s Debug |
+
+## Milestone 0.2 numbers (Apple M2 Max, Release unless stated)
+
+| Metric | Value |
+|---|---|
+| DamagedHelmet load (3.8 MB, five 2048² PNGs) | 161 ms Release, 835 ms Debug (stb PNG decode) |
+| Environment preprocessing, 1k HDRI (cube 256 + 9 mips, irradiance 32, prefiltered 128 x 6, BRDF 128) | 18 ms Release, 127 ms Debug |
+| Helmet + IBL + skybox, 2880x1800 window | 120 fps (vsync), CPU work 0.3 ms, GPU 1.0-1.2 ms |
+| Helmet headless 1280x720 incl. readback | ~6 ms per frame |
 
 ## Budget and revisit triggers
 

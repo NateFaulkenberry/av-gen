@@ -4,9 +4,10 @@ A native C++ real-time GPU audiovisual engine. Not a waveform visualizer: the go
 scene engine in which audio analysis drives a general parameter/modulation system that in turn
 drives GPU-rendered 3D scenes, in real time and as deterministic offline frame sequences.
 
-Milestone 0.1 (this release): load an audio file, play it, analyse it, and render a GPU scene
-whose scale, rotation, emission, brightness and impulse respond to bass, mids, highs, RMS and
-onsets through data-driven modulation routes.
+Milestone 0.2 (current): load an audio file, play it, analyse it, and render either the built-in
+orb scene or any glTF 2.0 scene with PBR materials, textures, punctual lights and an HDR
+environment (image-based lighting, skybox). Scene parameters respond to bass, mids, highs, RMS
+and onsets through data-driven modulation routes.
 
 ```
 Audio file -> AudioPlayer -> AnalysisRunner -> SignalBus -> Modulator -> ParameterSet
@@ -33,11 +34,12 @@ the Dawn from-source path, and platform notes.
 ```sh
 python3 tools/make_test_audio.py /tmp/track.wav        # deterministic 120 BPM test track
 ./build/debug/src/avgen --audio /tmp/track.wav --play  # live window
-./build/debug/src/avgen --headless --audio /tmp/track.wav --frames 300 --fps 30 --capture out.ppm
+./build/debug/src/avgen --scene DamagedHelmet.glb --env studio.hdr --audio /tmp/track.wav --play
+./build/debug/src/avgen --headless --audio /tmp/track.wav --frames 300 --fps 30 --capture out.png
 ```
 
-Keys: Space play/pause, O open file, Left/Right seek 5 s. Drop an audio file on the window to
-load it. `--help` lists every flag.
+Keys: Space play/pause, O open audio, S open scene, E open environment, Left/Right seek 5 s.
+Drop an audio, .glb/.gltf or .hdr file on the window to load it. `--help` lists every flag.
 
 ## Documentation
 
@@ -52,5 +54,5 @@ load it. `--help` lists every flag.
 
 ## Status
 
-Milestone 0.1 complete on macOS 26 / Apple silicon. Windows and Linux are architecturally
-supported (WebGPU via Dawn, SDL3) but not yet built or tested. Licence: MIT.
+Milestones 0.1 and 0.2 complete on macOS 26 / Apple silicon. Windows and Linux are
+architecturally supported (WebGPU via Dawn, SDL3) but not yet built or tested. Licence: MIT.

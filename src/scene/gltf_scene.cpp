@@ -33,8 +33,7 @@ std::string sanitise(std::string name) {
 }
 } // namespace
 
-Result<std::unique_ptr<GltfScene>> GltfScene::load(const std::filesystem::path& path, params::ParameterSet& params,
-                                                   params::Modulator& modulator) {
+Result<std::unique_ptr<GltfScene>> GltfScene::load(const std::filesystem::path& path) {
     std::unique_ptr<GltfScene> ctrl(new GltfScene());
     auto summary = assets::loadGltf(path, ctrl->scene_);
     if (!summary) {
@@ -78,11 +77,14 @@ Result<std::unique_ptr<GltfScene>> GltfScene::load(const std::filesystem::path& 
     ctrl->scene_.environment.gridIntensity = 0.0f;
     ctrl->scene_.environment.backgroundColor = glm::vec3(0.02f, 0.02f, 0.03f);
 
-    ctrl->registerParameters(params);
-    addDefaultRoutes(modulator);
     log::info("scene '{}': {} entities, {} meshes, {} textures, {} lights, radius {:.2f}", ctrl->name_,
               summary->entities, summary->meshes, summary->textures, summary->lights, ctrl->radius_);
     return ctrl;
+}
+
+void GltfScene::attach(params::ParameterSet& params, params::Modulator& modulator) {
+    registerParameters(params);
+    addDefaultRoutes(modulator);
 }
 
 void GltfScene::registerParameters(params::ParameterSet& params) {

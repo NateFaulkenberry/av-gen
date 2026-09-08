@@ -38,9 +38,10 @@ with `FixedStepClock`. Everything from `SignalBus` downwards is identical.
 | `analysis` | avgen_core | `RealFFT` (KissFFT), Hann window, `Analyzer` (streaming STFT features), `AnalysisTrack` (offline), `AnalysisRunner` (thread) | KissFFT |
 | `signals` | avgen_core | `SignalBus` (named float channels + events), `AudioSignals` (the `audio.*` vocabulary) | analysis (struct only) |
 | `params` | avgen_core | `Parameter<T>`/`IParameter`, `ParameterSet`, `ProcessorChain`, `ModRoute`/`Modulator`, JSON serialisation | glm, nlohmann/json |
-| `scene` | avgen_core | `Scene` data model (camera, light, material, meshes, entities), mesh generators, `OrbScene` (the 0.1 scene as parameters + routes) | glm, params |
+| `assets` | avgen_core | image decode/encode (stb), glTF 2.0 import (fastgltf) into a `Scene` | fastgltf, stb |
+| `scene` | avgen_core | `Scene` data model (cameras, punctual lights, materials with textures, meshes, entities, environment), mesh generators, `SceneController` interface with `OrbScene` (built-in preset) and `GltfScene` (imported file + curated parameters) | glm, params, assets |
 | `gpu` | avgen_gpu | `Context` (Dawn instance/adapter/device/surface), `ShaderLibrary` (WGSL files + includes + diagnostics), `RenderTarget`, `GpuTimer`, readback | Dawn |
-| `rendering` | avgen_gpu | `SceneRenderer`: pass list, pipelines, uniform layout, mesh upload, tone mapping | gpu, scene |
+| `rendering` | avgen_gpu | `SceneRenderer` (pass list, PBR/grid/skybox/tonemap pipelines, material bind groups, lights), `EnvironmentProcessor` (IBL preprocessing) | gpu, scene |
 | `platform` | avgen_platform | `Window` (SDL3, Metal layer, events, file dialog) | SDL3 |
 | `ui` | avgen_platform | `ImGuiLayer` (SDL3 + WebGPU backends), `ControlPanel` (transport, response, generated parameter panel, analysis plots, performance) | ImGui, ImPlot |
 | `app` | avgen | `Engine` (the pipeline; also compiled into the test binary), `Application` (live/headless loops, CLI) | everything |
