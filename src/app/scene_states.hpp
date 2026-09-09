@@ -51,6 +51,8 @@ enum class TriggerKind : std::uint8_t {
     Onset,    // audio.onset events with audio.onsetStrength >= threshold
     Signal,   // `signal` rises through `threshold`
     Macro,    // "macro.<signal>" rises through `threshold` (falls when `falling`)
+    Phrase,   // every `every`-th musical phrase (ADR-041)
+    Section,  // every `every`-th section
     Cue,      // reserved: cues address states through their preset
 };
 [[nodiscard]] const char* triggerKindName(TriggerKind kind);
@@ -76,6 +78,8 @@ struct SceneState {
 
 struct BeatInfo {
     bool beatPulse = false;
+    bool phrasePulse = false;   // a phrase boundary passed this frame
+    float sectionPhase = 0.0f;  // 0..1 through the current section, for section edges
     float barPhase = 0.0f;
     bool onset = false;
     float onsetStrength = 0.0f;
@@ -119,7 +123,10 @@ private:
     // trigger edge state
     int beatCounter_ = 0;
     int barCounter_ = 0;
+    int phraseCounter_ = 0;
+    int sectionCounter_ = 0;
     float lastBarPhase_ = 0.0f;
+    float lastSectionPhase_ = 0.0f;
     std::vector<float> lastSignal_; // per (state, trigger) flattened
     std::string pendingQuantized_;  // go() waiting for the next beat/bar
     double lastSeconds_ = 0.0;

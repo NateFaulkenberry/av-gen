@@ -44,6 +44,11 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     timeSignals_.beatCount = bus_.declare("beat.count", 0.0f, 100000.0f);
     timeSignals_.bpm = bus_.declare("beat.bpm", 0.0f, 300.0f);
     timeSignals_.barPhase = bus_.declare("beat.bar");
+    timeSignals_.phrasePhase = bus_.declare("beat.phrase");
+    timeSignals_.phraseCount = bus_.declare("beat.phraseCount", 0.0f, 100000.0f);
+    timeSignals_.phrasePulse = bus_.declare("beat.phrasePulse", 0.0f, 1.0f, true);
+    timeSignals_.sectionPhase = bus_.declare("beat.section");
+    timeSignals_.sectionCount = bus_.declare("beat.sectionCount", 0.0f, 100000.0f);
     stateProgressSignal_ = bus_.declare("state.progress");
     stateIndexSignal_ = bus_.declare("state.index", 0.0f, 64.0f);
     sources_.attach(bus_, params_);
@@ -480,6 +485,8 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
         doc["outputs"] = outputs_;
     }
     doc["control"]["tempoSource"] = tempoSourceName(tempoSource_);
+    doc["control"]["phraseBars"] = phraseBars_;
+    doc["control"]["sectionPhrases"] = sectionPhrases_;
     nlohmann::json assets = nlohmann::json::object();
     if (!audioPath_.empty()) {
         assets["audio"] = assetRefJson(audioPath_, dir);
@@ -653,6 +660,8 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         } else {
             return fail("control.tempoSource '{}' unknown (analysis|midi)", tempo);
         }
+        setPhraseBars(doc["control"].value("phraseBars", 4));
+        setSectionPhrases(doc["control"].value("sectionPhrases", 4));
     } else {
         controlHub_.setMap(control::ControlMap{});
         setTempoSource(TempoSource::Analysis);
@@ -1329,6 +1338,22 @@ void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
     bus_.set(timeSignals_.beatCount, static_cast<float>(beatClockCount_));
     bus_.set(timeSignals_.bpm, static_cast<float>(bpm));
     bus_.set(timeSignals_.barPhase, static_cast<float>((beatClockCount_ % 4 + beatClockPhase_) / 4.0));
+    {
+        // Phrases and sections from the beat clock: continuous phases plus an event at each phrase
+        // boundary, so a state machine can escalate over musical structure rather than per beat.
+        const double beatsPerBar = 4.0;
+        const double beats = static_cast<double>(beatClockCount_) + beatClockPhase_;
+        const double bars = beats / beatsPerBar;
+        const double phrases = bars / static_cast<double>(phraseBars_);
+        const double sections = phrases / static_cast<double>(sectionPhrases_);
+        const auto phraseIndex = static_cast<std::uint32_t>(phrases < 0.0 ? 0.0 : phrases);
+        bus_.set(timeSignals_.phrasePhase, static_cast<float>(phrases - std::floor(phrases)));
+        bus_.set(timeSignals_.phraseCount, static_cast<float>(phraseIndex));
+        bus_.setEvent(timeSignals_.phrasePulse, phraseIndex != lastPhraseIndex_, 1.0f);
+        lastPhraseIndex_ = phraseIndex;
+        bus_.set(timeSignals_.sectionPhase, static_cast<float>(sections - std::floor(sections)));
+        bus_.set(timeSignals_.sectionCount, static_cast<float>(static_cast<std::uint32_t>(sections < 0.0 ? 0.0 : sections)));
+    }
 
     sourceContext_.time = time;
     sourceContext_.audioPosition = positionSeconds();
@@ -1446,6 +1471,8 @@ void Engine::update(const FrameTime& time) {
         BeatInfo beat;
         beat.beatPulse = bus_.event(timeSignals_.beatPulse);
         beat.barPhase = bus_.value(timeSignals_.barPhase);
+        beat.phrasePulse = bus_.event(timeSignals_.phrasePulse);
+        beat.sectionPhase = bus_.value(timeSignals_.sectionPhase);
         beat.onset = bus_.event(audioSignals_.onset);
         beat.onsetStrength = bus_.value(audioSignals_.onsetStrength);
         const double bpm = sourceContext_.tempoBpm > 1.0f ? static_cast<double>(sourceContext_.tempoBpm) : 120.0;

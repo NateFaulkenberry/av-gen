@@ -199,8 +199,21 @@ public:
         signals::SignalId beatCount = signals::kInvalidSignal;
         signals::SignalId bpm = signals::kInvalidSignal;
         signals::SignalId barPhase = signals::kInvalidSignal;
+        // Musical structure above the bar (ADR-041): a phrase is `phraseBars` bars, a section is
+        // `sectionPhrases` phrases. States and slow escalations key to these rather than to beats.
+        signals::SignalId phrasePhase = signals::kInvalidSignal;  // 0..1 through the current phrase
+        signals::SignalId phraseCount = signals::kInvalidSignal;  // phrases since the start
+        signals::SignalId phrasePulse = signals::kInvalidSignal;  // event at each phrase boundary
+        signals::SignalId sectionPhase = signals::kInvalidSignal; // 0..1 through the current section
+        signals::SignalId sectionCount = signals::kInvalidSignal;
     };
     [[nodiscard]] const TimeSignals& timeSignals() const { return timeSignals_; }
+    // Musical structure: bars per phrase (default 4) and phrases per section (default 4). Saved
+    // with the project so a piece keeps its structure.
+    [[nodiscard]] int phraseBars() const { return phraseBars_; }
+    void setPhraseBars(int bars) { phraseBars_ = std::max(1, bars); }
+    [[nodiscard]] int sectionPhrases() const { return sectionPhrases_; }
+    void setSectionPhrases(int phrases) { sectionPhrases_ = std::max(1, phrases); }
     [[nodiscard]] const signals::SourceContext& sourceContext() const { return sourceContext_; }
     [[nodiscard]] bool hasAudio() const { return audioFile_ != nullptr; }
     [[nodiscard]] const std::filesystem::path& audioPath() const { return audioPath_; }
@@ -285,6 +298,9 @@ private:
     scene::PostSettings post_;
     scene::PostParameters postParams_;
     TimeSignals timeSignals_;
+    int phraseBars_ = 4;
+    int sectionPhrases_ = 4;
+    std::uint32_t lastPhraseIndex_ = 0;
     signals::SourceContext sourceContext_;
     assets::AssetRegistry registry_;
     std::unique_ptr<scene::SceneController> controller_;

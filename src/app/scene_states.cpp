@@ -52,13 +52,15 @@ const char* triggerKindName(TriggerKind k) {
     case TriggerKind::Onset: return "onset";
     case TriggerKind::Signal: return "signal";
     case TriggerKind::Macro: return "macro";
+    case TriggerKind::Phrase: return "phrase";
+    case TriggerKind::Section: return "section";
     case TriggerKind::Cue: return "cue";
     }
     return "manual";
 }
 std::optional<TriggerKind> triggerKindFromName(std::string_view n) {
     for (auto k : {TriggerKind::Manual, TriggerKind::Beat, TriggerKind::Bar, TriggerKind::Onset, TriggerKind::Signal,
-                   TriggerKind::Macro, TriggerKind::Cue}) {
+                   TriggerKind::Macro, TriggerKind::Phrase, TriggerKind::Section, TriggerKind::Cue}) {
         if (n == triggerKindName(k)) return k;
     }
     return std::nullopt;
@@ -146,7 +148,10 @@ void StateMachine::reset(params::ParameterSet& params, const params::PresetBank&
     progress_ = 1.0f;
     beatCounter_ = 0;
     barCounter_ = 0;
+    phraseCounter_ = 0;
+    sectionCounter_ = 0;
     lastBarPhase_ = 0.0f;
+    lastSectionPhase_ = 0.0f;
     lastSignal_.assign(0, 0.0f);
     if (!initial.empty()) {
         go(initial, params, presets, true);
@@ -165,6 +170,14 @@ void StateMachine::update(double seconds, double dt, const signals::SignalBus& b
     lastBarPhase_ = beat.barPhase;
     if (barEdge) {
         ++barCounter_;
+    }
+    if (beat.phrasePulse) {
+        ++phraseCounter_;
+    }
+    const bool sectionEdge = beat.sectionPhase < lastSectionPhase_ - 0.5f;
+    lastSectionPhase_ = beat.sectionPhase;
+    if (sectionEdge) {
+        ++sectionCounter_;
     }
     // Quantised start requested by go().
     if (!pendingQuantized_.empty()) {
@@ -205,6 +218,12 @@ void StateMachine::update(double seconds, double dt, const signals::SignalBus& b
                 break;
             case TriggerKind::Bar:
                 fired = barEdge && t.every > 0 && (barCounter_ % t.every) == 0;
+                break;
+            case TriggerKind::Phrase:
+                fired = beat.phrasePulse && t.every > 0 && (phraseCounter_ % t.every) == 0;
+                break;
+            case TriggerKind::Section:
+                fired = sectionEdge && t.every > 0 && (sectionCounter_ % t.every) == 0;
                 break;
             case TriggerKind::Onset:
                 fired = beat.onset && beat.onsetStrength >= t.threshold;
