@@ -798,7 +798,7 @@ void ControlPanel::drawSceneTab(app::Engine& engine) {
         }
     }
     ImGui::Separator();
-    static const char* kinds[] = {"gltf", "orb", "grid", "particles", "scene", "procedural"};
+    static const char* kinds[] = {"gltf", "orb", "grid", "particles", "scene", "procedural", "field"};
     ImGui::SetNextItemWidth(110);
     ImGui::Combo("##nodekind", &newNodeKind_, kinds, 6);
     ImGui::SameLine();

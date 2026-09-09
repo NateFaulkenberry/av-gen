@@ -40,6 +40,7 @@ with `FixedStepClock`. Everything from `SignalBus` downwards is identical.
 | `params` | avgen_core | `Parameter<T>`/`IParameter`, `ParameterSet`, `ProcessorChain`, `ModRoute`/`Modulator`, presets, `Timeline` (keyframe tracks + cues, ADR-018), JSON serialisation | glm, nlohmann/json |
 | `assets` | avgen_core | image decode/encode (stb), OpenEXR write/read (tinyexr), glTF 2.0 import (fastgltf) into a `Scene`, `AssetRegistry` (cached, versioned, path-resolving loads), `VideoWriter` (AVFoundation native / external ffmpeg) | fastgltf, stb, tinyexr, AVFoundation (macOS) |
 | `shaders` | avgen_core | user shader contract: ISF-style header parsing, WGSL module generation, inputs layout/packing, `ShaderLayerSet` (layers, parameters, hot-reload watching, project JSON) | params, core |
+| `spatial` | avgen_core | procedural world data (ADR-024..027): typed `AttributeSet`/`PointCloud`, point operators, `FieldSpec`/`FieldSet` sampling + GPU packing, `Effector`, `Spline`, `SdfTree` (+ surface nets meshing); `core/noise` is the CPU twin of the WGSL noise | glm, core |
 | `scene` | avgen_core | `Scene` data model (cameras, punctual lights, materials with textures, meshes, entities, environment, particle systems), mesh generators, particle parameter registration, `SceneController` interface with `OrbScene` (built-in preset + sparks), `GltfScene` (imported file + curated parameters + dust) and `Composition` (nodes of any kind incl. `procedural`, nested scene files, flattened into one `Scene`; ADR-017), `ProceduralGeometry` (primitives, distributions, seeded variation, deformer stack, instance records; ADR-023) | glm, params, assets |
 | `control` | avgen_core | OSC 1.0 (messages, bundles, patterns, UDP receiver/sender), MIDI input (CoreMIDI on macOS, byte parser, virtual source), `ControlMap` (bindings + direct OSC scheme; ADR-021) | POSIX sockets, CoreMIDI |
 | `gpu` | avgen_gpu | `Context` (Dawn instance/adapter/device/surface), `ShaderLibrary` (WGSL files + includes + diagnostics), `RenderTarget`, `GpuTimer`, readback (synchronous helpers and `ReadbackRing`) | Dawn |
@@ -124,6 +125,30 @@ when post-processing arrives; compute passes are peers of render passes in the s
 the `gpu` module exposes storage buffers, indirect draw/dispatch and 3D storage textures through
 plain WebGPU, which the particle research (§11) requires.
 
+## 5b. Procedural world (ADR-024 … ADR-032)
+
+```
+  SourceSpec (box|cylinder|sphere|torus|point|mesh|procedural)      Scene::fields (FieldSet)
+       │                                                                  │  packField ×16 → FieldBlock (uniform)
+  Distribution (+ spline) → PointCloud ──pointOps──▶ projectInstances     │
+       │   (attributes: position rotation scale id seed density color …)  │
+       ▼                                                                  ▼
+  InstanceRecord[] (96 B) ──GPU effector pass (points.wgsl)──▶ live records ──▶ procedural.wgsl
+                                                                          │       (deformers incl. Field, Point billboards)
+  ParticleSystem.fieldForces ──▶ particles.wgsl (simulate reads FieldBlock)│
+  Material programs ──▶ material.wgsl (inputs incl. fieldColor)  ◀────────┘
+  SdfTree ──▶ sdf.wgsl (sphere tracing, writes depth) | meshSdf (surface nets → MeshData)
+```
+
+Rules: structure is built on the CPU only when a structural hash changes (`rebuild()`); motion is
+per-frame uniforms and GPU passes. Every struct member that is not structural is a registered
+parameter (`field/<node>/…`, `procedural/<node>/effector/<n>/…`), so audio, timeline, presets,
+OSC/MIDI and macros reach fields, effectors and materials through the ordinary routes. Nested
+scenes prefix field names and every reference to them (`<node>_<field>`), so a scene file is
+self-contained. CPU and GPU implement the same maths (`core/noise` ↔ `noise.wgsl`,
+`spatial::sample*` ↔ `fields.wgsl`, `applyEffectorsToRecords` ↔ `points.wgsl`) and the render
+tests compare them.
+
 ## 6. Threading
 
 | Thread | Owns | May touch |
@@ -147,7 +172,7 @@ audio callback never logs.
 ## 8. Directory layout
 
 ```
-src/{core,audio,analysis,signals,params,scene,gpu,rendering,platform,ui,app}
+src/{core,audio,analysis,signals,params,spatial,scene,control,assets,shaders,share,gpu,rendering,platform,ui,app}
 shaders/           WGSL, loaded at runtime (AVGEN_SHADER_DIR overrides the search path)
 tests/{unit,integration,rendering,support}
 tools/             make_test_audio.py

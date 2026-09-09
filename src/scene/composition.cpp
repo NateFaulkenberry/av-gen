@@ -88,6 +88,9 @@ void forEachParticleParam(ParticleParameters& p, F&& f) {
     f(p.attractorPosition);
     f(p.attractorStrength);
     f(p.orbit);
+    for (auto*& fs : p.fieldStrength) {
+        f(fs);
+    }
     f(p.size);
     f(p.colorStart);
     f(p.colorEnd);
@@ -296,6 +299,20 @@ json particlesToJson(const ParticleSystem& s) {
     j["emissive"] = s.emissive;
     j["blend"] = blendName(s.blend);
     j["softness"] = s.softness;
+    if (!s.fieldForces.empty()) {
+        json forces = json::array();
+        for (const FieldForce& f : s.fieldForces) {
+            json fj;
+            fj["field"] = f.field;
+            fj["mode"] = fieldForceModeName(f.mode);
+            fj["enabled"] = f.enabled;
+            fj["strength"] = f.strength;
+            fj["mix"] = f.mix;
+            fj["axis"] = vecToJson(f.axis);
+            forces.push_back(std::move(fj));
+        }
+        j["fieldForces"] = std::move(forces);
+    }
     return j;
 }
 
@@ -374,6 +391,52 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
     }
     AVGEN_READ(softness, readFloat);
 #undef AVGEN_READ
+    if (j.contains("fieldForces")) {
+        const json& forces = j.at("fieldForces");
+        if (!forces.is_array()) {
+            return fail("'fieldForces' must be an array");
+        }
+        if (forces.size() > static_cast<std::size_t>(kMaxFieldForces)) {
+            return fail("at most {} field forces", kMaxFieldForces);
+        }
+        for (const json& fj : forces) {
+            if (!fj.is_object()) {
+                return fail("'fieldForces' entries must be objects");
+            }
+            FieldForce f;
+            auto field = readString(fj, "field", "");
+            if (!field) {
+                return std::unexpected(field.error());
+            }
+            f.field = *field;
+            if (f.field.empty()) {
+                return fail("field force needs a 'field' name");
+            }
+            if (fj.contains("mode")) {
+                auto mode = readString(fj, "mode", "force");
+                if (!mode) {
+                    return std::unexpected(mode.error());
+                }
+                auto m = fieldForceModeFromName(*mode);
+                if (!m) {
+                    return fail("unknown field force mode '{}'", *mode);
+                }
+                f.mode = *m;
+            }
+            auto enabled = readBool(fj, "enabled", true);
+            auto strength = readFloat(fj, "strength", 1.0f);
+            auto mix = readFloat(fj, "mix", 1.0f);
+            auto axis = readVec<3>(fj, "axis", f.axis);
+            if (!enabled || !strength || !mix || !axis) {
+                return fail("field force '{}': invalid fields", f.field);
+            }
+            f.enabled = *enabled;
+            f.strength = *strength;
+            f.mix = *mix;
+            f.axis = *axis;
+            s.fieldForces.push_back(std::move(f));
+        }
+    }
     return s;
 }
 
@@ -403,6 +466,43 @@ void offsetEntityIds(Entity& e, MeshId meshOffset, TextureId textureOffset) {
     offsetTextureRef(e.material.occlusionTexture, textureOffset);
 }
 
+// Field references inside nested scenes point at the nested file's field names; after flattening
+// every field is renamed "<prefix><name>", so the references follow (idempotent: a name that
+// already starts with the prefix is left alone, which also covers the per-frame re-application).
+std::string prefixed(const std::string& prefix, const std::string& name) {
+    if (name.empty() || prefix.empty() || name.compare(0, prefix.size(), prefix) == 0) {
+        return name;
+    }
+    return prefix + name;
+}
+void prefixFieldReferences(ProceduralGeometry& pg, const std::string& prefix) {
+    for (auto& e : pg.effectors) {
+        e.field = prefixed(prefix, e.field);
+    }
+    for (auto& d : pg.deformers) {
+        d.field = prefixed(prefix, d.field);
+    }
+    pg.emissiveField = prefixed(prefix, pg.emissiveField);
+}
+void prefixFieldReferences(ParticleSystem& ps, const std::string& prefix) {
+    for (auto& f : ps.fieldForces) {
+        f.field = prefixed(prefix, f.field);
+    }
+}
+void prefixFieldReferences(spatial::FieldSpec& f, const std::string& prefix) {
+    for (auto& child : f.children) {
+        child = prefixed(prefix, child);
+    }
+    f.reference = prefixed(prefix, f.reference);
+}
+// Folds a node/world transform into the field's own frame (world = outer * field frame).
+void foldFieldFrame(spatial::FieldSpec& f, const Transform& outer) {
+    const Transform folded = Transform::fromMatrix(outer.matrix() * f.localToWorld());
+    f.position = folded.position;
+    f.rotationDegrees = eulerDegrees(folded.rotation);
+    f.scale = folded.scale;
+}
+
 constexpr float kFitFovRadians = 0.87f;
 
 } // namespace
@@ -423,13 +523,16 @@ const char* nodeKindName(NodeKind kind) {
         return "scene";
     case NodeKind::Procedural:
         return "procedural";
+    case NodeKind::Field:
+        return "field";
     }
     return "gltf";
 }
 
 Result<NodeKind> nodeKindFromName(const std::string& name) {
     for (const NodeKind kind :
-         {NodeKind::Gltf, NodeKind::Orb, NodeKind::Grid, NodeKind::Particles, NodeKind::Scene, NodeKind::Procedural}) {
+         {NodeKind::Gltf, NodeKind::Orb, NodeKind::Grid, NodeKind::Particles, NodeKind::Scene, NodeKind::Procedural,
+          NodeKind::Field}) {
         if (name == nodeKindName(kind)) {
             return kind;
         }
@@ -586,6 +689,13 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
         }
         node.proceduralRest = node.procedural;
         break;
+    case NodeKind::Field:
+        node.field.name = node.name;
+        if (auto v = node.field.validate(); !v) {
+            return std::unexpected(v.error());
+        }
+        node.fieldRest = node.field;
+        break;
     case NodeKind::Orb:
     case NodeKind::Grid:
         break;
@@ -721,6 +831,9 @@ void Composition::registerNodeParameters(CompositionNode& node) {
         node.proceduralParams =
             registerProceduralParameters(*params_, node.proceduralRest, "procedural/" + sanitise(prefix_) + node.name + "/");
     }
+    if (node.kind == NodeKind::Field) {
+        node.fieldParams = registerFieldParameters(*params_, node.fieldRest, "field/" + sanitise(prefix_) + node.name + "/");
+    }
     if (node.kind == NodeKind::Scene && node.child) {
         node.child->attach(*params_, *modulator_, base);
     }
@@ -741,11 +854,15 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
         if (node.kind == NodeKind::Procedural) {
             unregisterProceduralParameters(*params_, node.proceduralParams);
         }
+        if (node.kind == NodeKind::Field) {
+            unregisterFieldParameters(*params_, node.fieldParams);
+        }
         if (node.child) {
             node.child->unregisterParameters();
         }
     }
     node.proceduralParams = {};
+    node.fieldParams = {};
     node.positionParam = nullptr;
     node.rotationParam = nullptr;
     node.scaleParam = nullptr;
@@ -866,6 +983,7 @@ void Composition::rebuild() {
     scene_.entities.clear();
     scene_.particles.clear();
     scene_.procedurals.clear();
+    scene_.fields.fields.clear();
     scene_.lights.clear();
     scene_.cameras.clear();
     ranges_.clear();
@@ -950,6 +1068,7 @@ void Composition::rebuild() {
         }
         case NodeKind::Particles: {
             ParticleSystem ps = node.particleRest;
+            prefixFieldReferences(ps, sanitise(prefix_));
             ps.position = transformPoint(nodeT, ps.position);
             ps.attractorPosition = transformPoint(nodeT, ps.attractorPosition);
             ps.enabled = ps.enabled && visible;
@@ -960,11 +1079,22 @@ void Composition::rebuild() {
         case NodeKind::Procedural: {
             ProceduralGeometry pg = node.proceduralRest;
             pg.name = sanitise(prefix_) + node.name;
+            prefixFieldReferences(pg, sanitise(prefix_));
             pg.distributionTransform = Transform::fromMatrix(nodeT.matrix() * pg.distributionTransform.matrix());
             pg.visible = pg.visible && visible;
             pg.rebuild();
             range.proceduralIndex = static_cast<int>(scene_.procedurals.size());
             scene_.procedurals.push_back(std::move(pg));
+            break;
+        }
+        case NodeKind::Field: {
+            spatial::FieldSpec f = node.fieldRest;
+            f.name = sanitise(prefix_) + node.name;
+            prefixFieldReferences(f, sanitise(prefix_));
+            foldFieldFrame(f, nodeT);
+            f.enabled = f.enabled && visible;
+            range.fieldIndex = static_cast<int>(scene_.fields.fields.size());
+            scene_.fields.fields.push_back(std::move(f));
             break;
         }
         case NodeKind::Scene: {
@@ -1000,8 +1130,10 @@ void Composition::rebuild() {
                 scene_.addLight(std::move(light));
             }
             const float scale = lengthScale(nodeT);
+            const std::string childPrefix = sanitise(prefix_) + node.name + "_";
             for (const ParticleSystem& src : cs.particles) {
                 ParticleSystem ps = src;
+                prefixFieldReferences(ps, childPrefix);
                 ps.position = transformPoint(nodeT, src.position);
                 ps.attractorPosition = transformPoint(nodeT, src.attractorPosition);
                 ps.extent = src.extent * scale;
@@ -1014,11 +1146,22 @@ void Composition::rebuild() {
             range.proceduralCount = cs.procedurals.size();
             for (const ProceduralGeometry& src : cs.procedurals) {
                 ProceduralGeometry pg = src;
-                pg.name = sanitise(prefix_) + node.name + "_" + src.name;
+                pg.name = childPrefix + src.name;
+                prefixFieldReferences(pg, childPrefix);
                 pg.distributionTransform = Transform::fromMatrix(nodeT.matrix() * src.distributionTransform.matrix());
                 pg.visible = pg.visible && visible;
                 pg.rebuild();
                 scene_.procedurals.push_back(std::move(pg));
+            }
+            range.firstField = scene_.fields.fields.size();
+            range.fieldCount = cs.fields.fields.size();
+            for (const spatial::FieldSpec& src : cs.fields.fields) {
+                spatial::FieldSpec f = src;
+                f.name = childPrefix + src.name;
+                prefixFieldReferences(f, childPrefix);
+                foldFieldFrame(f, nodeT);
+                f.enabled = src.enabled && visible;
+                scene_.fields.fields.push_back(std::move(f));
             }
             range.childMeshVersion = cs.meshVersion;
             range.childEntityCount = cs.entities.size();
@@ -1183,15 +1326,27 @@ void Composition::applyParameters() {
             // transform so the instance records already sit in world space.
             ProceduralGeometry& pg = scene_.procedurals[static_cast<std::size_t>(range.proceduralIndex)];
             applyProceduralParameters(node.proceduralParams, node.proceduralRest, pg);
+            prefixFieldReferences(pg, sanitise(prefix_));
             pg.distributionTransform = Transform::fromMatrix(full.matrix() * pg.distributionTransform.matrix());
             pg.visible = pg.visible && visible;
             pg.rebuild();
+        }
+        if (node.kind == NodeKind::Field && range.fieldIndex >= 0 &&
+            static_cast<std::size_t>(range.fieldIndex) < scene_.fields.fields.size()) {
+            spatial::FieldSpec& f = scene_.fields.fields[static_cast<std::size_t>(range.fieldIndex)];
+            const std::string name = f.name;
+            applyFieldParameters(node.fieldParams, node.fieldRest, f);
+            f.name = name;
+            prefixFieldReferences(f, sanitise(prefix_));
+            foldFieldFrame(f, full);
+            f.enabled = f.enabled && visible;
         }
         if (node.kind == NodeKind::Particles && range.particleIndex >= 0 &&
             static_cast<std::size_t>(range.particleIndex) < scene_.particles.size()) {
             ParticleSystem& ps = scene_.particles[static_cast<std::size_t>(range.particleIndex)];
             ps = node.particleRest;
             applyParticleParameters(node.particleParams, node.particleRest, ps);
+            prefixFieldReferences(ps, sanitise(prefix_));
             const float scale = lengthScale(full);
             ps.position = transformPoint(full, ps.position);
             ps.attractorPosition = transformPoint(full, ps.attractorPosition);
@@ -1201,10 +1356,12 @@ void Composition::applyParameters() {
             ps.enabled = ps.enabled && visible;
         } else if (child != nullptr && child->particles.size() == range.particleCount) {
             const float scale = lengthScale(full);
+            const std::string childPrefix = sanitise(prefix_) + node.name + "_";
             for (std::size_t k = 0; k < range.particleCount; ++k) {
                 const ParticleSystem& src = child->particles[k];
                 ParticleSystem& ps = scene_.particles[range.firstParticle + k];
                 ps = src;
+                prefixFieldReferences(ps, childPrefix);
                 ps.position = transformPoint(full, src.position);
                 ps.attractorPosition = transformPoint(full, src.attractorPosition);
                 ps.extent = src.extent * scale;
@@ -1214,15 +1371,30 @@ void Composition::applyParameters() {
             }
         }
         if (child != nullptr && child->procedurals.size() == range.proceduralCount) {
+            const std::string childPrefix = sanitise(prefix_) + node.name + "_";
             for (std::size_t k = 0; k < range.proceduralCount; ++k) {
                 const ProceduralGeometry& src = child->procedurals[k];
                 ProceduralGeometry& pg = scene_.procedurals[range.firstProcedural + k];
                 const std::string name = pg.name;
                 pg = src;
                 pg.name = name;
+                prefixFieldReferences(pg, childPrefix);
                 pg.distributionTransform = Transform::fromMatrix(full.matrix() * src.distributionTransform.matrix());
                 pg.visible = pg.visible && visible;
                 pg.rebuild();
+            }
+        }
+        if (child != nullptr && child->fields.fields.size() == range.fieldCount) {
+            const std::string childPrefix = sanitise(prefix_) + node.name + "_";
+            for (std::size_t k = 0; k < range.fieldCount; ++k) {
+                const spatial::FieldSpec& src = child->fields.fields[k];
+                spatial::FieldSpec& f = scene_.fields.fields[range.firstField + k];
+                const std::string name = f.name;
+                f = src;
+                f.name = name;
+                prefixFieldReferences(f, childPrefix);
+                foldFieldFrame(f, full);
+                f.enabled = src.enabled && visible;
             }
         }
     }
@@ -1351,6 +1523,9 @@ nlohmann::json Composition::toJson() const {
         }
         if (node.kind == NodeKind::Procedural) {
             n["procedural"] = node.procedural.toJson();
+        }
+        if (node.kind == NodeKind::Field) {
+            n["field"] = node.field.toJson();
         }
         nodes.push_back(std::move(n));
     }
@@ -1548,6 +1723,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return fail("node '{}': {}", node.name, particles.error().message);
                 }
                 node.particles = std::move(*particles);
+            }
+            if (item.contains("field")) {
+                auto field = spatial::FieldSpec::fromJson(item.at("field"));
+                if (!field) {
+                    return fail("scene file '{}': node '{}': {}", sourcePath.string(), node.name, field.error().message);
+                }
+                node.field = std::move(*field);
             }
 
             const std::string label = node.name.empty() ? std::string(nodeKindName(node.kind)) : node.name;

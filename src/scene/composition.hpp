@@ -9,7 +9,7 @@
 //
 // Scene file (JSON): { "format": "avgen-scene", "version": 1, "name": "...",
 //   "camera": {"distance", "height", "orbitSpeed", "fov"}, "environment": {"map": path, "intensity"},
-//   "nodes": [ {"name", "kind": "gltf|orb|grid|particles|scene", "asset": path, "parent": "other",
+//   "nodes": [ {"name", "kind": "gltf|orb|grid|particles|scene|procedural|field", "asset": path, "parent": "other",
 //               "position": [x,y,z], "rotation": [degrees x,y,z], "scale": [x,y,z], "visible": true,
 //               "emissiveBoost": 1.0, "roughnessScale": 1.0, "particles": {...settings...}} ] }
 // Nodes may be parented to another node of the same composition ("parent"): the world transform
@@ -18,6 +18,7 @@
 
 #include "assets/asset_registry.hpp"
 #include "core/error.hpp"
+#include "scene/field_params.hpp"
 #include "scene/particles.hpp"
 #include "scene/scene_controller.hpp"
 
@@ -32,7 +33,7 @@
 
 namespace avgen::scene {
 
-enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural };
+enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural, Field };
 const char* nodeKindName(NodeKind kind);
 Result<NodeKind> nodeKindFromName(const std::string& name);
 
@@ -47,6 +48,8 @@ struct CompositionNode {
     float roughnessScale = 1.0f;
     ParticleSystem particles;      // settings for kind Particles (name is taken from the node)
     ProceduralGeometry procedural; // settings for kind Procedural (ADR-023; name is taken from the node)
+    spatial::FieldSpec field;      // settings for kind Field (ADR-025; name is taken from the node; the node
+                                   // transform is the field's frame, folded into the FieldSpec at rebuild)
 
     // Runtime (not serialised)
     std::shared_ptr<const assets::SceneAsset> sceneAsset; // Gltf
@@ -61,6 +64,8 @@ struct CompositionNode {
     ParticleSystem particleRest;
     ProceduralParameters proceduralParams;
     ProceduralGeometry proceduralRest;
+    FieldParameters fieldParams;
+    spatial::FieldSpec fieldRest;
 };
 
 class Composition final : public SceneController {
@@ -185,6 +190,9 @@ private:
         std::vector<float> restRoughness;
         int particleIndex = -1;                      // index into scene_.particles (Particles kind)
         int proceduralIndex = -1;                    // index into scene_.procedurals (Procedural kind)
+        int fieldIndex = -1;                         // index into scene_.fields.fields (Field kind)
+        std::size_t firstField = 0;                  // Scene kind: the child's fields copied in
+        std::size_t fieldCount = 0;
         std::size_t firstProcedural = 0;             // Scene kind: the child's procedurals copied in
         std::size_t proceduralCount = 0;
         std::size_t firstParticle = 0;               // particle range (Particles and Scene kinds)
