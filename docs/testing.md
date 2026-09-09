@@ -92,3 +92,13 @@ hashes are bit-identical with particles on; the render job's sequence hash is th
 
 The parity tests are the backbone: any change to a field, effector, SDF node or material op has to
 produce the same number on the CPU and the GPU, which is what keeps offline renders honest.
+
+## Diagnosing input
+
+`AVGEN_UI_SELFTEST=1 ./build/debug/src/avgen --play` logs two lines every thirty frames: what ImGui
+sees of the pointer (position, buttons, the hovered window, whether it captured the mouse) and what
+SDL reports (window position, global and window-relative pointer, focus flags, and counts of the
+raw mouse events the application received). It separates "the widgets are broken" from "the events
+never arrived", which is how the event-queue regression in `OutputManager::pumpEvents` was found.
+The counter for filtered events also shows when the application's own window filter is dropping
+input meant for the UI.
