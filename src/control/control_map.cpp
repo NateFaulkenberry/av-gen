@@ -126,7 +126,9 @@ nlohmann::json ControlMap::toJson() const {
         j["inMax"] = b.inMax;
         oscJson.push_back(std::move(j));
     }
-    return nlohmann::json{{"osc", {{"enabled", oscEnabled}, {"port", oscPort}, {"bind", oscBind}, {"prefix", oscPrefix}, {"direct", directOsc}, {"bindings", std::move(oscJson)}}},
+    return nlohmann::json{{"osc", {{"enabled", oscEnabled}, {"port", oscPort}, {"bind", oscBind}, {"prefix", oscPrefix}, {"direct", directOsc},
+                                   {"feedbackHost", feedbackHost}, {"feedbackPort", feedbackPort}, {"feedback", feedbackEnabled},
+                                   {"bindings", std::move(oscJson)}}},
                           {"midi", {{"enabled", midiEnabled}, {"filter", midiFilter}, {"bindings", std::move(midiJson)}}}};
 }
 
@@ -152,6 +154,13 @@ Result<ControlMap> ControlMap::fromJson(const nlohmann::json& j) {
             return fail("control.osc.prefix '{}' is not a valid OSC address", m.oscPrefix);
         }
         m.directOsc = o.value("direct", true);
+        m.feedbackHost = o.value("feedbackHost", std::string());
+        const int feedbackPort = o.value("feedbackPort", 9001);
+        if (feedbackPort < 0 || feedbackPort > 65535) {
+            return fail("control.osc.feedbackPort {} is out of range", feedbackPort);
+        }
+        m.feedbackPort = static_cast<std::uint16_t>(feedbackPort);
+        m.feedbackEnabled = o.value("feedback", false);
         if (o.contains("bindings")) {
             if (!o["bindings"].is_array()) {
                 return fail("control.osc.bindings must be an array");
@@ -368,6 +377,26 @@ std::optional<DirectCommand> parseDirectOsc(const OscMessage& message, std::stri
         }
         return std::nullopt;
     }
+    if (verb == "query") {
+        if (rest == "all") {
+            cmd.kind = K::QueryAll;
+            return cmd;
+        }
+        if (rest == "presets") {
+            cmd.kind = K::QueryPresets;
+            return cmd;
+        }
+        const auto path = message.text(0);
+        if (!path.empty()) {
+            cmd.path = std::string(path);
+        } else if (!rest.empty()) {
+            cmd.path = std::string(rest);
+        } else {
+            return std::nullopt;
+        }
+        cmd.kind = K::Query;
+        return cmd;
+    }
     if (verb == "transport") {
         if (rest == "play") cmd.kind = K::Play;
         else if (rest == "pause") cmd.kind = K::Pause;
@@ -391,6 +420,26 @@ std::string parameterAddress(std::string_view prefix, std::string_view path) {
     out += "/param/";
     out += path;
     return out;
+}
+
+bool splitHostPort(std::string_view text, std::string& host, std::uint16_t& port) {
+    const auto colon = text.rfind(':');
+    if (colon == std::string_view::npos || colon == 0 || colon + 1 >= text.size()) {
+        return false;
+    }
+    int value = 0;
+    for (const char c : text.substr(colon + 1)) {
+        if (c < '0' || c > '9') {
+            return false;
+        }
+        value = value * 10 + (c - '0');
+        if (value > 65535) {
+            return false;
+        }
+    }
+    host = std::string(text.substr(0, colon));
+    port = static_cast<std::uint16_t>(value);
+    return true;
 }
 
 } // namespace avgen::control

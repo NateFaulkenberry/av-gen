@@ -54,5 +54,6 @@ stream keeps ADR-012's model: analysis is indexed by sample position, not wall t
 - Negative: IPv4 only; MIDI clock/tempo sync not yet used; no OSC feedback to controllers;
   MIDI on Linux/Windows needs a backend (ALSA/WinMM or a library); live input has no latency
   compensation beyond the analyser's hop.
-- Follow-ups: MIDI clock as a beat source, OSC feedback/query (`/avgen/param/*` replies),
-  multi-output and NDI/Syphon (1.2), display/projection workflows.
+- Follow-ups: MIDI clock as a beat source and OSC feedback/query (`/avgen/param/*` replies)
+  are done (`docs/control.md`: `control::MidiClockTracker`, `Engine::setTempoSource`, feedback
+  host in the control map); multi-output and NDI/Syphon (1.2), display/projection workflows.

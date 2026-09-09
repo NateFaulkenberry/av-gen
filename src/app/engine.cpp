@@ -5,6 +5,7 @@
 #include <set>
 
 #include "assets/image.hpp"
+#include "core/hash.hpp"
 #include "core/log.hpp"
 #include "params/serialization.hpp"
 
@@ -17,6 +18,20 @@
 #include <chrono>
 
 namespace avgen::app {
+
+const char* tempoSourceName(TempoSource source) {
+    return source == TempoSource::MidiClock ? "midi" : "analysis";
+}
+
+std::optional<TempoSource> tempoSourceFromName(std::string_view name) {
+    if (name == "analysis") {
+        return TempoSource::Analysis;
+    }
+    if (name == "midi" || name == "midiClock" || name == "midi-clock") {
+        return TempoSource::MidiClock;
+    }
+    return std::nullopt;
+}
 
 Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     ensureControlSource();
@@ -51,6 +66,17 @@ void Engine::ensureControlSource() {
 signals::ControlSource& Engine::controlSource() {
     ensureControlSource();
     return *dynamic_cast<signals::ControlSource*>(sources_.find("control", "control"));
+}
+
+void Engine::setTempoSource(TempoSource source) {
+    if (source == tempoSource_) {
+        return;
+    }
+    tempoSource_ = source;
+    // Re-sync the extrapolated beat clock from whichever source is now in charge.
+    beatClockPhase_ = 0.0;
+    lastAnalysisBeatCount_ = 0;
+    log::info("tempo source: {}", tempoSourceName(source));
 }
 
 void Engine::installController(std::unique_ptr<scene::SceneController> controller) {
@@ -216,6 +242,111 @@ std::filesystem::path resolveFrom(const std::string& stored, const std::filesyst
     return (baseDir / p).lexically_normal();
 }
 
+// Asset references in the project's "assets" block and shader entries: an object
+// { "path", "size", "sha256" } (the old bare string form is still read). Size and hash identify
+// the file by content so a moved asset can be relinked.
+struct AssetRef {
+    std::string path;
+    std::uintmax_t size = 0;
+    bool hasSize = false;
+    std::string sha256;
+};
+
+std::optional<AssetRef> readAssetRef(const nlohmann::json& j) {
+    AssetRef ref;
+    if (j.is_string()) {
+        ref.path = j.get<std::string>();
+        return ref;
+    }
+    if (!j.is_object() || !j.contains("path") || !j["path"].is_string()) {
+        return std::nullopt;
+    }
+    ref.path = j["path"].get<std::string>();
+    if (j.contains("size") && j["size"].is_number_unsigned()) {
+        ref.size = j["size"].get<std::uintmax_t>();
+        ref.hasSize = true;
+    }
+    if (j.contains("sha256") && j["sha256"].is_string()) {
+        ref.sha256 = j["sha256"].get<std::string>();
+    }
+    return ref;
+}
+
+// Writes { "path": relative, "size", "sha256" } for a file (size/hash omitted when unreadable).
+nlohmann::json assetRefJson(const std::filesystem::path& file, const std::filesystem::path& baseDir) {
+    nlohmann::json j = nlohmann::json::object();
+    j["path"] = relativeTo(file, baseDir);
+    std::error_code ec;
+    const auto size = std::filesystem::file_size(file, ec);
+    if (!ec) {
+        j["size"] = size;
+        if (auto hash = sha256File(file)) {
+            j["sha256"] = *hash;
+        }
+    }
+    return j;
+}
+
+std::string assetRefPath(const nlohmann::json& j) {
+    const auto ref = readAssetRef(j);
+    return ref ? ref->path : std::string();
+}
+
+void setAssetRefPath(nlohmann::json& j, const std::string& path) {
+    if (j.is_object()) {
+        j["path"] = path;
+    } else {
+        j = path;
+    }
+}
+
+// Looks for a moved asset under `root` (depth <= 6): the same file name, preferring the same
+// size; with a stored hash the content must match. Returns the first acceptable candidate.
+constexpr int kRelinkMaxDepth = 6;
+
+std::optional<std::filesystem::path> findRelinkCandidate(const AssetRef& ref, const std::filesystem::path& missing,
+                                                         const std::filesystem::path& root) {
+    std::error_code ec;
+    const auto wanted = missing.filename();
+    if (wanted.empty() || !std::filesystem::is_directory(root, ec)) {
+        return std::nullopt;
+    }
+    std::vector<std::pair<bool, std::filesystem::path>> candidates; // (size matches, path)
+    auto it = std::filesystem::recursive_directory_iterator(
+        root, std::filesystem::directory_options::skip_permission_denied, ec);
+    for (; !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
+        if (it.depth() >= kRelinkMaxDepth) {
+            it.disable_recursion_pending();
+        }
+        if (!it->is_regular_file(ec) || it->path().filename() != wanted) {
+            continue;
+        }
+        const auto candidate = it->path().lexically_normal();
+        if (candidate == missing) {
+            continue;
+        }
+        const auto size = it->file_size(ec);
+        const bool sizeMatches = !ec && (!ref.hasSize || size == ref.size);
+        candidates.emplace_back(sizeMatches, candidate);
+    }
+    std::stable_sort(candidates.begin(), candidates.end(),
+                     [](const auto& a, const auto& b) { return a.first && !b.first; });
+    for (const auto& [sizeMatches, candidate] : candidates) {
+        if (!ref.sha256.empty()) {
+            auto hash = sha256File(candidate);
+            if (!hash || *hash != ref.sha256) {
+                continue; // same name, different content
+            }
+            return candidate;
+        }
+        if (ref.hasSize && !sizeMatches) {
+            continue;
+        }
+        return candidate;
+    }
+    return std::nullopt;
+}
+
 // Files a glTF may reference next to itself (external buffers and images); copied with bundles.
 bool isGltfSidecar(const std::filesystem::path& p) {
     std::string ext = p.extension().string();
@@ -261,11 +392,14 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
     nlohmann::json doc = params::saveProject(params_, modulator_, &sources_, &presets_);
     const auto dir = std::filesystem::absolute(path).parent_path();
     doc["app"] = {{"name", "avgen"}, {"version", kAppVersion}};
-    // Shader layer paths relative to the project.
+    // Shader layer paths relative to the project, with size and content hash for relinking.
     nlohmann::json shaders = shaderLayers_.toJson();
     for (auto& entry : shaders) {
         if (entry.is_object() && entry.contains("path") && entry["path"].is_string()) {
-            entry["path"] = relativeTo(entry["path"].get<std::string>(), dir);
+            const nlohmann::json ref = assetRefJson(entry["path"].get<std::string>(), dir);
+            for (const auto& [key, value] : ref.items()) {
+                entry[key] = value;
+            }
         }
     }
     doc["shaders"] = std::move(shaders);
@@ -277,12 +411,13 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
     if (outputs_.is_array() && !outputs_.empty()) {
         doc["outputs"] = outputs_;
     }
+    doc["control"]["tempoSource"] = tempoSourceName(tempoSource_);
     nlohmann::json assets = nlohmann::json::object();
     if (!audioPath_.empty()) {
-        assets["audio"] = relativeTo(audioPath_, dir);
+        assets["audio"] = assetRefJson(audioPath_, dir);
     }
     if (!environmentPath_.empty()) {
-        assets["environment"] = relativeTo(environmentPath_, dir);
+        assets["environment"] = assetRefJson(environmentPath_, dir);
     }
     nlohmann::json sceneRef = nlohmann::json::object();
     if (auto* comp = composition()) {
@@ -292,11 +427,11 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
             sceneRef["inline"] = comp->toJson();
         } else {
             sceneRef["kind"] = "composition";
-            sceneRef["path"] = relativeTo(compositionPath_, dir);
+            sceneRef["path"] = assetRefJson(compositionPath_, dir);
         }
     } else if (auto* gltf = gltfScene()) {
         sceneRef["kind"] = "gltf";
-        sceneRef["path"] = relativeTo(gltf->path(), dir);
+        sceneRef["path"] = assetRefJson(gltf->path(), dir);
     } else {
         sceneRef["kind"] = "orb";
     }
@@ -338,13 +473,30 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         log::warn("project: {}", message);
         projectWarnings_.push_back(std::move(message));
     };
+    // Resolves an asset reference (string or object form); a missing file is searched for under
+    // the project folder by name, size and content hash and relinked with a warning.
+    auto resolveAsset = [&](const nlohmann::json& j, const char* label) -> std::optional<std::filesystem::path> {
+        const auto ref = readAssetRef(j);
+        if (!ref) {
+            return std::nullopt;
+        }
+        auto path = resolveFrom(ref->path, dir);
+        std::error_code ec;
+        if (std::filesystem::exists(path, ec)) {
+            return path;
+        }
+        if (auto found = findRelinkCandidate(*ref, path, dir)) {
+            warn(fmt::format("relinked {}: {} -> {}", label, ref->path, relativeTo(*found, dir)));
+            return *found;
+        }
+        return path; // still missing: the loader reports it
+    };
 
     // ---- assets first: they define the parameter surface the rest of the document targets ----
     if (const auto assets = doc.find("assets"); assets != doc.end() && assets->is_object()) {
-        if (assets->contains("audio") && (*assets)["audio"].is_string()) {
-            const auto audio = resolveFrom((*assets)["audio"].get<std::string>(), dir);
-            if (audio != audioPath_) {
-                if (auto r = loadAudio(audio); !r) {
+        if (assets->contains("audio")) {
+            if (const auto audio = resolveAsset((*assets)["audio"], "audio"); audio && *audio != audioPath_) {
+                if (auto r = loadAudio(*audio); !r) {
                     warn("audio: " + r.error().message);
                 }
             }
@@ -357,14 +509,14 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                     loadOrbScene();
                 }
             } else if (kind == "gltf" && sceneRef.contains("path")) {
-                const auto scenePath = resolveFrom(sceneRef["path"].get<std::string>(), dir);
+                const auto scenePath = resolveAsset(sceneRef["path"], "scene").value_or(std::filesystem::path());
                 if (gltfScene() == nullptr || gltfScene()->path() != scenePath) {
                     if (auto r = loadScene(scenePath); !r) {
                         warn("scene: " + r.error().message);
                     }
                 }
             } else if (kind == "composition" && sceneRef.contains("path")) {
-                const auto scenePath = resolveFrom(sceneRef["path"].get<std::string>(), dir);
+                const auto scenePath = resolveAsset(sceneRef["path"], "scene").value_or(std::filesystem::path());
                 if (composition() == nullptr || compositionPath_ != scenePath) {
                     if (auto r = loadComposition(scenePath); !r) {
                         warn("scene: " + r.error().message);
@@ -389,10 +541,13 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                 warn("scene: unknown kind '" + kind + "'");
             }
         }
-        if (assets->contains("environment") && (*assets)["environment"].is_string()) {
-            const auto env = resolveFrom((*assets)["environment"].get<std::string>(), dir);
-            if (env != environmentPath_) {
-                if (auto r = loadEnvironment(env); !r) {
+        std::optional<std::filesystem::path> env;
+        if (assets->contains("environment")) {
+            env = resolveAsset((*assets)["environment"], "environment");
+        }
+        if (env) {
+            if (*env != environmentPath_) {
+                if (auto r = loadEnvironment(*env); !r) {
                     warn("environment: " + r.error().message);
                 }
             }
@@ -404,11 +559,13 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             }
         }
     }
-    // Shader layer paths are project-relative on disk.
+    // Shader layer paths are project-relative on disk (and relinked like other assets).
     if (doc.contains("shaders") && doc["shaders"].is_array()) {
         for (auto& entry : doc["shaders"]) {
             if (entry.is_object() && entry.contains("path") && entry["path"].is_string()) {
-                entry["path"] = resolveFrom(entry["path"].get<std::string>(), dir).string();
+                if (const auto shaderPath = resolveAsset(entry, "shader")) {
+                    entry["path"] = shaderPath->string();
+                }
             }
         }
     }
@@ -422,8 +579,15 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             return std::unexpected(map.error());
         }
         controlHub_.setMap(std::move(*map));
+        const std::string tempo = doc["control"].value("tempoSource", std::string("analysis"));
+        if (const auto source = tempoSourceFromName(tempo)) {
+            setTempoSource(*source);
+        } else {
+            return fail("control.tempoSource '{}' unknown (analysis|midi)", tempo);
+        }
     } else {
         controlHub_.setMap(control::ControlMap{});
+        setTempoSource(TempoSource::Analysis);
     }
     outputs_ = doc.contains("outputs") && doc["outputs"].is_array() ? doc["outputs"] : nlohmann::json::array();
     ensureControlSource();
@@ -485,6 +649,7 @@ void Engine::newProject() {
     render_ = RenderSettings{};
     controlHub_.setMap(control::ControlMap{});
     outputs_ = nlohmann::json::array();
+    setTempoSource(TempoSource::Analysis);
     ensureControlSource();
     sources_.attach(bus_, params_);
     modulator_.masterGain = 1.0f;
@@ -631,26 +796,27 @@ Result<void> Engine::exportBundle(const std::filesystem::path& dir) {
     in.close();
     auto& assets = doc["assets"];
     if (assets.contains("audio")) {
-        auto copied = copyFile(resolveFrom(assets["audio"].get<std::string>(), dir));
+        auto copied = copyFile(resolveFrom(assetRefPath(assets["audio"]), dir));
         if (!copied) {
             return std::unexpected(copied.error());
         }
-        assets["audio"] = relativeTo(*copied, dir);
+        setAssetRefPath(assets["audio"], relativeTo(*copied, dir));
     }
     if (assets.contains("environment")) {
-        auto copied = copyFile(resolveFrom(assets["environment"].get<std::string>(), dir));
+        auto copied = copyFile(resolveFrom(assetRefPath(assets["environment"]), dir));
         if (!copied) {
             return std::unexpected(copied.error());
         }
-        assets["environment"] = relativeTo(*copied, dir);
+        setAssetRefPath(assets["environment"], relativeTo(*copied, dir));
     }
     if (assets.contains("scene") && assets["scene"].contains("path")) {
-        const auto scenePath = resolveFrom(assets["scene"]["path"].get<std::string>(), dir);
+        const auto scenePath = resolveFrom(assetRefPath(assets["scene"]["path"]), dir);
         auto copied = assets["scene"]["kind"] == "composition" ? bundleScene(scenePath, 0) : copyFile(scenePath);
         if (!copied) {
             return std::unexpected(copied.error());
         }
-        assets["scene"]["path"] = relativeTo(*copied, dir);
+        // A rewritten scene file has new content: refresh its identity.
+        assets["scene"]["path"] = assetRefJson(*copied, dir);
     } else if (assets.contains("scene") && assets["scene"].contains("inline")) {
         // Inline compositions: write them out as a scene file in the bundle so nodes' assets can
         // be rewritten like any other scene file.
@@ -1034,9 +1200,18 @@ void Engine::publishFrame(const analysis::AnalysisFrame& frame) {
 }
 
 void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
-    const double bpm = hasFrame_ ? static_cast<double>(latest_.tempoBpm) : 0.0;
+    const auto& midiClock = controlHub_.midiClock();
+    midiClockActive_ = tempoSource_ == TempoSource::MidiClock && midiClock.running() && midiClock.hasTempo();
+    double bpm = hasFrame_ ? static_cast<double>(latest_.tempoBpm) : 0.0;
     bool pulse = false;
-    if (bpm > 0.0) {
+    if (midiClockActive_) {
+        // The MIDI clock owns the beat clock: phase and count come straight from the tracker
+        // (already extrapolated to this frame by the hub).
+        bpm = midiClock.bpm();
+        beatClockPhase_ = midiClock.beatPhase();
+        beatClockCount_ = midiClock.beatCount();
+        pulse = midiClock.beatEvent();
+    } else if (bpm > 0.0) {
         // Advance the per-frame beat clock; re-sync to the analyser whenever it reports a beat.
         beatClockPhase_ += time.deltaTime * bpm / 60.0;
         if (newAnalysisFrame && latest_.beatCount != lastAnalysisBeatCount_) {
@@ -1164,14 +1339,16 @@ void Engine::update(const FrameTime& time) {
         audioSignals_.publishSilence(bus_);
     }
 
-    updateTimeSignals(time, newFrame);
-    updateTimelineClock(time);
-    applyCues();
-    controlHub_.update(*this);
+    // Live control first: MIDI clock messages feed this frame's beat clock, transport commands
+    // move the position the time signals read, parameter writes precede modulation.
+    controlHub_.update(*this, time);
     if (controlSource().needsAttach()) {
         sources_.attach(bus_, params_); // new control channels: declare and rebind routes
         rebind();
     }
+    updateTimeSignals(time, newFrame);
+    updateTimelineClock(time);
+    applyCues();
     if (input_ && inputGain_ != nullptr) {
         input_->setGain(inputGain_->value());
     }

@@ -717,3 +717,129 @@ TEST_CASE("nodeKindName and nodeKindFromName round trip", "[scene][composition]"
     }
     CHECK_FALSE(scene::nodeKindFromName("cube").has_value());
 }
+
+TEST_CASE("Composition node parenting: children follow the parent, cycles are refused, removal reparents",
+          "[scene][composition][parenting]") {
+    Fixture fx;
+    scene::Composition comp(fx.registry, "tree");
+    auto parent = makeNode(scene::NodeKind::Orb, "parent");
+    parent.transform.position = glm::vec3(1.0f, 0.0f, 0.0f);
+    parent.transform.rotation = glm::angleAxis(glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    parent.transform.scale = glm::vec3(2.0f);
+    REQUIRE(comp.addNode(std::move(parent)).has_value());
+    auto child = makeNode(scene::NodeKind::Orb, "child");
+    child.parent = "parent";
+    child.transform.position = glm::vec3(1.0f, 0.0f, 0.0f);
+    REQUIRE(comp.addNode(std::move(child)).has_value());
+    auto grandchild = makeNode(scene::NodeKind::Orb, "grandchild");
+    grandchild.parent = "child";
+    grandchild.transform.position = glm::vec3(0.0f, 1.0f, 0.0f);
+    REQUIRE(comp.addNode(std::move(grandchild)).has_value());
+    comp.update(FrameTime{});
+    const scene::Scene& sc = comp.scene();
+    const glm::quat ninety = glm::angleAxis(glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    // child: local (1,0,0) scaled by 2 -> (2,0,0), rotated 90 deg about +Y -> (0,0,-2), plus (1,0,0).
+    REQUIRE(findEntity(sc, "child") != nullptr);
+    checkVec(findEntity(sc, "child")->transform.position, glm::vec3(1.0f, 0.0f, -2.0f));
+    checkVec(findEntity(sc, "child")->transform.scale, glm::vec3(2.0f));
+    checkQuat(findEntity(sc, "child")->transform.rotation, ninety);
+    // grandchild: local (0,1,0) under the child's world (scale 2, rotated) -> (0,2,0) + (1,0,-2).
+    REQUIRE(findEntity(sc, "grandchild") != nullptr);
+    checkVec(findEntity(sc, "grandchild")->transform.position, glm::vec3(1.0f, 2.0f, -2.0f));
+    checkVec(findEntity(sc, "grandchild")->transform.scale, glm::vec3(2.0f));
+    // The parent itself is unaffected; nodeWorldTransform agrees with the flattened scene.
+    checkVec(findEntity(sc, "parent")->transform.position, glm::vec3(1.0f, 0.0f, 0.0f));
+    checkVec(comp.nodeWorldTransform(*comp.findNode("grandchild")).position, glm::vec3(1.0f, 2.0f, -2.0f));
+
+    SECTION("a parameter change on the parent moves the child; parameter paths are unchanged") {
+        params::ParameterSet params;
+        params::Modulator modulator;
+        comp.attach(params, modulator);
+        CHECK(params.find("nodes/child/position") != nullptr);
+        CHECK(params.find("nodes/parent/nodes/child/position") == nullptr);
+        params.findAs<float>("root/rotationSpeed")->setBase(0.0f);
+        params.findAs<glm::vec3>("nodes/parent/position")->setBase(glm::vec3(5.0f, 0.0f, 0.0f));
+        params.resetFinals();
+        comp.update(FrameTime{});
+        checkVec(findEntity(sc, "child")->transform.position, glm::vec3(5.0f, 0.0f, -2.0f));
+        checkVec(findEntity(sc, "grandchild")->transform.position, glm::vec3(5.0f, 2.0f, -2.0f));
+        params.findAs<glm::vec3>("nodes/parent/rotation")->setBase(glm::vec3(0.0f));
+        params.findAs<glm::vec3>("nodes/parent/scale")->setBase(glm::vec3(1.0f));
+        params.resetFinals();
+        comp.update(FrameTime{});
+        checkVec(findEntity(sc, "child")->transform.position, glm::vec3(6.0f, 0.0f, 0.0f));
+        checkVec(findEntity(sc, "child")->transform.scale, glm::vec3(1.0f));
+    }
+    SECTION("cycles are rejected") {
+        CHECK_FALSE(comp.setParent("parent", "grandchild").has_value());
+        CHECK_FALSE(comp.setParent("parent", "parent").has_value());
+        CHECK(comp.findNode("parent")->parent.empty());
+        auto self = makeNode(scene::NodeKind::Orb, "loop");
+        self.parent = "loop";
+        CHECK_FALSE(comp.addNode(std::move(self)).has_value());
+        CHECK(comp.findNode("loop") == nullptr);
+        // A dangling parent that a later node would close into a cycle.
+        auto dangling = makeNode(scene::NodeKind::Orb, "d1");
+        dangling.parent = "d2";
+        REQUIRE(comp.addNode(std::move(dangling)).has_value());
+        auto closing = makeNode(scene::NodeKind::Orb, "d2");
+        closing.parent = "d1";
+        CHECK_FALSE(comp.addNode(std::move(closing)).has_value());
+        CHECK_FALSE(comp.setParent("nope", "parent").has_value());
+        CHECK(comp.setParent("grandchild", "").has_value());
+        comp.update(FrameTime{});
+        checkVec(findEntity(sc, "grandchild")->transform.position, glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+    SECTION("an unknown parent is a root") {
+        auto orphan = makeNode(scene::NodeKind::Orb, "orphan");
+        orphan.parent = "ghost";
+        orphan.transform.position = glm::vec3(0.0f, 0.0f, 3.0f);
+        REQUIRE(comp.addNode(std::move(orphan)).has_value());
+        CHECK(comp.findNode("orphan")->parent == "ghost"); // kept for the file
+        comp.update(FrameTime{});
+        checkVec(findEntity(sc, "orphan")->transform.position, glm::vec3(0.0f, 0.0f, 3.0f));
+    }
+    SECTION("removing a node hands its children to the grandparent") {
+        REQUIRE(comp.removeNode("child"));
+        CHECK(comp.findNode("grandchild")->parent == "parent");
+        comp.update(FrameTime{});
+        // local (0,1,0) under the parent: scaled (0,2,0), rotation about Y leaves it, plus (1,0,0).
+        checkVec(findEntity(sc, "grandchild")->transform.position, glm::vec3(1.0f, 2.0f, 0.0f));
+        REQUIRE(comp.removeNode("parent"));
+        CHECK(comp.findNode("grandchild")->parent.empty());
+    }
+}
+
+TEST_CASE("Composition parents round-trip JSON, allow forward references and refuse cycles",
+          "[scene][composition][parenting][json]") {
+    Fixture fx;
+    const std::string text = R"({
+  "format": "avgen-scene", "version": 1, "name": "parented",
+  "nodes": [
+    {"name": "leaf", "kind": "orb", "parent": "root", "position": [0, 1, 0]},
+    {"name": "root", "kind": "orb", "position": [3, 0, 0], "scale": [2, 2, 2]},
+    {"name": "lost", "kind": "grid", "parent": "missing"}
+  ]})";
+    auto loaded = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    REQUIRE(loaded.has_value());
+    scene::Composition& comp = **loaded;
+    REQUIRE(comp.nodeCount() == 3);
+    CHECK(comp.findNode("leaf")->parent == "root");
+    CHECK(comp.findNode("lost")->parent == "missing");
+    comp.update(FrameTime{});
+    checkVec(findEntity(comp.scene(), "leaf")->transform.position, glm::vec3(3.0f, 2.0f, 0.0f));
+    const nlohmann::json j = comp.toJson();
+    CHECK(j["nodes"][0]["parent"] == "root");
+    CHECK_FALSE(j["nodes"][1].contains("parent"));
+    auto again = scene::Composition::fromJson(j, fx.registry);
+    REQUIRE(again.has_value());
+    CHECK((*again)->findNode("leaf")->parent == "root");
+    (*again)->update(FrameTime{});
+    checkVec(findEntity((*again)->scene(), "leaf")->transform.position, glm::vec3(3.0f, 2.0f, 0.0f));
+
+    const std::string cycle = R"({"format": "avgen-scene", "version": 1, "nodes": [
+        {"name": "a", "kind": "orb", "parent": "b"}, {"name": "b", "kind": "orb", "parent": "a"}]})";
+    auto bad = scene::Composition::fromJson(nlohmann::json::parse(cycle), fx.registry);
+    REQUIRE_FALSE(bad.has_value());
+    CHECK(bad.error().message.find("cycle") != std::string::npos);
+}

@@ -36,11 +36,19 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace avgen::app {
 
 enum class EngineMode { Live, Offline };
+
+// Where the beat clock (beat.* signals, SourceContext tempo fields, the timeline's beat time)
+// comes from: the audio analyser, or an incoming MIDI clock (ADR-021 follow-up). With MidiClock
+// selected but no running clock the analyser is used; the analyser keeps running either way.
+enum class TempoSource { Analysis, MidiClock };
+[[nodiscard]] const char* tempoSourceName(TempoSource source);          // "analysis" | "midi"
+[[nodiscard]] std::optional<TempoSource> tempoSourceFromName(std::string_view name);
 
 struct EngineStats {
     double analysisHopMicros = 0.0;
@@ -139,6 +147,11 @@ public:
     void stopAudioInput();
     [[nodiscard]] bool hasLiveInput() const { return input_ != nullptr; }
     [[nodiscard]] audio::AudioInput* audioInput() { return input_.get(); }
+    // Tempo source (saved in the project's "control" block as "tempoSource").
+    void setTempoSource(TempoSource source);
+    [[nodiscard]] TempoSource tempoSource() const { return tempoSource_; }
+    // True when this frame's beat clock came from the MIDI clock (source selected and running).
+    [[nodiscard]] bool midiClockActive() const { return midiClockActive_; }
 
     // ---- outputs (milestone 1.2): the application owns the windows; the engine only carries the
     // project's "outputs" block so it saves and loads with everything else ----
@@ -241,6 +254,8 @@ private:
     RenderSettings render_;
     ControlHub controlHub_;
     nlohmann::json outputs_;
+    TempoSource tempoSource_ = TempoSource::Analysis;
+    bool midiClockActive_ = false;
     std::unique_ptr<audio::AudioInput> input_;
     params::Parameter<float>* inputGain_ = nullptr;
     params::TimelineClock timelineClock_;

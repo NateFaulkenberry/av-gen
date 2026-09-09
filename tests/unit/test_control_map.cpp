@@ -214,3 +214,55 @@ TEST_CASE("Control maps round-trip JSON and list their channels", "[control][map
     CHECK_FALSE(ControlMap::fromJson(nlohmann::json{{"midi", {{"bindings", {{{"kind", "wat"}, {"signal", "x"}}}}}}}).has_value());
     CHECK_FALSE(ControlMap::fromJson(nlohmann::json{{"osc", {{"bindings", {{{"signal", "x"}}}}}}}).has_value()); // no address
 }
+
+TEST_CASE("Direct OSC query commands parse and host:port strings split", "[control][map]") {
+    auto q = parseDirectOsc(osc("/avgen/query", {std::string("orb/scale")}), "/avgen");
+    REQUIRE(q.has_value());
+    CHECK(q->kind == DirectCommand::Kind::Query);
+    CHECK(q->path == "orb/scale");
+    q = parseDirectOsc(osc("/avgen/query/orb/baseColor"), "/avgen");
+    REQUIRE(q.has_value());
+    CHECK(q->kind == DirectCommand::Kind::Query);
+    CHECK(q->path == "orb/baseColor");
+    q = parseDirectOsc(osc("/avgen/query/all"), "/avgen");
+    REQUIRE(q.has_value());
+    CHECK(q->kind == DirectCommand::Kind::QueryAll);
+    q = parseDirectOsc(osc("/avgen/query/presets"), "/avgen");
+    REQUIRE(q.has_value());
+    CHECK(q->kind == DirectCommand::Kind::QueryPresets);
+    CHECK_FALSE(parseDirectOsc(osc("/avgen/query"), "/avgen").has_value()); // nothing to query
+
+    std::string host;
+    std::uint16_t port = 0;
+    CHECK(splitHostPort("127.0.0.1:9001", host, port));
+    CHECK(host == "127.0.0.1");
+    CHECK(port == 9001);
+    CHECK_FALSE(splitHostPort("127.0.0.1", host, port));
+    CHECK_FALSE(splitHostPort(":9001", host, port));
+    CHECK_FALSE(splitHostPort("host:", host, port));
+    CHECK_FALSE(splitHostPort("host:70000", host, port));
+    CHECK_FALSE(splitHostPort("host:12a", host, port));
+}
+
+TEST_CASE("Control maps round-trip the OSC feedback settings", "[control][map][json]") {
+    ControlMap m;
+    m.feedbackHost = "192.168.1.20";
+    m.feedbackPort = 9100;
+    m.feedbackEnabled = true;
+    const nlohmann::json j = m.toJson();
+    CHECK(j["osc"]["feedbackHost"] == "192.168.1.20");
+    CHECK(j["osc"]["feedbackPort"] == 9100);
+    CHECK(j["osc"]["feedback"] == true);
+    auto back = ControlMap::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->feedbackHost == "192.168.1.20");
+    CHECK(back->feedbackPort == 9100);
+    CHECK(back->feedbackEnabled);
+    // Defaults when absent (older documents).
+    auto old = ControlMap::fromJson(nlohmann::json{{"osc", {{"port", 9000}}}});
+    REQUIRE(old.has_value());
+    CHECK(old->feedbackHost.empty());
+    CHECK(old->feedbackPort == 9001);
+    CHECK_FALSE(old->feedbackEnabled);
+    CHECK_FALSE(ControlMap::fromJson(nlohmann::json{{"osc", {{"feedbackPort", 70000}}}}).has_value());
+}

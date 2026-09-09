@@ -9,9 +9,12 @@
 //
 // Scene file (JSON): { "format": "avgen-scene", "version": 1, "name": "...",
 //   "camera": {"distance", "height", "orbitSpeed", "fov"}, "environment": {"map": path, "intensity"},
-//   "nodes": [ {"name", "kind": "gltf|orb|grid|particles|scene", "asset": path,
+//   "nodes": [ {"name", "kind": "gltf|orb|grid|particles|scene", "asset": path, "parent": "other",
 //               "position": [x,y,z], "rotation": [degrees x,y,z], "scale": [x,y,z], "visible": true,
 //               "emissiveBoost": 1.0, "roughnessScale": 1.0, "particles": {...settings...}} ] }
+// Nodes may be parented to another node of the same composition ("parent"): the world transform
+// is parent world x local (rest + parameter offsets). Cycles are errors; an unknown parent is a
+// warning and the node behaves as a root. Parameter paths do not change with parenting.
 
 #include "assets/asset_registry.hpp"
 #include "core/error.hpp"
@@ -37,6 +40,7 @@ struct CompositionNode {
     std::string name;
     NodeKind kind = NodeKind::Gltf;
     std::filesystem::path asset;   // gltf/glb for Gltf, scene file for Scene (as written; resolved via registry)
+    std::string parent;            // name of the parent node ("" = root); world = parent world x local
     Transform transform;           // local transform of the instance
     bool visible = true;
     float emissiveBoost = 1.0f;
@@ -71,8 +75,15 @@ public:
     // Loads the node's asset (Gltf / Scene kinds) through the registry; names are made unique.
     // Registers the node's parameters immediately when the composition is attached.
     Result<CompositionNode*> addNode(CompositionNode node);
+    // Removes a node; its children are re-parented to the removed node's parent.
     bool removeNode(const std::string& name);
     [[nodiscard]] CompositionNode* findNode(const std::string& name);
+    [[nodiscard]] const CompositionNode* findNode(const std::string& name) const;
+    // Re-parents `name` under `parent` ("" = root). Errors: unknown node, a cycle.
+    Result<void> setParent(const std::string& name, const std::string& parent);
+    // World transform of a node (parent chain applied, parameters included), without the root
+    // scale/rotation. Unknown parents are treated as roots.
+    [[nodiscard]] Transform nodeWorldTransform(const CompositionNode& node) const;
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
     [[nodiscard]] std::size_t nodeCount() const { return nodes_.size(); }
 
@@ -113,7 +124,9 @@ private:
     void unregisterNodeParameters(CompositionNode& node);
     void unregisterParameters(); // removes every parameter this composition registered, then detach()
     std::string uniqueName(const std::string& base) const;
-    [[nodiscard]] Transform nodeTransform(const CompositionNode& node) const; // params or authored values
+    [[nodiscard]] Transform nodeTransform(const CompositionNode& node) const; // params or authored values (local)
+    // True when making `parent` the parent of `node` would close a cycle (node and parent by name).
+    [[nodiscard]] bool wouldCycle(const std::string& node, const std::string& parent) const;
     [[nodiscard]] static bool nodeVisible(const CompositionNode& node);
     [[nodiscard]] float fitDistance() const;
     // Loads a nested scene file for a Scene node (cycle and depth checks against this chain).
