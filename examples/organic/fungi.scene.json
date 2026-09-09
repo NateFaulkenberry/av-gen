@@ -1,0 +1,2074 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "fungi",
+ "camera": {
+  "mode": 1,
+  "position": [
+   2.9,
+   1.35,
+   3.3
+  ],
+  "target": [
+   0.0,
+   0.5,
+   0.0
+  ],
+  "fov": 30.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../lightrigs/studio-softbox.rig.json",
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   0.005,
+   0.008,
+   0.011
+  ],
+  "fogColor": [
+   0.02,
+   0.035,
+   0.045
+  ],
+  "fogDensity": 0.03,
+  "volumeDensity": 0.0,
+  "sky": {
+   "zenithColor": [
+    0.05,
+    0.1,
+    0.14
+   ],
+   "horizonColor": [
+    0.03,
+    0.06,
+    0.09
+   ],
+   "groundColor": [
+    0.006,
+    0.009,
+    0.011
+   ],
+   "haze": 0.3,
+   "sunColor": [
+    0.55,
+    0.8,
+    1.0
+   ],
+   "sunIntensity": 5.0,
+   "sunSize": 0.35,
+   "sunGlow": 0.5,
+   "intensity": 1.0,
+   "background": false,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      18.0,
+      0.3,
+      18.0
+     ],
+     "subdivisions": 2,
+     "bevel": 0.04,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      -0.15,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.026,
+      0.031,
+      0.03
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.94,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "stem0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.02976,
+     "tubeTaper": 0.72,
+     "tubeSides": 10,
+     "tubeSegments": 14,
+     "tubeTwist": 0.2,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "noise",
+      "count": 8,
+      "start": [
+       0,
+       0,
+       0
+      ],
+      "end": [
+       0.031,
+       0.26039999999999996,
+       0.0186
+      ],
+      "noiseAmount": 0.05,
+      "noiseScale": 1.4,
+      "seed": 5,
+      "samplesPerSegment": 8
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.42,
+      0.36,
+      0.33
+     ],
+     "emissiveColor": [
+      0.2,
+      0.5,
+      0.45
+     ],
+     "emissiveIntensity": 0.02,
+     "roughness": 0.72,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.2,
+     "roughnessRandom": 0.2
+    },
+    "distributionTransform": {
+     "position": [
+      -0.72,
+      0,
+      0.15
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "cap0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.16,
+     "tubeTaper": 1.0,
+     "tubeSides": 30,
+     "tubeSegments": 16,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.015,
+         0.0
+        ],
+        "scale": 0.9932,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.03,
+         0.0
+        ],
+        "scale": 0.9728,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.045,
+         0.0
+        ],
+        "scale": 0.9385,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.06,
+         0.0
+        ],
+        "scale": 0.89,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.075,
+         0.0
+        ],
+        "scale": 0.8265,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.09,
+         0.0
+        ],
+        "scale": 0.7466,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.105,
+         0.0
+        ],
+        "scale": 0.6477,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.12,
+         0.0
+        ],
+        "scale": 0.5242,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.135,
+         0.0
+        ],
+        "scale": 0.3605,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.15,
+         0.0
+        ],
+        "scale": 0.02,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 10
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.3,
+      0.22,
+      0.24
+     ],
+     "emissiveColor": [
+      0.25,
+      0.7,
+      0.9
+     ],
+     "emissiveIntensity": 0.05,
+     "roughness": 0.55,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.25
+    },
+    "distributionTransform": {
+     "position": [
+      -0.689,
+      0.26039999999999996,
+      0.1686
+     ],
+     "rotation": [
+      0,
+      35.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "gill0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.142,
+     "tubeTaper": 1.0,
+     "tubeSides": 30,
+     "tubeSegments": 12,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0085,
+         0.0
+        ],
+        "scale": 0.9932,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.017,
+         0.0
+        ],
+        "scale": 0.9728,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0255,
+         0.0
+        ],
+        "scale": 0.9385,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.034,
+         0.0
+        ],
+        "scale": 0.89,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0425,
+         0.0
+        ],
+        "scale": 0.8265,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.051,
+         0.0
+        ],
+        "scale": 0.7466,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0595,
+         0.0
+        ],
+        "scale": 0.6477,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.068,
+         0.0
+        ],
+        "scale": 0.5242,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0765,
+         0.0
+        ],
+        "scale": 0.3605,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.085,
+         0.0
+        ],
+        "scale": 0.02,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 10
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.1,
+      0.12
+     ],
+     "emissiveColor": [
+      0.35,
+      0.95,
+      0.85
+     ],
+     "emissiveIntensity": 1.8,
+     "roughness": 0.6,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "emissiveRandom": 0.6
+    },
+    "distributionTransform": {
+     "position": [
+      -0.689,
+      0.25539999999999996,
+      0.1686
+     ],
+     "rotation": [
+      180,
+      35.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "stem1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.0432,
+     "tubeTaper": 0.72,
+     "tubeSides": 10,
+     "tubeSegments": 14,
+     "tubeTwist": 0.2,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "noise",
+      "count": 8,
+      "start": [
+       0,
+       0,
+       0
+      ],
+      "end": [
+       0.045000000000000005,
+       0.378,
+       0.027
+      ],
+      "noiseAmount": 0.05,
+      "noiseScale": 1.4,
+      "seed": 11,
+      "samplesPerSegment": 8
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.42,
+      0.36,
+      0.33
+     ],
+     "emissiveColor": [
+      0.2,
+      0.5,
+      0.45
+     ],
+     "emissiveIntensity": 0.02,
+     "roughness": 0.72,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.2,
+     "roughnessRandom": 0.2
+    },
+    "distributionTransform": {
+     "position": [
+      -0.3,
+      0,
+      -0.35
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "cap1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.16,
+     "tubeTaper": 1.0,
+     "tubeSides": 30,
+     "tubeSegments": 16,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.015,
+         0.0
+        ],
+        "scale": 0.9932,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.03,
+         0.0
+        ],
+        "scale": 0.9728,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.045,
+         0.0
+        ],
+        "scale": 0.9385,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.06,
+         0.0
+        ],
+        "scale": 0.89,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.075,
+         0.0
+        ],
+        "scale": 0.8265,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.09,
+         0.0
+        ],
+        "scale": 0.7466,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.105,
+         0.0
+        ],
+        "scale": 0.6477,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.12,
+         0.0
+        ],
+        "scale": 0.5242,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.135,
+         0.0
+        ],
+        "scale": 0.3605,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.15,
+         0.0
+        ],
+        "scale": 0.02,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 10
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.3,
+      0.22,
+      0.24
+     ],
+     "emissiveColor": [
+      0.25,
+      0.7,
+      0.9
+     ],
+     "emissiveIntensity": 0.05,
+     "roughness": 0.55,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.25
+    },
+    "distributionTransform": {
+     "position": [
+      -0.255,
+      0.378,
+      -0.32299999999999995
+     ],
+     "rotation": [
+      0,
+      77.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "gill1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.142,
+     "tubeTaper": 1.0,
+     "tubeSides": 30,
+     "tubeSegments": 12,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0085,
+         0.0
+        ],
+        "scale": 0.9932,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.017,
+         0.0
+        ],
+        "scale": 0.9728,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0255,
+         0.0
+        ],
+        "scale": 0.9385,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.034,
+         0.0
+        ],
+        "scale": 0.89,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0425,
+         0.0
+        ],
+        "scale": 0.8265,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.051,
+         0.0
+        ],
+        "scale": 0.7466,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0595,
+         0.0
+        ],
+        "scale": 0.6477,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.068,
+         0.0
+        ],
+        "scale": 0.5242,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0765,
+         0.0
+        ],
+        "scale": 0.3605,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.085,
+         0.0
+        ],
+        "scale": 0.02,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 10
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.1,
+      0.12
+     ],
+     "emissiveColor": [
+      0.35,
+      0.95,
+      0.85
+     ],
+     "emissiveIntensity": 1.8,
+     "roughness": 0.6,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "emissiveRandom": 0.6
+    },
+    "distributionTransform": {
+     "position": [
+      -0.255,
+      0.373,
+      -0.32299999999999995
+     ],
+     "rotation": [
+      180,
+      77.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "stem2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.048,
+     "tubeTaper": 0.72,
+     "tubeSides": 10,
+     "tubeSegments": 14,
+     "tubeTwist": 0.2,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "noise",
+      "count": 8,
+      "start": [
+       0,
+       0,
+       0
+      ],
+      "end": [
+       0.05,
+       0.42,
+       0.03
+      ],
+      "noiseAmount": 0.05,
+      "noiseScale": 1.4,
+      "seed": 17,
+      "samplesPerSegment": 8
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.42,
+      0.36,
+      0.33
+     ],
+     "emissiveColor": [
+      0.2,
+      0.5,
+      0.45
+     ],
+     "emissiveIntensity": 0.02,
+     "roughness": 0.72,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.2,
+     "roughnessRandom": 0.2
+    },
+    "distributionTransform": {
+     "position": [
+      0.18,
+      0,
+      0.28
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "cap2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.16,
+     "tubeTaper": 1.0,
+     "tubeSides": 30,
+     "tubeSegments": 16,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.015,
+         0.0
+        ],
+        "scale": 0.9932,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.03,
+         0.0
+        ],
+        "scale": 0.9728,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.045,
+         0.0
+        ],
+        "scale": 0.9385,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.06,
+         0.0
+        ],
+        "scale": 0.89,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.075,
+         0.0
+        ],
+        "scale": 0.8265,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.09,
+         0.0
+        ],
+        "scale": 0.7466,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.105,
+         0.0
+        ],
+        "scale": 0.6477,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.12,
+         0.0
+        ],
+        "scale": 0.5242,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.135,
+         0.0
+        ],
+        "scale": 0.3605,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.15,
+         0.0
+        ],
+        "scale": 0.02,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 10
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.3,
+      0.22,
+      0.24
+     ],
+     "emissiveColor": [
+      0.25,
+      0.7,
+      0.9
+     ],
+     "emissiveIntensity": 0.05,
+     "roughness": 0.55,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.25
+    },
+    "distributionTransform": {
+     "position": [
+      0.22999999999999998,
+      0.42,
+      0.31000000000000005
+     ],
+     "rotation": [
+      0,
+      119.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "gill2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.142,
+     "tubeTaper": 1.0,
+     "tubeSides": 30,
+     "tubeSegments": 12,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0085,
+         0.0
+        ],
+        "scale": 0.9932,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.017,
+         0.0
+        ],
+        "scale": 0.9728,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0255,
+         0.0
+        ],
+        "scale": 0.9385,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.034,
+         0.0
+        ],
+        "scale": 0.89,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0425,
+         0.0
+        ],
+        "scale": 0.8265,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.051,
+         0.0
+        ],
+        "scale": 0.7466,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0595,
+         0.0
+        ],
+        "scale": 0.6477,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.068,
+         0.0
+        ],
+        "scale": 0.5242,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0765,
+         0.0
+        ],
+        "scale": 0.3605,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.085,
+         0.0
+        ],
+        "scale": 0.02,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 10
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.1,
+      0.12
+     ],
+     "emissiveColor": [
+      0.35,
+      0.95,
+      0.85
+     ],
+     "emissiveIntensity": 1.8,
+     "roughness": 0.6,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "emissiveRandom": 0.6
+    },
+    "distributionTransform": {
+     "position": [
+      0.22999999999999998,
+      0.415,
+      0.31000000000000005
+     ],
+     "rotation": [
+      180,
+      119.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "stem3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.03552,
+     "tubeTaper": 0.72,
+     "tubeSides": 10,
+     "tubeSegments": 14,
+     "tubeTwist": 0.2,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "noise",
+      "count": 8,
+      "start": [
+       0,
+       0,
+       0
+      ],
+      "end": [
+       0.037,
+       0.31079999999999997,
+       0.022199999999999998
+      ],
+      "noiseAmount": 0.05,
+      "noiseScale": 1.4,
+      "seed": 23,
+      "samplesPerSegment": 8
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.42,
+      0.36,
+      0.33
+     ],
+     "emissiveColor": [
+      0.2,
+      0.5,
+      0.45
+     ],
+     "emissiveIntensity": 0.02,
+     "roughness": 0.72,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.2,
+     "roughnessRandom": 0.2
+    },
+    "distributionTransform": {
+     "position": [
+      0.66,
+      0,
+      -0.18
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "cap3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.16,
+     "tubeTaper": 1.0,
+     "tubeSides": 30,
+     "tubeSegments": 16,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.015,
+         0.0
+        ],
+        "scale": 0.9932,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.03,
+         0.0
+        ],
+        "scale": 0.9728,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.045,
+         0.0
+        ],
+        "scale": 0.9385,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.06,
+         0.0
+        ],
+        "scale": 0.89,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.075,
+         0.0
+        ],
+        "scale": 0.8265,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.09,
+         0.0
+        ],
+        "scale": 0.7466,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.105,
+         0.0
+        ],
+        "scale": 0.6477,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.12,
+         0.0
+        ],
+        "scale": 0.5242,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.135,
+         0.0
+        ],
+        "scale": 0.3605,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.15,
+         0.0
+        ],
+        "scale": 0.02,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 10
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.3,
+      0.22,
+      0.24
+     ],
+     "emissiveColor": [
+      0.25,
+      0.7,
+      0.9
+     ],
+     "emissiveIntensity": 0.05,
+     "roughness": 0.55,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.25
+    },
+    "distributionTransform": {
+     "position": [
+      0.6970000000000001,
+      0.31079999999999997,
+      -0.1578
+     ],
+     "rotation": [
+      0,
+      161.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "gill3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.142,
+     "tubeTaper": 1.0,
+     "tubeSides": 30,
+     "tubeSegments": 12,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0085,
+         0.0
+        ],
+        "scale": 0.9932,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.017,
+         0.0
+        ],
+        "scale": 0.9728,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0255,
+         0.0
+        ],
+        "scale": 0.9385,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.034,
+         0.0
+        ],
+        "scale": 0.89,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0425,
+         0.0
+        ],
+        "scale": 0.8265,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.051,
+         0.0
+        ],
+        "scale": 0.7466,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0595,
+         0.0
+        ],
+        "scale": 0.6477,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.068,
+         0.0
+        ],
+        "scale": 0.5242,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0765,
+         0.0
+        ],
+        "scale": 0.3605,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.085,
+         0.0
+        ],
+        "scale": 0.02,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 10
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.1,
+      0.12
+     ],
+     "emissiveColor": [
+      0.35,
+      0.95,
+      0.85
+     ],
+     "emissiveIntensity": 1.8,
+     "roughness": 0.6,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "emissiveRandom": 0.6
+    },
+    "distributionTransform": {
+     "position": [
+      0.6970000000000001,
+      0.30579999999999996,
+      -0.1578
+     ],
+     "rotation": [
+      180,
+      161.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "stem4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.024960000000000003,
+     "tubeTaper": 0.72,
+     "tubeSides": 10,
+     "tubeSegments": 14,
+     "tubeTwist": 0.2,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "noise",
+      "count": 8,
+      "start": [
+       0,
+       0,
+       0
+      ],
+      "end": [
+       0.026000000000000002,
+       0.2184,
+       0.0156
+      ],
+      "noiseAmount": 0.05,
+      "noiseScale": 1.4,
+      "seed": 29,
+      "samplesPerSegment": 8
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.42,
+      0.36,
+      0.33
+     ],
+     "emissiveColor": [
+      0.2,
+      0.5,
+      0.45
+     ],
+     "emissiveIntensity": 0.02,
+     "roughness": 0.72,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.2,
+     "roughnessRandom": 0.2
+    },
+    "distributionTransform": {
+     "position": [
+      1.02,
+      0,
+      0.42
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "cap4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.16,
+     "tubeTaper": 1.0,
+     "tubeSides": 30,
+     "tubeSegments": 16,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.015,
+         0.0
+        ],
+        "scale": 0.9932,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.03,
+         0.0
+        ],
+        "scale": 0.9728,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.045,
+         0.0
+        ],
+        "scale": 0.9385,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.06,
+         0.0
+        ],
+        "scale": 0.89,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.075,
+         0.0
+        ],
+        "scale": 0.8265,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.09,
+         0.0
+        ],
+        "scale": 0.7466,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.105,
+         0.0
+        ],
+        "scale": 0.6477,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.12,
+         0.0
+        ],
+        "scale": 0.5242,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.135,
+         0.0
+        ],
+        "scale": 0.3605,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.15,
+         0.0
+        ],
+        "scale": 0.02,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 10
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.3,
+      0.22,
+      0.24
+     ],
+     "emissiveColor": [
+      0.25,
+      0.7,
+      0.9
+     ],
+     "emissiveIntensity": 0.05,
+     "roughness": 0.55,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "valueRandom": 0.25
+    },
+    "distributionTransform": {
+     "position": [
+      1.046,
+      0.2184,
+      0.4356
+     ],
+     "rotation": [
+      0,
+      203.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "gill4",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.142,
+     "tubeTaper": 1.0,
+     "tubeSides": 30,
+     "tubeSegments": 12,
+     "tubeTwist": 0.0,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.0,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0085,
+         0.0
+        ],
+        "scale": 0.9932,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.017,
+         0.0
+        ],
+        "scale": 0.9728,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0255,
+         0.0
+        ],
+        "scale": 0.9385,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.034,
+         0.0
+        ],
+        "scale": 0.89,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0425,
+         0.0
+        ],
+        "scale": 0.8265,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.051,
+         0.0
+        ],
+        "scale": 0.7466,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0595,
+         0.0
+        ],
+        "scale": 0.6477,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.068,
+         0.0
+        ],
+        "scale": 0.5242,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.0765,
+         0.0
+        ],
+        "scale": 0.3605,
+        "roll": 0.0
+       },
+       {
+        "position": [
+         0.0,
+         0.085,
+         0.0
+        ],
+        "scale": 0.02,
+        "roll": 0.0
+       }
+      ],
+      "samplesPerSegment": 10
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.08,
+      0.1,
+      0.12
+     ],
+     "emissiveColor": [
+      0.35,
+      0.95,
+      0.85
+     ],
+     "emissiveIntensity": 1.8,
+     "roughness": 0.6,
+     "metallic": 0.0
+    },
+    "materialVariation": {
+     "emissiveRandom": 0.6
+    },
+    "distributionTransform": {
+     "position": [
+      1.046,
+      0.2134,
+      0.4356
+     ],
+     "rotation": [
+      180,
+      203.0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  }
+ ]
+}

@@ -89,6 +89,12 @@
    "category": "Look development",
    "description": "Three individuals of one species from the same grammar and different seeds -- recursive branching with no bespoke code.",
    "project": "organic/plants.json"
+  },
+  {
+   "name": "Fungi",
+   "category": "Look development",
+   "description": "Five glowing fungi: a stem and a domed cap, both the same swept-curve primitive with a radius profile.",
+   "project": "organic/fungi.json"
   }
  ]
 }

@@ -78,7 +78,10 @@ TEST_CASE("Procedural parameters register under the prefix with relative labels"
     CHECK(params.find(prefix + "source/kind")->kind() == params::ParamKind::Int);
     CHECK(params.find(prefix + "distribution/count")->hardMin(0) == 1.0f);
     CHECK(params.find(prefix + "distribution/count")->hardMax(0) == 1048576.0f);
-    CHECK(params.find(prefix + "source/kind")->hardMax(0) == 5.0f); // Box..Procedural
+    // The range has to cover the whole enum, expressed from the enum rather than as a literal:
+    // a primitive added without widening it is silently clamped to the last kind, which is how
+    // Tube first surfaced as every tube reporting an unresolvable source reference.
+    CHECK(params.find(prefix + "source/kind")->hardMax(0) == static_cast<float>(PrimitiveKind::Tube));
     CHECK(params.find(prefix + "material/emissive")->softMax(0) == 8.0f);
 
     REQUIRE(p.sourceRadius != nullptr);

@@ -1,0 +1,43 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Fungi"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "fungi.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/lens/focalLength": 70.0,
+  "camera/lens/aperture": 2.8,
+  "camera/lens/focusDistance": 4.5,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.5,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.5,
+  "post/bloom/threshold": 0.9,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.03
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": false,
+  "tracks": [],
+  "cues": []
+ },
+ "render": {
+  "width": 1280,
+  "height": 720,
+  "fps": 24,
+  "output": "sequence",
+  "path": "renders/fungi"
+ }
+}
