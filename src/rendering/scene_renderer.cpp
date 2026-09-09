@@ -41,7 +41,9 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       samplers_(std::make_unique<gpu::SamplerCache>(context)),
       environment_(std::make_unique<EnvironmentProcessor>(context, shaders)),
       shaderStack_(std::make_unique<ShaderStack>(context, shaders)),
-      fields_(std::make_unique<FieldUniforms>(context)), splines_(std::make_unique<SplineBuffers>(context)),
+      fields_(std::make_unique<FieldUniforms>(context)),
+      materialPrograms_(std::make_unique<MaterialPrograms>(context)),
+      splines_(std::make_unique<SplineBuffers>(context)),
       particles_(std::make_unique<ParticleRenderer>(context, shaders)),
       procedurals_(std::make_unique<ProceduralRenderer>(context, shaders)),
       sdfs_(std::make_unique<SdfRenderer>(context, shaders)),
@@ -71,7 +73,10 @@ Result<void> SceneRenderer::init() {
     frameLayout_ = uniformLayout("frame-layout", sizeof(FrameUniforms), false);
     objectLayout_ = uniformLayout("object-layout", sizeof(ObjectUniforms), true);
     {
-        std::array<wgpu::BindGroupLayoutEntry, 6> entries{};
+        // 0 sampler, 1..5 the glTF textures, then ADR-030: 6 the material program block, 7 the
+        // 16-byte select region naming this material's program, 8 the field block (only the entity
+        // pass reads it there; procedural.wgsl and sdf_raymarch.wgsl bind their own at group 1).
+        std::array<wgpu::BindGroupLayoutEntry, 9> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Fragment;
         entries[0].sampler.type = wgpu::SamplerBindingType::Filtering;
@@ -81,6 +86,18 @@ Result<void> SceneRenderer::init() {
             entries[i].texture.sampleType = wgpu::TextureSampleType::Float;
             entries[i].texture.viewDimension = wgpu::TextureViewDimension::e2D;
         }
+        entries[6].binding = 6;
+        entries[6].visibility = wgpu::ShaderStage::Fragment;
+        entries[6].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[6].buffer.minBindingSize = MaterialPrograms::kBufferSize;
+        entries[7].binding = 7;
+        entries[7].visibility = wgpu::ShaderStage::Fragment;
+        entries[7].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[7].buffer.minBindingSize = MaterialPrograms::kSelectSize;
+        entries[8].binding = 8;
+        entries[8].visibility = wgpu::ShaderStage::Fragment;
+        entries[8].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[8].buffer.minBindingSize = FieldUniforms::kBufferSize;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "material-layout";
         desc.entryCount = entries.size();
@@ -748,11 +765,14 @@ const gpu::GpuTexture& SceneRenderer::textureOrDefault(const scene::TextureRef& 
 }
 
 const wgpu::BindGroup& SceneRenderer::materialBindGroup(const scene::Material& material) {
-    const std::uint64_t key = materialKey(material);
+    // The program slot is part of the key: the same textures with a different program need their
+    // own group (it binds a different 16-byte region of the select buffer).
+    const int programSlot = materialPrograms_->slotOf(material.program);
+    const std::uint64_t key = materialKey(material) * 31ull + static_cast<std::uint64_t>(programSlot + 1);
     if (auto it = materialBindGroups_.find(key); it != materialBindGroups_.end()) {
         return it->second;
     }
-    std::array<wgpu::BindGroupEntry, 6> entries{};
+    std::array<wgpu::BindGroupEntry, 9> entries{};
     entries[0].binding = 0;
     entries[0].sampler = samplers_->get(material.baseColorTexture);
     entries[1].binding = 1;
@@ -765,6 +785,16 @@ const wgpu::BindGroup& SceneRenderer::materialBindGroup(const scene::Material& m
     entries[4].textureView = textureOrDefault(material.emissiveTexture, whiteSrgb_).view;
     entries[5].binding = 5;
     entries[5].textureView = textureOrDefault(material.occlusionTexture, whiteLinear_).view;
+    entries[6].binding = 6;
+    entries[6].buffer = materialPrograms_->buffer();
+    entries[6].size = MaterialPrograms::kBufferSize;
+    entries[7].binding = 7;
+    entries[7].buffer = materialPrograms_->selectBuffer();
+    entries[7].offset = MaterialPrograms::selectOffset(programSlot);
+    entries[7].size = MaterialPrograms::kSelectSize;
+    entries[8].binding = 8;
+    entries[8].buffer = fields_->buffer();
+    entries[8].size = FieldUniforms::kBufferSize;
     wgpu::BindGroupDescriptor desc{};
     desc.label = "material-bind-group";
     desc.layout = materialLayout_;
@@ -844,6 +874,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                 ibl ? 1.0f : 0.0f);
     frame.skyParams = glm::vec4(scene.environment.backgroundColor, scene.environment.skyboxBlur);
     frame.fogParams = glm::vec4(scene.environment.fogColor, std::max(scene.environment.fogDensity, 0.0f));
+    // ADR-030 audio inputs, from the analysis frame the caller passed (zero without one): the same
+    // band picks as the user-shader std uniforms (engine.cpp), plus the centroid and the flux.
+    if (shaderInputs != nullptr && shaderInputs->frame != nullptr) {
+        const analysis::AnalysisFrame& af = *shaderInputs->frame;
+        const auto band = [&af](std::size_t i) { return i < af.bandCount ? af.bands[i] : 0.0f; };
+        frame.audio = glm::vec4(af.rms, band(0), band(2), band(4));
+        frame.audioBands = glm::vec4(band(1), band(3), af.centroidNorm, af.flux);
+        frame.beat = glm::vec4(af.beatPhase, 1.0f - af.beatPhase, std::min(1.0f, af.onsetStrength / 2.0f),
+                               std::fmod((static_cast<float>(af.beatCount) + af.beatPhase) * 0.25f, 1.0f));
+    }
     queue.WriteBuffer(frameUniforms_, 0, &frame, sizeof(frame));
 
     // ---- object uniforms (one 256-byte slot per visible entity) ----
@@ -856,7 +896,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     std::vector<DrawItem> grid;
     std::vector<DrawItem> blended;
     std::uint32_t objectIndex = 0;
+    std::size_t entityIndex = 0;
     for (const auto& entity : scene.entities) {
+        const std::size_t thisEntity = entityIndex++;
         if (!entity.visible || entity.mesh >= meshes_.size() || meshes_[entity.mesh].indexCount == 0) {
             continue;
         }
@@ -882,6 +924,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         if (has(m.occlusionTexture)) mask |= 16;
         obj.flags = glm::vec4(static_cast<float>(m.alphaMode), m.alphaCutoff, m.unlit ? 1.0f : 0.0f,
                               static_cast<float>(mask));
+        obj.ids = glm::vec4(static_cast<float>(thisEntity), 0.0f, 0.0f, 0.0f);
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
         const float depth = -(view * glm::vec4(entity.transform.position, 1.0f)).z;
@@ -920,6 +963,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
 
     // ---- fields (ADR-025): the per-frame field block shared by particles and procedurals ----
     fields_->update(scene.fields, time.renderTime);
+    // ---- material programs (ADR-030): packed after the fields so Field ops resolve to slots ----
+    materialPrograms_->update(scene.materialPrograms, fields_.get());
     // ---- splines (ADR-026): the sample tables, re-uploaded only when a spline changed ----
     splines_->update(scene.splines);
 

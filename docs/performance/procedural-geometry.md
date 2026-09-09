@@ -172,3 +172,43 @@ Reading the numbers against the targets (cull pass under 0.5 ms at 100k, under 2
 CPU cost is unchanged: the cull parameters are one 256-byte uniform write per culling object per
 frame, and the stats readback is asynchronous (`ProceduralStats::visibleInstances` and friends lag
 the drawn frame by a frame or two and nothing waits on them).
+
+## Procedural materials (ADR-030)
+
+Probe: `avgen_render_tests "[.perf][material]"` (Release build;
+`tests/rendering/test_material_gpu.cpp`). Apple M2 Max, macOS 26.6.2, headless **1920x1080**,
+GPU time from the frame timer, mean of frames 20..59, two runs. Scene: 102,400 instanced boxes
+(12 triangles each, 1.2 M triangles) on a 320 x 320 grid filling the frame, one directional light,
+no IBL, no post chain. The only difference between the rows is `Material::program`: the same
+geometry, the same draw call, the same number of shaded fragments.
+
+| Material program | GPU ms/frame (run 1 / run 2) | Added |
+|---|---|---|
+| none | 3.62 / 3.69 | – |
+| 3 ops: `input worldPosition`, `gradient`, `ramp` | 4.85 / 5.18 | +1.23 / +1.48 ms |
+| 16 ops incl. `noise`, `voronoi`, `palette`, `hueShift`, `saturate` | 21.66 / 21.78 | +18.04 / +18.09 ms |
+
+Reading the numbers:
+
+- **The interpreter itself is cheap.** A three-op program that loads the world position, takes an
+  axis gradient and looks it up in a three-stop ramp costs **1.2-1.5 ms** for a full 1080p frame of
+  covered pixels — under a nanosecond per shaded fragment, the loop overhead plus a dozen ALU. The
+  no-program path is byte-for-byte the pre-ADR-030 shader (the golden hashes in
+  `test_procedural_examples_gpu.cpp` still match), so a scene that names no program pays nothing.
+- **The op you pick dominates, not the op count.** Of the 18 ms the heavy program adds, the
+  `voronoi` op alone is most of it: Worley F1 evaluates 27 cells x 3 `hash01` calls = 81 `pcg3d`
+  rounds per fragment. `noise` (3-octave fBM = 24 hashes) is the next tier, then `hueShift` and
+  `saturate`, which each run a full linear-RGB -> OKLab -> RGB round trip with three cube roots and
+  three cubes. Everything else - `gradient`, `ramp`, `remap`, `mix`, `multiply`, `smoothstep`,
+  `threshold`, `power`, `fresnel`, `constant`, `input` - is a handful of ALU.
+- **This is a fragment cost, so it scales with covered pixels (and overdraw), not with instances.**
+  1280x720 is 44% of the pixels of 1080p and costs about that fraction. Budget a program against the
+  frame's shaded area, and prefer driving an expensive pattern from a vertex-stage deformer (which
+  runs per vertex) when it is low-frequency enough.
+- A `field` op costs whatever its field kind costs (see "Fields and effectors" above): the material
+  interpreter calls the same `fieldScalar` / `fieldVector` / `fieldColor` the deformers do.
+
+Practical guidance: one noise or voronoi op per material is affordable at 1080p (about 2-3 ms and
+12-15 ms respectively for a full-frame surface); two of each is not. Cache-style tricks do not apply
+- every op is recomputed per fragment - so the lever is choosing cheaper ops, shrinking the covered
+area, or moving the pattern into the geometry.

@@ -467,6 +467,9 @@ json SdfObject::toJson() const {
         m["emissiveIntensity"] = material.emissiveIntensity;
         m["roughness"] = material.roughness;
         m["metallic"] = material.metallic;
+        if (!material.program.empty()) {
+            m["program"] = material.program; // ADR-030 material program name
+        }
         j["material"] = std::move(m);
     }
     j["renderMode"] = sdfRenderModeName(renderMode);
@@ -521,6 +524,7 @@ Result<SdfObject> SdfObject::fromJson(const json& j) {
         if (auto r = read(o.material.emissiveIntensity, "emissiveIntensity", readFloat); !r) return std::unexpected(r.error());
         if (auto r = read(o.material.roughness, "roughness", readFloat); !r) return std::unexpected(r.error());
         if (auto r = read(o.material.metallic, "metallic", readFloat); !r) return std::unexpected(r.error());
+        if (auto r = read(o.material.program, "program", readString); !r) return std::unexpected(r.error());
     }
     if (j.contains("renderMode")) {
         const json& v = j.at("renderMode");

@@ -13,6 +13,7 @@
 #include "gpu/texture.hpp"
 #include "gpu/transient_pool.hpp"
 #include "rendering/field_uniforms.hpp"
+#include "rendering/material_programs.hpp"
 #include "rendering/particle_renderer.hpp"
 #include "rendering/post_processor.hpp"
 #include "rendering/procedural_renderer.hpp"
@@ -84,10 +85,13 @@ struct FrameUniforms {
     glm::vec4 params;
     glm::vec4 envParams;
     glm::vec4 skyParams;
-    glm::vec4 fogParams; // rgb = fog colour, w = density (0 = off)
+    glm::vec4 fogParams;   // rgb = fog colour, w = density (0 = off)
+    glm::vec4 audio;       // ADR-030 material inputs: rms, bass, mid, treble
+    glm::vec4 audioBands;  // lowMid, highMid, spectral centroid, flux
+    glm::vec4 beat;        // beat phase 0..1, pulse (1 - phase), onset strength, bar phase
     LightUniform lights[kMaxLights];
 };
-static_assert(sizeof(FrameUniforms) == 128 + 112 + 512);
+static_assert(sizeof(FrameUniforms) == 128 + 112 + 48 + 512);
 
 struct ObjectUniforms {
     glm::mat4 model;
@@ -96,8 +100,9 @@ struct ObjectUniforms {
     glm::vec4 emissive;
     glm::vec4 material;
     glm::vec4 flags;
+    glm::vec4 ids; // x = object id (its index in the scene's list; the ADR-030 `objectId` input)
 };
-static_assert(sizeof(ObjectUniforms) == 192);
+static_assert(sizeof(ObjectUniforms) == 208);
 
 struct TonemapUniforms {
     float exposure;
@@ -155,6 +160,7 @@ public:
     [[nodiscard]] ProceduralRenderer& procedurals() { return *procedurals_; }
     [[nodiscard]] SdfRenderer& sdfs() { return *sdfs_; } // ADR-027
     [[nodiscard]] FieldUniforms& fields() { return *fields_; } // the per-frame field block (ADR-025)
+    [[nodiscard]] MaterialPrograms& materialPrograms() { return *materialPrograms_; } // ADR-030
     [[nodiscard]] SplineBuffers& splines() { return *splines_; } // the spline tables (ADR-026)
     [[nodiscard]] PostProcessor& post() { return *postProcessor_; }
     [[nodiscard]] gpu::TransientPool& transientPool() { return *pool_; }
@@ -209,6 +215,7 @@ private:
     std::unique_ptr<EnvironmentProcessor> environment_;
     std::unique_ptr<ShaderStack> shaderStack_;
     std::unique_ptr<FieldUniforms> fields_;
+    std::unique_ptr<MaterialPrograms> materialPrograms_;
     std::unique_ptr<SplineBuffers> splines_;
     std::unique_ptr<ParticleRenderer> particles_;
     std::unique_ptr<ProceduralRenderer> procedurals_;

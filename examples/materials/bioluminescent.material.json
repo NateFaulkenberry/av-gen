@@ -1,0 +1,26 @@
+{
+  "name": "bioluminescent",
+  "ops": [
+    { "kind": "input",      "input": "worldPosition", "dst": 0 },
+    { "kind": "input",      "input": "time",          "dst": 1 },
+    { "kind": "input",      "input": "audio",         "dst": 2 },
+    { "kind": "constant",   "dst": 3, "constant": [0, 0, 0.15, 0] },
+    { "kind": "multiply",   "dst": 3, "srcA": 3, "srcB": 1 },
+    { "kind": "add",        "dst": 3, "srcA": 0, "srcB": 3 },
+    { "kind": "noise",      "dst": 4, "srcA": 3, "value": 2.0, "seed": 4 },
+    { "kind": "smoothstep", "dst": 5, "srcA": 4, "constant": [0.35, 0.7, 0, 0] },
+    { "kind": "palette",    "dst": 6, "srcA": 4, "value": 0.1,
+      "constant":  [0.2, 0.4, 0.5, 0], "constant2": [0.2, 0.4, 0.5, 0],
+      "constant3": [1, 1, 0.5, 0],     "constant4": [0, 0.15, 0.2, 0] },
+    { "kind": "multiply",   "dst": 6, "srcA": 6, "srcB": 5 },
+    { "kind": "gradient",   "dst": 7, "srcA": 2, "constant": [1, 0, 0, 0.2], "value": 1.6 },
+    { "kind": "multiply",   "dst": 6, "srcA": 6, "srcB": 7 },
+    { "kind": "constant",   "dst": 1, "constant": [0.02, 0.03, 0.05, 1] }
+  ],
+  "baseColor": 1,
+  "metallic": -1,
+  "roughness": -1,
+  "emission": 6,
+  "emissionIntensity": 4.0,
+  "opacity": -1
+}

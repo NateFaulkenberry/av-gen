@@ -21,6 +21,9 @@ struct FrameUniforms {
     envParams: vec4<f32>,      // x = env rotation (radians), y = prefiltered mip count - 1, z = light count, w = ibl enabled
     skyParams: vec4<f32>,      // rgb = background colour, w = skybox blur 0..1
     fogParams: vec4<f32>,      // rgb = fog colour, w = fog density (0 = off; exp2 fog by view distance)
+    audio: vec4<f32>,          // ADR-030 material inputs: rms, bass, mid, treble
+    audioBands: vec4<f32>,     // lowMid, highMid, spectral centroid, flux
+    beat: vec4<f32>,           // beat phase 0..1, pulse (1 - phase), onset strength, bar phase
     lights: array<Light, 8>,
 };
 
@@ -31,6 +34,7 @@ struct ObjectUniforms {
     emissive: vec4<f32>,       // rgb = colour, w = intensity
     material: vec4<f32>,       // x = roughness, y = metallic, z = normalScale, w = occlusionStrength
     flags: vec4<f32>,          // x = alpha mode (0 opaque, 1 mask, 2 blend), y = alpha cutoff, z = unlit, w = texture mask
+    ids: vec4<f32>,            // x = object id (its index in the scene's list; ADR-030 `objectId` input), yzw reserved
 };
 
 @group(0) @binding(0) var<uniform> frame: FrameUniforms;
@@ -47,6 +51,7 @@ struct VertexOut {
     @location(0) worldPos: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) uv: vec2<f32>,
+    @location(3) localPos: vec3<f32>, // object space, for the ADR-030 `localPosition` material input
 };
 
 @vertex
@@ -57,6 +62,7 @@ fn vs_main(in: VertexIn) -> VertexOut {
     out.worldPos = world.xyz;
     out.normal = normalize((object.normalMatrix * vec4<f32>(in.normal, 0.0)).xyz);
     out.uv = in.uv;
+    out.localPos = in.position;
     return out;
 }
 

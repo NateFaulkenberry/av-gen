@@ -1857,6 +1857,9 @@ json ProceduralGeometry::toJson() const {
         s["metallic"] = material.metallic;
         s["doubleSided"] = material.doubleSided;
         s["unlit"] = material.unlit;
+        if (!material.program.empty()) {
+            s["program"] = material.program; // ADR-030 material program name
+        }
         j["material"] = std::move(s);
     }
     {
@@ -2073,6 +2076,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(m.metallic, "metallic", readFloat);
         AVGEN_PROC_READ(m.doubleSided, "doubleSided", readBool);
         AVGEN_PROC_READ(m.unlit, "unlit", readBool);
+        AVGEN_PROC_READ(m.program, "program", readString);
     }
     if (root.contains("materialVariation")) {
         const json& j = root.at("materialVariation");

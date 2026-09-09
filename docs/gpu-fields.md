@@ -16,6 +16,7 @@ same maths in the same operation order; `tests/rendering/test_fields_gpu.cpp` an
 | `shaders/points.wgsl` | The effector compute pass (`cs_effectors`). |
 | `shaders/procedural.wgsl` | Field deformer (kind 5), emissive field, Point billboard. Includes `fields.wgsl`. |
 | `shaders/particles.wgsl` | Field forces in `cs_simulate`. Includes `fields.wgsl`. |
+| `shaders/material.wgsl` | The `field` material op (ADR-030): `materialFieldValue(slot, p)` over `fieldScalar`/`fieldVector`/`fieldColor`. Needs `fields.wgsl` in the module. |
 | `src/rendering/field_uniforms.hpp/.cpp` | `FieldUniforms`: packs `Scene::fields` into the `FieldBlock` uniform every frame; name → slot map. |
 | `src/rendering/procedural_renderer.*` | Effector pass, live record buffers, deformer/field uniforms, Point mesh, stats, `readInstanceRecords` (tests). |
 | `src/rendering/particle_renderer.*` | `ParticleUniforms::fieldForces`, field block at compute binding 8. |
@@ -61,6 +62,8 @@ Sampling with an invalid slot (`i < 0` or `i >= count`) returns 0.
 | procedural draw | group 1 binding 3 (`fieldBlock`) | vertex + fragment |
 | effector pass (`points.wgsl`) | group 0: 0 `PointsParams`, 1 base records (read), 2 live records (read_write), 3 `fieldBlock` | compute |
 | particle simulate | group 0 binding 8 (`fieldBlock`) | compute |
+| entity draw (`pbr.wgsl`) | group 2 binding 8 (`fieldBlock`) — for `field` material ops | fragment |
+| SDF raymarch (`sdf_raymarch.wgsl`) | group 1 binding 3 (`fieldBlock`) | fragment |
 | parity test harness | group 0 binding 0 | compute |
 
 `fields.wgsl` references a module-scope `fieldBlock: FieldBlock` that the including module declares

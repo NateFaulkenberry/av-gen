@@ -131,6 +131,12 @@ resolves field names to slots through a callback.
 
 ## Example programs
 
+The three below ship as a copy-and-paste library in `examples/materials/`
+(`alien-metal.material.json`, `emissive-glass.material.json`, `bioluminescent.material.json`):
+each file is one `MaterialProgram` document, ready to drop into a scene file's
+`"materialPrograms"` array and name from a material's `"program"`. `examples/machine`
+does exactly that with `alienMetal` on its ribs.
+
 ### Alien metal
 
 Dark base, Voronoi cells drive roughness, Fresnel rim glows.
@@ -198,6 +204,102 @@ broadcast to all four lanes — so the multiply scales every colour channel by t
 `remap` of the audio register would have scaled r by rms, g by bass and b by mid. Keep the
 palette's `b` term no larger than its `a` term: emission is not clamped, and the palette can
 otherwise go negative.)
+
+## On the GPU
+
+`shaders/material.wgsl` is the transliteration of `scene::evaluateMaterialProgram`, and
+`shaders/color.wgsl` of `src/core/color.cpp`. `tests/rendering/test_material_gpu.cpp` runs both
+sides over the same contexts through a compute harness and compares the five outputs within 1e-4
+(1e-3 where a `noise`, `voronoi` or noisy field op is involved).
+
+### Buffers and bindings
+
+Everything lives in the **material bind group (group 2)**, which every shading pass already binds
+per material, so the procedural and SDF renderers need no plumbing of their own:
+
+| Binding | Contents |
+|---|---|
+| 0..5 | sampler + the five glTF textures (unchanged) |
+| 6 | `MaterialProgramBlock`: `count` + `array<MaterialProgramGpu, 8>` (14,736 bytes, uniform) |
+| 7 | `MaterialSelect`: `program: i32` — a 16-byte slice naming the slot this material runs |
+| 8 | `FieldBlock` — the entity pass only; `procedural.wgsl` and `sdf_raymarch.wgsl` bind their own at group 1 binding 3 |
+
+`rendering::MaterialPrograms` (`src/rendering/material_programs.{hpp,cpp}`, the twin of
+`field_uniforms.*`) packs `Scene::materialPrograms` into binding 6 every frame — programs are
+hot-editable parameters, so the block is re-uploaded unconditionally, like the field block.
+`slotOf(name)` is the name → slot map. **Slot i is `Scene::materialPrograms[i]`**; at most
+`kMaxGpuMaterialPrograms` = **8** programs reach the GPU, and the rest warn once and resolve to -1
+(their materials shade with their own values).
+
+Binding 7 is the trick that keeps the per-object uniforms alone: the select buffer holds one
+16-byte region per possible slot value (-1, then 0..7) at 256-byte (dynamic-offset-aligned) stride,
+written once at construction. `SceneRenderer::materialBindGroup` resolves
+`Material::program → slot` and binds that region, and the program slot is part of the bind-group
+cache key. A material naming no program (or an unknown one) binds the `-1` region and the shader
+skips the interpreter entirely.
+
+Field references resolve through the *frame's* `FieldUniforms`: `MaterialPrograms::update` is
+called immediately after `FieldUniforms::update`, and `packMaterialProgram` rewrites every `field`
+op's name into that frame's slot (`fieldSlot`, -1 when the field is missing, disabled or past the
+16-field GPU limit). A -1 slot samples as zeros.
+
+### Where the program runs
+
+`shadePbrInstanced` in `shaders/pbr_shade.wgsl` runs it **first**, before any texture fetch or
+lighting, and its outputs replace `object.baseColor.rgb`, `object.baseColor.a` (opacity),
+`object.material.x/y` (roughness/metallic) and `object.emissive.rgb * object.emissive.w`
+(emission, which becomes a finished radiance with an intensity lane of 1). The per-instance
+colour/emissive multipliers and the material textures then apply to the program's result, and the
+alpha-mask test sees the program's opacity. With `materialSelect.program < 0` the whole block is
+skipped and the shader is byte-for-byte the pre-ADR-030 one — the golden example hashes in
+`tests/rendering/test_procedural_examples_gpu.cpp` are the guard.
+
+The three passes differ only in the context they hand it (`MaterialInstanceInfo`):
+
+| Pass | `localPosition` | instance lanes | `objectId` |
+|---|---|---|---|
+| `pbr.wgsl` (entities) | the vertex's object-space position (`VertexOut.localPos`) | none: index/id 0, random 0, colour/emissive 1 | `object.ids.x` = the entity's index in `Scene::entities` |
+| `procedural.wgsl` (instances) | the source position **before** the deformer stack | the `InstanceRecord`: `scale.w` (normalised index), `color.a` (id), `random`, `color`, `emissive` | the object's index in `Scene::procedurals` |
+| `sdf_raymarch.wgsl` (surfaces) | the local-space hit point | none | the object's index in `Scene::sdfs` |
+
+`shadePbr` fills the rest from what it already has: `worldPosition`, `normal` (front-facing
+corrected, **before** normal mapping), `uv`, `viewDirection` (fragment → camera), `depth`
+(distance to the camera), `time` (`frame.params.x`) and `audio` / `audioBands` / `beatPhase`, which
+are new `FrameUniforms` lanes filled from the render's `AnalysisFrame` (rms, bands 0/2/4 as
+bass/mid/treble; bands 1/3 plus the spectral centroid and flux; beat phase, `1 - phase` as the
+pulse, onset strength and a 4/4 bar phase). Without an analysis frame they are zero.
+
+### Limits
+
+- 8 programs per scene on the GPU, 16 ops each, 8 registers — the CPU limits (`kMaxMaterialOps`,
+  `kMaterialRegisters`) with the program count added.
+- 16 fields on the GPU (`spatial::kMaxGpuFields`), so a `field` op past the sixteenth reads zero.
+- No textures as material inputs and no normal-map generation yet (ADR-030 "Consequences").
+- The interpreter runs **per fragment**: see docs/performance/procedural-geometry.md
+  ("Procedural materials") for what each op costs.
+
+### Adding an op
+
+Both sides move together; the enum order *is* the wire format.
+
+1. `src/scene/material_program.hpp`: add the kind to the end of `MaterialOpKind` (appending keeps
+   every packed program valid) and document its formula in the header comment.
+2. `src/scene/material_program.cpp`: add its name to `kOpKindNames` and its case to `evaluateOp`.
+   Nothing else changes — packing, JSON, validation and hashing are generic over the members.
+3. `shaders/material.wgsl`: add the matching `MAT_OP_*` constant with the same ordinal and the
+   matching branch in `evaluateMaterialProgram`. Watch the WGSL gotchas: `saturate` and `std` are
+   taken, there is no ternary (`select(f, t, cond)`, and its arguments are both evaluated), no
+   recursion, and `pow(0, 0)` is implementation-defined (`matPow1` guards it).
+4. `docs/procedural-materials.md`: a row in the op reference table above.
+5. Tests: a CPU case in `tests/unit/test_material_program.cpp` and a parity program in
+   `tests/rendering/test_material_gpu.cpp` ("material program ops match the CPU interpreter").
+   The parity probe writes r7 and points every output at it, so the op's `xyz` is compared
+   unclamped through the emission lane.
+
+A new **input** is the same shape: `MaterialInput` + `kInputNames` + `inputValue` on the CPU,
+`MAT_IN_*` + `materialInputValue` in WGSL, and — if the value is not already in `MaterialContext` —
+a lane in `MaterialInstanceInfo` (per-object) or `FrameUniforms` (per-frame), filled by each of the
+three passes.
 
 ## Colour utilities (`core/color.hpp`, `shaders/color.wgsl`)
 

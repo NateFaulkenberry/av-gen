@@ -1220,6 +1220,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // Blend materials are drawn opaque in this phase: alpha mode 0 keeps the shader's opaque path.
         const float alphaMode = m.alphaMode == scene::AlphaMode::Mask ? 1.0f : 0.0f;
         obj.flags = glm::vec4(alphaMode, m.alphaCutoff, m.unlit ? 1.0f : 0.0f, static_cast<float>(mask));
+        obj.ids = glm::vec4(static_cast<float>(i), 0.0f, 0.0f, 0.0f); // ADR-030 `objectId` material input
         const std::uint32_t offset = slot * kObjectStride;
         std::memcpy(im.staging.data() + offset, &obj, sizeof(obj));
 

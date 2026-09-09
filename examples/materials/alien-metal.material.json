@@ -1,0 +1,19 @@
+{
+  "name": "alienMetal",
+  "ops": [
+    { "kind": "input",    "input": "worldPosition", "dst": 0 },
+    { "kind": "constant", "dst": 1, "constant": [0.04, 0.05, 0.07, 1] },
+    { "kind": "voronoi",  "dst": 2, "srcA": 0, "value": 3.0, "seed": 9 },
+    { "kind": "remap",    "dst": 3, "srcA": 2, "constant": [0, 0.8, 0.15, 0.7] },
+    { "kind": "constant", "dst": 4, "constant": [1, 1, 1, 1] },
+    { "kind": "fresnel",  "dst": 5, "value": 4.0 },
+    { "kind": "constant", "dst": 6, "constant": [0.2, 0.9, 0.6, 1] },
+    { "kind": "multiply", "dst": 7, "srcA": 5, "srcB": 6 }
+  ],
+  "baseColor": 1,
+  "metallic": 4,
+  "roughness": 3,
+  "emission": 7,
+  "emissionIntensity": 2.5,
+  "opacity": -1
+}
