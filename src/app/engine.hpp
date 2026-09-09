@@ -8,6 +8,7 @@
 #include "analysis/analysis_runner.hpp"
 #include "app/control_hub.hpp"
 #include "app/render_settings.hpp"
+#include "app/scene_states.hpp"
 #include "audio/audio_input.hpp"
 #include "analysis/analysis_track.hpp"
 #include "analysis/analyzer.hpp"
@@ -134,6 +135,18 @@ public:
     params::Preset& storePreset(const std::string& name);
     [[nodiscard]] bool recallPreset(const std::string& name);
     void morphPresets(const std::string& a, const std::string& b, float t);
+
+    // ---- scene states and world macros (ADR-031) ----
+    [[nodiscard]] StateMachine& states() { return states_; }
+    [[nodiscard]] const StateMachine& states() const { return states_; }
+    // Starts a transition to the named state (false when unknown). Instant skips the morph.
+    bool goToState(const std::string& name, bool instant = false);
+    [[nodiscard]] std::vector<WorldMacro>& worldMacros() { return worldMacros_; }
+    [[nodiscard]] const std::vector<WorldMacro>& worldMacros() const { return worldMacros_; }
+    // Adds/replaces a world macro: ensures its knob exists on the macro source and regenerates
+    // its routes. Removal drops the routes too.
+    void setWorldMacro(WorldMacro macro);
+    bool removeWorldMacro(const std::string& name);
 
     // ---- live control (milestone 1.1, ADR-021) ----
     [[nodiscard]] ControlHub& control() { return controlHub_; }
@@ -262,6 +275,12 @@ private:
     params::Timeline::CueState cueState_;
     params::Preset cueFrom_;      // base values captured when the current cue started (morphs)
     bool cueApplied_ = false;     // the current cue's preset has been applied at full weight
+    StateMachine states_;
+    std::vector<WorldMacro> worldMacros_;
+    signals::SignalId stateProgressSignal_ = signals::kInvalidSignal; // "state.progress"
+    signals::SignalId stateIndexSignal_ = signals::kInvalidSignal;    // "state.index"
+    void applyWorldMacros();      // regenerates every world macro's routes (after load)
+    void ensureMacroKnob(const std::string& knob, float defaultValue);
     shaders::ShaderLayerSet shaderLayers_;
     scene::PostSettings post_;
     scene::PostParameters postParams_;

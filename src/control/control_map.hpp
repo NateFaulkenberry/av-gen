@@ -103,7 +103,7 @@ struct Match {
 struct DirectCommand {
     enum class Kind : std::uint8_t {
         SetParameter, SetSignal, Pulse, PresetRecall, PresetMorph, Play, Pause, Stop, Toggle, Seek,
-        Query, QueryAll, QueryPresets
+        Query, QueryAll, QueryPresets, StateGo
     } kind = Kind::SetParameter;
     std::string path;            // parameter path / channel / preset name (or preset A) / queried path
     std::string second;          // preset B for morph

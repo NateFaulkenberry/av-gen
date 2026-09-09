@@ -191,6 +191,25 @@ Result<void> parameterFromJson(IParameter& param, const json& value) {
     return {};
 }
 
+std::string_view curveTypeName(CurveType curve) {
+    return enumToString(kCurveNames, curve);
+}
+std::optional<CurveType> curveTypeFromName(std::string_view name) {
+    for (const auto& e : kCurveNames) {
+        if (e.name == name) return e.value;
+    }
+    return std::nullopt;
+}
+std::string_view modOpName(ModOp op) {
+    return enumToString(kOpNames, op);
+}
+std::optional<ModOp> modOpFromName(std::string_view name) {
+    for (const auto& e : kOpNames) {
+        if (e.name == name) return e.value;
+    }
+    return std::nullopt;
+}
+
 json chainToJson(const ProcessorChain& chain) {
     json j;
     j["gain"] = static_cast<double>(chain.gain);

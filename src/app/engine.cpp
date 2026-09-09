@@ -44,6 +44,8 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     timeSignals_.beatCount = bus_.declare("beat.count", 0.0f, 100000.0f);
     timeSignals_.bpm = bus_.declare("beat.bpm", 0.0f, 300.0f);
     timeSignals_.barPhase = bus_.declare("beat.bar");
+    stateProgressSignal_ = bus_.declare("state.progress");
+    stateIndexSignal_ = bus_.declare("state.index", 0.0f, 64.0f);
     sources_.attach(bus_, params_);
     postParams_ = scene::registerPostParameters(params_, post_);
     installController(std::make_unique<scene::OrbScene>(params_, modulator_));
@@ -197,6 +199,62 @@ void Engine::morphPresets(const std::string& a, const std::string& b, float t) {
         return;
     }
     params::applyPresetBlend(params_, *pa, *pb, t);
+}
+
+bool Engine::goToState(const std::string& name, bool instant) {
+    return states_.go(name, params_, presets_, instant);
+}
+
+void Engine::ensureMacroKnob(const std::string& knob, float defaultValue) {
+    auto* source = sources_.find("macro", "macros");
+    if (source == nullptr) {
+        source = &sources_.add(std::make_unique<signals::MacroSource>("macros"));
+    }
+    auto* macros = dynamic_cast<signals::MacroSource*>(source);
+    if (macros == nullptr) {
+        return;
+    }
+    const auto& knobs = macros->knobs();
+    if (std::find(knobs.begin(), knobs.end(), knob) == knobs.end()) {
+        macros->addKnob(knob, defaultValue);
+        sources_.attach(bus_, params_); // new knob parameter and signal
+    }
+}
+
+void Engine::applyWorldMacros() {
+    for (const WorldMacro& m : worldMacros_) {
+        ensureMacroKnob(m.name, m.defaultValue);
+        applyWorldMacro(m, modulator_);
+    }
+    rebind();
+}
+
+void Engine::setWorldMacro(WorldMacro macro) {
+    bool replaced = false;
+    for (WorldMacro& m : worldMacros_) {
+        if (m.name == macro.name) {
+            m = macro;
+            replaced = true;
+        }
+    }
+    if (!replaced) {
+        worldMacros_.push_back(macro);
+    }
+    ensureMacroKnob(macro.name, macro.defaultValue);
+    applyWorldMacro(macro, modulator_);
+    rebind();
+}
+
+bool Engine::removeWorldMacro(const std::string& name) {
+    const auto it = std::remove_if(worldMacros_.begin(), worldMacros_.end(),
+                                   [&](const WorldMacro& m) { return m.name == name; });
+    if (it == worldMacros_.end()) {
+        return false;
+    }
+    worldMacros_.erase(it, worldMacros_.end());
+    removeWorldMacroRoutes(name, modulator_);
+    rebind();
+    return true;
 }
 
 Result<std::uint32_t> Engine::addShaderLayer(const std::filesystem::path& path, shaders::LayerStage stage) {
@@ -406,6 +464,16 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
     if (!timeline_.empty()) {
         doc["timeline"] = timeline_.toJson();
     }
+    if (!states_.empty()) {
+        doc["states"] = states_.toJson();
+    }
+    if (!worldMacros_.empty()) {
+        nlohmann::json macros = nlohmann::json::array();
+        for (const WorldMacro& m : worldMacros_) {
+            macros.push_back(m.toJson());
+        }
+        doc["worldMacros"] = std::move(macros);
+    }
     doc["render"] = render_.toJson();
     doc["control"] = controlHub_.map().toJson();
     if (outputs_.is_array() && !outputs_.empty()) {
@@ -608,6 +676,30 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     }
     cueState_ = {};
     cueApplied_ = false;
+    states_ = StateMachine{};
+    if (doc.contains("states")) {
+        if (auto r = states_.fromJson(doc["states"]); !r) {
+            return r;
+        }
+        if (auto r = states_.validate(presets_); !r) {
+            log::warn("project states: {}", r.error().message);
+        }
+    }
+    worldMacros_.clear();
+    if (doc.contains("worldMacros")) {
+        if (!doc["worldMacros"].is_array()) {
+            return fail("'worldMacros' must be an array");
+        }
+        for (const auto& mj : doc["worldMacros"]) {
+            auto m = WorldMacro::fromJson(mj);
+            if (!m) {
+                return std::unexpected(m.error());
+            }
+            worldMacros_.push_back(std::move(*m));
+        }
+    }
+    applyWorldMacros();
+    states_.reset(params_, presets_);
     if (doc.contains("render")) {
         auto r = RenderSettings::fromJson(doc["render"]);
         if (!r) {
@@ -1350,6 +1442,19 @@ void Engine::update(const FrameTime& time) {
     updateTimeSignals(time, newFrame);
     updateTimelineClock(time);
     applyCues();
+    {
+        BeatInfo beat;
+        beat.beatPulse = bus_.event(timeSignals_.beatPulse);
+        beat.barPhase = bus_.value(timeSignals_.barPhase);
+        beat.onset = bus_.event(audioSignals_.onset);
+        beat.onsetStrength = bus_.value(audioSignals_.onsetStrength);
+        const double bpm = sourceContext_.tempoBpm > 1.0f ? static_cast<double>(sourceContext_.tempoBpm) : 120.0;
+        beat.beatSeconds = 60.0 / bpm;
+        beat.barSeconds = beat.beatSeconds * 4.0;
+        states_.update(time.renderTime, time.deltaTime, bus_, beat, params_, presets_);
+        bus_.set(stateProgressSignal_, states_.progress());
+        bus_.set(stateIndexSignal_, static_cast<float>(std::max(0, states_.currentIndex())));
+    }
     if (input_ && inputGain_ != nullptr) {
         input_->setGain(inputGain_->value());
     }

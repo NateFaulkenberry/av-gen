@@ -18,7 +18,9 @@
 
 #include <filesystem>
 #include <nlohmann/json_fwd.hpp>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace avgen::params {
@@ -28,6 +30,13 @@ constexpr const char* kProjectFormatName = "avgen-project";
 
 nlohmann::json parameterToJson(const IParameter& param); // base value only
 Result<void> parameterFromJson(IParameter& param, const nlohmann::json& value);
+
+// Enum names shared with other serialisers (lower-case: "linear", "power", "log", "exp", "scurve";
+// "add", "multiply", "replace", "min", "max").
+[[nodiscard]] std::string_view curveTypeName(CurveType curve);
+[[nodiscard]] std::optional<CurveType> curveTypeFromName(std::string_view name);
+[[nodiscard]] std::string_view modOpName(ModOp op);
+[[nodiscard]] std::optional<ModOp> modOpFromName(std::string_view name);
 
 nlohmann::json chainToJson(const ProcessorChain& chain);
 Result<ProcessorChain> chainFromJson(const nlohmann::json& j);

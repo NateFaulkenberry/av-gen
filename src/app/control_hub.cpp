@@ -211,6 +211,9 @@ void ControlHub::applyOsc(Engine& engine, const control::OscMessage& message) {
             case K::PresetMorph:
                 engine.morphPresets(cmd->path, cmd->second, std::clamp(cmd->values.front(), 0.0f, 1.0f));
                 break;
+            case K::StateGo:
+                matched = engine.goToState(cmd->path, !cmd->values.empty() && cmd->values.front() > 0.5f);
+                break;
             case K::Play:
                 if (auto r = engine.play(); !r) {
                     log::warn("osc transport/play: {}", r.error().message);

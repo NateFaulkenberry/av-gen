@@ -353,6 +353,19 @@ std::optional<DirectCommand> parseDirectOsc(const OscMessage& message, std::stri
         }
         return cmd;
     }
+    if (verb == "state") {
+        // "/avgen/state/go <name> [instant]" or "/avgen/state/<name>"
+        std::string_view name = rest == "go" ? message.text(0) : rest;
+        if (name.empty()) {
+            return std::nullopt;
+        }
+        cmd.kind = K::StateGo;
+        cmd.path = std::string(name);
+        if (rest == "go" && message.hasNumber(1)) {
+            cmd.values.push_back(message.number(1));
+        }
+        return cmd;
+    }
     if (verb == "preset") {
         if (rest == "recall") {
             const auto name = message.text(0);
