@@ -1,0 +1,56 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Bioluminescent World"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "world.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/lens/focalLength": 34.0,
+  "camera/lens/aperture": 2.2,
+  "camera/lens/focusDistance": 24.0,
+  "camera/lens/shutterAngle": 172.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 1.1,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.62,
+  "post/bloom/threshold": 0.85,
+  "post/bloom/radius": 1.25,
+  "post/bloom/emissionWeight": 1.4,
+  "post/halation/enabled": true,
+  "post/halation/intensity": 0.24,
+  "post/halation/threshold": 1.8,
+  "post/halation/warmth": 0.35,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "post/motionBlur/amount": 0.7,
+  "post/grade/contrast": 1.08,
+  "post/grade/saturation": 1.05,
+  "post/grade/temperature": -0.05,
+  "post/output/vignette": 0.5,
+  "post/output/grain": 0.035,
+  "post/anamorphic/enabled": false,
+  "post/lens/chromaticAberration": 0.03
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "tracks": [],
+  "cues": []
+ },
+ "render": {
+  "width": 1280,
+  "height": 720,
+  "fps": 24,
+  "output": "sequence",
+  "path": "renders/world"
+ }
+}

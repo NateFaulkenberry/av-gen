@@ -1,6 +1,12 @@
 {
  "examples": [
   {
+   "name": "Bioluminescent World",
+   "category": "Showcase",
+   "description": "One glowing organism in a dark alien ecosystem: the visual benchmark the renderer is being built towards.",
+   "project": "world/world.json"
+  },
+  {
    "name": "Procedural Geometry Lab",
    "category": "Lab",
    "description": "Every primitive, distribution, variation control, deformer and stack, with audio routes and a performance readout.",
