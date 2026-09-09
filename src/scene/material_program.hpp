@@ -70,6 +70,11 @@ enum class MaterialOpKind : std::uint8_t {
     // ADR-036. Appended: the enum order is the wire format.
     Triplanar, WorldProject, ObjectProject, HeightBlend, DetailNormal, CurvatureMask, EdgeWear,
     DecalBox, Anisotropy, RoughnessFilter, MicroDetail,
+    // Appended: reorders a register's components. Every op that takes a scalar takes it from a
+    // register's x channel, and most of the values worth masking with arrive somewhere else -- the
+    // y of a normal, the y of a world position, the second half of a uv. Without this, a program
+    // can carry exactly one maskable scalar, which is one fewer than terrain needs.
+    Swizzle,
 };
 [[nodiscard]] const char* materialOpKindName(MaterialOpKind kind);
 [[nodiscard]] std::optional<MaterialOpKind> materialOpKindFromName(std::string_view name);

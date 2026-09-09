@@ -5,6 +5,7 @@
 
 #include "world/terrain.hpp"
 #include "scene/scene.hpp"
+#include "world/biome.hpp"
 #include "world/world_map.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -14,6 +15,8 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <string>
+#include <tuple>
 
 using namespace avgen;
 using Catch::Matchers::WithinAbs;
@@ -249,18 +252,77 @@ TEST_CASE("every level of a chunk spans the same footprint", "[unit][terrain]") 
     }
 }
 
-TEST_CASE("chunk uv carries slope and altitude", "[unit][terrain]") {
-    const world::WorldMap map = world::defaultWorld();
+TEST_CASE("chunk uv carries the biome axis and the slope", "[unit][terrain]") {
+    world::WorldMap map = world::defaultWorld();
     world::TerrainSettings settings;
     settings.skirtDepth = 0.0f;
     settings.resolution = 8;
-    const scene::MeshData mesh = world::buildChunkMesh(map, settings, {8, 8}, 0);
-    for (const scene::Vertex& v : mesh.vertices) {
-        CHECK_THAT(v.uv.x, WithinAbs(std::clamp(1.0f - v.normal.y, 0.0f, 1.0f), 1e-5f));
-        CHECK_THAT(v.uv.y, WithinAbs(map.altitude01(v.position.y), 1e-5f));
-        CHECK(v.uv.y >= 0.0f);
-        CHECK(v.uv.y <= 1.0f);
+
+    SECTION("uv.y is the shading slope and uv.x is somewhere along the biome order") {
+        const scene::MeshData mesh = world::buildChunkMesh(map, settings, {8, 8}, 0);
+        bool varied = false;
+        const float first = mesh.vertices.front().uv.x;
+        for (const scene::Vertex& v : mesh.vertices) {
+            CHECK_THAT(v.uv.y, WithinAbs(std::clamp(1.0f - v.normal.y, 0.0f, 1.0f), 1e-5f));
+            CHECK(v.uv.x >= 0.0f);
+            CHECK(v.uv.x <= 1.0f);
+            varied = varied || std::fabs(v.uv.x - first) > 1e-4f;
+        }
+        // A chunk that reports one biome everywhere would satisfy the range check and mean nothing.
+        CHECK(varied);
     }
+
+    SECTION("a world with no biomes leaves the axis at the altitude") {
+        map.biomes.biomes.clear();
+        const scene::MeshData mesh = world::buildChunkMesh(map, settings, {8, 8}, 0);
+        for (const scene::Vertex& v : mesh.vertices) {
+            CHECK_THAT(v.uv.x, WithinAbs(map.altitude01(v.position.y), 1e-5f));
+        }
+    }
+}
+
+TEST_CASE("the biome axis follows the hillside, not the ripple on it", "[unit][terrain]") {
+    // Biome rules read a slope measured over about eight metres rather than over one vertex. Fed
+    // the per-vertex slope, a rule puts a boundary on every bump and a ridge comes out as a
+    // sawtooth of alternating biomes. The claim is that the axis varies more smoothly along a row
+    // than the shading slope does over the same ground.
+    const world::WorldMap map = world::defaultWorld();
+    world::TerrainSettings settings;
+    settings.skirtDepth = 0.0f;
+    settings.resolution = 32;
+    const float step = settings.chunkSize / static_cast<float>(settings.resolution);
+    const int spread = std::max(1, static_cast<int>(std::lround(8.0f / step)));
+    REQUIRE(spread > 1); // or the two measurements below are the same measurement
+
+    // Over the flanks of both massifs, because slope only decides anything where the ground is
+    // actually steep: measured on the flat valley floor the two numbers come out identical, and a
+    // test that compares a thing to itself passes without meaning anything.
+    const std::vector<glm::ivec2> steep = {{4, 2}, {5, 3}, {11, 2}, {12, 3}};
+    const auto totalVariation = [&](int useSpread) {
+        float total = 0.0f;
+        for (const glm::ivec2 coord : steep) {
+            const world::ChunkField field = world::sampleChunkField(map, settings, coord);
+            for (int j = 0; j <= settings.resolution; ++j) {
+                float previous = 0.0f;
+                for (int i = 0; i <= settings.resolution; ++i) {
+                    const glm::vec2 p = world::chunkOrigin(map, settings, coord) +
+                                        glm::vec2(static_cast<float>(i), static_cast<float>(j)) * step;
+                    const float altitude = map.altitude01(field.at(i, j));
+                    const float slope = std::clamp(1.0f - field.normalAt(i, j, useSpread).y, 0.0f, 1.0f);
+                    const float axis = map.biomes.at(altitude, slope, map.moisture(p, altitude), p).axis();
+                    if (i > 0) {
+                        total += std::fabs(axis - previous);
+                    }
+                    previous = axis;
+                }
+            }
+        }
+        return total;
+    };
+    const float fine = totalVariation(1);
+    const float coarse = totalVariation(spread);
+    INFO("axis variation from a one-vertex slope " << fine << " vs an eight-metre slope " << coarse);
+    CHECK(coarse < fine * 0.8f);
 }
 
 TEST_CASE("the skirt hangs below the chunk and only below it", "[unit][terrain]") {
@@ -358,4 +420,188 @@ TEST_CASE("mesh bounds are cached against the mesh version", "[unit][scene]") {
     ++s.meshVersion;
     CHECK(s.meshBounds(id).second == glm::vec3(40.0f, 50.0f, 60.0f));
     CHECK(s.meshBounds(scene::kInvalidMesh).first == glm::vec3(0.0f));
+}
+
+// ---- biomes ------------------------------------------------------------------------------------
+
+TEST_CASE("a biome range is a band with soft edges", "[unit][biome]") {
+    world::Range r{0.3f, 0.6f, 0.1f};
+    CHECK_THAT(r.membership(0.45f), WithinAbs(1.0f, 1e-5f));
+    CHECK_THAT(r.membership(0.3f), WithinAbs(1.0f, 1e-5f));
+    CHECK_THAT(r.membership(0.6f), WithinAbs(1.0f, 1e-5f));
+    CHECK_THAT(r.membership(0.19f), WithinAbs(0.0f, 1e-5f));   // fully outside the fade
+    CHECK_THAT(r.membership(0.71f), WithinAbs(0.0f, 1e-5f));
+    // Inside the fade it is between, and it is monotone -- a hard edge is what puts a visible line
+    // on the ground where two biomes meet.
+    CHECK(r.membership(0.25f) > 0.0f);
+    CHECK(r.membership(0.25f) < 1.0f);
+    CHECK(r.membership(0.26f) > r.membership(0.24f));
+    CHECK(r.membership(0.64f) > r.membership(0.66f));
+}
+
+TEST_CASE("a biome has to satisfy every one of its rules", "[unit][biome]") {
+    // The score is a product, not a sum. Summed, alpine scree turns up on the valley floor on the
+    // strength of its slope term alone.
+    world::BiomeSet set;
+    world::Biome low;
+    low.name = "low";
+    low.rule.altitude = {0.0f, 0.2f, 0.05f};
+    low.rule.slope = {0.0f, 1.0f, 0.05f};
+    low.rule.moisture = {0.0f, 1.0f, 0.05f};
+    world::Biome steepHigh;
+    steepHigh.name = "steepHigh";
+    steepHigh.rule.altitude = {0.8f, 1.0f, 0.05f};
+    steepHigh.rule.slope = {0.5f, 1.0f, 0.05f};
+    steepHigh.rule.moisture = {0.0f, 1.0f, 0.05f};
+    set.biomes = {low, steepHigh};
+    REQUIRE(set.validate().has_value());
+
+    // Steep but low: `steepHigh` matches the slope and fails the altitude, so it is not here.
+    const world::BiomeWeights valley = set.at(0.05f, 0.9f, 0.5f, {0.0f, 0.0f});
+    CHECK(valley.dominant() == 0);
+    CHECK_THAT(valley.weights[1], WithinAbs(0.0f, 1e-5f));
+    // High and steep: both terms hold.
+    CHECK(set.at(0.95f, 0.9f, 0.5f, {0.0f, 0.0f}).dominant() == 1);
+}
+
+TEST_CASE("weights are normalised and a point is always somewhere", "[unit][biome]") {
+    const world::BiomeSet set = world::defaultBiomes();
+    REQUIRE(set.validate().has_value());
+    for (const auto& [altitude, slope, moisture] :
+         {std::tuple{0.0f, 0.0f, 1.0f}, std::tuple{0.5f, 0.3f, 0.4f}, std::tuple{1.0f, 0.9f, 0.0f}}) {
+        const world::BiomeWeights w = set.at(altitude, slope, moisture, {900.0f, 900.0f});
+        float total = 0.0f;
+        for (int i = 0; i < w.count; ++i) {
+            CHECK(w.weights[static_cast<std::size_t>(i)] >= 0.0f);
+            total += w.weights[static_cast<std::size_t>(i)];
+        }
+        CHECK_THAT(total, WithinAbs(1.0f, 1e-4f));
+        CHECK(w.axis() >= 0.0f);
+        CHECK(w.axis() <= 1.0f);
+    }
+    // A combination no biome claims still lands somewhere, evenly, rather than leaving a hole that
+    // would snap the axis to zero and put one biome's colour in the gaps of every other.
+    world::BiomeSet narrow;
+    world::Biome only;
+    only.name = "only";
+    only.rule.altitude = {0.9f, 1.0f, 0.0f};
+    narrow.biomes = {only, only};
+    narrow.biomes[1].name = "other";
+    const world::BiomeWeights nowhere = narrow.at(0.0f, 0.0f, 0.0f, {0.0f, 0.0f});
+    CHECK_THAT(nowhere.weights[0], WithinAbs(0.5f, 1e-5f));
+    CHECK_THAT(nowhere.weights[1], WithinAbs(0.5f, 1e-5f));
+}
+
+TEST_CASE("the biome axis walks the authored order", "[unit][biome]") {
+    world::BiomeSet set;
+    for (int i = 0; i < 5; ++i) {
+        world::Biome b;
+        b.name = "b" + std::to_string(i);
+        // Five bands up the altitude axis, in order, so the axis should track altitude.
+        b.rule.altitude = {static_cast<float>(i) * 0.2f, static_cast<float>(i + 1) * 0.2f, 0.05f};
+        set.biomes.push_back(b);
+    }
+    float previous = -1.0f;
+    for (float a = 0.05f; a < 1.0f; a += 0.05f) {
+        const float axis = set.at(a, 0.0f, 0.5f, {0.0f, 0.0f}).axis();
+        CHECK(axis >= previous - 1e-4f); // monotone: the axis is an order, not a lookup
+        previous = axis;
+    }
+    CHECK_THAT(set.at(0.02f, 0.0f, 0.5f, {0.0f, 0.0f}).axis(), WithinAbs(0.0f, 0.05f));
+    CHECK_THAT(set.at(0.98f, 0.0f, 0.5f, {0.0f, 0.0f}).axis(), WithinAbs(1.0f, 0.05f));
+}
+
+TEST_CASE("a region puts a biome somewhere the rules would not", "[unit][biome]") {
+    // The point of regions: a grove goes where a shot needs it, not where the moisture landed.
+    world::BiomeSet set;
+    world::Biome ordinary;
+    ordinary.name = "ordinary";
+    world::Biome grove;
+    grove.name = "grove";
+    grove.rule.altitude = {0.9f, 1.0f, 0.01f}; // its rules exclude the whole valley
+    world::BiomeRegion here;
+    here.path = {{40.0f, -20.0f}};
+    here.width = 30.0f;
+    here.strength = 4.0f;
+    grove.regions.push_back(here);
+    set.biomes = {ordinary, grove};
+
+    CHECK(set.at(0.1f, 0.0f, 0.5f, {40.0f, -20.0f}).dominant() == 1);  // inside the region
+    CHECK(set.at(0.1f, 0.0f, 0.5f, {200.0f, -20.0f}).dominant() == 0); // well outside it
+    // And the edge is a fade, not a wall.
+    const float edge = set.at(0.1f, 0.0f, 0.5f, {62.0f, -20.0f}).weights[1];
+    CHECK(edge > 0.0f);
+    CHECK(edge < 1.0f);
+}
+
+TEST_CASE("the shipped biome set covers the world without one biome owning it", "[unit][biome]") {
+    // A biome that owns one per cent of the map is not a biome, and one that owns eighty is the
+    // only one. Both happened while these bands were being written; this is the guard rail.
+    const world::WorldMap map = world::defaultWorld();
+    REQUIRE(map.biomes.biomes.size() == 5);
+    std::vector<int> owned(map.biomes.biomes.size(), 0);
+    int total = 0;
+    constexpr int kSteps = 61;
+    for (int j = 0; j < kSteps; ++j) {
+        for (int i = 0; i < kSteps; ++i) {
+            const glm::vec2 uv((static_cast<float>(i) + 0.5f) / kSteps, (static_cast<float>(j) + 0.5f) / kSteps);
+            const glm::vec2 p = map.min() + map.size * uv;
+            const world::Sample s = map.sample(p, 0.6f);
+            ++owned[static_cast<std::size_t>(map.biomes.at(s.altitude, s.slope, s.moisture, p).dominant())];
+            ++total;
+        }
+    }
+    for (std::size_t b = 0; b < owned.size(); ++b) {
+        const double share = 100.0 * owned[b] / total;
+        INFO(map.biomes.biomes[b].name << " owns " << share << "%");
+        CHECK(share > 4.0);
+        CHECK(share < 60.0);
+    }
+}
+
+TEST_CASE("a biome set round-trips through json", "[unit][biome]") {
+    const world::BiomeSet original = world::defaultBiomes();
+    auto parsed = world::biomeSetFromJson(world::biomeSetToJson(original));
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->structuralHash() == original.structuralHash());
+    const world::BiomeWeights a = original.at(0.3f, 0.2f, 0.6f, {12.0f, -40.0f});
+    const world::BiomeWeights b = parsed->at(0.3f, 0.2f, 0.6f, {12.0f, -40.0f});
+    CHECK_THAT(a.axis(), WithinAbs(b.axis(), 1e-5f));
+}
+
+TEST_CASE("moisture falls away from water and rises toward the valley floor", "[unit][world]") {
+    const world::WorldMap map = world::defaultWorld();
+    // On the river, and a long way from it at the same height band.
+    const float onRiver = map.moisture({6.0f, -12.0f}, 0.2f);
+    const float offRiver = map.moisture({260.0f, -12.0f}, 0.2f);
+    CHECK(onRiver > offRiver);
+    CHECK(onRiver > 0.8f);
+    // Low ground is damp even with no water near it, which is what makes a basin floor read as one.
+    CHECK(map.moisture({300.0f, 300.0f}, 0.0f) > map.moisture({300.0f, 300.0f}, 1.0f));
+}
+
+TEST_CASE("the generated ground material is a valid program built from the palette", "[unit][biome]") {
+    const world::BiomeSet set = world::defaultBiomes();
+    const scene::MaterialProgram program = world::terrainMaterialProgram(set, "ground");
+    REQUIRE(program.validate().has_value());
+    CHECK(program.baseColorRegister >= 0);
+    CHECK(program.roughnessRegister >= 0);
+    CHECK(program.totalOpCount() <= scene::kMaxMaterialOps);
+    // It has to actually carry the palette: a program that compiles and paints last week's colours
+    // is exactly what generating it was meant to prevent.
+    const auto mentions = [&](const glm::vec3& colour) {
+        for (const scene::MaterialOp& op : program.ops) {
+            for (const glm::vec4& k : {op.constant, op.constant2, op.constant3, op.constant4}) {
+                if (glm::length(glm::vec3(k) - colour) < 1e-5f) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+    CHECK(mentions(set.biomes.front().groundColor));
+    CHECK(mentions(set.biomes.back().groundColor));
+    CHECK(mentions(set.biomes.front().rockColor));
+    // And an empty set produces an empty program rather than a broken one.
+    CHECK(world::terrainMaterialProgram({}, "none").ops.empty());
 }

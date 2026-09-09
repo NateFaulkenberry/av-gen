@@ -83,6 +83,7 @@ constexpr OpKindName kOpKindNames[] = {
     {MaterialOpKind::Anisotropy, "anisotropy"},
     {MaterialOpKind::RoughnessFilter, "roughnessFilter"},
     {MaterialOpKind::MicroDetail, "microDetail"},
+    {MaterialOpKind::Swizzle, "swizzle"},
 };
 
 struct InputName {
@@ -614,6 +615,15 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
         const glm::vec3 p = glm::vec3(a) * f + glm::vec3(k);
         const float fade = saturate1(1.0f - ctx.footprint * std::abs(f) * 2.0f);
         return glm::vec4(0.5f + (noise::fbm3(p, op.seed) - 0.5f) * fade);
+    }
+    case MaterialOpKind::Swizzle: {
+        // `constant` names the source component of each output channel, clamped to 0..3. The
+        // default all-zero constant broadcasts x, which is the case that matters: it takes a value
+        // that arrived in some other channel and puts it where every mask op looks for it.
+        const auto pick = [&a](float index) {
+            return a[static_cast<glm::length_t>(std::clamp(static_cast<int>(index), 0, 3))];
+        };
+        return {pick(k.x), pick(k.y), pick(k.z), pick(k.w)};
     }
     }
     return glm::vec4(0.0f);

@@ -68,134 +68,6 @@
       "sunGlow": 0.35
     }
   },
-  "materialPrograms": [
-    {
-      "name": "valleyGround",
-      "ops": [
-        {
-          "kind": "input",
-          "dst": 0,
-          "input": "uv"
-        },
-        {
-          "kind": "smoothstep",
-          "dst": 1,
-          "srcA": 0,
-          "constant": [
-            0.16,
-            0.52,
-            0,
-            0
-          ]
-        },
-        {
-          "kind": "constant",
-          "dst": 2,
-          "constant": [
-            0.0231,
-            0.1441,
-            0.0865,
-            1
-          ]
-        },
-        {
-          "kind": "constant",
-          "dst": 3,
-          "constant": [
-            0.0925,
-            0.117,
-            0.1544,
-            1
-          ]
-        },
-        {
-          "kind": "mixBy",
-          "dst": 4,
-          "srcA": 2,
-          "srcB": 3,
-          "srcC": 1
-        },
-        {
-          "kind": "input",
-          "dst": 5,
-          "input": "worldPosition"
-        },
-        {
-          "kind": "constant",
-          "dst": 6,
-          "constant": [
-            0.045,
-            0.045,
-            0.045,
-            0
-          ]
-        },
-        {
-          "kind": "multiply",
-          "dst": 5,
-          "srcA": 5,
-          "srcB": 6
-        },
-        {
-          "kind": "noise",
-          "dst": 6,
-          "srcA": 5,
-          "value": 1.0,
-          "seed": 41
-        },
-        {
-          "kind": "remap",
-          "dst": 6,
-          "srcA": 6,
-          "value": 1,
-          "constant": [
-            0.0,
-            1.0,
-            0.72,
-            1.24
-          ]
-        },
-        {
-          "kind": "multiply",
-          "dst": 4,
-          "srcA": 4,
-          "srcB": 6
-        },
-        {
-          "kind": "constant",
-          "dst": 7,
-          "constant": [
-            0.92,
-            0.92,
-            0.92,
-            1
-          ]
-        },
-        {
-          "kind": "constant",
-          "dst": 6,
-          "constant": [
-            0.62,
-            0.62,
-            0.62,
-            1
-          ]
-        },
-        {
-          "kind": "mixBy",
-          "dst": 7,
-          "srcA": 7,
-          "srcB": 6,
-          "srcC": 1
-        }
-      ],
-      "baseColor": 4,
-      "roughness": 7,
-      "metallic": -1,
-      "emission": -1,
-      "opacity": -1
-    }
-  ],
   "nodes": [
     {
       "name": "valley",
@@ -225,14 +97,13 @@
       },
       "material": {
         "baseColor": [
-          0.0231,
-          0.1441,
-          0.0865
+          0.023,
+          0.144,
+          0.087
         ],
         "roughness": 0.9,
         "metallic": 0.0,
-        "emissiveIntensity": 0.0,
-        "program": "valleyGround"
+        "emissiveIntensity": 0.0
       }
     }
   ]

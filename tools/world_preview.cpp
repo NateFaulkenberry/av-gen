@@ -31,12 +31,30 @@ glm::vec3 hypsometric(float t) {
     return glm::mix(stops[i], stops[j], u - static_cast<float>(i));
 }
 
+// Distinct, evenly spread inks so a five-biome blend is legible; they are labels, not art.
+glm::vec3 biomeInk(int index) {
+    const glm::vec3 inks[world::kMaxBiomes] = {{0.16f, 0.42f, 0.62f}, {0.42f, 0.68f, 0.28f}, {0.12f, 0.40f, 0.20f},
+                                               {0.62f, 0.56f, 0.44f}, {0.88f, 0.88f, 0.92f}, {0.72f, 0.34f, 0.62f},
+                                               {0.90f, 0.62f, 0.24f}, {0.36f, 0.30f, 0.66f}};
+    return inks[std::clamp(index, 0, world::kMaxBiomes - 1)];
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
-    const std::string worldPath = argc > 1 ? argv[1] : "";
-    const std::string outPath = argc > 2 ? argv[2] : "world_preview.png";
-    const int size = argc > 3 ? std::atoi(argv[3]) : 768;
+    // A leading --biomes swaps the hypsometric tint for the biome blend. The relief is drawn the
+    // same way in both, so the two images are the same landscape read two ways: the question a
+    // biome map has to answer is whether its regions sit where the geography put them.
+    int arg = 1;
+    bool biomeView = false;
+    if (argc > 1 && std::string(argv[1]) == "--biomes") {
+        biomeView = true;
+        ++arg;
+    }
+    const std::string worldPath = argc > arg ? argv[arg] : "";
+    const std::string outPath = argc > arg + 1 ? argv[arg + 1] : "world_preview.png";
+    const int size = argc > arg + 2 ? std::atoi(argv[arg + 2]) : 768;
+    const int firstProbe = arg + 3;
 
     world::WorldMap map = world::defaultWorld();
     if (!worldPath.empty()) {
@@ -71,6 +89,57 @@ int main(int argc, char** argv) {
     std::printf("world '%s': %.0f x %.0f m, height %.1f .. %.1f m (%.1f m of relief)\n", map.name.c_str(),
                 map.size.x, map.size.y, lo, hi, hi - lo);
 
+    // What the rules have to be written against. A biome band placed without knowing the spread of
+    // the value it bands is a guess: scree asked for slope above 0.34 on terrain whose slope reaches
+    // 0.4 in a handful of places, and duly owned one per cent of the world.
+    {
+        std::vector<float> slopes;
+        std::vector<float> moistures;
+        constexpr int kStep = 4;
+        for (int y = 0; y < size; y += kStep) {
+            for (int x = 0; x < size; x += kStep) {
+                const glm::vec2 q =
+                    map.min() + map.size * glm::vec2((static_cast<float>(x) + 0.5f) / static_cast<float>(size),
+                                                     (static_cast<float>(y) + 0.5f) / static_cast<float>(size));
+                const world::Sample sm = map.sample(q, 0.6f);
+                slopes.push_back(sm.slope);
+                moistures.push_back(sm.moisture);
+            }
+        }
+        const auto pct = [](std::vector<float>& v, double q) {
+            std::sort(v.begin(), v.end());
+            return v.empty() ? 0.0f : v[std::min(v.size() - 1, static_cast<std::size_t>(q * (v.size() - 1)))];
+        };
+        std::printf("  slope    p10 %.3f p50 %.3f p90 %.3f p99 %.3f\n", pct(slopes, 0.1), pct(slopes, 0.5),
+                    pct(slopes, 0.9), pct(slopes, 0.99));
+        std::printf("  moisture p10 %.2f p50 %.2f p90 %.2f\n", pct(moistures, 0.1), pct(moistures, 0.5),
+                    pct(moistures, 0.9));
+    }
+
+    // How much of the map each biome actually owns. "Meadow looks dominant" is an impression; a
+    // biome set is balanced or not, and that is a number.
+    if (!map.biomes.empty()) {
+        std::vector<int> owned(map.biomes.biomes.size(), 0);
+        int total = 0;
+        constexpr int kStep = 4;
+        for (int y = 0; y < size; y += kStep) {
+            for (int x = 0; x < size; x += kStep) {
+                const glm::vec2 q =
+                    map.min() + map.size * glm::vec2((static_cast<float>(x) + 0.5f) / static_cast<float>(size),
+                                                     (static_cast<float>(y) + 0.5f) / static_cast<float>(size));
+                const world::Sample sm = map.sample(q, 0.6f);
+                ++owned[static_cast<std::size_t>(map.biomes.at(sm.altitude, sm.slope, sm.moisture, q).dominant())];
+                ++total;
+            }
+        }
+        std::printf("  biomes:");
+        for (std::size_t b = 0; b < owned.size(); ++b) {
+            std::printf(" %s %.0f%%", map.biomes.biomes[b].name.c_str(),
+                        100.0 * owned[b] / std::max(total, 1));
+        }
+        std::printf("\n");
+    }
+
     const float metresPerPixel = map.size.x / static_cast<float>(size);
     std::vector<std::uint8_t> rgba(static_cast<std::size_t>(size) * size * 4, 255);
     for (int y = 0; y < size; ++y) {
@@ -78,7 +147,19 @@ int main(int argc, char** argv) {
             const std::size_t i = static_cast<std::size_t>(y) * size + x;
             const float h = heights[i];
             const float t = (h - lo) / std::max(hi - lo, 1e-3f);
+            const glm::vec2 q = map.min() + map.size * glm::vec2((static_cast<float>(x) + 0.5f) / static_cast<float>(size),
+                                                                 (static_cast<float>(y) + 0.5f) / static_cast<float>(size));
             glm::vec3 c = hypsometric(t);
+            if (biomeView && !map.biomes.empty()) {
+                // The blend itself, not the dominant biome: a map of hard cells would hide exactly
+                // what needs checking, which is how wide the transitions are.
+                const world::Sample sm = map.sample(q, 0.6f);
+                const world::BiomeWeights bw = map.biomes.at(sm.altitude, sm.slope, sm.moisture, q);
+                c = glm::vec3(0.0f);
+                for (int b = 0; b < bw.count; ++b) {
+                    c += biomeInk(b) * bw.weights[static_cast<std::size_t>(b)];
+                }
+            }
             // Hillshade from the north-west, the cartographic convention, by finite differences on
             // the rendered grid rather than the analytic normal -- what is shaded is what is shown.
             const float hx = heights[static_cast<std::size_t>(y) * size + std::min(x + 1, size - 1)] -
@@ -93,9 +174,7 @@ int main(int argc, char** argv) {
             if (std::min(band, 10.0f - band) < std::max(std::fabs(hx), std::fabs(hz)) * 0.5f) {
                 c *= 0.72f;
             }
-            const glm::vec2 p = map.min() + map.size * glm::vec2((static_cast<float>(x) + 0.5f) / static_cast<float>(size),
-                                                                 (static_cast<float>(y) + 0.5f) / static_cast<float>(size));
-            const float water = map.waterSurface(p);
+            const float water = map.waterSurface(q);
             if (h < water) {
                 const float depth = std::clamp((water - h) / 3.0f, 0.0f, 1.0f);
                 c = glm::mix(glm::vec3(0.25f, 0.55f, 0.62f), glm::vec3(0.04f, 0.14f, 0.26f), depth);
@@ -107,11 +186,13 @@ int main(int argc, char** argv) {
     }
     // Probes: the heights a scene author actually needs -- where to stand a camera, where the ground
     // is under a focal point -- printed rather than guessed at from a colour ramp.
-    for (int i = 4; i + 1 < argc; i += 2) {
+    for (int i = firstProbe; i + 1 < argc; i += 2) {
         const glm::vec2 q(static_cast<float>(std::atof(argv[i])), static_cast<float>(std::atof(argv[i + 1])));
         const world::Sample sm = map.sample(q, 0.6f);
-        std::printf("  probe (%.1f, %.1f): height %.2f  slope %.2f  %s\n", q.x, q.y, sm.height, sm.slope,
-                    sm.submerged ? "under water" : "dry");
+        const world::BiomeWeights bw = map.biomes.at(sm.altitude, sm.slope, sm.moisture, q);
+        const char* biome = map.biomes.empty() ? "-" : map.biomes.biomes[static_cast<std::size_t>(bw.dominant())].name.c_str();
+        std::printf("  probe (%.1f, %.1f): height %.2f  slope %.2f  moisture %.2f  %s  biome %s (axis %.2f)\n",
+                    q.x, q.y, sm.height, sm.slope, sm.moisture, sm.submerged ? "wet" : "dry", biome, bw.axis());
     }
     if (auto r = assets::writePng(outPath, static_cast<std::uint32_t>(size), static_cast<std::uint32_t>(size), rgba); !r) {
         std::fprintf(stderr, "%s\n", r.error().message.c_str());

@@ -680,6 +680,12 @@ const Material* dominantAssetMaterial(const assets::SceneAsset& asset) {
 // Field references inside nested scenes point at the nested file's field names; after flattening
 // every field is renamed "<prefix><name>", so the references follow (idempotent: a name that
 // already starts with the prefix is left alone, which also covers the per-frame re-application).
+// The generated ground material's name, before this composition's prefix is applied. One place, so
+// the node that names it and the pass that creates it cannot drift apart.
+std::string terrainGroundProgramName(const std::string& node) {
+    return node + "_ground";
+}
+
 std::string prefixed(const std::string& prefix, const std::string& name) {
     if (name.empty() || prefix.empty() || name.compare(0, prefix.size(), prefix) == 0) {
         return name;
@@ -1621,6 +1627,29 @@ void Composition::rebuild() {
     }
     scene_.splines.splines.clear();
     scene_.sdfs.clear();
+    // Terrain grounds first: the generated ground material has to exist before the programs are
+    // copied into the scene, or the terrain names a program that is not there until the next
+    // rebuild -- which, for a scene that rebuilds once, is never. Generating it here rather than
+    // in the node loop is the whole of that fix.
+    for (const auto& nodePtr : nodes_) {
+        const CompositionNode& node = *nodePtr;
+        if (node.kind != NodeKind::Terrain || !node.terrainMaterial.program.empty() || node.worldMap.biomes.empty()) {
+            continue;
+        }
+        const std::string name = terrainGroundProgramName(node.name);
+        const auto existing = std::find_if(materialPrograms_.begin(), materialPrograms_.end(),
+                                           [&](const MaterialProgram& mp) { return mp.name == name; });
+        MaterialProgram mp = world::terrainMaterialProgram(node.worldMap.biomes, name);
+        if (auto v = mp.validate(); !v) {
+            log::warn("terrain '{}': generated ground material: {}", node.name, v.error().message);
+            continue;
+        }
+        if (existing != materialPrograms_.end()) {
+            *existing = std::move(mp); // a retuned biome set repaints the ground on the next rebuild
+        } else {
+            materialPrograms_.push_back(std::move(mp));
+        }
+    }
     scene_.materialPrograms.clear();
     ownMaterialCount_ = materialPrograms_.size();
     for (const MaterialProgram& src : materialPrograms_) {
@@ -1724,6 +1753,9 @@ void Composition::rebuild() {
                 Entity& e = scene_.addEntity(fmt::format("{}.chunk{}", node.name, c), chunk.meshes[0]);
                 e.style = MeshStyle::Lit;
                 e.material = node.terrainMaterial;
+                if (e.material.program.empty() && !node.worldMap.biomes.empty()) {
+                    e.material.program = prefixed(sanitise(prefix_), terrainGroundProgramName(node.name));
+                }
                 e.transform = nodeT;
                 e.visible = visible;
                 range.restTransforms.emplace_back();

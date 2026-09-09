@@ -268,6 +268,26 @@ float WorldMap::waterSurface(glm::vec2 p) const {
     return surface > kNegInf ? surface : kNegInf;
 }
 
+float WorldMap::moisture(glm::vec2 p, float altitude01) const {
+    // Distance to the nearest water feature's bank, faded over `moistureReach`. The bounding boxes
+    // features carry are grown by their width, not by the reach, so the search is over every water
+    // feature rather than the ones whose weight is non-zero -- there are few of them and the fade
+    // extends well past the bank.
+    float wet = 0.0f;
+    for (const Feature& f : features) {
+        if (!f.water) {
+            continue;
+        }
+        const PathHit hit = closestOnPath(f.samplePath(), p);
+        const float beyondBank = std::max(hit.distance - f.width, 0.0f);
+        wet = std::max(wet, std::exp(-beyondBank / std::max(moistureReach, 1e-3f)));
+    }
+    // Low ground is damp even away from a river: that is what makes a basin floor read as a basin
+    // floor rather than as a plateau that happens to be low.
+    const float lowland = lowlandMoisture * (1.0f - glm::clamp(altitude01, 0.0f, 1.0f));
+    return glm::clamp(std::max(wet, lowland), 0.0f, 1.0f);
+}
+
 Sample WorldMap::sample(glm::vec2 p, float epsilon) const {
     Sample s;
     s.height = height(p);
@@ -275,6 +295,8 @@ Sample WorldMap::sample(glm::vec2 p, float epsilon) const {
     s.slope = glm::clamp(1.0f - s.normal.y, 0.0f, 1.0f);
     s.waterSurface = waterSurface(p);
     s.submerged = s.height < s.waterSurface;
+    s.altitude = altitude01(s.height);
+    s.moisture = moisture(p, s.altitude);
     return s;
 }
 
@@ -338,6 +360,15 @@ Result<void> WorldMap::validate() const {
             return r;
         }
     }
+    if (auto r = biomes.validate(); !r) {
+        return fail("world '{}': {}", name, r.error().message);
+    }
+    if (moistureReach <= 0.0f || moistureReach > 100000.0f) {
+        return fail("world '{}': moistureReach must be in (0, 100000]", name);
+    }
+    if (lowlandMoisture < 0.0f || lowlandMoisture > 1.0f) {
+        return fail("world '{}': lowlandMoisture must be in [0, 1]", name);
+    }
     if (erosion < 0.0f || erosion > 1.0f) {
         return fail("world '{}': erosion must be in [0, 1]", name);
     }
@@ -380,6 +411,9 @@ std::uint64_t WorldMap::structuralHash() const {
         h.f32(f.waterDepth);
         h.i32(f.smoothing);
     }
+    h.f32(moistureReach);
+    h.f32(lowlandMoisture);
+    h.u64(biomes.structuralHash());
     h.str(heightImage);
     h.f32(imageHeight);
     h.f32(imageBlend);
@@ -416,6 +450,7 @@ WorldMap defaultWorld() {
     w.size = {640.0f, 640.0f};
     w.baseHeight = 0.0f;
     w.erosion = 0.35f;
+    w.biomes = defaultBiomes();
     w.seaLevel = -1000.0f;
     // Five octaves, weighted toward the middle rather than the bottom. A spectrum dominated by its
     // lowest octave gives two smooth hills and nothing to read at any other distance; the 0.0075 and
@@ -594,6 +629,19 @@ Result<WorldMap> worldMapFromJson(const json& j) {
     auto baseHeight = readFloat(j, "baseHeight", w.baseHeight);
     if (!baseHeight) return fail("world '{}': {}", w.name, baseHeight.error().message);
     w.baseHeight = *baseHeight;
+    auto moistureReach = readFloat(j, "moistureReach", w.moistureReach);
+    if (!moistureReach) return fail("world '{}': {}", w.name, moistureReach.error().message);
+    w.moistureReach = *moistureReach;
+    auto lowland = readFloat(j, "lowlandMoisture", w.lowlandMoisture);
+    if (!lowland) return fail("world '{}': {}", w.name, lowland.error().message);
+    w.lowlandMoisture = *lowland;
+    if (j.contains("biomes")) {
+        auto set = biomeSetFromJson(j.at("biomes"));
+        if (!set) {
+            return fail("world '{}': {}", w.name, set.error().message);
+        }
+        w.biomes = std::move(*set);
+    }
     auto erosion = readFloat(j, "erosion", w.erosion);
     if (!erosion) return fail("world '{}': {}", w.name, erosion.error().message);
     w.erosion = *erosion;
@@ -710,6 +758,11 @@ json worldMapToJson(const WorldMap& map) {
     j["size"] = json::array({map.size.x, map.size.y});
     j["baseHeight"] = map.baseHeight;
     j["erosion"] = map.erosion;
+    j["moistureReach"] = map.moistureReach;
+    j["lowlandMoisture"] = map.lowlandMoisture;
+    if (!map.biomes.empty()) {
+        j["biomes"] = biomeSetToJson(map.biomes);
+    }
     j["seaLevel"] = map.seaLevel;
     if (!map.heightImage.empty()) {
         j["heightImage"] = map.heightImage;

@@ -96,23 +96,74 @@ Debug parameters, per node: `terrainLod`, `terrainCull`, `terrainLodDistance`, `
 Turn LOD off to find out whether a shading artefact is a level boundary; turn culling off to see
 what culling was removing.
 
-### Terrain materials read slope and altitude from uv
+### Terrain materials read the biome axis and the slope from uv
 
 Terrain has no unwrap worth having, and material programs reach world space directly through
 `Triplanar` and `WorldProject`, so uv carries the two scalars a terrain material actually needs:
-`uv.x` is slope (0 flat, 1 vertical) and `uv.y` is altitude normalised over the whole map. Both are
-otherwise unreachable from a program, because the mask ops read a register's x channel and slope
-and altitude live in the y channel of `Normal` and `WorldPosition`.
+`uv.x` is the biome axis and `uv.y` is the slope. Neither is reachable otherwise, because mask ops
+read a register's x channel.
 
-A rock-on-steep-ground blend is then four ops:
+Getting a value *into* that channel is what `swizzle` is for -- it is the primitive every shading
+language has and this op set did not:
 
 ```json
-{"kind": "input",      "dst": 0, "input": "uv"},
-{"kind": "smoothstep", "dst": 1, "srcA": 0, "constant": [0.16, 0.52, 0, 0]},
-{"kind": "constant",   "dst": 2, "constant": [0.023, 0.144, 0.087, 1]},
-{"kind": "constant",   "dst": 3, "constant": [0.093, 0.117, 0.154, 1]},
-{"kind": "mixBy",      "dst": 4, "srcA": 2, "srcB": 3, "srcC": 1}
+{"kind": "input",   "dst": 0, "input": "uv"},
+{"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [0, 0, 0, 0]},
+{"kind": "swizzle", "dst": 2, "srcA": 0, "constant": [1, 1, 1, 1]}
 ```
+
+r1 now holds the biome axis in every channel and r2 the slope, and both can drive a mask.
+
+## Biomes
+
+A biome (ADR-047) is a set of soft-edged bands over what the map already knows -- altitude, slope
+and moisture -- plus places it simply is:
+
+```json
+{ "name": "marsh",
+  "altitude": [0.0, 0.30, 0.20], "slope": [0.0, 0.16, 0.14], "moisture": [0.70, 1.0, 0.22],
+  "weight": 1.4,
+  "groundColor": [0.0044, 0.1046, 0.0844], "rockColor": [0.0132, 0.0742, 0.0700], "roughness": 0.82,
+  "regions": [{ "path": [[4, -14]], "width": 46, "falloff": 1.4, "strength": 2.2 }] }
+```
+
+A range is `[lo, hi]` or `[lo, hi, fade]`, where `fade` is how far outside the band the membership
+takes to reach zero. Every biome scores a point, the scores are normalised, and what comes back is
+a blend -- so a transition is a band, and everything that reads the weights crosses over together.
+The score is a *product*: a biome must satisfy all three of its ranges to be anywhere at all.
+
+Moisture is defined once, by the map: a falloff from the nearest water feature's bank over
+`moistureReach` metres, or `lowlandMoisture * (1 - altitude)`, whichever is larger.
+
+### The set is ordered, and the order matters
+
+A material program masks on a register's x channel and a terrain vertex has two floats, so the blend
+is collapsed to one scalar -- its position along the authored order -- and carried in `uv.x`, with
+the shading slope in `uv.y`. That is what lets a palette be blended along it.
+
+The constraint that buys: **neighbours in the list must be neighbours on the ground.** Two biomes
+far apart in the list that meet will blend through the colours in between. Keep a set small and
+ordered like a gradient, and make the palette a *path* through hue rather than a spread around it.
+An olive meadow between a green forest and a violet scree made every transition rainbow.
+
+### Write the bands against the world, not against round numbers
+
+`avgen_world_preview --biomes` prints the slope and moisture percentiles and the share each biome
+ends up owning. The first scree band asked for slope above 0.34, which sounds steep; this terrain's
+slope has a median of 0.065 and a 99th percentile of 0.31, so scree owned one per cent of the map.
+The shipped set is 15% marsh, 18% meadow, 37% forest, 22% scree, 9% rim, and a test holds every
+biome between 4% and 60%.
+
+### The ground material is generated
+
+Unless the scene names a program, the terrain node's material is built from the biome set: two
+three-stop ramps along the axis crossed in the middle, a cliff mask on the slope, world-space
+mottling. So a biome's colours are authored in one place -- the world -- and the shader that paints
+them follows. Retune a `groundColor` and the ground changes with no shader editing.
+
+Biome rules read a slope measured over about eight metres, not over one vertex. A rule fed
+mesh-scale slope puts a boundary on every ripple, and a hundred one-vertex boundaries across a ridge
+is a sawtooth rather than an ecotone.
 
 ## Looking at a world before it has triangles
 

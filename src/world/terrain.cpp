@@ -74,13 +74,14 @@ float ChunkField::at(int i, int j) const {
     return heights[static_cast<std::size_t>(y) * side + x];
 }
 
-glm::vec3 ChunkField::normalAt(int i, int j) const {
+glm::vec3 ChunkField::normalAt(int i, int j, int spread) const {
     // Central differences on the LOD 0 grid: the same expression the analytic normal used, reading
     // samples that already exist. The border cell is what lets the chunk's edge use a centred
     // difference too, so two chunks agree exactly along their shared edge.
-    const float hx = at(i + 1, j) - at(i - 1, j);
-    const float hz = at(i, j + 1) - at(i, j - 1);
-    return glm::normalize(glm::vec3(-hx, 2.0f * step, -hz));
+    const int d = std::max(spread, 1);
+    const float hx = at(i + d, j) - at(i - d, j);
+    const float hz = at(i, j + d) - at(i, j - d);
+    return glm::normalize(glm::vec3(-hx, 2.0f * step * static_cast<float>(d), -hz));
 }
 
 ChunkField sampleChunkField(const WorldMap& map, const TerrainSettings& settings, glm::ivec2 coord) {
@@ -116,6 +117,10 @@ scene::MeshData buildChunkMeshFrom(const WorldMap& map, const TerrainSettings& s
     // a visible tile grid -- the exact artefact chunking is supposed to be invisible about.
     const float epsilon = settings.chunkSize / static_cast<float>(settings.resolution) * 0.5f;
     const int stride = field != nullptr ? strideFor(settings, res) : 0;
+    // About eight metres of hillside, whatever the chunk's resolution: the scale a biome boundary
+    // should be drawn at rather than the scale the mesh happens to be tessellated at.
+    const int biomeSpread =
+        std::max(1, static_cast<int>(std::lround(8.0f / (settings.chunkSize / static_cast<float>(settings.resolution)))));
 
     scene::MeshData mesh;
     mesh.name = fmt::format("terrain_{}_{}_lod{}", coord.x, coord.y, lod);
@@ -132,7 +137,21 @@ scene::MeshData buildChunkMeshFrom(const WorldMap& map, const TerrainSettings& s
                 v.position = glm::vec3(p.x, map.height(p), p.y);
                 v.normal = map.normal(p, epsilon);
             }
-            v.uv = glm::vec2(glm::clamp(1.0f - v.normal.y, 0.0f, 1.0f), map.altitude01(v.position.y));
+            const float slope = glm::clamp(1.0f - v.normal.y, 0.0f, 1.0f);
+            const float altitude = map.altitude01(v.position.y);
+            float axis = altitude;
+            if (!map.biomes.empty()) {
+                // The biome reads the hillside's slope, not this vertex's. Beyond the chunk's own
+                // grid the coarse difference has nothing to read, so it falls back to the fine one
+                // rather than clamping into the border and reporting a hillside that is flat.
+                const bool coarseAvailable = stride > 0 && biomeSpread > 0;
+                const float biomeSlope =
+                    coarseAvailable
+                        ? glm::clamp(1.0f - field->normalAt(i * stride, j * stride, biomeSpread).y, 0.0f, 1.0f)
+                        : slope;
+                axis = map.biomes.at(altitude, biomeSlope, map.moisture(p, altitude), p).axis();
+            }
+            v.uv = glm::vec2(axis, slope);
             mesh.vertices.push_back(v);
         }
     }
@@ -289,6 +308,127 @@ std::vector<TerrainChunk> buildTerrain(
         }
     }
     return chunks;
+}
+
+// ---- the generated ground material ---------------------------------------------------------------
+
+namespace {
+
+scene::MaterialOp materialOp(scene::MaterialOpKind kind, int dst, int srcA = 0, int srcB = 0, int srcC = 0) {
+    scene::MaterialOp op;
+    op.kind = kind;
+    op.dst = dst;
+    op.srcA = srcA;
+    op.srcB = srcB;
+    op.srcC = srcC;
+    return op;
+}
+
+// A three-stop ramp over a sub-range of the axis. Ramp carries exactly three colours, so a set of
+// more than three biomes is two ramps crossed over in the middle -- which is also why the set is
+// ordered: the crossover is only meaningful if neighbours in the list are neighbours on the ground.
+void appendRamp(std::vector<scene::MaterialOp>& ops, int scratch, int axisRegister, float from, float to,
+                glm::vec3 a, glm::vec3 b, glm::vec3 c) {
+    scene::MaterialOp remap = materialOp(scene::MaterialOpKind::Remap, scratch, axisRegister);
+    remap.value = 1.0f; // clamp
+    remap.constant = {from, to, 0.0f, 1.0f};
+    ops.push_back(remap);
+    scene::MaterialOp ramp = materialOp(scene::MaterialOpKind::Ramp, scratch, scratch);
+    ramp.constant = glm::vec4(a, 1.0f);
+    ramp.constant2 = glm::vec4(b, 1.0f);
+    ramp.constant3 = glm::vec4(c, 1.0f);
+    ops.push_back(ramp);
+}
+
+glm::vec3 ground(const BiomeSet& set, std::size_t i) {
+    return set.biomes[std::min(i, set.biomes.size() - 1)].groundColor;
+}
+glm::vec3 rock(const BiomeSet& set, std::size_t i) {
+    return set.biomes[std::min(i, set.biomes.size() - 1)].rockColor;
+}
+
+} // namespace
+
+scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::string name) {
+    using Kind = scene::MaterialOpKind;
+    scene::MaterialProgram program;
+    program.name = std::move(name);
+    if (biomes.empty()) {
+        return program;
+    }
+    const std::size_t n = biomes.biomes.size();
+    const std::size_t mid = n / 2;
+
+    // r0 uv, r1 axis broadcast, r2 slope broadcast, r3/r4 scratch, r5 crossover, r6 colour, r7 rough.
+    std::vector<scene::MaterialOp>& ops = program.ops;
+    scene::MaterialOp uv = materialOp(Kind::Input, 0);
+    uv.input = scene::MaterialInput::Uv;
+    ops.push_back(uv);
+    scene::MaterialOp axis = materialOp(Kind::Swizzle, 1, 0);
+    axis.constant = {0.0f, 0.0f, 0.0f, 0.0f}; // uv.x is the biome axis; every mask op reads x
+    ops.push_back(axis);
+    scene::MaterialOp slope = materialOp(Kind::Swizzle, 2, 0);
+    slope.constant = {1.0f, 1.0f, 1.0f, 1.0f}; // uv.y is the slope
+    ops.push_back(slope);
+
+    // The crossover between the two ramps, a soft step either side of the middle biome.
+    const float centre = n > 1 ? static_cast<float>(mid) / static_cast<float>(n - 1) : 0.5f;
+    scene::MaterialOp cross = materialOp(Kind::Smoothstep, 5, 1);
+    cross.constant = {std::max(centre - 0.06f, 0.0f), std::min(centre + 0.06f, 1.0f), 0.0f, 0.0f};
+    ops.push_back(cross);
+
+    const auto palette = [&](glm::vec3 (*pick)(const BiomeSet&, std::size_t), int into) {
+        appendRamp(ops, 3, 1, 0.0f, centre, pick(biomes, 0), pick(biomes, mid / 2), pick(biomes, mid));
+        appendRamp(ops, 4, 1, centre, 1.0f, pick(biomes, mid), pick(biomes, (mid + n - 1) / 2), pick(biomes, n - 1));
+        ops.push_back(materialOp(Kind::MixBy, into, 3, 4, 5));
+    };
+    palette(ground, 6); // ground colour into r6
+    palette(rock, 7);   // rock colour into r7
+
+    // Where the ground gives way to bare rock. Slope is already one of the three things a biome
+    // rule is written in, so a broad slope mask here double-counts it: the first version put rock
+    // over a third of the frame and turned every mesh-scale ripple into a band. This one fires only
+    // on a genuine cliff -- the 99th percentile of this terrain's slope is 0.31 -- which is the
+    // part a biome cannot express, because a cliff inside a marsh is still a cliff.
+    scene::MaterialOp rockMask = materialOp(Kind::Smoothstep, 3, 2);
+    rockMask.constant = {0.28f, 0.50f, 0.0f, 0.0f};
+    ops.push_back(rockMask);
+    ops.push_back(materialOp(Kind::MixBy, 6, 6, 7, 3));
+
+    // Mottling in world space, so it does not swim with the camera and does not tile with a chunk.
+    scene::MaterialOp world = materialOp(Kind::Input, 4);
+    world.input = scene::MaterialInput::WorldPosition;
+    ops.push_back(world);
+    scene::MaterialOp scale = materialOp(Kind::Constant, 7);
+    scale.constant = {0.045f, 0.045f, 0.045f, 0.0f};
+    ops.push_back(scale);
+    ops.push_back(materialOp(Kind::Multiply, 4, 4, 7));
+    scene::MaterialOp mottle = materialOp(Kind::Noise, 7, 4);
+    mottle.value = 1.0f;
+    mottle.seed = 41;
+    ops.push_back(mottle);
+    scene::MaterialOp mottleRange = materialOp(Kind::Remap, 7, 7);
+    mottleRange.value = 1.0f;
+    mottleRange.constant = {0.0f, 1.0f, 0.80f, 1.20f};
+    ops.push_back(mottleRange);
+    ops.push_back(materialOp(Kind::Multiply, 6, 6, 7));
+
+    // Roughness: the biomes' own values, crossed to a smoother rock on the same slope mask.
+    scene::MaterialOp groundRough = materialOp(Kind::Constant, 7);
+    float roughSum = 0.0f;
+    for (const Biome& b : biomes.biomes) {
+        roughSum += b.roughness;
+    }
+    groundRough.constant = glm::vec4(roughSum / static_cast<float>(n));
+    ops.push_back(groundRough);
+    scene::MaterialOp rockRough = materialOp(Kind::Constant, 4);
+    rockRough.constant = glm::vec4(0.62f);
+    ops.push_back(rockRough);
+    ops.push_back(materialOp(Kind::MixBy, 7, 7, 4, 3));
+
+    program.baseColorRegister = 6;
+    program.roughnessRegister = 7;
+    return program;
 }
 
 } // namespace avgen::world

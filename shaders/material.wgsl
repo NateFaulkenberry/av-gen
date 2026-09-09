@@ -89,6 +89,11 @@ const MAT_OP_DECAL_BOX: u32 = 26u;
 const MAT_OP_ANISOTROPY: u32 = 27u;
 const MAT_OP_ROUGHNESS_FILTER: u32 = 28u;
 const MAT_OP_MICRO_DETAIL: u32 = 29u;
+const MAT_OP_SWIZZLE: u32 = 30u;
+
+fn matPick(v: vec4<f32>, index: f32) -> f32 {
+    return v[clamp(i32(index), 0, 3)];
+}
 
 const MAT_IN_WORLD_POSITION: u32 = 0u;
 const MAT_IN_LOCAL_POSITION: u32 = 1u;
@@ -531,6 +536,12 @@ fn materialEvalOp(op: MaterialOpGpu, ctx: MaterialContext, regs: MatRegs) -> vec
         let p = a.xyz * f + k.xyz;
         let fade = saturate(1.0 - ctx.footprint * abs(f) * 2.0);
         return vec4<f32>(0.5 + (fbm3(p, op.seed) - 0.5) * fade);
+    }
+    if (op.kind == MAT_OP_SWIZZLE) {
+        // `constant` names the source component of each output channel. The default all-zero
+        // constant broadcasts x, which is the case that matters: it takes a value that arrived in
+        // some other channel and puts it where every mask op looks for it.
+        return vec4<f32>(matPick(a, k.x), matPick(a, k.y), matPick(a, k.z), matPick(a, k.w));
     }
     return vec4<f32>(0.0);
 }

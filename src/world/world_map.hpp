@@ -22,6 +22,7 @@
 // mound, a crater, a clearing); two or more is a corridor (a ridge line, a valley floor, a river).
 
 #include "core/error.hpp"
+#include "world/biome.hpp"
 
 #include <glm/glm.hpp>
 #include <nlohmann/json_fwd.hpp>
@@ -110,6 +111,8 @@ struct Sample {
     float slope = 0.0f;       // 0 flat .. 1 vertical (1 - normal.y)
     float waterSurface = 0.0f;// metres; the surface above this point, or -inf where there is none
     bool submerged = false;   // height < waterSurface
+    float moisture = 0.0f;    // 0 dry .. 1 at the water's edge
+    float altitude = 0.0f;    // height as 0..1 over the map's measured range
 };
 
 struct WorldMap {
@@ -127,6 +130,12 @@ struct WorldMap {
     float seaLevel = -1000.0f;       // global water plane; below the world by default (no sea)
     std::vector<NoiseLayer> layers;
     std::vector<Feature> features;
+    BiomeSet biomes;                 // ADR-047; empty means the world has no biomes yet
+    // How far from open water the ground stays damp. Moisture is the third axis a biome is defined
+    // on and the only one that is not already a property of a single point, so it is defined here,
+    // once, rather than being re-derived by everything that needs it.
+    float moistureReach = 90.0f;     // metres
+    float lowlandMoisture = 0.35f;   // how wet the bottom of the map is before any water is near
     std::string heightImage;         // path as written; resolved by the caller
     float imageHeight = 60.0f;       // metres the image's 0..1 spans
     float imageBlend = 1.0f;         // 0 = ignore the image, 1 = the image replaces the base noise
@@ -144,6 +153,9 @@ struct WorldMap {
     [[nodiscard]] Sample sample(glm::vec2 p, float epsilon = 0.5f) const;
     // The water surface above p (sea level or the nearest water feature), or -infinity if dry.
     [[nodiscard]] float waterSurface(glm::vec2 p) const;
+    // 0 dry .. 1 at the water's edge: the larger of a falloff from the nearest water feature and a
+    // term that makes the bottom of the map damper than the top.
+    [[nodiscard]] float moisture(glm::vec2 p, float altitude01) const;
     [[nodiscard]] glm::vec2 min() const { return -size * 0.5f; }
     [[nodiscard]] glm::vec2 max() const { return size * 0.5f; }
 

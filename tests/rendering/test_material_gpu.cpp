@@ -758,6 +758,48 @@ TEST_CASE("ADR-036 ops match the CPU interpreter", "[material][gpu]") {
     CHECK(ctx->errorCount() == 0);
 }
 
+TEST_CASE("swizzle moves a component into the channel every mask op reads", "[material][gpu]") {
+    // Every op that takes a scalar takes it from x. The values worth masking with mostly arrive
+    // somewhere else -- terrain carries its biome axis and its slope in the two halves of a uv, and
+    // without this op a program can use exactly one of them.
+    auto ctx = makeContext();
+    MaterialHarness harness(*ctx);
+    const spatial::FieldSet noFields;
+    std::vector<MaterialProgram> batch;
+    {
+        // Broadcast y into every channel: the default constant is all zeroes, so the pattern has to
+        // be written out, which is also the read the terrain material makes.
+        MaterialOp o = op(MaterialOpKind::Swizzle, 7, 1);
+        o.constant = {1.0f, 1.0f, 1.0f, 1.0f};
+        batch.push_back(probe("swizzleBroadcastY", {constantOp(1, {0.2f, 0.7f, 0.4f, 0.9f}), o}));
+    }
+    {
+        MaterialOp o = op(MaterialOpKind::Swizzle, 7, 1); // all-zero constant broadcasts x
+        batch.push_back(probe("swizzleDefaultX", {constantOp(1, {0.2f, 0.7f, 0.4f, 0.9f}), o}));
+    }
+    {
+        MaterialOp o = op(MaterialOpKind::Swizzle, 7, 1);
+        o.constant = {3.0f, 2.0f, 1.0f, 0.0f}; // reverse
+        batch.push_back(probe("swizzleReverse", {constantOp(1, {0.2f, 0.7f, 0.4f, 0.9f}), o}));
+    }
+    {
+        MaterialOp o = op(MaterialOpKind::Swizzle, 7, 1);
+        o.constant = {-4.0f, 9.0f, 1.0f, 1.0f}; // out of range clamps rather than reading rubbish
+        batch.push_back(probe("swizzleClamped", {constantOp(1, {0.2f, 0.7f, 0.4f, 0.9f}), o}));
+    }
+    {
+        // The case it exists for: a normal's y is the slope, and a mask op can only see x.
+        MaterialOp pickY = op(MaterialOpKind::Swizzle, 1, 0);
+        pickY.constant = {1.0f, 1.0f, 1.0f, 1.0f};
+        MaterialOp blend = op(MaterialOpKind::MixBy, 7, 2, 3, 1);
+        batch.push_back(probe("swizzleAsMask", {inputOp(MaterialInput::Normal, 0), pickY,
+                                                constantOp(2, {1.0f, 0.0f, 0.0f, 1.0f}),
+                                                constantOp(3, {0.0f, 0.0f, 1.0f, 1.0f}), blend}));
+    }
+    checkParity(harness, batch, noFields, 0.0);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("layered programs match the CPU interpreter", "[material][gpu]") {
     auto ctx = makeContext();
     MaterialHarness harness(*ctx);

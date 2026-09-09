@@ -16,6 +16,7 @@
 // which is why terrain costs nothing to move the camera through.
 
 #include "core/error.hpp"
+#include "scene/material_program.hpp"
 #include "scene/scene_types.hpp"
 #include "world/world_map.hpp"
 
@@ -58,13 +59,17 @@ struct TerrainChunk {
 
 // The mesh for one chunk at one LOD.
 //
-// Vertex uv carries (slope, altitude) rather than a texture coordinate. Terrain has no unwrap worth
-// having, and the material op set already reaches world space directly through Triplanar and
+// Vertex uv carries (biome axis, slope) rather than a texture coordinate. Terrain has no unwrap
+// worth having, and the material op set already reaches world space directly through Triplanar and
 // WorldProject, so a tiling uv would be the one thing on the vertex nobody reads. What a terrain
-// material does need is exactly these two scalars -- how steep this point is, and how high -- and
-// neither is reachable from the shader otherwise, because the mask ops read a register's x channel
-// and both live in the y channel of the inputs that carry them. Slope is 1 - normal.y; altitude is
-// normalised over the whole map so every chunk agrees on where "high" is.
+// material does need is these two scalars: which kind of place this is, and how steep it is.
+//
+// The biome axis is the position of this point's biome blend along the authored order of the set
+// (ADR-047), so a material blends a palette along it and gets a band at every transition for free.
+// It replaced altitude, which is no loss: altitude is one of the three things a biome rule is
+// written in, so an altitude-banded look is now an authored biome rather than an implicit one.
+// A world with no biomes leaves the axis at the point's altitude, so terrain still has somewhere
+// to blend along before any biome is written.
 //
 // Normals come from central differences at the LOD 0 spacing regardless of the level being built,
 // so two chunks meeting at different resolutions shade continuously even though their silhouettes
@@ -75,6 +80,14 @@ struct TerrainChunk {
 // LOD level for a chunk whose centre is `distance` metres from the camera: 0 within `lodDistance`,
 // then one level per doubling. Returns lodLevels-1 at most.
 [[nodiscard]] int chunkLod(const TerrainSettings& settings, float distance);
+
+// The ground material for a biome set, generated rather than authored (ADR-047). A biome's colours
+// live in the world JSON, and a scene that also wrote them into a material program would have two
+// copies of them to keep in step -- which is how a scene ends up with the ground painted in last
+// week's palette. The program blends both palettes along the vertex's biome axis and crosses from
+// ground to rock on its slope, so an artist retunes a biome and the ground follows with no shader
+// editing at all. A scene that wants something else names its own program and this is not used.
+[[nodiscard]] scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::string name);
 
 // The six frustum planes (left, right, bottom, top, near, far) of a view-projection, in world
 // space, normalised, pointing inwards. rendering::frustumPlanes is the same construction for GPU
@@ -92,7 +105,11 @@ struct ChunkField {
     glm::vec2 origin{0.0f};// world XZ of grid index (0, 0), one cell before the chunk's corner
     std::vector<float> heights;
     [[nodiscard]] float at(int i, int j) const;         // chunk coordinates: -1 .. resolution + 1
-    [[nodiscard]] glm::vec3 normalAt(int i, int j) const;
+    // `spread` is how many cells the central difference reaches. One gives the surface normal the
+    // mesh is shaded with. More gives the slope of the hillside rather than of the ripple on it,
+    // which is what a biome rule wants: a rule fed mesh-scale slope puts a biome boundary on every
+    // bump, and a hundred one-vertex boundaries across a ridge is a sawtooth, not an ecotone.
+    [[nodiscard]] glm::vec3 normalAt(int i, int j, int spread = 1) const;
 };
 [[nodiscard]] ChunkField sampleChunkField(const WorldMap& map, const TerrainSettings& settings, glm::ivec2 coord);
 
