@@ -27,15 +27,25 @@ struct FocalPoint {
 };
 
 // A distance band from the camera with its own look. Bands are ordered near to far and clamp at
-// the last one; a scene with no bands behaves exactly as today.
+// the last one -- so a scene that declares only a near band applies it to everything beyond, which
+// is worth knowing before authoring one. A scene with no bands behaves exactly as it did before
+// bands existed.
+//
+// The two halves reach the frame by different routes, because they answer different questions.
+// `density` and `detail` are decisions about whole instances, taken in shaders/cull.wgsl against
+// the band a instance's centre falls in: `density` thins the band by a hash of the instance (so a
+// thinned band is stable under motion rather than flickering) and `detail` scales the LOD ladder.
+// `contrast` and `saturation` are per-pixel, applied in the composite pass of shaders/post.wgsl:
+// there they interpolate between band *midpoints*, because a value that switched at a band edge
+// would draw a line across the image.
 struct DepthLayer {
     std::string name = "mid";
     float start = 0.0f;        // metres from the camera
     float end = 60.0f;
-    float density = 1.0f;      // multiplies generator density in the band
-    float contrast = 1.0f;     // multiplies lighting contrast
-    float saturation = 1.0f;
-    float detail = 1.0f;       // multiplies material detail amplitude and LOD bias
+    float density = 1.0f;      // thins instances whose centre falls in the band
+    float contrast = 1.0f;     // multiplies the grade's contrast for pixels at this distance
+    float saturation = 1.0f;   // and its saturation
+    float detail = 1.0f;       // scales the LOD ladder: higher keeps a finer level further out
 };
 
 // A volume generators must avoid (negative space as an instruction).

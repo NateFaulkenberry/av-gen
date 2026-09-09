@@ -1984,6 +1984,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         scene::PostSettings postSettings = scene.post;
         postSettings.lens.shutterAngle = scene.camera.lens.shutterAngle;
         postIn.settings = &postSettings;
+        postIn.composition = &scene.composition; // ADR-038 depth layers grade the composite
         finalHdr = postProcessor_->run(encoder, postIn, *pool_);
         if (postProcessor_->outputTexture() != nullptr) {
             hdrOutput_ = postProcessor_->outputTexture();

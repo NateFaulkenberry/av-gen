@@ -1070,7 +1070,7 @@
     "start": 140,
     "end": 420,
     "density": 1.2,
-    "contrast": 0.8,
+    "contrast": 0.92,
     "saturation": 0.65,
     "detail": 0.5
    },
@@ -1079,8 +1079,8 @@
     "start": 420,
     "end": 1600,
     "density": 1.4,
-    "contrast": 0.55,
-    "saturation": 0.4,
+    "contrast": 0.82,
+    "saturation": 0.5,
     "detail": 0.25
    }
   ],

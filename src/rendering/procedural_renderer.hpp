@@ -145,6 +145,8 @@ struct EffectorPassUniforms {
 static_assert(sizeof(EffectorPassUniforms) == 128 + 16 + 48 * spatial::kMaxEffectors);
 
 // The cull pass parameters (shaders/cull.wgsl `CullParams`, 256 bytes).
+inline constexpr std::uint32_t kMaxCullDepthLayers = 6; // shaders/cull.wgsl CullParams
+
 struct CullPassUniforms {
     glm::mat4 objectToWorld;
     glm::vec4 planes[6];      // frustum planes (left, right, bottom, top, near, far)
@@ -154,8 +156,11 @@ struct CullPassUniforms {
     glm::uvec4 counts;        // x = record count, y = lod count, z = visible stride, w = scan blocks
     glm::uvec4 flags;         // x = cull enabled, y = thresholds are screen radii, z = stats slot, w = 0
     glm::uvec4 indexCounts;   // index count of each level's mesh
+    // ADR-038 depth layers, as (start, end, density, detail). `flags.w` holds the count, so a
+    // scene with no layers classifies exactly as it did before they existed.
+    glm::vec4 depthLayers[kMaxCullDepthLayers];
 };
-static_assert(sizeof(CullPassUniforms) == 256);
+static_assert(sizeof(CullPassUniforms) == 256 + 16 * kMaxCullDepthLayers);
 
 class ProceduralRenderer {
 public:

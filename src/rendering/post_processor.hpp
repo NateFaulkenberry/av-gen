@@ -18,6 +18,7 @@
 #include "core/error.hpp"
 #include "gpu/transient_pool.hpp"
 #include "scene/camera.hpp"
+#include "scene/composition_data.hpp"
 #include "scene/post_settings.hpp"
 
 #include <glm/glm.hpp>
@@ -50,6 +51,9 @@ struct PostFrameInputs {
     glm::vec3 cameraPos{0.0f};
     std::uint64_t frameIndex = 0;
     const scene::PostSettings* settings = nullptr;
+    // ADR-038: the scene's depth layers grade contrast and saturation by distance (atmospheric
+    // perspective). Null, or a scene with no layers, leaves the grade uniform across the frame.
+    const scene::CompositionData* composition = nullptr;
 };
 
 struct PostStats {
@@ -83,6 +87,8 @@ public:
     static constexpr wgpu::TextureFormat kVelocityFormat = wgpu::TextureFormat::RG16Float;
 
 private:
+    static constexpr std::uint32_t kMaxDepthLayers = 6; // shaders/post.wgsl PostUniforms
+
     struct Uniforms {
         glm::vec2 texelSize;
         glm::vec2 outputSize;
@@ -99,8 +105,11 @@ private:
         glm::vec4 cameraPos;
         glm::mat4 prevViewProj;
         glm::mat4 invViewProj;
+        // ADR-038 depth layers, as (start, end, contrast, saturation). Unused slots are zero and
+        // the count rides in params2.y, so a scene with no layers writes an identity grade.
+        glm::vec4 depthLayers[kMaxDepthLayers];
     };
-    static_assert(sizeof(Uniforms) == 16 + 16 * 11 + 128);
+    static_assert(sizeof(Uniforms) == 16 + 16 * 11 + 128 + 16 * kMaxDepthLayers);
     static constexpr std::uint32_t kSlotStride = 512; // dynamic-offset alignment safe
     static constexpr std::uint32_t kMaxSlots = 96;
     static constexpr std::uint64_t kMeterReadbackBytes = 256; // one row, alignment-safe

@@ -109,9 +109,17 @@ hours to find because the authoring looked correct.
 | `targetScreenPosition` / `framingStrength` | Parsed and never read. Three scenes were authored against them. |
 | `screenVelocity()`'s input | Fed framebuffer pixels instead of clip space, so the velocity target held hundreds of screens per frame. |
 
-All five are fixed with regression tests. **The depth `layers` half of the composition block is
-still inert and still advertised** — `layerAt()` has no callers outside a unit test. Two independent
-agents reported it as the single most misleading thing in the scene format.
+All five are fixed with regression tests, and so is the sixth: the composition block's depth
+`layers`, which two independent agents reported as the single most misleading thing in the scene
+format. `density` and `detail` now act on instances in `cull.wgsl`, and `contrast` and `saturation`
+grade pixels by distance in the composite pass — atmospheric perspective as a scene decision rather
+than a global grade.
+
+A seventh sat inside the fix itself and is worth recording, because it looked like a working
+feature: the composite pass never bound the scene depth, so it read the placeholder, every pixel
+measured as one unit away, and the whole frame silently received the *nearest* band. The temple
+looked different, so the change appeared to work. Only a test that asserted a near subject and a
+far subject were graded *differently* caught it.
 
 The lesson for the next feature: a field that a scene file can set, that round-trips through JSON
 and hashing, and that no test asserts an *observable* consequence for, is a field that probably

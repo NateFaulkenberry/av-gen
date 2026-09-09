@@ -508,3 +508,67 @@ TEST_CASE("Culling throughput", "[.perf][culling]") {
     WARN("1M points, culling off: GPU " << millionOff.gpuMs << " ms/frame");
     CHECK(ctx->errorCount() == 0);
 }
+
+// Depth layers (ADR-038) were parsed, validated, hashed and serialised, and read by nothing. Their
+// instance-side half is `density`, which thins a distance band, and `detail`, which moves the LOD
+// ladder; the per-pixel half lives in the composite pass. A scene with no layers must classify
+// exactly as it did before they existed, or every golden frame in the suite moves.
+TEST_CASE("Depth layers thin a distance band and move the LOD ladder", "[gpu][culling][composition]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    scene::Scene s = sceneWith(boxGrid(20, 20, 1.5f));
+    s.camera.position = {0.0f, 40.0f, 0.001f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    s.procedurals[0].lod.cull = true;
+
+    const auto visibleCount = [&](const scene::Scene& scene) {
+        (void)renderWith(renderer, scene);
+        auto counts = renderer.procedurals().readCullCounts("grid");
+        REQUIRE(counts.has_value());
+        return counts->visible;
+    };
+
+    const std::uint32_t all = visibleCount(s);
+    CHECK(all == 400);
+
+    // A band covering the whole grid at half density keeps roughly half of it, and the same scene
+    // rendered twice keeps exactly the same instances: the thinning is keyed on the instance, not
+    // on the frame, so a thinned band does not flicker under motion.
+    scene::Scene thinned = s;
+    thinned.composition.layers.push_back(scene::DepthLayer{.name = "band", .start = 0.0f, .end = 200.0f, .density = 0.5f});
+    const std::uint32_t half = visibleCount(thinned);
+    CHECK(half > 150);
+    CHECK(half < 250);
+    CHECK(visibleCount(thinned) == half);
+
+    // Density is monotonic, and 1.0 is exactly the untouched count.
+    std::uint32_t previous = 0;
+    for (const float density : {0.0f, 0.25f, 0.5f, 0.75f, 1.0f}) {
+        scene::Scene graded = s;
+        graded.composition.layers.push_back(
+            scene::DepthLayer{.name = "band", .start = 0.0f, .end = 200.0f, .density = density});
+        const std::uint32_t count = visibleCount(graded);
+        INFO("density " << density);
+        CHECK(count >= previous);
+        previous = count;
+    }
+    CHECK(previous == all);
+
+    // Bands clamp at the last one, which is a real authoring hazard worth pinning: a scene that
+    // declares only a near band applies that band's density to everything beyond it too.
+    scene::Scene nearOnly = s;
+    nearOnly.composition.layers.push_back(
+        scene::DepthLayer{.name = "near", .start = 0.0f, .end = 10.0f, .density = 0.0f});
+    CHECK(visibleCount(nearOnly) == 0); // the grid is at 40 units and past the last band
+
+    // Naming the far band restores it.
+    scene::Scene banded = nearOnly;
+    banded.composition.layers.push_back(
+        scene::DepthLayer{.name = "far", .start = 10.0f, .end = 200.0f, .density = 1.0f});
+    CHECK(visibleCount(banded) == all);
+
+    CHECK(ctx->errorCount() == 0);
+}

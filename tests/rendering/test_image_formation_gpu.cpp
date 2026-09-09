@@ -613,3 +613,94 @@ TEST_CASE("Image formation chain cost", "[.perf][post]") {
         }
     }
 }
+
+// Depth layers (ADR-038), image side: the composite pass grades contrast and saturation by the
+// distance of each pixel, which is atmospheric perspective. Half of this feature -- the instance
+// thinning -- lives in cull.wgsl; this is the half a viewer sees.
+TEST_CASE("Depth layers desaturate distance without touching the foreground", "[gpu][post][composition]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    // Two saturated cubes on black, one at 6 units and one at 40, framed so the near one occupies
+    // the left of frame and the far one the right.
+    scene::Scene s;
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.environment.showSkybox = false;
+    s.camera.position = {0.0f, 0.0f, 0.0f};
+    s.camera.target = {0.0f, 0.0f, -1.0f};
+    s.post.bloomEnabled = false;
+    s.post.bloomIntensity = 0.0f;
+    const auto nearMesh = s.addMesh(scene::makeCube(0.7f));
+    const auto farMesh = s.addMesh(scene::makeCube(5.0f));
+    auto& nearCube = s.addEntity("near", nearMesh);
+    nearCube.transform.position = {-1.4f, 0.0f, -6.0f};
+    nearCube.material.baseColor = {0.0f, 0.0f, 0.0f};
+    nearCube.material.emissiveColor = {1.0f, 0.15f, 0.05f};
+    nearCube.material.emissiveIntensity = 3.0f;
+    auto& farCube = s.addEntity("far", farMesh);
+    farCube.transform.position = {9.0f, 0.0f, -40.0f};
+    farCube.material.baseColor = {0.0f, 0.0f, 0.0f};
+    farCube.material.emissiveColor = {1.0f, 0.15f, 0.05f};
+    farCube.material.emissiveIntensity = 3.0f;
+
+    FrameTime time{};
+    // Mean saturation over the pixels a cube actually covers.
+    const auto saturationOf = [](const gpu::Image8& img, bool leftHalf) {
+        double sum = 0.0;
+        int count = 0;
+        for (std::uint32_t y = 0; y < img.height; ++y) {
+            for (std::uint32_t x = 0; x < img.width; ++x) {
+                const bool left = x < img.width / 2;
+                if (left != leftHalf) {
+                    continue;
+                }
+                const auto* p = img.pixel(x, y);
+                const int hi = std::max({p[0], p[1], p[2]});
+                const int lo = std::min({p[0], p[1], p[2]});
+                if (hi < 24) {
+                    continue; // background, where saturation is meaningless
+                }
+                sum += static_cast<double>(hi - lo) / static_cast<double>(hi);
+                ++count;
+            }
+        }
+        REQUIRE(count > 20);
+        return sum / count;
+    };
+
+    auto plain = renderer.renderToImage(s, time, 128, 96);
+    REQUIRE(plain.has_value());
+    const double nearPlain = saturationOf(*plain, true);
+    const double farPlain = saturationOf(*plain, false);
+
+    scene::Scene layered = s;
+    layered.composition.layers.push_back(
+        scene::DepthLayer{.name = "near", .start = 0.0f, .end = 12.0f, .density = 1.0f, .contrast = 1.0f, .saturation = 1.0f});
+    // The far band ends at 60, so a cube at 40 sits past its midpoint and receives the band's
+    // value in full. The grade interpolates between band midpoints -- a per-pixel value that
+    // switched at a band edge would draw a line across the image -- so a subject in the middle of
+    // a band is graded partway, which is the point.
+    layered.composition.layers.push_back(
+        scene::DepthLayer{.name = "far", .start = 12.0f, .end = 60.0f, .density = 1.0f, .contrast = 1.0f, .saturation = 0.1f});
+    auto graded = renderer.renderToImage(layered, time, 128, 96);
+    REQUIRE(graded.has_value());
+    const double nearGraded = saturationOf(*graded, true);
+    const double farGraded = saturationOf(*graded, false);
+
+    INFO("near " << nearPlain << " -> " << nearGraded << ", far " << farPlain << " -> " << farGraded);
+    CHECK(farGraded < farPlain * 0.6);            // distance lost its colour
+    CHECK(nearGraded > nearPlain * 0.9);          // the foreground kept its own
+    CHECK(nearGraded > farGraded * 1.5);          // and the two now read as different distances
+
+    // A scene with no layers is bit-identical to one whose only layer is the identity, so adding
+    // the feature cannot have moved any existing frame.
+    scene::Scene identity = s;
+    identity.composition.layers.push_back(
+        scene::DepthLayer{.name = "all", .start = 0.0f, .end = 1000.0f, .density = 1.0f, .contrast = 1.0f, .saturation = 1.0f});
+    auto same = renderer.renderToImage(identity, time, 128, 96);
+    REQUIRE(same.has_value());
+    CHECK(gpu::hashImage(*same) == gpu::hashImage(*plain));
+    CHECK(ctx->errorCount() == 0);
+}

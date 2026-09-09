@@ -1223,7 +1223,16 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                                         lodSettings.lodDistances[2], 0.0f);
             const std::uint32_t blocks = std::max((instanceCount + kCullScanBlock - 1) / kCullScanBlock, 1u);
             cull.counts = glm::uvec4(instanceCount, lodCount, state.visibleStride, blocks);
-            cull.flags = glm::uvec4(lodSettings.cull ? 1u : 0u, lodSettings.lodByScreenSize ? 1u : 0u, slot, 0u);
+            // ADR-038: the composition's depth bands thin instances and move the LOD ladder.
+            // With no bands the count is zero and classification is unchanged.
+            std::uint32_t bandCount = 0;
+            for (const scene::DepthLayer& layer : scene.composition.layers) {
+                if (bandCount >= kMaxCullDepthLayers) {
+                    break;
+                }
+                cull.depthLayers[bandCount++] = glm::vec4(layer.start, layer.end, layer.density, layer.detail);
+            }
+            cull.flags = glm::uvec4(lodSettings.cull ? 1u : 0u, lodSettings.lodByScreenSize ? 1u : 0u, slot, bandCount);
             cull.indexCounts = glm::uvec4(0u);
             for (std::uint32_t level = 0; level < lodCount; ++level) {
                 cull.indexCounts[static_cast<int>(level)] = lodMeshes[level]->indexCount;

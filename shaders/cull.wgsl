@@ -48,6 +48,8 @@ struct CullParams {
     counts: vec4<u32>,           // x = record count, y = lod count, z = visible stride, w = scan blocks
     flags: vec4<u32>,            // x = cull enabled, y = thresholds are screen radii, z = stats slot, w = 0
     indexCounts: vec4<u32>,      // index count of each level's mesh (for the indirect args)
+    // ADR-038 depth layers, as (start, end, density, detail); the count is flags.w.
+    depthLayers: array<vec4<f32>, 6>,
 };
 
 @group(0) @binding(0) var<uniform> cullParams: CullParams;
@@ -79,6 +81,39 @@ fn indexCountAt(level: u32) -> u32 {
     return v;
 }
 
+// ---- depth layers (ADR-038) ---------------------------------------------------------------------
+// A layer is a distance band with its own instance density and detail. Unlike the per-pixel grade
+// in post.wgsl, which interpolates so the image has no seam, an instance is either in a band or it
+// is not: `density` thins the band and `detail` scales the LOD thresholds, and both are discrete
+// decisions about whole objects. The band search returns (density, detail), or (1, 1) when the
+// scene declares no layers.
+fn depthBand(dist: f32) -> vec2<f32> {
+    let count = cullParams.flags.w;
+    if (count == 0u) {
+        return vec2<f32>(1.0, 1.0);
+    }
+    var last = vec2<f32>(1.0, 1.0);
+    for (var i = 0u; i < 6u; i = i + 1u) {
+        if (i >= count) { break; }
+        let layer = cullParams.depthLayers[i];
+        last = layer.zw;
+        if (dist < layer.y) {
+            return last;
+        }
+    }
+    return last; // past the last band, it clamps
+}
+
+// Deterministic per-instance value in [0, 1) from the record index. Keyed on the instance rather
+// than the frame, so thinning a band is stable under motion instead of flickering.
+fn instanceHash(i: u32) -> f32 {
+    var h = i * 0x9E3779B1u;
+    h = h ^ (h >> 15u);
+    h = h * 0x2C1B3C6Du;
+    h = h ^ (h >> 12u);
+    return f32(h >> 8u) / 16777216.0;
+}
+
 // ---- classification -----------------------------------------------------------------------------
 
 @compute @workgroup_size(64)
@@ -105,6 +140,11 @@ fn cs_cull_classify(@builtin(global_invocation_id) gid: vec3<u32>) {
         if (minRadius > 0.0 && screenRadius < minRadius) { culled = true; }
     }
 
+    // The composition's depth bands: `density` thins this band, `detail` moves the LOD ladder.
+    let band = depthBand(dist);
+    if (band.x < 1.0 && instanceHash(i) >= max(band.x, 0.0)) { culled = true; }
+    let detail = max(band.y, 1e-3);
+
     // LOD ladder: a threshold of 0 ends it, so an unconfigured object stays at LOD0.
     var level = 0u;
     let lodCount = max(cullParams.counts.y, 1u);
@@ -113,8 +153,10 @@ fn cs_cull_classify(@builtin(global_invocation_id) gid: vec3<u32>) {
         if (k + 1u >= lodCount) { break; }
         let t = thresholdAt(k);
         if (t <= 0.0) { break; }
-        var take = dist >= t;
-        if (byScreen) { take = screenRadius <= t; }
+        // Higher detail pushes the ladder further out (distance) or accepts a smaller sliver
+        // before dropping a level (screen radius).
+        var take = dist >= t * detail;
+        if (byScreen) { take = screenRadius <= t / detail; }
         if (!take) { break; }
         level = k + 1u;
     }

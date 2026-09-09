@@ -24,6 +24,8 @@ struct PostUniforms {
     cameraPos: vec4<f32>,
     prevViewProj: mat4x4<f32>,
     invViewProj: mat4x4<f32>,
+    // ADR-038 depth layers, as (start, end, contrast, saturation); the count is params2.y.
+    depthLayers: array<vec4<f32>, 6>,
 };
 
 @group(0) @binding(0) var<uniform> post: PostUniforms;
@@ -269,6 +271,56 @@ fn fs_lens(in: FsIn) -> @location(0) vec4<f32> {
     return vec4<f32>(textureSampleLevel(source, linearSampler, uv, 0.0).rgb, 1.0);
 }
 
+// ---- depth helpers -----------------------------------------------------------------------------
+
+fn worldFromDepth(uv: vec2<f32>, depth: f32) -> vec3<f32> {
+    let ndc = vec4<f32>(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0, depth, 1.0);
+    let w = post.invViewProj * ndc;
+    return w.xyz / w.w;
+}
+
+fn sampleDepth(uv: vec2<f32>) -> f32 {
+    let size = vec2<f32>(textureDimensions(depthTex));
+    let coord = vec2<i32>(clamp(uv * size, vec2<f32>(0.0), size - vec2<f32>(1.0)));
+    return textureLoad(depthTex, coord, 0);
+}
+
+fn viewDistance(uv: vec2<f32>) -> f32 {
+    let d = sampleDepth(uv);
+    if (d >= 1.0) { return 1e6; }
+    return length(worldFromDepth(uv, d) - post.cameraPos.xyz);
+}
+
+// ---- depth layers: atmospheric perspective (ADR-038) ---------------------------------------------
+// A layer is a distance band with its own contrast and saturation. `layerAt()` on the CPU answers
+// the discrete question -- which band an *instance* is in -- but a per-pixel grade cannot switch
+// at a band edge without drawing a line across the image, so the grade treats each layer's values
+// as sitting at its band's midpoint and interpolates between midpoints, clamped at the ends. One
+// layer therefore grades its whole range uniformly, which is what a single band should mean.
+fn depthGrade(distance: f32, count: u32) -> vec2<f32> {
+    if (count == 0u) {
+        return vec2<f32>(1.0, 1.0);
+    }
+    var prevMid = 0.0;
+    var prevValue = vec2<f32>(1.0, 1.0);
+    for (var i = 0u; i < 6u; i = i + 1u) {
+        if (i >= count) { break; }
+        let layer = post.depthLayers[i];
+        let mid = (layer.x + layer.y) * 0.5;
+        let value = layer.zw;
+        if (i == 0u && distance <= mid) {
+            return value;
+        }
+        if (i > 0u && distance <= mid) {
+            let span = max(mid - prevMid, 1e-4);
+            return mix(prevValue, value, clamp((distance - prevMid) / span, 0.0, 1.0));
+        }
+        prevMid = mid;
+        prevValue = value;
+    }
+    return prevValue;
+}
+
 // ---- composite: bloom and the wide tier mixed in, then colour grading ---------------------------
 
 fn hueRotate(c: vec3<f32>, angle: f32) -> vec3<f32> {
@@ -290,6 +342,7 @@ fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
     let temperature = post.params1.z;
     let tint = post.params1.w;
     let hueShift = post.params2.x;
+    let layerCount = u32(post.params2.y + 0.5);
 
     var color = textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb;
     if (bloomOn > 0.5) {
@@ -304,11 +357,13 @@ fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
     if (abs(hueShift) > 1e-4) {
         color = hueRotate(color, hueShift);
     }
-    // Contrast about mid grey in log space, saturation about luminance.
+    // Contrast about mid grey in log space, saturation about luminance. The depth layers scale
+    // both per pixel, so distance can flatten and desaturate on its own.
+    let grade = depthGrade(viewDistance(in.uv), layerCount);
     let grey = 0.18;
-    color = grey * pow(max(color, vec3<f32>(1e-5)) / grey, vec3<f32>(contrast));
+    color = grey * pow(max(color, vec3<f32>(1e-5)) / grey, vec3<f32>(contrast * grade.x));
     let lum = luminance(color);
-    color = mix(vec3<f32>(lum), color, saturation);
+    color = mix(vec3<f32>(lum), color, saturation * grade.y);
     // Lift / gamma / gain.
     color = pow(max(color * post.gain.rgb + post.lift.rgb, vec3<f32>(0.0)), vec3<f32>(1.0) / max(post.gamma.rgb, vec3<f32>(1e-3)));
     return vec4<f32>(color, 1.0);
@@ -340,26 +395,6 @@ fn fs_sharpen(in: FsIn) -> @location(0) vec4<f32> {
     let hi = max(c, max(max(n, s), max(w, e)));
     let sharpened = c + (c * 4.0 - (n + s + w + e)) * amount * 0.25;
     return vec4<f32>(mix(c, clamp(sharpened, lo, hi), mask), 1.0);
-}
-
-// ---- depth helpers -----------------------------------------------------------------------------
-
-fn worldFromDepth(uv: vec2<f32>, depth: f32) -> vec3<f32> {
-    let ndc = vec4<f32>(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0, depth, 1.0);
-    let w = post.invViewProj * ndc;
-    return w.xyz / w.w;
-}
-
-fn sampleDepth(uv: vec2<f32>) -> f32 {
-    let size = vec2<f32>(textureDimensions(depthTex));
-    let coord = vec2<i32>(clamp(uv * size, vec2<f32>(0.0), size - vec2<f32>(1.0)));
-    return textureLoad(depthTex, coord, 0);
-}
-
-fn viewDistance(uv: vec2<f32>) -> f32 {
-    let d = sampleDepth(uv);
-    if (d >= 1.0) { return 1e6; }
-    return length(worldFromDepth(uv, d) - post.cameraPos.xyz);
 }
 
 // ---- depth of field: circle-of-confusion gather -------------------------------------------------

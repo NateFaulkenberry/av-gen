@@ -580,11 +580,23 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         Uniforms u = base;
         u.params0 = glm::vec4(s.bloomIntensity, (bloomOn && bloom) ? 1.0f : 0.0f, wide ? 1.0f : 0.0f, 0.0f);
         u.params1 = glm::vec4(s.contrast, s.saturation, s.temperature, s.tint);
-        u.params2 = glm::vec4(s.hueShift, 0.0f, 0.0f, 0.0f);
+        // ADR-038: the scene's depth bands grade contrast and saturation by distance. Without
+        // them the count is zero and the grade is exactly the uniform one it has always been.
+        std::uint32_t layerCount = 0;
+        if (in.composition != nullptr) {
+            for (const scene::DepthLayer& layer : in.composition->layers) {
+                if (layerCount >= kMaxDepthLayers) {
+                    break;
+                }
+                u.depthLayers[layerCount++] = glm::vec4(layer.start, layer.end, layer.contrast, layer.saturation);
+            }
+        }
+        u.params2 = glm::vec4(s.hueShift, static_cast<float>(layerCount), 0.0f, 0.0f);
         PassTextures textures;
         textures.source = current;
         textures.second = bloom;
         textures.third = wide;
+        textures.depth = in.depth; // the depth grade needs the real depth, not the placeholder
         runPass(encoder, composite_, target.view, textures, u);
         current = target.view;
         output_ = target.texture;
