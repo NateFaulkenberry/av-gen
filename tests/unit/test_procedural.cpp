@@ -2058,3 +2058,91 @@ TEST_CASE("A beveled cylinder is a revolved profile with rounded rims", "[proced
     sharp.bevel = 0.0f;
     CHECK(spec.structuralHash() != sharp.structuralHash());
 }
+
+// Tubes (ADR-043): the organic primitive. A stem, a branch, a vine, a root, a tendril and a
+// tentacle are one swept curve with different taper, twist and profile, so this checks the sweep
+// itself rather than any one of those.
+TEST_CASE("A tube sweeps a tapering profile along its curve", "[procedural][tube]") {
+    spatial::Spline curve;
+    curve.generator = spatial::SplineGenerator::Line;
+    curve.start = {0.0f, 0.0f, 0.0f};
+    curve.end = {0.0f, 4.0f, 0.0f};
+    curve.count = 8;
+    REQUIRE(curve.validate().has_value());
+
+    const float radius = 0.5f;
+    const MeshData tube = makeTube(curve, radius, 0.25f, 12, 20, 0.0f, true);
+    REQUIRE(!tube.vertices.empty());
+    CHECK(sameMesh(tube, makeTube(curve, radius, 0.25f, 12, 20, 0.0f, true))); // deterministic
+
+    // A straight line makes a cone frustum: the distance from the axis must follow the taper.
+    float maxError = 0.0f;
+    const std::size_t sideVertices = static_cast<std::size_t>(21) * 13; // (segments + 1) x (sides + 1)
+    for (std::size_t i = 0; i < tube.vertices.size(); ++i) {
+        const Vertex& v = tube.vertices[i];
+        CHECK_THAT(static_cast<double>(glm::length(v.normal)), WithinAbs(1.0, 1e-4));
+        if (i >= sideVertices) {
+            continue; // the cap fans include a centre vertex on the axis
+        }
+        const float rho = std::sqrt(v.position.x * v.position.x + v.position.z * v.position.z);
+        const float u = std::clamp(v.position.y / 4.0f, 0.0f, 1.0f);
+        const float expected = radius * ((1.0f - u) + u * 0.25f);
+        maxError = std::max(maxError, std::abs(rho - expected));
+    }
+    CHECK_THAT(static_cast<double>(maxError), WithinAbs(0.0, 1e-3));
+
+    // The taper has to show up in the shading: a cone's side normal tilts away from the axis, so
+    // a purely radial normal would mean the surface was being shaded as a cylinder.
+    float maxAxial = 0.0f;
+    for (const Vertex& v : tube.vertices) {
+        if (v.position.y > 0.4f && v.position.y < 3.6f) { // skip the caps
+            maxAxial = std::max(maxAxial, v.normal.y);
+        }
+    }
+    CHECK(maxAxial > 0.05f);
+
+    // Winding and collapsed edges, as for every other generator here.
+    std::size_t inverted = 0;
+    for (std::size_t i = 0; i + 2 < tube.indices.size(); i += 3) {
+        const Vertex& va = tube.vertices[tube.indices[i]];
+        const Vertex& vb = tube.vertices[tube.indices[i + 1]];
+        const Vertex& vc = tube.vertices[tube.indices[i + 2]];
+        CHECK(va.position != vb.position);
+        const glm::vec3 geometric = glm::cross(vb.position - va.position, vc.position - va.position);
+        if (glm::dot(geometric, va.normal + vb.normal + vc.normal) <= 0.0f) {
+            ++inverted;
+        }
+    }
+    CHECK(inverted == 0);
+
+    // A curve with no extent has no tube, and says so by being empty rather than by folding.
+    spatial::Spline degenerate = curve;
+    degenerate.end = degenerate.start;
+    CHECK(makeTube(degenerate, radius, 1.0f, 12, 20, 0.0f, true).vertices.empty());
+
+    // A fully tapered end closes itself, so it needs no cap.
+    const MeshData point = makeTube(curve, radius, 0.0f, 12, 20, 0.0f, true);
+    float smallest = 1e9f;
+    for (const Vertex& v : point.vertices) {
+        if (v.position.y > 3.9f) {
+            smallest = std::min(smallest, std::sqrt(v.position.x * v.position.x + v.position.z * v.position.z));
+        }
+    }
+    CHECK_THAT(static_cast<double>(smallest), WithinAbs(0.0, 1e-4));
+
+    // Through the spec, with the hash noticing a changed curve.
+    SourceSpec spec;
+    spec.kind = PrimitiveKind::Tube;
+    spec.curve = curve;
+    spec.tubeRadius = radius;
+    spec.tubeTaper = 0.25f;
+    spec.tubeSides = 12;
+    spec.tubeSegments = 20;
+    REQUIRE(spec.validate().has_value());
+    auto fromSpec = makeSourceMesh(spec);
+    REQUIRE(fromSpec.has_value());
+    CHECK(sameMesh(*fromSpec, tube));
+    SourceSpec bent = spec;
+    bent.curve.end = {1.0f, 4.0f, 0.0f};
+    CHECK(spec.structuralHash() != bent.structuralHash());
+}

@@ -474,6 +474,15 @@ glm::vec3 sourceHalfExtent(const SourceSpec& s) {
         return glm::vec3(s.pointSize * 0.5f);
     case PrimitiveKind::Procedural:
         return glm::vec3(0.0f); // resolved through the referenced object (detail::sourceHalfExtent)
+    case PrimitiveKind::Tube: {
+        // A handful of samples along the curve, grown by the widest the profile ever gets. The
+        // culler only needs a bound that contains the tube, and meshing it here would be waste.
+        glm::vec3 extent(0.0f);
+        for (const spatial::SplineSample& sample : s.curve.samples(16)) {
+            extent = glm::max(extent, glm::abs(sample.position));
+        }
+        return extent + glm::vec3(s.tubeRadius * std::max(1.0f, s.tubeTaper));
+    }
     case PrimitiveKind::Torus:
     default:
         return {s.majorRadius + s.minorRadius, s.minorRadius, s.majorRadius + s.minorRadius};
@@ -513,13 +522,15 @@ const char* primitiveKindName(PrimitiveKind kind) {
         return "point";
     case PrimitiveKind::Procedural:
         return "procedural";
+    case PrimitiveKind::Tube:
+        return "tube";
     }
     return "cylinder";
 }
 
 std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name) {
     for (const auto kind : {PrimitiveKind::Box, PrimitiveKind::Cylinder, PrimitiveKind::Sphere, PrimitiveKind::Torus,
-                            PrimitiveKind::Point, PrimitiveKind::Procedural}) {
+                            PrimitiveKind::Point, PrimitiveKind::Procedural, PrimitiveKind::Tube}) {
         if (name == primitiveKindName(kind)) {
             return kind;
         }
@@ -667,6 +678,23 @@ Result<void> SourceSpec::validate() const {
             return fail("box bevelSegments must be in 1..16 (got {})", bevelSegments);
         }
         break;
+    case PrimitiveKind::Tube:
+        if (!(tubeRadius > 0.0f)) {
+            return fail("tube radius must be positive (got {})", tubeRadius);
+        }
+        if (!(tubeTaper >= 0.0f)) {
+            return fail("tube taper must be >= 0 (got {})", tubeTaper);
+        }
+        if (!inRange(tubeSides, 3, 64)) {
+            return fail("tube sides must be in 3..64 (got {})", tubeSides);
+        }
+        if (!inRange(tubeSegments, 2, 512)) {
+            return fail("tube segments must be in 2..512 (got {})", tubeSegments);
+        }
+        if (auto ok = curve.validate(); !ok) {
+            return fail("tube curve: {}", ok.error().message);
+        }
+        break;
     case PrimitiveKind::Cylinder:
         if (!(radius > 0.0f) || !(height > 0.0f)) {
             return fail("cylinder radius and height must be positive");
@@ -732,6 +760,15 @@ std::uint64_t SourceSpec::structuralHash() const {
         h.boolean(caps);
         h.f32(bevel);
         h.i32(bevelSegments);
+        break;
+    case PrimitiveKind::Tube:
+        h.f32(tubeRadius);
+        h.f32(tubeTaper);
+        h.i32(tubeSides);
+        h.i32(tubeSegments);
+        h.f32(tubeTwist);
+        h.boolean(tubeCaps);
+        h.u64(curve.structuralHash());
         break;
     case PrimitiveKind::Sphere:
         h.f32(radius);
@@ -1082,6 +1119,125 @@ MeshData makeBeveledCylinder(float radius, float height, int radialSegments, int
     return mesh;
 }
 
+// A profile swept along a curve. Positions are laid out first and the normals come from the
+// swept surface itself (the cross of the two surface tangents), so a tapering tube shades as a
+// cone rather than as a cylinder and a twisting one shades along its twist. The radial direction
+// is used only to orient the result outwards.
+MeshData makeTube(const spatial::Spline& curve, float radius, float taper, int sides, int segments, float twist,
+                  bool caps) {
+    MeshData mesh;
+    mesh.name = "tube";
+    const float length = curve.length();
+    if (!(length > 1e-6f) || !(radius > 0.0f)) {
+        return mesh; // a curve with no extent has no tube; an empty mesh is better than a fold
+    }
+    const auto around = static_cast<std::uint32_t>(std::clamp(sides, 3, 64));
+    const auto along = static_cast<std::uint32_t>(std::clamp(segments, 2, 512));
+    const float endScale = std::max(taper, 0.0f);
+    constexpr float kTwoPi = 6.28318530718f;
+    const std::uint32_t columns = around + 1; // duplicated seam so uvs run 0..1
+
+    struct Ring {
+        spatial::SplineSample sample;
+        float radius;
+    };
+    std::vector<Ring> rings;
+    rings.reserve(along + 1);
+    for (std::uint32_t i = 0; i <= along; ++i) {
+        const float u = static_cast<float>(i) / static_cast<float>(along);
+        const spatial::SplineSample sample = curve.sampleByDistance(u * length);
+        rings.push_back({sample, radius * std::max(sample.scale, 0.0f) * ((1.0f - u) + u * endScale)});
+    }
+
+    const auto pointAt = [&](std::uint32_t row, float angle) {
+        const Ring& ring = rings[row];
+        const float u = static_cast<float>(row) / static_cast<float>(along);
+        const float theta = angle + twist * u;
+        const glm::vec3 offset = ring.sample.normal * std::cos(theta) + ring.sample.binormal * std::sin(theta);
+        return ring.sample.position + offset * ring.radius;
+    };
+
+    for (std::uint32_t row = 0; row <= along; ++row) {
+        const float v = static_cast<float>(row) / static_cast<float>(along);
+        for (std::uint32_t col = 0; col < columns; ++col) {
+            const float u = static_cast<float>(col) / static_cast<float>(around);
+            const float theta = u * kTwoPi;
+            const glm::vec3 position = pointAt(row, theta);
+            // Surface tangents by central difference in both parameters: exact enough that the
+            // taper's slope shows up in the shading, and free of the special cases an analytic
+            // derivative would need at the ends and at a zero-radius ring.
+            const float dTheta = kTwoPi / static_cast<float>(around);
+            const glm::vec3 dAround = pointAt(row, theta + dTheta) - pointAt(row, theta - dTheta);
+            const std::uint32_t prev = row > 0 ? row - 1 : row;
+            const std::uint32_t next = row < along ? row + 1 : row;
+            const glm::vec3 dAlong = pointAt(next, theta) - pointAt(prev, theta);
+            glm::vec3 normal = glm::cross(dAlong, dAround);
+            const glm::vec3 radial = position - rings[row].sample.position;
+            if (glm::dot(normal, normal) < 1e-16f) {
+                normal = glm::dot(radial, radial) > 1e-16f ? radial : rings[row].sample.normal;
+            }
+            normal = glm::normalize(normal);
+            if (glm::dot(normal, radial) < 0.0f) {
+                normal = -normal;
+            }
+            mesh.vertices.push_back(Vertex{position, normal, {u, v}});
+        }
+    }
+
+    const auto emit = [&](std::uint32_t i0, std::uint32_t i1, std::uint32_t i2) {
+        const glm::vec3& p0 = mesh.vertices[i0].position;
+        const glm::vec3& p1 = mesh.vertices[i1].position;
+        const glm::vec3& p2 = mesh.vertices[i2].position;
+        if (p0 != p1 && p1 != p2 && p0 != p2) {
+            mesh.indices.insert(mesh.indices.end(), {i0, i1, i2});
+        }
+    };
+    for (std::uint32_t row = 0; row < along; ++row) {
+        for (std::uint32_t col = 0; col < around; ++col) {
+            const std::uint32_t a = row * columns + col;
+            const std::uint32_t c = a + 1;
+            const std::uint32_t d = a + columns;
+            const std::uint32_t e = d + 1;
+            // The surface normal is cross(dAlong, dAround), so the first edge of each triangle
+            // has to run along the curve and the second around it.
+            emit(a, d, c);
+            emit(c, d, e);
+        }
+    }
+
+    if (caps) {
+        for (const bool atEnd : {false, true}) {
+            const Ring& ring = atEnd ? rings.back() : rings.front();
+            if (!(ring.radius > 1e-6f)) {
+                continue; // a fully tapered end is already closed
+            }
+            const glm::vec3 normal = atEnd ? ring.sample.tangent : -ring.sample.tangent;
+            const auto centre = static_cast<std::uint32_t>(mesh.vertices.size());
+            mesh.vertices.push_back(Vertex{ring.sample.position, normal, {0.5f, 0.5f}});
+            const std::uint32_t row = atEnd ? along : 0u;
+            const float roll = atEnd ? twist : 0.0f;
+            for (std::uint32_t col = 0; col < around; ++col) {
+                const float u = static_cast<float>(col) / static_cast<float>(around);
+                const float theta = u * kTwoPi + roll;
+                const glm::vec3 offset = ring.sample.normal * std::cos(theta) + ring.sample.binormal * std::sin(theta);
+                mesh.vertices.push_back(
+                    Vertex{ring.sample.position + offset * ring.radius, normal,
+                           {0.5f + 0.5f * std::cos(theta), 0.5f + 0.5f * std::sin(theta)}});
+            }
+            for (std::uint32_t col = 0; col < around; ++col) {
+                const std::uint32_t first = centre + 1 + col;
+                const std::uint32_t second = centre + 1 + (col + 1) % around;
+                if (atEnd) {
+                    emit(centre, second, first);
+                } else {
+                    emit(centre, first, second);
+                }
+            }
+        }
+    }
+    return mesh;
+}
+
 MeshData makeUvSphere(float radius, int segments, int rings) {
     const auto ss = static_cast<std::uint32_t>(std::clamp(segments, 3, 256));
     const auto rr = static_cast<std::uint32_t>(std::clamp(rings, 2, 128));
@@ -1181,6 +1337,9 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
         return makeUvSphere(spec.radius, spec.segments, spec.rings);
     case PrimitiveKind::Torus:
         return makeTorus(spec.majorRadius, spec.minorRadius, spec.majorSegments, spec.minorSegments);
+    case PrimitiveKind::Tube:
+        return makeTube(spec.curve, spec.tubeRadius, spec.tubeTaper, spec.tubeSides, spec.tubeSegments,
+                        spec.tubeTwist, spec.tubeCaps);
     case PrimitiveKind::Point:
         return makePointQuad(spec.pointSize);
     case PrimitiveKind::Procedural:
@@ -1963,6 +2122,13 @@ json ProceduralGeometry::toJson() const {
         s["size"] = vecToJson(source.size);
         s["subdivisions"] = source.subdivisions;
         s["bevel"] = source.bevel;
+        s["tubeRadius"] = source.tubeRadius;
+        s["tubeTaper"] = source.tubeTaper;
+        s["tubeSides"] = source.tubeSides;
+        s["tubeSegments"] = source.tubeSegments;
+        s["tubeTwist"] = source.tubeTwist;
+        s["tubeCaps"] = source.tubeCaps;
+        s["curve"] = source.curve.toJson();
         s["bevelSegments"] = source.bevelSegments;
         s["radius"] = source.radius;
         s["height"] = source.height;
@@ -2145,6 +2311,19 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(s.size, "size", readVec3);
         AVGEN_PROC_READ(s.subdivisions, "subdivisions", readInt);
         AVGEN_PROC_READ(s.bevel, "bevel", readFloat);
+        AVGEN_PROC_READ(s.tubeRadius, "tubeRadius", readFloat);
+        AVGEN_PROC_READ(s.tubeTaper, "tubeTaper", readFloat);
+        AVGEN_PROC_READ(s.tubeSides, "tubeSides", readInt);
+        AVGEN_PROC_READ(s.tubeSegments, "tubeSegments", readInt);
+        AVGEN_PROC_READ(s.tubeTwist, "tubeTwist", readFloat);
+        AVGEN_PROC_READ(s.tubeCaps, "tubeCaps", readBool);
+        if (j.contains("curve")) {
+            auto curve = spatial::Spline::fromJson(j.at("curve"));
+            if (!curve) {
+                return fail("tube curve: {}", curve.error().message);
+            }
+            s.curve = std::move(*curve);
+        }
         AVGEN_PROC_READ(s.bevelSegments, "bevelSegments", readInt);
         AVGEN_PROC_READ(s.radius, "radius", readFloat);
         AVGEN_PROC_READ(s.height, "height", readFloat);
@@ -2458,7 +2637,7 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
 
     // Source
     const SourceSpec& s = rest.source;
-    r.i("source/kind", static_cast<int>(s.kind), 0, 5, 0, 5);
+    r.i("source/kind", static_cast<int>(s.kind), 0, 6, 0, 6);
     p.sourceSize = r.v3("source/size", s.size, 0.001f, 1000.0f, 0.01f, 10.0f);
     r.i("source/subdivisions", s.subdivisions, 1, 64, 1, 16);
     r.f("source/bevel", s.bevel, 0.0f, 1e3f, 0.0f, 1.0f);
@@ -2671,7 +2850,7 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
     }
     // Source
     SourceSpec& s = live.source;
-    copyEnum(p, "source/kind", s.kind, 5);
+    copyEnum(p, "source/kind", s.kind, 6);
     copyValue(p, "source/size", s.size);
     copyValue(p, "source/subdivisions", s.subdivisions);
     copyValue(p, "source/bevel", s.bevel);

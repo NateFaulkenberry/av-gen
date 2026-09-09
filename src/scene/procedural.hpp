@@ -23,6 +23,7 @@
 #include "scene/scene_types.hpp"
 #include "spatial/effector.hpp"
 #include "spatial/field.hpp"
+#include "spatial/spline.hpp"
 #include "spatial/point_cloud.hpp"
 #include "spatial/spatial_ops.hpp"
 #include "spatial/spline.hpp"
@@ -50,7 +51,7 @@ namespace avgen::scene {
 // source mesh is used and its cloud is composed under each of this object's placements
 // (hierarchical instancing, ADR-029). The referenced object may itself reference another
 // (depth <= kMaxHierarchyDepth; cycles are rejected by validate through the scene).
-enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point, Procedural };
+enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point, Procedural, Tube };
 [[nodiscard]] const char* primitiveKindName(PrimitiveKind kind);
 [[nodiscard]] std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name);
 
@@ -79,6 +80,18 @@ struct SourceSpec {
     float minorRadius = 0.25f;
     int majorSegments = 48;        // 3..256
     int minorSegments = 16;        // 3..128
+    // Tube (ADR-043): a profile swept along a curve. This is the organic primitive -- stems,
+    // branches, vines, roots, tendrils, tentacles and ribbons are all one swept curve with
+    // different taper, twist and profile. The curve is embedded rather than referenced by name so
+    // the mesh stays a pure function of the spec, and its own generator (line, helix, spiral,
+    // bezier, noise) supplies the shape.
+    spatial::Spline curve;
+    float tubeRadius = 0.1f;       // radius at the start
+    float tubeTaper = 0.2f;        // radius at the end, as a fraction of the start (1 = no taper)
+    int tubeSides = 10;            // 3..64 around the profile
+    int tubeSegments = 24;         // 2..512 along the curve
+    float tubeTwist = 0.0f;        // radians of roll accumulated over the whole length
+    bool tubeCaps = true;
     // Point
     float pointSize = 0.05f;       // quad edge (units); scaled by the instance scale
     // Procedural
@@ -102,6 +115,11 @@ struct SourceSpec {
 [[nodiscard]] MeshData makeUvSphere(float radius, int segments, int rings);
 [[nodiscard]] MeshData makeTorus(float majorRadius, float minorRadius, int majorSegments, int minorSegments);
 [[nodiscard]] MeshData makePointQuad(float size); // 4 vertices, 2 triangles, XY plane, normal +Z, uv 0..1
+// A tapering, twisting tube swept along a curve (ADR-043). Normals come from the swept surface
+// itself, so a taper shades as a cone rather than as a cylinder. Zero-length or degenerate curves
+// return an empty mesh rather than a fold.
+[[nodiscard]] MeshData makeTube(const spatial::Spline& curve, float radius, float taper, int sides, int segments,
+                                float twist, bool caps);
 [[nodiscard]] Result<MeshData> makeSourceMesh(const SourceSpec& spec);
 // Reduced versions of the source for LOD levels (ADR-029, GPU culling/LOD):
 //   0 = makeSourceMesh(spec) exactly;

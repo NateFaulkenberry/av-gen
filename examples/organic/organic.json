@@ -1,0 +1,43 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Organic Curves"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "organic.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/lens/focalLength": 55.0,
+  "camera/lens/aperture": 3.2,
+  "camera/lens/focusDistance": 8.6,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.2,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.4,
+  "post/bloom/threshold": 1.1,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "post/output/vignette": 0.4,
+  "post/output/grain": 0.03
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": false,
+  "tracks": [],
+  "cues": []
+ },
+ "render": {
+  "width": 1280,
+  "height": 720,
+  "fps": 24,
+  "output": "sequence",
+  "path": "renders/organic"
+ }
+}
