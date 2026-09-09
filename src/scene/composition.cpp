@@ -1994,8 +1994,23 @@ void Composition::applyParameters() {
         const float scale = keyLight_ != nullptr ? std::max(keyLight_->value(), 0.0f) : 1.0f;
         live.keyIntensity *= scale;
         live.ambientIntensity *= scale;
+        // A rig lights a subject, not a bounding box. When the composition names what the frame
+        // is about, size the rig to that focal point; otherwise fall back to the whole scene.
+        // Without this a world with distant background geometry pushes its key light hundreds of
+        // units away, and an area light there contributes almost nothing.
+        glm::vec3 subjectCenter = center_;
+        float subjectRadius = radius_;
+        const FocalPoint* focus = compositionData_.cameraTarget.empty()
+                                      ? (compositionData_.focalPoints.empty()
+                                             ? nullptr
+                                             : &compositionData_.focalPoints.front())
+                                      : compositionData_.find(compositionData_.cameraTarget);
+        if (focus != nullptr) {
+            subjectCenter = focus->position;
+            subjectRadius = std::max(focus->radius, 1e-3f);
+        }
         std::vector<PunctualLight> expanded =
-            live.expand(center_, radius_, scene_.camera.position, glm::vec3(0.0f, 1.0f, 0.0f));
+            live.expand(subjectCenter, subjectRadius, scene_.camera.position, glm::vec3(0.0f, 1.0f, 0.0f));
         rigLightCount_ = expanded.size();
         for (PunctualLight& light : expanded) {
             light.name = sanitise(prefix_) + light.name;
