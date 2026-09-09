@@ -14,7 +14,12 @@
 // opacity; the per-instance multipliers and the material textures then apply to its result. With
 // no program the path is byte for byte the pre-ADR-030 shader. Modules that include this file
 // must also include fields.wgsl (material.wgsl needs it for Field ops).
+//
+// Lighting (ADR-033/034) lives in lighting.wgsl: the packed light buffer, the froxel grid, area
+// lights, shadow maps, contact shadows and ambient occlusion. Every path through this file uses
+// it, so a mesh, an instance and an SDF surface receive light identically.
 #include "material.wgsl"
+#include "lighting.wgsl"
 
 // Which program the bound material runs; a 16-byte slice of the shared select buffer.
 struct MaterialSelect {
@@ -77,30 +82,6 @@ fn perturbNormal(n: vec3<f32>, worldPos: vec3<f32>, uv: vec2<f32>, mapNormal: ve
     return normalize(tbn * mapNormal);
 }
 
-fn lightRadiance(light: Light, worldPos: vec3<f32>) -> vec4<f32> { // xyz = L (towards light), w = attenuation
-    let kind = light.positionType.w;
-    if (kind < 0.5) {
-        return vec4<f32>(-light.directionRange.xyz, 1.0);
-    }
-    let toLight = light.positionType.xyz - worldPos;
-    let dist2 = max(dot(toLight, toLight), 1e-4);
-    let dist = sqrt(dist2);
-    let l = toLight / dist;
-    var attenuation = 1.0 / dist2;
-    let range = light.directionRange.w;
-    if (range > 0.0) {
-        let ratio = dist / range;
-        let window = clamp(1.0 - ratio * ratio * ratio * ratio, 0.0, 1.0);
-        attenuation = attenuation * window * window;
-    }
-    if (kind > 1.5) {
-        let cosAngle = dot(-l, light.directionRange.xyz);
-        let spot = clamp((cosAngle - light.cone.x) * light.cone.y, 0.0, 1.0);
-        attenuation = attenuation * spot * spot;
-    }
-    return vec4<f32>(l, attenuation);
-}
-
 // Exponential-squared distance fog towards frame.fogParams.rgb; density 0 leaves the colour
 // untouched (the branch keeps the no-fog output bit-identical to the pre-fog shader).
 fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
@@ -138,17 +119,40 @@ fn materialInstanceZero(localPosition: vec3<f32>) -> MaterialInstanceInfo {
     return info;
 }
 
+// Everything one fragment needs to fill the auxiliary targets as well as the colour (ADR-035).
+struct ShadeResult {
+    color: vec4<f32>,
+    normal: vec3<f32>,     // the shading normal, after normal mapping
+    roughness: f32,
+    emission: vec3<f32>,
+    bloomWeight: f32,
+    flags: f32,            // 1 = lit, 2 = emissive, 4 = transparent
+};
+
 // The whole material evaluation for one fragment. `colorMul` / `emissiveMul` are per-instance
 // multipliers on the base colour and emissive (vec3(1.0) for entities). May discard (alpha mask).
 // Without instance information (entities before ADR-030 wiring): the object's own local position.
 fn shadePbr(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFacing: bool,
-            colorMul: vec3<f32>, emissiveMul: vec3<f32>) -> vec4<f32> {
-    return shadePbrInstanced(worldPos, normalIn, uv, frontFacing, colorMul, emissiveMul,
-                             materialInstanceZero(vec3<f32>(0.0)));
+            colorMul: vec3<f32>, emissiveMul: vec3<f32>, screenUv: vec2<f32>) -> vec4<f32> {
+    return shadeSurface(worldPos, normalIn, uv, frontFacing, colorMul, emissiveMul,
+                        materialInstanceZero(vec3<f32>(0.0)), screenUv).color;
 }
 
 fn shadePbrInstanced(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFacing: bool,
-                     colorMul: vec3<f32>, emissiveMul: vec3<f32>, info: MaterialInstanceInfo) -> vec4<f32> {
+                     colorMul: vec3<f32>, emissiveMul: vec3<f32>, info: MaterialInstanceInfo,
+                     screenUv: vec2<f32>) -> vec4<f32> {
+    return shadeSurface(worldPos, normalIn, uv, frontFacing, colorMul, emissiveMul, info, screenUv).color;
+}
+
+fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFacing: bool,
+                colorMul: vec3<f32>, emissiveMul: vec3<f32>, info: MaterialInstanceInfo,
+                screenUv: vec2<f32>) -> ShadeResult {
+    var result: ShadeResult;
+    result.normal = normalize(normalIn);
+    result.roughness = 1.0;
+    result.emission = vec3<f32>(0.0);
+    result.bloomWeight = max(object.ids.z, 0.0);
+    result.flags = 1.0;
     let texMask = u32(object.flags.w + 0.5);
     let hasBaseColor = (texMask & 1u) != 0u;
     let hasMetalRough = (texMask & 2u) != 0u;
@@ -217,7 +221,11 @@ fn shadePbrInstanced(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, fr
     }
 
     if (object.flags.z > 0.5) { // unlit
-        return vec4<f32>(applyFog(baseColor.rgb + emissive, worldPos), alpha);
+        result.color = vec4<f32>(applyFog(baseColor.rgb + emissive, worldPos), alpha);
+        result.normal = n;
+        result.emission = baseColor.rgb + emissive;
+        result.flags = 2.0;
+        return result;
     }
 
     var roughness = matRoughMetal.x;
@@ -247,24 +255,34 @@ fn shadePbrInstanced(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, fr
     let diffuseColor = albedo * (1.0 - metallic);
     let alphaR = roughness * roughness;
 
-    // ---- punctual lights ----
-    var direct = vec3<f32>(0.0);
-    let lightCount = u32(frame.envParams.z + 0.5);
-    for (var i = 0u; i < MAX_LIGHTS; i = i + 1u) {
-        if (i >= lightCount) { break; }
-        let light = frame.lights[i];
-        let lr = lightRadiance(light, worldPos);
-        let l = lr.xyz;
-        let nDotL = max(dot(n, l), 0.0);
-        if (nDotL <= 0.0 || lr.w <= 0.0) { continue; }
-        let h = normalize(l + v);
-        let nDotH = max(dot(n, h), 0.0);
-        let vDotH = max(dot(v, h), 0.0);
-        let f = fresnelSchlick(vDotH, f0);
-        let spec = distributionGGX(nDotH, alphaR) * visibilitySmithGGX(nDotV, nDotL, alphaR) * f;
-        let diff = (vec3<f32>(1.0) - f) * diffuseColor / PI;
-        direct = direct + (diff + spec) * light.colorIntensity.rgb * lr.w * nDotL;
-    }
+    // ---- direct lighting (ADR-033): clustered, area-aware, shadowed ----
+    var ctx: ShadeContext;
+    ctx.worldPos = worldPos;
+    ctx.normal = n;
+    ctx.view = v;
+    ctx.diffuseColor = diffuseColor;
+    ctx.f0 = f0;
+    ctx.roughness = roughness;
+    ctx.alpha = alphaR;
+    ctx.nDotV = nDotV;
+    ctx.screenUv = screenUv;
+    ctx.viewDepth = max(dot(worldPos - frame.cameraPos.xyz, frame.cameraForward.xyz), 1e-4);
+    // Deterministic per-pixel rotation and ray offset: the frame index enters through the sample
+    // position, never a wall clock, so the same frame renders identically twice.
+    let noise = gradientNoise(screenUv * frame.targetSize.xy);
+    ctx.rotation = noise * 6.28318531;
+    ctx.jitter = noise;
+    let lit = directLighting(ctx);
+    let direct = lit.diffuse + lit.specular;
+
+    // ---- ambient occlusion (ADR-034): applied to ambient diffuse, and to specular via the bent normal ----
+    let occlusion = sampleAmbientOcclusion(screenUv, ctx.viewDepth, n);
+    let aoStrength = clamp(frame.aoParams.x, 0.0, 4.0);
+    let visibility = clamp(mix(1.0, occlusion.visibility, aoStrength), 0.0, 1.0);
+    let bentNormal = normalize(mix(n, occlusion.bentNormal, aoStrength * 0.9));
+    // Frostbite's specular occlusion from the visibility cone (Lagarde & de Rousiers 2014).
+    let specularOcclusion =
+        clamp(pow(nDotV + visibility, exp2(-16.0 * roughness - 1.0)) - 1.0 + visibility, 0.0, 1.0);
 
     // ---- image-based lighting (split sum) or hemispheric fallback ----
     var ambient: vec3<f32>;
@@ -272,22 +290,30 @@ fn shadePbrInstanced(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, fr
     let kD = (vec3<f32>(1.0) - kS) * (1.0 - metallic);
     if (frame.envParams.w > 0.5) {
         let r = reflect(-v, n);
-        let irradiance = textureSample(irradianceMap, iblSampler, envRotate(n)).rgb;
+        let irradiance = textureSample(irradianceMap, iblSampler, envRotate(bentNormal)).rgb;
         let maxMip = frame.envParams.y;
         let prefiltered = textureSampleLevel(prefilteredMap, iblSampler, envRotate(r), roughness * maxMip).rgb;
         let brdf = textureSample(brdfLut, iblSampler, vec2<f32>(nDotV, roughness)).rg;
-        let specular = prefiltered * (kS * brdf.x + brdf.y);
-        ambient = (kD * irradiance * albedo + specular) * frame.params.w;
+        let specular = prefiltered * (kS * brdf.x + brdf.y) * specularOcclusion;
+        ambient = (kD * irradiance * albedo * visibility + specular) * frame.params.w;
     } else {
         let sky = vec3<f32>(0.10, 0.12, 0.20);
         let ground = vec3<f32>(0.02, 0.015, 0.03);
-        let hemi = mix(ground, sky, n.y * 0.5 + 0.5);
-        ambient = (kD * albedo * hemi + kS * hemi * 0.5) * 0.8;
+        let hemi = mix(ground, sky, bentNormal.y * 0.5 + 0.5);
+        ambient = (kD * albedo * hemi * visibility + kS * hemi * 0.5 * specularOcclusion) * 0.8;
     }
     ambient = ambient * ao;
 
     // Fresnel rim tinted with the emissive colour so glowing objects read as luminous at grazing angles.
     let rim = pow(1.0 - nDotV, 3.0) * emissiveBase * (0.3 * matEmissive.w);
 
-    return vec4<f32>(applyFog(direct + ambient + emissive + rim, worldPos), alpha);
+    result.color = vec4<f32>(applyFog(direct + ambient + emissive + rim, worldPos), alpha);
+    result.normal = n;
+    result.roughness = roughness;
+    result.emission = emissive + rim;
+    result.flags = select(1.0, 3.0, dot(emissive, emissive) > 1e-6);
+    if (alphaMode > 1.5) {
+        result.flags = result.flags + 4.0;
+    }
+    return result;
 }

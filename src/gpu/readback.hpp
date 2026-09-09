@@ -42,6 +42,10 @@ Result<Image8> readTexture8(Context& context, const wgpu::Texture& texture, std:
 Result<ImageF> readTextureF16(Context& context, const wgpu::Texture& texture, std::uint32_t width,
                               std::uint32_t height);
 
+// Reads an R32Uint texture (the identifier target, ADR-035) as one value per texel.
+Result<std::vector<std::uint32_t>> readTextureR32Uint(Context& context, const wgpu::Texture& texture,
+                                                      std::uint32_t width, std::uint32_t height);
+
 // Reads `size` bytes of a buffer created with CopySrc usage (blocking). For tests and tools.
 Result<std::vector<std::uint8_t>> readBuffer(Context& context, const wgpu::Buffer& buffer, std::uint64_t offset,
                                              std::uint64_t size);

@@ -1,0 +1,112 @@
+{
+  "format": "avgen-lightrig",
+  "version": 1,
+  "name": "CosmicBlue",
+  "description": "A cold distant key with a magenta counter-rim: deep space, no atmosphere, hard edges.",
+  "keyIntensity": 1.5,
+  "ambientIntensity": 0.07,
+  "ambientColor": [
+    0.28,
+    0.36,
+    0.7
+  ],
+  "ambientTemperature": 12000,
+  "lights": [
+    {
+      "name": "key",
+      "type": "directional",
+      "role": "key",
+      "azimuth": 52.0,
+      "elevation": 26.0,
+      "distance": 3.2,
+      "intensity": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 9800,
+      "tint": 0.0,
+      "size": 0.6,
+      "aspect": 1.0,
+      "castsShadow": true,
+      "shadowStrength": 1.0,
+      "softness": 0.8,
+      "volumetric": 0.7,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "counter",
+      "type": "rect",
+      "role": "rim",
+      "azimuth": -140.0,
+      "elevation": 18.0,
+      "distance": 2.6,
+      "intensity": 0.4,
+      "color": [
+        1.0,
+        0.55,
+        0.9
+      ],
+      "temperature": 6500,
+      "tint": 0.0,
+      "size": 1.4,
+      "aspect": 3.0,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "fill",
+      "type": "disk",
+      "role": "fill",
+      "azimuth": -60.0,
+      "elevation": -5.0,
+      "distance": 2.8,
+      "intensity": 0.07,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 11000,
+      "tint": 0.0,
+      "size": 2.4,
+      "aspect": 1.0,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "ambient",
+      "type": "directional",
+      "role": "ambient",
+      "azimuth": 0.0,
+      "elevation": 85.0,
+      "distance": 4.0,
+      "intensity": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 12000,
+      "tint": 0.0,
+      "size": 0.5,
+      "aspect": 1.0,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    }
+  ]
+}

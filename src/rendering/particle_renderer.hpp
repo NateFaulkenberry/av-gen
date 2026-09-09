@@ -30,6 +30,7 @@ class SplineBuffers;
 
 struct ParticleUniforms {
     glm::mat4 viewProj;
+    glm::mat4 prevViewProj; // ADR-035: last frame's, so particles write the velocity target
     glm::vec4 cameraRight;
     glm::vec4 cameraUp;
     glm::vec4 emitterPos;
@@ -47,7 +48,7 @@ struct ParticleUniforms {
     glm::uvec4 fieldInfo; // x = field force count (ADR-025), y = spline emitter slot + 1 (0 = none, ADR-026)
     glm::vec4 fieldForces[scene::kMaxFieldForces * 2]; // per force: (mode, slot, strength, mix), (axis.xyz, 0)
 };
-static_assert(sizeof(ParticleUniforms) == 64 + 16 * 15 + 32 * scene::kMaxFieldForces);
+static_assert(sizeof(ParticleUniforms) == 128 + 16 * 15 + 32 * scene::kMaxFieldForces);
 
 struct ParticleStats {
     std::uint32_t systems = 0;
@@ -78,6 +79,9 @@ public:
     // Encodes the compute passes for every enabled system. Call before the scene pass.
     // `fields` resolves the systems' field forces to slots (null = no field forces); `splines`
     // resolves Spline emitters (null or unknown name = the emitter falls back to Point).
+    // `prevViewProj` is last frame's view-projection (ADR-035); pass the current one on the first
+    // frame and particles simply report zero motion.
+    void setPreviousViewProjection(const glm::mat4& prevViewProj) { prevViewProj_ = prevViewProj; }
     void update(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
                 const glm::mat4& view, const glm::mat4& proj, const FieldUniforms* fields = nullptr,
                 const SplineBuffers* splines = nullptr);
@@ -126,6 +130,7 @@ private:
     double lastSimulateMs_ = -1.0;
     bool passThisFrame_ = false;
     bool initialised_ = false;
+    glm::mat4 prevViewProj_{1.0f};
     wgpu::BindGroupLayout computeLayout_;
     wgpu::BindGroupLayout renderLayout_;
     wgpu::PipelineLayout computePipelineLayout_;

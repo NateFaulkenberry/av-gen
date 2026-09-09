@@ -53,6 +53,14 @@ fn vs_sdf(@builtin(vertex_index) vertexIndex: u32) -> SdfVertexOut {
 
 struct SdfFragmentOut {
     @location(0) color: vec4<f32>,
+    @location(1) normalRoughness: vec4<f32>,
+    @location(2) velocity: vec2<f32>,
+    @location(3) emission: vec4<f32>,
+    @location(4) ids: u32,
+    @builtin(frag_depth) depth: f32,
+};
+
+struct SdfDepthOut {
     @builtin(frag_depth) depth: f32,
 };
 
@@ -123,10 +131,81 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
     }
     let clip = frame.viewProj * vec4<f32>(worldPos, 1.0);
 
+    let screenUv = vec2<f32>(in.ndc.x * 0.5 + 0.5, 0.5 - in.ndc.y * 0.5);
     var out: SdfFragmentOut;
     // The local hit point is the ADR-030 `localPosition` material input.
-    out.color = shadePbrInstanced(worldPos, normal, vec2<f32>(0.0), true, vec3<f32>(1.0), vec3<f32>(1.0),
-                                  materialInstanceZero(pL));
+    let shaded = shadeSurface(worldPos, normal, vec2<f32>(0.0), true, vec3<f32>(1.0), vec3<f32>(1.0),
+                              materialInstanceZero(pL), screenUv);
+    out.color = shaded.color;
+    out.normalRoughness = packNormalRoughness(shaded.normal, shaded.roughness, shaded.flags);
+    // The hit point carried by last frame's object matrix and view-projection (ADR-035).
+    let prevWorld = (object.prevModel * vec4<f32>(pL, 1.0)).xyz;
+    out.velocity = screenVelocity(clip, frame.prevViewProj * vec4<f32>(prevWorld, 1.0));
+    out.emission = vec4<f32>(shaded.emission, shaded.bloomWeight);
+    out.ids = packIds(object.ids.x, object.ids.y);
+    out.depth = clamp(clip.z / clip.w, 0.0, 1.0);
+    return out;
+}
+
+// Depth-only entries. `fs_sdf_depth` is the depth prepass: it must march exactly as the lit pass
+// does, or the depth it writes differs and the lit pass's LessEqual test rejects the surface.
+// `fs_sdf_shadow` is the shadow-map version (ADR-034): a quarter of the steps at a looser epsilon,
+// bounded by the object's box, because a caster silhouette needs far less precision.
+@fragment
+fn fs_sdf_depth(in: SdfVertexOut) -> SdfDepthOut {
+    return sdfDepthOnly(in, sdf.info.z, sdf.march.x);
+}
+
+@fragment
+fn fs_sdf_shadow(in: SdfVertexOut) -> SdfDepthOut {
+    return sdfDepthOnly(in, max(sdf.info.z / 4u, 8u), sdf.march.x * 3.0);
+}
+
+fn sdfDepthOnly(in: SdfVertexOut, maxSteps: u32, epsilon: f32) -> SdfDepthOut {
+    let nearH = frame.invViewProj * vec4<f32>(in.ndc, 0.0, 1.0);
+    let farH = frame.invViewProj * vec4<f32>(in.ndc, 1.0, 1.0);
+    let nearW = nearH.xyz / nearH.w;
+    let farW = farH.xyz / farH.w;
+    let eye = frame.cameraPos.xyz;
+    let rdW = normalize(farW - eye);
+    let tNearPlane = length(nearW - eye);
+
+    let roL = (sdf.worldToLocal * vec4<f32>(eye, 1.0)).xyz;
+    let rdScaled = (sdf.worldToLocal * vec4<f32>(rdW, 0.0)).xyz;
+    let unitScale = max(length(rdScaled), 1e-8);
+    let rdL = rdScaled / unitScale;
+    let slab = sdfSlab(roL, rdL, sdf.boundsMin.xyz, sdf.boundsMax.xyz);
+    let tStart = max(slab.x, tNearPlane * unitScale);
+    let tEnd = slab.y;
+    if (slab.x > slab.y || tEnd <= 0.0) {
+        discard;
+    }
+
+    let offset = sdf.info.x;
+    let count = sdf.info.y;
+    let stepScale = sdf.march.y;
+    let time = sdf.march.w;
+
+    var hit = false;
+    var t = tStart;
+    for (var i = 0u; i < maxSteps; i = i + 1u) {
+        let p = roL + rdL * t;
+        let d = sdfEvaluate(offset, count, p, time, object.model);
+        if (d < epsilon * max(t, 1e-4)) {
+            hit = true;
+            break;
+        }
+        t = t + d * stepScale;
+        if (t > tEnd) {
+            break;
+        }
+    }
+    if (!hit) {
+        discard;
+    }
+    let worldPos = (object.model * vec4<f32>(roL + rdL * t, 1.0)).xyz;
+    let clip = frame.viewProj * vec4<f32>(worldPos, 1.0);
+    var out: SdfDepthOut;
     out.depth = clamp(clip.z / clip.w, 0.0, 1.0);
     return out;
 }

@@ -15,6 +15,9 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"
     # Output mapping maths/JSON and the output set are GPU-free (milestone 1.2).
     "${CMAKE_SOURCE_DIR}/src/rendering/output_mapping.cpp"
+    # Light packing, the froxel grid, the LTC fit and the cascade maths are GPU-free (ADR-033/034).
+    "${CMAKE_SOURCE_DIR}/src/rendering/light_data.cpp"
+    "${CMAKE_SOURCE_DIR}/src/rendering/shadow_math.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp")
 target_link_libraries(avgen_tests PRIVATE avgen_core Catch2::Catch2WithMain)
 avgen_set_warnings(avgen_tests)

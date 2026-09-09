@@ -105,6 +105,17 @@ Result<ImageF> readTextureF16(Context& context, const wgpu::Texture& texture, st
     return image;
 }
 
+Result<std::vector<std::uint32_t>> readTextureR32Uint(Context& context, const wgpu::Texture& texture,
+                                                      std::uint32_t width, std::uint32_t height) {
+    auto rows = readTextureRaw(context, texture, width, height, 4);
+    if (!rows) {
+        return std::unexpected(rows.error());
+    }
+    std::vector<std::uint32_t> values(static_cast<std::size_t>(width) * height);
+    std::memcpy(values.data(), rows->data(), values.size() * sizeof(std::uint32_t));
+    return values;
+}
+
 Result<std::vector<std::uint8_t>> readBuffer(Context& context, const wgpu::Buffer& buffer, std::uint64_t offset,
                                              std::uint64_t size) {
     if (size == 0 || size % 4 != 0 || offset % 4 != 0) {

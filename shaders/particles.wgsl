@@ -47,6 +47,7 @@ struct Particle {
 
 struct Params {
     viewProj: mat4x4<f32>,
+    prevViewProj: mat4x4<f32>, // ADR-035: last frame's, for the velocity target
     cameraRight: vec4<f32>,
     cameraUp: vec4<f32>,
     emitterPos: vec4<f32>,  // xyz, w = shape (0 point, 1 sphere, 2 disc, 3 box, 4 spline)
@@ -376,6 +377,17 @@ struct VsOut {
     @builtin(position) clip: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) color: vec4<f32>,
+    @location(2) prevClip: vec4<f32>, // the simulated previous position, for the velocity target
+};
+
+// The scene pass writes five colour targets (ADR-035); particles fill the colour and the velocity
+// and leave the surface targets to the geometry behind them (their write masks are off).
+struct ParticleOut {
+    @location(0) color: vec4<f32>,
+    @location(1) normalRoughness: vec4<f32>,
+    @location(2) velocity: vec2<f32>,
+    @location(3) emission: vec4<f32>,
+    @location(4) ids: u32,
 };
 
 @vertex
@@ -390,6 +402,8 @@ fn vs_particle(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32)
     let world = p.position + (params.cameraRight.xyz * c.x + params.cameraUp.xyz * c.y) * size;
     var out: VsOut;
     out.clip = params.viewProj * vec4<f32>(world, 1.0);
+    let prevWorld = world - p.velocity * params.sim.x;
+    out.prevClip = params.prevViewProj * vec4<f32>(prevWorld, 1.0);
     out.uv = c;
     var color = mix(params.colorStart, params.colorEnd, t);
     // Per-particle tint variation from the seed keeps clouds from looking flat.
@@ -400,14 +414,23 @@ fn vs_particle(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32)
 }
 
 @fragment
-fn fs_particle(in: VsOut) -> @location(0) vec4<f32> {
+fn fs_particle(in: VsOut) -> ParticleOut {
     let r2 = dot(in.uv, in.uv);
     if (r2 > 1.0) { discard; }
     let falloff = (1.0 - r2) * (1.0 - r2);
     let alpha = in.color.a * falloff;
     let emissive = params.turb.w;
+    var out: ParticleOut;
     if (params.counts.z == 0u) {
-        return vec4<f32>(in.color.rgb * alpha * emissive, alpha); // additive: premultiplied
+        out.color = vec4<f32>(in.color.rgb * alpha * emissive, alpha); // additive: premultiplied
+    } else {
+        out.color = vec4<f32>(in.color.rgb * emissive, alpha);
     }
-    return vec4<f32>(in.color.rgb * emissive, alpha);
+    out.normalRoughness = vec4<f32>(0.0, 0.0, 1.0, 2.0);
+    let now = in.clip.xy / max(abs(in.clip.w), 1e-6);
+    let before = in.prevClip.xy / max(abs(in.prevClip.w), 1e-6);
+    out.velocity = vec2<f32>((now.x - before.x) * 0.5, (before.y - now.y) * 0.5);
+    out.emission = vec4<f32>(out.color.rgb, alpha);
+    out.ids = 0u;
+    return out;
 }

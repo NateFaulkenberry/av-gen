@@ -59,6 +59,10 @@ struct AppOptions {
     double offlineFps = 60.0;
     bool fpsGiven = false;
     std::optional<std::filesystem::path> capture; // PPM written after the last frame
+    // ADR-035: display one auxiliary target instead of the shaded frame; ADR-033/034: the quality
+    // tier that scales shadow, occlusion and cluster sample counts.
+    std::string debugTarget;
+    std::string qualityTier;
     // Offline rendering (1.0): --render <dir|video file>, --range a:b, --codec, --quality, --queue <file>
     std::optional<std::filesystem::path> render;
     std::optional<std::filesystem::path> queue;

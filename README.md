@@ -78,7 +78,8 @@ writes a scene file. `--help` lists every flag.
 
 - [docs/architecture.md](docs/architecture.md): modules, data flow, threading, seams for growth
 - [docs/build.md](docs/build.md), [docs/testing.md](docs/testing.md), [docs/performance.md](docs/performance.md)
-- [docs/audio.md](docs/audio.md), [docs/rendering.md](docs/rendering.md), [docs/shaders.md](docs/shaders.md),
+- [docs/audio.md](docs/audio.md), [docs/rendering.md](docs/rendering.md), [docs/lighting.md](docs/lighting.md),
+  [docs/shaders.md](docs/shaders.md),
   [docs/assets.md](docs/assets.md), [docs/project-format.md](docs/project-format.md)
 - [docs/authoring.md](docs/authoring.md): how to build a world, window by window
 - [docs/art-direction.md](docs/art-direction.md): the World Director, looks, composition and phrasing

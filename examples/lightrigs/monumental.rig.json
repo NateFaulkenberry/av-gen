@@ -1,0 +1,112 @@
+{
+  "format": "avgen-lightrig",
+  "version": 1,
+  "name": "Monumental",
+  "description": "One enormous soft source high and slightly behind the camera, almost no fill: scale reads through the falloff alone.",
+  "keyIntensity": 1.9,
+  "ambientIntensity": 0.11,
+  "ambientColor": [
+    0.5,
+    0.55,
+    0.7
+  ],
+  "ambientTemperature": 8600,
+  "lights": [
+    {
+      "name": "key",
+      "type": "rect",
+      "role": "key",
+      "azimuth": 18.0,
+      "elevation": 55.0,
+      "distance": 3.4,
+      "intensity": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 5400,
+      "tint": 0.0,
+      "size": 3.0,
+      "aspect": 1.4,
+      "castsShadow": true,
+      "shadowStrength": 1.0,
+      "softness": 2.2,
+      "volumetric": 0.4,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "bounce",
+      "type": "rect",
+      "role": "fill",
+      "azimuth": -30.0,
+      "elevation": -25.0,
+      "distance": 2.4,
+      "intensity": 0.1,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 4600,
+      "tint": 0.0,
+      "size": 3.0,
+      "aspect": 2.0,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "separation",
+      "type": "rect",
+      "role": "back",
+      "azimuth": 175.0,
+      "elevation": 45.0,
+      "distance": 3.0,
+      "intensity": 0.28,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 9200,
+      "tint": 0.0,
+      "size": 2.0,
+      "aspect": 1.0,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "ambient",
+      "type": "directional",
+      "role": "ambient",
+      "azimuth": 0.0,
+      "elevation": 85.0,
+      "distance": 4.0,
+      "intensity": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 8600,
+      "tint": 0.0,
+      "size": 0.5,
+      "aspect": 1.0,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    }
+  ]
+}

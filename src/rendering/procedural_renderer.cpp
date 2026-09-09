@@ -1,7 +1,8 @@
 #include "rendering/procedural_renderer.hpp"
 
 #include "rendering/field_uniforms.hpp"
-#include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 256-byte slot layout)
+#include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 512-byte slot layout)
+#include "rendering/scene_targets.hpp"  // the five colour targets of the scene pass (ADR-035)
 #include "rendering/spline_buffers.hpp"
 
 #include "core/log.hpp"
@@ -25,7 +26,7 @@ namespace avgen::rendering {
 namespace {
 
 constexpr std::uint32_t kMaxProceduralObjects = 256; // 256-byte slots in one uniform buffer
-constexpr std::uint32_t kObjectStride = 256;         // dynamic-offset alignment
+constexpr std::uint32_t kObjectStride = SceneRenderer::kObjectStride; // dynamic-offset alignment
 constexpr std::uint32_t kInstanceStride = sizeof(scene::InstanceRecord); // 96
 constexpr std::uint32_t kEffectorWorkgroup = 64;     // points.wgsl cs_effectors
 constexpr std::uint32_t kCullWorkgroup = 64;        // cull.wgsl cs_cull_classify
@@ -219,6 +220,8 @@ struct ProceduralRenderer::Impl {
         std::uint32_t cullLodCount = 0;         // levels the cull buffers are sized for
         std::uint32_t visibleStride = 0;        // elements per level in `visible`
         std::uint32_t statsSlot = 0;            // slot in the shared stats buffer
+        glm::mat4 prevModel{1.0f};              // last frame's object matrix (ADR-035 velocity)
+        bool hasPrevModel = false;
         std::uint64_t lastUsed = 0;
     };
     struct DrawItem {
@@ -268,7 +271,8 @@ struct ProceduralRenderer::Impl {
     Impl(const Impl&) = delete;
     Impl& operator=(const Impl&) = delete;
 
-    Result<wgpu::RenderPipeline> createPipeline(const wgpu::ShaderModule& module, bool cull);
+    Result<wgpu::RenderPipeline> createPipeline(const wgpu::ShaderModule& module, bool cull,
+                                                bool depthOnly = false);
     Result<void> createPipelines(const wgpu::ShaderModule& module);
     Result<void> createComputePipeline(const wgpu::ShaderModule& module);
     Result<void> createCullPipelines(const wgpu::ShaderModule& module);
@@ -294,6 +298,7 @@ struct ProceduralRenderer::Impl {
     wgpu::BindGroupLayout objectLayout;
     wgpu::PipelineLayout pipelineLayout;
     wgpu::RenderPipeline pipelineCull;
+    wgpu::RenderPipeline pipelineDepth; // depth-only: the prepass and the shadow passes (ADR-034)
     wgpu::RenderPipeline pipelineNoCull;
     wgpu::BindGroupLayout computeLayout;
     wgpu::PipelineLayout computePipelineLayout;
@@ -576,8 +581,11 @@ Result<void> ProceduralRenderer::Impl::createPipelines(const wgpu::ShaderModule&
     if (!cull) return std::unexpected(cull.error());
     auto noCull = createPipeline(module, false);
     if (!noCull) return std::unexpected(noCull.error());
+    auto depthOnly = createPipeline(module, false, true);
+    if (!depthOnly) return std::unexpected(depthOnly.error());
     pipelineCull = *cull;
     pipelineNoCull = *noCull;
+    pipelineDepth = *depthOnly;
     return {};
 }
 
@@ -633,22 +641,22 @@ Result<void> ProceduralRenderer::Impl::createCullPipelines(const wgpu::ShaderMod
     return {};
 }
 
-Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu::ShaderModule& module, bool cull) {
+Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu::ShaderModule& module, bool cull,
+                                                                      bool depthOnly) {
     VertexLayoutStorage vertex;
-    wgpu::ColorTargetState colorTarget{};
-    colorTarget.format = colorFormat;
-    colorTarget.writeMask = wgpu::ColorWriteMask::All;
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+    fillSceneTargets(colorTargets, colorFormat, nullptr);
     wgpu::FragmentState fragment{};
     fragment.module = module;
-    fragment.entryPoint = "fs_proc";
-    fragment.targetCount = 1;
-    fragment.targets = &colorTarget;
+    fragment.entryPoint = depthOnly ? "fs_proc_depth" : "fs_proc";
+    fragment.targetCount = depthOnly ? 0 : kSceneTargetCount;
+    fragment.targets = depthOnly ? nullptr : colorTargets.data();
     wgpu::DepthStencilState depth{};
     depth.format = depthFormat;
     depth.depthWriteEnabled = wgpu::OptionalBool::True;
-    depth.depthCompare = wgpu::CompareFunction::Less;
+    depth.depthCompare = depthOnly ? wgpu::CompareFunction::Less : wgpu::CompareFunction::LessEqual;
 
-    const char* label = cull ? "procedural-opaque" : "procedural-opaque-twosided";
+    const char* label = depthOnly ? "procedural-depth" : (cull ? "procedural-opaque" : "procedural-opaque-twosided");
     wgpu::RenderPipelineDescriptor desc{};
     desc.label = label;
     desc.layout = pipelineLayout;
@@ -660,7 +668,7 @@ Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu
     desc.primitive.frontFace = wgpu::FrontFace::CCW;
     desc.primitive.cullMode = cull ? wgpu::CullMode::Back : wgpu::CullMode::None;
     desc.depthStencil = &depth;
-    desc.multisample.count = sampleCount;
+    desc.multisample.count = depthOnly ? 1 : sampleCount;
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
 
@@ -1170,6 +1178,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         }
         u.timeInfo = glm::vec4(static_cast<float>(time.renderTime), static_cast<float>(deformerCount),
                                1e-3f * mesh->radius, static_cast<float>(object.instances.size()));
+        // Velocity needs the same chain evaluated at the previous frame's time (ADR-035).
+        u.prevInfo = glm::vec4(static_cast<float>(time.renderTime - time.deltaTime), 0.0f, 0.0f, 0.0f);
         int emissiveSlot = -1;
         if (fields != nullptr && !object.emissiveField.empty() && object.emissiveFieldAmount != 0.0f) {
             emissiveSlot = fields->slotOf(object.emissiveField);
@@ -1223,6 +1233,9 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         ObjectUniforms obj{};
         obj.model = model;
         obj.normalMatrix = glm::transpose(glm::inverse(obj.model));
+        obj.prevModel = state.hasPrevModel ? state.prevModel : model;
+        state.prevModel = model;
+        state.hasPrevModel = true;
         obj.baseColor = glm::vec4(m.baseColor, m.opacity);
         obj.emissive = glm::vec4(m.emissiveColor, m.emissiveIntensity);
         obj.material = glm::vec4(m.roughness, m.metallic, m.normalScale, m.occlusionStrength);
@@ -1238,7 +1251,9 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // Blend materials are drawn opaque in this phase: alpha mode 0 keeps the shader's opaque path.
         const float alphaMode = m.alphaMode == scene::AlphaMode::Mask ? 1.0f : 0.0f;
         obj.flags = glm::vec4(alphaMode, m.alphaCutoff, m.unlit ? 1.0f : 0.0f, static_cast<float>(mask));
-        obj.ids = glm::vec4(static_cast<float>(i), 0.0f, 0.0f, 0.0f); // ADR-030 `objectId` material input
+        // x = the ADR-030 `objectId` material input; y = material id and z = bloom weight feed the
+        // identifier and emission targets (ADR-035).
+        obj.ids = glm::vec4(static_cast<float>(i), static_cast<float>(i + 1), 1.0f, 0.0f);
         const std::uint32_t offset = slot * kObjectStride;
         std::memcpy(im.staging.data() + offset, &obj, sizeof(obj));
 
@@ -1343,8 +1358,19 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     stats_.cpuUpdateMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 }
 
+void ProceduralRenderer::drawDepthOnly(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
+                                       const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup) {
+    drawImpl(pass, scene, materialBindGroup, true);
+}
+
 void ProceduralRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
                               const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup) {
+    drawImpl(pass, scene, materialBindGroup, false);
+}
+
+void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
+                                  const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
+                                  bool depthOnly) {
     Impl& im = *impl_;
     if (!im.initialised || im.items.empty()) {
         return;
@@ -1359,13 +1385,15 @@ void ProceduralRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene&
         const bool twoSided = material.doubleSided || object.source.kind == scene::PrimitiveKind::Point;
         const auto& groups = item.state->usesLive ? item.state->groupsLive : item.state->groups;
         if (!item.indirect) {
-            pass.SetPipeline(twoSided ? im.pipelineNoCull : im.pipelineCull);
+            pass.SetPipeline(depthOnly ? im.pipelineDepth : (twoSided ? im.pipelineNoCull : im.pipelineCull));
             pass.SetBindGroup(1, groups[0], 1, &item.offset);
             pass.SetBindGroup(2, materialBindGroup(material));
             pass.SetVertexBuffer(0, item.meshes[0]->vertices);
             pass.SetIndexBuffer(item.meshes[0]->indices, wgpu::IndexFormat::Uint32);
             pass.DrawIndexed(item.meshes[0]->indexCount, item.instanceCount);
-            ++stats_.drawCalls;
+            if (!depthOnly) {
+                ++stats_.drawCalls;
+            }
             continue;
         }
         // One indirect draw per LOD level, instance counts written by the cull pass. Levels 2 and
@@ -1375,13 +1403,16 @@ void ProceduralRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene&
             if (mesh == nullptr || !groups[level]) {
                 continue;
             }
-            pass.SetPipeline(twoSided || level >= 2 ? im.pipelineNoCull : im.pipelineCull);
+            pass.SetPipeline(depthOnly ? im.pipelineDepth
+                                       : (twoSided || level >= 2 ? im.pipelineNoCull : im.pipelineCull));
             pass.SetBindGroup(1, groups[level], 1, &item.offset);
             pass.SetBindGroup(2, materialBindGroup(material));
             pass.SetVertexBuffer(0, mesh->vertices);
             pass.SetIndexBuffer(mesh->indices, wgpu::IndexFormat::Uint32);
             pass.DrawIndexedIndirect(item.state->indirect, static_cast<std::uint64_t>(level) * kIndirectStride);
-            ++stats_.drawCalls;
+            if (!depthOnly) {
+                ++stats_.drawCalls;
+            }
         }
     }
 }

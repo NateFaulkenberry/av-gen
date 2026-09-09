@@ -1,7 +1,8 @@
 #include "rendering/sdf_renderer.hpp"
 
 #include "rendering/field_uniforms.hpp"
-#include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 256-byte slot layout)
+#include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 512-byte slot layout)
+#include "rendering/scene_targets.hpp"  // the five colour targets of the scene pass (ADR-035)
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -73,7 +74,9 @@ ObjectUniforms objectUniformsFor(const scene::SdfObject& object, std::size_t obj
     // No UVs on either path: textures are never sampled (mask 0). Blend materials draw opaque.
     const float alphaMode = m.alphaMode == scene::AlphaMode::Mask ? 1.0f : 0.0f;
     obj.flags = glm::vec4(alphaMode, m.alphaCutoff, m.unlit ? 1.0f : 0.0f, 0.0f);
-    obj.ids = glm::vec4(static_cast<float>(objectId), 0.0f, 0.0f, 0.0f); // ADR-030 `objectId` input
+    obj.prevModel = obj.model; // SDF transforms are static within a frame; the camera supplies the motion
+    // x = the ADR-030 `objectId` input; y = material id, z = bloom weight (ADR-035 targets).
+    obj.ids = glm::vec4(static_cast<float>(objectId), static_cast<float>(objectId + 1), 1.0f, 0.0f);
     return obj;
 }
 
@@ -118,6 +121,8 @@ struct SdfRenderer::Impl {
     wgpu::BindGroupLayout meshObjectLayout; // mesh group 1 = SceneRenderer's entity object layout
     wgpu::PipelineLayout raymarchLayout;
     wgpu::RenderPipeline raymarchPipeline;
+    wgpu::RenderPipeline raymarchDepthPipeline;
+    wgpu::RenderPipeline raymarchShadowPipeline;
     wgpu::RenderPipeline meshCull;   // SceneRenderer's lit opaque pipelines (pbr.wgsl)
     wgpu::RenderPipeline meshNoCull;
     wgpu::Buffer objectUniforms;
@@ -262,18 +267,17 @@ Result<wgpu::RenderPipeline> SdfRenderer::Impl::finish(const wgpu::RenderPipelin
 }
 
 Result<void> SdfRenderer::Impl::createRaymarchPipeline(const wgpu::ShaderModule& module) {
-    wgpu::ColorTargetState colorTarget{};
-    colorTarget.format = colorFormat;
-    colorTarget.writeMask = wgpu::ColorWriteMask::All;
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+    fillSceneTargets(colorTargets, colorFormat, nullptr);
     wgpu::FragmentState fragment{};
     fragment.module = module;
     fragment.entryPoint = "fs_sdf";
-    fragment.targetCount = 1;
-    fragment.targets = &colorTarget;
+    fragment.targetCount = kSceneTargetCount;
+    fragment.targets = colorTargets.data();
     wgpu::DepthStencilState depth{};
     depth.format = depthFormat;
     depth.depthWriteEnabled = wgpu::OptionalBool::True;
-    depth.depthCompare = wgpu::CompareFunction::Less;
+    depth.depthCompare = wgpu::CompareFunction::LessEqual;
 
     wgpu::RenderPipelineDescriptor desc{};
     desc.label = "sdf-raymarch";
@@ -290,7 +294,32 @@ Result<void> SdfRenderer::Impl::createRaymarchPipeline(const wgpu::ShaderModule&
     if (!pipeline) {
         return std::unexpected(pipeline.error());
     }
+    // The depth-only variant (ADR-034): the same quad and the same tree at a quarter of the steps,
+    // so a raymarched SDF appears in the depth prepass and in the shadow maps.
+    wgpu::FragmentState depthFragment{};
+    depthFragment.module = module;
+    depthFragment.entryPoint = "fs_sdf_depth";
+    depthFragment.targetCount = 0;
+    depthFragment.targets = nullptr;
+    wgpu::DepthStencilState depthOnly = depth;
+    depthOnly.depthCompare = wgpu::CompareFunction::Less;
+    wgpu::RenderPipelineDescriptor depthDesc = desc;
+    depthDesc.label = "sdf-raymarch-depth";
+    depthDesc.fragment = &depthFragment;
+    depthDesc.depthStencil = &depthOnly;
+    auto depthPipeline = finish(depthDesc, "sdf-raymarch-depth");
+    if (!depthPipeline) {
+        return std::unexpected(depthPipeline.error());
+    }
+    depthFragment.entryPoint = "fs_sdf_shadow";
+    depthDesc.label = "sdf-raymarch-shadow";
+    auto shadowPipeline = finish(depthDesc, "sdf-raymarch-shadow");
+    if (!shadowPipeline) {
+        return std::unexpected(shadowPipeline.error());
+    }
     raymarchPipeline = *pipeline;
+    raymarchDepthPipeline = *depthPipeline;
+    raymarchShadowPipeline = *shadowPipeline;
     return {};
 }
 
@@ -483,7 +512,8 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
 }
 
 void SdfRenderer::drawMeshes(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
-                             const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup) {
+                             const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
+                             const wgpu::RenderPipeline* depthOnlyPipeline) {
     Impl& im = *impl_;
     if (!im.initialised || im.meshItems.empty() || !im.meshCull || !im.meshNoCull) {
         return;
@@ -493,7 +523,8 @@ void SdfRenderer::drawMeshes(wgpu::RenderPassEncoder& pass, const scene::Scene& 
             continue;
         }
         const auto& material = scene.sdfs[item.objectIndex].material;
-        pass.SetPipeline(material.doubleSided ? im.meshNoCull : im.meshCull);
+        pass.SetPipeline(depthOnlyPipeline != nullptr ? *depthOnlyPipeline
+                                                      : (material.doubleSided ? im.meshNoCull : im.meshCull));
         pass.SetBindGroup(1, im.meshGroup, 1, &item.offset);
         pass.SetBindGroup(2, materialBindGroup(material));
         pass.SetVertexBuffer(0, item.mesh->vertices);
@@ -505,23 +536,30 @@ void SdfRenderer::drawMeshes(wgpu::RenderPassEncoder& pass, const scene::Scene& 
 void SdfRenderer::encodeRaymarchPass(wgpu::CommandEncoder& encoder, const wgpu::TextureView& color,
                                      const wgpu::TextureView& depth, const wgpu::BindGroup& frameBindGroup,
                                      const wgpu::BindGroup& iblBindGroup, const scene::Scene& scene,
-                                     const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup) {
+                                     const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
+                                     const wgpu::TextureView* auxTargets, std::uint32_t auxCount) {
     Impl& im = *impl_;
     if (!im.initialised || im.raymarchItems.empty()) {
         return;
     }
-    wgpu::RenderPassColorAttachment colorAttachment{};
-    colorAttachment.view = color;
-    colorAttachment.loadOp = wgpu::LoadOp::Load;
-    colorAttachment.storeOp = wgpu::StoreOp::Store;
+    std::array<wgpu::RenderPassColorAttachment, kSceneTargetCount> attachments{};
+    attachments[0].view = color;
+    attachments[0].loadOp = wgpu::LoadOp::Load;
+    attachments[0].storeOp = wgpu::StoreOp::Store;
+    const std::uint32_t count = 1 + std::min<std::uint32_t>(auxCount, kSceneTargetCount - 1);
+    for (std::uint32_t i = 1; i < count; ++i) {
+        attachments[i].view = auxTargets[i - 1];
+        attachments[i].loadOp = wgpu::LoadOp::Load;
+        attachments[i].storeOp = wgpu::StoreOp::Store;
+    }
     wgpu::RenderPassDepthStencilAttachment depthAttachment{};
     depthAttachment.view = depth;
     depthAttachment.depthLoadOp = wgpu::LoadOp::Load;
     depthAttachment.depthStoreOp = wgpu::StoreOp::Store;
     wgpu::RenderPassDescriptor desc{};
     desc.label = "sdf-raymarch-pass";
-    desc.colorAttachmentCount = 1;
-    desc.colorAttachments = &colorAttachment;
+    desc.colorAttachmentCount = count;
+    desc.colorAttachments = attachments.data();
     desc.depthStencilAttachment = &depthAttachment;
     desc.timestampWrites = im.timer->passWrites();
     wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&desc);
@@ -541,6 +579,25 @@ void SdfRenderer::encodeRaymarchPass(wgpu::CommandEncoder& encoder, const wgpu::
     im.timer->resolve(encoder);
     im.passThisFrame = true;
     stats_.raymarchMs = im.lastRaymarchMs;
+}
+
+void SdfRenderer::drawRaymarchDepth(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
+                                    const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
+                                    bool reducedSteps) {
+    Impl& im = *impl_;
+    if (!im.initialised || im.raymarchItems.empty()) {
+        return;
+    }
+    pass.SetPipeline(reducedSteps ? im.raymarchShadowPipeline : im.raymarchDepthPipeline);
+    for (const auto& item : im.raymarchItems) {
+        if (item.objectIndex >= scene.sdfs.size()) {
+            continue;
+        }
+        const std::array<std::uint32_t, 2> offsets = {item.offset, item.offset};
+        pass.SetBindGroup(1, im.sdfGroup, offsets.size(), offsets.data());
+        pass.SetBindGroup(2, materialBindGroup(scene.sdfs[item.objectIndex].material));
+        pass.Draw(6);
+    }
 }
 
 } // namespace avgen::rendering

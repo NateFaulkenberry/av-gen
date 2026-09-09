@@ -20,6 +20,7 @@
 #include "core/error.hpp"
 #include "graph/graph.hpp"
 #include "scene/field_params.hpp"
+#include "scene/light_rig.hpp"
 #include "scene/material_params.hpp"
 #include "scene/sdf_object.hpp"
 #include "scene/spline_params.hpp"
@@ -165,6 +166,13 @@ public:
     // Environment map path (relative or absolute as given); empty = none.
     void setEnvironmentMap(const std::filesystem::path& path);
     [[nodiscard]] const std::filesystem::path& environmentMap() const { return environmentPath_; }
+    // Light rig (ADR-033): `"lightRig"` in the scene file's environment block, resolved through the
+    // asset registry and expanded into `Scene::lights` around the composition's bounds every frame,
+    // so `followCamera` rig lights track the camera. An empty path clears the rig and restores the
+    // default key light. A rig that fails to load is a warning, not an error.
+    Result<void> setLightRig(const std::filesystem::path& path);
+    [[nodiscard]] const std::filesystem::path& lightRigPath() const { return lightRigPath_; }
+    [[nodiscard]] const LightRig* lightRig() const { return lightRig_ ? &*lightRig_ : nullptr; }
     [[nodiscard]] const std::filesystem::path& sourcePath() const { return sourcePath_; }
 
     static void addDefaultRoutes(params::Modulator& modulator);
@@ -201,6 +209,10 @@ private:
     std::vector<std::filesystem::path> ancestors_; // enclosing scene files, outermost first
     int depth_ = 0;
     std::filesystem::path environmentPath_;
+    std::filesystem::path lightRigPath_;
+    std::optional<LightRig> lightRig_;   // the authored rig (parameter defaults)
+    LightRigParameters lightRigParams_;
+    std::size_t rigLightCount_ = 0;      // lights the rig appended to scene_.lights last frame
     // Authored camera/environment settings (used when unattached and as parameter defaults).
     std::optional<float> cameraDistanceSetting_; // empty = fitted to the bounds
     std::optional<float> cameraHeightSetting_;

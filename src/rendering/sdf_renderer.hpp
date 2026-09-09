@@ -92,18 +92,31 @@ public:
                 const FieldUniforms* fields = nullptr);
     // Inside the lit pass (frame and IBL groups already set): draws the Mesh-mode objects with
     // the entity PBR pipeline; sets its own group 1 and the material group via `materialBindGroup`.
+    // `depthOnlyPipeline` (optional) replaces the lit pipelines, for the depth prepass and the
+    // shadow passes: a meshed SDF casts exactly the shadow its surface would receive.
     void drawMeshes(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
-                    const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
+                    const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
+                    const wgpu::RenderPipeline* depthOnlyPipeline = nullptr);
     // True when this frame's update() found Raymarch objects to draw (the caller splits the lit
     // pass around encodeRaymarchPass only then, keeping the no-SDF frame unchanged).
     [[nodiscard]] bool hasRaymarchWork() const;
     // Encodes the raymarch render pass onto `color`/`depth` (both loaded and stored) with the
     // frame/IBL bind groups given; one draw per Raymarch object. Call between the lit pass's
     // opaque phase and its transparent phase.
+    // `auxTargets` are the auxiliary colour targets of the scene pass (ADR-035), in order; the
+    // pass attaches colour plus those, matching the pipeline's five declared targets.
     void encodeRaymarchPass(wgpu::CommandEncoder& encoder, const wgpu::TextureView& color,
                             const wgpu::TextureView& depth, const wgpu::BindGroup& frameBindGroup,
                             const wgpu::BindGroup& iblBindGroup, const scene::Scene& scene,
-                            const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
+                            const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
+                            const wgpu::TextureView* auxTargets = nullptr, std::uint32_t auxCount = 0);
+    // Raymarched objects in a depth-only pass. The prepass (`reducedSteps` false) marches exactly
+    // as the lit pass does, so the depth it writes matches; the shadow maps (`reducedSteps` true)
+    // march a quarter of the steps at a looser epsilon, which is all a caster silhouette needs
+    // (ADR-034). The caller owns the pass and has already bound group 0 and group 3.
+    void drawRaymarchDepth(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
+                           const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
+                           bool reducedSteps = false);
     // Pumps the raymarch-pass timer after the frame's command buffer was submitted (update()
     // also does this at the start of the next frame).
     void collectTimings();
@@ -111,7 +124,7 @@ public:
     [[nodiscard]] const SdfStats& stats() const { return stats_; }
 
     static constexpr std::uint32_t kMaxObjects = 256;   // 256-byte uniform slots
-    static constexpr std::uint32_t kObjectStride = 256;
+    static constexpr std::uint32_t kObjectStride = 512;
 
 private:
     struct Impl;

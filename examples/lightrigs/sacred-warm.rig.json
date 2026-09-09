@@ -1,0 +1,136 @@
+{
+  "format": "avgen-lightrig",
+  "version": 1,
+  "name": "SacredWarm",
+  "description": "A high warm key raking through the space, a cool sky fill and a cold rim: the standard cathedral relationship of candle against daylight.",
+  "keyIntensity": 1.6,
+  "ambientIntensity": 0.14,
+  "ambientColor": [
+    0.45,
+    0.58,
+    0.85
+  ],
+  "ambientTemperature": 9500,
+  "lights": [
+    {
+      "name": "key",
+      "type": "directional",
+      "role": "key",
+      "azimuth": 38.0,
+      "elevation": 42.0,
+      "distance": 3.0,
+      "intensity": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 2900,
+      "tint": 0.0,
+      "size": 1.2,
+      "aspect": 1.0,
+      "castsShadow": true,
+      "shadowStrength": 1.0,
+      "softness": 1.4,
+      "volumetric": 0.5,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "window",
+      "type": "rect",
+      "role": "practical",
+      "azimuth": -55.0,
+      "elevation": 30.0,
+      "distance": 2.2,
+      "intensity": 0.35,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 3200,
+      "tint": 0.0,
+      "size": 1.6,
+      "aspect": 0.35,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "fill",
+      "type": "rect",
+      "role": "fill",
+      "azimuth": -40.0,
+      "elevation": 8.0,
+      "distance": 2.6,
+      "intensity": 0.12,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 8000,
+      "tint": 0.0,
+      "size": 2.0,
+      "aspect": 1.6,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "rim",
+      "type": "rect",
+      "role": "rim",
+      "azimuth": 165.0,
+      "elevation": 30.0,
+      "distance": 2.4,
+      "intensity": 0.3,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 9000,
+      "tint": 0.0,
+      "size": 1.0,
+      "aspect": 2.5,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "ambient",
+      "type": "directional",
+      "role": "ambient",
+      "azimuth": 0.0,
+      "elevation": 85.0,
+      "distance": 4.0,
+      "intensity": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 9500,
+      "tint": 0.0,
+      "size": 0.5,
+      "aspect": 1.0,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    }
+  ]
+}

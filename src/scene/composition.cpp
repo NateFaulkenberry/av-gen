@@ -461,6 +461,11 @@ PunctualLight defaultKeyLight() {
     key.direction = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.35f));
     key.color = glm::vec3(1.0f, 0.97f, 0.92f);
     key.intensity = 3.0f;
+    // ADR-034: the key casts. A world with no authored lighting still gets contact and form,
+    // which is the single largest reason the old frames read as computer generated.
+    key.castsShadow = true;
+    key.softness = 1.0f;
+    key.temperature = 5600.0f;
     return key;
 }
 
@@ -1104,6 +1109,9 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     rootRotationSpeed_ = &params.add(
         floatDesc(prefix_ + "root/rotationSpeed", 0.0f, -20.0f, 20.0f, -3.0f, 3.0f)); // worlds do not spin by default
     rootImpulse_ = &params.add(floatDesc(prefix_ + "root/impulse", 0.0f, 0.0f, 4.0f, 0.0f, 1.0f));
+    if (lightRig_ && lightRigParams_.all.empty()) {
+        lightRigParams_ = registerLightRigParameters(params, *lightRig_, prefix_);
+    }
     for (auto& node : nodes_) {
         registerNodeParameters(*node);
     }
@@ -1204,6 +1212,10 @@ void Composition::unregisterParameters() {
                                  "env/intensity", "env/rotation", "scene/brightness", "scene/gridIntensity",
                                  "root/scale", "root/rotationSpeed", "root/impulse"}) {
             params_->remove(prefix_ + path);
+        }
+        if (!lightRigParams_.all.empty()) {
+            unregisterLightRigParameters(*params_, lightRigParams_);
+            lightRigParams_ = {};
         }
         for (const auto& mp : materialParams_) {
             unregisterMaterialProgramParameters(*params_, mp);
@@ -1596,7 +1608,10 @@ void Composition::rebuild() {
     rebuildProcedurals();
     rebuildSdfs();
 
-    addedKeyLight_ = scene_.lights.empty();
+    // A rig supplies the lighting; without one, a world with no authored lights still gets a key
+    // so it is not lit by ambient alone (ADR-033/034).
+    rigLightCount_ = 0;
+    addedKeyLight_ = !lightRig_ && scene_.lights.empty();
     if (addedKeyLight_) {
         scene_.addLight(defaultKeyLight());
     }
@@ -1965,6 +1980,28 @@ void Composition::applyParameters() {
     if (addedKeyLight_ && !scene_.lights.empty() && keyLight_ != nullptr) {
         scene_.lights.back().intensity = defaultKeyLight().intensity * keyLight_->value();
     }
+    // ---- light rig (ADR-033) ----
+    // Expanded after the camera is final so `followCamera` lights sit relative to this frame's
+    // view, and re-expanded every frame so the rig's parameters are live.
+    if (lightRig_) {
+        if (rigLightCount_ > 0 && rigLightCount_ <= scene_.lights.size()) {
+            scene_.lights.resize(scene_.lights.size() - rigLightCount_);
+        }
+        LightRig live = *lightRig_;
+        if (!lightRigParams_.all.empty()) {
+            applyLightRigParameters(lightRigParams_, *lightRig_, live);
+        }
+        const float scale = keyLight_ != nullptr ? std::max(keyLight_->value(), 0.0f) : 1.0f;
+        live.keyIntensity *= scale;
+        live.ambientIntensity *= scale;
+        std::vector<PunctualLight> expanded =
+            live.expand(center_, radius_, scene_.camera.position, glm::vec3(0.0f, 1.0f, 0.0f));
+        rigLightCount_ = expanded.size();
+        for (PunctualLight& light : expanded) {
+            light.name = sanitise(prefix_) + light.name;
+            scene_.lights.push_back(std::move(light));
+        }
+    }
     scene_.environment.fogColor = fogColor_ != nullptr ? fogColor_->value()
                                                        : (fogColorSet_ ? fogColorSetting_ : scene_.environment.backgroundColor);
     {
@@ -2001,6 +2038,29 @@ void Composition::applyParameters() {
 }
 
 // ---- files -------------------------------------------------------------------------------------
+
+Result<void> Composition::setLightRig(const std::filesystem::path& path) {
+    lightRigPath_ = path;
+    if (params_ != nullptr && !lightRigParams_.all.empty()) {
+        unregisterLightRigParameters(*params_, lightRigParams_);
+        lightRigParams_ = {};
+    }
+    lightRig_.reset();
+    rigLightCount_ = 0;
+    dirty_ = true;
+    if (path.empty()) {
+        return {};
+    }
+    auto rig = LightRig::loadFile(registry_.resolve(path));
+    if (!rig) {
+        return std::unexpected(rig.error());
+    }
+    lightRig_ = std::move(*rig);
+    if (params_ != nullptr) {
+        lightRigParams_ = registerLightRigParameters(*params_, *lightRig_, prefix_);
+    }
+    return {};
+}
 
 void Composition::setEnvironmentMap(const std::filesystem::path& path) {
     environmentPath_ = path;
@@ -2042,6 +2102,9 @@ nlohmann::json Composition::toJson() const {
     json environment = json::object();
     if (!environmentPath_.empty()) {
         environment["map"] = environmentPath_.generic_string();
+    }
+    if (!lightRigPath_.empty()) {
+        environment["lightRig"] = lightRigPath_.generic_string();
     }
     environment["intensity"] = envIntensity_ != nullptr ? envIntensity_->base() : envIntensitySetting_;
     environment["fogDensity"] = fogDensity_ != nullptr ? fogDensity_->base() : fogDensitySetting_;
@@ -2247,6 +2310,16 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(map.error());
         }
         comp->environmentPath_ = *map;
+        auto lightRig = readString(e, "lightRig", "");
+        if (!lightRig) {
+            return std::unexpected(lightRig.error());
+        }
+        if (!lightRig->empty()) {
+            // A missing or malformed rig is a warning: the world still loads, lit by its default key.
+            if (auto r = comp->setLightRig(*lightRig); !r) {
+                log::warn("composition '{}': light rig: {}", comp->name_, r.error().message);
+            }
+        }
         auto intensity = readFloat(e, "intensity", comp->envIntensitySetting_);
         if (!intensity) {
             return std::unexpected(intensity.error());
