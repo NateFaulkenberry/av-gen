@@ -191,6 +191,9 @@ Result<EmitterShape> shapeFromName(const std::string& name) {
     if (name == "box") {
         return EmitterShape::Box;
     }
+    if (name == "spline") {
+        return EmitterShape::Spline;
+    }
     return fail("unknown emitter shape '{}'", name);
 }
 
@@ -275,6 +278,9 @@ json particlesToJson(const ParticleSystem& s) {
     j["capacity"] = s.capacity;
     j["seed"] = s.seed;
     j["shape"] = shapeName(s.shape);
+    if (!s.spline.empty()) {
+        j["spline"] = s.spline;
+    }
     j["position"] = vecToJson(s.position);
     j["extent"] = vecToJson(s.extent);
     j["spawnRate"] = s.spawnRate;
@@ -355,6 +361,13 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
             return std::unexpected(shape.error());
         }
         s.shape = *shape;
+    }
+    if (j.contains("spline")) {
+        auto splineName = readString(j, "spline", "");
+        if (!splineName) {
+            return std::unexpected(splineName.error());
+        }
+        s.spline = *splineName;
     }
     AVGEN_READ(position, readVec<3>);
     AVGEN_READ(extent, readVec<3>);
