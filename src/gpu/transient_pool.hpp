@@ -27,9 +27,11 @@ public:
     explicit TransientPool(Context& context) : context_(context) {}
 
     // Returns a free texture matching the request (creating one if needed) and marks it in use.
+    // The default usage includes CopySrc so a full-resolution result can be read back (EXR output).
     TransientTexture acquire(std::uint32_t width, std::uint32_t height, wgpu::TextureFormat format,
                              wgpu::TextureUsage usage = wgpu::TextureUsage::RenderAttachment |
-                                                        wgpu::TextureUsage::TextureBinding,
+                                                        wgpu::TextureUsage::TextureBinding |
+                                                        wgpu::TextureUsage::CopySrc,
                              const char* label = "transient");
     // Marks a texture free for reuse (by handle identity).
     void release(const TransientTexture& texture);

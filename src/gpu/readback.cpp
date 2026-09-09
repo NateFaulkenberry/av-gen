@@ -1,19 +1,22 @@
 #include "gpu/readback.hpp"
 
 #include "gpu/context.hpp"
+#include "gpu/texture.hpp"
 
 #include <cstring>
 #include <fstream>
 
 namespace avgen::gpu {
 
-Result<Image8> readTexture8(Context& context, const wgpu::Texture& texture, std::uint32_t width,
-                            std::uint32_t height, bool bgra) {
+namespace {
+
+// Copies a 2D texture into a fresh staging buffer, maps it and returns the tightly packed rows.
+Result<std::vector<std::uint8_t>> readTextureRaw(Context& context, const wgpu::Texture& texture, std::uint32_t width,
+                                                 std::uint32_t height, std::uint32_t bytesPerPixel) {
     if (width == 0 || height == 0) {
-        return fail("readTexture8: empty texture");
+        return fail("readTexture: empty texture");
     }
-    constexpr std::uint32_t kBytesPerPixel = 4;
-    const std::uint32_t unpaddedRow = width * kBytesPerPixel;
+    const std::uint32_t unpaddedRow = width * bytesPerPixel;
     const std::uint32_t paddedRow = (unpaddedRow + 255u) / 256u * 256u; // WebGPU row alignment
     const std::uint64_t bufferSize = static_cast<std::uint64_t>(paddedRow) * height;
 
@@ -52,31 +55,53 @@ Result<Image8> readTexture8(Context& context, const wgpu::Texture& texture, std:
     if (!context.waitFor(future) || !mapped) {
         return fail("readback map failed: {}", mapError.empty() ? "timeout" : mapError);
     }
-
-    Image8 image;
-    image.width = width;
-    image.height = height;
-    image.rgba.resize(static_cast<std::size_t>(width) * height * kBytesPerPixel);
     const auto* data = static_cast<const std::uint8_t*>(staging.GetConstMappedRange(0, static_cast<std::size_t>(bufferSize)));
     if (data == nullptr) {
         staging.Unmap();
         return fail("readback: mapped range unavailable");
     }
+    std::vector<std::uint8_t> rows(static_cast<std::size_t>(unpaddedRow) * height);
     for (std::uint32_t y = 0; y < height; ++y) {
-        const std::uint8_t* row = data + static_cast<std::size_t>(y) * paddedRow;
-        std::uint8_t* dst = image.rgba.data() + static_cast<std::size_t>(y) * unpaddedRow;
-        if (bgra) {
-            for (std::uint32_t x = 0; x < width; ++x) {
-                dst[x * 4 + 0] = row[x * 4 + 2];
-                dst[x * 4 + 1] = row[x * 4 + 1];
-                dst[x * 4 + 2] = row[x * 4 + 0];
-                dst[x * 4 + 3] = row[x * 4 + 3];
-            }
-        } else {
-            std::memcpy(dst, row, unpaddedRow);
-        }
+        std::memcpy(rows.data() + static_cast<std::size_t>(y) * unpaddedRow, data + static_cast<std::size_t>(y) * paddedRow,
+                    unpaddedRow);
     }
     staging.Unmap();
+    return rows;
+}
+
+} // namespace
+
+Result<Image8> readTexture8(Context& context, const wgpu::Texture& texture, std::uint32_t width,
+                            std::uint32_t height, bool bgra) {
+    auto rows = readTextureRaw(context, texture, width, height, 4);
+    if (!rows) {
+        return std::unexpected(rows.error());
+    }
+    Image8 image;
+    image.width = width;
+    image.height = height;
+    image.rgba = std::move(*rows);
+    if (bgra) {
+        for (std::size_t i = 0; i + 3 < image.rgba.size(); i += 4) {
+            std::swap(image.rgba[i], image.rgba[i + 2]);
+        }
+    }
+    return image;
+}
+
+Result<ImageF> readTextureF16(Context& context, const wgpu::Texture& texture, std::uint32_t width,
+                              std::uint32_t height) {
+    auto rows = readTextureRaw(context, texture, width, height, 8);
+    if (!rows) {
+        return std::unexpected(rows.error());
+    }
+    ImageF image;
+    image.width = width;
+    image.height = height;
+    image.rgba.resize(static_cast<std::size_t>(width) * height * 4);
+    std::vector<std::uint16_t> halves(image.rgba.size());
+    std::memcpy(halves.data(), rows->data(), halves.size() * 2);
+    halfToFloatArray(halves.data(), image.rgba.data(), halves.size());
     return image;
 }
 
@@ -124,6 +149,18 @@ std::uint64_t hashImage(const Image8& image) {
     std::uint64_t hash = 1469598103934665603ull;
     for (const auto byte : image.rgba) {
         hash ^= byte;
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+std::uint64_t hashImage(const ImageF& image) {
+    // FNV-1a over the 32-bit float bit patterns (one step per value: a 1080p frame is 8M floats).
+    std::uint64_t hash = 1469598103934665603ull;
+    for (const float value : image.rgba) {
+        std::uint32_t bits;
+        std::memcpy(&bits, &value, sizeof(bits));
+        hash ^= bits;
         hash *= 1099511628211ull;
     }
     return hash;

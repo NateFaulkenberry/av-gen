@@ -51,6 +51,7 @@ python3 tools/make_test_audio.py /tmp/track.wav        # deterministic 120 BPM t
 ./build/debug/src/avgen --project show.json --export-bundle ./show_bundle   # self-contained folder
 ./build/debug/src/avgen --project show.json --render renders/show.mov --codec prores422   # offline video
 ./build/debug/src/avgen --project show.json --render renders/frames --size 3840x2160 --fps 60 --range 10:20
+./build/debug/src/avgen --project show.json --render renders/exr --output exr                  # scene-linear EXRs
 ./build/debug/src/avgen --queue jobs.json                            # batch renders
 ./build/debug/src/avgen --project show.json --input --osc-port 9000 # live input + OSC/MIDI control (docs/control.md)
 ./build/debug/src/avgen --audio /tmp/track.wav --shader shaders/examples/feedback.wgsl --post my_post.wgsl

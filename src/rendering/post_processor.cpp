@@ -197,6 +197,7 @@ void PostProcessor::runPass(wgpu::CommandEncoder& encoder, const wgpu::RenderPip
 wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFrameInputs& in, gpu::TransientPool& pool) {
     stats_ = PostStats{};
     slot_ = 0;
+    output_ = nullptr;
     if (!initialised_ || in.settings == nullptr || in.width == 0 || in.height == 0) {
         return in.sceneHdr;
     }
@@ -277,6 +278,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         u.params2 = glm::vec4(s.hueShift, bloomOn ? 1.0f : 0.0f, 0.0f, 0.0f);
         runPass(encoder, composite_, target.view, current, bloom, nullptr, u);
         current = target.view;
+        output_ = target.texture;
     }
     return current;
 }

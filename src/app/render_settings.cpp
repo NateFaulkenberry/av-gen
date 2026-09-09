@@ -11,7 +11,28 @@
 namespace avgen::app {
 
 const char* renderOutputName(RenderOutput output) {
-    return output == RenderOutput::Video ? "video" : "sequence";
+    switch (output) {
+    case RenderOutput::Video: return "video";
+    case RenderOutput::ExrSequence: return "exr";
+    case RenderOutput::PngSequence: break;
+    }
+    return "sequence";
+}
+
+bool isSequence(RenderOutput output) {
+    return output != RenderOutput::Video;
+}
+
+const char* RenderSettings::defaultPattern(RenderOutput output) {
+    return output == RenderOutput::ExrSequence ? "frame_{:06d}.exr" : "frame_{:06d}.png";
+}
+
+void RenderSettings::normalisePattern() {
+    if (output == RenderOutput::ExrSequence && pattern == defaultPattern(RenderOutput::PngSequence)) {
+        pattern = defaultPattern(RenderOutput::ExrSequence);
+    } else if (output == RenderOutput::PngSequence && pattern == defaultPattern(RenderOutput::ExrSequence)) {
+        pattern = defaultPattern(RenderOutput::PngSequence);
+    }
 }
 
 std::uint64_t RenderSettings::frameCount(double resolvedEndSeconds) const {
@@ -37,7 +58,7 @@ std::filesystem::path RenderSettings::frameFile(const std::filesystem::path& dir
     try {
         return dir / fmt::format(fmt::runtime(pattern), index);
     } catch (const fmt::format_error&) {
-        return dir / fmt::format("frame_{:06d}.png", index);
+        return dir / fmt::format(fmt::runtime(defaultPattern(output)), index);
     }
 }
 
@@ -69,7 +90,7 @@ Result<void> RenderSettings::validate() const {
     if (quality < 0 || quality > 100) {
         return fail("render quality {} must be 0..100", quality);
     }
-    if (output == RenderOutput::PngSequence) {
+    if (isSequence(output)) {
         if (pattern.find('{') == std::string::npos || pattern.find('}') == std::string::npos) {
             return fail("frame pattern '{}' needs a {{}} placeholder for the frame index", pattern);
         }
@@ -133,16 +154,19 @@ Result<RenderSettings> RenderSettings::fromJson(const nlohmann::json& j) {
     if (!output.empty()) {
         if (output == "video") {
             s.output = RenderOutput::Video;
-        } else if (output == "sequence") {
+        } else if (output == "sequence" || output == "png") {
             s.output = RenderOutput::PngSequence;
+        } else if (output == "exr") {
+            s.output = RenderOutput::ExrSequence;
         } else {
-            return fail("render.output '{}' is not 'sequence' or 'video'", output);
+            return fail("render.output '{}' is not 'sequence', 'exr' or 'video'", output);
         }
     }
     std::string path;
     if (auto r = text("path", path); !r) return std::unexpected(r.error());
     s.outputPath = path;
     if (auto r = text("pattern", s.pattern); !r) return std::unexpected(r.error());
+    s.normalisePattern(); // a missing pattern follows the output kind
     if (auto r = text("codec", s.codec); !r) return std::unexpected(r.error());
     if (auto r = text("backend", s.backend); !r) return std::unexpected(r.error());
     if (const auto it = j.find("muxAudio"); it != j.end()) {

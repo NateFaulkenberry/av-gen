@@ -14,8 +14,11 @@
 
 namespace avgen::app {
 
-enum class RenderOutput : std::uint8_t { PngSequence, Video };
-[[nodiscard]] const char* renderOutputName(RenderOutput output);
+// PngSequence: display-referred 8-bit PNGs after tone mapping. ExrSequence: scene-linear half
+// EXRs from the HDR target before tone mapping (compositing/grading). Video: see VideoWriter.
+enum class RenderOutput : std::uint8_t { PngSequence, Video, ExrSequence };
+[[nodiscard]] const char* renderOutputName(RenderOutput output); // "sequence" | "video" | "exr"
+[[nodiscard]] bool isSequence(RenderOutput output);
 
 struct RenderSettings {
     std::uint32_t width = 1920;
@@ -30,7 +33,7 @@ struct RenderSettings {
     std::string backend = "auto";      // "auto" | "native" | "ffmpeg"
     int quality = 80;                  // 0..100
     bool muxAudio = true;              // include the project's audio in the video
-    int encoderThreads = 0;            // 0 = hardware threads - 1, clamped to [1, 8]
+    int encoderThreads = 0;            // 0 = hardware threads - 1, clamped to [1, 16]
 
     // Frame count for a resolved end time (endSeconds >= startSeconds); the last frame is the one
     // whose time is < end (end exclusive), at least 1.
@@ -40,6 +43,11 @@ struct RenderSettings {
     [[nodiscard]] std::filesystem::path frameFile(const std::filesystem::path& dir, std::uint64_t index) const;
     // Infers the output kind from the path: a known video extension → Video, else PngSequence.
     static RenderOutput outputForPath(const std::filesystem::path& path);
+    // The default frame pattern of a sequence kind ("frame_{:06d}.png" / ".exr").
+    static const char* defaultPattern(RenderOutput output);
+    // Swaps a pattern that is still the other sequence kind's default for this kind's default, so
+    // switching PNG <-> EXR does not leave ".png" names on EXR files.
+    void normalisePattern();
 
     [[nodiscard]] Result<void> validate() const; // sizes > 0 and even for video, fps > 0, quality range, pattern has {}
     [[nodiscard]] nlohmann::json toJson() const;

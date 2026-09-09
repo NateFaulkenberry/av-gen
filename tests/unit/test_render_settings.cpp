@@ -52,6 +52,37 @@ TEST_CASE("Render settings validate and infer the output kind", "[render][settin
     CHECK(RenderSettings::outputForPath("frames.png") == RenderOutput::PngSequence);
 }
 
+TEST_CASE("Render settings know the EXR sequence kind", "[render][settings][json]") {
+    RenderSettings s;
+    s.output = RenderOutput::ExrSequence;
+    CHECK(std::string(renderOutputName(s.output)) == "exr");
+    CHECK(isSequence(s.output));
+    CHECK_FALSE(isSequence(RenderOutput::Video));
+    // The default pattern follows the kind; an explicit pattern is kept.
+    s.normalisePattern();
+    CHECK(s.pattern == "frame_{:06d}.exr");
+    CHECK(s.frameFile("out", 7).filename() == "frame_000007.exr");
+    s.output = RenderOutput::PngSequence;
+    s.normalisePattern();
+    CHECK(s.pattern == "frame_{:06d}.png");
+    s.pattern = "shot_{:04d}.exr";
+    s.output = RenderOutput::ExrSequence;
+    s.normalisePattern();
+    CHECK(s.pattern == "shot_{:04d}.exr");
+    CHECK(s.validate().has_value());
+
+    auto parsed = RenderSettings::fromJson(nlohmann::json{{"output", "exr"}});
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->output == RenderOutput::ExrSequence);
+    CHECK(parsed->pattern == "frame_{:06d}.exr");
+    CHECK(parsed->toJson()["output"] == "exr");
+    auto back = RenderSettings::fromJson(parsed->toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->output == RenderOutput::ExrSequence);
+    CHECK(RenderSettings::fromJson(nlohmann::json{{"output", "png"}})->output == RenderOutput::PngSequence);
+    CHECK_FALSE(RenderSettings::fromJson(nlohmann::json{{"output", "tiff"}}).has_value());
+}
+
 TEST_CASE("Render settings round-trip JSON and reject bad fields", "[render][settings][json]") {
     RenderSettings s;
     s.width = 640;

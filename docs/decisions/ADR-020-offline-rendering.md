@@ -51,8 +51,20 @@ Threaded encoding keeps the GPU busy: readback is synchronous, encoding is not.
 
 - Positive: bit-identical sequences, background renders in the app, queues, ProRes/H.264 out of
   the box on macOS, audio muxed, no new third-party dependency.
-- Negative: synchronous readback (a ring of staging buffers would overlap GPU and CPU work); no
-  EXR/16-bit output yet; motion blur and DoF are the real-time approximations (no temporal
-  supersampling); native video only on macOS.
-- Follow-ups: staging ring, EXR, temporal supersampling for motion blur, per-job GPU timing in
-  the log, render presets in the UI.
+- Negative: motion blur and DoF are the real-time approximations (no temporal supersampling);
+  native video only on macOS; no 16-bit PNG.
+- Follow-ups: temporal supersampling for motion blur, per-job GPU timing in the log, render
+  presets in the UI, AOVs (depth, velocity) as extra EXR channels.
+
+## Revision 2026-09-09: readback ring and EXR output
+
+- Readback is asynchronous: `gpu::ReadbackRing` (three staging buffers) records frame f's
+  texture-to-buffer copy in the frame's own command buffer, submits, and maps; the render thread
+  submits f+1 and f+2 while the GPU finishes f and only blocks when all three slots are in
+  flight. `poll()` returns completed frames in submission order, so the per-frame and sequence
+  hashes are unchanged and still in frame order (tested against the synchronous path).
+- `RenderOutput::ExrSequence` (`"output": "exr"`, `--output exr`, default pattern
+  `frame_{:06d}.exr`) writes the scene-linear RGBA16F image the tonemap pass reads (after the
+  post chain, before tone mapping) as half EXR through tinyexr (BSD-3, `docs/dependencies.md`);
+  `SceneRenderer::renderToImageFloat` is the synchronous equivalent for tests. PNG and video
+  stay display-referred.

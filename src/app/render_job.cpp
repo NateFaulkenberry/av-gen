@@ -1,5 +1,6 @@
 #include "app/render_job.hpp"
 
+#include "assets/exr.hpp"
 #include "assets/image.hpp"
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -32,10 +33,13 @@ RenderJob::~RenderJob() {
 }
 
 void RenderJob::fail(std::string message) {
-    std::lock_guard lock(mutex_);
-    if (error_.empty()) {
-        error_ = std::move(message);
+    {
+        std::lock_guard lock(mutex_);
+        if (error_.empty()) {
+            error_ = std::move(message);
+        }
     }
+    spaceCv_.notify_all();
 }
 
 Result<void> RenderJob::start() {
@@ -88,8 +92,23 @@ Result<void> RenderJob::start() {
     if (auto r = renderer_->resize(settings_.width, settings_.height); !r) {
         return r;
     }
+    {
+        wgpu::TextureDescriptor desc{};
+        desc.label = "render-job-ldr";
+        desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc;
+        desc.dimension = wgpu::TextureDimension::e2D;
+        desc.size = {settings_.width, settings_.height, 1};
+        desc.format = wgpu::TextureFormat::RGBA8Unorm;
+        ldr_ = context_.device().CreateTexture(&desc);
+        if (ldr_ == nullptr) {
+            return avgen::fail("cannot create the {}x{} render target", settings_.width, settings_.height);
+        }
+        ldrView_ = ldr_.CreateView();
+    }
+    ring_ = std::make_unique<gpu::ReadbackRing>(context_, 3);
     std::error_code ec;
-    if (settings_.output == RenderOutput::PngSequence) {
+    if (isSequence(settings_.output)) {
+        settings_.normalisePattern();
         std::filesystem::create_directories(output_, ec);
         if (ec) {
             return avgen::fail("cannot create '{}': {}", output_.string(), ec.message());
@@ -123,7 +142,7 @@ Result<void> RenderJob::start() {
     if (threads <= 0) {
         threads = static_cast<int>(std::thread::hardware_concurrency()) - 1;
     }
-    threads = std::clamp(threads, 1, 8);
+    threads = std::clamp(threads, 1, 16);
     if (settings_.output == RenderOutput::Video) {
         threads = 1; // the writer is sequential
     }
@@ -133,9 +152,9 @@ Result<void> RenderJob::start() {
     }
     startedAt_ = std::chrono::steady_clock::now();
     started_ = true;
-    log::info("render: {} frames {}x{} @ {} fps, {:.3f}s..{:.3f}s -> {} ({}, {} encoder thread(s))", total_,
-              settings_.width, settings_.height, settings_.fps, settings_.startSeconds, end_, output_.string(),
-              renderOutputName(settings_.output), threads);
+    log::info("render: {} frames {}x{} @ {} fps, {:.3f}s..{:.3f}s -> {} ({}, {} encoder thread(s), {} readback slots)",
+              total_, settings_.width, settings_.height, settings_.fps, settings_.startSeconds, end_, output_.string(),
+              renderOutputName(settings_.output), threads, ring_->slots());
     return {};
 }
 
@@ -156,6 +175,9 @@ void RenderJob::encoderLoop() {
         if (settings_.output == RenderOutput::PngSequence) {
             r = assets::writePng(settings_.frameFile(output_, item.index), item.image.width, item.image.height,
                                  item.image.rgba);
+        } else if (settings_.output == RenderOutput::ExrSequence) {
+            r = assets::writeExr(settings_.frameFile(output_, item.index), item.imageF.width, item.imageF.height,
+                                 item.imageF.rgba, true);
         } else {
             r = video_->writeFrame(item.image.rgba);
         }
@@ -173,26 +195,68 @@ Result<void> RenderJob::renderOne() {
     engine_->update(time);
     const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                     engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
-    auto image = renderer_->renderToImage(engine_->scene(), time, settings_.width, settings_.height, &shaderInputs);
-    if (!image) {
-        return std::unexpected(image.error());
+    // The frame's passes and its readback copy go into one command buffer; the ring submits it
+    // and starts the map, and only blocks when all its slots are still on the GPU.
+    wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
+    const gpu::TargetView target{ldrView_, wgpu::TextureFormat::RGBA8Unorm, settings_.width, settings_.height};
+    if (auto r = renderer_->render(encoder, engine_->scene(), time, target, &shaderInputs); !r) {
+        return r;
     }
-    lastHash_ = gpu::hashImage(*image);
+    const bool exr = settings_.output == RenderOutput::ExrSequence;
+    const auto& source = exr ? renderer_->hdrOutputTexture() : ldr_;
+    const auto format = exr ? gpu::ReadbackRing::Format::Rgba16Float : gpu::ReadbackRing::Format::Rgba8;
+    if (auto r = ring_->enqueue(encoder, source, settings_.width, settings_.height, rendered_, format); !r) {
+        return r;
+    }
+    log::trace("render frame {} t={:.4f} submitted ({} in flight)", rendered_, time.renderTime, ring_->inFlight());
+    ++rendered_;
+    return drain(false);
+}
+
+void RenderJob::handleFrame(gpu::ReadbackRing::Frame frame) {
+    lastHash_ = frame.format == gpu::ReadbackRing::Format::Rgba16Float ? gpu::hashImage(frame.imageF)
+                                                                       : gpu::hashImage(frame.image);
     sequenceHash_ = (sequenceHash_ ^ lastHash_) * 1099511628211ull;
-    log::debug("render frame {} t={:.4f} hash={:016x}", rendered_, time.renderTime, lastHash_);
+    frameHashes_.push_back(lastHash_);
+    ++readBack_;
+    log::debug("render frame {} hash={:016x}", frame.index, lastHash_);
     {
         std::unique_lock lock(mutex_);
-        spaceCv_.wait(lock, [&] { return queue_.size() < queueLimit_ || cancelled_; });
-        if (!cancelled_) {
-            queue_.push_back(Pending{rendered_, std::move(*image)});
+        // Frames already on the GPU when a cancel arrives are still written (partial output is
+        // kept); only a failed encoder drops them, since it stops consuming.
+        if (queue_.size() >= queueLimit_) {
+            const auto begin = std::chrono::steady_clock::now();
+            spaceCv_.wait(lock, [&] { return queue_.size() < queueLimit_ || stopEncoders_ || !error_.empty(); });
+            encoderWaitSeconds_ += std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
+        }
+        if (error_.empty() && !stopEncoders_) {
+            queue_.push_back(Pending{frame.index, std::move(frame.image), std::move(frame.imageF)});
         }
     }
     cv_.notify_one();
-    ++rendered_;
+}
+
+Result<void> RenderJob::drain(bool all) {
+    if (all) {
+        if (auto r = ring_->flush(); !r) {
+            return r;
+        }
+    }
+    while (auto frame = ring_->poll()) {
+        handleFrame(std::move(*frame));
+    }
+    if (!ring_->error().empty()) {
+        return avgen::fail("{}", ring_->error());
+    }
     return {};
 }
 
 Result<void> RenderJob::finish() {
+    if (ring_) {
+        if (auto r = drain(true); !r) {
+            fail(r.error().message);
+        }
+    }
     {
         std::lock_guard lock(mutex_);
         stopEncoders_ = true;
@@ -218,8 +282,11 @@ Result<void> RenderJob::finish() {
     const auto p = progress();
     if (error.empty()) {
         log::info("render complete: {} frames in {:.1f}s ({:.1f} fps), {} written, sequence hash {:016x}, GPU errors: {}",
-                  p.framesRendered, p.elapsedSeconds, p.renderFps, p.framesWritten, p.sequenceHash,
+                  p.framesReadBack, p.elapsedSeconds, p.renderFps, p.framesWritten, p.sequenceHash,
                   context_.errorCount());
+        log::info("render: the render thread waited {:.2f}s for the GPU (readback ring full) and {:.2f}s for the "
+                  "encoders (queue full)",
+                  ring_ ? ring_->blockedSeconds() : 0.0, encoderWaitSeconds_);
         if (context_.errorCount() != 0) {
             return avgen::fail("{} GPU validation error(s) during the render", context_.errorCount());
         }
@@ -293,6 +360,7 @@ void RenderJob::cancel() {
 RenderProgress RenderJob::progress() const {
     RenderProgress p;
     p.framesRendered = rendered_;
+    p.framesReadBack = readBack_;
     p.framesTotal = total_;
     p.lastFrameHash = lastHash_;
     p.sequenceHash = sequenceHash_;

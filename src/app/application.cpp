@@ -36,6 +36,8 @@ std::string usageText() {
            "  --export-bundle <d> copy every referenced asset into <d>/assets and write <d>/project.json\n"
            "  --render <out>      offline render (headless) to a PNG sequence directory or a video file\n"
            "                      (.mov/.mp4/...); size/fps/range/codec from the project's render settings\n"
+           "  --output <kind>     render output kind: png (default for a directory), exr (scene-linear half\n"
+           "                      EXR sequence, before tone mapping), or video\n"
            "  --range <a>:<b>     render time range in seconds (either side may be empty)\n"
            "  --codec <id>        video codec: prores4444, prores422, h264, hevc, or an ffmpeg encoder name\n"
            "  --quality <0-100>   video quality\n"
@@ -114,6 +116,19 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             options.queue = *v;
             options.headless = true;
+            ++i;
+        } else if (arg == "--output") {
+            auto v = need(i, "--output");
+            if (!v) return std::unexpected(v.error());
+            if (*v == "png" || *v == "sequence") {
+                options.renderOutput = RenderOutput::PngSequence;
+            } else if (*v == "exr") {
+                options.renderOutput = RenderOutput::ExrSequence;
+            } else if (*v == "video") {
+                options.renderOutput = RenderOutput::Video;
+            } else {
+                return fail("--output expects png, exr or video");
+            }
             ++i;
         } else if (arg == "--range") {
             auto v = need(i, "--range");
@@ -835,6 +850,10 @@ RenderSettings Application::renderSettingsFromOptions() const {
         s.outputPath = *options_.render;
         s.output = RenderSettings::outputForPath(*options_.render);
     }
+    if (options_.renderOutput) {
+        s.output = *options_.renderOutput;
+    }
+    s.normalisePattern();
     if (options_.renderWidth) s.width = *options_.renderWidth;
     if (options_.renderHeight) s.height = *options_.renderHeight;
     if (options_.offlineFps > 0.0 && options_.fpsGiven) s.fps = options_.offlineFps;
@@ -906,6 +925,8 @@ int Application::runQueue(const std::filesystem::path& queueFile) {
         }
         if (options_.codec) settings.codec = *options_.codec;
         if (options_.quality) settings.quality = *options_.quality;
+        if (options_.renderOutput) settings.output = *options_.renderOutput;
+        settings.normalisePattern();
         if (settings.outputPath.empty()) {
             settings.outputPath = project.stem().string() + "_frames";
         }

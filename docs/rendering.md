@@ -15,7 +15,9 @@ Decision: ADR-001 (WebGPU via Dawn). Research: `docs/research/rendering.md`,
   owns (swapchain, capture texture).
 - `gpu::GpuTimer`: two timestamps per frame resolved through a 4-slot mapped-buffer ring; never
   stalls; reports -1 without the feature.
-- `gpu::readTexture8`, `hashImage`, `writePpm`: synchronous readback for tests and captures.
+- `gpu::readTexture8`, `readTextureF16`, `hashImage`, `writePpm`: synchronous readback for tests
+  and captures; `gpu::ReadbackRing`: asynchronous readback through three staging buffers for the
+  offline render job (ADR-020 revision).
 - `rendering::SceneRenderer`: the frame's pass list for a `scene::Scene`.
 
 ## Frame (milestone 0.2)

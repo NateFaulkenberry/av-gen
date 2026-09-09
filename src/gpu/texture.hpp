@@ -32,7 +32,10 @@ Result<GpuTexture> uploadTexture(Context& context, const scene::TextureData& dat
 // Uploads an Rgba32Float image as RGBA16Float (filterable on every backend) with a mip chain.
 Result<GpuTexture> uploadTextureAsHalf(Context& context, const scene::TextureData& data, bool mips = true);
 
-std::uint16_t floatToHalf(float value);
+std::uint16_t floatToHalf(float value); // round to nearest even
+float halfToFloat(std::uint16_t half);   // exact
+// Converts `count` halves to floats through a 64K-entry table (exact; for whole images).
+void halfToFloatArray(const std::uint16_t* halves, float* out, std::size_t count);
 
 // Solid 1x1 texture of the given 8-bit colour (used for missing material textures).
 GpuTexture solidTexture(Context& context, std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a,

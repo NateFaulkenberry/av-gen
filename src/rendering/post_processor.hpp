@@ -47,6 +47,8 @@ public:
 
     // Encodes the chain and returns the view to tone-map (a pool texture, or the input itself).
     wgpu::TextureView run(wgpu::CommandEncoder& encoder, const PostFrameInputs& inputs, gpu::TransientPool& pool);
+    // The texture behind the view run() returned this frame; null when the input passed through.
+    [[nodiscard]] const wgpu::Texture& outputTexture() const { return output_; }
     [[nodiscard]] const PostStats& stats() const { return stats_; }
 
     static constexpr wgpu::TextureFormat kHdrFormat = wgpu::TextureFormat::RGBA16Float;
@@ -95,6 +97,7 @@ private:
     wgpu::Texture depthPlaceholder_;
     wgpu::TextureView depthPlaceholderView_;
     PostStats stats_;
+    wgpu::Texture output_;
 };
 
 } // namespace avgen::rendering
