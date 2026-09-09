@@ -208,8 +208,10 @@ fn fieldDistance(fi: u32, q: vec3<f32>) -> f32 {
     return length(q - fieldBlock.fields[fi].pointLength.xyz);
 }
 
+// The NoiseModulated falloff samples its noise at the LOCAL point q so the pattern moves with
+// the field's frame (matches spatial::Falloff::weight on the CPU).
 fn fieldWeightOf(fi: u32, q: vec3<f32>, p: vec3<f32>) -> f32 {
-    return fieldBlock.fields[fi].strengthInnerOuterTau.x * falloffWeight(fi, fieldDistance(fi, q), p);
+    return fieldBlock.fields[fi].strengthInnerOuterTau.x * falloffWeight(fi, fieldDistance(fi, q), q);
 }
 
 // ---- kinds -------------------------------------------------------------------------------------
@@ -512,16 +514,21 @@ fn combineVector(fi: u32, p: vec3<f32>) -> vec3<f32> {
     return acc;
 }
 
+// Compound colours: rgb combined like the other types, alpha = max child alpha (the owner's
+// strength * falloff is applied to the alpha only, by fieldColor). Matches spatial::colorAt.
 fn combineColor(fi: u32, p: vec3<f32>) -> vec4<f32> {
     let combine = u32(fieldBlock.fields[fi].noiseCombineMix.z + 0.5);
-    var acc = vec4<f32>(0.0);
+    var acc = vec3<f32>(0.0);
     var n = 0u;
-    var first = vec4<f32>(0.0);
-    var second = vec4<f32>(0.0);
+    var first = vec3<f32>(0.0);
+    var second = vec3<f32>(0.0);
+    var alpha = 0.0;
     for (var c = 0u; c < 4u; c = c + 1u) {
         let slot = childSlot(fi, c);
         if (slot < 0) { continue; }
-        let v = basicColor(u32(slot), p);
+        let cv = basicColor(u32(slot), p);
+        let v = cv.rgb;
+        alpha = max(alpha, cv.a);
         if (n == 0u) { first = v; }
         if (n == 1u) { second = v; }
         if (combine == FIELD_COMBINE_MULTIPLY) {
@@ -538,13 +545,16 @@ fn combineColor(fi: u32, p: vec3<f32>) -> vec4<f32> {
     if (n == 0u) {
         return vec4<f32>(0.0);
     }
+    var rgb = acc;
     if (combine == FIELD_COMBINE_MIX) {
-        return mix(first, second, fieldBlock.fields[fi].noiseCombineMix.w);
+        rgb = mix(first, second, fieldBlock.fields[fi].noiseCombineMix.w);
+    } else if (combine == FIELD_COMBINE_AVERAGE) {
+        rgb = acc / f32(n);
     }
-    if (combine == FIELD_COMBINE_AVERAGE) {
-        return acc / f32(n);
+    if (fieldBlock.fields[fi].freqExpInvertBias.z > 0.5) {
+        rgb = vec3<f32>(1.0) - rgb;
     }
-    return acc;
+    return vec4<f32>(rgb, alpha);
 }
 
 // ---- public API ---------------------------------------------------------------------------------
@@ -590,7 +600,8 @@ fn fieldColor(i: i32, p: vec3<f32>) -> vec4<f32> {
     }
     let fi = u32(i);
     if (fieldBlock.fields[fi].kind == FIELD_COMPOUND) {
-        return combineColor(fi, p) * fieldWeightOf(fi, fieldLocal(fi, p), p);
+        let c = combineColor(fi, p);
+        return vec4<f32>(c.rgb, c.a * fieldWeightOf(fi, fieldLocal(fi, p), p));
     }
     return basicColor(fi, p);
 }

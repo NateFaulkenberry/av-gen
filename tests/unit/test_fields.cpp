@@ -474,7 +474,8 @@ TEST_CASE("Colour field kinds and cross-type reads", "[spatial][fields]") {
     white.strength = 0.5f;
     CHECK_THAT(d(sampleScalar(white, {0.0f, 0.0f, 0.0f}, 0.0)), WithinAbs(0.5, 1e-6)); // luminance * alpha
     cc.strength = 1.0f;
-    checkVec(sampleVector(cc, {0.0f, 0.0f, 0.0f}, 0.0), {1.0f, -1.0f, -1.0f}); // (rgb * 2 - 1) * a
+    // colour as vector = luminance * alpha along the (unit) axis, like the GPU
+    checkVec(sampleVector(cc, {0.0f, 0.0f, 0.0f}, 0.0), {0.0f, 0.2126f, 0.0f});
 }
 
 TEST_CASE("Compound fields combine children and resolve by name", "[spatial][fields]") {

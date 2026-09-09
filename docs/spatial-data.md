@@ -189,7 +189,7 @@ Waves: `s = waveDistance(q) - waveOrigin - waveSpeed * t` with `waveGeometry` `p
 
 Cross-type reads: scalar as vector `s * (R n)`; vector as scalar `|v|`; colour as scalar
 `luminance(rgb) * a`; scalar as colour `(mix(colorA, colorB, saturate(s)), w)`; vector as colour
-`(v * 0.5 + 0.5, w)`; colour as vector `(rgb * 2 - 1) * a`. A disabled field samples as 0.
+`(v * 0.5 + 0.5, w)`; colour as vector `luminance(rgb) * a * axis`. A disabled field samples as 0.
 
 ### Falloff
 

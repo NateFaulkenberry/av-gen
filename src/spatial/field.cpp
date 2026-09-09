@@ -16,7 +16,7 @@
 // Cross-type reads: scalar as vector = s * (R n); vector as scalar = |v|; colour as scalar =
 // luminance(rgb) * a (luminance = dot(rgb, (0.2126, 0.7152, 0.0722))); scalar as colour =
 // (mix(colorA.rgb, colorB.rgb, saturate(s)), w); vector as colour = (v * 0.5 + 0.5, w); colour as
-// vector = (rgb * 2 - 1) * a.
+// vector = luminance(rgb) * a * axis (colour -> scalar -> vector).
 //
 // Choices/deviations to carry to the GPU (the brief left these open):
 // * The NoiseModulated falloff samples fbm3(q * noiseScale, seed) at the LOCAL point q (so the
@@ -381,8 +381,10 @@ glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldS
     case FieldType::Scalar:
         return scalarAt(f, p, t, set, depth) * (frame.rotation * fieldAxis(f));
     case FieldType::Color: {
+        // Colour as vector = (colour as scalar) along the axis, like the GPU (fields.wgsl basicVector).
         const glm::vec4 c = colorAt(f, p, t, set, depth);
-        return (glm::vec3(c) * 2.0f - 1.0f) * c.a;
+        const float lum = 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+        return (lum * c.a) * (frame.rotation * fieldAxis(f));
     }
     case FieldType::Vector:
         break;
