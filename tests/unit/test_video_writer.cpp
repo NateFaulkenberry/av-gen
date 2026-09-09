@@ -5,9 +5,11 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <string>
 #include <vector>
 
@@ -119,9 +121,9 @@ void writeScript(const std::filesystem::path& path, const std::string& body) {
     std::filesystem::permissions(path, std::filesystem::perms::owner_all, std::filesystem::perm_options::add);
 }
 
-// One second of a 440 Hz stereo tone at 48 kHz as a float WAV.
-void writeToneWav(const std::filesystem::path& path) {
-    const auto tone = testsupport::sine(440.0f, 48000, 48000, 0.5f);
+// `seconds` of a 440 Hz stereo tone at 48 kHz as a float WAV.
+void writeToneWav(const std::filesystem::path& path, double seconds = 1.0) {
+    const auto tone = testsupport::sine(440.0f, 48000, static_cast<std::size_t>(48000.0 * seconds), 0.5f);
     const auto file = audio::AudioFile::fromInterleaved(testsupport::interleave(tone, 2), 2, 48000);
     REQUIRE(file.writeWav(path).has_value());
 }
@@ -310,6 +312,73 @@ TEST_CASE("video writer: findFfmpeg honours a hint", "[assets][video]") {
     writeScript(fake, "exit 0\n");
     CHECK(assets::findFfmpeg(fake) == fake);
     CHECK(assets::findFfmpeg(dir.path) == fake);
+}
+
+// Regression: with audio muxed, AVAssetWriter interleaves media and stops accepting video until the
+// audio input has been fed to roughly the same time. Frames come from another thread (as RenderJob
+// does) and the test fails with a message instead of hanging.
+TEST_CASE("video writer: long clips with audio do not stall when fed from another thread",
+          "[assets][video]") {
+    if (!assets::hasNativeVideo()) {
+        SKIP("no native video backend on this platform");
+    }
+    constexpr std::uint32_t width = 640;
+    constexpr std::uint32_t height = 360;
+    constexpr std::size_t frames = 90; // 3 s at 30 fps
+    TempFile wav("long_tone.wav");
+    writeToneWav(wav.path, 5.0);
+
+    const auto run = [&](const std::string& codec, const std::string& ext, bool withAudio = true) {
+        TempFile out("long_" + codec + ext);
+        auto settings = smallClip(codec);
+        settings.width = width;
+        settings.height = height;
+        if (withAudio) {
+            settings.audio = wav.path;
+        }
+        auto opened = assets::openVideoWriter(out.path, settings);
+        REQUIRE(opened.has_value());
+        std::unique_ptr<assets::VideoWriter> writer = std::move(*opened);
+
+        // The writer times out internally when an input stalls, so the future always completes and
+        // its destructor never blocks forever; the 20 s deadline turns a stall into a failure message.
+        auto result = std::async(std::launch::async, [&writer] {
+            std::string error;
+            for (std::size_t i = 0; i < frames; ++i) {
+                if (const auto r = writer->writeFrame(gradientFrame(i, width, height)); !r) {
+                    error = r.error().message;
+                    break;
+                }
+            }
+            return error;
+        });
+        if (result.wait_for(std::chrono::seconds(20)) != std::future_status::ready) {
+            FAIL("writeFrame stalled for 20 s (" << codec << "): the writer blocks until audio is fed");
+        }
+        const std::string feederError = result.get();
+        INFO(feederError);
+        REQUIRE(feederError.empty());
+        REQUIRE(writer->finish().has_value());
+        CHECK(writer->framesWritten() == frames);
+
+        const auto info = assets::probeVideo(out.path);
+        REQUIRE(info.has_value());
+        CHECK(info->width == width);
+        CHECK(info->height == height);
+        CHECK(info->frames == frames);
+        CHECK_THAT(info->durationSeconds, WithinAbs(3.0, 0.02));
+        CHECK(info->hasAudio == withAudio);
+    };
+
+    SECTION("H.264 into .mp4 without audio (control)") {
+        run("h264", ".mp4", false);
+    }
+    SECTION("ProRes 422 into .mov") {
+        run("prores422", ".mov");
+    }
+    SECTION("H.264 into .mp4") {
+        run("h264", ".mp4");
+    }
 }
 
 #ifndef _WIN32
