@@ -401,3 +401,39 @@ only been exercised against the loader's error paths on machines without the run
 - MSAA, shadows, specular occlusion and multi-scatter compensation are not implemented.
 - HDR/EDR swapchains are Dawn features not yet requested.
 - `dawn/native/*` headers are forbidden outside `src/gpu/` so wgpu-native remains a drop-in.
+
+## Ambient occlusion at landscape scale
+
+GTAO takes a horizon from any sample whose direction has a large cosine against the view vector,
+and on ground running away from the camera every *coplanar* sample has one. Without a test that an
+occluder actually stands above the shaded point's tangent plane, a smooth surface occludes itself:
+the term collapses into a flat grey wash over anything seen at a grazing angle. This was invisible
+for the whole life of the engine because every scene was objects viewed from a normal angle, and it
+dominated the first terrain frame ever rendered, taking roughly half the ambient light off open
+hillsides. `fs_gtao` now requires `dot(delta, n) > bias`, where the bias is a pixel footprint or two
+so it scales with distance rather than being tuned for one scene's size.
+
+Removing that false occlusion exposed a second, older flaw underneath it. Each GTAO slice
+contributes the part of the normal lying in its own plane, and every one of those planes contains
+the view vector, so the summed bent normal systematically loses the component perpendicular to the
+view and leans toward the camera. On an unoccluded convex surface that is plainly wrong -- there is
+nothing to bend around -- and it showed as the underside of a sphere gathering *more* sky than its
+top, which AO can never legitimately do. The bend is now brought in proportionally to the visibility
+actually lost: no occlusion, no bend.
+
+Both are pinned by tests that assert what the previous ones had no reason to. `[gpu][ao]` renders a
+plane at a grazing angle and asserts it keeps its ambient (it was losing 51%, now 23%, the
+remainder being the legitimate bent-normal tilt). The sky irradiance test asserts its top-vs-bottom
+margin rather than a bare inequality -- it had been passing by 0.003 out of an unoccluded gap of
+0.08, which made it a test of ambient occlusion rather than of which way is up.
+
+The AO world radius is still `clamp(distance to the camera target * 0.05, 0.15, 4)`, and the
+horizon march still clamps its screen radius to a 4 px floor. Together those mean AO fades out
+beyond roughly `radius * 214` pixels of depth, which for a landscape is most of the frame. That is
+the right behaviour -- there is nothing at that distance AO could resolve -- but it is a
+consequence of two clamps rather than a decision, and it should become one if AO ever needs to
+reach further.
+
+At the realtime tier AO is 3 slices of 6 steps and relies on temporal accumulation to resolve; a
+static offline frame at that tier still shows fine hatching in the AO buffer. Stills should be
+rendered at `--tier offline` (6 slices, 12 steps), where it is clean.

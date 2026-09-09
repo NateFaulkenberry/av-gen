@@ -26,6 +26,7 @@
 #include "scene/spline_params.hpp"
 #include "scene/particles.hpp"
 #include "scene/scene_controller.hpp"
+#include "world/terrain.hpp"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -38,7 +39,10 @@
 
 namespace avgen::scene {
 
-enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural, Field, Spline, Sdf };
+// Terrain (ADR-046): the node kind that turns a WorldMap into ground. It is a node rather than a
+// property of the scene because a composition may hold more than one world, and because everything
+// a node already has -- a transform, visibility, a material, parameters -- is what terrain needs.
+enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural, Field, Spline, Sdf, Terrain };
 const char* nodeKindName(NodeKind kind);
 Result<NodeKind> nodeKindFromName(const std::string& name);
 
@@ -62,6 +66,9 @@ struct CompositionNode {
     spatial::Spline spline;        // settings for kind Spline (ADR-026; the node transform is applied to the
                                    // generated control points at rebuild)
     SdfObject sdf;                 // settings for kind Sdf (ADR-027; node transform folded into sdf.transform)
+    world::WorldMap worldMap;      // settings for kind Terrain (ADR-046): the geography
+    world::TerrainSettings terrain;// settings for kind Terrain: how it is chopped up and coarsened
+    Material terrainMaterial;      // settings for kind Terrain: shared by every chunk
 
     // Runtime (not serialised)
     std::shared_ptr<const assets::SceneAsset> sceneAsset; // Gltf
@@ -82,6 +89,11 @@ struct CompositionNode {
     spatial::Spline splineRest;
     SdfParameters sdfParams;
     SdfObject sdfRest;
+    std::vector<world::TerrainChunk> chunks;  // Terrain: built at rebuild, indexed by entity offset
+    params::Parameter<bool>* terrainLodParam = nullptr;   // Terrain: LOD selection on/off (debug)
+    params::Parameter<bool>* terrainCullParam = nullptr;  // Terrain: frustum culling on/off (debug)
+    params::Parameter<float>* terrainLodDistanceParam = nullptr;
+    params::Parameter<float>* terrainViewDistanceParam = nullptr;
 };
 
 class Composition final : public SceneController {
@@ -184,9 +196,13 @@ public:
 private:
     void rebuild();          // flattens nodes into scene_ (meshes/textures/entities/particles)
     void ensureBuilt();      // rebuild() when dirty
-    void applyParameters();
+    void applyParameters(); // node finals -> transforms/materials/particles; camera; environment
     // Aims the camera so the composition's focal point lands at its requested screen position.
-    void applyFraming();  // node finals -> transforms/materials/particles; camera; environment
+    void applyFraming();
+    // Per frame, after the camera is known: picks each terrain chunk's LOD mesh and culls the ones
+    // outside the frustum or beyond the view distance. Changes no geometry, only which mesh each
+    // chunk entity points at, which is why a camera can fly across a world for free.
+    void updateTerrainLod();
     void registerNodeParameters(CompositionNode& node);
     void unregisterNodeParameters(CompositionNode& node);
     void unregisterParameters(); // removes every parameter this composition registered, then detach()

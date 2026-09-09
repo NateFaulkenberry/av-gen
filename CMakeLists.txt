@@ -43,6 +43,7 @@ include(Dependencies)
 set(AVGEN_SHADER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
 
 add_subdirectory(src)
+add_subdirectory(tools)
 
 if(AVGEN_BUILD_TESTS)
     enable_testing()

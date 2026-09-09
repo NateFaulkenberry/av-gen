@@ -1,6 +1,12 @@
 {
  "examples": [
   {
+   "name": "Glowmere Valley",
+   "category": "Showcase",
+   "description": "The world map turned into ground: a 640 m valley of designed geography -- rim, arms, basin, a meandering river and a tarn -- chunked, coarsened by distance and culled by the frustum.",
+   "project": "world/terrain.json"
+  },
+  {
    "name": "Bioluminescent Grove",
    "category": "Showcase",
    "description": "Photogrammetry rocks, roots and vegetation from Poly Haven, placed and varied procedurally under a nocturne rig.",

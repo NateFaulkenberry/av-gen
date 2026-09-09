@@ -197,6 +197,72 @@ TEST_CASE("ambient occlusion is deterministic and darkens a crease", "[gpu][ao]"
     CHECK(withAo->stats().ao.width > 0);
 }
 
+TEST_CASE("a flat surface seen edge-on is not occluded by itself", "[gpu][ao]") {
+    // GTAO takes a horizon from any sample whose direction has a large cosine against the view
+    // vector, and on ground running away from the camera every coplanar sample has one. Without a
+    // height test against the tangent plane the term collapses into a grey wash over anything seen
+    // at a grazing angle -- which is invisible on an object seen from a normal angle and ruinous on
+    // a landscape, where most of the frame is ground receding into the distance.
+    //
+    // A plane occludes nothing, so ambient light reaching it should be close to unoccluded from any
+    // angle. It is not asserted to be exactly unoccluded: the bent normal the AO pass also produces
+    // tilts the ambient lookup toward the horizon at a grazing angle, which is a real effect and
+    // costs a little light. What is asserted is the size of the loss. Before the height test the
+    // grazing row of this frame lost 51% of its ambient; it now loses 23%, and the rows further
+    // away were never affected at all because the horizon march is clamped out there.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    scene::Scene s;
+    s.environment.backgroundColor = glm::vec3(0.0f);
+    s.environment.showSkybox = true;
+    s.environment.environmentIntensity = 3.0f; // ambient-dominant: AO is what moves these pixels
+    // Eye height on a wide floor, looking along it: the ground fills the lower frame at every angle
+    // from steeply down to nearly edge-on, which is the range the horizon search has to survive.
+    s.camera.position = {0.0f, 1.7f, 30.0f};
+    s.camera.target = {0.0f, 1.4f, -40.0f};
+    s.camera.fovYRadians = 0.8f;
+    s.camera.nearPlane = 0.1f;
+    s.camera.farPlane = 400.0f;
+    const auto floor = s.addMesh(boxMesh({150.0f, 0.25f, 150.0f}));
+    auto& e = s.addEntity("floor", floor);
+    e.transform.position = {0.0f, -0.25f, 0.0f};
+    e.material.baseColor = glm::vec3(0.8f);
+    e.material.roughness = 0.9f;
+    scene::PunctualLight key;
+    key.name = "key";
+    key.type = scene::PunctualLight::Type::Directional;
+    key.direction = glm::normalize(glm::vec3(0.3f, -0.9f, -0.3f));
+    key.intensity = 0.15f; // the sky does the lighting, so occlusion is not hidden by a key
+    key.castsShadow = false;
+    key.contactShadow = false;
+    s.addLight(key);
+
+    rendering::QualitySettings quality = rendering::QualitySettings::forTier(rendering::QualityTier::High);
+    quality.contactShadows = false;
+
+    auto withAo = makeRenderer(*ctx, shaders);
+    quality.ambientOcclusion = true;
+    withAo->setQualitySettings(quality);
+    auto lit = withAo->renderToImage(s, frameAt(9), kSize, kSize);
+    REQUIRE(lit.has_value());
+
+    auto withoutAo = makeRenderer(*ctx, shaders);
+    quality.ambientOcclusion = false;
+    withoutAo->setQualitySettings(quality);
+    auto plain = withoutAo->renderToImage(s, frameAt(9), kSize, kSize);
+    REQUIRE(plain.has_value());
+
+    // Sample down the middle of the frame, from the near ground to the horizon: the grazing end is
+    // where self-occlusion showed up worst, so the samples have to reach it.
+    for (const std::uint32_t y : {kSize * 3u / 4u, kSize * 5u / 8u, kSize * 9u / 16u}) {
+        const float a = luminanceAt(*lit, kSize / 2, y);
+        const float b = luminanceAt(*plain, kSize / 2, y);
+        INFO("row " << y << ": ao " << a << " vs no-ao " << b << " ratio " << (b > 0 ? a / b : 0.0f));
+        REQUIRE(b > 0.02f); // the floor is actually lit here, or the comparison proves nothing
+        CHECK(a >= b * 0.70f);
+    }
+}
+
 TEST_CASE("the auxiliary targets are written by the scene pass", "[gpu][aux]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);

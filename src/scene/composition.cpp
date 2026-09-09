@@ -18,6 +18,10 @@
 namespace avgen::scene {
 
 namespace {
+constexpr int kMaxTerrainLodIndex = world::kMaxTerrainLods - 1;
+} // namespace
+
+namespace {
 
 using nlohmann::json;
 
@@ -254,6 +258,17 @@ Result<float> readFloat(const json& j, const char* key, float def) {
         return fail("'{}' must be a number", key);
     }
     return v.get<float>();
+}
+
+Result<int> readInt(const json& j, const char* key, int def) {
+    if (!j.contains(key)) {
+        return def;
+    }
+    const json& v = j.at(key);
+    if (!v.is_number_integer()) {
+        return fail("'{}' must be an integer", key);
+    }
+    return v.get<int>();
 }
 
 Result<bool> readBool(const json& j, const char* key, bool def) {
@@ -764,6 +779,8 @@ const char* nodeKindName(NodeKind kind) {
         return "spline";
     case NodeKind::Sdf:
         return "sdf";
+    case NodeKind::Terrain:
+        return "terrain";
     }
     return "gltf";
 }
@@ -771,7 +788,7 @@ const char* nodeKindName(NodeKind kind) {
 Result<NodeKind> nodeKindFromName(const std::string& name) {
     for (const NodeKind kind :
          {NodeKind::Gltf, NodeKind::Orb, NodeKind::Grid, NodeKind::Particles, NodeKind::Scene, NodeKind::Procedural,
-          NodeKind::Field, NodeKind::Spline, NodeKind::Sdf}) {
+          NodeKind::Field, NodeKind::Spline, NodeKind::Sdf, NodeKind::Terrain}) {
         if (name == nodeKindName(kind)) {
             return kind;
         }
@@ -1147,6 +1164,16 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
         }
         node.sdfRest = node.sdf;
         break;
+    case NodeKind::Terrain:
+        node.worldMap.name = node.worldMap.name.empty() ? node.name : node.worldMap.name;
+        node.worldMap.prepare();
+        if (auto v = node.worldMap.validate(); !v) {
+            return std::unexpected(v.error());
+        }
+        if (auto v = node.terrain.validate(); !v) {
+            return std::unexpected(v.error());
+        }
+        break;
     case NodeKind::Orb:
     case NodeKind::Grid:
         break;
@@ -1359,6 +1386,17 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     if (node.kind == NodeKind::Sdf) {
         node.sdfParams = registerSdfParameters(*params_, node.sdfRest, "sdf/" + sanitise(prefix_) + node.name + "/");
     }
+    if (node.kind == NodeKind::Terrain) {
+        // Four knobs, all of them for looking at the thing rather than art-directing it: turn LOD
+        // off to see whether a shading artefact is a level boundary, turn culling off to see what
+        // culling was removing, and pull the two distances to find where the budget goes.
+        node.terrainLodParam = &params_->add(boolDesc(base + "terrainLod", true));
+        node.terrainCullParam = &params_->add(boolDesc(base + "terrainCull", true));
+        node.terrainLodDistanceParam = &params_->add(
+            floatDesc(base + "terrainLodDistance", node.terrain.lodDistance, 4.0f, 4000.0f, 20.0f, 400.0f));
+        node.terrainViewDistanceParam = &params_->add(
+            floatDesc(base + "terrainViewDistance", node.terrain.viewDistance, 8.0f, 20000.0f, 50.0f, 2000.0f));
+    }
     if (node.kind == NodeKind::Scene && node.child) {
         node.child->attach(*params_, *modulator_, base);
     }
@@ -1370,6 +1408,16 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
         for (const char* suffix :
              {"position", "rotation", "scale", "visible", "emissiveBoost", "roughnessScale"}) {
             params_->remove(base + suffix);
+        }
+        if (node.kind == NodeKind::Terrain) {
+            for (const char* suffix :
+                 {"terrainLod", "terrainCull", "terrainLodDistance", "terrainViewDistance"}) {
+                params_->remove(base + suffix);
+            }
+            node.terrainLodParam = nullptr;
+            node.terrainCullParam = nullptr;
+            node.terrainLodDistanceParam = nullptr;
+            node.terrainViewDistanceParam = nullptr;
         }
         forEachParticleParam(node.particleParams, [&](auto* p) {
             if (p != nullptr) {
@@ -1660,6 +1708,35 @@ void Composition::rebuild() {
             range.restTransforms.emplace_back();
             range.restEmissive.push_back(0.0f);
             range.restRoughness.push_back(0.5f);
+            break;
+        }
+        case NodeKind::Terrain: {
+            // The whole world is built here, once. Chunk meshes are static: only which of a chunk's
+            // four meshes is drawn, and whether it is drawn at all, changes per frame.
+            CompositionNode& mutableNode = *nodePtr;
+            mutableNode.chunks = world::buildTerrain(
+                node.worldMap, node.terrain,
+                [&](std::size_t, int, MeshData&& mesh) { return scene_.addMesh(std::move(mesh)); });
+            for (std::size_t c = 0; c < mutableNode.chunks.size(); ++c) {
+                const world::TerrainChunk& chunk = mutableNode.chunks[c];
+                Entity& e = scene_.addEntity(fmt::format("{}.chunk{}", node.name, c), chunk.meshes[0]);
+                e.style = MeshStyle::Lit;
+                e.material = node.terrainMaterial;
+                e.transform = nodeT;
+                e.visible = visible;
+                range.restTransforms.emplace_back();
+                range.restEmissive.push_back(node.terrainMaterial.emissiveIntensity);
+                range.restRoughness.push_back(node.terrainMaterial.roughness);
+            }
+            const auto triangles = [&] {
+                std::size_t t = 0;
+                for (const world::TerrainChunk& chunk : mutableNode.chunks) {
+                    t += scene_.meshes[chunk.meshes[0]].indices.size() / 3;
+                }
+                return t;
+            }();
+            log::info("terrain '{}': {} chunks, {} triangles at LOD 0", node.name, mutableNode.chunks.size(),
+                      triangles);
             break;
         }
         case NodeKind::Particles: {
@@ -2246,6 +2323,7 @@ void Composition::applyParameters() {
     scene_.camera.nearPlane = std::clamp(radius_ * 0.005f, 0.01f, 0.5f);
     scene_.camera.farPlane = std::max(radius_ * 50.0f, 2000.0f); // free cameras look across whole worlds
     applyFraming();
+    updateTerrainLod();
 
     if (brightness_ != nullptr) {
         scene_.environment.brightness = brightness_->value();
@@ -2359,6 +2437,69 @@ void Composition::applyParameters() {
 // interpolates between the authored aim and the fully framed one, so a shot can be nudged rather
 // than snapped. The aspect comes from the lens's sensor, which is the authored intent; the render
 // target's aspect is not known here and would make the framing depend on the output size.
+void Composition::updateTerrainLod() {
+    // The frustum is built at a deliberately wide aspect. A composition does not know the viewport
+    // it will be drawn into, and culling a chunk the frame turns out to include is a hole in the
+    // ground, while keeping one it does not include costs a draw call -- so the error is taken on
+    // the safe side.
+    constexpr float kCullAspect = 2.5f;
+    std::optional<world::FrustumPlanes> planes;
+    for (std::size_t i = 0; i < nodes_.size() && i < ranges_.size(); ++i) {
+        const CompositionNode& node = *nodes_[i];
+        if (node.kind != NodeKind::Terrain || node.chunks.empty()) {
+            continue;
+        }
+        const NodeRange& range = ranges_[i];
+        if (range.entityCount != node.chunks.size()) {
+            continue; // a rebuild is pending; the entities and the chunks do not correspond yet
+        }
+        const bool lodEnabled = node.terrainLodParam == nullptr || node.terrainLodParam->value();
+        const bool cullEnabled = node.terrainCullParam == nullptr || node.terrainCullParam->value();
+        world::TerrainSettings settings = node.terrain;
+        if (node.terrainLodDistanceParam != nullptr) {
+            settings.lodDistance = node.terrainLodDistanceParam->value();
+        }
+        if (node.terrainViewDistanceParam != nullptr) {
+            settings.viewDistance = node.terrainViewDistanceParam->value();
+        }
+        if (cullEnabled && !planes) {
+            planes = world::frustumPlanes(scene_.camera.projection(kCullAspect) * scene_.camera.view());
+        }
+        const glm::vec3 eye = scene_.camera.position;
+        for (std::size_t c = 0; c < node.chunks.size(); ++c) {
+            const world::TerrainChunk& chunk = node.chunks[c];
+            Entity& e = scene_.entities[range.firstEntity + c];
+            if (!e.visible) {
+                continue; // the node itself is hidden; nothing below can turn it back on
+            }
+            // Chunk bounds are in the world map's own space; the node transform moves the world.
+            const glm::mat4 m = e.transform.matrix();
+            glm::vec3 lo(std::numeric_limits<float>::max());
+            glm::vec3 hi(std::numeric_limits<float>::lowest());
+            for (int k = 0; k < 8; ++k) {
+                const glm::vec3 corner((k & 1) ? chunk.boundsMax.x : chunk.boundsMin.x,
+                                       (k & 2) ? chunk.boundsMax.y : chunk.boundsMin.y,
+                                       (k & 4) ? chunk.boundsMax.z : chunk.boundsMin.z);
+                const glm::vec3 p = glm::vec3(m * glm::vec4(corner, 1.0f));
+                lo = glm::min(lo, p);
+                hi = glm::max(hi, p);
+            }
+            // Distance to the box, not to its centre: a chunk the camera is standing on is at
+            // distance zero however big it is, and gets LOD 0.
+            const float distance = glm::distance(eye, glm::clamp(eye, lo, hi));
+            if (distance > settings.viewDistance || (planes && !world::aabbVisible(*planes, lo, hi))) {
+                e.visible = false;
+                continue;
+            }
+            const int lod = lodEnabled ? world::chunkLod(settings, distance) : 0;
+            const MeshId mesh = chunk.meshes[static_cast<std::size_t>(std::clamp(lod, 0, kMaxTerrainLodIndex))];
+            if (mesh != kInvalidMesh) {
+                e.mesh = mesh;
+            }
+        }
+    }
+}
+
 void Composition::applyFraming() {
     const float strength = std::clamp(compositionData_.framingStrength, 0.0f, 1.0f);
     if (strength <= 0.0f || compositionData_.cameraTarget.empty()) {
@@ -2599,6 +2740,24 @@ nlohmann::json Composition::toJson() const {
         }
         if (node.kind == NodeKind::Sdf) {
             n["sdf"] = node.sdf.toJson();
+        }
+        if (node.kind == NodeKind::Terrain) {
+            n["world"] = world::worldMapToJson(node.worldMap);
+            const world::TerrainSettings& ts = node.terrain;
+            n["terrain"] = json{{"chunkSize", ts.chunkSize},   {"resolution", ts.resolution},
+                                {"lodLevels", ts.lodLevels},   {"lodDistance", ts.lodDistance},
+                                {"viewDistance", ts.viewDistance}, {"skirtDepth", ts.skirtDepth}};
+            const Material& m = node.terrainMaterial;
+            json mat{{"baseColor", vecToJson(m.baseColor)},
+                     {"opacity", m.opacity},
+                     {"emissiveColor", vecToJson(m.emissiveColor)},
+                     {"emissiveIntensity", m.emissiveIntensity},
+                     {"roughness", m.roughness},
+                     {"metallic", m.metallic}};
+            if (!m.program.empty()) {
+                mat["program"] = m.program;
+            }
+            n["material"] = std::move(mat);
         }
         nodes.push_back(std::move(n));
     }
@@ -3007,6 +3166,81 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 }
                 node.procedural = std::move(*pg);
                 node.proceduralMaterialAuthored = item.at("procedural").contains("material");
+            }
+            if (node.kind == NodeKind::Terrain) {
+                // "world" is the geography and "terrain" is how it is turned into meshes; both are
+                // optional, so `{"kind": "terrain"}` alone gives the shipped world at shipped
+                // settings rather than nothing.
+                if (item.contains("world")) {
+                    auto map = world::worldMapFromJson(item.at("world"));
+                    if (!map) {
+                        return fail("scene file '{}': node '{}': world: {}", scenePath.string(), node.name,
+                                    map.error().message);
+                    }
+                    node.worldMap = std::move(*map);
+                } else {
+                    node.worldMap = world::defaultWorld();
+                }
+                if (item.contains("terrain")) {
+                    const json& t = item.at("terrain");
+                    if (!t.is_object()) {
+                        return fail("node '{}': 'terrain' must be an object", node.name);
+                    }
+                    world::TerrainSettings& ts = node.terrain;
+                    struct TerrainFloat { const char* key; float* target; };
+                    for (const TerrainFloat& f :
+                         {TerrainFloat{"chunkSize", &ts.chunkSize}, TerrainFloat{"lodDistance", &ts.lodDistance},
+                          TerrainFloat{"viewDistance", &ts.viewDistance},
+                          TerrainFloat{"skirtDepth", &ts.skirtDepth}}) {
+                        auto v = readFloat(t, f.key, *f.target);
+                        if (!v) {
+                            return fail("node '{}': terrain: {}", node.name, v.error().message);
+                        }
+                        *f.target = *v;
+                    }
+                    struct TerrainInt { const char* key; int* target; };
+                    for (const TerrainInt& f :
+                         {TerrainInt{"resolution", &ts.resolution}, TerrainInt{"lodLevels", &ts.lodLevels}}) {
+                        auto v = readInt(t, f.key, *f.target);
+                        if (!v) {
+                            return fail("node '{}': terrain: {}", node.name, v.error().message);
+                        }
+                        *f.target = *v;
+                    }
+                }
+                if (item.contains("material")) {
+                    const json& m = item.at("material");
+                    if (!m.is_object()) {
+                        return fail("node '{}': 'material' must be an object", node.name);
+                    }
+                    Material& mat = node.terrainMaterial;
+                    auto baseColor = readVec<3>(m, "baseColor", mat.baseColor);
+                    auto emissiveColor = readVec<3>(m, "emissiveColor", mat.emissiveColor);
+                    if (!baseColor) {
+                        return fail("node '{}': material: {}", node.name, baseColor.error().message);
+                    }
+                    if (!emissiveColor) {
+                        return fail("node '{}': material: {}", node.name, emissiveColor.error().message);
+                    }
+                    mat.baseColor = *baseColor;
+                    mat.emissiveColor = *emissiveColor;
+                    struct MatFloat { const char* key; float* target; };
+                    for (const MatFloat& f :
+                         {MatFloat{"opacity", &mat.opacity}, MatFloat{"emissiveIntensity", &mat.emissiveIntensity},
+                          MatFloat{"roughness", &mat.roughness}, MatFloat{"metallic", &mat.metallic}}) {
+                        auto v = readFloat(m, f.key, *f.target);
+                        if (!v) {
+                            return fail("node '{}': material: {}", node.name, v.error().message);
+                        }
+                        *f.target = *v;
+                    }
+                    if (m.contains("program")) {
+                        if (!m.at("program").is_string()) {
+                            return fail("node '{}': material 'program' must be a string", node.name);
+                        }
+                        mat.program = m.at("program").get<std::string>();
+                    }
+                }
             }
             if (item.contains("particles")) {
                 auto particles = particlesFromJson(item.at("particles"));

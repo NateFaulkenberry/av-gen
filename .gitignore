@@ -11,3 +11,4 @@ cmake-build-*/
 # fetcher are committed; ~110 MB of textures and meshes are not.
 /assets/nature/
 /assets/terrain/
+/assets/quaternius/

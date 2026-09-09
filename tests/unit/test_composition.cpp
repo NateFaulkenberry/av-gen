@@ -1057,3 +1057,80 @@ TEST_CASE("Composition framing puts the focal point where the scene asks", "[com
     CHECK(half.y > 0.5f);
     CHECK(half.y < 0.7f);
 }
+
+TEST_CASE("A terrain node flattens into chunk entities that pick their own level", "[composition][terrain]") {
+    // The terrain node's whole claim: geometry is built once and the per-frame cost is choosing
+    // which of a chunk's meshes is drawn and whether it is drawn at all. So the test is not that a
+    // mesh exists -- it is that moving the camera changes the mesh a chunk points at, and that
+    // chunks behind the camera stop being drawn, without the mesh list changing at all.
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "terra",
+      "camera": { "mode": 1, "position": [0, 30, 60], "target": [0, 0, -60], "fov": 50.0 },
+      "nodes": [
+        { "name": "ground", "kind": "terrain",
+          "world": { "name": "small", "size": [160, 160] },
+          "terrain": { "chunkSize": 40.0, "resolution": 8, "lodLevels": 4,
+                       "lodDistance": 50.0, "viewDistance": 400.0 },
+          "material": { "baseColor": [0.2, 0.4, 0.3], "roughness": 0.9 } }
+      ]
+    })";
+    Fixture fx;
+    const auto path = writeJson("terrain", text);
+    fx.files.push_back(path);
+    auto comp = scene::Composition::loadFile(path.filename(), fx.registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    (*comp)->update(FrameTime{});
+    const scene::Scene& s = (*comp)->scene();
+
+    const scene::CompositionNode* node = (*comp)->findNode("ground");
+    REQUIRE(node != nullptr);
+    CHECK(node->chunks.size() == 16u);            // 160 m of world in 40 m chunks
+    CHECK(s.entities.size() == node->chunks.size());
+    CHECK(s.meshes.size() == node->chunks.size() * 4u); // every level of every chunk, uploaded once
+    const std::uint64_t meshVersion = s.meshVersion;
+
+    // The chunk the camera is looking at from close range takes the finest level; a chunk the same
+    // camera sees only in the far distance takes a coarser one.
+    auto meshOfChunkNearest = [&](const glm::vec2& p) {
+        std::size_t best = 0;
+        float bestDistance = 1e30f;
+        for (std::size_t i = 0; i < node->chunks.size(); ++i) {
+            const float d = glm::distance(node->chunks[i].center, p);
+            if (d < bestDistance) {
+                bestDistance = d;
+                best = i;
+            }
+        }
+        return best;
+    };
+    const std::size_t nearChunk = meshOfChunkNearest({0.0f, 60.0f});
+    const std::size_t farChunk = meshOfChunkNearest({0.0f, -60.0f});
+    const scene::MeshId nearMesh = s.entities[nearChunk].mesh;
+    const scene::MeshId farMesh = s.entities[farChunk].mesh;
+    CHECK(nearMesh == node->chunks[nearChunk].meshes[0]);
+    CHECK(farMesh != node->chunks[farChunk].meshes[0]);
+    CHECK(s.entities[farChunk].visible);
+
+    // Turn the camera around: the far chunk leaves the frustum and stops being drawn, and nothing
+    // about the geometry changed to make that happen.
+    params::Parameter<glm::vec3>* target = params.findAs<glm::vec3>("camera/target");
+    REQUIRE(target != nullptr);
+    target->setBase(glm::vec3(0.0f, 30.0f, 400.0f));
+    params.resetFinals(); // what the modulation pass does at the start of every real frame
+    (*comp)->update(FrameTime{});
+    CHECK_FALSE(s.entities[farChunk].visible);
+    CHECK(s.meshVersion == meshVersion);
+    CHECK(s.meshes.size() == node->chunks.size() * 4u);
+
+    // Debug switches: with LOD off every visible chunk draws its finest mesh, whatever the distance.
+    params::Parameter<bool>* lod = params.findAs<bool>("nodes/ground/terrainLod");
+    REQUIRE(lod != nullptr);
+    lod->setBase(false);
+    target->setBase(glm::vec3(0.0f, 0.0f, -60.0f));
+    params.resetFinals();
+    (*comp)->update(FrameTime{});
+    CHECK(s.entities[farChunk].mesh == node->chunks[farChunk].meshes[0]);
+}

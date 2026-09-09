@@ -78,10 +78,20 @@ TEST_CASE("Procedural parameters register under the prefix with relative labels"
     CHECK(params.find(prefix + "source/kind")->kind() == params::ParamKind::Int);
     CHECK(params.find(prefix + "distribution/count")->hardMin(0) == 1.0f);
     CHECK(params.find(prefix + "distribution/count")->hardMax(0) == 1048576.0f);
-    // The range has to cover the whole enum, expressed from the enum rather than as a literal:
-    // a primitive added without widening it is silently clamped to the last kind, which is how
-    // Tube first surfaced as every tube reporting an unresolvable source reference.
-    CHECK(params.find(prefix + "source/kind")->hardMax(0) == static_cast<float>(PrimitiveKind::Tube));
+    // The range has to cover the whole enum, and it has to be derived from the enum rather than
+    // from whichever kind happens to be last today. Naming a member here is what let Mesh be added
+    // while the parameter stayed clamped to Tube -- the same failure the comment was warning about,
+    // repeated one kind later. Walk upward while each value still round-trips through its own name.
+    int lastKind = 0;
+    for (int k = 1; k < 64; ++k) {
+        const auto back = primitiveKindFromName(primitiveKindName(static_cast<PrimitiveKind>(k)));
+        if (!back || static_cast<int>(*back) != k) {
+            break;
+        }
+        lastKind = k;
+    }
+    CHECK(lastKind >= static_cast<int>(PrimitiveKind::Mesh));
+    CHECK(params.find(prefix + "source/kind")->hardMax(0) == static_cast<float>(lastKind));
     CHECK(params.find(prefix + "material/emissive")->softMax(0) == 8.0f);
 
     REQUIRE(p.sourceRadius != nullptr);

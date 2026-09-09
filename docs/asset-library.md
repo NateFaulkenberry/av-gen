@@ -75,3 +75,29 @@ Worth recording, because the intuition was wrong. With the photoreal library the
 pixel-bound and it was never triangle-bound: **the volumetric march is over half of it.** The
 stylized library was the right move for coherence and for memory, and it is not what buys the frame
 rate. Volumetric step count and reach are the dial that does.
+
+## Quaternius Stylized Nature MegaKit
+
+Added 2026-09-09, supplied by the user. CC0 1.0 (`assets/quaternius/License_Standard.txt`), 68
+glTF meshes with their textures, from the free tier of the pack at https://quaternius.com. This is
+the primary library the curated-asset direction called for, and it arrives as glTF, so it needs no
+conversion.
+
+| group | meshes |
+|---|---|
+| trees | `CommonTree_1..5`, `Pine_1..5`, `TwistedTree_1..5`, `DeadTree_1..5` |
+| undergrowth | `Bush_Common`, `Bush_Common_Flowers`, `Fern_1`, `Plant_1`, `Plant_1_Big`, `Plant_7`, `Plant_7_Big`, `Clover_1..2` |
+| grasses | `Grass_Common_Short/Tall`, `Grass_Wispy_Short/Tall` |
+| flowers | `Flower_3_Single/Group`, `Flower_4_Single/Group`, `Petal_1..5` |
+| fungi | `Mushroom_Common`, `Mushroom_Laetiporus` |
+| rock | `Rock_Medium_1..3`, `Pebble_Round_1..5`, `Pebble_Square_1..6`, `RockPath_*` |
+
+It is not in the manifest and no scene uses it yet: ecology is phase 3 of the world, and the
+hierarchy is deliberate -- terrain, then biomes, then what grows on them. Like the other packs the
+files are gitignored; the pack is a single download and the licence permits redistribution, but
+120 MB of textures does not belong in the history.
+
+One thing to check when it is used: these meshes carry several materials each (cap and stem, trunk
+and canopy), and `mergedAssetMesh` collapses an asset to one material chosen by triangle count. The
+Kenney fungi already read as single-colour blobs for this reason. Multi-material instancing is the
+open problem, not the assets.

@@ -1,0 +1,21 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Glowmere Valley"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "terrain.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/lens/focalLength": 34.0,
+  "camera/lens/aperture": 4.0,
+  "camera/lens/focusDistance": 120.0,
+  "camera/lens/shutterAngle": 172.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 1.0
+ }
+}

@@ -296,7 +296,11 @@ TEST_CASE("the irradiance the sky builds matches the CPU reference in shape", "[
     const float top = band(img.height * 5 / 16, img.height * 7 / 16);
     const float bottom = band(img.height * 9 / 16, img.height * 11 / 16);
     INFO("top " << top << " bottom " << bottom);
-    CHECK(top > bottom); // the sun is overhead, and so is the bright half of the sky
+    // With a margin, not merely greater. This assertion once passed by 0.003 because ambient
+    // occlusion was crushing the very band it measures, which made it a test of AO rather than of
+    // which way is up. The unoccluded gap is about 0.08; anything under a third of that means
+    // something is eating the sky again.
+    CHECK(top > bottom + 0.025f); // the sun is overhead, and so is the bright half of the sky
 
     const scene::SkyRuntime sky = scene::resolveSky(s.environment.sky, s.lights);
     const glm::vec3 up = scene::skyIrradiance(sky, {0.0f, 1.0f, 0.0f});

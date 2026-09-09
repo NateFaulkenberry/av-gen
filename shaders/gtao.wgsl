@@ -101,6 +101,17 @@ fn fs_gtao(in: FsIn) -> @location(0) vec4<f32> {
     let radiusPixels = clamp(radius * ao.projection.y * 0.0 + radius / max(depth, 1e-3) *
                                  (0.5 * ao.fullSize.y / max(ao.projection.y, 1e-4)),
                              4.0, 96.0);
+    // How high a sample must stand above this point's tangent plane before it counts as an
+    // occluder. Without such a test a smooth surface occludes itself: every sample along a slice is
+    // coplanar with the centre, and at a grazing angle the direction to it is nearly the view
+    // direction, so the horizon search reads the surface's own recession as a wall. That is
+    // invisible on objects seen from a normal angle and impossible to miss on terrain, where most
+    // of the frame is ground running away from the camera -- it turns every smooth hillside into a
+    // flat grey wash. With the test, a plane returns exactly full visibility from every angle,
+    // which is the property the term is supposed to have. The threshold is a pixel footprint or
+    // two, so it scales with distance instead of being a constant tuned for one scene's scale.
+    let pixelWorld = depth * 2.0 * ao.projection.y / max(ao.fullSize.y, 1.0);
+    let occluderBias = max(pixelWorld * 1.5, radius * 0.02);
     let slices = max(u32(ao.params.z), 1u);
     let steps = max(u32(ao.params.w), 1u);
     let pixel = in.clip.xy;
@@ -141,7 +152,7 @@ fn fs_gtao(in: FsIn) -> @location(0) vec4<f32> {
                 let sp = viewPosition(sampleUv, sampleDepth);
                 let delta = sp - p;
                 let dist = length(delta);
-                if (dist < 1e-5) {
+                if (dist < 1e-5 || dot(delta, n) <= occluderBias) {
                     continue;
                 }
                 let cosH = dot(delta / dist, v);
@@ -167,9 +178,18 @@ fn fs_gtao(in: FsIn) -> @location(0) vec4<f32> {
         bent = bent + (v * cos(bentAngle) + tangent * sin(bentAngle)) * projLength;
     }
     visibility = clamp(visibility / f32(slices), 0.0, 1.0);
-    var bentWorld = viewToWorldDirection(n);
+    // Each slice contributes the part of the normal that lies in its own plane, and every one of
+    // those planes contains the view vector, so the sum systematically loses the part of the normal
+    // perpendicular to the view: a bent normal built this way leans toward the camera even where
+    // nothing is occluding anything. On an unoccluded convex surface that is plainly wrong -- there
+    // is nothing for the normal to bend around -- and it shows up as the underside of a ball
+    // gathering more sky than its top. So the bend is brought in in proportion to the visibility
+    // actually lost, which is what a bent normal means: no occlusion, no bend.
+    let normalWorld = viewToWorldDirection(n);
+    var bentWorld = normalWorld;
     if (dot(bent, bent) > 1e-8) {
-        bentWorld = normalize(viewToWorldDirection(normalize(bent)));
+        let bendAmount = clamp(1.0 - visibility, 0.0, 1.0);
+        bentWorld = normalize(mix(normalWorld, normalize(viewToWorldDirection(normalize(bent))), bendAmount));
     }
     return vec4<f32>(octEncode(bentWorld), visibility, depth);
 }
