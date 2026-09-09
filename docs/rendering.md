@@ -154,6 +154,50 @@ GPU, 0.3 ms CPU work per frame (Release). Environment preprocessing: 18 ms Relea
 Xcode GPU capture works on the process (Tint-generated MSL is shown). Dawn validation messages
 are logged with the `[wgpu]` prefix and counted; a headless run exits non-zero if any occurred.
 
+## Sharing (milestone 1.2)
+
+`share::TextureShare` (`src/share/`) publishes a finished frame (RGBA8Unorm or BGRA8Unorm texture
+with `CopySrc` usage) to other applications; one instance is one output. `available(kind)` and
+`describe()` report what this machine can do; `open(kind, context, name)` starts a server, and
+`publish(texture, w, h)` is called once per frame after the frame's command buffer was submitted.
+`stats()` gives frames published, size, last error and whether clients are attached.
+
+**Syphon** (macOS) is native, no CPU copy and no CPU wait:
+
+1. An IOSurface in the source's pixel format is imported into Dawn once per size/format
+   (`wgpu::SharedTextureMemory` with `SharedTextureMemoryIOSurfaceDescriptor`; the device is
+   created with `SharedTextureMemoryIOSurface` and `SharedFenceMTLSharedEvent`, see
+   `Capabilities::sharedTextureIOSurface`).
+2. Each frame: `BeginAccess` → `CopyTextureToTexture` into the wrapped texture → `Submit` →
+   `EndAccess`. `EndAccess` hands back Dawn's queue `MTLSharedEvent` and the copy's serial.
+3. A `SyphonMetalServer` on a second `MTLDevice`/queue gets a command buffer that waits for that
+   event value on the GPU, blits (BGRA) or re-draws (RGBA, through Syphon's sampling shader) the
+   surface into Syphon's own IOSurface, signals our read-done `MTLSharedEvent`, and announces the
+   frame to clients from its completion handler.
+4. The next frame's `BeginAccess` passes the read-done event as a fence, so Dawn's copy never
+   overwrites a surface Syphon is still reading. One IOSurface suffices; there is no added frame
+   of latency. Size changes wait for the last frame to be announced first, because Syphon swaps
+   its surface at encode time but announces from completion handlers (a stale handler would
+   otherwise push a blank new-size surface to clients).
+
+Measured with the hidden `[.perf]` probe (Debug, 1920x1080 BGRA8, 300 frames, in-process
+client attached): `publish()` blocks the caller well under a millisecond on average. Clients
+verified: `SyphonMetalClient` in the test process, discovered by name through
+`SyphonServerDirectory` like any other application would.
+
+**NDI** is runtime-loaded (`share/ndi_runtime.*`, never linked) and CPU-bound by nature: a ring
+of three `MapRead` staging buffers. `publish()` pumps Dawn's events, hands every newly mapped
+buffer to `NDIlib_send_send_video_async_v2` (BGRA or RGBA FourCC, progressive, the frame rate set
+with `setFrameRate`), unmaps the buffer NDI has just finished with, then copies the new frame into
+a free slot and maps it asynchronously. Nothing blocks; when all three slots are busy the frame is
+dropped. Latency is one to two frames. `stats().clients` comes from
+`NDIlib_send_get_no_connections`. Without the runtime `available(Ndi)` is false and `describe()`
+says where it looked.
+
+Limitations: no alpha premultiplication or colour-space tagging (frames go out as stored, which
+is what Syphon and NDI clients expect for sRGB 8-bit); one output per `TextureShare`; NDI has
+only been exercised against the loader's error paths on machines without the runtime.
+
 ## Seams for later milestones
 
 - Pass list → frame graph with transient resources (0.6 post-processing).

@@ -27,10 +27,21 @@ target_compile_definitions(avgen_core PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FOR
 avgen_set_warnings(avgen_core)
 
 # ---- avgen_gpu: WebGPU facade and scene renderer (needs Dawn) ---------------------------------
-file(GLOB_RECURSE AVGEN_GPU_SOURCES CONFIGURE_DEPENDS gpu/*.cpp rendering/*.cpp)
+file(GLOB_RECURSE AVGEN_GPU_SOURCES CONFIGURE_DEPENDS gpu/*.cpp rendering/*.cpp share/*.cpp)
+if(APPLE)
+    # Texture sharing (milestone 1.2): Syphon is Objective-C++; the stub is for other platforms.
+    file(GLOB_RECURSE AVGEN_GPU_OBJCXX_SOURCES CONFIGURE_DEPENDS share/*.mm)
+    list(APPEND AVGEN_GPU_SOURCES ${AVGEN_GPU_OBJCXX_SOURCES})
+    list(REMOVE_ITEM AVGEN_GPU_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/share/syphon_share_stub.cpp")
+endif()
 if(AVGEN_GPU_SOURCES)
     add_library(avgen_gpu STATIC ${AVGEN_GPU_SOURCES})
     target_link_libraries(avgen_gpu PUBLIC avgen_core dawn::webgpu_dawn)
+    if(APPLE)
+        set_source_files_properties(${AVGEN_GPU_OBJCXX_SOURCES} PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+        target_link_libraries(avgen_gpu PRIVATE syphon::syphon
+            "-framework Metal" "-framework IOSurface" "-framework CoreVideo" "-framework Foundation")
+    endif()
     target_compile_definitions(avgen_gpu PUBLIC AVGEN_SHADER_SOURCE_DIR="${AVGEN_SHADER_SOURCE_DIR}")
     avgen_set_warnings(avgen_gpu)
 endif()

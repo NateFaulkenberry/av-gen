@@ -116,6 +116,11 @@ Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
     ctx->caps_.backendName = backendName(info.backendType);
     ctx->caps_.adapterType = adapterTypeName(info.adapterType);
     ctx->caps_.timestampQuery = desc.requestTimestamps && ctx->adapter_.HasFeature(wgpu::FeatureName::TimestampQuery);
+    // Dawn's Metal backend needs both for a wrapped IOSurface: the import itself and the shared
+    // event it hands back from EndAccess (share/syphon_share.mm waits on it GPU-side).
+    ctx->caps_.sharedTextureIOSurface = desc.requestSharedTextures &&
+        ctx->adapter_.HasFeature(wgpu::FeatureName::SharedTextureMemoryIOSurface) &&
+        ctx->adapter_.HasFeature(wgpu::FeatureName::SharedFenceMTLSharedEvent);
 
     // Request the adapter's full limits so nothing is capped at WebGPU defaults (ADR-001).
     wgpu::Limits adapterLimits{};
@@ -126,6 +131,10 @@ Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
     std::vector<wgpu::FeatureName> features;
     if (ctx->caps_.timestampQuery) {
         features.push_back(wgpu::FeatureName::TimestampQuery);
+    }
+    if (ctx->caps_.sharedTextureIOSurface) {
+        features.push_back(wgpu::FeatureName::SharedTextureMemoryIOSurface);
+        features.push_back(wgpu::FeatureName::SharedFenceMTLSharedEvent);
     }
     wgpu::DeviceDescriptor deviceDesc{};
     deviceDesc.label = desc.label.c_str();
@@ -184,9 +193,9 @@ Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
         }
     }
 
-    log::info("GPU: {} ({}, {}) via {}; timestamps={}; maxColorAttachments={}, maxBufferSize={} MB",
+    log::info("GPU: {} ({}, {}) via {}; timestamps={}; sharedTextures={}; maxColorAttachments={}, maxBufferSize={} MB",
               ctx->caps_.adapterName, ctx->caps_.vendor, ctx->caps_.adapterType, ctx->caps_.backendName,
-              ctx->caps_.timestampQuery, ctx->caps_.limits.maxColorAttachments,
+              ctx->caps_.timestampQuery, ctx->caps_.sharedTextureIOSurface, ctx->caps_.limits.maxColorAttachments,
               ctx->caps_.limits.maxBufferSize / (1024 * 1024));
     return ctx;
 }

@@ -797,3 +797,59 @@ feedback.
 - Timeline curve editor: keys are draggable points on the track preview.
 - Split across four subagents (outputs; sharing; control/scene/asset follow-ups; offline
   follow-ups) in worktrees, with the UI editors, application wiring, ADR-022 and docs on main.
+## 2026-09-09 — Milestone 1.2 (part): texture sharing to other applications (Syphon, NDI)
+
+### What was implemented and why
+
+- `share::TextureShare` (`src/share/`, in `avgen_gpu`): one output per instance, `open(kind,
+  context, name)`, `publish(texture, w, h)` once per frame after the frame's submit, `stats()`;
+  `available()`/`describe()` say what the machine supports. Two transports behind a small
+  internal interface (`share_backend.hpp`).
+- Syphon is native: Dawn writes straight into an IOSurface (`wgpu::SharedTextureMemory`,
+  `SharedTextureMemoryIOSurfaceDescriptor`; the device now requests
+  `SharedTextureMemoryIOSurface` + `SharedFenceMTLSharedEvent`, `Capabilities::
+  sharedTextureIOSurface`), and a `SyphonMetalServer` on a second Metal device blits from it.
+  Ordering is GPU-only in both directions with `MTLSharedEvent`s: Syphon's command buffer waits
+  for the value `EndAccess` exports, and the next `BeginAccess` waits on the event Syphon's
+  buffer signals. No CPU wait, no added latency, one IOSurface.
+- Syphon-Framework is compiled from source (BSD-2, pinned commit, Metal subset only, no OpenGL
+  framework linked). Its Metal renderer loads shaders from the framework bundle, which a static
+  library lacks; `cmake/patches/syphon-metal-library-from-source.patch` adds a compile-from-source
+  fallback and CMake verifies the patch is present in the CPM cache.
+- NDI is runtime-loaded only (`dlopen`/`dlsym`, `share/ndi_runtime.*`, own declarations of the
+  three SDK structures with size checks); frames come from a three-deep `MapRead` staging ring
+  and go to `NDIlib_send_send_video_async_v2`; a saturated ring drops the frame instead of
+  blocking.
+
+### Bugs found during the milestone
+
+- Syphon swaps its output IOSurface at encode time (`prepareToDrawFrameOfSize:`) but announces
+  frames from Metal completion handlers, so on a size change a handler of an older frame pushed
+  the new, still blank surface to clients. `ensureSurface` now waits until the last frame has
+  been announced (our own completion handler, registered after Syphon's) before recreating
+  anything; the burst-then-resize test caught it.
+- `MTLSharedEvent` values must stay monotonic: the read-done counter is no longer reset when the
+  surface is recreated.
+
+### Tests
+
+353 cases (was 349): `test_texture_share.cpp` with an in-process `SyphonMetalClient`
+(`tests/support/syphon_test_client.mm`) discovered by name through `SyphonServerDirectory`:
+solid colour then gradient from RGBA8 and BGRA8 sources match within 2/255, stats, close/reopen,
+30-frame burst plus size change, publish rejected when closed; the NDI case skips without the
+runtime. Hidden `[.perf]` probe: `publish()` at 1920x1080 BGRA8 over 300 frames blocks the caller
+0.07 ms on average, 0.55 ms worst (Debug, client attached, 267 frames observed by the client
+because notifications coalesce).
+
+### Results
+
+- Clean Debug rebuild: zero warnings (ObjC++ included); 353/353 tests pass (NDI skipped).
+- Syphon verified end to end in-process. No NDI runtime on the development machine, so the NDI
+  sender has only been exercised through its loader diagnostics.
+
+### Known limitations
+
+- No alpha premultiplication or colour-space metadata; one output per instance; NDI is CPU-bound
+  (readback) and untested against a live receiver; no Windows/Linux transport (Syphon is macOS
+  only, NDI loader handles dylib/so names but was built only on macOS); the app does not yet
+  expose the outputs (next: window/display outputs and a Sharing section in the UI).
