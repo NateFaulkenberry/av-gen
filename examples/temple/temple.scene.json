@@ -1,0 +1,534 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "temple",
+  "camera": {
+    "mode": 1,
+    "position": [
+      0,
+      3.5,
+      44
+    ],
+    "target": [
+      0,
+      20,
+      -6
+    ],
+    "fov": 66.0,
+    "orbitSpeed": 0.0,
+    "distance": 74.0,
+    "height": 9.0
+  },
+  "environment": {
+    "intensity": 0.0,
+    "fogDensity": 0.014,
+    "fogColor": [
+      0.02,
+      0.018,
+      0.03
+    ],
+    "background": [
+      0.008,
+      0.007,
+      0.012
+    ]
+  },
+  "nodes": [
+    {
+      "name": "floor",
+      "kind": "grid",
+      "scale": [
+        6,
+        1,
+        6
+      ]
+    },
+    {
+      "name": "columns",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "cylinder",
+          "radius": 0.6,
+          "height": 24.0,
+          "radialSegments": 28,
+          "heightSegments": 12,
+          "caps": true
+        },
+        "sourceTransform": {
+          "position": [
+            0,
+            12,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "distribution": {
+          "kind": "radial",
+          "count": 64,
+          "radius": 27.0,
+          "orientation": "outward",
+          "plane": "xz"
+        },
+        "variation": {
+          "seed": 7,
+          "randomScale": [
+            0.0,
+            0.12,
+            0.0
+          ],
+          "randomRotation": [
+            0.0,
+            0.08,
+            0.0
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "twist",
+            "amount": 0.025,
+            "speed": 0.01,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "space": "local"
+          },
+          {
+            "kind": "noise",
+            "amount": 0.15,
+            "scale": 0.35,
+            "speed": 0.15,
+            "seed": 3,
+            "axisMask": [
+              1,
+              0.3,
+              1
+            ],
+            "space": "world"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.02,
+            0.02,
+            0.025
+          ],
+          "emissiveColor": [
+            0.95,
+            0.55,
+            1.0
+          ],
+          "emissiveIntensity": 0.04,
+          "roughness": 0.5,
+          "metallic": 0.35
+        },
+        "materialVariation": {
+          "hueGradient": 0.18,
+          "emissiveRandom": 0.5
+        }
+      }
+    },
+    {
+      "name": "innerColumns",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.4,
+            14.0,
+            1.4
+          ],
+          "subdivisions": 6
+        },
+        "sourceTransform": {
+          "position": [
+            0,
+            7,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "distribution": {
+          "kind": "radial",
+          "count": 12,
+          "radius": 11.0,
+          "orientation": "inward",
+          "plane": "xz",
+          "startAngle": 0.2617,
+          "endAngle": 6.5449
+        },
+        "variation": {
+          "seed": 11,
+          "randomScale": [
+            0.0,
+            0.25,
+            0.0
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "bend",
+            "amount": 0.02,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "displacementAxis": [
+              0,
+              0,
+              1
+            ],
+            "space": "local"
+          },
+          {
+            "kind": "sine",
+            "amount": 0.12,
+            "frequency": 0.7,
+            "speed": 0.4,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "displacementAxis": [
+              1,
+              0,
+              0
+            ],
+            "space": "local"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.08,
+            0.07,
+            0.09
+          ],
+          "emissiveColor": [
+            1.0,
+            0.7,
+            0.9
+          ],
+          "emissiveIntensity": 0.7,
+          "roughness": 0.3,
+          "metallic": 0.4
+        },
+        "materialVariation": {
+          "hueGradient": 0.5,
+          "emissiveRandom": 0.4
+        }
+      }
+    },
+    {
+      "name": "rings",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "torus",
+          "majorRadius": 29.0,
+          "minorRadius": 0.35,
+          "majorSegments": 96,
+          "minorSegments": 12
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 5,
+          "start": [
+            0,
+            26,
+            0
+          ],
+          "end": [
+            0,
+            40,
+            0
+          ]
+        },
+        "variation": {
+          "seed": 5,
+          "randomRotation": [
+            0.0,
+            0.6,
+            0.0
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "sine",
+            "amount": 0.9,
+            "frequency": 0.25,
+            "speed": 0.3,
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "displacementAxis": [
+              0,
+              1,
+              0
+            ],
+            "space": "local"
+          },
+          {
+            "kind": "noise",
+            "amount": 0.4,
+            "scale": 0.12,
+            "speed": 0.08,
+            "seed": 9,
+            "space": "world"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.05,
+            0.05,
+            0.06
+          ],
+          "emissiveColor": [
+            0.6,
+            0.9,
+            1.0
+          ],
+          "emissiveIntensity": 1.6,
+          "roughness": 0.25,
+          "metallic": 0.6
+        },
+        "materialVariation": {
+          "hueGradient": 0.4
+        }
+      }
+    },
+    {
+      "name": "altar",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "torus",
+          "majorRadius": 3.2,
+          "minorRadius": 1.1,
+          "majorSegments": 64,
+          "minorSegments": 24
+        },
+        "sourceTransform": {
+          "position": [
+            0,
+            9,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "deformers": [
+          {
+            "kind": "twist",
+            "amount": 0.4,
+            "speed": 0.25,
+            "axis": [
+              0,
+              0,
+              1
+            ],
+            "space": "local"
+          },
+          {
+            "kind": "noise",
+            "amount": 0.25,
+            "scale": 0.9,
+            "speed": 0.35,
+            "seed": 21,
+            "space": "local"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.04,
+            0.03,
+            0.05
+          ],
+          "emissiveColor": [
+            1.0,
+            0.45,
+            0.2
+          ],
+          "emissiveIntensity": 3.0,
+          "roughness": 0.2,
+          "metallic": 0.8
+        }
+      }
+    },
+    {
+      "name": "ceilingTiles",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            3.4,
+            0.3,
+            3.4
+          ],
+          "subdivisions": 2
+        },
+        "distribution": {
+          "kind": "grid",
+          "gridCount": [
+            15,
+            1,
+            15
+          ],
+          "gridSpacing": [
+            4.2,
+            1.0,
+            4.2
+          ]
+        },
+        "distributionTransform": {
+          "position": [
+            0,
+            42,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "variation": {
+          "seed": 3,
+          "randomPosition": [
+            0,
+            0.6,
+            0
+          ],
+          "randomRotation": [
+            0.05,
+            0.3,
+            0.05
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "sine",
+            "amount": 1.2,
+            "frequency": 0.35,
+            "speed": 0.5,
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "displacementAxis": [
+              0,
+              1,
+              0
+            ],
+            "space": "world"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.05,
+            0.05,
+            0.06
+          ],
+          "emissiveColor": [
+            0.5,
+            0.35,
+            1.0
+          ],
+          "emissiveIntensity": 0.35,
+          "roughness": 0.5,
+          "metallic": 0.2
+        },
+        "materialVariation": {
+          "emissiveRandom": 0.9,
+          "hueShift": 0.08
+        }
+      }
+    },
+    {
+      "name": "dust",
+      "kind": "particles",
+      "particles": {
+        "capacity": 32768,
+        "spawnRate": 900,
+        "shape": "box",
+        "position": [
+          0,
+          16,
+          0
+        ],
+        "extent": [
+          30,
+          16,
+          30
+        ],
+        "lifetimeMin": 6,
+        "lifetimeMax": 12,
+        "speedMin": 0.05,
+        "speedMax": 0.25,
+        "spread": 1.0,
+        "gravity": [
+          0,
+          0.02,
+          0
+        ],
+        "sizeStart": 0.05,
+        "sizeEnd": 0.0,
+        "blend": "additive",
+        "colorStart": [
+          0.8,
+          0.6,
+          1.0,
+          0.35
+        ],
+        "colorEnd": [
+          0.3,
+          0.5,
+          1.0,
+          0.0
+        ]
+      }
+    }
+  ]
+}

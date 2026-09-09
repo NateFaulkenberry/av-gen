@@ -1,0 +1,353 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "avgen",
+    "version": "0.1.0"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "hyperspace.scene.json"
+    }
+  },
+  "parameters": {
+    "post/bloom/enabled": true,
+    "post/bloom/intensity": 0.7,
+    "post/bloom/threshold": 0.75,
+    "post/lens/chromaticAberration": 0.35,
+    "post/lens/distortion": -0.08,
+    "post/output/vignette": 0.5,
+    "scene/brightness": 0.85,
+    "root/rotationSpeed": 0.0
+  },
+  "sources": [
+    {
+      "kind": "lfo",
+      "name": "roll",
+      "settings": {
+        "shape": "sine"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "source": "audio.rms",
+      "target": "scene/brightness",
+      "amount": 0.35,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 40,
+        "decayMs": 500
+      }
+    },
+    {
+      "source": "audio.bass",
+      "target": "procedural/tunnel/distribution/radius",
+      "amount": 8.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 30,
+        "decayMs": 450,
+        "curve": "power",
+        "curveAmount": 0.8
+      }
+    },
+    {
+      "source": "audio.bass",
+      "target": "procedural/gates/transform/scale",
+      "amount": 0.3,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 30,
+        "decayMs": 500
+      }
+    },
+    {
+      "source": "audio.lowMid",
+      "target": "procedural/spokes/deform/2/amount",
+      "amount": 3.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 50,
+        "decayMs": 500
+      }
+    },
+    {
+      "source": "audio.mid",
+      "target": "procedural/tunnel/deform/1/amount",
+      "amount": 0.02,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 60,
+        "decayMs": 700
+      }
+    },
+    {
+      "source": "audio.mid",
+      "target": "procedural/gates/deform/1/amount",
+      "amount": 0.15,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 60,
+        "decayMs": 700
+      }
+    },
+    {
+      "source": "audio.highMid",
+      "target": "procedural/core/deform/2/amount",
+      "amount": 2.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 40,
+        "decayMs": 400
+      }
+    },
+    {
+      "source": "audio.treble",
+      "target": "procedural/core/material/emissive",
+      "amount": 6.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 20,
+        "decayMs": 300
+      }
+    },
+    {
+      "source": "audio.spectralCentroid",
+      "target": "procedural/tunnel/materialVariation/hueShift",
+      "amount": 0.6,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 150,
+        "decayMs": 1000
+      }
+    },
+    {
+      "source": "audio.spectralFlux",
+      "target": "procedural/tunnel/deform/3/amount",
+      "amount": 2.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 30,
+        "decayMs": 500
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "procedural/gates/deform/2/amount",
+      "amount": 2.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "peakhold",
+        "attackMs": 5,
+        "decayMs": 350
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "particles/streaks/burst",
+      "amount": 3000,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "none"
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "post/bloom/intensity",
+      "amount": 0.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "peakhold",
+        "attackMs": 5,
+        "decayMs": 300
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "procedural/spokes/transform/scale",
+      "amount": 0.15,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "peakhold",
+        "attackMs": 5,
+        "decayMs": 200
+      }
+    },
+    {
+      "source": "lfo.roll",
+      "target": "camera/position",
+      "component": 0,
+      "amount": 5.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {}
+    },
+    {
+      "source": "lfo.roll",
+      "target": "camera/position",
+      "component": 1,
+      "amount": 3.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "offset": 0.0
+      }
+    }
+  ],
+  "presets": [
+    {
+      "name": "Procedural / Hyperspace",
+      "values": {
+        "procedural/tunnel/distribution/radius": [
+          22
+        ],
+        "procedural/tunnel/deform/2/amount": [
+          3.0
+        ],
+        "procedural/tunnel/deform/3/amount": [
+          0.8
+        ],
+        "procedural/gates/material/emissive": [
+          1.5
+        ],
+        "scene/fogDensity": [
+          0.012
+        ]
+      }
+    },
+    {
+      "name": "Procedural / Hyperspace Calm",
+      "values": {
+        "procedural/tunnel/distribution/radius": [
+          30
+        ],
+        "procedural/tunnel/deform/2/amount": [
+          0.6
+        ],
+        "procedural/tunnel/deform/3/amount": [
+          0.2
+        ],
+        "procedural/gates/material/emissive": [
+          0.6
+        ],
+        "scene/fogDensity": [
+          0.012
+        ]
+      }
+    },
+    {
+      "name": "Procedural / Hyperspace Dense",
+      "values": {
+        "procedural/tunnel/distribution/radius": [
+          14
+        ],
+        "procedural/tunnel/deform/2/amount": [
+          5.0
+        ],
+        "procedural/tunnel/deform/3/amount": [
+          2.0
+        ],
+        "procedural/gates/material/emissive": [
+          3.0
+        ],
+        "scene/fogDensity": [
+          0.006
+        ]
+      }
+    }
+  ],
+  "timeline": {
+    "enabled": true,
+    "tracks": [
+      {
+        "target": "camera/position",
+        "component": 2,
+        "timeBase": "seconds",
+        "mode": "replace",
+        "loopLength": 60.0,
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              -40.0
+            ],
+            "interp": "easeInOut"
+          },
+          {
+            "time": 60.0,
+            "value": [
+              -260.0
+            ],
+            "interp": "linear"
+          }
+        ]
+      },
+      {
+        "target": "camera/target",
+        "component": 2,
+        "timeBase": "seconds",
+        "mode": "replace",
+        "loopLength": 60.0,
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              -300.0
+            ],
+            "interp": "easeInOut"
+          },
+          {
+            "time": 60.0,
+            "value": [
+              -420.0
+            ],
+            "interp": "linear"
+          }
+        ]
+      }
+    ],
+    "cues": [
+      {
+        "time": 0.0,
+        "name": "calm",
+        "preset": "Procedural / Hyperspace Calm",
+        "morphSeconds": 4.0
+      },
+      {
+        "time": 20.0,
+        "name": "open",
+        "preset": "Procedural / Hyperspace",
+        "morphSeconds": 6.0
+      },
+      {
+        "time": 40.0,
+        "name": "dense",
+        "preset": "Procedural / Hyperspace Dense",
+        "morphSeconds": 8.0
+      }
+    ]
+  },
+  "render": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "output": "sequence",
+    "path": "renders/hyperspace"
+  }
+}

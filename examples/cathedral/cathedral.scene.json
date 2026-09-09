@@ -1,0 +1,662 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "cathedral",
+  "camera": {
+    "mode": 1,
+    "position": [
+      0,
+      6,
+      46
+    ],
+    "target": [
+      0,
+      22,
+      -10
+    ],
+    "fov": 68.0,
+    "orbitSpeed": 0.0
+  },
+  "environment": {
+    "intensity": 0.0,
+    "fogDensity": 0.016,
+    "fogColor": [
+      0.015,
+      0.02,
+      0.035
+    ],
+    "background": [
+      0.006,
+      0.008,
+      0.014
+    ]
+  },
+  "nodes": [
+    {
+      "name": "floor",
+      "kind": "grid",
+      "scale": [
+        7,
+        1,
+        7
+      ]
+    },
+    {
+      "name": "archesLeft",
+      "kind": "procedural",
+      "position": [
+        -14,
+        0,
+        0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.6,
+            30.0,
+            1.6
+          ],
+          "subdivisions": 16
+        },
+        "sourceTransform": {
+          "position": [
+            0,
+            15,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 14,
+          "start": [
+            0,
+            0,
+            40
+          ],
+          "end": [
+            0,
+            0,
+            -50
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "bend",
+            "amount": 0.052,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "displacementAxis": [
+              1,
+              0,
+              0
+            ],
+            "center": [
+              0,
+              14,
+              0
+            ],
+            "space": "local"
+          },
+          {
+            "kind": "noise",
+            "amount": 0.08,
+            "scale": 0.4,
+            "speed": 0.12,
+            "seed": 2,
+            "space": "world"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.03,
+            0.03,
+            0.035
+          ],
+          "emissiveColor": [
+            0.5,
+            0.7,
+            1.0
+          ],
+          "emissiveIntensity": 0.12,
+          "roughness": 0.7,
+          "metallic": 0.1
+        },
+        "materialVariation": {
+          "emissiveRandom": 0.5
+        }
+      }
+    },
+    {
+      "name": "archesRight",
+      "kind": "procedural",
+      "position": [
+        14,
+        0,
+        0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.6,
+            30.0,
+            1.6
+          ],
+          "subdivisions": 16
+        },
+        "sourceTransform": {
+          "position": [
+            0,
+            15,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 14,
+          "start": [
+            0,
+            0,
+            40
+          ],
+          "end": [
+            0,
+            0,
+            -50
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "bend",
+            "amount": 0.052,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "displacementAxis": [
+              -1,
+              0,
+              0
+            ],
+            "center": [
+              0,
+              14,
+              0
+            ],
+            "space": "local"
+          },
+          {
+            "kind": "noise",
+            "amount": 0.08,
+            "scale": 0.4,
+            "speed": 0.12,
+            "seed": 3,
+            "space": "world"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.03,
+            0.03,
+            0.035
+          ],
+          "emissiveColor": [
+            0.5,
+            0.7,
+            1.0
+          ],
+          "emissiveIntensity": 0.12,
+          "roughness": 0.7,
+          "metallic": 0.1
+        },
+        "materialVariation": {
+          "emissiveRandom": 0.5
+        }
+      }
+    },
+    {
+      "name": "ribs",
+      "kind": "procedural",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "cylinder",
+          "radius": 0.3,
+          "height": 34.0,
+          "radialSegments": 12,
+          "heightSegments": 24,
+          "caps": false
+        },
+        "sourceTransform": {
+          "position": [
+            0,
+            17,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 14,
+          "start": [
+            0,
+            0,
+            40
+          ],
+          "end": [
+            0,
+            0,
+            -50
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "bend",
+            "amount": 0.085,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "displacementAxis": [
+              1,
+              0,
+              0
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "space": "local"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.05,
+            0.05,
+            0.06
+          ],
+          "emissiveColor": [
+            1.0,
+            0.85,
+            0.6
+          ],
+          "emissiveIntensity": 0.5,
+          "roughness": 0.4,
+          "metallic": 0.5
+        }
+      }
+    },
+    {
+      "name": "ribsMirror",
+      "kind": "procedural",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "cylinder",
+          "radius": 0.3,
+          "height": 34.0,
+          "radialSegments": 12,
+          "heightSegments": 24,
+          "caps": false
+        },
+        "sourceTransform": {
+          "position": [
+            0,
+            17,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 14,
+          "start": [
+            0,
+            0,
+            40
+          ],
+          "end": [
+            0,
+            0,
+            -50
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "bend",
+            "amount": 0.085,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "displacementAxis": [
+              -1,
+              0,
+              0
+            ],
+            "center": [
+              0,
+              0,
+              0
+            ],
+            "space": "local"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.05,
+            0.05,
+            0.06
+          ],
+          "emissiveColor": [
+            1.0,
+            0.85,
+            0.6
+          ],
+          "emissiveIntensity": 0.5,
+          "roughness": 0.4,
+          "metallic": 0.5
+        }
+      }
+    },
+    {
+      "name": "rosette",
+      "kind": "procedural",
+      "position": [
+        0,
+        30,
+        -52
+      ],
+      "procedural": {
+        "source": {
+          "kind": "torus",
+          "majorRadius": 1.2,
+          "minorRadius": 0.28,
+          "majorSegments": 32,
+          "minorSegments": 10
+        },
+        "distribution": {
+          "kind": "radial",
+          "count": 24,
+          "radius": 9.0,
+          "plane": "xy",
+          "orientation": "outward"
+        },
+        "variation": {
+          "seed": 4,
+          "randomRotation": [
+            0.4,
+            0.4,
+            0.4
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "twist",
+            "amount": 0.6,
+            "speed": 0.35,
+            "axis": [
+              0,
+              0,
+              1
+            ],
+            "space": "local"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.03,
+            0.03,
+            0.04
+          ],
+          "emissiveColor": [
+            1.0,
+            0.5,
+            0.9
+          ],
+          "emissiveIntensity": 2.0,
+          "roughness": 0.3,
+          "metallic": 0.5
+        },
+        "materialVariation": {
+          "hueGradient": 1.0
+        }
+      }
+    },
+    {
+      "name": "rosetteCore",
+      "kind": "procedural",
+      "position": [
+        0,
+        30,
+        -52
+      ],
+      "procedural": {
+        "source": {
+          "kind": "torus",
+          "majorRadius": 4.0,
+          "minorRadius": 1.2,
+          "majorSegments": 64,
+          "minorSegments": 24
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "deformers": [
+          {
+            "kind": "noise",
+            "amount": 0.35,
+            "scale": 0.8,
+            "speed": 0.3,
+            "seed": 6,
+            "space": "local"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.02,
+            0.02,
+            0.03
+          ],
+          "emissiveColor": [
+            0.9,
+            0.6,
+            1.0
+          ],
+          "emissiveIntensity": 3.5,
+          "roughness": 0.2,
+          "metallic": 0.8
+        }
+      }
+    },
+    {
+      "name": "ornaments",
+      "kind": "procedural",
+      "position": [
+        0,
+        20,
+        -6
+      ],
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.2,
+            1.2,
+            1.2
+          ],
+          "subdivisions": 2
+        },
+        "distribution": {
+          "kind": "spiral",
+          "count": 90,
+          "radius": 4.0,
+          "radiusGrowth": 6.0,
+          "turns": 4,
+          "spiralHeight": 24,
+          "orientation": "tangent"
+        },
+        "variation": {
+          "seed": 12,
+          "randomRotation": [
+            0.8,
+            0.8,
+            0.8
+          ],
+          "randomScale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "twist",
+            "amount": 0.9,
+            "speed": 0.5,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "space": "local"
+          },
+          {
+            "kind": "sine",
+            "amount": 1.4,
+            "frequency": 0.18,
+            "speed": 0.25,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "displacementAxis": [
+              1,
+              0,
+              0
+            ],
+            "space": "world"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.08,
+            0.06,
+            0.05
+          ],
+          "emissiveColor": [
+            1.0,
+            0.75,
+            0.4
+          ],
+          "emissiveIntensity": 1.2,
+          "roughness": 0.35,
+          "metallic": 0.7
+        },
+        "materialVariation": {
+          "emissiveRandom": 0.8,
+          "hueShift": 0.06
+        }
+      }
+    },
+    {
+      "name": "mist",
+      "kind": "particles",
+      "particles": {
+        "capacity": 32768,
+        "spawnRate": 600,
+        "shape": "box",
+        "position": [
+          0,
+          12,
+          -5
+        ],
+        "extent": [
+          14,
+          12,
+          45
+        ],
+        "lifetimeMin": 8,
+        "lifetimeMax": 14,
+        "speedMin": 0.02,
+        "speedMax": 0.15,
+        "spread": 1.0,
+        "gravity": [
+          0,
+          0.01,
+          0
+        ],
+        "sizeStart": 0.08,
+        "sizeEnd": 0.0,
+        "blend": "additive",
+        "colorStart": [
+          0.5,
+          0.7,
+          1.0,
+          0.25
+        ],
+        "colorEnd": [
+          0.9,
+          0.6,
+          1.0,
+          0.0
+        ]
+      }
+    }
+  ]
+}

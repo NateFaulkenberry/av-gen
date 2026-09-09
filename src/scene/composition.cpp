@@ -670,11 +670,19 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     envRotation_ =
         &params.add(floatDesc(prefix_ + "env/rotation", 0.0f, -6.2832f, 6.2832f, -3.1416f, 3.1416f));
     brightness_ = &params.add(floatDesc(prefix_ + "scene/brightness", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f));
+    fogDensity_ = &params.add(floatDesc(prefix_ + "scene/fogDensity", fogDensitySetting_, 0.0f, 2.0f, 0.0f, 0.2f));
+    keyLight_ = &params.add(floatDesc(prefix_ + "scene/keyLight", 1.0f, 0.0f, 10.0f, 0.0f, 3.0f));
+    {
+        auto fogDesc = vec3Desc(prefix_ + "scene/fogColor", fogColorSet_ ? fogColorSetting_ : scene_.environment.backgroundColor,
+                                0.0f, 1.0f, 0.0f, 1.0f);
+        fogDesc.isColor = true;
+        fogColor_ = &params.add(fogDesc);
+    }
     gridIntensity_ = &params.add(floatDesc(prefix_ + "scene/gridIntensity", 0.6f, 0.0f, 4.0f, 0.0f, 2.0f));
     rootScale_ = &params.add(floatDesc(prefix_ + "root/scale", 1.0f, 0.05f, 8.0f, 0.2f, 3.0f));
     // Nested compositions do not spin on their own by default; the enclosing root does.
     rootRotationSpeed_ = &params.add(
-        floatDesc(prefix_ + "root/rotationSpeed", root ? 0.15f : 0.0f, -20.0f, 20.0f, -3.0f, 3.0f));
+        floatDesc(prefix_ + "root/rotationSpeed", 0.0f, -20.0f, 20.0f, -3.0f, 3.0f)); // worlds do not spin by default
     rootImpulse_ = &params.add(floatDesc(prefix_ + "root/impulse", 0.0f, 0.0f, 4.0f, 0.0f, 1.0f));
     for (auto& node : nodes_) {
         registerNodeParameters(*node);
@@ -784,6 +792,9 @@ void Composition::detach() {
     envIntensity_ = nullptr;
     envRotation_ = nullptr;
     brightness_ = nullptr;
+    fogDensity_ = nullptr;
+    fogColor_ = nullptr;
+    keyLight_ = nullptr;
     gridIntensity_ = nullptr;
     rootScale_ = nullptr;
     rootRotationSpeed_ = nullptr;
@@ -999,6 +1010,16 @@ void Composition::rebuild() {
                 ps.enabled = src.enabled && visible;
                 scene_.particles.push_back(std::move(ps));
             }
+            range.firstProcedural = scene_.procedurals.size();
+            range.proceduralCount = cs.procedurals.size();
+            for (const ProceduralGeometry& src : cs.procedurals) {
+                ProceduralGeometry pg = src;
+                pg.name = sanitise(prefix_) + node.name + "_" + src.name;
+                pg.distributionTransform = Transform::fromMatrix(nodeT.matrix() * src.distributionTransform.matrix());
+                pg.visible = pg.visible && visible;
+                pg.rebuild();
+                scene_.procedurals.push_back(std::move(pg));
+            }
             range.childMeshVersion = cs.meshVersion;
             range.childEntityCount = cs.entities.size();
             range.childParticleCount = cs.particles.size();
@@ -1010,7 +1031,8 @@ void Composition::rebuild() {
         ranges_.push_back(std::move(range));
     }
 
-    if (scene_.lights.empty()) {
+    addedKeyLight_ = scene_.lights.empty();
+    if (addedKeyLight_) {
         scene_.addLight(defaultKeyLight());
     }
 
@@ -1031,6 +1053,8 @@ void Composition::rebuild() {
     const auto [lo, hi] = scene_.bounds();
     const bool hasLit = std::any_of(scene_.entities.begin(), scene_.entities.end(), [&](const Entity& e) {
         return e.visible && e.style == MeshStyle::Lit && e.mesh < scene_.meshes.size();
+    }) || std::any_of(scene_.procedurals.begin(), scene_.procedurals.end(), [](const ProceduralGeometry& pg) {
+        return pg.visible && !pg.instances.empty();
     });
     if (hasLit) {
         center_ = (lo + hi) * 0.5f;
@@ -1189,6 +1213,18 @@ void Composition::applyParameters() {
                 ps.enabled = src.enabled && visible;
             }
         }
+        if (child != nullptr && child->procedurals.size() == range.proceduralCount) {
+            for (std::size_t k = 0; k < range.proceduralCount; ++k) {
+                const ProceduralGeometry& src = child->procedurals[k];
+                ProceduralGeometry& pg = scene_.procedurals[range.firstProcedural + k];
+                const std::string name = pg.name;
+                pg = src;
+                pg.name = name;
+                pg.distributionTransform = Transform::fromMatrix(full.matrix() * src.distributionTransform.matrix());
+                pg.visible = pg.visible && visible;
+                pg.rebuild();
+            }
+        }
     }
 
     // Orbit camera around the bounds centre (distance fitted to the radius by default).
@@ -1207,6 +1243,11 @@ void Composition::applyParameters() {
         if (glm::length(scene_.camera.target - scene_.camera.position) < 1e-4f) {
             scene_.camera.target = scene_.camera.position + glm::vec3(0.0f, 0.0f, -1.0f);
         }
+        if ((frameCounter_++ % 120) == 0) {
+            log::debug("free camera pos ({:.1f} {:.1f} {:.1f}) target ({:.1f} {:.1f} {:.1f})", scene_.camera.position.x,
+                       scene_.camera.position.y, scene_.camera.position.z, scene_.camera.target.x, scene_.camera.target.y,
+                       scene_.camera.target.z);
+        }
     } else {
         scene_.camera.position =
             center_ + glm::vec3(std::sin(cameraAngle_) * distance, 0.0f, std::cos(cameraAngle_) * distance);
@@ -1214,12 +1255,18 @@ void Composition::applyParameters() {
         scene_.camera.target = center_;
     }
     scene_.camera.fovYRadians = glm::radians(fov);
-    scene_.camera.nearPlane = std::max(radius_ * 0.01f, 0.01f);
-    scene_.camera.farPlane = std::max(radius_ * 50.0f, 100.0f);
+    scene_.camera.nearPlane = std::clamp(radius_ * 0.005f, 0.01f, 0.5f);
+    scene_.camera.farPlane = std::max(radius_ * 50.0f, 2000.0f); // free cameras look across whole worlds
 
     if (brightness_ != nullptr) {
         scene_.environment.brightness = brightness_->value();
     }
+    scene_.environment.fogDensity = fogDensity_ != nullptr ? fogDensity_->value() : fogDensitySetting_;
+    if (addedKeyLight_ && !scene_.lights.empty() && keyLight_ != nullptr) {
+        scene_.lights.back().intensity = defaultKeyLight().intensity * keyLight_->value();
+    }
+    scene_.environment.fogColor = fogColor_ != nullptr ? fogColor_->value()
+                                                       : (fogColorSet_ ? fogColorSetting_ : scene_.environment.backgroundColor);
     if (gridIntensity_ != nullptr) {
         scene_.environment.gridIntensity = gridIntensity_->value();
     }
@@ -1271,6 +1318,13 @@ nlohmann::json Composition::toJson() const {
         environment["map"] = environmentPath_.generic_string();
     }
     environment["intensity"] = envIntensity_ != nullptr ? envIntensity_->base() : envIntensitySetting_;
+    environment["fogDensity"] = fogDensity_ != nullptr ? fogDensity_->base() : fogDensitySetting_;
+    {
+        const glm::vec3 fc = fogColor_ != nullptr ? fogColor_->base() : (fogColorSet_ ? fogColorSetting_ : scene_.environment.backgroundColor);
+        environment["fogColor"] = {fc.r, fc.g, fc.b};
+        const glm::vec3 bg = scene_.environment.backgroundColor;
+        environment["background"] = {bg.r, bg.g, bg.b};
+    }
     j["environment"] = std::move(environment);
 
     json nodes = json::array();
@@ -1400,6 +1454,23 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(intensity.error());
         }
         comp->envIntensitySetting_ = *intensity;
+        auto fog = readFloat(e, "fogDensity", comp->fogDensitySetting_);
+        if (!fog) {
+            return std::unexpected(fog.error());
+        }
+        comp->fogDensitySetting_ = *fog;
+        auto readColour = [&](const char* key, glm::vec3& out) -> bool {
+            if (e.contains(key) && e[key].is_array() && e[key].size() == 3 && e[key][0].is_number()) {
+                out = glm::vec3(e[key][0].get<float>(), e[key][1].get<float>(), e[key][2].get<float>());
+                return true;
+            }
+            return false;
+        };
+        comp->fogColorSet_ = readColour("fogColor", comp->fogColorSetting_);
+        glm::vec3 background;
+        if (readColour("background", background)) {
+            comp->scene_.environment.backgroundColor = background;
+        }
     }
 
     if (j.contains("nodes")) {

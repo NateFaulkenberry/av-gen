@@ -1,0 +1,281 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "avgen",
+    "version": "0.1.0"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "benchmark.scene.json"
+    }
+  },
+  "parameters": {
+    "root/rotationSpeed": 0.0
+  },
+  "sources": [],
+  "routes": [],
+  "presets": [
+    {
+      "name": "Benchmark / 100 no deformation",
+      "values": {
+        "procedural/field/distribution/gridCountX": [
+          10
+        ],
+        "procedural/field/distribution/gridCountZ": [
+          10
+        ],
+        "procedural/field/distribution/gridSpacing": [
+          3,
+          3,
+          3
+        ],
+        "procedural/field/deform/1/amount": [
+          0
+        ],
+        "procedural/field/deform/2/amount": [
+          0
+        ],
+        "procedural/field/deform/3/amount": [
+          0
+        ],
+        "procedural/field/deform/4/amount": [
+          0
+        ],
+        "procedural/field/materialVariation/hueGradient": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "Benchmark / 1000 no deformation",
+      "values": {
+        "procedural/field/distribution/gridCountX": [
+          32
+        ],
+        "procedural/field/distribution/gridCountZ": [
+          32
+        ],
+        "procedural/field/distribution/gridSpacing": [
+          2,
+          2,
+          2
+        ],
+        "procedural/field/deform/1/amount": [
+          0
+        ],
+        "procedural/field/deform/2/amount": [
+          0
+        ],
+        "procedural/field/deform/3/amount": [
+          0
+        ],
+        "procedural/field/deform/4/amount": [
+          0
+        ],
+        "procedural/field/materialVariation/hueGradient": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "Benchmark / 1000 one deformer",
+      "values": {
+        "procedural/field/distribution/gridCountX": [
+          32
+        ],
+        "procedural/field/distribution/gridCountZ": [
+          32
+        ],
+        "procedural/field/distribution/gridSpacing": [
+          2,
+          2,
+          2
+        ],
+        "procedural/field/deform/1/amount": [
+          0.5
+        ],
+        "procedural/field/deform/2/amount": [
+          0
+        ],
+        "procedural/field/deform/3/amount": [
+          0
+        ],
+        "procedural/field/deform/4/amount": [
+          0
+        ],
+        "procedural/field/materialVariation/hueGradient": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "Benchmark / 1000 three deformers",
+      "values": {
+        "procedural/field/distribution/gridCountX": [
+          32
+        ],
+        "procedural/field/distribution/gridCountZ": [
+          32
+        ],
+        "procedural/field/distribution/gridSpacing": [
+          2,
+          2,
+          2
+        ],
+        "procedural/field/deform/1/amount": [
+          0.5
+        ],
+        "procedural/field/deform/2/amount": [
+          0.1
+        ],
+        "procedural/field/deform/3/amount": [
+          0.3
+        ],
+        "procedural/field/deform/4/amount": [
+          0
+        ],
+        "procedural/field/materialVariation/hueGradient": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "Benchmark / 1000 noise",
+      "values": {
+        "procedural/field/distribution/gridCountX": [
+          32
+        ],
+        "procedural/field/distribution/gridCountZ": [
+          32
+        ],
+        "procedural/field/distribution/gridSpacing": [
+          2,
+          2,
+          2
+        ],
+        "procedural/field/deform/1/amount": [
+          0
+        ],
+        "procedural/field/deform/2/amount": [
+          0
+        ],
+        "procedural/field/deform/3/amount": [
+          0
+        ],
+        "procedural/field/deform/4/amount": [
+          0.3
+        ],
+        "procedural/field/materialVariation/hueGradient": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "Benchmark / 10000 no deformation",
+      "values": {
+        "procedural/field/distribution/gridCountX": [
+          100
+        ],
+        "procedural/field/distribution/gridCountZ": [
+          100
+        ],
+        "procedural/field/distribution/gridSpacing": [
+          1.5,
+          1.5,
+          1.5
+        ],
+        "procedural/field/deform/1/amount": [
+          0
+        ],
+        "procedural/field/deform/2/amount": [
+          0
+        ],
+        "procedural/field/deform/3/amount": [
+          0
+        ],
+        "procedural/field/deform/4/amount": [
+          0
+        ],
+        "procedural/field/materialVariation/hueGradient": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "Benchmark / 10000 three deformers + material variation",
+      "values": {
+        "procedural/field/distribution/gridCountX": [
+          100
+        ],
+        "procedural/field/distribution/gridCountZ": [
+          100
+        ],
+        "procedural/field/distribution/gridSpacing": [
+          1.5,
+          1.5,
+          1.5
+        ],
+        "procedural/field/deform/1/amount": [
+          0.5
+        ],
+        "procedural/field/deform/2/amount": [
+          0.1
+        ],
+        "procedural/field/deform/3/amount": [
+          0.3
+        ],
+        "procedural/field/deform/4/amount": [
+          0
+        ],
+        "procedural/field/materialVariation/hueGradient": [
+          1.0
+        ]
+      }
+    },
+    {
+      "name": "Benchmark / 10000 noise",
+      "values": {
+        "procedural/field/distribution/gridCountX": [
+          100
+        ],
+        "procedural/field/distribution/gridCountZ": [
+          100
+        ],
+        "procedural/field/distribution/gridSpacing": [
+          1.5,
+          1.5,
+          1.5
+        ],
+        "procedural/field/deform/1/amount": [
+          0
+        ],
+        "procedural/field/deform/2/amount": [
+          0
+        ],
+        "procedural/field/deform/3/amount": [
+          0
+        ],
+        "procedural/field/deform/4/amount": [
+          0.3
+        ],
+        "procedural/field/materialVariation/hueGradient": [
+          0
+        ]
+      }
+    }
+  ],
+  "timeline": {
+    "enabled": true,
+    "tracks": [],
+    "cues": []
+  },
+  "render": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "output": "sequence",
+    "path": "renders/benchmark"
+  }
+}

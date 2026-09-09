@@ -895,7 +895,8 @@ void Engine::newComposition() {
     }
 }
 
-Result<void> Engine::loadComposition(const std::filesystem::path& path) {
+Result<void> Engine::loadComposition(const std::filesystem::path& rawPath) {
+    const auto path = std::filesystem::absolute(rawPath).lexically_normal();
     registry_.setBaseDirectory(path.parent_path());
     auto comp = scene::Composition::loadFile(path, registry_);
     if (!comp) {

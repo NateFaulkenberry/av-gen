@@ -1,0 +1,347 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "helix",
+  "camera": {
+    "mode": 1,
+    "position": [
+      0,
+      4,
+      18
+    ],
+    "target": [
+      0,
+      22,
+      0
+    ],
+    "fov": 72.0,
+    "orbitSpeed": 0.0
+  },
+  "environment": {
+    "intensity": 0.0,
+    "fogDensity": 0.02,
+    "fogColor": [
+      0.02,
+      0.01,
+      0.03
+    ],
+    "background": [
+      0.008,
+      0.004,
+      0.012
+    ]
+  },
+  "nodes": [
+    {
+      "name": "helixA",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            2.4,
+            0.5,
+            0.9
+          ],
+          "subdivisions": 3
+        },
+        "distribution": {
+          "kind": "spiral",
+          "count": 400,
+          "radius": 9.0,
+          "radiusGrowth": 0.0,
+          "turns": 8,
+          "spiralHeight": 80,
+          "orientation": "tangent"
+        },
+        "variation": {
+          "seed": 1,
+          "randomScale": [
+            0.3,
+            0.0,
+            0.3
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "twist",
+            "amount": 0.02,
+            "speed": 0.15,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "space": "world"
+          },
+          {
+            "kind": "sine",
+            "amount": 1.5,
+            "frequency": 0.12,
+            "speed": 0.6,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "displacementAxis": [
+              1,
+              0,
+              1
+            ],
+            "space": "world"
+          },
+          {
+            "kind": "noise",
+            "amount": 0.25,
+            "scale": 0.3,
+            "speed": 0.25,
+            "seed": 7,
+            "space": "world"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.03,
+            0.03,
+            0.04
+          ],
+          "emissiveColor": [
+            0.3,
+            0.9,
+            1.0
+          ],
+          "emissiveIntensity": 0.25,
+          "roughness": 0.35,
+          "metallic": 0.4
+        },
+        "materialVariation": {
+          "hueGradient": 0.5,
+          "emissiveRandom": 0.4
+        }
+      }
+    },
+    {
+      "name": "helixB",
+      "kind": "procedural",
+      "rotation": [
+        0,
+        180,
+        0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "cylinder",
+          "radius": 0.35,
+          "height": 3.0,
+          "radialSegments": 12,
+          "heightSegments": 2
+        },
+        "sourceTransform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "distribution": {
+          "kind": "spiral",
+          "count": 400,
+          "radius": 9.0,
+          "radiusGrowth": 0.0,
+          "turns": 8,
+          "spiralHeight": 80,
+          "orientation": "outward"
+        },
+        "deformers": [
+          {
+            "kind": "twist",
+            "amount": 0.02,
+            "speed": 0.15,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "space": "world"
+          },
+          {
+            "kind": "sine",
+            "amount": 1.5,
+            "frequency": 0.12,
+            "speed": 0.6,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "displacementAxis": [
+              1,
+              0,
+              1
+            ],
+            "space": "world"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.03,
+            0.03,
+            0.04
+          ],
+          "emissiveColor": [
+            1.0,
+            0.4,
+            0.8
+          ],
+          "emissiveIntensity": 0.2,
+          "roughness": 0.4,
+          "metallic": 0.3
+        },
+        "materialVariation": {
+          "hueGradient": 0.8
+        }
+      }
+    },
+    {
+      "name": "core",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "torus",
+          "majorRadius": 1.6,
+          "minorRadius": 0.5,
+          "majorSegments": 48,
+          "minorSegments": 16
+        },
+        "sourceTransform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 40,
+          "start": [
+            0,
+            0,
+            0
+          ],
+          "end": [
+            0,
+            80,
+            0
+          ]
+        },
+        "variation": {
+          "seed": 9,
+          "randomRotation": [
+            0.0,
+            0.5,
+            0.0
+          ],
+          "randomScale": [
+            0.3,
+            0.3,
+            0.3
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "noise",
+            "amount": 0.3,
+            "scale": 0.6,
+            "speed": 0.5,
+            "seed": 3,
+            "space": "local"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.03,
+            0.03,
+            0.04
+          ],
+          "emissiveColor": [
+            1.0,
+            0.8,
+            0.5
+          ],
+          "emissiveIntensity": 1.0,
+          "roughness": 0.25,
+          "metallic": 0.7
+        },
+        "materialVariation": {
+          "emissiveGradient": 0.8,
+          "hueGradient": 0.3
+        }
+      }
+    },
+    {
+      "name": "sparks",
+      "kind": "particles",
+      "particles": {
+        "capacity": 65536,
+        "spawnRate": 2500,
+        "shape": "box",
+        "position": [
+          0,
+          40,
+          0
+        ],
+        "extent": [
+          12,
+          40,
+          12
+        ],
+        "lifetimeMin": 3,
+        "lifetimeMax": 7,
+        "speedMin": 0.1,
+        "speedMax": 0.6,
+        "spread": 1.0,
+        "gravity": [
+          0,
+          0.4,
+          0
+        ],
+        "sizeStart": 0.06,
+        "sizeEnd": 0.0,
+        "blend": "additive",
+        "colorStart": [
+          0.6,
+          0.9,
+          1.0,
+          0.5
+        ],
+        "colorEnd": [
+          1.0,
+          0.4,
+          0.9,
+          0.0
+        ]
+      }
+    }
+  ]
+}

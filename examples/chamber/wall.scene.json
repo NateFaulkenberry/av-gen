@@ -1,0 +1,25 @@
+{
+  "format": "avgen-scene", "version": 1, "name": "wall",
+  "nodes": [
+    { "name": "archesL", "kind": "procedural", "position": [-16, 0, 0], "procedural": {
+        "source": { "kind": "box", "size": [1.4, 26.0, 1.4], "subdivisions": 14 },
+        "sourceTransform": { "position": [0, 13, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+        "distribution": { "kind": "linear", "count": 10, "start": [0, 0, 10], "end": [0, 0, -60] },
+        "deformers": [ { "kind": "bend", "amount": 0.06, "axis": [0, 1, 0], "displacementAxis": [1, 0, 0], "center": [0, 12, 0], "space": "local" } ],
+        "material": { "baseColor": [0.03, 0.03, 0.035], "emissiveColor": [0.4, 0.7, 1.0], "emissiveIntensity": 0.15, "roughness": 0.7 },
+        "materialVariation": { "emissiveRandom": 0.6 } } },
+    { "name": "archesR", "kind": "procedural", "position": [16, 0, 0], "procedural": {
+        "source": { "kind": "box", "size": [1.4, 26.0, 1.4], "subdivisions": 14 },
+        "sourceTransform": { "position": [0, 13, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+        "distribution": { "kind": "linear", "count": 10, "start": [0, 0, 10], "end": [0, 0, -60] },
+        "deformers": [ { "kind": "bend", "amount": 0.06, "axis": [0, 1, 0], "displacementAxis": [-1, 0, 0], "center": [0, 12, 0], "space": "local" } ],
+        "material": { "baseColor": [0.03, 0.03, 0.035], "emissiveColor": [0.4, 0.7, 1.0], "emissiveIntensity": 0.15, "roughness": 0.7 },
+        "materialVariation": { "emissiveRandom": 0.6 } } },
+    { "name": "lintels", "kind": "procedural", "position": [0, 27, 0], "procedural": {
+        "source": { "kind": "box", "size": [34, 0.8, 0.8], "subdivisions": 8 },
+        "distribution": { "kind": "linear", "count": 10, "start": [0, 0, 10], "end": [0, 0, -60] },
+        "deformers": [ { "kind": "sine", "amount": 0.6, "frequency": 0.3, "speed": 0.4, "axis": [1, 0, 0], "displacementAxis": [0, 1, 0], "space": "local" } ],
+        "material": { "baseColor": [0.03, 0.03, 0.035], "emissiveColor": [1.0, 0.7, 0.4], "emissiveIntensity": 0.8, "roughness": 0.4, "metallic": 0.5 },
+        "materialVariation": { "emissiveGradient": 1.0 } } }
+  ]
+}

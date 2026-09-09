@@ -1013,3 +1013,58 @@ project relinking; EXR round trip and EXR render sequences; readback ring determ
 - Split: primitives/distributions/variation/deformers/parameters (GPU-free) and the instanced
   renderer + shader + fog + benchmark by two subagents against fixed headers; composition node,
   camera mode, examples browser, showcase files, presets, timeline demo, docs on main.
+
+### Bugs found during the milestone
+
+- The CPU and GPU noise deformers disagreed (scalar × mask versus three decorrelated channels);
+  aligned on the shader's per-axis form and documented in the header.
+- Relative `--composition` paths were resolved twice (against the scene's own folder); the
+  engine now absolutises the path first.
+- Compositions computed their bounds from entities only, so scenes made purely of procedural
+  objects framed to a radius of 1 and the far plane clipped everything beyond 100 units: a free
+  camera looking across a world saw nothing. Bounds now include procedural instance bounds and
+  the far plane has a 2,000-unit floor.
+- Nested scene files dropped their procedural nodes when flattened; they are now copied with
+  the node transform folded in, at rebuild and every frame.
+- Compositions inherited the glTF scene's default root rotation (0.15 rad/s), which swung
+  whole worlds past a free camera; the default is now 0 and the examples set it explicitly.
+- Route amounts that looked fine on the orb were far too strong for emissive architecture (the
+  Temple's columns washed out under treble); the showcase presets use modest amounts and let
+  the deformers' own speeds provide the idle motion.
+
+### Tests
+
+421 cases (was 385): primitives, distributions, variation, transform order, each deformer, stack
+order, CPU/GPU noise identity, JSON, parameter registration and application (30 CPU cases);
+GPU instancing coverage, deformer effects, determinism across renderers, 4,096 instances, fog
+(5); engine: procedural node registration and structural rebuilds, audio routes driving
+distribution radius and twist, project round trip, every example project loads with no
+warnings (3); showcase frame-hash regression: Temple, Helix, Chamber, Hyperspace and Lab
+render bit-identically across fresh engines and renderers and differ across time (1).
+
+### Results
+
+- Live loop and render job agree frame for frame on the Temple (20 frames), and two render runs
+  are identical; the showcase regression test covers radial, spiral, noise, combined stacks,
+  nested scenes and audio-reactive routes.
+- Windowed Release, the Temple at 2880x1800 (five procedural objects, ~1,000 instances, dust):
+  120 fps, GPU 2.7 ms, CPU 3.1 ms.
+- Release throughput (agent's probe, 1280x720, 24-segment cylinders): 1,000 instances 1.0 ms
+  (2.0 ms with noise); 10,000 instances 3.6 ms (4.5 ms one deformer, 5.6 ms three, 8.6 ms
+  noise); CPU instance regeneration 1–10 µs. See `docs/performance/procedural-geometry.md`.
+- The acid test: every showcase is a scene file plus a project; deleting the Temple and writing
+  the Cathedral, Helix, Chamber, Hyperspace and Worlds needed no C++. The Worlds project morphs
+  Cathedral → Temple → Helix → Hyperspace → Cathedral on a 60-second cue timeline.
+
+### Known limitations
+
+- Eight deformer slots; opaque instances only (blend materials draw opaque); one homography of
+  material variation (colour/emissive multipliers); no mesh or glTF sources, no spline/surface
+  distributions, no fields yet (all additive per ADR-023); the composition's per-node transform
+  is folded into the distribution transform, so moving a 10,000-instance node re-uploads its
+  records; the per-instance hue tint is baked at rebuild time.
+
+### Next step
+
+Fields/effectors that modulate instance attributes by position, mesh and glTF sources, spline
+distributions, and custom WGSL deformers spliced at the shader's include point.

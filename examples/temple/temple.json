@@ -1,0 +1,313 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "avgen",
+    "version": "0.1.0"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "temple.scene.json"
+    }
+  },
+  "parameters": {
+    "post/bloom/enabled": true,
+    "post/bloom/intensity": 0.55,
+    "post/bloom/threshold": 0.95,
+    "post/tonemap/operator": 1,
+    "post/output/vignette": 0.35,
+    "post/output/grain": 0.04,
+    "scene/brightness": 0.7,
+    "scene/gridIntensity": 1.4,
+    "scene/keyLight": 0.25,
+    "root/rotationSpeed": 0.0
+  },
+  "sources": [
+    {
+      "kind": "lfo",
+      "name": "breath",
+      "settings": {
+        "shape": "sine"
+      }
+    },
+    {
+      "kind": "control",
+      "name": "control",
+      "settings": {
+        "channels": []
+      }
+    },
+    {
+      "kind": "lfo",
+      "name": "sway",
+      "settings": {
+        "shape": "sine"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "source": "audio.rms",
+      "target": "scene/brightness",
+      "amount": 0.2,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 40,
+        "decayMs": 500
+      }
+    },
+    {
+      "source": "audio.bass",
+      "target": "procedural/columns/distribution/radius",
+      "amount": 2.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 30,
+        "decayMs": 450,
+        "curve": "power",
+        "curveAmount": 0.8
+      }
+    },
+    {
+      "source": "audio.bass",
+      "target": "procedural/columns/source/height",
+      "amount": 3.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 30,
+        "decayMs": 600
+      }
+    },
+    {
+      "source": "audio.lowMid",
+      "target": "procedural/innerColumns/deform/2/amount",
+      "amount": 0.35,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 60,
+        "decayMs": 500
+      }
+    },
+    {
+      "source": "audio.mid",
+      "target": "procedural/rings/transform/rotation",
+      "component": 1,
+      "amount": 25.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 80,
+        "decayMs": 900
+      }
+    },
+    {
+      "source": "audio.mid",
+      "target": "procedural/altar/deform/1/amount",
+      "amount": 0.6,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 60,
+        "decayMs": 700
+      }
+    },
+    {
+      "source": "audio.highMid",
+      "target": "procedural/ceilingTiles/deform/1/amount",
+      "amount": 1.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 40,
+        "decayMs": 400
+      }
+    },
+    {
+      "source": "audio.treble",
+      "target": "procedural/rings/material/emissive",
+      "amount": 2.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 20,
+        "decayMs": 300
+      }
+    },
+    {
+      "source": "audio.treble",
+      "target": "procedural/columns/material/emissive",
+      "amount": 0.12,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 20,
+        "decayMs": 350
+      }
+    },
+    {
+      "source": "audio.spectralCentroid",
+      "target": "procedural/columns/materialVariation/hueShift",
+      "amount": 0.2,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 200,
+        "decayMs": 1200
+      }
+    },
+    {
+      "source": "audio.spectralFlux",
+      "target": "procedural/columns/deform/2/amount",
+      "amount": 0.45,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 30,
+        "decayMs": 600
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "procedural/altar/transform/scale",
+      "amount": 0.35,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "peakhold",
+        "attackMs": 5,
+        "decayMs": 350
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "particles/dust/burst",
+      "amount": 400,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "none"
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "post/bloom/intensity",
+      "amount": 0.4,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "peakhold",
+        "attackMs": 5,
+        "decayMs": 300
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "scene/brightness",
+      "amount": 0.12,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "peakhold",
+        "attackMs": 5,
+        "decayMs": 180
+      }
+    },
+    {
+      "source": "lfo.breath",
+      "target": "procedural/innerColumns/transform/scale",
+      "component": 1,
+      "amount": 0.08,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {}
+    },
+    {
+      "source": "lfo.sway",
+      "target": "camera/position",
+      "component": 0,
+      "amount": 6.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {}
+    }
+  ],
+  "presets": [],
+  "timeline": {
+    "enabled": true,
+    "tracks": [
+      {
+        "target": "camera/position",
+        "component": 2,
+        "timeBase": "seconds",
+        "mode": "replace",
+        "loopLength": 90.0,
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              44.0
+            ],
+            "interp": "easeInOut"
+          },
+          {
+            "time": 45.0,
+            "value": [
+              -30.0
+            ],
+            "interp": "easeInOut"
+          },
+          {
+            "time": 90.0,
+            "value": [
+              44.0
+            ],
+            "interp": "easeInOut"
+          }
+        ]
+      },
+      {
+        "target": "camera/target",
+        "component": 1,
+        "timeBase": "seconds",
+        "mode": "replace",
+        "loopLength": 90.0,
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              20.0
+            ],
+            "interp": "easeInOut"
+          },
+          {
+            "time": 45.0,
+            "value": [
+              34.0
+            ],
+            "interp": "easeInOut"
+          },
+          {
+            "time": 90.0,
+            "value": [
+              20.0
+            ],
+            "interp": "easeInOut"
+          }
+        ]
+      }
+    ],
+    "cues": []
+  },
+  "render": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "output": "sequence",
+    "path": "renders/temple"
+  }
+}

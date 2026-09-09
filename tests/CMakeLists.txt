@@ -41,9 +41,6 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
     if(APPLE)
         target_link_libraries(avgen_render_tests PRIVATE syphon::syphon "-framework Metal")
     endif()
-    if(AVGEN_PROC_GPU_STANDALONE)
-        target_compile_definitions(avgen_render_tests PRIVATE AVGEN_PROC_GPU_STANDALONE)
-    endif()
     avgen_set_warnings(avgen_render_tests)
     catch_discover_tests(avgen_render_tests
         TEST_PREFIX "gpu."

@@ -1,0 +1,160 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "avgen",
+    "version": "0.1.0"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "lab.scene.json"
+    }
+  },
+  "parameters": {
+    "post/bloom/enabled": true,
+    "post/bloom/intensity": 0.25,
+    "root/rotationSpeed": 0.0
+  },
+  "sources": [],
+  "routes": [
+    {
+      "source": "audio.bass",
+      "target": "procedural/F_audio/transform/scale",
+      "amount": 0.35,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 20,
+        "decayMs": 300
+      }
+    },
+    {
+      "source": "audio.mid",
+      "target": "procedural/F_audio/deform/1/amount",
+      "amount": 0.8,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 40,
+        "decayMs": 400
+      }
+    },
+    {
+      "source": "audio.spectralFlux",
+      "target": "procedural/F_audio/deform/2/amount",
+      "amount": 0.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 20,
+        "decayMs": 500
+      }
+    },
+    {
+      "source": "audio.spectralCentroid",
+      "target": "procedural/F_audio/materialVariation/hueShift",
+      "amount": 0.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 150,
+        "decayMs": 800
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "procedural/F_audio/material/emissive",
+      "amount": 1.2,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "peakhold",
+        "attackMs": 5,
+        "decayMs": 250
+      }
+    }
+  ],
+  "presets": [
+    {
+      "name": "Procedural / Basic Cylinder Ring",
+      "values": {
+        "procedural/F_audio/distribution/count": [
+          16
+        ],
+        "procedural/F_audio/distribution/radius": [
+          5
+        ],
+        "procedural/F_audio/deform/1/amount": [
+          0
+        ],
+        "procedural/F_audio/deform/2/amount": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "Procedural / Dense Radial",
+      "values": {
+        "procedural/F_audio/distribution/count": [
+          96
+        ],
+        "procedural/F_audio/distribution/radius": [
+          9
+        ],
+        "procedural/F_audio/deform/1/amount": [
+          0
+        ],
+        "procedural/F_audio/deform/2/amount": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "Procedural / Twisted Architecture",
+      "values": {
+        "procedural/F_audio/distribution/count": [
+          32
+        ],
+        "procedural/F_audio/distribution/radius": [
+          7
+        ],
+        "procedural/F_audio/deform/1/amount": [
+          0.9
+        ],
+        "procedural/F_audio/deform/2/amount": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "Procedural / Noise Architecture",
+      "values": {
+        "procedural/F_audio/distribution/count": [
+          32
+        ],
+        "procedural/F_audio/distribution/radius": [
+          7
+        ],
+        "procedural/F_audio/deform/1/amount": [
+          0.2
+        ],
+        "procedural/F_audio/deform/2/amount": [
+          0.6
+        ]
+      }
+    }
+  ],
+  "timeline": {
+    "enabled": true,
+    "tracks": [],
+    "cues": []
+  },
+  "render": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "output": "sequence",
+    "path": "renders/lab"
+  }
+}

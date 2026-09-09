@@ -151,9 +151,10 @@ enum class DeformSpace : std::uint8_t { Local, World };
 //          arc of radius 1/curvature with curvature = a (radians per unit).
 //   Twist: rotation about `axis` by angle = a * dot(p - c, axis) (radians per unit) [+ speed * t].
 //   Sine:  p += displacementAxis * a * sin(dot(p - c, axis) * frequency + phase + speed * t).
-//   Noise: p += a * (fbm3(p * scale + seed offset + time * speed) * 2 - 1) masked by axisMask
-//          (value noise, 3 octaves, hash-based, identical on CPU and GPU within float rounding).
-//   Displacement: p += n * a * (procedural pattern: fbm(p * scale + speed * t)) — displacement
+//   Noise: q = p * scale + time * speed; p += a * axisMask * (fbm3(q), fbm3(q + 31.7), fbm3(q + 67.3)) * 2 - 1
+//          (three decorrelated channels of hash-based 3-octave value noise; identical on CPU and
+//          GPU within float rounding).
+//   Displacement: p += n * a * (fbm(p * scale + speed * t) * 2 - 1) — displacement
 //          along the vertex normal; the pattern source is `pattern` (0 = noise now; texture/audio/
 //          field/user later).
 struct Deformer {

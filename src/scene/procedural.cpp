@@ -1180,14 +1180,17 @@ glm::vec3 applySine(const Deformer& d, const glm::vec3& p, float t) {
 glm::vec3 applyNoise(const Deformer& d, const glm::vec3& p, float t) {
     const glm::vec3 axis = unitOr(d.axis, glm::vec3(0.0f, 1.0f, 0.0f));
     const float y = glm::dot(p - d.center, axis);
-    const float n = fbm3(p * d.scale + glm::vec3(d.speed * t), d.seed) * 2.0f - 1.0f;
-    return p + d.axisMask * (d.amount * falloffWeight(d, y) * n);
+    // Three decorrelated channels (input offset per axis), exactly as procedural.wgsl.
+    const glm::vec3 q = p * d.scale + glm::vec3(d.speed * t);
+    const glm::vec3 n(fbm3(q, d.seed) * 2.0f - 1.0f, fbm3(q + glm::vec3(31.7f), d.seed) * 2.0f - 1.0f,
+                      fbm3(q + glm::vec3(67.3f), d.seed) * 2.0f - 1.0f);
+    return p + n * d.axisMask * (d.amount * falloffWeight(d, y));
 }
 
 glm::vec3 applyDisplacement(const Deformer& d, const glm::vec3& p, float t) {
     const glm::vec3 axis = unitOr(d.axis, glm::vec3(0.0f, 1.0f, 0.0f));
     const float y = glm::dot(p - d.center, axis);
-    const float n = fbm3(p * d.scale + glm::vec3(d.speed * t), d.seed);
+    const float n = fbm3(p * d.scale + glm::vec3(d.speed * t), d.seed) * 2.0f - 1.0f; // as the shader
     return p + axis * (d.amount * falloffWeight(d, y) * n);
 }
 

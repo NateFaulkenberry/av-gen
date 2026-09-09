@@ -162,6 +162,14 @@ private:
     float cameraAngle_ = 0.0f;
     // Free camera (camera/mode = 1): explicit position/target parameters instead of the orbit.
     params::Parameter<int>* cameraMode_ = nullptr;
+    params::Parameter<float>* fogDensity_ = nullptr;
+    params::Parameter<float>* keyLight_ = nullptr;   // multiplier on the default key light
+    bool addedKeyLight_ = false;
+    std::uint64_t frameCounter_ = 0;
+    params::Parameter<glm::vec3>* fogColor_ = nullptr;
+    float fogDensitySetting_ = 0.0f;
+    glm::vec3 fogColorSetting_{0.012f, 0.012f, 0.02f};
+    bool fogColorSet_ = false;
     params::Parameter<glm::vec3>* cameraPosition_ = nullptr;
     params::Parameter<glm::vec3>* cameraTarget_ = nullptr;
     int cameraModeSetting_ = 0;
@@ -177,6 +185,8 @@ private:
         std::vector<float> restRoughness;
         int particleIndex = -1;                      // index into scene_.particles (Particles kind)
         int proceduralIndex = -1;                    // index into scene_.procedurals (Procedural kind)
+        std::size_t firstProcedural = 0;             // Scene kind: the child's procedurals copied in
+        std::size_t proceduralCount = 0;
         std::size_t firstParticle = 0;               // particle range (Particles and Scene kinds)
         std::size_t particleCount = 0;
         std::uint64_t childMeshVersion = 0;          // Scene kind: what was flattened

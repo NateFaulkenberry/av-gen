@@ -1,0 +1,449 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "hyperspace",
+  "camera": {
+    "mode": 1,
+    "position": [
+      0,
+      0,
+      -40
+    ],
+    "target": [
+      0,
+      0,
+      -300
+    ],
+    "fov": 85.0,
+    "orbitSpeed": 0.0
+  },
+  "environment": {
+    "intensity": 0.0,
+    "fogDensity": 0.012,
+    "fogColor": [
+      0.03,
+      0.0,
+      0.05
+    ],
+    "background": [
+      0.01,
+      0.0,
+      0.02
+    ]
+  },
+  "nodes": [
+    {
+      "name": "tunnel",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            3.0,
+            0.6,
+            1.2
+          ],
+          "subdivisions": 3
+        },
+        "distribution": {
+          "kind": "spiral",
+          "count": 1200,
+          "radius": 22.0,
+          "radiusGrowth": 0.0,
+          "turns": 24,
+          "spiralHeight": 480,
+          "orientation": "inward",
+          "plane": "xy"
+        },
+        "distributionTransform": {
+          "position": [
+            0,
+            0,
+            60
+          ],
+          "rotation": [
+            0,
+            180,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "variation": {
+          "seed": 5,
+          "randomScale": [
+            0.4,
+            0.2,
+            0.4
+          ],
+          "randomRotation": [
+            0.1,
+            0.1,
+            0.3
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "twist",
+            "amount": 0.008,
+            "speed": 0.25,
+            "axis": [
+              0,
+              0,
+              1
+            ],
+            "space": "world"
+          },
+          {
+            "kind": "sine",
+            "amount": 3.0,
+            "frequency": 0.04,
+            "speed": 0.8,
+            "axis": [
+              0,
+              0,
+              1
+            ],
+            "displacementAxis": [
+              1,
+              1,
+              0
+            ],
+            "space": "world"
+          },
+          {
+            "kind": "noise",
+            "amount": 0.8,
+            "scale": 0.08,
+            "speed": 0.3,
+            "seed": 8,
+            "space": "world"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.02,
+            0.02,
+            0.03
+          ],
+          "emissiveColor": [
+            0.2,
+            0.9,
+            1.0
+          ],
+          "emissiveIntensity": 0.8,
+          "roughness": 0.35,
+          "metallic": 0.5
+        },
+        "materialVariation": {
+          "hueGradient": 3.0,
+          "emissiveRandom": 0.7
+        }
+      }
+    },
+    {
+      "name": "gates",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "torus",
+          "majorRadius": 26.0,
+          "minorRadius": 0.8,
+          "majorSegments": 96,
+          "minorSegments": 12
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 14,
+          "start": [
+            0,
+            0,
+            40
+          ],
+          "end": [
+            0,
+            0,
+            -440
+          ]
+        },
+        "variation": {
+          "seed": 3,
+          "randomRotation": [
+            0.0,
+            0.0,
+            0.5
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "twist",
+            "amount": 0.03,
+            "speed": 0.4,
+            "axis": [
+              0,
+              0,
+              1
+            ],
+            "space": "local"
+          },
+          {
+            "kind": "noise",
+            "amount": 1.2,
+            "scale": 0.1,
+            "speed": 0.2,
+            "seed": 11,
+            "space": "world"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.02,
+            0.02,
+            0.03
+          ],
+          "emissiveColor": [
+            1.0,
+            0.3,
+            0.7
+          ],
+          "emissiveIntensity": 1.5,
+          "roughness": 0.3,
+          "metallic": 0.6
+        },
+        "materialVariation": {
+          "hueGradient": 1.0
+        },
+        "sourceTransform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "name": "spokes",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "cylinder",
+          "radius": 0.25,
+          "height": 44.0,
+          "radialSegments": 8,
+          "heightSegments": 16,
+          "caps": false
+        },
+        "sourceTransform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            90
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "distribution": {
+          "kind": "radial",
+          "count": 36,
+          "radius": 0.0,
+          "plane": "xy",
+          "orientation": "tangent"
+        },
+        "distributionTransform": {
+          "position": [
+            0,
+            0,
+            -160
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "bend",
+            "amount": 0.03,
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "displacementAxis": [
+              0,
+              0,
+              1
+            ],
+            "space": "local"
+          },
+          {
+            "kind": "sine",
+            "amount": 2.0,
+            "frequency": 0.2,
+            "speed": 1.0,
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "displacementAxis": [
+              0,
+              0,
+              1
+            ],
+            "space": "local"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.02,
+            0.02,
+            0.03
+          ],
+          "emissiveColor": [
+            1.0,
+            0.9,
+            0.4
+          ],
+          "emissiveIntensity": 1.2,
+          "roughness": 0.3,
+          "metallic": 0.5
+        },
+        "materialVariation": {
+          "hueGradient": 1.0,
+          "emissiveRandom": 0.5
+        }
+      }
+    },
+    {
+      "name": "core",
+      "kind": "procedural",
+      "position": [
+        0,
+        0,
+        -300
+      ],
+      "procedural": {
+        "source": {
+          "kind": "sphere",
+          "radius": 9.0,
+          "segments": 64,
+          "rings": 48
+        },
+        "distribution": {
+          "kind": "single"
+        },
+        "deformers": [
+          {
+            "kind": "noise",
+            "amount": 2.5,
+            "scale": 0.35,
+            "speed": 0.6,
+            "seed": 21,
+            "space": "local"
+          },
+          {
+            "kind": "displacement",
+            "amount": 1.5,
+            "scale": 1.2,
+            "speed": 0.9,
+            "seed": 4,
+            "space": "local"
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.01,
+            0.01,
+            0.02
+          ],
+          "emissiveColor": [
+            1.0,
+            0.7,
+            0.9
+          ],
+          "emissiveIntensity": 4.0,
+          "roughness": 0.2,
+          "metallic": 0.9
+        }
+      }
+    },
+    {
+      "name": "streaks",
+      "kind": "particles",
+      "particles": {
+        "capacity": 65536,
+        "spawnRate": 6000,
+        "shape": "disc",
+        "position": [
+          0,
+          0,
+          -420
+        ],
+        "extent": [
+          26,
+          0,
+          26
+        ],
+        "direction": [
+          0,
+          0,
+          1
+        ],
+        "lifetimeMin": 4,
+        "lifetimeMax": 7,
+        "speedMin": 40,
+        "speedMax": 90,
+        "spread": 0.02,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "sizeStart": 0.12,
+        "sizeEnd": 0.0,
+        "blend": "additive",
+        "colorStart": [
+          0.6,
+          0.9,
+          1.0,
+          0.6
+        ],
+        "colorEnd": [
+          1.0,
+          0.3,
+          0.9,
+          0.0
+        ]
+      }
+    }
+  ]
+}

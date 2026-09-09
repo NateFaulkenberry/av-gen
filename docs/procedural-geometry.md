@@ -59,7 +59,7 @@ own axis); world-space deformers act on the final world position (a wave across 
 | bend | bends the shape along `axis` with curvature `amount` (radians per unit), towards `displacementAxis` | amount, axis, center, falloff |
 | twist | rotates about `axis` by `amount` radians per unit of height (+ `speed`·time) | amount, axis, center, falloff, speed |
 | sine | pushes along `displacementAxis` by `amount·sin(frequency·x + phase + speed·t)` | amount, frequency, speed, phase, axis |
-| noise | seeded 3-octave value noise displacement, animated by `speed`, masked per axis | amount, scale, speed, seed, axisMask |
+| noise | three decorrelated channels of seeded 3-octave value noise (one per axis, masked by `axisMask`), animated by `speed` | amount, scale, speed, seed, axisMask |
 | displacement | pushes along the surface normal by a procedural pattern | amount, scale, speed |
 
 Stack order is the array order and is deterministic; `twist → noise` differs from `noise → twist`.
@@ -73,7 +73,9 @@ Stack order is the array order and is deterministic; `twist → noise` differs f
    (`scene/fogDensity`) and a dark background.
 4. Add deformers: a local `twist` for slow rotation, a world `noise` for breathing.
 5. Camera: `camera/mode` 0 orbits the bounds; 1 uses `camera/position` and `camera/target`,
-   which the timeline can key for fly-throughs.
+   which the timeline can key for fly-throughs. Compositions do not spin by default
+   (`root/rotationSpeed` 0); `scene/keyLight` scales the default light, `scene/fogDensity` and
+   `scene/fogColor` add distance fog.
 
 ## Modulating it with audio
 
@@ -115,3 +117,16 @@ File > Examples lists the built-in scenes from `examples/index.json`:
 | Impossible Chamber | nested scene files at extreme scale differences, camera inside |
 | Hyperspace | everything at once: radial and spiral structures, noise and sine, emissive colour modulation, timeline |
 | Procedural Benchmark | 100 / 1,000 / 10,000 instances with no, one, three and noise deformers |
+
+## Conventions worth knowing
+
+- Radial and spiral angles run counter-clockwise about the plane normal (`xz` → normal +Y,
+  `xy` → +Z, `yz` → +X); orientation `outward` points each instance's +Z away from the centre.
+- Bend curves the shape along `axis` towards `displacementAxis` with curvature `amount` in
+  radians per unit; `falloff` limits the bent region and continues straight beyond it.
+- Twist, sine, noise and displacement scale their effect by `clamp(|distance along axis| /
+  falloff, 0, 1)` when `falloff` > 0.
+- Per-instance hue variation is baked into the instance records against the material colours
+  at rebuild time; live colour modulation tints approximately until the next structural rebuild.
+- Nested scene files bring their procedural nodes along; their parameters are prefixed with the
+  node path (`procedural/nodes_<outer>_<inner>/…`).

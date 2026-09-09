@@ -29,6 +29,7 @@ struct FrameStats {
     std::uint32_t height = 0;
     std::string adapter;
     std::string backend;
+    rendering::ProceduralStats procedural;
 };
 
 class ControlPanel {

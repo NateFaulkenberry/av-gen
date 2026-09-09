@@ -912,6 +912,7 @@ int Application::runLive() {
         stats.height = window_->pixelHeight();
         stats.drawCalls = renderer_->stats().drawCalls;
         stats.triangles = renderer_->stats().triangles;
+        stats.procedural = renderer_->stats().procedural;
         stats.gpuFrameMs = renderer_->timer().lastFrameMs();
 
         // Background render: a few frames per UI frame, then the next queued job.

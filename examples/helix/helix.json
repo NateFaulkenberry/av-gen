@@ -1,0 +1,216 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "avgen",
+    "version": "0.1.0"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "helix.scene.json"
+    }
+  },
+  "parameters": {
+    "post/bloom/enabled": true,
+    "post/bloom/intensity": 0.3,
+    "post/bloom/threshold": 0.9,
+    "post/lens/chromaticAberration": 0.15,
+    "post/output/vignette": 0.45,
+    "scene/brightness": 0.6,
+    "root/rotationSpeed": 0.0
+  },
+  "sources": [
+    {
+      "kind": "lfo",
+      "name": "sway",
+      "settings": {
+        "shape": "sine"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "source": "audio.bass",
+      "target": "procedural/helixA/distribution/radius",
+      "amount": 3.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 30,
+        "decayMs": 450
+      }
+    },
+    {
+      "source": "audio.bass",
+      "target": "procedural/helixB/distribution/radius",
+      "amount": 3.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 30,
+        "decayMs": 450
+      }
+    },
+    {
+      "source": "audio.mid",
+      "target": "procedural/helixA/deform/1/amount",
+      "amount": 0.06,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 50,
+        "decayMs": 600
+      }
+    },
+    {
+      "source": "audio.mid",
+      "target": "procedural/helixB/deform/1/amount",
+      "amount": 0.06,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 50,
+        "decayMs": 600
+      }
+    },
+    {
+      "source": "audio.spectralFlux",
+      "target": "procedural/helixA/deform/3/amount",
+      "amount": 0.9,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 30,
+        "decayMs": 500
+      }
+    },
+    {
+      "source": "audio.spectralCentroid",
+      "target": "procedural/helixA/materialVariation/hueShift",
+      "amount": 0.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 200,
+        "decayMs": 1200
+      }
+    },
+    {
+      "source": "audio.treble",
+      "target": "procedural/core/material/emissive",
+      "amount": 1.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 20,
+        "decayMs": 300
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "procedural/core/transform/scale",
+      "amount": 0.4,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "peakhold",
+        "attackMs": 5,
+        "decayMs": 300
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "particles/sparks/burst",
+      "amount": 800,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "none"
+      }
+    },
+    {
+      "source": "lfo.sway",
+      "target": "camera/position",
+      "component": 0,
+      "amount": 3.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {}
+    }
+  ],
+  "presets": [],
+  "timeline": {
+    "enabled": true,
+    "tracks": [
+      {
+        "target": "camera/position",
+        "component": 1,
+        "timeBase": "seconds",
+        "mode": "replace",
+        "loopLength": 60.0,
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              2.0
+            ],
+            "interp": "easeInOut"
+          },
+          {
+            "time": 30.0,
+            "value": [
+              70.0
+            ],
+            "interp": "easeInOut"
+          },
+          {
+            "time": 60.0,
+            "value": [
+              2.0
+            ],
+            "interp": "easeInOut"
+          }
+        ]
+      },
+      {
+        "target": "camera/target",
+        "component": 1,
+        "timeBase": "seconds",
+        "mode": "replace",
+        "loopLength": 60.0,
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              22.0
+            ],
+            "interp": "easeInOut"
+          },
+          {
+            "time": 30.0,
+            "value": [
+              85.0
+            ],
+            "interp": "easeInOut"
+          },
+          {
+            "time": 60.0,
+            "value": [
+              22.0
+            ],
+            "interp": "easeInOut"
+          }
+        ]
+      }
+    ],
+    "cues": []
+  },
+  "render": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "output": "sequence",
+    "path": "renders/helix"
+  }
+}

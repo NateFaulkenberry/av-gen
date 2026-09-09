@@ -1,0 +1,146 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "avgen",
+    "version": "0.1.0"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "chamber.scene.json"
+    }
+  },
+  "parameters": {
+    "post/bloom/enabled": true,
+    "post/bloom/intensity": 0.5,
+    "post/bloom/threshold": 0.8,
+    "post/output/vignette": 0.5,
+    "scene/gridIntensity": 0.8,
+    "scene/brightness": 0.7,
+    "scene/keyLight": 0.5,
+    "root/rotationSpeed": 0.0
+  },
+  "sources": [
+    {
+      "kind": "lfo",
+      "name": "drift",
+      "settings": {
+        "shape": "sine"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "source": "audio.rms",
+      "target": "scene/brightness",
+      "amount": 0.3,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 60,
+        "decayMs": 700
+      }
+    },
+    {
+      "source": "audio.bass",
+      "target": "procedural/nodes_wallsFar_lintels/deform/1/amount",
+      "amount": 1.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 40,
+        "decayMs": 600
+      }
+    },
+    {
+      "source": "audio.bass",
+      "target": "procedural/monolith/deform/2/amount",
+      "amount": 4.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 40,
+        "decayMs": 800
+      }
+    },
+    {
+      "source": "audio.mid",
+      "target": "procedural/ringsInner/deform/1/amount",
+      "amount": 0.15,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 60,
+        "decayMs": 700
+      }
+    },
+    {
+      "source": "audio.spectralFlux",
+      "target": "procedural/ringsInner/deform/2/amount",
+      "amount": 1.2,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 30,
+        "decayMs": 500
+      }
+    },
+    {
+      "source": "audio.treble",
+      "target": "procedural/ringsInner/material/emissive",
+      "amount": 2.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 20,
+        "decayMs": 300
+      }
+    },
+    {
+      "source": "audio.spectralCentroid",
+      "target": "procedural/ringsInner/materialVariation/hueShift",
+      "amount": 0.3,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 200,
+        "decayMs": 1500
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "procedural/monolith/material/emissive",
+      "amount": 2.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "peakhold",
+        "attackMs": 5,
+        "decayMs": 500
+      }
+    },
+    {
+      "source": "lfo.drift",
+      "target": "camera/position",
+      "component": 0,
+      "amount": 2.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {}
+    }
+  ],
+  "presets": [],
+  "timeline": {
+    "enabled": true,
+    "tracks": [],
+    "cues": []
+  },
+  "render": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "output": "sequence",
+    "path": "renders/chamber"
+  }
+}

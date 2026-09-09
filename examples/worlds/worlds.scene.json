@@ -1,0 +1,43 @@
+{
+  "format": "avgen-scene", "version": 1, "name": "worlds",
+  "camera": { "mode": 1, "position": [0, 6, 46], "target": [0, 18, -10], "fov": 66.0, "orbitSpeed": 0.0 },
+  "environment": { "intensity": 0.0, "fogDensity": 0.012, "fogColor": [0.02, 0.015, 0.03], "background": [0.008, 0.006, 0.012] },
+  "nodes": [
+    { "name": "floor", "kind": "grid", "scale": [8, 1, 8] },
+    { "name": "pillars", "kind": "procedural", "procedural": {
+        "source": { "kind": "box", "size": [1.4, 22.0, 1.4], "subdivisions": 12 },
+        "sourceTransform": { "position": [0, 11, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+        "distribution": { "kind": "radial", "count": 40, "radius": 24.0, "orientation": "inward" },
+        "variation": { "seed": 7, "randomScale": [0.0, 0.15, 0.0] },
+        "deformers": [ { "kind": "bend", "amount": 0.0, "axis": [0, 1, 0], "displacementAxis": [0, 0, 1], "center": [0, 10, 0], "space": "local" },
+                       { "kind": "twist", "amount": 0.0, "speed": 0.1, "axis": [0, 1, 0], "space": "local" },
+                       { "kind": "sine", "amount": 0.0, "frequency": 0.3, "speed": 0.6, "axis": [0, 1, 0], "displacementAxis": [1, 0, 1], "space": "world" },
+                       { "kind": "noise", "amount": 0.0, "scale": 0.3, "speed": 0.25, "seed": 5, "space": "world" } ],
+        "material": { "baseColor": [0.03, 0.03, 0.035], "emissiveColor": [0.9, 0.55, 1.0], "emissiveIntensity": 0.2, "roughness": 0.5, "metallic": 0.3 },
+        "materialVariation": { "hueGradient": 0.2, "emissiveRandom": 0.6 } } },
+    { "name": "spiral", "kind": "procedural", "procedural": {
+        "source": { "kind": "box", "size": [2.2, 0.5, 0.9], "subdivisions": 2 },
+        "distribution": { "kind": "spiral", "count": 300, "radius": 10.0, "radiusGrowth": 0.0, "turns": 6, "spiralHeight": 60, "orientation": "tangent" },
+        "deformers": [ { "kind": "twist", "amount": 0.0, "speed": 0.15, "axis": [0, 1, 0], "space": "world" },
+                       { "kind": "sine", "amount": 0.0, "frequency": 0.12, "speed": 0.6, "axis": [0, 1, 0], "displacementAxis": [1, 0, 1], "space": "world" },
+                       { "kind": "noise", "amount": 0.0, "scale": 0.3, "speed": 0.25, "seed": 7, "space": "world" } ],
+        "material": { "baseColor": [0.03, 0.03, 0.04], "emissiveColor": [0.3, 0.9, 1.0], "emissiveIntensity": 0.0, "roughness": 0.35, "metallic": 0.4 },
+        "materialVariation": { "hueGradient": 0.6 } } },
+    { "name": "rings", "kind": "procedural", "procedural": {
+        "source": { "kind": "torus", "majorRadius": 26.0, "minorRadius": 0.4, "majorSegments": 96, "minorSegments": 12 },
+        "distribution": { "kind": "linear", "count": 6, "start": [0, 24, 0], "end": [0, 40, 0] },
+        "deformers": [ { "kind": "sine", "amount": 0.0, "frequency": 0.25, "speed": 0.3, "axis": [1, 0, 0], "displacementAxis": [0, 1, 0], "space": "local" },
+                       { "kind": "noise", "amount": 0.0, "scale": 0.12, "speed": 0.1, "seed": 9, "space": "world" } ],
+        "material": { "baseColor": [0.04, 0.04, 0.05], "emissiveColor": [0.6, 0.9, 1.0], "emissiveIntensity": 0.0, "roughness": 0.3, "metallic": 0.6 },
+        "materialVariation": { "hueGradient": 0.4 } } },
+    { "name": "core", "kind": "procedural", "position": [0, 12, 0], "procedural": {
+        "source": { "kind": "sphere", "radius": 3.0, "segments": 48, "rings": 32 },
+        "distribution": { "kind": "single" },
+        "deformers": [ { "kind": "noise", "amount": 0.0, "scale": 0.5, "speed": 0.6, "seed": 21, "space": "local" } ],
+        "material": { "baseColor": [0.02, 0.02, 0.03], "emissiveColor": [1.0, 0.6, 0.8], "emissiveIntensity": 0.0, "roughness": 0.2, "metallic": 0.8 } } },
+    { "name": "dust", "kind": "particles", "particles": {
+        "capacity": 32768, "spawnRate": 700, "shape": "box", "position": [0, 14, 0], "extent": [26, 14, 26],
+        "lifetimeMin": 6, "lifetimeMax": 12, "speedMin": 0.05, "speedMax": 0.25, "spread": 1.0, "gravity": [0, 0.02, 0],
+        "sizeStart": 0.06, "sizeEnd": 0.0, "blend": "additive", "colorStart": [0.7, 0.6, 1.0, 0.35], "colorEnd": [0.4, 0.6, 1.0, 0.0] } }
+  ]
+}

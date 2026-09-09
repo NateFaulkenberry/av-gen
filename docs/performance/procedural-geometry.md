@@ -37,3 +37,11 @@ Reading the numbers:
 Obvious next steps when a showcase needs more: skip the finite-difference passes when the stack is
 empty (the "none" row would drop by roughly a third), evaluate noise once per vertex and reuse it
 for the tangent offsets (approximate normal), and fewer height segments for straight columns.
+
+## Showcase scenes (Release, M2 Max, 2880x1800 window, default post chain)
+
+| Scene | Procedural objects / instances | Result |
+|---|---|---|
+| The Temple | 5 objects, ~1,000 instances (64 columns, 12 inner, 5 rings, 225 tiles, altar) + 32k dust | 120 fps, GPU 2.7 ms, CPU 3.1 ms |
+| Hyperspace | 1,200-instance spiral, 14 gates, 36 spokes, core + 65k streaks | 120 fps, GPU 3.0 ms, CPU 2.6 ms |
+| Impossible Chamber | three nested wall scenes at 1×/2.5×/7× (30 procedural objects) | 120 fps, GPU 2.8 ms, CPU 3.7 ms |

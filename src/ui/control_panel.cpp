@@ -702,6 +702,13 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
     ImGui::Text("%ux%u  %u draws  %u tris  analysis %.0f us/hop (%llu frames)  modulation %.0f us", stats.width,
                 stats.height, stats.drawCalls, stats.triangles, engine.stats().analysisHopMicros,
                 static_cast<unsigned long long>(engine.stats().analysisFrames), engine.stats().modulationMicros);
+    if (stats.procedural.objects > 0) {
+        const auto& pr = stats.procedural;
+        ImGui::Text("procedural: %u objects  %llu instances  %u src tris  %llu logical tris  %u deformers  %.1f KB instance buffers  cpu %.3f ms",
+                    pr.objects, static_cast<unsigned long long>(pr.instances), pr.sourceTriangles,
+                    static_cast<unsigned long long>(pr.logicalTriangles), pr.deformers,
+                    static_cast<double>(pr.instanceBufferBytes) / 1024.0, pr.cpuUpdateMs);
+    }
     ImGui::TextDisabled("%s (%s)", stats.adapter.c_str(), stats.backend.c_str());
 }
 

@@ -1,0 +1,518 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "avgen",
+    "version": "0.1.0"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "worlds.scene.json"
+    }
+  },
+  "parameters": {
+    "post/bloom/enabled": true,
+    "post/bloom/intensity": 0.6,
+    "post/bloom/threshold": 0.7,
+    "post/output/vignette": 0.4,
+    "scene/gridIntensity": 1.0,
+    "scene/brightness": 0.8,
+    "scene/keyLight": 0.45,
+    "root/rotationSpeed": 0.0
+  },
+  "sources": [
+    {
+      "kind": "lfo",
+      "name": "sway",
+      "settings": {
+        "shape": "sine"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "source": "audio.rms",
+      "target": "scene/brightness",
+      "amount": 0.3,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 40,
+        "decayMs": 500
+      }
+    },
+    {
+      "source": "audio.bass",
+      "target": "procedural/pillars/distribution/radius",
+      "amount": 2.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 30,
+        "decayMs": 450
+      }
+    },
+    {
+      "source": "audio.mid",
+      "target": "procedural/pillars/deform/2/amount",
+      "amount": 0.03,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 60,
+        "decayMs": 700
+      }
+    },
+    {
+      "source": "audio.spectralFlux",
+      "target": "procedural/pillars/deform/4/amount",
+      "amount": 0.4,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 30,
+        "decayMs": 600
+      }
+    },
+    {
+      "source": "audio.spectralCentroid",
+      "target": "procedural/pillars/materialVariation/hueShift",
+      "amount": 0.35,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 200,
+        "decayMs": 1200
+      }
+    },
+    {
+      "source": "audio.treble",
+      "target": "procedural/rings/material/emissive",
+      "amount": 2.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 20,
+        "decayMs": 300
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "procedural/core/transform/scale",
+      "amount": 0.35,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "peakhold",
+        "attackMs": 5,
+        "decayMs": 350
+      }
+    },
+    {
+      "source": "lfo.sway",
+      "target": "camera/position",
+      "component": 0,
+      "amount": 5.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {}
+    }
+  ],
+  "presets": [
+    {
+      "name": "Worlds / Cathedral",
+      "values": {
+        "procedural/pillars/distribution/count": [
+          28
+        ],
+        "procedural/pillars/distribution/radius": [
+          26
+        ],
+        "procedural/pillars/source/size": [
+          1.6,
+          30,
+          1.6
+        ],
+        "procedural/pillars/source/position": [
+          0,
+          15,
+          0
+        ],
+        "procedural/pillars/deform/1/amount": [
+          0.05
+        ],
+        "procedural/pillars/deform/2/amount": [
+          0.0
+        ],
+        "procedural/pillars/deform/3/amount": [
+          0.0
+        ],
+        "procedural/pillars/deform/4/amount": [
+          0.06
+        ],
+        "procedural/pillars/material/emissiveColor": [
+          0.5,
+          0.7,
+          1.0
+        ],
+        "procedural/pillars/material/emissive": [
+          0.15
+        ],
+        "procedural/spiral/material/emissive": [
+          0.0
+        ],
+        "procedural/spiral/distribution/radius": [
+          4.0
+        ],
+        "procedural/spiral/deform/1/amount": [
+          0.0
+        ],
+        "procedural/spiral/deform/2/amount": [
+          0.0
+        ],
+        "procedural/rings/material/emissive": [
+          0.3
+        ],
+        "procedural/rings/deform/1/amount": [
+          0.0
+        ],
+        "procedural/rings/transform/scale": [
+          0.6,
+          0.6,
+          0.6
+        ],
+        "procedural/core/material/emissive": [
+          1.5
+        ],
+        "procedural/core/deform/1/amount": [
+          0.2
+        ],
+        "scene/fogDensity": [
+          0.016
+        ],
+        "scene/fogColor": [
+          0.015,
+          0.02,
+          0.035
+        ]
+      }
+    },
+    {
+      "name": "Worlds / Temple",
+      "values": {
+        "procedural/pillars/distribution/count": [
+          64
+        ],
+        "procedural/pillars/distribution/radius": [
+          27
+        ],
+        "procedural/pillars/source/size": [
+          1.2,
+          24,
+          1.2
+        ],
+        "procedural/pillars/source/position": [
+          0,
+          12,
+          0
+        ],
+        "procedural/pillars/deform/1/amount": [
+          0.0
+        ],
+        "procedural/pillars/deform/2/amount": [
+          0.03
+        ],
+        "procedural/pillars/deform/3/amount": [
+          0.0
+        ],
+        "procedural/pillars/deform/4/amount": [
+          0.15
+        ],
+        "procedural/pillars/material/emissiveColor": [
+          0.95,
+          0.55,
+          1.0
+        ],
+        "procedural/pillars/material/emissive": [
+          0.12
+        ],
+        "procedural/spiral/material/emissive": [
+          0.0
+        ],
+        "procedural/spiral/distribution/radius": [
+          4.0
+        ],
+        "procedural/spiral/deform/1/amount": [
+          0.0
+        ],
+        "procedural/spiral/deform/2/amount": [
+          0.0
+        ],
+        "procedural/rings/material/emissive": [
+          1.6
+        ],
+        "procedural/rings/deform/1/amount": [
+          0.9
+        ],
+        "procedural/rings/transform/scale": [
+          1,
+          1,
+          1
+        ],
+        "procedural/core/material/emissive": [
+          3.0
+        ],
+        "procedural/core/deform/1/amount": [
+          0.25
+        ],
+        "scene/fogDensity": [
+          0.014
+        ],
+        "scene/fogColor": [
+          0.02,
+          0.018,
+          0.03
+        ]
+      }
+    },
+    {
+      "name": "Worlds / Helix",
+      "values": {
+        "procedural/pillars/distribution/count": [
+          8
+        ],
+        "procedural/pillars/distribution/radius": [
+          40
+        ],
+        "procedural/pillars/source/size": [
+          0.6,
+          10,
+          0.6
+        ],
+        "procedural/pillars/source/position": [
+          0,
+          5,
+          0
+        ],
+        "procedural/pillars/deform/1/amount": [
+          0.0
+        ],
+        "procedural/pillars/deform/2/amount": [
+          0.0
+        ],
+        "procedural/pillars/deform/3/amount": [
+          0.0
+        ],
+        "procedural/pillars/deform/4/amount": [
+          0.0
+        ],
+        "procedural/pillars/material/emissiveColor": [
+          0.3,
+          0.9,
+          1.0
+        ],
+        "procedural/pillars/material/emissive": [
+          0.05
+        ],
+        "procedural/spiral/material/emissive": [
+          0.35
+        ],
+        "procedural/spiral/distribution/radius": [
+          10.0
+        ],
+        "procedural/spiral/deform/1/amount": [
+          0.02
+        ],
+        "procedural/spiral/deform/2/amount": [
+          1.5
+        ],
+        "procedural/rings/material/emissive": [
+          0.4
+        ],
+        "procedural/rings/deform/1/amount": [
+          0.3
+        ],
+        "procedural/rings/transform/scale": [
+          0.4,
+          0.4,
+          0.4
+        ],
+        "procedural/core/material/emissive": [
+          1.0
+        ],
+        "procedural/core/deform/1/amount": [
+          0.4
+        ],
+        "scene/fogDensity": [
+          0.02
+        ],
+        "scene/fogColor": [
+          0.02,
+          0.01,
+          0.03
+        ]
+      }
+    },
+    {
+      "name": "Worlds / Hyperspace",
+      "values": {
+        "procedural/pillars/distribution/count": [
+          96
+        ],
+        "procedural/pillars/distribution/radius": [
+          30
+        ],
+        "procedural/pillars/source/size": [
+          0.8,
+          40,
+          0.8
+        ],
+        "procedural/pillars/source/position": [
+          0,
+          20,
+          0
+        ],
+        "procedural/pillars/deform/1/amount": [
+          0.0
+        ],
+        "procedural/pillars/deform/2/amount": [
+          0.06
+        ],
+        "procedural/pillars/deform/3/amount": [
+          2.0
+        ],
+        "procedural/pillars/deform/4/amount": [
+          0.8
+        ],
+        "procedural/pillars/material/emissiveColor": [
+          0.2,
+          0.9,
+          1.0
+        ],
+        "procedural/pillars/material/emissive": [
+          0.9
+        ],
+        "procedural/spiral/material/emissive": [
+          1.2
+        ],
+        "procedural/spiral/distribution/radius": [
+          18.0
+        ],
+        "procedural/spiral/deform/1/amount": [
+          0.05
+        ],
+        "procedural/spiral/deform/2/amount": [
+          3.0
+        ],
+        "procedural/rings/material/emissive": [
+          2.5
+        ],
+        "procedural/rings/deform/1/amount": [
+          2.0
+        ],
+        "procedural/rings/transform/scale": [
+          1.2,
+          1.2,
+          1.2
+        ],
+        "procedural/core/material/emissive": [
+          5.0
+        ],
+        "procedural/core/deform/1/amount": [
+          1.5
+        ],
+        "scene/fogDensity": [
+          0.008
+        ],
+        "scene/fogColor": [
+          0.03,
+          0.0,
+          0.05
+        ]
+      }
+    }
+  ],
+  "timeline": {
+    "enabled": true,
+    "tracks": [
+      {
+        "target": "camera/position",
+        "component": 1,
+        "timeBase": "seconds",
+        "mode": "replace",
+        "loopLength": 60.0,
+        "keys": [
+          {
+            "time": 0,
+            "value": [
+              6.0
+            ],
+            "interp": "easeInOut"
+          },
+          {
+            "time": 30,
+            "value": [
+              20.0
+            ],
+            "interp": "easeInOut"
+          },
+          {
+            "time": 60,
+            "value": [
+              6.0
+            ],
+            "interp": "easeInOut"
+          }
+        ]
+      }
+    ],
+    "cues": [
+      {
+        "time": 0.0,
+        "name": "calm cathedral",
+        "preset": "Worlds / Cathedral",
+        "morphSeconds": 3.0
+      },
+      {
+        "time": 10.0,
+        "name": "expand",
+        "preset": "Worlds / Temple",
+        "morphSeconds": 8.0
+      },
+      {
+        "time": 20.0,
+        "name": "deform",
+        "preset": "Worlds / Helix",
+        "morphSeconds": 8.0
+      },
+      {
+        "time": 30.0,
+        "name": "colour shift",
+        "preset": "Worlds / Temple",
+        "morphSeconds": 6.0
+      },
+      {
+        "time": 40.0,
+        "name": "dense hyperspace",
+        "preset": "Worlds / Hyperspace",
+        "morphSeconds": 8.0
+      },
+      {
+        "time": 50.0,
+        "name": "collapse",
+        "preset": "Worlds / Cathedral",
+        "morphSeconds": 8.0
+      }
+    ]
+  },
+  "render": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "output": "sequence",
+    "path": "renders/worlds",
+    "start": 0,
+    "end": 60
+  }
+}

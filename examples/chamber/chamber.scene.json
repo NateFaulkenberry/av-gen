@@ -1,0 +1,31 @@
+{
+  "format": "avgen-scene", "version": 1, "name": "chamber",
+  "camera": { "mode": 1, "position": [0, 5, 0], "target": [0, 30, -80], "fov": 80.0, "orbitSpeed": 0.0 },
+  "environment": { "intensity": 0.0, "fogDensity": 0.006, "fogColor": [0.01, 0.02, 0.03], "background": [0.004, 0.006, 0.012] },
+  "nodes": [
+    { "name": "floor", "kind": "grid", "scale": [20, 1, 20] },
+    { "name": "wallsNear", "kind": "scene", "asset": "wall.scene.json", "position": [0, 0, 0], "scale": [1, 1, 1] },
+    { "name": "wallsFar", "kind": "scene", "asset": "wall.scene.json", "position": [0, 0, -120], "scale": [2.5, 2.5, 2.5] },
+    { "name": "wallsVast", "kind": "scene", "asset": "wall.scene.json", "position": [0, 0, -400], "scale": [7, 7, 7] },
+    { "name": "ringsInner", "kind": "procedural", "position": [0, 30, -40], "procedural": {
+        "source": { "kind": "torus", "majorRadius": 12.0, "minorRadius": 0.6, "majorSegments": 96, "minorSegments": 12 },
+        "sourceTransform": { "position": [0, 0, 0], "rotation": [90, 0, 0], "scale": [1, 1, 1] },
+        "distribution": { "kind": "linear", "count": 9, "start": [0, 0, 0], "end": [0, 0, -300] },
+        "variation": { "seed": 2, "randomScale": [0.5, 0.5, 0.5] },
+        "deformers": [ { "kind": "twist", "amount": 0.05, "speed": 0.2, "axis": [0, 0, 1], "space": "world" },
+                       { "kind": "noise", "amount": 0.6, "scale": 0.15, "speed": 0.1, "seed": 4, "space": "world" } ],
+        "material": { "baseColor": [0.03, 0.03, 0.04], "emissiveColor": [0.4, 0.8, 1.0], "emissiveIntensity": 1.4, "roughness": 0.3, "metallic": 0.6 },
+        "materialVariation": { "hueGradient": 0.6, "emissiveGradient": 2.0 } } },
+    { "name": "monolith", "kind": "procedural", "position": [0, 0, -180], "procedural": {
+        "source": { "kind": "box", "size": [18, 140, 18], "subdivisions": 24 },
+        "sourceTransform": { "position": [0, 70, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+        "distribution": { "kind": "single" },
+        "deformers": [ { "kind": "twist", "amount": 0.004, "speed": 0.05, "axis": [0, 1, 0], "space": "local" },
+                       { "kind": "sine", "amount": 2.5, "frequency": 0.05, "speed": 0.3, "axis": [0, 1, 0], "displacementAxis": [1, 0, 0], "space": "local" } ],
+        "material": { "baseColor": [0.02, 0.02, 0.025], "emissiveColor": [0.9, 0.3, 0.6], "emissiveIntensity": 0.5, "roughness": 0.5, "metallic": 0.3 } } },
+    { "name": "motes", "kind": "particles", "particles": {
+        "capacity": 65536, "spawnRate": 1500, "shape": "box", "position": [0, 20, -80], "extent": [40, 20, 120],
+        "lifetimeMin": 8, "lifetimeMax": 16, "speedMin": 0.02, "speedMax": 0.2, "spread": 1.0, "gravity": [0, 0.01, 0],
+        "sizeStart": 0.15, "sizeEnd": 0.0, "blend": "additive", "colorStart": [0.5, 0.8, 1.0, 0.3], "colorEnd": [0.9, 0.5, 1.0, 0.0] } }
+  ]
+}

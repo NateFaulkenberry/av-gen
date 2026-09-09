@@ -536,8 +536,7 @@ TEST_CASE("Sine, noise and displacement deformers", "[scene][procedural]") {
     const glm::vec3 q = applyDeformer(disp, p, 0.0);
     CHECK(q.x == p.x);
     CHECK(q.z == p.z);
-    CHECK(q.y >= p.y);
-    CHECK(q.y - p.y <= 0.4f);
+    CHECK(std::abs(q.y - p.y) <= 0.4f); // fbm mapped to -1..1 times the amount, along the axis
     CHECK(q.y != p.y);
 }
 
