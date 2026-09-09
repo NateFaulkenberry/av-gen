@@ -117,6 +117,8 @@ struct FrameUniforms {
     glm::vec4 params;
     glm::vec4 envParams;
     glm::vec4 skyParams;
+    glm::vec4 skyExtra;       // ADR-036: x = 1 when the IBL is the procedural sky, y = draw it as
+                              // the background, zw = 0
     glm::vec4 fogParams;      // rgb = fog colour, w = density (0 = off)
     glm::vec4 audio;          // ADR-030 material inputs: rms, bass, mid, treble
     glm::vec4 audioBands;     // lowMid, highMid, spectral centroid, flux
@@ -129,7 +131,7 @@ struct FrameUniforms {
     glm::vec4 targetSize;     // x = width, y = height, z = 1 / width, w = 1 / height
     LightUniform lights[kMaxLights];
 };
-static_assert(sizeof(FrameUniforms) == 192 + 272 + 512);
+static_assert(sizeof(FrameUniforms) == 192 + 288 + 512);
 
 struct ObjectUniforms {
     glm::mat4 model;
@@ -162,6 +164,7 @@ struct IblResources {
     wgpu::TextureView brdfLut;     // 2D RG
     std::uint32_t prefilteredMips = 1;
     bool valid = false;
+    bool fromSky = false; // ADR-036: synthesised from the procedural sky, not from an HDR map
 };
 
 class SceneRenderer {
@@ -341,6 +344,9 @@ private:
     std::uint32_t engineReloads_ = 0;
     scene::TextureId environmentTexture_ = scene::kInvalidTexture;
     std::uint64_t environmentVersion_ = ~0ull;
+    // ADR-036: the procedural sky is rebuilt only when its resolved parameters change.
+    std::uint64_t skyHash_ = 0;
+    bool skyBuilt_ = false;
     bool initialised_ = false;
 
     gpu::RenderTarget hdr_;

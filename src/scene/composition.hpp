@@ -219,6 +219,8 @@ private:
     float cameraOrbitSpeedSetting_ = 0.12f;
     float cameraFovSetting_ = 50.0f;
     float envIntensitySetting_ = 1.0f;
+    // Procedural sky (ADR-036): the scene-file values behind the env/sky/* parameters.
+    scene::SkySettings skySetting_;
     Scene scene_;
     std::vector<std::unique_ptr<CompositionNode>> nodes_;
     bool dirty_ = true;
@@ -315,6 +317,18 @@ private:
     params::Parameter<float>* cameraFov_ = nullptr;
     params::Parameter<float>* envIntensity_ = nullptr;
     params::Parameter<float>* envRotation_ = nullptr;
+    // env/sky/* (ADR-036)
+    params::Parameter<bool>* skyEnabled_ = nullptr;
+    params::Parameter<bool>* skyBackground_ = nullptr;
+    params::Parameter<glm::vec3>* skyZenith_ = nullptr;
+    params::Parameter<glm::vec3>* skyHorizon_ = nullptr;
+    params::Parameter<glm::vec3>* skyGround_ = nullptr;
+    params::Parameter<glm::vec3>* skySunColor_ = nullptr;
+    params::Parameter<float>* skyHaze_ = nullptr;
+    params::Parameter<float>* skySunIntensity_ = nullptr;
+    params::Parameter<float>* skySunSize_ = nullptr;
+    params::Parameter<float>* skySunGlow_ = nullptr;
+    params::Parameter<float>* skyIntensity_ = nullptr;
     params::Parameter<float>* brightness_ = nullptr;
     params::Parameter<float>* gridIntensity_ = nullptr;
     params::Parameter<float>* rootScale_ = nullptr;

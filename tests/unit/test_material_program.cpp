@@ -652,7 +652,9 @@ TEST_CASE("packMaterialProgram: layout, disabled ops skipped, field slots", "[ma
     CHECK(offsetof(MaterialOpGpu, valuePad) == 32);
     CHECK(offsetof(MaterialOpGpu, constant) == 48);
     CHECK(offsetof(MaterialOpGpu, constant4) == 96);
-    CHECK(offsetof(MaterialProgramGpu, ops) == 48);
+    CHECK(offsetof(MaterialProgramGpu, layers) == 64);
+    CHECK(sizeof(MaterialLayerGpu) == 64);
+    CHECK(offsetof(MaterialProgramGpu, ops) == 320); // 64-byte header + 4 layer records (ADR-036)
 
     MaterialProgram p;
     MaterialOp in = inputOp(0, MaterialInput::Uv);
@@ -922,7 +924,8 @@ TEST_CASE("examples/materials/*.material.json parse, validate and name their pro
         names.push_back(program->name);
     }
     std::sort(names.begin(), names.end());
-    CHECK(names == std::vector<std::string>{"alienMetal", "bioluminescent", "emissiveGlass"});
+    CHECK(names == std::vector<std::string>{"alienMetal", "bioluminescent", "brushedMetal", "darkSteel",
+                                            "emissiveGlass", "oxidisedMetal", "weatheredStone"});
 }
 
 TEST_CASE("examples/machine wires a material program into the ribs material", "[material]") {
@@ -954,4 +957,603 @@ TEST_CASE("examples/machine wires a material program into the ribs material", "[
         wired = true;
     }
     CHECK(wired);
+}
+
+// =================================================================================================
+// ADR-036: layers, height-aware blending, the geometric inputs and the new ops.
+// =================================================================================================
+
+namespace {
+
+// A context with every ADR-036 geometric lane set to something distinctive.
+MaterialContext geometricContext() {
+    MaterialContext c;
+    c.worldPosition = {0.4f, -0.7f, 1.1f};
+    c.localPosition = {0.2f, 0.1f, -0.3f};
+    c.normal = glm::normalize(glm::vec3(0.3f, 0.8f, -0.5f));
+    c.viewDirection = glm::normalize(glm::vec3(0.1f, 0.4f, 0.9f));
+    c.curvature = 0.35f;
+    c.cavity = 0.62f;
+    c.occlusion = 0.44f;
+    c.height = 0.28f;
+    c.normalVariance = 0.031f;
+    c.footprint = 0.004f;
+    c.materialId = 7.0f;
+    c.depth = 12.5f;
+    return c;
+}
+
+// Runs `ops` and returns the register file (outputs are read through r7 by the caller).
+std::array<glm::vec4, kMaterialRegisters> runRegisters(const std::vector<MaterialOp>& ops,
+                                                        const MaterialContext& ctx) {
+    MaterialProgram p;
+    p.ops = ops;
+    REQUIRE(p.validate().has_value());
+    return evaluateMaterialProgram(p, ctx, MaterialResult{}).registers;
+}
+
+} // namespace
+
+TEST_CASE("heightBlendWeight: masks at the ends, a worn layer in the low spots", "[material]") {
+    // The mask alone decides the extremes, whatever the heights are.
+    CHECK_THAT(d(heightBlendWeight(0.0f, 0.0f, 0.0f, 0.1f)), WithinAbs(0.0, 1e-6));
+    CHECK_THAT(d(heightBlendWeight(0.0f, 0.0f, 1.0f, 0.1f)), WithinAbs(1.0, 1e-6));
+    CHECK_THAT(d(heightBlendWeight(0.9f, 0.1f, 1.0f, 0.1f)), WithinAbs(1.0, 1e-6));
+    CHECK_THAT(d(heightBlendWeight(0.1f, 0.9f, 0.0f, 0.1f)), WithinAbs(0.0, 1e-6));
+    // Equal heights and a half mask is the linear midpoint (a1 == a2 == 0.5).
+    CHECK_THAT(d(heightBlendWeight(0.0f, 0.0f, 0.5f, 0.2f)), WithinAbs(0.5, 1e-6));
+
+    // The point of height blending: with the same mask everywhere, a layer of constant height sits
+    // in the base's low spots rather than fading uniformly.
+    const float low = heightBlendWeight(0.0f, 0.5f, 0.5f, 0.2f);
+    const float high = heightBlendWeight(1.0f, 0.5f, 0.5f, 0.2f);
+    CHECK(low > 0.9f);
+    CHECK(high < 0.1f);
+    CHECK(low > high);
+    // A linear mix would have given 0.5 in both places.
+    CHECK(std::abs(low - 0.5f) > 0.2f);
+
+    // Hand-computed: base 0.2, layer 0.4, mask 0.5, range 0.5.
+    // a1 = 0.7, a2 = 0.9, top = 0.4, b1 = 0.3, b2 = 0.5 -> t = 0.625.
+    CHECK_THAT(d(heightBlendWeight(0.2f, 0.4f, 0.5f, 0.5f)), WithinAbs(0.625, 1e-6));
+    // Out-of-range masks clamp.
+    CHECK_THAT(d(heightBlendWeight(0.0f, 0.0f, 2.0f, 0.1f)), WithinAbs(1.0, 1e-6));
+    CHECK_THAT(d(heightBlendWeight(0.0f, 0.0f, -1.0f, 0.1f)), WithinAbs(0.0, 1e-6));
+}
+
+TEST_CASE("triplanarWeights: even in the normal, normalised, sharpness-driven", "[material]") {
+    const glm::vec3 n = glm::normalize(glm::vec3(0.4f, -0.7f, 0.5f));
+    const glm::vec3 w = triplanarWeights(n, 4.0f);
+    CHECK_THAT(d(w.x + w.y + w.z), WithinAbs(1.0, 1e-5));
+    // A normal flip is the same projection: this is what keeps a triplanar pattern continuous
+    // across a surface whose normal changes sign (back faces, inside-out geometry).
+    checkVec3(triplanarWeights(-n, 4.0f), w);
+    // The dominant axis wins harder as sharpness rises.
+    CHECK(triplanarWeights(n, 8.0f).y > w.y);
+    // Degenerate inputs fall back to an even blend.
+    checkVec3(triplanarWeights(glm::vec3(0.0f), 4.0f), glm::vec3(1.0f / 3.0f));
+    checkVec3(triplanarWeights(n, 0.0f), w); // sharpness <= 0 means the default 4
+}
+
+TEST_CASE("reorientNormal: identities and composition", "[material]") {
+    const glm::vec3 flat{0.0f, 0.0f, 1.0f};
+    const glm::vec3 base = glm::normalize(glm::vec3(0.3f, -0.2f, 0.9f));
+    const glm::vec3 detail = glm::normalize(glm::vec3(-0.15f, 0.35f, 0.9f));
+    checkVec3(reorientNormal(base, flat), base, 1e-5); // a flat detail leaves the base alone
+    checkVec3(reorientNormal(flat, detail), detail, 1e-5); // a flat base is the detail itself
+    const glm::vec3 both = reorientNormal(base, detail);
+    CHECK_THAT(d(glm::length(both)), WithinAbs(1.0, 1e-5));
+    CHECK(both.z > 0.0f);
+    // The detail tilts the base further, it does not replace it.
+    CHECK(glm::dot(both, base) > glm::dot(both, flat) * 0.0f);
+    CHECK(both != base);
+}
+
+TEST_CASE("geometric inputs load the context lanes", "[material]") {
+    const MaterialContext c = geometricContext();
+    const auto probe = [&c](MaterialInput input) {
+        return runRegisters({inputOp(7, input)}, c)[7];
+    };
+    checkVec4(probe(MaterialInput::Curvature), glm::vec4(0.35f));
+    checkVec4(probe(MaterialInput::Convexity), glm::vec4(0.35f));
+    checkVec4(probe(MaterialInput::Concavity), glm::vec4(0.0f));
+    checkVec4(probe(MaterialInput::Cavity), glm::vec4(0.62f));
+    checkVec4(probe(MaterialInput::Occlusion), glm::vec4(0.44f));
+    checkVec4(probe(MaterialInput::Height), glm::vec4(0.28f));
+    checkVec4(probe(MaterialInput::NormalVariance), glm::vec4(0.031f));
+    checkVec4(probe(MaterialInput::Footprint), glm::vec4(0.004f));
+    checkVec4(probe(MaterialInput::MaterialId), glm::vec4(7.0f));
+    checkVec4(probe(MaterialInput::CameraDistance), glm::vec4(12.5f));
+    checkVec4(probe(MaterialInput::ObjectPosition), glm::vec4(c.localPosition, 1.0f));
+    checkVec4(probe(MaterialInput::TriplanarWeights), glm::vec4(triplanarWeights(c.normal, 4.0f), 0.0f));
+
+    // Concave geometry swaps convexity and concavity; both stay non-negative.
+    MaterialContext concave = c;
+    concave.curvature = -0.5f;
+    checkVec4(runRegisters({inputOp(7, MaterialInput::Convexity)}, concave)[7], glm::vec4(0.0f));
+    checkVec4(runRegisters({inputOp(7, MaterialInput::Concavity)}, concave)[7], glm::vec4(0.5f));
+}
+
+TEST_CASE("ADR-036 ops: formulas", "[material]") {
+    const MaterialContext c = geometricContext();
+
+    SECTION("worldProject and objectProject scale and offset the position") {
+        MaterialOp w = makeOp(MaterialOpKind::WorldProject, 7);
+        w.value = 2.0f;
+        w.constant = {0.5f, -0.25f, 1.0f, 0.0f};
+        checkVec4(runRegisters({w}, c)[7], glm::vec4(c.worldPosition * 2.0f + glm::vec3(0.5f, -0.25f, 1.0f), 1.0f));
+        MaterialOp o = w;
+        o.kind = MaterialOpKind::ObjectProject;
+        checkVec4(runRegisters({o}, c)[7], glm::vec4(c.localPosition * 2.0f + glm::vec3(0.5f, -0.25f, 1.0f), 1.0f));
+    }
+
+    SECTION("triplanar blends three plane samples and survives a normal flip") {
+        MaterialOp t = makeOp(MaterialOpKind::Triplanar, 7, 0);
+        t.value = 1.0f;
+        t.seed = 5;
+        t.constant2 = {4.0f, 0.0f, 0.0f, 0.0f};
+        std::vector<MaterialOp> ops = {inputOp(0, MaterialInput::WorldPosition), t};
+        const float value = runRegisters(ops, c)[7].x;
+        MaterialContext flipped = c;
+        flipped.normal = -c.normal;
+        CHECK_THAT(d(runRegisters(ops, flipped)[7].x), WithinAbs(d(value), 1e-6));
+        // Against the definition.
+        const glm::vec3 p = c.worldPosition;
+        const glm::vec3 w = triplanarWeights(c.normal, 4.0f);
+        const float expected = w.x * noise::fbm3({p.y, p.z, 0.0f}, 5) + w.y * noise::fbm3({p.z, p.x, 0.0f}, 5) +
+                               w.z * noise::fbm3({p.x, p.y, 0.0f}, 5);
+        CHECK_THAT(d(value), WithinAbs(d(expected), 1e-5));
+        CHECK(value >= 0.0f);
+        CHECK(value <= 1.0f);
+    }
+
+    SECTION("heightBlend exposes the layer weight as an op") {
+        MaterialOp h = makeOp(MaterialOpKind::HeightBlend, 7, 1, 2, 3);
+        h.value = 0.5f;
+        const auto regs = runRegisters({constantOp(1, glm::vec4(0.2f)), constantOp(2, glm::vec4(0.4f)),
+                                        constantOp(3, glm::vec4(0.5f)), h},
+                                       c);
+        checkVec4(regs[7], glm::vec4(0.625f));
+    }
+
+    SECTION("detailNormal is reoriented normal mapping") {
+        const glm::vec3 base = glm::normalize(glm::vec3(0.2f, -0.1f, 0.95f));
+        const glm::vec3 detail = glm::normalize(glm::vec3(-0.3f, 0.2f, 0.9f));
+        const auto regs = runRegisters({constantOp(1, glm::vec4(base, 0.0f)), constantOp(2, glm::vec4(detail, 0.0f)),
+                                        makeOp(MaterialOpKind::DetailNormal, 7, 1, 2)},
+                                       c);
+        checkVec4(regs[7], glm::vec4(reorientNormal(base, detail), 0.0f));
+    }
+
+    SECTION("curvatureMask concentrates on edges") {
+        MaterialOp m = makeOp(MaterialOpKind::CurvatureMask, 7);
+        m.value = 2.0f;
+        m.constant = {0.2f, 0.9f, 0.0f, 0.0f};
+        MaterialContext flat = c;
+        flat.curvature = 0.0f;
+        MaterialContext edge = c;
+        edge.curvature = 1.0f;
+        MaterialContext crease = c;
+        crease.curvature = -1.0f;
+        CHECK_THAT(d(runRegisters({m}, flat)[7].x), WithinAbs(0.0, 1e-6));
+        CHECK_THAT(d(runRegisters({m}, edge)[7].x), WithinAbs(1.0, 1e-6));
+        CHECK_THAT(d(runRegisters({m}, crease)[7].x), WithinAbs(0.0, 1e-6));
+        // A negative scale turns the same op into a concavity mask.
+        MaterialOp inverted = m;
+        inverted.value = -2.0f;
+        CHECK_THAT(d(runRegisters({inverted}, crease)[7].x), WithinAbs(1.0, 1e-6));
+        CHECK_THAT(d(runRegisters({inverted}, edge)[7].x), WithinAbs(0.0, 1e-6));
+        // In between, the mask rises with curvature.
+        MaterialContext mild = c;
+        mild.curvature = 0.3f;
+        const float mid = runRegisters({m}, mild)[7].x;
+        CHECK(mid > 0.0f);
+        CHECK(mid < 1.0f);
+    }
+
+    SECTION("edgeWear picks convex geometry and is broken up by noise") {
+        MaterialOp w = makeOp(MaterialOpKind::EdgeWear, 7);
+        w.value = 2.0f;
+        w.constant = {1.0f, 0.0f, 0.0f, 0.0f};
+        w.constant2 = {0.0f, 0.1f, 0.9f, 0.0f}; // no noise influence: pure curvature
+        w.seed = 3;
+        MaterialContext concave = c;
+        concave.curvature = -1.0f;
+        MaterialContext convex = c;
+        convex.curvature = 1.0f;
+        CHECK_THAT(d(runRegisters({w}, concave)[7].x), WithinAbs(0.0, 1e-6));
+        CHECK_THAT(d(runRegisters({w}, convex)[7].x), WithinAbs(1.0, 1e-6));
+        // With the noise influence turned up, two different world positions differ.
+        MaterialOp noisy = w;
+        noisy.constant2 = {1.0f, 0.0f, 1.0f, 0.0f};
+        MaterialContext a = convex;
+        MaterialContext b = convex;
+        b.worldPosition = {5.5f, -2.25f, 3.75f};
+        CHECK(runRegisters({noisy}, a)[7].x != runRegisters({noisy}, b)[7].x);
+    }
+
+    SECTION("decalBox projects a box mask and its face coordinates") {
+        MaterialOp box = makeOp(MaterialOpKind::DecalBox, 7);
+        box.value = 0.0f; // hard edges
+        box.constant = {0.0f, 0.0f, 0.0f, 0.0f};
+        box.constant2 = {1.0f, 1.0f, 1.0f, 0.0f};
+        MaterialContext inside = c;
+        inside.worldPosition = {0.25f, -0.5f, 0.0f};
+        const glm::vec4 in = runRegisters({box}, inside)[7];
+        checkVec4(in, {0.625f, 0.25f, 1.0f, 1.0f});
+        MaterialContext outside = c;
+        outside.worldPosition = {2.0f, 0.0f, 0.0f};
+        CHECK_THAT(d(runRegisters({box}, outside)[7].z), WithinAbs(0.0, 1e-6));
+        // A soft edge fades rather than cutting.
+        MaterialOp soft = box;
+        soft.value = 0.5f;
+        MaterialContext edge = c;
+        edge.worldPosition = {0.75f, 0.0f, 0.0f};
+        const float mask = runRegisters({soft}, edge)[7].z;
+        CHECK(mask > 0.0f);
+        CHECK(mask < 1.0f);
+    }
+
+    SECTION("anisotropy stretches roughness along the brush direction") {
+        MaterialOp a = makeOp(MaterialOpKind::Anisotropy, 7, 1);
+        a.value = 0.8f;
+        a.constant = {0.0f, 1.0f, 0.0f, 0.0f};
+        MaterialContext ctx = c;
+        ctx.normal = {0.0f, 0.0f, 1.0f};
+        // Viewing along the brush direction sees the stretched (rougher) lobe...
+        ctx.viewDirection = glm::normalize(glm::vec3(0.0f, 1.0f, 0.2f));
+        const float along = runRegisters({constantOp(1, glm::vec4(0.3f)), a}, ctx)[7].x;
+        // ...and across it, the tightened one.
+        ctx.viewDirection = glm::normalize(glm::vec3(1.0f, 0.0f, 0.2f));
+        const float across = runRegisters({constantOp(1, glm::vec4(0.3f)), a}, ctx)[7].x;
+        CHECK(along > 0.3f);
+        CHECK(across < 0.3f);
+        // Zero anisotropy is the identity.
+        MaterialOp iso = a;
+        iso.value = 0.0f;
+        CHECK_THAT(d(runRegisters({constantOp(1, glm::vec4(0.3f)), iso}, ctx)[7].x), WithinAbs(0.3, 1e-5));
+        // A brush direction along the normal has no tangent: the roughness passes through.
+        MaterialOp degenerate = a;
+        degenerate.constant = {0.0f, 0.0f, 1.0f, 0.0f};
+        CHECK_THAT(d(runRegisters({constantOp(1, glm::vec4(0.3f)), degenerate}, ctx)[7].x), WithinAbs(0.3, 1e-5));
+    }
+
+    SECTION("roughnessFilter widens the lobe with normal variance") {
+        MaterialOp f = makeOp(MaterialOpKind::RoughnessFilter, 7, 1);
+        f.value = 1.0f;
+        MaterialContext smooth = c;
+        smooth.normalVariance = 0.0f;
+        CHECK_THAT(d(runRegisters({constantOp(1, glm::vec4(0.2f)), f}, smooth)[7].x), WithinAbs(0.2, 1e-6));
+        MaterialContext noisy = c;
+        noisy.normalVariance = 0.05f;
+        const float filtered = runRegisters({constantOp(1, glm::vec4(0.2f)), f}, noisy)[7].x;
+        CHECK(filtered > 0.2f);
+        // Kaplanyan's kernel is clamped, so it can never run away.
+        MaterialContext extreme = c;
+        extreme.normalVariance = 1000.0f;
+        const float capped = runRegisters({constantOp(1, glm::vec4(0.2f)), f}, extreme)[7].x;
+        CHECK_THAT(d(capped), WithinAbs(d(std::sqrt(0.04f + 0.18f)), 1e-5));
+    }
+
+    SECTION("microDetail fades with the screen-space footprint") {
+        MaterialOp m = makeOp(MaterialOpKind::MicroDetail, 7, 0);
+        m.value = 50.0f;
+        m.seed = 11;
+        const std::vector<MaterialOp> ops = {inputOp(0, MaterialInput::WorldPosition), m};
+        MaterialContext close = c;
+        close.footprint = 0.0f;
+        MaterialContext mid = c;
+        mid.footprint = 0.005f;
+        MaterialContext far = c;
+        far.footprint = 0.05f; // one pixel covers several periods
+        const float sharp = runRegisters(ops, close)[7].x;
+        const float half = runRegisters(ops, mid)[7].x;
+        const float gone = runRegisters(ops, far)[7].x;
+        CHECK_THAT(d(gone), WithinAbs(0.5, 1e-6)); // faded to the mean: nothing left to alias
+        CHECK(std::abs(sharp - 0.5f) > std::abs(half - 0.5f));
+        CHECK(std::abs(half - 0.5f) > std::abs(gone - 0.5f));
+        CHECK_THAT(d(sharp), WithinAbs(d(noise::fbm3(c.worldPosition * 50.0f, 11)), 1e-6));
+    }
+}
+
+TEST_CASE("layers: height-aware compositing against hand-computed values", "[material]") {
+    MaterialContext c;
+    MaterialResult base;
+    base.baseColor = {1.0f, 0.0f, 0.0f};
+    base.roughness = 0.2f;
+    base.metallic = 1.0f;
+    base.occlusion = 1.0f;
+
+    MaterialProgram p;
+    p.name = "layered";
+    p.ops = {constantOp(0, {0.0f, 0.0f, 1.0f, 1.0f}), // the layer's colour
+             constantOp(1, glm::vec4(0.5f)),          // the mask
+             constantOp(2, glm::vec4(0.8f)),          // the layer's roughness
+             constantOp(3, glm::vec4(0.4f))};         // the base's height
+    p.baseColorRegister = -1;
+    p.heightRegister = 3;
+    MaterialLayer layer;
+    layer.name = "grime";
+    layer.maskRegister = 1;
+    layer.baseColorRegister = 0;
+    layer.roughnessRegister = 2;
+    layer.blendRange = 0.5f;
+    p.layers.push_back(layer);
+    REQUIRE(p.validate().has_value());
+
+    // Base height 0.4, layer height 0 (no register), mask 0.5, range 0.5:
+    // a1 = 0.9, a2 = 0.5, top = 0.4, b1 = 0.5, b2 = 0.1 -> t = 1/6.
+    const float t = heightBlendWeight(0.4f, 0.0f, 0.5f, 0.5f);
+    CHECK_THAT(d(t), WithinAbs(1.0 / 6.0, 1e-6));
+    const MaterialResult r = evaluateMaterialProgram(p, c, base);
+    checkVec3(r.baseColor, glm::vec3(1.0f - t, 0.0f, t));
+    CHECK_THAT(d(r.roughness), WithinAbs(d(0.2f * (1.0f - t) + 0.8f * t), 1e-6));
+    CHECK_THAT(d(r.metallic), WithinAbs(1.0, 1e-6));   // the layer names no metallic register
+    CHECK_THAT(d(r.height), WithinAbs(d(0.4f * (1.0f - t)), 1e-6));
+
+    SECTION("a layer with a mask of 1 replaces the channels it names") {
+        p.ops[1].constant = glm::vec4(1.0f);
+        const MaterialResult full = evaluateMaterialProgram(p, c, base);
+        checkVec3(full.baseColor, {0.0f, 0.0f, 1.0f});
+        CHECK_THAT(d(full.roughness), WithinAbs(0.8, 1e-6));
+        CHECK_THAT(d(full.metallic), WithinAbs(1.0, 1e-6));
+    }
+
+    SECTION("a mask of 0 leaves the base untouched") {
+        p.ops[1].constant = glm::vec4(0.0f);
+        const MaterialResult none = evaluateMaterialProgram(p, c, base);
+        checkVec3(none.baseColor, {1.0f, 0.0f, 0.0f});
+        CHECK_THAT(d(none.roughness), WithinAbs(0.2, 1e-6));
+    }
+
+    SECTION("a disabled layer does nothing") {
+        p.layers[0].enabled = false;
+        const MaterialResult off = evaluateMaterialProgram(p, c, base);
+        checkVec3(off.baseColor, {1.0f, 0.0f, 0.0f});
+    }
+
+    SECTION("layers see the running height through the `height` input") {
+        // The layer's mask is the base's height, read back through the input.
+        p.layers[0].ops = {inputOp(1, MaterialInput::Height)};
+        const MaterialResult r2 = evaluateMaterialProgram(p, c, base);
+        const float t2 = heightBlendWeight(0.4f, 0.0f, 0.4f, 0.5f);
+        checkVec3(r2.baseColor, glm::vec3(1.0f - t2, 0.0f, t2));
+    }
+
+    SECTION("layers stack bottom-up over the running result") {
+        MaterialLayer second;
+        second.name = "paint";
+        second.ops = {constantOp(4, {0.0f, 1.0f, 0.0f, 1.0f}), constantOp(5, glm::vec4(1.0f))};
+        second.maskRegister = 5;
+        second.baseColorRegister = 4;
+        p.layers.push_back(second);
+        REQUIRE(p.validate().has_value());
+        const MaterialResult stacked = evaluateMaterialProgram(p, c, base);
+        checkVec3(stacked.baseColor, {0.0f, 1.0f, 0.0f}); // the top layer's mask is 1
+    }
+}
+
+TEST_CASE("layers: normal and occlusion channels", "[material]") {
+    MaterialContext c;
+    MaterialResult base;
+    MaterialProgram p;
+    p.ops = {constantOp(0, {0.4f, 0.0f, 0.9f, 0.0f}), constantOp(1, glm::vec4(0.25f)),
+             constantOp(2, glm::vec4(1.0f))};
+    p.normalRegister = 0;
+    p.occlusionRegister = 1;
+    const MaterialResult r = evaluateMaterialProgram(p, c, base);
+    checkVec3(r.normal, glm::normalize(glm::vec3(0.4f, 0.0f, 0.9f)));
+    CHECK_THAT(d(r.occlusion), WithinAbs(0.25, 1e-6));
+
+    // A zero-length normal register keeps the unperturbed normal.
+    p.ops[0].constant = glm::vec4(0.0f);
+    checkVec3(evaluateMaterialProgram(p, c, base).normal, {0.0f, 0.0f, 1.0f});
+
+    // A layer's normal is blended and renormalised.
+    p.ops[0].constant = {0.0f, 0.0f, 1.0f, 0.0f};
+    MaterialLayer layer;
+    layer.ops = {constantOp(3, {0.9f, 0.0f, 0.4f, 0.0f})};
+    layer.normalRegister = 3;
+    layer.maskRegister = 2; // mask 1
+    p.layers.push_back(layer);
+    REQUIRE(p.validate().has_value());
+    const MaterialResult withLayer = evaluateMaterialProgram(p, c, base);
+    checkVec3(withLayer.normal, glm::normalize(glm::vec3(0.9f, 0.0f, 0.4f)));
+    CHECK_THAT(d(glm::length(withLayer.normal)), WithinAbs(1.0, 1e-5));
+}
+
+TEST_CASE("validate and pack: the layer budget", "[material]") {
+    MaterialProgram p;
+    p.name = "m";
+    p.ops.assign(40, constantOp(0, glm::vec4(1.0f)));
+    MaterialLayer layer;
+    layer.ops.assign(8, constantOp(1, glm::vec4(1.0f)));
+    p.layers.push_back(layer);
+    CHECK(p.totalOpCount() == 48);
+    CHECK(p.validate().has_value());
+    p.layers[0].ops.push_back(constantOp(1, glm::vec4(1.0f)));
+    CHECK_FALSE(p.validate().has_value()); // 49 ops across the base and its layers
+
+    p.ops.clear();
+    p.layers.clear();
+    p.layers.assign(static_cast<std::size_t>(kMaxMaterialLayers), MaterialLayer{});
+    CHECK(p.validate().has_value());
+    p.layers.push_back(MaterialLayer{});
+    CHECK_FALSE(p.validate().has_value());
+
+    p.layers.assign(1, MaterialLayer{});
+    p.layers[0].maskRegister = kMaterialRegisters;
+    CHECK_FALSE(p.validate().has_value());
+    p.layers[0].maskRegister = -1;
+    p.layers[0].ops = {makeOp(MaterialOpKind::Add, kMaterialRegisters)};
+    CHECK_FALSE(p.validate().has_value());
+    p.layers[0].ops = {makeOp(MaterialOpKind::Field, 0)};
+    CHECK_FALSE(p.validate().has_value());
+
+    // Packing lays the base's ops out first, then each layer's, and records the ranges.
+    MaterialProgram q;
+    q.ops = {constantOp(0, glm::vec4(1.0f)), constantOp(1, glm::vec4(2.0f))};
+    MaterialLayer a;
+    a.ops = {constantOp(2, glm::vec4(3.0f))};
+    a.maskRegister = 2;
+    a.blendRange = 0.25f;
+    a.baseColorRegister = 2;
+    MaterialLayer disabled;
+    disabled.enabled = false;
+    disabled.ops = {constantOp(3, glm::vec4(4.0f))};
+    MaterialLayer b;
+    b.ops = {constantOp(4, glm::vec4(5.0f)), constantOp(5, glm::vec4(6.0f))};
+    q.layers = {a, disabled, b};
+    REQUIRE(q.validate().has_value());
+    const MaterialProgramGpu gpu = packMaterialProgramWithSlots(q, {});
+    CHECK(gpu.opacityCountPad.y == 2); // base op count
+    CHECK(gpu.opacityCountPad.z == 2); // enabled layers
+    CHECK(gpu.aux.w == 5);             // total packed ops
+    CHECK(gpu.layers[0].range == glm::ivec4(2, 1, 0, 0));
+    CHECK(gpu.layers[0].params == glm::vec4(1.0f, 0.25f, 0.0f, 0.0f));
+    CHECK(gpu.layers[0].aux == glm::ivec4(-1, -1, 2, -1));
+    CHECK(gpu.layers[1].range == glm::ivec4(3, 2, 0, 0)); // the disabled layer is not packed
+    CHECK(gpu.ops[3].constant == glm::vec4(5.0f));
+}
+
+TEST_CASE("JSON round trip carries layers and the new outputs", "[material]") {
+    MaterialProgram p;
+    p.name = "layered";
+    p.ops = {inputOp(0, MaterialInput::Curvature), makeOp(MaterialOpKind::Triplanar, 1, 0)};
+    p.baseColorRegister = 1;
+    p.normalRegister = 2;
+    p.occlusionRegister = 3;
+    p.heightRegister = 4;
+    MaterialLayer layer;
+    layer.name = "wear";
+    layer.ops = {makeOp(MaterialOpKind::EdgeWear, 5)};
+    layer.maskRegister = 5;
+    layer.heightRegister = 4;
+    layer.blendRange = 0.33f;
+    layer.baseColorRegister = 1;
+    layer.roughnessRegister = 5;
+    layer.emissionIntensity = 2.5f;
+    p.layers.push_back(layer);
+    REQUIRE(p.validate().has_value());
+
+    const nlohmann::json j = p.toJson();
+    auto back = MaterialProgram::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->structuralHash() == p.structuralHash());
+    CHECK(back->layers.size() == 1);
+    CHECK(back->layers[0].name == "wear");
+    CHECK(back->layers[0].blendRange == 0.33f);
+    CHECK(back->heightRegister == 4);
+
+    // A program with no layers writes no "layers"/"normal"/"occlusion"/"height" keys at all, so a
+    // pre-ADR-036 program round-trips to exactly the JSON it had before.
+    MaterialProgram plain;
+    plain.ops = {constantOp(0, glm::vec4(1.0f))};
+    const nlohmann::json pj = plain.toJson();
+    CHECK_FALSE(pj.contains("layers"));
+    CHECK_FALSE(pj.contains("normal"));
+    CHECK_FALSE(pj.contains("occlusion"));
+    CHECK_FALSE(pj.contains("height"));
+}
+
+TEST_CASE("the shipped library demonstrates multi-scale detail", "[material]") {
+    const std::filesystem::path dir = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "materials";
+    struct Expectation {
+        const char* file;
+        const char* name;
+        bool needsLayers;
+    };
+    const Expectation expected[] = {
+        {"brushed-metal.material.json", "brushedMetal", true},
+        {"oxidised-metal.material.json", "oxidisedMetal", true},
+        {"dark-steel.material.json", "darkSteel", true},
+        {"weathered-stone.material.json", "weatheredStone", true},
+        {"emissive-glass.material.json", "emissiveGlass", true},
+        {"bioluminescent.material.json", "bioluminescent", true},
+    };
+    for (const Expectation& e : expected) {
+        std::ifstream in(dir / e.file);
+        REQUIRE(in.good());
+        nlohmann::json j;
+        in >> j;
+        auto program = MaterialProgram::fromJson(j);
+        if (!program) {
+            FAIL(std::string(e.file) + ": " + program.error().message);
+        }
+        INFO(e.file);
+        CHECK(program->name == e.name);
+        CHECK(program->layers.empty() != e.needsLayers);
+        // Multi-scale: at least one large-scale op (triplanar or a low-frequency noise), and a
+        // micro-detail op that fades with the footprint so it can never alias.
+        bool macro = false;
+        bool micro = false;
+        const auto scan = [&macro, &micro](const std::vector<MaterialOp>& ops) {
+            for (const MaterialOp& op : ops) {
+                if (op.kind == MaterialOpKind::Triplanar || op.kind == MaterialOpKind::Noise ||
+                    op.kind == MaterialOpKind::Voronoi) {
+                    macro = macro || std::abs(op.value) < 6.0f;
+                }
+                if (op.kind == MaterialOpKind::MicroDetail) {
+                    micro = micro || std::abs(op.value) > 20.0f;
+                }
+            }
+        };
+        scan(program->ops);
+        for (const MaterialLayer& layer : program->layers) {
+            scan(layer.ops);
+        }
+        CHECK(macro);
+        CHECK(micro);
+        // Every one of them says something about roughness: that is what separates the materials.
+        CHECK(program->roughnessRegister >= 0);
+        // And every one fits the budget with room to spare for a scene to add to it.
+        CHECK(program->totalOpCount() <= kMaxMaterialOps);
+    }
+}
+
+TEST_CASE("examples/reassembly and examples/infinite wire the library in", "[material]") {
+    struct SceneExpectation {
+        const char* path;
+        std::vector<std::string> programs;
+        std::vector<std::string> nodes;
+    };
+    const SceneExpectation scenes[] = {
+        {"reassembly/reassembly.scene.json",
+         {"brushedMetal", "oxidisedMetal", "darkSteel"},
+         {"shell", "rings", "plates", "pins"}},
+        {"infinite/infinite.scene.json", {"weatheredStone"}, {"columns", "arches"}},
+    };
+    for (const SceneExpectation& expectation : scenes) {
+        INFO(expectation.path);
+        std::ifstream in(std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / expectation.path);
+        REQUIRE(in.good());
+        nlohmann::json j;
+        in >> j;
+        REQUIRE(j.contains("materialPrograms"));
+        std::vector<std::string> declared;
+        for (const nlohmann::json& pj : j.at("materialPrograms")) {
+            auto program = MaterialProgram::fromJson(pj);
+            REQUIRE(program.has_value());
+            CHECK(program->validate().has_value());
+            declared.push_back(program->name);
+        }
+        for (const std::string& name : expectation.programs) {
+            CHECK(std::find(declared.begin(), declared.end(), name) != declared.end());
+        }
+        for (const std::string& node : expectation.nodes) {
+            bool found = false;
+            for (const nlohmann::json& n : j.at("nodes")) {
+                if (n.value("name", std::string()) != node || !n.contains("procedural")) {
+                    continue;
+                }
+                const nlohmann::json& m = n.at("procedural").at("material");
+                REQUIRE(m.contains("program"));
+                const auto name = m.at("program").get<std::string>();
+                CHECK(std::find(declared.begin(), declared.end(), name) != declared.end());
+                found = true;
+            }
+            INFO("node " << node);
+            CHECK(found);
+        }
+    }
 }

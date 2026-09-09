@@ -1,0 +1,227 @@
+{
+  "name": "darkSteel",
+  "ops": [
+    {
+      "kind": "input",
+      "input": "worldPosition"
+    },
+    {
+      "kind": "constant",
+      "dst": 1,
+      "constant": [
+        0.4,
+        0.42,
+        0.46,
+        1
+      ]
+    },
+    {
+      "kind": "triplanar",
+      "dst": 2,
+      "value": 0.45,
+      "constant2": [
+        4,
+        0,
+        0,
+        0
+      ],
+      "seed": 13
+    },
+    {
+      "kind": "remap",
+      "dst": 5,
+      "srcA": 2,
+      "value": 1,
+      "constant": [
+        0.25,
+        0.75,
+        0.9,
+        1.1
+      ]
+    },
+    {
+      "kind": "multiply",
+      "dst": 1,
+      "srcA": 1,
+      "srcB": 5
+    },
+    {
+      "kind": "voronoi",
+      "dst": 3,
+      "value": 1.6,
+      "seed": 29
+    },
+    {
+      "kind": "smoothstep",
+      "dst": 3,
+      "srcA": 3,
+      "constant": [
+        0.0,
+        0.13,
+        0,
+        0
+      ]
+    },
+    {
+      "kind": "remap",
+      "dst": 4,
+      "srcA": 3,
+      "value": 1,
+      "constant": [
+        0,
+        1,
+        0.62,
+        0.2
+      ]
+    },
+    {
+      "kind": "microDetail",
+      "dst": 6,
+      "value": 90.0,
+      "seed": 19
+    },
+    {
+      "kind": "remap",
+      "dst": 6,
+      "srcA": 6,
+      "value": 1,
+      "constant": [
+        0,
+        1,
+        -0.03,
+        0.03
+      ]
+    },
+    {
+      "kind": "add",
+      "dst": 4,
+      "srcA": 4,
+      "srcB": 6
+    },
+    {
+      "kind": "roughnessFilter",
+      "dst": 4,
+      "srcA": 4,
+      "value": 1.0
+    },
+    {
+      "kind": "constant",
+      "dst": 7,
+      "constant": [
+        1,
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "layers": [
+    {
+      "name": "seamShadow",
+      "ops": [
+        {
+          "kind": "remap",
+          "dst": 5,
+          "srcA": 3,
+          "value": 1,
+          "constant": [
+            0,
+            1,
+            1.0,
+            0.0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 6,
+          "constant": [
+            0.055,
+            0.058,
+            0.065,
+            1
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 2,
+          "constant": [
+            0.45,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "mask": 5,
+      "height": -1,
+      "blendRange": 0.12,
+      "baseColor": 6,
+      "metallic": -1,
+      "roughness": -1,
+      "emission": -1,
+      "emissionIntensity": 1.0,
+      "normal": -1,
+      "occlusion": 2
+    },
+    {
+      "name": "edgeBurnish",
+      "ops": [
+        {
+          "kind": "edgeWear",
+          "dst": 5,
+          "value": 4.0,
+          "constant": [
+            3.0,
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            0.65,
+            0.1,
+            0.7,
+            0
+          ],
+          "seed": 61
+        },
+        {
+          "kind": "constant",
+          "dst": 6,
+          "constant": [
+            0.52,
+            0.53,
+            0.56,
+            1
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 3,
+          "constant": [
+            0.1,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "mask": 5,
+      "height": -1,
+      "blendRange": 0.25,
+      "baseColor": 6,
+      "metallic": -1,
+      "roughness": 3,
+      "emission": -1,
+      "emissionIntensity": 1.0,
+      "normal": -1,
+      "occlusion": -1
+    }
+  ],
+  "baseColor": 1,
+  "metallic": 7,
+  "roughness": 4,
+  "emission": -1,
+  "emissionIntensity": 1.0,
+  "opacity": -1,
+  "height": 2
+}

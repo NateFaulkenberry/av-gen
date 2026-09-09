@@ -28,7 +28,9 @@ fn fs_sky(in: SkyOut) -> SceneOut {
     let far = frame.invViewProj * vec4<f32>(in.ndc, 1.0, 1.0);
     let dir = normalize(far.xyz / far.w - near.xyz / near.w);
     var color = frame.skyParams.rgb;
-    if (frame.envParams.w >= 0.5) {
+    // ADR-036: a procedural sky is an IBL source first; it only stands behind the scene when the
+    // scene asks for it (skyExtra.y), so existing looks keep their flat background.
+    if (frame.envParams.w >= 0.5 && frame.skyExtra.y >= 0.5) {
         let mip = frame.skyParams.w * frame.envParams.y;
         color = textureSampleLevel(prefilteredMap, iblSampler, envRotate(dir), mip).rgb * frame.params.w;
     }

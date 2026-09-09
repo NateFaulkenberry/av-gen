@@ -12,7 +12,13 @@ struct EnvUniforms {
     roughness: f32,
     sourceMipCount: f32, // mip levels of the source cube (for pdf-based mip selection)
     sourceSize: f32,     // width of the source cube face at mip 0
-    pad1: f32,
+    faceSize: f32,       // width of the face being written (fs_sky: the mip's own size)
+    // Procedural sky (ADR-036), resolved from scene::SkyRuntime.
+    skyZenith: vec4<f32>,   // rgb, w = hazeWidth
+    skyHorizon: vec4<f32>,  // rgb, w = sunAngularRadius
+    skyGround: vec4<f32>,   // rgb, w = sunGlowWidth
+    skySun: vec4<f32>,      // rgb = sun colour * sun intensity, w = overall intensity
+    skySunDir: vec4<f32>,   // xyz = unit direction *towards* the sun
 };
 
 @group(0) @binding(0) var<uniform> env: EnvUniforms;
@@ -97,6 +103,45 @@ fn fs_equirect(in: FsIn) -> @location(0) vec4<f32> {
     let dir = faceDirection(env.faceIndex, in.ndc);
     let color = textureSampleLevel(sourceEquirect, envSampler, equirectUv(dir), f32(env.mipLevel)).rgb;
     return vec4<f32>(color, 1.0);
+}
+
+// ---- pass: procedural sky -> cube face (ADR-036) ----
+// The transliteration of scene::skyRadiance. Instead of downsampling the cube for its mip chain,
+// each mip renders the sky with a sun disc widened to at least one texel and scaled to conserve
+// its energy, which is the analytic equivalent and keeps the pass deterministic and cheap.
+fn skySmoothstep(e0: f32, e1: f32, x: f32) -> f32 {
+    if (e0 == e1) {
+        return select(1.0, 0.0, x < e0);
+    }
+    let t = saturate((x - e0) / (e1 - e0));
+    return t * t * (3.0 - 2.0 * t);
+}
+
+fn skyRadiance(dir: vec3<f32>, minRadius: f32) -> vec3<f32> {
+    let d = normalize(dir);
+    let hazeWidth = max(env.skyZenith.w, 1e-3);
+    let haze = exp(-saturate(d.y) / hazeWidth);
+    let gradient = mix(env.skyZenith.rgb, env.skyHorizon.rgb, haze);
+    let band = skySmoothstep(-0.03, 0.03, d.y);
+    let base = mix(env.skyGround.rgb, gradient, band);
+
+    let cosTheta = clamp(dot(d, env.skySunDir.xyz), -1.0, 1.0);
+    let theta = acos(cosTheta);
+    let sunRadius = max(env.skyHorizon.w, 1e-3);
+    let radius = max(sunRadius, max(minRadius, 0.0));
+    let energy = (sunRadius / radius) * (sunRadius / radius);
+    let disc = (1.0 - skySmoothstep(radius * 0.85, radius * 1.15, theta)) * energy;
+    let glow = exp(-theta / max(env.skyGround.w, 1e-3)) * 0.02; // SKY_AUREOLE, scene/sky.cpp
+    let sun = env.skySun.rgb * (disc + glow) * band;
+    return (base + sun) * env.skySun.w;
+}
+
+@fragment
+fn fs_sky(in: FsIn) -> @location(0) vec4<f32> {
+    let dir = faceDirection(env.faceIndex, in.ndc);
+    // Half the angular width of one texel of this face: a cube face spans 90 degrees.
+    let texelAngle = 1.5707963 / max(env.faceSize, 1.0);
+    return vec4<f32>(skyRadiance(dir, texelAngle * 1.5), 1.0);
 }
 
 // ---- pass: diffuse irradiance (cosine-weighted hemisphere, mip-filtered) ----

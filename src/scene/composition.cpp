@@ -1064,6 +1064,31 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         &params.add(floatDesc(prefix_ + "env/intensity", envIntensitySetting_, 0.0f, 20.0f, 0.0f, 4.0f));
     envRotation_ =
         &params.add(floatDesc(prefix_ + "env/rotation", 0.0f, -6.2832f, 6.2832f, -3.1416f, 3.1416f));
+    // Procedural sky (ADR-036). It is only consulted when the scene has no HDR environment map, so
+    // leaving `enabled` on by default gives every existing scene image-based lighting for free.
+    {
+        const SkySettings& sky = skySetting_;
+        skyEnabled_ = &params.add(boolDesc(prefix_ + "env/sky/enabled", sky.enabled));
+        skyBackground_ = &params.add(boolDesc(prefix_ + "env/sky/background", sky.showBackground));
+        auto colour = [](std::string path, glm::vec3 def) {
+            params::ParamDesc<glm::vec3> d = vec3Desc(std::move(path), def, 0.0f, 32.0f, 0.0f, 2.0f);
+            d.isColor = true;
+            return d;
+        };
+        skyZenith_ = &params.add(colour(prefix_ + "env/sky/zenithColor", sky.zenithColor));
+        skyHorizon_ = &params.add(colour(prefix_ + "env/sky/horizonColor", sky.horizonColor));
+        skyGround_ = &params.add(colour(prefix_ + "env/sky/groundColor", sky.groundColor));
+        skySunColor_ = &params.add(colour(prefix_ + "env/sky/sunColor", sky.sunColor));
+        skyHaze_ = &params.add(floatDesc(prefix_ + "env/sky/haze", sky.hazeWidth, 0.001f, 4.0f, 0.02f, 1.0f));
+        skySunIntensity_ = &params.add(
+            floatDesc(prefix_ + "env/sky/sunIntensity", sky.sunIntensity, 0.0f, 200.0f, 0.0f, 40.0f));
+        skySunSize_ = &params.add(
+            floatDesc(prefix_ + "env/sky/sunSize", sky.sunAngularRadius, 0.001f, 1.5f, 0.005f, 0.3f));
+        skySunGlow_ = &params.add(
+            floatDesc(prefix_ + "env/sky/sunGlow", sky.sunGlowWidth, 0.001f, 3.0f, 0.02f, 1.0f));
+        skyIntensity_ = &params.add(
+            floatDesc(prefix_ + "env/sky/intensity", sky.intensity, 0.0f, 20.0f, 0.0f, 4.0f));
+    }
     brightness_ = &params.add(floatDesc(prefix_ + "scene/brightness", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f));
     fogDensity_ = &params.add(floatDesc(prefix_ + "scene/fogDensity", fogDensitySetting_, 0.0f, 2.0f, 0.0f, 0.2f));
     keyLight_ = &params.add(floatDesc(prefix_ + "scene/keyLight", 1.0f, 0.0f, 10.0f, 0.0f, 3.0f));
@@ -1210,6 +1235,10 @@ void Composition::unregisterParameters() {
         for (const char* path : {"camera/distance", "camera/height", "camera/orbitSpeed", "camera/fov",
                                  "camera/splineT", "camera/lookAhead", "camera/splineOffset",
                                  "env/intensity", "env/rotation", "scene/brightness", "scene/gridIntensity",
+                                 "env/sky/enabled", "env/sky/background", "env/sky/zenithColor",
+                                 "env/sky/horizonColor", "env/sky/groundColor", "env/sky/sunColor",
+                                 "env/sky/haze", "env/sky/sunIntensity", "env/sky/sunSize",
+                                 "env/sky/sunGlow", "env/sky/intensity",
                                  "root/scale", "root/rotationSpeed", "root/impulse"}) {
             params_->remove(prefix_ + path);
         }
@@ -1254,6 +1283,17 @@ void Composition::detach() {
     cameraTarget_ = nullptr;
     envIntensity_ = nullptr;
     envRotation_ = nullptr;
+    skyEnabled_ = nullptr;
+    skyBackground_ = nullptr;
+    skyZenith_ = nullptr;
+    skyHorizon_ = nullptr;
+    skyGround_ = nullptr;
+    skySunColor_ = nullptr;
+    skyHaze_ = nullptr;
+    skySunIntensity_ = nullptr;
+    skySunSize_ = nullptr;
+    skySunGlow_ = nullptr;
+    skyIntensity_ = nullptr;
     brightness_ = nullptr;
     fogDensity_ = nullptr;
     fogColor_ = nullptr;
@@ -2035,6 +2075,31 @@ void Composition::applyParameters() {
     if (envRotation_ != nullptr) {
         scene_.environment.environmentRotation = envRotation_->value();
     }
+    {
+        SkySettings& sky = scene_.environment.sky;
+        sky = skySetting_;
+        const auto f = [](const params::Parameter<float>* p, float fallback) {
+            return p != nullptr ? p->value() : fallback;
+        };
+        const auto c = [](const params::Parameter<glm::vec3>* p, const glm::vec3& fallback) {
+            return p != nullptr ? p->value() : fallback;
+        };
+        if (skyEnabled_ != nullptr) {
+            sky.enabled = skyEnabled_->value();
+        }
+        if (skyBackground_ != nullptr) {
+            sky.showBackground = skyBackground_->value();
+        }
+        sky.zenithColor = c(skyZenith_, sky.zenithColor);
+        sky.horizonColor = c(skyHorizon_, sky.horizonColor);
+        sky.groundColor = c(skyGround_, sky.groundColor);
+        sky.sunColor = c(skySunColor_, sky.sunColor);
+        sky.hazeWidth = f(skyHaze_, sky.hazeWidth);
+        sky.sunIntensity = f(skySunIntensity_, sky.sunIntensity);
+        sky.sunAngularRadius = f(skySunSize_, sky.sunAngularRadius);
+        sky.sunGlowWidth = f(skySunGlow_, sky.sunGlowWidth);
+        sky.intensity = f(skyIntensity_, sky.intensity);
+    }
 }
 
 // ---- files -------------------------------------------------------------------------------------
@@ -2108,6 +2173,56 @@ nlohmann::json Composition::toJson() const {
     }
     environment["intensity"] = envIntensity_ != nullptr ? envIntensity_->base() : envIntensitySetting_;
     environment["fogDensity"] = fogDensity_ != nullptr ? fogDensity_->base() : fogDensitySetting_;
+    {
+        // Procedural sky (ADR-036): written only when it differs from the defaults, so scene files
+        // that never touched it stay byte-identical.
+        const SkySettings def;
+        SkySettings sky = skySetting_;
+        const auto f = [](const params::Parameter<float>* p, float fallback) {
+            return p != nullptr ? p->base() : fallback;
+        };
+        const auto c = [](const params::Parameter<glm::vec3>* p, const glm::vec3& fallback) {
+            return p != nullptr ? p->base() : fallback;
+        };
+        if (skyEnabled_ != nullptr) {
+            sky.enabled = skyEnabled_->base();
+        }
+        if (skyBackground_ != nullptr) {
+            sky.showBackground = skyBackground_->base();
+        }
+        sky.zenithColor = c(skyZenith_, sky.zenithColor);
+        sky.horizonColor = c(skyHorizon_, sky.horizonColor);
+        sky.groundColor = c(skyGround_, sky.groundColor);
+        sky.sunColor = c(skySunColor_, sky.sunColor);
+        sky.hazeWidth = f(skyHaze_, sky.hazeWidth);
+        sky.sunIntensity = f(skySunIntensity_, sky.sunIntensity);
+        sky.sunAngularRadius = f(skySunSize_, sky.sunAngularRadius);
+        sky.sunGlowWidth = f(skySunGlow_, sky.sunGlowWidth);
+        sky.intensity = f(skyIntensity_, sky.intensity);
+        json sj = json::object();
+        const auto colourEq = [](const glm::vec3& a, const glm::vec3& b) { return a == b; };
+        if (sky.enabled != def.enabled) sj["enabled"] = sky.enabled;
+        if (sky.showBackground != def.showBackground) sj["background"] = sky.showBackground;
+        if (sky.useKeyLight != def.useKeyLight) sj["useKeyLight"] = sky.useKeyLight;
+        if (!colourEq(sky.zenithColor, def.zenithColor))
+            sj["zenithColor"] = {sky.zenithColor.r, sky.zenithColor.g, sky.zenithColor.b};
+        if (!colourEq(sky.horizonColor, def.horizonColor))
+            sj["horizonColor"] = {sky.horizonColor.r, sky.horizonColor.g, sky.horizonColor.b};
+        if (!colourEq(sky.groundColor, def.groundColor))
+            sj["groundColor"] = {sky.groundColor.r, sky.groundColor.g, sky.groundColor.b};
+        if (!colourEq(sky.sunColor, def.sunColor))
+            sj["sunColor"] = {sky.sunColor.r, sky.sunColor.g, sky.sunColor.b};
+        if (!colourEq(sky.sunDirection, def.sunDirection))
+            sj["sunDirection"] = {sky.sunDirection.x, sky.sunDirection.y, sky.sunDirection.z};
+        if (sky.hazeWidth != def.hazeWidth) sj["haze"] = sky.hazeWidth;
+        if (sky.sunIntensity != def.sunIntensity) sj["sunIntensity"] = sky.sunIntensity;
+        if (sky.sunAngularRadius != def.sunAngularRadius) sj["sunSize"] = sky.sunAngularRadius;
+        if (sky.sunGlowWidth != def.sunGlowWidth) sj["sunGlow"] = sky.sunGlowWidth;
+        if (sky.intensity != def.intensity) sj["intensity"] = sky.intensity;
+        if (!sj.empty()) {
+            environment["sky"] = std::move(sj);
+        }
+    }
     {
         const glm::vec3 fc = fogColor_ != nullptr ? fogColor_->base() : (fogColorSet_ ? fogColorSetting_ : scene_.environment.backgroundColor);
         environment["fogColor"] = {fc.r, fc.g, fc.b};
@@ -2381,6 +2496,58 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         glm::vec3 background;
         if (readColour("background", background)) {
             comp->scene_.environment.backgroundColor = background;
+        }
+        // Procedural sky (ADR-036). Every member has a default, so an older scene file loads with
+        // the sky on and simply gains reflections.
+        if (e.contains("sky")) {
+            const json& sj = e.at("sky");
+            if (!sj.is_object()) {
+                return fail("'sky' must be an object");
+            }
+            SkySettings& sky = comp->skySetting_;
+            struct SkyFloat {
+                const char* key;
+                float* target;
+            };
+            for (const SkyFloat sf : {SkyFloat{"haze", &sky.hazeWidth},
+                                      SkyFloat{"sunIntensity", &sky.sunIntensity},
+                                      SkyFloat{"sunSize", &sky.sunAngularRadius},
+                                      SkyFloat{"sunGlow", &sky.sunGlowWidth},
+                                      SkyFloat{"intensity", &sky.intensity}}) {
+                auto value = readFloat(sj, sf.key, *sf.target);
+                if (!value) {
+                    return std::unexpected(value.error());
+                }
+                *sf.target = *value;
+            }
+            struct SkyColour {
+                const char* key;
+                glm::vec3* target;
+            };
+            for (const SkyColour sc : {SkyColour{"zenithColor", &sky.zenithColor},
+                                       SkyColour{"horizonColor", &sky.horizonColor},
+                                       SkyColour{"groundColor", &sky.groundColor},
+                                       SkyColour{"sunColor", &sky.sunColor},
+                                       SkyColour{"sunDirection", &sky.sunDirection}}) {
+                if (sj.contains(sc.key) && sj[sc.key].is_array() && sj[sc.key].size() == 3 &&
+                    sj[sc.key][0].is_number()) {
+                    *sc.target = glm::vec3(sj[sc.key][0].get<float>(), sj[sc.key][1].get<float>(),
+                                           sj[sc.key][2].get<float>());
+                }
+            }
+            struct SkyFlag {
+                const char* key;
+                bool* target;
+            };
+            for (const SkyFlag sb : {SkyFlag{"enabled", &sky.enabled}, SkyFlag{"background", &sky.showBackground},
+                                     SkyFlag{"useKeyLight", &sky.useKeyLight}}) {
+                if (sj.contains(sb.key)) {
+                    if (!sj[sb.key].is_boolean()) {
+                        return fail("sky '{}' must be a boolean", sb.key);
+                    }
+                    *sb.target = sj[sb.key].get<bool>();
+                }
+            }
         }
     }
 

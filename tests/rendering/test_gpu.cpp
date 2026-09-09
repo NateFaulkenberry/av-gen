@@ -255,7 +255,9 @@ TEST_CASE("Image-based lighting lights a rough white sphere from above", "[gpu][
     s.camera.target = {0.0f, 0.0f, 0.0f};
     s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
     s.environment.showSkybox = false;
-    // No punctual lights: everything comes from the environment.
+    // No punctual lights: everything comes from the environment. The procedural sky (ADR-036)
+    // would otherwise stand in for the missing map, which is not what this test is measuring.
+    s.environment.sky.enabled = false;
     FrameTime time{};
 
     auto noEnv = renderer.renderToImage(s, time, 64, 64);

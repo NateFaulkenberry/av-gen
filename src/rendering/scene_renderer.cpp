@@ -158,7 +158,9 @@ Result<void> SceneRenderer::init() {
         }
         entries[6].binding = 6;
         entries[6].visibility = wgpu::ShaderStage::Fragment;
-        entries[6].buffer.type = wgpu::BufferBindingType::Uniform;
+        // ADR-036: the program block outgrew the uniform size limit when the op budget went from
+        // 16 to 48, so it is a read-only storage buffer.
+        entries[6].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         entries[6].buffer.minBindingSize = MaterialPrograms::kBufferSize;
         entries[7].binding = 7;
         entries[7].visibility = wgpu::ShaderStage::Fragment;
@@ -345,10 +347,34 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
     const scene::TextureId id = scene.environment.environmentMap;
     const bool valid = id != scene::kInvalidTexture && id < scene.textures.size() && scene.textures[id].isHdr();
     if (!valid) {
-        if (ibl_.valid) {
-            setIbl(IblResources{});
-        }
+        // ADR-036: no HDR map, so synthesise one from the procedural sky. It is built once and
+        // rebuilt only when a sky parameter (or the key light it takes its sun from) changes, so
+        // this costs nothing per frame.
         environmentTexture_ = scene::kInvalidTexture;
+        if (!scene.environment.sky.enabled) {
+            if (skyBuilt_ || ibl_.valid) {
+                setIbl(IblResources{});
+                skyBuilt_ = false;
+                skyHash_ = 0;
+            }
+            return;
+        }
+        const scene::SkyRuntime sky = scene::resolveSky(scene.environment.sky, scene.lights);
+        const std::uint64_t hash = sky.hash();
+        if (skyBuilt_ && hash == skyHash_ && ibl_.valid) {
+            return;
+        }
+        auto built = environment_->processSky(sky);
+        if (!built) {
+            log::error("procedural sky: {}", built.error().message);
+            setIbl(IblResources{});
+            skyBuilt_ = false;
+            return;
+        }
+        built->fromSky = true;
+        setIbl(*built);
+        skyBuilt_ = true;
+        skyHash_ = hash;
         return;
     }
     if (id == environmentTexture_ && scene.textureVersion == environmentVersion_) {
@@ -361,6 +387,8 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
     } else {
         setIbl(*ibl);
     }
+    skyBuilt_ = false;
+    skyHash_ = 0;
     environmentTexture_ = id;
     environmentVersion_ = scene.textureVersion;
 }
@@ -1419,9 +1447,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     }
     frame.targetSize = glm::vec4(static_cast<float>(hdr_.width()), static_cast<float>(hdr_.height()),
                                  1.0f / static_cast<float>(hdr_.width()), 1.0f / static_cast<float>(hdr_.height()));
-    const bool ibl = ibl_.valid && scene.environment.environmentMap != scene::kInvalidTexture;
+    // The IBL is live either from an HDR map or from the procedural sky (ADR-036). The sky carries
+    // its own intensity, so `env/intensity` (which existing scenes often set to 0 because it did
+    // nothing without a map) never silences it.
+    const bool skyIbl = ibl_.valid && ibl_.fromSky;
+    const bool ibl = ibl_.valid && (skyIbl || scene.environment.environmentMap != scene::kInvalidTexture);
+    const float envIntensity = skyIbl ? scene.environment.sky.intensity : scene.environment.environmentIntensity;
     frame.params = glm::vec4(static_cast<float>(time.renderTime), scene.environment.gridIntensity,
-                             scene.environment.brightness, scene.environment.environmentIntensity);
+                             scene.environment.brightness, envIntensity);
     std::uint32_t lightCount = 0;
     for (const auto& light : scene.lights) {
         if (!light.enabled || lightCount >= kMaxLights) {
@@ -1440,6 +1473,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                 static_cast<float>(ibl ? ibl_.prefilteredMips - 1 : 0), static_cast<float>(lightCount),
                                 ibl ? 1.0f : 0.0f);
     frame.skyParams = glm::vec4(scene.environment.backgroundColor, scene.environment.skyboxBlur);
+    frame.skyExtra = glm::vec4(skyIbl ? 1.0f : 0.0f,
+                               (!skyIbl || scene.environment.sky.showBackground) ? 1.0f : 0.0f, 0.0f, 0.0f);
     frame.fogParams = glm::vec4(scene.environment.fogColor, std::max(scene.environment.fogDensity, 0.0f));
     // ---- lights, shadow views and the froxel grid (ADR-033/034) ----
     updateLights(encoder, scene, view, aspect, frame);
@@ -1814,7 +1849,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             rp.SetBindGroup(0, frameBindGroup_);
             rp.SetBindGroup(3, iblBindGroup_);
         }
-        if (scene.environment.showSkybox && ibl) {
+        // A procedural sky lights the scene without necessarily standing behind it: existing
+        // scenes keep their flat background unless `env/sky/background` asks for the sky (ADR-036).
+        const bool drawSky = ibl && (!ibl_.fromSky || scene.environment.sky.showBackground);
+        if (scene.environment.showSkybox && drawSky) {
             rp.SetPipeline(skyboxPipeline_);
             const std::uint32_t zeroOffset = 0; // layout requires group 1; the skybox ignores it
             rp.SetBindGroup(1, objectBindGroup_, 1, &zeroOffset);
