@@ -1068,3 +1068,77 @@ render bit-identically across fresh engines and renderers and differ across time
 
 Fields/effectors that modulate instance attributes by position, mesh and glTF sources, spline
 distributions, and custom WGSL deformers spliced at the shader's include point.
+
+## Procedural world engine (2026-09-09)
+
+The brief: turn the engine into a general-purpose procedural audiovisual world-building
+instrument, where worlds are built from spatial data, fields, effectors, splines, SDFs, materials
+and simulation without writing C++. Research first (eight documents under `docs/research/`), then
+ADR-024 to ADR-032, then implementation in waves with fixed headers so parallel agents could work
+against a stable contract.
+
+### What was built
+
+- **Spatial data** (`src/spatial/`, ADR-024): typed `AttributeSet` columns over a point domain,
+  `PointCloud` with the conventional core columns (position, rotation, scale, id, seed, density,
+  colour, emissive, velocity, normal, bounds, index), thirteen attribute operations and eighteen
+  point operators (transform, noise, randomise, scatter, five filters, sort, duplicate, sample,
+  merge). The renderer's 96-byte instance record became a projection of a cloud.
+- **Fields and effectors** (ADR-025): twenty-five field kinds with ten falloff curves, transforms,
+  animation and compounds, sampled identically in `src/spatial/field.cpp` and `shaders/fields.wgsl`
+  (a parity test compares every kind); eight effector operations with six blend modes, applied on
+  the GPU each frame over the record buffer; field forces in the particle simulation; a `Field`
+  vertex deformer; field-driven emission.
+- **Splines** (ADR-026): four spline kinds, seven generators, rotation-minimising frames, used by
+  a spline distribution, a path deformer, a spline particle emitter and camera mode 2.
+- **Hierarchy and grammar**: self-recursion with per-level transforms, a procedural object as
+  another object's source, and a seven-operation shape grammar (place, repeat, branch, alternate,
+  mirror, choice, conditional) with deterministic choices.
+- **SDFs** (ADR-027): a 26-kind node tree with constructive geometry, domain operations and
+  displacement, evaluated identically on both sides through a packed post-order interpreter,
+  raymarched with depth writes so it composes with rasterised geometry, or meshed by surface nets.
+- **Procedural materials** (ADR-030): a nineteen-operation interpreted program over a register
+  file with position, normal, attribute, time, audio and field inputs, plus an OKLab colour layer.
+- **GPU execution** (ADR-029): an effector compute pass, frustum, distance and screen-size culling
+  with stable compaction into indirect draws, and four levels of detail per object.
+- **States and macros** (ADR-031): scene states as preset morphs with easings, beat and bar
+  quantisation and seven trigger kinds; world macros that expand to ordinary remap routes; three
+  authoring layers; a world overview; an inspector that answers "why is this moving"; an asset
+  browser; debug view options; a profiling capture with percentile summaries.
+- **A procedural graph** (ADR-028): 102 typed node types that emit flat scene data, with
+  subgraphs, incremental evaluation by structural hash, and a graph library.
+
+### Results
+
+- 676 tests pass in Debug and Release, zero warnings.
+- CPU and GPU agree within 1e-4 for every field kind, falloff, effector operation and SDF tree.
+- Performance (M2 Max, 1080p): 1M point instances draw in 3.1 ms, with a curl-noise effector pass
+  at 4.6 ms; 100k boxes at 1.1 ms; the cull pass costs 0.06 ms at 100k and 0.38 ms at 1M and
+  removes 80 percent of a half-off-screen scene; particles at 256k simulate in 0.83 ms with two
+  field forces. SDF raymarching is the expensive path at roughly 100 ms for sixteen blended
+  spheres filling 1080p, which is why objects are bounded and it stays opt-in.
+- Ten example worlds ship as data, including the Living Machine (fields, effectors and particle
+  forces) and the Infinite Temple (seven macros, twenty audio routes, eight states, a four-minute
+  cue arc). A golden frame-hash test renders every world twice and walks the flagship along its
+  arc.
+
+### Bugs found and fixed
+
+- The output manager drained the shared SDL event queue with no handler at the end of every frame,
+  so mouse events never reached the UI while the panels kept redrawing. The window that pumps the
+  queue is now the only one that drains it, with a regression test.
+- Panels were positioned in framebuffer pixels where ImGui expects points, pushing them off the
+  right edge of a scaled display.
+- A file whose entire symbol set was also defined weakly elsewhere was never pulled out of the
+  static archive, so the stubs won at link time. All temporary stubs are now gone.
+- The scene path was moved into the composition before later parsing read it, so relative graph
+  paths never resolved.
+
+### Known limitations
+
+- Volumetric fog and simulated grid fields are specified (ADR-032) and being implemented.
+- SDF raymarching has no per-tree specialisation; cost scales with pixels times steps times nodes.
+- Culling uses the source bounds through the instance transform, so a large world-space deformer
+  can pop at the frustum edge; it is opt-in per object for that reason.
+- The graph is an authoring layer: a scene is either graph-driven or hand-made, since re-evaluation
+  replaces what the graph installed.

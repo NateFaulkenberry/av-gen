@@ -4,29 +4,35 @@ A native C++ real-time GPU audiovisual engine. Not a waveform visualizer: the go
 scene engine in which audio analysis drives a general parameter/modulation system that in turn
 drives GPU-rendered 3D scenes, in real time and as deterministic offline frame sequences.
 
-Procedural geometry phase (current): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
-and render the built-in orb scene, any glTF 2.0 scene, or a composition of nodes (glTF instances,
-orbs, grids, particle systems, nested scene files) saved as a scene file, with PBR materials,
-textures, punctual lights, an HDR environment and GPU particle systems, behind or on top of user-written
-WGSL shader layers, through a built-in post chain (bloom, colour grading, lens distortion and
-chromatic aberration, depth of field, camera motion blur, five tone-mapping operators, vignette,
-grain). Every parameter, including
-shader inputs, can be driven by data-driven modulation routes from audio signals, the beat clock,
-LFOs, envelopes, noise, random and timeline sources, and macros; a timeline keys any parameter
-in seconds or beats and fires preset cues; presets snapshot and morph parameters; a project file saves
-all of it plus the audio, scene and environment it belongs to, relative to the file, migrates
-older versions, and exports as a self-contained bundle folder; offline renders are bit-identical
-PNG sequences or ProRes/H.264 videos with the audio muxed, from the CLI, a queue, or in the
-background of the live app. Live control: OSC (direct parameter addresses or bindings) and MIDI
-become control signals or set parameters, and a microphone or line input can replace the file. Any number of output windows on any display
-with crop, warp and edge blend, plus Syphon and NDI sharing to other applications. Procedural geometry generates worlds: primitives
-instanced by linear, grid, radial and spiral distributions with seeded variation, deformed on the GPU by
-bend, twist, sine, noise and displacement stacks, every knob a modulation target; the Temple, Cathedral,
-Helix, Impossible Chamber and Hyperspace examples are scene files built from it.
+Procedural world engine (current): load audio, analyse it (bands, onsets, beat and tempo) and
+build a world from data. Worlds are made of procedural objects (primitives, points, or another
+object used as a source) instanced by linear, grid, radial, spiral, spline and grammar
+distributions with seeded variation and recursion; typed point clouds with named attributes that
+spatial operators filter, sort, scatter and transform; fields (radial, box, sphere, gradient,
+noise, Voronoi, curl noise, vortex, attractor, wave and compounds) sampled identically on the CPU
+and the GPU; effectors that apply a field to an object's instances every frame; GPU vertex
+deformers (bend, twist, sine, noise, displacement, field, spline path); signed distance fields
+with constructive geometry, raymarched with depth or meshed by surface nets; procedural material
+programs; GPU particles that read the same fields; splines used for distributions, deformation,
+emission and camera rails; and GPU frustum culling with levels of detail for large scenes.
+
+A node graph authors all of it and emits ordinary scene data, so the runtime stays a flat data
+path. Scene states morph presets on beat-synced transitions, world macros fan one knob out to
+many parameters as ordinary routes, and an inspector answers "why is this moving" for any
+parameter. Everything else the engine already had still applies to all of it: glTF scenes, PBR
+materials and image-based lighting, user WGSL shader layers, the post chain, modulation from
+audio, LFOs, envelopes, noise and macros, keyframe automation with cues, presets, projects with
+migration and bundling, deterministic offline renders to PNG, EXR or video, OSC and MIDI control,
+multiple output windows with warp and blend, and Syphon and NDI sharing.
+
+Ten example worlds ship as data, from the Geometry Lab to the flagship Infinite Temple with its
+seven macros and four-minute state arc. None of them required a line of C++.
 
 ```
-Audio file -> AudioPlayer -> AnalysisRunner -> SignalBus -> Modulator -> ParameterSet
-           -> OrbScene -> SceneRenderer (WebGPU/Dawn on Metal) -> tone map -> window / image
+Audio -> AnalysisRunner -> SignalBus -> Timeline -> Modulator -> ParameterSet
+      -> generators (points, fields, splines, SDFs, grammars) -> Scene
+      -> SceneRenderer (WebGPU/Dawn on Metal): cull/LOD -> effectors -> instanced draws
+      -> SDF raymarch -> particles -> post -> window / output windows / image / video
 ```
 
 ## Build (macOS, Apple silicon)
@@ -60,6 +66,7 @@ python3 tools/make_test_audio.py /tmp/track.wav        # deterministic 120 BPM t
 ./build/debug/src/avgen --project show.json --input --osc-port 9000 # live input + OSC/MIDI control (docs/control.md)
 ./build/debug/src/avgen --audio /tmp/track.wav --shader shaders/examples/feedback.wgsl --post my_post.wgsl
 ./build/debug/src/avgen --composition scenes/stage.json --audio /tmp/track.wav --play   # scene file (ADR-017)
+./build/debug/src/avgen --example "The Infinite Temple" --audio /tmp/track.wav --play   # a shipped world
 ```
 
 Keys: Space play/pause, O open audio, S open scene, E open environment, Left/Right seek 5 s.
@@ -73,6 +80,13 @@ writes a scene file. `--help` lists every flag.
 - [docs/build.md](docs/build.md), [docs/testing.md](docs/testing.md), [docs/performance.md](docs/performance.md)
 - [docs/audio.md](docs/audio.md), [docs/rendering.md](docs/rendering.md), [docs/shaders.md](docs/shaders.md),
   [docs/assets.md](docs/assets.md), [docs/project-format.md](docs/project-format.md)
+- The procedural world: [docs/procedural-geometry.md](docs/procedural-geometry.md),
+  [docs/spatial-data.md](docs/spatial-data.md), [docs/gpu-fields.md](docs/gpu-fields.md),
+  [docs/splines.md](docs/splines.md), [docs/grammar-and-hierarchy.md](docs/grammar-and-hierarchy.md),
+  [docs/sdf.md](docs/sdf.md), [docs/procedural-materials.md](docs/procedural-materials.md),
+  [docs/procedural-graph.md](docs/procedural-graph.md),
+  [docs/gpu-culling-lod.md](docs/gpu-culling-lod.md),
+  [docs/scene-states-and-macros.md](docs/scene-states-and-macros.md)
 - [docs/dependencies.md](docs/dependencies.md): every third-party library, licence and reason
 - [docs/decisions/](docs/decisions/): Architecture Decision Records
 - [docs/research/](docs/research/): the Phase 0 technology research with sources
@@ -80,5 +94,6 @@ writes a scene file. `--help` lists every flag.
 
 ## Status
 
-Milestones 0.1 to 1.2 complete on macOS 26 / Apple silicon. Windows and Linux are
+Milestones 0.1 to 1.2, the procedural geometry phase and the procedural world engine are complete
+on macOS 26 / Apple silicon. Windows and Linux are
 architecturally supported (WebGPU via Dawn, SDL3) but not yet built or tested. Licence: MIT.
