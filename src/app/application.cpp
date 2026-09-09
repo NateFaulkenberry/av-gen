@@ -570,7 +570,11 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         if (auto r = outputs_.open(*context_, *shaders_); !r) {
             log::warn("outputs: {}", r.error().message);
         }
-        storeOutputsToProject();
+        storeOutputsToProject();        if (options.syphon) {
+            applyShare("syphon", *options.syphon);
+        } else if (options.ndi) {
+            applyShare("ndi", *options.ndi);
+        }
     }
     return {};
 }

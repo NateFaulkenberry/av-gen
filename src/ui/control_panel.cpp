@@ -1193,6 +1193,38 @@ void ControlPanel::drawControlTab(app::Engine& engine) {
     } else {
         ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", status.midiError.empty() ? "closed" : status.midiError.c_str());
     }
+    // ---- feedback + tempo source ----
+    ioChanged |= ImGui::Checkbox("OSC feedback", &map.feedbackEnabled);
+    ImGui::SameLine();
+    char host[64];
+    std::snprintf(host, sizeof(host), "%s", map.feedbackHost.c_str());
+    ImGui::SetNextItemWidth(120);
+    if (ImGui::InputText("host", host, sizeof(host), ImGuiInputTextFlags_EnterReturnsTrue)) {
+        map.feedbackHost = host;
+        ioChanged = true;
+    }
+    ImGui::SameLine();
+    int fport = map.feedbackPort;
+    ImGui::SetNextItemWidth(70);
+    if (ImGui::InputInt("fb port", &fport, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue)) {
+        map.feedbackPort = static_cast<std::uint16_t>(std::clamp(fport, 0, 65535));
+        ioChanged = true;
+    }
+    ImGui::SameLine();
+    if (status.feedbackOpen) {
+        ImGui::TextDisabled("sent %llu", static_cast<unsigned long long>(status.feedbackSent));
+    } else if (!status.feedbackError.empty()) {
+        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", status.feedbackError.c_str());
+    }
+    int tempo = engine.tempoSource() == app::TempoSource::MidiClock ? 1 : 0;
+    static const char* tempoNames[] = {"analysis", "MIDI clock"};
+    ImGui::SetNextItemWidth(110);
+    if (ImGui::Combo("tempo source", &tempo, tempoNames, 2)) {
+        engine.setTempoSource(tempo == 1 ? app::TempoSource::MidiClock : app::TempoSource::Analysis);
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s, %llu clock msgs", engine.midiClockActive() ? "MIDI clock active" : "analyser tempo",
+                        static_cast<unsigned long long>(status.clockMessages));
     if (ioChanged) {
         hub.applyIo();
     }
