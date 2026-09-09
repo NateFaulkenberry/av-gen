@@ -3,8 +3,10 @@
 //
 // Frames arrive as RGBA8 and are swizzled on the CPU into 32BGRA pixel buffers from the adaptor's
 // pool (BGRA is the format every VideoToolbox encoder accepts). Audio is read back through
-// AVAssetReader as 16-bit PCM, re-timed so that audioOffsetSeconds lands on frame 0, trimmed to
-// the video's length and encoded to AAC (H.264/HEVC) or kept as PCM (ProRes).
+// AVAssetReader as 16-bit PCM, re-timed so that audioOffsetSeconds lands on frame 0, fed
+// incrementally half a second ahead of the video (AVAssetWriter interleaves its inputs and blocks
+// a video input whose audio lags), trimmed to the video's length in finish(), and encoded to AAC
+// (H.264/HEVC) or kept as PCM (ProRes).
 //
 // Compiled with ARC (src/CMakeLists.txt); CoreMedia/CoreVideo objects are released by hand.
 
@@ -69,15 +71,37 @@ CMTime frameTime(std::size_t index, double fps) {
     return CMTimeMake(static_cast<int64_t>(std::llround(ticks)), kTimescale);
 }
 
-// Blocks until the input accepts more data; false when the writer failed meanwhile.
-bool waitReady(AVAssetWriterInput* input, AVAssetWriter* writer) {
+// AVAssetWriter interleaves its inputs: at each chunk boundary the video input stops accepting
+// samples until the audio input has been fed past that boundary. Audio is therefore kept this far
+// ahead of the video (pumpAudio) and, whenever the video input blocks, served on demand
+// (waitVideoReady) instead of only in finish().
+constexpr double kAudioLookaheadSeconds = 0.5;
+// An input that accepts nothing for this long is stuck (an encoder never takes seconds per frame);
+// report it instead of hanging the render thread forever.
+constexpr std::chrono::seconds kReadyTimeout{30};
+
+enum class Ready { Yes, WriterFailed, TimedOut };
+
+// Blocks until the input accepts more data.
+Ready waitReady(AVAssetWriterInput* input, AVAssetWriter* writer) {
+    const auto deadline = std::chrono::steady_clock::now() + kReadyTimeout;
     while (!input.readyForMoreMediaData) {
         if (writer.status != AVAssetWriterStatusWriting) {
-            return false;
+            return Ready::WriterFailed;
+        }
+        if (std::chrono::steady_clock::now() > deadline) {
+            return Ready::TimedOut;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    return true;
+    return Ready::Yes;
+}
+
+std::string notReadyText(Ready ready, const char* what, AVAssetWriter* writer) {
+    if (ready == Ready::TimedOut) {
+        return fmt::format("the {} input accepted no data for {} s", what, kReadyTimeout.count());
+    }
+    return fmt::format("writer failed: {}", errorText(writer.error));
 }
 
 // Synchronous track loading (the synchronous accessor is deprecated on macOS 15).
@@ -372,9 +396,15 @@ private:
             return setError(fmt::format("video: frame {} has {} bytes, expected {} ({}x{} RGBA8)", frames_,
                                         rgba.size(), expected, settings_.width, settings_.height));
         }
-        if (!waitReady(videoInput_, writer_)) {
-            return setError(
-                fmt::format("video: writer failed before frame {}: {}", frames_, errorText(writer_.error)));
+        const CMTime pts = frameTime(frames_, settings_.fps);
+        if (audioInput_ != nil && !audioDone_) {
+            const CMTime lookahead = CMTimeMakeWithSeconds(kAudioLookaheadSeconds, kAudioTimescale);
+            if (auto pumped = pumpAudio(CMTimeAdd(pts, lookahead), kCMTimePositiveInfinity); !pumped) {
+                return setError(pumped.error().message);
+            }
+        }
+        if (auto ready = waitVideoReady(); !ready) {
+            return setError(ready.error().message);
         }
 
         CVPixelBufferRef buffer = nullptr;
@@ -409,8 +439,7 @@ private:
         }
         CVPixelBufferUnlockBaseAddress(buffer, 0);
 
-        const BOOL ok =
-            [adaptor_ appendPixelBuffer:buffer withPresentationTime:frameTime(frames_, settings_.fps)];
+        const BOOL ok = [adaptor_ appendPixelBuffer:buffer withPresentationTime:pts];
         CVPixelBufferRelease(buffer);
         if (!ok) {
             return setError(fmt::format("video: appending frame {} to '{}' failed: {}", frames_,
@@ -436,7 +465,7 @@ private:
         const CMTime end = frameTime(frames_, settings_.fps);
         [videoInput_ markAsFinished];
         if (audioInput_ != nil) {
-            auto pumped = pumpAudio(end);
+            auto pumped = pumpAudio(end, end);
             [audioInput_ markAsFinished];
             [reader_ cancelReading];
             if (!pumped) {
@@ -458,69 +487,122 @@ private:
         return {};
     }
 
-    // Copies audio samples up to `end` (video length) into the writer, shifting timestamps so that
-    // audioOffsetSeconds in the file becomes 0 in the movie; the last buffer is trimmed to fit.
-    Result<void> pumpAudio(CMTime end) {
+    // Appends the next audio buffer, cut at `limit` (+infinity while frames are still arriving, the
+    // video's end in finish(), where the last buffer is trimmed to fit). Timestamps are shifted so
+    // that audioOffsetSeconds in the file becomes 0 in the movie. Returns false once there is
+    // nothing more to append (reader exhausted or `limit` reached).
+    Result<bool> appendNextAudio(CMTime limit) {
+        if (audioDone_) {
+            return false;
+        }
         const CMTime offset = CMTimeMakeWithSeconds(settings_.audioOffsetSeconds, kAudioTimescale);
-        while (true) {
-            CMSampleBufferRef sample = pendingAudio_ != nullptr ? std::exchange(pendingAudio_, nullptr)
-                                                                : [audioOutput_ copyNextSampleBuffer];
-            if (sample == nullptr) {
-                break;
+        CMSampleBufferRef sample = pendingAudio_ != nullptr ? std::exchange(pendingAudio_, nullptr)
+                                                            : [audioOutput_ copyNextSampleBuffer];
+        if (sample == nullptr) {
+            audioDone_ = true;
+            if (reader_.status == AVAssetReaderStatusFailed) {
+                return fail("video: reading '{}' failed: {}", settings_.audio.string(),
+                            errorText(reader_.error));
             }
-            const CMTime pts = CMTimeSubtract(CMSampleBufferGetPresentationTimeStamp(sample), offset);
-            if (CMTimeCompare(pts, end) >= 0) {
-                CFRelease(sample);
-                break;
-            }
-            const CMTime sampleEnd = CMTimeAdd(pts, CMSampleBufferGetDuration(sample));
-            const CMItemCount numSamples = CMSampleBufferGetNumSamples(sample);
-            if (CMTimeCompare(sampleEnd, end) > 0 && numSamples > 1) {
-                const double keepSeconds = CMTimeGetSeconds(CMTimeSubtract(end, pts));
-                const double perSample =
-                    CMTimeGetSeconds(CMSampleBufferGetDuration(sample)) / static_cast<double>(numSamples);
-                const auto keep = static_cast<CMItemCount>(std::clamp(
-                    std::llround(keepSeconds / perSample), 0LL, static_cast<long long>(numSamples)));
-                if (keep == 0) {
-                    CFRelease(sample);
-                    break;
-                }
-                CMSampleBufferRef trimmed = nullptr;
-                if (CMSampleBufferCopySampleBufferForRange(kCFAllocatorDefault, sample, CFRangeMake(0, keep),
-                                                           &trimmed) == noErr &&
-                    trimmed != nullptr) {
-                    CFRelease(sample);
-                    sample = trimmed;
-                }
-            }
-
-            CMSampleTimingInfo timing{};
-            timing.duration = CMSampleBufferGetDuration(sample);
-            timing.presentationTimeStamp = pts;
-            timing.decodeTimeStamp = kCMTimeInvalid;
-            CMSampleBufferRef retimed = nullptr;
-            const OSStatus status =
-                CMSampleBufferCreateCopyWithNewTiming(kCFAllocatorDefault, sample, 1, &timing, &retimed);
+            return false;
+        }
+        const CMTime pts = CMTimeSubtract(CMSampleBufferGetPresentationTimeStamp(sample), offset);
+        if (CMTimeCompare(pts, limit) >= 0) {
             CFRelease(sample);
-            if (status != noErr || retimed == nullptr) {
-                return fail("video: cannot re-time audio samples (status {})", status);
+            audioDone_ = true;
+            return false;
+        }
+        CMTime sampleEnd = CMTimeAdd(pts, CMSampleBufferGetDuration(sample));
+        const CMItemCount numSamples = CMSampleBufferGetNumSamples(sample);
+        if (CMTimeCompare(sampleEnd, limit) > 0 && numSamples > 1) {
+            const double keepSeconds = CMTimeGetSeconds(CMTimeSubtract(limit, pts));
+            const double perSample =
+                CMTimeGetSeconds(CMSampleBufferGetDuration(sample)) / static_cast<double>(numSamples);
+            const auto keep = static_cast<CMItemCount>(
+                std::clamp(std::llround(keepSeconds / perSample), 0LL, static_cast<long long>(numSamples)));
+            if (keep == 0) {
+                CFRelease(sample);
+                audioDone_ = true;
+                return false;
             }
-            if (!waitReady(audioInput_, writer_)) {
-                CFRelease(retimed);
-                return fail("video: writer failed while muxing audio: {}", errorText(writer_.error));
+            CMSampleBufferRef trimmed = nullptr;
+            if (CMSampleBufferCopySampleBufferForRange(kCFAllocatorDefault, sample, CFRangeMake(0, keep),
+                                                       &trimmed) == noErr &&
+                trimmed != nullptr) {
+                CFRelease(sample);
+                sample = trimmed;
+                sampleEnd = CMTimeAdd(pts, CMSampleBufferGetDuration(sample));
             }
-            const BOOL ok = [audioInput_ appendSampleBuffer:retimed];
+        }
+
+        CMSampleTimingInfo timing{};
+        timing.duration = CMSampleBufferGetDuration(sample);
+        timing.presentationTimeStamp = pts;
+        timing.decodeTimeStamp = kCMTimeInvalid;
+        CMSampleBufferRef retimed = nullptr;
+        const OSStatus status =
+            CMSampleBufferCreateCopyWithNewTiming(kCFAllocatorDefault, sample, 1, &timing, &retimed);
+        CFRelease(sample);
+        if (status != noErr || retimed == nullptr) {
+            return fail("video: cannot re-time audio samples (status {})", status);
+        }
+        if (const Ready ready = waitReady(audioInput_, writer_); ready != Ready::Yes) {
             CFRelease(retimed);
-            if (!ok) {
-                return fail("video: appending audio to '{}' failed: {}", path_.string(),
-                            errorText(writer_.error));
+            return fail("video: while muxing audio into '{}': {}", path_.string(),
+                        notReadyText(ready, "audio", writer_));
+        }
+        const BOOL ok = [audioInput_ appendSampleBuffer:retimed];
+        CFRelease(retimed);
+        if (!ok) {
+            return fail("video: appending audio to '{}' failed: {}", path_.string(),
+                        errorText(writer_.error));
+        }
+        audioEnd_ = sampleEnd;
+        if (CMTimeCompare(sampleEnd, limit) >= 0) {
+            audioDone_ = true;
+        }
+        return true;
+    }
+
+    // Appends audio until the appended audio reaches `target` or there is nothing more to append.
+    Result<void> pumpAudio(CMTime target, CMTime limit) {
+        while (!audioDone_ && CMTimeCompare(audioEnd_, target) < 0) {
+            auto appended = appendNextAudio(limit);
+            if (!appended) {
+                return std::unexpected(appended.error());
             }
-            if (CMTimeCompare(sampleEnd, end) >= 0) {
+            if (!*appended) {
                 break;
             }
         }
-        if (reader_.status == AVAssetReaderStatusFailed) {
-            return fail("video: reading '{}' failed: {}", settings_.audio.string(), errorText(reader_.error));
+        return {};
+    }
+
+    // Blocks until the video input accepts a frame. While it refuses, the writer's interleaver is
+    // usually asking for audio (the audio input reads ready), so audio is served on demand here;
+    // without that the two sides wait for each other forever.
+    Result<void> waitVideoReady() {
+        auto deadline = std::chrono::steady_clock::now() + kReadyTimeout;
+        while (!videoInput_.readyForMoreMediaData) {
+            if (writer_.status != AVAssetWriterStatusWriting) {
+                return fail("video: before frame {} of '{}': writer failed: {}", frames_, path_.string(),
+                            errorText(writer_.error));
+            }
+            if (audioInput_ != nil && !audioDone_ && audioInput_.readyForMoreMediaData) {
+                auto appended = appendNextAudio(kCMTimePositiveInfinity);
+                if (!appended) {
+                    return std::unexpected(appended.error());
+                }
+                if (*appended) {
+                    deadline = std::chrono::steady_clock::now() + kReadyTimeout; // progress
+                    continue;
+                }
+            }
+            if (std::chrono::steady_clock::now() > deadline) {
+                return fail("video: before frame {} of '{}': {}", frames_, path_.string(),
+                            notReadyText(Ready::TimedOut, "video", writer_));
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         return {};
     }
@@ -554,6 +636,8 @@ private:
     AVAssetReaderTrackOutput* audioOutput_ = nil;
     AVAssetWriterInput* audioInput_ = nil;
     CMSampleBufferRef pendingAudio_ = nullptr;
+    CMTime audioEnd_ = kCMTimeZero; // end of the last appended audio buffer (movie time)
+    bool audioDone_ = false;        // reader exhausted or the video's end reached
     std::size_t frames_ = 0;
     bool finished_ = false;
     std::optional<Error> error_;

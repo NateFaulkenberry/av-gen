@@ -69,7 +69,11 @@ RGBA8 frames at a fixed frame rate and muxes an optional audio file. Two backend
   `h264`, `hevc` (`.mov` or `.mp4`, even dimensions required). `quality` 0..100 becomes an average
   bit rate derived from `width * height * fps` for H.264/HEVC; ProRes ignores it. Audio is read with
   `AVAssetReader` as 16-bit PCM, shifted so `audioOffsetSeconds` lands on frame 0, trimmed to the
-  video's length, and written as AAC (H.264/HEVC) or PCM (ProRes). No third-party code.
+  video's length, and written as AAC (H.264/HEVC) or PCM (ProRes). `AVAssetWriter` interleaves its
+  inputs and refuses video at each chunk boundary until the audio has passed it, so audio is fed
+  half a second ahead of every frame and served on demand while the video input is blocked (never
+  only in `finish()`); frames may come from any thread, and an input that accepts nothing for 30 s
+  is reported as an error rather than hanging the render. No third-party code.
 - `ffmpeg` (`video_writer.cpp`): a user-supplied `ffmpeg` binary found via `ffmpegPath`,
   `AVGEN_FFMPEG`, `PATH`, `/opt/homebrew/bin` or `/usr/local/bin`. It is spawned with
   `posix_spawn` (no shell), fed `-f rawvideo -pix_fmt rgba` on stdin, and its stderr is captured
