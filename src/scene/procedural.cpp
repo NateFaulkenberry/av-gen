@@ -929,6 +929,41 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
     return fail("unknown primitive kind");
 }
 
+float sourceBoundingRadius(const SourceSpec& spec) {
+    return std::max(glm::length(sourceHalfExtent(spec)), 1e-4f);
+}
+
+Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize) {
+    if (level <= 0) {
+        return makeSourceMesh(spec);
+    }
+    if (level == 1) {
+        // Half the segment counts of every generator; the floors keep the spec valid (3 for the
+        // radial-style counts, 2 for sphere rings, 1 for height segments and box subdivisions).
+        const auto halve = [](int v, int floorValue) { return std::max(v / 2, floorValue); };
+        SourceSpec reduced = spec;
+        reduced.subdivisions = halve(spec.subdivisions, 1);
+        reduced.radialSegments = halve(spec.radialSegments, 3);
+        reduced.heightSegments = halve(spec.heightSegments, 1);
+        reduced.segments = halve(spec.segments, 3);
+        reduced.rings = halve(spec.rings, 2);
+        reduced.majorSegments = halve(spec.majorSegments, 3);
+        reduced.minorSegments = halve(spec.minorSegments, 3);
+        return makeSourceMesh(reduced);
+    }
+    if (level > 3) {
+        return fail("lod level must be in 0..3 (got {})", level);
+    }
+    if (auto ok = spec.validate(); !ok) {
+        return std::unexpected(ok.error());
+    }
+    // LOD2: a billboard circumscribing the bounding sphere. LOD3: an eighth of that - a dot.
+    const float size = 2.0f * std::max(impostorSize, 1e-4f) * sourceBoundingRadius(spec);
+    MeshData quad = makePointQuad(level == 2 ? size : size * 0.125f);
+    quad.name = level == 2 ? "lod-impostor" : "lod-point";
+    return quad;
+}
+
 // ================================================================================================
 // Distributions
 // ================================================================================================
@@ -1150,6 +1185,12 @@ std::uint64_t Distribution::structuralHash() const {
 // ================================================================================================
 // Variation
 // ================================================================================================
+
+std::uint64_t LodSettings::structuralHash() const {
+    StructHash h;
+    h.i32(lodCount); // the only structural field: it decides how many LOD meshes are generated
+    return h.value();
+}
 
 std::uint64_t Variation::structuralHash() const {
     StructHash h;
@@ -1452,6 +1493,15 @@ Result<void> ProceduralGeometry::validate() const {
             return fail("procedural '{}': op {} (attribute) needs a target", name, i + 1);
         }
     }
+    if (lod.lodCount < 1 || lod.lodCount > kMaxLodLevels) {
+        return fail("procedural '{}': lod count must be in 1..{} (got {})", name, kMaxLodLevels, lod.lodCount);
+    }
+    if (lod.maxDistance < 0.0f || lod.minScreenRadius < 0.0f) {
+        return fail("procedural '{}': lod maxDistance and minScreenRadius must be >= 0", name);
+    }
+    if (!(lod.impostorSize > 0.0f)) {
+        return fail("procedural '{}': lod impostorSize must be > 0", name);
+    }
     if (material.roughness < 0.0f || material.roughness > 1.0f || material.metallic < 0.0f || material.metallic > 1.0f) {
         return fail("procedural '{}': roughness and metallic must be in 0..1", name);
     }
@@ -1481,6 +1531,7 @@ std::uint64_t ProceduralGeometry::structuralHash() const {
     for (const char c : extraLane) {
         h.u32(static_cast<std::uint8_t>(c));
     }
+    h.u64(lod.structuralHash()); // lodCount only; the rest of LodSettings is per-frame uniforms
     return h.value();
 }
 
@@ -1716,6 +1767,19 @@ json ProceduralGeometry::toJson() const {
     j["emissiveFieldAmount"] = emissiveFieldAmount;
     j["extraLane"] = extraLane;
     {
+        json s2 = json::object();
+        s2["cull"] = lod.cull;
+        s2["maxDistance"] = lod.maxDistance;
+        s2["minScreenRadius"] = lod.minScreenRadius;
+        s2["count"] = lod.lodCount;
+        s2["distance1"] = lod.lodDistances[0];
+        s2["distance2"] = lod.lodDistances[1];
+        s2["distance3"] = lod.lodDistances[2];
+        s2["byScreenSize"] = lod.lodByScreenSize;
+        s2["impostorSize"] = lod.impostorSize;
+        j["lod"] = std::move(s2);
+    }
+    {
         json s = json::object();
         s["baseColor"] = vecToJson(material.baseColor);
         s["opacity"] = material.opacity;
@@ -1896,6 +1960,22 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
             }
             g.effectors.push_back(std::move(*e));
         }
+    }
+    if (root.contains("lod")) {
+        const json& j = root.at("lod");
+        if (!j.is_object()) {
+            return fail("'lod' must be an object");
+        }
+        LodSettings& l = g.lod;
+        AVGEN_PROC_READ(l.cull, "cull", readBool);
+        AVGEN_PROC_READ(l.maxDistance, "maxDistance", readFloat);
+        AVGEN_PROC_READ(l.minScreenRadius, "minScreenRadius", readFloat);
+        AVGEN_PROC_READ(l.lodCount, "count", readInt);
+        AVGEN_PROC_READ(l.lodDistances[0], "distance1", readFloat);
+        AVGEN_PROC_READ(l.lodDistances[1], "distance2", readFloat);
+        AVGEN_PROC_READ(l.lodDistances[2], "distance3", readFloat);
+        AVGEN_PROC_READ(l.lodByScreenSize, "byScreenSize", readBool);
+        AVGEN_PROC_READ(l.impostorSize, "impostorSize", readFloat);
     }
     if (root.contains("material")) {
         const json& j = root.at("material");
@@ -2207,6 +2287,16 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     }
     p.emissiveFieldAmount = r.f("emissiveFieldAmount", rest.emissiveFieldAmount, 0.0f, 100.0f, 0.0f, 10.0f);
 
+    // Culling / LOD (ADR-029): per-frame uniforms, so no rebuild when they move. `lodCount`,
+    // `lodByScreenSize` and `impostorSize` are structural or mesh-shaping and stay file-authored.
+    const LodSettings& lodRest = rest.lod;
+    p.lodEnabled = r.b("lod/enabled", lodRest.cull);
+    p.lodMaxDistance = r.f("lod/maxDistance", lodRest.maxDistance, 0.0f, 100000.0f, 0.0f, 500.0f);
+    p.lodMinScreenRadius = r.f("lod/minScreenRadius", lodRest.minScreenRadius, 0.0f, 4096.0f, 0.0f, 32.0f);
+    p.lodDistance[0] = r.f("lod/distance1", lodRest.lodDistances[0], 0.0f, 100000.0f, 0.0f, 500.0f);
+    p.lodDistance[1] = r.f("lod/distance2", lodRest.lodDistances[1], 0.0f, 100000.0f, 0.0f, 500.0f);
+    p.lodDistance[2] = r.f("lod/distance3", lodRest.lodDistances[2], 0.0f, 100000.0f, 0.0f, 500.0f);
+
     // Material
     const Material& m = rest.material;
     p.baseColor = r.v3("material/baseColor", m.baseColor, 0.0f, 1.0f, 0.0f, 1.0f, true);
@@ -2337,6 +2427,17 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
         copyValue(p, base + "enabled", live.effectors[slot].enabled);
     }
     copyValue(p, "emissiveFieldAmount", live.emissiveFieldAmount);
+
+    // Culling / LOD: the structural / mesh-shaping fields always come from rest.
+    live.lod.lodCount = rest.lod.lodCount;
+    live.lod.lodByScreenSize = rest.lod.lodByScreenSize;
+    live.lod.impostorSize = rest.lod.impostorSize;
+    copyValue(p, "lod/enabled", live.lod.cull);
+    copyValue(p, "lod/maxDistance", live.lod.maxDistance);
+    copyValue(p, "lod/minScreenRadius", live.lod.minScreenRadius);
+    copyValue(p, "lod/distance1", live.lod.lodDistances[0]);
+    copyValue(p, "lod/distance2", live.lod.lodDistances[1]);
+    copyValue(p, "lod/distance3", live.lod.lodDistances[2]);
 
     // Material
     Material& m = live.material;
