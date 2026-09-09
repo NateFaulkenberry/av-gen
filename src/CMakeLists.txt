@@ -1,6 +1,6 @@
 # ---- avgen_core: GPU-free engine logic (core, audio, analysis, signals, params, scene, assets) ---
 file(GLOB_RECURSE AVGEN_CORE_SOURCES CONFIGURE_DEPENDS
-    core/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp shaders/*.cpp assets/*.cpp
+    core/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp spatial/*.cpp shaders/*.cpp assets/*.cpp
     control/*.cpp)
 if(APPLE)
     # Native video export (AVFoundation) is Objective-C++; the portable stub is for other platforms.

@@ -6,6 +6,7 @@
 #include "scene/particles.hpp"
 #include "scene/post_settings.hpp"
 #include "scene/procedural.hpp"
+#include "spatial/field.hpp"
 #include "scene/scene_types.hpp"
 
 #include <cstdint>
@@ -27,6 +28,7 @@ struct Scene {
     std::vector<Entity> entities;
     std::vector<ParticleSystem> particles;
     std::vector<ProceduralGeometry> procedurals; // ADR-023; evaluated by rendering::ProceduralRenderer
+    spatial::FieldSet fields;                    // ADR-025; sampled by effectors, deformers, particles, materials
     PostSettings post;                // built-in post-processing (copied in by the Engine)
     std::uint64_t meshVersion = 0;    // incremented when meshes change (renderer re-uploads)
     std::uint64_t textureVersion = 0; // incremented when textures change

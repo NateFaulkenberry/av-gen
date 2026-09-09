@@ -21,6 +21,10 @@
 #include "core/error.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/scene_types.hpp"
+#include "spatial/effector.hpp"
+#include "spatial/field.hpp"
+#include "spatial/point_cloud.hpp"
+#include "spatial/spatial_ops.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -37,7 +41,10 @@ namespace avgen::scene {
 
 // ---- source geometry ---------------------------------------------------------------------------
 
-enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus };
+// Point: a camera-facing quad of `pointSize` units (billboarded by the vertex shader; the CPU
+// mesh is a unit quad in XY facing +Z). Instances of a Point source are the "points" of the
+// performance targets (1M points with a GPU field).
+enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point };
 [[nodiscard]] const char* primitiveKindName(PrimitiveKind kind);
 [[nodiscard]] std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name);
 
@@ -60,6 +67,8 @@ struct SourceSpec {
     float minorRadius = 0.25f;
     int majorSegments = 48;        // 3..256
     int minorSegments = 16;        // 3..128
+    // Point
+    float pointSize = 0.05f;       // quad edge (units); scaled by the instance scale
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const; // changes whenever the mesh would change
@@ -70,6 +79,7 @@ struct SourceSpec {
 [[nodiscard]] MeshData makeCylinder(float radius, float height, int radialSegments, int heightSegments, bool caps);
 [[nodiscard]] MeshData makeUvSphere(float radius, int segments, int rings);
 [[nodiscard]] MeshData makeTorus(float majorRadius, float minorRadius, int majorSegments, int minorSegments);
+[[nodiscard]] MeshData makePointQuad(float size); // 4 vertices, 2 triangles, XY plane, normal +Z, uv 0..1
 [[nodiscard]] Result<MeshData> makeSourceMesh(const SourceSpec& spec);
 
 // ---- distributions ------------------------------------------------------------------------------
@@ -135,7 +145,7 @@ struct Variation {
 
 // ---- deformers ----------------------------------------------------------------------------------
 
-enum class DeformerKind : std::uint8_t { Bend, Twist, Sine, Noise, Displacement };
+enum class DeformerKind : std::uint8_t { Bend, Twist, Sine, Noise, Displacement, Field };
 [[nodiscard]] const char* deformerKindName(DeformerKind kind);
 [[nodiscard]] std::optional<DeformerKind> deformerKindFromName(std::string_view name);
 enum class DeformSpace : std::uint8_t { Local, World };
@@ -157,6 +167,10 @@ enum class DeformSpace : std::uint8_t { Local, World };
 //   Displacement: p += n * a * (fbm(p * scale + speed * t) * 2 - 1) — displacement
 //          along the vertex normal; the pattern source is `pattern` (0 = noise now; texture/audio/
 //          field/user later).
+//   Field: samples the scene field named `field` (ADR-025) at the point (world space when the
+//          deformer space is World, else at the instance's world position + local offset):
+//          vector fields: p += v * a; scalar fields: p += n * s * a (along the normal) when
+//          `alongNormal`, else p += axis * s * a.
 struct Deformer {
     DeformerKind kind = DeformerKind::Twist;
     bool enabled = true;
@@ -173,17 +187,24 @@ struct Deformer {
     std::uint32_t seed = 1;             // noise
     glm::vec3 axisMask{1.0f, 1.0f, 1.0f}; // noise per-axis mask
     int pattern = 0;                    // displacement pattern source (0 = noise)
+    std::string field;                  // Field: FieldSpec name (resolved by the owner/renderer)
+    bool alongNormal = true;            // Field: scalar fields displace along the normal
 };
 // CPU reference of the whole stack, identical in meaning to the GPU shader: applies the enabled
 // deformers in order; `instanceWorld` is the instance's world matrix (local deformers apply to
 // `p` in object space before it, world deformers to the world position after it). Returns the
 // world-space position. Used by tests and tools.
 [[nodiscard]] glm::vec3 deformPoint(const std::vector<Deformer>& stack, glm::vec3 objectPoint,
-                                    const glm::mat4& instanceWorld, double time);
+                                    const glm::mat4& instanceWorld, double time,
+                                    const spatial::FieldSet* fields = nullptr, glm::vec3 normal = {0.0f, 1.0f, 0.0f});
 [[nodiscard]] glm::vec3 applyDeformer(const Deformer& d, glm::vec3 p, double time);
+// Field deformer (needs the field set; `normal` in the same space as `p`). No-op when unbound.
+[[nodiscard]] glm::vec3 applyFieldDeformer(const Deformer& d, glm::vec3 p, glm::vec3 normal, double time,
+                                           const spatial::FieldSet& fields);
 // The GPU-side noise, evaluated on the CPU (for tests): 3-octave value fBM in [0, 1].
 [[nodiscard]] float fbm3(glm::vec3 p, std::uint32_t seed);
 constexpr int kMaxDeformers = 8;
+constexpr std::size_t kKeepCloudMax = 262144;
 
 // ---- material variation ------------------------------------------------------------------------
 
@@ -197,15 +218,7 @@ struct MaterialVariation {
 
 // ---- the procedural object ----------------------------------------------------------------------
 
-struct InstanceRecord {
-    glm::vec4 position;   // xyz, w = uniform scale hint (1)
-    glm::vec4 rotation;   // unit quaternion (x, y, z, w)
-    glm::vec4 scale;      // xyz, w = normalised index
-    glm::vec4 random;     // four hashed randoms in [0, 1)
-    glm::vec4 color;      // base colour multiplier (rgb), a = instance id
-    glm::vec4 emissive;   // emissive multiplier (rgb), a = unused
-};
-static_assert(sizeof(InstanceRecord) == 96);
+using InstanceRecord = spatial::InstanceRecord; // the fixed point projection (spatial/point_cloud.hpp)
 
 struct ProceduralGeometry {
     std::string name = "procedural";
@@ -218,8 +231,21 @@ struct ProceduralGeometry {
     std::vector<Deformer> deformers;     // ordered stack, at most kMaxDeformers
     Material material;
     MaterialVariation materialVariation;
+    // Spatial processing (ADR-024/025). Structural: `pointOps` run on the point cloud at rebuild
+    // (after distribution + variation, before projection), in order. Per frame: `effectors`
+    // (≤ kMaxEffectors) act on the instance records on the GPU (CPU reference:
+    // spatial::applyEffectorsToRecords); `emissiveField` multiplies emission by the named scalar
+    // field's sample at the instance origin (× emissiveFieldAmount, 0 = off).
+    std::vector<spatial::PointOp> pointOps;
+    std::vector<spatial::Effector> effectors;
+    std::string emissiveField;
+    float emissiveFieldAmount = 0.0f;
+    std::string extraLane;               // attribute projected into InstanceRecord::emissive.a
     // Structural outputs (filled by rebuild()); the renderer uploads them when the version
     // changes. `structureVersion` is bumped by rebuild() whenever the structural hash changed.
+    // `cloud` is the point cloud the records were projected from, retained for inspection and
+    // tools when count <= kKeepCloudMax (cleared otherwise).
+    spatial::PointCloud cloud;
     std::vector<InstanceRecord> instances;
     std::uint64_t structureVersion = 0;
     std::uint64_t meshHash = 0;           // hash of the last generated source (renderer cache key)
@@ -229,8 +255,12 @@ struct ProceduralGeometry {
     [[nodiscard]] Result<void> validate() const;
     // Regenerates instances (and reports whether the source mesh must be regenerated) when the
     // structural inputs changed since the last call; cheap when nothing changed. Returns true
-    // when something was rebuilt.
+    // when something was rebuilt. Pipeline: distribution + variation -> PointCloud (position,
+    // rotation, scale, id, seed, index, color/emissive from material variation) -> pointOps ->
+    // projectInstances(extraLane) -> bounds (+ effector strength padding).
     bool rebuild();
+    // The base cloud before pointOps (pure; used by rebuild and tests).
+    [[nodiscard]] spatial::PointCloud generateCloud() const;
     [[nodiscard]] std::uint64_t structuralHash() const;
     // Instance world matrix within the object (distribution * placement * variation * source).
     [[nodiscard]] glm::mat4 instanceMatrix(std::uint32_t index) const;
@@ -242,9 +272,11 @@ struct ProceduralGeometry {
 
 // Every field that makes sense as a modulation target, registered under `prefix` (e.g.
 // "procedural/columns/"): source/*, distribution/*, transform/*, variation/*, deform/<slot>/*
-// (slot = 1-based, label "<kind>/<field>"), material/*, materialVariation/*. Enum/kind fields are
-// int parameters; count/segment fields are ints. Group = prefix without the trailing '/'.
+// (slot = 1-based, label "<kind>/<field>"), ops/<slot>/*, effector/<slot>/*, emissiveFieldAmount,
+// material/*, materialVariation/*. Enum/kind fields are int parameters; count/segment fields are
+// ints. Group = prefix without the trailing '/'.
 struct ProceduralParameters;
+constexpr int kMaxEffectors = spatial::kMaxEffectors;
 [[nodiscard]] ProceduralParameters registerProceduralParameters(params::ParameterSet& params,
                                                                 const ProceduralGeometry& rest,
                                                                 const std::string& prefix);
@@ -277,6 +309,11 @@ struct ProceduralParameters {
     params::Parameter<float>* metallic = nullptr;
     params::Parameter<float>* hueShift = nullptr;
     params::Parameter<bool>* visible = nullptr;
+    // ops/<slot>/amount|enabled|offset|angle|factor|threshold|probability|value (slot 1-based, structural)
+    std::vector<params::Parameter<float>*> opAmount;
+    // effector/<slot>/strength|weight|enabled (per frame)
+    std::array<params::Parameter<float>*, kMaxEffectors> effectorStrength{};
+    params::Parameter<float>* emissiveFieldAmount = nullptr;
 };
 
 } // namespace avgen::scene

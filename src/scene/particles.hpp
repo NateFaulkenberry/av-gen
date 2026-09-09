@@ -9,13 +9,29 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <array>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace avgen::scene {
 
 enum class EmitterShape : std::uint8_t { Point, Sphere, Disc, Box };
 enum class ParticleBlend : std::uint8_t { Additive, Alpha };
+
+enum class FieldForceMode : std::uint8_t { Force, Velocity, Turbulence, Kill };
+[[nodiscard]] const char* fieldForceModeName(FieldForceMode mode);
+[[nodiscard]] std::optional<FieldForceMode> fieldForceModeFromName(std::string_view name);
+struct FieldForce {
+    std::string field;               // FieldSpec name in Scene::fields
+    FieldForceMode mode = FieldForceMode::Force;
+    bool enabled = true;
+    float strength = 1.0f;
+    float mix = 1.0f;                // Velocity mode blend
+    glm::vec3 axis{0.0f, 1.0f, 0.0f}; // scalar-field direction
+};
+constexpr int kMaxFieldForces = 4;
 
 struct ParticleSystem {
     std::string name = "particles";
@@ -46,6 +62,13 @@ struct ParticleSystem {
     float attractorStrength = 0.0f;  // > 0 pulls, < 0 pushes
     float attractorRadius = 3.0f;
     float orbit = 0.0f;              // tangential force around the attractor
+    // Field forces (ADR-025): each entry samples a scene field at the particle position every
+    // simulation step. Mode Velocity sets/adds the field vector to the velocity directly (scaled
+    // by strength, blended by `mix` 0..1 = full replace), Force adds it as an acceleration,
+    // Turbulence adds the field's vector scaled by strength like the built-in curl noise, and
+    // Kill removes particles where the scalar sample >= 0.5. Scalar fields act along `axis`.
+    // Emission spawns from a Field-shaped emitter when `emitField` is set (density-weighted, later).
+    std::vector<FieldForce> fieldForces; // at most kMaxFieldForces
 
     // Appearance
     float sizeStart = 0.04f;         // world units
@@ -75,6 +98,7 @@ struct ParticleParameters {
     params::Parameter<glm::vec3>* attractorPosition = nullptr;
     params::Parameter<float>* attractorStrength = nullptr;
     params::Parameter<float>* orbit = nullptr;
+    std::array<params::Parameter<float>*, kMaxFieldForces> fieldStrength{}; // fieldForce/<slot>/strength
     params::Parameter<float>* size = nullptr;          // scales sizeStart/End
     params::Parameter<glm::vec4>* colorStart = nullptr;
     params::Parameter<glm::vec4>* colorEnd = nullptr;

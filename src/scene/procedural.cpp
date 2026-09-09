@@ -72,6 +72,8 @@
 
 #include "scene/procedural.hpp"
 
+#include "core/noise.hpp"
+
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -247,63 +249,6 @@ glm::quat orientationRotation(OrientationMode mode, float theta, const glm::vec3
         return lookRotation(tangent, frame.n);
     }
     return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-}
-
-// ---- noise (transliteration of the GPU reference above) ----------------------------------------
-
-struct U3 {
-    std::uint32_t x, y, z;
-};
-
-U3 pcg3d(U3 v) {
-    v.x = v.x * 1664525u + 1013904223u;
-    v.y = v.y * 1664525u + 1013904223u;
-    v.z = v.z * 1664525u + 1013904223u;
-    v.x += v.y * v.z;
-    v.y += v.z * v.x;
-    v.z += v.x * v.y;
-    v.x ^= v.x >> 16u;
-    v.y ^= v.y >> 16u;
-    v.z ^= v.z >> 16u;
-    v.x += v.y * v.z;
-    v.y += v.z * v.x;
-    v.z += v.x * v.y;
-    return v;
-}
-
-float hash01(std::int32_t cx, std::int32_t cy, std::int32_t cz, std::uint32_t seed) {
-    const U3 h = pcg3d({std::bit_cast<std::uint32_t>(cx) + seed * 7919u,
-                        std::bit_cast<std::uint32_t>(cy) + seed * 104729u,
-                        std::bit_cast<std::uint32_t>(cz) + seed * 1299709u});
-    return static_cast<float>(h.x) * (1.0f / 4294967296.0f);
-}
-
-float wgslMix(float a, float b, float t) {
-    return a * (1.0f - t) + b * t;
-}
-
-float valueNoise(const glm::vec3& p, std::uint32_t seed) {
-    const glm::vec3 c(std::floor(p.x), std::floor(p.y), std::floor(p.z));
-    const glm::vec3 f = p - c;
-    const glm::vec3 u = f * f * (3.0f - 2.0f * f);
-    const auto ix = static_cast<std::int32_t>(c.x);
-    const auto iy = static_cast<std::int32_t>(c.y);
-    const auto iz = static_cast<std::int32_t>(c.z);
-    const float n000 = hash01(ix, iy, iz, seed);
-    const float n100 = hash01(ix + 1, iy, iz, seed);
-    const float n010 = hash01(ix, iy + 1, iz, seed);
-    const float n110 = hash01(ix + 1, iy + 1, iz, seed);
-    const float n001 = hash01(ix, iy, iz + 1, seed);
-    const float n101 = hash01(ix + 1, iy, iz + 1, seed);
-    const float n011 = hash01(ix, iy + 1, iz + 1, seed);
-    const float n111 = hash01(ix + 1, iy + 1, iz + 1, seed);
-    const float x00 = wgslMix(n000, n100, u.x);
-    const float x10 = wgslMix(n010, n110, u.x);
-    const float x01 = wgslMix(n001, n101, u.x);
-    const float x11 = wgslMix(n011, n111, u.x);
-    const float y0 = wgslMix(x00, x10, u.y);
-    const float y1 = wgslMix(x01, x11, u.y);
-    return wgslMix(y0, y1, u.z);
 }
 
 // ---- JSON helpers ------------------------------------------------------------------------------
@@ -1082,8 +1027,7 @@ std::uint64_t Variation::structuralHash() const {
 }
 
 float hashInstance(std::uint32_t seed, std::uint32_t index, std::uint32_t channel) {
-    const U3 h = pcg3d({index, channel, seed});
-    return static_cast<float>(h.x) * (1.0f / 4294967296.0f);
+    return noise::hashIndex(seed, index, channel);
 }
 
 namespace {
@@ -1231,9 +1175,7 @@ glm::vec3 deformPoint(const std::vector<Deformer>& stack, glm::vec3 objectPoint,
 }
 
 float fbm3(glm::vec3 p, std::uint32_t seed) {
-    return (0.5f * valueNoise(p, seed) + 0.25f * valueNoise(p * 2.03f + 17.0f, seed) +
-            0.125f * valueNoise(p * 4.11f + 31.0f, seed)) /
-           0.875f;
+    return noise::fbm3(p, seed);
 }
 
 // ================================================================================================
