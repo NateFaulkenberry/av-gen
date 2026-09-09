@@ -57,7 +57,9 @@
   "sources/breathe/rate": 0.041,
   "sources/breathe/phase": 0.0,
   "sources/turn/rate": 0.0075,
-  "sources/turn/phase": 0.6
+  "sources/turn/phase": 0.6,
+  "camera/splineT": 0.0,
+  "camera/lookAhead": 150.0
  },
  "sources": [
   {
@@ -92,36 +94,18 @@
  "routes": [
   {
    "source": "lfo.drift",
-   "target": "camera/position",
+   "target": "camera/splineOffset",
    "component": 0,
-   "amount": 2.6,
+   "amount": 3.2,
    "op": "add",
    "polarity": "unipolar",
    "chain": {}
   },
   {
    "source": "lfo.rise",
-   "target": "camera/position",
+   "target": "camera/splineOffset",
    "component": 1,
-   "amount": 1.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {}
-  },
-  {
-   "source": "lfo.drift",
-   "target": "camera/target",
-   "component": 0,
-   "amount": -5.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {}
-  },
-  {
-   "source": "lfo.rise",
-   "target": "camera/target",
-   "component": 1,
-   "amount": -3.5,
+   "amount": 2.1,
    "op": "add",
    "polarity": "unipolar",
    "chain": {}
@@ -319,8 +303,7 @@
   "enabled": true,
   "tracks": [
    {
-    "target": "camera/position",
-    "component": 0,
+    "target": "camera/splineT",
     "timeBase": "seconds",
     "mode": "replace",
     "loopLength": 60.0,
@@ -328,58 +311,21 @@
      {
       "time": 0,
       "value": [
-       16.0
+       0.0
       ],
       "interp": "easeInOut"
      },
      {
       "time": 18,
       "value": [
-       9.0
+       0.22
       ],
       "interp": "easeInOut"
      },
      {
       "time": 41,
       "value": [
-       -7.5
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 60,
-      "value": [
-       2.5
-      ],
-      "interp": "linear"
-     }
-    ]
-   },
-   {
-    "target": "camera/position",
-    "component": 1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 60.0,
-    "keys": [
-     {
-      "time": 0,
-      "value": [
-       10.0
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 18,
-      "value": [
-       4.5
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 41,
-      "value": [
-       -3.0
+       0.66
       ],
       "interp": "easeInOut"
      },
@@ -393,8 +339,7 @@
     ]
    },
    {
-    "target": "camera/position",
-    "component": 2,
+    "target": "camera/lookAhead",
     "timeBase": "seconds",
     "mode": "replace",
     "loopLength": 60.0,
@@ -402,139 +347,21 @@
      {
       "time": 0,
       "value": [
-       -30.0
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 18,
-      "value": [
-       -128.0
+       150.0
       ],
       "interp": "easeInOut"
      },
      {
       "time": 41,
       "value": [
-       -300.0
+       110.0
       ],
       "interp": "easeInOut"
      },
      {
       "time": 60,
       "value": [
-       -412.0
-      ],
-      "interp": "linear"
-     }
-    ]
-   },
-   {
-    "target": "camera/target",
-    "component": 0,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 60.0,
-    "keys": [
-     {
-      "time": 0,
-      "value": [
-       -6.0
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 18,
-      "value": [
-       -3.0
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 41,
-      "value": [
-       4.0
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 60,
-      "value": [
-       0.0
-      ],
-      "interp": "linear"
-     }
-    ]
-   },
-   {
-    "target": "camera/target",
-    "component": 1,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 60.0,
-    "keys": [
-     {
-      "time": 0,
-      "value": [
-       -4.0
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 18,
-      "value": [
-       -1.5
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 41,
-      "value": [
-       2.0
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 60,
-      "value": [
-       0.0
-      ],
-      "interp": "linear"
-     }
-    ]
-   },
-   {
-    "target": "camera/target",
-    "component": 2,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 60.0,
-    "keys": [
-     {
-      "time": 0,
-      "value": [
-       -340.0
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 18,
-      "value": [
-       -420.0
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 41,
-      "value": [
-       -505.0
-      ],
-      "interp": "easeInOut"
-     },
-     {
-      "time": 60,
-      "value": [
-       -545.0
+       70.0
       ],
       "interp": "linear"
      }

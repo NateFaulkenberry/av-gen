@@ -30,9 +30,13 @@ The corridor runs down -Z. Five node kinds carry five distinct jobs:
 - **shards** — small dark debris near the camera path, the near depth layer, in silhouette.
 - **core** — the subject. A displaced sphere at z=-540, the only bright thing in frame.
 
-The camera is a free camera keyed on the timeline. It rides *off* the corridor axis — starting
-high and to the right, crossing to the left through the descent, settling as it arrives — so the
-vanishing point is never dead centre. Four slow LFOs add a drift the audio never touches.
+The camera follows a spline (`camera.mode` 2, `camera.spline` "path"): a Catmull-Rom weaving
+through the corridor from (14, 9, -10) to the core. `camera/splineT` and `camera/lookAhead` are
+keyed on the timeline, so the shot accelerates through the descent and shortens its look-ahead as
+it arrives. This is the change that stopped the frame reading as concentric rings: a camera on the
+corridor axis sees a bullseye whatever the geometry does, and one that weaves sweeps the walls
+across frame and swings the vanishing point off centre. Four slow LFOs add a drift the audio never
+touches.
 
 ## Lighting
 
@@ -64,7 +68,13 @@ raised the black floor to mid-grey and destroyed every value relationship in the
 at 0.00004-0.00024, and the visible scattering belongs to a small practical at the source, so the
 haze is a halo around the light rather than a veil over the shot.
 
-**5. The `disc` particle emitter spawns in the XZ plane** by construction and uses only
+**5. A low albedo does not make a surface dark.** With `baseColor` at 0.02 and a warm key, the
+shards still rendered as flat tan cards — the visible term was the *specular* lobe, not diffuse,
+and a narrow lobe on a broad flat face is a bright flat card whatever its albedo. Roughness 0.92
+turned the same surfaces into composite. If something is too bright and lowering its colour does
+nothing, the highlight is specular: raise roughness or move the light.
+
+**6. The `disc` particle emitter spawns in the XZ plane** by construction and uses only
 `extent.x`. Edge-on to a corridor running down Z, it produced a flat horizontal line. A `box`
 emitter with zero depth is the cross-section this shot needed.
 
