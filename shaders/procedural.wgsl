@@ -20,13 +20,22 @@
 // the instance origin through the object matrix and the world deformers, the quad spans the
 // camera right/up axes scaled by the instance scale, the normal faces the camera.
 //
+// Splines (ADR-026, spline.wgsl): the Path deformer (kind 6, local space only) is a curve
+// deform: the object-space coordinate along the deformer axis (from its centre) maps to arc
+// length d = pathOffset + coord * pathScale on spline slot params.x, and the perpendicular
+// components (u along cross(up, axis), v along cross(axis, u)) are placed in the spline frame:
+// p' = S(d).position + (binormal * u + normal * v) * S.scale after rotating (u, v) by pathRoll;
+// result = mix(p, p', amount). The renderer resolves pathScale to units per object unit (the
+// "fit" mode divides the spline length by the source extent along the axis).
+//
 // Bind groups: 0 frame (common.wgsl), 1 = {0 ObjectUniforms (dynamic offset; model = object
 // matrix, material fields), 1 instances (read-only storage; the live buffer when the object has
-// effectors), 2 ProceduralUniforms, 3 FieldBlock}, 2 material, 3 IBL (both declared in
-// pbr_shade.wgsl). Mirrors rendering/procedural_renderer.hpp.
+// effectors), 2 ProceduralUniforms, 3 FieldBlock, 4 SplineTable}, 2 material, 3 IBL (both
+// declared in pbr_shade.wgsl). Mirrors rendering/procedural_renderer.hpp.
 #include "common.wgsl"
 #include "pbr_shade.wgsl"
 #include "fields.wgsl"
+#include "spline.wgsl"
 
 struct InstanceRecord {
     position: vec4<f32>,  // xyz, w = density
@@ -38,11 +47,11 @@ struct InstanceRecord {
 };
 
 // One deformer slot (64 bytes). Kinds: 0 bend, 1 twist, 2 sine, 3 noise, 4 displacement,
-// 5 field; + 8 when the deformer acts in world space; < 0 = disabled slot.
+// 5 field, 6 path; + 8 when the deformer acts in world space; < 0 = disabled slot.
 struct DeformerUniform {
     axisKind: vec4<f32>,     // xyz = unit axis, w = kind code (see above)
     centerAmount: vec4<f32>, // xyz = center, w = amount
-    params: vec4<f32>,       // x = frequency (sine) | spatial scale (noise, displacement) | field slot (field, -1 none), y = speed | alongNormal (field), z = phase, w = falloff
+    params: vec4<f32>,       // x = frequency (sine) | spatial scale (noise, displacement) | field slot (field, -1 none) | spline slot (path), y = speed | alongNormal (field) | pathScale (path), z = phase | pathOffset (path), w = falloff | pathRoll (path)
     extra: vec4<f32>,        // xyz = displacement axis (sine) | bend direction (bend) | axis mask (noise); w = bitcast<u32> seed
 };
 
@@ -55,6 +64,7 @@ struct ProceduralUniforms {
 @group(1) @binding(1) var<storage, read> instances: array<InstanceRecord>;
 @group(1) @binding(2) var<uniform> proc: ProceduralUniforms;
 @group(1) @binding(3) var<uniform> fieldBlock: FieldBlock;
+@group(1) @binding(4) var<storage, read> splineTable: SplineTable;
 
 const DEFORM_BEND: i32 = 0;
 const DEFORM_TWIST: i32 = 1;
@@ -62,6 +72,7 @@ const DEFORM_SINE: i32 = 2;
 const DEFORM_NOISE: i32 = 3;
 const DEFORM_DISPLACEMENT: i32 = 4;
 const DEFORM_FIELD: i32 = 5;
+const DEFORM_PATH: i32 = 6;
 const DEFORM_WORLD: i32 = 8;
 
 // ---- transforms ------------------------------------------------------------------------------
@@ -224,6 +235,32 @@ fn applyLocalFieldDeformer(d: DeformerUniform, p: vec3<f32>, nLocal: vec3<f32>, 
     return p + dir * (sv * amount);
 }
 
+// Path deformer (object space): see the header comment. Mirrors scene::applyPathDeformer.
+fn applyPathDeformer(d: DeformerUniform, p: vec3<f32>) -> vec3<f32> {
+    let slot = i32(floor(d.params.x + 0.5));
+    if (slot < 0) {
+        return p;
+    }
+    let axis = d.axisKind.xyz;
+    var up = vec3<f32>(0.0, 1.0, 0.0);
+    if (abs(axis.y) > 0.999) {
+        up = vec3<f32>(1.0, 0.0, 0.0);
+    }
+    let u = normalize(cross(up, axis));
+    let v = cross(axis, u);
+    let q = p - d.centerAmount.xyz;
+    let coord = dot(q, axis);
+    let cu = dot(q, u);
+    let cv = dot(q, v);
+    let s = splineSample(slot, d.params.z + coord * d.params.y);
+    let cr = cos(d.params.w);
+    let sr = sin(d.params.w);
+    let ru = cu * cr - cv * sr;
+    let rv = cu * sr + cv * cr;
+    let bent = s.position + (s.binormal * ru + s.normal * rv) * s.scale;
+    return mix(p, bent, d.centerAmount.w);
+}
+
 fn deformerCode(d: DeformerUniform) -> i32 {
     return i32(floor(d.axisKind.w + 0.5)); // -1 stays -1 (disabled)
 }
@@ -259,6 +296,8 @@ fn deformChain(pIn: vec3<f32>, nLocal: vec3<f32>, nWorld: vec3<f32>, inst: Insta
         if (code < 0 || code >= DEFORM_WORLD) { continue; }
         if (code == DEFORM_FIELD) {
             p = applyLocalFieldDeformer(d, p, nLocal, inst);
+        } else if (code == DEFORM_PATH) {
+            p = applyPathDeformer(d, p);
         } else {
             p = applyDeformer(d, code, p, nLocal, t);
         }

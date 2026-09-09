@@ -2,6 +2,7 @@
 
 #include "rendering/field_uniforms.hpp"
 #include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared 256-byte slot layout)
+#include "rendering/spline_buffers.hpp"
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -58,10 +59,12 @@ glm::vec3 safeNormalize(glm::vec3 v, glm::vec3 fallback) {
 
 // Packs one scene deformer into its uniform slot (see procedural.wgsl DeformerUniform).
 // `fieldSlot` is the resolved slot of a Field deformer's field (-1 = unbound: the slot is
-// disabled so the shader skips it).
-DeformerUniform packDeformer(const scene::Deformer& d, int fieldSlot) {
+// disabled so the shader skips it); `splineSlot` and `pathScale` are the resolved spline slot
+// and final scale of a Path deformer (unbound or world-space Path deformers are disabled).
+DeformerUniform packDeformer(const scene::Deformer& d, int fieldSlot, int splineSlot, float pathScale) {
     DeformerUniform u{};
-    if (!d.enabled || (d.kind == scene::DeformerKind::Field && fieldSlot < 0)) {
+    if (!d.enabled || (d.kind == scene::DeformerKind::Field && fieldSlot < 0) ||
+        (d.kind == scene::DeformerKind::Path && (splineSlot < 0 || d.space == scene::DeformSpace::World))) {
         u.axisKind = glm::vec4(0.0f, 1.0f, 0.0f, -1.0f);
         return u;
     }
@@ -81,6 +84,9 @@ DeformerUniform packDeformer(const scene::Deformer& d, int fieldSlot) {
         break;
     case scene::DeformerKind::Field:
         u.params = glm::vec4(static_cast<float>(fieldSlot), d.alongNormal ? 1.0f : 0.0f, 0.0f, 0.0f);
+        break;
+    case scene::DeformerKind::Path:
+        u.params = glm::vec4(static_cast<float>(splineSlot), pathScale, d.pathOffset, d.pathRoll);
         break;
     case scene::DeformerKind::Twist:
     case scene::DeformerKind::Displacement:
@@ -108,6 +114,8 @@ struct ProceduralRenderer::Impl {
         std::uint32_t indexCount = 0;  // 0 = generation failed (kept so the error is logged once)
         std::uint32_t vertexCount = 0;
         float radius = 1.0f;           // half diagonal of the source bounds (normal epsilon scale)
+        glm::vec3 boundsMin{0.0f};     // source mesh bounds (object space; Path deformer "fit" extent)
+        glm::vec3 boundsMax{0.0f};
         std::uint64_t lastUsed = 0;
     };
     struct ObjectState {
@@ -161,6 +169,7 @@ struct ProceduralRenderer::Impl {
     wgpu::ComputePipeline effectorPipeline;
     wgpu::Buffer objectUniforms;
     wgpu::Buffer fieldBlock;
+    wgpu::Buffer splineTable;
     std::unique_ptr<gpu::GpuTimer> effectorTimer;
     std::vector<std::uint8_t> staging;
     std::map<std::uint64_t, CachedMesh> meshes;
@@ -183,13 +192,24 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
                                       const wgpu::BindGroupLayout& frameLayout,
                                       const wgpu::BindGroupLayout& materialLayout,
                                       const wgpu::BindGroupLayout& iblLayout, std::uint32_t sampleCount,
-                                      wgpu::Buffer fieldBlock) {
+                                      wgpu::Buffer fieldBlock, wgpu::Buffer splineTable) {
     Impl& im = *impl_;
     const auto& device = im.context.device();
     im.colorFormat = colorFormat;
     im.depthFormat = depthFormat;
     im.sampleCount = std::max<std::uint32_t>(sampleCount, 1);
     im.fieldBlock = std::move(fieldBlock);
+    im.splineTable = std::move(splineTable);
+    if (!im.splineTable) {
+        // Standalone use without a SceneRenderer: an empty spline table (every slot invalid).
+        wgpu::BufferDescriptor desc{};
+        desc.label = "procedural-empty-spline-table";
+        desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        desc.size = SplineBuffers::kBufferSize;
+        im.splineTable = device.CreateBuffer(&desc);
+        const SplineInfoGpu zero{};
+        im.context.queue().WriteBuffer(im.splineTable, 0, &zero, sizeof(zero));
+    }
     if (!im.fieldBlock) {
         // Standalone use without a SceneRenderer: an empty field block (count 0).
         wgpu::BufferDescriptor desc{};
@@ -202,8 +222,8 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
     }
     {
         // Group 1: 0 = object uniforms (dynamic offset, 256-byte slots), 1 = instance records
-        // (read-only storage), 2 = deformer/time block, 3 = field block.
-        std::array<wgpu::BindGroupLayoutEntry, 4> entries{};
+        // (read-only storage), 2 = deformer/time block, 3 = field block, 4 = spline tables.
+        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -221,6 +241,10 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         entries[3].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[3].buffer.type = wgpu::BufferBindingType::Uniform;
         entries[3].buffer.minBindingSize = FieldUniforms::kBufferSize;
+        entries[4].binding = 4;
+        entries[4].visibility = wgpu::ShaderStage::Vertex;
+        entries[4].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[4].buffer.minBindingSize = SplineBuffers::kBufferSize;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "procedural-object-layout";
         desc.entryCount = entries.size();
@@ -419,6 +443,8 @@ const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureMesh
             cached.vertexCount = static_cast<std::uint32_t>(mesh->vertices.size());
             const auto [lo, hi] = mesh->bounds();
             cached.radius = std::max(0.5f * glm::length(hi - lo), 1e-4f);
+            cached.boundsMin = lo;
+            cached.boundsMax = hi;
         }
         it = meshes.emplace(object.meshHash, std::move(cached)).first;
     }
@@ -467,7 +493,7 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
     }
     if (rebuildGroup) {
         auto drawGroup = [&](const wgpu::Buffer& records, std::uint64_t bytes, const char* label) {
-            std::array<wgpu::BindGroupEntry, 4> entries{};
+            std::array<wgpu::BindGroupEntry, 5> entries{};
             entries[0].binding = 0;
             entries[0].buffer = objectUniforms;
             entries[0].size = sizeof(ObjectUniforms);
@@ -480,6 +506,9 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
             entries[3].binding = 3;
             entries[3].buffer = fieldBlock;
             entries[3].size = FieldUniforms::kBufferSize;
+            entries[4].binding = 4;
+            entries[4].buffer = splineTable;
+            entries[4].size = SplineBuffers::kBufferSize;
             wgpu::BindGroupDescriptor desc{};
             desc.label = label;
             desc.layout = objectLayout;
@@ -528,7 +557,7 @@ void ProceduralRenderer::collectTimings() {
 
 void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene,
                                 const std::vector<glm::mat4>& objectMatrices, const FrameTime& time,
-                                const FieldUniforms* fields) {
+                                const FieldUniforms* fields, const SplineBuffers* splines) {
     const auto start = std::chrono::steady_clock::now();
     Impl& im = *impl_;
     stats_ = ProceduralStats{};
@@ -627,7 +656,26 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                         ++stats_.fieldDeformers;
                     }
                 }
-                u.deformers[d] = packDeformer(deformer, fieldSlot);
+                int splineSlot = -1;
+                float pathScale = 0.0f;
+                if (deformer.kind == scene::DeformerKind::Path && splines != nullptr &&
+                    deformer.space == scene::DeformSpace::Local) {
+                    splineSlot = splines->slotOf(deformer.spline);
+                    if (splineSlot >= 0) {
+                        // "fit" (pathScale 0): the source extent along the axis maps to the length.
+                        pathScale = deformer.pathScale;
+                        if (pathScale == 0.0f) {
+                            const glm::vec3 axis = safeNormalize(deformer.axis, glm::vec3(0.0f, 1.0f, 0.0f));
+                            const float extent = glm::dot(glm::abs(axis), mesh->boundsMax - mesh->boundsMin);
+                            const float length = splines->header().info[splineSlot].x;
+                            pathScale = length / std::max(extent, 1e-6f);
+                        }
+                        if (deformer.enabled) {
+                            ++stats_.pathDeformers;
+                        }
+                    }
+                }
+                u.deformers[d] = packDeformer(deformer, fieldSlot, splineSlot, pathScale);
                 enabled += deformer.enabled ? 1u : 0u;
             } else {
                 u.deformers[d].axisKind = glm::vec4(0.0f, 1.0f, 0.0f, -1.0f);

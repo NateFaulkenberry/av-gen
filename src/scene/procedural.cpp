@@ -33,6 +33,21 @@
 //   point (the field acts in object space) and a World-space one at the world point with the
 //   normal rotated by the instance matrix. `applyDeformer` (no field set) leaves the point alone.
 //   Field deformers ignore `falloff`, `speed` and `phase`.
+// * Spline distributions (ADR-026): instance i sits at distance d = length * (splineStart +
+//   (splineEnd - splineStart) * u) with u = i / (n - 1) (open span) or i / n (a closed spline
+//   whose span is a whole turn: no duplicate end); position = S.position + frame * splineOffset
+//   (x = binormal, y = normal, z = tangent), rotation = S.rotation() then `roll` about the
+//   tangent when alignToSpline, scale = S.scale (the interpolated per-point factor). Spacing mode
+//   counts floor(length * span / spacing) + 1 instances (floor(length * span / spacing) for a
+//   closed whole-turn span, minimum 1) and places them exactly `spacing` apart from splineStart
+//   towards splineEnd (like Linear, whose spacing also overrides the end), i.e. u is replaced by
+//   i * spacing / (length * span). Without a spline every placement is the identity.
+// * Path deformers (ADR-026): the perpendicular basis of `axis` is u = normalize(cross(up, axis)),
+//   v = cross(axis, u) with up = +Y (+X when the axis is within 0.001 of +-Y), so for the default
+//   +Z-axis-along-+Z case (u, v) = (+X, +Y) coincide with (binormal, normal) of a +Z line spline
+//   and the deformer is the identity up to translation. The cross-section is rotated by
+//   `pathRoll` and scaled by the sample's `scale`. World-space Path deformers are skipped (the
+//   source extent has no meaning there); the GPU packs them as disabled slots.
 // * generateCloud() writes the point cloud the instance records are projected from: position,
 //   rotation, scale from the composed transform, id = index, seed = variation.seed (so
 //   random(i, c) == hashInstance(variation.seed, i, c) and the records stay bit-identical to
@@ -506,13 +521,18 @@ const char* distributionKindName(DistributionKind kind) {
         return "radial";
     case DistributionKind::Spiral:
         return "spiral";
+    case DistributionKind::Spline:
+        return "spline";
+    case DistributionKind::Grammar:
+        return "grammar"; // wave 2 hierarchy agent
     }
     return "single";
 }
 
 std::optional<DistributionKind> distributionKindFromName(std::string_view name) {
     for (const auto kind : {DistributionKind::Single, DistributionKind::Linear, DistributionKind::Grid,
-                            DistributionKind::Radial, DistributionKind::Spiral}) {
+                            DistributionKind::Radial, DistributionKind::Spiral, DistributionKind::Spline,
+                            DistributionKind::Grammar}) {
         if (name == distributionKindName(kind)) {
             return kind;
         }
@@ -578,13 +598,15 @@ const char* deformerKindName(DeformerKind kind) {
         return "displacement";
     case DeformerKind::Field:
         return "field";
+    case DeformerKind::Path:
+        return "path";
     }
     return "twist";
 }
 
 std::optional<DeformerKind> deformerKindFromName(std::string_view name) {
     for (const auto kind : {DeformerKind::Bend, DeformerKind::Twist, DeformerKind::Sine, DeformerKind::Noise,
-                            DeformerKind::Displacement, DeformerKind::Field}) {
+                            DeformerKind::Displacement, DeformerKind::Field, DeformerKind::Path}) {
         if (name == deformerKindName(kind)) {
             return kind;
         }
@@ -925,8 +947,16 @@ Result<void> Distribution::validate() const {
             return fail("count must be in 1..{} (got {})", kMaxInstances, count);
         }
     }
-    if (kind == DistributionKind::Linear && spacing < 0.0f) {
+    if ((kind == DistributionKind::Linear || kind == DistributionKind::Spline) && spacing < 0.0f) {
         return fail("spacing must be >= 0");
+    }
+    if (kind == DistributionKind::Spline) {
+        if (spline.empty()) {
+            return fail("spline distribution needs a spline name");
+        }
+        if (!std::isfinite(splineStart) || !std::isfinite(splineEnd) || !std::isfinite(roll)) {
+            return fail("splineStart, splineEnd and roll must be finite");
+        }
     }
     if ((kind == DistributionKind::Radial || kind == DistributionKind::Spiral) && radius < 0.0f) {
         return fail("radius must be >= 0");
@@ -934,7 +964,18 @@ Result<void> Distribution::validate() const {
     return {};
 }
 
-int Distribution::instanceCount(const spatial::Spline* spline) const {
+namespace {
+
+// A closed spline whose distributed span is a whole number of turns has no distinct end: the
+// instances divide the span without the duplicate at the seam.
+bool splineSpanWraps(const Distribution& d, const spatial::Spline& curve) {
+    const float span = std::abs(d.splineEnd - d.splineStart);
+    return curve.closed && std::abs(span - std::round(span)) < 1e-5f && span >= 0.5f;
+}
+
+} // namespace
+
+int Distribution::instanceCount(const spatial::Spline* curve) const {
     switch (kind) {
     case DistributionKind::Single:
         return 1;
@@ -944,27 +985,55 @@ int Distribution::instanceCount(const spatial::Spline* spline) const {
     case DistributionKind::Radial:
     case DistributionKind::Spiral:
         return std::max(count, 1);
-    case DistributionKind::Spline:
-        // TODO(wave 2, splines): spacing-driven counts need the spline length.
-        (void)spline;
-        return std::max(count, 1);
+    case DistributionKind::Spline: {
+        if (curve == nullptr || !(spacing > 0.0f)) {
+            return std::max(count, 1);
+        }
+        const float covered = curve->length() * std::abs(splineEnd - splineStart);
+        const float steps = std::floor(covered / spacing);
+        const float n = splineSpanWraps(*this, *curve) ? steps : steps + 1.0f;
+        return static_cast<int>(std::clamp(n, 1.0f, static_cast<float>(kMaxInstances)));
+    }
     case DistributionKind::Grammar:
         return std::max(count, 1); // the owner replaces this with the expansion size
     }
     return 1;
 }
 
-Transform Distribution::placement(int index, const spatial::Spline* spline) const {
+Transform Distribution::placement(int index, const spatial::Spline* curve) const {
     Transform t;
-    const int n = instanceCount(spline);
+    const int n = instanceCount(curve);
     const int i = std::clamp(index, 0, n - 1);
     const float u = n > 1 ? static_cast<float>(i) / static_cast<float>(n - 1) : 0.0f;
 
     switch (kind) {
     case DistributionKind::Single:
-    case DistributionKind::Spline:  // TODO(wave 2, splines)
     case DistributionKind::Grammar: // placements come from the grammar expansion (generateCloud)
         break;
+
+    case DistributionKind::Spline: {
+        if (curve == nullptr) {
+            break; // identity placements without the spline
+        }
+        // The normalised position within the span: evenly spread by index in count mode (the
+        // closed whole-turn case divides by n so the seam is not duplicated), exactly `spacing`
+        // apart from splineStart in spacing mode (running towards splineEnd).
+        const float len = curve->length();
+        float w = splineSpanWraps(*this, *curve) ? static_cast<float>(i) / static_cast<float>(n) : u;
+        if (spacing > 0.0f) {
+            const float span = splineEnd - splineStart;
+            const float dir = span < 0.0f ? -1.0f : 1.0f;
+            w = span != 0.0f ? static_cast<float>(i) * spacing * dir / (span * std::max(len, 1e-6f)) : 0.0f;
+        }
+        const float d = len * (splineStart + (splineEnd - splineStart) * w);
+        const spatial::SplineSample s = curve->sampleByDistance(d);
+        t.position = s.position + s.binormal * splineOffset.x + s.normal * splineOffset.y + s.tangent * splineOffset.z;
+        if (alignToSpline) {
+            t.rotation = glm::normalize(s.rotation() * glm::angleAxis(roll, glm::vec3(0.0f, 0.0f, 1.0f)));
+        }
+        t.scale = glm::vec3(std::max(s.scale, 1e-3f));
+        break;
+    }
 
     case DistributionKind::Linear: {
         glm::vec3 dir = end - start;
@@ -1057,6 +1126,22 @@ std::uint64_t Distribution::structuralHash() const {
         h.f32(turns);
         h.f32(spiralHeight);
         h.f32(spiralAngle);
+        break;
+    case DistributionKind::Spline:
+        h.i32(count);
+        h.f32(spacing);
+        h.u64(spline.size());
+        for (const char c : spline) {
+            h.u32(static_cast<std::uint8_t>(c));
+        }
+        h.f32(splineStart);
+        h.f32(splineEnd);
+        h.boolean(alignToSpline);
+        h.f32(roll);
+        h.v3(splineOffset);
+        break;
+    case DistributionKind::Grammar:
+        h.i32(count); // wave 2 hierarchy agent
         break;
     }
     return h.value();
@@ -1205,6 +1290,8 @@ glm::vec3 applyDeformer(const Deformer& d, glm::vec3 p, double time) {
         return applyDisplacement(d, p, t);
     case DeformerKind::Field:
         return p; // needs the field set: see applyFieldDeformer
+    case DeformerKind::Path:
+        return p; // needs the spline: see applyPathDeformer
     }
     return p;
 }
@@ -1250,6 +1337,59 @@ glm::vec3 deformPoint(const std::vector<Deformer>& stack, glm::vec3 objectPoint,
     return p;
 }
 
+glm::vec3 applyPathDeformer(const Deformer& d, glm::vec3 p, const spatial::Spline& spline, float sourceExtentAlongAxis) {
+    if (d.kind != DeformerKind::Path || d.amount == 0.0f) {
+        return p;
+    }
+    const glm::vec3 axis = unitOr(d.axis, glm::vec3(0.0f, 1.0f, 0.0f));
+    const glm::vec3 up = std::abs(axis.y) > 0.999f ? glm::vec3(1.0f, 0.0f, 0.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+    const glm::vec3 u = glm::normalize(glm::cross(up, axis));
+    const glm::vec3 v = glm::cross(axis, u);
+    const glm::vec3 q = p - d.center;
+    const float coord = glm::dot(q, axis);
+    const float cu = glm::dot(q, u);
+    const float cv = glm::dot(q, v);
+    float scale = d.pathScale;
+    if (scale == 0.0f) {
+        scale = spline.length() / std::max(sourceExtentAlongAxis, 1e-6f);
+    }
+    const spatial::SplineSample s = spline.sampleByDistance(d.pathOffset + coord * scale);
+    const float cr = std::cos(d.pathRoll);
+    const float sr = std::sin(d.pathRoll);
+    const float ru = cu * cr - cv * sr;
+    const float rv = cu * sr + cv * cr;
+    const glm::vec3 bent = s.position + (s.binormal * ru + s.normal * rv) * s.scale;
+    return glm::mix(p, bent, d.amount);
+}
+
+glm::vec3 deformPointWith(const std::vector<Deformer>& stack, glm::vec3 objectPoint, const glm::mat4& instanceWorld,
+                          double time, const DeformContext& ctx, glm::vec3 normal) {
+    const auto apply = [&](const Deformer& d, const glm::vec3& p, const glm::vec3& n) {
+        if (d.kind == DeformerKind::Field) {
+            return ctx.fields != nullptr ? applyFieldDeformer(d, p, n, time, *ctx.fields) : p;
+        }
+        if (d.kind == DeformerKind::Path) {
+            const spatial::Spline* spline = ctx.splines != nullptr ? ctx.splines->find(d.spline) : nullptr;
+            return spline != nullptr ? applyPathDeformer(d, p, *spline, ctx.sourceExtent) : p;
+        }
+        return applyDeformer(d, p, time);
+    };
+    glm::vec3 p = objectPoint;
+    for (const Deformer& d : stack) {
+        if (d.enabled && d.space == DeformSpace::Local) {
+            p = apply(d, p, normal);
+        }
+    }
+    p = glm::vec3(instanceWorld * glm::vec4(p, 1.0f));
+    const glm::vec3 worldNormal = unitOr(glm::mat3(instanceWorld) * normal, glm::vec3(0.0f));
+    for (const Deformer& d : stack) {
+        if (d.enabled && d.space == DeformSpace::World && d.kind != DeformerKind::Path) {
+            p = apply(d, p, worldNormal);
+        }
+    }
+    return p;
+}
+
 float fbm3(glm::vec3 p, std::uint32_t seed) {
     return noise::fbm3(p, seed);
 }
@@ -1284,6 +1424,9 @@ Result<void> ProceduralGeometry::validate() const {
         }
         if (d.kind == DeformerKind::Field && d.field.empty()) {
             return fail("procedural '{}': deformer {} (field) needs a field name", name, i + 1);
+        }
+        if (d.kind == DeformerKind::Path && d.spline.empty()) {
+            return fail("procedural '{}': deformer {} (path) needs a spline name", name, i + 1);
         }
     }
     if (effectors.size() > static_cast<std::size_t>(kMaxEffectors)) {
@@ -1341,9 +1484,27 @@ std::uint64_t ProceduralGeometry::structuralHash() const {
     return h.value();
 }
 
+std::uint64_t ProceduralGeometry::contextualHash(const GenerationContext& ctx) const {
+    StructHash h;
+    h.u64(structuralHash());
+    // Splines (ADR-026): the referenced distribution spline's own hash, so editing the curve
+    // rebuilds the cloud; a missing spline hashes as "unbound".
+    if (distribution.kind == DistributionKind::Spline) {
+        const spatial::Spline* curve = ctx.splines != nullptr ? ctx.splines->find(distribution.spline) : nullptr;
+        h.u64(curve != nullptr ? curve->structuralHash() : 0x5b1a3e5u);
+    }
+    return h.value();
+}
+
 spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& ctx) const {
-    (void)ctx; // TODO(wave 2): spline distributions, procedural sources, hierarchy, grammar
-    const auto count = static_cast<std::size_t>(std::max(distribution.instanceCount(), 1));
+    const spatial::Spline* curve = nullptr;
+    if (distribution.kind == DistributionKind::Spline && ctx.splines != nullptr) {
+        curve = ctx.splines->find(distribution.spline);
+        if (curve != nullptr) {
+            curve->prepare();
+        }
+    }
+    const auto count = static_cast<std::size_t>(std::max(distribution.instanceCount(curve), 1));
     spatial::PointCloud out(count);
     const float invLast = count > 1 ? 1.0f / static_cast<float>(count - 1) : 0.0f;
     const glm::vec3 sourceExtent = sourceHalfExtent(source) * glm::abs(sourceTransform.scale);
@@ -1363,7 +1524,7 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
         const auto signedIndex = static_cast<int>(i);
         const float u = static_cast<float>(i) * invLast;
         const Transform t =
-            compose(distributionTransform, compose(distribution.placement(signedIndex), variationTransform(variation, index)));
+            compose(distributionTransform, compose(distribution.placement(signedIndex, curve), variationTransform(variation, index)));
 
         positions[i] = t.position;
         rotations[i] = glm::vec4(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w);
@@ -1490,6 +1651,12 @@ json ProceduralGeometry::toJson() const {
         s["turns"] = d.turns;
         s["spiralHeight"] = d.spiralHeight;
         s["spiralAngle"] = d.spiralAngle;
+        s["spline"] = d.spline;
+        s["splineStart"] = d.splineStart;
+        s["splineEnd"] = d.splineEnd;
+        s["alignToSpline"] = d.alignToSpline;
+        s["roll"] = d.roll;
+        s["splineOffset"] = vecToJson(d.splineOffset);
         j["distribution"] = std::move(s);
     }
     j["distributionTransform"] = transformToJson(distributionTransform);
@@ -1523,6 +1690,10 @@ json ProceduralGeometry::toJson() const {
             s["pattern"] = d.pattern;
             s["field"] = d.field;
             s["alongNormal"] = d.alongNormal;
+            s["spline"] = d.spline;
+            s["pathOffset"] = d.pathOffset;
+            s["pathScale"] = d.pathScale;
+            s["pathRoll"] = d.pathRoll;
             arr.push_back(std::move(s));
         }
         j["deformers"] = std::move(arr);
@@ -1637,6 +1808,12 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(d.turns, "turns", readFloat);
         AVGEN_PROC_READ(d.spiralHeight, "spiralHeight", readFloat);
         AVGEN_PROC_READ(d.spiralAngle, "spiralAngle", readFloat);
+        AVGEN_PROC_READ(d.spline, "spline", readString);
+        AVGEN_PROC_READ(d.splineStart, "splineStart", readFloat);
+        AVGEN_PROC_READ(d.splineEnd, "splineEnd", readFloat);
+        AVGEN_PROC_READ(d.alignToSpline, "alignToSpline", readBool);
+        AVGEN_PROC_READ(d.roll, "roll", readFloat);
+        AVGEN_PROC_READ(d.splineOffset, "splineOffset", readVec3);
     }
     if (root.contains("variation")) {
         const json& j = root.at("variation");
@@ -1684,6 +1861,10 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
             AVGEN_PROC_READ(d.pattern, "pattern", readInt);
             AVGEN_PROC_READ(d.field, "field", readString);
             AVGEN_PROC_READ(d.alongNormal, "alongNormal", readBool);
+            AVGEN_PROC_READ(d.spline, "spline", readString);
+            AVGEN_PROC_READ(d.pathOffset, "pathOffset", readFloat);
+            AVGEN_PROC_READ(d.pathScale, "pathScale", readFloat);
+            AVGEN_PROC_READ(d.pathRoll, "pathRoll", readFloat);
             g.deformers.push_back(d);
         }
     }
@@ -1879,7 +2060,7 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
 
     // Distribution
     const Distribution& d = rest.distribution;
-    r.i("distribution/kind", static_cast<int>(d.kind), 0, 4, 0, 4);
+    r.i("distribution/kind", static_cast<int>(d.kind), 0, 6, 0, 6);
     p.distributionCount = r.i("distribution/count", d.count, 1, kMaxInstances, 1, 256);
     r.v3("distribution/start", d.start, -1e4f, 1e4f, -20.0f, 20.0f);
     r.v3("distribution/end", d.end, -1e4f, 1e4f, -20.0f, 20.0f);
@@ -1899,6 +2080,12 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     r.f("distribution/turns", d.turns, -100.0f, 100.0f, 0.0f, 10.0f);
     r.f("distribution/spiralHeight", d.spiralHeight, -1000.0f, 1000.0f, -20.0f, 20.0f);
     r.f("distribution/spiralAngle", d.spiralAngle, -100.0f, 100.0f, -kTwoPi, kTwoPi);
+    // Spline (ADR-026): the spline name is structural and comes from the file.
+    p.splineStart = r.f("distribution/splineStart", d.splineStart, -100.0f, 100.0f, 0.0f, 1.0f);
+    p.splineEnd = r.f("distribution/splineEnd", d.splineEnd, -100.0f, 100.0f, 0.0f, 1.0f);
+    r.b("distribution/alignToSpline", d.alignToSpline);
+    r.f("distribution/roll", d.roll, -100.0f, 100.0f, -kTwoPi, kTwoPi);
+    r.v3("distribution/splineOffset", d.splineOffset, -1e4f, 1e4f, -10.0f, 10.0f);
 
     // Distribution transform
     p.transformPosition = r.v3("transform/position", rest.distributionTransform.position, -1e4f, 1e4f, -20.0f, 20.0f);
@@ -1957,6 +2144,11 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
         addF("falloff", def.falloff, 0.0f, 1000.0f, 0.0f, 10.0f);
         addV3("center", def.center, -1e4f, 1e4f, -10.0f, 10.0f);
         addV3("axis", def.axis, -1.0f, 1.0f, -1.0f, 1.0f);
+        if (def.kind == DeformerKind::Path) {
+            addF("pathOffset", def.pathOffset, -1e4f, 1e4f, -20.0f, 20.0f);
+            addF("pathScale", def.pathScale, -1000.0f, 1000.0f, 0.0f, 5.0f);
+            addF("pathRoll", def.pathRoll, -100.0f, 100.0f, -kTwoPi, kTwoPi);
+        }
         {
             params::ParamDesc<bool> desc;
             desc.defaultValue = def.enabled;
@@ -2060,7 +2252,7 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
 
     // Distribution
     Distribution& d = live.distribution;
-    copyEnum(p, "distribution/kind", d.kind, 4);
+    copyEnum(p, "distribution/kind", d.kind, 6);
     copyValue(p, "distribution/count", d.count);
     copyValue(p, "distribution/start", d.start);
     copyValue(p, "distribution/end", d.end);
@@ -2080,6 +2272,12 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
     copyValue(p, "distribution/turns", d.turns);
     copyValue(p, "distribution/spiralHeight", d.spiralHeight);
     copyValue(p, "distribution/spiralAngle", d.spiralAngle);
+    d.spline = rest.distribution.spline;
+    copyValue(p, "distribution/splineStart", d.splineStart);
+    copyValue(p, "distribution/splineEnd", d.splineEnd);
+    copyValue(p, "distribution/alignToSpline", d.alignToSpline);
+    copyValue(p, "distribution/roll", d.roll);
+    copyValue(p, "distribution/splineOffset", d.splineOffset);
     copyTransform(p, "transform/", live.distributionTransform);
 
     // Variation
@@ -2110,6 +2308,10 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
         copyValue(p, base + "center", def.center);
         copyValue(p, base + "axis", def.axis);
         copyValue(p, base + "enabled", def.enabled);
+        def.spline = rest.deformers[slot].spline;
+        copyValue(p, base + "pathOffset", def.pathOffset);
+        copyValue(p, base + "pathScale", def.pathScale);
+        copyValue(p, base + "pathRoll", def.pathRoll);
     }
 
     // Point ops and effectors: the list shapes come from rest; amount/enabled/strength/weight from

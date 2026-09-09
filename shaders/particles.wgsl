@@ -25,7 +25,15 @@
 // built-in forces: Force / Turbulence add fieldVector * strength * dt to the velocity, Velocity
 // blends the velocity towards fieldVector * strength by `mix`, Kill removes the particle where
 // fieldScalar >= 0.5. Scalar fields act along the force's axis (fieldScalar * axis).
+//
+// Spline emitter (ADR-026, spline.wgsl): shape 4 spawns at S(u * length).position of the spline
+// slot params.fieldInfo.y - 1 (u = a per-spawn hash, so spawns cover the whole curve evenly by
+// arc length), jittered inside a sphere of radius extent.x; `direction` is read in the spline
+// frame (x = binormal, y = normal, z = tangent), so the default (0, 1, 0) rises along the
+// sample normal and (0, 0, 1) follows the tangent. The CPU falls back to the Point shape when
+// the spline is missing.
 #include "fields.wgsl"
+#include "spline.wgsl"
 
 struct Particle {
     position: vec3<f32>,
@@ -41,7 +49,7 @@ struct Params {
     viewProj: mat4x4<f32>,
     cameraRight: vec4<f32>,
     cameraUp: vec4<f32>,
-    emitterPos: vec4<f32>,  // xyz, w = shape (0 point, 1 sphere, 2 disc, 3 box)
+    emitterPos: vec4<f32>,  // xyz, w = shape (0 point, 1 sphere, 2 disc, 3 box, 4 spline)
     extent: vec4<f32>,      // xyz, w = spread
     direction: vec4<f32>,   // xyz, w = drag
     speedLife: vec4<f32>,   // speedMin, speedMax, lifeMin, lifeMax
@@ -53,7 +61,7 @@ struct Params {
     colorEnd: vec4<f32>,
     sim: vec4<f32>,         // dt, time, frameIndex, seed
     counts: vec4<u32>,      // emitCount, capacity, blend (0 additive, 1 alpha), scan blocks
-    fieldInfo: vec4<u32>,   // x = field force count
+    fieldInfo: vec4<u32>,   // x = field force count, y = spline slot + 1 (0 = none)
     fieldForces: array<vec4<f32>, 8>, // per force: (mode, slot, strength, mix), (axis.xyz, 0)
 };
 
@@ -81,6 +89,7 @@ struct Indirect {
 @group(0) @binding(6) var<storage, read_write> flags: array<u32>;     // 1 = alive after simulate
 @group(0) @binding(7) var<storage, read_write> blockSums: array<u32>; // per scan block
 @group(0) @binding(8) var<uniform> fieldBlock: FieldBlock;
+@group(0) @binding(9) var<storage, read> splineTable: SplineTable;
 // Read-only views for the render stage (same bindings, used only by vs_particle).
 @group(0) @binding(1) var<storage, read> particlesRead: array<Particle>;
 @group(0) @binding(4) var<storage, read> aliveRead: array<u32>;
@@ -154,7 +163,16 @@ fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
     var p: Particle;
     let shape = params.emitterPos.w;
     var offset = vec3<f32>(0.0);
-    if (shape > 2.5) {
+    var baseDir = normalize(params.direction.xyz + vec3<f32>(1e-5, 0.0, 0.0));
+    if (shape > 3.5) {
+        // spline: S(u * length) + a sphere jitter of extent.x; direction in the spline frame
+        let splineSlot = i32(params.fieldInfo.y) - 1;
+        let u = rand3(slot, frame, 4u).x;
+        let s = splineSample(splineSlot, u * splineLength(splineSlot));
+        offset = s.position - params.emitterPos.xyz + sphereDir(r1.xy) * pow(r1.z, 1.0 / 3.0) * params.extent.x;
+        let dir = params.direction.xyz;
+        baseDir = normalize(s.binormal * dir.x + s.normal * dir.y + s.tangent * dir.z + vec3<f32>(1e-5, 0.0, 0.0));
+    } else if (shape > 2.5) {
         offset = (r1 * 2.0 - 1.0) * params.extent.xyz;
     } else if (shape > 1.5) {
         let ang = 6.28318530 * r1.x;
@@ -164,7 +182,6 @@ fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
         offset = sphereDir(r1.xy) * pow(r1.z, 1.0 / 3.0) * params.extent.x;
     }
     p.position = params.emitterPos.xyz + offset;
-    let baseDir = normalize(params.direction.xyz + vec3<f32>(1e-5, 0.0, 0.0));
     let randomDir = sphereDir(r2.xy);
     let dir = normalize(mix(baseDir, randomDir, params.extent.w) + vec3<f32>(1e-5));
     let speed = mix(params.speedLife.x, params.speedLife.y, r2.z);
