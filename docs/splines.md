@@ -151,21 +151,44 @@ when missing); systems reference a spline by name.
 
 ## How other systems use splines (ADR-026)
 
-The integrations below are owned by their respective systems; this describes the intended
-contract with the spline API.
+Distributions, the path deformer and the particle emitter are implemented (details below);
+lights and the camera describe the intended contract with the spline API.
 
-- **Distribution along a spline** (`Distribution::kind = spline`): instances are placed by
-  `samples(count)` (equal arc-length spacing) or at a fixed distance step; each instance takes
-  `sample.position`, `sample.rotation()` (optionally with an extra orientation mode) and
-  `sample.scale` times its own scale. Closed splines omit the duplicate end automatically.
-- **Path deformer** (`Deformer::kind = path`): a curve deform. The source's axis coordinate (its
-  +Z by default) maps to distance along the spline (`offset + z * stretch`), and the cross-section
-  `(x, y)` maps onto `(binormal, normal)` of the frame at that distance, scaled by `sample.scale`:
-  `world = position + binormal * x + normal * y`. Runs on the GPU from the packed table
-  (`packSplineTable`) interpolated by distance; the CPU reference is `sampleByDistance`.
-- **Particle emitter** (`EmitterShape::Spline`): spawn positions from `sampleByDistance(u *
-  length)` with `u` random or audio-driven; the initial velocity is the tangent (optionally with a
-  normal/binormal spread); closed splines wrap.
+- **Distribution along a spline** (`Distribution::kind = "spline"`, `docs/procedural-geometry.md`):
+  `count` instances spread evenly by arc length over `[splineStart, splineEnd]` (fractions of
+  `length()`; a reversed range runs backwards), or — when `spacing > 0` —
+  `floor(length × |splineEnd - splineStart| / spacing) + 1` instances exactly `spacing` apart
+  starting at `splineStart`. A closed spline whose span is a whole number of turns drops the
+  duplicate seam instance (and its spacing count loses the `+ 1`). Each instance takes
+  `sample.position` offset by `splineOffset` in frame space (x = binormal, y = normal,
+  z = tangent), `sample.rotation()` composed with `roll` radians about the tangent when
+  `alignToSpline` (identity rotation otherwise), and `sample.scale` as its scale. Without the
+  spline (no context, unknown name) every placement is the identity, so the object still builds.
+  `ProceduralGeometry::generateCloud(ctx)` looks the spline up through
+  `GenerationContext::splines`, and `contextualHash(ctx)` mixes in the spline's
+  `structuralHash()`, so editing the curve rebuilds the cloud.
+- **Path deformer** (`Deformer::kind = "path"`): a curve deform, object space only (a `world`
+  one is skipped). The coordinate along the deformer's `axis`, measured from `center`, maps to
+  arc length `d = pathOffset + coord × pathScale`; `pathScale = 0` means "fit": the source's
+  extent along the axis maps to the whole spline length. The perpendicular components ride the
+  frame at `d`: with `u = normalize(cross(up, axis))` (`up` = +Y, or +X when the axis is within
+  0.001 of ±Y) and `v = cross(axis, u)`,
+
+  ```
+  p' = S(d).position + (binormal × u' + normal × v') × S(d).scale     (u', v') = (u, v) rotated by pathRoll
+  p_out = mix(p, p', amount)
+  ```
+
+  For the default `axis = +Z` the basis is `(u, v) = (+X, +Y)`, which coincides with the
+  `(binormal, normal)` of a straight +Z spline: the deformer is then the identity up to
+  translation. The CPU reference is `scene::applyPathDeformer` (and `deformPointWith`, which
+  resolves the whole stack through a `DeformContext`); the GPU transliterates it in
+  `shaders/procedural.wgsl` (deformer kind 6) from the packed table.
+- **Particle emitter** (`EmitterShape::Spline`): each spawn hashes a `u` in [0, 1) and starts at
+  `sampleByDistance(u × length).position`, jittered inside a sphere of radius `extent.x`; the
+  emitter's `direction` is read in the spline frame (x = binormal, y = normal, z = tangent), so
+  the default (0, 1, 0) rises along the normal and (0, 0, 1) follows the tangent. A missing or
+  un-uploaded spline falls back to the `point` shape at the emitter position.
 - **Lights**: a light group distributes `n` lights with `samples(n)`, orienting spot lights along
   the tangent and using `normal` as the light's up.
 - **Camera** (`camera/mode = spline`): the camera sits at `sampleByDistance(splineT * length)`
@@ -175,3 +198,26 @@ contract with the spline API.
 
 All of these consume the same table, so the frame convention above (x = binormal, y = normal,
 z = tangent) is the one to match on the GPU (`shaders/spline.wgsl`).
+
+## On the GPU
+
+`rendering/spline_buffers.hpp` (`SplineBuffers`, owned by `SceneRenderer`) packs every
+`Scene::splines` entry with `packSplineTable` into one read-only storage buffer: a header of 16
+`vec4` (x = length, y = closed, z = sample count, w = 1 when the slot holds a spline) followed by
+16 × 512 `SplineSampleGpu` entries. Slot `i` is `scene.splines.splines[i]`; `slotOf(name)` returns
+-1 for an unknown name or one beyond the 16-spline limit (the extras are logged once and are
+simply unavailable to the shaders — their consumers fall back to "no spline"). The tables are
+re-packed only when the set's combined structural hash changes, so a static set costs one upload.
+
+`shaders/spline.wgsl` is included by `procedural.wgsl` (group 1, binding 4) and `particles.wgsl`
+(group 0, binding 9). It offers `splineLength(slot)` and `splineSample(slot, distance)`, which
+binary-searches the distance column, interpolates the two neighbouring entries and
+re-orthonormalises the frame exactly like `Spline::sampleByDistance` — the CPU samples its own
+denser table, so the two agree to the tables' interpolation error rather than bit for bit.
+Distances clamp on open splines and wrap on closed ones (the last entry interpolates back to the
+first). An invalid slot returns the identity frame at the origin.
+
+The procedural renderer resolves a Path deformer's spline name to a slot and its `pathScale` to
+units of arc length per object unit (the "fit" mode divides the spline length by the source mesh
+extent along the deformer axis) before packing the deformer uniform; an unresolved or world-space
+Path deformer becomes a disabled slot. `ProceduralStats::pathDeformers` counts the bound ones.

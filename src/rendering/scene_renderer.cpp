@@ -41,7 +41,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       samplers_(std::make_unique<gpu::SamplerCache>(context)),
       environment_(std::make_unique<EnvironmentProcessor>(context, shaders)),
       shaderStack_(std::make_unique<ShaderStack>(context, shaders)),
-      fields_(std::make_unique<FieldUniforms>(context)),
+      fields_(std::make_unique<FieldUniforms>(context)), splines_(std::make_unique<SplineBuffers>(context)),
       particles_(std::make_unique<ParticleRenderer>(context, shaders)),
       procedurals_(std::make_unique<ProceduralRenderer>(context, shaders)),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
@@ -209,11 +209,11 @@ Result<void> SceneRenderer::init() {
     if (auto r = environment_->init(); !r) {
         return r;
     }
-    if (auto r = particles_->init(fields_->buffer()); !r) {
+    if (auto r = particles_->init(fields_->buffer(), splines_->buffer()); !r) {
         return r;
     }
     if (auto r = procedurals_->init(kHdrFormat, kDepthFormat, frameLayout_, materialLayout_, iblLayout_, 1,
-                                    fields_->buffer());
+                                    fields_->buffer(), splines_->buffer());
         !r) {
         return r;
     }
@@ -909,16 +909,18 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
 
     // ---- fields (ADR-025): the per-frame field block shared by particles and procedurals ----
     fields_->update(scene.fields, time.renderTime);
+    // ---- splines (ADR-026): the sample tables, re-uploaded only when a spline changed ----
+    splines_->update(scene.splines);
 
     // ---- particle simulation (compute) ----
-    particles_->update(encoder, scene, time, view, proj, fields_.get());
+    particles_->update(encoder, scene, time, view, proj, fields_.get(), splines_.get());
     stats_.particles = particles_->stats();
 
     // ---- procedural geometry (ADR-023): mesh/instance uploads, per-frame uniforms, effector pass ----
     // The scene places its procedurals itself in this phase: identity object matrices.
     {
         const std::vector<glm::mat4> identity(scene.procedurals.size(), glm::mat4(1.0f));
-        procedurals_->update(encoder, scene, identity, time, fields_.get());
+        procedurals_->update(encoder, scene, identity, time, fields_.get(), splines_.get());
         stats_.procedural = procedurals_->stats();
     }
 

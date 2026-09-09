@@ -1,6 +1,7 @@
 #include "rendering/particle_renderer.hpp"
 
 #include "rendering/field_uniforms.hpp"
+#include "rendering/spline_buffers.hpp"
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -19,7 +20,7 @@ namespace {
 constexpr std::uint32_t kParticleStride = 48;
 constexpr std::uint32_t kWorkgroup = 64;   // cs_emit / cs_simulate
 constexpr std::uint32_t kScanBlock = 1024; // slots per compaction workgroup (256 threads x 4)
-constexpr std::uint32_t kComputeBindings = 9; // 0 uniforms, 1..7 storage, 8 field block
+constexpr std::uint32_t kComputeBindings = 10; // 0 uniforms, 1..7 storage, 8 field block, 9 spline tables
 } // namespace
 
 ParticleRenderer::ParticleRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
@@ -37,9 +38,19 @@ void ParticleRenderer::collectTimings() {
     stats_.simulateMs = passThisFrame_ ? lastSimulateMs_ : -1.0;
 }
 
-Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock) {
+Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer splineTable) {
     const auto& device = context_.device();
     fieldBlock_ = std::move(fieldBlock);
+    splineTable_ = std::move(splineTable);
+    if (!splineTable_) {
+        wgpu::BufferDescriptor desc{};
+        desc.label = "particles-empty-spline-table";
+        desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        desc.size = SplineBuffers::kBufferSize;
+        splineTable_ = device.CreateBuffer(&desc);
+        const SplineInfoGpu zero{};
+        context_.queue().WriteBuffer(splineTable_, 0, &zero, sizeof(zero));
+    }
     if (!fieldBlock_) {
         wgpu::BufferDescriptor desc{};
         desc.label = "particles-empty-field-block";
@@ -54,7 +65,7 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock) {
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Compute;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
-        for (std::uint32_t i = 1; i < kComputeBindings - 1; ++i) {
+        for (std::uint32_t i = 1; i < 8; ++i) {
             entries[i].binding = i;
             entries[i].visibility = wgpu::ShaderStage::Compute;
             entries[i].buffer.type = wgpu::BufferBindingType::Storage;
@@ -63,6 +74,10 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock) {
         entries[8].visibility = wgpu::ShaderStage::Compute;
         entries[8].buffer.type = wgpu::BufferBindingType::Uniform;
         entries[8].buffer.minBindingSize = FieldUniforms::kBufferSize;
+        entries[9].binding = 9;
+        entries[9].visibility = wgpu::ShaderStage::Compute;
+        entries[9].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[9].buffer.minBindingSize = SplineBuffers::kBufferSize;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "particles-compute-layout";
         desc.entryCount = entries.size();
@@ -243,11 +258,11 @@ void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity) {
     std::array<wgpu::BindGroupEntry, kComputeBindings> entries{};
     const wgpu::Buffer* buffers[kComputeBindings] = {&pool.uniforms, &pool.particles, &pool.deadList, &pool.counters,
                                                      &pool.aliveList, &pool.indirect, &pool.flags, &pool.blockSums,
-                                                     &fieldBlock_};
+                                                     &fieldBlock_, &splineTable_};
     const std::uint64_t sizes[kComputeBindings] = {sizeof(ParticleUniforms),
                                                    static_cast<std::uint64_t>(capacity) * kParticleStride,
                                                    listBytes, 16, listBytes, 16, listBytes, blockBytes,
-                                                   FieldUniforms::kBufferSize};
+                                                   FieldUniforms::kBufferSize, SplineBuffers::kBufferSize};
     for (std::uint32_t i = 0; i < kComputeBindings; ++i) {
         entries[i].binding = i;
         entries[i].buffer = *buffers[i];
@@ -296,7 +311,8 @@ void ParticleRenderer::resetAll() {
 }
 
 void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
-                              const glm::mat4& view, const glm::mat4& proj, const FieldUniforms* fields) {
+                              const glm::mat4& view, const glm::mat4& proj, const FieldUniforms* fields,
+                              const SplineBuffers* splines) {
     stats_ = ParticleStats{};
     passThisFrame_ = false;
     if (!initialised_) {
@@ -329,11 +345,19 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         emitCount += static_cast<std::uint32_t>(std::max(0.0f, sys.burst));
         emitCount = std::min(emitCount, pool.capacity);
 
+        // Spline emitters (ADR-026) need an uploaded spline; otherwise the shape falls back to Point.
+        int splineSlot = -1;
+        if (sys.shape == scene::EmitterShape::Spline && splines != nullptr) {
+            splineSlot = splines->slotOf(sys.spline);
+        }
+        const scene::EmitterShape shape =
+            sys.shape == scene::EmitterShape::Spline && splineSlot < 0 ? scene::EmitterShape::Point : sys.shape;
+
         ParticleUniforms u{};
         u.viewProj = proj * view;
         u.cameraRight = glm::vec4(right, 0.0f);
         u.cameraUp = glm::vec4(up, 0.0f);
-        u.emitterPos = glm::vec4(sys.position, static_cast<float>(sys.shape));
+        u.emitterPos = glm::vec4(sys.position, static_cast<float>(shape));
         u.extent = glm::vec4(sys.extent, sys.spread);
         u.direction = glm::vec4(sys.direction, sys.drag);
         u.speedLife = glm::vec4(sys.speedMin, sys.speedMax, sys.lifetimeMin, sys.lifetimeMax);
@@ -367,7 +391,7 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
                 ++forceCount;
             }
         }
-        u.fieldInfo = glm::uvec4(forceCount, 0u, 0u, 0u);
+        u.fieldInfo = glm::uvec4(forceCount, static_cast<std::uint32_t>(splineSlot + 1), 0u, 0u);
         context_.queue().WriteBuffer(pool.uniforms, 0, &u, sizeof(u));
 
         // Pass order (see particles.wgsl): emit -> simulate -> reduce -> top scan -> scatter.

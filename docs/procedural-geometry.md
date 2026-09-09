@@ -34,10 +34,10 @@ Parameters appear under `procedural/<node>/…`:
 | Group | Paths | Notes |
 |---|---|---|
 | Source | `source/kind`, `source/radius`, `source/height`, `source/size`, segments, `source/position|rotation|scale` | changing structure regenerates the mesh |
-| Distribution | `distribution/kind`, `count`, `radius`, `startAngle`, `endAngle`, `turns`, `radiusGrowth`, `spiralHeight`, `gridCount`, `gridSpacing`, `start`, `end`, `orientation`, `plane` | instances regenerate on change (microseconds) |
+| Distribution | `distribution/kind`, `count`, `radius`, `startAngle`, `endAngle`, `turns`, `radiusGrowth`, `spiralHeight`, `gridCount`, `gridSpacing`, `start`, `end`, `orientation`, `plane`, `splineStart`, `splineEnd`, `alignToSpline`, `roll`, `splineOffset` | instances regenerate on change (microseconds); the spline *name* is structural and comes from the file |
 | Transform | `transform/position|rotation|scale` | the whole arrangement |
 | Variation | `variation/seed`, `position`, `rotation`, `scale`, `uniformScale` | same seed = same world, live or offline |
-| Deformation | `deform/1/amount`, `speed`, `phase`, `frequency`, `scale`, `falloff`, `center`, `axis`, `enabled` (slot 1..8, label shows the kind) | evaluated on the GPU every frame |
+| Deformation | `deform/1/amount`, `speed`, `phase`, `frequency`, `scale`, `falloff`, `center`, `axis`, `enabled` (slot 1..8, label shows the kind); `pathOffset`, `pathScale`, `pathRoll` on `path` slots | evaluated on the GPU every frame |
 | Material | `material/baseColor`, `emissiveColor`, `emissive`, `roughness`, `metallic`; `materialVariation/hueShift|hueGradient|valueRandom|emissiveRandom|emissiveGradient` | per-instance colour is baked into the instance records |
 
 **Transform order**: `world = node × distribution × placement(i) × variation(i) × source`.
@@ -51,6 +51,15 @@ own axis); world-space deformers act on the final world position (a wave across 
 - **grid**: `gridCount` × `gridSpacing`, centred.
 - **radial**: `count` around `center` at `radius` in `plane`, from `startAngle` to `endAngle` (a full turn closes the circle); orientation `none | outward | inward | tangent`.
 - **spiral**: a helix: `turns`, `radius` growing by `radiusGrowth`, rising `spiralHeight` along the plane normal.
+- **spline**: `count` instances along the named scene spline (ADR-026, `docs/splines.md`),
+  evenly by arc length between `splineStart` and `splineEnd` (fractions of the length; reversed
+  ranges run backwards). `spacing` > 0 switches to fixed spacing instead: `floor(length ×
+  |splineEnd - splineStart| / spacing) + 1` instances exactly `spacing` apart from `splineStart`.
+  Each instance takes the sample's position, its `scale` factor and — with `alignToSpline` — the
+  frame rotation (+Z along the tangent, +Y along the normal) plus `roll` radians about the
+  tangent; `splineOffset` shifts it in frame space (x = binormal, y = normal, z = tangent). A
+  closed spline whose span is a whole number of turns drops the duplicate seam instance. An
+  unknown spline name leaves every placement at the identity.
 
 ## Deformers
 
@@ -61,6 +70,7 @@ own axis); world-space deformers act on the final world position (a wave across 
 | sine | pushes along `displacementAxis` by `amount·sin(frequency·x + phase + speed·t)` | amount, frequency, speed, phase, axis |
 | noise | three decorrelated channels of seeded 3-octave value noise (one per axis, masked by `axisMask`), animated by `speed` | amount, scale, speed, seed, axisMask |
 | displacement | pushes along the surface normal by a procedural pattern | amount, scale, speed |
+| path | bends the shape along a scene spline: the coordinate along `axis` becomes arc length, the cross-section rides the spline frame | amount, spline, pathOffset, pathScale, pathRoll, axis, center |
 
 Stack order is the array order and is deterministic; `twist → noise` differs from `noise → twist`.
 
@@ -132,3 +142,8 @@ File > Examples lists the built-in scenes from `examples/index.json`:
   node path (`procedural/nodes_<outer>_<inner>/…`).
 - Point clouds, point ops, fields and effectors (ADR-024/025) are described in
   `docs/spatial-data.md`; `rebuild()` now goes through `generateCloud()` and the `ops` list.
+- The `spline` distribution and the `path` deformer resolve their spline name against the
+  scene's spline set: `rebuild(ctx)` needs a `GenerationContext` carrying `splines` (the object's
+  `contextualHash` mixes in the referenced spline, so editing the curve rebuilds the cloud), and
+  the renderer needs the spline uploaded (at most 16 per scene reach the GPU). Path deformers are
+  object space only — a `world` one is skipped. See `docs/splines.md`.

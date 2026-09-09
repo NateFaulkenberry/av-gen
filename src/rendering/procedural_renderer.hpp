@@ -11,6 +11,11 @@
 // Field deformers, the emissive field and Point sources are resolved into the per-object
 // uniforms. The FieldBlock uniform (rendering/field_uniforms.hpp) is bound to both the draw
 // (group 1 binding 3) and the effector pass (group 0 binding 3).
+//
+// Splines (ADR-026): the SplineBuffers storage buffer (rendering/spline_buffers.hpp) is bound to
+// the draw at group 1 binding 4; Path deformers are resolved to a spline slot and a final
+// pathScale (units of arc length per object unit; "fit" divides the length by the source
+// extent along the deformer axis) in the per-object deformer block.
 
 #include "core/error.hpp"
 #include "core/time.hpp"
@@ -35,6 +40,7 @@ class ShaderLibrary;
 namespace avgen::rendering {
 
 class FieldUniforms;
+class SplineBuffers;
 
 struct ProceduralStats {
     std::uint32_t objects = 0;          // visible procedural objects drawn this frame
@@ -54,14 +60,15 @@ struct ProceduralStats {
     double effectorPassMs = -1.0;        // GPU time of the last measured effector pass (-1 = none / unavailable)
     std::uint32_t pointObjects = 0;      // objects drawn as Point billboards
     std::uint32_t fieldDeformers = 0;    // enabled Field deformers bound to a slot
+    std::uint32_t pathDeformers = 0;     // enabled Path deformers bound to a spline slot (ADR-026)
 };
 
 // The deformer record as the shader sees it (64 bytes, std140-compatible). Mirrors
 // shaders/procedural.wgsl `DeformerUniform`.
 struct DeformerUniform {
-    glm::vec4 axisKind;      // xyz = unit axis, w = kind code: DeformerKind (0..5) + 8 for world space, -1 = disabled slot
+    glm::vec4 axisKind;      // xyz = unit axis, w = kind code: DeformerKind (0..6) + 8 for world space, -1 = disabled slot
     glm::vec4 centerAmount;  // xyz = center, w = amount
-    glm::vec4 params;        // x = frequency (sine) | spatial scale (noise, displacement) | field slot (field), y = speed | alongNormal (field), z = phase, w = falloff
+    glm::vec4 params;        // x = frequency (sine) | spatial scale (noise, displacement) | field slot (field) | spline slot (path), y = speed | alongNormal (field) | resolved pathScale (path), z = phase | pathOffset (path), w = falloff | pathRoll (path)
     glm::vec4 extra;         // xyz = displacementAxis (sine, bend direction) | axisMask (noise); w = seed as float bits
 };
 static_assert(sizeof(DeformerUniform) == 64);
@@ -94,13 +101,14 @@ public:
 
     // Creates pipelines for the given colour/depth formats and the frame/material/IBL bind group
     // layouts shared with the entity pipelines (group 0 frame, group 2 material, group 3 IBL);
-    // group 1 is this renderer's own (object uniforms + instances + deformers + field block).
-    // `fieldBlock` is the FieldUniforms buffer (a zeroed private one is created when null).
+    // group 1 is this renderer's own (object uniforms + instances + deformers + field block +
+    // spline tables). `fieldBlock` is the FieldUniforms buffer and `splineTable` the
+    // SplineBuffers buffer (zeroed private ones are created when null).
     [[nodiscard]] Result<void> init(wgpu::TextureFormat colorFormat, wgpu::TextureFormat depthFormat,
                                     const wgpu::BindGroupLayout& frameLayout,
                                     const wgpu::BindGroupLayout& materialLayout,
                                     const wgpu::BindGroupLayout& iblLayout, std::uint32_t sampleCount = 1,
-                                    wgpu::Buffer fieldBlock = nullptr);
+                                    wgpu::Buffer fieldBlock = nullptr, wgpu::Buffer splineTable = nullptr);
     [[nodiscard]] Result<void> reload(); // hot reload of procedural.wgsl / points.wgsl (keeps buffers)
 
     // Per frame, before the lit pass: uploads source meshes (cached by `meshHash`) and instance
@@ -111,10 +119,11 @@ public:
     // `instances` or a zero `meshHash` is skipped). Per-object GPU state is keyed by the object's
     // name. `objectMatrices[i]` is the parent matrix for scene.procedurals[i] (identity when the
     // scene places them itself; missing entries = identity). `fields` resolves field names to
-    // slots (null = no fields: effectors, Field deformers and emissive fields are inert).
+    // slots (null = no fields: effectors, Field deformers and emissive fields are inert);
+    // `splines` resolves Path deformer spline names to slots (null = Path deformers are inert).
     void update(wgpu::CommandEncoder& encoder, const scene::Scene& scene,
                 const std::vector<glm::mat4>& objectMatrices, const FrameTime& time,
-                const FieldUniforms* fields = nullptr);
+                const FieldUniforms* fields = nullptr, const SplineBuffers* splines = nullptr);
     // Inside the lit pass (frame and IBL bind groups already set by the caller): sets its own
     // pipeline and group 1, the material group via `materialBindGroup`, and draws every visible
     // object. Opaque objects only in this phase (blend materials are drawn opaque).

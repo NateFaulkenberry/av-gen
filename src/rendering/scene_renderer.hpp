@@ -17,6 +17,7 @@
 #include "rendering/post_processor.hpp"
 #include "rendering/procedural_renderer.hpp"
 #include "rendering/shader_layer.hpp"
+#include "rendering/spline_buffers.hpp"
 #include "scene/scene.hpp"
 #include "shaders/shader_layers.hpp"
 
@@ -151,6 +152,7 @@ public:
     [[nodiscard]] ParticleRenderer& particles() { return *particles_; }
     [[nodiscard]] ProceduralRenderer& procedurals() { return *procedurals_; }
     [[nodiscard]] FieldUniforms& fields() { return *fields_; } // the per-frame field block (ADR-025)
+    [[nodiscard]] SplineBuffers& splines() { return *splines_; } // the spline tables (ADR-026)
     [[nodiscard]] PostProcessor& post() { return *postProcessor_; }
     [[nodiscard]] gpu::TransientPool& transientPool() { return *pool_; }
 
@@ -204,6 +206,7 @@ private:
     std::unique_ptr<EnvironmentProcessor> environment_;
     std::unique_ptr<ShaderStack> shaderStack_;
     std::unique_ptr<FieldUniforms> fields_;
+    std::unique_ptr<SplineBuffers> splines_;
     std::unique_ptr<ParticleRenderer> particles_;
     std::unique_ptr<ProceduralRenderer> procedurals_;
     std::unique_ptr<PostProcessor> postProcessor_;
