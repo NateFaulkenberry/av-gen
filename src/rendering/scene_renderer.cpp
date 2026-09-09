@@ -44,6 +44,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       fields_(std::make_unique<FieldUniforms>(context)), splines_(std::make_unique<SplineBuffers>(context)),
       particles_(std::make_unique<ParticleRenderer>(context, shaders)),
       procedurals_(std::make_unique<ProceduralRenderer>(context, shaders)),
+      sdfs_(std::make_unique<SdfRenderer>(context, shaders)),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
     objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
 }
@@ -217,6 +218,12 @@ Result<void> SceneRenderer::init() {
         !r) {
         return r;
     }
+    if (auto r = sdfs_->init(kHdrFormat, kDepthFormat, frameLayout_, objectLayout_, materialLayout_, iblLayout_,
+                             fields_->buffer());
+        !r) {
+        return r;
+    }
+    sdfs_->setMeshPipelines(litOpaqueCull_, litOpaqueNoCull_); // Mesh-mode objects draw as entities
     if (auto r = postProcessor_->init(); !r) {
         return r;
     }
@@ -546,6 +553,7 @@ Result<void> SceneRenderer::reloadEngineShaders() {
             litOpaqueCull_ = *a;
             litOpaqueNoCull_ = *b;
             litBlend_ = *c;
+            sdfs_->setMeshPipelines(litOpaqueCull_, litOpaqueNoCull_);
         } else {
             keep("pbr.wgsl", std::unexpected((!a ? a : !b ? b : c).error()));
         }
@@ -581,6 +589,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     }
     if (auto r = procedurals_->reload(); !r) {
         keep("procedural.wgsl", r);
+    }
+    if (auto r = sdfs_->reload(); !r) {
+        keep("sdf_raymarch.wgsl", r);
     }
     if (auto r = postProcessor_->reload(); !r) {
         keep("post.wgsl", r);
@@ -924,6 +935,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         stats_.procedural = procedurals_->stats();
     }
 
+    // ---- SDF objects (ADR-027): node packing, mesh uploads, per-object uniforms ----
+    sdfs_->update(scene, time, frame.viewProj, fields_.get());
+    stats_.sdf = sdfs_->stats();
+
     // ---- pass 1: scene -> HDR ----
     {
         wgpu::RenderPassColorAttachment color{};
@@ -984,6 +999,26 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         stats_.drawCalls += stats_.procedural.objects;
         stats_.triangles += static_cast<std::uint32_t>(
             std::min<std::uint64_t>(stats_.procedural.logicalTriangles, 0xFFFFFFFFull - stats_.triangles));
+        // SDF objects (ADR-027): meshed ones draw here like entities; raymarched ones need their own
+        // pass (own timestamps, frag_depth writes), so the lit pass is split around it only when
+        // there is raymarch work, keeping the no-SDF frame identical.
+        sdfs_->drawMeshes(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
+        stats_.drawCalls += stats_.sdf.meshObjects;
+        stats_.triangles += stats_.sdf.meshTriangles;
+        if (sdfs_->hasRaymarchWork()) {
+            rp.End();
+            sdfs_->encodeRaymarchPass(encoder, hdr_.colorView(), hdr_.depthView(), frameBindGroup_, iblBindGroup_, scene,
+                                      [this](const scene::Material& m) { return materialBindGroup(m); });
+            stats_.drawCalls += stats_.sdf.raymarchObjects;
+            stats_.triangles += stats_.sdf.raymarchObjects * 2;
+            color.loadOp = wgpu::LoadOp::Load;
+            depth.depthLoadOp = wgpu::LoadOp::Load;
+            pass.label = "scene-pass-after-sdf";
+            pass.timestampWrites = nullptr;
+            rp = encoder.BeginRenderPass(&pass);
+            rp.SetBindGroup(0, frameBindGroup_);
+            rp.SetBindGroup(3, iblBindGroup_);
+        }
         if (scene.environment.showSkybox && ibl) {
             rp.SetPipeline(skyboxPipeline_);
             const std::uint32_t zeroOffset = 0; // layout requires group 1; the skybox ignores it
@@ -1129,12 +1164,15 @@ Result<wgpu::Texture> SceneRenderer::renderSubmitted(const scene::Scene& scene, 
     stats_.gpuFrameMs = timer_->collect();
     procedurals_->collectTimings();
     particles_->collectTimings();
+    sdfs_->collectTimings();
     context_.waitForQueue();
     stats_.gpuFrameMs = timer_->collect();
     procedurals_->collectTimings();
     particles_->collectTimings();
+    sdfs_->collectTimings();
     stats_.procedural.effectorPassMs = procedurals_->stats().effectorPassMs;
     stats_.particles.simulateMs = particles_->stats().simulateMs;
+    stats_.sdf.raymarchMs = sdfs_->stats().raymarchMs;
     return texture;
 }
 
