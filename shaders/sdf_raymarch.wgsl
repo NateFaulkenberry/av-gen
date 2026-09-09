@@ -124,7 +124,9 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
     let clip = frame.viewProj * vec4<f32>(worldPos, 1.0);
 
     var out: SdfFragmentOut;
-    out.color = shadePbr(worldPos, normal, vec2<f32>(0.0), true, vec3<f32>(1.0), vec3<f32>(1.0));
+    // The local hit point is the ADR-030 `localPosition` material input.
+    out.color = shadePbrInstanced(worldPos, normal, vec2<f32>(0.0), true, vec3<f32>(1.0), vec3<f32>(1.0),
+                                  materialInstanceZero(pL));
     out.depth = clamp(clip.z / clip.w, 0.0, 1.0);
     return out;
 }

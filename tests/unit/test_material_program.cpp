@@ -7,10 +7,13 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -888,4 +891,67 @@ TEST_CASE("docs/procedural-materials.md example programs parse, validate and eva
     ctx.time = 30.0f;
     const MaterialResult later = run(*bio, ctx);
     CHECK(later.registers[4].x != loud.registers[4].x);
+}
+
+// ---- the shipped library ------------------------------------------------------------------------
+
+TEST_CASE("examples/materials/*.material.json parse, validate and name their program", "[material]") {
+    const std::filesystem::path dir = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "materials";
+    REQUIRE(std::filesystem::is_directory(dir));
+    std::vector<std::string> names;
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+        const std::string file = entry.path().filename().string();
+        if (!file.ends_with(".material.json")) {
+            continue;
+        }
+        std::ifstream in(entry.path());
+        REQUIRE(in.good());
+        nlohmann::json j;
+        in >> j;
+        auto program = MaterialProgram::fromJson(j);
+        if (!program) {
+            FAIL(file + ": " + program.error().message);
+        }
+        CHECK(program->validate().has_value());
+        CHECK(!program->name.empty());
+        CHECK(!program->ops.empty());
+        // A program that names no output would shade exactly like the material without it.
+        CHECK((program->baseColorRegister >= 0 || program->metallicRegister >= 0 ||
+               program->roughnessRegister >= 0 || program->emissionRegister >= 0 ||
+               program->opacityRegister >= 0));
+        names.push_back(program->name);
+    }
+    std::sort(names.begin(), names.end());
+    CHECK(names == std::vector<std::string>{"alienMetal", "bioluminescent", "emissiveGlass"});
+}
+
+TEST_CASE("examples/machine wires a material program into the ribs material", "[material]") {
+    const std::filesystem::path scene =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "machine" / "machine.scene.json";
+    REQUIRE(std::filesystem::is_regular_file(scene));
+    std::ifstream in(scene);
+    REQUIRE(in.good());
+    nlohmann::json j;
+    in >> j;
+    REQUIRE(j.contains("materialPrograms"));
+    std::vector<std::string> declared;
+    for (const nlohmann::json& pj : j.at("materialPrograms")) {
+        auto program = MaterialProgram::fromJson(pj);
+        REQUIRE(program.has_value());
+        declared.push_back(program->name);
+    }
+    bool wired = false;
+    for (const nlohmann::json& node : j.at("nodes")) {
+        if (!node.contains("procedural") || !node.at("procedural").contains("material")) {
+            continue;
+        }
+        const nlohmann::json& m = node.at("procedural").at("material");
+        if (!m.contains("program")) {
+            continue;
+        }
+        const auto name = m.at("program").get<std::string>();
+        CHECK(std::find(declared.begin(), declared.end(), name) != declared.end());
+        wired = true;
+    }
+    CHECK(wired);
 }

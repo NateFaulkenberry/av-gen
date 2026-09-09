@@ -62,7 +62,7 @@ bool projectedRect(const glm::mat4& clipFromLocal, const glm::vec3& lo, const gl
     return true;
 }
 
-ObjectUniforms objectUniformsFor(const scene::SdfObject& object) {
+ObjectUniforms objectUniformsFor(const scene::SdfObject& object, std::size_t objectId) {
     const auto& m = object.material;
     ObjectUniforms obj{};
     obj.model = object.transform.matrix();
@@ -73,6 +73,7 @@ ObjectUniforms objectUniformsFor(const scene::SdfObject& object) {
     // No UVs on either path: textures are never sampled (mask 0). Blend materials draw opaque.
     const float alphaMode = m.alphaMode == scene::AlphaMode::Mask ? 1.0f : 0.0f;
     obj.flags = glm::vec4(alphaMode, m.alphaCutoff, m.unlit ? 1.0f : 0.0f, 0.0f);
+    obj.ids = glm::vec4(static_cast<float>(objectId), 0.0f, 0.0f, 0.0f); // ADR-030 `objectId` input
     return obj;
 }
 
@@ -392,7 +393,7 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
             }
             continue;
         }
-        const ObjectUniforms obj = objectUniformsFor(object);
+        const ObjectUniforms obj = objectUniformsFor(object, i);
         const std::uint32_t offset = slot * kObjectStride;
 
         if (object.renderMode == scene::SdfRenderMode::Raymarch) {

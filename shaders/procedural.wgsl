@@ -325,8 +325,12 @@ struct ProcVertexOut {
     @location(0) worldPos: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) uv: vec2<f32>,
-    @location(3) colorMul: vec3<f32>,
-    @location(4) emissiveMul: vec3<f32>,
+    @location(3) instColor: vec4<f32>,    // rgb = base colour multiplier, a = instance id
+    @location(4) instEmissive: vec4<f32>, // rgb = emissive multiplier, a = extra lane
+    // ADR-030 material inputs: the source position before the deformer stack and the instance record.
+    @location(5) localPos: vec3<f32>,
+    @location(6) instRandom: vec4<f32>,
+    @location(7) instIndex: f32,          // normalised instance index in [0, 1]
 };
 
 @vertex
@@ -337,8 +341,11 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     let inst = instances[recordIndex];
     var out: ProcVertexOut;
     out.uv = in.uv;
-    out.colorMul = inst.color.rgb;
-    out.emissiveMul = inst.emissive.rgb;
+    out.instColor = inst.color;
+    out.instEmissive = inst.emissive;
+    out.localPos = in.position;
+    out.instRandom = inst.random;
+    out.instIndex = inst.scale.w;
 
     if (proc.fieldInfo.z > 0.5) {
         // Point source: a camera-facing quad around the instance centre. The centre goes through
@@ -389,10 +396,18 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
 
 @fragment
 fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> @location(0) vec4<f32> {
-    var emissiveMul = in.emissiveMul;
+    var emissiveMul = in.instEmissive.rgb;
     let emissiveSlot = i32(floor(proc.fieldInfo.x + 0.5));
     if (emissiveSlot >= 0) {
         emissiveMul = emissiveMul * (1.0 + proc.fieldInfo.y * fieldScalar(emissiveSlot, in.worldPos));
     }
-    return shadePbr(in.worldPos, in.normal, in.uv, frontFacing, in.colorMul, emissiveMul);
+    var info: MaterialInstanceInfo;
+    info.localPosition = in.localPos;
+    info.objectId = object.ids.x;
+    info.instanceIndex = in.instIndex;
+    info.instanceId = in.instColor.a;
+    info.instanceRandom = in.instRandom;
+    info.instanceColor = in.instColor;
+    info.instanceEmissive = in.instEmissive;
+    return shadePbrInstanced(in.worldPos, in.normal, in.uv, frontFacing, in.instColor.rgb, emissiveMul, info);
 }

@@ -1,11 +1,28 @@
-// Shared PBR fragment shading (ADR-023): included by pbr.wgsl (entities) and procedural.wgsl
-// (instanced procedural geometry) so both paths shade identically. Expects `frame` and `object`
-// from common.wgsl; declares the material (group 2) and IBL (group 3) bindings.
+// Shared PBR fragment shading (ADR-023): included by pbr.wgsl (entities), procedural.wgsl
+// (instanced procedural geometry) and sdf_raymarch.wgsl (raymarched surfaces) so every path
+// shades identically. Expects `frame` and `object` from common.wgsl; declares the material
+// (group 2) and IBL (group 3) bindings.
 //
 // glTF metallic-roughness PBR: Cook-Torrance (GGX distribution, height-correlated Smith
 // visibility, Schlick Fresnel) for punctual lights, split-sum image-based lighting, normal
 // mapping via a derivative-based cotangent frame, emissive, occlusion, alpha mask/blend, then
 // distance fog. Outputs scene-linear HDR radiance; tone mapping happens in tonemap.wgsl.
+//
+// Procedural materials (ADR-030, material.wgsl): when the bound material names a program
+// (materialSelect.program >= 0, a slot in materialPrograms) the program runs first, before any
+// texture or lighting, and replaces the object's base colour, metallic, roughness, emission and
+// opacity; the per-instance multipliers and the material textures then apply to its result. With
+// no program the path is byte for byte the pre-ADR-030 shader. Modules that include this file
+// must also include fields.wgsl (material.wgsl needs it for Field ops).
+#include "material.wgsl"
+
+// Which program the bound material runs; a 16-byte slice of the shared select buffer.
+struct MaterialSelect {
+    program: i32,   // material program slot, -1 = none
+    pad0: i32,
+    pad1: i32,
+    pad2: i32,
+};
 
 @group(2) @binding(0) var materialSampler: sampler;
 @group(2) @binding(1) var baseColorTex: texture_2d<f32>;
@@ -13,6 +30,8 @@
 @group(2) @binding(3) var normalTex: texture_2d<f32>;
 @group(2) @binding(4) var emissiveTex: texture_2d<f32>;
 @group(2) @binding(5) var occlusionTex: texture_2d<f32>;
+@group(2) @binding(6) var<uniform> materialPrograms: MaterialProgramBlock;
+@group(2) @binding(7) var<uniform> materialSelect: MaterialSelect;
 
 @group(3) @binding(0) var iblSampler: sampler;
 @group(3) @binding(1) var irradianceMap: texture_cube<f32>;
@@ -94,10 +113,42 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
     return mix(frame.fogParams.rgb, color, f);
 }
 
+// The material-program inputs only the caller knows: the object-space position (before the
+// deformer stack), the object id and the instance record's lanes. Entities and SDF surfaces have
+// no instance, so materialInstanceZero() stands in for them.
+struct MaterialInstanceInfo {
+    localPosition: vec3<f32>,
+    objectId: f32,
+    instanceIndex: f32,   // normalised index in [0, 1]
+    instanceId: f32,
+    instanceRandom: vec4<f32>,
+    instanceColor: vec4<f32>,
+    instanceEmissive: vec4<f32>,
+};
+
+fn materialInstanceZero(localPosition: vec3<f32>) -> MaterialInstanceInfo {
+    var info: MaterialInstanceInfo;
+    info.localPosition = localPosition;
+    info.objectId = object.ids.x;
+    info.instanceIndex = 0.0;
+    info.instanceId = 0.0;
+    info.instanceRandom = vec4<f32>(0.0);
+    info.instanceColor = vec4<f32>(1.0);
+    info.instanceEmissive = vec4<f32>(1.0);
+    return info;
+}
+
 // The whole material evaluation for one fragment. `colorMul` / `emissiveMul` are per-instance
 // multipliers on the base colour and emissive (vec3(1.0) for entities). May discard (alpha mask).
+// Without instance information (entities before ADR-030 wiring): the object's own local position.
 fn shadePbr(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFacing: bool,
             colorMul: vec3<f32>, emissiveMul: vec3<f32>) -> vec4<f32> {
+    return shadePbrInstanced(worldPos, normalIn, uv, frontFacing, colorMul, emissiveMul,
+                             materialInstanceZero(vec3<f32>(0.0)));
+}
+
+fn shadePbrInstanced(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFacing: bool,
+                     colorMul: vec3<f32>, emissiveMul: vec3<f32>, info: MaterialInstanceInfo) -> vec4<f32> {
     let texMask = u32(object.flags.w + 0.5);
     let hasBaseColor = (texMask & 1u) != 0u;
     let hasMetalRough = (texMask & 2u) != 0u;
@@ -105,7 +156,51 @@ fn shadePbr(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFacing
     let hasEmissive = (texMask & 8u) != 0u;
     let hasOcclusion = (texMask & 16u) != 0u;
 
-    var baseColor = object.baseColor * vec4<f32>(colorMul, 1.0);
+    // The geometric normal (front-facing corrected) and the view vector: the material program's
+    // `normal` / `viewDirection` / Fresnel inputs, and the frame the normal map perturbs below.
+    var n = normalize(normalIn);
+    if (!frontFacing) {
+        n = -n;
+    }
+    let v = normalize(frame.cameraPos.xyz - worldPos);
+
+    // ---- procedural material program (ADR-030) ----
+    var matColor = object.baseColor;        // rgb = base colour, a = opacity
+    var matEmissive = object.emissive;      // rgb = emissive colour, w = intensity
+    var matRoughMetal = object.material.xy; // x = roughness, y = metallic
+    let programIndex = materialSelect.program;
+    if (programIndex >= 0) {
+        var ctx = materialContextZero();
+        ctx.worldPosition = worldPos;
+        ctx.localPosition = info.localPosition;
+        ctx.normal = n;
+        ctx.uv = uv;
+        ctx.objectId = info.objectId;
+        ctx.instanceIndex = info.instanceIndex;
+        ctx.instanceId = info.instanceId;
+        ctx.instanceRandom = info.instanceRandom;
+        ctx.instanceColor = info.instanceColor;
+        ctx.instanceEmissive = info.instanceEmissive;
+        ctx.time = frame.params.x;
+        ctx.audio = frame.audio;
+        ctx.audioBands = frame.audioBands;
+        ctx.beat = frame.beat;
+        ctx.viewDirection = v;
+        ctx.depth = distance(frame.cameraPos.xyz, worldPos);
+        var base: MaterialResult;
+        base.baseColor = object.baseColor.rgb;
+        base.metallic = object.material.y;
+        base.roughness = object.material.x;
+        base.emission = object.emissive.rgb * object.emissive.w;
+        base.opacity = object.baseColor.a;
+        let program = evaluateMaterialProgram(programIndex, ctx, base);
+        // The program's emission is a finished radiance, so the intensity lane becomes 1.
+        matColor = vec4<f32>(program.baseColor, program.opacity);
+        matEmissive = vec4<f32>(program.emission, 1.0);
+        matRoughMetal = vec2<f32>(program.roughness, program.metallic);
+    }
+
+    var baseColor = matColor * vec4<f32>(colorMul, 1.0);
     if (hasBaseColor) {
         baseColor = baseColor * textureSample(baseColorTex, materialSampler, uv);
     }
@@ -115,8 +210,8 @@ fn shadePbr(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFacing
     }
     let alpha = select(1.0, baseColor.a, alphaMode > 1.5);
 
-    let emissiveBase = object.emissive.rgb * emissiveMul;
-    var emissive = emissiveBase * object.emissive.w;
+    let emissiveBase = matEmissive.rgb * emissiveMul;
+    var emissive = emissiveBase * matEmissive.w;
     if (hasEmissive) {
         emissive = emissive * textureSample(emissiveTex, materialSampler, uv).rgb;
     }
@@ -125,8 +220,8 @@ fn shadePbr(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFacing
         return vec4<f32>(applyFog(baseColor.rgb + emissive, worldPos), alpha);
     }
 
-    var roughness = object.material.x;
-    var metallic = object.material.y;
+    var roughness = matRoughMetal.x;
+    var metallic = matRoughMetal.y;
     if (hasMetalRough) {
         let mr = textureSample(metallicRoughnessTex, materialSampler, uv);
         roughness = roughness * mr.g;
@@ -140,16 +235,11 @@ fn shadePbr(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFacing
         ao = 1.0 + object.material.w * (occ - 1.0);
     }
 
-    var n = normalize(normalIn);
-    if (!frontFacing) {
-        n = -n;
-    }
     if (hasNormal) {
         var mapN = textureSample(normalTex, materialSampler, uv).xyz * 2.0 - 1.0;
         mapN = vec3<f32>(mapN.xy * object.material.z, mapN.z);
         n = perturbNormal(n, worldPos, uv, normalize(mapN));
     }
-    let v = normalize(frame.cameraPos.xyz - worldPos);
     let nDotV = max(dot(n, v), 1e-4);
 
     let albedo = baseColor.rgb;
@@ -197,7 +287,7 @@ fn shadePbr(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFacing
     ambient = ambient * ao;
 
     // Fresnel rim tinted with the emissive colour so glowing objects read as luminous at grazing angles.
-    let rim = pow(1.0 - nDotV, 3.0) * emissiveBase * (0.3 * object.emissive.w);
+    let rim = pow(1.0 - nDotV, 3.0) * emissiveBase * (0.3 * matEmissive.w);
 
     return vec4<f32>(applyFog(direct + ambient + emissive + rim, worldPos), alpha);
 }
