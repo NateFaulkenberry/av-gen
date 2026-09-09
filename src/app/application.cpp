@@ -44,6 +44,8 @@ std::string usageText() {
            "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
            "  --list-audio-devices, --list-midi   enumerate inputs and exit\n"
            "  --output <d>[:fullscreen|:WxH]      add an output window on display index <d> (repeatable)\n"
+           "  --syphon <name>     publish the frame as a Syphon server (macOS)\n"
+           "  --ndi <name>        publish the frame as an NDI source (needs the NDI runtime installed)\n"
            "  --shader <file>     add a user shader layer behind the scene (repeatable)\n"
            "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
            "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
@@ -99,6 +101,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             } catch (const std::exception&) {
                 return fail("--osc-port expects an integer");
             }
+            ++i;
+        } else if (arg == "--syphon" || arg == "--ndi") {
+            auto v = need(i, arg.c_str());
+            if (!v) return std::unexpected(v.error());
+            if (arg == "--syphon") options.syphon = *v; else options.ndi = *v;
             ++i;
         } else if (arg == "--output") {
             auto v = need(i, "--output");
@@ -431,6 +438,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             job_ = std::move(*job);
         };
         panel_->outputs = &outputs_;
+        panel_->shareStatus = share::TextureShare::describe();
+        panel_->onShare = [this](const std::string& kind, const std::string& name) { applyShare(kind, name); };
         panel_->onOutputsChanged = [this] {
             if (auto r = outputs_.open(*context_, *shaders_); !r) {
                 panel_->setStatus(r.error().message);
@@ -581,6 +590,24 @@ void Application::loadAudio(const std::filesystem::path& path) {
     if (window_) {
         window_->setTitle("avgen 0.1 - " + path.filename().string());
     }
+}
+
+void Application::applyShare(const std::string& kind, const std::string& name) {
+    share_.close();
+    if (kind == "off") {
+        if (panel_) panel_->shareStatus = share::TextureShare::describe();
+        return;
+    }
+    const auto k = kind == "ndi" ? share::ShareKind::Ndi : share::ShareKind::Syphon;
+    if (auto r = share_.open(k, *context_, name.empty() ? "avgen" : name); !r) {
+        log::error("share: {}", r.error().message);
+        if (panel_) {
+            panel_->setStatus(r.error().message);
+            panel_->shareStatus = r.error().message;
+        }
+        return;
+    }
+    log::info("sharing the frame as {} '{}'", kind, share_.name());
 }
 
 void Application::loadAny(const std::filesystem::path& path) {
@@ -893,6 +920,18 @@ int Application::runLive() {
         if (outputs_.openCount() > 0) {
             if (auto r = outputs_.presentAll(*context_, finalTexture_, pw, ph); !r) {
                 log::warn("outputs: {}", r.error().message);
+            }
+        }
+        if (share_.isOpen()) {
+            if (auto r = share_.publish(finalTexture_, pw, ph); !r) {
+                log::warn("share: {}", r.error().message);
+            }
+            if (fpsFrames % 30 == 0) {
+                const auto st = share_.stats();
+                panel_->shareStatus = fmt::format("{} '{}': {} frames{}{}", share::TextureShare::kindName(share_.kind()),
+                                                  share_.name(), st.framesPublished,
+                                                  st.clients >= 0 ? fmt::format(", {} client(s)", st.clients) : std::string(),
+                                                  st.lastError.empty() ? std::string() : ", error: " + st.lastError);
             }
         }
         outputs_.pumpEvents();

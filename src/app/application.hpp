@@ -9,6 +9,7 @@
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
 #include "rendering/output_mapper.hpp"
+#include "share/texture_share.hpp"
 
 #include <webgpu/webgpu_cpp.h>
 #include "core/error.hpp"
@@ -70,6 +71,8 @@ struct AppOptions {
     bool listAudioDevices = false;
     bool listMidi = false;
     std::vector<std::string> outputs; // --output <display>[:fullscreen|:WxH]
+    std::optional<std::string> syphon; // --syphon <name>
+    std::optional<std::string> ndi;    // --ndi <name>
     std::uint32_t width = 1440;
     std::uint32_t height = 900;
     log::Level logLevel = log::Level::Info;
@@ -104,6 +107,7 @@ private:
     [[nodiscard]] Result<void> ensureFinalTexture(std::uint32_t width, std::uint32_t height);
     void applyOutputsFromProject();
     void storeOutputsToProject();
+    void applyShare(const std::string& kind, const std::string& name); // "syphon" | "ndi" | "off"
     Result<void> captureFrame(const FrameTime& time, const std::filesystem::path& path);
 
     AppOptions options_;
@@ -115,6 +119,7 @@ private:
     RenderProgress lastRender_;
     std::unique_ptr<rendering::OutputMapper> mapper_;
     OutputManager outputs_;
+    share::TextureShare share_;
     wgpu::Texture finalTexture_;
     wgpu::TextureView finalView_;
     std::uint32_t finalWidth_ = 0;
