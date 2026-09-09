@@ -64,6 +64,7 @@ struct DeformerUniform {
 struct ProceduralUniforms {
     timeInfo: vec4<f32>,  // x = render time, y = deformer count, z = normal epsilon, w = instance count
     fieldInfo: vec4<f32>, // x = emissive field slot (-1 none), y = emissive field amount, z = point source or LOD billboard (1/0), w = indirection enabled (1/0)
+    prevInfo: vec4<f32>,  // x = last frame's render time (ADR-035 velocity: deformation motion), yzw = 0
     deformers: array<DeformerUniform, 8>,
 };
 
@@ -277,9 +278,8 @@ fn deformerCode(d: DeformerUniform) -> i32 {
 }
 
 // The world-space deformers applied to a world-space point (the second half of the chain).
-fn deformWorld(pIn: vec3<f32>, nWorld: vec3<f32>) -> vec3<f32> {
+fn deformWorld(pIn: vec3<f32>, nWorld: vec3<f32>, t: f32) -> vec3<f32> {
     let count = u32(proc.timeInfo.y + 0.5);
-    let t = proc.timeInfo.x;
     var p = pIn;
     for (var i = 0u; i < 8u; i = i + 1u) {
         if (i >= count) { break; }
@@ -296,9 +296,9 @@ fn deformWorld(pIn: vec3<f32>, nWorld: vec3<f32>) -> vec3<f32> {
 }
 
 // The whole chain for one source point: local deformers, instance, object, world deformers.
-fn deformChain(pIn: vec3<f32>, nLocal: vec3<f32>, nWorld: vec3<f32>, inst: InstanceRecord) -> vec3<f32> {
+fn deformChain(pIn: vec3<f32>, nLocal: vec3<f32>, nWorld: vec3<f32>, inst: InstanceRecord, t: f32,
+               model: mat4x4<f32>) -> vec3<f32> {
     let count = u32(proc.timeInfo.y + 0.5);
-    let t = proc.timeInfo.x;
     var p = pIn;
     for (var i = 0u; i < 8u; i = i + 1u) {
         if (i >= count) { break; }
@@ -314,8 +314,8 @@ fn deformChain(pIn: vec3<f32>, nLocal: vec3<f32>, nWorld: vec3<f32>, inst: Insta
         }
     }
     p = instancePoint(inst, p);
-    p = (object.model * vec4<f32>(p, 1.0)).xyz;
-    return deformWorld(p, nWorld);
+    p = (model * vec4<f32>(p, 1.0)).xyz;
+    return deformWorld(p, nWorld, t);
 }
 
 // ---- vertex / fragment -------------------------------------------------------------------------
@@ -331,6 +331,7 @@ struct ProcVertexOut {
     @location(5) localPos: vec3<f32>,
     @location(6) instRandom: vec4<f32>,
     @location(7) instIndex: f32,          // normalised instance index in [0, 1]
+    @location(8) prevClip: vec4<f32>,     // last frame's clip position, for the velocity target
 };
 
 @vertex
@@ -352,13 +353,17 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
         // the object matrix and the world deformers; the quad offsets skip the deformer stack.
         var c = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
         let toCamera = normalize(frame.cameraPos.xyz - c + vec3<f32>(0.0, 0.0, 1e-6));
-        c = deformWorld(c, toCamera);
+        c = deformWorld(c, toCamera, proc.timeInfo.x);
         let right = frame.cameraRight.xyz;
         let up = frame.cameraUp.xyz;
         let p = c + right * (in.position.x * inst.scale.x) + up * (in.position.y * inst.scale.y);
         out.clip = frame.viewProj * vec4<f32>(p, 1.0);
         out.worldPos = p;
         out.normal = normalize(frame.cameraPos.xyz - c + vec3<f32>(0.0, 0.0, 1e-6));
+        var cPrev = (object.prevModel * vec4<f32>(inst.position.xyz, 1.0)).xyz;
+        cPrev = deformWorld(cPrev, toCamera, proc.prevInfo.x);
+        let pPrev = cPrev + right * (in.position.x * inst.scale.x) + up * (in.position.y * inst.scale.y);
+        out.prevClip = frame.prevViewProj * vec4<f32>(pPrev, 1.0);
         return out;
     }
 
@@ -375,9 +380,10 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     let nRef = normalize((object.normalMatrix * vec4<f32>(nInst, 0.0)).xyz);
 
     let eps = proc.timeInfo.z;
-    let p0 = deformChain(in.position, n, nRef, inst);
-    let p1 = deformChain(in.position + t1 * eps, n, nRef, inst);
-    let p2 = deformChain(in.position + t2 * eps, n, nRef, inst);
+    let now = proc.timeInfo.x;
+    let p0 = deformChain(in.position, n, nRef, inst, now, object.model);
+    let p1 = deformChain(in.position + t1 * eps, n, nRef, inst, now, object.model);
+    let p2 = deformChain(in.position + t2 * eps, n, nRef, inst, now, object.model);
     var nw = cross(p1 - p0, p2 - p0);
     if (dot(nw, nw) < 1e-30) {
         nw = nRef;
@@ -391,11 +397,15 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     out.clip = frame.viewProj * vec4<f32>(p0, 1.0);
     out.worldPos = p0;
     out.normal = nw;
+    // Velocity covers camera, object, instance and deformation motion: the same chain evaluated
+    // with last frame's time and last frame's object matrix (ADR-035).
+    let pPrev = deformChain(in.position, n, nRef, inst, proc.prevInfo.x, object.prevModel);
+    out.prevClip = frame.prevViewProj * vec4<f32>(pPrev, 1.0);
     return out;
 }
 
 @fragment
-fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> @location(0) vec4<f32> {
+fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
     var emissiveMul = in.instEmissive.rgb;
     let emissiveSlot = i32(floor(proc.fieldInfo.x + 0.5));
     if (emissiveSlot >= 0) {
@@ -409,5 +419,20 @@ fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> @loca
     info.instanceRandom = in.instRandom;
     info.instanceColor = in.instColor;
     info.instanceEmissive = in.instEmissive;
-    return shadePbrInstanced(in.worldPos, in.normal, in.uv, frontFacing, in.instColor.rgb, emissiveMul, info);
+    let screenUv = in.clip.xy * frame.targetSize.zw;
+    let shaded = shadeSurface(in.worldPos, in.normal, in.uv, frontFacing, in.instColor.rgb, emissiveMul, info,
+                              screenUv);
+    var out: SceneOut;
+    out.color = shaded.color;
+    out.normalRoughness = packNormalRoughness(shaded.normal, shaded.roughness, shaded.flags);
+    out.velocity = screenVelocity(in.clip, in.prevClip);
+    out.emission = vec4<f32>(shaded.emission, shaded.bloomWeight);
+    out.ids = packIds(object.ids.x, object.ids.y);
+    return out;
+}
+
+// Depth-only entry for the prepass and the shadow passes: the same vertex stage, so the depth
+// matches the lit pass and instanced procedural geometry casts shadows (ADR-034).
+@fragment
+fn fs_proc_depth(in: ProcVertexOut) {
 }

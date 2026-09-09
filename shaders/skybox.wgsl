@@ -23,14 +23,23 @@ fn vs_sky(@builtin(vertex_index) index: u32) -> SkyOut {
 }
 
 @fragment
-fn fs_sky(in: SkyOut) -> @location(0) vec4<f32> {
-    if (frame.envParams.w < 0.5) {
-        return vec4<f32>(frame.skyParams.rgb, 1.0);
-    }
+fn fs_sky(in: SkyOut) -> SceneOut {
     let near = frame.invViewProj * vec4<f32>(in.ndc, 0.0, 1.0);
     let far = frame.invViewProj * vec4<f32>(in.ndc, 1.0, 1.0);
     let dir = normalize(far.xyz / far.w - near.xyz / near.w);
-    let mip = frame.skyParams.w * frame.envParams.y;
-    let color = textureSampleLevel(prefilteredMap, iblSampler, envRotate(dir), mip).rgb * frame.params.w;
-    return vec4<f32>(color, 1.0);
+    var color = frame.skyParams.rgb;
+    if (frame.envParams.w >= 0.5) {
+        let mip = frame.skyParams.w * frame.envParams.y;
+        color = textureSampleLevel(prefilteredMap, iblSampler, envRotate(dir), mip).rgb * frame.params.w;
+    }
+    // The sky is at infinity: its velocity is the camera rotation alone, and it carries no bloom
+    // weight so a bright environment does not glow through the emission target (ADR-035).
+    let prevClip = frame.prevViewProj * vec4<f32>(frame.cameraPos.xyz + dir * 1.0e6, 1.0);
+    var out: SceneOut;
+    out.color = vec4<f32>(color, 1.0);
+    out.normalRoughness = packNormalRoughness(-dir, 1.0, 8.0);
+    out.velocity = screenVelocity(in.clip, prevClip);
+    out.emission = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    out.ids = 0u;
+    return out;
 }

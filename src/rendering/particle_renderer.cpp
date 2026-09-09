@@ -1,5 +1,7 @@
 #include "rendering/particle_renderer.hpp"
 
+#include "rendering/scene_targets.hpp" // the five colour targets of the scene pass (ADR-035)
+
 #include "rendering/field_uniforms.hpp"
 #include "rendering/spline_buffers.hpp"
 
@@ -174,15 +176,16 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
         blend.alpha.operation = wgpu::BlendOperation::Add;
         blend.alpha.srcFactor = wgpu::BlendFactor::One;
         blend.alpha.dstFactor = wgpu::BlendFactor::OneMinusSrcAlpha;
-        wgpu::ColorTargetState colorTarget{};
-        colorTarget.format = kHdrFormat;
-        colorTarget.blend = &blend;
-        colorTarget.writeMask = wgpu::ColorWriteMask::All;
+        // The scene pass has five colour targets (ADR-035). Particles blend into the colour and
+        // write the velocity target; the surface targets stay with the opaque geometry behind them.
+        std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+        fillSceneTargets(colorTargets, kHdrFormat, &blend, wgpu::ColorWriteMask::None);
+        colorTargets[2].writeMask = wgpu::ColorWriteMask::All;
         wgpu::FragmentState fragment{};
         fragment.module = module;
         fragment.entryPoint = "fs_particle";
-        fragment.targetCount = 1;
-        fragment.targets = &colorTarget;
+        fragment.targetCount = kSceneTargetCount;
+        fragment.targets = colorTargets.data();
         wgpu::DepthStencilState depth{};
         depth.format = kDepthFormat;
         depth.depthWriteEnabled = wgpu::OptionalBool::False;
@@ -370,6 +373,7 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
 
         ParticleUniforms u{};
         u.viewProj = proj * view;
+        u.prevViewProj = prevViewProj_;
         u.cameraRight = glm::vec4(right, 0.0f);
         u.cameraUp = glm::vec4(up, 0.0f);
         u.emitterPos = glm::vec4(sys.position, static_cast<float>(shape));

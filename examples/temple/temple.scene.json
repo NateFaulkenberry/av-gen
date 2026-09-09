@@ -31,7 +31,8 @@
       0.008,
       0.007,
       0.012
-    ]
+    ],
+    "lightRig": "../lightrigs/sacred-warm.rig.json"
   },
   "nodes": [
     {

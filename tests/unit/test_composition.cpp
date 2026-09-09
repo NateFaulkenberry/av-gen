@@ -906,3 +906,63 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
     CHECK((*again)->grids()[0].structuralHash() == (*comp)->grids()[0].structuralHash());
     CHECK((*again)->toJson() == j);
 }
+
+TEST_CASE("A scene file's environment can name a light rig", "[scene][composition][lightrig]") {
+    Fixture fx;
+    // The rig is written next to the scene file, so the registry resolves the relative path.
+    const std::filesystem::path rig = fx.json("comp_rig.rig.json", R"({
+        "format": "avgen-lightrig", "version": 1, "name": "CompRig",
+        "keyIntensity": 2.0, "ambientIntensity": 0.25,
+        "lights": [
+          {"name": "key", "type": "directional", "role": "key",
+           "azimuth": 30, "elevation": 40, "distance": 3.0, "intensity": 1.0,
+           "temperature": 3200, "castsShadow": true},
+          {"name": "sky", "type": "directional", "role": "ambient",
+           "azimuth": 0, "elevation": 85, "distance": 4.0, "intensity": 1.0, "temperature": 9000}
+        ]})");
+    const std::string sceneText = R"({"format": "avgen-scene", "version": 1, "name": "rigged",
+        "environment": {"lightRig": ")" + rig.filename().generic_string() + R"("},
+        "nodes": [{"name": "orb", "kind": "orb"}]})";
+    const std::filesystem::path scenePath = fx.json("comp_rigged.scene.json", sceneText);
+
+    auto comp = scene::Composition::loadFile(scenePath, fx.registry);
+    REQUIRE(comp.has_value());
+    REQUIRE((*comp)->lightRig() != nullptr);
+    CHECK((*comp)->lightRig()->name == "CompRig");
+    CHECK((*comp)->lightRigPath() == rig.filename());
+
+    // The rig replaces the default key light with its own, expanded around the composition's bounds.
+    (*comp)->update(FrameTime{});
+    const scene::Scene& s = (*comp)->scene();
+    REQUIRE(s.lights.size() == 2);
+    CHECK(s.lights[0].name == "key");
+    CHECK(s.lights[0].castsShadow);
+    CHECK(s.lights[0].temperature == 3200.0f);
+    CHECK(s.lights[0].intensity > 0.0f);
+    CHECK(s.lights[1].name == "sky");
+    CHECK(s.lights[1].position.y > s.lights[0].position.y); // 85 degrees of elevation is higher
+
+    // Re-expanded every frame rather than accumulated.
+    (*comp)->update(FrameTime{});
+    CHECK((*comp)->scene().lights.size() == 2);
+
+    // The path survives a save/load round trip.
+    const nlohmann::json doc = (*comp)->toJson();
+    REQUIRE(doc.contains("environment"));
+    CHECK(doc["environment"]["lightRig"] == rig.filename().generic_string());
+
+    // Clearing it restores the default key.
+    REQUIRE((*comp)->setLightRig({}).has_value());
+    (*comp)->update(FrameTime{});
+    CHECK((*comp)->lightRig() == nullptr);
+    CHECK((*comp)->scene().lights.size() == 1);
+
+    // A missing rig is a warning, not a failed load.
+    const std::filesystem::path missing = fx.json("comp_norig.scene.json",
+        R"({"format": "avgen-scene", "version": 1, "name": "norig",
+            "environment": {"lightRig": "does-not-exist.rig.json"},
+            "nodes": [{"name": "orb", "kind": "orb"}]})");
+    auto fallbackComp = scene::Composition::loadFile(missing, fx.registry);
+    REQUIRE(fallbackComp.has_value());
+    CHECK((*fallbackComp)->lightRig() == nullptr);
+}

@@ -20,39 +20,95 @@ Decision: ADR-001 (WebGPU via Dawn). Research: `docs/research/rendering.md`,
   offline render job (ADR-020 revision).
 - `rendering::SceneRenderer`: the frame's pass list for a `scene::Scene`.
 
-## Frame (milestone 0.2)
+## Frame
 
 ```
 encoder = device.CreateCommandEncoder()
   [environment passes: only when scene.environment.environmentMap changed; see ADR-013]
-  pass "scene-pass"  : HDR RGBA16Float + Depth24Plus, clear to environment.backgroundColor
-                       opaque PBR entities (pbr.wgsl; back-face cull, or none for doubleSided)
-                       procedural geometry (procedural.wgsl; one DrawIndexed(indexCount, instanceCount)
-                         per object, deformer stack in the vertex stage, same fragment shading; ADR-023)
-                       skybox (skybox.wgsl, far plane, LessEqual) when an environment is set
-                       grid entities (grid.wgsl, additive, depth test only)
-                       particles (particles.wgsl, indirect draw, additive/alpha, depth test only)
-                       alpha-blended PBR entities, sorted back to front
-  pass "tonemap-pass": fullscreen triangle, textureLoad HDR, ACES fitted, sRGB encode -> target
-  [pass "ui-pass"    : Dear ImGui, LoadOp::Load]           (added by the application)
+  [simulation, particle, procedural effector/cull and SDF compute passes]
+  pass "cluster-build-pass" : compute, 16x8x24 froxels of light indices                (ADR-033)
+  pass "shadow-pass" x N    : depth only, one per cascade / spot map, into the atlas   (ADR-034)
+                              opaque entities, meshed SDFs, procedural instances (same
+                              instance buffer), raymarched SDFs at a quarter of the steps
+  pass "background-pass"    : HDR colour cleared, background user-shader layers
+  pass "depth-prepass"      : depth only, the same casters, into the scene depth       (ADR-035)
+  pass "linear-depth-pass"  : Depth24Plus -> R32Float view distance
+  pass "gtao-pass"          : half-resolution horizon occlusion + bent normal          (ADR-034)
+  pass "gtao-temporal-pass" : reprojected, neighbourhood-clamped accumulation
+  pass "scene-pass"         : HDR RGBA16Float + 4 auxiliary targets + Depth24Plus      (ADR-035)
+                              opaque PBR entities (pbr.wgsl; back-face cull, or none for doubleSided)
+                              procedural geometry (procedural.wgsl; one DrawIndexed(indexCount,
+                                instanceCount) per object, deformer stack in the vertex stage; ADR-023)
+                              meshed SDFs, then "sdf-raymarch-pass" for raymarched ones
+                              skybox (skybox.wgsl, far plane, LessEqual) when an environment is set
+                              grid entities (grid.wgsl, additive, depth test only)
+                              particles (particles.wgsl, indirect draw, additive/alpha, depth test only)
+                              alpha-blended PBR entities, sorted back to front
+  [volume march + composite, debug geometry, user post layers, the built-in post chain]
+  [pass "aux-debug-pass"    : one auxiliary target full-screen, when a debug view is selected]
+  pass "tonemap-pass"       : fullscreen triangle, textureLoad HDR, ACES fitted, sRGB encode -> target
+  [pass "ui-pass"           : Dear ImGui, LoadOp::Load]        (added by the application)
 timer.resolve(encoder); queue.Submit; timer.collect(); surface.Present()
 ```
 
-Bind groups: 0 `FrameUniforms` (720 B: viewProj, invViewProj, cameraPos, params, envParams,
-skyParams, fogParams, 8 `LightUniform`s); 1 `ObjectUniforms` (192 B: model, normalMatrix, baseColor+opacity,
-emissive rgb+intensity, material roughness/metallic/normalScale/occlusion, flags alphaMode/
-cutoff/unlit/textureMask) in one buffer with 256-byte dynamic offsets (up to 256 objects);
+The depth prepass exists because ambient occlusion and the contact-shadow march need the depth of
+the whole opaque scene *while it is being shaded*, which a forward pass cannot give them. It costs
+one fragment-free geometry pass and pays part of itself back as early-Z in the scene pass; it is
+skipped entirely when both occlusion and contact shadows are off.
+
+### Colour targets of the scene pass (ADR-035)
+
+Every pipeline used inside `scene-pass` declares all five, in this order, or WebGPU rejects it
+(`rendering/scene_targets.hpp` builds the array):
+
+| # | Target | Format | Contents |
+|---|---|---|---|
+| 0 | HDR colour | RGBA16Float | scene-linear radiance |
+| 1 | normal + roughness | RGBA16Float | rg = octahedral normal, b = roughness, a = flags (1 lit, 2 emissive, 4 transparent, 8 sky) |
+| 2 | velocity | RG16Float | screen motion in UV units, from this and last frame's clip positions |
+| 3 | emission | RGBA16Float | rgb = emitted radiance, a = bloom weight |
+| 4 | identifiers | R32Uint | low 16 bits object id, high 16 bits material id |
+
+Alpha-blended surfaces and particles leave targets 1, 3 and 4 to the opaque geometry behind them
+(their write masks are off); particles do write velocity, from their simulated previous position.
+Two more targets live outside the scene pass: `aux-linear-depth` (R32Float view distance) and the
+half-resolution occlusion target (rg = octahedral bent normal, b = visibility, a = view depth).
+`SceneRenderer::setAuxDebugView` displays any of them full-screen; `avgen --debug-target
+normal|roughness|velocity|emission|ids|occlusion|depth` does the same from the command line.
+
+### Quality tiers
+
+`rendering::QualityTier` (preview, realtime, high, offline) scales sample counts, resolutions and
+history lengths only - never the scene, its parameters or its determinism. `avgen --tier <name>`
+selects one; `rendering/render_quality.hpp` lists what each scales.
+
+Bind groups: 0 the frame group - 0 `FrameUniforms` (976 B: viewProj, invViewProj, prevViewProj,
+camera basis, params, envParams, skyParams, fogParams, audio, cluster and shadow parameters, AO
+parameters, target size, and 8 `LightUniform`s for the fallback tier), 1 the packed scene lights
+(read-only storage), 2 the froxel light lists, 3 `ShadowUniforms`, 4 the shadow atlas
+(`texture_depth_2d_array`), 5 its comparison sampler, 6 the occlusion target, 7 the linear scene
+depth, 8/9 the LTC tables, 10 their sampler, 15 the simulated-grid table; 1 `ObjectUniforms`
+(272 B: model, normalMatrix, prevModel, baseColor+opacity, emissive rgb+intensity, material
+roughness/metallic/normalScale/occlusion, flags alphaMode/cutoff/unlit/textureMask, ids
+object/material/bloom weight) in one buffer with 512-byte dynamic offsets (up to 256 objects);
 2 material (one filtering sampler + baseColor, metallicRoughness, normal, emissive, occlusion
 textures; 1x1 defaults fill absent slots; bind groups cached per texture combination);
 3 image-based lighting (clamp sampler, irradiance cube, prefiltered cube, BRDF LUT). The C++
 structs are `static_assert`ed against the WGSL layouts. Vertex layout: position, normal, uv
 (32 bytes, `scene::Vertex`); tangents are derived per fragment.
 
+The passes that write something the shading pass reads (the shadow maps, the linear depth, the
+occlusion target) bind a placeholder in its slot, because WebGPU forbids sampling a resource that
+the same pass is writing. `SceneRenderer::rebuildFrameBindGroups` builds the three variants: the
+shading group, the auxiliary group, and one per shadow view whose `viewProj` is the light's - which
+is what lets every depth-only pass reuse the ordinary vertex shaders unchanged.
+
 Materials follow glTF metallic-roughness: textures multiply factors; normal maps are applied
 through a derivative-based cotangent frame; alpha mask discards below the cutoff; blend
-materials draw last without depth write. Lights: up to 8 enabled `PunctualLight`s per frame
-(directional, point with inverse-square and range window, spot with smooth cone). Ambient comes
-from the environment (split sum) or a hemispheric fallback when no map is set.
+materials draw last without depth write. Lighting is clustered forward with area lights, colour
+temperature, cascaded shadows, contact shadows and ground-truth occlusion: see `docs/lighting.md`
+for the whole of it. Ambient comes from the environment (split sum, looked up along the bent
+normal) or a hemispheric fallback when no map is set.
 
 Textures are uploaded with CPU-generated mip chains (sRGB filtered in linear space); HDR maps as
 RGBA16Float. Uploads happen when `Scene::textureVersion` changes.

@@ -1,0 +1,136 @@
+{
+  "format": "avgen-lightrig",
+  "version": 1,
+  "name": "IndustrialCold",
+  "description": "Hard cold overheads with warm sodium practicals underneath: machinery, not architecture.",
+  "keyIntensity": 1.9,
+  "ambientIntensity": 0.08,
+  "ambientColor": [
+    0.35,
+    0.42,
+    0.55
+  ],
+  "ambientTemperature": 7200,
+  "lights": [
+    {
+      "name": "key",
+      "type": "directional",
+      "role": "key",
+      "azimuth": 20.0,
+      "elevation": 68.0,
+      "distance": 3.0,
+      "intensity": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 6800,
+      "tint": 0.0,
+      "size": 0.3,
+      "aspect": 1.0,
+      "castsShadow": true,
+      "shadowStrength": 1.0,
+      "softness": 0.45,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "fill",
+      "type": "rect",
+      "role": "fill",
+      "azimuth": -70.0,
+      "elevation": 12.0,
+      "distance": 2.4,
+      "intensity": 0.1,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 6500,
+      "tint": 0.0,
+      "size": 1.4,
+      "aspect": 2.0,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "rim",
+      "type": "tube",
+      "role": "rim",
+      "azimuth": 150.0,
+      "elevation": 22.0,
+      "distance": 2.2,
+      "intensity": 0.35,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 7500,
+      "tint": 0.0,
+      "size": 2.4,
+      "aspect": 1.0,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "practical",
+      "type": "sphere",
+      "role": "practical",
+      "azimuth": -25.0,
+      "elevation": -18.0,
+      "distance": 1.2,
+      "intensity": 0.2,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 2200,
+      "tint": 0.0,
+      "size": 0.18,
+      "aspect": 1.0,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    },
+    {
+      "name": "ambient",
+      "type": "directional",
+      "role": "ambient",
+      "azimuth": 0.0,
+      "elevation": 85.0,
+      "distance": 4.0,
+      "intensity": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 7200,
+      "tint": 0.0,
+      "size": 0.5,
+      "aspect": 1.0,
+      "castsShadow": false,
+      "shadowStrength": 1.0,
+      "softness": 1.0,
+      "volumetric": 0.0,
+      "cone": 45.0,
+      "followCamera": true
+    }
+  ]
+}

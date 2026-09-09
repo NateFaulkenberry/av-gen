@@ -124,9 +124,10 @@ static_assert(sizeof(DeformerUniform) == 64);
 struct ProceduralUniforms {
     glm::vec4 timeInfo;      // x = render time, y = deformer count, z = epsilon for normals, w = instance count
     glm::vec4 fieldInfo;     // x = emissive field slot (-1 none), y = emissive field amount, z = point source (1/0), w = 0
+    glm::vec4 prevInfo;      // x = last frame's render time (ADR-035 velocity: deformation motion), yzw = 0
     DeformerUniform deformers[scene::kMaxDeformers];
 };
-static_assert(sizeof(ProceduralUniforms) == 32 + 64 * scene::kMaxDeformers);
+static_assert(sizeof(ProceduralUniforms) == 48 + 64 * scene::kMaxDeformers);
 
 // The effector pass parameters (shaders/points.wgsl `PointsParams`, 528 bytes).
 struct EffectorPassUniforms {
@@ -188,6 +189,11 @@ public:
     // object. Opaque objects only in this phase (blend materials are drawn opaque).
     void draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
               const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
+    // The same draws with the depth-only pipeline, for the depth prepass and the shadow passes
+    // (ADR-034): the same vertex stage and the same instance buffer, so instanced procedural
+    // geometry casts shadows without a second data path.
+    void drawDepthOnly(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
+                       const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
     // Pumps the effector-pass timer after the frame's command buffer was submitted (update()
     // also does this at the start of the next frame).
     void collectTimings();
@@ -212,6 +218,10 @@ public:
     [[nodiscard]] Result<std::vector<std::uint32_t>> readVisibleIndices(const std::string& name, int level);
 
 private:
+    void drawImpl(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
+                  const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
+                  bool depthOnly);
+
     struct Impl;
     std::unique_ptr<Impl> impl_;
     ProceduralStats stats_;

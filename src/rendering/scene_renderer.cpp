@@ -1,6 +1,7 @@
 #include "rendering/scene_renderer.hpp"
 
 #include "rendering/environment.hpp"
+#include "rendering/scene_targets.hpp"
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -16,6 +17,20 @@
 #include <cstring>
 
 namespace avgen::rendering {
+
+const char* auxDebugViewName(AuxDebugView view) {
+    switch (view) {
+    case AuxDebugView::None: return "none";
+    case AuxDebugView::Normal: return "normal";
+    case AuxDebugView::Roughness: return "roughness";
+    case AuxDebugView::Velocity: return "velocity";
+    case AuxDebugView::Emission: return "emission";
+    case AuxDebugView::Ids: return "ids";
+    case AuxDebugView::Occlusion: return "occlusion";
+    case AuxDebugView::Depth: return "depth";
+    }
+    return "none";
+}
 
 namespace {
 
@@ -38,6 +53,7 @@ std::uint64_t materialKey(const scene::Material& m) {
 
 SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
     : context_(context), shaders_(shaders), timer_(std::make_unique<gpu::GpuTimer>(context)),
+      shadowTimer_(std::make_unique<gpu::GpuTimer>(context)),
       samplers_(std::make_unique<gpu::SamplerCache>(context)),
       environment_(std::make_unique<EnvironmentProcessor>(context, shaders)),
       shaderStack_(std::make_unique<ShaderStack>(context, shaders)),
@@ -50,6 +66,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       volumes_(std::make_unique<VolumeRenderer>(context, shaders)),
       debug_(std::make_unique<DebugDraw>(context, shaders)),
       simulation_(std::make_unique<Simulation>(context, shaders)),
+      shadows_(std::make_unique<ShadowRenderer>(context)), ao_(std::make_unique<AoRenderer>(context, shaders)),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
     objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
 }
@@ -74,16 +91,50 @@ Result<void> SceneRenderer::init() {
         return device.CreateBindGroupLayout(&desc);
     };
     {
-        // Group 0 of every scene pass: 0 = FrameUniforms, 15 = the simulated-grid table declared
+        // Group 0 of every scene pass. 0 = FrameUniforms and 15 = the simulated-grid table declared
         // by shaders/fields.wgsl (ADR-032; read-only storage, inert when the scene has no grids).
-        std::array<wgpu::BindGroupLayoutEntry, 2> entries{};
+        // 1..10 are the lighting bindings shaders/lighting.wgsl declares (ADR-033/034); a pass whose
+        // shader does not mention them simply never reads them.
+        std::array<wgpu::BindGroupLayoutEntry, 12> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
         entries[0].buffer.minBindingSize = sizeof(FrameUniforms);
-        entries[1].binding = 15;
-        entries[1].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
+        entries[1].binding = 1; // the packed scene lights
+        entries[1].visibility = wgpu::ShaderStage::Fragment;
         entries[1].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[2].binding = 2; // the froxel light lists
+        entries[2].visibility = wgpu::ShaderStage::Fragment;
+        entries[2].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[3].binding = 3; // ShadowUniforms
+        entries[3].visibility = wgpu::ShaderStage::Fragment;
+        entries[3].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[3].buffer.minBindingSize = sizeof(ShadowUniforms);
+        entries[4].binding = 4; // the shadow atlas
+        entries[4].visibility = wgpu::ShaderStage::Fragment;
+        entries[4].texture.sampleType = wgpu::TextureSampleType::Depth;
+        entries[4].texture.viewDimension = wgpu::TextureViewDimension::e2DArray;
+        entries[5].binding = 5;
+        entries[5].visibility = wgpu::ShaderStage::Fragment;
+        entries[5].sampler.type = wgpu::SamplerBindingType::Comparison;
+        entries[6].binding = 6; // ambient occlusion
+        entries[6].visibility = wgpu::ShaderStage::Fragment;
+        entries[6].texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+        entries[6].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        entries[7] = entries[6];
+        entries[7].binding = 7; // linear scene depth (contact shadows)
+        entries[8].binding = 8; // the LTC matrix table
+        entries[8].visibility = wgpu::ShaderStage::Fragment;
+        entries[8].texture.sampleType = wgpu::TextureSampleType::Float;
+        entries[8].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        entries[9] = entries[8];
+        entries[9].binding = 9; // the LTC magnitude / Fresnel table
+        entries[10].binding = 10;
+        entries[10].visibility = wgpu::ShaderStage::Fragment;
+        entries[10].sampler.type = wgpu::SamplerBindingType::Filtering;
+        entries[11].binding = 15;
+        entries[11].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
+        entries[11].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "frame-layout";
         desc.entryCount = entries.size();
@@ -203,21 +254,6 @@ Result<void> SceneRenderer::init() {
         desc.entries = &entry;
         return device.CreateBindGroup(&desc);
     };
-    {
-        std::array<wgpu::BindGroupEntry, 2> entries{};
-        entries[0].binding = 0;
-        entries[0].buffer = frameUniforms_;
-        entries[0].size = sizeof(FrameUniforms);
-        entries[1].binding = 15;
-        entries[1].buffer = fields_->gridBuffer();
-        entries[1].size = FieldUniforms::kGridBufferSize;
-        wgpu::BindGroupDescriptor desc{};
-        desc.label = "frame-bind-group";
-        desc.layout = frameLayout_;
-        desc.entryCount = entries.size();
-        desc.entries = entries.data();
-        frameBindGroup_ = device.CreateBindGroup(&desc);
-    }
     objectBindGroup_ = bufferGroup("object-bind-group", objectLayout_, objectUniforms_, sizeof(ObjectUniforms));
 
     // ---- default textures ----
@@ -253,6 +289,17 @@ Result<void> SceneRenderer::init() {
         iblSampler_ = device.CreateSampler(&desc);
     }
     rebuildIblBindGroup();
+
+    if (auto r = createLightResources(); !r) {
+        return r;
+    }
+    if (auto r = shadows_->init(sizeof(FrameUniforms)); !r) {
+        return r;
+    }
+    if (auto r = ao_->init(frameLayout_); !r) {
+        return r;
+    }
+    rebuildFrameBindGroups();
 
     if (auto r = createPipelines(); !r) {
         return r;
@@ -318,6 +365,265 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
     environmentVersion_ = scene.textureVersion;
 }
 
+
+// The froxel-build pass's uniform block (shaders/clusters.wgsl `ClusterParams`).
+namespace {
+struct ClusterParamsGpu {
+    glm::uvec4 grid;  // x, y, z froxel counts, w = local light count
+    glm::vec4 depth;  // near, far, tan(fovY/2) * aspect, tan(fovY/2)
+    glm::vec4 lights[kMaxSceneLights]; // xyz = view-space position, w = influence radius
+};
+static_assert(sizeof(ClusterParamsGpu) == 32 + 16 * kMaxSceneLights);
+constexpr std::uint32_t kClusterBufferWords = kClusterCount * (1 + kMaxLightsPerCluster);
+} // namespace
+
+Result<void> SceneRenderer::createLightResources() {
+    const auto& device = context_.device();
+    {
+        wgpu::BufferDescriptor desc{};
+        desc.label = "scene-lights";
+        desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        desc.size = sizeof(GpuLight) * kMaxSceneLights;
+        lightBuffer_ = device.CreateBuffer(&desc);
+        desc.label = "cluster-lights";
+        desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
+        desc.size = static_cast<std::uint64_t>(kClusterBufferWords) * sizeof(std::uint32_t);
+        clusterBuffer_ = device.CreateBuffer(&desc);
+        desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        desc.label = "cluster-params";
+        desc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+        desc.size = sizeof(ClusterParamsGpu);
+        clusterParams_ = device.CreateBuffer(&desc);
+    }
+    // The cluster build writes what the shading pass reads, so it needs its own writable layout.
+    {
+        std::array<wgpu::BindGroupLayoutEntry, 2> entries{};
+        entries[0].binding = 0;
+        entries[0].visibility = wgpu::ShaderStage::Compute;
+        entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[0].buffer.minBindingSize = sizeof(ClusterParamsGpu);
+        entries[1].binding = 1;
+        entries[1].visibility = wgpu::ShaderStage::Compute;
+        entries[1].buffer.type = wgpu::BufferBindingType::Storage;
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.label = "cluster-layout";
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        clusterLayout_ = device.CreateBindGroupLayout(&desc);
+    }
+    {
+        std::array<wgpu::BindGroupEntry, 2> entries{};
+        entries[0].binding = 0;
+        entries[0].buffer = clusterParams_;
+        entries[0].size = sizeof(ClusterParamsGpu);
+        entries[1].binding = 1;
+        entries[1].buffer = clusterBuffer_;
+        entries[1].size = static_cast<std::uint64_t>(kClusterBufferWords) * sizeof(std::uint32_t);
+        wgpu::BindGroupDescriptor desc{};
+        desc.label = "cluster-bind-group";
+        desc.layout = clusterLayout_;
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        clusterBindGroup_ = device.CreateBindGroup(&desc);
+    }
+    {
+        auto module = shaders_.load("clusters.wgsl");
+        if (!module) {
+            return std::unexpected(module.error());
+        }
+        clusterModule_ = *module;
+        wgpu::PipelineLayoutDescriptor layoutDesc{};
+        layoutDesc.label = "cluster-pipeline-layout";
+        layoutDesc.bindGroupLayoutCount = 1;
+        layoutDesc.bindGroupLayouts = &clusterLayout_;
+        wgpu::PipelineLayout layout = device.CreatePipelineLayout(&layoutDesc);
+        wgpu::ComputePipelineDescriptor desc{};
+        desc.label = "cluster-build";
+        desc.layout = layout;
+        desc.compute.module = clusterModule_;
+        desc.compute.entryPoint = "cs_build";
+        device.PushErrorScope(wgpu::ErrorFilter::Validation);
+        clusterPipeline_ = device.CreateComputePipeline(&desc);
+        std::string error;
+        auto future = device.PopErrorScope(wgpu::CallbackMode::WaitAnyOnly,
+                                           [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
+                                               if (type != wgpu::ErrorType::NoError) {
+                                                   error = gpu::Context::toString(msg);
+                                               }
+                                           });
+        context_.waitFor(future);
+        if (!error.empty() || !clusterPipeline_) {
+            return fail("cluster build pipeline failed: {}", error);
+        }
+    }
+    // The linearly transformed cone table (ADR-033): fitted at startup, never shipped as data.
+    {
+        const LtcTable table = buildLtcTable();
+        auto upload = [&](const std::vector<glm::vec4>& source, const char* label) {
+            gpu::GpuTexture out;
+            wgpu::TextureDescriptor desc{};
+            desc.label = label;
+            desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+            desc.dimension = wgpu::TextureDimension::e2D;
+            desc.size = {table.size, table.size, 1};
+            desc.format = wgpu::TextureFormat::RGBA16Float;
+            out.texture = device.CreateTexture(&desc);
+            out.view = out.texture.CreateView();
+            out.width = out.height = table.size;
+            out.format = desc.format;
+            std::vector<std::uint16_t> halves(source.size() * 4);
+            for (std::size_t i = 0; i < source.size(); ++i) {
+                for (int c = 0; c < 4; ++c) {
+                    halves[i * 4 + static_cast<std::size_t>(c)] =
+                        gpu::floatToHalf(std::clamp(source[i][c], -1000.0f, 1000.0f));
+                }
+            }
+            wgpu::TexelCopyTextureInfo destination{};
+            destination.texture = out.texture;
+            wgpu::TexelCopyBufferLayout layout{};
+            layout.bytesPerRow = table.size * 8;
+            layout.rowsPerImage = table.size;
+            const wgpu::Extent3D size = {table.size, table.size, 1};
+            context_.queue().WriteTexture(&destination, halves.data(), halves.size() * sizeof(std::uint16_t),
+                                          &layout, &size);
+            return out;
+        };
+        ltc1_ = upload(table.matrix, "ltc-matrix");
+        ltc2_ = upload(table.terms, "ltc-terms");
+        wgpu::SamplerDescriptor desc{};
+        desc.label = "ltc-sampler";
+        desc.addressModeU = wgpu::AddressMode::ClampToEdge;
+        desc.addressModeV = wgpu::AddressMode::ClampToEdge;
+        desc.addressModeW = wgpu::AddressMode::ClampToEdge;
+        desc.magFilter = wgpu::FilterMode::Linear;
+        desc.minFilter = wgpu::FilterMode::Linear;
+        ltcSampler_ = device.CreateSampler(&desc);
+    }
+    {
+        // Bound in place of the linear depth target before the first frame allocated it.
+        wgpu::TextureDescriptor desc{};
+        desc.label = "linear-depth-placeholder";
+        desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+        desc.dimension = wgpu::TextureDimension::e2D;
+        desc.size = {1, 1, 1};
+        desc.format = kLinearDepthFormat;
+        linearDepthDefault_.texture = device.CreateTexture(&desc);
+        linearDepthDefault_.view = linearDepthDefault_.texture.CreateView();
+        linearDepthDefault_.width = linearDepthDefault_.height = 1;
+        linearDepthDefault_.format = desc.format;
+        const float far = 1.0e7f;
+        wgpu::TexelCopyTextureInfo destination{};
+        destination.texture = linearDepthDefault_.texture;
+        wgpu::TexelCopyBufferLayout layout{};
+        layout.bytesPerRow = 4;
+        layout.rowsPerImage = 1;
+        const wgpu::Extent3D size = {1, 1, 1};
+        context_.queue().WriteTexture(&destination, &far, sizeof(far), &layout, &size);
+    }
+    lightStaging_.resize(kMaxSceneLights);
+    clusterStaging_.assign(kClusterBufferWords, 0u);
+    return {};
+}
+
+void SceneRenderer::rebuildFrameBindGroups() {
+    const auto& device = context_.device();
+    auto make = [&](const wgpu::Buffer& frameBuffer, const wgpu::TextureView& shadowAtlas,
+                    const wgpu::TextureView& aoView, const wgpu::TextureView& depthView, const char* label) {
+        std::array<wgpu::BindGroupEntry, 12> entries{};
+        entries[0].binding = 0;
+        entries[0].buffer = frameBuffer;
+        entries[0].size = sizeof(FrameUniforms);
+        entries[1].binding = 1;
+        entries[1].buffer = lightBuffer_;
+        entries[1].size = sizeof(GpuLight) * kMaxSceneLights;
+        entries[2].binding = 2;
+        entries[2].buffer = clusterBuffer_;
+        entries[2].size = static_cast<std::uint64_t>(kClusterBufferWords) * sizeof(std::uint32_t);
+        entries[3].binding = 3;
+        entries[3].buffer = shadows_->uniforms();
+        entries[3].size = sizeof(ShadowUniforms);
+        entries[4].binding = 4;
+        entries[4].textureView = shadowAtlas;
+        entries[5].binding = 5;
+        entries[5].sampler = shadows_->comparisonSampler();
+        entries[6].binding = 6;
+        entries[6].textureView = aoView;
+        entries[7].binding = 7;
+        entries[7].textureView = depthView;
+        entries[8].binding = 8;
+        entries[8].textureView = ltc1_.view;
+        entries[9].binding = 9;
+        entries[9].textureView = ltc2_.view;
+        entries[10].binding = 10;
+        entries[10].sampler = ltcSampler_;
+        entries[11].binding = 15;
+        entries[11].buffer = fields_->gridBuffer();
+        entries[11].size = FieldUniforms::kGridBufferSize;
+        wgpu::BindGroupDescriptor desc{};
+        desc.label = label;
+        desc.layout = frameLayout_;
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        return device.CreateBindGroup(&desc);
+    };
+    const wgpu::TextureView sceneDepth = linearDepth_.valid() ? linearDepth_.view : linearDepthDefault_.view;
+    frameBindGroup_ = make(frameUniforms_, shadows_->atlasView(), ao_->output(), sceneDepth, "frame-bind-group");
+    // The prepass, the shadow passes, the linear-depth pass and the AO passes all write something
+    // the shading pass reads, so their copy binds placeholders in those three slots. Ambient
+    // occlusion reads the linear depth through its own group instead.
+    frameBindGroupAux_ = make(frameUniforms_, shadows_->dummyAtlasView(), ao_->placeholder(),
+                              linearDepthDefault_.view, "frame-bind-group-aux");
+    for (std::uint32_t v = 0; v < kMaxShadowViews; ++v) {
+        shadowFrameGroups_[v] = make(shadows_->viewUniforms(v), shadows_->dummyAtlasView(), ao_->placeholder(),
+                                     linearDepthDefault_.view, "shadow-frame-group");
+    }
+}
+
+Result<void> SceneRenderer::createAuxTargets(std::uint32_t width, std::uint32_t height) {
+    const auto& device = context_.device();
+    auto make = [&](AuxTarget& target, wgpu::TextureFormat format, const char* label) -> Result<void> {
+        wgpu::TextureDescriptor desc{};
+        desc.label = label;
+        desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding |
+                     wgpu::TextureUsage::CopySrc;
+        desc.dimension = wgpu::TextureDimension::e2D;
+        desc.size = {width, height, 1};
+        desc.format = format;
+        device.PushErrorScope(wgpu::ErrorFilter::Validation);
+        wgpu::Texture texture = device.CreateTexture(&desc);
+        std::string error;
+        auto future = device.PopErrorScope(wgpu::CallbackMode::WaitAnyOnly,
+                                           [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
+                                               if (type != wgpu::ErrorType::NoError) {
+                                                   error = gpu::Context::toString(msg);
+                                               }
+                                           });
+        context_.waitFor(future);
+        if (!error.empty() || !texture) {
+            return fail("auxiliary target '{}' {}x{}: {}", label, width, height, error);
+        }
+        target.texture = std::move(texture);
+        target.view = target.texture.CreateView();
+        return {};
+    };
+    if (auto r = make(normalRough_, kNormalFormat, "aux-normal-roughness"); !r) return r;
+    if (auto r = make(velocity_, kVelocityFormat, "aux-velocity"); !r) return r;
+    if (auto r = make(emission_, kEmissionFormat, "aux-emission"); !r) return r;
+    if (auto r = make(ids_, kIdFormat, "aux-ids"); !r) return r;
+    if (auto r = make(linearDepth_, kLinearDepthFormat, "aux-linear-depth"); !r) return r;
+    linearDepthGroup_ = nullptr;
+    auxDebugGroup_ = nullptr;
+    return {};
+}
+
+void SceneRenderer::setQuality(QualityTier tier) {
+    tier_ = tier;
+    qualitySettings_ = QualitySettings::forTier(tier);
+    if (ao_) {
+        ao_->resetHistory();
+    }
+}
+
 Result<void> SceneRenderer::createPipelines() {
     auto pbr = shaders_.load("pbr.wgsl");
     if (!pbr) return std::unexpected(pbr.error());
@@ -328,6 +634,11 @@ Result<void> SceneRenderer::createPipelines() {
     auto tonemap = shaders_.load("tonemap.wgsl");
     if (!tonemap) return std::unexpected(tonemap.error());
     tonemapModule_ = *tonemap;
+    auto linear = shaders_.load("linear_depth.wgsl");
+    if (!linear) return std::unexpected(linear.error());
+    auto auxDebug = shaders_.load("aux_debug.wgsl");
+    if (!auxDebug) return std::unexpected(auxDebug.error());
+    pbrModule_ = *pbr;
 
     auto a = createLitPipeline(*pbr, LitVariant::OpaqueCull);
     if (!a) return std::unexpected(a.error());
@@ -344,6 +655,15 @@ Result<void> SceneRenderer::createPipelines() {
     auto s = createSkyboxPipeline(*sky);
     if (!s) return std::unexpected(s.error());
     skyboxPipeline_ = *s;
+    auto d = createDepthOnlyPipeline(*pbr);
+    if (!d) return std::unexpected(d.error());
+    depthOnlyPipeline_ = *d;
+    auto l = createLinearDepthPipeline(*linear);
+    if (!l) return std::unexpected(l.error());
+    linearDepthPipeline_ = *l;
+    auto x = createAuxDebugPipeline(*auxDebug);
+    if (!x) return std::unexpected(x.error());
+    auxDebugPipeline_ = *x;
     return {};
 }
 
@@ -397,19 +717,21 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
     blend.alpha.operation = wgpu::BlendOperation::Add;
     blend.alpha.srcFactor = wgpu::BlendFactor::One;
     blend.alpha.dstFactor = wgpu::BlendFactor::OneMinusSrcAlpha;
-    wgpu::ColorTargetState colorTarget{};
-    colorTarget.format = kHdrFormat;
-    colorTarget.blend = variant == LitVariant::Blend ? &blend : nullptr;
-    colorTarget.writeMask = wgpu::ColorWriteMask::All;
+    // Blended surfaces keep the auxiliary targets of the opaque geometry behind them (ADR-035):
+    // a normal or an identifier averaged over a transparency is worse than none.
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+    fillSceneTargets(colorTargets, kHdrFormat, variant == LitVariant::Blend ? &blend : nullptr,
+                     variant == LitVariant::Blend ? wgpu::ColorWriteMask::None : wgpu::ColorWriteMask::All);
     wgpu::FragmentState fragment{};
     fragment.module = module;
     fragment.entryPoint = "fs_main";
-    fragment.targetCount = 1;
-    fragment.targets = &colorTarget;
+    fragment.targetCount = kSceneTargetCount;
+    fragment.targets = colorTargets.data();
     wgpu::DepthStencilState depth{};
     depth.format = kDepthFormat;
     depth.depthWriteEnabled = variant == LitVariant::Blend ? wgpu::OptionalBool::False : wgpu::OptionalBool::True;
-    depth.depthCompare = wgpu::CompareFunction::Less;
+    depth.depthCompare = variant == LitVariant::Blend ? wgpu::CompareFunction::Less
+                                                      : wgpu::CompareFunction::LessEqual;
 
     wgpu::RenderPipelineDescriptor desc{};
     const char* label = variant == LitVariant::OpaqueCull ? "pbr-opaque" : variant == LitVariant::OpaqueNoCull ? "pbr-opaque-twosided" : "pbr-blend";
@@ -438,15 +760,13 @@ Result<wgpu::RenderPipeline> SceneRenderer::createGridPipeline(const wgpu::Shade
     blend.alpha.operation = wgpu::BlendOperation::Add;
     blend.alpha.srcFactor = wgpu::BlendFactor::One;
     blend.alpha.dstFactor = wgpu::BlendFactor::Zero;
-    wgpu::ColorTargetState colorTarget{};
-    colorTarget.format = kHdrFormat;
-    colorTarget.blend = &blend;
-    colorTarget.writeMask = wgpu::ColorWriteMask::All;
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+    fillSceneTargets(colorTargets, kHdrFormat, &blend);
     wgpu::FragmentState fragment{};
     fragment.module = module;
     fragment.entryPoint = "fs_main";
-    fragment.targetCount = 1;
-    fragment.targets = &colorTarget;
+    fragment.targetCount = kSceneTargetCount;
+    fragment.targets = colorTargets.data();
     wgpu::DepthStencilState depth{};
     depth.format = kDepthFormat;
     depth.depthWriteEnabled = wgpu::OptionalBool::False;
@@ -470,14 +790,13 @@ Result<wgpu::RenderPipeline> SceneRenderer::createGridPipeline(const wgpu::Shade
 }
 
 Result<wgpu::RenderPipeline> SceneRenderer::createSkyboxPipeline(const wgpu::ShaderModule& module) {
-    wgpu::ColorTargetState colorTarget{};
-    colorTarget.format = kHdrFormat;
-    colorTarget.writeMask = wgpu::ColorWriteMask::All;
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+    fillSceneTargets(colorTargets, kHdrFormat, nullptr);
     wgpu::FragmentState fragment{};
     fragment.module = module;
     fragment.entryPoint = "fs_sky";
-    fragment.targetCount = 1;
-    fragment.targets = &colorTarget;
+    fragment.targetCount = kSceneTargetCount;
+    fragment.targets = colorTargets.data();
     wgpu::DepthStencilState depth{};
     depth.format = kDepthFormat;
     depth.depthWriteEnabled = wgpu::OptionalBool::False;
@@ -495,6 +814,131 @@ Result<wgpu::RenderPipeline> SceneRenderer::createSkyboxPipeline(const wgpu::Sha
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
     return finishPipeline(desc, "skybox-pipeline");
+}
+
+// Depth-only entities and meshed SDFs: the same vertex stage as the lit pipeline, so the depth it
+// writes matches exactly, used by the prepass and by every shadow view (ADR-034).
+Result<wgpu::RenderPipeline> SceneRenderer::createDepthOnlyPipeline(const wgpu::ShaderModule& module) {
+    VertexLayoutStorage vertex;
+    wgpu::FragmentState fragment{};
+    fragment.module = module;
+    fragment.entryPoint = "fs_depth";
+    fragment.targetCount = 0;
+    fragment.targets = nullptr;
+    wgpu::DepthStencilState depth{};
+    depth.format = kDepthFormat;
+    depth.depthWriteEnabled = wgpu::OptionalBool::True;
+    depth.depthCompare = wgpu::CompareFunction::Less;
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "depth-only";
+    desc.layout = scenePipelineLayout_;
+    desc.vertex.module = module;
+    desc.vertex.entryPoint = "vs_main";
+    desc.vertex.bufferCount = 1;
+    desc.vertex.buffers = &vertex.layout;
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.frontFace = wgpu::FrontFace::CCW;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+    desc.depthStencil = &depth;
+    desc.multisample.count = 1;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    return finishPipeline(desc, "depth-only");
+}
+
+Result<wgpu::RenderPipeline> SceneRenderer::createLinearDepthPipeline(const wgpu::ShaderModule& module) {
+    const auto& device = context_.device();
+    if (!linearDepthLayout_) {
+        wgpu::BindGroupLayoutEntry entry{};
+        entry.binding = 0;
+        entry.visibility = wgpu::ShaderStage::Fragment;
+        entry.texture.sampleType = wgpu::TextureSampleType::Depth;
+        entry.texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        wgpu::BindGroupLayoutDescriptor layoutDesc{};
+        layoutDesc.label = "linear-depth-layout";
+        layoutDesc.entryCount = 1;
+        layoutDesc.entries = &entry;
+        linearDepthLayout_ = device.CreateBindGroupLayout(&layoutDesc);
+    }
+    const std::array<wgpu::BindGroupLayout, 2> layouts = {frameLayout_, linearDepthLayout_};
+    wgpu::PipelineLayoutDescriptor layoutDesc{};
+    layoutDesc.label = "linear-depth-pipeline-layout";
+    layoutDesc.bindGroupLayoutCount = layouts.size();
+    layoutDesc.bindGroupLayouts = layouts.data();
+    wgpu::PipelineLayout layout = device.CreatePipelineLayout(&layoutDesc);
+    wgpu::ColorTargetState colorTarget{};
+    colorTarget.format = kLinearDepthFormat;
+    colorTarget.writeMask = wgpu::ColorWriteMask::All;
+    wgpu::FragmentState fragment{};
+    fragment.module = module;
+    fragment.entryPoint = "fs_linear_depth";
+    fragment.targetCount = 1;
+    fragment.targets = &colorTarget;
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "linear-depth";
+    desc.layout = layout;
+    desc.vertex.module = module;
+    desc.vertex.entryPoint = "vs_linear_depth";
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+    desc.multisample.count = 1;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    return finishPipeline(desc, "linear-depth");
+}
+
+Result<wgpu::RenderPipeline> SceneRenderer::createAuxDebugPipeline(const wgpu::ShaderModule& module) {
+    const auto& device = context_.device();
+    if (!auxDebugUniforms_) {
+        wgpu::BufferDescriptor bufferDesc{};
+        bufferDesc.label = "aux-debug-uniforms";
+        bufferDesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+        bufferDesc.size = sizeof(glm::vec4);
+        auxDebugUniforms_ = device.CreateBuffer(&bufferDesc);
+    }
+    if (!auxDebugLayout_) {
+        std::array<wgpu::BindGroupLayoutEntry, 7> entries{};
+        entries[0].binding = 0;
+        entries[0].visibility = wgpu::ShaderStage::Fragment;
+        entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[0].buffer.minBindingSize = sizeof(glm::vec4);
+        for (std::uint32_t i = 1; i < 7; ++i) {
+            entries[i].binding = i;
+            entries[i].visibility = wgpu::ShaderStage::Fragment;
+            entries[i].texture.sampleType = i == 4 ? wgpu::TextureSampleType::Uint
+                                                   : wgpu::TextureSampleType::UnfilterableFloat;
+            entries[i].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        }
+        wgpu::BindGroupLayoutDescriptor layoutDesc{};
+        layoutDesc.label = "aux-debug-layout";
+        layoutDesc.entryCount = entries.size();
+        layoutDesc.entries = entries.data();
+        auxDebugLayout_ = device.CreateBindGroupLayout(&layoutDesc);
+    }
+    wgpu::PipelineLayoutDescriptor layoutDesc{};
+    layoutDesc.label = "aux-debug-pipeline-layout";
+    layoutDesc.bindGroupLayoutCount = 1;
+    layoutDesc.bindGroupLayouts = &auxDebugLayout_;
+    wgpu::PipelineLayout layout = device.CreatePipelineLayout(&layoutDesc);
+    wgpu::ColorTargetState colorTarget{};
+    colorTarget.format = kHdrFormat;
+    colorTarget.writeMask = wgpu::ColorWriteMask::All;
+    wgpu::FragmentState fragment{};
+    fragment.module = module;
+    fragment.entryPoint = "fs_aux";
+    fragment.targetCount = 1;
+    fragment.targets = &colorTarget;
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "aux-debug";
+    desc.layout = layout;
+    desc.vertex.module = module;
+    desc.vertex.entryPoint = "vs_aux";
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+    desc.multisample.count = 1;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    return finishPipeline(desc, "aux-debug");
 }
 
 Result<wgpu::RenderPipeline> SceneRenderer::tonemapPipelineFor(wgpu::TextureFormat format) {
@@ -546,6 +990,11 @@ Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
         return std::unexpected(target.error());
     }
     hdr_ = std::move(*target);
+    if (auto r = createAuxTargets(width, height); !r) {
+        return r;
+    }
+    rebuildFrameBindGroups();
+    ao_->resetHistory();
     tonemapBindGroup_ = nullptr;
     tonemapBoundView_ = nullptr;
     tonemapGroups_.clear();
@@ -851,6 +1300,69 @@ const wgpu::BindGroup& SceneRenderer::materialBindGroup(const scene::Material& m
     return materialBindGroups_.emplace(key, context_.device().CreateBindGroup(&desc)).first->second;
 }
 
+// Packs this frame's lights, chooses the shadow views, uploads both and encodes the froxel build
+// (ADR-033). `frame` gains the cluster and light counts the shading pass reads.
+void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const glm::mat4& view,
+                                 float aspect, FrameUniforms& frame) {
+    const std::uint32_t directional = orderLightsForShading(scene.lights, lightOrder_);
+    const auto total = static_cast<std::uint32_t>(lightOrder_.size());
+
+    // A radius that covers what the camera can see: the lit bounds when there are any, otherwise
+    // how far the camera stands off its target. It sizes the cascades and the caster range.
+    const auto [lo, hi] = scene.bounds();
+    float sceneRadius = glm::length(hi - lo) * 0.5f;
+    sceneRadius = std::max(sceneRadius, glm::length(scene.camera.target - scene.camera.position));
+    sceneRadius = std::clamp(sceneRadius, 1.0f, std::max(scene.camera.farPlane, 2.0f));
+
+    const double shadowMs = stats_.shadows.shadowMs;
+    shadows_->update(lightOrder_, frame.viewProj, scene.camera.nearPlane, scene.camera.farPlane, sceneRadius,
+                     qualitySettings_);
+    stats_.shadows = shadows_->stats();
+    stats_.shadows.shadowMs = shadowMs;
+
+    for (std::uint32_t i = 0; i < total; ++i) {
+        bool cascaded = false;
+        const int shadowView = shadows_->viewForLight(i, cascaded);
+        lightStaging_[i] = packLight(*lightOrder_[i], shadowView, cascaded);
+    }
+    if (total > 0) {
+        context_.queue().WriteBuffer(lightBuffer_, 0, lightStaging_.data(),
+                                     static_cast<std::size_t>(total) * sizeof(GpuLight));
+    }
+
+    // ---- the froxel grid: local lights only, in view space ----
+    const bool clustered = qualitySettings_.clusteredLighting;
+    ClusterGrid grid;
+    grid.zNear = std::max(scene.camera.nearPlane, 0.01f);
+    grid.zFar = std::max(scene.camera.farPlane, grid.zNear * 2.0f);
+    grid.tanHalfFovY = std::tan(scene.camera.effectiveFovY() * 0.5f);
+    grid.aspect = aspect;
+    frame.clusterParams = glm::vec4(static_cast<float>(grid.x), static_cast<float>(grid.y),
+                                    static_cast<float>(grid.z), clustered ? 1.0f : 0.0f);
+    frame.clusterDepth = glm::vec4(grid.sliceScale(), grid.sliceBias(), grid.zNear, grid.zFar);
+    frame.lightCounts = glm::vec4(static_cast<float>(directional), static_cast<float>(total), 0.0f, 0.0f);
+    stats_.clusteredLights = clustered ? total - directional : 0;
+    if (!clustered) {
+        return;
+    }
+    ClusterParamsGpu params{};
+    params.grid = glm::uvec4(grid.x, grid.y, grid.z, total - directional);
+    params.depth = glm::vec4(grid.zNear, grid.zFar, grid.tanHalfFovY * grid.aspect, grid.tanHalfFovY);
+    for (std::uint32_t i = directional; i < total; ++i) {
+        const scene::PunctualLight& light = *lightOrder_[i];
+        const glm::vec3 viewPos = glm::vec3(view * glm::vec4(light.position, 1.0f));
+        params.lights[i - directional] = glm::vec4(viewPos, lightInfluenceRadius(light));
+    }
+    context_.queue().WriteBuffer(clusterParams_, 0, &params, sizeof(params));
+    wgpu::ComputePassDescriptor desc{};
+    desc.label = "cluster-build-pass";
+    wgpu::ComputePassEncoder pass = encoder.BeginComputePass(&desc);
+    pass.SetPipeline(clusterPipeline_);
+    pass.SetBindGroup(0, clusterBindGroup_);
+    pass.DispatchWorkgroups((grid.x + 3) / 4, (grid.y + 3) / 4, (grid.z + 3) / 4);
+    pass.End();
+}
+
 Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
                                    const gpu::TargetView& target, const ShaderFrameInputs* shaderInputs) {
     if (!initialised_) {
@@ -861,6 +1373,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             return r;
         }
     }
+    stats_.shadows.shadowMs = shadowTimer_->collect();
     uploadMeshes(scene);
     uploadTextures(scene);
     updateEnvironment(scene);
@@ -895,11 +1408,17 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     frame.viewProj = proj * view;
     frame.invViewProj = glm::inverse(frame.viewProj);
     frame.cameraPos = glm::vec4(scene.camera.position, 1.0f);
+    frame.prevViewProj = havePrevViewProj_ ? prevViewProj_ : frame.viewProj;
     {
         const glm::mat4 invView = glm::inverse(view);
         frame.cameraRight = glm::vec4(glm::normalize(glm::vec3(invView[0])), 0.0f);
         frame.cameraUp = glm::vec4(glm::normalize(glm::vec3(invView[1])), 0.0f);
+        // The camera looks down -Z in view space; the froxel grid and the contact-shadow march
+        // measure depth along this axis.
+        frame.cameraForward = glm::vec4(-glm::normalize(glm::vec3(invView[2])), 0.0f);
     }
+    frame.targetSize = glm::vec4(static_cast<float>(hdr_.width()), static_cast<float>(hdr_.height()),
+                                 1.0f / static_cast<float>(hdr_.width()), 1.0f / static_cast<float>(hdr_.height()));
     const bool ibl = ibl_.valid && scene.environment.environmentMap != scene::kInvalidTexture;
     frame.params = glm::vec4(static_cast<float>(time.renderTime), scene.environment.gridIntensity,
                              scene.environment.brightness, scene.environment.environmentIntensity);
@@ -922,6 +1441,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                 ibl ? 1.0f : 0.0f);
     frame.skyParams = glm::vec4(scene.environment.backgroundColor, scene.environment.skyboxBlur);
     frame.fogParams = glm::vec4(scene.environment.fogColor, std::max(scene.environment.fogDensity, 0.0f));
+    // ---- lights, shadow views and the froxel grid (ADR-033/034) ----
+    updateLights(encoder, scene, view, aspect, frame);
+    frame.shadowParams = glm::vec4(static_cast<float>(shadows_->resolution()), 1.5f,
+                                   qualitySettings_.contactShadows
+                                       ? static_cast<float>(qualitySettings_.contactSteps)
+                                       : 0.0f,
+                                   0.6f);
     // ADR-030 audio inputs, from the analysis frame the caller passed (zero without one): the same
     // band picks as the user-shader std uniforms (engine.cpp), plus the centroid and the flux.
     if (shaderInputs != nullptr && shaderInputs->frame != nullptr) {
@@ -932,7 +1458,26 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.beat = glm::vec4(af.beatPhase, 1.0f - af.beatPhase, std::min(1.0f, af.onsetStrength / 2.0f),
                                std::fmod((static_cast<float>(af.beatCount) + af.beatPhase) * 0.25f, 1.0f));
     }
+    // ---- ambient occlusion (ADR-034): sized here so the frame block can carry its resolution ----
+    {
+        const float aoRadius = std::clamp(glm::length(scene.camera.target - scene.camera.position) * 0.05f,
+                                          0.15f, 4.0f);
+        ao_->update(hdr_.width(), hdr_.height(), linearDepth_.view, qualitySettings_, time.frameIndex,
+                    scene.camera.effectiveFovY(), aspect, scene.camera.nearPlane, scene.camera.farPlane,
+                    aoRadius, 1.0f);
+        stats_.ao = ao_->stats();
+        const bool on = ao_->active();
+        frame.aoParams = glm::vec4(on ? 1.0f : 0.0f, on ? 1.0f : 0.0f,
+                                   static_cast<float>(std::max(stats_.ao.width, 1u)),
+                                   static_cast<float>(std::max(stats_.ao.height, 1u)));
+    }
     queue.WriteBuffer(frameUniforms_, 0, &frame, sizeof(frame));
+    // Each shadow view is the same block with its own light-space matrix, so the depth-only passes
+    // reuse the ordinary vertex shaders (ADR-034).
+    shadows_->upload(&frame, sizeof(frame));
+    // The AO output and the shadow atlas are bound through the frame group, and both change layer
+    // count / target as the frame is set up.
+    rebuildFrameBindGroups();
 
     // ---- object uniforms (one 256-byte slot per visible entity) ----
     struct DrawItem {
@@ -958,6 +1503,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         ObjectUniforms obj{};
         obj.model = entity.transform.matrix();
         obj.normalMatrix = glm::transpose(glm::inverse(obj.model));
+        // Velocity needs last frame's matrix; keyed by name so reordering entities cannot make an
+        // object inherit another's motion (ADR-035).
+        {
+            const auto previous = prevModels_.find(entity.name);
+            obj.prevModel = previous != prevModels_.end() ? previous->second : obj.model;
+            prevModelsNext_.insert_or_assign(entity.name, obj.model);
+        }
         obj.baseColor = glm::vec4(m.baseColor, m.opacity);
         obj.emissive = glm::vec4(m.emissiveColor, m.emissiveIntensity);
         obj.material = glm::vec4(m.roughness, m.metallic, m.normalScale, m.occlusionStrength);
@@ -972,7 +1524,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         if (has(m.occlusionTexture)) mask |= 16;
         obj.flags = glm::vec4(static_cast<float>(m.alphaMode), m.alphaCutoff, m.unlit ? 1.0f : 0.0f,
                               static_cast<float>(mask));
-        obj.ids = glm::vec4(static_cast<float>(thisEntity), 0.0f, 0.0f, 0.0f);
+        // x = the ADR-030 `objectId` input; y = material id and z = bloom weight feed the
+        // identifier and emission targets (ADR-035).
+        obj.ids = glm::vec4(static_cast<float>(thisEntity), static_cast<float>(thisEntity + 1), 1.0f, 0.0f);
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
         const float depth = -(view * glm::vec4(entity.transform.position, 1.0f)).z;
@@ -992,6 +1546,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     }
     std::stable_sort(blended.begin(), blended.end(),
                      [](const DrawItem& a, const DrawItem& b) { return a.viewDepth > b.viewDepth; });
+    prevModels_.swap(prevModelsNext_);
+    prevModelsNext_.clear();
 
     TonemapUniforms tonemap{};
     tonemap.exposure = scene.environment.brightness;
@@ -1020,6 +1576,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     stats_.simulation = simulation_->stats();
 
     // ---- particle simulation (compute) ----
+    particles_->setPreviousViewProjection(frame.prevViewProj); // ADR-035: particles write velocity
     particles_->update(encoder, scene, time, view, proj, fields_.get(), splines_.get());
     stats_.particles = particles_->stats();
 
@@ -1037,7 +1594,55 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     sdfs_->update(scene, time, frame.viewProj, fields_.get());
     stats_.sdf = sdfs_->stats();
 
-    // ---- pass 1: scene -> HDR ----
+    // ---- shadow depth passes (ADR-034): one per cascade / spot map, depth only ----
+    // Every caster is drawn with its ordinary vertex shader against a frame block whose
+    // view-projection is the light's, so entities, procedural instances and SDFs need no second
+    // data path. The raymarched SDFs march their bounding box at a quarter of the steps.
+    const std::uint32_t shadowViews = std::min(shadows_->stats().views, kMaxShadowViews);
+    for (std::uint32_t v = 0; v < shadowViews; ++v) {
+        wgpu::RenderPassDepthStencilAttachment depth{};
+        depth.view = shadows_->layerView(v);
+        depth.depthLoadOp = wgpu::LoadOp::Clear;
+        depth.depthStoreOp = wgpu::StoreOp::Store;
+        depth.depthClearValue = 1.0f;
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = "shadow-pass";
+        pass.colorAttachmentCount = 0;
+        pass.depthStencilAttachment = &depth;
+        // One timer spanning every shadow view, so the budget in docs/performance is measurable.
+        if (shadowViews == 1) {
+            pass.timestampWrites = shadowTimer_->passWrites();
+        } else if (v == 0) {
+            pass.timestampWrites = shadowTimer_->beginWrites();
+        } else if (v + 1 == shadowViews) {
+            pass.timestampWrites = shadowTimer_->endWrites();
+        }
+        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        rp.SetBindGroup(0, shadowFrameGroups_[v]);
+        rp.SetBindGroup(3, iblBindGroup_);
+        rp.SetPipeline(depthOnlyPipeline_);
+        for (const auto& item : opaque) {
+            const GpuMesh& mesh = meshes_[item.entity->mesh];
+            rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
+            rp.SetBindGroup(2, materialBindGroup(item.entity->material));
+            rp.SetVertexBuffer(0, mesh.vertices);
+            rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
+            rp.DrawIndexed(mesh.indexCount);
+        }
+        sdfs_->drawMeshes(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
+                          &depthOnlyPipeline_);
+        procedurals_->drawDepthOnly(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
+        sdfs_->drawRaymarchDepth(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
+                                 true);
+        rp.End();
+    }
+    if (shadowViews > 0) {
+        shadowTimer_->resolve(encoder);
+    }
+
+    // ---- background pass: the HDR clear and the background user-shader layers ----
+    // These are fullscreen quads with a single colour output, so they get their own pass; the
+    // geometry pass that follows loads the colour and clears the auxiliary targets.
     {
         wgpu::RenderPassColorAttachment color{};
         color.view = hdr_.colorView();
@@ -1045,30 +1650,117 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         color.storeOp = wgpu::StoreOp::Store;
         const auto& bg = scene.environment.backgroundColor;
         color.clearValue = {static_cast<double>(bg.r), static_cast<double>(bg.g), static_cast<double>(bg.b), 1.0};
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = "background-pass";
+        pass.colorAttachmentCount = 1;
+        pass.colorAttachments = &color;
+        pass.timestampWrites = timer_->beginWrites();
+        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        if (layerSet != nullptr) {
+            for (const auto& layer : layerSet->layers()) {
+                if (layer->enabled && layer->stage == shaders::LayerStage::Background) {
+                    if (auto* gpuLayer = shaderStack_->find(layer->id)) {
+                        gpuLayer->drawOutput(rp, kHdrFormat, false, *layer, shaderCtx);
+                        ++stats_.drawCalls;
+                    }
+                }
+            }
+        }
+        rp.End();
+    }
+
+    // ---- depth prepass: the scene depth, before anything reads it ----
+    // Ambient occlusion and the contact-shadow march both need the depth of the whole opaque scene
+    // while it is being shaded, which a forward pass cannot give them (ADR-034/035). The prepass is
+    // cheap - no fragment work - and the shading pass then tests LessEqual against it.
+    const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows;
+    if (needsDepthPrepass) {
         wgpu::RenderPassDepthStencilAttachment depth{};
         depth.view = hdr_.depthView();
         depth.depthLoadOp = wgpu::LoadOp::Clear;
         depth.depthStoreOp = wgpu::StoreOp::Store;
         depth.depthClearValue = 1.0f;
         wgpu::RenderPassDescriptor pass{};
-        pass.label = "scene-pass";
-        pass.colorAttachmentCount = 1;
-        pass.colorAttachments = &color;
+        pass.label = "depth-prepass";
+        pass.colorAttachmentCount = 0;
         pass.depthStencilAttachment = &depth;
-        pass.timestampWrites = timer_->beginWrites();
+        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        rp.SetBindGroup(0, frameBindGroupAux_);
+        rp.SetBindGroup(3, iblBindGroup_);
+        rp.SetPipeline(depthOnlyPipeline_);
+        for (const auto& item : opaque) {
+            const GpuMesh& mesh = meshes_[item.entity->mesh];
+            rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
+            rp.SetBindGroup(2, materialBindGroup(item.entity->material));
+            rp.SetVertexBuffer(0, mesh.vertices);
+            rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
+            rp.DrawIndexed(mesh.indexCount);
+        }
+        sdfs_->drawMeshes(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
+                          &depthOnlyPipeline_);
+        procedurals_->drawDepthOnly(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
+        sdfs_->drawRaymarchDepth(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
+        rp.End();
+
+        // ---- linear depth: the R32F view distance AO and the contact march read ----
+        if (!linearDepthGroup_ || linearDepthBoundView_.Get() != hdr_.depthView().Get()) {
+            wgpu::BindGroupEntry entry{};
+            entry.binding = 0;
+            entry.textureView = hdr_.depthView();
+            wgpu::BindGroupDescriptor desc{};
+            desc.label = "linear-depth-group";
+            desc.layout = linearDepthLayout_;
+            desc.entryCount = 1;
+            desc.entries = &entry;
+            linearDepthGroup_ = context_.device().CreateBindGroup(&desc);
+            linearDepthBoundView_ = hdr_.depthView();
+        }
+        wgpu::RenderPassColorAttachment colour{};
+        colour.view = linearDepth_.view;
+        colour.loadOp = wgpu::LoadOp::Clear;
+        colour.storeOp = wgpu::StoreOp::Store;
+        colour.clearValue = {1.0e7, 0.0, 0.0, 0.0};
+        wgpu::RenderPassDescriptor linearPass{};
+        linearPass.label = "linear-depth-pass";
+        linearPass.colorAttachmentCount = 1;
+        linearPass.colorAttachments = &colour;
+        wgpu::RenderPassEncoder lrp = encoder.BeginRenderPass(&linearPass);
+        lrp.SetPipeline(linearDepthPipeline_);
+        lrp.SetBindGroup(0, frameBindGroupAux_);
+        lrp.SetBindGroup(1, linearDepthGroup_);
+        lrp.Draw(3);
+        lrp.End();
+
+        // ---- ground-truth ambient occlusion (ADR-034) ----
+        ao_->encode(encoder, frameBindGroupAux_);
+    }
+
+    // ---- pass 1: scene -> HDR + the auxiliary targets (ADR-035) ----
+    {
+        std::array<wgpu::RenderPassColorAttachment, kSceneTargetCount> attachments{};
+        attachments[0].view = hdr_.colorView();
+        attachments[0].loadOp = wgpu::LoadOp::Load; // the background pass already cleared it
+        attachments[0].storeOp = wgpu::StoreOp::Store;
+        const std::array<wgpu::TextureView, kAuxTargetCount> auxViews = {normalRough_.view, velocity_.view,
+                                                                         emission_.view, ids_.view};
+        for (std::uint32_t i = 0; i < kAuxTargetCount; ++i) {
+            attachments[i + 1].view = auxViews[i];
+            attachments[i + 1].loadOp = wgpu::LoadOp::Clear;
+            attachments[i + 1].storeOp = wgpu::StoreOp::Store;
+            attachments[i + 1].clearValue = {0.0, 0.0, 0.0, 0.0};
+        }
+        wgpu::RenderPassDepthStencilAttachment depth{};
+        depth.view = hdr_.depthView();
+        depth.depthLoadOp = needsDepthPrepass ? wgpu::LoadOp::Load : wgpu::LoadOp::Clear;
+        depth.depthStoreOp = wgpu::StoreOp::Store;
+        depth.depthClearValue = 1.0f;
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = "scene-pass";
+        pass.colorAttachmentCount = kSceneTargetCount;
+        pass.colorAttachments = attachments.data();
+        pass.depthStencilAttachment = &depth;
 
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
-        // Background user shaders first (fullscreen, no depth write), then the scene on top.
-        if (layerSet != nullptr) {
-            for (const auto& layer : layerSet->layers()) {
-                if (layer->enabled && layer->stage == shaders::LayerStage::Background) {
-                    if (auto* gpuLayer = shaderStack_->find(layer->id)) {
-                        gpuLayer->drawOutput(rp, kHdrFormat, true, *layer, shaderCtx);
-                        ++stats_.drawCalls;
-                    }
-                }
-            }
-        }
         rp.SetBindGroup(0, frameBindGroup_);
         rp.SetBindGroup(3, iblBindGroup_);
         auto drawItems = [&](const std::vector<DrawItem>& items, bool lit) {
@@ -1106,14 +1798,18 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         stats_.triangles += stats_.sdf.meshTriangles;
         if (sdfs_->hasRaymarchWork()) {
             rp.End();
-            sdfs_->encodeRaymarchPass(encoder, hdr_.colorView(), hdr_.depthView(), frameBindGroup_, iblBindGroup_, scene,
-                                      [this](const scene::Material& m) { return materialBindGroup(m); });
+            const std::array<wgpu::TextureView, kAuxTargetCount> raymarchAux = {normalRough_.view, velocity_.view,
+                                                                                emission_.view, ids_.view};
+            sdfs_->encodeRaymarchPass(encoder, hdr_.colorView(), hdr_.depthView(), frameBindGroup_, iblBindGroup_,
+                                      scene, [this](const scene::Material& m) { return materialBindGroup(m); },
+                                      raymarchAux.data(), kAuxTargetCount);
             stats_.drawCalls += stats_.sdf.raymarchObjects;
             stats_.triangles += stats_.sdf.raymarchObjects * 2;
-            color.loadOp = wgpu::LoadOp::Load;
+            for (auto& attachment : attachments) {
+                attachment.loadOp = wgpu::LoadOp::Load;
+            }
             depth.depthLoadOp = wgpu::LoadOp::Load;
             pass.label = "scene-pass-after-sdf";
-            pass.timestampWrites = nullptr;
             rp = encoder.BeginRenderPass(&pass);
             rp.SetBindGroup(0, frameBindGroup_);
             rp.SetBindGroup(3, iblBindGroup_);
@@ -1223,6 +1919,53 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     }
     prevViewProj_ = frame.viewProj;
     havePrevViewProj_ = true;
+
+    // ---- auxiliary-target debug view (ADR-035): one target full-screen, before tone mapping ----
+    if (auxDebugView_ != AuxDebugView::None) {
+        if (!auxDebugGroup_) {
+            std::array<wgpu::BindGroupEntry, 7> entries{};
+            entries[0].binding = 0;
+            entries[0].buffer = auxDebugUniforms_;
+            entries[0].size = sizeof(glm::vec4);
+            entries[1].binding = 1;
+            entries[1].textureView = normalRough_.view;
+            entries[2].binding = 2;
+            entries[2].textureView = velocity_.view;
+            entries[3].binding = 3;
+            entries[3].textureView = emission_.view;
+            entries[4].binding = 4;
+            entries[4].textureView = ids_.view;
+            entries[5].binding = 5;
+            entries[5].textureView = ao_->output();
+            entries[6].binding = 6;
+            entries[6].textureView = linearDepth_.view;
+            wgpu::BindGroupDescriptor desc{};
+            desc.label = "aux-debug-group";
+            desc.layout = auxDebugLayout_;
+            desc.entryCount = entries.size();
+            desc.entries = entries.data();
+            auxDebugGroup_ = context_.device().CreateBindGroup(&desc);
+        }
+        const glm::vec4 info(static_cast<float>(auxDebugView_),
+                             auxDebugView_ == AuxDebugView::Velocity ? 40.0f : 1.0f,
+                             static_cast<float>(hdr_.width()), static_cast<float>(hdr_.height()));
+        queue.WriteBuffer(auxDebugUniforms_, 0, &info, sizeof(info));
+        wgpu::RenderPassColorAttachment colour{};
+        colour.view = finalHdr;
+        colour.loadOp = wgpu::LoadOp::Clear;
+        colour.storeOp = wgpu::StoreOp::Store;
+        colour.clearValue = {0.0, 0.0, 0.0, 1.0};
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = "aux-debug-pass";
+        pass.colorAttachmentCount = 1;
+        pass.colorAttachments = &colour;
+        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        rp.SetPipeline(auxDebugPipeline_);
+        rp.SetBindGroup(0, auxDebugGroup_);
+        rp.Draw(3);
+        rp.End();
+        ++stats_.drawCalls;
+    }
 
     // ---- pass 2: tonemap -> target ----
     {

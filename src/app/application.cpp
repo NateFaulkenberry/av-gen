@@ -63,6 +63,9 @@ std::string usageText() {
            "  --frames <n>        exit after n frames\n"
            "  --stress <seed>     apply random slider-like actions every frame (seek, params, routes, volume)\n"
            "  --capture <file>    write the last frame as a PPM image\n"
+           "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
+           "                      emission|ids|occlusion|depth\n"
+           "  --tier <t>          quality tier: preview|realtime|high|offline\n"
            "  --headless          no window: offline mode, fixed-step clock, precomputed analysis\n"
            "  --fps <n>           offline frame rate (default 60)\n"
            "  --size <w>x<h>      window size in points (default 1440x900)\n"
@@ -216,6 +219,16 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             options.capture = *v;
             ++i;
+        } else if (arg == "--debug-target") {
+            auto v = need(i, "--debug-target");
+            if (!v) return std::unexpected(v.error());
+            options.debugTarget = *v;
+            ++i;
+        } else if (arg == "--tier") {
+            auto v = need(i, "--tier");
+            if (!v) return std::unexpected(v.error());
+            options.qualityTier = *v;
+            ++i;
         } else if (arg == "--stress") {
             auto v = need(i, "--stress");
             if (!v) return std::unexpected(v.error());
@@ -315,6 +328,30 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     }
     if (auto r = renderer_->init(); !r) {
         return std::unexpected(r.error());
+    }
+    if (!options_.qualityTier.empty()) {
+        rendering::QualityTier tier = rendering::QualityTier::Realtime;
+        if (!rendering::qualityTierFromName(options_.qualityTier, tier)) {
+            return fail("unknown quality tier '{}' (preview|realtime|high|offline)", options_.qualityTier);
+        }
+        renderer_->setQuality(tier);
+    }
+    if (!options_.debugTarget.empty()) {
+        static constexpr rendering::AuxDebugView kViews[] = {
+            rendering::AuxDebugView::None,      rendering::AuxDebugView::Normal,
+            rendering::AuxDebugView::Roughness, rendering::AuxDebugView::Velocity,
+            rendering::AuxDebugView::Emission,  rendering::AuxDebugView::Ids,
+            rendering::AuxDebugView::Occlusion, rendering::AuxDebugView::Depth};
+        bool found = false;
+        for (const auto view : kViews) {
+            if (options_.debugTarget == rendering::auxDebugViewName(view)) {
+                renderer_->setAuxDebugView(view);
+                found = true;
+            }
+        }
+        if (!found) {
+            return fail("unknown debug target '{}'", options_.debugTarget);
+        }
     }
 
     if (window_) {
