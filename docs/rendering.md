@@ -29,7 +29,8 @@ encoder = device.CreateCommandEncoder()
                        opaque PBR entities (pbr.wgsl; back-face cull, or none for doubleSided)
                        procedural geometry (procedural.wgsl; one DrawIndexed(indexCount, instanceCount)
                          per object, deformer stack in the vertex stage, same fragment shading; ADR-023)
-                       skybox (skybox.wgsl, far plane, LessEqual) when an environment is set
+                       skybox (skybox.wgsl, far plane, LessEqual) when an environment map is set,
+                         or when the procedural sky asks to be the background (ADR-036)
                        grid entities (grid.wgsl, additive, depth test only)
                        particles (particles.wgsl, indirect draw, additive/alpha, depth test only)
                        alpha-blended PBR entities, sorted back to front
@@ -51,7 +52,8 @@ encoder = device.CreateCommandEncoder()
                               procedural geometry (procedural.wgsl; one DrawIndexed(indexCount,
                                 instanceCount) per object, deformer stack in the vertex stage; ADR-023)
                               meshed SDFs, then "sdf-raymarch-pass" for raymarched ones
-                              skybox (skybox.wgsl, far plane, LessEqual) when an environment is set
+                              skybox (skybox.wgsl, far plane, LessEqual) when an environment map is set,
+                         or when the procedural sky asks to be the background (ADR-036)
                               grid entities (grid.wgsl, additive, depth test only)
                               particles (particles.wgsl, indirect draw, additive/alpha, depth test only)
                               alpha-blended PBR entities, sorted back to front
@@ -123,6 +125,12 @@ normal) or a hemispheric fallback when no map is set.
 
 Textures are uploaded with CPU-generated mip chains (sRGB filtered in linear space); HDR maps as
 RGBA16Float. Uploads happen when `Scene::textureVersion` changes.
+
+**Image-based lighting always exists** (ADR-036): with an HDR map, `EnvironmentProcessor::process`
+builds the cube/irradiance/prefiltered chain from it; without one, `processSky` builds the same
+chain from the analytic procedural sky (`scene/sky.hpp`, `docs/lighting.md`), hashed so it is built
+once per parameter change rather than per frame. The skybox is only *drawn* for a map, or for a sky
+that asks to stand behind the scene.
 
 Distance fog (`Environment::fogColor`, `fogDensity`; 0 = off) is exponential-squared in view
 distance, `mix(fogColor, color, exp(-(d * density)^2))`, applied in `pbr_shade.wgsl` after

@@ -1,7 +1,8 @@
 # Lighting
 
 Decisions: ADR-033 (clustered forward, area lights, colour temperature, light rigs), ADR-034
-(cascaded shadows, contact shadows, ground-truth occlusion), ADR-035 (auxiliary targets).
+(cascaded shadows, contact shadows, ground-truth occlusion), ADR-035 (auxiliary targets),
+ADR-036 (the procedural sky environment, below).
 Research: `docs/research/cinematic-lighting.md`, `docs/research/shadows-and-occlusion.md`.
 
 Everything below happens in `shaders/lighting.wgsl`, which `pbr_shade.wgsl` includes, so a mesh,
@@ -154,6 +155,90 @@ index - never a wall clock - and the temporal history is dropped whenever the fr
 advance by exactly one. Two renders of the same frame are therefore bit-identical, which a GPU test
 checks.
 
+## The procedural sky (ADR-036)
+
+A scene with no HDR environment map used to fall back to a two-colour hemispheric constant, which
+gave a 0.95-metallic surface nothing to reflect: metal rendered as flat dark grey, because a metal
+*is* its reflection. So when `environment.environmentMap` is unset, the renderer **synthesises an
+environment**: an analytic gradient sky with a sun disc, rendered into the same cube / irradiance /
+prefiltered chain the HDR path uses, so image-based lighting works identically either way.
+
+`scene::SkySettings` lives on `scene::Environment` and every field is a parameter under
+`env/sky/*`:
+
+| Field (`env/sky/…`) | Default | Meaning |
+|---|---|---|
+| `enabled` | **on** | consulted only when there is no environment map, so an existing scene gains reflections and keeps its look |
+| `zenithColor` | (0.055, 0.105, 0.235) | radiance straight up |
+| `horizonColor` | (0.300, 0.340, 0.420) | radiance at the horizon |
+| `groundColor` | (0.045, 0.042, 0.038) | radiance below the horizon |
+| `haze` | 0.25 | turbidity-like: how far up the horizon colour reaches. Small = a tight bright band (studio); large = an evenly bright dome (overcast) |
+| `sunColor` | (1.0, 0.93, 0.82) | tinted by the key light's colour and temperature |
+| `sunIntensity` | 8 | radiance of the disc, relative to the gradient |
+| `sunSize` | 0.045 rad | angular *radius* (~2.6 degrees; wider than the real sun so a 128 px prefiltered cube resolves it) |
+| `sunGlow` | 0.18 rad | width of the aureole around the disc |
+| `intensity` | 1 | multiplies the whole sky, **and is the IBL intensity the shading uses** |
+| `background` | off | draw the sky behind the scene instead of the flat background colour |
+| `useKeyLight` | on | take the sun direction from the scene's key light |
+| `sunDirection` | (0.35, 0.75, 0.55) | the direction *towards* the sun, used when `useKeyLight` is off or there is no key light |
+
+The model, exactly (`scene::skyRadiance`, transliterated by `fs_sky` in `shaders/environment.wgsl`):
+
+```
+h     = saturate(dir.y)
+haze  = exp(-h / max(hazeWidth, 1e-3))
+sky   = mix(zenithColor, horizonColor, haze)
+band  = smoothstep(-0.03, 0.03, dir.y)          // a soft horizon: no seam in the cube
+base  = mix(groundColor, sky, band)
+theta = angle(dir, sunDirection)
+r     = max(sunAngularRadius, minRadius)         // minRadius = one texel of the mip being written
+disc  = (1 - smoothstep(r * 0.85, r * 1.15, theta)) * (sunAngularRadius / r)^2
+glow  = exp(-theta / max(sunGlowWidth, 1e-3)) * 0.02
+out   = (base + sunColor * sunIntensity * (disc + glow) * band) * intensity
+```
+
+Notes on the two parts that are not obvious:
+
+- **The disc widens with the mip.** Instead of downsampling the cube to build its mip chain, each
+  mip renders the sky with the disc widened to at least one texel and its radiance scaled by
+  `(radius / widened)^2`. That conserves the disc's energy exactly, which is what keeps the sun
+  from disappearing between texels in the coarse mips the prefilter pass reads — and it keeps the
+  whole build analytic, deterministic and free of a downsample pass.
+- **The aureole is 2% of the disc.** Coupling the halo any harder to `sunIntensity` floods the whole
+  environment as soon as the sun is turned up enough to give a metal a real highlight, which is
+  exactly the setting a cinematic scene wants.
+
+### The sun and the key light
+
+`scene::skyKeyLight` picks the first enabled directional light with role `key`, else the first
+enabled directional light, else nothing. The sun direction is `-normalize(light.direction)` (a
+light's `direction` is the way the light travels), and the sun colour is multiplied by the light's
+colour and temperature **normalised to luminance 1**, so relighting with a warm key warms the
+reflections without the light's intensity doubling as sky brightness. Swap a light rig and the
+environment follows it.
+
+### Build and caching
+
+`SceneRenderer::updateEnvironment` resolves the settings against the scene's lights
+(`scene::resolveSky`), hashes the result (`SkyRuntime::hash`) and calls
+`EnvironmentProcessor::processSky` only when that hash changes — about **10 ms**, once, at the
+default 256 cube / 128 prefiltered (`docs/performance/surfaces.md`). Nothing about the sky is
+per-frame.
+
+Two lanes carry it to the shaders: `envParams.w` is already "IBL is live" and now covers the sky
+too, and `skyExtra` (x = the IBL came from the sky, y = draw it as the background) is new.
+`frame.params.w`, the IBL intensity the ambient term multiplies by, becomes `env/sky/intensity`
+rather than `env/intensity` when the sky is the source — several shipped scenes set
+`env/intensity` to 0 precisely because it did nothing without a map, and they should not go dark
+now that it would.
+
+The skybox is **not** drawn by default: a procedural sky is an IBL source first, and a scene with a
+near-black backdrop and a bright environment is a studio setup, not a mistake. `env/sky/background`
+turns the backdrop on.
+
+`scene::skyIrradiance` is the CPU reference for the irradiance cube — a fixed Fibonacci-hemisphere
+quadrature, so it is bit-deterministic and can be compared against the GPU's result in tests.
+
 ## Light rigs
 
 A rig is a named lighting setup expressed relative to the subject and the camera, so the same rig
@@ -276,4 +361,7 @@ if a world needs the milliseconds back.
 | `src/rendering/render_quality.hpp` | the tiers and what each scales |
 | `shaders/lighting.wgsl` | all of the shading above |
 | `shaders/clusters.wgsl`, `shaders/gtao.wgsl` | the froxel build and the occlusion passes |
+| `src/scene/sky.{hpp,cpp}` | the procedural sky: settings, the key-light sun, the analytic model, the irradiance reference |
+| `src/rendering/environment.{hpp,cpp}` | the IBL chain, fed by an HDR map (`process`) or by the sky (`processSky`) |
+| `shaders/environment.wgsl` | the cube, irradiance, prefilter, BRDF and `fs_sky` passes |
 | `examples/lightrigs/` | the six rigs |

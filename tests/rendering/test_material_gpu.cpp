@@ -70,15 +70,15 @@ scene::MaterialResult harnessBase() {
 
 // ---- the compute harness --------------------------------------------------------------------------
 
-// 12 vec4s per context (the last is padding); results are 3 vec4s per context. The base values are
-// baked in so both sides start from harnessBase().
+// 14 vec4s per context (ADR-036 added the geometric inputs); results are 4 vec4s per context. The
+// base values are baked in so both sides start from harnessBase().
 constexpr const char* kKernel = R"(
 @group(0) @binding(0) var<uniform> fieldBlock: FieldBlock;
-@group(0) @binding(1) var<uniform> materialPrograms: MaterialProgramBlock;
+@group(0) @binding(1) var<storage, read> materialPrograms: MaterialProgramBlock;
 @group(0) @binding(2) var<storage, read> contexts: array<vec4<f32>>;
 @group(0) @binding(3) var<storage, read_write> results: array<vec4<f32>>;
 
-const CTX_STRIDE: u32 = 12u;
+const CTX_STRIDE: u32 = 14u;
 
 @compute @workgroup_size(64)
 fn cs_material(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -103,8 +103,15 @@ fn cs_material(@builtin(global_invocation_id) gid: vec3<u32>) {
     ctx.beat = contexts[b + 9u];
     ctx.viewDirection = contexts[b + 10u].xyz;
     let programIndex = i32(contexts[b + 10u].w);
+    ctx.curvature = contexts[b + 11u].x;
+    ctx.cavity = contexts[b + 11u].y;
+    ctx.occlusion = contexts[b + 11u].z;
+    ctx.height = contexts[b + 11u].w;
+    ctx.normalVariance = contexts[b + 12u].x;
+    ctx.footprint = contexts[b + 12u].y;
+    ctx.materialId = contexts[b + 12u].z;
 
-    var base: MaterialResult;
+    var base = materialResultZero();
     base.baseColor = vec3<f32>(0.8, 0.7, 0.6);
     base.metallic = 0.25;
     base.roughness = 0.35;
@@ -112,9 +119,10 @@ fn cs_material(@builtin(global_invocation_id) gid: vec3<u32>) {
     base.opacity = 0.9;
 
     let r = evaluateMaterialProgram(programIndex, ctx, base);
-    results[i * 3u] = vec4<f32>(r.baseColor, r.metallic);
-    results[i * 3u + 1u] = vec4<f32>(r.emission, r.roughness);
-    results[i * 3u + 2u] = vec4<f32>(r.opacity, 0.0, 0.0, 0.0);
+    results[i * 4u] = vec4<f32>(r.baseColor, r.metallic);
+    results[i * 4u + 1u] = vec4<f32>(r.emission, r.roughness);
+    results[i * 4u + 2u] = vec4<f32>(r.opacity, r.occlusion, r.height, 0.0);
+    results[i * 4u + 3u] = vec4<f32>(r.normal, 0.0);
 }
 )";
 
@@ -145,7 +153,7 @@ public:
             entries[i].visibility = wgpu::ShaderStage::Compute;
         }
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
-        entries[1].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[1].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         entries[2].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         entries[3].buffer.type = wgpu::BufferBindingType::Storage;
         entries[4].binding = 15;
@@ -175,10 +183,10 @@ public:
         rendering::MaterialPrograms block(ctx_);
         block.update(programs, &fieldBlock);
 
-        std::vector<glm::vec4> packed(cases.size() * 12, glm::vec4(0.0f));
+        std::vector<glm::vec4> packed(cases.size() * 14, glm::vec4(0.0f));
         for (std::size_t i = 0; i < cases.size(); ++i) {
             const scene::MaterialContext& c = cases[i].ctx;
-            glm::vec4* p = packed.data() + i * 12;
+            glm::vec4* p = packed.data() + i * 14;
             p[0] = glm::vec4(c.worldPosition, c.objectId);
             p[1] = glm::vec4(c.localPosition, c.instanceIndex);
             p[2] = glm::vec4(c.normal, c.instanceId);
@@ -190,6 +198,8 @@ public:
             p[8] = c.audioBands;
             p[9] = c.beat;
             p[10] = glm::vec4(c.viewDirection, static_cast<float>(cases[i].program));
+            p[11] = glm::vec4(c.curvature, c.cavity, c.occlusion, c.height);
+            p[12] = glm::vec4(c.normalVariance, c.footprint, c.materialId, 0.0f);
         }
 
         const auto& device = ctx_.device();
@@ -201,7 +211,7 @@ public:
         ctx_.queue().WriteBuffer(contexts, 0, packed.data(), cdesc.size);
         wgpu::BufferDescriptor rdesc{};
         rdesc.label = "material-harness-results";
-        rdesc.size = cases.size() * 3 * sizeof(glm::vec4);
+        rdesc.size = cases.size() * 4 * sizeof(glm::vec4);
         rdesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc;
         wgpu::Buffer results = device.CreateBuffer(&rdesc);
 
@@ -237,15 +247,18 @@ public:
         ctx_.queue().Submit(1, &commands);
         auto bytes = gpu::readBuffer(ctx_, results, 0, rdesc.size);
         REQUIRE(bytes.has_value());
-        std::vector<glm::vec4> raw(cases.size() * 3);
+        std::vector<glm::vec4> raw(cases.size() * 4);
         std::memcpy(raw.data(), bytes->data(), rdesc.size);
         std::vector<scene::MaterialResult> out(cases.size());
         for (std::size_t i = 0; i < cases.size(); ++i) {
-            out[i].baseColor = glm::vec3(raw[i * 3]);
-            out[i].metallic = raw[i * 3].w;
-            out[i].emission = glm::vec3(raw[i * 3 + 1]);
-            out[i].roughness = raw[i * 3 + 1].w;
-            out[i].opacity = raw[i * 3 + 2].x;
+            out[i].baseColor = glm::vec3(raw[i * 4]);
+            out[i].metallic = raw[i * 4].w;
+            out[i].emission = glm::vec3(raw[i * 4 + 1]);
+            out[i].roughness = raw[i * 4 + 1].w;
+            out[i].opacity = raw[i * 4 + 2].x;
+            out[i].occlusion = raw[i * 4 + 2].y;
+            out[i].height = raw[i * 4 + 2].z;
+            out[i].normal = glm::vec3(raw[i * 4 + 3]);
         }
         return out;
     }
@@ -343,6 +356,15 @@ std::vector<scene::MaterialContext> makeContexts() {
         c.beat = {std::fmod(t * 0.23f, 1.0f), 0.5f, 0.8f, 0.25f};
         c.viewDirection = glm::normalize(glm::vec3(0.2f, 0.4f, 1.0f - t * 0.05f));
         c.depth = 2.0f + t;
+        // ADR-036 geometric lanes: a spread that covers convex, flat and concave fragments, a
+        // footprint from "sharp" to "several noise periods per pixel", and both AO extremes.
+        c.curvature = (t - 4.5f) * 0.35f;
+        c.cavity = std::fmod(t * 0.17f, 1.0f);
+        c.occlusion = 1.0f - std::fmod(t * 0.11f, 1.0f);
+        c.height = std::fmod(t * 0.29f, 1.0f);
+        c.normalVariance = t * 0.011f;
+        c.footprint = t * 0.004f;
+        c.materialId = std::fmod(t, 4.0f);
         out.push_back(c);
     }
     return out;
@@ -377,7 +399,8 @@ void checkParity(MaterialHarness& harness, const std::vector<MaterialProgram>& p
         const scene::MaterialResult& g = gpu[i];
         const float worst = std::max({maxAbs(cpu.baseColor - g.baseColor), maxAbs(cpu.emission - g.emission),
                                       std::abs(cpu.metallic - g.metallic), std::abs(cpu.roughness - g.roughness),
-                                      std::abs(cpu.opacity - g.opacity)});
+                                      std::abs(cpu.opacity - g.opacity), maxAbs(cpu.normal - g.normal),
+                                      std::abs(cpu.occlusion - g.occlusion), std::abs(cpu.height - g.height)});
         if (worst > tolerance) {
             INFO("program '" << program.name << "' context " << (i % 10) << " differs by " << worst);
             CHECK(worst <= tolerance);
@@ -614,6 +637,199 @@ TEST_CASE("material program ops match the CPU interpreter", "[material][gpu]") {
     CHECK(ctx->errorCount() == 0);
 }
 
+// ---- ADR-036: the geometric inputs, the new ops and layers ---------------------------------------
+
+TEST_CASE("ADR-036 geometric inputs match the CPU interpreter", "[material][gpu]") {
+    auto ctx = makeContext();
+    MaterialHarness harness(*ctx);
+    const spatial::FieldSet noFields;
+    const auto build = [](const char* name, MaterialInput input) { return probe(name, {inputOp(input, 7)}); };
+    checkParity(harness,
+                {build("curvature", MaterialInput::Curvature), build("convexity", MaterialInput::Convexity),
+                 build("concavity", MaterialInput::Concavity), build("cavity", MaterialInput::Cavity),
+                 build("occlusion", MaterialInput::Occlusion), build("height", MaterialInput::Height),
+                 build("normalVariance", MaterialInput::NormalVariance),
+                 build("objectPosition", MaterialInput::ObjectPosition)},
+                noFields, 0.0);
+    checkParity(harness,
+                {build("triplanarWeights", MaterialInput::TriplanarWeights),
+                 build("cameraDistance", MaterialInput::CameraDistance),
+                 build("materialId", MaterialInput::MaterialId), build("footprint", MaterialInput::Footprint)},
+                noFields, 0.0);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("ADR-036 ops match the CPU interpreter", "[material][gpu]") {
+    auto ctx = makeContext();
+    MaterialHarness harness(*ctx);
+    const spatial::FieldSet noFields;
+    std::vector<MaterialProgram> batch;
+
+    {
+        MaterialOp o = op(MaterialOpKind::WorldProject, 7);
+        o.value = 1.7f;
+        o.constant = {0.3f, -0.6f, 0.2f, 0.0f};
+        batch.push_back(probe("worldProject", {o}));
+        o.kind = MaterialOpKind::ObjectProject;
+        batch.push_back(probe("objectProject", {o}));
+    }
+    {
+        MaterialOp o = op(MaterialOpKind::Triplanar, 7, 0);
+        o.value = 0.8f;
+        o.seed = 13;
+        o.constant = {0.2f, 0.0f, -0.4f, 0.0f};
+        o.constant2 = {4.0f, 0.0f, 0.0f, 0.0f};
+        batch.push_back(probe("triplanar", {inputOp(MaterialInput::WorldPosition, 0), o}));
+        MaterialOp sharp = o;
+        sharp.constant2 = {12.0f, 0.0f, 0.0f, 0.0f};
+        batch.push_back(probe("triplanarSharp", {inputOp(MaterialInput::WorldPosition, 0), sharp}));
+    }
+    {
+        MaterialOp o = op(MaterialOpKind::HeightBlend, 7, 1, 2, 3);
+        o.value = 0.35f;
+        batch.push_back(probe("heightBlend", {inputOp(MaterialInput::Height, 1),
+                                              inputOp(MaterialInput::Cavity, 2),
+                                              inputOp(MaterialInput::Occlusion, 3), o}));
+    }
+    {
+        MaterialOp o = op(MaterialOpKind::DetailNormal, 7, 1, 2);
+        batch.push_back(probe("detailNormal", {inputOp(MaterialInput::Normal, 1),
+                                               constantOp(2, {-0.3f, 0.2f, 0.9f, 0.0f}), o}));
+    }
+    {
+        MaterialOp o = op(MaterialOpKind::CurvatureMask, 7);
+        o.value = 1.8f;
+        o.constant = {0.05f, 0.7f, 0.0f, 0.0f};
+        batch.push_back(probe("curvatureMask", {o}));
+    }
+    {
+        MaterialOp o = op(MaterialOpKind::EdgeWear, 7);
+        o.value = 2.5f;
+        o.constant = {1.3f, 0.4f, -0.2f, 0.7f};
+        o.constant2 = {0.6f, 0.05f, 0.85f, 0.0f};
+        o.seed = 23;
+        batch.push_back(probe("edgeWear", {o}));
+    }
+    checkParity(harness, batch, noFields, 0.0, 1e-3f); // noise-based ops
+    batch.clear();
+
+    {
+        MaterialOp o = op(MaterialOpKind::DecalBox, 7);
+        o.value = 0.35f;
+        o.constant = {0.2f, -0.1f, 0.4f, 0.0f};
+        o.constant2 = {1.5f, 0.9f, 2.0f, 0.0f};
+        batch.push_back(probe("decalBox", {o}));
+        MaterialOp hard = o;
+        hard.value = 0.0f;
+        batch.push_back(probe("decalBoxHard", {hard}));
+    }
+    {
+        MaterialOp o = op(MaterialOpKind::Anisotropy, 7, 1);
+        o.value = 0.7f;
+        o.constant = {0.0f, 1.0f, 0.0f, 0.0f};
+        batch.push_back(probe("anisotropy", {constantOp(1, glm::vec4(0.32f)), o}));
+        MaterialOp negative = o;
+        negative.value = -0.7f;
+        negative.constant = {1.0f, 0.0f, 0.0f, 0.0f};
+        batch.push_back(probe("anisotropyNegative", {constantOp(1, glm::vec4(0.32f)), negative}));
+        MaterialOp degenerate = o;
+        degenerate.constant = {0.0f, 0.0f, 0.0f, 0.0f}; // no direction at all
+        batch.push_back(probe("anisotropyDegenerate", {constantOp(1, glm::vec4(0.32f)), degenerate}));
+    }
+    {
+        MaterialOp o = op(MaterialOpKind::RoughnessFilter, 7, 1);
+        o.value = 1.0f;
+        batch.push_back(probe("roughnessFilter", {constantOp(1, glm::vec4(0.25f)), o}));
+        MaterialOp strong = o;
+        strong.value = 40.0f; // saturates the clamped kernel
+        batch.push_back(probe("roughnessFilterClamped", {constantOp(1, glm::vec4(0.25f)), strong}));
+    }
+    checkParity(harness, batch, noFields, 0.0);
+    batch.clear();
+
+    {
+        MaterialOp o = op(MaterialOpKind::MicroDetail, 7, 0);
+        o.value = 60.0f;
+        o.seed = 29;
+        o.constant = {0.1f, 0.2f, 0.3f, 0.0f};
+        batch.push_back(probe("microDetail", {inputOp(MaterialInput::WorldPosition, 0), o}));
+    }
+    checkParity(harness, batch, noFields, 0.0, 1e-3f);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("layered programs match the CPU interpreter", "[material][gpu]") {
+    auto ctx = makeContext();
+    MaterialHarness harness(*ctx);
+    const spatial::FieldSet noFields;
+
+    // A base plus three layers that between them write every channel, mask from a geometric input
+    // and blend against a real height field.
+    MaterialProgram p;
+    p.name = "layered";
+    p.ops = {inputOp(MaterialInput::WorldPosition, 0), constantOp(1, {0.6f, 0.3f, 0.2f, 1.0f})};
+    {
+        MaterialOp height = op(MaterialOpKind::Triplanar, 2, 0);
+        height.value = 0.9f;
+        height.seed = 7;
+        height.constant2 = {4.0f, 0.0f, 0.0f, 0.0f};
+        p.ops.push_back(height);
+    }
+    p.baseColorRegister = 1;
+    p.roughnessRegister = 2;
+    p.heightRegister = 2;
+
+    scene::MaterialLayer rust;
+    rust.name = "rust";
+    rust.ops = {inputOp(MaterialInput::Cavity, 3), constantOp(4, {0.3f, 0.12f, 0.05f, 1.0f}),
+                constantOp(5, glm::vec4(0.85f))};
+    rust.maskRegister = 3;
+    rust.blendRange = 0.3f;
+    rust.baseColorRegister = 4;
+    rust.roughnessRegister = 5;
+    rust.metallicRegister = 3;
+    p.layers.push_back(rust);
+
+    scene::MaterialLayer wear;
+    wear.name = "wear";
+    {
+        MaterialOp o = op(MaterialOpKind::CurvatureMask, 6);
+        o.value = 1.2f;
+        o.constant = {0.0f, 0.9f, 0.0f, 0.0f};
+        wear.ops = {o, constantOp(7, {0.95f, 0.95f, 1.0f, 1.0f})};
+    }
+    wear.maskRegister = 6;
+    wear.heightRegister = 2;
+    wear.blendRange = 0.2f;
+    wear.baseColorRegister = 7;
+    wear.emissionRegister = 7;
+    wear.emissionIntensity = 0.4f;
+    p.layers.push_back(wear);
+
+    scene::MaterialLayer glow;
+    glow.name = "glow";
+    glow.ops = {inputOp(MaterialInput::Occlusion, 3), constantOp(4, {0.1f, 0.4f, 0.9f, 0.0f}),
+                constantOp(5, glm::vec4(0.6f))};
+    glow.maskRegister = 3;
+    glow.normalRegister = 4;
+    glow.occlusionRegister = 5;
+    p.layers.push_back(glow);
+    REQUIRE(p.validate().has_value());
+
+    // The same program with the middle layer disabled must differ, and must match the CPU too.
+    MaterialProgram disabled = p;
+    disabled.name = "layeredDisabled";
+    disabled.layers[1].enabled = false;
+
+    // A base-only program: the pre-ADR-036 path, byte for byte.
+    MaterialProgram plain = p;
+    plain.name = "baseOnly";
+    plain.layers.clear();
+
+    checkParity(harness, {p, disabled, plain}, noFields, 0.0, 1e-3f);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("material field ops and program outputs match the CPU interpreter", "[material][gpu]") {
     auto ctx = makeContext();
     MaterialHarness harness(*ctx);
@@ -724,7 +940,7 @@ TEST_CASE("material field ops and program outputs match the CPU interpreter", "[
         MaterialOp threshold = op(MaterialOpKind::Threshold, 5, 4);
         threshold.value = 0.5f;
         p.ops.push_back(threshold);                                    // 16
-        REQUIRE(p.ops.size() == static_cast<std::size_t>(scene::kMaxMaterialOps));
+        REQUIRE(p.ops.size() == 16); // the pre-ADR-036 budget: still valid unchanged
         p.baseColorRegister = 6;
         p.metallicRegister = 5;
         p.roughnessRegister = 3;
@@ -966,7 +1182,7 @@ TEST_CASE("Material program throughput", "[.perf][material]") {
         o.value = 0.3f;
         heavy.ops.push_back(o);
     }
-    REQUIRE(heavy.ops.size() == static_cast<std::size_t>(scene::kMaxMaterialOps));
+    REQUIRE(heavy.ops.size() == 16);
     heavy.baseColorRegister = 5;
     heavy.roughnessRegister = 6;
     heavy.metallicRegister = 3;
@@ -982,10 +1198,71 @@ TEST_CASE("Material program throughput", "[.perf][material]") {
     REQUIRE(light.ops.size() == 3);
     REQUIRE(light.validate().has_value());
 
-    const MaterialProgram* configs[3] = {nullptr, &light, &heavy};
-    const char* names[3] = {"no program", "3-op program (input, gradient, ramp)", "16-op program"};
+    // ADR-036: the same shape of program at the new 48-op budget, spent the way a shipped material
+    // spends it -- a 28-op base plus four layers of five ops, each masked and height-blended. This
+    // is the cost the ADR asked to be measured against the 16-op path above.
+    MaterialProgram layered;
+    layered.name = "layered48";
+    layered.ops = heavy.ops;
+    while (layered.ops.size() < 28) {
+        MaterialOp o = op(MaterialOpKind::Triplanar, 4, 0);
+        o.value = 0.4f + 0.1f * static_cast<float>(layered.ops.size());
+        o.seed = static_cast<std::uint32_t>(31 + layered.ops.size());
+        o.constant2 = {4.0f, 0.0f, 0.0f, 0.0f};
+        layered.ops.push_back(o);
+        MaterialOp micro = op(MaterialOpKind::MicroDetail, 6, 0);
+        micro.value = 40.0f + static_cast<float>(layered.ops.size());
+        micro.seed = static_cast<std::uint32_t>(71 + layered.ops.size());
+        layered.ops.push_back(micro);
+    }
+    layered.ops.resize(28);
+    layered.baseColorRegister = 5;
+    layered.roughnessRegister = 6;
+    layered.metallicRegister = 3;
+    layered.emissionRegister = 7;
+    layered.emissionIntensity = 0.6f;
+    layered.heightRegister = 4;
+    for (int li = 0; li < scene::kMaxMaterialLayers; ++li) {
+        scene::MaterialLayer layer;
+        layer.name = "layer" + std::to_string(li);
+        MaterialOp wear = op(MaterialOpKind::EdgeWear, 1);
+        wear.value = 2.0f + static_cast<float>(li);
+        wear.constant = {1.5f, 0.2f * static_cast<float>(li), 0.0f, 0.0f};
+        wear.constant2 = {0.5f, 0.1f, 0.8f, 0.0f};
+        wear.seed = static_cast<std::uint32_t>(101 + li);
+        layer.ops.push_back(wear);
+        MaterialOp tint = op(MaterialOpKind::Triplanar, 2, 0);
+        tint.value = 0.7f + 0.3f * static_cast<float>(li);
+        tint.seed = static_cast<std::uint32_t>(151 + li);
+        tint.constant2 = {4.0f, 0.0f, 0.0f, 0.0f};
+        layer.ops.push_back(tint);
+        MaterialOp ramp = op(MaterialOpKind::Ramp, 3, 2);
+        ramp.constant = {0.2f, 0.1f, 0.08f, 1.0f};
+        ramp.constant2 = {0.5f, 0.4f, 0.35f, 1.0f};
+        ramp.constant3 = {0.8f, 0.75f, 0.7f, 1.0f};
+        layer.ops.push_back(ramp);
+        MaterialOp micro = op(MaterialOpKind::MicroDetail, 2, 0);
+        micro.value = 90.0f + 10.0f * static_cast<float>(li);
+        micro.seed = static_cast<std::uint32_t>(201 + li);
+        layer.ops.push_back(micro);
+        MaterialOp filter = op(MaterialOpKind::RoughnessFilter, 2, 2);
+        filter.value = 1.0f;
+        layer.ops.push_back(filter);
+        layer.maskRegister = 1;
+        layer.heightRegister = 2;
+        layer.blendRange = 0.2f;
+        layer.baseColorRegister = 3;
+        layer.roughnessRegister = 2;
+        layered.layers.push_back(std::move(layer));
+    }
+    REQUIRE(layered.totalOpCount() == scene::kMaxMaterialOps);
+    REQUIRE(layered.validate().has_value());
+
+    const MaterialProgram* configs[4] = {nullptr, &light, &heavy, &layered};
+    const char* names[4] = {"no program", "3-op program (input, gradient, ramp)", "16-op program",
+                            "48-op layered program (28-op base + 4 layers x 5)"};
     double base = -1.0;
-    for (int cfg = 0; cfg < 3; ++cfg) {
+    for (int cfg = 0; cfg < 4; ++cfg) {
         scene::Scene s = baseScene();
         s.camera.position = {0.0f, 40.0f, 120.0f};
         s.camera.target = {0.0f, 0.0f, 0.0f};

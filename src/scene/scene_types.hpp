@@ -223,6 +223,25 @@ struct PunctualLight {
 
 // ---- environment ------------------------------------------------------------------------------
 
+// The sky's authored parameters. `enabled` defaults on; the renderer only reaches for the sky when
+// the scene has no environment map, so an existing scene gains reflections and keeps its look.
+struct SkySettings {
+    bool enabled = true;
+    glm::vec3 zenithColor{0.055f, 0.105f, 0.235f};
+    glm::vec3 horizonColor{0.300f, 0.340f, 0.420f};
+    glm::vec3 groundColor{0.045f, 0.042f, 0.038f};
+    float hazeWidth = 0.25f;         // turbidity-like: how far up the horizon colour reaches (0..1)
+    glm::vec3 sunColor{1.0f, 0.93f, 0.82f};
+    float sunIntensity = 8.0f;       // radiance of the disc, relative to the sky gradient
+    float sunAngularRadius = 0.045f; // radians (~2.6 degrees; wider than the real sun so a 128 px
+                                     // prefiltered cube resolves it)
+    float sunGlowWidth = 0.18f;      // radians; the exponential halo around the disc
+    float intensity = 1.0f;          // multiplies the whole sky, and is the IBL intensity in shading
+    bool showBackground = false;     // draw the sky behind the scene instead of the background colour
+    bool useKeyLight = true;         // take the sun direction from the scene's key light
+    glm::vec3 sunDirection{0.35f, 0.75f, 0.55f}; // fallback direction *towards* the sun
+};
+
 struct Environment {
     glm::vec3 backgroundColor{0.012f, 0.012f, 0.02f};
     float brightness = 1.0f;     // global exposure multiplier applied in tone mapping
@@ -232,6 +251,9 @@ struct Environment {
     float environmentRotation = 0.0f; // radians about +Y
     bool showSkybox = true;
     float skyboxBlur = 0.0f; // 0 = sharp, 1 = fully prefiltered
+    // Procedural sky (ADR-036): used as the image-based lighting source whenever `environmentMap`
+    // is unset, so metals and rough surfaces always have something to reflect. See scene/sky.hpp.
+    SkySettings sky;
     // Distance fog (exponential-squared by view distance) applied to lit/unlit surfaces after
     // shading; the skybox is untouched. Default colour = the default background colour.
     glm::vec3 fogColor{0.012f, 0.012f, 0.02f};

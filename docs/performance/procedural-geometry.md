@@ -188,6 +188,10 @@ geometry, the same draw call, the same number of shaded fragments.
 | 3 ops: `input worldPosition`, `gradient`, `ramp` | 4.85 / 5.18 | +1.23 / +1.48 ms |
 | 16 ops incl. `noise`, `voronoi`, `palette`, `hueShift`, `saturate` | 21.66 / 21.78 | +18.04 / +18.09 ms |
 
+(ADR-036 raised the budget from 16 ops to 48 and added layers; `docs/performance/surfaces.md` has
+the re-measured table, including a 48-op layered program. The conclusions below did not change:
+cost is proportional to the ops a program enables, and the noise ops dominate.)
+
 Reading the numbers:
 
 - **The interpreter itself is cheap.** A three-op program that loads the world position, takes an

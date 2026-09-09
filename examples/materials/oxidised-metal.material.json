@@ -1,0 +1,249 @@
+{
+  "name": "oxidisedMetal",
+  "ops": [
+    {
+      "kind": "input",
+      "input": "worldPosition"
+    },
+    {
+      "kind": "constant",
+      "dst": 1,
+      "constant": [
+        0.54,
+        0.51,
+        0.47,
+        1
+      ]
+    },
+    {
+      "kind": "triplanar",
+      "dst": 2,
+      "value": 0.55,
+      "constant2": [
+        4,
+        0,
+        0,
+        0
+      ],
+      "seed": 11
+    },
+    {
+      "kind": "noise",
+      "dst": 3,
+      "value": 5.0,
+      "seed": 23
+    },
+    {
+      "kind": "remap",
+      "dst": 4,
+      "srcA": 3,
+      "value": 1,
+      "constant": [
+        0.4,
+        1.0,
+        0.0,
+        0.34
+      ]
+    },
+    {
+      "kind": "constant",
+      "dst": 5,
+      "constant": [
+        0.24,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "kind": "add",
+      "dst": 5,
+      "srcA": 5,
+      "srcB": 4
+    },
+    {
+      "kind": "microDetail",
+      "dst": 6,
+      "value": 64.0,
+      "seed": 7
+    },
+    {
+      "kind": "remap",
+      "dst": 6,
+      "srcA": 6,
+      "value": 1,
+      "constant": [
+        0,
+        1,
+        -0.04,
+        0.04
+      ]
+    },
+    {
+      "kind": "add",
+      "dst": 5,
+      "srcA": 5,
+      "srcB": 6
+    },
+    {
+      "kind": "roughnessFilter",
+      "dst": 5,
+      "srcA": 5,
+      "value": 1.0
+    },
+    {
+      "kind": "constant",
+      "dst": 7,
+      "constant": [
+        1,
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "layers": [
+    {
+      "name": "oxide",
+      "ops": [
+        {
+          "kind": "noise",
+          "dst": 3,
+          "value": 1.1,
+          "seed": 41
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "value": 1,
+          "constant": [
+            0.3,
+            0.72,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 6,
+          "constant": [
+            0.29,
+            0.125,
+            0.052,
+            1
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 4,
+          "constant": [
+            0.86,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 7,
+          "constant": [
+            0.06,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "mask": 3,
+      "height": -1,
+      "blendRange": 0.3,
+      "baseColor": 6,
+      "metallic": 7,
+      "roughness": 4,
+      "emission": -1,
+      "emissionIntensity": 1.0,
+      "normal": -1,
+      "occlusion": -1
+    },
+    {
+      "name": "cavityGrime",
+      "ops": [
+        {
+          "kind": "input",
+          "dst": 3,
+          "input": "cavity"
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "value": 1,
+          "constant": [
+            0.05,
+            0.6,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 6,
+          "constant": [
+            0.055,
+            0.05,
+            0.046,
+            1
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 4,
+          "constant": [
+            0.94,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 7,
+          "constant": [
+            0.0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 2,
+          "constant": [
+            0.55,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "mask": 3,
+      "height": -1,
+      "blendRange": 0.2,
+      "baseColor": 6,
+      "metallic": 7,
+      "roughness": 4,
+      "emission": -1,
+      "emissionIntensity": 1.0,
+      "normal": -1,
+      "occlusion": 2
+    }
+  ],
+  "baseColor": 1,
+  "metallic": 7,
+  "roughness": 5,
+  "emission": -1,
+  "emissionIntensity": 1.0,
+  "opacity": -1,
+  "height": 2
+}

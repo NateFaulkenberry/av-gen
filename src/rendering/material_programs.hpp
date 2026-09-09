@@ -1,7 +1,7 @@
 #pragma once
 
-// The per-frame material program block (ADR-030): Scene::materialPrograms packed into one uniform
-// buffer shared by every shading pass (entities, procedural instances, SDF surfaces). Owned by
+// The per-frame material program block (ADR-030, ADR-036): Scene::materialPrograms packed into
+// one read-only storage buffer shared by every shading pass (entities, procedural instances, SDF surfaces). Owned by
 // SceneRenderer; re-packed every frame because programs are hot-editable parameters and their
 // field references resolve through the frame's FieldUniforms slot map.
 //
@@ -35,7 +35,8 @@ class FieldUniforms;
 
 constexpr int kMaxGpuMaterialPrograms = 8;
 
-// Mirrors `MaterialProgramBlock` in shaders/material.wgsl (14736 bytes).
+// Mirrors `MaterialProgramBlock` in shaders/material.wgsl (45,584 bytes since ADR-036, which is
+// why it is a read-only storage buffer rather than a uniform).
 struct MaterialProgramBlock {
     std::uint32_t count = 0;
     std::uint32_t pad[3] = {0, 0, 0};

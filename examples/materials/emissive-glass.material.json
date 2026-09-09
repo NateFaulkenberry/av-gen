@@ -1,17 +1,178 @@
 {
   "name": "emissiveGlass",
   "ops": [
-    { "kind": "constant", "dst": 0, "constant": [0.6, 0.85, 1.0, 1] },
-    { "kind": "fresnel",  "dst": 1, "value": 2.0 },
-    { "kind": "remap",    "dst": 2, "srcA": 1, "constant": [0, 1, 0.15, 0.95] },
-    { "kind": "multiply", "dst": 3, "srcA": 0, "srcB": 1 },
-    { "kind": "constant", "dst": 4, "constant": [0.05, 0, 0, 0] },
-    { "kind": "constant", "dst": 5, "constant": [0, 0, 0, 0] }
+    {
+      "kind": "input",
+      "input": "worldPosition"
+    },
+    {
+      "kind": "constant",
+      "dst": 1,
+      "constant": [
+        0.58,
+        0.84,
+        1.0,
+        1
+      ]
+    },
+    {
+      "kind": "triplanar",
+      "dst": 2,
+      "value": 0.5,
+      "constant2": [
+        4,
+        0,
+        0,
+        0
+      ],
+      "seed": 131
+    },
+    {
+      "kind": "remap",
+      "dst": 3,
+      "srcA": 2,
+      "value": 1,
+      "constant": [
+        0.3,
+        0.7,
+        0.86,
+        1.14
+      ]
+    },
+    {
+      "kind": "multiply",
+      "dst": 1,
+      "srcA": 1,
+      "srcB": 3
+    },
+    {
+      "kind": "fresnel",
+      "dst": 4,
+      "value": 2.0
+    },
+    {
+      "kind": "remap",
+      "dst": 5,
+      "srcA": 4,
+      "value": 1,
+      "constant": [
+        0,
+        1,
+        0.15,
+        0.95
+      ]
+    },
+    {
+      "kind": "multiply",
+      "dst": 6,
+      "srcA": 1,
+      "srcB": 4
+    },
+    {
+      "kind": "microDetail",
+      "dst": 7,
+      "value": 110.0,
+      "seed": 137
+    },
+    {
+      "kind": "remap",
+      "dst": 7,
+      "srcA": 7,
+      "value": 1,
+      "constant": [
+        0,
+        1,
+        0.02,
+        0.09
+      ]
+    },
+    {
+      "kind": "roughnessFilter",
+      "dst": 7,
+      "srcA": 7,
+      "value": 1.0
+    },
+    {
+      "kind": "constant",
+      "dst": 3,
+      "constant": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
   ],
-  "baseColor": 0,
-  "metallic": 5,
-  "roughness": 4,
-  "emission": 3,
+  "layers": [
+    {
+      "name": "etchedBand",
+      "ops": [
+        {
+          "kind": "decalBox",
+          "dst": 2,
+          "value": 0.4,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            40.0,
+            0.35,
+            40.0,
+            0
+          ]
+        },
+        {
+          "kind": "gradient",
+          "dst": 2,
+          "srcA": 2,
+          "value": 1,
+          "constant": [
+            0,
+            0,
+            1,
+            0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 4,
+          "constant": [
+            0.55,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 5,
+          "constant": [
+            0.85,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "mask": 2,
+      "height": -1,
+      "blendRange": 0.2,
+      "baseColor": -1,
+      "metallic": -1,
+      "roughness": 4,
+      "emission": -1,
+      "emissionIntensity": 1.0,
+      "normal": -1,
+      "occlusion": -1
+    }
+  ],
+  "baseColor": 1,
+  "metallic": 3,
+  "roughness": 7,
+  "emission": 6,
   "emissionIntensity": 1.5,
-  "opacity": 2
+  "opacity": 5
 }

@@ -13,7 +13,7 @@ namespace avgen::rendering {
 MaterialPrograms::MaterialPrograms(gpu::Context& context) : context_(context) {
     wgpu::BufferDescriptor desc{};
     desc.label = "material-program-block";
-    desc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+    desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
     desc.size = kBufferSize;
     buffer_ = context_.device().CreateBuffer(&desc);
     context_.queue().WriteBuffer(buffer_, 0, &block_, sizeof(block_));

@@ -85,6 +85,9 @@ Result<void> EnvironmentProcessor::init() {
     auto p4 = createPipeline(*module, "fs_brdf", wgpu::TextureFormat::RG16Float, "env-brdf");
     if (!p4) return std::unexpected(p4.error());
     brdfPipeline_ = *p4;
+    auto p5 = createPipeline(*module, "fs_sky", wgpu::TextureFormat::RGBA16Float, "env-sky");
+    if (!p5) return std::unexpected(p5.error());
+    skyPipeline_ = *p5;
     initialised_ = true;
     return {};
 }
@@ -216,6 +219,79 @@ Result<void> EnvironmentProcessor::ensureBrdf(const EnvironmentSettings& setting
     return {};
 }
 
+// Cube face views are needed by every pass that writes one; the descriptor is the same each time.
+namespace {
+wgpu::TextureView cubeFaceView(const wgpu::Texture& texture, std::uint32_t face, std::uint32_t mip) {
+    wgpu::TextureViewDescriptor desc{};
+    desc.dimension = wgpu::TextureViewDimension::e2D;
+    desc.baseArrayLayer = face;
+    desc.arrayLayerCount = 1;
+    desc.baseMipLevel = mip;
+    desc.mipLevelCount = 1;
+    return texture.CreateView(&desc);
+}
+} // namespace
+
+Result<IblResources> EnvironmentProcessor::filterCube(const CubeTexture& sourceCube, const EnvironmentSettings& settings) {
+    auto irradiance = createCube(settings.irradianceSize, 1, "env-irradiance");
+    if (!irradiance) return std::unexpected(irradiance.error());
+    auto prefiltered = createCube(settings.prefilteredSize, settings.prefilteredMips, "env-prefiltered");
+    if (!prefiltered) return std::unexpected(prefiltered.error());
+
+    std::uint32_t slot = 0;
+    wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
+    auto flush = [&]() {
+        wgpu::CommandBuffer commands = encoder.Finish();
+        context_.queue().Submit(1, &commands);
+        context_.waitForQueue();
+        encoder = context_.device().CreateCommandEncoder();
+        slot = 0;
+    };
+    auto nextSlot = [&]() {
+        if (slot >= kUniformSlots) {
+            flush();
+        }
+        return slot++;
+    };
+
+    const wgpu::BindGroup cubeGroup = makeBindGroup(nullptr, sourceCube.cubeView);
+    for (std::uint32_t face = 0; face < 6; ++face) {
+        EnvUniforms u{};
+        u.faceIndex = face;
+        u.sampleCount = settings.irradianceSamples;
+        u.sourceMipCount = static_cast<float>(sourceCube.mips);
+        u.sourceSize = static_cast<float>(sourceCube.size);
+        runPass(encoder, irradiancePipeline_, cubeFaceView(irradiance->texture, face, 0), cubeGroup, u, nextSlot());
+    }
+    for (std::uint32_t mip = 0; mip < settings.prefilteredMips; ++mip) {
+        const float roughness = settings.prefilteredMips > 1
+                                    ? static_cast<float>(mip) / static_cast<float>(settings.prefilteredMips - 1)
+                                    : 0.0f;
+        for (std::uint32_t face = 0; face < 6; ++face) {
+            EnvUniforms u{};
+            u.faceIndex = face;
+            u.mipLevel = mip;
+            u.sampleCount = settings.prefilterSamples;
+            u.roughness = roughness;
+            u.sourceMipCount = static_cast<float>(sourceCube.mips);
+            u.sourceSize = static_cast<float>(sourceCube.size);
+            runPass(encoder, prefilterPipeline_, cubeFaceView(prefiltered->texture, face, mip), cubeGroup, u,
+                    nextSlot());
+        }
+    }
+    flush();
+
+    IblResources out;
+    out.irradiance = irradiance->cubeView;
+    out.prefiltered = prefiltered->cubeView;
+    out.brdfLut = brdf_.view;
+    out.prefilteredMips = settings.prefilteredMips;
+    out.valid = context_.errorCount() == 0;
+    // The textures stay alive through the views the caller holds (a wgpu::TextureView keeps a
+    // reference to its texture), exactly as the pre-ADR-036 code relied on.
+    return out;
+}
+
 Result<IblResources> EnvironmentProcessor::process(const scene::TextureData& equirect,
                                                    const EnvironmentSettings& settings) {
     if (!initialised_) {
@@ -233,89 +309,102 @@ Result<IblResources> EnvironmentProcessor::process(const scene::TextureData& equ
     const std::uint32_t cubeMips = gpu::mipLevelCount(settings.cubeSize, settings.cubeSize);
     auto sourceCube = createCube(settings.cubeSize, cubeMips, "env-source-cube");
     if (!sourceCube) return std::unexpected(sourceCube.error());
-    auto irradiance = createCube(settings.irradianceSize, 1, "env-irradiance");
-    if (!irradiance) return std::unexpected(irradiance.error());
-    auto prefiltered = createCube(settings.prefilteredSize, settings.prefilteredMips, "env-prefiltered");
-    if (!prefiltered) return std::unexpected(prefiltered.error());
 
-    auto faceView = [](const CubeTexture& cube, std::uint32_t face, std::uint32_t mip) {
-        wgpu::TextureViewDescriptor desc{};
-        desc.dimension = wgpu::TextureViewDimension::e2D;
-        desc.baseArrayLayer = face;
-        desc.arrayLayerCount = 1;
-        desc.baseMipLevel = mip;
-        desc.mipLevelCount = 1;
-        return cube.texture.CreateView(&desc);
-    };
-
-    // Batches are split so a submission never exceeds the uniform ring.
     std::uint32_t slot = 0;
     wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
-    auto flush = [&]() {
-        wgpu::CommandBuffer commands = encoder.Finish();
-        context_.queue().Submit(1, &commands);
-        context_.waitForQueue();
-        encoder = context_.device().CreateCommandEncoder();
-        slot = 0;
-    };
-    auto nextSlot = [&]() {
-        if (slot >= kUniformSlots) {
-            flush();
-        }
-        return slot++;
-    };
-
-    // 1. equirect -> source cube, every mip.
     const wgpu::BindGroup equirectGroup = makeBindGroup(source->view, nullptr);
     for (std::uint32_t mip = 0; mip < cubeMips; ++mip) {
         for (std::uint32_t face = 0; face < 6; ++face) {
+            if (slot >= kUniformSlots) {
+                wgpu::CommandBuffer commands = encoder.Finish();
+                context_.queue().Submit(1, &commands);
+                context_.waitForQueue();
+                encoder = context_.device().CreateCommandEncoder();
+                slot = 0;
+            }
             EnvUniforms u{};
             u.faceIndex = face;
             u.mipLevel = std::min(mip, source->mipLevels - 1);
-            runPass(encoder, equirectPipeline_, faceView(*sourceCube, face, mip), equirectGroup, u, nextSlot());
+            runPass(encoder, equirectPipeline_, cubeFaceView(sourceCube->texture, face, mip), equirectGroup, u,
+                    slot++);
         }
     }
-    flush();
-
-    // 2. irradiance and 3. prefiltered specular from the source cube.
-    const wgpu::BindGroup cubeGroup = makeBindGroup(nullptr, sourceCube->cubeView);
-    for (std::uint32_t face = 0; face < 6; ++face) {
-        EnvUniforms u{};
-        u.faceIndex = face;
-        u.sampleCount = settings.irradianceSamples;
-        u.sourceMipCount = static_cast<float>(cubeMips);
-        u.sourceSize = static_cast<float>(settings.cubeSize);
-        runPass(encoder, irradiancePipeline_, faceView(*irradiance, face, 0), cubeGroup, u, nextSlot());
+    {
+        wgpu::CommandBuffer commands = encoder.Finish();
+        context_.queue().Submit(1, &commands);
+        context_.waitForQueue();
     }
-    for (std::uint32_t mip = 0; mip < settings.prefilteredMips; ++mip) {
-        const float roughness = settings.prefilteredMips > 1
-                                    ? static_cast<float>(mip) / static_cast<float>(settings.prefilteredMips - 1)
-                                    : 0.0f;
-        for (std::uint32_t face = 0; face < 6; ++face) {
-            EnvUniforms u{};
-            u.faceIndex = face;
-            u.mipLevel = mip;
-            u.sampleCount = settings.prefilterSamples;
-            u.roughness = roughness;
-            u.sourceMipCount = static_cast<float>(cubeMips);
-            u.sourceSize = static_cast<float>(settings.cubeSize);
-            runPass(encoder, prefilterPipeline_, faceView(*prefiltered, face, mip), cubeGroup, u, nextSlot());
-        }
-    }
-    flush();
 
-    IblResources out;
-    out.irradiance = irradiance->cubeView;
-    out.prefiltered = prefiltered->cubeView;
-    out.brdfLut = brdf_.view;
-    out.prefilteredMips = settings.prefilteredMips;
-    out.valid = context_.errorCount() == 0;
+    auto out = filterCube(*sourceCube, settings);
+    if (!out) {
+        return out;
+    }
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     log::info("environment '{}' ({}x{}) processed in {:.1f} ms: cube {} ({} mips), irradiance {}, prefiltered {} x {} mips",
               equirect.name, equirect.width, equirect.height, ms, settings.cubeSize, cubeMips,
               settings.irradianceSize, settings.prefilteredSize, settings.prefilteredMips);
-    if (!out.valid) {
+    if (!out->valid) {
         return fail("environment processing raised GPU errors: {}", context_.lastError());
+    }
+    return out;
+}
+
+Result<IblResources> EnvironmentProcessor::processSky(const scene::SkyRuntime& sky,
+                                                      const EnvironmentSettings& settings) {
+    if (!initialised_) {
+        return fail("environment processor not initialised");
+    }
+    const auto start = std::chrono::steady_clock::now();
+    if (auto r = ensureBrdf(settings); !r) {
+        return std::unexpected(r.error());
+    }
+    const std::uint32_t cubeMips = gpu::mipLevelCount(settings.cubeSize, settings.cubeSize);
+    auto sourceCube = createCube(settings.cubeSize, cubeMips, "env-sky-cube");
+    if (!sourceCube) return std::unexpected(sourceCube.error());
+
+    EnvUniforms sky4{};
+    sky4.skyZenith = glm::vec4(sky.zenithColor, sky.hazeWidth);
+    sky4.skyHorizon = glm::vec4(sky.horizonColor, sky.sunAngularRadius);
+    sky4.skyGround = glm::vec4(sky.groundColor, sky.sunGlowWidth);
+    sky4.skySun = glm::vec4(sky.sunColor * sky.sunIntensity, sky.intensity);
+    sky4.skySunDir = glm::vec4(sky.sunDirection, 0.0f);
+
+    std::uint32_t slot = 0;
+    wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
+    const wgpu::BindGroup skyGroup = makeBindGroup(nullptr, nullptr);
+    for (std::uint32_t mip = 0; mip < cubeMips; ++mip) {
+        for (std::uint32_t face = 0; face < 6; ++face) {
+            if (slot >= kUniformSlots) {
+                wgpu::CommandBuffer commands = encoder.Finish();
+                context_.queue().Submit(1, &commands);
+                context_.waitForQueue();
+                encoder = context_.device().CreateCommandEncoder();
+                slot = 0;
+            }
+            EnvUniforms u = sky4;
+            u.faceIndex = face;
+            u.mipLevel = mip;
+            u.faceSize = static_cast<float>(std::max(settings.cubeSize >> mip, 1u));
+            runPass(encoder, skyPipeline_, cubeFaceView(sourceCube->texture, face, mip), skyGroup, u, slot++);
+        }
+    }
+    {
+        wgpu::CommandBuffer commands = encoder.Finish();
+        context_.queue().Submit(1, &commands);
+        context_.waitForQueue();
+    }
+
+    auto out = filterCube(*sourceCube, settings);
+    if (!out) {
+        return out;
+    }
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    log::info("procedural sky built in {:.1f} ms: cube {} ({} mips), irradiance {}, prefiltered {} x {} mips; "
+              "sun ({:.2f}, {:.2f}, {:.2f})",
+              ms, settings.cubeSize, cubeMips, settings.irradianceSize, settings.prefilteredSize,
+              settings.prefilteredMips, sky.sunDirection.x, sky.sunDirection.y, sky.sunDirection.z);
+    if (!out->valid) {
+        return fail("procedural sky processing raised GPU errors: {}", context_.lastError());
     }
     return out;
 }

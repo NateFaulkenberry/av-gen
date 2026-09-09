@@ -1,15 +1,18 @@
 # Procedural materials (user guide and shader spec)
 
-Procedural materials (ADR-030) replace a material's fixed base colour, metallic, roughness,
-emission and opacity with a small *program*: up to 16 ops over 8 vec4 registers, evaluated per
-fragment by `shaders/material.wgsl` and, identically, on the CPU by
+Procedural materials (ADR-030, layered in ADR-036) replace a material's fixed base colour,
+metallic, roughness, emission and opacity with a small *program*: up to 48 ops over 8 vec4
+registers, evaluated per fragment by `shaders/material.wgsl` and, identically, on the CPU by
 `scene::evaluateMaterialProgram` (`src/scene/material_program.hpp`). Programs are data: JSON in
-the scene file, hot-editable uniforms on the GPU, deterministic everywhere.
+the scene file, hot-editable buffers on the GPU, deterministic everywhere.
 
 ```
-inputs (position, normal, uv, ids, time, audio, fields)
-      → ops write registers r0..r7 in order
-      → outputs read registers: baseColor, metallic, roughness, emission, opacity
+inputs (position, normal, uv, ids, time, audio, fields, geometry)
+      → base ops write registers r0..r7 in order
+      → outputs read registers: baseColor, metallic, roughness, emission, opacity,
+                                normal, occlusion, height
+      → then up to 4 layers, each with its own ops, a mask and a height, composited
+        over the running result with height-aware blending
 ```
 
 This document is the reference both the CPU implementation (`src/scene/material_program.cpp`,
@@ -31,6 +34,9 @@ This document is the reference both the CPU implementation (`src/scene/material_
 | `roughness` | `clamp(reg.x, 0, 1)` |
 | `emission` | `reg.rgb * emissionIntensity` (not clamped) |
 | `opacity` | `clamp(reg.x, 0, 1)` |
+| `normal` (ADR-036) | `normalize(reg.xyz)`, tangent space; a zero-length register keeps `(0, 0, 1)` |
+| `occlusion` (ADR-036) | `clamp(reg.x, 0, 1)`, multiplied into the material's own occlusion |
+| `height` (ADR-036) | `reg.x`, unclamped; the surface the layers blend against |
 
 `saturate(x)` below means `clamp(x, 0, 1)`; `mix(a, b, t)` means `a * (1 - t) + b * t`
 (component-wise, `t` not clamped); `step(e, x)` is `1` when `x >= e`, else `0`.
@@ -56,7 +62,27 @@ This document is the reference both the CPU implementation (`src/scene/material_
 | `audioBands` | `(lowMid, highMid, centroid, flux)` | |
 | `beatPhase` | `(phase, pulse, onset, bar)` | |
 | `viewDirection` | `(x, y, z, 0)` | unit vector from the fragment to the camera |
-| `depth` | `(d, d, d, d)` | view depth, broadcast |
+| `depth` | `(d, d, d, d)` | distance to the camera, broadcast |
+
+The **geometric inputs** (ADR-036) come from screen-space derivatives of the shading normal and
+position, and from the GTAO target. They are broadcast scalars unless the layout says otherwise;
+`materialGeometry()` in `shaders/pbr_shade.wgsl` computes them, and `scene::MaterialContext` takes
+them as given so the CPU reference and the shader evaluate the same numbers.
+
+| Name | vec4 layout | Definition |
+|---|---|---|
+| `curvature` | `(c, c, c, c)` | signed, 1/metre: `(dN/dx · dP/dx + dN/dy · dP/dy) / (|dP/dx|² + |dP/dy|²)`. Positive convex, negative concave |
+| `convexity` | `(max(c, 0), …)` | the convex part: edges, corners, the outside of a bend |
+| `concavity` | `(max(-c, 0), …)` | the concave part: creases and the inside of a bend |
+| `cavity` | `(v, v, v, v)` | `saturate(concavity · footprint · 8)`: concavity at the current screen scale, so it only picks up crevices small enough to matter |
+| `occlusion` | `(a, a, a, a)` | the GTAO visibility at this fragment, 1 = unoccluded |
+| `height` | `(h, h, h, h)` | the running surface height: 0 in the base, the base's `height` output in a layer, then the running value as layers composite |
+| `normalVariance` | `(v, v, v, v)` | `0.5 (|dN/dx|² + |dN/dy|²)` (Kaplanyan et al. 2016); feeds `roughnessFilter` |
+| `footprint` | `(f, f, f, f)` | world units covered by one pixel; feeds `microDetail`'s fade |
+| `objectPosition` | `(x, y, z, 1)` | object space — the same value as `localPosition`, under the name ADR-036 uses |
+| `triplanarWeights` | `(wx, wy, wz, 0)` | `|n|⁴` normalised to sum 1; even in `n`, so a normal flip leaves them unchanged |
+| `cameraDistance` | `(d, d, d, d)` | the same value as `depth`, under the name ADR-036 uses |
+| `materialId` | `(id, …)` | the material's id (`object.ids.y`, the ADR-035 identifier target) |
 
 ## Op reference
 
@@ -82,6 +108,23 @@ This document is the reference both the CPU implementation (`src/scene/material_
 | `palette` | a | `rgb = k.xyz + k2.xyz * cos(2π (k3.xyz * (a.x + f) + k4.xyz))`, `w = 1` |
 | `field` | – | `fieldColor(fieldSlot, worldPosition)`; scalar fields broadcast to all four components, vector fields `(x, y, z, 0)`; unknown slot (`-1`) → zeros |
 
+ADR-036 adds the ops below. `p` is `a.xyz * f + k.xyz` where they take a position; `N` and `V` are
+the fragment's normal and view direction.
+
+| Kind (JSON) | Reads | Writes `reg[dst]` |
+|---|---|---|
+| `triplanar` | a, N | `vec4(w.x·fbm3(p.yz, 0) + w.y·fbm3(p.zx, 0) + w.z·fbm3(p.xy, 0))` with `w = triplanarWeights(N, k2.x)` (`k2.x ≤ 0` means the default sharpness 4). One 3D noise sampled on three world planes: the standard answer to geometry with no UVs |
+| `worldProject` | – | `vec4(worldPosition * f + k.xyz, 1)` — a world-space projection, stationary while the object moves |
+| `objectProject` | – | `vec4(localPosition * f + k.xyz, 1)` — an object-space projection, moving with it |
+| `heightBlend` | a, b, c | `vec4(heightBlendWeight(a.x, b.x, c.x, f))`: base height, layer height, mask, transition width. The layer weight, exposed as an op |
+| `detailNormal` | a, b | `vec4(reorientNormal(a.xyz, b.xyz), 0)` — reoriented normal mapping (Barré-Brisebois & Hill 2012): `t = a + (0,0,1)`, `u = b·(-1,-1,1)`, `normalize(t·(t·u)/max(t.z, 1e-5) - u)`. A flat detail leaves the base alone; a flat base is the detail itself |
+| `curvatureMask` | N (via `curvature`) | `vec4(smoothstep(k.x, k.y, curvature * f))`. A negative `f` turns the same op into a concavity mask |
+| `edgeWear` | – | `e = saturate(max(curvature, 0) · f)`; `nz = fbm3(worldPosition·k.x + k.yzw, seed)`; `v = e · mix(1, nz, saturate(k2.x))`; `vec4(smoothstep(k2.y, k2.z, v))` — convex edges, broken up by noise so the wear does not look painted on |
+| `decalBox` | – | `q = (worldPosition - k.xyz) / max(abs(k2.xyz), 1e-4)`; `vec4(q.x·0.5+0.5, q.y·0.5+0.5, m, m)` where `m` is 1 inside the box, 0 outside, with a border `f` wide (`f = 0` is a hard edge). The face coordinates are in `xy`, the mask in `zw` |
+| `anisotropy` | a, N, V | An anisotropic lobe's effective roughness for the current view. `α = a.x²`, `αT = α(1+f)`, `αB = α(1-f)` with `f` clamped to ±0.95; `t` is `k.xyz` projected onto the tangent plane, `c` the cosine between `t` and the view's tangent projection; `vec4(sqrt(sqrt(αT²c² + αB²(1-c²))))`. A direction with no tangent component passes `a.x` through unchanged |
+| `roughnessFilter` | a | Specular anti-aliasing (Kaplanyan et al. 2016): `α = a.x²`, `κ = min(2·max(f,0)·normalVariance, 0.18)`, `vec4(sqrt(min(α + κ, 1)))`. Put it last, on whatever register feeds `roughness` |
+| `microDetail` | a | `fade = saturate(1 - footprint·|f|·2)`; `vec4(0.5 + (fbm3(p, seed) - 0.5) · fade)`. Noise that fades to its own mean as one pixel grows to cover a period, so micro detail can never alias or shimmer |
+
 Notes for the shader transliteration:
 
 - `fbm3` and `voronoiF1` are the functions in `core/noise.hpp` / `procedural.wgsl` (3-octave
@@ -99,6 +142,86 @@ Notes for the shader transliteration:
 - All the colour ops call the functions in the "Colour utilities" section with the exact
   matrices and clamping shown there.
 
+## Layers (ADR-036)
+
+A program is a **base** plus up to four layers. The base's ops run first and its outputs become the
+running surface values; each layer then runs its own ops and is composited over that result:
+
+```json
+{ "name": "oxidisedMetal",
+  "ops": [ … ],  "baseColor": 1, "metallic": 7, "roughness": 5, "height": 2,
+  "layers": [
+    { "name": "oxide",
+      "ops": [ … ],
+      "mask": 3, "height": -1, "blendRange": 0.30,
+      "baseColor": 6, "roughness": 4, "metallic": 7 } ] }
+```
+
+| Layer member | Default | Meaning |
+|---|---|---|
+| `name`, `enabled` | `""`, `true` | a disabled layer is skipped entirely and is not packed |
+| `ops` | `[]` | the layer's own ops, run **over the same register file** the base left behind, so a layer can reuse what the base computed |
+| `mask` | -1 | the register whose `.x` is the layer's mask, clamped to [0, 1]; -1 means a mask of 1 |
+| `height` | -1 | the register whose `.x` is the layer's height; -1 means 0 |
+| `blendRange` | 0.1 | width of the height transition; 0 is a hard height threshold |
+| `baseColor`, `metallic`, `roughness`, `emission`, `normal`, `occlusion` | -1 | the channels this layer writes; -1 leaves a channel alone |
+| `emissionIntensity` | 1 | the layer's own emission scale |
+
+**Height-aware blending, not a linear mix.** With running height `H`, layer height `h`, mask `m`
+and range `r`:
+
+```
+a1 = H + (1 - m)
+a2 = h + m
+top = max(a1, a2) - max(r, 1e-4)
+t = max(a2 - top, 0) / (max(a1 - top, 0) + max(a2 - top, 0))
+```
+
+Then every channel the layer names becomes `mix(running, layer, t)` (the normal is renormalised
+after the mix), and the running height becomes `mix(H, h, t)`.
+
+A mask of 0 gives `t = 0` and a mask of 1 gives `t = 1`, whatever the heights are, so the mask is
+still in charge. Between them the *heights* decide **where** the layer lands: with a constant mask
+of 0.5 and a constant layer height, the layer sits almost entirely in the base's low spots and
+almost not at all on its high ones, where a linear mix would have given a flat 50% everywhere.
+That is what makes wear, grime and oxide follow the surface instead of fading uniformly over it —
+`scene::heightBlendWeight` is the shared implementation, and `heightBlend` exposes it as an op.
+
+Layers run bottom-up in array order, and each one sees the running height through the `height`
+input, so a second layer can mask itself against what the first one did.
+
+**The op budget is shared**: `base.ops.size() + Σ layer.ops.size() ≤ 48`. `validate()` rejects more
+than that, more than four layers, and any register outside 0..7 (outputs: -1..7) in a base or a
+layer.
+
+## Multi-scale authoring
+
+Multi-scale detail is a *convention*, not a mechanism. A surface that reads as a real material
+varies at three scales at once, and the absence of the middle and small ones is what makes an
+instanced cylinder read as a cylinder primitive:
+
+| Scale | Size | Built from |
+|---|---|---|
+| **Macro** | metres | `triplanar` or a low-frequency `noise` on world position; `curvature`; large masks that say *which part* of the object is worn, oxidised or wet |
+| **Meso** | centimetres | `voronoi` seams and cracks, anisotropic `noise` for machining marks, `decalBox` for markings, `edgeWear` for chipping — the features an eye recognises as manufacture or damage |
+| **Micro** | millimetres | `microDetail` on roughness and normal, finished with `roughnessFilter` |
+
+Three rules that make it hold up in motion:
+
+1. **Tie frequencies to world scale, not object scale.** Feed the noise ops `worldPosition` (or
+   `worldProject`), so two instances of different size do not shimmer differently. Use
+   `objectProject` only when the pattern should travel with the object — panels on a machine part,
+   not weathering on a wall.
+2. **Fade micro detail with the footprint.** `microDetail` does this for you: its amplitude falls
+   to zero as one pixel grows to cover a period. Plain `noise` at the same frequency will alias.
+3. **Filter roughness by normal variance.** End the roughness chain with `roughnessFilter`, which
+   widens the specular lobe by exactly the amount the sub-pixel normals scatter it. Without it,
+   micro-normals produce the crawling specular sparkle that is the classic tell of procedural
+   detail.
+
+Scales, in practice, for an object a few metres across: macro at 0.2–1 cycles per unit, meso at
+1–10, micro at 40–120.
+
 ### Program data
 
 ```json
@@ -109,33 +232,62 @@ Notes for the shader transliteration:
 
 Each op writes `"kind"` and only its non-default members: `enabled` (true), `dst`/`srcA`/
 `srcB`/`srcC` (0), `value` (1), `constant`…`constant4` (`[0,0,0,0]`), `seed` (1), `input`
-(`worldPosition`), `field` (""). `validate()` rejects more than 16 ops, register indices outside
-0..7, output registers outside -1..7 and `field` ops without a name; `fromJson` validates.
-`structuralHash()` covers every member (name, every op member, outputs, emission intensity).
+(`worldPosition`), `field` (""). `validate()` rejects more than 48 ops across the base and its
+layers, more than four layers, register indices outside 0..7, output registers outside -1..7 and
+`field` ops without a name; `fromJson` validates. `structuralHash()` covers every member (name,
+every op member, outputs, emission intensity, and every layer).
+
+The ADR-036 members are written only when they are used: a program with no layers, no normal, no
+occlusion and no height output round-trips to exactly the JSON it had before, so every program
+written against ADR-030 still loads, still validates and still evaluates to the same numbers.
 
 ### GPU packing (`MaterialProgramGpu`)
 
 | Offset | Field | Contents |
 |---|---|---|
 | 0 | `outputs` (ivec4) | baseColor, metallic, roughness, emission registers |
-| 16 | `opacityCountPad` (ivec4) | opacity register, op count, 0, 0 |
+| 16 | `opacityCountPad` (ivec4) | opacity register, **base** op count, layer count, 0 |
 | 32 | `emissionIntensityPad` (vec4) | emissionIntensity, 0, 0, 0 |
-| 48 | `ops[16]` | 112 bytes each |
+| 48 | `aux` (ivec4) | normal, occlusion, height registers, total packed op count |
+| 64 | `layers[4]` | 64 bytes each: `outputs` (baseColor, metallic, roughness, emission), `aux` (normal, occlusion, mask, height), `range` (firstOp, opCount, 0, 0), `params` (emissionIntensity, blendRange, 0, 0) |
+| 320 | `ops[48]` | 112 bytes each |
+
+A program is 5,696 bytes and the block of eight is 45,584, which is past the uniform-buffer size
+limit — hence the move to a **read-only storage buffer** (ADR-036). Nothing else about the binding
+changed.
 
 Per op: `kind` (u32, enum order of `MaterialOpKind`), `input` (u32, enum order of
 `MaterialInput`), `seed` (u32), `fieldSlot` (i32, -1 when unresolved or not a field op),
 `registers` (ivec4 `dst, srcA, srcB, srcC`), `valuePad` (`value, 0, 0, 0`), `constant`,
 `constant2`, `constant3`, `constant4`. Disabled ops are dropped and the rest packed
-contiguously; slots past the count are zero. `packMaterialProgram(program, fieldSlotOf)`
+contiguously — the base's ops first, then each enabled layer's, with the layer's `range` naming
+its slice — and slots past the count are zero. `packMaterialProgram(program, fieldSlotOf)`
 resolves field names to slots through a callback.
 
 ## Example programs
 
-The three below ship as a copy-and-paste library in `examples/materials/`
-(`alien-metal.material.json`, `emissive-glass.material.json`, `bioluminescent.material.json`):
-each file is one `MaterialProgram` document, ready to drop into a scene file's
-`"materialPrograms"` array and name from a material's `"program"`. `examples/machine`
-does exactly that with `alienMetal` on its ribs.
+`examples/materials/` ships seven programs as a copy-and-paste library: each file is one
+`MaterialProgram` document, ready to drop into a scene file's `"materialPrograms"` array and name
+from a material's `"program"`.
+
+| File | Program | What it demonstrates |
+|---|---|---|
+| `brushed-metal.material.json` | `brushedMetal` | anisotropic machining marks (a stretched noise plus `anisotropy`), a macro `triplanar` tone, `microDetail` pitting, and a `edgeWear`-masked polished-edge layer |
+| `oxidised-metal.material.json` | `oxidisedMetal` | a `triplanar` height field with an oxide layer that **height-blends into the low spots**, plus a `cavity`-masked grime layer that also writes occlusion |
+| `dark-steel.material.json` | `darkSteel` | `voronoi` panel seams as meso structure, a seam-shadow layer and a burnished-edge layer |
+| `weathered-stone.material.json` | `weatheredStone` | a three-stop `ramp` over macro `triplanar`, bedding grain as a second `triplanar`, `voronoi` cracks, chalky edge wear and cavity dirt — three layers |
+| `emissive-glass.material.json` | `emissiveGlass` | Fresnel opacity and rim emission, casting waves, micro ripple, and a `decalBox`-masked frosted band |
+| `bioluminescent.material.json` | `bioluminescent` | a drifting `triplanar` colony pattern through a cosine palette, audio-driven glow, and a `voronoi` vein layer with its own emission intensity |
+| `alien-metal.material.json` | `alienMetal` | the original ADR-030 example, unchanged: 8 ops, no layers |
+
+`examples/machine` uses `alienMetal` on its ribs; `examples/reassembly` uses `darkSteel`,
+`brushedMetal` and `oxidisedMetal` on its shell, rings, plates and pins; `examples/infinite` uses
+`weatheredStone` on its columns and arches.
+
+The three below are **simplified, single-layer walkthroughs** of the format — `alienMetal` is the
+shipped file verbatim; the glass and the bioluminescent surface are the ADR-030 originals, kept
+here because they are short enough to read, while the shipped files of those two names are the
+layered, multi-scale versions the table describes.
 
 ### Alien metal
 
@@ -220,7 +372,7 @@ per material, so the procedural and SDF renderers need no plumbing of their own:
 | Binding | Contents |
 |---|---|
 | 0..5 | sampler + the five glTF textures (unchanged) |
-| 6 | `MaterialProgramBlock`: `count` + `array<MaterialProgramGpu, 8>` (14,736 bytes, uniform) |
+| 6 | `MaterialProgramBlock`: `count` + `array<MaterialProgramGpu, 8>` (45,584 bytes, **read-only storage** since ADR-036) |
 | 7 | `MaterialSelect`: `program: i32` — a 16-byte slice naming the slot this material runs |
 | 8 | `FieldBlock` — the entity pass only; `procedural.wgsl` and `sdf_raymarch.wgsl` bind their own at group 1 binding 3 |
 
@@ -254,6 +406,21 @@ alpha-mask test sees the program's opacity. With `materialSelect.program < 0` th
 skipped and the shader is byte-for-byte the pre-ADR-030 one — the golden example hashes in
 `tests/rendering/test_procedural_examples_gpu.cpp` are the guard.
 
+The two ADR-036 outputs join the same path rather than replacing anything:
+
+- **`normal`** is a tangent-space perturbation. It goes through the derivative-based cotangent
+  frame (`cotangentFrame`, Schüler), so no tangent attribute is needed; when the material *also*
+  has a normal map, the map is combined over the program's normal with `matReorientNormal`, so the
+  two compose instead of one winning. Procedural geometry often carries a constant UV, which makes
+  the usual UV-gradient frame degenerate — the frame falls back to the position gradient there, so
+  a program's normal still perturbs.
+- **`occlusion`** multiplies the material's own occlusion (the `occlusionTexture` term), and lands
+  on the ambient contribution exactly as that does.
+
+The geometric inputs are computed once, unconditionally, at the top of `shadeSurface`
+(`materialGeometry`), because derivatives must be taken in uniform control flow and because the
+ambient-occlusion sample the program reads is the same one the ambient term uses.
+
 The three passes differ only in the context they hand it (`MaterialInstanceInfo`):
 
 | Pass | `localPosition` | instance lanes | `objectId` |
@@ -271,12 +438,20 @@ pulse, onset strength and a 4/4 bar phase). Without an analysis frame they are z
 
 ### Limits
 
-- 8 programs per scene on the GPU, 16 ops each, 8 registers — the CPU limits (`kMaxMaterialOps`,
-  `kMaterialRegisters`) with the program count added.
+- 8 programs per scene on the GPU, 48 ops each across the base and its layers, 4 layers,
+  8 registers — the CPU limits (`kMaxMaterialOps`, `kMaxMaterialLayers`, `kMaterialRegisters`)
+  with the program count added.
 - 16 fields on the GPU (`spatial::kMaxGpuFields`), so a `field` op past the sixteenth reads zero.
-- No textures as material inputs and no normal-map generation yet (ADR-030 "Consequences").
-- The interpreter runs **per fragment**: see docs/performance/procedural-geometry.md
-  ("Procedural materials") for what each op costs.
+- No textures as material inputs (ADR-030 "Consequences"). A program can now write a tangent-space
+  `normal`, but it has to build it from ops; there is still no normal-map *generation* from a
+  height field.
+- Curvature and the other derivative-based inputs are **approximate**: they are screen-space
+  derivatives of the interpolated normal, which is stable enough for wear masks but is not the
+  mesh's real curvature, and is noisy on the silhouettes of raymarched surfaces.
+- The interpreter runs **per fragment**, and its cost is proportional to the ops a program
+  actually enables — raising the budget from 16 to 48 costs nothing by itself. A 48-op layered
+  program built from noise costs about 57 ms per full frame of covered pixels at 1080p on an
+  M2 Max; the shipped library sits at 16–23 ops. See docs/performance/surfaces.md.
 
 ### Adding an op
 
