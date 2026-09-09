@@ -1,0 +1,651 @@
+{
+  "format": "avgen-library",
+  "version": 1,
+  "description": "Reusable building blocks: paste a generator body into a scene node's \"procedural\" block, a field body into a \"field\" node, a deformer into an object's \"deformers\" array.",
+  "generators": {
+    "radial-columns": {
+      "description": "A ring of columns facing outwards.",
+      "procedural": {
+        "source": {
+          "kind": "cylinder",
+          "radius": 1.2,
+          "height": 24,
+          "radialSegments": 20,
+          "heightSegments": 6
+        },
+        "distribution": {
+          "kind": "radial",
+          "count": 48,
+          "radius": 30,
+          "center": [
+            0,
+            12,
+            0
+          ],
+          "orientation": "outward"
+        },
+        "variation": {
+          "seed": 11,
+          "randomScale": [
+            0,
+            0.15,
+            0
+          ]
+        },
+        "material": {
+          "baseColor": [
+            0.3,
+            0.3,
+            0.34
+          ],
+          "emissiveColor": [
+            0.6,
+            0.8,
+            1.0
+          ],
+          "emissiveIntensity": 0.05,
+          "roughness": 0.55,
+          "metallic": 0.15
+        }
+      }
+    },
+    "spiral-tower": {
+      "description": "A rising spiral of blocks.",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            3.0,
+            1.0,
+            1.6
+          ]
+        },
+        "distribution": {
+          "kind": "spiral",
+          "count": 240,
+          "radius": 14,
+          "radiusGrowth": 10,
+          "turns": 6,
+          "spiralHeight": 70,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "orientation": "tangent"
+        },
+        "variation": {
+          "seed": 23,
+          "randomRotation": [
+            0.05,
+            0.2,
+            0.05
+          ]
+        },
+        "material": {
+          "baseColor": [
+            0.28,
+            0.26,
+            0.32
+          ],
+          "emissiveColor": [
+            1.0,
+            0.6,
+            0.35
+          ],
+          "emissiveIntensity": 0.15,
+          "roughness": 0.45,
+          "metallic": 0.35
+        },
+        "materialVariation": {
+          "hueGradient": 0.2,
+          "emissiveGradient": 1.0
+        }
+      }
+    },
+    "infinite-corridor": {
+      "description": "A receding corridor of arches.",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.2,
+            10.0,
+            1.2
+          ]
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 120,
+          "start": [
+            0,
+            5,
+            0
+          ],
+          "end": [
+            0,
+            5,
+            -400
+          ],
+          "orientAlong": false
+        },
+        "variation": {
+          "seed": 5,
+          "randomScale": [
+            0.1,
+            0.1,
+            0.1
+          ]
+        },
+        "deformers": [
+          {
+            "kind": "bend",
+            "amount": 0.1,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "falloff": 10
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.2,
+            0.22,
+            0.28
+          ],
+          "emissiveColor": [
+            0.5,
+            0.9,
+            1.0
+          ],
+          "emissiveIntensity": 0.3,
+          "roughness": 0.4,
+          "metallic": 0.5
+        },
+        "materialVariation": {
+          "emissiveGradient": 1.5
+        }
+      }
+    },
+    "ring-stack": {
+      "description": "Concentric rings stacked in height.",
+      "procedural": {
+        "source": {
+          "kind": "torus",
+          "majorRadius": 20,
+          "minorRadius": 0.5,
+          "majorSegments": 80,
+          "minorSegments": 10
+        },
+        "sourceTransform": {
+          "rotation": [
+            90,
+            0,
+            0
+          ]
+        },
+        "distribution": {
+          "kind": "linear",
+          "count": 12,
+          "start": [
+            0,
+            1,
+            0
+          ],
+          "end": [
+            0,
+            40,
+            0
+          ]
+        },
+        "material": {
+          "baseColor": [
+            0.16,
+            0.18,
+            0.22
+          ],
+          "emissiveColor": [
+            0.4,
+            0.95,
+            1.0
+          ],
+          "emissiveIntensity": 0.6,
+          "roughness": 0.3,
+          "metallic": 0.7
+        },
+        "materialVariation": {
+          "emissiveGradient": 1.4
+        }
+      }
+    },
+    "helix": {
+      "description": "A double helix of blocks.",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            2.0,
+            0.6,
+            0.6
+          ]
+        },
+        "distribution": {
+          "kind": "spiral",
+          "count": 300,
+          "radius": 10,
+          "turns": 8,
+          "spiralHeight": 60,
+          "orientation": "tangent"
+        },
+        "material": {
+          "baseColor": [
+            0.3,
+            0.32,
+            0.4
+          ],
+          "emissiveColor": [
+            0.7,
+            0.8,
+            1.0
+          ],
+          "emissiveIntensity": 0.4,
+          "roughness": 0.35,
+          "metallic": 0.5
+        },
+        "materialVariation": {
+          "hueGradient": 0.4
+        }
+      }
+    },
+    "grid-cathedral": {
+      "description": "A grid of pillars under a vaulted grid ceiling.",
+      "procedural": {
+        "source": {
+          "kind": "cylinder",
+          "radius": 0.9,
+          "height": 28,
+          "radialSegments": 16
+        },
+        "distribution": {
+          "kind": "grid",
+          "gridCount": [
+            7,
+            1,
+            7
+          ],
+          "gridSpacing": [
+            14,
+            1,
+            14
+          ],
+          "center": [
+            0,
+            14,
+            0
+          ]
+        },
+        "variation": {
+          "seed": 41,
+          "randomScale": [
+            0,
+            0.1,
+            0
+          ]
+        },
+        "material": {
+          "baseColor": [
+            0.32,
+            0.31,
+            0.35
+          ],
+          "emissiveColor": [
+            0.8,
+            0.7,
+            1.0
+          ],
+          "emissiveIntensity": 0.08,
+          "roughness": 0.5,
+          "metallic": 0.2
+        }
+      }
+    },
+    "fractal-tower": {
+      "description": "Self-recursive tower: each level spawns a smaller ring.",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            2.4,
+            3.0,
+            2.4
+          ]
+        },
+        "distribution": {
+          "kind": "radial",
+          "count": 5,
+          "radius": 6,
+          "orientation": "outward"
+        },
+        "hierarchy": {
+          "recursionDepth": 3,
+          "scalePerLevel": 0.55,
+          "offsetPerLevel": [
+            0,
+            6,
+            0
+          ],
+          "rotationPerLevel": [
+            0,
+            25,
+            0
+          ],
+          "colorPerLevel": true
+        },
+        "material": {
+          "baseColor": [
+            0.24,
+            0.26,
+            0.32
+          ],
+          "emissiveColor": [
+            0.6,
+            0.9,
+            1.0
+          ],
+          "emissiveIntensity": 0.3,
+          "roughness": 0.4,
+          "metallic": 0.4
+        },
+        "materialVariation": {
+          "hueGradient": 0.25
+        }
+      }
+    },
+    "floating-platforms": {
+      "description": "Scattered platforms filtered out of a grid.",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            6.0,
+            0.6,
+            6.0
+          ]
+        },
+        "distribution": {
+          "kind": "grid",
+          "gridCount": [
+            9,
+            5,
+            9
+          ],
+          "gridSpacing": [
+            12,
+            10,
+            12
+          ],
+          "center": [
+            0,
+            20,
+            0
+          ]
+        },
+        "variation": {
+          "seed": 77,
+          "randomPosition": [
+            2,
+            2,
+            2
+          ],
+          "randomRotation": [
+            0.05,
+            0.4,
+            0.05
+          ]
+        },
+        "ops": [
+          {
+            "kind": "filterProbability",
+            "probability": 0.35,
+            "seed": 9
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.26,
+            0.27,
+            0.3
+          ],
+          "emissiveColor": [
+            1.0,
+            0.75,
+            0.4
+          ],
+          "emissiveIntensity": 0.2,
+          "roughness": 0.5,
+          "metallic": 0.25
+        }
+      }
+    }
+  },
+  "fields": {
+    "radial-pulse": {
+      "description": "A spherical wave expanding from the origin; drive amplitude from onsets.",
+      "field": {
+        "kind": "wave",
+        "waveGeometry": "spherical",
+        "amplitude": 1.0,
+        "wavelength": 12,
+        "waveSpeed": 18,
+        "waveWidth": 18,
+        "strength": 1.0,
+        "falloff": {
+          "kind": "smoothstep",
+          "inner": 0,
+          "outer": 120
+        }
+      }
+    },
+    "vortex": {
+      "description": "Rotation about +Y, strongest near the axis.",
+      "field": {
+        "kind": "vortex",
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "strength": 1.5,
+        "falloff": {
+          "kind": "smooth",
+          "inner": 4,
+          "outer": 90
+        }
+      }
+    },
+    "attractor": {
+      "description": "Pulls towards a point.",
+      "field": {
+        "kind": "attractor",
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "strength": 2.0,
+        "falloff": {
+          "kind": "exponential",
+          "inner": 1,
+          "outer": 60,
+          "exponent": 2
+        }
+      }
+    },
+    "repulsor": {
+      "description": "Pushes away from a point.",
+      "field": {
+        "kind": "repulsor",
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "strength": 2.0,
+        "falloff": {
+          "kind": "exponential",
+          "inner": 1,
+          "outer": 60,
+          "exponent": 2
+        }
+      }
+    },
+    "curl-noise": {
+      "description": "Divergence-free turbulence.",
+      "field": {
+        "kind": "curlNoise",
+        "frequency": 0.05,
+        "speed": 0.3,
+        "seed": 12,
+        "strength": 1.5,
+        "falloff": {
+          "kind": "none"
+        }
+      }
+    },
+    "wave": {
+      "description": "A travelling planar wave.",
+      "field": {
+        "kind": "wave",
+        "waveGeometry": "planar",
+        "axis": [
+          0,
+          0,
+          1
+        ],
+        "amplitude": 1.0,
+        "wavelength": 20,
+        "waveSpeed": 12,
+        "waveWidth": 40,
+        "strength": 1.0,
+        "falloff": {
+          "kind": "none"
+        }
+      }
+    },
+    "turbulence": {
+      "description": "Noise scalar for scale and emission jitter.",
+      "field": {
+        "kind": "noise",
+        "frequency": 0.08,
+        "speed": 0.4,
+        "seed": 3,
+        "strength": 1.0,
+        "falloff": {
+          "kind": "none"
+        }
+      }
+    }
+  },
+  "deformers": {
+    "bend": {
+      "description": "Barr bend about +Y.",
+      "deformer": {
+        "kind": "bend",
+        "amount": 0.25,
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "falloff": 10
+      }
+    },
+    "twist": {
+      "description": "Twist about +Y.",
+      "deformer": {
+        "kind": "twist",
+        "amount": 0.3,
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "speed": 0.2
+      }
+    },
+    "noise": {
+      "description": "Per-vertex noise displacement.",
+      "deformer": {
+        "kind": "noise",
+        "amount": 0.6,
+        "scale": 0.4,
+        "speed": 0.3,
+        "seed": 7,
+        "space": "world"
+      }
+    },
+    "wave": {
+      "description": "Sine displacement along X.",
+      "deformer": {
+        "kind": "sine",
+        "amount": 0.8,
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "displacementAxis": [
+          1,
+          0,
+          0
+        ],
+        "frequency": 0.4,
+        "speed": 1.0
+      }
+    },
+    "ripple": {
+      "description": "Sine displacement along the normal.",
+      "deformer": {
+        "kind": "displacement",
+        "amount": 0.4,
+        "scale": 0.6,
+        "speed": 0.8,
+        "seed": 2
+      }
+    },
+    "field-displace": {
+      "description": "Displacement driven by a scene field.",
+      "deformer": {
+        "kind": "field",
+        "field": "churn",
+        "amount": 1.0,
+        "alongNormal": true
+      }
+    },
+    "path": {
+      "description": "Bends the source along a scene spline.",
+      "deformer": {
+        "kind": "path",
+        "spline": "rail",
+        "amount": 1.0,
+        "axis": [
+          1,
+          0,
+          0
+        ],
+        "pathScale": 0.0
+      }
+    }
+  },
+  "worlds": {
+    "temple": "examples/temple/temple.json",
+    "cathedral": "examples/cathedral/cathedral.json",
+    "hyperspace": "examples/hyperspace/hyperspace.json",
+    "impossible-chamber": "examples/chamber/chamber.json",
+    "living-machine": "examples/machine/machine.json",
+    "infinite-temple": "examples/infinite/infinite.json",
+    "helix": "examples/helix/helix.json"
+  }
+}
