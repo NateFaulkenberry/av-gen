@@ -72,3 +72,22 @@ hashes are bit-identical with particles on; the render job's sequence hash is th
   monotonic progress with generous margins.
 - Benchmarks: `Analyzer` hop time and modulation evaluation are reported, not asserted
   (`docs/performance.md`).
+
+## Procedural world suites (2026-09-09)
+
+| Tag | Binary | Covers |
+|---|---|---|
+| `[spatial]` | unit | attributes, point clouds, operators, fields, effectors |
+| `[spline]` | unit | spline kinds, generators, frames, sampling, packing |
+| `[grammar]`, `[hierarchy]` | unit | shape grammar operations, recursion, procedural sources |
+| `[sdf]` | unit + gpu | node tree evaluation, packed interpreter parity, surface nets, objects |
+| `[material]`, `[color]` | unit | material programs, OKLab and palette maths |
+| `[graph]` | unit | node registry, typing, evaluation, dirty tracking, subgraphs, library |
+| `[fields][gpu]` | gpu | every field kind and falloff, CPU against GPU within 1e-4 |
+| `[culling][gpu]`, `[lod]` | gpu + unit | frustum and screen-size culling against a CPU reference, LOD meshes |
+| `[debug]` | gpu | debug geometry builder and the drawing pipelines |
+| `[states]`, `[assetbrowser]`, `[profile]`, `[library]` | unit | states and macros, asset scanning, profiling, the preset library |
+| `[examples]` | gpu | every showcase renders bit-identically twice; the flagship along its arc |
+
+The parity tests are the backbone: any change to a field, effector, SDF node or material op has to
+produce the same number on the CPU and the GPU, which is what keeps offline renders honest.
