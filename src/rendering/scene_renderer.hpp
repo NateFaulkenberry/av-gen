@@ -12,6 +12,7 @@
 #include "gpu/render_target.hpp"
 #include "gpu/texture.hpp"
 #include "gpu/transient_pool.hpp"
+#include "rendering/field_uniforms.hpp"
 #include "rendering/particle_renderer.hpp"
 #include "rendering/post_processor.hpp"
 #include "rendering/procedural_renderer.hpp"
@@ -75,13 +76,15 @@ struct FrameUniforms {
     glm::mat4 viewProj;
     glm::mat4 invViewProj;
     glm::vec4 cameraPos;
+    glm::vec4 cameraRight; // xyz = camera right axis (world), for billboards
+    glm::vec4 cameraUp;    // xyz = camera up axis (world)
     glm::vec4 params;
     glm::vec4 envParams;
     glm::vec4 skyParams;
     glm::vec4 fogParams; // rgb = fog colour, w = density (0 = off)
     LightUniform lights[kMaxLights];
 };
-static_assert(sizeof(FrameUniforms) == 128 + 80 + 512);
+static_assert(sizeof(FrameUniforms) == 128 + 112 + 512);
 
 struct ObjectUniforms {
     glm::mat4 model;
@@ -147,6 +150,7 @@ public:
     [[nodiscard]] ShaderStack& shaderStack() { return *shaderStack_; }
     [[nodiscard]] ParticleRenderer& particles() { return *particles_; }
     [[nodiscard]] ProceduralRenderer& procedurals() { return *procedurals_; }
+    [[nodiscard]] FieldUniforms& fields() { return *fields_; } // the per-frame field block (ADR-025)
     [[nodiscard]] PostProcessor& post() { return *postProcessor_; }
     [[nodiscard]] gpu::TransientPool& transientPool() { return *pool_; }
 
@@ -199,6 +203,7 @@ private:
     std::unique_ptr<gpu::SamplerCache> samplers_;
     std::unique_ptr<EnvironmentProcessor> environment_;
     std::unique_ptr<ShaderStack> shaderStack_;
+    std::unique_ptr<FieldUniforms> fields_;
     std::unique_ptr<ParticleRenderer> particles_;
     std::unique_ptr<ProceduralRenderer> procedurals_;
     std::unique_ptr<PostProcessor> postProcessor_;

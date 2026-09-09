@@ -1,7 +1,10 @@
 #include "rendering/particle_renderer.hpp"
 
+#include "rendering/field_uniforms.hpp"
+
 #include "core/log.hpp"
 #include "gpu/context.hpp"
+#include "gpu/gpu_timer.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
 
@@ -16,24 +19,50 @@ namespace {
 constexpr std::uint32_t kParticleStride = 48;
 constexpr std::uint32_t kWorkgroup = 64;   // cs_emit / cs_simulate
 constexpr std::uint32_t kScanBlock = 1024; // slots per compaction workgroup (256 threads x 4)
-constexpr std::uint32_t kComputeBindings = 8;
+constexpr std::uint32_t kComputeBindings = 9; // 0 uniforms, 1..7 storage, 8 field block
 } // namespace
 
 ParticleRenderer::ParticleRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
     : context_(context), shaders_(shaders) {}
 
-Result<void> ParticleRenderer::init() {
+ParticleRenderer::~ParticleRenderer() = default;
+
+void ParticleRenderer::collectTimings() {
+    if (timer_) {
+        const double ms = timer_->collect();
+        if (ms >= 0.0) {
+            lastSimulateMs_ = ms;
+        }
+    }
+    stats_.simulateMs = passThisFrame_ ? lastSimulateMs_ : -1.0;
+}
+
+Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock) {
     const auto& device = context_.device();
+    fieldBlock_ = std::move(fieldBlock);
+    if (!fieldBlock_) {
+        wgpu::BufferDescriptor desc{};
+        desc.label = "particles-empty-field-block";
+        desc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+        desc.size = FieldUniforms::kBufferSize;
+        fieldBlock_ = device.CreateBuffer(&desc);
+        const FieldBlock zero{};
+        context_.queue().WriteBuffer(fieldBlock_, 0, &zero, sizeof(zero));
+    }
     {
         std::array<wgpu::BindGroupLayoutEntry, kComputeBindings> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Compute;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
-        for (std::uint32_t i = 1; i < kComputeBindings; ++i) {
+        for (std::uint32_t i = 1; i < kComputeBindings - 1; ++i) {
             entries[i].binding = i;
             entries[i].visibility = wgpu::ShaderStage::Compute;
             entries[i].buffer.type = wgpu::BufferBindingType::Storage;
         }
+        entries[8].binding = 8;
+        entries[8].visibility = wgpu::ShaderStage::Compute;
+        entries[8].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[8].buffer.minBindingSize = FieldUniforms::kBufferSize;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "particles-compute-layout";
         desc.entryCount = entries.size();
@@ -65,6 +94,7 @@ Result<void> ParticleRenderer::init() {
         desc.bindGroupLayouts = &renderLayout_;
         renderPipelineLayout_ = device.CreatePipelineLayout(&desc);
     }
+    timer_ = std::make_unique<gpu::GpuTimer>(context_);
     auto module = shaders_.load("particles.wgsl");
     if (!module) {
         return std::unexpected(module.error());
@@ -212,10 +242,12 @@ void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity) {
 
     std::array<wgpu::BindGroupEntry, kComputeBindings> entries{};
     const wgpu::Buffer* buffers[kComputeBindings] = {&pool.uniforms, &pool.particles, &pool.deadList, &pool.counters,
-                                                     &pool.aliveList, &pool.indirect, &pool.flags, &pool.blockSums};
+                                                     &pool.aliveList, &pool.indirect, &pool.flags, &pool.blockSums,
+                                                     &fieldBlock_};
     const std::uint64_t sizes[kComputeBindings] = {sizeof(ParticleUniforms),
                                                    static_cast<std::uint64_t>(capacity) * kParticleStride,
-                                                   listBytes, 16, listBytes, 16, listBytes, blockBytes};
+                                                   listBytes, 16, listBytes, 16, listBytes, blockBytes,
+                                                   FieldUniforms::kBufferSize};
     for (std::uint32_t i = 0; i < kComputeBindings; ++i) {
         entries[i].binding = i;
         entries[i].buffer = *buffers[i];
@@ -264,11 +296,19 @@ void ParticleRenderer::resetAll() {
 }
 
 void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
-                              const glm::mat4& view, const glm::mat4& proj) {
+                              const glm::mat4& view, const glm::mat4& proj, const FieldUniforms* fields) {
     stats_ = ParticleStats{};
+    passThisFrame_ = false;
     if (!initialised_) {
         return;
     }
+    collectTimings(); // the previous frame's measurement (its command buffer was submitted by now)
+    // The timestamps span every enabled system's compute pass: begin on the first, end on the last.
+    std::size_t enabledSystems = 0;
+    for (const auto& sys : scene.particles) {
+        enabledSystems += sys.enabled ? 1 : 0;
+    }
+    std::size_t encoded = 0;
     const glm::mat4 invView = glm::inverse(view);
     const glm::vec3 right = glm::normalize(glm::vec3(invView[0]));
     const glm::vec3 up = glm::normalize(glm::vec3(invView[1]));
@@ -307,6 +347,27 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
                           static_cast<float>(time.frameIndex), static_cast<float>(sys.seed));
         u.counts = glm::uvec4(emitCount, pool.capacity, sys.blend == scene::ParticleBlend::Additive ? 0u : 1u,
                               pool.blocks);
+        // Field forces (ADR-025): enabled entries bound to an uploaded field, in order.
+        std::uint32_t forceCount = 0;
+        if (fields != nullptr) {
+            for (const auto& f : sys.fieldForces) {
+                if (forceCount >= static_cast<std::uint32_t>(scene::kMaxFieldForces)) {
+                    break;
+                }
+                if (!f.enabled) {
+                    continue;
+                }
+                const int slot = fields->slotOf(f.field);
+                if (slot < 0) {
+                    continue;
+                }
+                u.fieldForces[forceCount * 2] = glm::vec4(static_cast<float>(f.mode), static_cast<float>(slot), f.strength,
+                                                          std::clamp(f.mix, 0.0f, 1.0f));
+                u.fieldForces[forceCount * 2 + 1] = glm::vec4(f.axis, 0.0f);
+                ++forceCount;
+            }
+        }
+        u.fieldInfo = glm::uvec4(forceCount, 0u, 0u, 0u);
         context_.queue().WriteBuffer(pool.uniforms, 0, &u, sizeof(u));
 
         // Pass order (see particles.wgsl): emit -> simulate -> reduce -> top scan -> scatter.
@@ -314,6 +375,21 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         // emit consumes last frame's dead list before scatter rewrites it.
         wgpu::ComputePassDescriptor cdesc{};
         cdesc.label = "particles-compute";
+        wgpu::PassTimestampWrites writes{};
+        if (const wgpu::PassTimestampWrites* both = timer_->passWrites(); both != nullptr) {
+            writes.querySet = both->querySet;
+            if (enabledSystems == 1) {
+                writes = *both;
+            } else if (encoded == 0) {
+                writes.beginningOfPassWriteIndex = both->beginningOfPassWriteIndex;
+            } else if (encoded + 1 == enabledSystems) {
+                writes.endOfPassWriteIndex = both->endOfPassWriteIndex;
+            }
+            if (encoded == 0 || encoded + 1 == enabledSystems) {
+                cdesc.timestampWrites = &writes;
+            }
+        }
+        ++encoded;
         wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&cdesc);
         cp.SetBindGroup(0, pool.computeGroup);
         if (emitCount > 0) {
@@ -333,6 +409,11 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         ++stats_.systems;
         stats_.capacity += pool.capacity;
         stats_.emittedThisFrame += emitCount;
+    }
+    if (encoded > 0 && timer_->available()) {
+        timer_->resolve(encoder);
+        passThisFrame_ = true;
+        stats_.simulateMs = lastSimulateMs_;
     }
 }
 

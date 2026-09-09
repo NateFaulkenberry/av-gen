@@ -24,6 +24,8 @@ public:
     // Timestamp writes to attach to the first and last pass of the frame. Null when unavailable.
     [[nodiscard]] const wgpu::PassTimestampWrites* beginWrites() const { return available_ ? &begin_ : nullptr; }
     [[nodiscard]] const wgpu::PassTimestampWrites* endWrites() const { return available_ ? &end_ : nullptr; }
+    // Both timestamps on one pass (a single compute or render pass measured on its own).
+    [[nodiscard]] const wgpu::PassTimestampWrites* passWrites() const { return available_ ? &both_ : nullptr; }
 
     // Call after all passes are encoded, before Finish(): resolves and copies into a staging slot.
     void resolve(wgpu::CommandEncoder& encoder);
@@ -47,6 +49,7 @@ private:
     wgpu::QuerySet querySet_;
     wgpu::PassTimestampWrites begin_{};
     wgpu::PassTimestampWrites end_{};
+    wgpu::PassTimestampWrites both_{};
     std::array<Slot, kSlots> slots_{};
     std::size_t next_ = 0;
     int pendingSlot_ = -1;

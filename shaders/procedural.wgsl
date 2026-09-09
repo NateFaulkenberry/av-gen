@@ -12,84 +12,57 @@
 // basis (t1, t2) of the source normal, flipped into the hemisphere of the transformed source
 // normal; eps = timeInfo.z (1e-3 x source bounds radius, set by the renderer).
 //
+// Fields (ADR-025, fields.wgsl): the Field deformer (kind 5) samples slot params.x at the
+// vertex's current world position and displaces in the deformer's space (vector fields: v *
+// amount, rotated into object space for local deformers; scalar fields: along the normal or the
+// axis by s * amount). fieldInfo.x/y multiply the emission by 1 + amount * fieldScalar(slot,
+// worldPos) in the fragment. Point sources (fieldInfo.z) are camera-facing quads: the centre is
+// the instance origin through the object matrix and the world deformers, the quad spans the
+// camera right/up axes scaled by the instance scale, the normal faces the camera.
+//
 // Bind groups: 0 frame (common.wgsl), 1 = {0 ObjectUniforms (dynamic offset; model = object
-// matrix, material fields), 1 instances (read-only storage), 2 ProceduralUniforms}, 2 material,
-// 3 IBL (both declared in pbr_shade.wgsl). Mirrors rendering/procedural_renderer.hpp.
+// matrix, material fields), 1 instances (read-only storage; the live buffer when the object has
+// effectors), 2 ProceduralUniforms, 3 FieldBlock}, 2 material, 3 IBL (both declared in
+// pbr_shade.wgsl). Mirrors rendering/procedural_renderer.hpp.
 #include "common.wgsl"
 #include "pbr_shade.wgsl"
+#include "fields.wgsl"
 
 struct InstanceRecord {
-    position: vec4<f32>,  // xyz, w = uniform scale hint (unused here)
+    position: vec4<f32>,  // xyz, w = density
     rotation: vec4<f32>,  // unit quaternion (x, y, z, w)
     scale: vec4<f32>,     // xyz, w = normalised index
     random: vec4<f32>,    // four hashed randoms in [0, 1)
     color: vec4<f32>,     // rgb = base colour multiplier, a = instance id
-    emissive: vec4<f32>,  // rgb = emissive multiplier
+    emissive: vec4<f32>,  // rgb = emissive multiplier, a = extra lane
 };
 
-// One deformer slot (64 bytes). Kinds: 0 bend, 1 twist, 2 sine, 3 noise, 4 displacement;
-// + 8 when the deformer acts in world space; < 0 = disabled slot.
+// One deformer slot (64 bytes). Kinds: 0 bend, 1 twist, 2 sine, 3 noise, 4 displacement,
+// 5 field; + 8 when the deformer acts in world space; < 0 = disabled slot.
 struct DeformerUniform {
     axisKind: vec4<f32>,     // xyz = unit axis, w = kind code (see above)
     centerAmount: vec4<f32>, // xyz = center, w = amount
-    params: vec4<f32>,       // x = frequency (sine) | spatial scale (noise, displacement), y = speed, z = phase, w = falloff
+    params: vec4<f32>,       // x = frequency (sine) | spatial scale (noise, displacement) | field slot (field, -1 none), y = speed | alongNormal (field), z = phase, w = falloff
     extra: vec4<f32>,        // xyz = displacement axis (sine) | bend direction (bend) | axis mask (noise); w = bitcast<u32> seed
 };
 
 struct ProceduralUniforms {
     timeInfo: vec4<f32>,  // x = render time, y = deformer count, z = normal epsilon, w = instance count
+    fieldInfo: vec4<f32>, // x = emissive field slot (-1 none), y = emissive field amount, z = point source (1/0), w = 0
     deformers: array<DeformerUniform, 8>,
 };
 
 @group(1) @binding(1) var<storage, read> instances: array<InstanceRecord>;
 @group(1) @binding(2) var<uniform> proc: ProceduralUniforms;
+@group(1) @binding(3) var<uniform> fieldBlock: FieldBlock;
 
 const DEFORM_BEND: i32 = 0;
 const DEFORM_TWIST: i32 = 1;
 const DEFORM_SINE: i32 = 2;
 const DEFORM_NOISE: i32 = 3;
 const DEFORM_DISPLACEMENT: i32 = 4;
+const DEFORM_FIELD: i32 = 5;
 const DEFORM_WORLD: i32 = 8;
-
-// ---- hashing / noise (reference implementation; scene::fbm3 on the CPU must match) ----------
-
-fn pcg3d(vIn: vec3<u32>) -> vec3<u32> {
-    var v = vIn * 1664525u + 1013904223u;
-    v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
-    v ^= v >> vec3<u32>(16u);
-    v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
-    return v;
-}
-
-fn hash01(cell: vec3<i32>, seed: u32) -> f32 {
-    let h = pcg3d(vec3<u32>(bitcast<u32>(cell.x) + seed * 7919u, bitcast<u32>(cell.y) + seed * 104729u,
-                            bitcast<u32>(cell.z) + seed * 1299709u));
-    return f32(h.x) * (1.0 / 4294967296.0);
-}
-
-// Value noise: trilinear (smoothstep-weighted) interpolation of hash01 at the 8 cell corners.
-fn valueNoise(p: vec3<f32>, seed: u32) -> f32 {
-    let c = floor(p);
-    let f = p - c;
-    let u = f * f * (3.0 - 2.0 * f);
-    let ci = vec3<i32>(c);
-    let n000 = hash01(ci, seed);
-    let n100 = hash01(ci + vec3<i32>(1, 0, 0), seed);
-    let n010 = hash01(ci + vec3<i32>(0, 1, 0), seed);
-    let n110 = hash01(ci + vec3<i32>(1, 1, 0), seed);
-    let n001 = hash01(ci + vec3<i32>(0, 0, 1), seed);
-    let n101 = hash01(ci + vec3<i32>(1, 0, 1), seed);
-    let n011 = hash01(ci + vec3<i32>(0, 1, 1), seed);
-    let n111 = hash01(ci + vec3<i32>(1, 1, 1), seed);
-    return mix(mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y),
-               mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y), u.z);
-}
-
-// Three-octave value fBM in [0, 1].
-fn fbm3(p: vec3<f32>, seed: u32) -> f32 {
-    return (0.5 * valueNoise(p, seed) + 0.25 * valueNoise(p * 2.03 + vec3<f32>(17.0), seed) +
-            0.125 * valueNoise(p * 4.11 + vec3<f32>(31.0), seed)) / 0.875;
-}
 
 // ---- transforms ------------------------------------------------------------------------------
 
@@ -113,6 +86,11 @@ fn perpendicularTo(a: vec3<f32>) -> vec3<f32> {
         helper = vec3<f32>(1.0, 0.0, 0.0);
     }
     return normalize(cross(helper, a));
+}
+
+// The instance transform of an object-space point.
+fn instancePoint(inst: InstanceRecord, p: vec3<f32>) -> vec3<f32> {
+    return inst.position.xyz + quatRotate(inst.rotation, p * inst.scale.xyz);
 }
 
 // ---- deformers -------------------------------------------------------------------------------
@@ -164,7 +142,7 @@ fn falloffRamp(y: f32, falloff: f32) -> f32 {
 }
 
 // Applies one deformer (kind without the world flag) to p; n is the source normal expressed in
-// the deformer's space (used by displacement only).
+// the deformer's space (used by displacement only). Field deformers are handled by the chain.
 fn applyDeformer(d: DeformerUniform, kind: i32, p: vec3<f32>, n: vec3<f32>, t: f32) -> vec3<f32> {
     let axis = d.axisKind.xyz;
     let c = d.centerAmount.xyz;
@@ -200,8 +178,73 @@ fn applyDeformer(d: DeformerUniform, kind: i32, p: vec3<f32>, n: vec3<f32>, t: f
     return p;
 }
 
+// Field deformer on a world-space point: samples slot params.x at p and displaces p (vector
+// fields by v * amount; scalar fields along the world normal or the axis by s * amount).
+fn applyWorldFieldDeformer(d: DeformerUniform, p: vec3<f32>, nWorld: vec3<f32>) -> vec3<f32> {
+    let slot = i32(floor(d.params.x + 0.5));
+    if (slot < 0) {
+        return p;
+    }
+    let amount = d.centerAmount.w;
+    if (fieldTypeOf(slot) == FIELD_TYPE_VECTOR) {
+        return p + fieldVector(slot, p) * amount;
+    }
+    let s = fieldScalar(slot, p);
+    var dir = d.axisKind.xyz;
+    if (d.params.y > 0.5) {
+        dir = nWorld;
+    }
+    return p + dir * (s * amount);
+}
+
+// Field deformer on an object-space point: samples at the point's current world position and
+// brings vector results back through the inverse of the object's linear part (the transpose of
+// its normal matrix) and the instance rotation and scale.
+fn applyLocalFieldDeformer(d: DeformerUniform, p: vec3<f32>, nLocal: vec3<f32>, inst: InstanceRecord) -> vec3<f32> {
+    let slot = i32(floor(d.params.x + 0.5));
+    if (slot < 0) {
+        return p;
+    }
+    let amount = d.centerAmount.w;
+    let pw = (object.model * vec4<f32>(instancePoint(inst, p), 1.0)).xyz;
+    if (fieldTypeOf(slot) == FIELD_TYPE_VECTOR) {
+        let s = inst.scale.xyz;
+        let safeScale = select(s, vec3<f32>(1.0), abs(s) < vec3<f32>(1e-8));
+        let nm = object.normalMatrix;
+        let objInv = transpose(mat3x3<f32>(nm[0].xyz, nm[1].xyz, nm[2].xyz));
+        let conj = vec4<f32>(-inst.rotation.xyz, inst.rotation.w);
+        let vObj = objInv * fieldVector(slot, pw);
+        return p + (quatRotate(conj, vObj) / safeScale) * amount;
+    }
+    let sv = fieldScalar(slot, pw);
+    var dir = d.axisKind.xyz;
+    if (d.params.y > 0.5) {
+        dir = nLocal;
+    }
+    return p + dir * (sv * amount);
+}
+
 fn deformerCode(d: DeformerUniform) -> i32 {
     return i32(floor(d.axisKind.w + 0.5)); // -1 stays -1 (disabled)
+}
+
+// The world-space deformers applied to a world-space point (the second half of the chain).
+fn deformWorld(pIn: vec3<f32>, nWorld: vec3<f32>) -> vec3<f32> {
+    let count = u32(proc.timeInfo.y + 0.5);
+    let t = proc.timeInfo.x;
+    var p = pIn;
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        if (i >= count) { break; }
+        let d = proc.deformers[i];
+        let code = deformerCode(d);
+        if (code < DEFORM_WORLD) { continue; }
+        if (code - DEFORM_WORLD == DEFORM_FIELD) {
+            p = applyWorldFieldDeformer(d, p, nWorld);
+        } else {
+            p = applyDeformer(d, code - DEFORM_WORLD, p, nWorld, t);
+        }
+    }
+    return p;
 }
 
 // The whole chain for one source point: local deformers, instance, object, world deformers.
@@ -214,18 +257,15 @@ fn deformChain(pIn: vec3<f32>, nLocal: vec3<f32>, nWorld: vec3<f32>, inst: Insta
         let d = proc.deformers[i];
         let code = deformerCode(d);
         if (code < 0 || code >= DEFORM_WORLD) { continue; }
-        p = applyDeformer(d, code, p, nLocal, t);
+        if (code == DEFORM_FIELD) {
+            p = applyLocalFieldDeformer(d, p, nLocal, inst);
+        } else {
+            p = applyDeformer(d, code, p, nLocal, t);
+        }
     }
-    p = inst.position.xyz + quatRotate(inst.rotation, p * inst.scale.xyz);
+    p = instancePoint(inst, p);
     p = (object.model * vec4<f32>(p, 1.0)).xyz;
-    for (var i = 0u; i < 8u; i = i + 1u) {
-        if (i >= count) { break; }
-        let d = proc.deformers[i];
-        let code = deformerCode(d);
-        if (code < DEFORM_WORLD) { continue; }
-        p = applyDeformer(d, code - DEFORM_WORLD, p, nWorld, t);
-    }
-    return p;
+    return deformWorld(p, nWorld);
 }
 
 // ---- vertex / fragment -------------------------------------------------------------------------
@@ -242,6 +282,26 @@ struct ProcVertexOut {
 @vertex
 fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVertexOut {
     let inst = instances[instanceIndex];
+    var out: ProcVertexOut;
+    out.uv = in.uv;
+    out.colorMul = inst.color.rgb;
+    out.emissiveMul = inst.emissive.rgb;
+
+    if (proc.fieldInfo.z > 0.5) {
+        // Point source: a camera-facing quad around the instance centre. The centre goes through
+        // the object matrix and the world deformers; the quad offsets skip the deformer stack.
+        var c = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
+        let toCamera = normalize(frame.cameraPos.xyz - c + vec3<f32>(0.0, 0.0, 1e-6));
+        c = deformWorld(c, toCamera);
+        let right = frame.cameraRight.xyz;
+        let up = frame.cameraUp.xyz;
+        let p = c + right * (in.position.x * inst.scale.x) + up * (in.position.y * inst.scale.y);
+        out.clip = frame.viewProj * vec4<f32>(p, 1.0);
+        out.worldPos = p;
+        out.normal = normalize(frame.cameraPos.xyz - c + vec3<f32>(0.0, 0.0, 1e-6));
+        return out;
+    }
+
     let n = normalize(in.normal);
     // Tangent basis around the source normal: cross(t1, t2) == n.
     let t1 = perpendicularTo(n);
@@ -268,17 +328,18 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
         }
     }
 
-    var out: ProcVertexOut;
     out.clip = frame.viewProj * vec4<f32>(p0, 1.0);
     out.worldPos = p0;
     out.normal = nw;
-    out.uv = in.uv;
-    out.colorMul = inst.color.rgb;
-    out.emissiveMul = inst.emissive.rgb;
     return out;
 }
 
 @fragment
 fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> @location(0) vec4<f32> {
-    return shadePbr(in.worldPos, in.normal, in.uv, frontFacing, in.colorMul, in.emissiveMul);
+    var emissiveMul = in.emissiveMul;
+    let emissiveSlot = i32(floor(proc.fieldInfo.x + 0.5));
+    if (emissiveSlot >= 0) {
+        emissiveMul = emissiveMul * (1.0 + proc.fieldInfo.y * fieldScalar(emissiveSlot, in.worldPos));
+    }
+    return shadePbr(in.worldPos, in.normal, in.uv, frontFacing, in.colorMul, emissiveMul);
 }

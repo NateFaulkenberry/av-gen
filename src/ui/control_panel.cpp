@@ -708,6 +708,11 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
                     pr.objects, static_cast<unsigned long long>(pr.instances), pr.sourceTriangles,
                     static_cast<unsigned long long>(pr.logicalTriangles), pr.deformers,
                     static_cast<double>(pr.instanceBufferBytes) / 1024.0, pr.cpuUpdateMs);
+        if (pr.effectorObjects > 0 || pr.fieldDeformers > 0 || pr.pointObjects > 0) {
+            ImGui::Text("fields: %u effector objects  %llu records  %u effectors  pass %.3f ms  %u field deformers  %u point objects",
+                        pr.effectorObjects, static_cast<unsigned long long>(pr.effectorInstances), pr.effectors,
+                        pr.effectorPassMs, pr.fieldDeformers, pr.pointObjects);
+        }
     }
     ImGui::TextDisabled("%s (%s)", stats.adapter.c_str(), stats.backend.c_str());
 }

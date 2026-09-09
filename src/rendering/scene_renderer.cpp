@@ -41,6 +41,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       samplers_(std::make_unique<gpu::SamplerCache>(context)),
       environment_(std::make_unique<EnvironmentProcessor>(context, shaders)),
       shaderStack_(std::make_unique<ShaderStack>(context, shaders)),
+      fields_(std::make_unique<FieldUniforms>(context)),
       particles_(std::make_unique<ParticleRenderer>(context, shaders)),
       procedurals_(std::make_unique<ProceduralRenderer>(context, shaders)),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
@@ -208,10 +209,12 @@ Result<void> SceneRenderer::init() {
     if (auto r = environment_->init(); !r) {
         return r;
     }
-    if (auto r = particles_->init(); !r) {
+    if (auto r = particles_->init(fields_->buffer()); !r) {
         return r;
     }
-    if (auto r = procedurals_->init(kHdrFormat, kDepthFormat, frameLayout_, materialLayout_, iblLayout_); !r) {
+    if (auto r = procedurals_->init(kHdrFormat, kDepthFormat, frameLayout_, materialLayout_, iblLayout_, 1,
+                                    fields_->buffer());
+        !r) {
         return r;
     }
     if (auto r = postProcessor_->init(); !r) {
@@ -803,6 +806,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     frame.viewProj = proj * view;
     frame.invViewProj = glm::inverse(frame.viewProj);
     frame.cameraPos = glm::vec4(scene.camera.position, 1.0f);
+    {
+        const glm::mat4 invView = glm::inverse(view);
+        frame.cameraRight = glm::vec4(glm::normalize(glm::vec3(invView[0])), 0.0f);
+        frame.cameraUp = glm::vec4(glm::normalize(glm::vec3(invView[1])), 0.0f);
+    }
     const bool ibl = ibl_.valid && scene.environment.environmentMap != scene::kInvalidTexture;
     frame.params = glm::vec4(static_cast<float>(time.renderTime), scene.environment.gridIntensity,
                              scene.environment.brightness, scene.environment.environmentIntensity);
@@ -899,15 +907,18 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     stats_.lights = lightCount;
     stats_.ibl = ibl;
 
+    // ---- fields (ADR-025): the per-frame field block shared by particles and procedurals ----
+    fields_->update(scene.fields, time.renderTime);
+
     // ---- particle simulation (compute) ----
-    particles_->update(encoder, scene, time, view, proj);
+    particles_->update(encoder, scene, time, view, proj, fields_.get());
     stats_.particles = particles_->stats();
 
-    // ---- procedural geometry (ADR-023): mesh/instance uploads and per-frame uniforms ----
+    // ---- procedural geometry (ADR-023): mesh/instance uploads, per-frame uniforms, effector pass ----
     // The scene places its procedurals itself in this phase: identity object matrices.
     {
         const std::vector<glm::mat4> identity(scene.procedurals.size(), glm::mat4(1.0f));
-        procedurals_->update(scene, identity, time);
+        procedurals_->update(encoder, scene, identity, time, fields_.get());
         stats_.procedural = procedurals_->stats();
     }
 
@@ -1114,8 +1125,14 @@ Result<wgpu::Texture> SceneRenderer::renderSubmitted(const scene::Scene& scene, 
     wgpu::CommandBuffer commands = encoder.Finish();
     context_.queue().Submit(1, &commands);
     stats_.gpuFrameMs = timer_->collect();
+    procedurals_->collectTimings();
+    particles_->collectTimings();
     context_.waitForQueue();
     stats_.gpuFrameMs = timer_->collect();
+    procedurals_->collectTimings();
+    particles_->collectTimings();
+    stats_.procedural.effectorPassMs = procedurals_->stats().effectorPassMs;
+    stats_.particles.simulateMs = particles_->stats().simulateMs;
     return texture;
 }
 

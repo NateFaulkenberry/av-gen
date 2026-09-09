@@ -14,14 +14,18 @@
 #include <webgpu/webgpu_cpp.h>
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace avgen::gpu {
 class Context;
+class GpuTimer;
 class ShaderLibrary;
 } // namespace avgen::gpu
 
 namespace avgen::rendering {
+
+class FieldUniforms;
 
 struct ParticleUniforms {
     glm::mat4 viewProj;
@@ -39,13 +43,16 @@ struct ParticleUniforms {
     glm::vec4 colorEnd;
     glm::vec4 sim;
     glm::uvec4 counts; // emitCount, capacity, blend, scan blocks
+    glm::uvec4 fieldInfo; // x = field force count (ADR-025)
+    glm::vec4 fieldForces[scene::kMaxFieldForces * 2]; // per force: (mode, slot, strength, mix), (axis.xyz, 0)
 };
-static_assert(sizeof(ParticleUniforms) == 64 + 16 * 14);
+static_assert(sizeof(ParticleUniforms) == 64 + 16 * 15 + 32 * scene::kMaxFieldForces);
 
 struct ParticleStats {
     std::uint32_t systems = 0;
     std::uint32_t capacity = 0;         // sum of pools
     std::uint32_t emittedThisFrame = 0; // requested spawns (the GPU clamps to the free slots)
+    double simulateMs = -1.0;           // GPU time of the compute passes (emit..compaction) of the last measured frame; -1 = none / unavailable
 };
 
 // GPU-side pool occupancy after the last update(); alive + dead == capacity.
@@ -57,16 +64,25 @@ struct ParticleCounts {
 class ParticleRenderer {
 public:
     ParticleRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders);
-    [[nodiscard]] Result<void> init();
+    ~ParticleRenderer();
+    ParticleRenderer(const ParticleRenderer&) = delete;
+    ParticleRenderer& operator=(const ParticleRenderer&) = delete;
+    // `fieldBlock` is the FieldUniforms buffer bound to the simulate pass (a zeroed private one
+    // is created when null).
+    [[nodiscard]] Result<void> init(wgpu::Buffer fieldBlock = nullptr);
     [[nodiscard]] Result<void> reload(); // hot reload of particles.wgsl (keeps old on failure)
 
     // Encodes the compute passes for every enabled system. Call before the scene pass.
+    // `fields` resolves the systems' field forces to slots (null = no field forces).
     void update(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
-                const glm::mat4& view, const glm::mat4& proj);
+                const glm::mat4& view, const glm::mat4& proj, const FieldUniforms* fields = nullptr);
     // Draws every enabled system into the current render pass (additive/alpha, depth test only).
     void draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene);
     // Resets all pools (kills every particle); used on seek/offline restarts.
     void resetAll();
+    // Pumps the compute-pass timer after the frame's command buffer was submitted (update() also
+    // does this at the start of the next frame).
+    void collectTimings();
 
     [[nodiscard]] const ParticleStats& stats() const { return stats_; }
     [[nodiscard]] bool initialised() const { return initialised_; }
@@ -98,6 +114,10 @@ private:
 
     gpu::Context& context_;
     gpu::ShaderLibrary& shaders_;
+    wgpu::Buffer fieldBlock_;
+    std::unique_ptr<gpu::GpuTimer> timer_;
+    double lastSimulateMs_ = -1.0;
+    bool passThisFrame_ = false;
     bool initialised_ = false;
     wgpu::BindGroupLayout computeLayout_;
     wgpu::BindGroupLayout renderLayout_;
