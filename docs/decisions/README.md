@@ -38,3 +38,12 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [030](ADR-030-procedural-materials.md) | Procedural materials as an interpreted op program; colour utilities | Accepted |
 | [031](ADR-031-states-macros-authoring.md) | Scene states, world macros, layered authoring, inspection, debug drawing | Accepted |
 | [032](ADR-032-simulation-and-volumes.md) | Simulated fields and volumetric atmosphere | Accepted |
+| [033](ADR-033-lighting-architecture.md) | Clustered forward lighting, area lights, colour temperature, light rigs | Accepted |
+| [034](ADR-034-shadows-and-occlusion.md) | Cascaded shadows, contact shadows, ground-truth ambient occlusion | Accepted |
+| [035](ADR-035-render-passes.md) | Auxiliary render targets and a declared frame graph | Accepted |
+| [036](ADR-036-layered-materials.md) | Layered materials, geometric inputs, triplanar mapping, decals | Accepted |
+| [037](ADR-037-cinematic-camera.md) | Physical camera, exposure and camera behaviours | Accepted |
+| [038](ADR-038-composition.md) | Procedural composition, visual hierarchy and negative space | Accepted |
+| [039](ADR-039-image-formation.md) | Image formation, selective post and tone mapping | Accepted |
+| [040](ADR-040-particles-and-motion.md) | Particle trails, velocity-aware rendering and motion blur | Accepted |
+| [041](ADR-041-world-director.md) | World Director, look presets and musical phrasing | Accepted |
