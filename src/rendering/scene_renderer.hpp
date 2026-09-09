@@ -16,6 +16,7 @@
 #include "rendering/particle_renderer.hpp"
 #include "rendering/post_processor.hpp"
 #include "rendering/procedural_renderer.hpp"
+#include "rendering/sdf_renderer.hpp"
 #include "rendering/shader_layer.hpp"
 #include "scene/scene.hpp"
 #include "shaders/shader_layers.hpp"
@@ -57,6 +58,7 @@ struct RenderStats {
     bool ibl = false;
     ParticleStats particles;
     ProceduralStats procedural; // ADR-023; its draws/triangles are also folded into the totals
+    SdfStats sdf;               // ADR-027; its draws/triangles are also folded into the totals
     PostStats post;
     std::uint32_t transientTextures = 0;
 };
@@ -150,6 +152,7 @@ public:
     [[nodiscard]] ShaderStack& shaderStack() { return *shaderStack_; }
     [[nodiscard]] ParticleRenderer& particles() { return *particles_; }
     [[nodiscard]] ProceduralRenderer& procedurals() { return *procedurals_; }
+    [[nodiscard]] SdfRenderer& sdfs() { return *sdfs_; } // ADR-027
     [[nodiscard]] FieldUniforms& fields() { return *fields_; } // the per-frame field block (ADR-025)
     [[nodiscard]] PostProcessor& post() { return *postProcessor_; }
     [[nodiscard]] gpu::TransientPool& transientPool() { return *pool_; }
@@ -206,6 +209,7 @@ private:
     std::unique_ptr<FieldUniforms> fields_;
     std::unique_ptr<ParticleRenderer> particles_;
     std::unique_ptr<ProceduralRenderer> procedurals_;
+    std::unique_ptr<SdfRenderer> sdfs_;
     std::unique_ptr<PostProcessor> postProcessor_;
     std::unique_ptr<gpu::TransientPool> pool_;
     glm::mat4 prevViewProj_{1.0f};

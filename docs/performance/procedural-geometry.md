@@ -91,3 +91,39 @@ under 6 ms):
   0.75 ms of simulation (the curl again dominates); the stable compaction is unchanged.
 - CPU cost is microseconds per frame in every case: the field block (5 KB) and the per-object
   uniforms are the only per-frame uploads.
+
+## SDF objects (ADR-027)
+
+Probe: `avgen_render_tests "[.perf][sdf]"` (Release; `tests/rendering/test_sdf_gpu.cpp`).
+Apple M2 Max, macOS 26.6.2, Dawn v20260907 (Metal), headless 1920x1080, mean of frames 30..89.
+"raymarch pass" is `SdfStats::raymarchMs`, the timestamped SDF pass alone; "frame" is the frame
+timer (scene pass through tone map), so the difference is the rest of the scene. The camera sits
+at z = 3 *inside* the object's 8-unit bounds, so the quad covers the whole screen and every one of
+the 2.07 M pixels marches: this is the worst case, not a typical shot. `maxSteps` 128, `epsilon`
+0.002, `stepScale` 0.9 (0.7 with noise, which is not Lipschitz-1). Three runs; the two heavy rows
+swing by 20-30% with GPU clock state, so their range is given.
+
+| Case | Packed nodes | Raymarch pass ms | Frame ms | CPU update ms |
+|---|---|---|---|---|
+| 1 sphere | 3 | 3.58-3.66 | 4.19-4.25 | 0.002 |
+| 16 spheres, smooth union (4x4 fold) | 63 | 114.5-140.1 | 115.4-140.9 | 0.007-0.013 |
+| 16 spheres, smooth union + 3-octave fBM displacement | 65 | 153.8-204.1 | 154.6-204.9 | 0.007-0.015 |
+
+Reading the numbers:
+
+- Cost is (pixels) x (steps) x (nodes), and nothing culls: a full-screen march of a 63-node
+  program at 128 steps is ~1.7e10 node evaluations per frame. One sphere (3 nodes) at 3.6 ms is
+  the floor and scales roughly linearly with the program length, so the useful lever is the
+  bounds: a raymarched object that covers a quarter of the screen costs a quarter of this.
+- The noise displacement adds ~40-60 ms: it is one 3-octave fBM per *step*, plus four more per
+  hit for the tetrahedron normal, and it forces `stepScale` down to 0.7, which lengthens every
+  ray. Displaced trees are the expensive kind here exactly as they are for the deformers above.
+- The interpreter's distance and point stacks are dynamically indexed `array<f32, 8>` locals,
+  which Metal keeps in scratch memory rather than registers; that, and the per-node branch chain,
+  is why a node costs far more than the few ALU its formula needs. A per-tree specialised shader
+  (generating WGSL from the tree, as `shader_layers` does for user shaders) is the obvious next
+  step and would remove both.
+- The CPU side is microseconds: packing 65 nodes and writing two 256-byte uniform slots.
+- Mesh mode has no per-frame GPU cost beyond an ordinary mesh draw; its cost is the CPU
+  surface-nets pass in `SdfObject::rebuild` (resolution^3 tree evaluations), paid only when the
+  structural hash changes.

@@ -176,3 +176,168 @@ missing members keep their defaults. Vectors are 3-element arrays; `rotation` is
 
 `structuralHash` covers every member of every node (kind, enabled, all parameters, `reference`,
 child count) recursively; it changes whenever the JSON would.
+
+## Scene objects and rendering
+
+Header: `src/scene/sdf_object.hpp` / `src/rendering/sdf_renderer.hpp`. Implementation:
+`src/scene/sdf_object.cpp`, `src/rendering/sdf_renderer.cpp`, `shaders/sdf.wgsl` (the interpreter)
+and `shaders/sdf_raymarch.wgsl` (the pass). Tests: `tests/unit/test_sdf_object.cpp` (`[sdf]`) and
+`tests/rendering/test_sdf_gpu.cpp` (`[sdf][gpu]`).
+
+A `scene::SdfObject` is a tree plus a transform, a material and a render mode; `scene.sdfs` holds
+them. `renderMode` decides how it reaches the screen:
+
+- **`raymarch`** (default): nothing is meshed. Every frame the tree is packed and
+  `shaders/sdf_raymarch.wgsl` sphere-traces it on the GPU inside `boundsMin..boundsMax`. Node
+  parameters are live uniforms: modulating a radius costs nothing extra.
+- **`mesh`**: `SdfObject::rebuild` meshes the tree with `meshSdf` at `resolution` and the result is
+  drawn as an ordinary lit mesh (the entity `pbr.wgsl` pipelines). The mesh is cached by
+  `meshHash`; a structural change re-meshes on the CPU, so modulating a node is expensive.
+
+### JSON
+
+```json
+{
+  "name": "blob", "visible": true,
+  "tree": { "root": { "kind": "sphere", "radius": 1 } },
+  "position": [0, 1, 0], "rotation": [0, 30, 0], "scale": [1, 1, 1],
+  "material": {"baseColor": [0.2, 0.6, 0.9], "emissiveColor": [1, 1, 1],
+               "emissiveIntensity": 0, "roughness": 0.4, "metallic": 0},
+  "renderMode": "raymarch",
+  "boundsMin": [-5, -5, -5], "boundsMax": [5, 5, 5],
+  "resolution": 48, "maxSteps": 128, "epsilon": 0.002, "stepScale": 0.9, "normalEpsilon": 0.002
+}
+```
+
+`rotation` is Euler degrees (the composition-node convention). Every member is optional and takes
+the struct default when missing; `fromJson` validates the result, so a bad `renderMode`,
+`resolution` or `stepScale` is an error rather than a clamp. `toJson` writes them all.
+
+- `boundsMin/Max` is the tree-local box the object lives in. Raymarch: the ray enters and leaves it
+  (nothing outside is drawn, and the projected box is the quad that gets rasterised, so a tight box
+  is the single biggest performance lever). Mesh: the meshing domain.
+- `maxSteps`, `epsilon` (hit threshold, scaled by distance so it is screen-space constant),
+  `stepScale` (relaxation; displaced or twisted trees need < 1) and `normalEpsilon` are raymarch
+  only. `resolution` is mesh only.
+
+### Structural hash and rebuild
+
+`structuralHash` covers the tree, the bounds, the resolution and the render mode. The transform,
+the material and the march settings are per-frame uniforms and are *not* in it.
+`rebuild(time, fields)` compares it with `builtHash`: on a change it bumps `structureVersion` and,
+in Mesh mode, re-meshes into `mesh` (`meshHash` = the new hash); in Raymarch mode it clears the
+mesh. It returns whether anything changed. An animated displacement is frozen at the `time` given
+in Mesh mode; Raymarch evaluates the tree every frame on the GPU.
+
+### Parameters
+
+`registerSdfParameters(params, rest, prefix)` registers, all under `prefix` and grouped by it:
+
+| path | type |
+|---|---|
+| `visible` | bool |
+| `transform/position`, `transform/rotation` (degrees), `transform/scale` | vec3 |
+| `material/baseColor`, `material/emissiveColor` | colour |
+| `material/emissive`, `material/roughness`, `material/metallic` | float |
+| `bounds/min`, `bounds/max` | vec3 |
+| `resolution` | int |
+| `node/<i>/<field>` | per node, see below |
+
+`<i>` is the node's **1-based pre-order index over enabled and disabled nodes**, so disabling a
+node does not renumber its siblings. Only the members a kind uses are registered, plus `enabled`
+on every node; the label is `"<kind>/<field>"` (e.g. `smoothUnion/smooth`) while the path stays
+`node/1/smooth`. Fields: `radius`, `height`, `size`, `rounding`, `offset`, `translation`,
+`rotation`, `scale`, `amount`, `smooth`, `frequency`, `speed`, `enabled`. `SdfParameters` also
+carries `nodeAmount`, `nodeRadius` and `nodeSmooth` vectors with one slot per node (null where the
+kind has no such member) for cheap live modulation.
+
+`applySdfParameters(p, rest, live)` sets `live = rest` (keeping its structure outputs and mesh
+cache), copies every final into it — walking both trees in the same pre-order, so kinds and
+children always come from `rest` — and returns whether `live`'s structural hash changed. Because
+every tree parameter is structural, that is "true whenever a node parameter moved". In **Raymarch**
+mode the caller can ignore it beyond bumping the version: the renderer repacks the node buffer
+every frame, so node parameters behave as live uniforms. In **Mesh** mode it must call `rebuild`,
+which re-meshes; that is the intended cost of modulating a meshed object.
+
+Per frame the composition must, for each SDF object: `params.resetFinals()` as usual, then
+`applySdfParameters(p, rest, live)`, then `live.rebuild(time, &scene.fields)` (cheap when nothing
+changed), and put `live` in `scene.sdfs` with the parent transform already folded into
+`live.transform`. `SceneRenderer::render` does the rest.
+
+### Pass order and depth composition
+
+`SceneRenderer::render` calls `SdfRenderer::update(scene, time, viewProj, fields)` before the lit
+pass (packing, mesh uploads, uniform writes), then inside the lit pass, after the opaque entity
+meshes and the procedural instances:
+
+1. `SdfRenderer::drawMeshes(pass, scene, materialBindGroup)` — Mesh-mode objects, drawn with
+   SceneRenderer's own lit opaque pipelines and object bind-group layout.
+2. If `hasRaymarchWork()`, the lit pass **ends** and `SdfRenderer::encodeRaymarchPass` runs its own
+   render pass on the same HDR colour and depth (both `Load`/`Store`), then the lit pass is
+   re-begun with `Load` for the skybox, grid, particles and blended meshes. A frame with no
+   raymarched object is encoded exactly as before, in one pass.
+
+The raymarch pass needs a pass of its own for its timestamps (`SdfStats::raymarchMs`). Depth
+composes in both directions because the fragment stage writes `@builtin(frag_depth)`: the hit is
+taken to clip space with `frame.viewProj` and `clip.z / clip.w` is written, so an SDF surface is
+occluded by (and occludes) meshes, procedural instances, other SDF objects and the particles drawn
+afterwards. A miss `discard`s, leaving colour and depth untouched.
+
+Bind groups of the raymarch pipeline (`shaders/sdf_raymarch.wgsl`):
+
+| group | binding | contents |
+|---|---|---|
+| 0 | 0 | `FrameUniforms` (`common.wgsl`), shared with the entity pipelines |
+| 1 | 0 | `ObjectUniforms` — model, normal matrix, material lanes (dynamic offset, 256-byte slots) |
+| 1 | 1 | `SdfObjectUniforms` — worldToLocal, bounds, node offset/count/maxSteps, epsilon/stepScale/normalEpsilon/time, the NDC rect (dynamic offset) |
+| 1 | 2 | `array<SdfNodeGpu>` read-only storage: every object's packed program, concatenated |
+| 1 | 3 | `FieldBlock` (`shaders/fields.wgsl`) for `displaceField` |
+| 2 | 0-5 | material sampler + textures (`pbr_shade.wgsl`); never sampled here (texture mask 0) |
+| 3 | 0-3 | IBL (`pbr_shade.wgsl`) |
+
+Mesh-mode draws use group 1 binding 0 only, with SceneRenderer's `object-layout`, so they are
+pipeline-compatible with the entity draws.
+
+Shading: the fragment marches in the object's **local** space (so `epsilon` and `stepScale` are
+invariant to a uniform object scale), takes the hit to world space, builds a tetrahedron-difference
+normal from `sdfNormal`, flips it towards the eye and calls the shared `shadePbr` (lights, IBL,
+emissive, fog) from `pbr_shade.wgsl` — the same function entities and procedural instances use, so
+a raymarched and a meshed version of the same tree shade alike. `displaceField` samples
+`fieldScalar(slot, worldPos)`, taking the local point to world with the object's model matrix,
+because fields live in world space.
+
+Limits: 256 visible SDF objects per frame (256-byte uniform slots; extras are skipped with a
+warning), 128 packed records per object, 8 distance and 8 point stack entries (`SdfTree::validate`
+guarantees both). An object that fails `validate()` is skipped with a one-time warning; an
+off-screen one is skipped silently; an invisible one is not packed at all. Node buffers are packed
+fresh every frame (microseconds for a full 128-record program), so nothing has to invalidate them.
+
+### Mesh mode details
+
+`SdfRenderer` keeps one vertex/index buffer pair per object, keyed by name and re-uploaded only
+when `meshHash` changes (`SdfStats::meshUploads` counts uploads); buffers unused for 120 frames are
+dropped. An object whose mesh is empty (never rebuilt, or the surface lies outside the bounds) is
+skipped. Meshed objects draw inside the lit pass and their draws and triangles are folded into
+`RenderStats` totals as well as into `RenderStats::sdf`.
+
+### Adding a node kind
+
+Both interpreters must change together or the parity test fails:
+
+1. `spatial::SdfNodeKind` in `src/spatial/sdf.hpp` — append the enum value (the order defines the
+   GPU `kind` numbers, and primitives/combinations/unary ops are recognised by range, so add it to
+   the right block), and add its name to `kKindNames` in `src/spatial/sdf.cpp`.
+2. `src/spatial/sdf.cpp`: the distance in `primitiveDistance`, the fold in `combine`, the point
+   warp in `warpPoint` or the term in `displace`/`finishUnary`; `sdfNodeIsPrimitive` /
+   `sdfNodeMaxChildren` / `isCombination` / `isUnary` / `isDisplacement`; validation of the members
+   it uses; the payload it needs in `packSdfTree` (`p0..p5`).
+3. `shaders/sdf.wgsl`: the matching `SDF_*` constant and the same formula in `sdfPrimitive`,
+   `sdfCombine`, `sdfWarp` or `sdfFinishUnary`. Watch the WGSL rules: `smooth` and `std` are
+   reserved words, there is no ternary (use `select`), `round` is half-to-even (use
+   `floor(x + 0.5)`, spelt `sdfRnd`) and `atan2(0, 0)` is undefined (guard it, as `polarRepeat`
+   does) — the CPU is the reference in all three cases.
+4. `src/scene/sdf_object.cpp`: list the members the kind exposes in `nodeFields`, so they get
+   parameters and are copied by `applySdfParameters`.
+5. Tests: a case in `tests/unit/test_sdf.cpp`, and one in the parity list of
+   `tests/rendering/test_sdf_gpu.cpp` (CPU/GPU within 1e-4, 1e-3 for noise) — plus the JSON name
+   in `docs/sdf.md`'s node reference above.
