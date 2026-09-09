@@ -1,0 +1,58 @@
+{
+  "format": "avgen-look",
+  "name": "Cosmic",
+  "description": "Deep blacks, enormous scale, sparse bright points, volumetric depth.",
+  "prefixes": [
+    "camera/exposure/",
+    "camera/lens/",
+    "post/",
+    "scene/",
+    "env/",
+    "lightrig/",
+    "macros/"
+  ],
+  "values": {
+    "scene/keyLight": [
+      0.25
+    ],
+    "scene/brightness": [
+      0.9
+    ],
+    "scene/fogDensity": [
+      0.006
+    ],
+    "scene/volumeDensity": [
+      0.02
+    ],
+    "post/bloom/intensity": [
+      0.6
+    ],
+    "post/bloom/threshold": [
+      1.1
+    ],
+    "post/output/vignette": [
+      0.55
+    ],
+    "post/grade/contrast": [
+      1.35
+    ],
+    "post/grade/saturation": [
+      1.05
+    ],
+    "post/grade/temperature": [
+      -0.25
+    ],
+    "macros/scale": [
+      1.0
+    ],
+    "macros/depth": [
+      0.9
+    ],
+    "macros/density": [
+      0.25
+    ],
+    "macros/stillness": [
+      0.6
+    ]
+  }
+}

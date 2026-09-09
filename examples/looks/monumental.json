@@ -1,0 +1,61 @@
+{
+  "format": "avgen-look",
+  "name": "Monumental",
+  "description": "Huge scale, deep shadows, narrow highlights, heavy atmospheric depth.",
+  "prefixes": [
+    "camera/exposure/",
+    "camera/lens/",
+    "post/",
+    "scene/",
+    "env/",
+    "lightrig/",
+    "macros/"
+  ],
+  "values": {
+    "scene/keyLight": [
+      1.1
+    ],
+    "scene/brightness": [
+      0.75
+    ],
+    "scene/fogDensity": [
+      0.018
+    ],
+    "scene/volumeDensity": [
+      0.05
+    ],
+    "scene/volumeAnisotropy": [
+      0.45
+    ],
+    "post/bloom/intensity": [
+      0.35
+    ],
+    "post/bloom/threshold": [
+      1.4
+    ],
+    "post/output/vignette": [
+      0.45
+    ],
+    "post/grade/contrast": [
+      1.25
+    ],
+    "post/grade/saturation": [
+      0.85
+    ],
+    "post/grade/temperature": [
+      -0.1
+    ],
+    "macros/scale": [
+      0.9
+    ],
+    "macros/drama": [
+      0.8
+    ],
+    "macros/atmosphere": [
+      0.7
+    ],
+    "macros/motion": [
+      0.2
+    ]
+  }
+}

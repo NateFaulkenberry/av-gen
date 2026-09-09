@@ -1,0 +1,58 @@
+{
+  "format": "avgen-look",
+  "name": "Industrial",
+  "description": "Metallic surfaces, hard light, roughness variation, dust and sparks.",
+  "prefixes": [
+    "camera/exposure/",
+    "camera/lens/",
+    "post/",
+    "scene/",
+    "env/",
+    "lightrig/",
+    "macros/"
+  ],
+  "values": {
+    "scene/keyLight": [
+      1.6
+    ],
+    "scene/brightness": [
+      0.85
+    ],
+    "scene/fogDensity": [
+      0.012
+    ],
+    "scene/volumeDensity": [
+      0.035
+    ],
+    "post/bloom/intensity": [
+      0.3
+    ],
+    "post/bloom/threshold": [
+      1.5
+    ],
+    "post/output/grain": [
+      0.05
+    ],
+    "post/grade/contrast": [
+      1.3
+    ],
+    "post/grade/saturation": [
+      0.75
+    ],
+    "post/grade/temperature": [
+      -0.2
+    ],
+    "macros/mechanical": [
+      0.9
+    ],
+    "macros/drama": [
+      0.7
+    ],
+    "macros/energy": [
+      0.6
+    ],
+    "macros/glow": [
+      0.3
+    ]
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "format": "avgen-look",
+  "name": "Hyperreal",
+  "description": "High contrast, crisp geometry, restrained post, honest material response.",
+  "prefixes": [
+    "camera/exposure/",
+    "camera/lens/",
+    "post/",
+    "scene/",
+    "env/",
+    "lightrig/",
+    "macros/"
+  ],
+  "values": {
+    "scene/keyLight": [
+      1.4
+    ],
+    "scene/brightness": [
+      0.85
+    ],
+    "scene/fogDensity": [
+      0.008
+    ],
+    "scene/volumeDensity": [
+      0.02
+    ],
+    "post/bloom/intensity": [
+      0.2
+    ],
+    "post/bloom/threshold": [
+      1.8
+    ],
+    "post/output/vignette": [
+      0.15
+    ],
+    "post/output/grain": [
+      0.02
+    ],
+    "post/grade/contrast": [
+      1.15
+    ],
+    "post/grade/saturation": [
+      1.0
+    ],
+    "macros/drama": [
+      0.5
+    ],
+    "macros/glow": [
+      0.2
+    ],
+    "macros/chaos": [
+      0.15
+    ],
+    "macros/focus": [
+      0.8
+    ]
+  }
+}

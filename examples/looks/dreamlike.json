@@ -1,0 +1,61 @@
+{
+  "format": "avgen-look",
+  "name": "Dreamlike",
+  "description": "Soft light, haze, gentle bloom, slow low-frequency change.",
+  "prefixes": [
+    "camera/exposure/",
+    "camera/lens/",
+    "post/",
+    "scene/",
+    "env/",
+    "lightrig/",
+    "macros/"
+  ],
+  "values": {
+    "scene/keyLight": [
+      0.6
+    ],
+    "scene/brightness": [
+      0.95
+    ],
+    "scene/fogDensity": [
+      0.028
+    ],
+    "scene/volumeDensity": [
+      0.075
+    ],
+    "scene/volumeAnisotropy": [
+      0.2
+    ],
+    "post/bloom/intensity": [
+      0.75
+    ],
+    "post/bloom/threshold": [
+      0.85
+    ],
+    "post/output/vignette": [
+      0.25
+    ],
+    "post/grade/contrast": [
+      0.9
+    ],
+    "post/grade/saturation": [
+      0.9
+    ],
+    "post/grade/temperature": [
+      0.15
+    ],
+    "macros/stillness": [
+      0.85
+    ],
+    "macros/atmosphere": [
+      0.8
+    ],
+    "macros/motion": [
+      0.15
+    ],
+    "macros/mystery": [
+      0.5
+    ]
+  }
+}

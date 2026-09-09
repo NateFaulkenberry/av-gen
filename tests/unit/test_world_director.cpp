@@ -160,3 +160,48 @@ TEST_CASE("Looks are scanned from a directory", "[director][look]") {
     CHECK(app::scanLooks({dir / "missing"}).empty());
     fs::remove_all(dir);
 }
+
+TEST_CASE("The shipped looks and directors parse and are well formed", "[director][library]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const fs::path root = fs::path(AVGEN_SOURCE_DIR) / "examples";
+    const auto looks = app::scanLooks({root / "looks"});
+    REQUIRE(looks.size() >= 8);
+    for (const app::LookPreset& look : looks) {
+        INFO(look.name);
+        CHECK_FALSE(look.description.empty());
+        const params::Preset filtered = look.filtered();
+        // A look carries visual parameters only, and carries something.
+        CHECK(filtered.values.size() >= 5);
+        CHECK(filtered.values.size() == look.preset.values.size());
+        for (const auto& [path, values] : filtered.values) {
+            INFO(path);
+            CHECK_FALSE(values.empty());
+            const bool geometry = path.rfind("procedural/", 0) == 0 || path.rfind("nodes/", 0) == 0;
+            CHECK_FALSE(geometry);
+        }
+    }
+    // Every shipped look is distinct: two looks with identical values would be a copy-paste slip.
+    for (std::size_t i = 0; i < looks.size(); ++i) {
+        for (std::size_t j = i + 1; j < looks.size(); ++j) {
+            INFO(looks[i].name << " vs " << looks[j].name);
+            CHECK(looks[i].filtered().values != looks[j].filtered().values);
+        }
+    }
+
+    const fs::path directorFile = root / "directors" / "infinite-temple.json";
+    if (fs::exists(directorFile)) {
+        auto director = app::WorldDirector::loadFile(directorFile);
+        REQUIRE(director.has_value());
+        CHECK(director->mappings.size() >= 10);
+        const auto macros = director->macros();
+        CHECK(macros.size() == director->mappings.size());
+        for (const app::WorldMacro& m : macros) {
+            INFO(m.name);
+            CHECK_FALSE(m.targets.empty());
+            CHECK(m.routes().size() == m.targets.size());
+        }
+    }
+#endif
+}

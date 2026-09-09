@@ -1,0 +1,58 @@
+{
+  "format": "avgen-look",
+  "name": "Bioluminescent",
+  "description": "Dark environment, localised emissive sources, coloured atmosphere.",
+  "prefixes": [
+    "camera/exposure/",
+    "camera/lens/",
+    "post/",
+    "scene/",
+    "env/",
+    "lightrig/",
+    "macros/"
+  ],
+  "values": {
+    "scene/keyLight": [
+      0.15
+    ],
+    "scene/brightness": [
+      1.0
+    ],
+    "scene/fogDensity": [
+      0.03
+    ],
+    "scene/volumeDensity": [
+      0.08
+    ],
+    "scene/volumeEmission": [
+      0.4
+    ],
+    "post/bloom/intensity": [
+      0.8
+    ],
+    "post/bloom/threshold": [
+      0.7
+    ],
+    "post/output/vignette": [
+      0.5
+    ],
+    "post/grade/saturation": [
+      1.25
+    ],
+    "post/grade/temperature": [
+      -0.3
+    ],
+    "macros/organic": [
+      0.9
+    ],
+    "macros/glow": [
+      0.85
+    ],
+    "macros/mystery": [
+      0.6
+    ],
+    "macros/motion": [
+      0.35
+    ]
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "format": "avgen-look",
+  "name": "Sacred",
+  "description": "Warm key against cool shadow, shafts of light, restrained particles, symmetry.",
+  "prefixes": [
+    "camera/exposure/",
+    "camera/lens/",
+    "post/",
+    "scene/",
+    "env/",
+    "lightrig/",
+    "macros/"
+  ],
+  "values": {
+    "scene/keyLight": [
+      0.9
+    ],
+    "scene/brightness": [
+      0.8
+    ],
+    "scene/fogDensity": [
+      0.02
+    ],
+    "scene/volumeDensity": [
+      0.06
+    ],
+    "scene/volumeScattering": [
+      1.4
+    ],
+    "scene/volumeAnisotropy": [
+      0.6
+    ],
+    "post/bloom/intensity": [
+      0.45
+    ],
+    "post/bloom/threshold": [
+      1.2
+    ],
+    "post/output/vignette": [
+      0.35
+    ],
+    "post/grade/temperature": [
+      0.3
+    ],
+    "post/grade/saturation": [
+      0.95
+    ],
+    "macros/warmth": [
+      0.8
+    ],
+    "macros/sacred": [
+      0.9
+    ],
+    "macros/atmosphere": [
+      0.75
+    ],
+    "macros/stillness": [
+      0.7
+    ]
+  }
+}
