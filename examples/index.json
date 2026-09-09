@@ -77,6 +77,18 @@
    "category": "Look development",
    "description": "One machined part on a plinth under two softboxes: the benchmark for whether a single object can be made to look photographed rather than generated.",
    "project": "hero/hero.json"
+  },
+  {
+   "name": "Organic Curves",
+   "category": "Look development",
+   "description": "Trunk, boughs and tendrils, all one swept-curve primitive: the geometry foundation for the ecosystem work.",
+   "project": "organic/organic.json"
+  },
+  {
+   "name": "Plant Grammar",
+   "category": "Look development",
+   "description": "Three individuals of one species from the same grammar and different seeds -- recursive branching with no bespoke code.",
+   "project": "organic/plants.json"
   }
  ]
 }
