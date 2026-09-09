@@ -141,7 +141,7 @@ struct Distribution {
 
     [[nodiscard]] Result<void> validate() const;
     // Spline kind: count when spacing == 0, else floor(length * (end - start) / spacing) + 1
-    // (needs the spline; 0 when null). Grammar kind: reported by the owner (see ProceduralGeometry).
+    // (needs the spline; `count` when null). Grammar kind: reported by the owner (ProceduralGeometry).
     [[nodiscard]] int instanceCount(const spatial::Spline* spline = nullptr) const;
     // Placement of instance i (0..count-1) in distribution space: position, rotation (unit
     // quaternion), scale 1. Pure. `u` = normalised index (0 for i=0, 1 for the last; 0 when count==1).
