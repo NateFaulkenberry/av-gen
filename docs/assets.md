@@ -58,6 +58,35 @@ four levels deep; self-inclusion is refused.
 | BoxTextured.glb | 3.4 ms |
 | studio_small_09_1k.hdr (1024x512) | environment processed in 127 ms |
 
+## Milestone 1.0: video output
+
+`assets::openVideoWriter(file, VideoSettings)` (`src/assets/video_writer.hpp`, ADR-020) appends
+RGBA8 frames at a fixed frame rate and muxes an optional audio file. Two backends, chosen by
+`VideoSettings::backend`:
+
+- `native` (macOS, `video_writer_apple.mm`): AVFoundation's `AVAssetWriter` with a pixel-buffer
+  adaptor (RGBA is swizzled to 32BGRA on the CPU). Codecs `prores4444`, `prores422` (`.mov` only),
+  `h264`, `hevc` (`.mov` or `.mp4`, even dimensions required). `quality` 0..100 becomes an average
+  bit rate derived from `width * height * fps` for H.264/HEVC; ProRes ignores it. Audio is read with
+  `AVAssetReader` as 16-bit PCM, shifted so `audioOffsetSeconds` lands on frame 0, trimmed to the
+  video's length, and written as AAC (H.264/HEVC) or PCM (ProRes). No third-party code.
+- `ffmpeg` (`video_writer.cpp`): a user-supplied `ffmpeg` binary found via `ffmpegPath`,
+  `AVGEN_FFMPEG`, `PATH`, `/opt/homebrew/bin` or `/usr/local/bin`. It is spawned with
+  `posix_spawn` (no shell), fed `-f rawvideo -pix_fmt rgba` on stdin, and its stderr is captured
+  to a temporary log whose tail is quoted in error messages. `codec` is an ffmpeg encoder name;
+  the native ids map onto `libx264`, `libx265` and `prores_ks` so `auto` can fall back. `quality`
+  maps to `-crf` (x264/x265, VP9, AV1) or `-q:v` (VideoToolbox encoders); ProRes gets
+  `-profile:v 4` (4444, `yuva444p10le`) or `3` (`yuv422p10le`). Nothing is linked or shipped
+  (research `offline-rendering.md` §8.1, `docs/dependencies.md`).
+- `auto` picks native when the codec is a native one, else ffmpeg when found, else fails with a
+  message listing what is available (`describeVideoBackends()`).
+
+Errors are sticky: after a failed `writeFrame` every later call fails and `finish()` reports the
+first error; the partial file is removed. `probeVideo(path)` (native backend) reads back size,
+exact frame count, duration and whether an audio track exists; the tests use it to verify every
+codec, audio muxing, non-integer frame rates and the error paths (ffmpeg tests skip when no
+binary is installed).
+
 ## Later
 
 meshoptimizer (vertex cache, LOD, `EXT_meshopt_compression`), KTX2/Basis via libktx, EXR via

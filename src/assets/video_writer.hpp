@@ -63,3 +63,22 @@ public:
 [[nodiscard]] std::string describeVideoBackends();
 
 } // namespace avgen::assets
+
+// ---- probe (tests/UI) -------------------------------------------------------------------------
+// Reads a finished file back through the native backend (AVFoundation). Fails where
+// hasNativeVideo() is false. `frames` is exact: the video track's samples are counted without
+// decoding, so probing a long file costs a pass over its index.
+
+namespace avgen::assets {
+
+struct VideoInfo {
+    std::uint32_t width = 0;
+    std::uint32_t height = 0;
+    std::uint64_t frames = 0;
+    double durationSeconds = 0.0;
+    bool hasAudio = false;
+};
+
+[[nodiscard]] Result<VideoInfo> probeVideo(const std::filesystem::path& file);
+
+} // namespace avgen::assets

@@ -1,11 +1,22 @@
 # ---- avgen_core: GPU-free engine logic (core, audio, analysis, signals, params, scene, assets) ---
 file(GLOB_RECURSE AVGEN_CORE_SOURCES CONFIGURE_DEPENDS
     core/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp shaders/*.cpp assets/*.cpp)
+if(APPLE)
+    # Native video export (AVFoundation) is Objective-C++; the portable stub is for other platforms.
+    file(GLOB_RECURSE AVGEN_CORE_OBJCXX_SOURCES CONFIGURE_DEPENDS assets/*.mm)
+    list(APPEND AVGEN_CORE_SOURCES ${AVGEN_CORE_OBJCXX_SOURCES})
+    list(REMOVE_ITEM AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/assets/video_writer_native_stub.cpp")
+endif()
 add_library(avgen_core STATIC ${AVGEN_CORE_SOURCES})
 target_include_directories(avgen_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(avgen_core
     PUBLIC fmt::fmt spdlog::spdlog glm::glm nlohmann_json::nlohmann_json Threads::Threads
     PRIVATE miniaudio::miniaudio kissfft::kissfft fastgltf::fastgltf stb::stb)
+if(APPLE)
+    set_source_files_properties(${AVGEN_CORE_OBJCXX_SOURCES} PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    target_link_libraries(avgen_core PUBLIC
+        "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo" "-framework Foundation")
+endif()
 target_compile_definitions(avgen_core PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FORCE_RADIANS GLM_ENABLE_EXPERIMENTAL)
 avgen_set_warnings(avgen_core)
 
