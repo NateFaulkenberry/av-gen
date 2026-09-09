@@ -34,7 +34,7 @@ constexpr std::uint32_t kCullScanBlock = 1024;      // cull.wgsl kScanBlock (256
 constexpr std::uint32_t kCullStatsStride = 8;       // u32 per object slot in the shared stats buffer
 constexpr std::uint32_t kIndirectStride = 20;       // drawIndexedIndirect args: five u32
 // Per-level slot in the object's deformer/time buffer. Uniform bind-group offsets must be a
-// multiple of 256, so the 544-byte ProceduralUniforms is padded out to 768.
+// multiple of 256, so the 672-byte ProceduralUniforms is padded out to 768.
 constexpr std::uint32_t kDeformerSlotStride = ((sizeof(ProceduralUniforms) + 255) / 256) * 256;
 // Elements per level in the visible list. Storage bind-group offsets must also be 256-byte
 // aligned, so each level's slice is a whole number of 64 u32 blocks.
@@ -1180,6 +1180,11 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                                1e-3f * mesh->radius, static_cast<float>(object.instances.size()));
         // Velocity needs the same chain evaluated at the previous frame's time (ADR-035).
         u.prevInfo = glm::vec4(static_cast<float>(time.renderTime - time.deltaTime), 0.0f, 0.0f, 0.0f);
+        // Step 1 of the transform chain. It is a uniform rather than a baked mesh because
+        // source/position|rotation|scale animate; the shader applies it before the deformers so
+        // the GPU matches ProceduralGeometry::instanceMatrix().
+        u.sourceMatrix = object.sourceTransform.matrix();
+        u.sourceNormalMatrix = glm::transpose(glm::inverse(u.sourceMatrix));
         int emissiveSlot = -1;
         if (fields != nullptr && !object.emissiveField.empty() && object.emissiveFieldAmount != 0.0f) {
             emissiveSlot = fields->slotOf(object.emissiveField);

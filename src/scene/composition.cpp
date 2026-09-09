@@ -2315,6 +2315,19 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         }
         comp->cameraFovSetting_ = *fov;
     }
+    // A rig is a scene-level idea, so it is accepted at the top level as well as inside
+    // `environment`; the environment block wins when both name one.
+    if (j.contains("lightRig")) {
+        auto topRig = readString(j, "lightRig", "");
+        if (!topRig) {
+            return std::unexpected(topRig.error());
+        }
+        if (!topRig->empty()) {
+            if (auto r = comp->setLightRig(*topRig); !r) {
+                log::warn("composition '{}': light rig: {}", comp->name_, r.error().message);
+            }
+        }
+    }
     if (j.contains("environment")) {
         const json& e = j.at("environment");
         if (!e.is_object()) {

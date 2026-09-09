@@ -1,0 +1,102 @@
+{
+  "format": "avgen-lightrig",
+  "version": 1,
+  "name": "void-core",
+  "description": "Everything is backlit by one distant source sitting past the subject. Structure reads as silhouette with a thin cold rim; the void stays black so the source is the only bright thing in frame.",
+  "keyIntensity": 3.4,
+  "ambientIntensity": 0.022,
+  "ambientColor": [
+    0.32,
+    0.36,
+    0.62
+  ],
+  "ambientTemperature": 11000,
+  "lights": [
+    {
+      "name": "core",
+      "type": "directional",
+      "role": "key",
+      "azimuth": 180.0,
+      "elevation": 2.0,
+      "distance": 1.4,
+      "intensity": 1.0,
+      "color": [
+        1.0,
+        0.93,
+        0.86
+      ],
+      "temperature": 6200,
+      "castsShadow": true,
+      "shadowStrength": 1.0,
+      "softness": 1.6,
+      "volumetric": 0.12,
+      "followCamera": true
+    },
+    {
+      "name": "glow",
+      "type": "sphere",
+      "role": "practical",
+      "azimuth": 180.0,
+      "elevation": 0.0,
+      "distance": 0.18,
+      "intensity": 0.4,
+      "color": [
+        1.0,
+        0.72,
+        0.52
+      ],
+      "temperature": 4200,
+      "size": 0.18,
+      "castsShadow": false,
+      "volumetric": 1.0,
+      "followCamera": true
+    },
+    {
+      "name": "rim",
+      "type": "directional",
+      "role": "rim",
+      "azimuth": 118.0,
+      "elevation": 34.0,
+      "distance": 3.0,
+      "intensity": 0.22,
+      "color": [
+        0.62,
+        0.78,
+        1.0
+      ],
+      "temperature": 11500,
+      "castsShadow": false,
+      "volumetric": 0.0,
+      "followCamera": true
+    },
+    {
+      "name": "counter",
+      "type": "directional",
+      "role": "fill",
+      "azimuth": -118.0,
+      "elevation": -18.0,
+      "distance": 3.0,
+      "intensity": 0.03,
+      "color": [
+        0.55,
+        0.42,
+        0.9
+      ],
+      "temperature": 9000,
+      "castsShadow": false,
+      "volumetric": 0.0,
+      "followCamera": true
+    },
+    {
+      "name": "ambient",
+      "type": "directional",
+      "role": "ambient",
+      "azimuth": 0.0,
+      "elevation": 80.0,
+      "distance": 4.0,
+      "intensity": 1.0,
+      "castsShadow": false,
+      "followCamera": true
+    }
+  ]
+}

@@ -10,6 +10,7 @@
 #include "scene/scene.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -251,6 +252,76 @@ TEST_CASE("Twist deformer: amount 0 is the identity, amount 1 moves the silhouet
     if (const char* dumpDir = std::getenv("AVGEN_DUMP_DIR")) {
         REQUIRE(gpu::writePpm(twistedImg, std::filesystem::path(dumpDir) / "procedural_twist.ppm").has_value());
     }
+    CHECK(ctx->errorCount() == 0);
+}
+
+// The source transform is step 1 of the chain in procedural.hpp and the trailing factor of
+// ProceduralGeometry::instanceMatrix(). It used to be honoured only on the CPU: the vertex shader
+// ignored it, so an authored `sourceTransform` silently did nothing on screen.
+TEST_CASE("Source transform places the source mesh before the deformers", "[gpu][procedural]") {
+    auto ctx = makeContext();
+
+    // One flat plate, seen from straight above, so its silhouette says which way it faces.
+    scene::Scene s;
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.environment.showSkybox = false;
+    s.camera.position = {0.0f, 12.0f, 0.0f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    s.camera.up = {0.0f, 0.0f, -1.0f};
+    scene::PunctualLight key;
+    key.direction = glm::normalize(glm::vec3(-0.2f, -1.0f, -0.3f));
+    key.intensity = 3.0f;
+    s.addLight(key);
+
+    scene::ProceduralGeometry g;
+    g.name = "plate";
+    g.source.kind = scene::PrimitiveKind::Box;
+    g.source.size = {4.0f, 0.2f, 1.0f};
+    g.source.subdivisions = 1;
+    g.distribution.kind = scene::DistributionKind::Single; // matches the single record below
+    g.instances = gridInstances(1, 1, 1.0f);
+    g.structureVersion = 1;
+    g.meshHash = specHash(g.source);
+    g.material.baseColor = {0.85f, 0.7f, 0.55f};
+    g.material.emissiveIntensity = 0.0f;
+    s.procedurals.push_back(g);
+
+    const auto flat = renderOnce(*ctx, s, 0.0);
+    const Coverage flatCov = coverage(flat);
+    REQUIRE(flatCov.pixels > 0);
+
+    // An identity source transform changes nothing.
+    scene::Scene identity = s;
+    identity.procedurals[0].sourceTransform = scene::Transform{};
+    ++identity.procedurals[0].structureVersion;
+    CHECK(gpu::hashImage(renderOnce(*ctx, identity, 0.0)) == gpu::hashImage(flat));
+
+    // A quarter turn about Y swaps the plate's long and short axes on screen.
+    scene::Scene turned = s;
+    turned.procedurals[0].sourceTransform.rotation =
+        glm::angleAxis(glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ++turned.procedurals[0].structureVersion;
+    const Coverage turnedCov = coverage(renderOnce(*ctx, turned, 0.0));
+    REQUIRE(turnedCov.pixels > 0);
+    const int flatWide = flatCov.maxX - flatCov.minX;
+    const int flatTall = flatCov.maxY - flatCov.minY;
+    const int turnedWide = turnedCov.maxX - turnedCov.minX;
+    const int turnedTall = turnedCov.maxY - turnedCov.minY;
+    CHECK(flatWide > flatTall);
+    CHECK(turnedTall > turnedWide);
+
+    // A translation moves the silhouette by the amount the CPU chain predicts.
+    scene::Scene shifted = s;
+    shifted.procedurals[0].sourceTransform.position = {3.0f, 0.0f, 0.0f};
+    ++shifted.procedurals[0].structureVersion;
+    const Coverage shiftedCov = coverage(renderOnce(*ctx, shifted, 0.0));
+    REQUIRE(shiftedCov.pixels > 0);
+    CHECK(shiftedCov.minX > flatCov.minX);
+    CHECK(shiftedCov.maxX > flatCov.maxX);
+    const glm::vec3 predicted = glm::vec3(shifted.procedurals[0].instanceMatrix(0) * glm::vec4(0, 0, 0, 1));
+    CHECK(predicted.x > 2.9f);
+    CHECK(predicted.x < 3.1f);
+
     CHECK(ctx->errorCount() == 0);
 }
 

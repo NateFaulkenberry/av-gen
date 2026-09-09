@@ -125,9 +125,15 @@ struct ProceduralUniforms {
     glm::vec4 timeInfo;      // x = render time, y = deformer count, z = epsilon for normals, w = instance count
     glm::vec4 fieldInfo;     // x = emissive field slot (-1 none), y = emissive field amount, z = point source (1/0), w = 0
     glm::vec4 prevInfo;      // x = last frame's render time (ADR-035 velocity: deformation motion), yzw = 0
+    // Step 1 of the transform chain (procedural.hpp): the source mesh's own placement, applied
+    // before the deformer stack so it matches ProceduralGeometry::instanceMatrix() on the CPU.
+    // It lives in the uniform rather than baked into the mesh because source/position|rotation|scale
+    // are live parameters.
+    glm::mat4 sourceMatrix;
+    glm::mat4 sourceNormalMatrix; // inverse transpose of sourceMatrix
     DeformerUniform deformers[scene::kMaxDeformers];
 };
-static_assert(sizeof(ProceduralUniforms) == 48 + 64 * scene::kMaxDeformers);
+static_assert(sizeof(ProceduralUniforms) == 48 + 128 + 64 * scene::kMaxDeformers);
 
 // The effector pass parameters (shaders/points.wgsl `PointsParams`, 528 bytes).
 struct EffectorPassUniforms {

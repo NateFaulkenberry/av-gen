@@ -65,6 +65,10 @@ struct ProceduralUniforms {
     timeInfo: vec4<f32>,  // x = render time, y = deformer count, z = normal epsilon, w = instance count
     fieldInfo: vec4<f32>, // x = emissive field slot (-1 none), y = emissive field amount, z = point source or LOD billboard (1/0), w = indirection enabled (1/0)
     prevInfo: vec4<f32>,  // x = last frame's render time (ADR-035 velocity: deformation motion), yzw = 0
+    // Step 1 of the chain: the source mesh's own placement, applied to the vertex before any
+    // deformer runs. Mirrors ProceduralGeometry::instanceMatrix()'s trailing sourceTransform.
+    sourceMatrix: mat4x4<f32>,
+    sourceNormalMatrix: mat4x4<f32>,
     deformers: array<DeformerUniform, 8>,
 };
 
@@ -351,7 +355,8 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     if (proc.fieldInfo.z > 0.5) {
         // Point source: a camera-facing quad around the instance centre. The centre goes through
         // the object matrix and the world deformers; the quad offsets skip the deformer stack.
-        var c = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
+        let srcOffset = (proc.sourceMatrix * vec4<f32>(0.0, 0.0, 0.0, 1.0)).xyz;
+        var c = (object.model * vec4<f32>(instancePoint(inst, srcOffset), 1.0)).xyz;
         let toCamera = normalize(frame.cameraPos.xyz - c + vec3<f32>(0.0, 0.0, 1e-6));
         c = deformWorld(c, toCamera, proc.timeInfo.x);
         let right = frame.cameraRight.xyz;
@@ -360,14 +365,18 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
         out.clip = frame.viewProj * vec4<f32>(p, 1.0);
         out.worldPos = p;
         out.normal = normalize(frame.cameraPos.xyz - c + vec3<f32>(0.0, 0.0, 1e-6));
-        var cPrev = (object.prevModel * vec4<f32>(inst.position.xyz, 1.0)).xyz;
+        var cPrev = (object.prevModel * vec4<f32>(instancePoint(inst, srcOffset), 1.0)).xyz;
         cPrev = deformWorld(cPrev, toCamera, proc.prevInfo.x);
         let pPrev = cPrev + right * (in.position.x * inst.scale.x) + up * (in.position.y * inst.scale.y);
         out.prevClip = frame.prevViewProj * vec4<f32>(pPrev, 1.0);
         return out;
     }
 
-    let n = normalize(in.normal);
+    // The source transform is step 1 of the chain: the vertex and its normal enter the deformer
+    // stack already placed.
+    let srcPos = (proc.sourceMatrix * vec4<f32>(in.position, 1.0)).xyz;
+    let srcNormal = (proc.sourceNormalMatrix * vec4<f32>(in.normal, 0.0)).xyz;
+    let n = normalize(select(srcNormal, in.normal, dot(srcNormal, srcNormal) < 1e-20));
     // Tangent basis around the source normal: cross(t1, t2) == n.
     let t1 = perpendicularTo(n);
     let t2 = cross(n, t1);
@@ -381,9 +390,9 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
 
     let eps = proc.timeInfo.z;
     let now = proc.timeInfo.x;
-    let p0 = deformChain(in.position, n, nRef, inst, now, object.model);
-    let p1 = deformChain(in.position + t1 * eps, n, nRef, inst, now, object.model);
-    let p2 = deformChain(in.position + t2 * eps, n, nRef, inst, now, object.model);
+    let p0 = deformChain(srcPos, n, nRef, inst, now, object.model);
+    let p1 = deformChain(srcPos + t1 * eps, n, nRef, inst, now, object.model);
+    let p2 = deformChain(srcPos + t2 * eps, n, nRef, inst, now, object.model);
     var nw = cross(p1 - p0, p2 - p0);
     if (dot(nw, nw) < 1e-30) {
         nw = nRef;
@@ -399,7 +408,7 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     out.normal = nw;
     // Velocity covers camera, object, instance and deformation motion: the same chain evaluated
     // with last frame's time and last frame's object matrix (ADR-035).
-    let pPrev = deformChain(in.position, n, nRef, inst, proc.prevInfo.x, object.prevModel);
+    let pPrev = deformChain(srcPos, n, nRef, inst, proc.prevInfo.x, object.prevModel);
     out.prevClip = frame.prevViewProj * vec4<f32>(pPrev, 1.0);
     return out;
 }
