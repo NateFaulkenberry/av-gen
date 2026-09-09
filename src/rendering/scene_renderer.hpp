@@ -102,7 +102,7 @@ struct LightUniform {
     glm::vec4 positionType;
     glm::vec4 directionRange;
     glm::vec4 colorIntensity;
-    glm::vec4 cone;
+    glm::vec4 cone; // x = cos(outer), y = 1/(cos(inner)-cos(outer)), z = volumetric strength, w = 0
 };
 static_assert(sizeof(LightUniform) == 64);
 

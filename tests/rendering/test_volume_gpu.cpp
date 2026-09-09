@@ -237,6 +237,78 @@ TEST_CASE("Height falloff makes the fog a vertical gradient", "[volume][gpu]") {
     CHECK(ctx->errorCount() == 0);
 }
 
+// ADR-032/ADR-033. `PunctualLight::volumetricStrength` (and a light rig's per-light `volumetric`)
+// used to be packed for the GPU and read by nothing: the fog was always lit by the first enabled
+// light at full strength, whatever the rig asked for. It now weights each light's in-scatter, and
+// extinction is independent of it, so a light can darken the air without lighting it.
+TEST_CASE("Per-light volumetric strength weights the in-scatter and not the extinction",
+          "[volume][gpu]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    // A corner pixel sees no geometry, so its whole value is in-scattered fog.
+    constexpr std::uint32_t kSkyX = 6;
+    constexpr std::uint32_t kSkyY = 6;
+
+    scene::Scene s = twoBoxScene();
+    enableFog(s, 0.04f);
+    REQUIRE(s.lights.size() == 1);
+    REQUIRE(s.lights[0].volumetricStrength == 1.0f); // a light lights the air unless told otherwise
+    const gpu::ImageF lit = renderFloat(*renderer, s);
+    const float skyLit = luminanceAt(lit, kSkyX, kSkyY);
+    const float farLit = luminanceAt(lit, kFarX, kMidY);
+    REQUIRE(skyLit > 0.01f);
+
+    s.lights[0].volumetricStrength = 0.0f;
+    const gpu::ImageF dark = renderFloat(*renderer, s);
+    const float skyDark = luminanceAt(dark, kSkyX, kSkyY);
+    const float farDark = luminanceAt(dark, kFarX, kMidY);
+    INFO("sky " << skyLit << " -> " << skyDark << ", far box " << farLit << " -> " << farDark);
+    CHECK(skyDark < skyLit * 0.02f); // nothing lights the air any more
+
+    s.lights[0].volumetricStrength = 0.5f;
+    const float skyHalf = luminanceAt(renderFloat(*renderer, s), kSkyX, kSkyY);
+    INFO("half strength " << skyHalf);
+    CHECK(skyHalf > skyLit * 0.3f);
+    CHECK(skyHalf < skyLit * 0.7f);
+
+    // The far box is still fogged: turning the light out of the air does not turn the air off.
+    const gpu::ImageF clear = [&] {
+        scene::Scene noFog = twoBoxScene();
+        return renderFloat(*renderer, noFog);
+    }();
+    CHECK(farDark < luminanceAt(clear, kFarX, kMidY) * 0.45f);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// Two lights, only the second of which is in the air: the fog takes the second one's colour.
+TEST_CASE("The fog is lit by every light that declares a volumetric strength", "[volume][gpu]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    scene::Scene s = twoBoxScene();
+    enableFog(s, 0.04f);
+    s.lights[0].color = glm::vec3(1.0f, 0.1f, 0.1f); // red key, out of the air
+    s.lights[0].volumetricStrength = 0.0f;
+    scene::PunctualLight practical;
+    practical.direction = glm::normalize(glm::vec3(0.0f, -0.2f, -1.0f));
+    practical.intensity = 2.0f;
+    practical.color = glm::vec3(0.1f, 0.1f, 1.0f); // blue practical, in the air
+    practical.volumetricStrength = 1.0f;
+    s.addLight(practical);
+
+    constexpr std::uint32_t kSkyX = 6;
+    constexpr std::uint32_t kSkyY = 6;
+    const gpu::ImageF image = renderFloat(*renderer, s);
+    const float* sky = image.pixel(kSkyX, kSkyY);
+    INFO("sky rgb " << sky[0] << ", " << sky[1] << ", " << sky[2]);
+    CHECK(sky[2] > 0.002f);
+    CHECK(sky[2] > sky[0] * 4.0f); // the red light contributes nothing to the haze
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("Two fresh renderers produce identical volumetric frames", "[volume][gpu]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);

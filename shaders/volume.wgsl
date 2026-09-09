@@ -103,29 +103,21 @@ fn henyeyGreenstein(cosTheta: f32, g: f32) -> f32 {
     return (1.0 - g2) / (4.0 * PI * d * sqrt(d));
 }
 
-// Radiance the key light (the first enabled light) delivers at p, and the direction towards it.
-struct KeyLight {
-    radiance: vec3<f32>,
-    towards: vec3<f32>,
-};
-
-fn keyLightAt(p: vec3<f32>) -> KeyLight {
-    var out: KeyLight;
-    out.radiance = vec3<f32>(0.0);
-    out.towards = vec3<f32>(0.0, 1.0, 0.0);
-    if (frame.envParams.z < 0.5) {
-        return out;
-    }
-    let light = frame.lights[0];
+// In-scattered radiance at `p` for a ray travelling along `direction`.
+//
+// Every enabled light contributes in proportion to its `volumetricStrength` (packed into
+// `cone.z` by rendering::SceneRenderer; 0 means "this light does not light the air"), so a rig
+// can put a warm practical in the haze without the key washing the whole volume out. Lights with
+// zero strength cost one comparison. There is no shadowing in the fog: a beam is the falloff of a
+// local emitter, not an occluded shaft.
+fn lightRadiance(index: i32, p: vec3<f32>) -> vec4<f32> {
+    let light = frame.lights[index];
     let kind = light.positionType.w;
     if (kind < 0.5) { // directional
-        out.towards = -light.directionRange.xyz;
-        out.radiance = light.colorIntensity.rgb;
-        return out;
+        return vec4<f32>(light.colorIntensity.rgb, 0.0);
     }
     let toLight = light.positionType.xyz - p;
     let dist2 = max(dot(toLight, toLight), 1e-4);
-    out.towards = toLight * inverseSqrt(dist2);
     var attenuation = 1.0 / dist2;
     let range = light.directionRange.w;
     if (range > 0.0) {
@@ -133,11 +125,35 @@ fn keyLightAt(p: vec3<f32>) -> KeyLight {
         attenuation = attenuation * ratio * ratio;
     }
     if (kind > 1.5) { // spot
-        let cosAngle = dot(light.directionRange.xyz, -out.towards);
+        let towards = toLight * inverseSqrt(dist2);
+        let cosAngle = dot(light.directionRange.xyz, -towards);
         attenuation = attenuation * clamp((cosAngle - light.cone.x) * light.cone.y, 0.0, 1.0);
     }
-    out.radiance = light.colorIntensity.rgb * attenuation;
-    return out;
+    return vec4<f32>(light.colorIntensity.rgb * attenuation, 1.0);
+}
+
+fn lightTowards(index: i32, p: vec3<f32>) -> vec3<f32> {
+    let light = frame.lights[index];
+    if (light.positionType.w < 0.5) {
+        return -light.directionRange.xyz;
+    }
+    let toLight = light.positionType.xyz - p;
+    return toLight * inverseSqrt(max(dot(toLight, toLight), 1e-4));
+}
+
+fn inScatterAt(p: vec3<f32>, direction: vec3<f32>, anisotropy: f32) -> vec3<f32> {
+    var total = vec3<f32>(0.0);
+    let count = min(i32(frame.envParams.z), 8);
+    for (var i = 0; i < count; i = i + 1) {
+        let strength = frame.lights[i].cone.z;
+        if (strength <= 0.0) {
+            continue;
+        }
+        let towards = lightTowards(i, p);
+        let phase = henyeyGreenstein(dot(direction, towards), anisotropy);
+        total = total + strength * phase * lightRadiance(i, p).rgb;
+    }
+    return total;
 }
 
 @fragment
@@ -176,8 +192,6 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         }
         let extinction = density * vol.params1.x;
         let scattering = density * vol.params0.w;
-        let key = keyLightAt(p);
-        let phase = henyeyGreenstein(dot(direction, key.towards), anisotropy);
         var emission = vec3<f32>(0.0);
         if (vol.params1.z > 0.0) {
             var emissionColor = vol.fogColor.rgb;
@@ -187,7 +201,7 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
             }
             emission = density * vol.params1.z * emissionColor;
         }
-        let source = scattering * phase * key.radiance + emission;
+        let source = scattering * inScatterAt(p, direction, anisotropy) + emission;
         scattered = scattered + transmittance * source * stepLength;
         transmittance = transmittance * exp(-extinction * stepLength);
         if (transmittance < 0.002) {

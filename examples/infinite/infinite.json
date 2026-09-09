@@ -1,978 +1,978 @@
 {
-  "format": "avgen-project",
-  "version": 4,
-  "app": {
-    "name": "avgen",
-    "version": "0.1.0"
-  },
-  "assets": {
-    "scene": {
-      "kind": "composition",
-      "path": "infinite.scene.json"
-    }
-  },
-  "parameters": {
-    "post/bloom/enabled": true,
-    "post/bloom/intensity": 0.35,
-    "post/bloom/threshold": 1.25,
-    "post/tonemap/operator": 1,
-    "post/output/vignette": 0.35,
-    "post/output/grain": 0.03,
-    "scene/brightness": 0.85,
-    "scene/keyLight": 1.5,
-    "scene/fogDensity": 0.01,
-    "root/rotationSpeed": 0.0
-  },
-  "sources": [
-    {
-      "kind": "macro",
-      "name": "macros",
-      "settings": {
-        "knobs": [
-          {
-            "name": "energy",
-            "default": 0.2
-          },
-          {
-            "name": "architecture",
-            "default": 0.35
-          },
-          {
-            "name": "distortion",
-            "default": 0.0
-          },
-          {
-            "name": "color",
-            "default": 0.3
-          },
-          {
-            "name": "atmosphere",
-            "default": 0.35
-          },
-          {
-            "name": "particles",
-            "default": 0.3
-          },
-          {
-            "name": "time",
-            "default": 0.3
-          }
-        ]
-      }
-    },
-    {
-      "kind": "control",
-      "name": "control",
-      "settings": {
-        "channels": []
-      }
-    }
-  ],
-  "worldMacros": [
-    {
-      "name": "energy",
-      "label": "WORLD ENERGY",
-      "default": 0.2,
-      "targets": [
-        {
-          "path": "field/pulse/amplitude",
-          "min": 0.2,
-          "max": 2.6
-        },
-        {
-          "path": "field/breath/strength",
-          "min": 0.2,
-          "max": 2.0
-        },
-        {
-          "path": "scene/brightness",
-          "min": 0.45,
-          "max": 1.15
-        },
-        {
-          "path": "particles/dust/spawnRate",
-          "min": 400,
-          "max": 9000,
-          "op": "replace"
-        },
-        {
-          "path": "procedural/altar/material/emissive",
-          "min": 0.6,
-          "max": 6.0
-        }
-      ]
-    },
-    {
-      "name": "architecture",
-      "label": "ARCHITECTURE",
-      "default": 0.35,
-      "targets": [
-        {
-          "path": "procedural/columns/distribution/radius",
-          "min": 34.0,
-          "max": 54.0
-        },
-        {
-          "path": "procedural/columns/source/height",
-          "min": 26.0,
-          "max": 46.0
-        },
-        {
-          "path": "procedural/innerColumns/distribution/radius",
-          "min": 16.0,
-          "max": 30.0
-        },
-        {
-          "path": "procedural/rings/distribution/count",
-          "min": 3,
-          "max": 9
-        },
-        {
-          "path": "procedural/arches/distribution/count",
-          "min": 16,
-          "max": 40
-        }
-      ]
-    },
-    {
-      "name": "distortion",
-      "label": "DISTORTION",
-      "default": 0.0,
-      "targets": [
-        {
-          "path": "procedural/columns/deform/1/amount",
-          "min": 0.0,
-          "max": 0.5
-        },
-        {
-          "path": "procedural/columns/deform/2/amount",
-          "min": 0.0,
-          "max": 2.5
-        },
-        {
-          "path": "procedural/innerColumns/deform/1/amount",
-          "min": 0.0,
-          "max": 2.0
-        },
-        {
-          "path": "field/churn/strength",
-          "min": 0.2,
-          "max": 3.5
-        },
-        {
-          "path": "procedural/corridor/effector/1/strength",
-          "min": 0.4,
-          "max": 3.0
-        }
-      ]
-    },
-    {
-      "name": "color",
-      "label": "COLOR",
-      "default": 0.3,
-      "targets": [
-        {
-          "path": "procedural/columns/materialVariation/hueShift",
-          "min": 0.0,
-          "max": 0.6
-        },
-        {
-          "path": "procedural/corridor/materialVariation/hueGradient",
-          "min": 0.1,
-          "max": 0.9
-        },
-        {
-          "path": "procedural/motes/materialVariation/hueShift",
-          "min": 0.0,
-          "max": 0.8
-        },
-        {
-          "path": "field/glow/strength",
-          "min": 0.3,
-          "max": 2.0
-        }
-      ]
-    },
-    {
-      "name": "atmosphere",
-      "label": "ATMOSPHERE",
-      "default": 0.35,
-      "targets": [
-        {
-          "path": "scene/fogDensity",
-          "min": 0.002,
-          "max": 0.03
-        },
-        {
-          "path": "post/bloom/intensity",
-          "min": 0.25,
-          "max": 1.0
-        },
-        {
-          "path": "post/output/vignette",
-          "min": 0.15,
-          "max": 0.6
-        }
-      ]
-    },
-    {
-      "name": "particles",
-      "label": "PARTICLES",
-      "default": 0.3,
-      "targets": [
-        {
-          "path": "particles/dust/spawnRate",
-          "min": 0,
-          "max": 12000,
-          "op": "replace"
-        },
-        {
-          "path": "particles/dust/size",
-          "min": 0.5,
-          "max": 2.5
-        },
-        {
-          "path": "particles/dust/emissive",
-          "min": 1.0,
-          "max": 6.0
-        },
-        {
-          "path": "procedural/motes/material/emissive",
-          "min": 0.4,
-          "max": 4.0
-        }
-      ]
-    },
-    {
-      "name": "time",
-      "label": "TIME",
-      "default": 0.3,
-      "targets": [
-        {
-          "path": "field/swirl/strength",
-          "min": 0.0,
-          "max": 2.2
-        },
-        {
-          "path": "field/pulse/waveSpeed",
-          "min": 6.0,
-          "max": 50.0
-        },
-        {
-          "path": "field/churn/speed",
-          "min": 0.05,
-          "max": 1.2
-        },
-        {
-          "path": "procedural/columns/deform/2/speed",
-          "min": 0.05,
-          "max": 1.5
-        }
-      ]
-    }
-  ],
-  "routes": [
-    {
-      "source": "audio.rms",
-      "target": "macros/energy",
-      "amount": 0.55,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 60,
-        "decayMs": 420
-      }
-    },
-    {
-      "source": "audio.bass",
-      "target": "macros/architecture",
-      "amount": 0.4,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 25,
-        "decayMs": 260
-      }
-    },
-    {
-      "source": "audio.bass",
-      "target": "procedural/columns/source/radius",
-      "amount": 0.9,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 20,
-        "decayMs": 220
-      }
-    },
-    {
-      "source": "audio.lowMid",
-      "target": "procedural/columns/deform/1/amount",
-      "amount": 0.35,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 25,
-        "decayMs": 300
-      }
-    },
-    {
-      "source": "audio.lowMid",
-      "target": "procedural/innerColumns/deform/1/amount",
-      "amount": 0.8,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 25,
-        "decayMs": 300
-      }
-    },
-    {
-      "source": "audio.mid",
-      "target": "field/swirl/strength",
-      "amount": 1.4,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 30,
-        "decayMs": 350
-      }
-    },
-    {
-      "source": "audio.mid",
-      "target": "procedural/rings/effector/1/strength",
-      "amount": 0.9,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 30,
-        "decayMs": 350
-      }
-    },
-    {
-      "source": "audio.highMid",
-      "target": "procedural/corridor/effector/1/strength",
-      "amount": 1.1,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 20,
-        "decayMs": 260
-      }
-    },
-    {
-      "source": "audio.highMid",
-      "target": "procedural/chambers/effector/1/strength",
-      "amount": 0.8,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 20,
-        "decayMs": 260
-      }
-    },
-    {
-      "source": "audio.treble",
-      "target": "procedural/columns/emissiveFieldAmount",
-      "amount": 3.0,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 10,
-        "decayMs": 180
-      }
-    },
-    {
-      "source": "audio.treble",
-      "target": "procedural/motes/material/emissive",
-      "amount": 2.5,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 8,
-        "decayMs": 160
-      }
-    },
-    {
-      "source": "audio.spectralCentroid",
-      "target": "macros/color",
-      "amount": 0.5,
-      "op": "add",
-      "polarity": "unipolar"
-    },
-    {
-      "source": "audio.spectralFlux",
-      "target": "macros/distortion",
-      "amount": 0.45,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 15,
-        "decayMs": 500
-      }
-    },
-    {
-      "source": "audio.onset",
-      "target": "procedural/altar/effector/1/strength",
-      "amount": 2.0,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "envelope": "linearfall",
-        "decayMs": 700
-      }
-    },
-    {
-      "source": "audio.onset",
-      "target": "field/pulse/waveOrigin",
-      "amount": -40.0,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "envelope": "linearfall",
-        "decayMs": 1400
-      }
-    },
-    {
-      "source": "audio.onset",
-      "target": "particles/dust/burst",
-      "amount": 1400.0,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "envelope": "peakhold",
-        "decayMs": 40
-      }
-    },
-    {
-      "source": "audio.onset",
-      "target": "post/lens/chromaticAberration",
-      "amount": 0.25,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "envelope": "linearfall",
-        "decayMs": 300
-      }
-    },
-    {
-      "source": "beat.pulse",
-      "target": "procedural/rings/effector/2/strength",
-      "amount": 0.8,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "envelope": "linearfall",
-        "decayMs": 420
-      }
-    },
-    {
-      "source": "beat.phase",
-      "target": "procedural/altar/effector/2/strength",
-      "amount": 0.6,
-      "op": "add",
-      "polarity": "unipolar"
-    },
-    {
-      "source": "beat.bar",
-      "target": "field/rise/strength",
-      "amount": 0.5,
-      "op": "add",
-      "polarity": "unipolar"
-    }
-  ],
-  "presets": [
-    {
-      "name": "Dormant",
-      "values": {
-        "macros/energy": [
-          0.08
-        ],
-        "macros/architecture": [
-          0.2
-        ],
-        "macros/distortion": [
-          0.0
-        ],
-        "macros/color": [
-          0.15
-        ],
-        "macros/atmosphere": [
-          0.5
-        ],
-        "macros/particles": [
-          0.1
-        ],
-        "macros/time": [
-          0.1
-        ],
-        "camera/position": [
-          0,
-          20,
-          250
-        ],
-        "camera/target": [
-          0,
-          12,
-          0
-        ],
-        "scene/keyLight": [
-          0.7
-        ]
-      }
-    },
-    {
-      "name": "Awakening",
-      "values": {
-        "macros/energy": [
-          0.3
-        ],
-        "macros/architecture": [
-          0.35
-        ],
-        "macros/distortion": [
-          0.05
-        ],
-        "macros/color": [
-          0.25
-        ],
-        "macros/atmosphere": [
-          0.45
-        ],
-        "macros/particles": [
-          0.3
-        ],
-        "macros/time": [
-          0.25
-        ],
-        "camera/position": [
-          0,
-          24,
-          175
-        ],
-        "camera/target": [
-          0,
-          14,
-          0
-        ],
-        "scene/keyLight": [
-          1.0
-        ]
-      }
-    },
-    {
-      "name": "Expansion",
-      "values": {
-        "macros/energy": [
-          0.55
-        ],
-        "macros/architecture": [
-          0.6
-        ],
-        "macros/distortion": [
-          0.15
-        ],
-        "macros/color": [
-          0.4
-        ],
-        "macros/atmosphere": [
-          0.4
-        ],
-        "macros/particles": [
-          0.5
-        ],
-        "macros/time": [
-          0.4
-        ],
-        "camera/position": [
-          0,
-          34,
-          130
-        ],
-        "camera/target": [
-          0,
-          18,
-          0
-        ],
-        "scene/keyLight": [
-          1.3
-        ]
-      }
-    },
-    {
-      "name": "Ascension",
-      "values": {
-        "macros/energy": [
-          0.75
-        ],
-        "macros/architecture": [
-          0.75
-        ],
-        "macros/distortion": [
-          0.25
-        ],
-        "macros/color": [
-          0.55
-        ],
-        "macros/atmosphere": [
-          0.35
-        ],
-        "macros/particles": [
-          0.65
-        ],
-        "macros/time": [
-          0.55
-        ],
-        "camera/position": [
-          0,
-          62,
-          150
-        ],
-        "camera/target": [
-          0,
-          34,
-          0
-        ],
-        "scene/keyLight": [
-          1.5
-        ]
-      }
-    },
-    {
-      "name": "Overload",
-      "values": {
-        "macros/energy": [
-          1.0
-        ],
-        "macros/architecture": [
-          0.9
-        ],
-        "macros/distortion": [
-          0.6
-        ],
-        "macros/color": [
-          0.8
-        ],
-        "macros/atmosphere": [
-          0.25
-        ],
-        "macros/particles": [
-          0.9
-        ],
-        "macros/time": [
-          0.8
-        ],
-        "camera/position": [
-          0,
-          30,
-          96
-        ],
-        "camera/target": [
-          0,
-          16,
-          0
-        ],
-        "scene/keyLight": [
-          2.0
-        ]
-      }
-    },
-    {
-      "name": "Fracture",
-      "values": {
-        "macros/energy": [
-          0.85
-        ],
-        "macros/architecture": [
-          0.5
-        ],
-        "macros/distortion": [
-          1.0
-        ],
-        "macros/color": [
-          0.95
-        ],
-        "macros/atmosphere": [
-          0.6
-        ],
-        "macros/particles": [
-          1.0
-        ],
-        "macros/time": [
-          1.0
-        ],
-        "camera/position": [
-          26,
-          20,
-          78
-        ],
-        "camera/target": [
-          0,
-          12,
-          0
-        ],
-        "scene/keyLight": [
-          1.8
-        ]
-      }
-    },
-    {
-      "name": "Hyperspace",
-      "values": {
-        "macros/energy": [
-          0.95
-        ],
-        "macros/architecture": [
-          0.25
-        ],
-        "macros/distortion": [
-          0.75
-        ],
-        "macros/color": [
-          1.0
-        ],
-        "macros/atmosphere": [
-          0.15
-        ],
-        "macros/particles": [
-          0.85
-        ],
-        "macros/time": [
-          1.0
-        ],
-        "camera/position": [
-          0,
-          12,
-          40
-        ],
-        "camera/target": [
-          0,
-          30,
-          -260
-        ],
-        "scene/keyLight": [
-          1.6
-        ]
-      }
-    },
-    {
-      "name": "Rebirth",
-      "values": {
-        "macros/energy": [
-          0.25
-        ],
-        "macros/architecture": [
-          0.35
-        ],
-        "macros/distortion": [
-          0.05
-        ],
-        "macros/color": [
-          0.3
-        ],
-        "macros/atmosphere": [
-          0.55
-        ],
-        "macros/particles": [
-          0.25
-        ],
-        "macros/time": [
-          0.2
-        ],
-        "camera/position": [
-          0,
-          20,
-          210
-        ],
-        "camera/target": [
-          0,
-          12,
-          0
-        ],
-        "scene/keyLight": [
-          0.8
-        ]
-      }
-    }
-  ],
-  "states": {
-    "initial": "Dormant",
-    "states": [
-      {
-        "name": "Dormant",
-        "preset": "Dormant",
-        "transition": {
-          "seconds": 8.0,
-          "easing": "smooth"
-        }
-      },
-      {
-        "name": "Awakening",
-        "preset": "Awakening",
-        "transition": {
-          "seconds": 10.0,
-          "easing": "smooth",
-          "quantize": "bar"
-        },
-        "triggers": [
-          {
-            "kind": "macro",
-            "signal": "energy",
-            "threshold": 0.25,
-            "from": "Dormant"
-          }
-        ]
-      },
-      {
-        "name": "Expansion",
-        "preset": "Expansion",
-        "transition": {
-          "seconds": 12.0,
-          "easing": "easeInOut",
-          "quantize": "bar"
-        },
-        "triggers": [
-          {
-            "kind": "macro",
-            "signal": "energy",
-            "threshold": 0.5,
-            "from": "Awakening"
-          }
-        ]
-      },
-      {
-        "name": "Ascension",
-        "preset": "Ascension",
-        "transition": {
-          "seconds": 10.0,
-          "easing": "easeInOut",
-          "quantize": "bar"
-        },
-        "triggers": [
-          {
-            "kind": "macro",
-            "signal": "energy",
-            "threshold": 0.7,
-            "from": "Expansion"
-          }
-        ]
-      },
-      {
-        "name": "Overload",
-        "preset": "Overload",
-        "transition": {
-          "seconds": 4.0,
-          "easing": "easeIn",
-          "quantize": "beat"
-        },
-        "triggers": [
-          {
-            "kind": "onset",
-            "threshold": 1.8,
-            "from": "Ascension"
-          }
-        ]
-      },
-      {
-        "name": "Fracture",
-        "preset": "Fracture",
-        "transition": {
-          "seconds": 1.5,
-          "easing": "easeIn"
-        },
-        "triggers": [
-          {
-            "kind": "macro",
-            "signal": "distortion",
-            "threshold": 0.8,
-            "from": "Overload"
-          }
-        ]
-      },
-      {
-        "name": "Hyperspace",
-        "preset": "Hyperspace",
-        "transition": {
-          "seconds": 6.0,
-          "easing": "smooth"
-        },
-        "triggers": [
-          {
-            "kind": "beat",
-            "every": 64,
-            "from": "Fracture"
-          }
-        ]
-      },
-      {
-        "name": "Rebirth",
-        "preset": "Rebirth",
-        "transition": {
-          "seconds": 14.0,
-          "easing": "smooth"
-        }
-      }
-    ]
-  },
-  "timeline": {
-    "tracks": [],
-    "cues": [
-      {
-        "time": 0,
-        "name": "Dormant",
-        "preset": "Dormant",
-        "morphSeconds": 0,
-        "timeBase": "seconds"
-      },
-      {
-        "time": 25,
-        "name": "Awakening",
-        "preset": "Awakening",
-        "morphSeconds": 12,
-        "timeBase": "seconds"
-      },
-      {
-        "time": 55,
-        "name": "Expansion",
-        "preset": "Expansion",
-        "morphSeconds": 14,
-        "timeBase": "seconds"
-      },
-      {
-        "time": 95,
-        "name": "Ascension",
-        "preset": "Ascension",
-        "morphSeconds": 12,
-        "timeBase": "seconds"
-      },
-      {
-        "time": 140,
-        "name": "Overload",
-        "preset": "Overload",
-        "morphSeconds": 6,
-        "timeBase": "seconds"
-      },
-      {
-        "time": 170,
-        "name": "Fracture",
-        "preset": "Fracture",
-        "morphSeconds": 3,
-        "timeBase": "seconds"
-      },
-      {
-        "time": 195,
-        "name": "Hyperspace",
-        "preset": "Hyperspace",
-        "morphSeconds": 8,
-        "timeBase": "seconds"
-      },
-      {
-        "time": 225,
-        "name": "Rebirth",
-        "preset": "Rebirth",
-        "morphSeconds": 16,
-        "timeBase": "seconds"
-      }
-    ]
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "infinite.scene.json"
   }
+ },
+ "parameters": {
+  "root/rotationSpeed": 0.0,
+  "scene/brightness": 0.85,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/focalLength": 38.0,
+  "camera/lens/aperture": 5.6,
+  "camera/lens/shutterAngle": 172.0,
+  "camera/focus/mode": 2,
+  "camera/focus/speed": 8.0,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.3,
+  "post/bloom/threshold": 1.05,
+  "post/bloom/knee": 0.45,
+  "post/bloom/radius": 1.2,
+  "post/bloom/emissionWeight": 1.2,
+  "post/halation/enabled": true,
+  "post/halation/intensity": 0.26,
+  "post/halation/threshold": 1.5,
+  "post/halation/radius": 1.7,
+  "post/halation/warmth": 0.9,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "post/motionBlur/amount": 0.6,
+  "post/grade/contrast": 1.1,
+  "post/grade/saturation": 1.02,
+  "post/grade/temperature": 0.0,
+  "post/grade/lift": [
+   -0.006,
+   -0.005,
+   0.002
+  ],
+  "post/lens/chromaticAberration": 0.05,
+  "post/lens/distortion": -0.02,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.03,
+  "post/output/sharpen": 0.2,
+  "sources/drift/rate": 0.017,
+  "sources/drift/phase": 0.0,
+  "sources/rise/rate": 0.011,
+  "sources/rise/phase": 0.35,
+  "sources/breathe/rate": 0.033,
+  "sources/breathe/phase": 0.0,
+  "sources/turn/rate": 0.0068,
+  "sources/turn/phase": 0.55
+ },
+ "sources": [
+  {
+   "kind": "macro",
+   "name": "macros",
+   "settings": {
+    "knobs": [
+     {
+      "name": "energy",
+      "default": 0.18
+     },
+     {
+      "name": "architecture",
+      "default": 0.35
+     },
+     {
+      "name": "distortion",
+      "default": 0.0
+     },
+     {
+      "name": "color",
+      "default": 0.3
+     },
+     {
+      "name": "atmosphere",
+      "default": 0.35
+     },
+     {
+      "name": "particles",
+      "default": 0.3
+     },
+     {
+      "name": "time",
+      "default": 0.28
+     }
+    ]
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "drift",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "rise",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "breathe",
+   "settings": {
+    "shape": "triangle"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "turn",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "control",
+   "name": "control",
+   "settings": {
+    "channels": []
+   }
+  }
+ ],
+ "worldMacros": [
+  {
+   "name": "energy",
+   "label": "WORLD ENERGY",
+   "default": 0.18,
+   "targets": [
+    {
+     "path": "field/pulse/amplitude",
+     "min": 0.1,
+     "max": 1.1
+    },
+    {
+     "path": "field/breath/strength",
+     "min": 0.15,
+     "max": 1.2
+    },
+    {
+     "path": "scene/brightness",
+     "min": 0.7,
+     "max": 1.05
+    }
+   ]
+  },
+  {
+   "name": "architecture",
+   "label": "ARCHITECTURE",
+   "default": 0.35,
+   "targets": [
+    {
+     "path": "procedural/columns/distribution/radius",
+     "min": 46.0,
+     "max": 58.0
+    },
+    {
+     "path": "procedural/columns/source/height",
+     "min": 44.0,
+     "max": 60.0
+    },
+    {
+     "path": "procedural/innerColumns/distribution/radius",
+     "min": 26.0,
+     "max": 34.0
+    },
+    {
+     "path": "procedural/arches/source/majorRadius",
+     "min": 46.0,
+     "max": 58.0
+    },
+    {
+     "path": "procedural/rings/distribution/count",
+     "min": 2,
+     "max": 4
+    }
+   ]
+  },
+  {
+   "name": "distortion",
+   "label": "DISTORTION",
+   "default": 0.0,
+   "targets": [
+    {
+     "path": "procedural/columns/deform/1/amount",
+     "min": 0.0,
+     "max": 0.18
+    },
+    {
+     "path": "procedural/columns/deform/2/amount",
+     "min": 0.0,
+     "max": 0.3
+    },
+    {
+     "path": "procedural/innerColumns/deform/1/amount",
+     "min": 0.0,
+     "max": 0.6
+    },
+    {
+     "path": "field/churn/strength",
+     "min": 0.15,
+     "max": 1.6
+    }
+   ]
+  },
+  {
+   "name": "color",
+   "label": "COLOR",
+   "default": 0.3,
+   "targets": [
+    {
+     "path": "post/grade/temperature",
+     "min": -0.06,
+     "max": 0.1
+    },
+    {
+     "path": "post/grade/saturation",
+     "min": 0.9,
+     "max": 1.12
+    },
+    {
+     "path": "field/glow/strength",
+     "min": 0.2,
+     "max": 1.0
+    }
+   ]
+  },
+  {
+   "name": "atmosphere",
+   "label": "ATMOSPHERE",
+   "default": 0.35,
+   "targets": [
+    {
+     "path": "scene/volumeDensity",
+     "min": 0.00018,
+     "max": 0.0016
+    },
+    {
+     "path": "scene/fogDensity",
+     "min": 0.0014,
+     "max": 0.0055
+    }
+   ]
+  },
+  {
+   "name": "particles",
+   "label": "PARTICLES",
+   "default": 0.3,
+   "targets": [
+    {
+     "path": "particles/dust/spawnRate",
+     "min": 120,
+     "max": 2400,
+     "op": "replace"
+    },
+    {
+     "path": "particles/dust/size",
+     "min": 0.6,
+     "max": 1.6
+    },
+    {
+     "path": "procedural/motes/material/emissive",
+     "min": 0.25,
+     "max": 1.2
+    }
+   ]
+  },
+  {
+   "name": "time",
+   "label": "TIME",
+   "default": 0.28,
+   "targets": [
+    {
+     "path": "field/swirl/strength",
+     "min": 0.04,
+     "max": 0.55
+    },
+    {
+     "path": "field/churn/speed",
+     "min": 0.03,
+     "max": 0.3
+    },
+    {
+     "path": "field/pulse/waveSpeed",
+     "min": 5.0,
+     "max": 18.0
+    }
+   ]
+  }
+ ],
+ "routes": [
+  {
+   "source": "lfo.drift",
+   "target": "camera/position",
+   "component": 0,
+   "amount": 2.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.rise",
+   "target": "camera/position",
+   "component": 1,
+   "amount": 1.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.drift",
+   "target": "camera/target",
+   "component": 0,
+   "amount": -3.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.breathe",
+   "target": "camera/target",
+   "component": 1,
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.turn",
+   "target": "procedural/altar/effector/2/strength",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.breathe",
+   "target": "procedural/rings/effector/1/strength",
+   "amount": 0.18,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "audio.rms",
+   "target": "macros/energy",
+   "amount": 0.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 220,
+    "decayMs": 1600
+   }
+  },
+  {
+   "source": "audio.spectralCentroid",
+   "target": "macros/color",
+   "amount": 0.16,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "procedural/altar/material/emissive",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 90,
+    "decayMs": 1100,
+    "curve": "power",
+    "curveAmount": 0.7
+   }
+  },
+  {
+   "source": "audio.onset",
+   "target": "particles/dust/burst",
+   "amount": 220.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "none"
+   }
+  },
+  {
+   "source": "beat.bar",
+   "target": "procedural/altar/effector/1/strength",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "linearfall",
+    "decayMs": 1200
+   }
+  }
+ ],
+ "presets": [
+  {
+   "name": "Temple / Threshold",
+   "values": {
+    "macros/energy": [
+     0.14
+    ],
+    "macros/architecture": [
+     0.35
+    ],
+    "macros/distortion": [
+     0.0
+    ],
+    "macros/color": [
+     0.26
+    ],
+    "macros/atmosphere": [
+     0.3
+    ],
+    "macros/particles": [
+     0.18
+    ],
+    "macros/time": [
+     0.22
+    ],
+    "lightrig/Colonnade/keyIntensity": [
+     3.6
+    ],
+    "camera/exposure/compensation": [
+     -0.2
+    ],
+    "post/bloom/intensity": [
+     0.24
+    ],
+    "post/output/vignette": [
+     0.52
+    ],
+    "procedural/altar/material/emissive": [
+     1.6
+    ],
+    "post/halation/intensity": [
+     0.18
+    ]
+   }
+  },
+  {
+   "name": "Temple / Procession",
+   "values": {
+    "macros/energy": [
+     0.26
+    ],
+    "macros/architecture": [
+     0.4
+    ],
+    "macros/distortion": [
+     0.03
+    ],
+    "macros/color": [
+     0.32
+    ],
+    "macros/atmosphere": [
+     0.36
+    ],
+    "macros/particles": [
+     0.34
+    ],
+    "macros/time": [
+     0.28
+    ],
+    "lightrig/Colonnade/keyIntensity": [
+     4.1
+    ],
+    "camera/exposure/compensation": [
+     -0.2
+    ],
+    "post/bloom/intensity": [
+     0.32
+    ],
+    "post/output/vignette": [
+     0.46
+    ],
+    "procedural/altar/material/emissive": [
+     2.0
+    ],
+    "post/halation/intensity": [
+     0.26
+    ]
+   }
+  },
+  {
+   "name": "Temple / Sanctum",
+   "values": {
+    "macros/energy": [
+     0.4
+    ],
+    "macros/architecture": [
+     0.46
+    ],
+    "macros/distortion": [
+     0.06
+    ],
+    "macros/color": [
+     0.4
+    ],
+    "macros/atmosphere": [
+     0.5
+    ],
+    "macros/particles": [
+     0.52
+    ],
+    "macros/time": [
+     0.34
+    ],
+    "lightrig/Colonnade/keyIntensity": [
+     4.5
+    ],
+    "camera/exposure/compensation": [
+     -0.1
+    ],
+    "post/bloom/intensity": [
+     0.42
+    ],
+    "post/output/vignette": [
+     0.4
+    ],
+    "procedural/altar/material/emissive": [
+     1.9
+    ],
+    "post/halation/intensity": [
+     0.34
+    ]
+   }
+  },
+  {
+   "name": "Temple / Ascent",
+   "values": {
+    "macros/energy": [
+     0.5
+    ],
+    "macros/architecture": [
+     0.52
+    ],
+    "macros/distortion": [
+     0.08
+    ],
+    "macros/color": [
+     0.46
+    ],
+    "macros/atmosphere": [
+     0.58
+    ],
+    "macros/particles": [
+     0.44
+    ],
+    "macros/time": [
+     0.3
+    ],
+    "lightrig/Colonnade/keyIntensity": [
+     4.3
+    ],
+    "camera/exposure/compensation": [
+     -0.05
+    ],
+    "post/bloom/intensity": [
+     0.5
+    ],
+    "post/output/vignette": [
+     0.44
+    ],
+    "procedural/altar/material/emissive": [
+     2.4
+    ],
+    "post/halation/intensity": [
+     0.4
+    ]
+   }
+  }
+ ],
+ "timeline": {
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": 0,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       96.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 12,
+      "value": [
+       60.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 26,
+      "value": [
+       24.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 36,
+      "value": [
+       12.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 46,
+      "value": [
+       14.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 52,
+      "value": [
+       24.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 60,
+      "value": [
+       46.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": 1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       22.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 12,
+      "value": [
+       12.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 26,
+      "value": [
+       7.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 36,
+      "value": [
+       8.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 46,
+      "value": [
+       10.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 52,
+      "value": [
+       44.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 60,
+      "value": [
+       66.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": 2,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       330.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 12,
+      "value": [
+       210.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 26,
+      "value": [
+       82.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 36,
+      "value": [
+       39.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 46,
+      "value": [
+       44.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 52,
+      "value": [
+       92.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 60,
+      "value": [
+       196.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": 0,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       -12.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 12,
+      "value": [
+       -8.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 26,
+      "value": [
+       -2.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 36,
+      "value": [
+       0.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 46,
+      "value": [
+       0.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 52,
+      "value": [
+       2.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 60,
+      "value": [
+       2.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": 1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       34.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 12,
+      "value": [
+       24.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 26,
+      "value": [
+       14.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 36,
+      "value": [
+       12.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 46,
+      "value": [
+       13.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 52,
+      "value": [
+       22.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 60,
+      "value": [
+       26.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": 2,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       0.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 12,
+      "value": [
+       0.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 26,
+      "value": [
+       0.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 36,
+      "value": [
+       0.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 46,
+      "value": [
+       0.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 52,
+      "value": [
+       0.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 60,
+      "value": [
+       0.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   }
+  ],
+  "cues": [
+   {
+    "time": 0.0,
+    "name": "threshold",
+    "preset": "Temple / Threshold",
+    "morphSeconds": 0.0,
+    "timeBase": "seconds"
+   },
+   {
+    "time": 12.0,
+    "name": "procession",
+    "preset": "Temple / Procession",
+    "morphSeconds": 8.0,
+    "timeBase": "seconds"
+   },
+   {
+    "time": 30.0,
+    "name": "sanctum",
+    "preset": "Temple / Sanctum",
+    "morphSeconds": 8.0,
+    "timeBase": "seconds"
+   },
+   {
+    "time": 46.0,
+    "name": "ascent",
+    "preset": "Temple / Ascent",
+    "morphSeconds": 9.0,
+    "timeBase": "seconds"
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "sequence",
+  "path": "renders/infinite-temple"
+ }
 }

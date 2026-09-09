@@ -1,0 +1,89 @@
+{
+  "format": "avgen-lightrig",
+  "version": 1,
+  "name": "Colonnade",
+  "description": "A low warm sun raking through a colonnade from behind the subject, a cold sky fill, a cold rim, and one warm practical at the focal point that lights the air. The key belongs to the world, not to the camera, so shadows stay put while the shot moves through them.",
+  "keyIntensity": 5.0,
+  "ambientIntensity": 0.1,
+  "ambientColor": [
+    0.42,
+    0.54,
+    0.82
+  ],
+  "ambientTemperature": 9200,
+  "lights": [
+    {
+      "name": "sun",
+      "type": "directional",
+      "role": "key",
+      "azimuth": -104.0,
+      "elevation": 15.0,
+      "distance": 4.0,
+      "intensity": 1.0,
+      "temperature": 2500,
+      "size": 1.0,
+      "castsShadow": true,
+      "shadowStrength": 1.0,
+      "softness": 1.6,
+      "volumetric": 0.06,
+      "followCamera": false
+    },
+    {
+      "name": "altar",
+      "type": "point",
+      "role": "practical",
+      "azimuth": 0.0,
+      "elevation": 90.0,
+      "distance": 0.3,
+      "intensity": 0.55,
+      "temperature": 2100,
+      "size": 0.4,
+      "castsShadow": false,
+      "volumetric": 1.0,
+      "followCamera": false
+    },
+    {
+      "name": "sky",
+      "type": "rect",
+      "role": "fill",
+      "azimuth": -48.0,
+      "elevation": 26.0,
+      "distance": 2.6,
+      "intensity": 0.07,
+      "temperature": 8800,
+      "size": 2.4,
+      "aspect": 1.8,
+      "castsShadow": false,
+      "volumetric": 0.0,
+      "followCamera": true
+    },
+    {
+      "name": "rim",
+      "type": "directional",
+      "role": "rim",
+      "azimuth": -152.0,
+      "elevation": 24.0,
+      "distance": 3.0,
+      "intensity": 0.18,
+      "temperature": 9600,
+      "size": 1.0,
+      "castsShadow": false,
+      "volumetric": 0.0,
+      "followCamera": true
+    },
+    {
+      "name": "ambient",
+      "type": "directional",
+      "role": "ambient",
+      "azimuth": 0.0,
+      "elevation": 85.0,
+      "distance": 4.0,
+      "intensity": 1.0,
+      "temperature": 9200,
+      "size": 0.5,
+      "castsShadow": false,
+      "volumetric": 0.0,
+      "followCamera": true
+    }
+  ]
+}
