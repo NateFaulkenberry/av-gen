@@ -107,7 +107,7 @@ using nlohmann::json;
 namespace {
 
 constexpr float kTwoPi = 6.283185307179586f;
-constexpr int kMaxInstances = 100000;
+constexpr int kMaxInstances = 1048576; // 1M points (brief performance target)
 
 // ---- structural hashing (FNV-1a over the bit patterns) -----------------------------------------
 
@@ -934,7 +934,7 @@ Result<void> Distribution::validate() const {
     return {};
 }
 
-int Distribution::instanceCount() const {
+int Distribution::instanceCount(const spatial::Spline* spline) const {
     switch (kind) {
     case DistributionKind::Single:
         return 1;
@@ -944,18 +944,26 @@ int Distribution::instanceCount() const {
     case DistributionKind::Radial:
     case DistributionKind::Spiral:
         return std::max(count, 1);
+    case DistributionKind::Spline:
+        // TODO(wave 2, splines): spacing-driven counts need the spline length.
+        (void)spline;
+        return std::max(count, 1);
+    case DistributionKind::Grammar:
+        return std::max(count, 1); // the owner replaces this with the expansion size
     }
     return 1;
 }
 
-Transform Distribution::placement(int index) const {
+Transform Distribution::placement(int index, const spatial::Spline* spline) const {
     Transform t;
-    const int n = instanceCount();
+    const int n = instanceCount(spline);
     const int i = std::clamp(index, 0, n - 1);
     const float u = n > 1 ? static_cast<float>(i) / static_cast<float>(n - 1) : 0.0f;
 
     switch (kind) {
     case DistributionKind::Single:
+    case DistributionKind::Spline:  // TODO(wave 2, splines)
+    case DistributionKind::Grammar: // placements come from the grammar expansion (generateCloud)
         break;
 
     case DistributionKind::Linear: {
@@ -1333,7 +1341,8 @@ std::uint64_t ProceduralGeometry::structuralHash() const {
     return h.value();
 }
 
-spatial::PointCloud ProceduralGeometry::generateCloud() const {
+spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& ctx) const {
+    (void)ctx; // TODO(wave 2): spline distributions, procedural sources, hierarchy, grammar
     const auto count = static_cast<std::size_t>(std::max(distribution.instanceCount(), 1));
     spatial::PointCloud out(count);
     const float invLast = count > 1 ? 1.0f / static_cast<float>(count - 1) : 0.0f;
@@ -1380,8 +1389,8 @@ spatial::PointCloud ProceduralGeometry::generateCloud() const {
     return out;
 }
 
-bool ProceduralGeometry::rebuild() {
-    const std::uint64_t hash = structuralHash();
+bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
+    const std::uint64_t hash = contextualHash(ctx);
     if (structureVersion != 0 && hash == builtHash) {
         return false;
     }
@@ -1389,7 +1398,7 @@ bool ProceduralGeometry::rebuild() {
     meshHash = source.structuralHash();
     ++structureVersion;
 
-    spatial::PointCloud built = generateCloud();
+    spatial::PointCloud built = generateCloud(ctx);
     if (auto ok = spatial::applyPointOps(built, pointOps); !ok) {
         log::warn("procedural '{}': {}", name, ok.error().message);
     }

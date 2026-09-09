@@ -6,7 +6,10 @@
 #include "scene/particles.hpp"
 #include "scene/post_settings.hpp"
 #include "scene/procedural.hpp"
+#include "scene/material_program.hpp"
+#include "scene/sdf_object.hpp"
 #include "spatial/field.hpp"
+#include "spatial/spline.hpp"
 #include "scene/scene_types.hpp"
 
 #include <cstdint>
@@ -29,6 +32,9 @@ struct Scene {
     std::vector<ParticleSystem> particles;
     std::vector<ProceduralGeometry> procedurals; // ADR-023; evaluated by rendering::ProceduralRenderer
     spatial::FieldSet fields;                    // ADR-025; sampled by effectors, deformers, particles, materials
+    spatial::SplineSet splines;                  // ADR-026; distributions, path deformers, camera, emitters
+    std::vector<SdfObject> sdfs;                 // ADR-027; rendering::SdfRenderer / meshed entities
+    std::vector<MaterialProgram> materialPrograms; // ADR-030; referenced by Material::program
     PostSettings post;                // built-in post-processing (copied in by the Engine)
     std::uint64_t meshVersion = 0;    // incremented when meshes change (renderer re-uploads)
     std::uint64_t textureVersion = 0; // incremented when textures change

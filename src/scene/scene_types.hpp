@@ -88,6 +88,7 @@ struct Material {
     float alphaCutoff = 0.5f;
     bool doubleSided = false;
     bool unlit = false;
+    std::string program;                 // procedural material program name (ADR-030; empty = none)
     TextureRef baseColorTexture;         // sRGB, rgb * baseColor, a * opacity
     TextureRef metallicRoughnessTexture; // linear, g = roughness, b = metallic
     TextureRef normalTexture;            // linear, tangent space

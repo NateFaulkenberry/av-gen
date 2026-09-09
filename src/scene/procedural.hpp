@@ -25,6 +25,8 @@
 #include "spatial/field.hpp"
 #include "spatial/point_cloud.hpp"
 #include "spatial/spatial_ops.hpp"
+#include "spatial/spline.hpp"
+#include "scene/grammar.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -44,7 +46,11 @@ namespace avgen::scene {
 // Point: a camera-facing quad of `pointSize` units (billboarded by the vertex shader; the CPU
 // mesh is a unit quad in XY facing +Z). Instances of a Point source are the "points" of the
 // performance targets (1M points with a GPU field).
-enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point };
+// Procedural: the source is another procedural object of the same scene (`reference`): its
+// source mesh is used and its cloud is composed under each of this object's placements
+// (hierarchical instancing, ADR-029). The referenced object may itself reference another
+// (depth <= kMaxHierarchyDepth; cycles are rejected by validate through the scene).
+enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point, Procedural };
 [[nodiscard]] const char* primitiveKindName(PrimitiveKind kind);
 [[nodiscard]] std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name);
 
@@ -69,6 +75,8 @@ struct SourceSpec {
     int minorSegments = 16;        // 3..128
     // Point
     float pointSize = 0.05f;       // quad edge (units); scaled by the instance scale
+    // Procedural
+    std::string reference;         // name of the referenced procedural object (kind Procedural)
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const; // changes whenever the mesh would change
@@ -84,7 +92,11 @@ struct SourceSpec {
 
 // ---- distributions ------------------------------------------------------------------------------
 
-enum class DistributionKind : std::uint8_t { Single, Linear, Grid, Radial, Spiral };
+// Spline: instances along the named scene spline (ADR-026): by count (evenly by distance between
+// splineStart and splineEnd of the length) or by `spacing` (units of arc length); frame-aligned
+// when `alignToSpline` (x = binormal, y = normal, z = tangent) with `roll` about the tangent and
+// `splineOffset` in frame space. Grammar: the object's `grammar` expansion provides placements.
+enum class DistributionKind : std::uint8_t { Single, Linear, Grid, Radial, Spiral, Spline, Grammar };
 [[nodiscard]] const char* distributionKindName(DistributionKind kind);
 [[nodiscard]] std::optional<DistributionKind> distributionKindFromName(std::string_view name);
 
@@ -119,12 +131,22 @@ struct Distribution {
     float turns = 3.0f;
     float spiralHeight = 8.0f;     // rise over the whole spiral along the plane normal
     float spiralAngle = 0.0f;      // extra constant rotation about the normal (radians)
+    // Spline
+    std::string spline;            // scene spline name
+    float splineStart = 0.0f;      // fraction of the length
+    float splineEnd = 1.0f;
+    bool alignToSpline = true;
+    float roll = 0.0f;             // radians about the tangent
+    glm::vec3 splineOffset{0.0f};  // in the spline frame (binormal, normal, tangent)
 
     [[nodiscard]] Result<void> validate() const;
-    [[nodiscard]] int instanceCount() const;
+    // Spline kind: count when spacing == 0, else floor(length * (end - start) / spacing) + 1
+    // (needs the spline; 0 when null). Grammar kind: reported by the owner (see ProceduralGeometry).
+    [[nodiscard]] int instanceCount(const spatial::Spline* spline = nullptr) const;
     // Placement of instance i (0..count-1) in distribution space: position, rotation (unit
     // quaternion), scale 1. Pure. `u` = normalised index (0 for i=0, 1 for the last; 0 when count==1).
-    [[nodiscard]] Transform placement(int index) const;
+    // `spline` is required for the Spline kind (identity placements when null).
+    [[nodiscard]] Transform placement(int index, const spatial::Spline* spline = nullptr) const;
     [[nodiscard]] std::uint64_t structuralHash() const;
 };
 
@@ -145,7 +167,7 @@ struct Variation {
 
 // ---- deformers ----------------------------------------------------------------------------------
 
-enum class DeformerKind : std::uint8_t { Bend, Twist, Sine, Noise, Displacement, Field };
+enum class DeformerKind : std::uint8_t { Bend, Twist, Sine, Noise, Displacement, Field, Path };
 [[nodiscard]] const char* deformerKindName(DeformerKind kind);
 [[nodiscard]] std::optional<DeformerKind> deformerKindFromName(std::string_view name);
 enum class DeformSpace : std::uint8_t { Local, World };
@@ -167,6 +189,13 @@ enum class DeformSpace : std::uint8_t { Local, World };
 //   Displacement: p += n * a * (fbm(p * scale + speed * t) * 2 - 1) — displacement
 //          along the vertex normal; the pattern source is `pattern` (0 = noise now; texture/audio/
 //          field/user later).
+//   Path: curve deform along the scene spline named `spline` (ADR-026). The coordinate along
+//          `axis` (from `center`, object space) maps to arc length d = pathOffset + coord *
+//          pathScale (pathScale 0 = the source extent along the axis maps to the whole length);
+//          the perpendicular components (u along a stable perpendicular of the axis, v along
+//          axis x u) are placed in the spline frame: p' = S(d).position + binormal * u + normal * v
+//          (+ roll). Result = mix(p, p', amount). Object space only; applied after the instance
+//          transform is NOT used (the deformed object is placed by its instance transform).
 //   Field: samples the scene field named `field` (ADR-025) at the point (world space when the
 //          deformer space is World, else at the instance's world position + local offset):
 //          vector fields: p += v * a; scalar fields: p += n * s * a (along the normal) when
@@ -189,6 +218,10 @@ struct Deformer {
     int pattern = 0;                    // displacement pattern source (0 = noise)
     std::string field;                  // Field: FieldSpec name (resolved by the owner/renderer)
     bool alongNormal = true;            // Field: scalar fields displace along the normal
+    std::string spline;                 // Path: spline name
+    float pathOffset = 0.0f;            // Path: arc-length offset
+    float pathScale = 0.0f;             // Path: units of arc length per object unit (0 = fit)
+    float pathRoll = 0.0f;              // Path: extra roll (radians)
 };
 // CPU reference of the whole stack, identical in meaning to the GPU shader: applies the enabled
 // deformers in order; `instanceWorld` is the instance's world matrix (local deformers apply to
@@ -201,6 +234,18 @@ struct Deformer {
 // Field deformer (needs the field set; `normal` in the same space as `p`). No-op when unbound.
 [[nodiscard]] glm::vec3 applyFieldDeformer(const Deformer& d, glm::vec3 p, glm::vec3 normal, double time,
                                            const spatial::FieldSet& fields);
+// Path deformer (needs the spline and the source extent along the axis for pathScale == 0).
+[[nodiscard]] glm::vec3 applyPathDeformer(const Deformer& d, glm::vec3 p, const spatial::Spline& spline,
+                                          float sourceExtentAlongAxis);
+// Full stack with every dependency (fields for Field deformers, splines for Path deformers).
+struct DeformContext {
+    const spatial::FieldSet* fields = nullptr;
+    const spatial::SplineSet* splines = nullptr;
+    float sourceExtent = 1.0f; // along the path axis
+};
+[[nodiscard]] glm::vec3 deformPointWith(const std::vector<Deformer>& stack, glm::vec3 objectPoint,
+                                        const glm::mat4& instanceWorld, double time, const DeformContext& ctx,
+                                        glm::vec3 normal = {0.0f, 1.0f, 0.0f});
 // The GPU-side noise, evaluated on the CPU (for tests): 3-octave value fBM in [0, 1].
 [[nodiscard]] float fbm3(glm::vec3 p, std::uint32_t seed);
 constexpr int kMaxDeformers = 8;
@@ -219,6 +264,30 @@ struct MaterialVariation {
 // ---- the procedural object ----------------------------------------------------------------------
 
 using InstanceRecord = spatial::InstanceRecord; // the fixed point projection (spatial/point_cloud.hpp)
+
+// Hierarchy (ADR-029): self-recursion. Level 0 = the distribution's placements; level k places a
+// copy of level k-1 under each placement, transformed by `scalePerLevel`/`offsetPerLevel`/
+// `rotationPerLevel` (degrees) per level. Total = count^(depth+1) instances, truncated to
+// `maxInstances` in order. depth 0 = no recursion.
+struct HierarchySpec {
+    int recursionDepth = 0;              // 0..kMaxHierarchyDepth
+    int maxInstances = 100000;
+    float scalePerLevel = 0.5f;
+    glm::vec3 offsetPerLevel{0.0f};
+    glm::vec3 rotationPerLevelDegrees{0.0f};
+    bool colorPerLevel = true;           // hue rotates by 1/(depth+1) turns per level
+    [[nodiscard]] std::uint64_t structuralHash() const;
+};
+constexpr int kMaxHierarchyDepth = 4;
+
+// Everything a cloud generation needs from outside the object (other objects for Procedural
+// sources, splines for Spline distributions and Path deformers).
+struct ProceduralGeometry;
+struct GenerationContext {
+    const std::vector<ProceduralGeometry>* objects = nullptr; // the scene's procedurals (for references)
+    const spatial::SplineSet* splines = nullptr;
+    int depth = 0;                                            // reference recursion guard
+};
 
 struct ProceduralGeometry {
     std::string name = "procedural";
@@ -241,6 +310,8 @@ struct ProceduralGeometry {
     std::string emissiveField;
     float emissiveFieldAmount = 0.0f;
     std::string extraLane;               // attribute projected into InstanceRecord::emissive.a
+    HierarchySpec hierarchy;             // self-recursion (structural)
+    Grammar grammar;                     // placements when distribution.kind == Grammar (structural)
     // Structural outputs (filled by rebuild()); the renderer uploads them when the version
     // changes. `structureVersion` is bumped by rebuild() whenever the structural hash changed.
     // `cloud` is the point cloud the records were projected from, retained for inspection and
@@ -253,14 +324,21 @@ struct ProceduralGeometry {
     glm::vec3 boundsMin{0.0f}, boundsMax{0.0f}; // of instance origins + source extent (world of the object)
 
     [[nodiscard]] Result<void> validate() const;
+    // Scene-level check: references resolve and do not cycle (depth <= kMaxHierarchyDepth).
+    [[nodiscard]] static Result<void> validateReferences(const std::vector<ProceduralGeometry>& objects);
     // Regenerates instances (and reports whether the source mesh must be regenerated) when the
     // structural inputs changed since the last call; cheap when nothing changed. Returns true
     // when something was rebuilt. Pipeline: distribution + variation -> PointCloud (position,
     // rotation, scale, id, seed, index, color/emissive from material variation) -> pointOps ->
     // projectInstances(extraLane) -> bounds (+ effector strength padding).
-    bool rebuild();
-    // The base cloud before pointOps (pure; used by rebuild and tests).
-    [[nodiscard]] spatial::PointCloud generateCloud() const;
+    bool rebuild(const GenerationContext& ctx = {});
+    // The base cloud before pointOps (pure; used by rebuild and tests). Spline distributions,
+    // Procedural sources and hierarchy need the context (empty context -> identity/placeholder).
+    [[nodiscard]] spatial::PointCloud generateCloud(const GenerationContext& ctx = {}) const;
+    // The mesh this object draws: its primitive, or the referenced object's (recursively).
+    [[nodiscard]] Result<MeshData> resolveSourceMesh(const GenerationContext& ctx = {}) const;
+    // Structural hash including everything the context contributes (referenced objects, splines).
+    [[nodiscard]] std::uint64_t contextualHash(const GenerationContext& ctx) const;
     [[nodiscard]] std::uint64_t structuralHash() const;
     // Instance world matrix within the object (distribution * placement * variation * source).
     [[nodiscard]] glm::mat4 instanceMatrix(std::uint32_t index) const;
@@ -314,6 +392,10 @@ struct ProceduralParameters {
     // effector/<slot>/strength|weight|enabled (per frame)
     std::array<params::Parameter<float>*, kMaxEffectors> effectorStrength{};
     params::Parameter<float>* emissiveFieldAmount = nullptr;
+    params::Parameter<int>* recursionDepth = nullptr;     // hierarchy/depth (structural)
+    params::Parameter<float>* scalePerLevel = nullptr;    // hierarchy/scalePerLevel (structural)
+    params::Parameter<float>* splineStart = nullptr;      // distribution/splineStart
+    params::Parameter<float>* splineEnd = nullptr;        // distribution/splineEnd
 };
 
 } // namespace avgen::scene

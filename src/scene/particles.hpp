@@ -17,7 +17,8 @@
 
 namespace avgen::scene {
 
-enum class EmitterShape : std::uint8_t { Point, Sphere, Disc, Box };
+// Spline: emits along the scene spline named `spline` (position = S(u) + jitter within extent.x).
+enum class EmitterShape : std::uint8_t { Point, Sphere, Disc, Box, Spline };
 enum class ParticleBlend : std::uint8_t { Additive, Alpha };
 
 enum class FieldForceMode : std::uint8_t { Force, Velocity, Turbulence, Kill };
@@ -41,6 +42,7 @@ struct ParticleSystem {
 
     // Emitter
     EmitterShape shape = EmitterShape::Sphere;
+    std::string spline;              // Spline shape: scene spline name
     glm::vec3 position{0.0f, 1.0f, 0.0f};
     glm::vec3 extent{0.5f};          // sphere radius (x), disc radius (x), box half extents
     float spawnRate = 2000.0f;       // particles per second (continuous)

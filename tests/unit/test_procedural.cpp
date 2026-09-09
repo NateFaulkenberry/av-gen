@@ -306,9 +306,9 @@ TEST_CASE("Radial distribution: closed circle, arc, planes and orientation modes
     SECTION("count limits") {
         dist.count = 0;
         CHECK_FALSE(dist.validate().has_value());
-        dist.count = 100001;
+        dist.count = 1048577;
         CHECK_FALSE(dist.validate().has_value());
-        dist.count = 100000;
+        dist.count = 1048576;
         CHECK(dist.validate().has_value());
     }
 }
