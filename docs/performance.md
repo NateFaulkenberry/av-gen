@@ -54,6 +54,12 @@ All of these are displayed in the Control window and logged every 120 frames at 
 Bloom at native Retina resolution dominates; starting the chain at quarter resolution is the
 obvious optimisation when the budget tightens.
 
+## Procedural geometry (ADR-023)
+
+Instanced procedural objects with the GPU deformer stack: 1k/10k-instance probe in
+`docs/performance/procedural-geometry.md` (10k instances of a 24-segment cylinder, 2.4 M
+triangles, one draw: 3.6 ms undeformed, 4.5-5.6 ms with one to three deformers at 720p).
+
 ## Milestone 0.7 numbers (Apple M2 Max, Release)
 
 | Metric | Value |
