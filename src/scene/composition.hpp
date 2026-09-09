@@ -132,6 +132,7 @@ private:
     void unregisterNodeParameters(CompositionNode& node);
     void unregisterParameters(); // removes every parameter this composition registered, then detach()
     std::string uniqueName(const std::string& base) const;
+    [[nodiscard]] std::string nestedPrefix(const CompositionNode& node) const;
     [[nodiscard]] Transform nodeTransform(const CompositionNode& node) const; // params or authored values (local)
     // True when making `parent` the parent of `node` would close a cycle (node and parent by name).
     [[nodiscard]] bool wouldCycle(const std::string& node, const std::string& parent) const;

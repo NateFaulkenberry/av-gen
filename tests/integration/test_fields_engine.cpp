@@ -49,7 +49,7 @@ TEST_CASE("Field nodes register parameters and flatten into Scene::fields", "[in
     REQUIRE(engine.loadComposition(scene).has_value());
     FixedStepClock clock(60.0);
     engine.update(engine.tick(clock));
-    const Scene& s = engine.scene();
+    const scene::Scene& s = engine.scene();
     REQUIRE(s.fields.fields.size() == 2);
     CHECK(s.fields.fields[0].name == "pulse");
     CHECK(s.fields.fields[0].kind == spatial::FieldKind::Wave);
@@ -100,22 +100,22 @@ TEST_CASE("Nested scenes rename their fields and every reference to them", "[int
     REQUIRE(engine.loadComposition(outer).has_value());
     FixedStepClock clock(60.0);
     engine.update(engine.tick(clock));
-    const Scene& s = engine.scene();
+    const scene::Scene& s = engine.scene();
     REQUIRE(s.fields.fields.size() == 4);
-    CHECK(s.fields.find("left_pulse") != nullptr);
-    CHECK(s.fields.find("right_swirl") != nullptr);
-    CHECK_THAT(s.fields.find("left_pulse")->position.x, WithinAbs(-10.0, 1e-4));
+    CHECK(s.fields.find("nodes_left_pulse") != nullptr);
+    CHECK(s.fields.find("nodes_right_swirl") != nullptr);
+    CHECK_THAT(s.fields.find("nodes_left_pulse")->position.x, WithinAbs(-10.0, 1e-4));
     REQUIRE(s.procedurals.size() == 2);
-    CHECK(s.procedurals[0].effectors[0].field == "left_pulse");
-    CHECK(s.procedurals[0].deformers[0].field == "left_swirl");
-    CHECK(s.procedurals[0].emissiveField == "left_pulse");
-    CHECK(s.procedurals[1].effectors[1].field == "right_swirl");
+    CHECK(s.procedurals[0].effectors[0].field == "nodes_left_pulse");
+    CHECK(s.procedurals[0].deformers[0].field == "nodes_left_swirl");
+    CHECK(s.procedurals[0].emissiveField == "nodes_left_pulse");
+    CHECK(s.procedurals[1].effectors[1].field == "nodes_right_swirl");
     REQUIRE(s.particles.size() == 2);
-    CHECK(s.particles[1].fieldForces[0].field == "right_swirl");
-    REQUIRE(engine.params().find("nodes/left/field/pulse/strength") != nullptr);
+    CHECK(s.particles[1].fieldForces[0].field == "nodes_right_swirl");
+    REQUIRE(engine.params().find("field/nodes_left_pulse/strength") != nullptr);
     // A second frame keeps names stable (prefixing is idempotent).
     engine.update(engine.tick(clock));
-    CHECK(engine.scene().procedurals[0].effectors[0].field == "left_pulse");
+    CHECK(engine.scene().procedurals[0].effectors[0].field == "nodes_left_pulse");
     fs::remove_all(dir);
 }
 

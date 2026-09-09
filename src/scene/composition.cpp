@@ -505,6 +505,13 @@ void foldFieldFrame(spatial::FieldSpec& f, const Transform& outer) {
 
 constexpr float kFitFovRadians = 0.87f;
 
+// Names of a nested scene's objects inside the flattened scene. An attached child already names
+// its objects "nodes_<node>_<name>" (its parameter prefix sanitised), which is unique and matches
+// the parameter paths; an unattached child gets the same prefix applied here.
+std::string nestedPrefixFor(const std::string& outerPrefix, const std::string& nodeName, bool childAttached) {
+    return childAttached ? std::string() : sanitise(outerPrefix) + "nodes_" + nodeName + "_";
+}
+
 } // namespace
 
 // ---- node kinds --------------------------------------------------------------------------------
@@ -552,6 +559,10 @@ Composition::Composition(assets::AssetRegistry& registry, std::string name)
 Composition::~Composition() = default;
 
 // ---- nodes -------------------------------------------------------------------------------------
+
+std::string Composition::nestedPrefix(const CompositionNode& node) const {
+    return nestedPrefixFor(prefix_, node.name, node.child != nullptr && node.child->attached());
+}
 
 std::string Composition::uniqueName(const std::string& base) const {
     auto taken = [&](const std::string& candidate) {
@@ -1130,7 +1141,7 @@ void Composition::rebuild() {
                 scene_.addLight(std::move(light));
             }
             const float scale = lengthScale(nodeT);
-            const std::string childPrefix = sanitise(prefix_) + node.name + "_";
+            const std::string childPrefix = nestedPrefix(node);
             for (const ParticleSystem& src : cs.particles) {
                 ParticleSystem ps = src;
                 prefixFieldReferences(ps, childPrefix);
@@ -1356,7 +1367,7 @@ void Composition::applyParameters() {
             ps.enabled = ps.enabled && visible;
         } else if (child != nullptr && child->particles.size() == range.particleCount) {
             const float scale = lengthScale(full);
-            const std::string childPrefix = sanitise(prefix_) + node.name + "_";
+            const std::string childPrefix = nestedPrefix(node);
             for (std::size_t k = 0; k < range.particleCount; ++k) {
                 const ParticleSystem& src = child->particles[k];
                 ParticleSystem& ps = scene_.particles[range.firstParticle + k];
@@ -1371,7 +1382,7 @@ void Composition::applyParameters() {
             }
         }
         if (child != nullptr && child->procedurals.size() == range.proceduralCount) {
-            const std::string childPrefix = sanitise(prefix_) + node.name + "_";
+            const std::string childPrefix = nestedPrefix(node);
             for (std::size_t k = 0; k < range.proceduralCount; ++k) {
                 const ProceduralGeometry& src = child->procedurals[k];
                 ProceduralGeometry& pg = scene_.procedurals[range.firstProcedural + k];
@@ -1385,7 +1396,7 @@ void Composition::applyParameters() {
             }
         }
         if (child != nullptr && child->fields.fields.size() == range.fieldCount) {
-            const std::string childPrefix = sanitise(prefix_) + node.name + "_";
+            const std::string childPrefix = nestedPrefix(node);
             for (std::size_t k = 0; k < range.fieldCount; ++k) {
                 const spatial::FieldSpec& src = child->fields.fields[k];
                 spatial::FieldSpec& f = scene_.fields.fields[range.firstField + k];
