@@ -1,9 +1,9 @@
 {
   "format": "avgen-lightrig",
   "version": 1,
-  "name": "void-core",
+  "name": "VoidCore",
   "description": "Everything is backlit by one distant source sitting past the subject. Structure reads as silhouette with a thin cold rim; the void stays black so the source is the only bright thing in frame.",
-  "keyIntensity": 3.4,
+  "keyIntensity": 2.0,
   "ambientIntensity": 0.022,
   "ambientColor": [
     0.32,
@@ -55,10 +55,10 @@
       "name": "rim",
       "type": "directional",
       "role": "rim",
-      "azimuth": 118.0,
-      "elevation": 34.0,
+      "azimuth": 112.0,
+      "elevation": 28.0,
       "distance": 3.0,
-      "intensity": 0.22,
+      "intensity": 0.55,
       "color": [
         0.62,
         0.78,
@@ -73,16 +73,16 @@
       "name": "counter",
       "type": "directional",
       "role": "fill",
-      "azimuth": -118.0,
-      "elevation": -18.0,
+      "azimuth": -104.0,
+      "elevation": -22.0,
       "distance": 3.0,
-      "intensity": 0.03,
+      "intensity": 0.3,
       "color": [
-        0.55,
-        0.42,
-        0.9
+        0.58,
+        0.72,
+        1.0
       ],
-      "temperature": 9000,
+      "temperature": 11000,
       "castsShadow": false,
       "volumetric": 0.0,
       "followCamera": true

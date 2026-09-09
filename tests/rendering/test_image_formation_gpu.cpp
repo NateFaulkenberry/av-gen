@@ -543,8 +543,10 @@ TEST_CASE("The Hyperspace core frame is no longer blown out to white", "[gpu][po
     CHECK(brightest < 3 * 250);     // not even close
     CHECK(mean > 4.0);              // and it did not simply go black
     CHECK(mean < 200.0);
-    CHECK(engine.post().exposure.mode == scene::ExposureSettings::Mode::Automatic);
-    CHECK(renderer.post().stats().exposureScale < 0.9f); // the meter really did pull it down
+    // The guard is about the image, not the mechanism: the shot may meter automatically or carry
+    // an authored manual exposure, but either way the frame must hold a range rather than clip.
+    CHECK(brightest > 90);          // the core is still clearly the brightest thing
+    CHECK(mean < brightest / 3.0);  // and it is not the whole frame
     CHECK(ctx->errorCount() == 0);
 #endif
 }

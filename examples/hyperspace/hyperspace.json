@@ -17,13 +17,8 @@
   "camera/lens/focalLength": 42.0,
   "camera/lens/aperture": 2.2,
   "camera/lens/shutterAngle": 172.0,
-  "camera/exposure/mode": 1,
-  "camera/exposure/meterCenterWeight": 0.85,
-  "camera/exposure/minEv": 9.0,
-  "camera/exposure/maxEv": 14.5,
-  "camera/exposure/speedUp": 1.2,
-  "camera/exposure/speedDown": 0.5,
-  "camera/exposure/compensation": 0.25,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
   "post/tonemap/operator": 1,
   "post/bloom/enabled": true,
   "post/bloom/intensity": 0.6,
@@ -53,7 +48,7 @@
   ],
   "post/lens/chromaticAberration": 0.07,
   "post/lens/distortion": -0.03,
-  "post/output/vignette": 0.42,
+  "post/output/vignette": 0.5,
   "post/output/grain": 0.035,
   "sources/drift/rate": 0.019,
   "sources/drift/phase": 0.0,
@@ -227,10 +222,10 @@
      17.0
     ],
     "procedural/gates/material/emissive": [
-     0.45
+     0.04
     ],
     "procedural/core/material/emissive": [
-     3.4
+     5.0
     ],
     "scene/volumeDensity": [
      4e-05
@@ -244,7 +239,7 @@
     "post/anamorphic/intensity": [
      0.14
     ],
-    "lightrig/void-core/keyIntensity": [
+    "lightrig/VoidCore/keyIntensity": [
      1.6800000000000002
     ]
    }
@@ -262,10 +257,10 @@
      13.0
     ],
     "procedural/gates/material/emissive": [
-     0.9
+     0.1
     ],
     "procedural/core/material/emissive": [
-     5.0
+     9.0
     ],
     "scene/volumeDensity": [
      9e-05
@@ -279,7 +274,7 @@
     "post/anamorphic/intensity": [
      0.22
     ],
-    "lightrig/void-core/keyIntensity": [
+    "lightrig/VoidCore/keyIntensity": [
      2.2
     ]
    }
@@ -297,10 +292,10 @@
      9.5
     ],
     "procedural/gates/material/emissive": [
-     1.5
+     0.26
     ],
     "procedural/core/material/emissive": [
-     7.5
+     15.0
     ],
     "scene/volumeDensity": [
      0.00024
@@ -314,7 +309,7 @@
     "post/anamorphic/intensity": [
      0.34
     ],
-    "lightrig/void-core/keyIntensity": [
+    "lightrig/VoidCore/keyIntensity": [
      2.9600000000000004
     ]
    }

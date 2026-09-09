@@ -37,7 +37,35 @@
   "volumeNoiseAmount": 0.4,
   "volumeNoiseScale": 0.035,
   "volumeSteps": 32,
-  "volumeMaxDistance": 220.0
+  "volumeMaxDistance": 220.0,
+  "sky": {
+   "zenithColor": [
+    0.01,
+    0.012,
+    0.026
+   ],
+   "horizonColor": [
+    0.03,
+    0.026,
+    0.048
+   ],
+   "groundColor": [
+    0.005,
+    0.005,
+    0.011
+   ],
+   "haze": 0.18,
+   "sunColor": [
+    1.0,
+    0.82,
+    0.62
+   ],
+   "sunIntensity": 45.0,
+   "sunSize": 0.07,
+   "sunGlow": 0.42,
+   "intensity": 1.1,
+   "background": false
+  }
  },
  "composition": {
   "focalPoints": [
@@ -172,9 +200,9 @@
     ],
     "material": {
      "baseColor": [
-      0.055,
-      0.062,
-      0.075
+      0.03,
+      0.034,
+      0.042
      ],
      "emissiveColor": [
       0.35,
@@ -292,15 +320,15 @@
     "source": {
      "kind": "box",
      "size": [
-      0.8,
-      0.18,
-      3.2
+      0.55,
+      0.14,
+      2.4
      ],
      "subdivisions": 1
     },
     "distribution": {
      "kind": "spiral",
-     "count": 280,
+     "count": 180,
      "radius": 13.5,
      "radiusGrowth": 6.0,
      "turns": 44,
@@ -355,9 +383,9 @@
     ],
     "material": {
      "baseColor": [
-      0.04,
-      0.042,
-      0.05
+      0.022,
+      0.024,
+      0.03
      ],
      "emissiveColor": [
       0.4,
@@ -388,7 +416,7 @@
     },
     "distribution": {
      "kind": "spiral",
-     "count": 44,
+     "count": 36,
      "radius": 46.0,
      "radiusGrowth": -6.0,
      "turns": 5.5,
@@ -441,9 +469,9 @@
     ],
     "material": {
      "baseColor": [
-      0.075,
-      0.055,
-      0.045
+      0.042,
+      0.032,
+      0.026
      ],
      "emissiveColor": [
       1.0,
@@ -616,7 +644,7 @@
       0.82,
       0.62
      ],
-     "emissiveIntensity": 7.5,
+     "emissiveIntensity": 9.0,
      "roughness": 0.25,
      "metallic": 0.4
     }
