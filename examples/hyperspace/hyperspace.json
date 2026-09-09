@@ -34,7 +34,7 @@
   "post/anamorphic/enabled": true,
   "post/anamorphic/intensity": 0.12,
   "post/anamorphic/stretch": 3.0,
-  "post/anamorphic/ghosts": 2,
+  "post/anamorphic/ghosts": 0,
   "post/dof/enabled": true,
   "post/dof/physical": true,
   "post/motionBlur/amount": 0.75,

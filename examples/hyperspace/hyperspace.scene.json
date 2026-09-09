@@ -742,7 +742,7 @@
    "kind": "particles",
    "particles": {
     "capacity": 65536,
-    "spawnRate": 3200,
+    "spawnRate": 850,
     "shape": "box",
     "position": [
      0,
@@ -783,6 +783,75 @@
      0.45,
      1.0,
      0.0
+    ],
+    "velocityStretch": 5.5,
+    "stretchMax": 3.0,
+    "stretchMin": 0.02,
+    "fogCoupling": 1.0,
+    "volumeGlow": 0.25,
+    "emissive": 1.1,
+    "softness": 0.35,
+    "sizeCurve": [
+     {
+      "t": 0.0,
+      "value": 0.0
+     },
+     {
+      "t": 0.08,
+      "value": 0.032
+     },
+     {
+      "t": 0.7,
+      "value": 0.022
+     },
+     {
+      "t": 1.0,
+      "value": 0.0
+     }
+    ],
+    "opacityCurve": [
+     {
+      "t": 0.0,
+      "value": 0.0
+     },
+     {
+      "t": 0.12,
+      "value": 0.75
+     },
+     {
+      "t": 0.75,
+      "value": 0.4
+     },
+     {
+      "t": 1.0,
+      "value": 0.0
+     }
+    ],
+    "colorCurve": [
+     {
+      "t": 0.0,
+      "color": [
+       1.0,
+       0.94,
+       0.86
+      ]
+     },
+     {
+      "t": 0.4,
+      "color": [
+       0.78,
+       0.86,
+       1.0
+      ]
+     },
+     {
+      "t": 1.0,
+      "color": [
+       0.32,
+       0.42,
+       0.95
+      ]
+     }
     ]
    }
   }
