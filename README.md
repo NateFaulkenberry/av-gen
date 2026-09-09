@@ -80,6 +80,7 @@ writes a scene file. `--help` lists every flag.
 - [docs/build.md](docs/build.md), [docs/testing.md](docs/testing.md), [docs/performance.md](docs/performance.md)
 - [docs/audio.md](docs/audio.md), [docs/rendering.md](docs/rendering.md), [docs/shaders.md](docs/shaders.md),
   [docs/assets.md](docs/assets.md), [docs/project-format.md](docs/project-format.md)
+- [docs/authoring.md](docs/authoring.md): how to build a world, window by window
 - The procedural world: [docs/procedural-geometry.md](docs/procedural-geometry.md),
   [docs/spatial-data.md](docs/spatial-data.md), [docs/gpu-fields.md](docs/gpu-fields.md),
   [docs/splines.md](docs/splines.md), [docs/grammar-and-hierarchy.md](docs/grammar-and-hierarchy.md),
