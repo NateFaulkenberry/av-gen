@@ -69,3 +69,13 @@ binary (`AVGEN_SHADER_SOURCE_DIR`). Running from the build tree therefore needs 
   work: the Dawn from-source path (or the corresponding prebuilt archive), a `WGPUSurfaceSource*`
   branch in `gpu::Context::create` fed from SDL's native window handle, and MSVC `/std:c++latest`.
 - App bundle, code signing and the microphone entitlement are not needed for 0.1 (no live input).
+- Multiple windows (milestone 1.2 outputs): every `platform::Window` shares one SDL video
+  subsystem (`SDL_InitSubSystem`, reference counted; `Window::displays()` initialises it
+  transiently, so it works before any window exists and returns an empty list on a headless
+  machine). The process-wide SDL queue is pumped once per frame by `Window::pumpEvents`, which
+  routes window events by `SDL_WindowID`. Output windows are created with
+  `SDL_CreateWindowWithProperties` (position centred on the chosen display, borderless,
+  always-on-top, fullscreen) and fullscreen means SDL's desktop mode (no exclusive display mode)
+  with `SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES` off, so an output per display does not start a
+  Spaces transition or hide the other windows. Each output gets its own `gpu::Surface` on the
+  one Dawn device; Metal allows any number of `CAMetalLayer` swapchains per device.

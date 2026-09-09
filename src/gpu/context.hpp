@@ -15,6 +15,8 @@
 
 namespace avgen::gpu {
 
+class Surface;
+
 struct ContextDesc {
     void* metalLayer = nullptr;      // CAMetalLayer*; nullptr = headless (offscreen only)
     bool requestTimestamps = true;   // ask for the timestamp-query feature if available
@@ -44,11 +46,14 @@ public:
     [[nodiscard]] const wgpu::Queue& queue() const { return queue_; }
     [[nodiscard]] const Capabilities& capabilities() const { return caps_; }
 
-    // ---- surface (absent in headless mode) ----
-    [[nodiscard]] bool hasSurface() const { return surface_ != nullptr; }
-    [[nodiscard]] wgpu::TextureFormat surfaceFormat() const { return surfaceFormat_; }
-    [[nodiscard]] std::uint32_t surfaceWidth() const { return surfaceWidth_; }
-    [[nodiscard]] std::uint32_t surfaceHeight() const { return surfaceHeight_; }
+    // ---- primary surface (absent in headless mode) ----
+    // The window given at creation owns the primary Surface; these forward to it. Further output
+    // windows create their own gpu::Surface on this device (see gpu/surface.hpp).
+    [[nodiscard]] bool hasSurface() const { return primarySurface_ != nullptr; }
+    [[nodiscard]] Surface* primarySurface() const { return primarySurface_.get(); }
+    [[nodiscard]] wgpu::TextureFormat surfaceFormat() const;
+    [[nodiscard]] std::uint32_t surfaceWidth() const;
+    [[nodiscard]] std::uint32_t surfaceHeight() const;
     // (Re)configures the swapchain to the given pixel size. No-op when headless or size is zero.
     void configureSurface(std::uint32_t width, std::uint32_t height);
     // Acquires the current swapchain texture view. Fails on lost/outdated surfaces after one
@@ -78,11 +83,7 @@ private:
     wgpu::Adapter adapter_;
     wgpu::Device device_;
     wgpu::Queue queue_;
-    wgpu::Surface surface_;
-    wgpu::TextureFormat surfaceFormat_ = wgpu::TextureFormat::Undefined;
-    std::uint32_t surfaceWidth_ = 0;
-    std::uint32_t surfaceHeight_ = 0;
-    bool surfaceConfigured_ = false;
+    std::unique_ptr<Surface> primarySurface_;
     Capabilities caps_;
     std::uint64_t errorCount_ = 0;
     std::string lastError_;

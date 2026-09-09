@@ -202,6 +202,34 @@ project. `output` is `sequence` (PNG files named by `pattern`) or `video`. Codec
 ffmpeg (`backend: "ffmpeg"`). CLI overrides: `--render <out>`, `--size`, `--fps`, `--range a:b`,
 `--codec`, `--quality`.
 
+## Outputs block (milestone 1.2)
+
+```json
+"outputs": [
+  { "name": "left", "display": 1, "fullscreen": true, "enabled": true,
+    "mapping": { "crop": [0.0, 0.0, 0.55, 1.0], "blend": [0.0, 0.1, 0.0, 0.0], "blendGamma": 2.2 } },
+  { "name": "right", "display": 2, "fullscreen": true,
+    "mapping": { "crop": [0.45, 0.0, 0.55, 1.0], "blend": [0.1, 0.0, 0.0, 0.0],
+                 "corners": [[0.02, 0.0], [1.0, 0.01], [0.98, 1.0], [0.0, 0.99]] } },
+  { "name": "preview", "width": 960, "height": 540, "borderless": false, "alwaysOnTop": true,
+    "mapping": { "brightness": 0.8, "gamma": 1.1, "flipX": false, "flipY": false } }
+]
+```
+
+An array of output windows (`app::OutputManager::toJson/fromJson`); absent or empty means the
+main window only. Every field but `name` is optional: `display` (index into
+`platform::Window::displays()`, -1 = the default display, default -1), `fullscreen` (borderless
+desktop fullscreen on that display, default false), `width` / `height` (points, used when not
+fullscreen, default 1920x1080), `borderless` (default true), `alwaysOnTop` (default false),
+`enabled` (default true; an output closed by the user is saved disabled), `mapping`. Names must
+be unique. `mapping` is an `OutputMapping` (see `docs/rendering.md`, Outputs): `crop`
+`[x, y, w, h]` in 0..1 of the source (default full), `corners` four `[x, y]` pairs in target
+space for the source's TL, TR, BR, BL corners (default the unit square), `blend`
+`[left, right, top, bottom]` widths in 0..1 (default 0), `blendGamma` (2.2), `brightness` (1),
+`gamma` (1), `flipX` / `flipY` (false). Loading validates the whole array before replacing the
+set: a bad crop, a concave or degenerate quad, widths outside 0..1, non-positive gammas, a
+duplicate or empty name are errors.
+
 ## Render queue files
 
 ```json

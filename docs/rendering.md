@@ -88,12 +88,56 @@ white balance, hue, contrast, saturation, lift/gamma/gain). The output pass tone
 selected operator and applies vignette and seeded grain. All settings come from `Scene::post`
 (`post/*` parameters). Disabled effects add no passes; a full chain is 13 passes at 1280x720.
 
+## Outputs (milestone 1.2)
+
+An *output* is a window with its own swapchain (`gpu::Surface`, one per `CAMetalLayer`; the
+primary window's surface is the one `gpu::Context` owns and forwards to) that shows the final
+frame through an `rendering::OutputMapping`. `app::OutputManager` owns the set: `open()` creates
+the windows and surfaces for the enabled outputs (fullscreen on a chosen display, borderless,
+always-on-top), `pumpEvents()` resizes swapchains and drops windows the user closed, and
+`presentAll(context, finalTexture, w, h)` acquires every open surface, encodes one
+`OutputMapper::draw` per output in its own command buffer, submits and presents. The main window
+uses the same mapper with the identity mapping, so the final frame is rendered once into an
+RGBA8/BGRA8 texture with `TextureBinding` usage and copied to every sink.
+
+`OutputMapper::draw(encoder, source, target, targetWidth, targetHeight, mapping, targetFormat)`
+is one fullscreen pass (`shaders/output_map.wgsl`) that clears the target to black and, per
+target pixel `p` in normalised target space (0..1, top-left origin):
+
+1. **Warp.** `mapping.corners` are the target-space positions of the source quad's TL, TR, BR,
+   BL corners. The CPU computes the homography `H` from the unit square to that quad
+   (`homographyFromCorners`, Heckbert's square-to-quad form; affine quads give a bottom row of
+   `0 0 1`) and uploads its inverse, normalised so that `w > 0` at the quad centre. The shader
+   evaluates `q = H^-1 · (p, 1)`, `uv = q.xy / q.z` (perspective-correct) and treats `q.z <= 0`
+   or `uv` outside 0..1 as *outside the quad*: black.
+2. **Blend.** Soft edges in quad space, per edge `weight = pow(clamp(d / width, 0, 1),
+   blendGamma)` where `d` is the distance from that edge (`uv.x` for `left`, `1 - uv.x` for
+   `right`, `uv.y` for `top`, `1 - uv.y` for `bottom`); a zero width is weight 1. The four
+   weights multiply. Two projectors overlapping by 10 % of their width use `right = 0.1` on the
+   left projector and `left = 0.1` on the right one with the same `blendGamma` (2.2 approximates
+   linear-light addition of sRGB-encoded frames).
+3. **Flip and crop.** `flipX` / `flipY` mirror `uv`, then `src = crop.xy + uv * crop.wh`
+   selects the part of the source (`crop` in 0..1 of the source, top-left origin).
+4. **Sample and grade.** Linear filtering, clamp to edge, no colour-space conversion: the
+   source is already display-encoded. `colour = pow(max(colour * brightness, 0), 1 / gamma) *
+   weight`; `gamma > 1` lifts midtones.
+
+`OutputMapping::identity()` (full crop, unit-square corners, no blend, brightness and gamma 1,
+no flips) takes a plain-blit fast path (`fs_blit`); `OutputMapper::setFastPathEnabled(false)`
+forces the full path (tests). Pipelines are cached per target format; uniforms live in a
+64-slot ring with dynamic offsets so several draws can share one submission. GPU-free parts
+(`homographyFromCorners`, `inverseHomography`, `projectPoint`, `blendWeight`, JSON,
+`validate()` — crop inside 0..1, convex non-degenerate corners, widths in 0..1, positive gammas)
+are in `rendering/output_mapping.hpp` and unit-tested; `tests/rendering/test_output_mapper_gpu.cpp`
+reads back identity, crop, flips, blend ramps, a projective warp, brightness and gamma.
+
 ## Lifecycle
 
 `Context::create` → `SceneRenderer::init` (layouts, buffers, pipelines) → `resize(w, h)` (HDR
 target; tonemap bind group is rebuilt lazily) → per frame `render(encoder, scene, time, target)`.
 Tone-map pipelines are cached per target format (BGRA8 swapchain, RGBA8 capture). Surface loss
-or outdated swapchains are reconfigured once inside `acquireSurfaceView`.
+or outdated swapchains are reconfigured once inside `gpu::Surface::acquire` (which
+`Context::acquireSurfaceView` forwards to for the primary window).
 
 ## Threading
 

@@ -1,6 +1,7 @@
 #include "gpu/context.hpp"
 
 #include "core/log.hpp"
+#include "gpu/surface.hpp"
 
 #include <array>
 #include <cstring>
@@ -56,9 +57,7 @@ std::string Context::toString(wgpu::StringView view) {
 }
 
 Context::~Context() {
-    if (surface_ && surfaceConfigured_) {
-        surface_.Unconfigure();
-    }
+    primarySurface_.reset(); // unconfigures before the device goes away
 }
 
 Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
@@ -74,15 +73,16 @@ Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
         return fail("wgpuCreateInstance failed (TimedWaitAny unsupported?)");
     }
 
-    // ---- surface (optional) ----
+    // ---- primary surface (optional); created before the adapter so it can be compatible ----
+    wgpu::Surface rawSurface;
     if (desc.metalLayer != nullptr) {
         wgpu::SurfaceSourceMetalLayer metalSource{};
         metalSource.layer = desc.metalLayer;
         wgpu::SurfaceDescriptor surfaceDesc{};
         surfaceDesc.nextInChain = &metalSource;
         surfaceDesc.label = "avgen-surface";
-        ctx->surface_ = ctx->instance_.CreateSurface(&surfaceDesc);
-        if (!ctx->surface_) {
+        rawSurface = ctx->instance_.CreateSurface(&surfaceDesc);
+        if (!rawSurface) {
             return fail("failed to create a WebGPU surface from the Metal layer");
         }
     }
@@ -91,7 +91,7 @@ Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
     wgpu::RequestAdapterOptions adapterOptions{};
     adapterOptions.powerPreference =
         desc.preferHighPerformance ? wgpu::PowerPreference::HighPerformance : wgpu::PowerPreference::LowPower;
-    adapterOptions.compatibleSurface = ctx->surface_;
+    adapterOptions.compatibleSurface = rawSurface;
 #if defined(__APPLE__)
     adapterOptions.backendType = wgpu::BackendType::Metal;
 #endif
@@ -176,19 +176,11 @@ Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
         }
     });
 
-    // ---- surface format ----
-    if (ctx->surface_) {
-        wgpu::SurfaceCapabilities surfaceCaps{};
-        if (ctx->surface_.GetCapabilities(ctx->adapter_, &surfaceCaps) != wgpu::Status::Success ||
-            surfaceCaps.formatCount == 0) {
-            return fail("surface reports no supported formats");
-        }
-        ctx->surfaceFormat_ = surfaceCaps.formats[0];
-        for (std::size_t i = 0; i < surfaceCaps.formatCount; ++i) {
-            if (surfaceCaps.formats[i] == wgpu::TextureFormat::BGRA8Unorm) {
-                ctx->surfaceFormat_ = wgpu::TextureFormat::BGRA8Unorm;
-                break;
-            }
+    // ---- primary surface format ----
+    if (rawSurface) {
+        ctx->primarySurface_ = std::unique_ptr<Surface>(new Surface(*ctx, std::move(rawSurface)));
+        if (auto r = ctx->primarySurface_->chooseFormat(); !r) {
+            return std::unexpected(r.error());
         }
     }
 
@@ -205,66 +197,30 @@ void Context::onError(wgpu::ErrorType type, wgpu::StringView message) {
     log::error("[wgpu {}] {}", errorTypeName(type), lastError_);
 }
 
+wgpu::TextureFormat Context::surfaceFormat() const {
+    return primarySurface_ ? primarySurface_->format() : wgpu::TextureFormat::Undefined;
+}
+
+std::uint32_t Context::surfaceWidth() const { return primarySurface_ ? primarySurface_->width() : 0; }
+
+std::uint32_t Context::surfaceHeight() const { return primarySurface_ ? primarySurface_->height() : 0; }
+
 void Context::configureSurface(std::uint32_t width, std::uint32_t height) {
-    if (!surface_ || width == 0 || height == 0) {
-        return;
+    if (primarySurface_) {
+        primarySurface_->configure(width, height);
     }
-    if (surfaceConfigured_ && width == surfaceWidth_ && height == surfaceHeight_) {
-        return;
-    }
-    wgpu::SurfaceConfiguration config{};
-    config.device = device_;
-    config.format = surfaceFormat_;
-    config.usage = wgpu::TextureUsage::RenderAttachment;
-    config.width = width;
-    config.height = height;
-    config.alphaMode = wgpu::CompositeAlphaMode::Auto;
-    config.presentMode = wgpu::PresentMode::Fifo;
-    surface_.Configure(&config);
-    surfaceWidth_ = width;
-    surfaceHeight_ = height;
-    surfaceConfigured_ = true;
-    log::debug("surface configured {}x{}", width, height);
 }
 
 Result<wgpu::TextureView> Context::acquireSurfaceView() {
-    if (!surface_ || !surfaceConfigured_) {
+    if (!primarySurface_) {
         return fail("no configured surface");
     }
-    for (int attempt = 0; attempt < 2; ++attempt) {
-        wgpu::SurfaceTexture surfaceTexture{};
-        surface_.GetCurrentTexture(&surfaceTexture);
-        switch (surfaceTexture.status) {
-        case wgpu::SurfaceGetCurrentTextureStatus::SuccessOptimal:
-        case wgpu::SurfaceGetCurrentTextureStatus::SuccessSuboptimal: {
-            wgpu::TextureViewDescriptor viewDesc{};
-            viewDesc.label = "swapchain-view";
-            viewDesc.format = surfaceFormat_;
-            viewDesc.dimension = wgpu::TextureViewDimension::e2D;
-            return surfaceTexture.texture.CreateView(&viewDesc);
-        }
-        case wgpu::SurfaceGetCurrentTextureStatus::Timeout:
-        case wgpu::SurfaceGetCurrentTextureStatus::Outdated:
-        case wgpu::SurfaceGetCurrentTextureStatus::Lost: {
-            // Reconfigure once and retry.
-            surfaceConfigured_ = false;
-            const auto w = surfaceWidth_;
-            const auto h = surfaceHeight_;
-            surfaceWidth_ = 0;
-            configureSurface(w, h);
-            break;
-        }
-        case wgpu::SurfaceGetCurrentTextureStatus::Error:
-        default:
-            return fail("surface texture acquisition error");
-        }
-    }
-    return fail("surface texture unavailable after reconfigure");
+    return primarySurface_->acquire();
 }
 
 void Context::present() {
-    if (surface_ && surfaceConfigured_) {
-        surface_.Present();
+    if (primarySurface_) {
+        primarySurface_->present();
     }
 }
 
