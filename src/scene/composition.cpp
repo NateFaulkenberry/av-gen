@@ -4,6 +4,7 @@
 #include "scene/mesh_generators.hpp"
 
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -56,6 +57,11 @@ params::ParamDesc<bool> boolDesc(std::string path, bool def) {
 }
 
 // Node names and prefixes become parameter path segments; keep them free of separators.
+glm::vec3 safeNormalize(const glm::vec3& v, const glm::vec3& fallback) {
+    const float len2 = glm::dot(v, v);
+    return len2 > 1e-12f ? v * (1.0f / std::sqrt(len2)) : fallback;
+}
+
 std::string sanitise(std::string name) {
     for (auto& c : name) {
         if (c == '/' || c == ' ' || c == '.') {
@@ -2123,6 +2129,7 @@ void Composition::applyParameters() {
     scene_.camera.fovYRadians = glm::radians(fov);
     scene_.camera.nearPlane = std::clamp(radius_ * 0.005f, 0.01f, 0.5f);
     scene_.camera.farPlane = std::max(radius_ * 50.0f, 2000.0f); // free cameras look across whole worlds
+    applyFraming();
 
     if (brightness_ != nullptr) {
         scene_.environment.brightness = brightness_->value();
@@ -2229,6 +2236,60 @@ void Composition::applyParameters() {
 }
 
 // ---- files -------------------------------------------------------------------------------------
+
+// Composition framing (ADR-038): nudges the camera's aim so the named focal point lands at
+// `targetScreenPosition` instead of the centre of frame. The position is untouched -- this is a
+// pan and tilt, the way a framing decision is made on a real head -- and `framingStrength`
+// interpolates between the authored aim and the fully framed one, so a shot can be nudged rather
+// than snapped. The aspect comes from the lens's sensor, which is the authored intent; the render
+// target's aspect is not known here and would make the framing depend on the output size.
+void Composition::applyFraming() {
+    const float strength = std::clamp(compositionData_.framingStrength, 0.0f, 1.0f);
+    if (strength <= 0.0f || compositionData_.cameraTarget.empty()) {
+        return;
+    }
+    const FocalPoint* focus = compositionData_.find(compositionData_.cameraTarget);
+    if (focus == nullptr) {
+        return;
+    }
+    const glm::vec3 toFocus = focus->position - scene_.camera.position;
+    if (glm::dot(toFocus, toFocus) < 1e-8f) {
+        return;
+    }
+    const glm::vec3 original =
+        safeNormalize(scene_.camera.target - scene_.camera.position, glm::vec3(0.0f, 0.0f, -1.0f));
+    const glm::vec3 worldUp = safeNormalize(scene_.camera.up, glm::vec3(0.0f, 1.0f, 0.0f));
+    const glm::vec3 subject = safeNormalize(toFocus, original);
+
+    // Where the focal point should sit, as an offset from the centre of frame. Screen coordinates
+    // have a top-left origin, so y flips into NDC.
+    const float tanY = std::tan(scene_.camera.effectiveFovY() * 0.5f);
+    const float aspect = scene_.camera.lens.sensorHeight > 1e-4f
+                             ? scene_.camera.lens.sensorWidth / scene_.camera.lens.sensorHeight
+                             : 16.0f / 9.0f;
+    const float ndcX = compositionData_.targetScreenPosition.x * 2.0f - 1.0f;
+    const float ndcY = 1.0f - compositionData_.targetScreenPosition.y * 2.0f;
+
+    // Each step aims so that the requested screen offset, measured in the basis the previous step
+    // produced, points at the subject. Rotating the aim moves the basis too, so one step leaves a
+    // fraction of a percent of frame height on the table; three converge well inside a pixel.
+    glm::vec3 forward = original;
+    for (int i = 0; i < 3; ++i) {
+        const glm::vec3 right = safeNormalize(glm::cross(forward, worldUp), glm::vec3(1.0f, 0.0f, 0.0f));
+        const glm::vec3 up = glm::cross(right, forward);
+        const glm::vec3 wanted =
+            safeNormalize(forward + right * (ndcX * tanY * aspect) + up * (ndcY * tanY), forward);
+        forward = safeNormalize(glm::rotation(wanted, subject) * forward, forward);
+    }
+
+    // Interpolate the aim itself, so a shot can be nudged towards the framing rather than snapped.
+    const glm::vec3 aimed =
+        safeNormalize(glm::slerp(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::rotation(original, forward), strength) *
+                          original,
+                      forward);
+    const float distance = std::max(glm::length(scene_.camera.target - scene_.camera.position), 1e-3f);
+    scene_.camera.target = scene_.camera.position + aimed * distance;
+}
 
 Result<void> Composition::setLightRig(const std::filesystem::path& path) {
     lightRigPath_ = path;

@@ -180,7 +180,9 @@ public:
 private:
     void rebuild();          // flattens nodes into scene_ (meshes/textures/entities/particles)
     void ensureBuilt();      // rebuild() when dirty
-    void applyParameters();  // node finals -> transforms/materials/particles; camera; environment
+    void applyParameters();
+    // Aims the camera so the composition's focal point lands at its requested screen position.
+    void applyFraming();  // node finals -> transforms/materials/particles; camera; environment
     void registerNodeParameters(CompositionNode& node);
     void unregisterNodeParameters(CompositionNode& node);
     void unregisterParameters(); // removes every parameter this composition registered, then detach()

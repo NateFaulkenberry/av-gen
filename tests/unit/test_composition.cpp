@@ -14,6 +14,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
@@ -965,4 +966,58 @@ TEST_CASE("A scene file's environment can name a light rig", "[scene][compositio
     auto fallbackComp = scene::Composition::loadFile(missing, fx.registry);
     REQUIRE(fallbackComp.has_value());
     CHECK((*fallbackComp)->lightRig() == nullptr);
+}
+
+// Composition framing (ADR-038): `targetScreenPosition` and `framingStrength` were parsed,
+// hashed and serialised, and read by nothing, so a scene could ask for an off-centre subject and
+// silently get a centred one.
+TEST_CASE("Composition framing puts the focal point where the scene asks", "[composition][framing]") {
+    auto sceneText = [](float sx, float sy, float strength) {
+        return fmt::format(R"({{
+          "format": "avgen-scene", "version": 1, "name": "framed",
+          "camera": {{ "mode": 1, "position": [0, 0, 20], "target": [0, 0, 0], "fov": 50.0 }},
+          "composition": {{
+            "focalPoints": [{{ "name": "hero", "position": [0, 0, 0], "radius": 2.0 }}],
+            "cameraTarget": "hero",
+            "targetScreenPosition": [{}, {}],
+            "framingStrength": {}
+          }},
+          "nodes": []
+        }})", sx, sy, strength);
+    };
+
+    Fixture fx;
+    // Where the focal point lands on screen, as a fraction from the top-left.
+    auto screenOf = [&](float sx, float sy, float strength) {
+        const auto path = writeJson("framing", sceneText(sx, sy, strength));
+        fx.files.push_back(path);
+        auto comp = scene::Composition::loadFile(path.filename(), fx.registry);
+        REQUIRE(comp.has_value());
+        (*comp)->update(FrameTime{});
+        const scene::Scene& s = (*comp)->scene();
+        const float aspect = s.camera.lens.sensorHeight > 1e-4f
+                                 ? s.camera.lens.sensorWidth / s.camera.lens.sensorHeight
+                                 : 16.0f / 9.0f;
+        const glm::vec4 clip = s.camera.projection(aspect) * s.camera.view() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        REQUIRE(clip.w > 0.0f);
+        const glm::vec2 ndc(clip.x / clip.w, clip.y / clip.w);
+        return glm::vec2((ndc.x + 1.0f) * 0.5f, (1.0f - ndc.y) * 0.5f);
+    };
+
+    // Strength 0 leaves the aim alone: the subject stays where the camera was pointed.
+    const glm::vec2 untouched = screenOf(0.25f, 0.7f, 0.0f);
+    CHECK_THAT(static_cast<double>(untouched.x), WithinAbs(0.5, 0.01));
+    CHECK_THAT(static_cast<double>(untouched.y), WithinAbs(0.5, 0.01));
+
+    // Full strength puts it exactly where the scene asked.
+    const glm::vec2 framed = screenOf(0.25f, 0.7f, 1.0f);
+    CHECK_THAT(static_cast<double>(framed.x), WithinAbs(0.25, 0.01));
+    CHECK_THAT(static_cast<double>(framed.y), WithinAbs(0.7, 0.01));
+
+    // Half strength lands between the two, so a shot can be nudged rather than snapped.
+    const glm::vec2 half = screenOf(0.25f, 0.7f, 0.5f);
+    CHECK(half.x > 0.25f);
+    CHECK(half.x < 0.5f);
+    CHECK(half.y > 0.5f);
+    CHECK(half.y < 0.7f);
 }
