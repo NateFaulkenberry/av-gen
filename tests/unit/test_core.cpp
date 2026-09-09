@@ -37,6 +37,14 @@ TEST_CASE("FixedStepClock seek restarts the timeline at the requested time", "[c
     CHECK(clock.current().deltaTime == 0.0);
     auto t = clock.tick();
     CHECK_THAT(t.renderTime, Catch::Matchers::WithinAbs(10.0 + 1.0 / 60.0, 1e-12));
+    clock.restartAt(4.0);
+    t = clock.tick();
+    CHECK(t.renderTime == 4.0);
+    CHECK(t.frameIndex == 0);
+    CHECK(t.deltaTime == 0.0);
+    t = clock.tick();
+    CHECK_THAT(t.renderTime, Catch::Matchers::WithinAbs(4.0 + 1.0 / 60.0, 1e-12));
+    CHECK(t.frameIndex == 1);
 }
 
 TEST_CASE("RealtimeClock clamps large deltas and never goes backwards", "[core][time]") {

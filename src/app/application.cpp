@@ -1,5 +1,11 @@
 #include "app/application.hpp"
 
+#include "assets/video_writer.hpp"
+
+#include <nlohmann/json.hpp>
+
+#include <fstream>
+
 #include "assets/image.hpp"
 #include "rendering/shader_layer.hpp"
 #include "core/rng.hpp"
@@ -28,6 +34,12 @@ std::string usageText() {
            "  --env <file>        load an equirectangular .hdr environment map\n"
            "  --composition <f>   load a scene composition file (avgen-scene JSON)\n"
            "  --export-bundle <d> copy every referenced asset into <d>/assets and write <d>/project.json\n"
+           "  --render <out>      offline render (headless) to a PNG sequence directory or a video file\n"
+           "                      (.mov/.mp4/...); size/fps/range/codec from the project's render settings\n"
+           "  --range <a>:<b>     render time range in seconds (either side may be empty)\n"
+           "  --codec <id>        video codec: prores4444, prores422, h264, hevc, or an ffmpeg encoder name\n"
+           "  --quality <0-100>   video quality\n"
+           "  --queue <file>      run a render queue (JSON list of projects and render settings), headless\n"
            "  --shader <file>     add a user shader layer behind the scene (repeatable)\n"
            "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
            "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
@@ -68,6 +80,44 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--scene");
             if (!v) return std::unexpected(v.error());
             options.scene = *v;
+            ++i;
+        } else if (arg == "--render") {
+            auto v = need(i, "--render");
+            if (!v) return std::unexpected(v.error());
+            options.render = *v;
+            options.headless = true;
+            ++i;
+        } else if (arg == "--queue") {
+            auto v = need(i, "--queue");
+            if (!v) return std::unexpected(v.error());
+            options.queue = *v;
+            options.headless = true;
+            ++i;
+        } else if (arg == "--range") {
+            auto v = need(i, "--range");
+            if (!v) return std::unexpected(v.error());
+            const auto colon = v->find(':');
+            if (colon == std::string::npos) return fail("--range expects <a>:<b>");
+            try {
+                if (colon > 0) options.rangeStart = std::stod(v->substr(0, colon));
+                if (colon + 1 < v->size()) options.rangeEnd = std::stod(v->substr(colon + 1));
+            } catch (const std::exception&) {
+                return fail("--range expects numbers");
+            }
+            ++i;
+        } else if (arg == "--codec") {
+            auto v = need(i, "--codec");
+            if (!v) return std::unexpected(v.error());
+            options.codec = *v;
+            ++i;
+        } else if (arg == "--quality") {
+            auto v = need(i, "--quality");
+            if (!v) return std::unexpected(v.error());
+            try {
+                options.quality = std::stoi(*v);
+            } catch (const std::exception&) {
+                return fail("--quality expects an integer");
+            }
             ++i;
         } else if (arg == "--export-bundle") {
             auto v = need(i, "--export-bundle");
@@ -120,6 +170,7 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             options.offlineFps = std::atof(v->c_str());
             if (options.offlineFps <= 0.0) return fail("--fps must be positive");
+            options.fpsGiven = true;
             ++i;
         } else if (arg == "--size") {
             auto v = need(i, "--size");
@@ -131,6 +182,8 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             }
             options.width = w;
             options.height = h;
+            options.renderWidth = w;
+            options.renderHeight = h;
             ++i;
         } else if (arg == "--log") {
             auto v = need(i, "--log");
@@ -309,6 +362,48 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         recent_.pruneMissing();
         panel_->recentProjects = recent_.entries();
+        // ---- offline rendering from the UI ----
+        uiRender_ = engine_->renderSettings();
+        panel_->renderSettings = &uiRender_;
+        panel_->videoBackends = assets::describeVideoBackends();
+        panel_->renderProgress = [this]() -> RenderProgress { return job_ ? job_->progress() : lastRender_; };
+        panel_->onStartRender = [this] { startRenderFromUi(); };
+        panel_->onCancelRender = [this] {
+            if (job_) job_->cancel();
+        };
+        panel_->onEnqueueRender = [this] {
+            if (engine_->projectPath().empty()) {
+                panel_->setStatus("save the project before queueing a render");
+                return;
+            }
+            engine_->renderSettings() = uiRender_;
+            if (auto r = engine_->saveProject(engine_->projectPath()); !r) {
+                panel_->setStatus(r.error().message);
+                return;
+            }
+            uiQueue_.emplace_back(engine_->projectPath(), uiRender_);
+            panel_->queuedRenders = uiQueue_.size();
+            panel_->setStatus("queued " + engine_->projectPath().filename().string());
+        };
+        panel_->onRunQueue = [this] {
+            if (job_ || uiQueue_.empty()) return;
+            auto [project, settings] = uiQueue_.front();
+            uiQueue_.pop_front();
+            panel_->queuedRenders = uiQueue_.size();
+            auto job = makeRenderJob(project, settings);
+            if (!job) {
+                panel_->setStatus(job.error().message);
+                return;
+            }
+            job_ = std::move(*job);
+        };
+        panel_->onChooseRenderOutput = [this] {
+            window_->saveFileDialog([this](std::string path) {
+                if (path.empty()) return;
+                uiRender_.outputPath = path;
+                uiRender_.output = RenderSettings::outputForPath(path);
+            });
+        };
     }
 
     // The project restores its own audio/scene/environment; explicit flags below override it.
@@ -415,6 +510,33 @@ void Application::loadAny(const std::filesystem::path& path) {
     } else if (window_) {
         window_->setTitle("avgen " + std::string(app::Engine::kAppVersion) + " - " + path.filename().string());
     }
+}
+
+void Application::startRenderFromUi() {
+    if (job_) {
+        return;
+    }
+    engine_->renderSettings() = uiRender_;
+    // Renders load a project file: the current one when saved, else a session snapshot.
+    std::filesystem::path projectFile = engine_->projectPath();
+    if (projectFile.empty()) {
+        renderProjectTemp_ = std::filesystem::temp_directory_path() / "avgen_render_session.json";
+        projectFile = renderProjectTemp_;
+    }
+    if (auto r = engine_->saveProject(projectFile); !r) {
+        panel_->setStatus(r.error().message);
+        return;
+    }
+    if (renderProjectTemp_ == projectFile) {
+        engine_->clearProjectPath(); // the snapshot is not the user's project
+    }
+    auto job = makeRenderJob(projectFile, uiRender_);
+    if (!job) {
+        panel_->setStatus(job.error().message);
+        return;
+    }
+    job_ = std::move(*job);
+    panel_->setStatus("rendering...");
 }
 
 void Application::rememberProject(const std::filesystem::path& path) {
@@ -584,6 +706,20 @@ int Application::runLive() {
         stats.triangles = renderer_->stats().triangles;
         stats.gpuFrameMs = renderer_->timer().lastFrameMs();
 
+        // Background render: a few frames per UI frame, then the next queued job.
+        if (job_) {
+            if (job_->step(4, 0.010)) {
+                const auto p = job_->progress();
+                lastRender_ = p;
+                panel_->setStatus(p.error.empty() ? fmt::format("render done: {} frames, hash {:016x}", p.framesRendered,
+                                                                p.sequenceHash)
+                                                  : "render failed: " + p.error);
+                job_.reset();
+                if (!uiQueue_.empty() && p.error.empty() && panel_->onRunQueue) {
+                    panel_->onRunQueue();
+                }
+            }
+        }
         imgui_->newFrame();
         panel_->draw(*engine_, stats);
 
@@ -651,7 +787,130 @@ int Application::runLive() {
     return context_->errorCount() == 0 ? 0 : 5;
 }
 
+RenderSettings Application::renderSettingsFromOptions() const {
+    RenderSettings s = engine_->renderSettings();
+    if (options_.render) {
+        s.outputPath = *options_.render;
+        s.output = RenderSettings::outputForPath(*options_.render);
+    }
+    if (options_.renderWidth) s.width = *options_.renderWidth;
+    if (options_.renderHeight) s.height = *options_.renderHeight;
+    if (options_.offlineFps > 0.0 && options_.fpsGiven) s.fps = options_.offlineFps;
+    if (options_.rangeStart) s.startSeconds = *options_.rangeStart;
+    if (options_.rangeEnd) s.endSeconds = *options_.rangeEnd;
+    if (options_.codec) s.codec = *options_.codec;
+    if (options_.quality) s.quality = *options_.quality;
+    return s;
+}
+
+Result<std::unique_ptr<RenderJob>> Application::makeRenderJob(const std::filesystem::path& projectFile,
+                                                              RenderSettings settings) {
+    auto offline = std::make_unique<Engine>(EngineMode::Offline);
+    if (auto r = offline->loadProject(projectFile); !r) {
+        return std::unexpected(r.error());
+    }
+    for (const auto& w : offline->projectWarnings()) {
+        log::warn("render project: {}", w);
+    }
+    auto job = std::make_unique<RenderJob>(*context_, *shaders_, std::move(offline), std::move(settings),
+                                           std::filesystem::absolute(projectFile).parent_path());
+    if (auto r = job->start(); !r) {
+        return std::unexpected(r.error());
+    }
+    return job;
+}
+
+int Application::runQueue(const std::filesystem::path& queueFile) {
+    std::ifstream in(queueFile);
+    nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
+    if (!doc.is_object() || doc.value("format", std::string()) != "avgen-render-queue" || !doc.contains("jobs") ||
+        !doc["jobs"].is_array()) {
+        log::error("'{}' is not a render queue (format 'avgen-render-queue' with a 'jobs' array)", queueFile.string());
+        return 2;
+    }
+    const auto dir = std::filesystem::absolute(queueFile).parent_path();
+    int failures = 0;
+    int index = 0;
+    for (const auto& jobJson : doc["jobs"]) {
+        ++index;
+        if (!jobJson.is_object() || !jobJson.contains("project")) {
+            log::error("queue job {}: needs a 'project'", index);
+            ++failures;
+            continue;
+        }
+        std::filesystem::path project = jobJson["project"].get<std::string>();
+        if (project.is_relative()) {
+            project = dir / project;
+        }
+        // Settings: the project's, overridden by the job's "render" block, then by CLI flags.
+        RenderSettings settings;
+        {
+            std::ifstream pin(project);
+            nlohmann::json pdoc = nlohmann::json::parse(pin, nullptr, false);
+            if (pdoc.is_object() && pdoc.contains("render")) {
+                if (auto s = RenderSettings::fromJson(pdoc["render"])) settings = *s;
+            }
+        }
+        if (jobJson.contains("render")) {
+            auto merged = settings.toJson();
+            merged.update(jobJson["render"]);
+            auto s = RenderSettings::fromJson(merged);
+            if (!s) {
+                log::error("queue job {}: {}", index, s.error().message);
+                ++failures;
+                continue;
+            }
+            settings = *s;
+        }
+        if (options_.codec) settings.codec = *options_.codec;
+        if (options_.quality) settings.quality = *options_.quality;
+        if (settings.outputPath.empty()) {
+            settings.outputPath = project.stem().string() + "_frames";
+        }
+        log::info("queue job {}/{}: {} -> {}", index, doc["jobs"].size(), project.filename().string(),
+                  settings.outputPath.string());
+        auto job = makeRenderJob(project, settings);
+        if (!job) {
+            log::error("queue job {}: {}", index, job.error().message);
+            ++failures;
+            continue;
+        }
+        if (auto r = (*job)->run(); !r) {
+            log::error("queue job {}: {}", index, r.error().message);
+            ++failures;
+        }
+    }
+    log::info("queue complete: {} job(s), {} failure(s)", index, failures);
+    return failures == 0 ? 0 : 7;
+}
+
 int Application::runHeadless() {
+    if (options_.queue) {
+        return runQueue(*options_.queue);
+    }
+    if (options_.render) {
+        // The offline engine loads the project itself; without a project file, snapshot the
+        // current session into a temporary one.
+        std::filesystem::path projectFile = engine_->projectPath();
+        if (projectFile.empty() || options_.audio || options_.scene || options_.composition || options_.environment ||
+            !options_.shaders.empty()) {
+            projectFile = std::filesystem::temp_directory_path() / "avgen_render_session.json";
+            if (auto r = engine_->saveProject(projectFile); !r) {
+                log::error("render: {}", r.error().message);
+                return 2;
+            }
+        }
+        auto job = makeRenderJob(projectFile, renderSettingsFromOptions());
+        if (!job) {
+            log::error("render: {}", job.error().message);
+            return 2;
+        }
+        if (auto r = (*job)->run(); !r) {
+            log::error("render: {}", r.error().message);
+            return context_->errorCount() == 0 ? 7 : 5;
+        }
+        return 0;
+    }
     const int frames = options_.frames > 0 ? options_.frames : 120;
     FixedStepClock clock(options_.offlineFps);
     const std::uint32_t w = 1280;

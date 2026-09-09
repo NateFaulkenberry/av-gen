@@ -5,6 +5,8 @@
 // through its public API and the parameter system.
 
 #include "app/engine.hpp"
+#include "app/render_job.hpp"
+#include "app/render_settings.hpp"
 #include "rendering/scene_renderer.hpp"
 
 #include <filesystem>
@@ -48,6 +50,16 @@ public:
     std::function<void()> onExportBundle;
     std::function<void(const std::filesystem::path&)> onOpenRecent;
     std::vector<std::filesystem::path> recentProjects; // shown in File > Open Recent
+    // Offline rendering (1.0): the host owns the settings, the job and the queue.
+    app::RenderSettings* renderSettings = nullptr;
+    std::function<void()> onStartRender;
+    std::function<void()> onCancelRender;
+    std::function<void()> onEnqueueRender;
+    std::function<void()> onRunQueue;
+    std::function<void()> onChooseRenderOutput;
+    std::function<app::RenderProgress()> renderProgress; // empty when no job is running
+    std::size_t queuedRenders = 0;
+    std::string videoBackends; // describeVideoBackends()
 
     void draw(app::Engine& engine, const FrameStats& stats);
 
@@ -68,11 +80,13 @@ private:
     void drawShadersTab(app::Engine& engine);
     void drawSceneTab(app::Engine& engine);
     void drawTimelineTab(app::Engine& engine);
+    void drawRender(app::Engine& engine);
 
     bool showDemo_ = false;
     bool showParameters_ = true;
     bool showAnalysis_ = true;
     bool showModulation_ = true;
+    bool showRender_ = false;
     int newRouteSource_ = 0;
     int newRouteTarget_ = 0;
     int newSourceKind_ = 0;

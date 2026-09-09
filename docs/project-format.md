@@ -186,3 +186,29 @@ roots). On load the assets are restored first; a missing one is reported in
 `avgen --export-bundle <dir>` (or File > Export Bundle) copies every referenced file into
 `<dir>/assets/` (scene files are rewritten so their node assets point into the bundle, glTF
 sidecar `.bin`/image files next to a `.gltf` come along) and writes `<dir>/project.json`.
+
+
+## Render block (milestone 1.0, ADR-020)
+
+```json
+"render": { "width": 1920, "height": 1080, "fps": 60.0, "start": 0.0, "end": -1.0,
+            "output": "video", "path": "renders/show.mov", "pattern": "frame_{:06d}.png",
+            "codec": "prores422", "backend": "auto", "quality": 80, "muxAudio": true, "encoderThreads": 0 }
+```
+
+`end` < 0 means the audio duration (else the timeline's, else 10 s). `path` is relative to the
+project. `output` is `sequence` (PNG files named by `pattern`) or `video`. Codecs: `prores4444`,
+`prores422`, `h264`, `hevc` on the native macOS backend, or any encoder name for a user-supplied
+ffmpeg (`backend: "ffmpeg"`). CLI overrides: `--render <out>`, `--size`, `--fps`, `--range a:b`,
+`--codec`, `--quality`.
+
+## Render queue files
+
+```json
+{ "format": "avgen-render-queue", "version": 1,
+  "jobs": [ { "project": "shows/a.json" },
+            { "project": "shows/b.json", "render": { "path": "renders/b_4k.mov", "width": 3840, "height": 2160 } } ] }
+```
+
+Run with `avgen --queue jobs.json`. Each job's settings are the project's `render` block with
+the job's `render` fields merged over it; paths in the queue file are relative to it.

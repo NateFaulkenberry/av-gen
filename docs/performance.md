@@ -82,6 +82,14 @@ The extra cost is two passes over the 4 MB flag buffer plus a 4 KB block-sum sca
 simulation still dominates. The earlier 3.4 ms figure above was a different build of the same
 probe; the before/after pair here was measured back to back on the same binary configuration.
 
+## Milestone 1.0 offline rendering numbers (Apple M2 Max, Release)
+
+| Metric | Value |
+|---|---|
+| Six-node composition + HDRI + timeline, 1920x1080 PNG sequence, 8 encoder threads | 50 fps (60 frames in 1.2 s incl. readback and PNG encode) |
+| Orb scene + sparks, 1280x720 PNG sequence | 102 fps (300 frames in 2.9 s) |
+| Readback | synchronous per frame; the GPU idles while the CPU maps (a staging ring is the next step) |
+
 ## Budget and revisit triggers
 
 - Analysis: switch FFT backend (pffft/vDSP) if hop time exceeds 10% of the hop period.

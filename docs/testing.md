@@ -29,6 +29,7 @@ cmake --preset tsan && cmake --build --preset tsan && ctest --preset tsan   # Th
 | sources/presets | `test_sources.cpp`, `test_presets.cpp` | LFO shapes and seek exactness, beat sync, ADSR timing, noise determinism/continuity, random sample-and-hold sequences, timeline interpolation and looping, macros, rack JSON round trips, modulators of modulators; preset capture/apply/blend, bank JSON |
 | timeline | `test_timeline.cpp`, `tests/integration/test_timeline_engine.cpp` | key insertion and sorting, every interpolation, looping, vector and single-component tracks, apply modes write finals not base, bind/unbind and unknown targets, recordKey, cues and morph progress, JSON round trip and malformed input, determinism; engine: offline keyed values at exact times, routes add on top of automation, beat-based loop follows the click track, cue recalls a preset and morphs, seek re-syncs cues, project v3 round trip, scene swap rebinds tracks |
 | project system | `tests/integration/test_project_system.cpp`, migration cases in `test_serialization.cpp`, `test_recent_files.cpp` | relative asset references and full session restore after moving the folder, missing assets as warnings with parameters still applied, composition projects by path or inline, bundle export reopens after deleting the originals, new project resets; v1/v2 documents migrate step by step, too-new rejected, caller's document untouched; recent list order/dedupe/limit/persist/prune |
+| offline rendering | `test_render_settings.cpp`, `tests/rendering/test_render_job.cpp`, `test_video_writer.cpp` | range/frame-count resolution, pattern and JSON validation; GPU: an exact PNG sequence at the requested size, bit-identical sequence hash on a fresh engine + renderer, bounded stepping and cancellation with partial output, bad settings rejected, video with audio when a backend exists; native/ffmpeg video writers probed after writing |
 | ui logic | `test_ui_logic.cpp` | regression: route slider bounds independent of the value (0.2 crash) |
 | stress | `test_engine_stress.cpp` (`[device][stress]`) | rapid seeks/param/route/volume/transport edits during live playback; run under ASan and TSan |
 | modulation integration | `tests/integration/test_modulation_sources.cpp` | LFO drives the orb without audio, seek exactness, modulators of modulators, project round trip through the engine (sources, routes, presets, values, morph), beat clock from a click track |
@@ -49,9 +50,8 @@ recordings are needed.
 
 ## Determinism requirements
 
-Known gap (found in 0.8, scheduled for 1.0): GPU particle systems compact their dead/alive
-lists with atomics, so slot assignment, seeds and draw order vary between runs; headless hashes
-are bit-identical only with particles disabled, or for the first ~100 frames before slots recycle.
+GPU particle systems use stable stream compaction since 1.0 (ADR-015 revision), so headless
+hashes are bit-identical with particles on; the render job's sequence hash is the check.
 
 - `Analyzer`: bit-identical output for identical samples regardless of chunking or run.
 - Offline `Engine` runs: bit-identical parameter values and matrices across runs (tested).

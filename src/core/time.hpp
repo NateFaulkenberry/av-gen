@@ -50,6 +50,9 @@ public:
     FrameTime tick() override;
     [[nodiscard]] FrameTime current() const override { return current_; }
     void seek(double renderTime) override;
+    // Like seek, but the *next* tick returns `renderTime` itself with frame index 0 (offline
+    // renders: frame f is at start + f / fps).
+    void restartAt(double renderTime);
     [[nodiscard]] double fps() const { return fps_; }
 
 private:

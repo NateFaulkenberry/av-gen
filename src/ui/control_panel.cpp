@@ -959,4 +959,132 @@ void ControlPanel::drawTimelineTab(app::Engine& engine) {
     }
 }
 
+
+void ControlPanel::drawRender(app::Engine& engine) {
+    ImGui::SetNextWindowSize(ImVec2(460, 420), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Render", &showRender_)) {
+        ImGui::End();
+        return;
+    }
+    if (renderSettings == nullptr) {
+        ImGui::TextDisabled("render settings unavailable");
+        ImGui::End();
+        return;
+    }
+    auto& s = *renderSettings;
+    const app::RenderProgress current = renderProgress ? renderProgress() : app::RenderProgress{};
+    const bool running = current.framesTotal > 0 && !current.finished;
+    ImGui::BeginDisabled(running);
+    int size[2] = {static_cast<int>(s.width), static_cast<int>(s.height)};
+    if (ImGui::InputInt2("size", size)) {
+        s.width = static_cast<std::uint32_t>(std::clamp(size[0], 2, 16384));
+        s.height = static_cast<std::uint32_t>(std::clamp(size[1], 2, 16384));
+    }
+    auto fps = static_cast<float>(s.fps);
+    if (ImGui::InputFloat("fps", &fps, 1.0f, 10.0f, "%.3f")) {
+        s.fps = static_cast<double>(std::clamp(fps, 1.0f, 240.0f));
+    }
+    float range[2] = {static_cast<float>(s.startSeconds), static_cast<float>(s.endSeconds)};
+    if (ImGui::InputFloat2("range (s, end<0 = auto)", range, "%.2f")) {
+        s.startSeconds = static_cast<double>(std::max(0.0f, range[0]));
+        s.endSeconds = static_cast<double>(range[1]);
+    }
+    const double end = s.resolvedEnd(engine.durationSeconds(), engine.timeline().durationSeconds());
+    ImGui::TextDisabled("%llu frames (%.2f s .. %.2f s)", static_cast<unsigned long long>(s.frameCount(end)),
+                        s.startSeconds, end);
+    int output = s.output == app::RenderOutput::Video ? 1 : 0;
+    if (ImGui::RadioButton("PNG sequence", &output, 0)) {
+        s.output = app::RenderOutput::PngSequence;
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Video", &output, 1)) {
+        s.output = app::RenderOutput::Video;
+    }
+    char pathBuf[512];
+    std::snprintf(pathBuf, sizeof(pathBuf), "%s", s.outputPath.string().c_str());
+    ImGui::SetNextItemWidth(-90);
+    if (ImGui::InputText("##out", pathBuf, sizeof(pathBuf))) {
+        s.outputPath = pathBuf;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Choose...") && onChooseRenderOutput) {
+        onChooseRenderOutput();
+    }
+    if (s.output == app::RenderOutput::Video) {
+        static const char* codecs[] = {"prores4444", "prores422", "h264", "hevc", "libx264", "libx265", "prores_ks", "libvpx-vp9"};
+        int codec = 0;
+        for (int i = 0; i < 8; ++i) {
+            if (s.codec == codecs[i]) {
+                codec = i;
+            }
+        }
+        ImGui::SetNextItemWidth(140);
+        if (ImGui::Combo("codec", &codec, codecs, 8)) {
+            s.codec = codecs[codec];
+        }
+        ImGui::SameLine();
+        static const char* backends[] = {"auto", "native", "ffmpeg"};
+        int backend = s.backend == "native" ? 1 : (s.backend == "ffmpeg" ? 2 : 0);
+        ImGui::SetNextItemWidth(90);
+        if (ImGui::Combo("backend", &backend, backends, 3)) {
+            s.backend = backends[backend];
+        }
+        ImGui::SliderInt("quality", &s.quality, 0, 100);
+        ImGui::Checkbox("mux audio", &s.muxAudio);
+        if (!videoBackends.empty()) {
+            ImGui::TextWrapped("%s", videoBackends.c_str());
+        }
+    } else {
+        char pat[128];
+        std::snprintf(pat, sizeof(pat), "%s", s.pattern.c_str());
+        ImGui::SetNextItemWidth(200);
+        if (ImGui::InputText("pattern", pat, sizeof(pat))) {
+            s.pattern = pat;
+        }
+    }
+    if (auto v = s.validate(); !v) {
+        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "%s", v.error().message.c_str());
+    }
+    ImGui::EndDisabled();
+    ImGui::Separator();
+    if (running) {
+        ImGui::ProgressBar(static_cast<float>(current.fraction()), ImVec2(-1, 0));
+        ImGui::Text("%llu / %llu frames, %.1f fps, %.0f s elapsed, written %llu",
+                    static_cast<unsigned long long>(current.framesRendered),
+                    static_cast<unsigned long long>(current.framesTotal), current.renderFps, current.elapsedSeconds,
+                    static_cast<unsigned long long>(current.framesWritten));
+        if (ImGui::Button("Cancel") && onCancelRender) {
+            onCancelRender();
+        }
+    } else {
+        if (ImGui::Button("Render") && onStartRender) {
+            onStartRender();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Add to queue") && onEnqueueRender) {
+            onEnqueueRender();
+        }
+        ImGui::SameLine();
+        ImGui::BeginDisabled(queuedRenders == 0);
+        if (ImGui::Button("Run queue") && onRunQueue) {
+            onRunQueue();
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::TextDisabled("%zu queued", queuedRenders);
+        if (current.finished) {
+            if (!current.error.empty()) {
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "last render failed: %s", current.error.c_str());
+            } else if (current.framesTotal > 0) {
+                ImGui::TextDisabled("last render: %llu frames in %.1f s, sequence hash %016llx%s",
+                                    static_cast<unsigned long long>(current.framesRendered), current.elapsedSeconds,
+                                    static_cast<unsigned long long>(current.sequenceHash),
+                                    current.cancelled ? " (cancelled)" : "");
+            }
+        }
+    }
+    ImGui::TextDisabled("renders load the saved project; the live view keeps playing");
+    ImGui::End();
+}
+
 } // namespace avgen::ui

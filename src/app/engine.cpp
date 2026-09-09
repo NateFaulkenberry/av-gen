@@ -243,6 +243,7 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
     if (!timeline_.empty()) {
         doc["timeline"] = timeline_.toJson();
     }
+    doc["render"] = render_.toJson();
     nlohmann::json assets = nlohmann::json::object();
     if (!audioPath_.empty()) {
         assets["audio"] = relativeTo(audioPath_, dir);
@@ -399,6 +400,15 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     }
     cueState_ = {};
     cueApplied_ = false;
+    if (doc.contains("render")) {
+        auto r = RenderSettings::fromJson(doc["render"]);
+        if (!r) {
+            return std::unexpected(r.error());
+        }
+        render_ = *r;
+    } else {
+        render_ = RenderSettings{};
+    }
     // Parameter values for sources and shader inputs arrive in the same document; apply them
     // again now that those parameters exist (unknown-at-first-pass paths were skipped).
     if (auto r = params::loadProject(doc, params_, modulator_, nullptr, nullptr); !r) {
@@ -428,6 +438,7 @@ void Engine::newProject() {
         }
     }
     post_ = scene::PostSettings{};
+    render_ = RenderSettings{};
     modulator_.masterGain = 1.0f;
     projectPath_.clear();
     projectWarnings_.clear();

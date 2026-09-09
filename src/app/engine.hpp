@@ -6,6 +6,7 @@
 // runs on a thread) and Offline (fixed-step clock, analysis precomputed and indexed by time).
 
 #include "analysis/analysis_runner.hpp"
+#include "app/render_settings.hpp"
 #include "analysis/analysis_track.hpp"
 #include "analysis/analyzer.hpp"
 #include "audio/audio_file.hpp"
@@ -87,6 +88,7 @@ public:
     [[nodiscard]] Result<void> loadProject(const std::filesystem::path& path);
     [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
     [[nodiscard]] const std::vector<std::string>& projectWarnings() const { return projectWarnings_; }
+    void clearProjectPath() { projectPath_.clear(); }
     // Resets everything but the audio: orb scene, no sources/presets/timeline/shaders/environment,
     // default post settings, no project path.
     void newProject();
@@ -120,6 +122,10 @@ public:
     params::Preset& storePreset(const std::string& name);
     [[nodiscard]] bool recallPreset(const std::string& name);
     void morphPresets(const std::string& a, const std::string& b, float t);
+
+    // ---- offline render settings (milestone 1.0), saved in the project under "render" ----
+    [[nodiscard]] RenderSettings& renderSettings() { return render_; }
+    [[nodiscard]] const RenderSettings& renderSettings() const { return render_; }
 
     // ---- timeline (milestone 0.8) ----
     [[nodiscard]] params::Timeline& timeline() { return timeline_; }
@@ -209,6 +215,7 @@ private:
     signals::SourceRack sources_;
     params::PresetBank presets_;
     params::Timeline timeline_;
+    RenderSettings render_;
     params::TimelineClock timelineClock_;
     params::Timeline::CueState cueState_;
     params::Preset cueFrom_;      // base values captured when the current cue started (morphs)

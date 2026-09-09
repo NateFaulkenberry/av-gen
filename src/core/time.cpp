@@ -46,6 +46,11 @@ FrameTime FixedStepClock::tick() {
     return current_;
 }
 
+void FixedStepClock::restartAt(double renderTime) {
+    seek(renderTime);
+    started_ = false;
+}
+
 void FixedStepClock::seek(double renderTime) {
     startTime_ = renderTime;
     current_.frameIndex = 0;

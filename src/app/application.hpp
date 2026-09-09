@@ -5,12 +5,15 @@
 
 #include "app/engine.hpp"
 #include "app/recent_files.hpp"
+#include "app/render_job.hpp"
+#include "app/render_settings.hpp"
 #include "core/error.hpp"
 #include "core/file_watcher.hpp"
 #include "core/log.hpp"
 
 #include <cstdint>
 #include <filesystem>
+#include <deque>
 #include <memory>
 #include <optional>
 #include <string>
@@ -48,7 +51,15 @@ struct AppOptions {
     std::uint64_t stressSeed = 0; // > 0: apply random UI-like actions every frame (crash reproduction)
     bool headless = false;
     double offlineFps = 60.0;
+    bool fpsGiven = false;
     std::optional<std::filesystem::path> capture; // PPM written after the last frame
+    // Offline rendering (1.0): --render <dir|video file>, --range a:b, --codec, --quality, --queue <file>
+    std::optional<std::filesystem::path> render;
+    std::optional<std::filesystem::path> queue;
+    std::optional<double> rangeStart, rangeEnd;
+    std::optional<std::string> codec;
+    std::optional<int> quality;
+    std::optional<std::uint32_t> renderWidth, renderHeight;
     std::uint32_t width = 1440;
     std::uint32_t height = 900;
     log::Level logLevel = log::Level::Info;
@@ -71,10 +82,22 @@ private:
     void loadAudio(const std::filesystem::path& path);
     void loadAny(const std::filesystem::path& path);
     void rememberProject(const std::filesystem::path& path); // recent list + window title
+    // Offline rendering: settings from the project + CLI overrides; a job runs to completion
+    // headless, or a few frames per UI frame in the live app.
+    [[nodiscard]] RenderSettings renderSettingsFromOptions() const;
+    [[nodiscard]] Result<std::unique_ptr<RenderJob>> makeRenderJob(const std::filesystem::path& projectFile,
+                                                                   RenderSettings settings);
+    int runQueue(const std::filesystem::path& queueFile);
+    void startRenderFromUi();
     Result<void> captureFrame(const FrameTime& time, const std::filesystem::path& path);
 
     AppOptions options_;
     RecentFiles recent_{{}};
+    std::unique_ptr<RenderJob> job_;             // in-app render in progress
+    RenderSettings uiRender_;                     // the Render window's settings
+    std::deque<std::pair<std::filesystem::path, RenderSettings>> uiQueue_;
+    std::filesystem::path renderProjectTemp_;
+    RenderProgress lastRender_;
     std::unique_ptr<platform::Window> window_;
     std::unique_ptr<gpu::Context> context_;
     std::unique_ptr<gpu::ShaderLibrary> shaders_;

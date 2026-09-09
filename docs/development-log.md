@@ -631,3 +631,78 @@ after the originals are deleted, new project resets everything but the audio).
 Milestone 1.0 (offline rendering): frame sequences and video export from the timeline range,
 a render queue, render settings in the project, and the particle determinism fix (stable
 compaction) so headless hashes stay bit-identical with particles on.
+
+## 2026-09-08 — Milestone 1.0: offline rendering
+
+### What was implemented and why
+
+- `app::RenderSettings` (size, fps, range, PNG sequence or video, path, pattern, codec, backend,
+  quality, audio mux, threads) saved in the project under `"render"` and overridable from the
+  CLI (`--render`, `--size`, `--fps`, `--range`, `--codec`, `--quality`).
+- `app::RenderJob` (ADR-020): an Offline engine loaded from the project file plus its own
+  `SceneRenderer`; frame f at `start + f / fps`, synchronous readback, per-frame and sequence
+  hashes, encoder threads (PNG in parallel; video in order to one writer). `step()` renders a
+  bounded number of frames so the live app renders in the background with a progress bar and a
+  cancel button; `run()` loops headless with progress every second.
+- Video: `assets::VideoWriter` with a native AVFoundation backend (ProRes 4444/422, H.264,
+  HEVC; audio muxed from the project's file) and an external ffmpeg backend (raw RGBA piped to a
+  user-supplied binary; nothing linked or shipped, per the research's licensing posture).
+- Render queue: `--queue jobs.json` (projects with per-job render overrides) and an in-app queue.
+- Particle determinism: stable stream compaction replaces the atomic dead/alive lists
+  (ADR-015 revision), closing the gap found in 0.8.
+- Split: particle compaction (GPU) and the video backends (ObjC++/process) by two subagents in
+  worktrees; render settings/job, CLI, headless path, queue, Render window, tests and docs on
+  main.
+
+### Bugs found during the milestone
+
+- The render job's renderer was created but never `init()`ed (every frame failed with
+  "renderer not initialised"); caught by the first GPU test.
+- `FixedStepClock::seek` makes the *next* tick land one step later, so frame 0 of a render was
+  at start + 1/fps; added `restartAt` (next tick returns the start itself, frame index 0) and a
+  core test for it. With it, the job's per-frame hashes equal the classic headless loop's
+  exactly (20 of 20 frames compared).
+- The very first renderer in a process produced a 1-LSB difference in 27 pixels on its second
+  frame only (bisected with a three-job queue: job A frame 1 differed, jobs B and C agreed with
+  each other and with separate processes). Root cause unknown (cold pipeline or driver state);
+  the job now warms up with a throwaway renderer (one dt-0 update rendered twice, no state
+  drift) and the in-process re-render test is bit-identical.
+- The native video writer stalled on renders longer than ~1 s with audio: AVAssetWriter
+  interleaves its inputs and stops accepting video until the audio input has caught up, and the
+  audio was only pumped at `finish()`; fixed by feeding audio incrementally alongside the video
+  frames (regression test: a 3 s ProRes render fed from another thread with a deadline).
+
+### Tests
+
+316 cases (was 296): render settings (3), GPU render job (4: exact PNG sequence and
+bit-identical re-render in one process, bounded stepping and cancellation with partial output,
+bad settings rejected before the GPU, video with audio), particles (2: 200-frame determinism
+across fresh renderers and contexts with heavy slot recycling; exact CPU-predicted alive/dead
+counts), video writer (11: every native codec and container, non-integer fps, audio muxing with
+offset, sticky errors, odd sizes, ProRes-in-mp4, backend selection, an ffmpeg stand-in script for
+the process plumbing, the 3-second cross-thread stall regression), and `restartAt` in the clock.
+
+### Results
+
+- Six-node composition + HDRI + timeline project rendered from the CLI: ProRes 422 `.mov` and
+  H.264 `.mp4` at 1280x720, 30 fps, 6 s with the audio muxed, both at 120 fps and with the same
+  sequence hash; probed with AVFoundation: 6.00 s, apcn + LPCM and avc1 + AAC.
+- PNG sequences: 1920x1080 composition at 50 fps, 1280x720 orb at 102 fps (Release).
+- Determinism: the render job's frames equal the classic headless loop's frame for frame; the
+  orb scene with sparks is bit-identical over 240 frames (agent-verified) and three identical
+  queue jobs in one process agree; the GPU particle change cost +15% on the 1M-particle probe.
+- Windowed Release from a project: 120 fps with the Render window present.
+- Debug and Release: 316/316 tests pass; zero warnings.
+
+### Known limitations
+
+- Readback is synchronous (a staging ring would overlap GPU and CPU); no EXR/16-bit output;
+  motion blur and DoF are the real-time approximations; native video is macOS only and the
+  ffmpeg backend is untested against a real ffmpeg on this machine; the first-renderer 1-LSB
+  quirk is worked around (warm-up), not explained; the UI render runs from the saved project,
+  so unsaved edits are not rendered until Save.
+
+### Next step
+
+Milestone 1.x (live control): OSC and MIDI input as modulation sources and parameter targets,
+a hot-reloadable control map, and a staging-buffer ring for faster offline readback.
