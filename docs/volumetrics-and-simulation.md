@@ -45,8 +45,13 @@ radiance += transmittance * (sigmaS * phaseHG(cos theta, volumeAnisotropy) * key
 transmittance *= exp(-sigmaT * stepLength)
 ```
 
-`keyLight` is the first enabled light (directional: its colour × intensity; point/spot: with
-inverse-square, range and cone attenuation). There are no shadows in the fog yet. The emission
+The in-scatter sums over **every enabled light**, each weighted by its `volumetricStrength`
+(directional: its colour × intensity; point/spot: with inverse-square, range and cone attenuation).
+A light with strength 0 lights surfaces and not the air, which is how a rig puts one warm practical
+in the haze without the key washing the whole volume out. `PunctualLight::volumetricStrength`
+defaults to 1 - a hand-authored light lights the air - while a light rig's `volumetric` defaults to
+0, so a rig opts each source in deliberately. There are no shadows in the fog yet: a visible beam
+is the falloff of a local emitter, never an occluded shaft. The emission
 colour is `volumeColorField`'s colour sample (rgb × alpha) when one is named, otherwise
 `fogColor`. The march stops early once transmittance falls below 0.002.
 

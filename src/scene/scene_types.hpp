@@ -208,7 +208,12 @@ struct PunctualLight {
     float shadowStrength = 1.0f;   // 0 = no shadowing, 1 = full
     float shadowBias = 0.0015f;    // normal-offset scale in world units
     float softness = 1.0f;         // multiplies the penumbra width of a soft-shadowed light
-    float volumetricStrength = 0.0f; // in-scattering into the atmosphere (ADR-032 volume pass)
+    // In-scattering into the volumetric atmosphere (ADR-032 volume pass), read by the march
+    // through GpuLight/LightUniform. 1 = this light lights the air as much as it lights
+    // surfaces, 0 = it does not touch the fog. The default is 1 so a hand-authored light
+    // behaves the obvious way; light rigs set it per light and default their own to 0, so a rig
+    // opts each source into the haze deliberately.
+    float volumetricStrength = 1.0f;
     bool diffuseOnly = false;
     bool specularOnly = false;
     bool enabled = true;

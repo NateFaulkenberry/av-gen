@@ -247,9 +247,9 @@ TEST_CASE("the shipped rigs load, validate and expand", "[lightrig]") {
         CHECK(again->structuralHash() == rig->structuralHash());
     }
     std::sort(names.begin(), names.end());
-    const std::vector<std::string> expected = {"Bioluminescent", "CosmicBlue",     "IndustrialCold",
-                                               "Monumental",     "NightCinematic", "SacredWarm",
-                                               "VoidCore"};
+    const std::vector<std::string> expected = {"Bioluminescent", "Colonnade",      "CosmicBlue",
+                                               "IndustrialCold", "Monumental",     "NightCinematic",
+                                               "SacredWarm",     "VoidCore"};
     CHECK(names == expected);
 }
 

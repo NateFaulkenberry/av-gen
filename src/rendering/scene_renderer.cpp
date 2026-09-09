@@ -1470,7 +1470,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         u.colorIntensity = glm::vec4(light.color * light.intensity, 1.0f);
         const float cosOuter = std::cos(light.outerConeAngle);
         const float cosInner = std::cos(light.innerConeAngle);
-        u.cone = glm::vec4(cosOuter, 1.0f / std::max(cosInner - cosOuter, 1e-4f), 0.0f, 0.0f);
+        // z carries the volumetric strength: shaders/volume.wgsl weights each light's in-scatter
+        // by it, so a rig decides which sources are visible in the air (ADR-032/ADR-033).
+        u.cone = glm::vec4(cosOuter, 1.0f / std::max(cosInner - cosOuter, 1e-4f),
+                           std::max(light.volumetricStrength, 0.0f), 0.0f);
     }
     frame.envParams = glm::vec4(scene.environment.environmentRotation,
                                 static_cast<float>(ibl ? ibl_.prefilteredMips - 1 : 0), static_cast<float>(lightCount),

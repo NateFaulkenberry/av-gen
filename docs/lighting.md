@@ -25,7 +25,7 @@ code. There is one shading path, not three.
 | `width`, `height`, `radius` | emitter size: rect uses width and height, disk and sphere the radius, tube both |
 | `castsShadow`, `shadowStrength`, `shadowBias`, `softness` | shadow map participation (ADR-034) |
 | `contactShadow` | the screen-space march, independent of whether the light has a map |
-| `volumetricStrength` | in-scattering into the atmosphere (ADR-032) |
+| `volumetricStrength` | how much this light lights the *air* in the volumetric pass (ADR-032): 1 = as much as it lights surfaces, 0 = not at all. Defaults to 1 on a `PunctualLight` and to 0 on a rig light |
 | `diffuseOnly`, `specularOnly`, `enabled` | shaping switches |
 
 `rendering::packLight` turns one of these into the 128-byte `GpuLight` the shader reads. The

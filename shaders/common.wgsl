@@ -8,7 +8,8 @@ struct Light {
     positionType: vec4<f32>,   // xyz = position, w = type (0 directional, 1 point, 2 spot)
     directionRange: vec4<f32>, // xyz = direction the light travels (normalised), w = range (0 = inf)
     colorIntensity: vec4<f32>, // rgb = colour * intensity
-    cone: vec4<f32>,           // x = cos(outer), y = 1 / max(cos(inner) - cos(outer), eps)
+    cone: vec4<f32>,           // x = cos(outer), y = 1 / max(cos(inner) - cos(outer), eps),
+                               // z = volumetric strength (volume.wgsl), w = 0
 };
 
 struct FrameUniforms {

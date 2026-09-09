@@ -7,23 +7,28 @@
       "targets": [
         {
           "path": "procedural/columns/distribution/radius",
-          "min": 30,
-          "max": 60
+          "min": 40.0,
+          "max": 64.0
         },
         {
           "path": "procedural/columns/source/height",
-          "min": 24,
-          "max": 52
+          "min": 40.0,
+          "max": 66.0
         },
         {
           "path": "procedural/rings/source/majorRadius",
-          "min": 28,
-          "max": 56
+          "min": 30.0,
+          "max": 52.0
         },
         {
           "path": "camera/lens/focalLength",
           "min": 50,
           "max": 18
+        },
+        {
+          "path": "procedural/arches/source/majorRadius",
+          "min": 40.0,
+          "max": 64.0
         }
       ]
     },
@@ -33,18 +38,18 @@
       "targets": [
         {
           "path": "procedural/columns/distribution/count",
-          "min": 32,
-          "max": 96
+          "min": 12,
+          "max": 28
         },
         {
           "path": "procedural/corridor/distribution/count",
-          "min": 180,
-          "max": 600
+          "min": 120,
+          "max": 360
         },
         {
           "path": "particles/dust/spawnRate",
-          "min": 500,
-          "max": 6000,
+          "min": 200,
+          "max": 3000,
           "op": "replace"
         }
       ]
@@ -65,8 +70,8 @@
         },
         {
           "path": "scene/volumeDensity",
-          "min": 0.01,
-          "max": 0.09
+          "min": 0.0004,
+          "max": 0.002
         },
         {
           "path": "post/grade/contrast",
@@ -97,8 +102,8 @@
       "targets": [
         {
           "path": "scene/fogDensity",
-          "min": 0.004,
-          "max": 0.035
+          "min": 0.001,
+          "max": 0.0055
         },
         {
           "path": "scene/brightness",
@@ -128,8 +133,8 @@
         },
         {
           "path": "procedural/motes/material/emissive",
-          "min": 0.5,
-          "max": 4.0
+          "min": 0.08,
+          "max": 0.9
         }
       ]
     },
@@ -139,8 +144,8 @@
       "targets": [
         {
           "path": "scene/fogDensity",
-          "min": 0.004,
-          "max": 0.03
+          "min": 0.001,
+          "max": 0.0048
         },
         {
           "path": "camera/lens/aperture",
@@ -156,7 +161,7 @@
         {
           "path": "scene/volumeDensity",
           "min": 0.0,
-          "max": 0.1
+          "max": 0.0026
         },
         {
           "path": "scene/volumeScattering",
@@ -165,8 +170,8 @@
         },
         {
           "path": "scene/fogDensity",
-          "min": 0.004,
-          "max": 0.03
+          "min": 0.0012,
+          "max": 0.005
         }
       ]
     },
@@ -220,16 +225,6 @@
           "path": "post/bloom/intensity",
           "min": 0.2,
           "max": 0.9
-        },
-        {
-          "path": "procedural/columns/emissiveFieldAmount",
-          "min": 0.5,
-          "max": 5.0
-        },
-        {
-          "path": "procedural/rings/material/emissive",
-          "min": 0.2,
-          "max": 2.5
         }
       ]
     },
@@ -237,11 +232,6 @@
       "knob": "sacred",
       "default": 0.5,
       "targets": [
-        {
-          "path": "procedural/arches/distribution/count",
-          "min": 16,
-          "max": 48
-        },
         {
           "path": "scene/volumeScattering",
           "min": 0.6,
