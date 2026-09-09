@@ -1,5 +1,6 @@
 #include "app/application.hpp"
 
+#include "app/asset_browser.hpp"
 #include "app/examples.hpp"
 #include "assets/video_writer.hpp"
 
@@ -430,6 +431,11 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             log::warn("examples: {}", examples.error().message);
         }
         panel_->onOpenExample = [this](const ExampleInfo& ex) { loadAny(ex.file); };
+        // ---- asset browser (ADR-031): the example directories plus the current project's folder
+        const auto assetDirs = [executablePath]() { return exampleSearchDirs(executablePath); };
+        panel_->onRescanAssets = [this, assetDirs] { panel_->assets = scanAssets(assetDirs()); };
+        panel_->assets = scanAssets(assetDirs());
+        panel_->onOpenAsset = [this](const AssetEntry& asset) { loadAny(asset.path); };
         // ---- offline rendering from the UI ----
         uiRender_ = engine_->renderSettings();
         panel_->renderSettings = &uiRender_;

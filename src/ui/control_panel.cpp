@@ -118,6 +118,7 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
             ImGui::MenuItem("Analysis", nullptr, &showAnalysis_);
             ImGui::MenuItem("Modulation", nullptr, &showModulation_);
             ImGui::MenuItem("World", nullptr, &showWorld_);
+            ImGui::MenuItem("Assets", nullptr, &showAssets_);
             ImGui::MenuItem("ImGui Demo", nullptr, &showDemo_);
             ImGui::EndMenu();
         }
@@ -170,8 +171,59 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
         }
         ImGui::End();
     }
+    if (showAssets_) {
+        ImGui::SetNextWindowSize(ImVec2(520, 420), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(120, 120), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Assets", &showAssets_)) {
+            drawAssetsWindow();
+        }
+        ImGui::End();
+    }
     if (showDemo_) {
         ImGui::ShowDemoWindow(&showDemo_);
+    }
+}
+
+void ControlPanel::drawAssetsWindow() {
+    if (ImGui::Button("Rescan") && onRescanAssets) {
+        onRescanAssets();
+    }
+    ImGui::SameLine();
+    const char* kinds[] = {"all", "project", "scene", "graph", "preset", "model", "environment", "shader", "audio"};
+    ImGui::SetNextItemWidth(140.0f);
+    ImGui::Combo("kind", &assetKind_, kinds, IM_ARRAYSIZE(kinds));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(200.0f);
+    ImGui::InputText("search", assetSearch_, sizeof(assetSearch_));
+    const app::AssetKind kind = assetKind_ == 0 ? app::AssetKind::Unknown : static_cast<app::AssetKind>(assetKind_ - 1);
+    const auto shown = app::filterAssets(assets, kind, assetSearch_);
+    ImGui::TextDisabled("%zu of %zu", shown.size(), assets.size());
+    ImGui::Separator();
+    if (ImGui::BeginTable("assets", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable)) {
+        ImGui::TableSetupColumn("name");
+        ImGui::TableSetupColumn("kind", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+        ImGui::TableSetupColumn("category", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+        ImGui::TableSetupColumn("thumb", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+        ImGui::TableHeadersRow();
+        for (const app::AssetEntry* a : shown) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::PushID(a->path.string().c_str());
+            if (ImGui::Selectable(a->name.c_str(), false, ImGuiSelectableFlags_SpanAllColumns) && onOpenAsset) {
+                onOpenAsset(*a);
+            }
+            if (ImGui::IsItemHovered() && !a->description.empty()) {
+                ImGui::SetTooltip("%s\n%s", a->description.c_str(), a->path.string().c_str());
+            }
+            ImGui::PopID();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(app::assetKindName(a->kind));
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(a->category.c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextDisabled("%s", a->thumbnail.empty() ? "-" : "png");
+        }
+        ImGui::EndTable();
     }
 }
 

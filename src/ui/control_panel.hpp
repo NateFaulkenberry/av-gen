@@ -5,6 +5,7 @@
 // through its public API and the parameter system.
 
 #include "app/engine.hpp"
+#include "app/asset_browser.hpp"
 #include "app/examples.hpp"
 #include "app/render_job.hpp"
 #include "app/output_manager.hpp"
@@ -56,6 +57,10 @@ public:
     std::vector<std::filesystem::path> recentProjects; // shown in File > Open Recent
     std::vector<app::ExampleInfo> examples;             // File > Examples
     std::function<void(const app::ExampleInfo&)> onOpenExample;
+    // Asset browser (ADR-031): the host scans directories and opens what the user picks.
+    std::vector<app::AssetEntry> assets;
+    std::function<void()> onRescanAssets;
+    std::function<void(const app::AssetEntry&)> onOpenAsset;
     // Offline rendering (1.0): the host owns the settings, the job and the queue.
     app::RenderSettings* renderSettings = nullptr;
     std::function<void()> onStartRender;
@@ -101,6 +106,7 @@ private:
     void drawControlTab(app::Engine& engine);
     void drawOutputsTab(app::Engine& engine);
     void drawWorldWindow(app::Engine& engine);
+    void drawAssetsWindow();
 
     bool showDemo_ = false;
     bool showParameters_ = true;
@@ -108,6 +114,9 @@ private:
     bool showModulation_ = true;
     bool showRender_ = false;
     bool showWorld_ = true;
+    bool showAssets_ = false;
+    int assetKind_ = 0;
+    char assetSearch_[96] = "";
     int newRouteSource_ = 0;
     int newRouteTarget_ = 0;
     int newSourceKind_ = 0;
