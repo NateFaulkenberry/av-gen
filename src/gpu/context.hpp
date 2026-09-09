@@ -18,6 +18,8 @@ namespace avgen::gpu {
 struct ContextDesc {
     void* metalLayer = nullptr;      // CAMetalLayer*; nullptr = headless (offscreen only)
     bool requestTimestamps = true;   // ask for the timestamp-query feature if available
+    // Ask for IOSurface shared-texture import + MTLSharedEvent fences (texture sharing, 1.2).
+    bool requestSharedTextures = true;
     bool preferHighPerformance = true;
     std::string label = "avgen";
 };
@@ -28,6 +30,7 @@ struct Capabilities {
     std::string adapterType;
     std::string vendor;
     bool timestampQuery = false;
+    bool sharedTextureIOSurface = false;   // SharedTextureMemoryIOSurface + SharedFenceMTLSharedEvent
     wgpu::Limits limits{};
 };
 

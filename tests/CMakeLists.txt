@@ -17,6 +17,12 @@ catch_discover_tests(avgen_tests
     DISCOVERY_MODE PRE_TEST)
 
 file(GLOB_RECURSE AVGEN_RENDER_TEST_SOURCES CONFIGURE_DEPENDS rendering/*.cpp support/*.cpp)
+if(APPLE)
+    # In-process Syphon client for the texture-sharing tests (Objective-C++, ARC).
+    file(GLOB_RECURSE AVGEN_RENDER_TEST_OBJCXX_SOURCES CONFIGURE_DEPENDS rendering/*.mm support/*.mm)
+    list(APPEND AVGEN_RENDER_TEST_SOURCES ${AVGEN_RENDER_TEST_OBJCXX_SOURCES})
+    set_source_files_properties(${AVGEN_RENDER_TEST_OBJCXX_SOURCES} PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+endif()
 if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
     add_executable(avgen_render_tests ${AVGEN_RENDER_TEST_SOURCES}
         "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
@@ -26,6 +32,9 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp")
     target_include_directories(avgen_render_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(avgen_render_tests PRIVATE avgen_gpu Catch2::Catch2WithMain)
+    if(APPLE)
+        target_link_libraries(avgen_render_tests PRIVATE syphon::syphon "-framework Metal")
+    endif()
     avgen_set_warnings(avgen_render_tests)
     catch_discover_tests(avgen_render_tests
         TEST_PREFIX "gpu."

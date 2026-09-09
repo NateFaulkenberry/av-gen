@@ -164,3 +164,56 @@ if(APPLE)
     set_source_files_properties("${imgui_SOURCE_DIR}/backends/imgui_impl_wgpu.cpp" PROPERTIES LANGUAGE OBJCXX)
 endif()
 add_library(imgui::imgui ALIAS imgui)
+
+# ---- Syphon-Framework (macOS frame sharing), compiled from source as a static library -----------
+# Pinned to the 2025-10-06 master commit (the last tagged release, "5", is from 2019 and predates
+# the Metal server). Only the Metal server/client, messaging and directory sources are compiled;
+# the OpenGL server/client and their CGL helpers are left out so the deprecated OpenGL framework
+# is never linked. The renderer loads its shaders from the framework bundle, which a static
+# library does not have: the patch adds a compile-from-source fallback (see cmake/patches/).
+if(APPLE)
+    CPMAddPackage(
+        NAME syphon
+        GITHUB_REPOSITORY Syphon/Syphon-Framework
+        GIT_TAG 71351d4b484cd2d1917867f7846a5cdca724552d
+        DOWNLOAD_ONLY YES
+        PATCHES "${CMAKE_CURRENT_LIST_DIR}/patches/syphon-metal-library-from-source.patch")
+    # CPM's source-cache key includes the patch path but not its content: check it was applied.
+    file(STRINGS "${syphon_SOURCE_DIR}/SyphonServerRendererMetal.m" AVGEN_SYPHON_PATCHED
+        REGEX "newLibraryWithSource")
+    if(NOT AVGEN_SYPHON_PATCHED)
+        message(FATAL_ERROR "avgen: Syphon sources in ${syphon_SOURCE_DIR} are unpatched; delete that "
+                            "directory and re-run CMake so the patch in cmake/patches is applied")
+    endif()
+    # The sources import their own headers as <Syphon/...>: mirror them into a Syphon/ directory.
+    set(AVGEN_SYPHON_INCLUDE "${CMAKE_BINARY_DIR}/syphon-include")
+    file(GLOB AVGEN_SYPHON_HEADERS "${syphon_SOURCE_DIR}/*.h")
+    file(MAKE_DIRECTORY "${AVGEN_SYPHON_INCLUDE}/Syphon")
+    file(COPY ${AVGEN_SYPHON_HEADERS} DESTINATION "${AVGEN_SYPHON_INCLUDE}/Syphon")
+    add_library(syphon STATIC EXCLUDE_FROM_ALL
+        "${syphon_SOURCE_DIR}/SyphonCFMessageReceiver.m"
+        "${syphon_SOURCE_DIR}/SyphonCFMessageSender.m"
+        "${syphon_SOURCE_DIR}/SyphonClientBase.m"
+        "${syphon_SOURCE_DIR}/SyphonClientConnectionManager.m"
+        "${syphon_SOURCE_DIR}/SyphonDispatch.c"
+        "${syphon_SOURCE_DIR}/SyphonMessageQueue.m"
+        "${syphon_SOURCE_DIR}/SyphonMessageReceiver.m"
+        "${syphon_SOURCE_DIR}/SyphonMessageSender.m"
+        "${syphon_SOURCE_DIR}/SyphonMessaging.m"
+        "${syphon_SOURCE_DIR}/SyphonMetalClient.m"
+        "${syphon_SOURCE_DIR}/SyphonMetalServer.m"
+        "${syphon_SOURCE_DIR}/SyphonPrivate.m"
+        "${syphon_SOURCE_DIR}/SyphonServerBase.m"
+        "${syphon_SOURCE_DIR}/SyphonServerConnectionManager.m"
+        "${syphon_SOURCE_DIR}/SyphonServerDirectory.m"
+        "${syphon_SOURCE_DIR}/SyphonServerRendererMetal.m")
+    target_include_directories(syphon SYSTEM PUBLIC "${AVGEN_SYPHON_INCLUDE}" "${syphon_SOURCE_DIR}")
+    # The Xcode project compiles everything with ARC and the Syphon_Prefix.pch prefix header
+    # (Cocoa import + SYPHONLOG). Third-party code: its warnings are not ours to fix.
+    target_compile_options(syphon PRIVATE -w "-include${syphon_SOURCE_DIR}/Syphon_Prefix.pch"
+        $<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>)
+    target_link_libraries(syphon PUBLIC
+        "-framework Metal" "-framework IOSurface" "-framework CoreVideo" "-framework Cocoa"
+        "-framework Foundation")
+    add_library(syphon::syphon ALIAS syphon)
+endif()
