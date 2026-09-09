@@ -43,6 +43,12 @@
       "project": "hyperspace/hyperspace.json"
     },
     {
+      "name": "The Infinite Temple",
+      "category": "Showcase",
+      "description": "The flagship world: radial colonnades, rings, arches, spiral corridors and recursive chambers driven by fields, with seven world macros, eight states and a four-minute cue arc.",
+      "project": "infinite/infinite.json"
+    },
+    {
       "name": "Worlds (preset morph)",
       "category": "Showcase",
       "description": "One scene, four presets: Cathedral, Temple, Helix, Hyperspace morph into each other on a timeline.",
