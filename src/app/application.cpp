@@ -673,6 +673,7 @@ int Application::runHeadless() {
             return 2;
         }
         lastHash = gpu::hashImage(*image);
+        log::debug("offline frame {:4d} hash={:016x}", i, lastHash); // every frame, for determinism diffs
         if (i % 30 == 0 || i == frames - 1) {
             const auto& f = engine_->latestFrame();
             // The headline parameters differ per scene kind; a missing one reads as 0.

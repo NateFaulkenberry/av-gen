@@ -51,3 +51,46 @@ the HDR scene pass and depth.
   (research §11.13) is not implemented, so alive ordering is not bit-stable across runs.
 - Pools are re-created (particles lost) when `capacity` changes; all other settings are live.
 - Soft particles (depth fade) are parameterised but not yet sampled from the depth buffer.
+
+## Revision 2026-09-08: deterministic compaction
+
+Milestone 1.0 (offline rendering) needs bit-identical frames from identical runs, and the
+atomic dead-list pop / alive-list append above made slot assignment and draw order depend on
+GPU scheduling: two headless orb runs diverged after ~100 frames. Alternative 3 (stream
+compaction with prefix sums) is now implemented and replaces the atomic path entirely.
+
+- **No atomics on any path.** `Counters` holds plain `deadCount`/`aliveCount`; the indirect
+  `instanceCount` is a plain store from one thread of the scan pass.
+- **Emission** is `cs_emit`: thread `i < min(emitCount, deadCount)` takes `deadList[i]` (lowest
+  free slot first). `deadList` and `deadCount` are the previous frame's compaction output (or the
+  CPU reset: `0..capacity-1`, `capacity`). Seeds stay `pcg3d(slot, frame + seed·7919, salt)`,
+  and because the slot is now a function of the frame sequence the seeds are too. Lifetime is
+  `lifeMin + (lifeMax - lifeMin)·r` (exact when min == max) instead of `mix`.
+- **Simulation** writes `flags[slot] = 1/0` (alive after this step) instead of appending.
+- **Stable compaction** in three dispatches over blocks of 1024 slots (256 threads x 4
+  consecutive slots, Hillis-Steele scan in workgroup memory): `cs_scan_reduce` writes each
+  block's alive count to `blockSums`; `cs_scan_top` (one workgroup, looping over chunks of 1024
+  blocks, so any pool up to the 4M clamp works) scans `blockSums` in place and writes the counts
+  and indirect args; `cs_scan_scatter` recomputes the local scan and writes `aliveList[rank] =
+  slot` for alive slots and `deadList[slot - rank] = slot` for dead ones. One scan serves both
+  lists because the dead rank of a slot is `slot - aliveRank`. Integer sums are associative, so
+  nothing depends on scheduling. Both lists are in slot order, so the draw order is fixed.
+- **Pass order** per system per frame, in one compute pass (dispatches are ordered and their
+  storage writes visible to later dispatches, so no ping-pong is needed): emit -> simulate ->
+  reduce -> top scan -> scatter -> indirect draw. Emit consumes last frame's dead list before
+  scatter rewrites it.
+- **API:** unchanged except one addition, `ParticleRenderer::readCounts(index)`, a blocking
+  readback of a pool's counters for tests and tools. Parameters and the scene format are
+  unchanged. `ParticleStats::emittedThisFrame` remains the requested count.
+- **Cost:** two extra 4 MB passes over the flag buffer plus one 16 KB scan per 1M pool. The
+  `[.perf]` probe (1M pool, ~1M alive, 1280x720, Release, M2 Max) measures 2.29 ms before and
+  2.61-2.73 ms after (+15%); the simulate pass (curl noise) dominates.
+- **Verification:** `tests/rendering/test_particles_gpu.cpp` runs the same 200-frame sequence on
+  fresh renderers (and a fresh context after unrelated GPU work) and requires identical per-frame
+  hashes; a second test checks the GPU alive/dead counts against a CPU model every frame
+  (64 fps so `dt` and the 1 s life are exact in f32), including the free-slot clamp. The orb
+  scene rendered headless twice for 240 frames gives 240 identical per-frame hashes
+  (`--log debug` now prints every frame's hash).
+- **Remaining limits:** determinism is per GPU family and driver (fast-math and FMA contraction
+  are compiler decisions, see `docs/research/offline-rendering.md` §4); the alive order is slot
+  order, not age or depth order, so alpha-blended systems are still unsorted.

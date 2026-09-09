@@ -28,6 +28,10 @@ struct Image8 {
 Result<Image8> readTexture8(Context& context, const wgpu::Texture& texture, std::uint32_t width,
                             std::uint32_t height, bool bgra);
 
+// Reads `size` bytes of a buffer created with CopySrc usage (blocking). For tests and tools.
+Result<std::vector<std::uint8_t>> readBuffer(Context& context, const wgpu::Buffer& buffer, std::uint64_t offset,
+                                             std::uint64_t size);
+
 // 64-bit FNV-1a over the pixel data; used for same-GPU determinism checks.
 std::uint64_t hashImage(const Image8& image);
 

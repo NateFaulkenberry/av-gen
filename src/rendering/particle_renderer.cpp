@@ -2,18 +2,22 @@
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
+#include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstring>
 
 namespace avgen::rendering {
 
 namespace {
 constexpr std::uint32_t kParticleStride = 48;
-constexpr std::uint32_t kWorkgroup = 64;
-}
+constexpr std::uint32_t kWorkgroup = 64;   // cs_emit / cs_simulate
+constexpr std::uint32_t kScanBlock = 1024; // slots per compaction workgroup (256 threads x 4)
+constexpr std::uint32_t kComputeBindings = 8;
+} // namespace
 
 ParticleRenderer::ParticleRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
     : context_(context), shaders_(shaders) {}
@@ -21,11 +25,11 @@ ParticleRenderer::ParticleRenderer(gpu::Context& context, gpu::ShaderLibrary& sh
 Result<void> ParticleRenderer::init() {
     const auto& device = context_.device();
     {
-        std::array<wgpu::BindGroupLayoutEntry, 6> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, kComputeBindings> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Compute;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
-        for (std::uint32_t i = 1; i < 6; ++i) {
+        for (std::uint32_t i = 1; i < kComputeBindings; ++i) {
             entries[i].binding = i;
             entries[i].visibility = wgpu::ShaderStage::Compute;
             entries[i].buffer.type = wgpu::BufferBindingType::Storage;
@@ -150,19 +154,25 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
         }
         return pipeline;
     };
-    auto reset = makeCompute("cs_reset");
-    if (!reset) return std::unexpected(reset.error());
     auto emit = makeCompute("cs_emit");
     if (!emit) return std::unexpected(emit.error());
     auto simulate = makeCompute("cs_simulate");
     if (!simulate) return std::unexpected(simulate.error());
+    auto reduce = makeCompute("cs_scan_reduce");
+    if (!reduce) return std::unexpected(reduce.error());
+    auto top = makeCompute("cs_scan_top");
+    if (!top) return std::unexpected(top.error());
+    auto scatter = makeCompute("cs_scan_scatter");
+    if (!scatter) return std::unexpected(scatter.error());
     auto additive = makeRender(true);
     if (!additive) return std::unexpected(additive.error());
     auto alpha = makeRender(false);
     if (!alpha) return std::unexpected(alpha.error());
-    resetPipeline_ = *reset;
     emitPipeline_ = *emit;
     simulatePipeline_ = *simulate;
+    scanReducePipeline_ = *reduce;
+    scanTopPipeline_ = *top;
+    scanScatterPipeline_ = *scatter;
     additivePipeline_ = *additive;
     alphaPipeline_ = *alpha;
     return {};
@@ -180,6 +190,7 @@ void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity) {
     const auto& device = context_.device();
     pool = Pool{};
     pool.capacity = capacity;
+    pool.blocks = (capacity + kScanBlock - 1) / kScanBlock;
     auto buffer = [&](const char* label, std::uint64_t size, wgpu::BufferUsage usage) {
         wgpu::BufferDescriptor desc{};
         desc.label = label;
@@ -187,19 +198,25 @@ void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity) {
         desc.usage = usage;
         return device.CreateBuffer(&desc);
     };
+    const std::uint64_t listBytes = static_cast<std::uint64_t>(capacity) * 4;
+    const std::uint64_t blockBytes = static_cast<std::uint64_t>(pool.blocks) * 4;
+    constexpr auto kStorage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
     pool.uniforms = buffer("particles-uniforms", sizeof(ParticleUniforms), wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst);
-    pool.particles = buffer("particles-pool", static_cast<std::uint64_t>(capacity) * kParticleStride,
-                            wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
-    pool.deadList = buffer("particles-dead", static_cast<std::uint64_t>(capacity) * 4, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
-    pool.counters = buffer("particles-counters", 16, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
-    pool.aliveList = buffer("particles-alive", static_cast<std::uint64_t>(capacity) * 4, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst);
-    pool.indirect = buffer("particles-indirect", 16, wgpu::BufferUsage::Storage | wgpu::BufferUsage::Indirect | wgpu::BufferUsage::CopyDst);
+    pool.particles = buffer("particles-pool", static_cast<std::uint64_t>(capacity) * kParticleStride, kStorage);
+    pool.deadList = buffer("particles-dead", listBytes, kStorage);
+    pool.counters = buffer("particles-counters", 16, kStorage | wgpu::BufferUsage::CopySrc);
+    pool.aliveList = buffer("particles-alive", listBytes, kStorage);
+    pool.indirect = buffer("particles-indirect", 16, kStorage | wgpu::BufferUsage::Indirect);
+    pool.flags = buffer("particles-flags", listBytes, kStorage);
+    pool.blockSums = buffer("particles-block-sums", blockBytes, kStorage);
 
-    std::array<wgpu::BindGroupEntry, 6> entries{};
-    const wgpu::Buffer* buffers[6] = {&pool.uniforms, &pool.particles, &pool.deadList, &pool.counters, &pool.aliveList, &pool.indirect};
-    const std::uint64_t sizes[6] = {sizeof(ParticleUniforms), static_cast<std::uint64_t>(capacity) * kParticleStride,
-                                    static_cast<std::uint64_t>(capacity) * 4, 16, static_cast<std::uint64_t>(capacity) * 4, 16};
-    for (std::uint32_t i = 0; i < 6; ++i) {
+    std::array<wgpu::BindGroupEntry, kComputeBindings> entries{};
+    const wgpu::Buffer* buffers[kComputeBindings] = {&pool.uniforms, &pool.particles, &pool.deadList, &pool.counters,
+                                                     &pool.aliveList, &pool.indirect, &pool.flags, &pool.blockSums};
+    const std::uint64_t sizes[kComputeBindings] = {sizeof(ParticleUniforms),
+                                                   static_cast<std::uint64_t>(capacity) * kParticleStride,
+                                                   listBytes, 16, listBytes, 16, listBytes, blockBytes};
+    for (std::uint32_t i = 0; i < kComputeBindings; ++i) {
         entries[i].binding = i;
         entries[i].buffer = *buffers[i];
         entries[i].size = sizes[i];
@@ -221,15 +238,19 @@ void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity) {
 }
 
 void ParticleRenderer::resetPool(Pool& pool) {
+    // The same state the compaction pass would produce for an empty pool: every slot dead, the
+    // dead list in slot order, no alive instances.
     std::vector<std::uint32_t> dead(pool.capacity);
     for (std::uint32_t i = 0; i < pool.capacity; ++i) {
-        dead[i] = pool.capacity - 1 - i; // pop order: slot 0 first
+        dead[i] = i;
     }
     context_.queue().WriteBuffer(pool.deadList, 0, dead.data(), dead.size() * 4);
-    const std::uint32_t counters[4] = {pool.capacity, 0, 0, 0};
+    const std::uint32_t counters[4] = {pool.capacity, 0, 0, 0}; // deadCount, aliveCount
     context_.queue().WriteBuffer(pool.counters, 0, counters, sizeof(counters));
     std::vector<std::uint8_t> zeros(static_cast<std::size_t>(pool.capacity) * kParticleStride, 0);
     context_.queue().WriteBuffer(pool.particles, 0, zeros.data(), zeros.size());
+    context_.queue().WriteBuffer(pool.flags, 0, zeros.data(), static_cast<std::size_t>(pool.capacity) * 4);
+    context_.queue().WriteBuffer(pool.blockSums, 0, zeros.data(), static_cast<std::size_t>(pool.blocks) * 4);
     const std::uint32_t indirect[4] = {6, 0, 0, 0};
     context_.queue().WriteBuffer(pool.indirect, 0, indirect, sizeof(indirect));
     pool.emitCarry = 0.0;
@@ -284,21 +305,29 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         u.colorEnd = sys.colorEnd;
         u.sim = glm::vec4(static_cast<float>(dt), static_cast<float>(time.renderTime),
                           static_cast<float>(time.frameIndex), static_cast<float>(sys.seed));
-        u.counts = glm::uvec4(emitCount, pool.capacity, sys.blend == scene::ParticleBlend::Additive ? 0u : 1u, 0u);
+        u.counts = glm::uvec4(emitCount, pool.capacity, sys.blend == scene::ParticleBlend::Additive ? 0u : 1u,
+                              pool.blocks);
         context_.queue().WriteBuffer(pool.uniforms, 0, &u, sizeof(u));
 
+        // Pass order (see particles.wgsl): emit -> simulate -> reduce -> top scan -> scatter.
+        // Dispatches in one compute pass are ordered, so each reads the previous one's writes;
+        // emit consumes last frame's dead list before scatter rewrites it.
         wgpu::ComputePassDescriptor cdesc{};
         cdesc.label = "particles-compute";
         wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&cdesc);
         cp.SetBindGroup(0, pool.computeGroup);
-        cp.SetPipeline(resetPipeline_);
-        cp.DispatchWorkgroups(1);
         if (emitCount > 0) {
             cp.SetPipeline(emitPipeline_);
             cp.DispatchWorkgroups((emitCount + kWorkgroup - 1) / kWorkgroup);
         }
         cp.SetPipeline(simulatePipeline_);
         cp.DispatchWorkgroups((pool.capacity + kWorkgroup - 1) / kWorkgroup);
+        cp.SetPipeline(scanReducePipeline_);
+        cp.DispatchWorkgroups(pool.blocks);
+        cp.SetPipeline(scanTopPipeline_);
+        cp.DispatchWorkgroups(1);
+        cp.SetPipeline(scanScatterPipeline_);
+        cp.DispatchWorkgroups(pool.blocks);
         cp.End();
 
         ++stats_.systems;
@@ -320,6 +349,19 @@ void ParticleRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& s
         pass.SetBindGroup(0, pools_[i].renderGroup);
         pass.DrawIndirect(pools_[i].indirect, 0);
     }
+}
+
+Result<ParticleCounts> ParticleRenderer::readCounts(std::size_t systemIndex) {
+    if (systemIndex >= pools_.size() || !pools_[systemIndex].counters) {
+        return fail("particle system {} has no pool", systemIndex);
+    }
+    auto bytes = gpu::readBuffer(context_, pools_[systemIndex].counters, 0, 16);
+    if (!bytes) {
+        return std::unexpected(bytes.error());
+    }
+    std::uint32_t words[4];
+    std::memcpy(words, bytes->data(), sizeof(words));
+    return ParticleCounts{words[1], words[0]};
 }
 
 } // namespace avgen::rendering

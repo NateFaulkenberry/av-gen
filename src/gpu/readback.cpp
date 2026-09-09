@@ -80,6 +80,46 @@ Result<Image8> readTexture8(Context& context, const wgpu::Texture& texture, std:
     return image;
 }
 
+Result<std::vector<std::uint8_t>> readBuffer(Context& context, const wgpu::Buffer& buffer, std::uint64_t offset,
+                                             std::uint64_t size) {
+    if (size == 0 || size % 4 != 0 || offset % 4 != 0) {
+        return fail("readBuffer: offset and size must be non-zero multiples of 4 (got {} + {})", offset, size);
+    }
+    const std::uint64_t paddedSize = size;
+    wgpu::BufferDescriptor bufferDesc{};
+    bufferDesc.label = "readback-buffer";
+    bufferDesc.size = paddedSize;
+    bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
+    wgpu::Buffer staging = context.device().CreateBuffer(&bufferDesc);
+
+    wgpu::CommandEncoder encoder = context.device().CreateCommandEncoder();
+    encoder.CopyBufferToBuffer(buffer, offset, staging, 0, paddedSize);
+    wgpu::CommandBuffer commands = encoder.Finish();
+    context.queue().Submit(1, &commands);
+
+    bool mapped = false;
+    std::string mapError;
+    auto future = staging.MapAsync(wgpu::MapMode::Read, 0, static_cast<std::size_t>(paddedSize),
+                                   wgpu::CallbackMode::WaitAnyOnly,
+                                   [&](wgpu::MapAsyncStatus status, wgpu::StringView message) {
+                                       mapped = status == wgpu::MapAsyncStatus::Success;
+                                       if (!mapped) {
+                                           mapError = Context::toString(message);
+                                       }
+                                   });
+    if (!context.waitFor(future) || !mapped) {
+        return fail("readBuffer map failed: {}", mapError.empty() ? "timeout" : mapError);
+    }
+    const auto* data = static_cast<const std::uint8_t*>(staging.GetConstMappedRange(0, static_cast<std::size_t>(paddedSize)));
+    if (data == nullptr) {
+        staging.Unmap();
+        return fail("readBuffer: mapped range unavailable");
+    }
+    std::vector<std::uint8_t> bytes(data, data + size);
+    staging.Unmap();
+    return bytes;
+}
+
 std::uint64_t hashImage(const Image8& image) {
     std::uint64_t hash = 1469598103934665603ull;
     for (const auto byte : image.rgba) {

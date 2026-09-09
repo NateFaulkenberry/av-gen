@@ -1,8 +1,10 @@
 #pragma once
 
-// GPU particle systems (ADR-015): compute emit/simulate passes and an indirect draw per
-// scene::ParticleSystem. Pools are allocated per (system index, capacity); everything else is
-// driven by the per-frame uniforms, so parameters can change every frame without reallocation.
+// GPU particle systems (ADR-015): compute emit/simulate/compaction passes and an indirect draw
+// per scene::ParticleSystem. Pools are allocated per (system index, capacity); everything else
+// is driven by the per-frame uniforms, so parameters can change every frame without
+// reallocation. Slot assignment and draw order are deterministic (stable prefix-sum compaction,
+// no atomics): the same frame sequence produces bit-identical buffers on the same GPU.
 
 #include "core/error.hpp"
 #include "core/time.hpp"
@@ -36,14 +38,20 @@ struct ParticleUniforms {
     glm::vec4 colorStart;
     glm::vec4 colorEnd;
     glm::vec4 sim;
-    glm::uvec4 counts;
+    glm::uvec4 counts; // emitCount, capacity, blend, scan blocks
 };
 static_assert(sizeof(ParticleUniforms) == 64 + 16 * 14);
 
 struct ParticleStats {
     std::uint32_t systems = 0;
-    std::uint32_t capacity = 0;      // sum of pools
-    std::uint32_t emittedThisFrame = 0;
+    std::uint32_t capacity = 0;         // sum of pools
+    std::uint32_t emittedThisFrame = 0; // requested spawns (the GPU clamps to the free slots)
+};
+
+// GPU-side pool occupancy after the last update(); alive + dead == capacity.
+struct ParticleCounts {
+    std::uint32_t alive = 0;
+    std::uint32_t dead = 0;
 };
 
 class ParticleRenderer {
@@ -63,15 +71,21 @@ public:
     [[nodiscard]] const ParticleStats& stats() const { return stats_; }
     [[nodiscard]] bool initialised() const { return initialised_; }
 
+    // Blocking readback of a pool's counters (tests and tools only; waits for the GPU).
+    [[nodiscard]] Result<ParticleCounts> readCounts(std::size_t systemIndex);
+
 private:
     struct Pool {
         std::uint32_t capacity = 0;
+        std::uint32_t blocks = 0; // scan blocks: ceil(capacity / kScanBlock)
         wgpu::Buffer uniforms;
         wgpu::Buffer particles;
         wgpu::Buffer deadList;
         wgpu::Buffer counters;
         wgpu::Buffer aliveList;
         wgpu::Buffer indirect;
+        wgpu::Buffer flags;
+        wgpu::Buffer blockSums;
         wgpu::BindGroup computeGroup;
         wgpu::BindGroup renderGroup;
         double emitCarry = 0.0;
@@ -89,9 +103,11 @@ private:
     wgpu::BindGroupLayout renderLayout_;
     wgpu::PipelineLayout computePipelineLayout_;
     wgpu::PipelineLayout renderPipelineLayout_;
-    wgpu::ComputePipeline resetPipeline_;
     wgpu::ComputePipeline emitPipeline_;
     wgpu::ComputePipeline simulatePipeline_;
+    wgpu::ComputePipeline scanReducePipeline_;
+    wgpu::ComputePipeline scanTopPipeline_;
+    wgpu::ComputePipeline scanScatterPipeline_;
     wgpu::RenderPipeline additivePipeline_;
     wgpu::RenderPipeline alphaPipeline_;
     std::vector<Pool> pools_;

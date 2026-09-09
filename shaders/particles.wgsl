@@ -1,7 +1,24 @@
-// GPU particle system (ADR-015): fixed pool with a dead list and a per-frame alive list.
-// Passes per system per frame: cs_reset (indirect args) -> cs_emit (pop dead slots, initialise)
-// -> cs_simulate (integrate, kill, append alive) -> indirect draw of camera-facing quads.
-// Randomness is a hash of (seed, frameIndex, slot): deterministic for a given frame sequence.
+// GPU particle system (ADR-015, revision 2026-09-08: deterministic compaction).
+//
+// Fixed pool of `capacity` slots. Every list this shader produces is a pure function of
+// (slot index, frame index, parameters): there are no atomics anywhere, so which slot a spawn
+// takes, its random seeds, and the draw order are bit-identical from run to run.
+//
+// Pass order per system per frame (one compute pass; dispatches in a pass are ordered and their
+// storage writes are visible to later dispatches):
+//   1. cs_emit          thread i < min(emitCount, counters.deadCount) initialises slot
+//                       deadList[i]. deadList/deadCount are the previous frame's compaction
+//                       output (or the CPU reset: deadList = 0..capacity-1, deadCount = capacity).
+//   2. cs_simulate      every slot: age, kill, integrate. Writes flags[slot] = 1 if alive else 0.
+//   3. cs_scan_reduce   one workgroup per block of kScanBlock slots: blockSums[b] = alive count.
+//   4. cs_scan_top      one workgroup: exclusive scan of blockSums in place (looping over chunks
+//                       of kScanBlock); thread 0 writes counters.aliveCount, counters.deadCount
+//                       = capacity - aliveCount, and the indirect draw args.
+//   5. cs_scan_scatter  one workgroup per block: local exclusive scan + blockSums[b] gives every
+//                       alive slot its rank r; aliveList[r] = slot, and every dead slot its rank
+//                       slot - r; deadList[slot - r] = slot. Both lists are therefore in slot order.
+//   Render: vs_particle reads aliveList[instance_index], so instances are drawn in slot order.
+// Randomness is a hash of (slot, frameIndex, seed, salt) - deterministic for a frame sequence.
 
 struct Particle {
     position: vec3<f32>,
@@ -28,19 +45,20 @@ struct Params {
     colorStart: vec4<f32>,
     colorEnd: vec4<f32>,
     sim: vec4<f32>,         // dt, time, frameIndex, seed
-    counts: vec4<u32>,      // emitCount, capacity, blend (0 additive, 1 alpha), pad
+    counts: vec4<u32>,      // emitCount, capacity, blend (0 additive, 1 alpha), scan blocks
 };
 
+// Plain values: written by one thread of cs_scan_top, read by cs_emit the next frame.
 struct Counters {
-    deadCount: atomic<u32>,
+    deadCount: u32,
+    aliveCount: u32,
     pad0: u32,
     pad1: u32,
-    pad2: u32,
 };
 
 struct Indirect {
     vertexCount: u32,
-    instanceCount: atomic<u32>,
+    instanceCount: u32,
     firstVertex: u32,
     firstInstance: u32,
 };
@@ -51,6 +69,8 @@ struct Indirect {
 @group(0) @binding(3) var<storage, read_write> counters: Counters;
 @group(0) @binding(4) var<storage, read_write> aliveList: array<u32>;
 @group(0) @binding(5) var<storage, read_write> indirect: Indirect;
+@group(0) @binding(6) var<storage, read_write> flags: array<u32>;     // 1 = alive after simulate
+@group(0) @binding(7) var<storage, read_write> blockSums: array<u32>; // per scan block
 // Read-only views for the render stage (same bindings, used only by vs_particle).
 @group(0) @binding(1) var<storage, read> particlesRead: array<Particle>;
 @group(0) @binding(4) var<storage, read> aliveRead: array<u32>;
@@ -114,24 +134,14 @@ fn sphereDir(r: vec2<f32>) -> vec3<f32> {
     return vec3<f32>(s * cos(phi), s * sin(phi), z);
 }
 
-// ---- compute passes ----------------------------------------------------------------------
-
-@compute @workgroup_size(1)
-fn cs_reset() {
-    indirect.vertexCount = 6u;
-    atomicStore(&indirect.instanceCount, 0u);
-    indirect.firstVertex = 0u;
-    indirect.firstInstance = 0u;
-}
+// ---- emit / simulate --------------------------------------------------------------------------
 
 @compute @workgroup_size(64)
 fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
-    if (i >= params.counts.x) { return; }
-    if (atomicLoad(&counters.deadCount) == 0u) { return; }
-    let old = atomicSub(&counters.deadCount, 1u);
-    if (old == 0u) { atomicAdd(&counters.deadCount, 1u); return; }
-    let slot = deadList[old - 1u];
+    // Spawn i takes the i-th free slot (lowest slot first). Clamped to last frame's dead count.
+    if (i >= params.counts.x || i >= counters.deadCount) { return; }
+    let slot = deadList[i];
     let frame = u32(params.sim.z);
     let r1 = rand3(slot, frame, 1u);
     let r2 = rand3(slot, frame, 2u);
@@ -156,7 +166,9 @@ fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
     let speed = mix(params.speedLife.x, params.speedLife.y, r2.z);
     p.velocity = dir * speed;
     p.age = 0.0;
-    p.life = mix(params.speedLife.z, params.speedLife.w, r3.x);
+    // lifeMin + (lifeMax - lifeMin) * r rather than mix(): exact when lifeMin == lifeMax, so a
+    // fixed lifetime dies on a predictable frame.
+    p.life = params.speedLife.z + (params.speedLife.w - params.speedLife.z) * r3.x;
     p.seed = r3.y;
     p.size = mix(0.7, 1.3, r3.z);
     particles[slot] = p;
@@ -167,14 +179,16 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
     let slot = gid.x;
     if (slot >= params.counts.y) { return; }
     var p = particles[slot];
-    if (p.life <= 0.0) { return; }
+    if (p.life <= 0.0) {
+        flags[slot] = 0u;
+        return;
+    }
     let dt = params.sim.x;
     p.age += dt;
     if (p.age >= p.life) {
         p.life = 0.0;
         particles[slot] = p;
-        let idx = atomicAdd(&counters.deadCount, 1u);
-        if (idx < params.counts.y) { deadList[idx] = slot; }
+        flags[slot] = 0u;
         return;
     }
     // forces
@@ -195,8 +209,114 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
     p.velocity *= max(0.0, 1.0 - params.direction.w * dt);
     p.position += p.velocity * dt;
     particles[slot] = p;
-    let out = atomicAdd(&indirect.instanceCount, 1u);
-    if (out < params.counts.y) { aliveList[out] = slot; }
+    flags[slot] = 1u;
+}
+
+// ---- stable stream compaction -------------------------------------------------------------------
+// Workgroups of kScanThreads threads, kScanElems consecutive slots per thread: kScanBlock slots
+// per block. Integer sums are associative, so the result does not depend on scheduling.
+
+const kScanThreads: u32 = 256u;
+const kScanElems: u32 = 4u;
+const kScanBlock: u32 = 1024u; // kScanThreads * kScanElems
+
+var<workgroup> scanShared: array<u32, 256>;
+
+// Workgroup-wide exclusive prefix sum of one value per thread (Hillis-Steele, 8 rounds).
+// Must be called in uniform control flow. Returns (exclusive prefix, workgroup total).
+fn workgroupScan(tid: u32, value: u32) -> vec2<u32> {
+    workgroupBarrier(); // previous call's readers are done with scanShared
+    scanShared[tid] = value;
+    workgroupBarrier();
+    for (var offset = 1u; offset < kScanThreads; offset = offset << 1u) {
+        var v = scanShared[tid];
+        if (tid >= offset) { v += scanShared[tid - offset]; }
+        workgroupBarrier();
+        scanShared[tid] = v;
+        workgroupBarrier();
+    }
+    let inclusive = scanShared[tid];
+    let total = scanShared[kScanThreads - 1u];
+    return vec2<u32>(inclusive - value, total);
+}
+
+// Loads this thread's kScanElems flags (0 beyond capacity) and returns their sum.
+fn loadFlags(base: u32, out: ptr<function, array<u32, 4>>) -> u32 {
+    var sum = 0u;
+    for (var k = 0u; k < kScanElems; k++) {
+        let i = base + k;
+        var f = 0u;
+        if (i < params.counts.y) { f = flags[i]; }
+        (*out)[k] = f;
+        sum += f;
+    }
+    return sum;
+}
+
+@compute @workgroup_size(256)
+fn cs_scan_reduce(@builtin(local_invocation_id) lid: vec3<u32>, @builtin(workgroup_id) wid: vec3<u32>) {
+    let tid = lid.x;
+    var f: array<u32, 4>;
+    let local = loadFlags(wid.x * kScanBlock + tid * kScanElems, &f);
+    let r = workgroupScan(tid, local);
+    if (tid == 0u) { blockSums[wid.x] = r.y; }
+}
+
+@compute @workgroup_size(256)
+fn cs_scan_top(@builtin(local_invocation_id) lid: vec3<u32>) {
+    let tid = lid.x;
+    let blocks = params.counts.w;
+    var carry = 0u;
+    for (var chunk = 0u; chunk < blocks; chunk += kScanBlock) {
+        let base = chunk + tid * kScanElems;
+        var v: array<u32, 4>;
+        var local = 0u;
+        for (var k = 0u; k < kScanElems; k++) {
+            let i = base + k;
+            var s = 0u;
+            if (i < blocks) { s = blockSums[i]; }
+            v[k] = s;
+            local += s;
+        }
+        let r = workgroupScan(tid, local);
+        var run = carry + r.x;
+        for (var k = 0u; k < kScanElems; k++) {
+            let i = base + k;
+            if (i < blocks) { blockSums[i] = run; }
+            run += v[k];
+        }
+        carry += r.y;
+    }
+    if (tid == 0u) {
+        let alive = min(carry, params.counts.y);
+        counters.aliveCount = alive;
+        counters.deadCount = params.counts.y - alive;
+        indirect.vertexCount = 6u;
+        indirect.instanceCount = alive;
+        indirect.firstVertex = 0u;
+        indirect.firstInstance = 0u;
+    }
+}
+
+@compute @workgroup_size(256)
+fn cs_scan_scatter(@builtin(local_invocation_id) lid: vec3<u32>, @builtin(workgroup_id) wid: vec3<u32>) {
+    let tid = lid.x;
+    let base = wid.x * kScanBlock + tid * kScanElems;
+    var f: array<u32, 4>;
+    let local = loadFlags(base, &f);
+    let r = workgroupScan(tid, local);
+    var rank = blockSums[wid.x] + r.x; // alive slots before slot `base`
+    for (var k = 0u; k < kScanElems; k++) {
+        let i = base + k;
+        if (i < params.counts.y) {
+            if (f[k] != 0u) {
+                aliveList[rank] = i;
+            } else {
+                deadList[i - rank] = i;
+            }
+            rank += f[k];
+        }
+    }
 }
 
 // ---- rendering --------------------------------------------------------------------------------

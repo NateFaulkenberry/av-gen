@@ -70,6 +70,18 @@ obvious optimisation when the budget tightens.
 | Orb scene + 3 timeline tracks + 2 cues, 2880x1800 window | 120 fps, GPU 1.4 ms, CPU work ~1 ms |
 | Timeline evaluation | binary search per track per frame; negligible next to modulation |
 
+## Milestone 1.0 numbers (Apple M2 Max, Release): deterministic particle compaction
+
+| Metric | Value |
+|---|---|
+| One-million-particle pool, ~1M alive, 1280x720 headless (`[.perf]` probe), atomic dead/alive lists (before) | 2.29 ms GPU per frame |
+| Same probe with stable prefix-sum compaction (after: emit + simulate + reduce + top scan + scatter + indirect draw) | 2.61-2.73 ms GPU per frame (+15%, two runs) |
+| Orb scene headless 1280x720, 240 frames at 30 fps, run twice | 240/240 identical per-frame hashes, 0 GPU errors |
+
+The extra cost is two passes over the 4 MB flag buffer plus a 4 KB block-sum scan; curl-noise
+simulation still dominates. The earlier 3.4 ms figure above was a different build of the same
+probe; the before/after pair here was measured back to back on the same binary configuration.
+
 ## Budget and revisit triggers
 
 - Analysis: switch FFT backend (pffft/vDSP) if hop time exceeds 10% of the hop period.

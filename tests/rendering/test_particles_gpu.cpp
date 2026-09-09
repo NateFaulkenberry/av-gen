@@ -8,9 +8,13 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
+#include <deque>
 #include <filesystem>
 #include <memory>
+#include <vector>
 
 using namespace avgen;
 
@@ -142,6 +146,194 @@ TEST_CASE("Particle burst produces an immediate flash and capacity bounds emissi
     if (const char* dumpDir = std::getenv("AVGEN_DUMP_DIR")) {
         REQUIRE(gpu::writePpm(*after, std::filesystem::path(dumpDir) / "particles.ppm").has_value());
     }
+}
+
+namespace {
+// A pool that recycles slots heavily: 2000/s into 4096 slots with a 1 s life, big overlapping
+// additive sprites, and every force on so the full simulate path runs.
+scene::ParticleSystem recyclingSystem() {
+    scene::ParticleSystem sys;
+    sys.name = "det";
+    sys.capacity = 4096;
+    sys.seed = 7;
+    sys.shape = scene::EmitterShape::Sphere;
+    sys.position = {0.0f, 0.0f, 0.0f};
+    sys.extent = {1.0f, 1.0f, 1.0f};
+    sys.spawnRate = 2000.0f;
+    sys.lifetimeMin = sys.lifetimeMax = 1.0f;
+    sys.speedMin = 0.5f;
+    sys.speedMax = 2.0f;
+    sys.spread = 1.0f;
+    sys.gravity = {0.0f, -0.3f, 0.0f};
+    sys.drag = 0.3f;
+    sys.turbulence = 1.0f;
+    sys.attractorPosition = {0.0f, 0.0f, 0.0f};
+    sys.attractorStrength = 1.5f;
+    sys.attractorRadius = 4.0f;
+    sys.orbit = 1.0f;
+    sys.sizeStart = 0.35f;
+    sys.sizeEnd = 0.1f;
+    sys.colorStart = {1.0f, 0.6f, 0.2f, 1.0f};
+    sys.colorEnd = {0.2f, 0.4f, 1.0f, 0.0f};
+    sys.emissive = 2.0f;
+    sys.blend = scene::ParticleBlend::Additive;
+    return sys;
+}
+
+scene::Scene sceneWith(const scene::ParticleSystem& sys) {
+    scene::Scene s;
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.camera.position = {0.0f, 0.0f, 6.0f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    s.particles.push_back(sys);
+    return s;
+}
+
+// Renders `frames` frames with a fresh renderer and returns every frame's readback hash.
+std::vector<std::uint64_t> hashSequence(gpu::Context& ctx, const scene::Scene& s, int frames, double fps) {
+    gpu::ShaderLibrary shaders(ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FixedStepClock clock(fps);
+    std::vector<std::uint64_t> hashes;
+    hashes.reserve(static_cast<std::size_t>(frames));
+    for (int i = 0; i < frames; ++i) {
+        auto img = renderer.renderToImage(s, clock.tick(), 96, 96);
+        REQUIRE(img.has_value());
+        hashes.push_back(gpu::hashImage(*img));
+    }
+    return hashes;
+}
+
+// CPU mirror of the pool's occupancy: same fractional-carry emission as ParticleRenderer, the
+// GPU's clamp to the free slots, and the f32 age accumulation of cs_simulate. Requires
+// lifetimeMin == lifetimeMax so every particle's life is exactly that value.
+class PoolModel {
+public:
+    explicit PoolModel(std::uint32_t capacity) : capacity_(capacity) {}
+
+    void step(const scene::ParticleSystem& sys, const FrameTime& time) {
+        const double dt = std::clamp(time.deltaTime, 0.0, 0.1);
+        carry_ += static_cast<double>(sys.spawnRate) * dt;
+        auto requested = static_cast<std::uint32_t>(std::floor(carry_));
+        carry_ -= requested;
+        requested += static_cast<std::uint32_t>(std::max(0.0f, sys.burst));
+        requested = std::min(requested, capacity_);
+        const std::uint32_t spawned = std::min(requested, capacity_ - alive_); // GPU clamp
+        if (spawned > 0) {
+            cohorts_.push_back({0.0f, sys.lifetimeMin, spawned});
+            alive_ += spawned;
+        }
+        const auto dtF = static_cast<float>(dt);
+        for (auto& c : cohorts_) {
+            c.age += dtF;
+        }
+        while (!cohorts_.empty() && cohorts_.front().age >= cohorts_.front().life) {
+            alive_ -= cohorts_.front().count;
+            cohorts_.pop_front();
+        }
+    }
+    [[nodiscard]] std::uint32_t alive() const { return alive_; }
+
+private:
+    struct Cohort {
+        float age;
+        float life;
+        std::uint32_t count;
+    };
+    std::uint32_t capacity_;
+    double carry_ = 0.0;
+    std::uint32_t alive_ = 0;
+    std::deque<Cohort> cohorts_; // oldest first; equal lifetimes so deaths are in emission order
+};
+} // namespace
+
+TEST_CASE("Particle emission, compaction and draw order are bit-deterministic across runs", "[gpu][particles]") {
+    constexpr int kFrames = 200;
+    auto ctx = makeContext();
+    const scene::Scene s = sceneWith(recyclingSystem());
+    const auto first = hashSequence(*ctx, s, kFrames, 60.0);
+    const auto second = hashSequence(*ctx, s, kFrames, 60.0);
+    REQUIRE(first.size() == second.size());
+    // Something must actually be drawn and change over time for the comparison to mean anything.
+    CHECK(first.front() != first[kFrames / 2]);
+    CHECK(first[kFrames / 2] != first.back());
+    for (int i = 0; i < kFrames; ++i) {
+        INFO("frame " << i);
+        REQUIRE(first[static_cast<std::size_t>(i)] == second[static_cast<std::size_t>(i)]);
+    }
+    CHECK(ctx->errorCount() == 0);
+
+    // Unrelated GPU work in between (a differently configured pool) and a fresh context.
+    {
+        auto other = recyclingSystem();
+        other.capacity = 1000; // not a multiple of the scan block
+        other.spawnRate = 9000.0f;
+        other.turbulence = 0.0f;
+        (void)hashSequence(*ctx, sceneWith(other), 40, 30.0);
+    }
+    auto ctx2 = makeContext();
+    const auto third = hashSequence(*ctx2, s, kFrames, 60.0);
+    REQUIRE(third.size() == first.size());
+    for (int i = 0; i < kFrames; ++i) {
+        INFO("frame " << i);
+        REQUIRE(first[static_cast<std::size_t>(i)] == third[static_cast<std::size_t>(i)]);
+    }
+    CHECK(ctx2->errorCount() == 0);
+}
+
+TEST_CASE("Particle alive and dead counts match a CPU model exactly", "[gpu][particles]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    auto sys = recyclingSystem();
+    sys.capacity = 1000; // 31.25 spawns/frame x 64 frames of life > 1000: the free-slot clamp binds
+    scene::Scene s = sceneWith(sys);
+    // 64 fps: dt = 1/64 is exact in f32, so a 1 s life is exactly 64 simulate steps.
+    FixedStepClock clock(64.0);
+    PoolModel model(sys.capacity);
+
+    auto stepAndCheck = [&](int frame) {
+        const FrameTime time = clock.tick();
+        auto img = renderer.renderToImage(s, time, 32, 32);
+        REQUIRE(img.has_value());
+        model.step(s.particles[0], time);
+        auto counts = renderer.particles().readCounts(0);
+        REQUIRE(counts.has_value());
+        INFO("frame " << frame << " model alive " << model.alive());
+        CHECK(counts->alive == model.alive());
+        CHECK(counts->alive + counts->dead == sys.capacity);
+        return counts->alive;
+    };
+
+    // Fill up: the pool must hit capacity exactly and stay there.
+    std::uint32_t peak = 0;
+    for (int f = 0; f < 100; ++f) {
+        peak = std::max(peak, stepAndCheck(f));
+    }
+    CHECK(peak == sys.capacity);
+    // Continuous emission alone never blocks: the exact steady-state count is the model's.
+    CHECK(model.alive() > 0);
+
+    // Stop emitting: counts drain in emission order down to exactly zero.
+    s.particles[0].spawnRate = 0.0f;
+    std::uint32_t last = 1;
+    for (int f = 100; f < 170; ++f) {
+        last = stepAndCheck(f);
+    }
+    CHECK(last == 0);
+
+    // A burst larger than the pool is clamped to the free slots (capacity, then nothing).
+    s.particles[0].burst = 100000.0f;
+    CHECK(stepAndCheck(170) == sys.capacity);
+    CHECK(renderer.stats().particles.emittedThisFrame == sys.capacity);
+    s.particles[0].burst = 0.0f;
+    CHECK(stepAndCheck(171) == sys.capacity);
+    s.particles[0].burst = 5.0f;
+    CHECK(stepAndCheck(172) == sys.capacity); // still full: the spawns are dropped
+    CHECK(ctx->errorCount() == 0);
 }
 
 // Hidden performance probe: run with `avgen_render_tests "[.perf]"`. Reports GPU time per frame

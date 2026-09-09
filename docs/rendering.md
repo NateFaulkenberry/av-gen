@@ -61,15 +61,22 @@ Meshes are uploaded when `Scene::meshVersion` changes (all meshes re-uploaded; f
 Invalid meshes and entities referencing missing meshes are skipped with a warning and no GPU
 error.
 
-## Particles (milestone 0.5, ADR-015)
+## Particles (milestone 0.5, ADR-015; deterministic compaction 2026-09-08)
 
 `ParticleRenderer` runs one compute pass per enabled `scene::ParticleSystem` before the scene
-pass (reset indirect args, emit into dead slots, simulate all slots: gravity, drag, curl-noise
-turbulence, attractor/orbit, kill and append alive) and one `DrawIndirect` of camera-facing
-quads inside the scene pass after the grid (additive premultiplied or alpha, depth test only).
-Pools: particle AoS buffer, dead list + atomic counter, alive list, indirect args; created per
-(system, capacity), reset on creation and on `resetAll()`. Emission uses a fractional carry so
-low rates emit evenly; bursts add particles for one frame. All settings are per-frame uniforms.
+pass and one `DrawIndirect` of camera-facing quads inside the scene pass after the grid
+(additive premultiplied or alpha, depth test only). The compute pass is five ordered dispatches
+with no atomics, so slot assignment, per-slot random seeds and draw order are a pure function of
+(slot, frame index, parameters): `cs_emit` (spawn `i` takes `deadList[i]`, clamped to last
+frame's `deadCount`), `cs_simulate` (gravity, drag, curl-noise turbulence, attractor/orbit, kill;
+writes an alive flag per slot), then a stable stream compaction: `cs_scan_reduce` (alive count
+per 1024-slot block), `cs_scan_top` (one workgroup scans the block sums and writes
+`aliveCount`, `deadCount` and the indirect args) and `cs_scan_scatter` (alive and dead lists in
+slot order). Pools: particle AoS buffer, dead list, alive list, flags, block sums, counters,
+indirect args; created per (system, capacity), reset on creation and on `resetAll()`. Emission
+uses a fractional carry so low rates emit evenly; bursts add particles for one frame; requests
+beyond the free slots are dropped. All settings are per-frame uniforms.
+`ParticleRenderer::readCounts(i)` reads a pool's alive/dead counts back (blocking; tests only).
 
 ## Post-processing (milestone 0.6, ADR-016)
 
