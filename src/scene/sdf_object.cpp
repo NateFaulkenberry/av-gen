@@ -369,7 +369,6 @@ std::string_view nodeKey(char* buf, std::size_t size, int index, NodeField field
 // The link anchor declared in the header: only this translation unit defines it, so every
 // including TU drags sdf_object.cpp.o into the link ahead of pending_wave2.cpp's weak stubs.
 namespace detail {
-const char kSdfObjectAnchor = 0;
 } // namespace detail
 
 // ---- render mode names ---------------------------------------------------------------------------

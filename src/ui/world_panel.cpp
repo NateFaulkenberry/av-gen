@@ -19,15 +19,6 @@ bool startsWith(const std::string& s, std::string_view prefix) {
 const char* const kBeginnerPrefixes[] = {"macros/", "scene/", "env/", "post/", "camera/", "root/"};
 const char* const kIntermediatePrefixes[] = {"procedural/", "field/", "spline/", "sdf/", "material/", "particles/"};
 
-std::string nameFromPath(const std::string& path) {
-    const auto first = path.find('/');
-    if (first == std::string::npos) {
-        return {};
-    }
-    const auto second = path.find('/', first + 1);
-    return path.substr(first + 1, second == std::string::npos ? std::string::npos : second - first - 1);
-}
-
 } // namespace
 
 const char* authoringLayerName(AuthoringLayer layer) {

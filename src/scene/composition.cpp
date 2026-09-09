@@ -172,6 +172,8 @@ const char* shapeName(EmitterShape shape) {
         return "disc";
     case EmitterShape::Box:
         return "box";
+    case EmitterShape::Spline:
+        return "spline";
     }
     return "sphere";
 }

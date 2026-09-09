@@ -73,17 +73,4 @@ struct SdfParameters {
 bool applySdfParameters(const SdfParameters& p, const SdfObject& rest, SdfObject& live);
 void unregisterSdfParameters(params::ParameterSet& params, const SdfParameters& p);
 
-// Link anchor (temporary, paired with the weak stubs in scene/pending_wave2.cpp). Every symbol
-// declared above also has a WEAK definition there, so a static-archive link satisfies the
-// references from that object alone and never pulls scene/sdf_object.cpp in, leaving the stubs
-// in place. Taking the address of a symbol only sdf_object.cpp defines forces that translation
-// unit into every binary that includes this header, and its strong definitions then win.
-// Delete together with pending_wave2.cpp.
-namespace detail {
-extern const char kSdfObjectAnchor; // defined only in scene/sdf_object.cpp
-// One per including translation unit; `used` keeps it (and its relocation against the anchor) in
-// the object file, which is what makes the linker load scene/sdf_object.cpp.o.
-[[maybe_unused]] __attribute__((used)) static const char* const kSdfObjectAnchorRef = &kSdfObjectAnchor;
-} // namespace detail
-
 } // namespace avgen::scene
