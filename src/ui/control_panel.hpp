@@ -10,6 +10,7 @@
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "ui/world_panel.hpp"
 
 #include <filesystem>
 #include <functional>
@@ -75,6 +76,10 @@ public:
 
     void draw(app::Engine& engine, const FrameStats& stats);
 
+    // World authoring (ADR-031): layers, overview, inspector, states, macros, debug options.
+    // The host reads `world.debug` to build the debug-draw geometry each frame.
+    WorldPanel world;
+
     [[nodiscard]] bool showDemo() const { return showDemo_; }
     [[nodiscard]] const std::string& statusMessage() const { return status_; }
     void setStatus(std::string message) { status_ = std::move(message); }
@@ -95,12 +100,14 @@ private:
     void drawRender(app::Engine& engine);
     void drawControlTab(app::Engine& engine);
     void drawOutputsTab(app::Engine& engine);
+    void drawWorldWindow(app::Engine& engine);
 
     bool showDemo_ = false;
     bool showParameters_ = true;
     bool showAnalysis_ = true;
     bool showModulation_ = true;
     bool showRender_ = false;
+    bool showWorld_ = true;
     int newRouteSource_ = 0;
     int newRouteTarget_ = 0;
     int newSourceKind_ = 0;

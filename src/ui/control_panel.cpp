@@ -117,6 +117,7 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
             ImGui::MenuItem("Parameters", nullptr, &showParameters_);
             ImGui::MenuItem("Analysis", nullptr, &showAnalysis_);
             ImGui::MenuItem("Modulation", nullptr, &showModulation_);
+            ImGui::MenuItem("World", nullptr, &showWorld_);
             ImGui::MenuItem("ImGui Demo", nullptr, &showDemo_);
             ImGui::EndMenu();
         }
@@ -160,8 +161,44 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
         }
         ImGui::End();
     }
+    if (showWorld_) {
+        ImGui::SetNextWindowSize(ImVec2(460, 520), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(stats.width > 0 ? std::max(16.0f, stats.width - 480.0f) : 1200.0f, 40),
+                                ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("World", &showWorld_)) {
+            drawWorldWindow(engine);
+        }
+        ImGui::End();
+    }
     if (showDemo_) {
         ImGui::ShowDemoWindow(&showDemo_);
+    }
+}
+
+void ControlPanel::drawWorldWindow(app::Engine& engine) {
+    world.drawLayerSelector();
+    if (ImGui::BeginTabBar("world")) {
+        if (ImGui::BeginTabItem("Overview")) {
+            world.drawOverview(engine);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Inspector")) {
+            world.drawInspector(engine);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("States")) {
+            world.drawStates(engine);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Macros")) {
+            world.drawMacros(engine);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Debug")) {
+            world.drawDebugOptions(engine);
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
     }
 }
 
@@ -523,6 +560,9 @@ void ControlPanel::drawParameters(app::Engine& engine) {
     for (IParameter* param : engine.params().ordered()) {
         if (!param->flags().exposed) {
             continue;
+        }
+        if (!world.shows(param->path())) {
+            continue; // hidden by the authoring layer (World window)
         }
         if (param->group() != currentGroup) {
             if (groupOpen) {
