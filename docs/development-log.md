@@ -987,3 +987,29 @@ project relinking; EXR round trip and EXR render sequences; readback ring determ
   (Windows) does not exist. MIDI clock cold start hands the first downbeat to the analyser.
   EXR is half/ZIP only, no AOVs. Windows and Linux builds remain unexercised (Dawn/SDL keep the
   door open; MIDI, Syphon and native video have stubs there).
+
+## 2026-09-09 — Procedural geometry phase: generators, instancing, deformers, showcase worlds
+
+### What was implemented and why
+
+- Audit and design first (`docs/research/procedural-geometry.md`, ADR-023): one new scene
+  component instead of scene classes. `scene::ProceduralGeometry` = source primitive (box,
+  cylinder, UV sphere, torus) + distribution (single, linear, grid, radial, spiral) + seeded
+  variation + ordered deformer stack (bend, twist, sine, noise, displacement; ≤ 8) + material and
+  per-instance material variation. Instance records (96 bytes) are generated on the CPU only when
+  structure changes; the GPU applies instance transforms and the deformer stack per vertex every
+  frame and recomputes normals by finite differences of the whole stack. One instanced draw per
+  object; the PBR fragment is shared with entities through `pbr_shade.wgsl`.
+- Transform order `world = node × distribution × placement(i) × variation(i) × source`; local
+  deformers before instancing, world deformers after. Deterministic: `hashInstance(seed, index,
+  channel)` on the CPU and the same `pcg3d` value-noise fBM in WGSL and C++.
+- Parameters under `procedural/<node>/…` through the particle-style register/apply pattern, so
+  modulation, timeline, presets, projects, OSC and MIDI need nothing new. Compositions gain a
+  `procedural` node kind (JSON `"procedural": {…}`), a free camera mode
+  (`camera/mode|position|target`) for fly-throughs, and distance fog (`scene/fogDensity|fogColor`).
+- Examples browser (File > Examples, `--example <name>`, `examples/index.json`): the Lab, Temple,
+  Cathedral, Helix, Impossible Chamber, Hyperspace and Benchmark are scene + project files; no C++
+  knows about any of them.
+- Split: primitives/distributions/variation/deformers/parameters (GPU-free) and the instanced
+  renderer + shader + fog + benchmark by two subagents against fixed headers; composition node,
+  camera mode, examples browser, showcase files, presets, timeline demo, docs on main.

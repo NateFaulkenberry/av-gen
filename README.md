@@ -4,7 +4,7 @@ A native C++ real-time GPU audiovisual engine. Not a waveform visualizer: the go
 scene engine in which audio analysis drives a general parameter/modulation system that in turn
 drives GPU-rendered 3D scenes, in real time and as deterministic offline frame sequences.
 
-Milestone 1.2 (complete): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
+Procedural geometry phase (current): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
 and render the built-in orb scene, any glTF 2.0 scene, or a composition of nodes (glTF instances,
 orbs, grids, particle systems, nested scene files) saved as a scene file, with PBR materials,
 textures, punctual lights, an HDR environment and GPU particle systems, behind or on top of user-written
@@ -19,7 +19,10 @@ older versions, and exports as a self-contained bundle folder; offline renders a
 PNG sequences or ProRes/H.264 videos with the audio muxed, from the CLI, a queue, or in the
 background of the live app. Live control: OSC (direct parameter addresses or bindings) and MIDI
 become control signals or set parameters, and a microphone or line input can replace the file. Any number of output windows on any display
-with crop, warp and edge blend, plus Syphon and NDI sharing to other applications.
+with crop, warp and edge blend, plus Syphon and NDI sharing to other applications. Procedural geometry generates worlds: primitives
+instanced by linear, grid, radial and spiral distributions with seeded variation, deformed on the GPU by
+bend, twist, sine, noise and displacement stacks, every knob a modulation target; the Temple, Cathedral,
+Helix, Impossible Chamber and Hyperspace examples are scene files built from it.
 
 ```
 Audio file -> AudioPlayer -> AnalysisRunner -> SignalBus -> Modulator -> ParameterSet
