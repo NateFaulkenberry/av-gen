@@ -81,6 +81,18 @@ only mitigated by the prior; tempo changes inside an offline track get one globa
 derives a per-frame beat clock from these (`beat.*`, see `docs/architecture.md` §4). No smoothing
 is applied at this level; each modulation route smooths independently.
 
+## Live input (milestone 1.1, `audio::AudioInput`)
+
+`AudioInput` opens a miniaudio capture device (default, or the first whose name contains a
+case-insensitive substring; `listCaptureDevices()` enumerates them and marks the default) at its
+native rate or a requested one, and its callback downmixes every block to mono (channel average),
+applies a software gain (clamped to 0..16), tracks the block peak for a level meter and writes the
+`AnalysisStream` exactly as the player does, so the analyser, signals and everything downstream see
+a microphone or line input as if it were a file. There is no play-head: `framesCaptured()` is the
+sample-accurate stream position (a discontinuity at frame 0 is marked on every open) and the
+engine clock is the wall clock. The callback never allocates, locks or logs. macOS asks for
+microphone permission on first use; a denied device opens but delivers silence.
+
 ## Lifecycle and threading
 
 `Engine::loadAudio` decodes the file, installs it in the player (device recreated at the file's
@@ -99,9 +111,10 @@ opt-out for the display vectors is a planned optimisation for long files.
 
 ## Testing
 
-See `docs/testing.md`. Device tests (`[audio][device]`) skip themselves without an output device.
+See `docs/testing.md`. Device tests (`[audio][device]`) skip themselves without an output or
+capture device.
 
 ## Later
 
 Beat tracking and tempo (0.3), loudness via libebur128, pffft/vDSP behind `RealFFT`, streaming
-decode for very long files, live input (1.x) through miniaudio duplex devices.
+decode for very long files, duplex (monitor the live input) devices.
