@@ -81,6 +81,26 @@ add_library(stb INTERFACE)
 target_include_directories(stb SYSTEM INTERFACE "${stb_SOURCE_DIR}")
 add_library(stb::stb ALIAS stb)
 
+# ---- tinyexr (OpenEXR read/write), header-only, implementation in src/assets/exr_impl.cpp -------
+# Release archive v3.2.0 (commit 6f470c9a), SHA256-pinned; the git checkout would also pull the ZFP
+# submodule. We use the classic single header `tinyexr.h` with the bundled miniz for ZIP, not the
+# v3 C11 library that the same release introduces.
+CPMAddPackage(
+    NAME tinyexr
+    URL "https://github.com/syoyo/tinyexr/archive/refs/tags/v3.2.0.tar.gz"
+    URL_HASH SHA256=df2bd61124a35d8138f8b0bc22418a1d4fe33622c818e0e022f5522afc0821b0
+    DOWNLOAD_ONLY YES)
+add_library(tinyexr STATIC EXCLUDE_FROM_ALL "${tinyexr_SOURCE_DIR}/deps/miniz/miniz.c")
+target_include_directories(tinyexr SYSTEM PUBLIC "${tinyexr_SOURCE_DIR}" "${tinyexr_SOURCE_DIR}/deps/miniz")
+target_compile_definitions(tinyexr PUBLIC
+    TINYEXR_USE_MINIZ=1 TINYEXR_USE_STB_ZLIB=0 TINYEXR_USE_NANOZLIB=0 TINYEXR_USE_THREAD=0 TINYEXR_USE_OPENMP=0
+    MINIZ_NO_ARCHIVE_APIS MINIZ_NO_STDIO)
+set_target_properties(tinyexr PROPERTIES C_STANDARD 99)
+if(NOT MSVC)
+    target_compile_options(tinyexr PRIVATE -w) # third-party code: no engine warning flags
+endif()
+add_library(tinyexr::tinyexr ALIAS tinyexr)
+
 # ---- Catch2 (tests) ---------------------------------------------------------------------------
 if(AVGEN_BUILD_TESTS)
     CPMAddPackage(

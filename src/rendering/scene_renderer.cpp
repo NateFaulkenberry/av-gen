@@ -466,6 +466,7 @@ Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
     desc.height = height;
     desc.colorFormat = kHdrFormat;
     desc.depthFormat = kDepthFormat;
+    desc.extraColorUsage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc; // HDR readback
     desc.label = "hdr-target";
     auto target = gpu::RenderTarget::create(context_, desc);
     if (!target) {
@@ -628,6 +629,7 @@ Result<void> SceneRenderer::ensurePostTargets(std::uint32_t width, std::uint32_t
         desc.height = height;
         desc.colorFormat = kHdrFormat;
         desc.depthFormat = wgpu::TextureFormat::Undefined;
+        desc.extraColorUsage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc;
         desc.label = "post-target";
         auto made = gpu::RenderTarget::create(context_, desc);
         if (!made) {
@@ -967,6 +969,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
 
     // ---- post layers: HDR -> ping-pong HDR ----
     wgpu::TextureView finalHdr = hdr_.colorView();
+    hdrOutput_ = hdr_.colorTexture();
     if (layerSet != nullptr) {
         int ping = 0;
         for (const auto& layer : layerSet->layers()) {
@@ -996,6 +999,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             rp.End();
             ++stats_.drawCalls;
             finalHdr = post_[ping].colorView();
+            hdrOutput_ = post_[ping].colorTexture();
             ping = 1 - ping;
         }
     }
@@ -1013,6 +1017,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         postIn.frameIndex = time.frameIndex;
         postIn.settings = &scene.post;
         finalHdr = postProcessor_->run(encoder, postIn, *pool_);
+        if (postProcessor_->outputTexture() != nullptr) {
+            hdrOutput_ = postProcessor_->outputTexture();
+        }
         stats_.post = postProcessor_->stats();
         stats_.transientTextures = static_cast<std::uint32_t>(pool_->size());
     }
@@ -1048,20 +1055,32 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     return {};
 }
 
-Result<gpu::Image8> SceneRenderer::renderToImage(const scene::Scene& scene, const FrameTime& time,
-                                                 std::uint32_t width, std::uint32_t height,
-                                                 const ShaderFrameInputs* shaderInputs) {
+namespace {
+
+Result<wgpu::Texture> makeReadbackTarget(gpu::Context& context, std::uint32_t width, std::uint32_t height) {
     wgpu::TextureDescriptor desc{};
     desc.label = "render-to-image";
     desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc;
     desc.dimension = wgpu::TextureDimension::e2D;
     desc.size = {width, height, 1};
     desc.format = wgpu::TextureFormat::RGBA8Unorm;
-    wgpu::Texture texture = context_.device().CreateTexture(&desc);
+    wgpu::Texture texture = context.device().CreateTexture(&desc);
     if (!texture) {
         return fail("cannot create {}x{} readback texture", width, height);
     }
-    gpu::TargetView target{texture.CreateView(), wgpu::TextureFormat::RGBA8Unorm, width, height};
+    return texture;
+}
+
+} // namespace
+
+Result<wgpu::Texture> SceneRenderer::renderSubmitted(const scene::Scene& scene, const FrameTime& time,
+                                                     std::uint32_t width, std::uint32_t height,
+                                                     const ShaderFrameInputs* shaderInputs) {
+    auto texture = makeReadbackTarget(context_, width, height);
+    if (!texture) {
+        return texture;
+    }
+    gpu::TargetView target{texture->CreateView(), wgpu::TextureFormat::RGBA8Unorm, width, height};
     if (auto r = resize(width, height); !r) {
         return std::unexpected(r.error());
     }
@@ -1074,7 +1093,30 @@ Result<gpu::Image8> SceneRenderer::renderToImage(const scene::Scene& scene, cons
     stats_.gpuFrameMs = timer_->collect();
     context_.waitForQueue();
     stats_.gpuFrameMs = timer_->collect();
-    return gpu::readTexture8(context_, texture, width, height, false);
+    return texture;
+}
+
+Result<gpu::Image8> SceneRenderer::renderToImage(const scene::Scene& scene, const FrameTime& time,
+                                                 std::uint32_t width, std::uint32_t height,
+                                                 const ShaderFrameInputs* shaderInputs) {
+    auto texture = renderSubmitted(scene, time, width, height, shaderInputs);
+    if (!texture) {
+        return std::unexpected(texture.error());
+    }
+    return gpu::readTexture8(context_, *texture, width, height, false);
+}
+
+Result<gpu::ImageF> SceneRenderer::renderToImageFloat(const scene::Scene& scene, const FrameTime& time,
+                                                      std::uint32_t width, std::uint32_t height,
+                                                      const ShaderFrameInputs* shaderInputs) {
+    auto texture = renderSubmitted(scene, time, width, height, shaderInputs);
+    if (!texture) {
+        return std::unexpected(texture.error());
+    }
+    if (hdrOutput_ == nullptr) {
+        return fail("no HDR output texture after render");
+    }
+    return gpu::readTextureF16(context_, hdrOutput_, width, height);
 }
 
 } // namespace avgen::rendering

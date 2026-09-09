@@ -3,6 +3,7 @@
 
 #include "app/engine.hpp"
 #include "app/render_job.hpp"
+#include "assets/exr.hpp"
 #include "assets/image.hpp"
 #include "assets/video_writer.hpp"
 #include "audio/audio_file.hpp"
@@ -15,6 +16,7 @@
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -58,6 +60,11 @@ struct ProjectFixture {
         track.addKey({.time = 0.0, .value = {0.5f}});
         track.addKey({.time = 2.0, .value = {2.0f}});
         engine.timeline().addTrack(track);
+        // A hot emissive so the orb exceeds 1.0 in linear light (the EXR test looks for it).
+        params::Track glow;
+        glow.target = "orb/emissive";
+        glow.addKey({.time = 0.0, .value = {6.0f}});
+        engine.timeline().addTrack(glow);
         project = dir / "show.json";
         REQUIRE(engine.saveProject(project).has_value());
     }
@@ -83,6 +90,12 @@ app::RenderSettings smallSettings(const fs::path& out) {
     s.endSeconds = 1.5;
     s.outputPath = out;
     s.encoderThreads = 2;
+    return s;
+}
+
+app::RenderSettings smallSettingsExr(const fs::path& out) {
+    auto s = smallSettings(out);
+    s.output = app::RenderOutput::ExrSequence;
     return s;
 }
 
@@ -184,4 +197,116 @@ TEST_CASE("Render job writes a video with audio when a backend is available", "[
     CHECK(job.progress().framesWritten == 10);
     REQUIRE(fs::exists(f.dir / "out.mov"));
     CHECK(fs::file_size(f.dir / "out.mov") > 1024);
+}
+
+TEST_CASE("Render job readback ring matches the synchronous path frame for frame", "[gpu][render]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+    auto settings = smallSettings(f.dir / "ring");
+    settings.endSeconds = 2.5; // 20 frames at 10 fps
+    std::vector<std::uint64_t> ringHashes;
+    {
+        app::RenderJob job(*ctx, shaders, loadOffline(f.project), settings, f.dir);
+        REQUIRE(job.run().has_value());
+        ringHashes = job.frameHashes();
+        CHECK(job.progress().framesReadBack == 20);
+    }
+    REQUIRE(ringHashes.size() == 20);
+
+    // The classic path: a fresh engine and renderer, one renderToImage (submit + wait) per frame.
+    auto engine = loadOffline(f.project);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    REQUIRE(renderer.resize(settings.width, settings.height).has_value());
+    FixedStepClock clock(settings.fps);
+    clock.restartAt(settings.startSeconds);
+    engine->seekSeconds(settings.startSeconds);
+    for (std::size_t i = 0; i < ringHashes.size(); ++i) {
+        const FrameTime time = engine->tick(clock);
+        engine->update(time);
+        const rendering::ShaderFrameInputs inputs{&engine->shaderLayers(),
+                                                  engine->hasFrame() ? &engine->latestFrame() : nullptr};
+        auto image = renderer.renderToImage(engine->scene(), time, settings.width, settings.height, &inputs);
+        REQUIRE(image.has_value());
+        INFO("frame " << i);
+        CHECK(gpu::hashImage(*image) == ringHashes[i]);
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Render job writes a scene-linear EXR sequence deterministically", "[gpu][render][exr]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+    auto settings = smallSettings(f.dir / "exr");
+    settings.output = app::RenderOutput::ExrSequence;
+    app::RenderProgress p;
+    {
+        app::RenderJob job(*ctx, shaders, loadOffline(f.project), settings, f.dir);
+        REQUIRE(job.start().has_value());
+        CHECK(job.settings().pattern == "frame_{:06d}.exr");
+        REQUIRE(job.run().has_value());
+        p = job.progress();
+    }
+    CHECK(p.framesRendered == 10);
+    CHECK(p.framesWritten == 10);
+    CHECK(p.error.empty());
+    float brightest = 0.0f;
+    for (int i = 0; i < 10; ++i) {
+        const auto file = f.dir / "exr" / fmt::format("frame_{:06d}.exr", i);
+        INFO(file.string());
+        REQUIRE(fs::exists(file));
+        auto image = assets::readExr(file);
+        REQUIRE(image.has_value());
+        CHECK(image->width == 96);
+        CHECK(image->height == 64);
+        for (const float v : assets::floatPixels(*image)) {
+            brightest = std::max(brightest, v);
+        }
+    }
+    CHECK_FALSE(fs::exists(f.dir / "exr" / "frame_000010.exr"));
+    CHECK_FALSE(fs::exists(f.dir / "exr" / "frame_000000.png"));
+    // Scene-linear light before tone mapping: the emissive orb is brighter than anything an 8-bit
+    // PNG can hold.
+    CHECK(brightest > 1.0f);
+
+    // The sync float readback agrees with the ring on frame 0.
+    {
+        auto engine = loadOffline(f.project);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        FixedStepClock clock(settings.fps);
+        clock.restartAt(settings.startSeconds);
+        engine->seekSeconds(settings.startSeconds);
+        const FrameTime time = engine->tick(clock);
+        engine->update(time);
+        const rendering::ShaderFrameInputs inputs{&engine->shaderLayers(),
+                                                  engine->hasFrame() ? &engine->latestFrame() : nullptr};
+        auto image = renderer.renderToImageFloat(engine->scene(), time, settings.width, settings.height, &inputs);
+        REQUIRE(image.has_value());
+        CHECK(image->rgba.size() == 96u * 64u * 4u);
+        auto first = assets::readExr(f.dir / "exr" / "frame_000000.exr");
+        REQUIRE(first.has_value());
+        const auto px = assets::floatPixels(*first);
+        REQUIRE(px.size() == image->rgba.size());
+        std::size_t mismatches = 0;
+        for (std::size_t i = 0; i < px.size(); ++i) {
+            if (px[i] != image->rgba[i]) {
+                ++mismatches;
+            }
+        }
+        CHECK(mismatches == 0);
+    }
+
+    // A second EXR render: same hashes and byte-identical files.
+    app::RenderJob again(*ctx, shaders, loadOffline(f.project), smallSettingsExr(f.dir / "exr2"), f.dir);
+    REQUIRE(again.run().has_value());
+    CHECK(again.progress().sequenceHash == p.sequenceHash);
+    CHECK(again.progress().lastFrameHash == p.lastFrameHash);
+    std::ifstream a(f.dir / "exr" / "frame_000005.exr", std::ios::binary), b(f.dir / "exr2" / "frame_000005.exr", std::ios::binary);
+    std::string sa((std::istreambuf_iterator<char>(a)), {}), sb((std::istreambuf_iterator<char>(b)), {});
+    CHECK(sa.size() > 0);
+    CHECK(sa == sb);
+    CHECK(ctx->errorCount() == 0);
 }

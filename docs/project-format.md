@@ -218,9 +218,11 @@ sidecar `.bin`/image files next to a `.gltf` come along) and writes `<dir>/proje
 ```
 
 `end` < 0 means the audio duration (else the timeline's, else 10 s). `path` is relative to the
-project. `output` is `sequence` (PNG files named by `pattern`) or `video`. Codecs: `prores4444`,
-`prores422`, `h264`, `hevc` on the native macOS backend, or any encoder name for a user-supplied
-ffmpeg (`backend: "ffmpeg"`). CLI overrides: `--render <out>`, `--size`, `--fps`, `--range a:b`,
+project. `output` is `sequence` (tone-mapped 8-bit PNG files named by `pattern`), `exr`
+(scene-linear half-float OpenEXR files, before tone mapping; `pattern` defaults to
+`frame_{:06d}.exr` when absent) or `video`. Codecs: `prores4444`, `prores422`, `h264`, `hevc` on
+the native macOS backend, or any encoder name for a user-supplied ffmpeg (`backend: "ffmpeg"`).
+CLI overrides: `--render <out>`, `--output png|exr|video`, `--size`, `--fps`, `--range a:b`,
 `--codec`, `--quality`.
 
 ## Outputs block (milestone 1.2)

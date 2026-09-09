@@ -128,6 +128,14 @@ public:
     [[nodiscard]] Result<gpu::Image8> renderToImage(const scene::Scene& scene, const FrameTime& time,
                                                     std::uint32_t width, std::uint32_t height,
                                                     const ShaderFrameInputs* shaderInputs = nullptr);
+    // Full frame, then the scene-linear HDR image the tonemap pass read (RGBA16F after the post
+    // chain, before tone mapping), submitted and read back as floats. For EXR output and tests.
+    [[nodiscard]] Result<gpu::ImageF> renderToImageFloat(const scene::Scene& scene, const FrameTime& time,
+                                                         std::uint32_t width, std::uint32_t height,
+                                                         const ShaderFrameInputs* shaderInputs = nullptr);
+    // The RGBA16F texture the tonemap pass sampled in the last render() (the HDR target or the
+    // last post output; CopySrc usage), for asynchronous HDR readback. Null before the first frame.
+    [[nodiscard]] const wgpu::Texture& hdrOutputTexture() const { return hdrOutput_; }
 
     // Hot reload of the engine's own WGSL files: rebuilds every pipeline whose shader compiles,
     // keeps the previous pipeline for any that fails, and returns the first error.
@@ -161,6 +169,9 @@ private:
     };
     enum class LitVariant : std::uint8_t { OpaqueCull, OpaqueNoCull, Blend };
 
+    // Renders into a fresh RGBA8 texture with CopySrc usage, submits and waits (the sync path).
+    Result<wgpu::Texture> renderSubmitted(const scene::Scene& scene, const FrameTime& time, std::uint32_t width,
+                                          std::uint32_t height, const ShaderFrameInputs* shaderInputs);
     Result<void> createPipelines();
     Result<wgpu::RenderPipeline> createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant);
     Result<wgpu::RenderPipeline> createGridPipeline(const wgpu::ShaderModule& module);
@@ -199,6 +210,7 @@ private:
     bool initialised_ = false;
 
     gpu::RenderTarget hdr_;
+    wgpu::Texture hdrOutput_;
     wgpu::BindGroupLayout frameLayout_;
     wgpu::BindGroupLayout objectLayout_;
     wgpu::BindGroupLayout materialLayout_;

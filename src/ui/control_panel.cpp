@@ -1050,9 +1050,15 @@ void ControlPanel::drawRender(app::Engine& engine) {
     const double end = s.resolvedEnd(engine.durationSeconds(), engine.timeline().durationSeconds());
     ImGui::TextDisabled("%llu frames (%.2f s .. %.2f s)", static_cast<unsigned long long>(s.frameCount(end)),
                         s.startSeconds, end);
-    int output = s.output == app::RenderOutput::Video ? 1 : 0;
+    int output = s.output == app::RenderOutput::Video ? 1 : s.output == app::RenderOutput::ExrSequence ? 2 : 0;
     if (ImGui::RadioButton("PNG sequence", &output, 0)) {
         s.output = app::RenderOutput::PngSequence;
+        s.normalisePattern();
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("EXR sequence", &output, 2)) {
+        s.output = app::RenderOutput::ExrSequence;
+        s.normalisePattern();
     }
     ImGui::SameLine();
     if (ImGui::RadioButton("Video", &output, 1)) {

@@ -2,16 +2,20 @@
 
 // An offline render (milestone 1.0, ADR-020): a dedicated Offline engine (fixed-step clock,
 // precomputed analysis) drives a SceneRenderer into an offscreen target; every frame is read
-// back, hashed, and handed to encoder threads (PNG) or the video writer. `step()` renders a
-// bounded number of frames so the live application can run a job between UI frames; the
-// headless CLI just loops until done. Frame f is rendered at time start + f / fps and depends on
-// nothing but the project and f (ADR-012), so the per-frame hashes are the determinism check.
+// back through a gpu::ReadbackRing (the copy rides in the frame's command buffer and the render
+// thread keeps submitting while the GPU finishes earlier frames), hashed in frame order, and
+// handed to encoder threads (PNG or EXR) or the video writer. `step()` renders a bounded number
+// of frames so the live application can run a job between UI frames; the headless CLI just loops
+// until done. Frame f is rendered at time start + f / fps and depends on nothing but the project
+// and f (ADR-012), so the per-frame hashes are the determinism check. EXR output reads the
+// scene-linear RGBA16F image before tone mapping; PNG and video read the tone-mapped RGBA8.
 
 #include "app/engine.hpp"
 #include "app/render_settings.hpp"
 #include "assets/video_writer.hpp"
 #include "core/error.hpp"
 #include "gpu/readback.hpp"
+#include "gpu/readback_ring.hpp"
 #include "rendering/scene_renderer.hpp"
 
 #include <atomic>
@@ -29,7 +33,8 @@
 namespace avgen::app {
 
 struct RenderProgress {
-    std::uint64_t framesRendered = 0;
+    std::uint64_t framesRendered = 0;  // submitted to the GPU
+    std::uint64_t framesReadBack = 0;  // read back and hashed (<= framesRendered while in flight)
     std::uint64_t framesTotal = 0;
     std::uint64_t framesWritten = 0;   // encoded and on disk / in the video
     double elapsedSeconds = 0.0;
@@ -68,13 +73,19 @@ public:
     [[nodiscard]] const std::filesystem::path& outputPath() const { return output_; }
     [[nodiscard]] Engine& engine() { return *engine_; }
     [[nodiscard]] double resolvedEndSeconds() const { return end_; }
+    // Per-frame hashes of the frames read back so far, in frame order (determinism checks).
+    [[nodiscard]] const std::vector<std::uint64_t>& frameHashes() const { return frameHashes_; }
 
 private:
     struct Pending {
         std::uint64_t index = 0;
-        gpu::Image8 image;
+        gpu::Image8 image;  // PNG / video
+        gpu::ImageF imageF; // EXR
     };
     [[nodiscard]] Result<void> renderOne();
+    // Hands completed readbacks to the encoders; `all` waits for every frame in flight first.
+    [[nodiscard]] Result<void> drain(bool all);
+    void handleFrame(gpu::ReadbackRing::Frame frame);
     [[nodiscard]] Result<void> finish();
     void encoderLoop();
     void fail(std::string message);
@@ -86,13 +97,19 @@ private:
     std::filesystem::path baseDir_;
     std::filesystem::path output_;
     std::unique_ptr<rendering::SceneRenderer> renderer_;
+    std::unique_ptr<gpu::ReadbackRing> ring_; // after renderer_: destroyed (and flushed) first
+    wgpu::Texture ldr_;                       // tone-mapped RGBA8 target (CopySrc)
+    wgpu::TextureView ldrView_;
     std::unique_ptr<assets::VideoWriter> video_;
     std::unique_ptr<FixedStepClock> clock_;
     double end_ = 0.0;
     std::uint64_t total_ = 0;
     std::uint64_t rendered_ = 0;
+    std::uint64_t readBack_ = 0;
+    double encoderWaitSeconds_ = 0.0; // render thread blocked on a full encoder queue
     std::uint64_t sequenceHash_ = 14695981039346656037ull;
     std::uint64_t lastHash_ = 0;
+    std::vector<std::uint64_t> frameHashes_;
     std::chrono::steady_clock::time_point startedAt_;
     bool started_ = false;
     bool done_ = false;

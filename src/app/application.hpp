@@ -63,6 +63,7 @@ struct AppOptions {
     std::optional<std::filesystem::path> queue;
     std::optional<double> rangeStart, rangeEnd;
     std::optional<std::string> codec;
+    std::optional<RenderOutput> renderOutput; // --output png|exr|video
     std::optional<int> quality;
     std::optional<std::uint32_t> renderWidth, renderHeight;
     // Live control (1.1): --input [device], --osc-port <n>, --list-audio-devices, --list-midi

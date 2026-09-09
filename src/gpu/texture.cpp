@@ -191,6 +191,47 @@ std::uint16_t floatToHalf(float value) {
     return static_cast<std::uint16_t>(sign | half);
 }
 
+float halfToFloat(std::uint16_t half) {
+    const std::uint32_t sign = static_cast<std::uint32_t>(half >> 15) << 31;
+    const std::uint32_t exponent = (half >> 10) & 0x1Fu;
+    std::uint32_t mantissa = half & 0x3FFu;
+    std::uint32_t bits;
+    if (exponent == 0) {
+        if (mantissa == 0) {
+            bits = sign; // signed zero
+        } else {
+            // Subnormal half: normalise by shifting until the implicit bit is at bit 10.
+            std::uint32_t shift = 0;
+            while ((mantissa & 0x400u) == 0) {
+                mantissa <<= 1;
+                ++shift;
+            }
+            mantissa &= 0x3FFu;
+            bits = sign | ((113u - shift) << 23) | (mantissa << 13);
+        }
+    } else if (exponent == 31) {
+        bits = sign | 0x7F800000u | (mantissa << 13); // inf / nan
+    } else {
+        bits = sign | ((exponent + 112u) << 23) | (mantissa << 13);
+    }
+    float value;
+    std::memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+void halfToFloatArray(const std::uint16_t* halves, float* out, std::size_t count) {
+    static const std::vector<float> table = [] {
+        std::vector<float> t(65536);
+        for (std::uint32_t i = 0; i < 65536; ++i) {
+            t[i] = halfToFloat(static_cast<std::uint16_t>(i));
+        }
+        return t;
+    }();
+    for (std::size_t i = 0; i < count; ++i) {
+        out[i] = table[halves[i]];
+    }
+}
+
 Result<GpuTexture> uploadTextureAsHalf(Context& context, const scene::TextureData& data, bool mips) {
     if (!data.valid() || !data.isHdr()) {
         return fail("uploadTextureAsHalf requires a valid Rgba32Float image ('{}')", data.name);
