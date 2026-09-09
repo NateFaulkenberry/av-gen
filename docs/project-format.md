@@ -222,7 +222,7 @@ project. `output` is `sequence` (tone-mapped 8-bit PNG files named by `pattern`)
 (scene-linear half-float OpenEXR files, before tone mapping; `pattern` defaults to
 `frame_{:06d}.exr` when absent) or `video`. Codecs: `prores4444`, `prores422`, `h264`, `hevc` on
 the native macOS backend, or any encoder name for a user-supplied ffmpeg (`backend: "ffmpeg"`).
-CLI overrides: `--render <out>`, `--output png|exr|video`, `--size`, `--fps`, `--range a:b`,
+CLI overrides: `--render <out>`, `--format png|exr|video`, `--size`, `--fps`, `--range a:b`,
 `--codec`, `--quality`.
 
 ## Outputs block (milestone 1.2)

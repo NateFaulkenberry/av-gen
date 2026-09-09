@@ -36,7 +36,7 @@ std::string usageText() {
            "  --export-bundle <d> copy every referenced asset into <d>/assets and write <d>/project.json\n"
            "  --render <out>      offline render (headless) to a PNG sequence directory or a video file\n"
            "                      (.mov/.mp4/...); size/fps/range/codec from the project's render settings\n"
-           "  --output <kind>     render output kind: png (default for a directory), exr (scene-linear half\n"
+           "  --format <kind>     render output kind: png (default for a directory), exr (scene-linear half\n"
            "                      EXR sequence, before tone mapping), or video\n"
            "  --range <a>:<b>     render time range in seconds (either side may be empty)\n"
            "  --codec <id>        video codec: prores4444, prores422, h264, hevc, or an ffmpeg encoder name\n"
@@ -130,8 +130,8 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             options.queue = *v;
             options.headless = true;
             ++i;
-        } else if (arg == "--output") {
-            auto v = need(i, "--output");
+        } else if (arg == "--format") {
+            auto v = need(i, "--format");
             if (!v) return std::unexpected(v.error());
             if (*v == "png" || *v == "sequence") {
                 options.renderOutput = RenderOutput::PngSequence;

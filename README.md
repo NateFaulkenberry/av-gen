@@ -4,7 +4,7 @@ A native C++ real-time GPU audiovisual engine. Not a waveform visualizer: the go
 scene engine in which audio analysis drives a general parameter/modulation system that in turn
 drives GPU-rendered 3D scenes, in real time and as deterministic offline frame sequences.
 
-Milestone 1.2 (current): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
+Milestone 1.2 (complete): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
 and render the built-in orb scene, any glTF 2.0 scene, or a composition of nodes (glTF instances,
 orbs, grids, particle systems, nested scene files) saved as a scene file, with PBR materials,
 textures, punctual lights, an HDR environment and GPU particle systems, behind or on top of user-written
@@ -52,7 +52,7 @@ python3 tools/make_test_audio.py /tmp/track.wav        # deterministic 120 BPM t
 ./build/debug/src/avgen --project show.json --export-bundle ./show_bundle   # self-contained folder
 ./build/debug/src/avgen --project show.json --render renders/show.mov --codec prores422   # offline video
 ./build/debug/src/avgen --project show.json --render renders/frames --size 3840x2160 --fps 60 --range 10:20
-./build/debug/src/avgen --project show.json --render renders/exr --output exr                  # scene-linear EXRs
+./build/debug/src/avgen --project show.json --render renders/exr --format exr                  # scene-linear EXRs
 ./build/debug/src/avgen --queue jobs.json                            # batch renders
 ./build/debug/src/avgen --project show.json --input --osc-port 9000 # live input + OSC/MIDI control (docs/control.md)
 ./build/debug/src/avgen --audio /tmp/track.wav --shader shaders/examples/feedback.wgsl --post my_post.wgsl

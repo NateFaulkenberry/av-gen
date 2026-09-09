@@ -871,7 +871,7 @@ because notifications coalesce).
   `SceneRenderer::renderToImageFloat` and `hdrOutputTexture()` (the RGBA16F image the tonemap
   pass sampled: HDR target, last post layer or the post chain's composite; those targets and the
   transient pool's default usage gained `CopySrc`). `RenderOutput::ExrSequence`
-  (`"output": "exr"`, `--output exr`, UI radio, default pattern `frame_{:06d}.exr`) writes half
+  (`"output": "exr"`, `--format exr`, UI radio, default pattern `frame_{:06d}.exr`) writes half
   EXRs from the ring's float path on the encoder threads.
 - PNG deflate now goes through miniz (level 2) instead of stb_image_write's compressor: once the
   readback no longer stalled, the encoders were the bottleneck. Encoder threads clamp at 16.
@@ -957,3 +957,33 @@ reproduce. The live application is unaffected in practice (its first frames are 
 
 Milestone 1.2 (live performance outputs), then AOVs (depth, velocity, emissive) as extra EXR
 channels and temporal supersampling for motion blur in the offline path.
+
+### Tests
+
+385 cases (was 349): output mapping (homographies, blend weights, JSON) and GPU mapper cases
+(identity, crop, flip, blend ramps, warp), window smoke; Syphon self-receive through a real
+`SyphonMetalClient` (solid and gradient frames, RGBA and BGRA, burst + resize), NDI skipped
+without the runtime; MIDI clock tracker (jittered 120 BPM, dropped ticks, tempo change) and the
+engine tempo source; OSC query/feedback over UDP; composition parenting; SHA-256 vectors and
+project relinking; EXR round trip and EXR render sequences; readback ring determinism.
+
+### Results
+
+- Second output window from the CLI (`--output 0:640x360`) alongside the main window: 120 fps,
+  0 GPU errors, the output saved in the project and restored.
+- Syphon server from the CLI (`--syphon avgen`) with the composition project: 120 fps; the
+  self-receive test verifies pixels through a real client; `publish()` costs 0.07 ms average.
+- Offline: PNG sequences 96 → 186 fps at 720p and 49 → 89 fps at 1080p (readback ring plus
+  miniz deflate); EXR half sequences 83 / 41 fps; sequence hashes unchanged by the ring.
+- The first-renderer quirk was bisected to no pass: it follows frame cost and disappears after a
+  one-second idle, so it is attributed to driver-side pipeline binary swapping; the warm-up
+  stays, with `AVGEN_NO_WARMUP=1` to reproduce.
+- Debug and Release: 385/385 tests pass; zero warnings.
+
+### Known limitations
+
+- No mesh warp or mask images per output; a single homography and per-side blends. Syphon and
+  IOSurface are macOS only; NDI is untested against a live receiver (no runtime here); Spout
+  (Windows) does not exist. MIDI clock cold start hands the first downbeat to the analyser.
+  EXR is half/ZIP only, no AOVs. Windows and Linux builds remain unexercised (Dawn/SDL keep the
+  door open; MIDI, Syphon and native video have stubs there).
