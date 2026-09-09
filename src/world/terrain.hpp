@@ -83,8 +83,26 @@ using FrustumPlanes = std::array<glm::vec4, 6>;
 [[nodiscard]] FrustumPlanes frustumPlanes(const glm::mat4& viewProjection);
 [[nodiscard]] bool aabbVisible(const FrustumPlanes& planes, const glm::vec3& min, const glm::vec3& max);
 
+// A chunk's height field, sampled once at LOD 0 spacing with a one-cell border. Every level of the
+// chunk is then a stride through it, which is what makes the levels agree exactly and costs one
+// height evaluation per point instead of the five an analytic normal needs.
+struct ChunkField {
+    int side = 0;          // resolution + 3: the chunk's grid plus a border cell on each side
+    float step = 1.0f;     // LOD 0 spacing, in metres
+    glm::vec2 origin{0.0f};// world XZ of grid index (0, 0), one cell before the chunk's corner
+    std::vector<float> heights;
+    [[nodiscard]] float at(int i, int j) const;         // chunk coordinates: -1 .. resolution + 1
+    [[nodiscard]] glm::vec3 normalAt(int i, int j) const;
+};
+[[nodiscard]] ChunkField sampleChunkField(const WorldMap& map, const TerrainSettings& settings, glm::ivec2 coord);
+
 // Builds every chunk at every level. `emit(chunkIndex, lod, mesh)` receives each mesh in build
 // order; the caller decides where meshes live. Returns the chunks with bounds filled in.
+//
+// The meshes themselves are built on as many threads as the machine has, because a world is a few
+// hundred chunks of independent arithmetic and doing it serially is seconds of a cold start. `emit`
+// is still called once per mesh, in order, on the calling thread: it hands meshes to the Scene,
+// which is not thread safe and does not need to be.
 [[nodiscard]] std::vector<TerrainChunk> buildTerrain(
     const WorldMap& map, const TerrainSettings& settings,
     const std::function<scene::MeshId(std::size_t chunkIndex, int lod, scene::MeshData&& mesh)>& emit);

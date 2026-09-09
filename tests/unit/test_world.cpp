@@ -4,6 +4,7 @@
 // meeting at a seam agree on where the ground is.
 
 #include "world/terrain.hpp"
+#include "scene/scene.hpp"
 #include "world/world_map.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -329,4 +330,32 @@ TEST_CASE("building a terrain emits every level of every chunk", "[unit][terrain
             CHECK(c.meshes[static_cast<std::size_t>(lod)] != scene::kInvalidMesh);
         }
     }
+}
+
+TEST_CASE("mesh bounds are cached against the mesh version", "[unit][scene]") {
+    // Scene::bounds() runs every frame and a mesh's bounds are a scan of all its vertices. With a
+    // world's worth of terrain that is hundreds of thousands of vertex reads per frame to recompute
+    // numbers that have not changed. The cache has to follow meshVersion exactly: too eager and the
+    // renderer sizes its shadow cascades to geometry that is gone.
+    scene::Scene s;
+    scene::MeshData a;
+    a.vertices = {{{-1.0f, -2.0f, -3.0f}, {0, 1, 0}, {0, 0}}, {{4.0f, 5.0f, 6.0f}, {0, 1, 0}, {0, 0}}};
+    a.indices = {0, 1, 0};
+    const scene::MeshId id = s.addMesh(std::move(a));
+    CHECK(s.meshBounds(id).first == glm::vec3(-1.0f, -2.0f, -3.0f));
+    CHECK(s.meshBounds(id).second == glm::vec3(4.0f, 5.0f, 6.0f));
+
+    // Adding a mesh bumps the version, so the new one is measured rather than read off the end.
+    scene::MeshData b;
+    b.vertices = {{{10.0f, 10.0f, 10.0f}, {0, 1, 0}, {0, 0}}, {{12.0f, 14.0f, 16.0f}, {0, 1, 0}, {0, 0}}};
+    b.indices = {0, 1, 0};
+    const scene::MeshId second = s.addMesh(std::move(b));
+    CHECK(s.meshBounds(second).second == glm::vec3(12.0f, 14.0f, 16.0f));
+    CHECK(s.meshBounds(id).first == glm::vec3(-1.0f, -2.0f, -3.0f));
+
+    // An edit that bumps the version is picked up; an out-of-range id is not a crash.
+    s.meshes[id].vertices[1].position = glm::vec3(40.0f, 50.0f, 60.0f);
+    ++s.meshVersion;
+    CHECK(s.meshBounds(id).second == glm::vec3(40.0f, 50.0f, 60.0f));
+    CHECK(s.meshBounds(scene::kInvalidMesh).first == glm::vec3(0.0f));
 }

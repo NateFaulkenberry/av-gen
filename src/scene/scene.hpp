@@ -43,12 +43,21 @@ struct Scene {
     std::uint64_t textureVersion = 0; // incremented when textures change
 
     MeshId addMesh(MeshData mesh);
+    // A mesh's world-space-agnostic bounds, computed once per `meshVersion`. MeshData::bounds()
+    // scans every vertex, and bounds() below is called every frame by the renderer to size the
+    // shadow cascades; before terrain that was a handful of meshes and now it is a world's worth,
+    // so the answer is cached against the version that already says when meshes changed.
+    [[nodiscard]] const std::pair<glm::vec3, glm::vec3>& meshBounds(MeshId mesh) const;
     TextureId addTexture(TextureData texture);
     Entity& addEntity(std::string name, MeshId mesh);
     PunctualLight& addLight(PunctualLight light);
     // World-space bounds over visible lit entities (their mesh bounds transformed by their matrix).
     [[nodiscard]] std::pair<glm::vec3, glm::vec3> bounds() const;
     void clear();
+
+private:
+    mutable std::vector<std::pair<glm::vec3, glm::vec3>> meshBoundsCache_;
+    mutable std::uint64_t meshBoundsVersion_ = ~0ULL;
 };
 
 } // namespace avgen::scene

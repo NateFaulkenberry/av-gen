@@ -7,6 +7,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <limits>
@@ -1714,6 +1715,7 @@ void Composition::rebuild() {
             // The whole world is built here, once. Chunk meshes are static: only which of a chunk's
             // four meshes is drawn, and whether it is drawn at all, changes per frame.
             CompositionNode& mutableNode = *nodePtr;
+            const auto buildStart = std::chrono::steady_clock::now();
             mutableNode.chunks = world::buildTerrain(
                 node.worldMap, node.terrain,
                 [&](std::size_t, int, MeshData&& mesh) { return scene_.addMesh(std::move(mesh)); });
@@ -1735,8 +1737,11 @@ void Composition::rebuild() {
                 }
                 return t;
             }();
-            log::info("terrain '{}': {} chunks, {} triangles at LOD 0", node.name, mutableNode.chunks.size(),
-                      triangles);
+            const auto buildMs = std::chrono::duration<double, std::milli>(
+                                     std::chrono::steady_clock::now() - buildStart)
+                                     .count();
+            log::info("terrain '{}': {} chunks, {} triangles at LOD 0, built in {:.0f} ms", node.name,
+                      mutableNode.chunks.size(), triangles, buildMs);
             break;
         }
         case NodeKind::Particles: {

@@ -89,8 +89,11 @@ where "high" is.
 
 ## Consequences
 A 640 m world at 40 m chunks and 1.25 m spacing is 256 chunks, 590k triangles at LOD 0, about 18 MB
-of vertex data, and roughly 2.5 s to build at load. The build is single-threaded and obvious to
-parallelise if it becomes a problem; it has not yet.
+of vertex data, and 28 ms to build at load (1.3 s in a debug build). The first version took 2.5 s
+and 30 s respectively, which was slow enough to read as a hang; `docs/world.md` records the three
+changes that closed it. The one worth repeating here is that a chunk samples its height field once,
+at LOD 0 spacing with a one-cell border, and every level of that chunk is a stride through it --
+that is both the optimisation and the reason the levels agree exactly.
 
 Frustum culling sets `Entity::visible`, which the shadow pass also honours, so a chunk behind the
 camera stops casting into the frame. That is wrong in principle and has not been visible in

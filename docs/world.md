@@ -140,16 +140,35 @@ by another name.
 ## Costs
 
 640 m at 40 m chunks and 1.25 m spacing: 256 chunks, 590k triangles at LOD 0, ~18 MB of vertex data,
-~2.5 s to build at load, single-threaded. A 720p offline frame of bare terrain is 14--16 ms on an
-M2 Max, which is the same frame time the fully dressed Kenney grove ran at -- terrain is not what
-the frame is spent on.
+**28 ms** to build at load in a release build (1.3 s in a debug one). It was 2.5 s and 30 s, and the
+89x came from two changes and one measurement:
+
+- A chunk samples its heights **once**, on a grid at LOD 0 spacing with a one-cell border, and every
+  level of that chunk is a stride through it. That is one height evaluation per point instead of the
+  five an analytic normal needs, and it is shared across four levels instead of repeated. The border
+  cell is what lets an edge vertex use a centred difference, so two chunks still agree bitwise along
+  a shared seam.
+- Chunks are built **across the machine's cores**. Each thread owns whole chunks and writes only its
+  own slots; the shared state is the map, and sampling a map is a pure function. `emit` is still
+  serial, because it hands meshes to the Scene.
+- The cost was then dominated by asking every feature how far away every sample was -- a smoothed
+  river is a hundred segments, and most samples are nowhere near it. Each feature now carries the
+  box outside which its weight is exactly zero, which is one compare and cuts the debug build by 3x.
+
+At 2880x1800 a frame of bare terrain is 11--14 ms of GPU time, which is the same as the fully
+dressed Kenney grove and about the same as the grove takes windowed. Terrain is not what the frame
+is spent on: with volumetrics off the same frame is 12 ms, so the volumetric march remains the dial,
+as it was before there was a world.
+
+`Scene::bounds()` is called every frame to size the shadow cascades, and it used to rescan every
+vertex of every visible mesh to do it. Terrain made that a few hundred thousand vertex reads per
+frame; mesh bounds are now cached against `meshVersion`.
 
 ## Known limitations
 
 - Frustum culling sets `Entity::visible`, which the shadow pass also honours, so a chunk behind the
   camera stops casting into the frame. Not visible with the low keys this world uses; the fix when
   it matters is to cull against a frustum extended along the light direction, not to stop culling.
-- The chunk build is single-threaded.
 - LOD is chosen by distance, not by screen-space error, so a `lodDistance` tuned for one focal
   length is wrong for another.
 - There is no water surface yet. A river reads as a dark notch until phase 4.

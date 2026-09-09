@@ -194,6 +194,9 @@ float WorldMap::height(glm::vec2 p) const {
     float cutTarget = std::numeric_limits<float>::max();
     float cutWeight = 0.0f;
     for (const Feature& f : features) {
+        if (!f.reaches(p)) {
+            continue; // exactly equivalent to a zero weight, and it costs one compare
+        }
         const PathHit hit = closestOnPath(f.samplePath(), p);
         const float w = featureWeight(hit.distance, f.width, f.falloff);
         if (w <= 0.0f) {
@@ -252,7 +255,7 @@ glm::vec3 WorldMap::normal(glm::vec2 p, float epsilon) const {
 float WorldMap::waterSurface(glm::vec2 p) const {
     float surface = seaLevel;
     for (const Feature& f : features) {
-        if (!f.water) {
+        if (!f.water || !f.reaches(p)) {
             continue;
         }
         const PathHit hit = closestOnPath(f.samplePath(), p);
@@ -278,6 +281,14 @@ Sample WorldMap::sample(glm::vec2 p, float epsilon) const {
 void WorldMap::prepare() {
     for (Feature& f : features) {
         f.curve = f.smoothing > 0 && f.path.size() >= 3 ? chaikin(f.path, f.smoothing) : std::vector<glm::vec3>{};
+        glm::vec2 lo(std::numeric_limits<float>::max());
+        glm::vec2 hi(std::numeric_limits<float>::lowest());
+        for (const glm::vec3& q : f.samplePath()) {
+            lo = glm::min(lo, glm::vec2(q.x, q.z));
+            hi = glm::max(hi, glm::vec2(q.x, q.z));
+        }
+        f.boundsMin = lo - glm::vec2(f.width);
+        f.boundsMax = hi + glm::vec2(f.width);
     }
     // A coarse survey rather than the exact extremes: 97 samples a side is enough to place the
     // range within a metre or two, and what altitude blending needs is a stable reference every

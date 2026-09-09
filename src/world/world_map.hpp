@@ -76,6 +76,15 @@ struct Feature {
     // Runtime: `path` after `smoothing`, filled by WorldMap::prepare(). Never serialised, and part
     // of no hash except through `path` and `smoothing` themselves.
     std::vector<glm::vec3> curve;
+    // Runtime: the XZ box outside which this feature's weight is exactly zero -- the path's bounds
+    // grown by `width`. Sampling a height means asking every feature how far away it is, and a
+    // smoothed river is a hundred segments; without this the cost of a world is the product of
+    // every sample and every segment of every feature, most of which are nowhere near the point.
+    glm::vec2 boundsMin{0.0f};
+    glm::vec2 boundsMax{0.0f};
+    [[nodiscard]] bool reaches(glm::vec2 p) const {
+        return p.x >= boundsMin.x && p.x <= boundsMax.x && p.y >= boundsMin.y && p.y <= boundsMax.y;
+    }
 
     [[nodiscard]] Result<void> validate() const;
     // The points actually sampled: `curve` when prepared, `path` otherwise.

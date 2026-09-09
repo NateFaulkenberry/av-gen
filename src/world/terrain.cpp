@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <thread>
 
 namespace avgen::world {
 namespace {
@@ -67,7 +68,46 @@ glm::vec2 chunkOrigin(const WorldMap& map, const TerrainSettings& settings, glm:
     return map.min() + glm::vec2(static_cast<float>(coord.x), static_cast<float>(coord.y)) * settings.chunkSize;
 }
 
-scene::MeshData buildChunkMesh(const WorldMap& map, const TerrainSettings& settings, glm::ivec2 coord, int lod) {
+float ChunkField::at(int i, int j) const {
+    const int x = std::clamp(i + 1, 0, side - 1);
+    const int y = std::clamp(j + 1, 0, side - 1);
+    return heights[static_cast<std::size_t>(y) * side + x];
+}
+
+glm::vec3 ChunkField::normalAt(int i, int j) const {
+    // Central differences on the LOD 0 grid: the same expression the analytic normal used, reading
+    // samples that already exist. The border cell is what lets the chunk's edge use a centred
+    // difference too, so two chunks agree exactly along their shared edge.
+    const float hx = at(i + 1, j) - at(i - 1, j);
+    const float hz = at(i, j + 1) - at(i, j - 1);
+    return glm::normalize(glm::vec3(-hx, 2.0f * step, -hz));
+}
+
+ChunkField sampleChunkField(const WorldMap& map, const TerrainSettings& settings, glm::ivec2 coord) {
+    ChunkField field;
+    field.side = settings.resolution + 3;
+    field.step = settings.chunkSize / static_cast<float>(settings.resolution);
+    field.origin = chunkOrigin(map, settings, coord) - glm::vec2(field.step);
+    field.heights.resize(static_cast<std::size_t>(field.side) * field.side);
+    for (int y = 0; y < field.side; ++y) {
+        for (int x = 0; x < field.side; ++x) {
+            const glm::vec2 p = field.origin + glm::vec2(static_cast<float>(x), static_cast<float>(y)) * field.step;
+            field.heights[static_cast<std::size_t>(y) * field.side + x] = map.height(p);
+        }
+    }
+    return field;
+}
+
+namespace {
+
+// The stride through the LOD 0 grid that gives `res` quads across the chunk, or 0 when the level's
+// resolution does not divide the base one and the grid cannot be reused.
+int strideFor(const TerrainSettings& settings, int res) {
+    return res > 0 && settings.resolution % res == 0 ? settings.resolution / res : 0;
+}
+
+scene::MeshData buildChunkMeshFrom(const WorldMap& map, const TerrainSettings& settings, glm::ivec2 coord, int lod,
+                                   const ChunkField* field) {
     const int res = lodResolution(settings, lod);
     const float step = settings.chunkSize / static_cast<float>(res);
     const glm::vec2 origin = chunkOrigin(map, settings, coord);
@@ -75,6 +115,7 @@ scene::MeshData buildChunkMesh(const WorldMap& map, const TerrainSettings& setti
     // make a distant chunk's shading disagree with its neighbour's across the seam, which reads as
     // a visible tile grid -- the exact artefact chunking is supposed to be invisible about.
     const float epsilon = settings.chunkSize / static_cast<float>(settings.resolution) * 0.5f;
+    const int stride = field != nullptr ? strideFor(settings, res) : 0;
 
     scene::MeshData mesh;
     mesh.name = fmt::format("terrain_{}_{}_lod{}", coord.x, coord.y, lod);
@@ -83,11 +124,15 @@ scene::MeshData buildChunkMesh(const WorldMap& map, const TerrainSettings& setti
     for (int j = 0; j <= res; ++j) {
         for (int i = 0; i <= res; ++i) {
             const glm::vec2 p = origin + glm::vec2(static_cast<float>(i), static_cast<float>(j)) * step;
-            const float h = map.height(p);
             scene::Vertex v;
-            v.position = glm::vec3(p.x, h, p.y);
-            v.normal = map.normal(p, epsilon);
-            v.uv = glm::vec2(glm::clamp(1.0f - v.normal.y, 0.0f, 1.0f), map.altitude01(h));
+            if (stride > 0) {
+                v.position = glm::vec3(p.x, field->at(i * stride, j * stride), p.y);
+                v.normal = field->normalAt(i * stride, j * stride);
+            } else {
+                v.position = glm::vec3(p.x, map.height(p), p.y);
+                v.normal = map.normal(p, epsilon);
+            }
+            v.uv = glm::vec2(glm::clamp(1.0f - v.normal.y, 0.0f, 1.0f), map.altitude01(v.position.y));
             mesh.vertices.push_back(v);
         }
     }
@@ -136,6 +181,13 @@ scene::MeshData buildChunkMesh(const WorldMap& map, const TerrainSettings& setti
     return mesh;
 }
 
+} // namespace
+
+scene::MeshData buildChunkMesh(const WorldMap& map, const TerrainSettings& settings, glm::ivec2 coord, int lod) {
+    const ChunkField field = sampleChunkField(map, settings, coord);
+    return buildChunkMeshFrom(map, settings, coord, lod, &field);
+}
+
 int chunkLod(const TerrainSettings& settings, float distance) {
     if (distance <= settings.lodDistance || settings.lodLevels <= 1) {
         return 0;
@@ -175,29 +227,66 @@ std::vector<TerrainChunk> buildTerrain(
     const WorldMap& map, const TerrainSettings& settings,
     const std::function<scene::MeshId(std::size_t, int, scene::MeshData&&)>& emit) {
     const std::vector<glm::ivec2> coords = chunkGrid(map, settings);
-    std::vector<TerrainChunk> chunks;
-    chunks.reserve(coords.size());
-    for (std::size_t c = 0; c < coords.size(); ++c) {
-        TerrainChunk chunk;
-        chunk.coord = coords[c];
-        chunk.center = chunkOrigin(map, settings, coords[c]) + glm::vec2(settings.chunkSize * 0.5f);
-        chunk.meshes.fill(scene::kInvalidMesh);
-        for (int lod = 0; lod < settings.lodLevels; ++lod) {
-            scene::MeshData mesh = buildChunkMesh(map, settings, coords[c], lod);
-            if (lod == 0) {
-                // LOD 0 bounds hold every level: coarser levels sample a subset of the same
-                // surface, so they can only be flatter, and the skirt is already in the bounds.
-                const auto [lo, hi] = mesh.bounds();
-                chunk.boundsMin = lo;
-                chunk.boundsMax = hi;
+    const std::size_t levels = static_cast<std::size_t>(std::max(settings.lodLevels, 1));
+    std::vector<scene::MeshData> built(coords.size() * levels);
+    std::vector<TerrainChunk> chunks(coords.size());
+
+    // One chunk is a few thousand independent height evaluations and a few hundred chunks is a
+    // second or more of a cold start, so the meshes are built across the machine's cores. Each
+    // thread owns whole chunks and writes only into its own slots, which is why there is no lock:
+    // the shared state is the map, and sampling a map is a pure function.
+    const auto buildRange = [&](std::size_t first, std::size_t last) {
+        for (std::size_t c = first; c < last; ++c) {
+            const ChunkField field = sampleChunkField(map, settings, coords[c]);
+            TerrainChunk& chunk = chunks[c];
+            chunk.coord = coords[c];
+            chunk.center = chunkOrigin(map, settings, coords[c]) + glm::vec2(settings.chunkSize * 0.5f);
+            chunk.meshes.fill(scene::kInvalidMesh);
+            for (std::size_t lod = 0; lod < levels; ++lod) {
+                scene::MeshData mesh = buildChunkMeshFrom(map, settings, coords[c], static_cast<int>(lod), &field);
+                if (lod == 0) {
+                    // LOD 0 bounds hold every level: coarser levels sample a subset of the same
+                    // surface, so they can only be flatter, and the skirt is already in the bounds.
+                    const auto [lo, hi] = mesh.bounds();
+                    chunk.boundsMin = lo;
+                    chunk.boundsMax = hi;
+                }
+                built[c * levels + lod] = std::move(mesh);
             }
-            chunk.meshes[static_cast<std::size_t>(lod)] = emit(c, lod, std::move(mesh));
+            // A coarse level can overshoot LOD 0's extremes where it skips a peak, and the AABB is
+            // what culling trusts, so give it slack rather than clipping a hill off the frustum.
+            chunk.boundsMin.y -= settings.skirtDepth;
+            chunk.boundsMax.y += settings.chunkSize * 0.1f;
         }
-        // A coarse level can overshoot LOD 0's extremes where it skips a peak, and the AABB is what
-        // culling trusts, so give it a little slack rather than clipping a hill off the frustum.
-        chunk.boundsMin.y -= settings.skirtDepth;
-        chunk.boundsMax.y += settings.chunkSize * 0.1f;
-        chunks.push_back(chunk);
+    };
+
+    const unsigned hardware = std::max(1u, std::thread::hardware_concurrency());
+    const std::size_t workers = std::min<std::size_t>(hardware, std::max<std::size_t>(coords.size() / 4, 1));
+    if (workers <= 1) {
+        buildRange(0, coords.size());
+    } else {
+        std::vector<std::thread> pool;
+        pool.reserve(workers - 1);
+        const std::size_t span = (coords.size() + workers - 1) / workers;
+        for (std::size_t w = 1; w < workers; ++w) {
+            const std::size_t first = std::min(w * span, coords.size());
+            const std::size_t last = std::min(first + span, coords.size());
+            if (first < last) {
+                pool.emplace_back(buildRange, first, last);
+            }
+        }
+        buildRange(0, std::min(span, coords.size()));
+        for (std::thread& t : pool) {
+            t.join();
+        }
+    }
+
+    // Emission is serial and in order: it hands meshes to the Scene, which is not thread safe and
+    // has no reason to be.
+    for (std::size_t c = 0; c < coords.size(); ++c) {
+        for (std::size_t lod = 0; lod < levels; ++lod) {
+            chunks[c].meshes[lod] = emit(c, static_cast<int>(lod), std::move(built[c * levels + lod]));
+        }
     }
     return chunks;
 }

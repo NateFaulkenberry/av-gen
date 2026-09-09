@@ -114,6 +114,21 @@ PunctualLight& Scene::addLight(PunctualLight light) {
     return lights.back();
 }
 
+const std::pair<glm::vec3, glm::vec3>& Scene::meshBounds(MeshId mesh) const {
+    static const std::pair<glm::vec3, glm::vec3> empty{glm::vec3(0.0f), glm::vec3(0.0f)};
+    if (mesh >= meshes.size()) {
+        return empty;
+    }
+    if (meshBoundsVersion_ != meshVersion || meshBoundsCache_.size() != meshes.size()) {
+        meshBoundsCache_.resize(meshes.size());
+        for (std::size_t i = 0; i < meshes.size(); ++i) {
+            meshBoundsCache_[i] = meshes[i].bounds();
+        }
+        meshBoundsVersion_ = meshVersion;
+    }
+    return meshBoundsCache_[mesh];
+}
+
 std::pair<glm::vec3, glm::vec3> Scene::bounds() const {
     glm::vec3 lo(std::numeric_limits<float>::max());
     glm::vec3 hi(std::numeric_limits<float>::lowest());
@@ -122,7 +137,7 @@ std::pair<glm::vec3, glm::vec3> Scene::bounds() const {
         if (!e.visible || e.style != MeshStyle::Lit || e.mesh >= meshes.size() || !meshes[e.mesh].valid()) {
             continue;
         }
-        const auto [mlo, mhi] = meshes[e.mesh].bounds();
+        const auto& [mlo, mhi] = meshBounds(e.mesh);
         const glm::mat4 m = e.transform.matrix();
         for (int corner = 0; corner < 8; ++corner) {
             const glm::vec3 p((corner & 1) ? mhi.x : mlo.x, (corner & 2) ? mhi.y : mlo.y, (corner & 4) ? mhi.z : mlo.z);
