@@ -73,6 +73,7 @@ struct AppOptions {
     bool listMidi = false;
     std::vector<std::string> outputs; // --output <display>[:fullscreen|:WxH]
     std::optional<std::string> syphon; // --syphon <name>
+    std::optional<std::string> example; // --example <name>
     std::optional<std::string> ndi;    // --ndi <name>
     std::uint32_t width = 1440;
     std::uint32_t height = 900;

@@ -132,6 +132,14 @@ std::pair<glm::vec3, glm::vec3> Scene::bounds() const {
             any = true;
         }
     }
+    for (const auto& pg : procedurals) {
+        if (!pg.visible || pg.instances.empty()) {
+            continue;
+        }
+        lo = glm::min(lo, pg.boundsMin);
+        hi = glm::max(hi, pg.boundsMax);
+        any = true;
+    }
     if (!any) {
         return {glm::vec3(0.0f), glm::vec3(0.0f)};
     }
@@ -144,6 +152,8 @@ void Scene::clear() {
     meshes.clear();
     textures.clear();
     entities.clear();
+    particles.clear();
+    procedurals.clear();
     ++meshVersion;
     ++textureVersion;
 }

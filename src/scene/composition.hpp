@@ -32,7 +32,7 @@
 
 namespace avgen::scene {
 
-enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene };
+enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural };
 const char* nodeKindName(NodeKind kind);
 Result<NodeKind> nodeKindFromName(const std::string& name);
 
@@ -46,6 +46,7 @@ struct CompositionNode {
     float emissiveBoost = 1.0f;
     float roughnessScale = 1.0f;
     ParticleSystem particles;      // settings for kind Particles (name is taken from the node)
+    ProceduralGeometry procedural; // settings for kind Procedural (ADR-023; name is taken from the node)
 
     // Runtime (not serialised)
     std::shared_ptr<const assets::SceneAsset> sceneAsset; // Gltf
@@ -58,6 +59,8 @@ struct CompositionNode {
     params::Parameter<float>* roughnessParam = nullptr;
     ParticleParameters particleParams;
     ParticleSystem particleRest;
+    ProceduralParameters proceduralParams;
+    ProceduralGeometry proceduralRest;
 };
 
 class Composition final : public SceneController {
@@ -157,6 +160,13 @@ private:
     glm::vec3 center_{0.0f};
     float radius_ = 1.0f;
     float cameraAngle_ = 0.0f;
+    // Free camera (camera/mode = 1): explicit position/target parameters instead of the orbit.
+    params::Parameter<int>* cameraMode_ = nullptr;
+    params::Parameter<glm::vec3>* cameraPosition_ = nullptr;
+    params::Parameter<glm::vec3>* cameraTarget_ = nullptr;
+    int cameraModeSetting_ = 0;
+    glm::vec3 cameraPositionSetting_{0.0f, 2.0f, 10.0f};
+    glm::vec3 cameraTargetSetting_{0.0f, 1.0f, 0.0f};
 
     // Flattened bookkeeping: per node, the entity index range in scene_ and the rest transforms.
     struct NodeRange {
@@ -166,6 +176,7 @@ private:
         std::vector<float> restEmissive;
         std::vector<float> restRoughness;
         int particleIndex = -1;                      // index into scene_.particles (Particles kind)
+        int proceduralIndex = -1;                    // index into scene_.procedurals (Procedural kind)
         std::size_t firstParticle = 0;               // particle range (Particles and Scene kinds)
         std::size_t particleCount = 0;
         std::uint64_t childMeshVersion = 0;          // Scene kind: what was flattened

@@ -72,6 +72,25 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
             if (ImGui::MenuItem("Open Project...") && onOpenProject) {
                 onOpenProject();
             }
+            if (ImGui::BeginMenu("Examples", !examples.empty())) {
+                std::string category;
+                for (const auto& ex : examples) {
+                    if (ex.category != category) {
+                        if (!category.empty()) {
+                            ImGui::Separator();
+                        }
+                        ImGui::TextDisabled("%s", ex.category.c_str());
+                        category = ex.category;
+                    }
+                    if (ImGui::MenuItem(ex.name.c_str()) && onOpenExample) {
+                        onOpenExample(ex);
+                    }
+                    if (ImGui::IsItemHovered() && !ex.description.empty()) {
+                        ImGui::SetTooltip("%s", ex.description.c_str());
+                    }
+                }
+                ImGui::EndMenu();
+            }
             if (ImGui::BeginMenu("Open Recent", !recentProjects.empty())) {
                 for (const auto& recent : recentProjects) {
                     if (ImGui::MenuItem(recent.filename().string().c_str()) && onOpenRecent) {
@@ -772,9 +791,9 @@ void ControlPanel::drawSceneTab(app::Engine& engine) {
         }
     }
     ImGui::Separator();
-    static const char* kinds[] = {"gltf", "orb", "grid", "particles", "scene"};
+    static const char* kinds[] = {"gltf", "orb", "grid", "particles", "scene", "procedural"};
     ImGui::SetNextItemWidth(110);
-    ImGui::Combo("##nodekind", &newNodeKind_, kinds, 5);
+    ImGui::Combo("##nodekind", &newNodeKind_, kinds, 6);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(140);
     ImGui::InputText("##nodename", nodeName_, sizeof(nodeName_));

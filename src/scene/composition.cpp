@@ -421,13 +421,15 @@ const char* nodeKindName(NodeKind kind) {
         return "particles";
     case NodeKind::Scene:
         return "scene";
+    case NodeKind::Procedural:
+        return "procedural";
     }
     return "gltf";
 }
 
 Result<NodeKind> nodeKindFromName(const std::string& name) {
     for (const NodeKind kind :
-         {NodeKind::Gltf, NodeKind::Orb, NodeKind::Grid, NodeKind::Particles, NodeKind::Scene}) {
+         {NodeKind::Gltf, NodeKind::Orb, NodeKind::Grid, NodeKind::Particles, NodeKind::Scene, NodeKind::Procedural}) {
         if (name == nodeKindName(kind)) {
             return kind;
         }
@@ -577,6 +579,13 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
         node.particles.name = node.name;
         node.particleRest = node.particles;
         break;
+    case NodeKind::Procedural:
+        node.procedural.name = node.name;
+        if (auto v = node.procedural.validate(); !v) {
+            return std::unexpected(v.error());
+        }
+        node.proceduralRest = node.procedural;
+        break;
     case NodeKind::Orb:
     case NodeKind::Grid:
         break;
@@ -646,6 +655,16 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         floatDesc(prefix_ + "camera/orbitSpeed", cameraOrbitSpeedSetting_, -3.0f, 3.0f, -1.0f, 1.0f));
     cameraFov_ =
         &params.add(floatDesc(prefix_ + "camera/fov", cameraFovSetting_, 5.0f, 120.0f, 20.0f, 90.0f));
+    cameraMode_ = &params.add(params::ParamDesc<int>{.path = prefix_ + "camera/mode",
+                                                     .defaultValue = cameraModeSetting_,
+                                                     .hardMin = 0,
+                                                     .hardMax = 1,
+                                                     .softMin = 0,
+                                                     .softMax = 1,
+                                                     .label = "camera/mode (0 orbit, 1 free)"});
+    const float reachCam = 10.0f * std::max(radius_, 1.0f);
+    cameraPosition_ = &params.add(vec3Desc(prefix_ + "camera/position", cameraPositionSetting_, -1e4f, 1e4f, -reachCam, reachCam));
+    cameraTarget_ = &params.add(vec3Desc(prefix_ + "camera/target", cameraTargetSetting_, -1e4f, 1e4f, -reachCam, reachCam));
     envIntensity_ =
         &params.add(floatDesc(prefix_ + "env/intensity", envIntensitySetting_, 0.0f, 20.0f, 0.0f, 4.0f));
     envRotation_ =
@@ -690,6 +709,10 @@ void Composition::registerNodeParameters(CompositionNode& node) {
         node.particleRest.name = sanitise(prefix_) + node.name;
         node.particleParams = registerParticleParameters(*params_, node.particleRest);
     }
+    if (node.kind == NodeKind::Procedural) {
+        node.proceduralParams =
+            registerProceduralParameters(*params_, node.proceduralRest, "procedural/" + sanitise(prefix_) + node.name + "/");
+    }
     if (node.kind == NodeKind::Scene && node.child) {
         node.child->attach(*params_, *modulator_, base);
     }
@@ -707,10 +730,14 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
                 params_->remove(p->path());
             }
         });
+        if (node.kind == NodeKind::Procedural) {
+            unregisterProceduralParameters(*params_, node.proceduralParams);
+        }
         if (node.child) {
             node.child->unregisterParameters();
         }
     }
+    node.proceduralParams = {};
     node.positionParam = nullptr;
     node.rotationParam = nullptr;
     node.scaleParam = nullptr;
@@ -751,6 +778,9 @@ void Composition::detach() {
     cameraHeight_ = nullptr;
     cameraOrbitSpeed_ = nullptr;
     cameraFov_ = nullptr;
+    cameraMode_ = nullptr;
+    cameraPosition_ = nullptr;
+    cameraTarget_ = nullptr;
     envIntensity_ = nullptr;
     envRotation_ = nullptr;
     brightness_ = nullptr;
@@ -824,6 +854,7 @@ void Composition::rebuild() {
     scene_.textures.clear();
     scene_.entities.clear();
     scene_.particles.clear();
+    scene_.procedurals.clear();
     scene_.lights.clear();
     scene_.cameras.clear();
     ranges_.clear();
@@ -913,6 +944,16 @@ void Composition::rebuild() {
             ps.enabled = ps.enabled && visible;
             range.particleIndex = static_cast<int>(scene_.particles.size());
             scene_.particles.push_back(std::move(ps));
+            break;
+        }
+        case NodeKind::Procedural: {
+            ProceduralGeometry pg = node.proceduralRest;
+            pg.name = sanitise(prefix_) + node.name;
+            pg.distributionTransform = Transform::fromMatrix(nodeT.matrix() * pg.distributionTransform.matrix());
+            pg.visible = pg.visible && visible;
+            pg.rebuild();
+            range.proceduralIndex = static_cast<int>(scene_.procedurals.size());
+            scene_.procedurals.push_back(std::move(pg));
             break;
         }
         case NodeKind::Scene: {
@@ -1112,6 +1153,16 @@ void Composition::applyParameters() {
             }
         }
 
+        if (node.kind == NodeKind::Procedural && range.proceduralIndex >= 0 &&
+            static_cast<std::size_t>(range.proceduralIndex) < scene_.procedurals.size()) {
+            // Parameters drive a live copy; the node transform folds into the distribution
+            // transform so the instance records already sit in world space.
+            ProceduralGeometry& pg = scene_.procedurals[static_cast<std::size_t>(range.proceduralIndex)];
+            applyProceduralParameters(node.proceduralParams, node.proceduralRest, pg);
+            pg.distributionTransform = Transform::fromMatrix(full.matrix() * pg.distributionTransform.matrix());
+            pg.visible = pg.visible && visible;
+            pg.rebuild();
+        }
         if (node.kind == NodeKind::Particles && range.particleIndex >= 0 &&
             static_cast<std::size_t>(range.particleIndex) < scene_.particles.size()) {
             ParticleSystem& ps = scene_.particles[static_cast<std::size_t>(range.particleIndex)];
@@ -1148,10 +1199,20 @@ void Composition::applyParameters() {
                              ? cameraHeight_->value()
                              : cameraHeightSetting_.value_or(center_.y + radius_ * 0.35f);
     const float fov = cameraFov_ != nullptr ? cameraFov_->value() : cameraFovSetting_;
-    scene_.camera.position =
-        center_ + glm::vec3(std::sin(cameraAngle_) * distance, 0.0f, std::cos(cameraAngle_) * distance);
-    scene_.camera.position.y = height;
-    scene_.camera.target = center_;
+    const int cameraMode = cameraMode_ != nullptr ? cameraMode_->value() : cameraModeSetting_;
+    if (cameraMode == 1) {
+        // Free camera: explicit position and target (keyable on the timeline, modulatable).
+        scene_.camera.position = cameraPosition_ != nullptr ? cameraPosition_->value() : cameraPositionSetting_;
+        scene_.camera.target = cameraTarget_ != nullptr ? cameraTarget_->value() : cameraTargetSetting_;
+        if (glm::length(scene_.camera.target - scene_.camera.position) < 1e-4f) {
+            scene_.camera.target = scene_.camera.position + glm::vec3(0.0f, 0.0f, -1.0f);
+        }
+    } else {
+        scene_.camera.position =
+            center_ + glm::vec3(std::sin(cameraAngle_) * distance, 0.0f, std::cos(cameraAngle_) * distance);
+        scene_.camera.position.y = height;
+        scene_.camera.target = center_;
+    }
     scene_.camera.fovYRadians = glm::radians(fov);
     scene_.camera.nearPlane = std::max(radius_ * 0.01f, 0.01f);
     scene_.camera.farPlane = std::max(radius_ * 50.0f, 100.0f);
@@ -1196,6 +1257,13 @@ nlohmann::json Composition::toJson() const {
     camera["orbitSpeed"] =
         cameraOrbitSpeed_ != nullptr ? cameraOrbitSpeed_->base() : cameraOrbitSpeedSetting_;
     camera["fov"] = cameraFov_ != nullptr ? cameraFov_->base() : cameraFovSetting_;
+    camera["mode"] = cameraMode_ != nullptr ? cameraMode_->base() : cameraModeSetting_;
+    {
+        const glm::vec3 cp = cameraPosition_ != nullptr ? cameraPosition_->base() : cameraPositionSetting_;
+        const glm::vec3 ct = cameraTarget_ != nullptr ? cameraTarget_->base() : cameraTargetSetting_;
+        camera["position"] = {cp.x, cp.y, cp.z};
+        camera["target"] = {ct.x, ct.y, ct.z};
+    }
     j["camera"] = std::move(camera);
 
     json environment = json::object();
@@ -1226,6 +1294,9 @@ nlohmann::json Composition::toJson() const {
         n["roughnessScale"] = node.roughnessScale;
         if (node.kind == NodeKind::Particles) {
             n["particles"] = particlesToJson(node.particles);
+        }
+        if (node.kind == NodeKind::Procedural) {
+            n["procedural"] = node.procedural.toJson();
         }
         nodes.push_back(std::move(n));
     }
@@ -1298,6 +1369,16 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(orbit.error());
         }
         comp->cameraOrbitSpeedSetting_ = *orbit;
+        if (c.contains("mode") && c["mode"].is_number_integer()) {
+            comp->cameraModeSetting_ = std::clamp(c["mode"].get<int>(), 0, 1);
+        }
+        auto readVec = [&](const char* key, glm::vec3& out) {
+            if (c.contains(key) && c[key].is_array() && c[key].size() == 3 && c[key][0].is_number()) {
+                out = glm::vec3(c[key][0].get<float>(), c[key][1].get<float>(), c[key][2].get<float>());
+            }
+        };
+        readVec("position", comp->cameraPositionSetting_);
+        readVec("target", comp->cameraTargetSetting_);
         auto fov = readFloat(c, "fov", comp->cameraFovSetting_);
         if (!fov) {
             return std::unexpected(fov.error());
@@ -1383,6 +1464,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             node.visible = *visible;
             node.emissiveBoost = *emissive;
             node.roughnessScale = *roughness;
+            if (item.contains("procedural")) {
+                auto pg = ProceduralGeometry::fromJson(item.at("procedural"));
+                if (!pg) {
+                    return fail("scene file '{}': node '{}': {}", sourcePath.string(), node.name, pg.error().message);
+                }
+                node.procedural = std::move(*pg);
+            }
             if (item.contains("particles")) {
                 auto particles = particlesFromJson(item.at("particles"));
                 if (!particles) {

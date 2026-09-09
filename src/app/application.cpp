@@ -1,5 +1,6 @@
 #include "app/application.hpp"
 
+#include "app/examples.hpp"
 #include "assets/video_writer.hpp"
 
 #include <nlohmann/json.hpp>
@@ -46,6 +47,7 @@ std::string usageText() {
            "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
            "  --list-audio-devices, --list-midi   enumerate inputs and exit\n"
            "  --output <d>[:fullscreen|:WxH]      add an output window on display index <d> (repeatable)\n"
+           "  --example <name>    open a built-in example by name (see examples/index.json)\n"
            "  --syphon <name>     publish the frame as a Syphon server (macOS)\n"
            "  --ndi <name>        publish the frame as an NDI source (needs the NDI runtime installed)\n"
            "  --shader <file>     add a user shader layer behind the scene (repeatable)\n"
@@ -103,6 +105,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             } catch (const std::exception&) {
                 return fail("--osc-port expects an integer");
             }
+            ++i;
+        } else if (arg == "--example") {
+            auto v = need(i, "--example");
+            if (!v) return std::unexpected(v.error());
+            options.example = *v;
             ++i;
         } else if (arg == "--syphon" || arg == "--ndi") {
             auto v = need(i, arg.c_str());
@@ -417,6 +424,12 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         recent_.pruneMissing();
         panel_->recentProjects = recent_.entries();
+        if (auto examples = loadExamples(exampleSearchDirs(executablePath))) {
+            panel_->examples = std::move(*examples);
+        } else {
+            log::warn("examples: {}", examples.error().message);
+        }
+        panel_->onOpenExample = [this](const ExampleInfo& ex) { loadAny(ex.file); };
         // ---- offline rendering from the UI ----
         uiRender_ = engine_->renderSettings();
         panel_->renderSettings = &uiRender_;
@@ -478,6 +491,25 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
     }
 
+    if (options.example) {
+        auto examples = loadExamples(exampleSearchDirs(executablePath));
+        bool found = false;
+        if (examples) {
+            for (const auto& ex : *examples) {
+                if (ex.name == *options.example) {
+                    if (auto r = engine_->loadFile(ex.file); !r) {
+                        log::error("example '{}': {}", ex.name, r.error().message);
+                        if (options.headless) return std::unexpected(r.error());
+                    }
+                    found = true;
+                }
+            }
+        }
+        if (!found) {
+            log::error("example '{}' not found", *options.example);
+            if (options.headless) return fail("example '{}' not found", *options.example);
+        }
+    }
     // The project restores its own audio/scene/environment; explicit flags below override it.
     if (options.project) {
         if (auto r = engine_->loadProject(*options.project); !r) {

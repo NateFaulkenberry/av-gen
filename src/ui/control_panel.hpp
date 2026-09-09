@@ -5,6 +5,7 @@
 // through its public API and the parameter system.
 
 #include "app/engine.hpp"
+#include "app/examples.hpp"
 #include "app/render_job.hpp"
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
@@ -51,6 +52,8 @@ public:
     std::function<void()> onExportBundle;
     std::function<void(const std::filesystem::path&)> onOpenRecent;
     std::vector<std::filesystem::path> recentProjects; // shown in File > Open Recent
+    std::vector<app::ExampleInfo> examples;             // File > Examples
+    std::function<void(const app::ExampleInfo&)> onOpenExample;
     // Offline rendering (1.0): the host owns the settings, the job and the queue.
     app::RenderSettings* renderSettings = nullptr;
     std::function<void()> onStartRender;
