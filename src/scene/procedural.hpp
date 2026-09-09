@@ -222,6 +222,7 @@ struct ProceduralGeometry {
     std::vector<InstanceRecord> instances;
     std::uint64_t structureVersion = 0;
     std::uint64_t meshHash = 0;           // hash of the last generated source (renderer cache key)
+    std::uint64_t builtHash = 0;          // structuralHash() at the last rebuild() (internal bookkeeping)
     glm::vec3 boundsMin{0.0f}, boundsMax{0.0f}; // of instance origins + source extent (world of the object)
 
     [[nodiscard]] Result<void> validate() const;
