@@ -130,3 +130,5 @@ File > Examples lists the built-in scenes from `examples/index.json`:
   at rebuild time; live colour modulation tints approximately until the next structural rebuild.
 - Nested scene files bring their procedural nodes along; their parameters are prefixed with the
   node path (`procedural/nodes_<outer>_<inner>/…`).
+- Point clouds, point ops, fields and effectors (ADR-024/025) are described in
+  `docs/spatial-data.md`; `rebuild()` now goes through `generateCloud()` and the `ops` list.

@@ -1,8 +1,32 @@
 #include "scene/particles.hpp"
 
 #include <algorithm>
+#include <string>
 
 namespace avgen::scene {
+
+const char* fieldForceModeName(FieldForceMode mode) {
+    switch (mode) {
+    case FieldForceMode::Force:
+        return "force";
+    case FieldForceMode::Velocity:
+        return "velocity";
+    case FieldForceMode::Turbulence:
+        return "turbulence";
+    case FieldForceMode::Kill:
+        return "kill";
+    }
+    return "force";
+}
+
+std::optional<FieldForceMode> fieldForceModeFromName(std::string_view name) {
+    for (const auto mode : {FieldForceMode::Force, FieldForceMode::Velocity, FieldForceMode::Turbulence, FieldForceMode::Kill}) {
+        if (name == fieldForceModeName(mode)) {
+            return mode;
+        }
+    }
+    return std::nullopt;
+}
 
 namespace {
 params::ParamDesc<float> f(const std::string& base, const char* name, float def, float lo, float hi, float slo, float shi) {
@@ -52,6 +76,14 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
     p.attractorPosition = &params.add(v3(base, "attractorPosition", s.attractorPosition, -1000.0f, 1000.0f));
     p.attractorStrength = &params.add(f(base, "attractorStrength", s.attractorStrength, -100.0f, 100.0f, -10.0f, 10.0f));
     p.orbit = &params.add(f(base, "orbit", s.orbit, -50.0f, 50.0f, -5.0f, 5.0f));
+    // Field forces (ADR-025): one strength per existing slot (1-based).
+    const std::size_t fieldSlots = std::min(s.fieldForces.size(), static_cast<std::size_t>(kMaxFieldForces));
+    for (std::size_t slot = 0; slot < fieldSlots; ++slot) {
+        const std::string rel = "fieldForce/" + std::to_string(slot + 1) + "/strength";
+        params::ParamDesc<float> d = f(base, rel.c_str(), s.fieldForces[slot].strength, -100.0f, 100.0f, -10.0f, 10.0f);
+        d.label = std::string(fieldForceModeName(s.fieldForces[slot].mode)) + "/strength";
+        p.fieldStrength[slot] = &params.add(std::move(d));
+    }
     p.size = &params.add(f(base, "size", 1.0f, 0.0f, 100.0f, 0.0f, 5.0f));
     p.colorStart = &params.add(color(base, "colorStart", s.colorStart));
     p.colorEnd = &params.add(color(base, "colorEnd", s.colorEnd));
@@ -88,6 +120,14 @@ void applyParticleParameters(const ParticleParameters& p, const ParticleSystem& 
     s.attractorPosition = p.attractorPosition->value();
     s.attractorStrength = p.attractorStrength->value();
     s.orbit = p.orbit->value();
+    if (s.fieldForces.size() != rest.fieldForces.size()) {
+        s.fieldForces = rest.fieldForces;
+    }
+    for (std::size_t slot = 0; slot < s.fieldForces.size() && slot < p.fieldStrength.size(); ++slot) {
+        if (p.fieldStrength[slot] != nullptr) {
+            s.fieldForces[slot].strength = p.fieldStrength[slot]->value();
+        }
+    }
     s.sizeStart = rest.sizeStart * p.size->value();
     s.sizeEnd = rest.sizeEnd * p.size->value();
     s.colorStart = p.colorStart->value();
