@@ -7,10 +7,12 @@
 // uploads and draws them. Off by default; zero cost when no vertices are queued.
 
 #include "gpu/context.hpp"
+#include "gpu/shader_library.hpp"
 #include "scene/scene_types.hpp"
 
 #include <glm/glm.hpp>
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -27,8 +29,14 @@ struct DebugVertex {
 
 class DebugDraw {
 public:
-    [[nodiscard]] Result<void> init(gpu::Context& context, WGPUTextureFormat colorFormat, WGPUTextureFormat depthFormat,
-                                    WGPUBindGroupLayout frameLayout);
+    DebugDraw(gpu::Context& context, gpu::ShaderLibrary& shaders);
+    ~DebugDraw();
+    DebugDraw(const DebugDraw&) = delete;
+    DebugDraw& operator=(const DebugDraw&) = delete;
+
+    // `frameLayout` is the scene renderer's group-0 layout (FrameUniforms).
+    [[nodiscard]] Result<void> init(wgpu::TextureFormat colorFormat, wgpu::TextureFormat depthFormat,
+                                    wgpu::BindGroupLayout frameLayout);
     void clear();
     void line(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color);
     void point(const glm::vec3& p, float size, const glm::vec4& color);
@@ -38,18 +46,31 @@ public:
     void arrow(const glm::vec3& from, const glm::vec3& dir, float length, const glm::vec4& color);
     void circle(const glm::vec3& center, const glm::vec3& normal, float radius, const glm::vec4& color, int segments = 32);
     void polyline(std::span<const glm::vec3> points, const glm::vec4& color, bool closed = false);
-    // Uploads and draws inside a render pass that has the frame bind group at group 0.
-    void upload(gpu::Context& context);
-    void render(WGPURenderPassEncoder pass, WGPUBindGroup frameBindGroup, bool depthTest);
+    // Uploads this frame's vertices; call once before the pass that draws them.
+    void upload();
+    // Draws inside a render pass that binds the frame uniforms at group 0.
+    void render(wgpu::RenderPassEncoder& pass, wgpu::BindGroup frameBindGroup, bool depthTest);
     [[nodiscard]] std::size_t lineVertexCount() const { return lines_.size(); }
     [[nodiscard]] std::size_t pointVertexCount() const { return points_.size(); }
     [[nodiscard]] bool empty() const { return lines_.empty() && points_.empty(); }
 
 private:
+    gpu::Context& context_;
+    gpu::ShaderLibrary& shaders_;
     std::vector<DebugVertex> lines_;
     std::vector<DebugVertex> points_;
-    struct Impl;
-    std::shared_ptr<Impl> impl_;
+    wgpu::Buffer buffer_;          // lines then points, one storage buffer
+    std::size_t capacity_ = 0;     // vertices the buffer can hold
+    std::size_t uploadedLines_ = 0;
+    std::size_t uploadedPoints_ = 0;
+    wgpu::BindGroupLayout vertexLayout_;
+    wgpu::BindGroup lineGroup_;
+    wgpu::BindGroup pointGroup_;
+    wgpu::RenderPipeline linePipeline_;      // depth-tested
+    wgpu::RenderPipeline linePipelineNoDepth_;
+    wgpu::RenderPipeline pointPipeline_;
+    wgpu::RenderPipeline pointPipelineNoDepth_;
+    [[nodiscard]] Result<void> ensureCapacity(std::size_t vertices);
 };
 
 // Which visualisations to build from the scene each frame.
