@@ -8,10 +8,15 @@ Decisions: ADR-006 (engine shaders), ADR-014 (user shader contract). Research:
 - Language: WGSL. Files under `shaders/`, loaded at runtime by `gpu::ShaderLibrary` (search order
   in `docs/build.md`). `#include "file.wgsl"` at the start of a line is expanded textually.
 - Files: `common.wgsl` (uniform structs incl. lights, vertex stage, env rotation, hash noise),
-  `pbr.wgsl` (glTF metallic-roughness: GGX + height-correlated Smith + Schlick, punctual lights,
-  split-sum IBL, derivative-based normal mapping, occlusion, emissive, alpha mask/blend, unlit),
-  `grid.wgsl`, `skybox.wgsl`, `environment.wgsl` (IBL preprocessing passes), `tonemap.wgsl`
-  (ACES fitted, sRGB).
+  `pbr_shade.wgsl` (the shared fragment shading `shadePbr(...)`: glTF metallic-roughness with GGX
+  + height-correlated Smith + Schlick, punctual lights, split-sum IBL, derivative-based normal
+  mapping, occlusion, emissive, alpha mask/blend, unlit, distance fog; declares the material and
+  IBL bindings), `pbr.wgsl` (entity pipeline: common vertex stage + `shadePbr`), `procedural.wgsl`
+  (ADR-023: instanced vertex stage reading `InstanceRecord`s from storage, the deformer stack —
+  bend, twist, sine, noise, displacement — finite-difference normals, `pcg3d` value-noise fBM
+  that `scene::fbm3` mirrors on the CPU; fragment = `shadePbr` with per-instance colour/emissive
+  multipliers), `grid.wgsl`, `skybox.wgsl`, `environment.wgsl` (IBL preprocessing passes),
+  `tonemap.wgsl` (ACES fitted, sRGB).
 - **Hot reload (0.4):** the application watches these files (polling, 0.5 s) and calls
   `SceneRenderer::reloadEngineShaders()`. Each pipeline is rebuilt from its module; a shader that
   fails to compile keeps its previous pipeline and the error is shown in the Control window.
@@ -25,6 +30,7 @@ Decisions: ADR-006 (engine shaders), ADR-014 (user shader contract). Research:
 | 1 | 0 | vertex+fragment | `ObjectUniforms` (uniform, dynamic offset) |
 | 2 | 0..5 | fragment | material sampler; baseColor, metallicRoughness, normal, emissive, occlusion `texture_2d<f32>` |
 | 3 | 0..3 | fragment | IBL sampler; irradiance `texture_cube`, prefiltered `texture_cube`, BRDF LUT `texture_2d` |
+| procedural 1 | 0 / 1 / 2 | vertex+fragment / vertex / vertex | `ObjectUniforms` (uniform, dynamic offset, 256-byte slots); `array<InstanceRecord>` (read-only storage, 96 B each); `ProceduralUniforms` (uniform, 528 B: timeInfo + 8 x 64-byte `DeformerUniform`) — groups 0, 2, 3 as above |
 | tonemap 0 | 0 / 1 | fragment | HDR `texture_2d<f32>` (unfilterable, `textureLoad`) / `TonemapUniforms` |
 | env 0 | 0..3 | fragment | `EnvUniforms` (dynamic offset); sampler; source equirect `texture_2d`; source `texture_cube` |
 

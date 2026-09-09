@@ -27,6 +27,8 @@ encoder = device.CreateCommandEncoder()
   [environment passes: only when scene.environment.environmentMap changed; see ADR-013]
   pass "scene-pass"  : HDR RGBA16Float + Depth24Plus, clear to environment.backgroundColor
                        opaque PBR entities (pbr.wgsl; back-face cull, or none for doubleSided)
+                       procedural geometry (procedural.wgsl; one DrawIndexed(indexCount, instanceCount)
+                         per object, deformer stack in the vertex stage, same fragment shading; ADR-023)
                        skybox (skybox.wgsl, far plane, LessEqual) when an environment is set
                        grid entities (grid.wgsl, additive, depth test only)
                        particles (particles.wgsl, indirect draw, additive/alpha, depth test only)
@@ -36,8 +38,8 @@ encoder = device.CreateCommandEncoder()
 timer.resolve(encoder); queue.Submit; timer.collect(); surface.Present()
 ```
 
-Bind groups: 0 `FrameUniforms` (704 B: viewProj, invViewProj, cameraPos, params, envParams,
-skyParams, 8 `LightUniform`s); 1 `ObjectUniforms` (192 B: model, normalMatrix, baseColor+opacity,
+Bind groups: 0 `FrameUniforms` (720 B: viewProj, invViewProj, cameraPos, params, envParams,
+skyParams, fogParams, 8 `LightUniform`s); 1 `ObjectUniforms` (192 B: model, normalMatrix, baseColor+opacity,
 emissive rgb+intensity, material roughness/metallic/normalScale/occlusion, flags alphaMode/
 cutoff/unlit/textureMask) in one buffer with 256-byte dynamic offsets (up to 256 objects);
 2 material (one filtering sampler + baseColor, metallicRoughness, normal, emissive, occlusion
@@ -54,6 +56,24 @@ from the environment (split sum) or a hemispheric fallback when no map is set.
 
 Textures are uploaded with CPU-generated mip chains (sRGB filtered in linear space); HDR maps as
 RGBA16Float. Uploads happen when `Scene::textureVersion` changes.
+
+Distance fog (`Environment::fogColor`, `fogDensity`; 0 = off) is exponential-squared in view
+distance, `mix(fogColor, color, exp(-(d * density)^2))`, applied in `pbr_shade.wgsl` after
+lighting to lit and unlit surfaces (entities and procedural instances alike); the skybox and
+particles are untouched.
+
+Procedural geometry (`rendering::ProceduralRenderer`, ADR-023): per `scene::ProceduralGeometry`
+a source mesh cached by `meshHash` (generated with `scene::makeSourceMesh`), an instance storage
+buffer of 96-byte `InstanceRecord`s re-uploaded when `structureVersion` changes (re-created when
+it grows), a 528-byte deformer/time uniform block written every frame, and one 256-byte
+`ObjectUniforms` slot (object matrix + the material fields exactly as entities fill them). Group
+1 of `procedural.wgsl` is {0 object uniforms (dynamic offset), 1 instances (read-only storage),
+2 `ProceduralUniforms`}; groups 0/2/3 are the entity layouts. The vertex stage runs local-space
+deformers, the instance transform (position + rotate(quaternion, p * scale)), the object matrix
+and world-space deformers, and recomputes the normal by finite differences of the whole chain
+(epsilon = 1e-3 x source bounds radius). Per-object GPU state is keyed by name and dropped after
+120 unused frames. `RenderStats::procedural` reports objects, instances, logical triangles, uploads
+and CPU update time; draw calls and triangles are folded into the totals.
 
 Conventions: right-handed, +Y up, CCW front faces, clip depth 0..1 (`GLM_FORCE_DEPTH_ZERO_TO_ONE`,
 `glm::perspectiveRH_ZO`). Scene-linear HDR until the tone map; `environment.brightness` is the

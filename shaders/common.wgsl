@@ -18,6 +18,7 @@ struct FrameUniforms {
     params: vec4<f32>,         // x = time, y = gridIntensity, z = brightness, w = environmentIntensity
     envParams: vec4<f32>,      // x = env rotation (radians), y = prefiltered mip count - 1, z = light count, w = ibl enabled
     skyParams: vec4<f32>,      // rgb = background colour, w = skybox blur 0..1
+    fogParams: vec4<f32>,      // rgb = fog colour, w = fog density (0 = off; exp2 fog by view distance)
     lights: array<Light, 8>,
 };
 

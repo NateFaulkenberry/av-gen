@@ -42,6 +42,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       environment_(std::make_unique<EnvironmentProcessor>(context, shaders)),
       shaderStack_(std::make_unique<ShaderStack>(context, shaders)),
       particles_(std::make_unique<ParticleRenderer>(context, shaders)),
+      procedurals_(std::make_unique<ProceduralRenderer>(context, shaders)),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
     objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
 }
@@ -208,6 +209,9 @@ Result<void> SceneRenderer::init() {
         return r;
     }
     if (auto r = particles_->init(); !r) {
+        return r;
+    }
+    if (auto r = procedurals_->init(kHdrFormat, kDepthFormat, frameLayout_, materialLayout_, iblLayout_); !r) {
         return r;
     }
     if (auto r = postProcessor_->init(); !r) {
@@ -572,6 +576,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     if (auto r = particles_->reload(); !r) {
         keep("particles.wgsl", r);
     }
+    if (auto r = procedurals_->reload(); !r) {
+        keep("procedural.wgsl", r);
+    }
     if (auto r = postProcessor_->reload(); !r) {
         keep("post.wgsl", r);
     }
@@ -817,6 +824,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                 static_cast<float>(ibl ? ibl_.prefilteredMips - 1 : 0), static_cast<float>(lightCount),
                                 ibl ? 1.0f : 0.0f);
     frame.skyParams = glm::vec4(scene.environment.backgroundColor, scene.environment.skyboxBlur);
+    frame.fogParams = glm::vec4(scene.environment.fogColor, std::max(scene.environment.fogDensity, 0.0f));
     queue.WriteBuffer(frameUniforms_, 0, &frame, sizeof(frame));
 
     // ---- object uniforms (one 256-byte slot per visible entity) ----
@@ -895,6 +903,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     particles_->update(encoder, scene, time, view, proj);
     stats_.particles = particles_->stats();
 
+    // ---- procedural geometry (ADR-023): mesh/instance uploads and per-frame uniforms ----
+    // The scene places its procedurals itself in this phase: identity object matrices.
+    {
+        const std::vector<glm::mat4> identity(scene.procedurals.size(), glm::mat4(1.0f));
+        procedurals_->update(scene, identity, time);
+        stats_.procedural = procedurals_->stats();
+    }
+
     // ---- pass 1: scene -> HDR ----
     {
         wgpu::RenderPassColorAttachment color{};
@@ -951,6 +967,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             }
         };
         drawItems(opaque, true);
+        procedurals_->draw(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
+        stats_.drawCalls += stats_.procedural.objects;
+        stats_.triangles += static_cast<std::uint32_t>(
+            std::min<std::uint64_t>(stats_.procedural.logicalTriangles, 0xFFFFFFFFull - stats_.triangles));
         if (scene.environment.showSkybox && ibl) {
             rp.SetPipeline(skyboxPipeline_);
             const std::uint32_t zeroOffset = 0; // layout requires group 1; the skybox ignores it
@@ -963,6 +983,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         drawItems(grid, false);
         particles_->draw(rp, scene);
         stats_.drawCalls += particles_->stats().systems;
+        if (!blended.empty() && particles_->stats().systems > 0) {
+            rp.SetBindGroup(0, frameBindGroup_); // the particle pass rebinds group 0 with its own layout
+        }
         drawItems(blended, true);
         rp.End();
     }

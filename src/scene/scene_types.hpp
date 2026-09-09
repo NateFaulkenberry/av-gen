@@ -153,6 +153,10 @@ struct Environment {
     float environmentRotation = 0.0f; // radians about +Y
     bool showSkybox = true;
     float skyboxBlur = 0.0f; // 0 = sharp, 1 = fully prefiltered
+    // Distance fog (exponential-squared by view distance) applied to lit/unlit surfaces after
+    // shading; the skybox is untouched. Default colour = the default background colour.
+    glm::vec3 fogColor{0.012f, 0.012f, 0.02f};
+    float fogDensity = 0.0f; // 0 = off; factor = exp(-(distance * density)^2)
 };
 
 } // namespace avgen::scene
