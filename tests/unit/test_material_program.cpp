@@ -928,7 +928,8 @@ TEST_CASE("examples/materials/*.material.json parse, validate and name their pro
                                             "emissiveGlass", "oxidisedMetal", "weatheredStone"});
 }
 
-TEST_CASE("examples/machine wires a material program into the ribs material", "[material]") {
+TEST_CASE("examples/machine declares its material programs inline and by file, and wires them in",
+          "[material]") {
     const std::filesystem::path scene =
         std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "machine" / "machine.scene.json";
     REQUIRE(std::filesystem::is_regular_file(scene));
@@ -938,11 +939,22 @@ TEST_CASE("examples/machine wires a material program into the ribs material", "[
     in >> j;
     REQUIRE(j.contains("materialPrograms"));
     std::vector<std::string> declared;
+    bool byFile = false;
     for (const nlohmann::json& pj : j.at("materialPrograms")) {
+        // An entry is the program inline or a path to a library `.material.json`, resolved
+        // relative to the scene file.
+        if (pj.is_string()) {
+            auto program = MaterialProgram::loadFile(scene.parent_path() / pj.get<std::string>());
+            REQUIRE(program.has_value());
+            declared.push_back(program->name);
+            byFile = true;
+            continue;
+        }
         auto program = MaterialProgram::fromJson(pj);
         REQUIRE(program.has_value());
         declared.push_back(program->name);
     }
+    CHECK(byFile);
     bool wired = false;
     for (const nlohmann::json& node : j.at("nodes")) {
         if (!node.contains("procedural") || !node.at("procedural").contains("material")) {

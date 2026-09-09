@@ -531,6 +531,42 @@ TEST_CASE("Composition rejects malformed files and skips missing assets", "[scen
     CHECK((*loaded)->findNode("gone") == nullptr);
 }
 
+TEST_CASE("Composition takes material programs inline or from a file", "[scene][composition][material]") {
+    Fixture fx;
+    // A library material as its own file, the way examples/materials/*.material.json ship.
+    const auto lib = fx.json("library_material", R"({"name": "libIron",
+        "ops": [{"kind": "constant", "dst": 1, "constant": [0.2, 0.1, 0.05, 1]}],
+        "baseColor": 1, "roughness": -1})");
+    // A file that forgot its name falls back to the file's, minus the ".material" the library uses.
+    const auto unnamed = fx.json("anon.material", R"({"ops": [{"kind": "constant", "dst": 2,
+        "constant": [1, 1, 1, 1]}], "metallic": 2})");
+    const auto scene = fx.json("materials_scene", R"({"format": "avgen-scene", "version": 1,
+        "name": "mats", "materialPrograms": [
+            ")" + lib.filename().string() + R"(",
+            {"name": "inlineGlass", "ops": [{"kind": "fresnel", "dst": 3, "value": 2.0}], "emission": 3},
+            ")" + unnamed.filename().string() + R"("],
+        "nodes": [{"name": "orb", "kind": "orb"}]})");
+
+    auto loaded = scene::Composition::loadFile(scene, fx.registry);
+    REQUIRE(loaded.has_value());
+    const auto& programs = (*loaded)->materialPrograms();
+    REQUIRE(programs.size() == 3);
+    CHECK(programs[0].name == "libIron"); // from the file, in the order the array gives
+    REQUIRE(programs[0].ops.size() == 1);
+    CHECK(programs[0].ops[0].constant == glm::vec4(0.2f, 0.1f, 0.05f, 1.0f));
+    CHECK(programs[1].name == "inlineGlass");
+    CHECK(programs[2].name == "avgen_comp_anon"); // named by its file, ".material" stripped
+
+    // A path that does not resolve, and a malformed program, are both errors rather than a
+    // silently missing material.
+    const auto missing = fx.json("materials_missing", R"({"format": "avgen-scene", "version": 1,
+        "materialPrograms": ["avgen_no_such_material.json"]})");
+    CHECK_FALSE(scene::Composition::loadFile(missing, fx.registry).has_value());
+    const auto wrongType = fx.json("materials_wrong", R"({"format": "avgen-scene", "version": 1,
+        "materialPrograms": [42]})");
+    CHECK_FALSE(scene::Composition::loadFile(wrongType, fx.registry).has_value());
+}
+
 TEST_CASE("Composition nests scene files and flattens them with prefixed parameters",
           "[scene][composition]") {
     Fixture fx;
