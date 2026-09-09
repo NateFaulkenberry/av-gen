@@ -48,6 +48,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       procedurals_(std::make_unique<ProceduralRenderer>(context, shaders)),
       sdfs_(std::make_unique<SdfRenderer>(context, shaders)),
       volumes_(std::make_unique<VolumeRenderer>(context, shaders)),
+      debug_(std::make_unique<DebugDraw>(context, shaders)),
       simulation_(std::make_unique<Simulation>(context, shaders)),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
     objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
@@ -273,6 +274,9 @@ Result<void> SceneRenderer::init() {
         return r;
     }
     sdfs_->setMeshPipelines(litOpaqueCull_, litOpaqueNoCull_); // Mesh-mode objects draw as entities
+    if (auto r = debug_->init(kHdrFormat, kDepthFormat, frameLayout_); !r) {
+        return r;
+    }
     if (auto r = volumes_->init(kHdrFormat, kDepthFormat, frameLayout_, fields_->buffer()); !r) {
         return r;
     }
@@ -1138,6 +1142,28 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     volumes_->update(scene, time, hdr_.width(), hdr_.height(), hdr_.depthView(), fields_.get());
     volumes_->encode(encoder, hdr_.colorView(), frameBindGroup_);
     stats_.volume = volumes_->stats();
+
+    // ---- debug drawing (ADR-031): whatever the host queued this frame, over the lit scene ----
+    if (!debug_->empty()) {
+        debug_->upload();
+        wgpu::RenderPassColorAttachment colour{};
+        colour.view = hdr_.colorView();
+        colour.loadOp = wgpu::LoadOp::Load;
+        colour.storeOp = wgpu::StoreOp::Store;
+        wgpu::RenderPassDepthStencilAttachment depth{};
+        depth.view = hdr_.depthView();
+        depth.depthLoadOp = wgpu::LoadOp::Load;
+        depth.depthStoreOp = wgpu::StoreOp::Store;
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = "debug-pass";
+        pass.colorAttachmentCount = 1;
+        pass.colorAttachments = &colour;
+        pass.depthStencilAttachment = &depth;
+        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        debug_->render(rp, frameBindGroup_, debugDepthTest_);
+        rp.End();
+        debug_->clear();
+    }
 
     // ---- post layers: HDR -> ping-pong HDR ----
     wgpu::TextureView finalHdr = hdr_.colorView();

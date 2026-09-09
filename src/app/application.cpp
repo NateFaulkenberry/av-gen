@@ -17,6 +17,7 @@
 #include "gpu/shader_library.hpp"
 #include "platform/window.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "rendering/debug_visualizer.hpp"
 #include "ui/control_panel.hpp"
 
 #include <imgui.h>
@@ -1011,6 +1012,13 @@ int Application::runLive() {
         gpu::TargetView finalTarget{finalView_, wgpu::TextureFormat::BGRA8Unorm, pw, ph};
         gpu::TargetView target{*view, context_->surfaceFormat(), pw, ph};
         wgpu::CommandEncoder encoder = context_->device().CreateCommandEncoder();
+        // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
+        // options; an empty set costs nothing.
+        if (panel_) {
+            const rendering::DebugViewOptions& options = panel_->world.debug;
+            renderer_->setDebugDepthTest(options.depthTest);
+            rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime);
+        }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
         if (auto r = renderer_->render(encoder, engine_->scene(), time, finalTarget, &shaderInputs); !r) {
@@ -1230,6 +1238,13 @@ int Application::runHeadless() {
     for (int i = 0; i < frames; ++i) {
         time = engine_->tick(clock);
         engine_->update(time);
+        // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
+        // options; an empty set costs nothing.
+        if (panel_) {
+            const rendering::DebugViewOptions& options = panel_->world.debug;
+            renderer_->setDebugDepthTest(options.depthTest);
+            rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime);
+        }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
         auto image = renderer_->renderToImage(engine_->scene(), time, w, h, &shaderInputs);

@@ -23,6 +23,7 @@
 #include "rendering/simulation.hpp"
 #include "rendering/spline_buffers.hpp"
 #include "rendering/volume_renderer.hpp"
+#include "rendering/debug_draw.hpp"
 #include "scene/scene.hpp"
 #include "shaders/shader_layers.hpp"
 
@@ -178,6 +179,11 @@ public:
     [[nodiscard]] const IblResources& ibl() const { return ibl_; }
 
     [[nodiscard]] const RenderStats& stats() const { return stats_; }
+
+    // Debug drawing (ADR-031): the host fills this before render() and the geometry is drawn over
+    // the lit scene. Empty by default, so a frame with no debug geometry is encoded as before.
+    [[nodiscard]] DebugDraw& debugDraw() { return *debug_; }
+    void setDebugDepthTest(bool on) { debugDepthTest_ = on; }
     [[nodiscard]] gpu::GpuTimer& timer() { return *timer_; }
     [[nodiscard]] const gpu::RenderTarget& hdrTarget() const { return hdr_; }
     [[nodiscard]] bool initialised() const { return initialised_; }
@@ -228,6 +234,8 @@ private:
     std::unique_ptr<ProceduralRenderer> procedurals_;
     std::unique_ptr<SdfRenderer> sdfs_;
     std::unique_ptr<VolumeRenderer> volumes_;
+    std::unique_ptr<DebugDraw> debug_;
+    bool debugDepthTest_ = true;
     std::unique_ptr<Simulation> simulation_;
     std::unique_ptr<PostProcessor> postProcessor_;
     std::unique_ptr<gpu::TransientPool> pool_;
