@@ -158,6 +158,27 @@ struct Environment {
     // shading; the skybox is untouched. Default colour = the default background colour.
     glm::vec3 fogColor{0.012f, 0.012f, 0.02f};
     float fogDensity = 0.0f; // 0 = off; factor = exp(-(distance * density)^2)
+    // Volumetric atmosphere (ADR-032): raymarched after the lit pass (rendering::VolumeRenderer).
+    // Density = volumeDensity * heightFalloff(y) * (1 + noise) * densityField(p) where the height
+    // term is exp(-max(0, y - fogHeight) * fogHeightFalloff), the noise term is
+    // volumeNoiseAmount * (fbm3(p * volumeNoiseScale + t * volumeNoiseSpeed) * 2 - 1) and the
+    // field term is the named scalar field's sample (1 when unset). Lit by the key light with a
+    // Henyey–Greenstein phase (volumeAnisotropy) and self-emitting with volumeEmission × the
+    // named colour field (or fogColor).
+    float volumeDensity = 0.0f;            // 0 = off
+    float fogHeight = 0.0f;                // height above which density falls off
+    float fogHeightFalloff = 0.0f;         // 0 = uniform
+    float volumeScattering = 1.0f;         // in-scatter strength
+    float volumeAbsorption = 0.5f;         // extinction multiplier
+    float volumeAnisotropy = 0.3f;         // HG g in (-1, 1)
+    float volumeNoiseAmount = 0.0f;
+    float volumeNoiseScale = 0.1f;
+    float volumeNoiseSpeed = 0.1f;
+    float volumeEmission = 0.0f;
+    int volumeSteps = 32;                  // raymarch samples per pixel
+    float volumeMaxDistance = 200.0f;
+    std::string volumeDensityField;        // scalar field name ("" = none)
+    std::string volumeColorField;          // colour field name ("" = fogColor)
 };
 
 } // namespace avgen::scene
