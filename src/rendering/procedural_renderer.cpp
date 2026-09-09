@@ -1044,7 +1044,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     const FrustumPlanes planes = frustumPlanes(viewProj);
     CullCamera cullCamera;
     cullCamera.position = scene.camera.position;
-    cullCamera.projScale = cullProjScale(scene.camera.fovYRadians, im.viewportHeight);
+    cullCamera.projScale = cullProjScale(scene.camera.effectiveFovY(), im.viewportHeight);
     std::uint32_t slot = 0;
     for (std::size_t i = 0; i < scene.procedurals.size(); ++i) {
         const auto& object = scene.procedurals[i];

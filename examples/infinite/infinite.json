@@ -13,7 +13,7 @@
   },
   "parameters": {
     "post/bloom/enabled": true,
-    "post/bloom/intensity": 0.55,
+    "post/bloom/intensity": 1.1,
     "post/bloom/threshold": 1.05,
     "post/tonemap/operator": 1,
     "post/output/vignette": 0.35,

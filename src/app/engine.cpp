@@ -48,6 +48,7 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     stateIndexSignal_ = bus_.declare("state.index", 0.0f, 64.0f);
     sources_.attach(bus_, params_);
     postParams_ = scene::registerPostParameters(params_, post_);
+    cameraParams_ = scene::registerCameraParameters(params_, lens_, exposure_, focus_);
     installController(std::make_unique<scene::OrbScene>(params_, modulator_));
     if (mode_ == EngineMode::Live) {
         player_ = std::make_unique<audio::AudioPlayer>();
@@ -99,10 +100,22 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         scene::PostSettings keep = post_;
         postParams_ = scene::registerPostParameters(params_, keep);
     }
+    if (params_.find("camera/lens/focalLength") == nullptr) {
+        const scene::LensSettings keepLens = lens_;
+        const scene::ExposureSettings keepExposure = exposure_;
+        const scene::FocusSettings keepFocus = focus_;
+        cameraParams_ = scene::registerCameraParameters(params_, keepLens, keepExposure, keepFocus);
+    }
+    resetCameraState();
     shaderLayers_.reattach();
     addDefaultPostRoutes();
     rebind();
     modulator_.resetState();
+}
+
+void Engine::resetCameraState() {
+    focusState_.reset();
+    cameraStateReset_ = true;
 }
 
 void Engine::addDefaultPostRoutes() {
@@ -1464,6 +1477,33 @@ void Engine::update(const FrameTime& time) {
     modulator_.applyRoutes(bus_, params_, time.deltaTime);
     controller_->update(time);
     scene::applyPostParameters(postParams_, post_);
+    // ---- physical camera (ADR-037) ---------------------------------------------------------
+    // After controller_->update() has placed the camera: the lens, the focus tracker's new
+    // distance and the exposure block go onto the camera and into the post chain, which applies
+    // exposure before bloom (ADR-039). With the defaults the exposure scale is exactly 1 and the
+    // lens does not touch the field of view, so scenes authored before this render unchanged.
+    scene::applyCameraParameters(cameraParams_, lens_, exposure_, focus_);
+    {
+        scene::Scene& live = controller_->scene();
+        live.camera.lens = lens_;
+        live.camera.exposure = exposure_;
+        const float deltaSeconds = static_cast<float>(time.deltaTime);
+        const float target =
+            scene::focusTargetDistance(focus_, live.camera, live.composition, lens_.focusDistance);
+        const float tracked = scene::updateFocus(focusState_, target, deltaSeconds, focus_.speed);
+        live.camera.lens.focusDistance = tracked;
+        post_.lens = live.camera.lens;
+        if (post_.dofPhysical || focus_.mode != scene::FocusSettings::Mode::Fixed) {
+            post_.focusDistance = tracked;
+        }
+        post_.exposure = exposure_;
+        post_.exposureDeltaSeconds = deltaSeconds;
+        post_.exposureReset = cameraStateReset_;
+        cameraStateReset_ = false;
+        // The shutter sets how long the blur trails: 180 degrees is the reference, so an
+        // untouched shutter angle leaves post/motionBlur/amount exactly as authored.
+        post_.motionBlurAmount *= std::clamp(lens_.shutterAngle / 180.0f, 0.0f, 2.0f);
+    }
     controller_->scene().post = post_;
     {
         shaders::StdUniforms base;

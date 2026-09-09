@@ -13,13 +13,20 @@
   },
   "parameters": {
     "post/bloom/enabled": true,
-    "post/bloom/intensity": 0.7,
+    "post/bloom/intensity": 1.26,
     "post/bloom/threshold": 0.75,
     "post/lens/chromaticAberration": 0.35,
     "post/lens/distortion": -0.08,
     "post/output/vignette": 0.5,
     "scene/brightness": 0.85,
-    "root/rotationSpeed": 0.0
+    "root/rotationSpeed": 0.0,
+    "camera/exposure/mode": 1,
+    "camera/exposure/speedUp": 2.0,
+    "camera/exposure/speedDown": 1.0,
+    "camera/exposure/minEv": 8.65,
+    "camera/exposure/maxEv": 16.0,
+    "post/grade/contrast": 1.1,
+    "post/grade/saturation": 1.15
   },
   "sources": [
     {

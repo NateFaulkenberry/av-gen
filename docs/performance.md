@@ -54,6 +54,11 @@ All of these are displayed in the Control window and logged every 120 frames at 
 Bloom at native Retina resolution dominates; starting the chain at quarter resolution is the
 obvious optimisation when the budget tightens.
 
+Superseded for the post chain by the ADR-037/ADR-039 reordering: see
+`docs/performance/image-formation.md` for 1080p and 4K measurements of exposure, bloom, halation,
+anamorphic and depth of field on and off (bloom 0.3 ms at 1080p; depth of field is now the
+expensive stage).
+
 ## Procedural geometry (ADR-023)
 
 Instanced procedural objects with the GPU deformer stack: 1k/10k-instance probe in

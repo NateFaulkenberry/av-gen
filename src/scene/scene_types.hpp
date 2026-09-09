@@ -31,18 +31,25 @@ struct Transform {
 };
 
 // Exposure (ADR-037): manual photographic settings, or metering the previous frame's luminance.
+// The maths lives in scene/camera.hpp; the chain applies the resulting scale before bloom
+// (ADR-039). Scene-linear values in this engine are not calibrated in nits, so the applied scale
+// is the photographic one *relative to* `referenceEv100`: at the default aperture, shutter and ISO
+// the scale is exactly 1 and every scene authored before ADR-037 renders unchanged, while one
+// stop of aperture, shutter or ISO is still one stop.
 struct ExposureSettings {
     enum class Mode : std::uint8_t { Manual, Automatic };
     Mode mode = Mode::Manual;
     float aperture = 5.6f;        // f-number
     float shutterSeconds = 1.0f / 50.0f;
     float iso = 400.0f;
-    float compensation = 0.0f;    // EV offset applied in both modes
+    float compensation = 0.0f;    // EV offset applied in both modes (positive = brighter)
     float minEv = -4.0f;          // automatic clamp
     float maxEv = 16.0f;
     float speedUp = 3.0f;         // EV per second when the image brightens
     float speedDown = 1.0f;       // EV per second when it darkens
     float meterCenterWeight = 0.6f; // 0 = flat average, 1 = strongly centre-weighted
+    // EV100 at which the applied scale is 1: EV100(f/5.6, 1/50 s, ISO 400) = 8.61471.
+    float referenceEv100 = 8.614710f;
 };
 
 // A physical lens (ADR-037). Field of view comes from `focalLength` and `sensorHeight` unless
@@ -56,7 +63,14 @@ struct LensSettings {
     float shutterAngle = 180.0f;  // degrees; motion blur length
     bool useExplicitFov = true;   // scenes authored before the lens existed
     [[nodiscard]] float fovYRadians() const;      // 2 atan(sensorHeight / (2 focalLength))
-    [[nodiscard]] float circleOfConfusion(float distance) const; // millimetres on the sensor
+    // Diameter of the blur circle a point at `distance` metres projects onto the sensor, in
+    // millimetres: c = f^2 |d - s| / (N d (s - f)) with d and s in the same units (Potmesil and
+    // Chakravarty 1981; PBRT 3rd ed. 6.2.3). Zero at the focus distance, bounded behind it.
+    [[nodiscard]] float circleOfConfusion(float distance) const;
+    // The same circle expressed in pixels of an image `imageHeight` pixels tall.
+    [[nodiscard]] float circleOfConfusionPixels(float distance, float imageHeight) const;
+    // Horizontal field of view, from `sensorWidth`; the vertical one is what the projection uses.
+    [[nodiscard]] float fovXRadians() const;
 };
 
 struct Camera {

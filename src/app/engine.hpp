@@ -24,6 +24,7 @@
 #include "scene/composition.hpp"
 #include "scene/gltf_scene.hpp"
 #include "scene/orb_scene.hpp"
+#include "scene/camera.hpp"
 #include "scene/post_settings.hpp"
 #include "scene/scene_controller.hpp"
 #include "shaders/shader_layers.hpp"
@@ -115,6 +116,23 @@ public:
     // ---- built-in post-processing ----
     [[nodiscard]] scene::PostSettings& post() { return post_; }
     [[nodiscard]] const scene::PostSettings& post() const { return post_; }
+
+    // ---- physical camera (ADR-037): lens, exposure and focus tracking ----
+    // Registered as "camera/lens/*", "camera/exposure/*" and "camera/focus/*"; applied to
+    // Scene::camera after the controller has placed it, so any scene picks them up. The lens only
+    // drives the field of view when `camera/lens/useExplicitFov` is turned off, so every scene
+    // authored before ADR-037 renders exactly as it did.
+    [[nodiscard]] scene::LensSettings& lens() { return lens_; }
+    [[nodiscard]] const scene::LensSettings& lens() const { return lens_; }
+    [[nodiscard]] scene::ExposureSettings& exposure() { return exposure_; }
+    [[nodiscard]] const scene::ExposureSettings& exposure() const { return exposure_; }
+    [[nodiscard]] scene::FocusSettings& focus() { return focus_; }
+    [[nodiscard]] const scene::FocusSettings& focus() const { return focus_; }
+    // The focus distance the tracker has reached this frame (metres).
+    [[nodiscard]] float trackedFocusDistance() const { return focusState_.distance; }
+    // Re-seeds focus tracking and the auto-exposure meter. Call on a scene swap or a seek so an
+    // offline render starts from the same state a live one does.
+    void resetCameraState();
 
     // ---- user shader layers ----
     [[nodiscard]] shaders::ShaderLayerSet& shaderLayers() { return shaderLayers_; }
@@ -284,6 +302,12 @@ private:
     shaders::ShaderLayerSet shaderLayers_;
     scene::PostSettings post_;
     scene::PostParameters postParams_;
+    scene::LensSettings lens_;
+    scene::ExposureSettings exposure_;
+    scene::FocusSettings focus_;
+    scene::CameraParameters cameraParams_;
+    scene::FocusState focusState_;
+    bool cameraStateReset_ = true; // forwarded to the post chain as PostSettings::exposureReset
     TimeSignals timeSignals_;
     signals::SourceContext sourceContext_;
     assets::AssetRegistry registry_;

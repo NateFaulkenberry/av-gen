@@ -31,7 +31,7 @@ glm::mat4 Camera::view() const {
 }
 
 glm::mat4 Camera::projection(float aspect) const {
-    return glm::perspectiveRH_ZO(fovYRadians, aspect, nearPlane, farPlane);
+    return glm::perspectiveRH_ZO(effectiveFovY(), aspect, nearPlane, farPlane);
 }
 
 bool TextureData::valid() const {
