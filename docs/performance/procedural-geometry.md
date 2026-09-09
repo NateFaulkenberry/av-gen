@@ -212,3 +212,86 @@ Practical guidance: one noise or voronoi op per material is affordable at 1080p 
 12-15 ms respectively for a full-frame surface); two of each is not. Cache-style tricks do not apply
 - every op is recomputed per fragment - so the lever is choosing cheaper ops, shrinking the covered
 area, or moving the pattern into the geometry.
+
+## Volumetrics and simulation (ADR-032)
+
+Probes: `avgen_render_tests "[.perf][volume]"` and `avgen_render_tests "[.perf][simulation]"`
+(Release; `tests/rendering/test_volume_gpu.cpp`, `tests/rendering/test_simulation_gpu.cpp`).
+Apple M2 Max (38-core GPU, 64 GB), macOS 26.6.2, Dawn (Metal), headless, mean of frames 30..89.
+
+### Volumetric fog at 1920x1080
+
+The march runs at half resolution (960x540) into its own RGBA16F target and is composited into
+the HDR target with a depth-aware upsample; "volume pass" is the two passes together
+(`RenderStats::volume.volumeMs`), "scene+post" is the frame timer around everything else. The
+scene is two unlit boxes at 4 and 40 units in front of the camera on a black background, so the
+frame cost is almost entirely the fog. The density field is a `sphere` field 20 units across in
+front of the camera; the noise row adds the 3-octave value fBM (`volumeNoise` 0.6).
+
+| Case | scene+post ms | volume pass ms |
+|---|---|---|
+| fog off (baseline; no passes encoded) | 0.75 | – |
+| 32 steps, no noise | 1.82 | 0.79 |
+| 32 steps + fbm3 noise | 3.05 | 2.11 |
+| 32 steps + noise + density field + emission | 3.15 | 2.18 |
+| 64 steps, no noise | 2.46 | 1.49 |
+| 64 steps + fbm3 noise | 5.14 | 4.16 |
+| 64 steps + noise + density field + emission | 5.04 | 4.17 |
+
+Reading the numbers:
+
+- **The march is linear in the step count** (0.79 -> 1.49 ms plain, 2.11 -> 4.16 ms with noise)
+  and half resolution buys the factor of four it should: 32 steps at 1080p costs what 32 steps at
+  540p would cost at full resolution.
+- **The noise is 70% of the cost.** A 3-octave value fBM is 24 hashed corner lookups per sample;
+  at 32 steps x 518 k half-res pixels that is 400 M lookups a frame. `volumeDensityAt` therefore
+  evaluates the height and field terms first and skips the fBM wherever they already leave the
+  density at zero, which is why the "+ density field" rows cost only 0.07 ms more than the noise
+  rows despite adding a field sample per step: the field zeroes most of the volume and the noise
+  is not evaluated there.
+- **A density field and emission are nearly free** next to the noise (a `sphere` field is a
+  length, a saturate and a matrix multiply; the colour field is only sampled when
+  `volumeEmission > 0`).
+- **Fog off costs nothing**: `VolumeRenderer::update()` allocates nothing and `encode()` emits no
+  passes, so the baseline row is the pre-ADR-032 frame exactly (the golden frame hashes in
+  `test_procedural_examples_gpu.cpp` are unchanged).
+- **Budget**: 32 steps with noise at 1080p is ~2.1 ms, inside the 1-3 ms the ADR asked for. 64
+  steps with noise doubles that; use 64 only when the fog is thick enough for banding to show.
+
+The showcase (`examples/machine`, 1280x720, `volumeSteps` 24, `volumeNoise` 0.45,
+`volumeDensityField`/`volumeColorField` = `heat`, `volumeMaxDistance` 90): **0.39 ms/frame
+without fog, 1.97 ms with it** — about 1.6 ms for the atmosphere, at 60 fps offline with zero
+GPU errors.
+
+### Simulated grid fields
+
+One 60 Hz sub-step per frame (`maxSubSteps` 1), injection from a `box` field and advection by a
+`direction` field, timed with `SimulationStats::simulateMs` (the whole frame's compute pass).
+The whole sub-step chain is one compute pass — in a compute pass the usage scope is a single
+dispatch, so the ping-pong buffers can swap roles between dispatches — and the finished state is
+copied into the shared grid table afterwards.
+
+| Grid | Stages (dispatches) | GPU ms per sub-step | Table |
+|---|---|---|---|
+| 32^3 scalar | inject + advect (2) | 0.096 | 0.13 MB |
+| 64^3 scalar | inject + advect (2) | 0.262 | 1 MB |
+| 64^3 scalar | inject + advect + 4 Jacobi diffusion sweeps (7) | 0.466 | 1 MB |
+| 64^3 vector | inject + advect (2) | 0.322 | 4 MB |
+| 64^3 reaction-diffusion | inject + Gray-Scott (2) | 0.138 | 2 MB |
+
+Reading the numbers:
+
+- **A 64^3 grid stepped every frame is a quarter of a millisecond.** Eight times the cells of
+  32^3 costs 2.7x, not 8x: the small case never fills the machine.
+- **Diffusion is the expensive stage** — five extra dispatches (a snapshot plus four Jacobi
+  sweeps) add 0.2 ms, each sweep gathering six neighbours per component. Halve
+  `diffuseIterations` before you halve the resolution.
+- **Reaction-diffusion is the cheapest** per cell: two components, one gather of six neighbours
+  each, no field sampling and no advection.
+- **Injection and advection sample fields**, so their cost follows the field kind: the rows above
+  use a `box` and a `direction` field (a few tens of ALU). A `curlNoise` velocity field costs
+  what it costs everywhere else — six `fbm3Vec` evaluations per cell.
+- **Memory** is the real limit, not time: the shared grid table is a fixed 8 MB
+  (`spatial::kMaxGridTableFloats`), which is exactly one 128^3 scalar grid, one 64^3 vector grid
+  or a 100^3 reaction-diffusion grid; `Simulation` adds two ping-pong buffers plus one snapshot
+  buffer of the same size as the scene's grids.

@@ -20,7 +20,10 @@ namespace {
 constexpr std::uint32_t kParticleStride = 48;
 constexpr std::uint32_t kWorkgroup = 64;   // cs_emit / cs_simulate
 constexpr std::uint32_t kScanBlock = 1024; // slots per compaction workgroup (256 threads x 4)
-constexpr std::uint32_t kComputeBindings = 10; // 0 uniforms, 1..7 storage, 8 field block, 9 spline tables
+// 0 uniforms, 1..7 storage, 8 field block, 9 spline tables, 15 the simulated-grid table
+// (declared by fields.wgsl; ADR-032).
+constexpr std::uint32_t kComputeBindings = 11;
+constexpr std::uint32_t kComputeBindingSlots[kComputeBindings] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15};
 } // namespace
 
 ParticleRenderer::ParticleRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
@@ -38,10 +41,18 @@ void ParticleRenderer::collectTimings() {
     stats_.simulateMs = passThisFrame_ ? lastSimulateMs_ : -1.0;
 }
 
-Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer splineTable) {
+Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer splineTable, wgpu::Buffer gridTable) {
     const auto& device = context_.device();
     fieldBlock_ = std::move(fieldBlock);
     splineTable_ = std::move(splineTable);
+    gridTable_ = std::move(gridTable);
+    if (!gridTable_) {
+        wgpu::BufferDescriptor desc{};
+        desc.label = "particles-empty-grid-table";
+        desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        desc.size = FieldUniforms::kGridBufferSize;
+        gridTable_ = device.CreateBuffer(&desc);
+    }
     if (!splineTable_) {
         wgpu::BufferDescriptor desc{};
         desc.label = "particles-empty-spline-table";
@@ -78,6 +89,9 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer spline
         entries[9].visibility = wgpu::ShaderStage::Compute;
         entries[9].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         entries[9].buffer.minBindingSize = SplineBuffers::kBufferSize;
+        entries[10].binding = 15;
+        entries[10].visibility = wgpu::ShaderStage::Compute;
+        entries[10].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "particles-compute-layout";
         desc.entryCount = entries.size();
@@ -258,13 +272,14 @@ void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity) {
     std::array<wgpu::BindGroupEntry, kComputeBindings> entries{};
     const wgpu::Buffer* buffers[kComputeBindings] = {&pool.uniforms, &pool.particles, &pool.deadList, &pool.counters,
                                                      &pool.aliveList, &pool.indirect, &pool.flags, &pool.blockSums,
-                                                     &fieldBlock_, &splineTable_};
+                                                     &fieldBlock_, &splineTable_, &gridTable_};
     const std::uint64_t sizes[kComputeBindings] = {sizeof(ParticleUniforms),
                                                    static_cast<std::uint64_t>(capacity) * kParticleStride,
                                                    listBytes, 16, listBytes, 16, listBytes, blockBytes,
-                                                   FieldUniforms::kBufferSize, SplineBuffers::kBufferSize};
+                                                   FieldUniforms::kBufferSize, SplineBuffers::kBufferSize,
+                                                   FieldUniforms::kGridBufferSize};
     for (std::uint32_t i = 0; i < kComputeBindings; ++i) {
-        entries[i].binding = i;
+        entries[i].binding = kComputeBindingSlots[i];
         entries[i].buffer = *buffers[i];
         entries[i].size = sizes[i];
     }

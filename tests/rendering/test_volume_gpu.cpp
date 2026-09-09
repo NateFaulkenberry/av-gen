@@ -1,0 +1,339 @@
+// Volumetric atmosphere (ADR-032): the fog pass is skipped when volumeDensity is 0 (so scenes
+// without fog render exactly as before), it attenuates distant surfaces far more than near ones,
+// a density field concentrates it, the height falloff makes a vertical gradient, and two fresh
+// renderers produce identical frames.
+
+#include "core/log.hpp"
+#include "gpu/context.hpp"
+#include "gpu/readback.hpp"
+#include "gpu/shader_library.hpp"
+#include "rendering/scene_renderer.hpp"
+#include "scene/scene.hpp"
+#include "spatial/field.hpp"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <cmath>
+#include <filesystem>
+#include <memory>
+
+using namespace avgen;
+
+namespace {
+
+constexpr std::uint32_t kSize = 128;
+
+std::unique_ptr<gpu::Context> makeContext() {
+    static bool logInit = false;
+    if (!logInit) {
+        log::init(log::Level::Warn);
+        logInit = true;
+    }
+    auto ctx = gpu::Context::create(gpu::ContextDesc{});
+    if (!ctx) {
+        SKIP("no GPU adapter available: " << ctx.error().message);
+    }
+    return std::move(*ctx);
+}
+
+gpu::ShaderLibrary makeShaders(gpu::Context& ctx) {
+    return gpu::ShaderLibrary(ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+}
+
+std::unique_ptr<rendering::SceneRenderer> makeRenderer(gpu::Context& ctx, gpu::ShaderLibrary& shaders) {
+    auto renderer = std::make_unique<rendering::SceneRenderer>(ctx, shaders);
+    REQUIRE(renderer->init().has_value());
+    return renderer;
+}
+
+scene::MeshData boxMesh(float h) {
+    scene::MeshData m;
+    const glm::vec3 n[6] = {{0, 0, 1}, {0, 0, -1}, {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}};
+    for (const glm::vec3 normal : n) {
+        const glm::vec3 u = std::abs(normal.y) > 0.5f ? glm::vec3(1, 0, 0) : glm::cross(glm::vec3(0, 1, 0), normal);
+        const glm::vec3 v = glm::cross(normal, u);
+        const auto base = static_cast<std::uint32_t>(m.vertices.size());
+        m.vertices.push_back({normal * h - u * h - v * h, normal, {0, 0}});
+        m.vertices.push_back({normal * h + u * h - v * h, normal, {1, 0}});
+        m.vertices.push_back({normal * h + u * h + v * h, normal, {1, 1}});
+        m.vertices.push_back({normal * h - u * h + v * h, normal, {0, 1}});
+        m.indices.insert(m.indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
+    }
+    return m;
+}
+
+// Two unlit boxes of the same apparent size: one 4 units away on the left, one 40 units away on
+// the right, so their pixels are identical without fog and only the distance differs.
+scene::Scene twoBoxScene() {
+    scene::Scene s;
+    s.environment.backgroundColor = glm::vec3(0.0f);
+    s.environment.fogColor = glm::vec3(0.02f, 0.03f, 0.05f);
+    s.environment.showSkybox = false;
+    s.camera.position = {0.0f, 0.0f, 0.0f};
+    s.camera.target = {0.0f, 0.0f, -1.0f};
+    s.camera.fovYRadians = 0.87266f; // 50 degrees
+    s.camera.nearPlane = 0.1f;
+    s.camera.farPlane = 400.0f;
+    const auto near = s.addMesh(boxMesh(0.5f));
+    const auto far = s.addMesh(boxMesh(5.0f));
+    {
+        auto& e = s.addEntity("near", near);
+        e.transform.position = {-1.2f, 0.0f, -4.0f};
+        e.material.unlit = true;
+        e.material.baseColor = glm::vec3(0.6f);
+    }
+    {
+        auto& e = s.addEntity("far", far);
+        e.transform.position = {12.0f, 0.0f, -40.0f};
+        e.material.unlit = true;
+        e.material.baseColor = glm::vec3(0.6f);
+    }
+    scene::PunctualLight key;
+    key.direction = glm::normalize(glm::vec3(0.0f, -0.2f, -1.0f));
+    key.intensity = 2.0f;
+    s.addLight(key);
+    return s;
+}
+
+// Screen positions of the two boxes (both at |ndc.x| = 0.64, ndc.y = 0).
+constexpr std::uint32_t kNearX = 23;
+constexpr std::uint32_t kFarX = 104;
+constexpr std::uint32_t kMidY = kSize / 2;
+
+float luminanceAt(const gpu::ImageF& image, std::uint32_t x, std::uint32_t y) {
+    const float* p = image.pixel(x, y);
+    return 0.2126f * p[0] + 0.7152f * p[1] + 0.0722f * p[2];
+}
+
+gpu::ImageF renderFloat(rendering::SceneRenderer& renderer, const scene::Scene& s, std::uint64_t frameIndex = 0) {
+    FrameTime time{};
+    time.renderTime = 1.0;
+    time.deltaTime = 1.0 / 60.0;
+    time.frameIndex = frameIndex;
+    auto image = renderer.renderToImageFloat(s, time, kSize, kSize);
+    REQUIRE(image.has_value());
+    return std::move(*image);
+}
+
+void enableFog(scene::Scene& s, float density) {
+    s.environment.volumeDensity = density;
+    s.environment.volumeScattering = 0.6f;
+    s.environment.volumeAbsorption = 1.0f;
+    s.environment.volumeAnisotropy = 0.2f;
+    s.environment.volumeSteps = 48;
+    s.environment.volumeMaxDistance = 120.0f;
+}
+
+} // namespace
+
+TEST_CASE("Fog off encodes no volume pass and renders identically to a fresh renderer", "[volume][gpu]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    const scene::Scene s = twoBoxScene();
+    REQUIRE(s.environment.volumeDensity == 0.0f); // off by default
+
+    auto a = makeRenderer(*ctx, shaders);
+    const gpu::ImageF imageA = renderFloat(*a, s);
+    CHECK(a->stats().volume.steps == 0);
+    CHECK(a->stats().volume.volumeMs < 0.0);
+
+    auto b = makeRenderer(*ctx, shaders);
+    const gpu::ImageF imageB = renderFloat(*b, s);
+    CHECK(gpu::hashImage(imageA) == gpu::hashImage(imageB));
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Volumetric fog darkens a distant surface and leaves a near one almost untouched",
+          "[volume][gpu]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    scene::Scene s = twoBoxScene();
+    const gpu::ImageF clear = renderFloat(*renderer, s);
+    const float nearClear = luminanceAt(clear, kNearX, kMidY);
+    const float farClear = luminanceAt(clear, kFarX, kMidY);
+    INFO("near " << nearClear << " far " << farClear);
+    REQUIRE(nearClear > 0.05f); // the sample pixels really are on the boxes
+    REQUIRE(farClear > 0.05f);
+    REQUIRE(std::abs(nearClear - farClear) < 0.02f); // and identical without fog
+
+    enableFog(s, 0.04f);
+    const gpu::ImageF foggy = renderFloat(*renderer, s);
+    CHECK(renderer->stats().volume.steps == 48);
+    CHECK(renderer->stats().volume.halfResolution);
+    const float nearFog = luminanceAt(foggy, kNearX, kMidY);
+    const float farFog = luminanceAt(foggy, kFarX, kMidY);
+    INFO("near fog " << nearFog << " far fog " << farFog);
+    // exp(-0.04 * 40) = 0.20 at the far box, exp(-0.04 * 4) = 0.85 at the near one.
+    CHECK(farFog < farClear * 0.45f);
+    CHECK(nearFog > nearClear * 0.7f);
+    CHECK(nearFog < nearClear * 1.3f);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("A density field concentrates the fog where the field is strong", "[volume][gpu]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    scene::Scene s = twoBoxScene();
+    enableFog(s, 0.06f);
+    const gpu::ImageF uniform = renderFloat(*renderer, s);
+
+    // A sphere of fog around the far box only: the near box's ray never enters it.
+    spatial::FieldSpec blob;
+    blob.name = "blob";
+    blob.kind = spatial::FieldKind::Sphere;
+    blob.position = {12.0f, 0.0f, -40.0f};
+    blob.radius = 14.0f;
+    blob.softness = 6.0f;
+    s.fields.fields.push_back(blob);
+    s.environment.volumeDensityField = "blob";
+    const gpu::ImageF shaped = renderFloat(*renderer, s);
+
+    const float nearUniform = luminanceAt(uniform, kNearX, kMidY);
+    const float nearShaped = luminanceAt(shaped, kNearX, kMidY);
+    const float farUniform = luminanceAt(uniform, kFarX, kMidY);
+    const float farShaped = luminanceAt(shaped, kFarX, kMidY);
+    INFO("near " << nearUniform << " -> " << nearShaped << ", far " << farUniform << " -> " << farShaped);
+    // The near ray leaves the field's sphere alone, so it recovers almost all of its brightness.
+    CHECK(nearShaped > nearUniform * 1.05f);
+    // The far ray still crosses the blob, so it stays attenuated.
+    CHECK(farShaped < nearShaped * 0.8f);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Height falloff makes the fog a vertical gradient", "[volume][gpu]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    // An empty scene: the only thing the fog can do is scatter light towards the eye.
+    scene::Scene s;
+    s.environment.backgroundColor = glm::vec3(0.0f);
+    s.environment.showSkybox = false;
+    s.camera.position = {0.0f, 0.0f, 0.0f};
+    s.camera.target = {0.0f, 0.0f, -1.0f};
+    s.camera.farPlane = 400.0f;
+    scene::PunctualLight key;
+    key.direction = glm::normalize(glm::vec3(0.0f, -1.0f, -0.2f));
+    key.intensity = 4.0f;
+    s.addLight(key);
+    enableFog(s, 0.05f);
+    s.environment.fogHeight = -2.0f;
+    s.environment.fogHeightFalloff = 0.6f; // dense low, thin high
+
+    const gpu::ImageF image = renderFloat(*renderer, s);
+    const float low = luminanceAt(image, kSize / 2, kSize - 8);
+    const float high = luminanceAt(image, kSize / 2, 8);
+    INFO("low " << low << " high " << high);
+    CHECK(low > 1e-4f);
+    CHECK(low > high * 1.5f);
+    // Monotone from the bottom of the frame to the top.
+    const float middle = luminanceAt(image, kSize / 2, kSize / 2);
+    CHECK(low >= middle);
+    CHECK(middle >= high);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Two fresh renderers produce identical volumetric frames", "[volume][gpu]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    scene::Scene s = twoBoxScene();
+    enableFog(s, 0.05f);
+    s.environment.volumeNoiseAmount = 0.7f;
+    s.environment.volumeNoiseScale = 0.15f;
+    s.environment.volumeNoiseSpeed = 0.3f;
+    s.environment.volumeEmission = 0.4f;
+
+    auto a = makeRenderer(*ctx, shaders);
+    auto b = makeRenderer(*ctx, shaders);
+    for (std::uint64_t frame = 0; frame < 3; ++frame) {
+        const gpu::ImageF ia = renderFloat(*a, s, frame);
+        const gpu::ImageF ib = renderFloat(*b, s, frame);
+        INFO("frame " << frame);
+        CHECK(gpu::hashImage(ia) == gpu::hashImage(ib));
+    }
+    // The jitter is a function of the frame index, so a different frame is a different image.
+    const gpu::ImageF first = renderFloat(*a, s, 0);
+    const gpu::ImageF second = renderFloat(*a, s, 1);
+    CHECK(gpu::hashImage(first) != gpu::hashImage(second));
+    CHECK(ctx->errorCount() == 0);
+}
+
+// Hidden performance probe: `avgen_render_tests "[.perf][volume]"` (Release). Reports the frame
+// GPU time and the volume pass time at 1920x1080 for 32 and 64 steps, with and without the
+// 3-octave noise and a density field. See docs/performance/procedural-geometry.md.
+TEST_CASE("Volumetric fog throughput", "[.perf][volume]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    auto measure = [&](const scene::Scene& s, const char* label) {
+        FixedStepClock clock(60.0);
+        double frameSum = 0.0;
+        double volumeSum = 0.0;
+        int frames = 0;
+        int volumeFrames = 0;
+        for (int i = 0; i < 90; ++i) {
+            auto img = renderer.renderToImage(s, clock.tick(), 1920, 1080);
+            REQUIRE(img.has_value());
+            if (i < 30) {
+                continue;
+            }
+            if (renderer.stats().gpuFrameMs >= 0.0) {
+                frameSum += renderer.stats().gpuFrameMs;
+                ++frames;
+            }
+            if (renderer.stats().volume.volumeMs >= 0.0) {
+                volumeSum += renderer.stats().volume.volumeMs;
+                ++volumeFrames;
+            }
+        }
+        CHECK(ctx->errorCount() == 0);
+        WARN(label << ": scene+post GPU " << (frames ? frameSum / frames : -1.0) << " ms, volume pass "
+                   << (volumeFrames ? volumeSum / volumeFrames : -1.0) << " ms, steps "
+                   << renderer.stats().volume.steps);
+    };
+
+    {
+        scene::Scene s = twoBoxScene();
+        measure(s, "fog off (baseline)");
+    }
+    for (const int steps : {32, 64}) {
+        {
+            scene::Scene s = twoBoxScene();
+            enableFog(s, 0.04f);
+            s.environment.volumeSteps = steps;
+            measure(s, steps == 32 ? "32 steps, no noise" : "64 steps, no noise");
+        }
+        {
+            scene::Scene s = twoBoxScene();
+            enableFog(s, 0.04f);
+            s.environment.volumeSteps = steps;
+            s.environment.volumeNoiseAmount = 0.6f;
+            s.environment.volumeNoiseScale = 0.12f;
+            s.environment.volumeNoiseSpeed = 0.2f;
+            measure(s, steps == 32 ? "32 steps + fbm3 noise" : "64 steps + fbm3 noise");
+        }
+        {
+            scene::Scene s = twoBoxScene();
+            enableFog(s, 0.04f);
+            s.environment.volumeSteps = steps;
+            s.environment.volumeNoiseAmount = 0.6f;
+            s.environment.volumeNoiseScale = 0.12f;
+            s.environment.volumeEmission = 0.4f;
+            spatial::FieldSpec blob;
+            blob.name = "blob";
+            blob.kind = spatial::FieldKind::Sphere;
+            blob.position = {0.0f, 0.0f, -20.0f};
+            blob.radius = 20.0f;
+            blob.softness = 8.0f;
+            s.fields.fields.push_back(blob);
+            s.environment.volumeDensityField = "blob";
+            measure(s, steps == 32 ? "32 steps + noise + density field + emission"
+                                   : "64 steps + noise + density field + emission");
+        }
+    }
+}

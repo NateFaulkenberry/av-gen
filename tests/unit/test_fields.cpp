@@ -635,7 +635,44 @@ TEST_CASE("packField fills every GPU field", "[spatial][fields]") {
     CHECK(noSet.freqExpInvertBias.z == 1.0f);
     f.invert = false;
     CHECK(packField(f, 0.0).freqExpInvertBias.z == 0.0f);
-    CHECK(sizeof(FieldGpu) == 320);
+    // A non-grid kind leaves the Grid members zero, so gridRes.w = 0 ("no grid bound") and the
+    // shader never touches the grid table (ADR-032).
+    CHECK(g.gridBounds0 == glm::vec4(0.0f));
+    CHECK(g.gridBounds1 == glm::vec4(0.0f));
+    CHECK(g.gridRes == glm::vec4(0.0f));
+    CHECK(sizeof(FieldGpu) == 368);
+}
+
+TEST_CASE("packField points a Grid field at its grid's range of the table", "[spatial][fields]") {
+    GridField a;
+    a.name = "a";
+    a.resolution = {4, 4, 4}; // 64 floats
+    GridField b;
+    b.name = "b";
+    b.mode = GridMode::Vector;
+    b.wrap = GridWrap::Wrap;
+    b.resolution = {8, 4, 2};
+    b.boundsMin = {-1.0f, -2.0f, -3.0f};
+    b.boundsMax = {5.0f, 6.0f, 7.0f};
+
+    FieldSpec f;
+    f.name = "read";
+    f.kind = FieldKind::Grid;
+    f.reference = "b";
+    FieldSet set;
+    set.grids = {a, b};
+    set.fields = {f};
+
+    const FieldGpu g = packField(f, 0.0, &set);
+    CHECK(g.kind == static_cast<std::uint32_t>(FieldKind::Grid));
+    CHECK(g.type == static_cast<std::uint32_t>(FieldType::Vector)); // the bound grid's mode wins
+    CHECK(g.gridBounds0 == glm::vec4(-1.0f, -2.0f, -3.0f, 64.0f));  // grid `a` comes first
+    CHECK(g.gridBounds1 == glm::vec4(5.0f, 6.0f, 7.0f, 4.0f));      // vector cells are 4 floats
+    CHECK(g.gridRes == glm::vec4(8.0f, 4.0f, 2.0f, 3.0f));          // 1 bound + 2 wrapping
+    // Unbound (no set, or an unknown name) stays zero, which samples as 0.
+    CHECK(packField(f, 0.0).gridRes.w == 0.0f);
+    f.reference = "missing";
+    CHECK(packField(f, 0.0, &set).gridRes.w == 0.0f);
 }
 
 TEST_CASE("FieldSpec JSON round trip, structural hash and validation", "[spatial][fields]") {

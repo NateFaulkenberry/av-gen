@@ -24,6 +24,7 @@
 #include "scene/mesh_generators.hpp"
 #include "scene/orb_scene.hpp"
 #include "scene/scene.hpp"
+#include "spatial/grid_field.hpp"
 #include "shaders/shader_format.hpp"
 #include "signals/audio_signals.hpp"
 #include "signals/signal_bus.hpp"

@@ -68,9 +68,11 @@ public:
     ~ParticleRenderer();
     ParticleRenderer(const ParticleRenderer&) = delete;
     ParticleRenderer& operator=(const ParticleRenderer&) = delete;
-    // `fieldBlock` is the FieldUniforms buffer and `splineTable` the SplineBuffers buffer bound
-    // to the compute passes (zeroed private ones are created when null).
-    [[nodiscard]] Result<void> init(wgpu::Buffer fieldBlock = nullptr, wgpu::Buffer splineTable = nullptr);
+    // `fieldBlock` is the FieldUniforms buffer, `splineTable` the SplineBuffers buffer and
+    // `gridTable` the simulated-grid table fields.wgsl reads at group 0 binding 15 (ADR-032),
+    // all bound to the compute passes (zeroed private ones are created when null).
+    [[nodiscard]] Result<void> init(wgpu::Buffer fieldBlock = nullptr, wgpu::Buffer splineTable = nullptr,
+                                    wgpu::Buffer gridTable = nullptr);
     [[nodiscard]] Result<void> reload(); // hot reload of particles.wgsl (keeps old on failure)
 
     // Encodes the compute passes for every enabled system. Call before the scene pass.
@@ -119,6 +121,7 @@ private:
     gpu::ShaderLibrary& shaders_;
     wgpu::Buffer fieldBlock_;
     wgpu::Buffer splineTable_;
+    wgpu::Buffer gridTable_;
     std::unique_ptr<gpu::GpuTimer> timer_;
     double lastSimulateMs_ = -1.0;
     bool passThisFrame_ = false;

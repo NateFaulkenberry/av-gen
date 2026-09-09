@@ -1,7 +1,8 @@
 #pragma once
 
 // Draws a scene::Scene with WebGPU (ADR-001). Frame = ordered passes: [scene -> HDR target]
-// (opaque PBR, skybox, additive grid, blended PBR), [tonemap -> caller's target]. The caller
+// (opaque PBR, skybox, additive grid, blended PBR), [volumetric atmosphere -> HDR target when
+// Environment::volumeDensity > 0; ADR-032], [tonemap -> caller's target]. The caller
 // owns the command encoder so it can append passes (UI) and submit; renderToImage() wraps that
 // for tests and offline output.
 
@@ -19,7 +20,9 @@
 #include "rendering/procedural_renderer.hpp"
 #include "rendering/sdf_renderer.hpp"
 #include "rendering/shader_layer.hpp"
+#include "rendering/simulation.hpp"
 #include "rendering/spline_buffers.hpp"
+#include "rendering/volume_renderer.hpp"
 #include "scene/scene.hpp"
 #include "shaders/shader_layers.hpp"
 
@@ -61,6 +64,8 @@ struct RenderStats {
     ParticleStats particles;
     ProceduralStats procedural; // ADR-023; its draws/triangles are also folded into the totals
     SdfStats sdf;               // ADR-027; its draws/triangles are also folded into the totals
+    VolumeStats volume;         // ADR-032; the raymarched atmosphere (steps 0 = off)
+    SimulationStats simulation; // ADR-032; the simulated grid fields stepped this frame
     PostStats post;
     std::uint32_t transientTextures = 0;
 };
@@ -159,6 +164,8 @@ public:
     [[nodiscard]] ParticleRenderer& particles() { return *particles_; }
     [[nodiscard]] ProceduralRenderer& procedurals() { return *procedurals_; }
     [[nodiscard]] SdfRenderer& sdfs() { return *sdfs_; } // ADR-027
+    [[nodiscard]] VolumeRenderer& volumes() { return *volumes_; } // ADR-032
+    [[nodiscard]] Simulation& simulation() { return *simulation_; } // ADR-032
     [[nodiscard]] FieldUniforms& fields() { return *fields_; } // the per-frame field block (ADR-025)
     [[nodiscard]] MaterialPrograms& materialPrograms() { return *materialPrograms_; } // ADR-030
     [[nodiscard]] SplineBuffers& splines() { return *splines_; } // the spline tables (ADR-026)
@@ -220,6 +227,8 @@ private:
     std::unique_ptr<ParticleRenderer> particles_;
     std::unique_ptr<ProceduralRenderer> procedurals_;
     std::unique_ptr<SdfRenderer> sdfs_;
+    std::unique_ptr<VolumeRenderer> volumes_;
+    std::unique_ptr<Simulation> simulation_;
     std::unique_ptr<PostProcessor> postProcessor_;
     std::unique_ptr<gpu::TransientPool> pool_;
     glm::mat4 prevViewProj_{1.0f};

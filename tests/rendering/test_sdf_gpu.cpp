@@ -210,8 +210,10 @@ public:
             FAIL(module.error().message);
         }
         const auto& device = ctx_.device();
-        std::array<wgpu::BindGroupLayoutEntry, 6> entries{};
-        for (std::uint32_t b = 0; b < 6; ++b) {
+        // Binding 15 is the simulated-grid table fields.wgsl declares (ADR-032); the harness
+        // binds FieldUniforms' own (empty) table.
+        std::array<wgpu::BindGroupLayoutEntry, 7> entries{};
+        for (std::uint32_t b = 0; b < 7; ++b) {
             entries[b].binding = b;
             entries[b].visibility = wgpu::ShaderStage::Compute;
         }
@@ -221,6 +223,8 @@ public:
         entries[3].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         entries[4].buffer.type = wgpu::BufferBindingType::Storage;
         entries[5].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[6].binding = 15;
+        entries[6].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         wgpu::BindGroupLayoutDescriptor ldesc{};
         ldesc.entryCount = entries.size();
         ldesc.entries = entries.data();
@@ -278,7 +282,7 @@ public:
             const glm::vec4 t(static_cast<float>(time), normalEps, 0.0f, 0.0f);
             ctx_.queue().WriteBuffer(timeBuf, 0, &t, sizeof(t));
         }
-        std::array<wgpu::BindGroupEntry, 6> entries{};
+        std::array<wgpu::BindGroupEntry, 7> entries{};
         entries[0].binding = 0;
         entries[0].buffer = nodeBuf;
         entries[1].binding = 1;
@@ -292,6 +296,9 @@ public:
         entries[4].buffer = resultBuf;
         entries[5].binding = 5;
         entries[5].buffer = timeBuf;
+        entries[6].binding = 15;
+        entries[6].buffer = block.gridBuffer();
+        entries[6].size = rendering::FieldUniforms::kGridBufferSize;
         wgpu::BindGroupDescriptor gdesc{};
         gdesc.layout = layout_;
         gdesc.entryCount = entries.size();

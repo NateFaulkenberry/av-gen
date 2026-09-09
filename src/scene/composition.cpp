@@ -778,6 +778,20 @@ Result<void> Composition::evaluateGraph(double time) {
     return {};
 }
 
+Result<void> Composition::addGrid(spatial::GridField grid) {
+    if (auto ok = grid.validate(); !ok) {
+        return ok;
+    }
+    for (const spatial::GridField& existing : grids_) {
+        if (existing.name == grid.name) {
+            return fail("grid '{}' already exists", grid.name);
+        }
+    }
+    grids_.push_back(std::move(grid));
+    dirty_ = true;
+    return {};
+}
+
 Result<void> Composition::addMaterialProgram(MaterialProgram program) {
     if (auto v = program.validate(); !v) {
         return std::unexpected(v.error());
@@ -1048,6 +1062,36 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     brightness_ = &params.add(floatDesc(prefix_ + "scene/brightness", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f));
     fogDensity_ = &params.add(floatDesc(prefix_ + "scene/fogDensity", fogDensitySetting_, 0.0f, 2.0f, 0.0f, 0.2f));
     keyLight_ = &params.add(floatDesc(prefix_ + "scene/keyLight", 1.0f, 0.0f, 10.0f, 0.0f, 3.0f));
+    // Volumetric atmosphere (ADR-032). volumeDensity 0 keeps the pass off, so these are free
+    // until someone turns them up; every one is an ordinary parameter, so audio, the timeline,
+    // presets, OSC/MIDI and macros drive fog through the usual routes.
+    volumeDensity_ = &params.add(
+        floatDesc(prefix_ + "scene/volumeDensity", volumeSetting_.volumeDensity, 0.0f, 2.0f, 0.0f, 0.2f));
+    fogHeight_ = &params.add(floatDesc(prefix_ + "scene/fogHeight", volumeSetting_.fogHeight, -1e4f, 1e4f,
+                                       -20.0f, 40.0f));
+    fogHeightFalloff_ = &params.add(floatDesc(prefix_ + "scene/fogHeightFalloff", volumeSetting_.fogHeightFalloff,
+                                              0.0f, 10.0f, 0.0f, 1.0f));
+    volumeScattering_ = &params.add(floatDesc(prefix_ + "scene/volumeScattering", volumeSetting_.volumeScattering,
+                                              0.0f, 20.0f, 0.0f, 4.0f));
+    volumeAbsorption_ = &params.add(floatDesc(prefix_ + "scene/volumeAbsorption", volumeSetting_.volumeAbsorption,
+                                              0.0f, 20.0f, 0.0f, 4.0f));
+    volumeAnisotropy_ = &params.add(floatDesc(prefix_ + "scene/volumeAnisotropy", volumeSetting_.volumeAnisotropy,
+                                              -0.95f, 0.95f, -0.9f, 0.9f));
+    volumeNoise_ = &params.add(
+        floatDesc(prefix_ + "scene/volumeNoise", volumeSetting_.volumeNoiseAmount, 0.0f, 4.0f, 0.0f, 1.0f));
+    volumeNoiseScale_ = &params.add(floatDesc(prefix_ + "scene/volumeNoiseScale", volumeSetting_.volumeNoiseScale,
+                                              0.0f, 10.0f, 0.0f, 1.0f));
+    volumeNoiseSpeed_ = &params.add(floatDesc(prefix_ + "scene/volumeNoiseSpeed", volumeSetting_.volumeNoiseSpeed,
+                                              -10.0f, 10.0f, -2.0f, 2.0f));
+    volumeEmission_ = &params.add(
+        floatDesc(prefix_ + "scene/volumeEmission", volumeSetting_.volumeEmission, 0.0f, 20.0f, 0.0f, 4.0f));
+    volumeSteps_ = &params.add(params::ParamDesc<int>{.path = prefix_ + "scene/volumeSteps",
+                                                      .defaultValue = volumeSetting_.volumeSteps,
+                                                      .hardMin = 4,
+                                                      .hardMax = 256,
+                                                      .softMin = 8,
+                                                      .softMax = 96,
+                                                      .label = "scene/volumeSteps"});
     {
         auto fogDesc = vec3Desc(prefix_ + "scene/fogColor", fogColorSet_ ? fogColorSetting_ : scene_.environment.backgroundColor,
                                 0.0f, 1.0f, 0.0f, 1.0f);
@@ -1201,6 +1245,17 @@ void Composition::detach() {
     brightness_ = nullptr;
     fogDensity_ = nullptr;
     fogColor_ = nullptr;
+    volumeDensity_ = nullptr;
+    fogHeight_ = nullptr;
+    fogHeightFalloff_ = nullptr;
+    volumeScattering_ = nullptr;
+    volumeAbsorption_ = nullptr;
+    volumeAnisotropy_ = nullptr;
+    volumeNoise_ = nullptr;
+    volumeNoiseScale_ = nullptr;
+    volumeNoiseSpeed_ = nullptr;
+    volumeEmission_ = nullptr;
+    volumeSteps_ = nullptr;
     keyLight_ = nullptr;
     gridIntensity_ = nullptr;
     rootScale_ = nullptr;
@@ -1274,6 +1329,20 @@ void Composition::rebuild() {
     scene_.particles.clear();
     scene_.procedurals.clear();
     scene_.fields.fields.clear();
+    scene_.fields.grids.clear();
+    // Simulated grids (ADR-032) are scene-level, not nodes: they have no transform of their own
+    // (their bounds are world space) and are referenced by name from Grid fields.
+    for (const spatial::GridField& src : grids_) {
+        spatial::GridField g = src;
+        g.name = sanitise(prefix_) + src.name;
+        if (!g.injectField.empty()) {
+            g.injectField = sanitise(prefix_) + src.injectField;
+        }
+        if (!g.velocityField.empty()) {
+            g.velocityField = sanitise(prefix_) + src.velocityField;
+        }
+        scene_.fields.grids.push_back(std::move(g));
+    }
     scene_.splines.splines.clear();
     scene_.sdfs.clear();
     scene_.materialPrograms.clear();
@@ -1420,6 +1489,9 @@ void Composition::rebuild() {
             }
             node.child->ensureBuilt();
             const Scene& cs = node.child->scene();
+            for (const spatial::GridField& g : cs.fields.grids) {
+                scene_.fields.grids.push_back(g); // the child already prefixed the names
+            }
             const auto meshOffset = static_cast<MeshId>(scene_.meshes.size());
             const auto textureOffset = static_cast<TextureId>(scene_.textures.size());
             for (const auto& mesh : cs.meshes) {
@@ -1890,6 +1962,29 @@ void Composition::applyParameters() {
     }
     scene_.environment.fogColor = fogColor_ != nullptr ? fogColor_->value()
                                                        : (fogColorSet_ ? fogColorSetting_ : scene_.environment.backgroundColor);
+    {
+        scene::Environment& env = scene_.environment;
+        auto pick = [](const params::Parameter<float>* p, float fallback) {
+            return p != nullptr ? p->value() : fallback;
+        };
+        env.volumeDensity = pick(volumeDensity_, volumeSetting_.volumeDensity);
+        env.fogHeight = pick(fogHeight_, volumeSetting_.fogHeight);
+        env.fogHeightFalloff = pick(fogHeightFalloff_, volumeSetting_.fogHeightFalloff);
+        env.volumeScattering = pick(volumeScattering_, volumeSetting_.volumeScattering);
+        env.volumeAbsorption = pick(volumeAbsorption_, volumeSetting_.volumeAbsorption);
+        env.volumeAnisotropy = pick(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
+        env.volumeNoiseAmount = pick(volumeNoise_, volumeSetting_.volumeNoiseAmount);
+        env.volumeNoiseScale = pick(volumeNoiseScale_, volumeSetting_.volumeNoiseScale);
+        env.volumeNoiseSpeed = pick(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
+        env.volumeEmission = pick(volumeEmission_, volumeSetting_.volumeEmission);
+        env.volumeSteps = volumeSteps_ != nullptr ? volumeSteps_->value() : volumeSetting_.volumeSteps;
+        env.volumeMaxDistance = volumeSetting_.volumeMaxDistance;
+        // Field names are prefixed like every other reference so a nested scene stays self-contained.
+        env.volumeDensityField =
+            volumeDensityFieldSetting_.empty() ? std::string() : sanitise(prefix_) + volumeDensityFieldSetting_;
+        env.volumeColorField =
+            volumeColorFieldSetting_.empty() ? std::string() : sanitise(prefix_) + volumeColorFieldSetting_;
+    }
     if (gridIntensity_ != nullptr) {
         scene_.environment.gridIntensity = gridIntensity_->value();
     }
@@ -1951,6 +2046,34 @@ nlohmann::json Composition::toJson() const {
         const glm::vec3 bg = scene_.environment.backgroundColor;
         environment["background"] = {bg.r, bg.g, bg.b};
     }
+    {
+        // Volumetric atmosphere (ADR-032); written only when it is on, so existing files are
+        // unchanged by a round trip.
+        const float density = volumeDensity_ != nullptr ? volumeDensity_->base() : volumeSetting_.volumeDensity;
+        if (density > 0.0f || !volumeDensityFieldSetting_.empty() || !volumeColorFieldSetting_.empty()) {
+            auto base = [](const params::Parameter<float>* p, float fallback) {
+                return p != nullptr ? p->base() : fallback;
+            };
+            environment["volumeDensity"] = density;
+            environment["fogHeight"] = base(fogHeight_, volumeSetting_.fogHeight);
+            environment["fogHeightFalloff"] = base(fogHeightFalloff_, volumeSetting_.fogHeightFalloff);
+            environment["volumeScattering"] = base(volumeScattering_, volumeSetting_.volumeScattering);
+            environment["volumeAbsorption"] = base(volumeAbsorption_, volumeSetting_.volumeAbsorption);
+            environment["volumeAnisotropy"] = base(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
+            environment["volumeNoise"] = base(volumeNoise_, volumeSetting_.volumeNoiseAmount);
+            environment["volumeNoiseScale"] = base(volumeNoiseScale_, volumeSetting_.volumeNoiseScale);
+            environment["volumeNoiseSpeed"] = base(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
+            environment["volumeEmission"] = base(volumeEmission_, volumeSetting_.volumeEmission);
+            environment["volumeSteps"] = volumeSteps_ != nullptr ? volumeSteps_->base() : volumeSetting_.volumeSteps;
+            environment["volumeMaxDistance"] = volumeSetting_.volumeMaxDistance;
+            if (!volumeDensityFieldSetting_.empty()) {
+                environment["volumeDensityField"] = volumeDensityFieldSetting_;
+            }
+            if (!volumeColorFieldSetting_.empty()) {
+                environment["volumeColorField"] = volumeColorFieldSetting_;
+            }
+        }
+    }
     j["environment"] = std::move(environment);
 
     json nodes = json::array();
@@ -1996,6 +2119,13 @@ nlohmann::json Composition::toJson() const {
     j["nodes"] = std::move(nodes);
     if (graph_) {
         j["graph"] = graph_->toJson();
+    }
+    if (!grids_.empty()) {
+        json gridsJson = json::array();
+        for (const spatial::GridField& g : grids_) {
+            gridsJson.push_back(g.toJson()); // settings only, never the cell values
+        }
+        j["grids"] = std::move(gridsJson);
     }
     if (!materialPrograms_.empty()) {
         json programs = json::array();
@@ -2124,6 +2254,46 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return false;
         };
         comp->fogColorSet_ = readColour("fogColor", comp->fogColorSetting_);
+        {
+            scene::Environment& v = comp->volumeSetting_;
+            struct FloatKey {
+                const char* key;
+                float* target;
+            };
+            for (const FloatKey fk : {FloatKey{"volumeDensity", &v.volumeDensity},
+                                      FloatKey{"fogHeight", &v.fogHeight},
+                                      FloatKey{"fogHeightFalloff", &v.fogHeightFalloff},
+                                      FloatKey{"volumeScattering", &v.volumeScattering},
+                                      FloatKey{"volumeAbsorption", &v.volumeAbsorption},
+                                      FloatKey{"volumeAnisotropy", &v.volumeAnisotropy},
+                                      FloatKey{"volumeNoise", &v.volumeNoiseAmount},
+                                      FloatKey{"volumeNoiseScale", &v.volumeNoiseScale},
+                                      FloatKey{"volumeNoiseSpeed", &v.volumeNoiseSpeed},
+                                      FloatKey{"volumeEmission", &v.volumeEmission},
+                                      FloatKey{"volumeMaxDistance", &v.volumeMaxDistance}}) {
+                auto value = readFloat(e, fk.key, *fk.target);
+                if (!value) {
+                    return std::unexpected(value.error());
+                }
+                *fk.target = *value;
+            }
+            if (e.contains("volumeSteps")) {
+                if (!e["volumeSteps"].is_number_integer()) {
+                    return fail("'volumeSteps' must be an integer");
+                }
+                v.volumeSteps = std::clamp(e["volumeSteps"].get<int>(), 4, 256);
+            }
+            auto densityField = readString(e, "volumeDensityField", comp->volumeDensityFieldSetting_);
+            if (!densityField) {
+                return std::unexpected(densityField.error());
+            }
+            comp->volumeDensityFieldSetting_ = *densityField;
+            auto colourField = readString(e, "volumeColorField", comp->volumeColorFieldSetting_);
+            if (!colourField) {
+                return std::unexpected(colourField.error());
+            }
+            comp->volumeColorFieldSetting_ = *colourField;
+        }
         glm::vec3 background;
         if (readColour("background", background)) {
             comp->scene_.environment.backgroundColor = background;
@@ -2149,6 +2319,21 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         }
         if (auto ok = comp->setGraph(std::move(*g)); !ok) {
             return fail("scene file '{}': graph: {}", scenePath.string(), ok.error().message);
+        }
+    }
+    if (j.contains("grids")) {
+        const json& gridsJson = j.at("grids");
+        if (!gridsJson.is_array()) {
+            return fail("'grids' must be an array");
+        }
+        for (const json& gj : gridsJson) {
+            auto g = spatial::GridField::fromJson(gj);
+            if (!g) {
+                return fail("scene file '{}': grid: {}", scenePath.string(), g.error().message);
+            }
+            if (auto added = comp->addGrid(std::move(*g)); !added) {
+                return fail("scene file '{}': {}", scenePath.string(), added.error().message);
+            }
         }
     }
     if (j.contains("materialPrograms")) {

@@ -73,7 +73,9 @@ public:
         auto module = shaders_.compile(*source + kKernel, "fields-harness");
         REQUIRE(module.has_value());
         const auto& device = ctx_.device();
-        std::array<wgpu::BindGroupLayoutEntry, 3> entries{};
+        // Binding 15 is the simulated-grid table fields.wgsl declares (ADR-032); the harness
+        // binds FieldUniforms' own (empty) table so no Grid field can resolve.
+        std::array<wgpu::BindGroupLayoutEntry, 4> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Compute;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -83,6 +85,9 @@ public:
         entries[2].binding = 2;
         entries[2].visibility = wgpu::ShaderStage::Compute;
         entries[2].buffer.type = wgpu::BufferBindingType::Storage;
+        entries[3].binding = 15;
+        entries[3].visibility = wgpu::ShaderStage::Compute;
+        entries[3].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         wgpu::BindGroupLayoutDescriptor ldesc{};
         ldesc.entryCount = entries.size();
         ldesc.entries = entries.data();
@@ -113,7 +118,7 @@ public:
         rdesc.size = positions.size() * 3 * sizeof(glm::vec4);
         rdesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc;
         wgpu::Buffer results = device.CreateBuffer(&rdesc);
-        std::array<wgpu::BindGroupEntry, 3> entries{};
+        std::array<wgpu::BindGroupEntry, 4> entries{};
         entries[0].binding = 0;
         entries[0].buffer = block.buffer();
         entries[0].size = rendering::FieldUniforms::kBufferSize;
@@ -123,6 +128,9 @@ public:
         entries[2].binding = 2;
         entries[2].buffer = results;
         entries[2].size = rdesc.size;
+        entries[3].binding = 15;
+        entries[3].buffer = block.gridBuffer();
+        entries[3].size = rendering::FieldUniforms::kGridBufferSize;
         wgpu::BindGroupDescriptor gdesc{};
         gdesc.layout = layout_;
         gdesc.entryCount = entries.size();

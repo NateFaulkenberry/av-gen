@@ -5,6 +5,12 @@
 // (field forces) and, later, materials. Owned by SceneRenderer; re-packed every frame because
 // fields animate (tau = speed * t + phase, waves travel).
 //
+// FieldUniforms also owns the simulated-grid table (ADR-032): one storage buffer every module
+// that includes fields.wgsl binds at group 0 binding 15. It is allocated once at a fixed size
+// (spatial::kMaxGridTableFloats floats = 8 MB) so no bind group ever has to be rebuilt;
+// rendering::Simulation fills it, spatial::gridTableOffset says where each grid lives, and a
+// scene without grids simply never reads it.
+//
 // Slot assignment: slot i is Scene::fields.fields[i] for i < spatial::kMaxGpuFields, so compound
 // children packed by spatial::packField (which resolves names through FieldSet::indexOf) point
 // at the right slot. A disabled field keeps its slot but is packed as a zero-strength constant
@@ -26,13 +32,13 @@ class Context;
 
 namespace avgen::rendering {
 
-// Mirrors `FieldBlock` in shaders/fields.wgsl (5136 bytes).
+// Mirrors `FieldBlock` in shaders/fields.wgsl (5904 bytes).
 struct FieldBlock {
     std::uint32_t count = 0;
     std::uint32_t pad[3] = {0, 0, 0};
     spatial::FieldGpu fields[spatial::kMaxGpuFields];
 };
-static_assert(sizeof(FieldBlock) == 16 + 320 * spatial::kMaxGpuFields);
+static_assert(sizeof(FieldBlock) == 16 + sizeof(spatial::FieldGpu) * spatial::kMaxGpuFields);
 
 class FieldUniforms {
 public:
@@ -48,11 +54,16 @@ public:
     [[nodiscard]] std::uint32_t count() const { return block_.count; }
     [[nodiscard]] const wgpu::Buffer& buffer() const { return buffer_; }
     [[nodiscard]] const FieldBlock& block() const { return block_; } // the last packed block (tests)
+    // The shared simulated-grid table (group 0 binding 15 of every fields.wgsl consumer).
+    [[nodiscard]] const wgpu::Buffer& gridBuffer() const { return gridBuffer_; }
     static constexpr std::uint64_t kBufferSize = sizeof(FieldBlock);
+    static constexpr std::uint64_t kGridBufferSize =
+        static_cast<std::uint64_t>(spatial::kMaxGridTableFloats) * sizeof(float);
 
 private:
     gpu::Context& context_;
     wgpu::Buffer buffer_;
+    wgpu::Buffer gridBuffer_;
     FieldBlock block_{};
     std::unordered_map<std::string, int> slots_;
     bool warnedLimit_ = false;

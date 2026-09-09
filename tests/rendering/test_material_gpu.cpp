@@ -137,8 +137,10 @@ public:
             FAIL(module.error().message);
         }
         const auto& device = ctx_.device();
-        std::array<wgpu::BindGroupLayoutEntry, 4> entries{};
-        for (std::uint32_t i = 0; i < entries.size(); ++i) {
+        // fields.wgsl declares the shared grid table at binding 15 (ADR-032), so every layout
+        // serving a consumer of it must carry that entry too.
+        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
+        for (std::uint32_t i = 0; i < 4; ++i) {
             entries[i].binding = i;
             entries[i].visibility = wgpu::ShaderStage::Compute;
         }
@@ -146,6 +148,9 @@ public:
         entries[1].buffer.type = wgpu::BufferBindingType::Uniform;
         entries[2].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         entries[3].buffer.type = wgpu::BufferBindingType::Storage;
+        entries[4].binding = 15;
+        entries[4].visibility = wgpu::ShaderStage::Compute;
+        entries[4].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         wgpu::BindGroupLayoutDescriptor ldesc{};
         ldesc.entryCount = entries.size();
         ldesc.entries = entries.data();
@@ -200,7 +205,7 @@ public:
         rdesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc;
         wgpu::Buffer results = device.CreateBuffer(&rdesc);
 
-        std::array<wgpu::BindGroupEntry, 4> entries{};
+        std::array<wgpu::BindGroupEntry, 5> entries{};
         entries[0].binding = 0;
         entries[0].buffer = fieldBlock.buffer();
         entries[0].size = rendering::FieldUniforms::kBufferSize;
@@ -213,6 +218,9 @@ public:
         entries[3].binding = 3;
         entries[3].buffer = results;
         entries[3].size = rdesc.size;
+        entries[4].binding = 15;
+        entries[4].buffer = fieldBlock.gridBuffer();
+        entries[4].size = rendering::FieldUniforms::kGridBufferSize;
         wgpu::BindGroupDescriptor gdesc{};
         gdesc.layout = layout_;
         gdesc.entryCount = entries.size();

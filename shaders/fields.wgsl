@@ -4,9 +4,12 @@
 // order, as spatial::sampleScalar / sampleVector / sampleColor (tests/rendering/test_fields_gpu.cpp
 // compares them within 1e-4, noise kinds 1e-3).
 //
-// The including module declares the binding itself, e.g.
+// The including module declares the FieldBlock binding itself, e.g.
 //   @group(1) @binding(3) var<uniform> fieldBlock: FieldBlock;
-// (module-scope declarations may appear in any order). This file includes noise.wgsl; do not
+// (module-scope declarations may appear in any order). The simulated-grid table is different: it
+// is declared HERE, at @group(0) @binding(15), so every module sees one binding; a module that
+// includes this file must carry that entry in its group-0 layout (rendering::FieldUniforms owns
+// the buffer and hands it over next to the field block). This file includes noise.wgsl; do not
 // include it a second time.
 //
 // Conventions (p world space):
@@ -46,6 +49,9 @@ struct FieldGpu {
     curve: vec4<f32>,                // custom falloff curve control values
     noiseCombineMix: vec4<f32>,      // falloff noiseAmount, noiseScale, combine, mix
     children: vec4<i32>,             // compound child slots, -1 = none
+    gridBounds0: vec4<f32>,          // Grid kind: boundsMin.xyz, offset into gridTable (floats)
+    gridBounds1: vec4<f32>,          // boundsMax.xyz, components per cell (1 scalar, 2 Rd, 4 vector)
+    gridRes: vec4<f32>,              // resolution.xyz, w = 0 unbound, 1 bound (clamp), 3 bound (wrap)
 };
 
 struct FieldBlock {
@@ -81,6 +87,7 @@ const FIELD_RADIAL_GRADIENT: u32 = 21u;
 const FIELD_NOISE_COLOR: u32 = 22u;
 const FIELD_POSITION_COLOR: u32 = 23u;
 const FIELD_COMPOUND: u32 = 24u;
+const FIELD_GRID: u32 = 25u;
 
 const FIELD_TYPE_SCALAR: u32 = 0u;
 const FIELD_TYPE_VECTOR: u32 = 1u;
@@ -105,6 +112,97 @@ const FIELD_COMBINE_MIX: u32 = 4u;
 const FIELD_COMBINE_AVERAGE: u32 = 5u;
 
 const FIELD_TWO_PI: f32 = 6.28318530717958647692;
+
+// ---- simulated grids (ADR-032) ------------------------------------------------------------------
+// Every simulated grid of the scene lives in one shared table, back to back in FieldSet::grids
+// order (spatial::gridTableOffset, rendering::Simulation). The table is bound HERE, at group 0
+// binding 15, so every module that includes this file sees the same binding; its bind group
+// layout must carry that entry (a 16-byte placeholder buffer when the scene has no grids -
+// gridRes.w is then 0 for every record and no sample reads the buffer).
+@group(0) @binding(15) var<storage, read> gridTable: array<f32>;
+
+// Continuous cell coordinate of a point in the grid's own space (cell i is centred at i).
+fn gridCoord(fi: u32, q: vec3<f32>) -> vec3<f32> {
+    let lo = fieldBlock.fields[fi].gridBounds0.xyz;
+    let hi = fieldBlock.fields[fi].gridBounds1.xyz;
+    let res = fieldBlock.fields[fi].gridRes.xyz;
+    let extent = max(hi - lo, vec3<f32>(1e-6));
+    return (q - lo) / extent * res - vec3<f32>(0.5);
+}
+
+fn gridAxisIndex(i: i32, n: i32, wraps: bool) -> i32 {
+    if (wraps) {
+        let m = i % n;
+        return select(m, m + n, m < 0);
+    }
+    return clamp(i, 0, n - 1);
+}
+
+// One cell component, with the wrap rule. Matches spatial::GridField::at.
+fn gridFetch(fi: u32, i: i32, j: i32, k: i32, c: i32) -> f32 {
+    let nx = i32(fieldBlock.fields[fi].gridRes.x);
+    let ny = i32(fieldBlock.fields[fi].gridRes.y);
+    let nz = i32(fieldBlock.fields[fi].gridRes.z);
+    if (nx <= 0 || ny <= 0 || nz <= 0) {
+        return 0.0;
+    }
+    let comps = i32(fieldBlock.fields[fi].gridBounds1.w + 0.5);
+    if (c < 0 || c >= comps) {
+        return 0.0;
+    }
+    let wraps = fieldBlock.fields[fi].gridRes.w > 2.0;
+    let ii = gridAxisIndex(i, nx, wraps);
+    let jj = gridAxisIndex(j, ny, wraps);
+    let kk = gridAxisIndex(k, nz, wraps);
+    let base = i32(fieldBlock.fields[fi].gridBounds0.w + 0.5);
+    let idx = base + ((kk * ny + jj) * nx + ii) * comps + c;
+    if (idx < 0 || u32(idx) >= arrayLength(&gridTable)) {
+        return 0.0;
+    }
+    return gridTable[u32(idx)];
+}
+
+// Trilinear gather of one component. Matches spatial's trilinear() operation for operation.
+fn gridTrilinear(fi: u32, coord: vec3<f32>, c: i32) -> f32 {
+    let base = floor(coord);
+    let f = coord - base;
+    let i = i32(base.x);
+    let j = i32(base.y);
+    let k = i32(base.z);
+    let c000 = gridFetch(fi, i, j, k, c);
+    let c100 = gridFetch(fi, i + 1, j, k, c);
+    let c010 = gridFetch(fi, i, j + 1, k, c);
+    let c110 = gridFetch(fi, i + 1, j + 1, k, c);
+    let c001 = gridFetch(fi, i, j, k + 1, c);
+    let c101 = gridFetch(fi, i + 1, j, k + 1, c);
+    let c011 = gridFetch(fi, i, j + 1, k + 1, c);
+    let c111 = gridFetch(fi, i + 1, j + 1, k + 1, c);
+    let x00 = c000 + (c100 - c000) * f.x;
+    let x10 = c010 + (c110 - c010) * f.x;
+    let x01 = c001 + (c101 - c001) * f.x;
+    let x11 = c011 + (c111 - c011) * f.x;
+    let y0 = x00 + (x10 - x00) * f.y;
+    let y1 = x01 + (x11 - x01) * f.y;
+    return y0 + (y1 - y0) * f.z;
+}
+
+// The grid's scalar reading: the single channel, or B for reaction-diffusion (2 components).
+fn gridScalarAt(fi: u32, q: vec3<f32>) -> f32 {
+    if (fieldBlock.fields[fi].gridRes.w < 0.5) {
+        return 0.0;
+    }
+    let comps = i32(fieldBlock.fields[fi].gridBounds1.w + 0.5);
+    let channel = select(0, 1, comps == 2);
+    return gridTrilinear(fi, gridCoord(fi, q), channel);
+}
+
+fn gridVectorAt(fi: u32, q: vec3<f32>) -> vec3<f32> {
+    if (fieldBlock.fields[fi].gridRes.w < 0.5) {
+        return vec3<f32>(0.0);
+    }
+    let coord = gridCoord(fi, q);
+    return vec3<f32>(gridTrilinear(fi, coord, 0), gridTrilinear(fi, coord, 1), gridTrilinear(fi, coord, 2));
+}
 
 // normalize() that returns 0 for a zero vector (the CPU does the same).
 fn fieldNormalize(v: vec3<f32>) -> vec3<f32> {
@@ -301,6 +399,9 @@ fn scalarShape(fi: u32, q: vec3<f32>) -> f32 {
     if (kind == FIELD_WAVE) {
         return waveValue(fi, q);
     }
+    if (kind == FIELD_GRID) {
+        return gridScalarAt(fi, q);
+    }
     return 0.0; // SdfDistance (unbound on the GPU) and anything unknown
 }
 
@@ -329,6 +430,9 @@ fn vectorDirection(fi: u32, q: vec3<f32>) -> vec3<f32> {
     }
     if (kind == FIELD_WAVE_VECTOR) {
         return waveValue(fi, q) * waveDirection(fi, q);
+    }
+    if (kind == FIELD_GRID) {
+        return gridVectorAt(fi, q);
     }
     return vec3<f32>(0.0);
 }

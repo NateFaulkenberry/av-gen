@@ -47,6 +47,8 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       particles_(std::make_unique<ParticleRenderer>(context, shaders)),
       procedurals_(std::make_unique<ProceduralRenderer>(context, shaders)),
       sdfs_(std::make_unique<SdfRenderer>(context, shaders)),
+      volumes_(std::make_unique<VolumeRenderer>(context, shaders)),
+      simulation_(std::make_unique<Simulation>(context, shaders)),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
     objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
 }
@@ -70,7 +72,23 @@ Result<void> SceneRenderer::init() {
         desc.entries = &entry;
         return device.CreateBindGroupLayout(&desc);
     };
-    frameLayout_ = uniformLayout("frame-layout", sizeof(FrameUniforms), false);
+    {
+        // Group 0 of every scene pass: 0 = FrameUniforms, 15 = the simulated-grid table declared
+        // by shaders/fields.wgsl (ADR-032; read-only storage, inert when the scene has no grids).
+        std::array<wgpu::BindGroupLayoutEntry, 2> entries{};
+        entries[0].binding = 0;
+        entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
+        entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[0].buffer.minBindingSize = sizeof(FrameUniforms);
+        entries[1].binding = 15;
+        entries[1].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
+        entries[1].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.label = "frame-layout";
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        frameLayout_ = device.CreateBindGroupLayout(&desc);
+    }
     objectLayout_ = uniformLayout("object-layout", sizeof(ObjectUniforms), true);
     {
         // 0 sampler, 1..5 the glTF textures, then ADR-030: 6 the material program block, 7 the
@@ -184,7 +202,21 @@ Result<void> SceneRenderer::init() {
         desc.entries = &entry;
         return device.CreateBindGroup(&desc);
     };
-    frameBindGroup_ = bufferGroup("frame-bind-group", frameLayout_, frameUniforms_, sizeof(FrameUniforms));
+    {
+        std::array<wgpu::BindGroupEntry, 2> entries{};
+        entries[0].binding = 0;
+        entries[0].buffer = frameUniforms_;
+        entries[0].size = sizeof(FrameUniforms);
+        entries[1].binding = 15;
+        entries[1].buffer = fields_->gridBuffer();
+        entries[1].size = FieldUniforms::kGridBufferSize;
+        wgpu::BindGroupDescriptor desc{};
+        desc.label = "frame-bind-group";
+        desc.layout = frameLayout_;
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        frameBindGroup_ = device.CreateBindGroup(&desc);
+    }
     objectBindGroup_ = bufferGroup("object-bind-group", objectLayout_, objectUniforms_, sizeof(ObjectUniforms));
 
     // ---- default textures ----
@@ -227,11 +259,11 @@ Result<void> SceneRenderer::init() {
     if (auto r = environment_->init(); !r) {
         return r;
     }
-    if (auto r = particles_->init(fields_->buffer(), splines_->buffer()); !r) {
+    if (auto r = particles_->init(fields_->buffer(), splines_->buffer(), fields_->gridBuffer()); !r) {
         return r;
     }
     if (auto r = procedurals_->init(kHdrFormat, kDepthFormat, frameLayout_, materialLayout_, iblLayout_, 1,
-                                    fields_->buffer(), splines_->buffer());
+                                    fields_->buffer(), splines_->buffer(), fields_->gridBuffer());
         !r) {
         return r;
     }
@@ -241,6 +273,12 @@ Result<void> SceneRenderer::init() {
         return r;
     }
     sdfs_->setMeshPipelines(litOpaqueCull_, litOpaqueNoCull_); // Mesh-mode objects draw as entities
+    if (auto r = volumes_->init(kHdrFormat, kDepthFormat, frameLayout_, fields_->buffer()); !r) {
+        return r;
+    }
+    if (auto r = simulation_->init(fields_->buffer(), fields_->gridBuffer()); !r) {
+        return r;
+    }
     if (auto r = postProcessor_->init(); !r) {
         return r;
     }
@@ -610,6 +648,12 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     if (auto r = sdfs_->reload(); !r) {
         keep("sdf_raymarch.wgsl", r);
     }
+    if (auto r = volumes_->reload(); !r) {
+        keep("volume.wgsl", r);
+    }
+    if (auto r = simulation_->reload(); !r) {
+        keep("simulate.wgsl", r);
+    }
     if (auto r = postProcessor_->reload(); !r) {
         keep("post.wgsl", r);
     }
@@ -967,6 +1011,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     materialPrograms_->update(scene.materialPrograms, fields_.get());
     // ---- splines (ADR-026): the sample tables, re-uploaded only when a spline changed ----
     splines_->update(scene.splines);
+    // ---- simulated grid fields (ADR-032): fixed sub-steps into the shared grid table ----
+    simulation_->update(encoder, scene, time);
+    stats_.simulation = simulation_->stats();
 
     // ---- particle simulation (compute) ----
     particles_->update(encoder, scene, time, view, proj, fields_.get(), splines_.get());
@@ -1085,6 +1132,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         drawItems(blended, true);
         rp.End();
     }
+
+    // ---- volumetric atmosphere (ADR-032): half-res raymarch + depth-aware composite ----
+    // Skipped entirely when Environment::volumeDensity is 0, so scenes without fog are unchanged.
+    volumes_->update(scene, time, hdr_.width(), hdr_.height(), hdr_.depthView(), fields_.get());
+    volumes_->encode(encoder, hdr_.colorView(), frameBindGroup_);
+    stats_.volume = volumes_->stats();
 
     // ---- post layers: HDR -> ping-pong HDR ----
     wgpu::TextureView finalHdr = hdr_.colorView();
@@ -1213,6 +1266,8 @@ Result<wgpu::Texture> SceneRenderer::renderSubmitted(const scene::Scene& scene, 
     procedurals_->collectTimings();
     particles_->collectTimings();
     sdfs_->collectTimings();
+    volumes_->collectTimings();
+    simulation_->collectTimings();
     context_.waitForQueue();
     stats_.gpuFrameMs = timer_->collect();
     procedurals_->collectTimings();
@@ -1221,6 +1276,10 @@ Result<wgpu::Texture> SceneRenderer::renderSubmitted(const scene::Scene& scene, 
     stats_.procedural.effectorPassMs = procedurals_->stats().effectorPassMs;
     stats_.particles.simulateMs = particles_->stats().simulateMs;
     stats_.sdf.raymarchMs = sdfs_->stats().raymarchMs;
+    volumes_->collectTimings();
+    stats_.volume.volumeMs = volumes_->stats().volumeMs;
+    simulation_->collectTimings();
+    stats_.simulation.simulateMs = simulation_->stats().simulateMs;
     return texture;
 }
 
