@@ -1,85 +1,791 @@
 {
-  "format": "avgen-project",
-  "version": 4,
-  "app": { "name": "avgen", "version": "0.1.0" },
-  "assets": { "scene": { "kind": "composition", "path": "reassembly.scene.json" } },
-  "parameters": {
-    "post/bloom/enabled": true, "post/bloom/intensity": 0.4, "post/bloom/threshold": 1.3,
-    "post/tonemap/operator": 1, "post/output/vignette": 0.4, "post/output/grain": 0.02,
-    "scene/brightness": 0.8, "scene/keyLight": 0.9, "root/rotationSpeed": 0.0,
-    "post/motionBlur/amount": 0.8
-  },
-  "sources": [
-    { "kind": "macro", "name": "macros", "settings": { "knobs": [
-      { "name": "disassembly", "default": 0.0 }, { "name": "energy", "default": 0.2 },
-      { "name": "tumble", "default": 0.0 } ] } },
-    { "kind": "control", "name": "control", "settings": { "channels": [] } }
-  ],
-  "worldMacros": [
-    { "name": "disassembly", "label": "DISASSEMBLY", "default": 0.0, "targets": [
-      { "path": "field/burst/strength", "min": 0.0, "max": 26.0 },
-      { "path": "field/gather/strength", "min": 6.0, "max": 0.0 },
-      { "path": "particles/sparks/spawnRate", "min": 0, "max": 5000, "op": "replace" } ] },
-    { "name": "tumble", "label": "TUMBLE", "default": 0.0, "targets": [
-      { "path": "field/tumble/strength", "min": 0.0, "max": 3.2 },
-      { "path": "field/tumble/speed", "min": 0.05, "max": 0.7 } ] },
-    { "name": "energy", "label": "ENERGY", "default": 0.2, "targets": [
-      { "path": "procedural/core/material/emissive", "min": 0.4, "max": 8.0 },
-      { "path": "field/core/strength", "min": 0.4, "max": 3.0 },
-      { "path": "field/spin/strength", "min": 0.1, "max": 1.4 },
-      { "path": "post/bloom/intensity", "min": 0.3, "max": 0.8 } ] }
-  ],
-  "routes": [
-    { "source": "audio.rms", "target": "macros/energy", "amount": 0.5, "op": "add",
-      "polarity": "unipolar", "chain": { "attackMs": 80, "decayMs": 500 } },
-    { "source": "audio.bass", "target": "field/spin/strength", "amount": 0.6, "op": "add",
-      "polarity": "unipolar", "chain": { "attackMs": 30, "decayMs": 300 } },
-    { "source": "audio.onset", "target": "particles/sparks/burst", "amount": 600.0, "op": "add",
-      "polarity": "unipolar", "chain": { "envelope": "peakhold", "decayMs": 40 } },
-    { "source": "audio.treble", "target": "procedural/pins/material/emissive", "amount": 1.5,
-      "op": "add", "polarity": "unipolar", "chain": { "attackMs": 10, "decayMs": 200 } }
-  ],
-  "presets": [
-    { "name": "Assembled", "values": { "macros/disassembly": [0.0], "macros/tumble": [0.0],
-      "macros/energy": [0.15], "camera/position": [0, 7.5, 26], "camera/target": [0, 6, 0] } },
-    { "name": "Tension", "values": { "macros/disassembly": [0.06], "macros/tumble": [0.05],
-      "macros/energy": [0.5], "camera/position": [0, 7.0, 20], "camera/target": [0, 6, 0] } },
-    { "name": "Disassembly", "values": { "macros/disassembly": [0.55], "macros/tumble": [0.4],
-      "macros/energy": [0.6], "camera/position": [0, 9.0, 30], "camera/target": [0, 6, 0] } },
-    { "name": "Float", "values": { "macros/disassembly": [0.85], "macros/tumble": [0.7],
-      "macros/energy": [0.35], "camera/position": [6, 7.0, 14], "camera/target": [0, 6, 0] } },
-    { "name": "Reassembly", "values": { "macros/disassembly": [0.25], "macros/tumble": [0.15],
-      "macros/energy": [0.7], "camera/position": [0, 7.5, 22], "camera/target": [0, 6, 0] } },
-    { "name": "Lock", "values": { "macros/disassembly": [0.0], "macros/tumble": [0.0],
-      "macros/energy": [0.9], "camera/position": [0, 6.5, 16], "camera/target": [0, 6, 0] } },
-    { "name": "Explosion", "values": { "macros/disassembly": [1.0], "macros/tumble": [1.0],
-      "macros/energy": [1.0], "camera/position": [0, 8.0, 34], "camera/target": [0, 6, 0] } }
-  ],
-  "states": {
-    "initial": "Assembled",
-    "states": [
-      { "name": "Assembled", "preset": "Assembled", "transition": { "seconds": 4.0, "easing": "smooth" } },
-      { "name": "Tension", "preset": "Tension", "transition": { "seconds": 3.0, "easing": "easeIn" },
-        "triggers": [ { "kind": "phrase", "every": 2, "from": "Assembled" } ] },
-      { "name": "Disassembly", "preset": "Disassembly", "transition": { "seconds": 2.5, "easing": "easeOut" },
-        "triggers": [ { "kind": "phrase", "every": 1, "from": "Tension" } ] },
-      { "name": "Float", "preset": "Float", "transition": { "seconds": 6.0, "easing": "smooth" },
-        "triggers": [ { "kind": "phrase", "every": 2, "from": "Disassembly" } ] },
-      { "name": "Reassembly", "preset": "Reassembly", "transition": { "seconds": 5.0, "easing": "easeInOut" },
-        "triggers": [ { "kind": "phrase", "every": 2, "from": "Float" } ] },
-      { "name": "Lock", "preset": "Lock", "transition": { "seconds": 1.2, "easing": "easeOut" },
-        "triggers": [ { "kind": "phrase", "every": 1, "from": "Reassembly" } ] },
-      { "name": "Explosion", "preset": "Explosion", "transition": { "seconds": 0.6, "easing": "easeIn" },
-        "triggers": [ { "kind": "onset", "threshold": 1.5, "from": "Lock" } ] }
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "reassembly.scene.json"
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.45,
+  "post/bloom/threshold": 1.5,
+  "post/tonemap/operator": 1,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.02,
+  "scene/brightness": 0.8,
+  "scene/keyLight": 0.9,
+  "root/rotationSpeed": 0.0,
+  "post/motionBlur/amount": 0.8,
+  "camera/exposure/mode": 0,
+  "camera/lens/focalLength": 50.0,
+  "camera/lens/aperture": 2.8,
+  "camera/lens/shutterAngle": 172.0,
+  "post/halation/enabled": true,
+  "post/halation/intensity": 0.22,
+  "post/halation/threshold": 2.4,
+  "post/halation/warmth": 0.75,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "post/grade/contrast": 1.1,
+  "post/grade/temperature": -0.04
+ },
+ "sources": [
+  {
+   "kind": "macro",
+   "name": "macros",
+   "settings": {
+    "knobs": [
+     {
+      "name": "disassembly",
+      "default": 0.0
+     },
+     {
+      "name": "energy",
+      "default": 0.2
+     },
+     {
+      "name": "tumble",
+      "default": 0.0
+     }
     ]
+   }
   },
-  "timeline": { "tracks": [], "cues": [
-    { "time": 0, "name": "Assembled", "preset": "Assembled", "morphSeconds": 0, "timeBase": "seconds" },
-    { "time": 8, "name": "Tension", "preset": "Tension", "morphSeconds": 4, "timeBase": "seconds" },
-    { "time": 16, "name": "Disassembly", "preset": "Disassembly", "morphSeconds": 3, "timeBase": "seconds" },
-    { "time": 26, "name": "Float", "preset": "Float", "morphSeconds": 6, "timeBase": "seconds" },
-    { "time": 38, "name": "Reassembly", "preset": "Reassembly", "morphSeconds": 6, "timeBase": "seconds" },
-    { "time": 48, "name": "Lock", "preset": "Lock", "morphSeconds": 1.5, "timeBase": "seconds" },
-    { "time": 54, "name": "Explosion", "preset": "Explosion", "morphSeconds": 0.7, "timeBase": "seconds" }
-  ] }
+  {
+   "kind": "control",
+   "name": "control",
+   "settings": {
+    "channels": []
+   }
+  }
+ ],
+ "worldMacros": [
+  {
+   "name": "disassembly",
+   "label": "DISASSEMBLY",
+   "default": 0.0,
+   "targets": [
+    {
+     "path": "field/burst/strength",
+     "min": 0.0,
+     "max": 26.0
+    },
+    {
+     "path": "field/gather/strength",
+     "min": 6.0,
+     "max": 0.0
+    },
+    {
+     "path": "particles/sparks/spawnRate",
+     "min": 0,
+     "max": 5000,
+     "op": "replace"
+    }
+   ]
+  },
+  {
+   "name": "tumble",
+   "label": "TUMBLE",
+   "default": 0.0,
+   "targets": [
+    {
+     "path": "field/tumble/strength",
+     "min": 0.0,
+     "max": 3.2
+    },
+    {
+     "path": "field/tumble/speed",
+     "min": 0.05,
+     "max": 0.7
+    }
+   ]
+  },
+  {
+   "name": "energy",
+   "label": "ENERGY",
+   "default": 0.2,
+   "targets": [
+    {
+     "path": "procedural/heart/material/emissive",
+     "min": 0.4,
+     "max": 8.0
+    },
+    {
+     "path": "field/core/strength",
+     "min": 0.4,
+     "max": 3.0
+    },
+    {
+     "path": "field/spin/strength",
+     "min": 0.1,
+     "max": 1.4
+    },
+    {
+     "path": "post/bloom/intensity",
+     "min": 0.3,
+     "max": 0.8
+    }
+   ]
+  }
+ ],
+ "routes": [
+  {
+   "source": "macro.energy",
+   "target": "particles/sparks/spawnRate",
+   "amount": 520.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "slewMs": 140
+   }
+  },
+  {
+   "source": "macro.energy",
+   "target": "particles/arcs/spawnRate",
+   "amount": 26.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "slewMs": 200
+   }
+  },
+  {
+   "source": "macro.disassembly",
+   "target": "field/burst/strength",
+   "amount": 7.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "slewMs": 180
+   }
+  },
+  {
+   "source": "macro.disassembly",
+   "target": "field/gather/strength",
+   "amount": -5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "slewMs": 260
+   }
+  },
+  {
+   "source": "macro.tumble",
+   "target": "field/tumble/strength",
+   "amount": 3.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "slewMs": 220
+   }
+  },
+  {
+   "source": "macro.energy",
+   "target": "procedural/heart/material/emissive",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "slewMs": 150
+   }
+  },
+  {
+   "source": "macro.energy",
+   "target": "field/spin/strength",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "slewMs": 200
+   }
+  },
+  {
+   "source": "audio.rms",
+   "target": "macros/energy",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 500
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "field/spin/strength",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "audio.onset",
+   "target": "particles/sparks/burst",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "peakhold",
+    "decayMs": 40
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "procedural/pins/material/emissive",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 10,
+    "decayMs": 200
+   }
+  }
+ ],
+ "presets": [
+  {
+   "name": "Assembled",
+   "values": {
+    "macros/disassembly": [
+     0.0
+    ],
+    "macros/tumble": [
+     0.0
+    ],
+    "macros/energy": [
+     0.15
+    ],
+    "camera/position": [
+     0,
+     7.5,
+     26
+    ],
+    "camera/target": [
+     0,
+     6,
+     0
+    ]
+   }
+  },
+  {
+   "name": "Tension",
+   "values": {
+    "macros/disassembly": [
+     0.06
+    ],
+    "macros/tumble": [
+     0.05
+    ],
+    "macros/energy": [
+     0.5
+    ],
+    "camera/position": [
+     0,
+     7.0,
+     20
+    ],
+    "camera/target": [
+     0,
+     6,
+     0
+    ]
+   }
+  },
+  {
+   "name": "Disassembly",
+   "values": {
+    "macros/disassembly": [
+     0.55
+    ],
+    "macros/tumble": [
+     0.4
+    ],
+    "macros/energy": [
+     0.6
+    ],
+    "camera/position": [
+     0,
+     9.0,
+     30
+    ],
+    "camera/target": [
+     0,
+     6,
+     0
+    ]
+   }
+  },
+  {
+   "name": "Float",
+   "values": {
+    "macros/disassembly": [
+     0.85
+    ],
+    "macros/tumble": [
+     0.7
+    ],
+    "macros/energy": [
+     0.35
+    ],
+    "camera/position": [
+     6,
+     7.0,
+     14
+    ],
+    "camera/target": [
+     0,
+     6,
+     0
+    ]
+   }
+  },
+  {
+   "name": "Reassembly",
+   "values": {
+    "macros/disassembly": [
+     0.25
+    ],
+    "macros/tumble": [
+     0.15
+    ],
+    "macros/energy": [
+     0.7
+    ],
+    "camera/position": [
+     0,
+     7.5,
+     22
+    ],
+    "camera/target": [
+     0,
+     6,
+     0
+    ]
+   }
+  },
+  {
+   "name": "Lock",
+   "values": {
+    "macros/disassembly": [
+     0.0
+    ],
+    "macros/tumble": [
+     0.0
+    ],
+    "macros/energy": [
+     0.9
+    ],
+    "camera/position": [
+     0,
+     6.5,
+     16
+    ],
+    "camera/target": [
+     0,
+     6,
+     0
+    ]
+   }
+  },
+  {
+   "name": "Explosion",
+   "values": {
+    "macros/disassembly": [
+     1.0
+    ],
+    "macros/tumble": [
+     1.0
+    ],
+    "macros/energy": [
+     1.0
+    ],
+    "camera/position": [
+     0,
+     8.0,
+     34
+    ],
+    "camera/target": [
+     0,
+     6,
+     0
+    ]
+   }
+  }
+ ],
+ "states": {
+  "initial": "Assembled",
+  "states": [
+   {
+    "name": "Assembled",
+    "preset": "Assembled",
+    "transition": {
+     "seconds": 4.0,
+     "easing": "smooth"
+    }
+   },
+   {
+    "name": "Tension",
+    "preset": "Tension",
+    "transition": {
+     "seconds": 3.0,
+     "easing": "easeIn"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 2,
+      "from": "Assembled"
+     }
+    ]
+   },
+   {
+    "name": "Disassembly",
+    "preset": "Disassembly",
+    "transition": {
+     "seconds": 2.5,
+     "easing": "easeOut"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Tension"
+     }
+    ]
+   },
+   {
+    "name": "Float",
+    "preset": "Float",
+    "transition": {
+     "seconds": 6.0,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 2,
+      "from": "Disassembly"
+     }
+    ]
+   },
+   {
+    "name": "Reassembly",
+    "preset": "Reassembly",
+    "transition": {
+     "seconds": 5.0,
+     "easing": "easeInOut"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 2,
+      "from": "Float"
+     }
+    ]
+   },
+   {
+    "name": "Lock",
+    "preset": "Lock",
+    "transition": {
+     "seconds": 1.2,
+     "easing": "easeOut"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Reassembly"
+     }
+    ]
+   },
+   {
+    "name": "Explosion",
+    "preset": "Explosion",
+    "transition": {
+     "seconds": 0.6,
+     "easing": "easeIn"
+    },
+    "triggers": [
+     {
+      "kind": "onset",
+      "threshold": 1.5,
+      "from": "Lock"
+     }
+    ]
+   }
+  ]
+ },
+ "timeline": {
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": 0,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       26.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 16,
+      "value": [
+       14.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 26,
+      "value": [
+       -18.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 38,
+      "value": [
+       -24.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 48,
+      "value": [
+       -10.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 54,
+      "value": [
+       -4.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 58,
+      "value": [
+       7.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": 1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       9.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 16,
+      "value": [
+       7.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 26,
+      "value": [
+       17.5
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 38,
+      "value": [
+       13.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 48,
+      "value": [
+       8.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 54,
+      "value": [
+       7.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 58,
+      "value": [
+       11.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": 2,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       34.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 16,
+      "value": [
+       34.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 26,
+      "value": [
+       32.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 38,
+      "value": [
+       30.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 48,
+      "value": [
+       26.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 54,
+      "value": [
+       24.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 58,
+      "value": [
+       42.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": 1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 60.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       6.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 26,
+      "value": [
+       7.5
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 48,
+      "value": [
+       6.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 58,
+      "value": [
+       6.5
+      ],
+      "interp": "linear"
+     }
+    ]
+   }
+  ],
+  "cues": [
+   {
+    "time": 0,
+    "name": "Assembled",
+    "preset": "Assembled",
+    "morphSeconds": 0,
+    "timeBase": "seconds"
+   },
+   {
+    "time": 8,
+    "name": "Tension",
+    "preset": "Tension",
+    "morphSeconds": 4,
+    "timeBase": "seconds"
+   },
+   {
+    "time": 16,
+    "name": "Disassembly",
+    "preset": "Disassembly",
+    "morphSeconds": 3,
+    "timeBase": "seconds"
+   },
+   {
+    "time": 26,
+    "name": "Float",
+    "preset": "Float",
+    "morphSeconds": 6,
+    "timeBase": "seconds"
+   },
+   {
+    "time": 38,
+    "name": "Reassembly",
+    "preset": "Reassembly",
+    "morphSeconds": 6,
+    "timeBase": "seconds"
+   },
+   {
+    "time": 48,
+    "name": "Lock",
+    "preset": "Lock",
+    "morphSeconds": 1.5,
+    "timeBase": "seconds"
+   },
+   {
+    "time": 54,
+    "name": "Explosion",
+    "preset": "Explosion",
+    "morphSeconds": 0.7,
+    "timeBase": "seconds"
+   }
+  ]
+ }
 }
