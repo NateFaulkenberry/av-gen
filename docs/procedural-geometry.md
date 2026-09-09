@@ -34,10 +34,11 @@ Parameters appear under `procedural/<node>/…`:
 | Group | Paths | Notes |
 |---|---|---|
 | Source | `source/kind`, `source/radius`, `source/height`, `source/size`, segments, `source/position|rotation|scale` | changing structure regenerates the mesh |
-| Distribution | `distribution/kind`, `count`, `radius`, `startAngle`, `endAngle`, `turns`, `radiusGrowth`, `spiralHeight`, `gridCount`, `gridSpacing`, `start`, `end`, `orientation`, `plane`, `splineStart`, `splineEnd`, `alignToSpline`, `roll`, `splineOffset` | instances regenerate on change (microseconds); the spline *name* is structural and comes from the file |
+| Distribution | `distribution/kind`, `count`, `radius`, `startAngle`, `endAngle`, `turns`, `radiusGrowth`, `spiralHeight`, `gridCount`, `gridSpacing`, `start`, `end`, `orientation`, `plane` | instances regenerate on change (microseconds) |
 | Transform | `transform/position|rotation|scale` | the whole arrangement |
 | Variation | `variation/seed`, `position`, `rotation`, `scale`, `uniformScale` | same seed = same world, live or offline |
-| Deformation | `deform/1/amount`, `speed`, `phase`, `frequency`, `scale`, `falloff`, `center`, `axis`, `enabled` (slot 1..8, label shows the kind); `pathOffset`, `pathScale`, `pathRoll` on `path` slots | evaluated on the GPU every frame |
+| Hierarchy | `hierarchy/depth`, `scalePerLevel`, `offsetPerLevel`, `rotationPerLevel` | self-recursion (ADR-029); structural, so a change regenerates the cloud |
+| Deformation | `deform/1/amount`, `speed`, `phase`, `frequency`, `scale`, `falloff`, `center`, `axis`, `enabled` (slot 1..8, label shows the kind) | evaluated on the GPU every frame |
 | Material | `material/baseColor`, `emissiveColor`, `emissive`, `roughness`, `metallic`; `materialVariation/hueShift|hueGradient|valueRandom|emissiveRandom|emissiveGradient` | per-instance colour is baked into the instance records |
 
 **Transform order**: `world = node × distribution × placement(i) × variation(i) × source`.
@@ -51,15 +52,7 @@ own axis); world-space deformers act on the final world position (a wave across 
 - **grid**: `gridCount` × `gridSpacing`, centred.
 - **radial**: `count` around `center` at `radius` in `plane`, from `startAngle` to `endAngle` (a full turn closes the circle); orientation `none | outward | inward | tangent`.
 - **spiral**: a helix: `turns`, `radius` growing by `radiusGrowth`, rising `spiralHeight` along the plane normal.
-- **spline**: `count` instances along the named scene spline (ADR-026, `docs/splines.md`),
-  evenly by arc length between `splineStart` and `splineEnd` (fractions of the length; reversed
-  ranges run backwards). `spacing` > 0 switches to fixed spacing instead: `floor(length ×
-  |splineEnd - splineStart| / spacing) + 1` instances exactly `spacing` apart from `splineStart`.
-  Each instance takes the sample's position, its `scale` factor and — with `alignToSpline` — the
-  frame rotation (+Z along the tangent, +Y along the normal) plus `roll` radians about the
-  tangent; `splineOffset` shifts it in frame space (x = binormal, y = normal, z = tangent). A
-  closed spline whose span is a whole number of turns drops the duplicate seam instance. An
-  unknown spline name leaves every placement at the identity.
+- **grammar**: the placements come from the object's `grammar` expansion — see [Compositional grammar and hierarchical instancing](grammar-and-hierarchy.md).
 
 ## Deformers
 
@@ -70,7 +63,6 @@ own axis); world-space deformers act on the final world position (a wave across 
 | sine | pushes along `displacementAxis` by `amount·sin(frequency·x + phase + speed·t)` | amount, frequency, speed, phase, axis |
 | noise | three decorrelated channels of seeded 3-octave value noise (one per axis, masked by `axisMask`), animated by `speed` | amount, scale, speed, seed, axisMask |
 | displacement | pushes along the surface normal by a procedural pattern | amount, scale, speed |
-| path | bends the shape along a scene spline: the coordinate along `axis` becomes arc length, the cross-section rides the spline frame | amount, spline, pathOffset, pathScale, pathRoll, axis, center |
 
 Stack order is the array order and is deterministic; `twist → noise` differs from `noise → twist`.
 
@@ -86,6 +78,41 @@ Stack order is the array order and is deterministic; `twist → noise` differs f
    which the timeline can key for fly-throughs. Compositions do not spin by default
    (`root/rotationSpeed` 0); `scene/keyLight` scales the default light, `scene/fogDensity` and
    `scene/fogColor` add distance fog.
+
+## Grammars and hierarchies
+
+Two ways to get a lot of structure out of a little data, both covered in full by
+[docs/grammar-and-hierarchy.md](grammar-and-hierarchy.md):
+
+- **A grammar** (`distribution.kind = "grammar"`) rewrites named rules — `place`, `repeat`,
+  `branch`, `alternate`, `mirror`, `choice`, `conditional` — into the object's placements, and
+  tags each point with `depth`, `rule` and `branch` columns that point ops and the `extraLane`
+  projection can select on. Six `repeat`ed bays, each `mirror`ed into two aisles, each
+  `branch`ing into a column and an arch is five rules and 24 instances.
+- **A hierarchy** composes placements with themselves or with another object's. Setting
+  `hierarchy.recursionDepth` to `d` makes the object a fractal of its own arrangement:
+  every point is a chain of `d + 1` placements composed through the per-level transform
+  (`offsetPerLevel`, `rotationPerLevel`, uniform `scalePerLevel`), so `n` placements become
+  `n^(d+1)`, truncated at `hierarchy.maxInstances`. The cloud is the *deepest* level only, so a
+  visible trunk-and-branches tree wants separate objects (one per depth) or a `branch` grammar.
+  `colorPerLevel` rotates the hue by `(root index mod (d+1)) / (d+1)` turns so the root branches
+  read as families.
+- **A procedural source** (`source.kind = "procedural"`, `source.reference = "<object>"`) makes
+  another procedural object of the same scene the source of this one: its mesh *and* its whole
+  arrangement are composed under every placement here (`n × m` instances, ids `i * m + j`,
+  colours multiplied). Chains may be up to four hops deep; cycles, missing references and
+  over-deep chains are rejected before anything is generated. Generation regenerates the
+  referenced object's cloud from the scene, so a composition may build its objects in any order.
+
+```json
+"hierarchy": { "recursionDepth": 2, "scalePerLevel": 0.45,
+               "offsetPerLevel": [0, 5, 0], "rotationPerLevel": [0, 30, 0], "colorPerLevel": true }
+```
+
+`hierarchy/depth`, `hierarchy/scalePerLevel`, `hierarchy/offsetPerLevel` and
+`hierarchy/rotationPerLevel` are ordinary parameters, so audio and the timeline drive the whole
+recursion; they are structural, so each change regenerates the cloud (microseconds at these
+sizes) rather than tinting it.
 
 ## Modulating it with audio
 
@@ -142,8 +169,7 @@ File > Examples lists the built-in scenes from `examples/index.json`:
   node path (`procedural/nodes_<outer>_<inner>/…`).
 - Point clouds, point ops, fields and effectors (ADR-024/025) are described in
   `docs/spatial-data.md`; `rebuild()` now goes through `generateCloud()` and the `ops` list.
-- The `spline` distribution and the `path` deformer resolve their spline name against the
-  scene's spline set: `rebuild(ctx)` needs a `GenerationContext` carrying `splines` (the object's
-  `contextualHash` mixes in the referenced spline, so editing the curve rebuilds the cloud), and
-  the renderer needs the spline uploaded (at most 16 per scene reach the GPU). Path deformers are
-  object space only — a `world` one is skipped. See `docs/splines.md`.
+- Grammars and hierarchical instancing (ADR-028/029) are described in
+  `docs/grammar-and-hierarchy.md`; `generateCloud()` dispatches to them when the
+  distribution is `grammar`, `hierarchy.recursionDepth` is above 0 or the source is
+  another procedural object.
