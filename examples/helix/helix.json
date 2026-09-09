@@ -13,12 +13,14 @@
   },
   "parameters": {
     "post/bloom/enabled": true,
-    "post/bloom/intensity": 0.3,
+    "post/bloom/intensity": 0.66,
     "post/bloom/threshold": 0.9,
     "post/lens/chromaticAberration": 0.15,
     "post/output/vignette": 0.45,
     "scene/brightness": 0.6,
-    "root/rotationSpeed": 0.0
+    "root/rotationSpeed": 0.0,
+    "post/grade/contrast": 1.1,
+    "post/grade/saturation": 1.15
   },
   "sources": [
     {

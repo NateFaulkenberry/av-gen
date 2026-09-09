@@ -197,11 +197,13 @@ TEST_CASE("A broken shader falls back to the error pattern and reports the error
     REQUIRE(image.has_value());
     const std::string error = renderer.shaderStack().errorFor(*id);
     CHECK(error.find("oops") != std::string::npos);
-    // Magenta stripes: red and blue high, green low, somewhere in the image.
+    // Magenta stripes: red and blue high, green well below them, somewhere in the image. The test
+    // compares green against red rather than an absolute level because the default operator is AgX
+    // (ADR-039), which lifts a fully crushed channel instead of clipping it to zero as ACES does.
     bool magenta = false;
     for (std::uint32_t x = 0; x < 32 && !magenta; ++x) {
         const auto* px = image->pixel(x, 16);
-        magenta = px[0] > 150 && px[2] > 150 && px[1] < 80;
+        magenta = px[0] > 150 && px[2] > 150 && int(px[1]) < int(px[0]) - 80;
     }
     CHECK(magenta);
     ctx->clearErrors();

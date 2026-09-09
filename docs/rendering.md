@@ -33,7 +33,7 @@ encoder = device.CreateCommandEncoder()
                        grid entities (grid.wgsl, additive, depth test only)
                        particles (particles.wgsl, indirect draw, additive/alpha, depth test only)
                        alpha-blended PBR entities, sorted back to front
-  pass "tonemap-pass": fullscreen triangle, textureLoad HDR, ACES fitted, sRGB encode -> target
+  pass "tonemap-pass": fullscreen triangle, textureLoad HDR, AgX (default; ADR-039), sRGB encode
   [pass "ui-pass"    : Dear ImGui, LoadOp::Load]           (added by the application)
 timer.resolve(encoder); queue.Submit; timer.collect(); surface.Present()
 ```
@@ -76,8 +76,9 @@ and world-space deformers, and recomputes the normal by finite differences of th
 and CPU update time; draw calls and triangles are folded into the totals.
 
 Conventions: right-handed, +Y up, CCW front faces, clip depth 0..1 (`GLM_FORCE_DEPTH_ZERO_TO_ONE`,
-`glm::perspectiveRH_ZO`). Scene-linear HDR until the tone map; `environment.brightness` is the
-exposure.
+`glm::perspectiveRH_ZO`). Scene-linear HDR until the tone map. `environment.brightness` is a plain
+global multiplier in the tone-map pass; the *camera's* exposure (ADR-037) is a separate, earlier
+stage in the post chain — see `docs/image-formation.md`.
 
 Meshes are uploaded when `Scene::meshVersion` changes (all meshes re-uploaded; fine for 0.1).
 Invalid meshes and entities referencing missing meshes are skipped with a warning and no GPU
@@ -100,15 +101,50 @@ uses a fractional carry so low rates emit evenly; bursts add particles for one f
 beyond the free slots are dropped. All settings are per-frame uniforms.
 `ParticleRenderer::readCounts(i)` reads a pool's alive/dead counts back (blocking; tests only).
 
-## Post-processing (milestone 0.6, ADR-016)
+## Image formation (milestone 0.6, ADR-016; reordered by ADR-037 and ADR-039)
 
-`PostProcessor` runs the built-in chain on `gpu::TransientPool` textures: depth of field
-(view distance reconstructed from depth, CoC gather), camera motion blur (reprojection with the
-previous view-projection, neighbourhood-max velocity), bloom (soft-knee prefilter, 13-tap
-downsample chain, tent upsample chain), and a composite pass (distortion, chromatic aberration,
-white balance, hue, contrast, saturation, lift/gamma/gain). The output pass tone-maps with the
-selected operator and applies vignette and seeded grain. All settings come from `Scene::post`
-(`post/*` parameters). Disabled effects add no passes; a full chain is 13 passes at 1280x720.
+The full treatment is `docs/image-formation.md`; this is the summary. `PostProcessor` runs the
+chain on `gpu::TransientPool` textures **in this fixed order**, and encodes only the stages whose
+settings are active:
+
+```
+scene HDR -> volumetrics -> user post layers
+  1. metering        centre-weighted average luminance of the pre-exposure image, reduced to 1x1
+                     and read back next frame (automatic exposure only)
+  2. exposure        one multiply; skipped entirely when the scale is 1
+  3. depth of field  view distance from depth, circle-of-confusion gather
+  4. motion blur     reprojection with the previous view-projection, neighbourhood-max velocity
+  5. lens            barrel/pincushion distortion, chromatic aberration
+  6. bloom           soft-knee prefilter, 13-tap downsample chain, energy-conserving tent upsample
+  7. halation        a wider, warm-weighted second pyramid; anamorphic streaks share its pass
+  8. composite       bloom and the wide tier mixed in, then white balance, hue, contrast,
+                     saturation, lift/gamma/gain
+  9. sharpen         contrast-adaptive, optionally masked by object identifier
+ -> tonemap pass     the selected operator (AgX by default), vignette, seeded grain, sRGB encode
+```
+
+Exposure moved ahead of bloom (ADR-039) so that `post/bloom/threshold` is a number in exposed
+units; the depth-aware stages stay ahead of lens distortion because distortion resamples the
+image and the depth buffer is not resampled with it. The upsample blends the levels
+(`mix(fine, tent(coarse), radius/2)`) instead of adding them, so the pyramid's mean equals the
+prefiltered image's mean whatever the level count — the old additive chain multiplied a
+highlight's energy by the number of levels, which is why every surface glowed.
+
+Settings come from `Scene::post` (`post/*` parameters) plus the camera's own exposure and lens
+blocks (`camera/exposure/*`, `camera/lens/*`, `camera/focus/*`; ADR-037), which `app::Engine`
+copies onto `Scene::camera` and into `Scene::post` each frame. `Camera::projection` uses
+`effectiveFovY()`, which is the explicit `fovYRadians` unless `camera/lens/useExplicitFov` is off,
+in which case it is derived from focal length and sensor height. All the defaults are no-ops, so
+scenes authored before ADR-037 render unchanged.
+
+Selective post (ADR-039) reads the ADR-035 emission and identifier targets through
+`PostFrameInputs::emission` / `::identifier`. Those are optional: when they are null the chain
+binds 1x1 placeholders, clears the `available` flags in the uniforms and every effect falls back to
+its luminance-only behaviour, so nothing changes until the renderer starts writing them.
+
+Cost at 1080p: one pass with everything off, 12 with bloom (0.3 ms of GPU on an M2 Max), 32 with
+bloom, halation, anamorphic, depth of field and automatic exposure all on. Depth of field dominates.
+See `docs/performance/image-formation.md`.
 
 ## Outputs (milestone 1.2)
 

@@ -1,5 +1,12 @@
-// Built-in post-processing chain (ADR-016). Every pass is a fullscreen triangle over `source`
-// (and optionally `second`) with `depth` for depth-aware effects. Uniforms carry per-pass data.
+// Built-in post-processing chain (ADR-016, image formation ADR-039). Every pass is a fullscreen
+// triangle over `source` (and optionally `second` / `third`) with `depth` for depth-aware effects,
+// `emission` and `identifier` for selective post (ADR-035; 1x1 placeholders when the renderer has
+// no such targets, in which case the `available` flags in the uniforms are 0 and every effect
+// falls back to its luminance-only behaviour). Uniforms carry per-pass data.
+//
+// Order (docs/image-formation.md): exposure, depth of field, motion blur, lens distortion and
+// chromatic aberration, bloom / halation / anamorphic, colour grade, sharpen; the tone map,
+// vignette and grain follow in shaders/tonemap.wgsl.
 
 struct PostUniforms {
     texelSize: vec2<f32>,    // 1 / source size
@@ -8,9 +15,12 @@ struct PostUniforms {
     params1: vec4<f32>,
     params2: vec4<f32>,
     params3: vec4<f32>,
+    params4: vec4<f32>,
     lift: vec4<f32>,
     gamma: vec4<f32>,
     gain: vec4<f32>,
+    tintA: vec4<f32>,
+    tintB: vec4<f32>,
     cameraPos: vec4<f32>,
     prevViewProj: mat4x4<f32>,
     invViewProj: mat4x4<f32>,
@@ -21,6 +31,9 @@ struct PostUniforms {
 @group(0) @binding(2) var source: texture_2d<f32>;
 @group(0) @binding(3) var second: texture_2d<f32>;
 @group(0) @binding(4) var depthTex: texture_depth_2d;
+@group(0) @binding(5) var third: texture_2d<f32>;
+@group(0) @binding(6) var emissionTex: texture_2d<f32>;
+@group(0) @binding(7) var identifierTex: texture_2d<u32>;
 
 struct FsIn {
     @builtin(position) clip: vec4<f32>,
@@ -39,25 +52,110 @@ fn vs_fullscreen(@builtin(vertex_index) i: u32) -> FsIn {
 
 fn luminance(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.2126, 0.7152, 0.0722)); }
 
-// ---- bloom (Jimenez 2014 style: soft threshold, 13-tap downsample, tent upsample) ----------
+// ---- exposure (ADR-037): the first stage, so every threshold below is in exposed units --------
+
+@fragment
+fn fs_exposure(in: FsIn) -> @location(0) vec4<f32> {
+    let scale = post.params0.x;
+    return vec4<f32>(textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb * scale, 1.0);
+}
+
+// ---- automatic metering: a centre-weighted average of the pre-exposure image's luminance -------
+// Each texel carries (sum of weight * luminance, sum of weight); the 1x1 result divides one by the
+// other. ADR-037 allows an average or a histogram; the arithmetic average is the one that keeps a
+// mostly-black frame with a blazing centre (Hyperspace's core) from being *brightened*, which is
+// exactly what a log-average would do once the empty background dominates the pixel count.
+
+@fragment
+fn fs_meter_prefilter(in: FsIn) -> @location(0) vec4<f32> {
+    let centerWeight = post.params0.x;
+    let aspect = post.params0.y;
+    let t = post.texelSize;
+    var sum = vec3<f32>(0.0);
+    for (var y = -1; y <= 1; y = y + 2) {
+        for (var x = -1; x <= 1; x = x + 2) {
+            sum += textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(f32(x), f32(y)) * t, 0.0).rgb;
+        }
+    }
+    // Clamped well inside the half-float range so one runaway texel cannot make the sum infinite.
+    let lum = clamp(luminance(sum * 0.25), 0.0, 4096.0);
+    // Centre weighting: 1 in the middle, falling to (1 - centerWeight) at the edges.
+    let d = length((in.uv - vec2<f32>(0.5)) * vec2<f32>(aspect, 1.0)) * 2.0;
+    let w = max(1.0 - centerWeight * smoothstep(0.25, 1.15, d), 1e-3);
+    return vec4<f32>(lum * w, w, 0.0, 1.0);
+}
+
+@fragment
+fn fs_meter_reduce(in: FsIn) -> @location(0) vec4<f32> {
+    // 4x4 box over the source, so a 1080p image reaches 1x1 in six passes.
+    let t = post.texelSize;
+    var sum = vec2<f32>(0.0);
+    for (var y = 0; y < 4; y = y + 1) {
+        for (var x = 0; x < 4; x = x + 1) {
+            let o = (vec2<f32>(f32(x), f32(y)) - vec2<f32>(1.5)) * t;
+            sum += textureSampleLevel(source, linearSampler, in.uv + o, 0.0).xy;
+        }
+    }
+    return vec4<f32>(sum * (1.0 / 16.0), 0.0, 1.0);
+}
+
+// ---- bloom (Jimenez 2014 downsample, energy-conserving upsample) -------------------------------
+
+// Soft-knee threshold on luminance. The weight is the fraction of the pixel's energy that passes,
+// so with threshold 0 the prefilter is the identity and the pyramid carries the whole image's
+// energy; that is what makes the bloom tier measurable rather than a look-dependent hard cut.
+fn thresholdWeight(lum: f32, threshold: f32, kneeFraction: f32) -> f32 {
+    let knee = max(threshold * kneeFraction, 1e-4);
+    let soft = clamp(lum - threshold + knee, 0.0, 2.0 * knee);
+    let softContribution = soft * soft / (4.0 * knee);
+    let contribution = max(softContribution, lum - threshold);
+    return clamp(contribution, 0.0, lum) / max(lum, 1e-5);
+}
 
 @fragment
 fn fs_prefilter(in: FsIn) -> @location(0) vec4<f32> {
-    // 4-tap box of the full-res scene, then soft knee threshold.
+    // 4-tap box of the full-res exposed scene, then the soft-knee threshold.
     let t = post.texelSize;
-    var c = textureSample(source, linearSampler, in.uv + vec2<f32>(-0.5, -0.5) * t).rgb;
-    c += textureSample(source, linearSampler, in.uv + vec2<f32>(0.5, -0.5) * t).rgb;
-    c += textureSample(source, linearSampler, in.uv + vec2<f32>(-0.5, 0.5) * t).rgb;
-    c += textureSample(source, linearSampler, in.uv + vec2<f32>(0.5, 0.5) * t).rgb;
+    var c = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(-0.5, -0.5) * t, 0.0).rgb;
+    c += textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(0.5, -0.5) * t, 0.0).rgb;
+    c += textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(-0.5, 0.5) * t, 0.0).rgb;
+    c += textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(0.5, 0.5) * t, 0.0).rgb;
     c *= 0.25;
     let threshold = post.params0.x;
-    let knee = threshold * post.params0.y;
-    let br = max(max(c.r, c.g), c.b);
-    let soft = clamp(br - threshold + knee, 0.0, 2.0 * knee);
-    let softContribution = soft * soft / (4.0 * knee + 1e-5);
-    let inKnee = soft > 0.0 && br <= threshold + knee;
-    let contribution = max(select(0.0, softContribution, inKnee), br - threshold);
-    let weight = max(contribution, 0.0) / max(br, 1e-5);
+    let knee = post.params0.y;
+    let emissionWeight = post.params0.z;
+    let emissionAvailable = post.params0.w;
+    var weight = thresholdWeight(luminance(c), threshold, knee);
+    // Selective bloom (ADR-039): weight by the emission target when the renderer wrote one, so a
+    // merely bright lit surface stops glowing like a light source.
+    if (emissionAvailable > 0.5 && emissionWeight > 0.0) {
+        let e = textureSampleLevel(emissionTex, linearSampler, in.uv, 0.0).rgb;
+        let mask = clamp(luminance(e) / max(luminance(c), 1e-4), 0.0, 1.0);
+        weight *= mix(1.0, mask, emissionWeight);
+    }
+    return vec4<f32>(c * weight, 1.0);
+}
+
+// Halation (ADR-039): the same threshold, restricted to highlights that are already warm, fed into
+// a pyramid that starts coarser so the halo is wider than bloom's.
+@fragment
+fn fs_halation_prefilter(in: FsIn) -> @location(0) vec4<f32> {
+    let t = post.texelSize;
+    var c = vec3<f32>(0.0);
+    for (var y = -1; y <= 1; y = y + 2) {
+        for (var x = -1; x <= 1; x = x + 2) {
+            c += textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(f32(x), f32(y)) * t, 0.0).rgb;
+        }
+    }
+    c *= 0.25;
+    let threshold = post.params0.x;
+    let knee = post.params0.y;
+    let warmth = post.params0.z;
+    let lum = luminance(c);
+    var weight = thresholdWeight(lum, threshold, knee);
+    // Warmth: how much redder than neutral this highlight already is.
+    let warm = clamp((c.r - 0.5 * (c.g + c.b)) / max(lum, 1e-4), 0.0, 1.0);
+    weight *= mix(1.0, warm, warmth);
     return vec4<f32>(c * weight, 1.0);
 }
 
@@ -84,10 +182,14 @@ fn fs_downsample(in: FsIn) -> @location(0) vec4<f32> {
     return vec4<f32>(sum, 1.0);
 }
 
+// Energy-conserving upsample (ADR-039): the coarse level's 9-tap tent (weights summing to 1) is
+// *blended* with this level rather than added to it, so the pyramid's mean equals the prefiltered
+// image's mean whatever the level count. Adding, as the chain did before, multiplied a highlight's
+// energy by the number of levels, which is why everything glowed.
 @fragment
 fn fs_upsample(in: FsIn) -> @location(0) vec4<f32> {
-    // 9-tap tent filter of the coarser level (source) added to this level (second).
-    let t = post.texelSize * post.params0.x; // radius
+    let t = post.texelSize * post.params0.x; // spread
+    let blend = clamp(post.params0.y, 0.0, 1.0);
     var sum = textureSample(source, linearSampler, in.uv + vec2<f32>(-1.0, -1.0) * t).rgb;
     sum += textureSample(source, linearSampler, in.uv + vec2<f32>(0.0, -1.0) * t).rgb * 2.0;
     sum += textureSample(source, linearSampler, in.uv + vec2<f32>(1.0, -1.0) * t).rgb;
@@ -98,16 +200,76 @@ fn fs_upsample(in: FsIn) -> @location(0) vec4<f32> {
     sum += textureSample(source, linearSampler, in.uv + vec2<f32>(0.0, 1.0) * t).rgb * 2.0;
     sum += textureSample(source, linearSampler, in.uv + vec2<f32>(1.0, 1.0) * t).rgb;
     sum *= 1.0 / 16.0;
-    return vec4<f32>(sum + textureSample(second, linearSampler, in.uv).rgb, 1.0);
+    let fine = textureSample(second, linearSampler, in.uv).rgb;
+    return vec4<f32>(mix(fine, sum, blend), 1.0);
 }
 
-// ---- composite: lens (distortion, chromatic aberration), bloom mix, colour grading ---------
+// ---- the wide tier: halation and anamorphic streaks, combined into one texture ------------------
+// source = a coarse bloom level (the streak's input), second = the halation pyramid's result.
+// tintA = the halation tint * intensity, tintB = the anamorphic tint * intensity.
+
+@fragment
+fn fs_wide(in: FsIn) -> @location(0) vec4<f32> {
+    let stretch = post.params0.x;
+    let ghosts = post.params0.y;
+    let anamorphicOn = post.params0.z;
+    let halationOn = post.params0.w;
+    var out = vec3<f32>(0.0);
+    if (halationOn > 0.5) {
+        out += textureSampleLevel(second, linearSampler, in.uv, 0.0).rgb * post.tintA.rgb;
+    }
+    if (anamorphicOn > 0.5) {
+        // A horizontal gaussian whose reach is `stretch` times the source texel size.
+        let step = post.texelSize.x * stretch;
+        var streak = textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb * 0.20;
+        var weightSum = 0.20;
+        for (var i = 1; i <= 8; i = i + 1) {
+            let w = exp(-0.5 * pow(f32(i) / 3.2, 2.0));
+            let o = vec2<f32>(step * f32(i), 0.0);
+            streak += textureSampleLevel(source, linearSampler, clamp(in.uv + o, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).rgb * w;
+            streak += textureSampleLevel(source, linearSampler, clamp(in.uv - o, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).rgb * w;
+            weightSum += 2.0 * w;
+        }
+        streak /= weightSum;
+        if (ghosts > 0.0) {
+            // Two flare ghosts mirrored through the frame centre, as an anamorphic lens gives.
+            let mirrored = vec2<f32>(1.0) - in.uv;
+            let g1 = textureSampleLevel(source, linearSampler, mix(vec2<f32>(0.5), mirrored, 0.75), 0.0).rgb;
+            let g2 = textureSampleLevel(source, linearSampler, mix(vec2<f32>(0.5), mirrored, 0.40), 0.0).rgb;
+            streak += (g1 * 0.6 + g2 * 0.35) * ghosts;
+        }
+        out += streak * post.tintB.rgb;
+    }
+    return vec4<f32>(out, 1.0);
+}
+
+// ---- lens: distortion and chromatic aberration --------------------------------------------------
 
 fn distort(uv: vec2<f32>, amount: f32) -> vec2<f32> {
     let c = uv - vec2<f32>(0.5);
     let r2 = dot(c, c);
     return vec2<f32>(0.5) + c * (1.0 + amount * r2 * 2.0);
 }
+
+@fragment
+fn fs_lens(in: FsIn) -> @location(0) vec4<f32> {
+    let chromatic = post.params0.x;
+    let distortion = post.params0.y;
+    var uv = in.uv;
+    if (abs(distortion) > 1e-4) {
+        uv = clamp(distort(uv, distortion), vec2<f32>(0.0), vec2<f32>(1.0));
+    }
+    if (chromatic > 1e-4) {
+        let dir = (uv - vec2<f32>(0.5)) * chromatic * 0.03;
+        return vec4<f32>(textureSampleLevel(source, linearSampler, clamp(uv + dir, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).r,
+                         textureSampleLevel(source, linearSampler, uv, 0.0).g,
+                         textureSampleLevel(source, linearSampler, clamp(uv - dir, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).b,
+                         1.0);
+    }
+    return vec4<f32>(textureSampleLevel(source, linearSampler, uv, 0.0).rgb, 1.0);
+}
+
+// ---- composite: bloom and the wide tier mixed in, then colour grading ---------------------------
 
 fn hueRotate(c: vec3<f32>, angle: f32) -> vec3<f32> {
     // YIQ rotation
@@ -121,31 +283,20 @@ fn hueRotate(c: vec3<f32>, angle: f32) -> vec3<f32> {
 @fragment
 fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
     let bloomIntensity = post.params0.x;
-    let chromatic = post.params0.y;
-    let distortion = post.params0.z;
+    let bloomOn = post.params0.y;
+    let wideOn = post.params0.z;
     let contrast = post.params1.x;
     let saturation = post.params1.y;
     let temperature = post.params1.z;
     let tint = post.params1.w;
     let hueShift = post.params2.x;
-    let bloomOn = post.params2.y;
 
-    var uv = in.uv;
-    if (abs(distortion) > 1e-4) {
-        uv = clamp(distort(uv, distortion), vec2<f32>(0.0), vec2<f32>(1.0));
-    }
-    var scene: vec3<f32>;
-    if (chromatic > 1e-4) {
-        let dir = (uv - vec2<f32>(0.5)) * chromatic * 0.03;
-        scene = vec3<f32>(textureSampleLevel(source, linearSampler, uv + dir, 0.0).r,
-                          textureSampleLevel(source, linearSampler, uv, 0.0).g,
-                          textureSampleLevel(source, linearSampler, uv - dir, 0.0).b);
-    } else {
-        scene = textureSampleLevel(source, linearSampler, uv, 0.0).rgb;
-    }
-    var color = scene;
+    var color = textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb;
     if (bloomOn > 0.5) {
-        color += textureSampleLevel(second, linearSampler, uv, 0.0).rgb * bloomIntensity;
+        color += textureSampleLevel(second, linearSampler, in.uv, 0.0).rgb * bloomIntensity;
+    }
+    if (wideOn > 0.5) {
+        color += textureSampleLevel(third, linearSampler, in.uv, 0.0).rgb;
     }
 
     // White balance: warm shifts red up / blue down, tint shifts green.
@@ -161,6 +312,34 @@ fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
     // Lift / gamma / gain.
     color = pow(max(color * post.gain.rgb + post.lift.rgb, vec3<f32>(0.0)), vec3<f32>(1.0) / max(post.gamma.rgb, vec3<f32>(1e-3)));
     return vec4<f32>(color, 1.0);
+}
+
+// ---- output: contrast-adaptive sharpening, optionally masked by the identifier target -----------
+
+@fragment
+fn fs_sharpen(in: FsIn) -> @location(0) vec4<f32> {
+    let amount = post.params0.x;
+    let maskId = u32(post.params0.y);
+    let identifierAvailable = post.params0.z;
+    let c = textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb;
+    var mask = 1.0;
+    if (identifierAvailable > 0.5 && maskId != 0u) {
+        let size = vec2<f32>(textureDimensions(identifierTex));
+        let coord = vec2<i32>(clamp(in.uv * size, vec2<f32>(0.0), size - vec2<f32>(1.0)));
+        mask = select(0.0, 1.0, textureLoad(identifierTex, coord, 0).r == maskId);
+    }
+    if (mask <= 0.0) {
+        return vec4<f32>(c, 1.0);
+    }
+    let t = post.texelSize;
+    let n = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(0.0, -t.y), 0.0).rgb;
+    let s = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(0.0, t.y), 0.0).rgb;
+    let w = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(-t.x, 0.0), 0.0).rgb;
+    let e = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(t.x, 0.0), 0.0).rgb;
+    let lo = min(c, min(min(n, s), min(w, e)));
+    let hi = max(c, max(max(n, s), max(w, e)));
+    let sharpened = c + (c * 4.0 - (n + s + w + e)) * amount * 0.25;
+    return vec4<f32>(mix(c, clamp(sharpened, lo, hi), mask), 1.0);
 }
 
 // ---- depth helpers -----------------------------------------------------------------------------
@@ -183,12 +362,25 @@ fn viewDistance(uv: vec2<f32>) -> f32 {
     return length(worldFromDepth(uv, d) - post.cameraPos.xyz);
 }
 
-// ---- depth of field: circle-of-confusion gather ----------------------------------------------
+// ---- depth of field: circle-of-confusion gather -------------------------------------------------
+// params0 = (focus distance m, focus range m, max radius px, physical flag)
+// params1 = (focal length mm, f-number, sensor height mm, image height px)
 
 fn circleOfConfusion(dist: f32) -> f32 {
     let focus = post.params0.x;
-    let range = post.params0.y;
     let maxRadius = post.params0.z;
+    if (post.params0.w > 0.5) {
+        // ADR-037: the lens's own circle of confusion, c = f^2 |d - s| / (N d (s - f)) millimetres
+        // on the sensor, converted to pixels; `maxRadius` now only clamps it.
+        let f = max(post.params1.x, 1e-3);
+        let n = max(post.params1.y, 0.05);
+        let s = max(focus * 1000.0, f * 1.0001 + 1e-3);
+        let d = max(min(dist, 1e5) * 1000.0, 1e-3);
+        let cMm = abs(f * f * (d - s) / (n * d * (s - f)));
+        let pixelsPerMm = post.params1.w / max(post.params1.z, 1e-3);
+        return min(cMm * pixelsPerMm * 0.5, maxRadius); // diameter -> gather radius
+    }
+    let range = post.params0.y;
     let offset = max(abs(dist - focus) - range, 0.0);
     return clamp(offset / max(focus, 1e-3), 0.0, 1.0) * maxRadius;
 }

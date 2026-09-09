@@ -1,12 +1,23 @@
 #pragma once
 
-// Built-in post-processing chain (ADR-016) over the transient pool:
-//   scene HDR -> [DoF] -> [motion blur] -> [bloom: prefilter, downsample chain, upsample chain]
-//             -> composite (lens, bloom mix, grading) -> HDR result for tone mapping.
-// Passes run only when their settings are active; with everything off the input is returned.
+// Built-in image formation chain (ADR-016, ADR-039) over the transient pool. The order is fixed
+// and documented in docs/image-formation.md:
+//
+//   scene HDR -> [metering of the pre-exposure image] -> [exposure] -> [DoF] -> [motion blur]
+//             -> [lens distortion + chromatic aberration]
+//             -> [bloom: prefilter, downsample chain, energy-conserving upsample chain]
+//             -> [halation pyramid + anamorphic streaks: the "wide" tier]
+//             -> composite (bloom + wide tier + colour grade) -> [sharpen]
+//             -> HDR result for tone mapping.
+//
+// Passes run only when their settings are active; with everything off and a unit exposure the
+// input is returned unchanged. Selective post (bloom weighted by emission, sharpening masked by
+// object identifier) uses the ADR-035 auxiliary targets when the caller supplies them in
+// PostFrameInputs, and silently falls back to the luminance-only behaviour when it does not.
 
 #include "core/error.hpp"
 #include "gpu/transient_pool.hpp"
+#include "scene/camera.hpp"
 #include "scene/post_settings.hpp"
 
 #include <glm/glm.hpp>
@@ -25,6 +36,10 @@ namespace avgen::rendering {
 struct PostFrameInputs {
     wgpu::TextureView sceneHdr;
     wgpu::TextureView depth;
+    // ADR-035 auxiliary targets, optional. Null (the normal case today) disables the selective
+    // paths without changing the image: `emission` weights bloom, `identifier` masks sharpening.
+    wgpu::TextureView emission;
+    wgpu::TextureView identifier;
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     glm::mat4 prevViewProj{1.0f};
@@ -37,6 +52,10 @@ struct PostFrameInputs {
 struct PostStats {
     std::uint32_t passes = 0;
     std::uint32_t bloomLevels = 0;
+    std::uint32_t halationLevels = 0;
+    float exposureScale = 1.0f;      // the linear scale applied before bloom
+    float exposureEv100 = 0.0f;      // the EV in force (scene-referred; see scene/camera.hpp)
+    float meteredLuminance = -1.0f;  // the previous frame's centre-weighted luminance (-1 = none)
 };
 
 class PostProcessor {
@@ -51,6 +70,11 @@ public:
     [[nodiscard]] const wgpu::Texture& outputTexture() const { return output_; }
     [[nodiscard]] const PostStats& stats() const { return stats_; }
 
+    // Auto-exposure state (ADR-037). It is part of render state: reset it when a render job seeks
+    // or a scene is swapped so an offline render reproduces a live one exactly.
+    [[nodiscard]] const scene::ExposureState& exposureState() const { return exposureState_; }
+    void resetExposure();
+
     static constexpr wgpu::TextureFormat kHdrFormat = wgpu::TextureFormat::RGBA16Float;
 
 private:
@@ -61,32 +85,64 @@ private:
         glm::vec4 params1;
         glm::vec4 params2;
         glm::vec4 params3;
+        glm::vec4 params4;
         glm::vec4 lift;
         glm::vec4 gamma;
         glm::vec4 gain;
+        glm::vec4 tintA;
+        glm::vec4 tintB;
         glm::vec4 cameraPos;
         glm::mat4 prevViewProj;
         glm::mat4 invViewProj;
     };
-    static_assert(sizeof(Uniforms) == 16 + 16 * 8 + 128);
+    static_assert(sizeof(Uniforms) == 16 + 16 * 11 + 128);
     static constexpr std::uint32_t kSlotStride = 512; // dynamic-offset alignment safe
-    static constexpr std::uint32_t kMaxSlots = 64;
+    static constexpr std::uint32_t kMaxSlots = 96;
+    static constexpr std::uint64_t kMeterReadbackBytes = 256; // one row, alignment-safe
+
+    struct PassTextures {
+        wgpu::TextureView source;
+        wgpu::TextureView second;
+        wgpu::TextureView third;
+        wgpu::TextureView depth;
+        wgpu::TextureView emission;
+        wgpu::TextureView identifier;
+    };
 
     Result<void> createPipelines(const wgpu::ShaderModule& module);
     Result<wgpu::RenderPipeline> makePipeline(const wgpu::ShaderModule& module, const char* entry);
     void runPass(wgpu::CommandEncoder& encoder, const wgpu::RenderPipeline& pipeline, const wgpu::TextureView& target,
+                 const PassTextures& textures, const Uniforms& uniforms);
+    // Convenience for the many passes that only bind `source` (and optionally `second`/`depth`).
+    void runPass(wgpu::CommandEncoder& encoder, const wgpu::RenderPipeline& pipeline, const wgpu::TextureView& target,
                  const wgpu::TextureView& source, const wgpu::TextureView& second, const wgpu::TextureView& depth,
                  const Uniforms& uniforms);
+    // Reads back the 1x1 metering result the previous frame produced (blocking, deterministic).
+    // Returns false when nothing has been metered yet.
+    bool takeMeasurement(float& luminance);
+    // Encodes the metering reduction of the pre-exposure image and the readback copy.
+    void encodeMetering(wgpu::CommandEncoder& encoder, const PostFrameInputs& in, gpu::TransientPool& pool,
+                        const Uniforms& base);
+    // Downsample/upsample pyramid over an already-prefiltered base; returns its finest level.
+    wgpu::TextureView buildPyramid(wgpu::CommandEncoder& encoder, gpu::TransientPool& pool, const Uniforms& base,
+                                   std::vector<gpu::TransientTexture>& down, float spread, float blend);
 
     gpu::Context& context_;
     gpu::ShaderLibrary& shaders_;
     bool initialised_ = false;
     wgpu::BindGroupLayout layout_;
     wgpu::PipelineLayout pipelineLayout_;
+    wgpu::RenderPipeline exposure_;
+    wgpu::RenderPipeline meterPrefilter_;
+    wgpu::RenderPipeline meterReduce_;
     wgpu::RenderPipeline prefilter_;
+    wgpu::RenderPipeline halationPrefilter_;
     wgpu::RenderPipeline downsample_;
     wgpu::RenderPipeline upsample_;
+    wgpu::RenderPipeline wide_;
+    wgpu::RenderPipeline lens_;
     wgpu::RenderPipeline composite_;
+    wgpu::RenderPipeline sharpen_;
     wgpu::RenderPipeline dof_;
     wgpu::RenderPipeline motionBlur_;
     wgpu::Sampler sampler_;
@@ -96,6 +152,13 @@ private:
     wgpu::TextureView blackView_;
     wgpu::Texture depthPlaceholder_;
     wgpu::TextureView depthPlaceholderView_;
+    wgpu::Texture idPlaceholder_;
+    wgpu::TextureView idPlaceholderView_;
+    wgpu::Buffer meterReadback_;
+    bool meterPending_ = false;   // a copy into meterReadback_ is in flight
+    bool haveMeasurement_ = false;
+    float measuredLuminance_ = 0.0f;
+    scene::ExposureState exposureState_;
     PostStats stats_;
     wgpu::Texture output_;
 };

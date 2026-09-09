@@ -6,15 +6,60 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <cstring>
+#include <utility>
 
 namespace avgen::rendering {
 
+namespace {
+
+// IEEE 754 binary16 -> float. The metering result is one RGBA16F texel, so a tiny decoder beats
+// pulling in a whole readback path.
+float halfToFloat(std::uint16_t h) {
+    const std::uint32_t sign = static_cast<std::uint32_t>(h & 0x8000u) << 16;
+    std::uint32_t exponent = (h >> 10) & 0x1Fu;
+    std::uint32_t mantissa = h & 0x3FFu;
+    std::uint32_t bits = 0;
+    if (exponent == 0) {
+        if (mantissa != 0) { // subnormal: normalise it
+            exponent = 127 - 15 + 1;
+            while ((mantissa & 0x400u) == 0) {
+                mantissa <<= 1;
+                --exponent;
+            }
+            mantissa &= 0x3FFu;
+            bits = sign | (exponent << 23) | (mantissa << 13);
+        } else {
+            bits = sign;
+        }
+    } else if (exponent == 31) {
+        bits = sign | 0x7F800000u | (mantissa << 13);
+    } else {
+        bits = sign | ((exponent + 127 - 15) << 23) | (mantissa << 13);
+    }
+    float out = 0.0f;
+    std::memcpy(&out, &bits, sizeof(out));
+    return out;
+}
+
+constexpr std::uint32_t kMeterFirstDivisor = 4;  // the prefilter drops straight to quarter size
+constexpr std::uint32_t kMeterReduceFactor = 4;  // then quarters again per pass
+
+} // namespace
+
 PostProcessor::PostProcessor(gpu::Context& context, gpu::ShaderLibrary& shaders) : context_(context), shaders_(shaders) {}
+
+void PostProcessor::resetExposure() {
+    exposureState_.reset();
+    haveMeasurement_ = false;
+    measuredLuminance_ = 0.0f;
+}
 
 Result<void> PostProcessor::init() {
     const auto& device = context_.device();
     {
-        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 8> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -33,6 +78,14 @@ Result<void> PostProcessor::init() {
         entries[4].visibility = wgpu::ShaderStage::Fragment;
         entries[4].texture.sampleType = wgpu::TextureSampleType::Depth;
         entries[4].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        entries[5] = entries[2];
+        entries[5].binding = 5;
+        entries[6] = entries[2];
+        entries[6].binding = 6;
+        entries[7].binding = 7;
+        entries[7].visibility = wgpu::ShaderStage::Fragment;
+        entries[7].texture.sampleType = wgpu::TextureSampleType::Uint;
+        entries[7].texture.viewDimension = wgpu::TextureViewDimension::e2D;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "post-layout";
         desc.entryCount = entries.size();
@@ -58,6 +111,11 @@ Result<void> PostProcessor::init() {
         desc.size = static_cast<std::uint64_t>(kMaxSlots) * kSlotStride;
         desc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
         uniforms_ = device.CreateBuffer(&desc);
+        wgpu::BufferDescriptor mdesc{};
+        mdesc.label = "post-meter-readback";
+        mdesc.size = kMeterReadbackBytes;
+        mdesc.usage = wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst;
+        meterReadback_ = device.CreateBuffer(&mdesc);
     }
     {
         wgpu::TextureDescriptor desc{};
@@ -76,6 +134,15 @@ Result<void> PostProcessor::init() {
         ddesc.format = wgpu::TextureFormat::Depth24Plus;
         depthPlaceholder_ = device.CreateTexture(&ddesc);
         depthPlaceholderView_ = depthPlaceholder_.CreateView();
+        // Identifier placeholder: one zero texel, so an unmasked chain reads "no object here".
+        wgpu::TextureDescriptor idesc{};
+        idesc.label = "post-id-placeholder";
+        idesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+        idesc.dimension = wgpu::TextureDimension::e2D;
+        idesc.size = {1, 1, 1};
+        idesc.format = wgpu::TextureFormat::R32Uint;
+        idPlaceholder_ = device.CreateTexture(&idesc);
+        idPlaceholderView_ = idPlaceholder_.CreateView();
     }
     auto module = shaders_.load("post.wgsl");
     if (!module) {
@@ -132,45 +199,59 @@ Result<wgpu::RenderPipeline> PostProcessor::makePipeline(const wgpu::ShaderModul
 }
 
 Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
-    auto a = makePipeline(module, "fs_prefilter");
-    if (!a) return std::unexpected(a.error());
-    auto b = makePipeline(module, "fs_downsample");
-    if (!b) return std::unexpected(b.error());
-    auto c = makePipeline(module, "fs_upsample");
-    if (!c) return std::unexpected(c.error());
-    auto d = makePipeline(module, "fs_composite");
-    if (!d) return std::unexpected(d.error());
-    auto e = makePipeline(module, "fs_dof");
-    if (!e) return std::unexpected(e.error());
-    auto f = makePipeline(module, "fs_motion_blur");
-    if (!f) return std::unexpected(f.error());
-    prefilter_ = *a;
-    downsample_ = *b;
-    upsample_ = *c;
-    composite_ = *d;
-    dof_ = *e;
-    motionBlur_ = *f;
+    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 13> slots{{
+        {"fs_exposure", &exposure_},
+        {"fs_meter_prefilter", &meterPrefilter_},
+        {"fs_meter_reduce", &meterReduce_},
+        {"fs_prefilter", &prefilter_},
+        {"fs_halation_prefilter", &halationPrefilter_},
+        {"fs_downsample", &downsample_},
+        {"fs_upsample", &upsample_},
+        {"fs_wide", &wide_},
+        {"fs_lens", &lens_},
+        {"fs_composite", &composite_},
+        {"fs_sharpen", &sharpen_},
+        {"fs_dof", &dof_},
+        {"fs_motion_blur", &motionBlur_},
+    }};
+    // Build every pipeline first, so a shader that fails to compile leaves the previous set intact.
+    std::array<wgpu::RenderPipeline, slots.size()> built{};
+    for (std::size_t i = 0; i < slots.size(); ++i) {
+        auto pipeline = makePipeline(module, slots[i].first);
+        if (!pipeline) {
+            return std::unexpected(pipeline.error());
+        }
+        built[i] = *pipeline;
+    }
+    for (std::size_t i = 0; i < slots.size(); ++i) {
+        *slots[i].second = built[i];
+    }
     return {};
 }
 
 void PostProcessor::runPass(wgpu::CommandEncoder& encoder, const wgpu::RenderPipeline& pipeline,
-                            const wgpu::TextureView& target, const wgpu::TextureView& source,
-                            const wgpu::TextureView& second, const wgpu::TextureView& depth, const Uniforms& uniforms) {
+                            const wgpu::TextureView& target, const PassTextures& textures, const Uniforms& uniforms) {
     const std::uint32_t offset = (slot_ % kMaxSlots) * kSlotStride;
     ++slot_;
     context_.queue().WriteBuffer(uniforms_, offset, &uniforms, sizeof(uniforms));
-    std::array<wgpu::BindGroupEntry, 5> entries{};
+    std::array<wgpu::BindGroupEntry, 8> entries{};
     entries[0].binding = 0;
     entries[0].buffer = uniforms_;
     entries[0].size = sizeof(Uniforms);
     entries[1].binding = 1;
     entries[1].sampler = sampler_;
     entries[2].binding = 2;
-    entries[2].textureView = source ? source : blackView_;
+    entries[2].textureView = textures.source ? textures.source : blackView_;
     entries[3].binding = 3;
-    entries[3].textureView = second ? second : blackView_;
+    entries[3].textureView = textures.second ? textures.second : blackView_;
     entries[4].binding = 4;
-    entries[4].textureView = depth ? depth : depthPlaceholderView_;
+    entries[4].textureView = textures.depth ? textures.depth : depthPlaceholderView_;
+    entries[5].binding = 5;
+    entries[5].textureView = textures.third ? textures.third : blackView_;
+    entries[6].binding = 6;
+    entries[6].textureView = textures.emission ? textures.emission : blackView_;
+    entries[7].binding = 7;
+    entries[7].textureView = textures.identifier ? textures.identifier : idPlaceholderView_;
     wgpu::BindGroupDescriptor bdesc{};
     bdesc.label = "post-bind-group";
     bdesc.layout = layout_;
@@ -194,6 +275,100 @@ void PostProcessor::runPass(wgpu::CommandEncoder& encoder, const wgpu::RenderPip
     ++stats_.passes;
 }
 
+void PostProcessor::runPass(wgpu::CommandEncoder& encoder, const wgpu::RenderPipeline& pipeline,
+                            const wgpu::TextureView& target, const wgpu::TextureView& source,
+                            const wgpu::TextureView& second, const wgpu::TextureView& depth, const Uniforms& uniforms) {
+    PassTextures textures;
+    textures.source = source;
+    textures.second = second;
+    textures.depth = depth;
+    runPass(encoder, pipeline, target, textures, uniforms);
+}
+
+bool PostProcessor::takeMeasurement(float& luminance) {
+    if (meterPending_) {
+        bool ok = false;
+        auto future = meterReadback_.MapAsync(wgpu::MapMode::Read, 0, kMeterReadbackBytes,
+                                              wgpu::CallbackMode::WaitAnyOnly,
+                                              [&](wgpu::MapAsyncStatus status, wgpu::StringView) {
+                                                  ok = status == wgpu::MapAsyncStatus::Success;
+                                              });
+        context_.waitFor(future);
+        if (ok) {
+            const auto* raw = static_cast<const std::uint16_t*>(meterReadback_.GetConstMappedRange(0, kMeterReadbackBytes));
+            if (raw != nullptr) {
+                const float weighted = halfToFloat(raw[0]);
+                const float weight = halfToFloat(raw[1]);
+                if (weight > 1e-6f && std::isfinite(weighted)) {
+                    measuredLuminance_ = std::max(weighted / weight, 0.0f);
+                    haveMeasurement_ = true;
+                }
+            }
+            meterReadback_.Unmap();
+        }
+        meterPending_ = false;
+    }
+    luminance = measuredLuminance_;
+    return haveMeasurement_;
+}
+
+void PostProcessor::encodeMetering(wgpu::CommandEncoder& encoder, const PostFrameInputs& in, gpu::TransientPool& pool,
+                                   const Uniforms& base) {
+    const auto usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding |
+                       wgpu::TextureUsage::CopySrc;
+    std::uint32_t w = std::max(1u, in.width / kMeterFirstDivisor);
+    std::uint32_t h = std::max(1u, in.height / kMeterFirstDivisor);
+    auto current = pool.acquire(w, h, kHdrFormat, usage, "meter");
+    {
+        Uniforms u = base;
+        u.texelSize = 1.0f / base.outputSize;
+        u.params0 = glm::vec4(std::clamp(in.settings->exposure.meterCenterWeight, 0.0f, 1.0f),
+                              base.outputSize.x / std::max(base.outputSize.y, 1.0f), 0.0f, 0.0f);
+        runPass(encoder, meterPrefilter_, current.view, in.sceneHdr, nullptr, nullptr, u);
+    }
+    while (w > 1 || h > 1) {
+        const std::uint32_t nw = std::max(1u, (w + kMeterReduceFactor - 1) / kMeterReduceFactor);
+        const std::uint32_t nh = std::max(1u, (h + kMeterReduceFactor - 1) / kMeterReduceFactor);
+        auto next = pool.acquire(nw, nh, kHdrFormat, usage, "meter");
+        Uniforms u = base;
+        u.texelSize = 1.0f / glm::vec2(static_cast<float>(w), static_cast<float>(h));
+        runPass(encoder, meterReduce_, next.view, current.view, nullptr, nullptr, u);
+        current = next;
+        w = nw;
+        h = nh;
+    }
+    wgpu::TexelCopyTextureInfo src{};
+    src.texture = current.texture;
+    wgpu::TexelCopyBufferInfo dst{};
+    dst.buffer = meterReadback_;
+    dst.layout.bytesPerRow = static_cast<std::uint32_t>(kMeterReadbackBytes);
+    dst.layout.rowsPerImage = 1;
+    const wgpu::Extent3D extent{1, 1, 1};
+    encoder.CopyTextureToBuffer(&src, &dst, &extent);
+    meterPending_ = true;
+}
+
+wgpu::TextureView PostProcessor::buildPyramid(wgpu::CommandEncoder& encoder, gpu::TransientPool& pool,
+                                              const Uniforms& base, std::vector<gpu::TransientTexture>& down,
+                                              float spread, float blend) {
+    if (down.empty()) {
+        return {};
+    }
+    wgpu::TextureView acc = down.back().view;
+    for (int level = static_cast<int>(down.size()) - 2; level >= 0; --level) {
+        const auto& fine = down[static_cast<std::size_t>(level)];
+        const auto& coarse = down[static_cast<std::size_t>(level) + 1];
+        auto target = pool.acquire(fine.width, fine.height, kHdrFormat,
+                                   wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding, "bloom-up");
+        Uniforms u = base;
+        u.texelSize = 1.0f / glm::vec2(static_cast<float>(coarse.width), static_cast<float>(coarse.height));
+        u.params0 = glm::vec4(spread, blend, 0.0f, 0.0f);
+        runPass(encoder, upsample_, target.view, acc, fine.view, nullptr, u);
+        acc = target.view;
+    }
+    return acc;
+}
+
 wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFrameInputs& in, gpu::TransientPool& pool) {
     stats_ = PostStats{};
     slot_ = 0;
@@ -202,6 +377,9 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         return in.sceneHdr;
     }
     const auto& s = *in.settings;
+    if (s.exposureReset) {
+        resetExposure();
+    }
     Uniforms base{};
     base.outputSize = glm::vec2(static_cast<float>(in.width), static_cast<float>(in.height));
     base.texelSize = 1.0f / base.outputSize;
@@ -214,40 +392,88 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
 
     wgpu::TextureView current = in.sceneHdr;
     const float pixelScale = static_cast<float>(in.height) / 720.0f;
+    const bool autoExposure = s.exposure.mode == scene::ExposureSettings::Mode::Automatic;
 
-    // ---- depth of field ----
+    // ---- 1. exposure (ADR-039: before everything, so bloom thresholds are in exposed units) ----
+    // Metering reads the *pre-exposure* image. The measurement it consumes is the previous frame's,
+    // read back synchronously, so the loop is a pure function of the frames that came before it.
+    float measured = 0.0f;
+    const bool haveMeasured = takeMeasurement(measured);
+    const float exposure =
+        scene::updateExposure(exposureState_, measured, autoExposure && haveMeasured, s.exposureDeltaSeconds, s.exposure);
+    stats_.exposureScale = exposure;
+    stats_.exposureEv100 = exposureState_.ev100;
+    stats_.meteredLuminance = haveMeasured ? measured : -1.0f;
+    if (autoExposure) {
+        encodeMetering(encoder, in, pool, base);
+    } else {
+        meterPending_ = false;
+    }
+    if (std::abs(exposure - 1.0f) > 1e-3f) {
+        auto target = pool.acquire(in.width, in.height, kHdrFormat);
+        Uniforms u = base;
+        u.params0 = glm::vec4(exposure, 0.0f, 0.0f, 0.0f);
+        runPass(encoder, exposure_, target.view, current, nullptr, nullptr, u);
+        current = target.view;
+    }
+
+    // ---- 2. depth of field (a lens effect, but it needs undistorted depth) ---------------------
     if (s.dofEnabled && s.dofMaxRadius > 0.0f) {
         auto target = pool.acquire(in.width, in.height, kHdrFormat);
         Uniforms u = base;
-        u.params0 = glm::vec4(s.focusDistance, s.focusRange, s.dofMaxRadius * pixelScale, 0.0f);
+        u.params0 = glm::vec4(s.focusDistance, s.focusRange, s.dofMaxRadius * pixelScale, s.dofPhysical ? 1.0f : 0.0f);
+        u.params1 = glm::vec4(s.lens.focalLength, s.lens.aperture, s.lens.sensorHeight, static_cast<float>(in.height));
         runPass(encoder, dof_, target.view, current, nullptr, in.depth, u);
         current = target.view;
     }
-    // ---- motion blur ----
+    // ---- 3. motion blur (temporal; also needs undistorted depth) --------------------------------
     if (s.motionBlurAmount > 0.0f) {
         auto target = pool.acquire(in.width, in.height, kHdrFormat);
         Uniforms u = base;
-        u.params0 = glm::vec4(s.motionBlurAmount, static_cast<float>(std::clamp<std::uint32_t>(s.motionBlurSamples, 2, 32)), 0.0f, 0.0f);
+        u.params0 = glm::vec4(s.motionBlurAmount,
+                              static_cast<float>(std::clamp<std::uint32_t>(s.motionBlurSamples, 2, 32)), 0.0f, 0.0f);
         runPass(encoder, motionBlur_, target.view, current, nullptr, in.depth, u);
         current = target.view;
     }
-    // ---- bloom ----
-    wgpu::TextureView bloom;
+    // ---- 4. lens: distortion and chromatic aberration -------------------------------------------
+    if (std::abs(s.distortion) > 1e-4f || s.chromaticAberration > 1e-4f) {
+        auto target = pool.acquire(in.width, in.height, kHdrFormat);
+        Uniforms u = base;
+        u.params0 = glm::vec4(s.chromaticAberration, s.distortion, 0.0f, 0.0f);
+        runPass(encoder, lens_, target.view, current, nullptr, nullptr, u);
+        current = target.view;
+    }
+
+    // ---- 5. bloom, halation, anamorphic ----------------------------------------------------------
     const bool bloomOn = s.bloomEnabled && s.bloomIntensity > 0.0f;
-    if (bloomOn) {
+    const bool anamorphicOn = s.anamorphicEnabled && s.anamorphicIntensity > 0.0f;
+    const bool halationOn = s.halationEnabled && s.halationIntensity > 0.0f;
+    const bool pyramidOn = bloomOn || anamorphicOn;
+    const auto pyramidUsage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
+    // The tent's blend weight: 0.5 halves each coarser level's share, so the pyramid's mean equals
+    // the prefiltered image's mean whatever the level count (energy-conserving upsample, ADR-039).
+    const float blend = std::clamp(s.bloomRadius * 0.5f, 0.05f, 0.95f);
+
+    wgpu::TextureView bloom;
+    std::vector<gpu::TransientTexture> down;
+    if (pyramidOn) {
         const std::uint32_t levels = std::clamp<std::uint32_t>(s.bloomLevels, 1, 8);
-        std::vector<gpu::TransientTexture> down;
         std::uint32_t w = std::max(1u, in.width / 2);
         std::uint32_t h = std::max(1u, in.height / 2);
         for (std::uint32_t level = 0; level < levels && w >= 2 && h >= 2; ++level) {
-            auto target = pool.acquire(w, h, kHdrFormat, wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding, "bloom-down");
+            auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage, "bloom-down");
             Uniforms u = base;
             if (level == 0) {
                 u.texelSize = 1.0f / base.outputSize;
-                u.params0 = glm::vec4(s.bloomThreshold, s.bloomKnee, 0.0f, 0.0f);
-                runPass(encoder, prefilter_, target.view, current, nullptr, nullptr, u);
+                u.params0 = glm::vec4(s.bloomThreshold, s.bloomKnee, std::clamp(s.bloomEmissionWeight, 0.0f, 1.0f),
+                                      in.emission ? 1.0f : 0.0f);
+                PassTextures textures;
+                textures.source = current;
+                textures.emission = in.emission;
+                runPass(encoder, prefilter_, target.view, textures, u);
             } else {
-                u.texelSize = 1.0f / glm::vec2(static_cast<float>(down.back().width), static_cast<float>(down.back().height));
+                u.texelSize =
+                    1.0f / glm::vec2(static_cast<float>(down.back().width), static_cast<float>(down.back().height));
                 runPass(encoder, downsample_, target.view, down.back().view, nullptr, nullptr, u);
             }
             down.push_back(target);
@@ -255,28 +481,81 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
             h = std::max(1u, h / 2);
         }
         stats_.bloomLevels = static_cast<std::uint32_t>(down.size());
-        // Upsample chain: coarse -> fine, each level = tent(previous) + down[level].
-        wgpu::TextureView acc = down.back().view;
-        for (int level = static_cast<int>(down.size()) - 2; level >= 0; --level) {
-            const auto& d = down[static_cast<std::size_t>(level)];
-            auto target = pool.acquire(d.width, d.height, kHdrFormat, wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding, "bloom-up");
-            Uniforms u = base;
-            const auto& coarse = down[static_cast<std::size_t>(level) + 1];
-            u.texelSize = 1.0f / glm::vec2(static_cast<float>(coarse.width), static_cast<float>(coarse.height));
-            u.params0 = glm::vec4(s.bloomRadius, 0.0f, 0.0f, 0.0f);
-            runPass(encoder, upsample_, target.view, acc, d.view, nullptr, u);
-            acc = target.view;
-        }
-        bloom = acc;
+        bloom = buildPyramid(encoder, pool, base, down, s.bloomRadius, blend);
     }
-    // ---- composite (always: applies grading and lens even without bloom) ----
+
+    // Halation: its own, coarser pyramid over a warm-weighted threshold (ADR-039).
+    wgpu::TextureView halation;
+    if (halationOn) {
+        const std::uint32_t levels = std::clamp<std::uint32_t>(s.bloomLevels, 1, 8);
+        std::vector<gpu::TransientTexture> hdown;
+        std::uint32_t w = std::max(1u, in.width / 4);
+        std::uint32_t h = std::max(1u, in.height / 4);
+        for (std::uint32_t level = 0; level < levels && w >= 2 && h >= 2; ++level) {
+            auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage, "halation-down");
+            Uniforms u = base;
+            if (level == 0) {
+                u.texelSize = 1.0f / base.outputSize;
+                u.params0 = glm::vec4(s.halationThreshold, s.bloomKnee, std::clamp(s.halationWarmth, 0.0f, 1.0f), 0.0f);
+                runPass(encoder, halationPrefilter_, target.view, current, nullptr, nullptr, u);
+            } else {
+                u.texelSize =
+                    1.0f / glm::vec2(static_cast<float>(hdown.back().width), static_cast<float>(hdown.back().height));
+                runPass(encoder, downsample_, target.view, hdown.back().view, nullptr, nullptr, u);
+            }
+            hdown.push_back(target);
+            w = std::max(1u, w / 2);
+            h = std::max(1u, h / 2);
+        }
+        stats_.halationLevels = static_cast<std::uint32_t>(hdown.size());
+        halation = buildPyramid(encoder, pool, base, hdown, s.bloomRadius * s.halationRadius, blend);
+    }
+
+    // The wide tier: halation tinted and the anamorphic streak, in one texture the composite adds.
+    wgpu::TextureView wide;
+    if (halationOn || (anamorphicOn && bloom)) {
+        // Quarter resolution: both tiers are low-frequency by construction.
+        const std::uint32_t w = std::max(1u, in.width / 4);
+        const std::uint32_t h = std::max(1u, in.height / 4);
+        auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage, "wide");
+        Uniforms u = base;
+        u.texelSize = 1.0f / glm::vec2(static_cast<float>(w), static_cast<float>(h));
+        u.params0 = glm::vec4(s.anamorphicStretch, std::clamp(s.anamorphicGhosts, 0.0f, 1.0f),
+                              (anamorphicOn && bloom) ? 1.0f : 0.0f, halationOn ? 1.0f : 0.0f);
+        u.tintA = glm::vec4(s.halationTint * s.halationIntensity, 0.0f);
+        u.tintB = glm::vec4(s.anamorphicTint * s.anamorphicIntensity, 0.0f);
+        PassTextures textures;
+        textures.source = bloom;
+        textures.second = halation;
+        runPass(encoder, wide_, target.view, textures, u);
+        wide = target.view;
+    }
+
+    // ---- 6. composite: bloom + wide tier + colour grade -------------------------------------------
     {
         auto target = pool.acquire(in.width, in.height, kHdrFormat);
         Uniforms u = base;
-        u.params0 = glm::vec4(s.bloomIntensity, s.chromaticAberration, s.distortion, 0.0f);
+        u.params0 = glm::vec4(s.bloomIntensity, (bloomOn && bloom) ? 1.0f : 0.0f, wide ? 1.0f : 0.0f, 0.0f);
         u.params1 = glm::vec4(s.contrast, s.saturation, s.temperature, s.tint);
-        u.params2 = glm::vec4(s.hueShift, bloomOn ? 1.0f : 0.0f, 0.0f, 0.0f);
-        runPass(encoder, composite_, target.view, current, bloom, nullptr, u);
+        u.params2 = glm::vec4(s.hueShift, 0.0f, 0.0f, 0.0f);
+        PassTextures textures;
+        textures.source = current;
+        textures.second = bloom;
+        textures.third = wide;
+        runPass(encoder, composite_, target.view, textures, u);
+        current = target.view;
+        output_ = target.texture;
+    }
+
+    // ---- 7. output: sharpening (the tone map, vignette and grain follow in tonemap.wgsl) ----------
+    if (s.sharpen > 1e-4f) {
+        auto target = pool.acquire(in.width, in.height, kHdrFormat);
+        Uniforms u = base;
+        u.params0 = glm::vec4(s.sharpen, static_cast<float>(s.sharpenId), in.identifier ? 1.0f : 0.0f, 0.0f);
+        PassTextures textures;
+        textures.source = current;
+        textures.identifier = in.identifier;
+        runPass(encoder, sharpen_, target.view, textures, u);
         current = target.view;
         output_ = target.texture;
     }

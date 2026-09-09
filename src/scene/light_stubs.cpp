@@ -82,19 +82,7 @@ glm::vec3 colorTemperatureToRgb(float kelvin, float tint) {
     return luminance > 1e-4f ? positive / luminance : glm::vec3(1.0f);
 }
 
-float LensSettings::fovYRadians() const {
-    return 2.0f * std::atan(sensorHeight / (2.0f * std::max(focalLength, 1e-3f)));
-}
-float LensSettings::circleOfConfusion(float distance) const {
-    const float f = focalLength;
-    const float s = std::max(focusDistance * 1000.0f, f + 1e-3f); // millimetres
-    const float d = std::max(distance * 1000.0f, 1e-3f);
-    const float aperture_ = f / std::max(aperture, 0.05f);
-    return std::abs(aperture_ * f * (d - s) / (d * (s - f)));
-}
-float Camera::effectiveFovY() const {
-    return lens.useExplicitFov ? fovYRadians : lens.fovYRadians();
-}
+// The lens and exposure members live in scene/camera.cpp (ADR-037), no longer stubbed here.
 
 Result<void> LightRig::validate() const { return {}; }
 std::vector<PunctualLight> LightRig::expand(const glm::vec3&, float, const glm::vec3&, const glm::vec3&) const {
