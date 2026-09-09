@@ -40,20 +40,24 @@ struct ProceduralStats {
     std::uint32_t uploads = 0;          // instance buffer uploads this frame
 };
 
-// The deformer record as the shader sees it (64 bytes, std140-compatible).
+// The deformer record as the shader sees it (64 bytes, std140-compatible). Mirrors
+// shaders/procedural.wgsl `DeformerUniform`.
 struct DeformerUniform {
-    glm::vec4 axisKind;      // xyz axis, w = kind (float) or -1 when disabled
-    glm::vec4 centerAmount;  // xyz center, w = amount
-    glm::vec4 params;        // x = frequency|scale, y = speed, z = phase, w = falloff
-    glm::vec4 extra;         // xyz displacement axis | axis mask, w = space (0 local, 1 world) + seed*2 ... see shader
+    glm::vec4 axisKind;      // xyz = unit axis, w = kind code: DeformerKind (0..4) + 8 for world space, -1 = disabled slot
+    glm::vec4 centerAmount;  // xyz = center, w = amount
+    glm::vec4 params;        // x = frequency (sine) | spatial scale (noise, displacement), y = speed, z = phase, w = falloff
+    glm::vec4 extra;         // xyz = displacementAxis (sine, bend direction) | axisMask (noise); w = seed as float bits
 };
 static_assert(sizeof(DeformerUniform) == 64);
 
+// Group 1 binding 2 (one buffer per object, written every frame). The object/parent matrix and
+// the material live in the 256-byte ObjectUniforms slot at group 1 binding 0 (same layout as
+// entities), so this block stays small and std140-trivial.
 struct ProceduralUniforms {
-    glm::mat4 object;        // parent/object matrix (distribution transform included on the CPU records? no: see below)
     glm::vec4 timeInfo;      // x = render time, y = deformer count, z = epsilon for normals, w = instance count
     DeformerUniform deformers[scene::kMaxDeformers];
 };
+static_assert(sizeof(ProceduralUniforms) == 16 + 64 * scene::kMaxDeformers);
 
 class ProceduralRenderer {
 public:
@@ -71,9 +75,13 @@ public:
                                     const wgpu::BindGroupLayout& iblLayout, std::uint32_t sampleCount = 1);
     [[nodiscard]] Result<void> reload(); // hot reload of procedural.wgsl (keeps buffers)
 
-    // Per frame, before the lit pass: rebuilds dirty objects (calls rebuild()), uploads meshes
-    // and instance buffers that changed, writes uniforms. `objectMatrices[i]` is the parent
-    // matrix for scene.procedurals[i] (identity when the scene places them itself).
+    // Per frame, before the lit pass: uploads source meshes (cached by `meshHash`) and instance
+    // buffers that changed, writes the deformer/time and object uniforms. The scene is const
+    // here, so the engine side must call `ProceduralGeometry::rebuild()` before rendering;
+    // `structureVersion` and `meshHash` are the change signals this renderer keys uploads on
+    // (an object with an empty `instances` or a zero `meshHash` is skipped). Per-object GPU state
+    // is keyed by the object's name. `objectMatrices[i]` is the parent matrix for
+    // scene.procedurals[i] (identity when the scene places them itself; missing entries = identity).
     void update(const scene::Scene& scene, const std::vector<glm::mat4>& objectMatrices, const FrameTime& time);
     // Inside the lit pass (frame and IBL bind groups already set by the caller): sets its own
     // pipeline and group 1, the material group via `materialBindGroup`, and draws every visible

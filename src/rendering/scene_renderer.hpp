@@ -14,6 +14,7 @@
 #include "gpu/transient_pool.hpp"
 #include "rendering/particle_renderer.hpp"
 #include "rendering/post_processor.hpp"
+#include "rendering/procedural_renderer.hpp"
 #include "rendering/shader_layer.hpp"
 #include "scene/scene.hpp"
 #include "shaders/shader_layers.hpp"
@@ -54,6 +55,7 @@ struct RenderStats {
     std::uint32_t height = 0;
     bool ibl = false;
     ParticleStats particles;
+    ProceduralStats procedural; // ADR-023; its draws/triangles are also folded into the totals
     PostStats post;
     std::uint32_t transientTextures = 0;
 };
@@ -76,9 +78,10 @@ struct FrameUniforms {
     glm::vec4 params;
     glm::vec4 envParams;
     glm::vec4 skyParams;
+    glm::vec4 fogParams; // rgb = fog colour, w = density (0 = off)
     LightUniform lights[kMaxLights];
 };
-static_assert(sizeof(FrameUniforms) == 128 + 64 + 512);
+static_assert(sizeof(FrameUniforms) == 128 + 80 + 512);
 
 struct ObjectUniforms {
     glm::mat4 model;
@@ -143,6 +146,7 @@ public:
     [[nodiscard]] std::uint32_t engineShaderReloads() const { return engineReloads_; }
     [[nodiscard]] ShaderStack& shaderStack() { return *shaderStack_; }
     [[nodiscard]] ParticleRenderer& particles() { return *particles_; }
+    [[nodiscard]] ProceduralRenderer& procedurals() { return *procedurals_; }
     [[nodiscard]] PostProcessor& post() { return *postProcessor_; }
     [[nodiscard]] gpu::TransientPool& transientPool() { return *pool_; }
 
@@ -196,6 +200,7 @@ private:
     std::unique_ptr<EnvironmentProcessor> environment_;
     std::unique_ptr<ShaderStack> shaderStack_;
     std::unique_ptr<ParticleRenderer> particles_;
+    std::unique_ptr<ProceduralRenderer> procedurals_;
     std::unique_ptr<PostProcessor> postProcessor_;
     std::unique_ptr<gpu::TransientPool> pool_;
     glm::mat4 prevViewProj_{1.0f};
