@@ -13,7 +13,9 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -28,16 +30,48 @@ struct Transform {
     static Transform fromMatrix(const glm::mat4& m);
 };
 
+// Exposure (ADR-037): manual photographic settings, or metering the previous frame's luminance.
+struct ExposureSettings {
+    enum class Mode : std::uint8_t { Manual, Automatic };
+    Mode mode = Mode::Manual;
+    float aperture = 5.6f;        // f-number
+    float shutterSeconds = 1.0f / 50.0f;
+    float iso = 400.0f;
+    float compensation = 0.0f;    // EV offset applied in both modes
+    float minEv = -4.0f;          // automatic clamp
+    float maxEv = 16.0f;
+    float speedUp = 3.0f;         // EV per second when the image brightens
+    float speedDown = 1.0f;       // EV per second when it darkens
+    float meterCenterWeight = 0.6f; // 0 = flat average, 1 = strongly centre-weighted
+};
+
+// A physical lens (ADR-037). Field of view comes from `focalLength` and `sensorHeight` unless
+// `useExplicitFov` is set, so existing scenes that only set `fovYRadians` keep working.
+struct LensSettings {
+    float focalLength = 35.0f;    // mm
+    float sensorWidth = 36.0f;    // mm (full frame)
+    float sensorHeight = 24.0f;
+    float aperture = 5.6f;        // f-number, drives the circle of confusion
+    float focusDistance = 8.0f;   // metres
+    float shutterAngle = 180.0f;  // degrees; motion blur length
+    bool useExplicitFov = true;   // scenes authored before the lens existed
+    [[nodiscard]] float fovYRadians() const;      // 2 atan(sensorHeight / (2 focalLength))
+    [[nodiscard]] float circleOfConfusion(float distance) const; // millimetres on the sensor
+};
+
 struct Camera {
     std::string name;
     glm::vec3 position{0.0f, 1.6f, 6.0f};
     glm::vec3 target{0.0f, 0.6f, 0.0f};
     glm::vec3 up{0.0f, 1.0f, 0.0f};
-    float fovYRadians = 0.87f; // ~50 degrees
+    float fovYRadians = 0.87f; // ~50 degrees; used when lens.useExplicitFov
     float nearPlane = 0.1f;
     float farPlane = 200.0f;
+    LensSettings lens;
+    ExposureSettings exposure;
     [[nodiscard]] glm::mat4 view() const;
     [[nodiscard]] glm::mat4 projection(float aspect) const; // depth 0..1 (WebGPU/Metal)
+    [[nodiscard]] float effectiveFovY() const; // lens or explicit, per lens.useExplicitFov
 };
 
 // ---- textures ------------------------------------------------------------------------------
@@ -129,19 +163,49 @@ struct Entity {
 
 // ---- lights ---------------------------------------------------------------------------------
 
+// A light (ADR-033). Punctual kinds keep their original meaning; the area kinds add a size that
+// softens both the diffuse falloff and the specular highlight (linearly transformed cones for
+// Rect and Disk, representative point for Tube and Sphere). `temperature` and `tint` multiply
+// `color` when the light is packed, so an artist works in Kelvin and the shader stays unchanged.
 struct PunctualLight {
-    enum class Type : std::uint8_t { Directional, Point, Spot };
+    enum class Type : std::uint8_t { Directional, Point, Spot, Rect, Disk, Tube, Sphere };
+    // The part a light plays in a rig; used by rigs, presets and the inspector, never by shading.
+    enum class Role : std::uint8_t { Key, Fill, Rim, Back, Ambient, Practical };
     std::string name;
     Type type = Type::Directional;
+    Role role = Role::Key;
     glm::vec3 position{0.0f};
     glm::vec3 direction{-0.4f, -1.0f, -0.35f}; // direction the light travels (normalised by users)
+    glm::vec3 up{0.0f, 1.0f, 0.0f};            // orientation of Rect/Disk/Tube emitters
     glm::vec3 color{1.0f};
-    float intensity = 1.0f;       // directional: lux (scene-linear multiplier); point/spot: candela
+    float intensity = 1.0f;       // directional: lux; point/spot: candela; area: nits over the emitter
+    float temperature = 6500.0f;  // Kelvin; 6500 is neutral and leaves `color` unchanged
+    float tint = 0.0f;            // -1 green .. +1 magenta, perpendicular to the Planckian locus
     float range = 0.0f;           // 0 = infinite
     float innerConeAngle = 0.0f;  // spot, radians
     float outerConeAngle = 0.7854f;
+    // Area emitters: Rect uses width and height, Disk and Sphere use radius, Tube uses both.
+    float width = 1.0f;
+    float height = 1.0f;
+    float radius = 0.25f;
+    // What this light participates in beyond direct shading.
+    bool castsShadow = false;      // a shadow map is allocated for it (ADR-034)
+    bool contactShadow = true;     // screen-space contact march when it casts
+    float shadowStrength = 1.0f;   // 0 = no shadowing, 1 = full
+    float shadowBias = 0.0015f;    // normal-offset scale in world units
+    float softness = 1.0f;         // multiplies the penumbra width of a soft-shadowed light
+    float volumetricStrength = 0.0f; // in-scattering into the atmosphere (ADR-032 volume pass)
+    bool diffuseOnly = false;
+    bool specularOnly = false;
     bool enabled = true;
 };
+[[nodiscard]] const char* lightTypeName(PunctualLight::Type type);
+[[nodiscard]] std::optional<PunctualLight::Type> lightTypeFromName(std::string_view name);
+[[nodiscard]] const char* lightRoleName(PunctualLight::Role role);
+[[nodiscard]] std::optional<PunctualLight::Role> lightRoleFromName(std::string_view name);
+// Linear sRGB of a black body at `kelvin` (1500..12000), normalised to luminance 1, with `tint`
+// applied perpendicular to the locus. 6500 K with tint 0 returns white.
+[[nodiscard]] glm::vec3 colorTemperatureToRgb(float kelvin, float tint = 0.0f);
 
 // ---- environment ------------------------------------------------------------------------------
 

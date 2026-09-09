@@ -5,6 +5,8 @@
 
 #include "scene/particles.hpp"
 #include "scene/post_settings.hpp"
+#include "scene/composition_data.hpp"
+#include "scene/light_rig.hpp"
 #include "scene/procedural.hpp"
 #include "scene/material_program.hpp"
 #include "scene/sdf_object.hpp"
@@ -32,6 +34,7 @@ struct Scene {
     std::vector<ParticleSystem> particles;
     std::vector<ProceduralGeometry> procedurals; // ADR-023; evaluated by rendering::ProceduralRenderer
     spatial::FieldSet fields;                    // ADR-025; sampled by effectors, deformers, particles, materials
+    CompositionData composition;                 // ADR-038; what the frame is about
     spatial::SplineSet splines;                  // ADR-026; distributions, path deformers, camera, emitters
     std::vector<SdfObject> sdfs;                 // ADR-027; rendering::SdfRenderer / meshed entities
     std::vector<MaterialProgram> materialPrograms; // ADR-030; referenced by Material::program
