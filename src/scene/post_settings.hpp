@@ -77,9 +77,15 @@ struct PostSettings {
     bool dofPhysical = false;
     LensSettings lens;
 
-    // ---- motion blur (camera, from depth reprojection) -----------------------------------------
-    float motionBlurAmount = 0.0f; // 0 off .. 1 = full frame velocity
-    std::uint32_t motionBlurSamples = 8;
+    // ---- motion blur (ADR-040: tile-based reconstruction over the ADR-035 velocity target) -----
+    // The blur length is the pixel's screen motion times `motionBlurAmount` times the shutter
+    // fraction `lens.shutterAngle / 360` (ADR-037), so 1.0 with a 180 degree shutter is the
+    // physically correct half-frame smear and a zero shutter angle is no blur at all. Camera,
+    // object, instance, deformation and particle motion all blur, because they all write velocity.
+    float motionBlurAmount = 0.0f;      // 0 off .. 1 = the physical length
+    std::uint32_t motionBlurSamples = 16; // taps along the smear; fewer bands a long streak
+    float motionBlurMaxRadius = 40.0f;  // pixels at 720p (scaled by height / 720)
+    std::uint32_t motionBlurTileSize = 20; // velocity tile edge in pixels; also the reach in tiles
 
     // ---- output effects ------------------------------------------------------------------------
     float sharpen = 0.0f;          // 0..1 contrast-adaptive sharpening, last in the post chain

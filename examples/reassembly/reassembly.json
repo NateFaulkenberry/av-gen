@@ -6,7 +6,8 @@
   "parameters": {
     "post/bloom/enabled": true, "post/bloom/intensity": 0.4, "post/bloom/threshold": 1.3,
     "post/tonemap/operator": 1, "post/output/vignette": 0.4, "post/output/grain": 0.02,
-    "scene/brightness": 0.8, "scene/keyLight": 0.9, "root/rotationSpeed": 0.0
+    "scene/brightness": 0.8, "scene/keyLight": 0.9, "root/rotationSpeed": 0.0,
+    "post/motionBlur/amount": 0.8
   },
   "sources": [
     { "kind": "macro", "name": "macros", "settings": { "knobs": [

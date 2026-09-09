@@ -15,6 +15,8 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <optional>
+#include <string>
 
 namespace avgen::rendering {
 
@@ -22,10 +24,19 @@ namespace {
 constexpr std::uint32_t kParticleStride = 48;
 constexpr std::uint32_t kWorkgroup = 64;   // cs_emit / cs_simulate
 constexpr std::uint32_t kScanBlock = 1024; // slots per compaction workgroup (256 threads x 4)
-// 0 uniforms, 1..7 storage, 8 field block, 9 spline tables, 15 the simulated-grid table
-// (declared by fields.wgsl; ADR-032).
+// 0 uniforms, 1 particles, 2 dead list, 3 counters + indirect draw args, 4 alive list,
+// 5 trail history, 6 glow scratch (ADR-040), 7 compaction scratch (flags then block sums),
+// 8 field block, 9 spline tables, 15 the simulated-grid table (declared by fields.wgsl; ADR-032).
+// That is nine storage buffers in the compute stage, the same as before ADR-040: this adapter
+// allows ten, which is why history, glow scratch, the counters and the compaction flags share
+// buffers with their neighbours.
 constexpr std::uint32_t kComputeBindings = 11;
 constexpr std::uint32_t kComputeBindingSlots[kComputeBindings] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15};
+// counters (16 bytes) then the billboard and ribbon DrawArgs.
+constexpr std::uint32_t kCountersBytes = 48;
+constexpr std::uint32_t kBillboardIndirectOffset = 16;
+constexpr std::uint32_t kRibbonIndirectOffset = 32;
+constexpr std::uint64_t kGlowBlockBytes = 32; // two vec4 partial sums per scan block
 } // namespace
 
 ParticleRenderer::ParticleRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
@@ -74,6 +85,34 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer spline
         context_.queue().WriteBuffer(fieldBlock_, 0, &zero, sizeof(zero));
     }
     {
+        wgpu::BufferDescriptor desc{};
+        desc.label = "particles-glow";
+        desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
+        desc.size = kGlowBufferSize;
+        glowBuffer_ = device.CreateBuffer(&desc);
+        const std::array<float, kMaxGlowSystems * 8> zero{};
+        context_.queue().WriteBuffer(glowBuffer_, 0, zero.data(), kGlowBufferSize);
+    }
+    {
+        // "Nothing in front": the same value the linear-depth pass clears to, so a frame with no
+        // depth prepass behaves as if the fog marched all the way to its maximum distance.
+        wgpu::TextureDescriptor desc{};
+        desc.label = "particles-linear-depth-placeholder";
+        desc.size = {1, 1, 1};
+        desc.format = wgpu::TextureFormat::R32Float;
+        desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+        depthPlaceholder_ = device.CreateTexture(&desc);
+        depthPlaceholderView_ = depthPlaceholder_.CreateView();
+        const float far = 1.0e7f;
+        wgpu::TexelCopyTextureInfo dst{};
+        dst.texture = depthPlaceholder_;
+        wgpu::TexelCopyBufferLayout layout{};
+        layout.bytesPerRow = 4;
+        layout.rowsPerImage = 1;
+        const wgpu::Extent3D extent{1, 1, 1};
+        context_.queue().WriteTexture(&dst, &far, sizeof(far), &layout, &extent);
+    }
+    {
         std::array<wgpu::BindGroupLayoutEntry, kComputeBindings> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Compute;
@@ -101,7 +140,7 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer spline
         computeLayout_ = device.CreateBindGroupLayout(&desc);
     }
     {
-        std::array<wgpu::BindGroupLayoutEntry, 3> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -111,6 +150,13 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer spline
         entries[2].binding = 4;
         entries[2].visibility = wgpu::ShaderStage::Vertex;
         entries[2].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[3].binding = 5; // trail history, read by vs_ribbon (ADR-040)
+        entries[3].visibility = wgpu::ShaderStage::Vertex;
+        entries[3].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[4].binding = 13; // linear depth, read by the fog coupling in fs_particle
+        entries[4].visibility = wgpu::ShaderStage::Fragment;
+        entries[4].texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+        entries[4].texture.viewDimension = wgpu::TextureViewDimension::e2D;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "particles-render-layout";
         desc.entryCount = entries.size();
@@ -168,7 +214,7 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
         }
         return pipeline;
     };
-    auto makeRender = [&](bool additive) -> Result<wgpu::RenderPipeline> {
+    auto makeRender = [&](bool additive, const char* vertexEntry) -> Result<wgpu::RenderPipeline> {
         wgpu::BlendState blend{};
         blend.color.operation = wgpu::BlendOperation::Add;
         blend.color.srcFactor = additive ? wgpu::BlendFactor::One : wgpu::BlendFactor::SrcAlpha;
@@ -194,7 +240,7 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
         desc.label = additive ? "particles-additive" : "particles-alpha";
         desc.layout = renderPipelineLayout_;
         desc.vertex.module = module;
-        desc.vertex.entryPoint = "vs_particle";
+        desc.vertex.entryPoint = vertexEntry;
         desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
         desc.primitive.cullMode = wgpu::CullMode::None;
         desc.depthStencil = &depth;
@@ -226,32 +272,45 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
     if (!top) return std::unexpected(top.error());
     auto scatter = makeCompute("cs_scan_scatter");
     if (!scatter) return std::unexpected(scatter.error());
-    auto additive = makeRender(true);
+    auto glowReduce = makeCompute("cs_glow_reduce");
+    if (!glowReduce) return std::unexpected(glowReduce.error());
+    auto glowTop = makeCompute("cs_glow_top");
+    if (!glowTop) return std::unexpected(glowTop.error());
+    auto additive = makeRender(true, "vs_particle");
     if (!additive) return std::unexpected(additive.error());
-    auto alpha = makeRender(false);
+    auto alpha = makeRender(false, "vs_particle");
     if (!alpha) return std::unexpected(alpha.error());
+    auto ribbonAdditive = makeRender(true, "vs_ribbon");
+    if (!ribbonAdditive) return std::unexpected(ribbonAdditive.error());
+    auto ribbonAlpha = makeRender(false, "vs_ribbon");
+    if (!ribbonAlpha) return std::unexpected(ribbonAlpha.error());
     emitPipeline_ = *emit;
     simulatePipeline_ = *simulate;
     scanReducePipeline_ = *reduce;
     scanTopPipeline_ = *top;
     scanScatterPipeline_ = *scatter;
+    glowReducePipeline_ = *glowReduce;
+    glowTopPipeline_ = *glowTop;
     additivePipeline_ = *additive;
     alphaPipeline_ = *alpha;
+    ribbonAdditivePipeline_ = *ribbonAdditive;
+    ribbonAlphaPipeline_ = *ribbonAlpha;
     return {};
 }
 
-void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity) {
+void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity, std::uint32_t historyPoints) {
     if (pools_.size() <= index) {
         pools_.resize(index + 1);
     }
     Pool& pool = pools_[index];
     capacity = std::clamp<std::uint32_t>(capacity, 64, 4u << 20);
-    if (pool.capacity == capacity && pool.particles) {
+    if (pool.capacity == capacity && pool.historyPoints == historyPoints && pool.particles) {
         return;
     }
     const auto& device = context_.device();
     pool = Pool{};
     pool.capacity = capacity;
+    pool.historyPoints = historyPoints;
     pool.blocks = (capacity + kScanBlock - 1) / kScanBlock;
     auto buffer = [&](const char* label, std::uint64_t size, wgpu::BufferUsage usage) {
         wgpu::BufferDescriptor desc{};
@@ -261,24 +320,34 @@ void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity) {
         return device.CreateBuffer(&desc);
     };
     const std::uint64_t listBytes = static_cast<std::uint64_t>(capacity) * 4;
-    const std::uint64_t blockBytes = static_cast<std::uint64_t>(pool.blocks) * 4;
+    // flags for every slot, then one sum per scan block (shaders/particles.wgsl `blockSumIndex`).
+    const std::uint64_t scratchBytes = listBytes + static_cast<std::uint64_t>(pool.blocks) * 4;
     constexpr auto kStorage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
     pool.uniforms = buffer("particles-uniforms", sizeof(ParticleUniforms), wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst);
     pool.particles = buffer("particles-pool", static_cast<std::uint64_t>(capacity) * kParticleStride, kStorage);
     pool.deadList = buffer("particles-dead", listBytes, kStorage);
-    pool.counters = buffer("particles-counters", 16, kStorage | wgpu::BufferUsage::CopySrc);
+    pool.counters = buffer("particles-counters", kCountersBytes,
+                           kStorage | wgpu::BufferUsage::CopySrc | wgpu::BufferUsage::Indirect);
     pool.aliveList = buffer("particles-alive", listBytes, kStorage);
-    pool.indirect = buffer("particles-indirect", 16, kStorage | wgpu::BufferUsage::Indirect);
-    pool.flags = buffer("particles-flags", listBytes, kStorage);
-    pool.blockSums = buffer("particles-block-sums", blockBytes, kStorage);
+    pool.scratch = buffer("particles-scratch", scratchBytes, kStorage);
+    // The history ring is the trail's whole cost: capacity * points * 16 bytes. A one-entry stub
+    // keeps the bind group valid when the system has no trails, so trails really are free when off.
+    const std::uint64_t historyBytes =
+        historyPoints > 0 ? static_cast<std::uint64_t>(capacity) * historyPoints * scene::kTrailBytesPerPoint : 16;
+    pool.history = buffer("particles-trail-history", historyBytes, kStorage | wgpu::BufferUsage::CopySrc);
+    // Two vec4 per block, then the two-vec4 aggregate cs_glow_top writes past them.
+    const std::uint64_t glowScratchBytes = (static_cast<std::uint64_t>(pool.blocks) + 1) * kGlowBlockBytes;
+    pool.glowScratch = buffer("particles-glow-scratch", glowScratchBytes, kStorage | wgpu::BufferUsage::CopySrc);
 
     std::array<wgpu::BindGroupEntry, kComputeBindings> entries{};
-    const wgpu::Buffer* buffers[kComputeBindings] = {&pool.uniforms, &pool.particles, &pool.deadList, &pool.counters,
-                                                     &pool.aliveList, &pool.indirect, &pool.flags, &pool.blockSums,
-                                                     &fieldBlock_, &splineTable_, &gridTable_};
+    const wgpu::Buffer* buffers[kComputeBindings] = {&pool.uniforms,  &pool.particles,  &pool.deadList,
+                                                     &pool.counters,  &pool.aliveList,  &pool.history,
+                                                     &pool.glowScratch, &pool.scratch,  &fieldBlock_,
+                                                     &splineTable_,   &gridTable_};
     const std::uint64_t sizes[kComputeBindings] = {sizeof(ParticleUniforms),
                                                    static_cast<std::uint64_t>(capacity) * kParticleStride,
-                                                   listBytes, 16, listBytes, 16, listBytes, blockBytes,
+                                                   listBytes, kCountersBytes, listBytes, historyBytes,
+                                                   glowScratchBytes, scratchBytes,
                                                    FieldUniforms::kBufferSize, SplineBuffers::kBufferSize,
                                                    FieldUniforms::kGridBufferSize};
     for (std::uint32_t i = 0; i < kComputeBindings; ++i) {
@@ -292,15 +361,44 @@ void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity) {
     cdesc.entryCount = entries.size();
     cdesc.entries = entries.data();
     pool.computeGroup = device.CreateBindGroup(&cdesc);
-    std::array<wgpu::BindGroupEntry, 3> rentries = {entries[0], entries[1], entries[4]};
+    pool.renderGroup = nullptr;
+    pool.needsReset = true;
+}
+
+void ParticleRenderer::ensureRenderGroup(Pool& pool) {
+    const wgpu::TextureView& depthView = frame_.linearDepth ? frame_.linearDepth : depthPlaceholderView_;
+    if (pool.renderGroup && pool.renderDepthView.Get() == depthView.Get()) {
+        return;
+    }
+    const std::uint64_t listBytes = static_cast<std::uint64_t>(pool.capacity) * 4;
+    const std::uint64_t historyBytes =
+        pool.historyPoints > 0 ? static_cast<std::uint64_t>(pool.capacity) * pool.historyPoints * scene::kTrailBytesPerPoint
+                               : 16;
+    std::array<wgpu::BindGroupEntry, 5> entries{};
+    entries[0].binding = 0;
+    entries[0].buffer = pool.uniforms;
+    entries[0].size = sizeof(ParticleUniforms);
+    entries[1].binding = 1;
+    entries[1].buffer = pool.particles;
+    entries[1].size = static_cast<std::uint64_t>(pool.capacity) * kParticleStride;
+    entries[2].binding = 4;
+    entries[2].buffer = pool.aliveList;
+    entries[2].size = listBytes;
+    entries[3].binding = 5;
+    entries[3].buffer = pool.history;
+    entries[3].size = historyBytes;
+    entries[4].binding = 13;
+    entries[4].textureView = depthView;
     wgpu::BindGroupDescriptor rdesc{};
     rdesc.label = "particles-render-group";
     rdesc.layout = renderLayout_;
-    rdesc.entryCount = rentries.size();
-    rdesc.entries = rentries.data();
-    pool.renderGroup = device.CreateBindGroup(&rdesc);
-    pool.needsReset = true;
+    rdesc.entryCount = entries.size();
+    rdesc.entries = entries.data();
+    pool.renderGroup = context_.device().CreateBindGroup(&rdesc);
+    pool.renderDepthView = depthView;
 }
+
+void ParticleRenderer::setFrameContext(const ParticleFrameContext& context) { frame_ = context; }
 
 void ParticleRenderer::resetPool(Pool& pool) {
     // The same state the compaction pass would produce for an empty pool: every slot dead, the
@@ -310,14 +408,21 @@ void ParticleRenderer::resetPool(Pool& pool) {
         dead[i] = i;
     }
     context_.queue().WriteBuffer(pool.deadList, 0, dead.data(), dead.size() * 4);
-    const std::uint32_t counters[4] = {pool.capacity, 0, 0, 0}; // deadCount, aliveCount
+    // deadCount, aliveCount, pad, pad, then the two indirect draws with no instances.
+    const std::uint32_t counters[12] = {pool.capacity, 0, 0, 0, 6, 0, 0, 0, pool.historyPoints * 6, 0, 0, 0};
     context_.queue().WriteBuffer(pool.counters, 0, counters, sizeof(counters));
     std::vector<std::uint8_t> zeros(static_cast<std::size_t>(pool.capacity) * kParticleStride, 0);
     context_.queue().WriteBuffer(pool.particles, 0, zeros.data(), zeros.size());
-    context_.queue().WriteBuffer(pool.flags, 0, zeros.data(), static_cast<std::size_t>(pool.capacity) * 4);
-    context_.queue().WriteBuffer(pool.blockSums, 0, zeros.data(), static_cast<std::size_t>(pool.blocks) * 4);
-    const std::uint32_t indirect[4] = {6, 0, 0, 0};
-    context_.queue().WriteBuffer(pool.indirect, 0, indirect, sizeof(indirect));
+    context_.queue().WriteBuffer(pool.scratch, 0, zeros.data(),
+                                 (static_cast<std::size_t>(pool.capacity) + pool.blocks) * 4);
+    if (pool.historyPoints > 0) {
+        // A ring full of the origin would draw ribbons from (0,0,0) on the first frame; zeroing
+        // it is not enough on its own (trailWrites gates reads) but keeps readbacks meaningful.
+        std::vector<std::uint8_t> history(static_cast<std::size_t>(pool.capacity) * pool.historyPoints *
+                                              scene::kTrailBytesPerPoint,
+                                          0);
+        context_.queue().WriteBuffer(pool.history, 0, history.data(), history.size());
+    }
     pool.emitCarry = 0.0;
     pool.needsReset = false;
 }
@@ -346,10 +451,31 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
     const glm::mat4 invView = glm::inverse(view);
     const glm::vec3 right = glm::normalize(glm::vec3(invView[0]));
     const glm::vec3 up = glm::normalize(glm::vec3(invView[1]));
+    // Slots past the ones written below must read as "no light" in volume.wgsl, and a system that
+    // stops glowing must not leave its last aggregate behind, so the table is cleared every frame.
+    {
+        const std::array<float, kMaxGlowSystems * 8> zero{};
+        context_.queue().WriteBuffer(glowBuffer_, 0, zero.data(), kGlowBufferSize);
+    }
+    std::uint32_t glowSlot = 0;
     for (std::size_t i = 0; i < scene.particles.size(); ++i) {
         const auto& sys = scene.particles[i];
-        ensurePool(i, sys.capacity);
+        // Trails are refused rather than silently truncated when they blow the memory budget
+        // (ADR-040): the scene still renders, with stretched billboards instead of ribbons.
+        std::uint32_t historyPoints = scene::trailHistoryPoints(sys);
+        std::optional<std::string> trailRefusal;
+        if (historyPoints > 0) {
+            if (auto valid = scene::validateParticleSystem(sys); !valid) {
+                trailRefusal = valid.error().message;
+                historyPoints = 0;
+            }
+        }
+        ensurePool(i, sys.capacity, historyPoints);
         Pool& pool = pools_[i];
+        if (trailRefusal && !pool.trailWarned) {
+            log::warn("particles: {}", *trailRefusal);
+            pool.trailWarned = true;
+        }
         if (pool.needsReset) {
             resetPool(pool);
         }
@@ -371,11 +497,15 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         const scene::EmitterShape shape =
             sys.shape == scene::EmitterShape::Spline && splineSlot < 0 ? scene::EmitterShape::Point : sys.shape;
 
+        const bool glowing = sys.volumeGlow > 0.0f && glowSlot < kMaxGlowSystems;
+        const std::uint32_t mySlot = glowing ? glowSlot++ : 0;
+
         ParticleUniforms u{};
         u.viewProj = proj * view;
-        u.prevViewProj = prevViewProj_;
+        u.prevViewProj = frame_.prevViewProj;
         u.cameraRight = glm::vec4(right, 0.0f);
         u.cameraUp = glm::vec4(up, 0.0f);
+        u.cameraPos = glm::vec4(frame_.cameraPosition, std::max(0.0f, frame_.shutterSeconds));
         u.emitterPos = glm::vec4(sys.position, static_cast<float>(shape));
         u.extent = glm::vec4(sys.extent, sys.spread);
         u.direction = glm::vec4(sys.direction, sys.drag);
@@ -388,6 +518,33 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         u.colorEnd = sys.colorEnd;
         u.sim = glm::vec4(static_cast<float>(dt), static_cast<float>(time.renderTime),
                           static_cast<float>(time.frameIndex), static_cast<float>(sys.seed));
+        u.stretch = glm::vec4(std::max(0.0f, sys.velocityStretch), std::max(0.0f, sys.stretchMax),
+                              std::max(0.0f, sys.stretchMin), 0.0f);
+        u.trail = glm::vec4(static_cast<float>(pool.historyPoints),
+                            static_cast<float>(std::clamp<std::uint32_t>(sys.trailStride, 1, 64)),
+                            std::max(0.0f, sys.trailWidth), std::clamp(sys.trailTaper, 0.0f, 1.0f));
+        u.trail2 = glm::vec4(std::clamp(sys.trailFade, 0.0f, 1.0f), sys.trailTint);
+        u.fog = glm::vec4(frame_.fogDensity, frame_.fogHeight, frame_.fogHeightFalloff, frame_.fogAbsorption);
+        u.fog2 = glm::vec4(frame_.fogMaxDistance, std::clamp(sys.fogCoupling, 0.0f, 1.0f),
+                           std::max(0.0f, sys.volumeGlow), frame_.linearDepth ? 1.0f : 0.0f);
+        // Lifetime curves (ADR-040): at most kMaxCurveKeys keys each; fewer than two disables the
+        // curve in the shader and the linear ramp above is used instead.
+        const auto keyCount = [](std::size_t n) {
+            return static_cast<std::uint32_t>(std::min(n, static_cast<std::size_t>(scene::kMaxCurveKeys)));
+        };
+        const std::uint32_t sizeKeys = keyCount(sys.sizeCurve.keys.size());
+        const std::uint32_t colorKeys = keyCount(sys.colorCurve.keys.size());
+        const std::uint32_t opacityKeys = keyCount(sys.opacityCurve.keys.size());
+        for (std::uint32_t k = 0; k < sizeKeys; ++k) {
+            u.sizeKeys[k] = glm::vec4(sys.sizeCurve.keys[k].t, sys.sizeCurve.keys[k].value, 0.0f, 0.0f);
+        }
+        for (std::uint32_t k = 0; k < opacityKeys; ++k) {
+            u.opacityKeys[k] = glm::vec4(sys.opacityCurve.keys[k].t, sys.opacityCurve.keys[k].value, 0.0f, 0.0f);
+        }
+        for (std::uint32_t k = 0; k < colorKeys; ++k) {
+            u.colorKeys[k] = glm::vec4(sys.colorCurve.keys[k].t, sys.colorCurve.keys[k].color);
+        }
+        u.curves = glm::uvec4(sizeKeys, colorKeys, opacityKeys, mySlot);
         u.counts = glm::uvec4(emitCount, pool.capacity, sys.blend == scene::ParticleBlend::Additive ? 0u : 1u,
                               pool.blocks);
         // Field forces (ADR-025): enabled entries bound to an uploaded field, in order.
@@ -447,11 +604,27 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         cp.DispatchWorkgroups(1);
         cp.SetPipeline(scanScatterPipeline_);
         cp.DispatchWorkgroups(pool.blocks);
+        if (glowing) {
+            // One aggregate emissive sphere for the volume march (ADR-040). Both dispatches run
+            // in this pass, after the simulation, so they see this frame's positions.
+            cp.SetPipeline(glowReducePipeline_);
+            cp.DispatchWorkgroups(pool.blocks);
+            cp.SetPipeline(glowTopPipeline_);
+            cp.DispatchWorkgroups(1);
+        }
         cp.End();
+        if (glowing) {
+            encoder.CopyBufferToBuffer(pool.glowScratch, static_cast<std::uint64_t>(pool.blocks) * kGlowBlockBytes,
+                                       glowBuffer_, static_cast<std::uint64_t>(mySlot) * kGlowBlockBytes,
+                                       kGlowBlockBytes);
+        }
 
         ++stats_.systems;
         stats_.capacity += pool.capacity;
         stats_.emittedThisFrame += emitCount;
+        stats_.ribbonSystems += pool.historyPoints > 0 ? 1 : 0;
+        stats_.glowSystems += glowing ? 1 : 0;
+        stats_.trailBytes += static_cast<std::uint64_t>(pool.capacity) * pool.historyPoints * scene::kTrailBytesPerPoint;
     }
     if (encoded > 0 && timer_->available()) {
         timer_->resolve(encoder);
@@ -469,9 +642,18 @@ void ParticleRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& s
         if (!sys.enabled || !pools_[i].particles) {
             continue;
         }
-        pass.SetPipeline(sys.blend == scene::ParticleBlend::Additive ? additivePipeline_ : alphaPipeline_);
-        pass.SetBindGroup(0, pools_[i].renderGroup);
-        pass.DrawIndirect(pools_[i].indirect, 0);
+        Pool& pool = pools_[i];
+        ensureRenderGroup(pool);
+        const bool additive = sys.blend == scene::ParticleBlend::Additive;
+        pass.SetBindGroup(0, pool.renderGroup);
+        // Ribbons first so an alpha-blended head sits on top of its own trail; additive systems
+        // do not care about the order. The ribbon draw's instance count is 0 when trails are off.
+        if (pool.historyPoints > 0) {
+            pass.SetPipeline(additive ? ribbonAdditivePipeline_ : ribbonAlphaPipeline_);
+            pass.DrawIndirect(pool.counters, kRibbonIndirectOffset);
+        }
+        pass.SetPipeline(additive ? additivePipeline_ : alphaPipeline_);
+        pass.DrawIndirect(pool.counters, kBillboardIndirectOffset);
     }
 }
 
@@ -486,6 +668,50 @@ Result<ParticleCounts> ParticleRenderer::readCounts(std::size_t systemIndex) {
     std::uint32_t words[4];
     std::memcpy(words, bytes->data(), sizeof(words));
     return ParticleCounts{words[1], words[0]};
+}
+
+Result<std::array<std::uint32_t, 8>> ParticleRenderer::readDrawArgs(std::size_t systemIndex) {
+    if (systemIndex >= pools_.size() || !pools_[systemIndex].counters) {
+        return fail("particle system {} has no pool", systemIndex);
+    }
+    auto bytes = gpu::readBuffer(context_, pools_[systemIndex].counters, kBillboardIndirectOffset, 32);
+    if (!bytes) {
+        return std::unexpected(bytes.error());
+    }
+    std::array<std::uint32_t, 8> args{};
+    std::memcpy(args.data(), bytes->data(), sizeof(args));
+    return args;
+}
+
+Result<std::vector<float>> ParticleRenderer::readTrailHistory(std::size_t systemIndex, std::uint32_t points) {
+    if (systemIndex >= pools_.size() || !pools_[systemIndex].history) {
+        return fail("particle system {} has no pool", systemIndex);
+    }
+    const Pool& pool = pools_[systemIndex];
+    if (pool.historyPoints == 0) {
+        return fail("particle system {} has no trail history", systemIndex);
+    }
+    const std::uint64_t wanted = std::min<std::uint64_t>(points, static_cast<std::uint64_t>(pool.capacity) * pool.historyPoints);
+    auto bytes = gpu::readBuffer(context_, pool.history, 0, wanted * scene::kTrailBytesPerPoint);
+    if (!bytes) {
+        return std::unexpected(bytes.error());
+    }
+    std::vector<float> out(wanted * 4);
+    std::memcpy(out.data(), bytes->data(), out.size() * sizeof(float));
+    return out;
+}
+
+Result<std::vector<float>> ParticleRenderer::readGlow() {
+    if (!glowBuffer_) {
+        return fail("particle renderer is not initialised");
+    }
+    auto bytes = gpu::readBuffer(context_, glowBuffer_, 0, kGlowBufferSize);
+    if (!bytes) {
+        return std::unexpected(bytes.error());
+    }
+    std::vector<float> out(kGlowBufferSize / sizeof(float));
+    std::memcpy(out.data(), bytes->data(), kGlowBufferSize);
+    return out;
 }
 
 } // namespace avgen::rendering

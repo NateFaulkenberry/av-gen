@@ -127,12 +127,25 @@ fn octDecode(e: vec2<f32>) -> vec3<f32> {
     return normalize(n);
 }
 
-// Screen-space motion in UV units, from this frame's and last frame's clip positions.
+// Screen-space motion in UV units, from this frame's and last frame's clip positions. Both must
+// be genuine clip-space vectors: a fragment's @builtin(position) is *not* one (it is in
+// framebuffer pixels with w = 1 / clip.w), so use screenVelocityAt() for that.
 fn screenVelocity(clip: vec4<f32>, prevClip: vec4<f32>) -> vec2<f32> {
     let now = clip.xy / max(abs(clip.w), 1e-6) * sign(max(clip.w, 1e-6));
     let before = prevClip.xy / max(abs(prevClip.w), 1e-6) * sign(max(prevClip.w, 1e-6));
     // NDC -> UV: x maps directly, y flips.
     return vec2<f32>((now.x - before.x) * 0.5, (before.y - now.y) * 0.5);
+}
+
+// Screen-space motion in UV units when the current position comes from the fragment stage's
+// @builtin(position). Dividing that by its own w is meaningless - it yields pixel * clip.w, which
+// is what made the velocity target read hundreds of screens per frame - so the UV comes straight
+// from the framebuffer coordinate instead.
+fn screenVelocityAt(fragCoord: vec4<f32>, prevClip: vec4<f32>) -> vec2<f32> {
+    let nowUv = fragCoord.xy * frame.targetSize.zw;
+    let before = prevClip.xy / max(abs(prevClip.w), 1e-6) * sign(max(prevClip.w, 1e-6));
+    let beforeUv = vec2<f32>(before.x * 0.5 + 0.5, 0.5 - before.y * 0.5);
+    return nowUv - beforeUv;
 }
 
 fn packIds(objectId: f32, materialId: f32) -> u32 {

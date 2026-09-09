@@ -132,6 +132,9 @@ TEST_CASE("Grading: zero saturation yields grey, vignette darkens corners, tone 
 }
 
 TEST_CASE("Depth of field blurs an out-of-focus edge and motion blur smears camera motion", "[gpu][post]") {
+    // ADR-040: motion blur is now tile-based reconstruction over the velocity target rather than a
+    // depth reprojection. test_motion_gpu.cpp checks that object motion smears along its own
+    // velocity; this case keeps the *camera* covered.
     auto ctx = makeContext();
     gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
     rendering::SceneRenderer renderer(*ctx, shaders);
@@ -165,8 +168,14 @@ TEST_CASE("Depth of field blurs an out-of-focus edge and motion blur smears came
     }
     s.post.dofEnabled = false;
 
-    // Motion blur: render once to seed the previous matrix, then move the camera sideways.
+    // Motion blur: render once to seed the previous matrices, then pan the camera sideways.
+    // `motionBlurMaxRadius` is in pixels at 720p and scales with the frame height, so at 128 px
+    // the default would clamp the smear to seven pixels; it is lifted here so the pan, not the
+    // clamp, sets the length. The ADR-040 filter weights each tap by whether it actually reaches
+    // this pixel, so a silhouette gets a soft ramp rather than the flat box average the old
+    // reprojection blur produced - which is why the threshold is 0.8 rather than 0.7.
     s.post.motionBlurAmount = 1.0f;
+    s.post.motionBlurMaxRadius = 200.0f;
     (void)renderer.renderToImage(s, time, 128, 128);
     s.camera.position.x += 0.6f;
     s.camera.target.x += 0.6f;
@@ -177,7 +186,7 @@ TEST_CASE("Depth of field blurs an out-of-focus edge and motion blur smears came
     if (const char* dumpDir = std::getenv("AVGEN_DUMP_DIR")) {
         REQUIRE(gpu::writePpm(*moved, std::filesystem::path(dumpDir) / "post_moved.ppm").has_value());
     }
-    CHECK(movedEdge < sharpEdge * 0.7f);
+    CHECK(movedEdge < sharpEdge * 0.8f);
     CHECK(ctx->errorCount() == 0);
 }
 

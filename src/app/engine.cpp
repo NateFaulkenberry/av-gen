@@ -1580,9 +1580,9 @@ void Engine::update(const FrameTime& time) {
         post_.exposureDeltaSeconds = deltaSeconds;
         post_.exposureReset = cameraStateReset_;
         cameraStateReset_ = false;
-        // The shutter sets how long the blur trails: 180 degrees is the reference, so an
-        // untouched shutter angle leaves post/motionBlur/amount exactly as authored.
-        post_.motionBlurAmount *= std::clamp(lens_.shutterAngle / 180.0f, 0.0f, 2.0f);
+        // ADR-040: the shutter now scales the blur inside the post chain (blur length is the
+        // screen motion times shutterAngle / 360), so `post_.lens` above is all it needs and
+        // post/motionBlur/amount stays exactly as authored.
     }
     controller_->scene().post = post_;
     {

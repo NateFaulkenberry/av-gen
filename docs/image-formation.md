@@ -21,7 +21,8 @@ user post layers                         shaders::LayerStage::Post
  1. metering            fs_meter_prefilter, fs_meter_reduce   (automatic exposure only)
  2. exposure            fs_exposure                           (skipped when the scale is 1)
  3. depth of field      fs_dof                                (needs undistorted depth)
- 4. motion blur         fs_motion_blur                        (needs undistorted depth)
+ 4. motion blur         fs_velocity_tile_max, fs_velocity_neighbour_max, fs_motion_blur
+                        (reads the ADR-035 velocity target and undistorted depth)
  5. lens                fs_lens        distortion, chromatic aberration
  6. bloom               fs_prefilter, fs_downsample, fs_upsample
  7. halation/anamorphic fs_halation_prefilter, ..., fs_wide
@@ -153,8 +154,10 @@ destroys deliberate darkness as surely as it fixes deliberate blow-out.
   evaluated per tap, and `post/dof/maxRadius` demotes itself to a safety clamp. With it off, the
   original `focusDistance`/`focusRange`/`maxRadius` behaviour is unchanged, so existing scenes and
   the existing tests are untouched.
-- **Shutter** feeds motion blur: `post/motionBlur/amount` is multiplied by `shutterAngle / 180`, so
-  the default 180-degree shutter leaves an authored value exactly as authored.
+- **Shutter** feeds motion blur: the blur length is the pixel's screen motion times
+  `post/motionBlur/amount` times `shutterAngle / 360`, so 1.0 with a 180-degree shutter is the
+  physically correct half-frame smear and a zero shutter angle is exactly no blur. See
+  [Motion blur](#motion-blur) below.
 
 ### Focus tracking
 
@@ -297,3 +300,60 @@ follow:
 | lens/focus/exposure applied to the live camera each frame | `src/app/engine.cpp` (`Engine::update`) |
 | tests | `tests/unit/test_camera.cpp`, `tests/rendering/test_image_formation_gpu.cpp` |
 | measured cost | `docs/performance/image-formation.md` |
+
+## Motion blur
+
+Until ADR-040 the motion blur was a *depth reprojection*: it un-projected each pixel with the
+inverse view-projection, pushed the world point through the previous frame's view-projection, and
+blurred along the difference. That can only ever see **camera** motion. A rotating object, an
+instance moving along a spline, a deforming mesh and a particle all sat perfectly sharp inside a
+frame that was otherwise smeared, which is the single clearest "this is computer graphics" tell a
+moving image has.
+
+It is now tile-based reconstruction over the ADR-035 velocity target, following McGuire et al.,
+*A Reconstruction Filter for Plausible Motion Blur* (2012). Every shading path writes that target
+— entities, procedural instances, raymarched SDFs, the grid, the skybox and particles from their
+simulated previous position — so all five kinds of motion blur for the same cost.
+
+```
+fs_velocity_tile_max        1920x1080 -> 96x54    the longest velocity in each 20 px tile,
+                                                  in pixels, already scaled by the shutter and
+                                                  clamped to post/motionBlur/maxRadius
+fs_velocity_neighbour_max   96x54 -> 96x54        3x3 maximum over those tiles
+fs_motion_blur              full resolution       samples along the neighbourhood velocity
+```
+
+The two tile passes are what let a moving object smear **outside its own silhouette**: a per-pixel
+filter can only gather colours that are already there, so it can never widen a shape. The 3x3
+neighbour pass is what lets a tile know about the fast thing that is about to sweep into it.
+
+Each of the reconstruction pass's taps is weighted by three terms:
+
+| term | meaning |
+|---|---|
+| foreground | the tap's surface is *in front of* this pixel and moving, so it smears over us |
+| background | the tap is behind us and *we* are moving, so we uncover it |
+| coherent   | both are moving at a similar rate: the ordinary blur of one moving surface |
+
+The depth comparison is soft (a 5% band scaled by the nearer of the two view distances) so
+silhouettes do not tear, and the "reaches this pixel" test is a cone in the tap's own velocity.
+The practical consequence, and the visible difference from the old filter, is that a **still
+background is not smeared into a moving object**: silhouettes against static surroundings stay
+crisp, where the reprojection blur averaged everything in the neighbourhood.
+
+**Blur length** is `velocity * post/motionBlur/amount * shutterAngle / 360` (ADR-037), clamped to
+`post/motionBlur/maxRadius` pixels (40 at 720p, scaled by `height / 720`). A zero shutter angle,
+or a zero amount, skips the three passes entirely, and there is no camera-only fallback any more:
+without a velocity target the pass does not run.
+
+**Determinism and temporal stability.** The tap jitter is interleaved gradient noise of the *pixel
+coordinate alone*. It never reads the frame index or the clock, so the same frame renders
+identically every time and a static image does not shimmer between frames. Below half a pixel of
+tile motion the pass returns the centre sample unchanged, which keeps a still frame bit-identical
+to the unblurred image.
+
+**Particles.** A velocity-stretched particle (ADR-040) is *already* a shutter smear, so it writes
+only the fraction of its motion the stretch has not drawn; otherwise the streak would be blurred a
+second time. Transparent surfaces keep the usual limitation of any post-process motion blur: they
+do not write depth, so where a particle sits in front of a fast-moving surface the filter treats
+the pixel as belonging to the surface and smears the composite.

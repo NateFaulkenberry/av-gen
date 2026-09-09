@@ -23,7 +23,7 @@ fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     var out: SceneOut;
     out.color = shaded.color;
     out.normalRoughness = packNormalRoughness(shaded.normal, shaded.roughness, shaded.flags);
-    out.velocity = screenVelocity(in.clip, in.prevClip);
+    out.velocity = screenVelocityAt(in.clip, in.prevClip);
     out.emission = vec4<f32>(shaded.emission, shaded.bloomWeight);
     out.ids = packIds(object.ids.x, object.ids.y);
     return out;
