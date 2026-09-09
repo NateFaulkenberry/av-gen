@@ -328,9 +328,30 @@ std::vector<const FieldSpec*> compoundChildren(const FieldSpec& f, const FieldSe
     return out;
 }
 
+// The grid a Grid field references (null when unbound, disabled or unallocated).
+const GridField* boundGrid(const FieldSpec& f, const FieldSet* set) {
+    if (f.kind != FieldKind::Grid || set == nullptr) {
+        return nullptr;
+    }
+    const GridField* g = set->findGrid(f.reference);
+    return (g != nullptr && g->enabled) ? g : nullptr;
+}
+
 float scalarAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* set, int depth) {
     if (!f.enabled || depth > kMaxDepth) {
         return 0.0f;
+    }
+    if (f.kind == FieldKind::Grid) {
+        const GridField* g = boundGrid(f, set);
+        if (g != nullptr && g->mode == GridMode::Vector) {
+            return glm::length(vectorAt(f, p, t, set, depth)); // vector as scalar
+        }
+        const glm::vec3 q = glm::vec3(f.worldToLocal() * glm::vec4(p, 1.0f));
+        float v = g != nullptr ? g->sampleScalar(q) : 0.0f;
+        if (f.invert) {
+            v = 1.0f - v;
+        }
+        return v * fieldWeight(f, q);
     }
     switch (f.type()) {
     case FieldType::Vector:
@@ -366,6 +387,17 @@ glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldS
     }
     const Frame frame = frameOf(f);
     const glm::vec3 q = glm::vec3(frame.worldToLocal * glm::vec4(p, 1.0f));
+    if (f.kind == FieldKind::Grid) {
+        const GridField* g = boundGrid(f, set);
+        if (g == nullptr || g->mode != GridMode::Vector) {
+            return scalarAt(f, p, t, set, depth) * (frame.rotation * fieldAxis(f)); // scalar as vector
+        }
+        glm::vec3 dir = g->sampleVector(q);
+        if (f.invert) {
+            dir = -dir;
+        }
+        return frame.rotation * (dir * fieldWeight(f, q));
+    }
     if (f.kind == FieldKind::Compound) {
         std::vector<glm::vec3> values;
         for (const FieldSpec* child : compoundChildren(f, set)) {
@@ -403,6 +435,14 @@ glm::vec4 colorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSe
     }
     const glm::vec3 q = glm::vec3(f.worldToLocal() * glm::vec4(p, 1.0f));
     const float w = fieldWeight(f, q);
+    if (f.kind == FieldKind::Grid) {
+        const GridField* g = boundGrid(f, set);
+        if (g != nullptr && g->mode == GridMode::Vector) {
+            return glm::vec4(vectorAt(f, p, t, set, depth) * 0.5f + 0.5f, w);
+        }
+        const float s = scalarAt(f, p, t, set, depth);
+        return glm::vec4(glm::mix(glm::vec3(f.colorA), glm::vec3(f.colorB), saturate(s)), w);
+    }
     if (f.kind == FieldKind::Compound) {
         std::vector<glm::vec3> rgb;
         float alpha = 0.0f;
@@ -492,6 +532,8 @@ const char* fieldKindName(FieldKind kind) {
         return "positionColor";
     case FieldKind::Compound:
         return "compound";
+    case FieldKind::Grid:
+        return "grid";
     }
     return "radial";
 }
@@ -504,7 +546,7 @@ constexpr FieldKind kAllFieldKinds[] = {
     FieldKind::RadialVector,  FieldKind::Attractor,      FieldKind::Repulsor,      FieldKind::Vortex,
     FieldKind::CurlNoise,     FieldKind::Spiral,         FieldKind::WaveVector,    FieldKind::ConstantColor,
     FieldKind::Gradient,      FieldKind::RadialGradient, FieldKind::NoiseColor,    FieldKind::PositionColor,
-    FieldKind::Compound,
+    FieldKind::Compound,      FieldKind::Grid,
 };
 }
 
@@ -791,6 +833,9 @@ Result<void> FieldSpec::validate() const {
     if (kind == FieldKind::SdfDistance && reference.empty()) {
         return fail("field '{}': sdfDistance needs a 'reference'", name);
     }
+    if (kind == FieldKind::Grid && reference.empty()) {
+        return fail("field '{}': grid needs a 'reference' (the grid's name)", name);
+    }
     return {};
 }
 
@@ -976,6 +1021,24 @@ const FieldSpec* FieldSet::find(std::string_view name) const {
     return nullptr;
 }
 
+const GridField* FieldSet::findGrid(std::string_view name) const {
+    for (const GridField& g : grids) {
+        if (g.name == name) {
+            return &g;
+        }
+    }
+    return nullptr;
+}
+
+int FieldSet::gridIndexOf(std::string_view name) const {
+    for (std::size_t i = 0; i < grids.size(); ++i) {
+        if (grids[i].name == name) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
 int FieldSet::indexOf(std::string_view name) const {
     for (std::size_t i = 0; i < fields.size(); ++i) {
         if (fields[i].name == name) {
@@ -1032,6 +1095,23 @@ FieldGpu packField(const FieldSpec& field, double time, const FieldSet* set) {
     g.curve = field.falloff.curve;
     g.noiseCombineMix = glm::vec4(field.falloff.noiseAmount, field.falloff.noiseScale,
                                   static_cast<float>(static_cast<int>(field.combine)), field.mix);
+    if (field.kind == FieldKind::Grid && set != nullptr) {
+        const int gi = set->gridIndexOf(field.reference);
+        if (gi >= 0) {
+            const GridField& grid = set->grids[static_cast<std::size_t>(gi)];
+            if (grid.enabled && grid.floatCount() > 0) {
+                const auto offset = static_cast<float>(gridTableOffset(set->grids, static_cast<std::size_t>(gi)));
+                g.gridBounds0 = glm::vec4(grid.boundsMin, offset);
+                g.gridBounds1 = glm::vec4(grid.boundsMax, static_cast<float>(grid.components()));
+                g.gridRes = glm::vec4(static_cast<float>(grid.resolution.x), static_cast<float>(grid.resolution.y),
+                                      static_cast<float>(grid.resolution.z),
+                                      grid.wrap == GridWrap::Wrap ? 3.0f : 1.0f);
+                // The bound grid's mode decides how the record reads across types.
+                g.type = static_cast<std::uint32_t>(grid.mode == GridMode::Vector ? FieldType::Vector
+                                                                                 : FieldType::Scalar);
+            }
+        }
+    }
     g.children = glm::ivec4(-1);
     for (int c = 0; c < kMaxCompoundChildren; ++c) {
         const auto i = static_cast<std::size_t>(c);

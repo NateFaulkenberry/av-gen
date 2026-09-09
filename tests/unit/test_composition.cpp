@@ -843,3 +843,66 @@ TEST_CASE("Composition parents round-trip JSON, allow forward references and ref
     REQUIRE_FALSE(bad.has_value());
     CHECK(bad.error().message.find("cycle") != std::string::npos);
 }
+
+TEST_CASE("Composition round-trips simulated grids and the volumetric environment (ADR-032)",
+          "[scene][composition][grid]") {
+    Fixture fx;
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "volumes",
+      "environment": {
+        "volumeDensity": 0.05, "fogHeight": 2.0, "fogHeightFalloff": 0.25,
+        "volumeScattering": 1.2, "volumeAbsorption": 0.8, "volumeAnisotropy": 0.4,
+        "volumeNoise": 0.6, "volumeNoiseScale": 0.09, "volumeNoiseSpeed": 0.2,
+        "volumeEmission": 0.3, "volumeSteps": 48, "volumeMaxDistance": 120.0,
+        "volumeDensityField": "smokeField", "volumeColorField": "heat"
+      },
+      "grids": [
+        { "name": "smoke", "mode": "scalar", "resolution": 16,
+          "boundsMin": [-4, 0, -4], "boundsMax": [4, 8, 4],
+          "injectField": "heat", "diffusion": 0.5, "diffuseIterations": 3, "dissipation": 0.2 }
+      ],
+      "nodes": [
+        { "name": "heat", "kind": "field", "field": { "kind": "radial", "radius": 4.0 } },
+        { "name": "smokeField", "kind": "field",
+          "field": { "kind": "grid", "reference": "smoke" } }
+      ]
+    })";
+    auto comp = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    REQUIRE(comp.has_value());
+    REQUIRE((*comp)->grids().size() == 1);
+    CHECK((*comp)->grids()[0].resolution == glm::ivec3(16));
+    CHECK((*comp)->grids()[0].diffuseIterations == 3);
+
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    (*comp)->update(FrameTime{});
+    const scene::Scene& s = (*comp)->scene();
+    REQUIRE(s.fields.grids.size() == 1);
+    CHECK(s.fields.grids[0].name == "smoke");
+    CHECK(s.fields.grids[0].injectField == "heat");
+    REQUIRE(s.fields.findGrid("smoke") != nullptr);
+    // The Grid field resolves to it, so anything that samples fields sees the grid.
+    const spatial::FieldSpec* gridField = s.fields.find("smokeField");
+    REQUIRE(gridField != nullptr);
+    CHECK(gridField->kind == spatial::FieldKind::Grid);
+    CHECK(gridField->reference == "smoke");
+    // The environment block came through and the parameters carry it.
+    CHECK(s.environment.volumeDensity == 0.05f);
+    CHECK(s.environment.volumeSteps == 48);
+    CHECK(s.environment.volumeDensityField == "smokeField");
+    CHECK(s.environment.volumeColorField == "heat");
+    REQUIRE(params.find("scene/volumeDensity") != nullptr);
+    REQUIRE(params.find("scene/volumeSteps") != nullptr);
+
+    // A JSON round trip preserves the settings and never writes the cell values.
+    const nlohmann::json j = (*comp)->toJson();
+    REQUIRE(j.contains("grids"));
+    CHECK_FALSE(j["grids"][0].contains("data"));
+    CHECK(j["environment"]["volumeSteps"] == 48);
+    auto again = scene::Composition::fromJson(j, fx.registry);
+    REQUIRE(again.has_value());
+    REQUIRE((*again)->grids().size() == 1);
+    CHECK((*again)->grids()[0].structuralHash() == (*comp)->grids()[0].structuralHash());
+    CHECK((*again)->toJson() == j);
+}

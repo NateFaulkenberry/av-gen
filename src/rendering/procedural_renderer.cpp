@@ -307,6 +307,7 @@ struct ProceduralRenderer::Impl {
     wgpu::Buffer objectUniforms;
     wgpu::Buffer fieldBlock;
     wgpu::Buffer splineTable;
+    wgpu::Buffer gridTable; // the simulated-grid table fields.wgsl binds at group 0 binding 15
     wgpu::Buffer emptyVisible;      // inert placeholder at group 1 binding 5 for uncalled objects
     wgpu::Buffer cullStats;         // kMaxProceduralObjects slots of kCullStatsStride u32
     std::unique_ptr<gpu::GpuTimer> effectorTimer;
@@ -340,7 +341,8 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
                                       const wgpu::BindGroupLayout& frameLayout,
                                       const wgpu::BindGroupLayout& materialLayout,
                                       const wgpu::BindGroupLayout& iblLayout, std::uint32_t sampleCount,
-                                      wgpu::Buffer fieldBlock, wgpu::Buffer splineTable) {
+                                      wgpu::Buffer fieldBlock, wgpu::Buffer splineTable,
+                                      wgpu::Buffer gridTable) {
     Impl& im = *impl_;
     const auto& device = im.context.device();
     im.colorFormat = colorFormat;
@@ -348,6 +350,15 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
     im.sampleCount = std::max<std::uint32_t>(sampleCount, 1);
     im.fieldBlock = std::move(fieldBlock);
     im.splineTable = std::move(splineTable);
+    im.gridTable = std::move(gridTable);
+    if (!im.gridTable) {
+        // Standalone use without a SceneRenderer: an empty grid table (no Grid field can bind).
+        wgpu::BufferDescriptor desc{};
+        desc.label = "procedural-empty-grid-table";
+        desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        desc.size = FieldUniforms::kGridBufferSize;
+        im.gridTable = device.CreateBuffer(&desc);
+    }
     if (!im.splineTable) {
         // Standalone use without a SceneRenderer: an empty spline table (every slot invalid).
         wgpu::BufferDescriptor desc{};
@@ -413,8 +424,9 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         im.pipelineLayout = device.CreatePipelineLayout(&desc);
     }
     {
-        // Effector pass: 0 = params, 1 = base records, 2 = live records, 3 = field block.
-        std::array<wgpu::BindGroupLayoutEntry, 4> entries{};
+        // Effector pass: 0 = params, 1 = base records, 2 = live records, 3 = field block,
+        // 15 = the simulated-grid table (declared by fields.wgsl; ADR-032).
+        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Compute;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -431,6 +443,9 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         entries[3].visibility = wgpu::ShaderStage::Compute;
         entries[3].buffer.type = wgpu::BufferBindingType::Uniform;
         entries[3].buffer.minBindingSize = FieldUniforms::kBufferSize;
+        entries[4].binding = 15;
+        entries[4].visibility = wgpu::ShaderStage::Compute;
+        entries[4].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "procedural-effector-layout";
         desc.entryCount = entries.size();
@@ -828,7 +843,7 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
         }
         state.computeGroup = nullptr;
         if (state.live) {
-            std::array<wgpu::BindGroupEntry, 4> entries{};
+            std::array<wgpu::BindGroupEntry, 5> entries{};
             entries[0].binding = 0;
             entries[0].buffer = state.effectorUniforms;
             entries[0].size = sizeof(EffectorPassUniforms);
@@ -841,6 +856,9 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
             entries[3].binding = 3;
             entries[3].buffer = fieldBlock;
             entries[3].size = FieldUniforms::kBufferSize;
+            entries[4].binding = 15;
+            entries[4].buffer = gridTable;
+            entries[4].size = FieldUniforms::kGridBufferSize;
             wgpu::BindGroupDescriptor desc{};
             desc.label = "procedural-effector-group";
             desc.layout = computeLayout;

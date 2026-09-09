@@ -166,7 +166,8 @@ public:
                                     const wgpu::BindGroupLayout& frameLayout,
                                     const wgpu::BindGroupLayout& materialLayout,
                                     const wgpu::BindGroupLayout& iblLayout, std::uint32_t sampleCount = 1,
-                                    wgpu::Buffer fieldBlock = nullptr, wgpu::Buffer splineTable = nullptr);
+                                    wgpu::Buffer fieldBlock = nullptr, wgpu::Buffer splineTable = nullptr,
+                                    wgpu::Buffer gridTable = nullptr);
     [[nodiscard]] Result<void> reload(); // hot reload of procedural.wgsl / points.wgsl / cull.wgsl (keeps buffers)
 
     // Per frame, before the lit pass: uploads source meshes (cached by `meshHash`) and instance

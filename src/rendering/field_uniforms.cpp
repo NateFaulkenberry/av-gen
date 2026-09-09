@@ -14,6 +14,12 @@ FieldUniforms::FieldUniforms(gpu::Context& context) : context_(context) {
     desc.size = kBufferSize;
     buffer_ = context_.device().CreateBuffer(&desc);
     context_.queue().WriteBuffer(buffer_, 0, &block_, sizeof(block_));
+    // The simulated-grid table: allocated once, zeroed, never resized (see the header).
+    wgpu::BufferDescriptor gridDesc{};
+    gridDesc.label = "grid-table";
+    gridDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
+    gridDesc.size = kGridBufferSize;
+    gridBuffer_ = context_.device().CreateBuffer(&gridDesc);
 }
 
 void FieldUniforms::update(const spatial::FieldSet& fields, double time) {

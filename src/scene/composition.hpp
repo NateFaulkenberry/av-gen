@@ -118,6 +118,13 @@ public:
     // Re-evaluates the graph when dirty and installs the result (called by update()).
     Result<void> evaluateGraph(double time);
 
+    // ---- simulated grid fields (scene-level, ADR-032) ----
+    // A grid is referenced by name from a `FieldKind::Grid` field; only its settings are
+    // serialised (`"grids"` in the scene file), never its cell values.
+    Result<void> addGrid(spatial::GridField grid);
+    [[nodiscard]] const std::vector<spatial::GridField>& grids() const { return grids_; }
+    [[nodiscard]] std::vector<spatial::GridField>& grids() { return grids_; }
+
     // ---- material programs (scene-level, ADR-030) ----
     Result<void> addMaterialProgram(MaterialProgram program); // registers parameters when attached
     [[nodiscard]] const std::vector<MaterialProgram>& materialPrograms() const { return materialPrograms_; }
@@ -200,11 +207,26 @@ private:
     // Free camera (camera/mode = 1): explicit position/target parameters instead of the orbit.
     params::Parameter<int>* cameraMode_ = nullptr;
     params::Parameter<float>* fogDensity_ = nullptr;
+    // Volumetric atmosphere (ADR-032): scene/volume* next to scene/fog*.
+    params::Parameter<float>* volumeDensity_ = nullptr;
+    params::Parameter<float>* fogHeight_ = nullptr;
+    params::Parameter<float>* fogHeightFalloff_ = nullptr;
+    params::Parameter<float>* volumeScattering_ = nullptr;
+    params::Parameter<float>* volumeAbsorption_ = nullptr;
+    params::Parameter<float>* volumeAnisotropy_ = nullptr;
+    params::Parameter<float>* volumeNoise_ = nullptr;
+    params::Parameter<float>* volumeNoiseScale_ = nullptr;
+    params::Parameter<float>* volumeNoiseSpeed_ = nullptr;
+    params::Parameter<float>* volumeEmission_ = nullptr;
+    params::Parameter<int>* volumeSteps_ = nullptr;
     params::Parameter<float>* keyLight_ = nullptr;   // multiplier on the default key light
     bool addedKeyLight_ = false;
     std::uint64_t frameCounter_ = 0;
     params::Parameter<glm::vec3>* fogColor_ = nullptr;
     float fogDensitySetting_ = 0.0f;
+    scene::Environment volumeSetting_; // the scene-file values behind the scene/volume* parameters
+    std::string volumeDensityFieldSetting_;
+    std::string volumeColorFieldSetting_;
     glm::vec3 fogColorSetting_{0.012f, 0.012f, 0.02f};
     bool fogColorSet_ = false;
     params::Parameter<glm::vec3>* cameraPosition_ = nullptr;
@@ -227,6 +249,7 @@ private:
     std::vector<std::string> graphMaterials_;  // material program names installed by it
     std::vector<std::string> graphWarnings_;
     params::Modulator* graphModulator_ = nullptr;
+    std::vector<spatial::GridField> grids_;
     std::vector<MaterialProgram> materialPrograms_;
     std::vector<MaterialProgramParameters> materialParams_;
     std::size_t ownMaterialCount_ = 0; // this composition's programs come first in scene_.materialPrograms

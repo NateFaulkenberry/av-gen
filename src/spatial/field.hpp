@@ -17,6 +17,7 @@
 // Time: tau = speed * t + phase (radians for waves / phase for noise animation).
 
 #include "core/error.hpp"
+#include "spatial/grid_field.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -61,12 +62,16 @@ enum class FieldKind : std::uint8_t {
     PositionColor,   // rgb = fract(q * frequency) (debug/position mapping)
     // compound
     Compound,        // combine(children) with `combine`
+    // simulated (ADR-032)
+    Grid,            // value = the named GridField's trilinear sample at q (`reference` = grid name)
 };
 [[nodiscard]] const char* fieldKindName(FieldKind kind);
 [[nodiscard]] std::optional<FieldKind> fieldKindFromName(std::string_view name);
 
 enum class FieldType : std::uint8_t { Scalar, Vector, Color };
-[[nodiscard]] FieldType fieldTypeOf(FieldKind kind); // Compound reports Scalar (its children decide)
+// Compound and Grid report Scalar (a compound's children and a grid's mode decide at sample time;
+// packField writes the bound grid's real type into FieldGpu::type).
+[[nodiscard]] FieldType fieldTypeOf(FieldKind kind);
 [[nodiscard]] const char* fieldTypeName(FieldType type);
 
 enum class FalloffKind : std::uint8_t {
@@ -158,11 +163,15 @@ struct FieldSpec {
     static Result<FieldSpec> fromJson(const nlohmann::json& j);
 };
 
-// A set of fields addressable by name (the scene-level list). Compound children resolve here.
+// A set of fields addressable by name (the scene-level list). Compound children and the grids a
+// `Grid` field references (by `FieldSpec::reference`) resolve here.
 struct FieldSet {
     std::vector<FieldSpec> fields;
+    std::vector<GridField> grids; // ADR-032; simulated, sampled through a Grid field
     [[nodiscard]] const FieldSpec* find(std::string_view name) const;
     [[nodiscard]] int indexOf(std::string_view name) const; // -1 when missing
+    [[nodiscard]] const GridField* findGrid(std::string_view name) const;
+    [[nodiscard]] int gridIndexOf(std::string_view name) const; // -1 when missing
 };
 
 // CPU sampling (pure). `set` resolves compound children; may be empty for simple kinds. Time in
@@ -178,7 +187,7 @@ struct FieldSet {
 constexpr int kMaxGpuFields = 16;
 constexpr int kMaxCompoundChildren = 4;
 
-// 320 bytes, std140/WGSL uniform compatible (all members 16-byte aligned).
+// 368 bytes, std140/WGSL uniform compatible (all members 16-byte aligned).
 struct alignas(16) FieldGpu {
     std::uint32_t kind;          // FieldKind
     std::uint32_t type;          // FieldType
@@ -200,8 +209,13 @@ struct alignas(16) FieldGpu {
     glm::vec4 curve;                   // falloff custom curve
     glm::vec4 noiseCombineMix;         // falloff.noiseAmount, falloff.noiseScale, combine, mix
     glm::ivec4 children;               // compound child slots (-1 = none)
+    // Grid kind (ADR-032). Zero for every other kind, and gridRes.w = 0 means "no grid bound",
+    // which samples as 0 (so a scene without grids never reads the table).
+    glm::vec4 gridBounds0;             // grid boundsMin.xyz, offset into the grid table (floats)
+    glm::vec4 gridBounds1;             // grid boundsMax.xyz, components per cell
+    glm::vec4 gridRes;                 // resolution.xyz, w = 1 bound + 2 when wrapping (0 = unbound)
 };
-static_assert(sizeof(FieldGpu) == 320);
+static_assert(sizeof(FieldGpu) == 368);
 // Packs a field for slot use; child names resolve to slots through `set` (order of `set.fields`).
 [[nodiscard]] FieldGpu packField(const FieldSpec& field, double time, const FieldSet* set = nullptr);
 

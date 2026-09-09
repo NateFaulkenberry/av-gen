@@ -40,11 +40,11 @@ with `FixedStepClock`. Everything from `SignalBus` downwards is identical.
 | `params` | avgen_core | `Parameter<T>`/`IParameter`, `ParameterSet`, `ProcessorChain`, `ModRoute`/`Modulator`, presets, `Timeline` (keyframe tracks + cues, ADR-018), JSON serialisation | glm, nlohmann/json |
 | `assets` | avgen_core | image decode/encode (stb), OpenEXR write/read (tinyexr), glTF 2.0 import (fastgltf) into a `Scene`, `AssetRegistry` (cached, versioned, path-resolving loads), `VideoWriter` (AVFoundation native / external ffmpeg) | fastgltf, stb, tinyexr, AVFoundation (macOS) |
 | `shaders` | avgen_core | user shader contract: ISF-style header parsing, WGSL module generation, inputs layout/packing, `ShaderLayerSet` (layers, parameters, hot-reload watching, project JSON) | params, core |
-| `spatial` | avgen_core | procedural world data (ADR-024..027): typed `AttributeSet`/`PointCloud`, point operators, `FieldSpec`/`FieldSet` sampling + GPU packing, `Effector`, `Spline`, `SdfTree` (+ surface nets meshing); `core/noise` is the CPU twin of the WGSL noise | glm, core |
+| `spatial` | avgen_core | procedural world data (ADR-024..027): typed `AttributeSet`/`PointCloud`, point operators, `FieldSpec`/`FieldSet` sampling + GPU packing, `GridField` (simulated 3D grids + the CPU reference step; ADR-032), `Effector`, `Spline`, `SdfTree` (+ surface nets meshing); `core/noise` is the CPU twin of the WGSL noise | glm, core |
 | `scene` | avgen_core | `Scene` data model (cameras, punctual lights, materials with textures, meshes, entities, environment, particle systems), mesh generators, particle parameter registration, `SceneController` interface with `OrbScene` (built-in preset + sparks), `GltfScene` (imported file + curated parameters + dust) and `Composition` (nodes of any kind incl. `procedural`, nested scene files, flattened into one `Scene`; ADR-017), `ProceduralGeometry` (primitives, distributions, seeded variation, deformer stack, instance records; ADR-023) | glm, params, assets |
 | `control` | avgen_core | OSC 1.0 (messages, bundles, patterns, UDP receiver/sender), MIDI input (CoreMIDI on macOS, byte parser, virtual source), `ControlMap` (bindings + direct OSC scheme; ADR-021) | POSIX sockets, CoreMIDI |
 | `gpu` | avgen_gpu | `Context` (Dawn instance/adapter/device/surface), `ShaderLibrary` (WGSL files + includes + diagnostics), `RenderTarget`, `GpuTimer`, readback (synchronous helpers and `ReadbackRing`) | Dawn |
-| `rendering` | avgen_gpu | `SceneRenderer` (pass list, PBR/grid/skybox/tonemap pipelines, material bind groups, lights, background/post user layers, engine shader reload), `EnvironmentProcessor` (IBL), `ShaderStack`/`ShaderLayerGpu` (user layers), `ParticleRenderer` (compute pools, indirect draw), `ProceduralRenderer` (one instanced draw per procedural object, deformer stack in the vertex shader; ADR-023), `PostProcessor` (built-in effect chain over `gpu::TransientPool`) | gpu, scene, shaders |
+| `rendering` | avgen_gpu | `SceneRenderer` (pass list, PBR/grid/skybox/tonemap pipelines, material bind groups, lights, background/post user layers, engine shader reload), `EnvironmentProcessor` (IBL), `ShaderStack`/`ShaderLayerGpu` (user layers), `ParticleRenderer` (compute pools, indirect draw), `ProceduralRenderer` (one instanced draw per procedural object, deformer stack in the vertex shader; ADR-023), `VolumeRenderer` (half-res raymarched atmosphere + depth-aware composite; ADR-032), `Simulation` (grid-field compute passes into the shared grid table; ADR-032), `PostProcessor` (built-in effect chain over `gpu::TransientPool`) | gpu, scene, shaders |
 | `platform` | avgen_platform | `Window` (SDL3, Metal layer, events, file dialog) | SDL3 |
 | `ui` | avgen_platform | `ImGuiLayer` (SDL3 + WebGPU backends), `ControlPanel` (transport, response, generated parameter panel, analysis plots, performance) | ImGui, ImPlot |
 | `app` | avgen | `Engine` (the pipeline; also compiled into the test binary), `Application` (live/headless loops, CLI), `RecentFiles`, `RenderSettings`/`RenderJob` (offline renders; ADR-020), `ControlHub` (applies the control map every frame, learn state) | everything |
@@ -138,6 +138,9 @@ plain WebGPU, which the particle research (§11) requires.
   ParticleSystem.fieldForces ──▶ particles.wgsl (simulate reads FieldBlock)│
   Material programs ──▶ material.wgsl (inputs incl. fieldColor)  ◀────────┘
   SdfTree ──▶ sdf.wgsl (sphere tracing, writes depth) | meshSdf (surface nets → MeshData)
+  GridField ──simulate.wgsl (inject/advect/diffuse/Gray-Scott)──▶ grid table ──▶ fields.wgsl
+                                                                  (FieldKind::Grid, trilinear)
+  Environment.volume* ──▶ volume.wgsl (half-res raymarch after the lit pass, depth-aware upsample)
 ```
 
 Rules: structure is built on the CPU only when a structural hash changes (`rebuild()`); motion is
@@ -146,8 +149,13 @@ parameter (`field/<node>/…`, `procedural/<node>/effector/<n>/…`), so audio, 
 OSC/MIDI and macros reach fields, effectors and materials through the ordinary routes. Nested
 scenes prefix field names and every reference to them (`<node>_<field>`), so a scene file is
 self-contained. CPU and GPU implement the same maths (`core/noise` ↔ `noise.wgsl`,
-`spatial::sample*` ↔ `fields.wgsl`, `applyEffectorsToRecords` ↔ `points.wgsl`) and the render
-tests compare them.
+`spatial::sample*` ↔ `fields.wgsl`, `applyEffectorsToRecords` ↔ `points.wgsl`,
+`GridField::step` ↔ `simulate.wgsl`) and the render tests compare them. Simulated grids and the
+volumetric atmosphere (ADR-032) are documented in
+[volumetrics-and-simulation.md](volumetrics-and-simulation.md): the grid table is one storage
+buffer every `fields.wgsl` consumer binds at group 0 binding 15, the simulation steps it with a
+fixed sub-step derived from the render time (never the wall clock), and the fog pass is skipped
+entirely when `Environment::volumeDensity` is 0.
 
 ## 6. Threading
 

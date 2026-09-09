@@ -195,3 +195,17 @@ deterministically across two renderers and a second context, checks the Field de
 emissive field change the image deterministically, and runs particle field forces (Force,
 Velocity, Kill) against the no-force sequence. The `[.perf][fields]` case is the benchmark behind
 `docs/performance/procedural-geometry.md`.
+
+## Simulated grids (ADR-032)
+
+`fields.wgsl` also declares the **grid table**, the storage buffer that holds every simulated
+grid of the scene back to back, at `@group(0) @binding(15)`. It is one binding for every module
+that includes the file, so any bind group layout serving a `fields.wgsl` consumer must carry it:
+`SceneRenderer`'s frame layout (group 0 of `pbr.wgsl`, `procedural.wgsl`, `sdf_raymarch.wgsl` and
+`volume.wgsl`), the particle compute layout and the procedural effector (`points.wgsl`) layout
+all do, and so must anything new. `rendering::FieldUniforms` owns the buffer (a fixed 8 MB,
+allocated once so no bind group is ever rebuilt) and `rendering::Simulation` fills it. A
+`FieldKind::Grid` record carries the grid's bounds, resolution, component count and table offset,
+and samples trilinearly; `gridRes.w == 0` means no grid is bound and the sample is 0, so a scene
+without grids never reads the buffer. See
+[volumetrics-and-simulation.md](volumetrics-and-simulation.md).
