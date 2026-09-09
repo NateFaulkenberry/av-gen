@@ -7,7 +7,8 @@ target_include_directories(avgen_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp")
+    "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp")
 target_link_libraries(avgen_tests PRIVATE avgen_core Catch2::Catch2WithMain)
 avgen_set_warnings(avgen_tests)
 catch_discover_tests(avgen_tests
@@ -21,7 +22,8 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/render_job.cpp")
+        "${CMAKE_SOURCE_DIR}/src/app/render_job.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp")
     target_include_directories(avgen_render_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(avgen_render_tests PRIVATE avgen_gpu Catch2::Catch2WithMain)
     avgen_set_warnings(avgen_render_tests)

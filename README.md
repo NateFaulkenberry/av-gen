@@ -4,7 +4,7 @@ A native C++ real-time GPU audiovisual engine. Not a waveform visualizer: the go
 scene engine in which audio analysis drives a general parameter/modulation system that in turn
 drives GPU-rendered 3D scenes, in real time and as deterministic offline frame sequences.
 
-Milestone 1.0 (current): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
+Milestone 1.1 (current): load an audio file, play it, analyse it (bands, onsets, beat and tempo),
 and render the built-in orb scene, any glTF 2.0 scene, or a composition of nodes (glTF instances,
 orbs, grids, particle systems, nested scene files) saved as a scene file, with PBR materials,
 textures, punctual lights, an HDR environment and GPU particle systems, behind or on top of user-written
@@ -17,7 +17,8 @@ in seconds or beats and fires preset cues; presets snapshot and morph parameters
 all of it plus the audio, scene and environment it belongs to, relative to the file, migrates
 older versions, and exports as a self-contained bundle folder; offline renders are bit-identical
 PNG sequences or ProRes/H.264 videos with the audio muxed, from the CLI, a queue, or in the
-background of the live app.
+background of the live app. Live control: OSC (direct parameter addresses or bindings) and MIDI
+become control signals or set parameters, and a microphone or line input can replace the file.
 
 ```
 Audio file -> AudioPlayer -> AnalysisRunner -> SignalBus -> Modulator -> ParameterSet
@@ -51,6 +52,7 @@ python3 tools/make_test_audio.py /tmp/track.wav        # deterministic 120 BPM t
 ./build/debug/src/avgen --project show.json --render renders/show.mov --codec prores422   # offline video
 ./build/debug/src/avgen --project show.json --render renders/frames --size 3840x2160 --fps 60 --range 10:20
 ./build/debug/src/avgen --queue jobs.json                            # batch renders
+./build/debug/src/avgen --project show.json --input --osc-port 9000 # live input + OSC/MIDI control (docs/control.md)
 ./build/debug/src/avgen --audio /tmp/track.wav --shader shaders/examples/feedback.wgsl --post my_post.wgsl
 ./build/debug/src/avgen --composition scenes/stage.json --audio /tmp/track.wav --play   # scene file (ADR-017)
 ```
@@ -73,5 +75,5 @@ writes a scene file. `--help` lists every flag.
 
 ## Status
 
-Milestones 0.1 to 1.0 complete on macOS 26 / Apple silicon. Windows and Linux are
+Milestones 0.1 to 1.1 complete on macOS 26 / Apple silicon. Windows and Linux are
 architecturally supported (WebGPU via Dawn, SDL3) but not yet built or tested. Licence: MIT.

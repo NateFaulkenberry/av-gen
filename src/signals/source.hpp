@@ -224,6 +224,45 @@ private:
     params::Parameter<float>* scale_ = nullptr;
 };
 
+// Outputs: "control.<channel>" for named channels fed from outside the frame loop (MIDI, OSC,
+// UI "learn", tests) through set()/pulse(): continuous channels hold their last value (0..1),
+// event channels fire for one frame with a strength. Channels declared in settings exist before
+// any message arrives so routes can bind to them; unknown channels are created on first set()
+// and need a re-attach (the engine rebinds when the source reports new channels).
+class ControlSource final : public Source {
+public:
+    explicit ControlSource(std::string name = "control");
+    [[nodiscard]] std::string kind() const override { return "control"; }
+    void attach(SignalBus& bus, params::ParameterSet& params) override;
+    void detach(params::ParameterSet& params) override;
+    void update(SignalBus& bus, const SourceContext& context) override;
+    void reset() override;
+    [[nodiscard]] nlohmann::json settingsToJson() const override;
+    Result<void> settingsFromJson(const nlohmann::json& j) override;
+    [[nodiscard]] std::vector<std::string> outputs() const override;
+
+    // Declares a channel (idempotent). Returns true when it is new (attach() needed).
+    bool addChannel(const std::string& channel, bool isEvent = false);
+    [[nodiscard]] bool hasChannel(const std::string& channel) const;
+    [[nodiscard]] const std::vector<std::string>& channels() const { return channels_; }
+    [[nodiscard]] bool isEventChannel(const std::string& channel) const;
+    // Value for a continuous channel (clamped 0..1); creates the channel when unknown.
+    void set(const std::string& channel, float value);
+    // Fires an event channel on the next update (strength 0..1); creates it when unknown.
+    void pulse(const std::string& channel, float strength = 1.0f);
+    [[nodiscard]] float value(const std::string& channel) const; // last set value (0 when unknown)
+    // True when set()/pulse() created channels since the last attach(); cleared by attach().
+    [[nodiscard]] bool needsAttach() const { return needsAttach_; }
+
+private:
+    std::vector<std::string> channels_;
+    std::vector<bool> events_;
+    std::vector<float> values_;
+    std::vector<float> pending_;    // event strength queued for the next update (-1 = none)
+    std::vector<SignalId> outputs_;
+    bool needsAttach_ = false;
+};
+
 // Outputs: "macro.<knob>" for each knob, mirroring the parameter "macros/<knob>" (0..1). Macros
 // are UI knobs that fan out through ordinary routes (with remap) to many targets, and because
 // they are parameters they can themselves be modulated.

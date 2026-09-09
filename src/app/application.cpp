@@ -40,6 +40,9 @@ std::string usageText() {
            "  --codec <id>        video codec: prores4444, prores422, h264, hevc, or an ffmpeg encoder name\n"
            "  --quality <0-100>   video quality\n"
            "  --queue <file>      run a render queue (JSON list of projects and render settings), headless\n"
+           "  --input [name]      analyse a live capture device (substring of its name; default device)\n"
+           "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
+           "  --list-audio-devices, --list-midi   enumerate inputs and exit\n"
            "  --shader <file>     add a user shader layer behind the scene (repeatable)\n"
            "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
            "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
@@ -81,6 +84,25 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             options.scene = *v;
             ++i;
+        } else if (arg == "--input") {
+            options.input = std::string();
+            if (i + 1 < argc && std::string(argv[i + 1]).rfind("--", 0) != 0) {
+                options.input = std::string(argv[i + 1]);
+                ++i;
+            }
+        } else if (arg == "--osc-port") {
+            auto v = need(i, "--osc-port");
+            if (!v) return std::unexpected(v.error());
+            try {
+                options.oscPort = std::stoi(*v);
+            } catch (const std::exception&) {
+                return fail("--osc-port expects an integer");
+            }
+            ++i;
+        } else if (arg == "--list-audio-devices") {
+            options.listAudioDevices = true;
+        } else if (arg == "--list-midi") {
+            options.listMidi = true;
         } else if (arg == "--render") {
             auto v = need(i, "--render");
             if (!v) return std::unexpected(v.error());
@@ -397,6 +419,14 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             }
             job_ = std::move(*job);
         };
+        panel_->onUseAudioInput = [this](const std::string& name) {
+            if (auto r = engine_->useAudioInput(name); !r) {
+                panel_->setStatus(r.error().message);
+            } else {
+                panel_->setStatus("live input: " + engine_->audioInput()->deviceName());
+            }
+        };
+        panel_->onStopAudioInput = [this] { engine_->stopAudioInput(); };
         panel_->onChooseRenderOutput = [this] {
             window_->saveFileDialog([this](std::string path) {
                 if (path.empty()) return;
@@ -416,6 +446,18 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             if (panel_) panel_->setStatus(r.error().message);
         } else if (!options.headless) {
             rememberProject(*options.project);
+        }
+    }
+    if (options.oscPort) {
+        auto map = engine_->control().map();
+        map.oscPort = static_cast<std::uint16_t>(std::clamp(*options.oscPort, 0, 65535));
+        map.oscEnabled = true;
+        engine_->control().setMap(std::move(map));
+    }
+    if (options.input && !options.headless) {
+        if (auto r = engine_->useAudioInput(*options.input); !r) {
+            log::error("audio input: {}", r.error().message);
+            if (panel_) panel_->setStatus(r.error().message);
         }
     }
     if (options.scene) {

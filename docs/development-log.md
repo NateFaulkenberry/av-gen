@@ -706,3 +706,72 @@ the process plumbing, the 3-second cross-thread stall regression), and `restartA
 
 Milestone 1.x (live control): OSC and MIDI input as modulation sources and parameter targets,
 a hot-reloadable control map, and a staging-buffer ring for faster offline readback.
+
+## 2026-09-09 — Milestone 1.1: live control (OSC, MIDI, live audio input)
+
+### What was implemented and why
+
+- `signals::ControlSource` ("control", always in the rack): named `control.<channel>` signals
+  (continuous 0..1 or event pulses) fed from outside the frame loop, so controllers are
+  modulation sources with the same chains, curves and polarity as audio.
+- `control::ControlMap` (project `"control"` block, ADR-021): MIDI bindings (cc, note, noteEvent,
+  pitch bend, pressure, program; source/channel/number filters, toggle) and OSC bindings
+  (address patterns, argument index, input range) to a control channel and/or a parameter base
+  value with a range; pure `matchMidi`/`matchOsc`. The direct OSC scheme (`/avgen/param/<path>`,
+  `/signal`, `/pulse`, `/preset/recall|morph`, `/transport/*`) needs no binding.
+- Transports with no third-party dependency: an in-house OSC 1.0 implementation (encode/decode,
+  bundles, patterns, UDP receiver thread with a bounded inbox, sender) and MIDI over CoreMIDI
+  (stub elsewhere), both with `inject` paths for tests. `app::ControlHub` drains and applies
+  both on the engine thread each frame and keeps "learn" state.
+- `audio::AudioInput` (miniaudio capture) feeds the same `AnalysisStream` as the player, so the
+  analyser, beat clock and routes run on a microphone or line input; `--input [device]`,
+  `--list-audio-devices`, `--list-midi`, `--osc-port`; transport input selector with a peak
+  meter; `audio/inputGain` parameter.
+- UI: Control tab (OSC/MIDI status and settings, learn/bind last message, bindings list).
+- Split: OSC library and MIDI/audio-input backends by two subagents in worktrees against fixed
+  headers; control source, map, hub, engine/CLI/UI integration, docs and integration tests on main.
+
+### Bugs found during the milestone
+
+- `Modulator::bind` cleared a route's `enabled` flag when its source or target did not resolve,
+  so a route to a control channel created later (or to a parameter of the next scene) stayed
+  dead after a rebind. Unresolved routes now keep the user's flag and are skipped until a bind
+  resolves them; two modulation tests updated.
+- The OSC binding matcher passed the pattern and address to `matchAddress` in the wrong order
+  (patterns never matched); caught by the unit test.
+- The agent's first recursive OSC pattern matcher was exponential on `*a*a*a…`; replaced by
+  the iterative glob with one backtrack point (patterns are per segment).
+- CoreMIDI hot-plug notifications need a CFRunLoop on the creating thread; the client lives on a
+  small dedicated run-loop thread.
+
+### Tests
+
+349 cases (was 316): OSC (11: every type tag round trip, spec byte vector, bundles and nesting,
+every truncation of a valid packet, pattern table, UDP loopback, queue limit), MIDI (11: parser
+table with running status, interleaved real-time and sysex, inbox, CoreMIDI virtual-source round
+trip and hot-plug), audio input (capture device when present), control map (4: MIDI/OSC match
+rules, direct scheme, JSON), engine integration (4: injected MIDI drives routes and parameters
+and pulses events, direct OSC sets parameters/signals/presets and counts unmatched, real UDP into
+the hub, project round trip and scene swaps keep the control source).
+
+### Results
+
+- `--list-audio-devices` / `--list-midi` enumerate the Mac's inputs (five capture devices, an
+  SE49 keyboard's two ports).
+- Windowed Release with `--osc-port 9009`: a Python sender set `root/scale` to 2.0 and
+  `scene/brightness` to 0.5, created the `control.energy` channel and paused the transport;
+  the project saved on exit carried the values and the channel.
+- `--input` on the MacBook microphone: analysis runs on the live stream at 120 fps, 0.7 ms CPU.
+- Debug and Release: 349/349 tests pass; zero warnings.
+
+### Known limitations
+
+- IPv4 only; no OSC feedback/query; MIDI clock is ignored (no tempo sync); MIDI backends exist
+  only for macOS (stub elsewhere); live input has no latency compensation and no transport;
+  the Control tab edits bindings by deletion and learn only (no field editor yet).
+
+### Next step
+
+Milestone 1.2 (live performance outputs): multi-output windows and displays, Syphon/NDI
+texture sharing where appropriate, projection/display workflows; then MIDI clock sync and OSC
+feedback.

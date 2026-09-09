@@ -2,6 +2,9 @@
 
 #include "ui/ui_logic.hpp"
 
+#include "audio/audio_input.hpp"
+#include "control/midi.hpp"
+
 #include <imgui.h>
 #include <implot.h>
 
@@ -166,6 +169,10 @@ void ControlPanel::drawModulation(app::Engine& engine) {
         }
         if (ImGui::BeginTabItem("Timeline")) {
             drawTimelineTab(engine);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Control")) {
+            drawControlTab(engine);
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
@@ -376,6 +383,35 @@ void ControlPanel::drawPresetsTab(app::Engine& engine) {
 }
 
 void ControlPanel::drawTransport(app::Engine& engine) {
+    if (engine.mode() == app::EngineMode::Live) {
+        static std::vector<audio::AudioDeviceInfo> devices;
+        static double lastScan = -1.0;
+        const double now = ImGui::GetTime();
+        if (now - lastScan > 5.0) {
+            devices = audio::listCaptureDevices();
+            lastScan = now;
+        }
+        std::vector<const char*> names;
+        names.push_back("(audio file)");
+        for (const auto& d : devices) {
+            names.push_back(d.name.c_str());
+        }
+        inputDevice_ = std::clamp(inputDevice_, 0, static_cast<int>(names.size()) - 1);
+        ImGui::SetNextItemWidth(220);
+        if (ImGui::Combo("input", &inputDevice_, names.data(), static_cast<int>(names.size()))) {
+            if (inputDevice_ == 0) {
+                if (onStopAudioInput) onStopAudioInput();
+            } else if (onUseAudioInput) {
+                onUseAudioInput(devices[static_cast<std::size_t>(inputDevice_ - 1)].name);
+            }
+        }
+        if (auto* input = engine.audioInput()) {
+            ImGui::SameLine();
+            ImGui::ProgressBar(std::clamp(input->lastPeak(), 0.0f, 1.0f), ImVec2(80, 0), "peak");
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s %u Hz", input->deviceName().c_str(), input->sampleRate());
+        }
+    }
     if (!engine.projectPath().empty()) {
         ImGui::TextDisabled("project: %s", engine.projectPath().filename().string().c_str());
         if (!engine.projectWarnings().empty()) {
@@ -1085,6 +1121,142 @@ void ControlPanel::drawRender(app::Engine& engine) {
     }
     ImGui::TextDisabled("renders load the saved project; the live view keeps playing");
     ImGui::End();
+}
+
+
+void ControlPanel::drawControlTab(app::Engine& engine) {
+    auto& hub = engine.control();
+    auto& map = hub.map();
+    const auto status = hub.status();
+    // ---- OSC ----
+    bool ioChanged = false;
+    ioChanged |= ImGui::Checkbox("OSC", &map.oscEnabled);
+    ImGui::SameLine();
+    int port = map.oscPort;
+    ImGui::SetNextItemWidth(80);
+    if (ImGui::InputInt("port", &port, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue)) {
+        map.oscPort = static_cast<std::uint16_t>(std::clamp(port, 0, 65535));
+        ioChanged = true;
+    }
+    ImGui::SameLine();
+    if (status.oscOpen) {
+        ImGui::TextDisabled("listening on %u: %llu msgs, %llu errors", status.oscPort,
+                            static_cast<unsigned long long>(status.osc.messages),
+                            static_cast<unsigned long long>(status.osc.errors));
+    } else {
+        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", status.oscError.empty() ? "closed" : status.oscError.c_str());
+    }
+    char prefix[64];
+    std::snprintf(prefix, sizeof(prefix), "%s", map.oscPrefix.c_str());
+    ImGui::SetNextItemWidth(120);
+    if (ImGui::InputText("prefix", prefix, sizeof(prefix), ImGuiInputTextFlags_EnterReturnsTrue)) {
+        map.oscPrefix = prefix;
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("direct scheme", &map.directOsc);
+    // ---- MIDI ----
+    ioChanged |= ImGui::Checkbox("MIDI", &map.midiEnabled);
+    ImGui::SameLine();
+    char filter[64];
+    std::snprintf(filter, sizeof(filter), "%s", map.midiFilter.c_str());
+    ImGui::SetNextItemWidth(120);
+    if (ImGui::InputText("filter", filter, sizeof(filter), ImGuiInputTextFlags_EnterReturnsTrue)) {
+        map.midiFilter = filter;
+        ioChanged = true;
+    }
+    ImGui::SameLine();
+    if (status.midiOpen) {
+        ImGui::TextDisabled("%zu source(s), %llu msgs", status.midiSources.size(),
+                            static_cast<unsigned long long>(status.midi.messages));
+    } else {
+        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", status.midiError.empty() ? "closed" : status.midiError.c_str());
+    }
+    if (ioChanged) {
+        hub.applyIo();
+    }
+    ImGui::Separator();
+
+    // ---- learn ----
+    ImGui::TextUnformatted("Learn: last received");
+    if (const auto& m = hub.lastMidi()) {
+        ImGui::Text("MIDI %s ch %d #%d = %d (%s)", control::midiKindName(m->kind), m->channel + 1, m->data1, m->data2,
+                    m->source.c_str());
+    } else {
+        ImGui::TextDisabled("MIDI: nothing yet");
+    }
+    if (const auto& o = hub.lastOsc()) {
+        ImGui::Text("OSC %s (%zu args)%s", o->address.c_str(), o->args.size(),
+                    o->hasNumber(0) ? fmt::format(" = {:.3f}", static_cast<double>(o->number(0))).c_str() : "");
+    } else {
+        ImGui::TextDisabled("OSC: nothing yet");
+    }
+    std::vector<const char*> targets;
+    targets.push_back("(signal only)");
+    for (const auto* p : engine.params().ordered()) {
+        if (p->flags().modulatable) {
+            targets.push_back(p->path().c_str());
+        }
+    }
+    learnTarget_ = std::clamp(learnTarget_, 0, static_cast<int>(targets.size()) - 1);
+    ImGui::SetNextItemWidth(120);
+    ImGui::InputText("signal", learnSignal_, sizeof(learnSignal_));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(200);
+    ImGui::Combo("##learntarget", &learnTarget_, targets.data(), static_cast<int>(targets.size()));
+    ImGui::SameLine();
+    ImGui::Checkbox("event", &learnAsEvent_);
+    const std::string parameter = learnTarget_ > 0 ? targets[static_cast<std::size_t>(learnTarget_)] : "";
+    if (ImGui::Button("Bind last MIDI")) {
+        if (!hub.bindLastMidi(learnSignal_, parameter, learnAsEvent_)) {
+            status_ = "no MIDI message received yet";
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Bind last OSC")) {
+        if (!hub.bindLastOsc(learnSignal_, parameter, learnAsEvent_)) {
+            status_ = "no OSC message received yet";
+        }
+    }
+    ImGui::Separator();
+
+    // ---- bindings ----
+    ImGui::Text("Bindings: %zu MIDI, %zu OSC (applied %llu, unmatched %llu)", map.midi.size(), map.osc.size(),
+                static_cast<unsigned long long>(status.applied), static_cast<unsigned long long>(status.unmatched));
+    int removeMidi = -1;
+    for (std::size_t i = 0; i < map.midi.size(); ++i) {
+        auto& b = map.midi[i];
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::Text("MIDI %s ch %d #%d%s -> %s%s%s", control::midiBindKindName(b.kind), b.channel, b.number,
+                    b.toggle ? " toggle" : "", b.target.signal.empty() ? "" : ("control." + b.target.signal).c_str(),
+                    (!b.target.signal.empty() && !b.target.parameter.empty()) ? " + " : "",
+                    b.target.parameter.c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("x")) {
+            removeMidi = static_cast<int>(i);
+        }
+        ImGui::PopID();
+    }
+    if (removeMidi >= 0) {
+        map.midi.erase(map.midi.begin() + removeMidi);
+    }
+    int removeOsc = -1;
+    for (std::size_t i = 0; i < map.osc.size(); ++i) {
+        auto& b = map.osc[i];
+        ImGui::PushID(1000 + static_cast<int>(i));
+        ImGui::Text("OSC %s [%d]%s -> %s%s%s", b.address.c_str(), b.argIndex, b.event ? " event" : "",
+                    b.target.signal.empty() ? "" : ("control." + b.target.signal).c_str(),
+                    (!b.target.signal.empty() && !b.target.parameter.empty()) ? " + " : "", b.target.parameter.c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("x")) {
+            removeOsc = static_cast<int>(i);
+        }
+        ImGui::PopID();
+    }
+    if (removeOsc >= 0) {
+        map.osc.erase(map.osc.begin() + removeOsc);
+    }
+    ImGui::TextDisabled("direct OSC: %s/param/<path> f, /signal/<ch> f, /pulse/<ch>, /preset/recall s, /transport/play",
+                        map.oscPrefix.c_str());
 }
 
 } // namespace avgen::ui

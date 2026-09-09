@@ -692,6 +692,139 @@ std::vector<std::string> TimelineSource::outputs() const {
 }
 
 // ============================================================================================
+// ControlSource
+// ============================================================================================
+
+ControlSource::ControlSource(std::string name)
+    : Source(std::move(name)) {}
+
+void ControlSource::attach(SignalBus& bus, ParameterSet& /*params*/) {
+    outputs_.resize(channels_.size(), kInvalidSignal);
+    for (std::size_t i = 0; i < channels_.size(); ++i) {
+        outputs_[i] = bus.declare("control." + channels_[i], 0.0f, 1.0f, events_[i]);
+    }
+    needsAttach_ = false;
+}
+
+void ControlSource::detach(ParameterSet& /*params*/) {}
+
+void ControlSource::update(SignalBus& bus, const SourceContext& /*context*/) {
+    const std::size_t count = std::min(outputs_.size(), channels_.size());
+    for (std::size_t i = 0; i < count; ++i) {
+        if (outputs_[i] == kInvalidSignal) {
+            continue;
+        }
+        if (events_[i]) {
+            const bool fired = pending_[i] >= 0.0f;
+            bus.setEvent(outputs_[i], fired, fired ? pending_[i] : 0.0f);
+            pending_[i] = -1.0f;
+        } else {
+            bus.set(outputs_[i], values_[i]);
+        }
+    }
+}
+
+void ControlSource::reset() {
+    std::fill(pending_.begin(), pending_.end(), -1.0f);
+}
+
+bool ControlSource::addChannel(const std::string& channel, bool isEvent) {
+    for (std::size_t i = 0; i < channels_.size(); ++i) {
+        if (channels_[i] == channel) {
+            return false;
+        }
+    }
+    channels_.push_back(channel);
+    events_.push_back(isEvent);
+    values_.push_back(0.0f);
+    pending_.push_back(-1.0f);
+    outputs_.push_back(kInvalidSignal);
+    needsAttach_ = true;
+    return true;
+}
+
+bool ControlSource::hasChannel(const std::string& channel) const {
+    return std::find(channels_.begin(), channels_.end(), channel) != channels_.end();
+}
+
+bool ControlSource::isEventChannel(const std::string& channel) const {
+    for (std::size_t i = 0; i < channels_.size(); ++i) {
+        if (channels_[i] == channel) {
+            return events_[i];
+        }
+    }
+    return false;
+}
+
+void ControlSource::set(const std::string& channel, float value) {
+    addChannel(channel, false);
+    for (std::size_t i = 0; i < channels_.size(); ++i) {
+        if (channels_[i] == channel) {
+            values_[i] = std::clamp(value, 0.0f, 1.0f);
+            return;
+        }
+    }
+}
+
+void ControlSource::pulse(const std::string& channel, float strength) {
+    addChannel(channel, true);
+    for (std::size_t i = 0; i < channels_.size(); ++i) {
+        if (channels_[i] == channel) {
+            pending_[i] = std::clamp(strength, 0.0f, 1.0f);
+            values_[i] = pending_[i];
+            return;
+        }
+    }
+}
+
+float ControlSource::value(const std::string& channel) const {
+    for (std::size_t i = 0; i < channels_.size(); ++i) {
+        if (channels_[i] == channel) {
+            return values_[i];
+        }
+    }
+    return 0.0f;
+}
+
+nlohmann::json ControlSource::settingsToJson() const {
+    nlohmann::json channels = nlohmann::json::array();
+    for (std::size_t i = 0; i < channels_.size(); ++i) {
+        channels.push_back({{"name", channels_[i]}, {"event", static_cast<bool>(events_[i])}});
+    }
+    return nlohmann::json{{"channels", std::move(channels)}};
+}
+
+Result<void> ControlSource::settingsFromJson(const nlohmann::json& j) {
+    if (!j.is_object()) {
+        return fail("control source settings must be an object");
+    }
+    if (const auto it = j.find("channels"); it != j.end()) {
+        if (!it->is_array()) {
+            return fail("control source 'channels' must be an array");
+        }
+        for (const auto& entry : *it) {
+            if (entry.is_string()) {
+                addChannel(entry.get<std::string>(), false);
+            } else if (entry.is_object() && entry.contains("name") && entry["name"].is_string()) {
+                addChannel(entry["name"].get<std::string>(), entry.value("event", false));
+            } else {
+                return fail("control source channel entries must be strings or {name, event}");
+            }
+        }
+    }
+    return {};
+}
+
+std::vector<std::string> ControlSource::outputs() const {
+    std::vector<std::string> names;
+    names.reserve(channels_.size());
+    for (const auto& c : channels_) {
+        names.push_back("control." + c);
+    }
+    return names;
+}
+
+// ============================================================================================
 // MacroSource
 // ============================================================================================
 
@@ -970,6 +1103,9 @@ std::unique_ptr<Source> SourceRack::create(const std::string& kind, const std::s
     }
     if (kind == "macro") {
         return std::make_unique<MacroSource>(name);
+    }
+    if (kind == "control") {
+        return std::make_unique<ControlSource>(name);
     }
     return nullptr;
 }

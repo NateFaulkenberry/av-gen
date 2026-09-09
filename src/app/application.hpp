@@ -60,6 +60,11 @@ struct AppOptions {
     std::optional<std::string> codec;
     std::optional<int> quality;
     std::optional<std::uint32_t> renderWidth, renderHeight;
+    // Live control (1.1): --input [device], --osc-port <n>, --list-audio-devices, --list-midi
+    std::optional<std::string> input;
+    std::optional<int> oscPort;
+    bool listAudioDevices = false;
+    bool listMidi = false;
     std::uint32_t width = 1440;
     std::uint32_t height = 900;
     log::Level logLevel = log::Level::Info;

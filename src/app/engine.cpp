@@ -19,6 +19,7 @@
 namespace avgen::app {
 
 Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
+    ensureControlSource();
     audioSignals_ = signals::AudioSignals::declare(bus_);
     timeSignals_.seconds = bus_.declare("time.seconds", 0.0f, 3600.0f);
     timeSignals_.progress = bus_.declare("time.progress");
@@ -36,11 +37,36 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     }
 }
 
+void Engine::ensureControlSource() {
+    auto* existing = sources_.find("control", "control");
+    if (existing == nullptr) {
+        existing = &sources_.add(std::make_unique<signals::ControlSource>("control"));
+    }
+    auto* control = dynamic_cast<signals::ControlSource*>(existing);
+    for (const auto& channel : controlHub_.map().channels()) {
+        control->addChannel(channel.name, channel.event);
+    }
+}
+
+signals::ControlSource& Engine::controlSource() {
+    ensureControlSource();
+    return *dynamic_cast<signals::ControlSource*>(sources_.find("control", "control"));
+}
+
 void Engine::installController(std::unique_ptr<scene::SceneController> controller) {
     controller_ = std::move(controller);
     // Scene swaps clear the parameter set, so sources, post settings and shader layers must
     // re-register. Post parameters keep their current base values (post_ holds them).
+    ensureControlSource();
     sources_.attach(bus_, params_);
+    if (params_.find("audio/inputGain") == nullptr) {
+        inputGain_ = &params_.add(params::ParamDesc<float>{.path = "audio/inputGain",
+                                                            .defaultValue = 1.0f,
+                                                            .hardMin = 0.0f,
+                                                            .hardMax = 8.0f,
+                                                            .softMin = 0.0f,
+                                                            .softMax = 4.0f});
+    }
     if (params_.find("post/bloom/intensity") == nullptr) {
         scene::PostSettings keep = post_;
         postParams_ = scene::registerPostParameters(params_, keep);
@@ -76,6 +102,9 @@ void Engine::addDefaultPostRoutes() {
 }
 
 void Engine::rebind() {
+    if (controlSource().needsAttach()) {
+        sources_.attach(bus_, params_); // new control channels must exist on the bus first
+    }
     if (auto r = modulator_.bind(bus_, params_); !r) {
         log::warn("modulation bind: {}", r.error().message);
     }
@@ -244,6 +273,7 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
         doc["timeline"] = timeline_.toJson();
     }
     doc["render"] = render_.toJson();
+    doc["control"] = controlHub_.map().toJson();
     nlohmann::json assets = nlohmann::json::object();
     if (!audioPath_.empty()) {
         assets["audio"] = relativeTo(audioPath_, dir);
@@ -383,6 +413,16 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     if (auto r = params::loadProject(doc, params_, modulator_, &sources_, &presets_); !r) {
         return r;
     }
+    if (doc.contains("control")) {
+        auto map = control::ControlMap::fromJson(doc["control"]);
+        if (!map) {
+            return std::unexpected(map.error());
+        }
+        controlHub_.setMap(std::move(*map));
+    } else {
+        controlHub_.setMap(control::ControlMap{});
+    }
+    ensureControlSource();
     sources_.attach(bus_, params_);
     if (doc.contains("shaders")) {
         if (auto r = shaderLayers_.fromJson(doc["shaders"]); !r) {
@@ -439,6 +479,9 @@ void Engine::newProject() {
     }
     post_ = scene::PostSettings{};
     render_ = RenderSettings{};
+    controlHub_.setMap(control::ControlMap{});
+    ensureControlSource();
+    sources_.attach(bus_, params_);
     modulator_.masterGain = 1.0f;
     projectPath_.clear();
     projectWarnings_.clear();
@@ -912,6 +955,9 @@ void Engine::seekSeconds(double seconds) {
 bool Engine::isPlaying() const { return player_ && player_->isPlaying(); }
 
 double Engine::positionSeconds() const {
+    if (input_) {
+        return input_->sampleRate() > 0 ? static_cast<double>(input_->framesCaptured()) / input_->sampleRate() : 0.0;
+    }
     if (player_) {
         return player_->positionSeconds();
     }
@@ -927,6 +973,42 @@ void Engine::setVolume(float volume) {
 }
 
 float Engine::volume() const { return player_ ? player_->volume() : 1.0f; }
+
+Result<void> Engine::useAudioInput(const std::string& deviceName) {
+    if (mode_ != EngineMode::Live) {
+        return fail("live audio input needs the live engine");
+    }
+    auto input = std::make_unique<audio::AudioInput>();
+    if (auto r = input->open(deviceName); !r) {
+        return r;
+    }
+    runner_.reset();
+    if (player_) {
+        player_->pause();
+    }
+    analyzerConfig_.sampleRate = input->sampleRate();
+    runner_ = std::make_unique<analysis::AnalysisRunner>(analyzerConfig_, input->analysisStream());
+    runner_->start();
+    input_ = std::move(input);
+    audioFile_.reset();
+    audioPath_.clear();
+    hasFrame_ = false;
+    beatClockPhase_ = 0.0;
+    beatClockCount_ = 0;
+    lastAnalysisBeatCount_ = 0;
+    log::info("live audio input '{}' at {} Hz", input_->deviceName(), input_->sampleRate());
+    return {};
+}
+
+void Engine::stopAudioInput() {
+    if (!input_) {
+        return;
+    }
+    runner_.reset();
+    input_.reset();
+    hasFrame_ = false;
+    audioSignals_.publishSilence(bus_);
+}
 
 FrameTime Engine::tick(FrameClock& clock) {
     FrameTime time = clock.tick();
@@ -1080,6 +1162,14 @@ void Engine::update(const FrameTime& time) {
     updateTimeSignals(time, newFrame);
     updateTimelineClock(time);
     applyCues();
+    controlHub_.update(*this);
+    if (controlSource().needsAttach()) {
+        sources_.attach(bus_, params_); // new control channels: declare and rebind routes
+        rebind();
+    }
+    if (input_ && inputGain_ != nullptr) {
+        input_->setGain(inputGain_->value());
+    }
     sources_.update(bus_, sourceContext_);
     params_.resetFinals();
     timeline_.apply(timelineClock_); // automation: the first modulation layer (ADR-018)

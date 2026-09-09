@@ -57,6 +57,8 @@ public:
     std::function<void()> onEnqueueRender;
     std::function<void()> onRunQueue;
     std::function<void()> onChooseRenderOutput;
+    std::function<void(const std::string&)> onUseAudioInput; // "" = default device
+    std::function<void()> onStopAudioInput;
     std::function<app::RenderProgress()> renderProgress; // empty when no job is running
     std::size_t queuedRenders = 0;
     std::string videoBackends; // describeVideoBackends()
@@ -81,6 +83,7 @@ private:
     void drawSceneTab(app::Engine& engine);
     void drawTimelineTab(app::Engine& engine);
     void drawRender(app::Engine& engine);
+    void drawControlTab(app::Engine& engine);
 
     bool showDemo_ = false;
     bool showParameters_ = true;
@@ -100,6 +103,10 @@ private:
     int cuePreset_ = 0;
     float cueMorph_ = 0.5f;
     char cueName_[64] = "cue";
+    char learnSignal_[64] = "fader1";
+    int learnTarget_ = 0;
+    bool learnAsEvent_ = false;
+    int inputDevice_ = 0;
     int morphA_ = 0;
     int morphB_ = 0;
     float morphT_ = 0.0f;

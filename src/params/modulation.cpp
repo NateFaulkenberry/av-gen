@@ -50,8 +50,10 @@ void Modulator::clearRoutes() {
 Result<void> Modulator::bind(const signals::SignalBus& bus, ParameterSet& params) {
     std::string problems;
     std::size_t failed = 0;
+    // Unresolved routes keep their `enabled` flag (the user's intent) but no ids, so evaluate()
+    // skips them until a later bind() resolves them (scene swaps, control channels that appear
+    // when the first message arrives).
     auto reject = [&](ModRoute& route, std::size_t index, std::string reason) {
-        route.enabled = false;
         route.sourceId = signals::kInvalidSignal;
         route.targetParam = nullptr;
         ++failed;
@@ -59,7 +61,7 @@ Result<void> Modulator::bind(const signals::SignalBus& bus, ParameterSet& params
             problems += "; ";
         }
         problems += fmt::format("route {} ({} -> {}): {}", index, route.source, route.target, reason);
-        log::warn("modulation route {} ({} -> {}) disabled: {}", index, route.source, route.target, reason);
+        log::warn("modulation route {} ({} -> {}) unresolved: {}", index, route.source, route.target, reason);
     };
 
     for (std::size_t i = 0; i < routes_.size(); ++i) {

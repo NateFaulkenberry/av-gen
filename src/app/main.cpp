@@ -1,4 +1,6 @@
 #include "app/application.hpp"
+#include "audio/audio_input.hpp"
+#include "control/midi.hpp"
 #include "core/log.hpp"
 
 #include <cstdio>
@@ -12,6 +14,21 @@ int main(int argc, char** argv) {
     }
     if (options->showHelp) {
         std::printf("%s", avgen::app::usageText().c_str());
+        return 0;
+    }
+    if (options->listAudioDevices || options->listMidi) {
+        if (options->listAudioDevices) {
+            std::printf("audio capture devices:\n");
+            for (const auto& d : avgen::audio::listCaptureDevices()) {
+                std::printf("  %s%s\n", d.name.c_str(), d.isDefault ? " (default)" : "");
+            }
+        }
+        if (options->listMidi) {
+            std::printf("MIDI inputs%s:\n", avgen::control::hasMidiBackend() ? "" : " (no backend on this platform)");
+            for (const auto& d : avgen::control::listMidiInputs()) {
+                std::printf("  %s%s\n", d.name.c_str(), d.virtualSource ? " (virtual)" : "");
+            }
+        }
         return 0;
     }
     avgen::log::init(options->logLevel);

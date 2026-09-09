@@ -6,7 +6,9 @@
 // runs on a thread) and Offline (fixed-step clock, analysis precomputed and indexed by time).
 
 #include "analysis/analysis_runner.hpp"
+#include "app/control_hub.hpp"
 #include "app/render_settings.hpp"
+#include "audio/audio_input.hpp"
 #include "analysis/analysis_track.hpp"
 #include "analysis/analyzer.hpp"
 #include "audio/audio_file.hpp"
@@ -123,6 +125,19 @@ public:
     [[nodiscard]] bool recallPreset(const std::string& name);
     void morphPresets(const std::string& a, const std::string& b, float t);
 
+    // ---- live control (milestone 1.1, ADR-021) ----
+    [[nodiscard]] ControlHub& control() { return controlHub_; }
+    [[nodiscard]] const ControlHub& control() const { return controlHub_; }
+    // The always-present "control" source (control.<channel> signals).
+    [[nodiscard]] signals::ControlSource& controlSource();
+    // Live audio input instead of a file: opens the capture device (substring match, "" =
+    // default) and runs the analysis on it. Live mode only. stopAudioInput() returns to the
+    // player (silent until a file is loaded).
+    [[nodiscard]] Result<void> useAudioInput(const std::string& deviceName = "");
+    void stopAudioInput();
+    [[nodiscard]] bool hasLiveInput() const { return input_ != nullptr; }
+    [[nodiscard]] audio::AudioInput* audioInput() { return input_.get(); }
+
     // ---- offline render settings (milestone 1.0), saved in the project under "render" ----
     [[nodiscard]] RenderSettings& renderSettings() { return render_; }
     [[nodiscard]] const RenderSettings& renderSettings() const { return render_; }
@@ -206,6 +221,7 @@ private:
     void updateTimelineClock(const FrameTime& time);
     void applyCues();
     void detachSceneParameters(); // before params_.clear(): composition, shader layers, timeline
+    void ensureControlSource();   // the "control" source exists in the rack and its channels are declared
 
     EngineMode mode_;
     params::ParameterSet params_;
@@ -216,6 +232,9 @@ private:
     params::PresetBank presets_;
     params::Timeline timeline_;
     RenderSettings render_;
+    ControlHub controlHub_;
+    std::unique_ptr<audio::AudioInput> input_;
+    params::Parameter<float>* inputGain_ = nullptr;
     params::TimelineClock timelineClock_;
     params::Timeline::CueState cueState_;
     params::Preset cueFrom_;      // base values captured when the current cue started (morphs)

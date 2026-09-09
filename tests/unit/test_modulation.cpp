@@ -70,7 +70,7 @@ TEST_CASE("bind resolves signal ids and parameters", "[modulation]") {
     CHECK(f.modulator.routes()[0].enabled);
 }
 
-TEST_CASE("bind reports unknown sources and targets and disables those routes", "[modulation]") {
+TEST_CASE("bind reports unknown sources and targets and skips those routes", "[modulation]") {
     Fixture f;
     f.modulator.addRoute(f.route("audio.nope", "orb/scale", ModOp::Add));
     f.modulator.addRoute(f.route("audio.bass", "orb/missing", ModOp::Add));
@@ -79,8 +79,12 @@ TEST_CASE("bind reports unknown sources and targets and disables those routes", 
     REQUIRE_FALSE(result.has_value());
     CHECK_THAT(result.error().message, ContainsSubstring("audio.nope"));
     CHECK_THAT(result.error().message, ContainsSubstring("orb/missing"));
-    CHECK_FALSE(f.modulator.routes()[0].enabled);
-    CHECK_FALSE(f.modulator.routes()[1].enabled);
+    // Unresolved routes keep the user's enabled flag but have no ids, so they do not evaluate
+    // until a later bind() resolves them (1.1: control channels can appear after the route).
+    CHECK(f.modulator.routes()[0].enabled);
+    CHECK(f.modulator.routes()[0].sourceId == signals::kInvalidSignal);
+    CHECK(f.modulator.routes()[1].enabled);
+    CHECK(f.modulator.routes()[1].targetParam == nullptr);
     CHECK(f.modulator.routes()[2].enabled);
     CHECK(f.modulator.bound()); // resolvable routes still evaluate
 
@@ -95,7 +99,8 @@ TEST_CASE("bind rejects a component out of range", "[modulation]") {
     const auto result = f.modulator.bind(f.bus, f.params);
     REQUIRE_FALSE(result.has_value());
     CHECK_THAT(result.error().message, ContainsSubstring("orb/color"));
-    CHECK_FALSE(f.modulator.routes()[0].enabled);
+    CHECK(f.modulator.routes()[0].enabled);
+    CHECK(f.modulator.routes()[0].targetParam == nullptr);
 }
 
 TEST_CASE("Each op combines with the base value", "[modulation]") {

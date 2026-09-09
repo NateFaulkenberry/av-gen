@@ -40,7 +40,8 @@ public:
     [[nodiscard]] std::vector<ModRoute>& routes() { return routes_; }
     [[nodiscard]] const std::vector<ModRoute>& routes() const { return routes_; }
 
-    // Resolves source/target names. Unresolvable routes are disabled and reported.
+    // Resolves source/target names. Unresolvable routes are reported and skipped by evaluate()
+    // until a later bind() resolves them; their `enabled` flag is left alone.
     [[nodiscard]] Result<void> bind(const signals::SignalBus& bus, ParameterSet& params);
     [[nodiscard]] bool bound() const { return bound_; }
 
