@@ -845,6 +845,15 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
                         static_cast<unsigned long long>(pr.lodCounts[3]), pr.cullMs);
         }
     }
+    if (stats.sdf.objects > 0) {
+        ImGui::Text("sdf: %u objects (%u raymarched, %u meshed)  %u packed nodes  %u mesh tris  pass %.3f ms",
+                    stats.sdf.objects, stats.sdf.raymarchObjects, stats.sdf.meshObjects, stats.sdf.packedNodes,
+                    stats.sdf.meshTriangles, stats.sdf.raymarchMs);
+    }
+    if (stats.particles.systems > 0) {
+        ImGui::Text("particles: %u systems  %u capacity  %u emitted  simulate %.3f ms", stats.particles.systems,
+                    stats.particles.capacity, stats.particles.emittedThisFrame, stats.particles.simulateMs);
+    }
     ImGui::TextDisabled("%s (%s)", stats.adapter.c_str(), stats.backend.c_str());
 }
 

@@ -11,6 +11,7 @@
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "rendering/sdf_renderer.hpp"
 #include "ui/graph_editor.hpp"
 #include "ui/world_panel.hpp"
 
@@ -33,6 +34,8 @@ struct FrameStats {
     std::string adapter;
     std::string backend;
     rendering::ProceduralStats procedural;
+    rendering::SdfStats sdf;
+    rendering::ParticleStats particles;
 };
 
 class ControlPanel {
