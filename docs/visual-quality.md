@@ -76,7 +76,48 @@ A number here is never a score. "Mean rose from 0.09 to 0.21 across the arc with
 is a useful sentence about a shot whose light is supposed to grow; "mean 0.21" on its own says
 nothing about whether the frame is worth looking at. That judgement comes from opening the frame.
 
-## 6. Recorded state
+## 6. Where the four scenes stand
+
+All four have been re-authored as shots. Each has its own note — `docs/shot-hyperspace.md`,
+`docs/shot-infinite-temple.md`, `docs/shot-living-machine.md`,
+`docs/shot-metallic-reassembly.md` — recording the composition, the lighting and what still does
+not work. A representative frame from each:
+
+| Scene | mean | RMS contrast | in shadow | clipped |
+|---|---|---|---|---|
+| Hyperspace, t=28 s | 0.087 | 0.106 | 64% | 0.00% |
+| The Infinite Temple, t=56 s | 0.122 | 0.140 | 54% | 0.00% |
+| The Living Machine, t=20 s | 0.098 | 0.154 | 64% | 0.03% |
+| Metallic Reassembly, t=30 s | 0.136 | 0.164 | 47% | 0.03% |
+
+Nothing clips, everything holds a shadow, and each carries an arc rather than a single state. By
+eye, The Living Machine is the closest to reading as a photographed place; Hyperspace is the most
+legible but still the most graphic; the Temple's architecture works and its far layer does not;
+Reassembly's mechanic finally runs and its debris is still uniform.
+
+## 7. Silent no-ops: a recurring family
+
+Five features in this codebase were parsed, validated, hashed, serialised — and read by nothing.
+Every one of them let a scene ask for something and silently get something else, and each cost
+hours to find because the authoring looked correct.
+
+| Feature | What happened |
+|---|---|
+| `sourceTransform` | Applied on the CPU, ignored by the vertex shader. Gate rings kept the generator's default axis. |
+| `lightRig` at a scene's top level | Only read inside `environment`. Three examples ran on the default key light. |
+| `PunctualLight::volumetricStrength` | Packed into the GPU light and read by no shader; the fog was lit by light 0 at full strength. |
+| `targetScreenPosition` / `framingStrength` | Parsed and never read. Three scenes were authored against them. |
+| `screenVelocity()`'s input | Fed framebuffer pixels instead of clip space, so the velocity target held hundreds of screens per frame. |
+
+All five are fixed with regression tests. **The depth `layers` half of the composition block is
+still inert and still advertised** — `layerAt()` has no callers outside a unit test. Two independent
+agents reported it as the single most misleading thing in the scene format.
+
+The lesson for the next feature: a field that a scene file can set, that round-trips through JSON
+and hashing, and that no test asserts an *observable* consequence for, is a field that probably
+does nothing. Assert the consequence, not the round trip.
+
+## 8. Recorded state
 
 Baselines before the phase began are in the session's scratch folder, and the observations that
 started this work were: Hyperspace blew out to white at its core; the Infinite Temple read as a
