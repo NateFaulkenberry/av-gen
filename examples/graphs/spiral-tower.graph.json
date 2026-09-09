@@ -1,0 +1,60 @@
+{
+  "format": "avgen-graph",
+  "version": 1,
+  "name": "Spiral Tower",
+  "category": "structures",
+  "description": "Boxes climbing a tapering spiral, twisted by a local deformer and lit by an emissive material.",
+  "nodes": [
+    {
+      "name": "block",
+      "type": "generators/primitive",
+      "position": [-360.0, -60.0],
+      "params": {"kind": "box", "size": [1.6, 0.5, 1.0]},
+      "subgraph": "",
+      "enabled": true
+    },
+    {
+      "name": "spiral",
+      "type": "distributions/spiral",
+      "position": [-360.0, 100.0],
+      "params": {"count": 96, "radius": 7.0, "radiusGrowth": -4.0, "turns": 4.0, "spiralHeight": 22.0, "plane": "xz", "orientation": "outward"},
+      "subgraph": "",
+      "enabled": true
+    },
+    {
+      "name": "twist",
+      "type": "deformers/twist",
+      "position": [-360.0, 280.0],
+      "params": {"amount": 0.35, "axis": [0.0, 1.0, 0.0]},
+      "subgraph": "",
+      "enabled": true
+    },
+    {
+      "name": "glow",
+      "type": "materials/material",
+      "position": [-360.0, 420.0],
+      "params": {"baseColor": [0.15, 0.18, 0.3, 1.0], "emissiveColor": [0.4, 0.7, 1.0, 1.0], "emissiveIntensity": 1.5, "roughness": 0.3},
+      "subgraph": "",
+      "enabled": true
+    },
+    {
+      "name": "tower",
+      "type": "output/procedural",
+      "position": [40.0, 120.0],
+      "params": {"name": "tower", "seed": 77, "randomRotation": [0.0, 0.15, 0.0]},
+      "subgraph": "",
+      "enabled": true
+    }
+  ],
+  "links": [
+    {"from": "block.mesh", "to": "tower.source"},
+    {"from": "spiral.spec", "to": "tower.spec"},
+    {"from": "twist.deformer", "to": "tower.deformers"},
+    {"from": "glow.material", "to": "tower.material"}
+  ],
+  "exposed": [
+    {"name": "count", "node": "spiral", "param": "count"},
+    {"name": "radius", "node": "spiral", "param": "radius"},
+    {"name": "turns", "node": "spiral", "param": "turns"}
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "format": "avgen-graph",
+  "version": 1,
+  "name": "Ring Stack",
+  "category": "structures",
+  "description": "A radial ring duplicated upwards on the point cloud, emitted as a grammar of placements (no Distribution covers it).",
+  "nodes": [
+    {
+      "name": "slab",
+      "type": "generators/primitive",
+      "position": [-520.0, -60.0],
+      "params": {"kind": "box", "size": [1.2, 0.4, 0.8]},
+      "subgraph": "",
+      "enabled": true
+    },
+    {
+      "name": "ring",
+      "type": "distributions/radial",
+      "position": [-520.0, 100.0],
+      "params": {"count": 12, "radius": 5.0, "plane": "xz", "orientation": "outward"},
+      "subgraph": "",
+      "enabled": true
+    },
+    {
+      "name": "stack",
+      "type": "points/duplicate",
+      "position": [-260.0, 100.0],
+      "params": {"copies": 5, "offset": [0.0, 1.4, 0.0], "axis": [0.0, 1.0, 0.0], "angle": 0.26, "factor": [0.92, 1.0, 0.92]},
+      "subgraph": "",
+      "enabled": true
+    },
+    {
+      "name": "shell",
+      "type": "materials/material",
+      "position": [-520.0, 260.0],
+      "params": {"baseColor": [0.9, 0.45, 0.2, 1.0], "roughness": 0.45},
+      "subgraph": "",
+      "enabled": true
+    },
+    {
+      "name": "rings",
+      "type": "output/procedural",
+      "position": [40.0, 100.0],
+      "params": {"name": "rings", "seed": 9},
+      "subgraph": "",
+      "enabled": true
+    }
+  ],
+  "links": [
+    {"from": "slab.mesh", "to": "rings.source"},
+    {"from": "ring.points", "to": "stack.points"},
+    {"from": "stack.points", "to": "rings.points"},
+    {"from": "shell.material", "to": "rings.material"}
+  ],
+  "exposed": [
+    {"name": "count", "node": "ring", "param": "count"},
+    {"name": "radius", "node": "ring", "param": "radius"},
+    {"name": "copies", "node": "stack", "param": "copies"}
+  ]
+}
