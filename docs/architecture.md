@@ -140,6 +140,55 @@ plain WebGPU, which the particle research (§11) requires.
   SdfTree ──▶ sdf.wgsl (sphere tracing, writes depth) | meshSdf (surface nets → MeshData)
 ```
 
+### Attribute flow
+
+```
+  Distribution / grammar / spline  --->  PointCloud (structure-of-arrays columns)
+      placement(i), variation(i)         position rotation scale id seed density colour
+                                         emissive velocity normal bounds index + user columns
+                                               |
+                     point operators ----------+  transform, noise, randomise, scatter,
+                     (structural, CPU)         |  filters (density, attribute, distance,
+                                               |  probability, bounds), sort, duplicate, sample
+                                               v
+                     projectInstances  --->  InstanceRecord (96 bytes)  ---> GPU
+                                               |
+                     effectors (per frame, points.wgsl) -- read fields --+
+                                               |                         |
+                     cull + LOD (cull.wgsl) ---+                         |
+                                               v                         |
+                     vertex deformers (procedural.wgsl) ------------------+
+                                               v                         |
+                     material program (material.wgsl) -------------------+
+```
+
+### Field evaluation
+
+One field is sampled by five consumers, all from the same 320-byte record:
+
+```
+   FieldSpec (data)  --packField-->  FieldBlock (uniform, 16 slots)
+        |                                   |
+   spatial::sampleScalar/Vector/Color       +--> effectors        (points.wgsl)
+   (CPU: tools, tests, offline)             +--> vertex deformers (procedural.wgsl)
+                                            +--> particle forces  (particles.wgsl)
+                                            +--> material inputs  (material.wgsl)
+                                            +--> SDF displacement (sdf.wgsl)
+```
+
+### World generation and the graph
+
+```
+   graph nodes --evaluate (dirty only)--> GraphOutput --install--> composition nodes
+   (typed pins)                           procedurals, fields,     + parameters
+                                          splines, sdfs,           + routes
+                                          particles, materials,
+                                          routes
+                                                    |
+                                                    v
+                                             flat Scene data ---> renderer
+```
+
 Rules: structure is built on the CPU only when a structural hash changes (`rebuild()`); motion is
 per-frame uniforms and GPU passes. Every struct member that is not structural is a registered
 parameter (`field/<node>/…`, `procedural/<node>/effector/<n>/…`), so audio, timeline, presets,
@@ -148,6 +197,24 @@ scenes prefix field names and every reference to them (`<node>_<field>`), so a s
 self-contained. CPU and GPU implement the same maths (`core/noise` ↔ `noise.wgsl`,
 `spatial::sample*` ↔ `fields.wgsl`, `applyEffectorsToRecords` ↔ `points.wgsl`) and the render
 tests compare them.
+
+### Audio to world
+
+```
+  audio.rms ------------> macro energy ------> field/pulse/amplitude
+  audio.bass -----------> architecture ------> procedural/columns/distribution/radius
+  audio.lowMid ---------> deformation -------> procedural/columns/deform/1/amount
+  audio.mid ------------> rotation ----------> field/swirl/strength
+  audio.treble ---------> emission ----------> procedural/*/emissiveFieldAmount
+  audio.spectralCentroid > palette ----------> materialVariation/hueShift
+  audio.spectralFlux ---> turbulence --------> field/churn/strength
+  audio.onset ----------> impulse -----------> field/pulse/waveOrigin, particle bursts
+  beat.pulse -----------> cyclic motion -----> effector strengths
+  beat count / macro threshold --------------> state transitions (preset morphs)
+```
+
+Every arrow is an ordinary modulation route with its own processing chain, so the same map drives
+the live window, an offline render and a remote OSC controller identically.
 
 ## 6. Threading
 
