@@ -161,3 +161,71 @@ TEST_CASE("World macros expand to routes and round-trip with states through proj
     CHECK(generated == 0);
     fs::remove_all(dir);
 }
+
+TEST_CASE("A director installs artistic knobs and a look changes only the look", "[integration][director]") {
+    const auto dir = fs::temp_directory_path() / "avgen_director_engine";
+    fs::create_directories(dir);
+    app::Engine engine(app::EngineMode::Offline);
+    FixedStepClock clock(60.0);
+    engine.update(engine.tick(clock));
+
+    app::WorldDirector director;
+    director.name = "orb";
+    app::DirectorMapping drama;
+    drama.knob = app::DirectorKnob::Drama;
+    drama.defaultValue = 0.25f;
+    drama.targets.push_back({.path = "orb/scale", .min = 1.0f, .max = 3.0f});
+    app::DirectorMapping glow;
+    glow.knob = app::DirectorKnob::Glow;
+    glow.defaultValue = 0.5f;
+    glow.targets.push_back({.path = "orb/emissive", .min = 0.0f, .max = 4.0f});
+    director.mappings = {drama, glow};
+    engine.setDirector(director);
+
+    // The knobs are ordinary macros, so they exist as parameters and as routes.
+    REQUIRE(engine.params().find("macros/drama") != nullptr);
+    REQUIRE(engine.params().find("macros/glow") != nullptr);
+    std::size_t generated = 0;
+    for (const auto& r : engine.modulator().routes()) {
+        generated += (app::WorldMacro::isGenerated(r, "drama") || app::WorldMacro::isGenerated(r, "glow")) ? 1 : 0;
+    }
+    CHECK(generated == 2);
+
+    engine.params().find("macros/drama")->setBaseComponent(0, 1.0f);
+    engine.update(engine.tick(clock));
+    engine.update(engine.tick(clock));
+    CHECK(engine.params().find("orb/scale")->finalComponent(0) > 2.5f);
+
+    // Replacing the director removes the knobs it owned.
+    app::WorldDirector other;
+    other.name = "other";
+    app::DirectorMapping warmth;
+    warmth.knob = app::DirectorKnob::Warmth;
+    warmth.targets.push_back({.path = "orb/emissive", .min = 0.0f, .max = 1.0f});
+    other.mappings = {warmth};
+    engine.setDirector(other);
+    CHECK(engine.params().find("macros/warmth") != nullptr);
+    CHECK(engine.params().find("macros/drama") == nullptr);
+
+    // Projects carry the director.
+    const auto project = dir / "directed.json";
+    REQUIRE(engine.saveProject(project).has_value());
+    app::Engine loaded(app::EngineMode::Offline);
+    REQUIRE(loaded.loadProject(project).has_value());
+    CHECK(loaded.director().mappings.size() == 1);
+    CHECK(loaded.director().mappings[0].knob == app::DirectorKnob::Warmth);
+    CHECK(loaded.params().find("macros/warmth") != nullptr);
+
+    // A look applies visual values only and reports what a world lacks.
+    app::LookPreset look;
+    look.name = "Test";
+    look.preset.name = "Test";
+    look.preset.values["post/bloom/intensity"] = {0.8f};
+    look.preset.values["scene/nonexistent"] = {1.0f};
+    engine.setLooks({look});
+    const app::LookApplyResult result = engine.applyLookByName("Test");
+    CHECK(result.applied >= 1);
+    CHECK(result.missing >= 1);
+    CHECK(engine.applyLookByName("nope").applied == 0);
+    fs::remove_all(dir);
+}

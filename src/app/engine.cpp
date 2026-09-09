@@ -227,6 +227,16 @@ void Engine::ensureMacroKnob(const std::string& knob, float defaultValue) {
 }
 
 void Engine::applyWorldMacros() {
+    // A director's knobs are world macros; installing them keeps a loaded project's director live.
+    for (WorldMacro& m : director_.macros()) {
+        bool known = false;
+        for (const WorldMacro& existing : worldMacros_) {
+            known = known || existing.name == m.name;
+        }
+        if (!known) {
+            worldMacros_.push_back(std::move(m));
+        }
+    }
     for (const WorldMacro& m : worldMacros_) {
         ensureMacroKnob(m.name, m.defaultValue);
         applyWorldMacro(m, modulator_);
@@ -250,6 +260,30 @@ void Engine::setWorldMacro(WorldMacro macro) {
     rebind();
 }
 
+void Engine::setDirector(WorldDirector director) {
+    clearDirector();
+    director_ = std::move(director);
+    for (WorldMacro& macro : director_.macros()) {
+        setWorldMacro(std::move(macro));
+    }
+}
+
+void Engine::clearDirector() {
+    for (const DirectorMapping& mapping : director_.mappings) {
+        removeWorldMacro(directorKnobName(mapping.knob));
+    }
+    director_ = WorldDirector{};
+}
+
+LookApplyResult Engine::applyLookByName(const std::string& name) {
+    for (const LookPreset& look : looks_) {
+        if (look.name == name) {
+            return applyLook(params_, look);
+        }
+    }
+    return LookApplyResult{};
+}
+
 bool Engine::removeWorldMacro(const std::string& name) {
     const auto it = std::remove_if(worldMacros_.begin(), worldMacros_.end(),
                                    [&](const WorldMacro& m) { return m.name == name; });
@@ -258,6 +292,13 @@ bool Engine::removeWorldMacro(const std::string& name) {
     }
     worldMacros_.erase(it, worldMacros_.end());
     removeWorldMacroRoutes(name, modulator_);
+    // The knob itself is a parameter on the macro source: remove it so a replaced director does
+    // not leave stale knobs behind.
+    if (auto* source = sources_.find("macro", "macros")) {
+        if (auto* macros = dynamic_cast<signals::MacroSource*>(source)) {
+            macros->removeKnob(name, params_);
+        }
+    }
     rebind();
     return true;
 }
@@ -471,6 +512,9 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
     }
     if (!states_.empty()) {
         doc["states"] = states_.toJson();
+    }
+    if (!director_.mappings.empty()) {
+        doc["director"] = director_.toJson();
     }
     if (!worldMacros_.empty()) {
         nlohmann::json macros = nlohmann::json::array();
@@ -706,6 +750,15 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             }
             worldMacros_.push_back(std::move(*m));
         }
+    }
+    if (doc.contains("director")) {
+        auto director = WorldDirector::fromJson(doc["director"]);
+        if (!director) {
+            return std::unexpected(director.error());
+        }
+        director_ = std::move(*director);
+    } else {
+        director_ = WorldDirector{};
     }
     applyWorldMacros();
     states_.reset(params_, presets_);

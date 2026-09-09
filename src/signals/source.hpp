@@ -280,6 +280,9 @@ public:
 
     // Adds a knob (default 0.5). Requires re-attach if called after attach().
     void addKnob(std::string knob, float defaultValue = 0.5f);
+    // Removes a knob and its parameter. Returns false when the knob is unknown. The caller
+    // re-attaches the rack so the remaining knobs keep their signals and parameters.
+    bool removeKnob(const std::string& knob, params::ParameterSet& params);
     [[nodiscard]] const std::vector<std::string>& knobs() const { return knobs_; }
 
 private:

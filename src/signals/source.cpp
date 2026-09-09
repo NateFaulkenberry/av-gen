@@ -874,6 +874,26 @@ void MacroSource::addKnob(std::string knob, float defaultValue) {
     }
 }
 
+bool MacroSource::removeKnob(const std::string& knob, params::ParameterSet& params) {
+    const auto it = std::find(knobs_.begin(), knobs_.end(), knob);
+    if (it == knobs_.end()) {
+        return false;
+    }
+    const auto index = static_cast<std::size_t>(std::distance(knobs_.begin(), it));
+    if (index < params_.size() && params_[index] != nullptr) {
+        removeParam(params, params_[index]);
+    }
+    knobs_.erase(it);
+    defaults_.erase(defaults_.begin() + static_cast<std::ptrdiff_t>(index));
+    if (index < params_.size()) {
+        params_.erase(params_.begin() + static_cast<std::ptrdiff_t>(index));
+    }
+    if (index < outputs_.size()) {
+        outputs_.erase(outputs_.begin() + static_cast<std::ptrdiff_t>(index));
+    }
+    return true;
+}
+
 json MacroSource::settingsToJson() const {
     json knobs = json::array();
     for (std::size_t i = 0; i < knobs_.size(); ++i) {
