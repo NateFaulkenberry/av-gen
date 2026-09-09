@@ -1,0 +1,51 @@
+{
+  "format": "avgen-graph",
+  "version": 1,
+  "name": "Radial Columns",
+  "category": "structures",
+  "description": "A ring of columns around the origin. Exposes count, radius and height, so it can be instantiated as a subgraph.",
+  "nodes": [
+    {
+      "name": "column",
+      "type": "generators/primitive",
+      "position": [-360.0, -60.0],
+      "params": {"kind": "cylinder", "radius": 0.4, "height": 6.0, "radialSegments": 16},
+      "subgraph": "",
+      "enabled": true
+    },
+    {
+      "name": "ring",
+      "type": "distributions/radial",
+      "position": [-360.0, 100.0],
+      "params": {"count": 16, "radius": 8.0, "plane": "xz", "orientation": "outward"},
+      "subgraph": "",
+      "enabled": true
+    },
+    {
+      "name": "stone",
+      "type": "materials/material",
+      "position": [-360.0, 260.0],
+      "params": {"baseColor": [0.62, 0.6, 0.66, 1.0], "roughness": 0.6, "metallic": 0.0},
+      "subgraph": "",
+      "enabled": true
+    },
+    {
+      "name": "columns",
+      "type": "output/procedural",
+      "position": [40.0, 60.0],
+      "params": {"name": "columns", "seed": 4242, "position": [0.0, 3.0, 0.0]},
+      "subgraph": "",
+      "enabled": true
+    }
+  ],
+  "links": [
+    {"from": "column.mesh", "to": "columns.source"},
+    {"from": "ring.spec", "to": "columns.spec"},
+    {"from": "stone.material", "to": "columns.material"}
+  ],
+  "exposed": [
+    {"name": "count", "node": "ring", "param": "count"},
+    {"name": "radius", "node": "ring", "param": "radius"},
+    {"name": "height", "node": "column", "param": "height"}
+  ]
+}
