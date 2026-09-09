@@ -165,6 +165,38 @@ Biome rules read a slope measured over about eight metres, not over one vertex. 
 mesh-scale slope puts a boundary on every ripple, and a hundred one-vertex boundaries across a ridge
 is a sawtooth rather than an ecotone.
 
+## Ecology
+
+A scatter layer (ADR-048) names an asset and says how densely it occurs in each biome:
+
+```json
+{ "name": "fungi", "asset": "../../assets/quaternius/glTF/Mushroom_Common.gltf",
+  "densities": { "marsh": 0.030, "forest": 0.008 },
+  "height": 0.28, "minScale": 0.6, "maxScale": 2.2,
+  "maxSlope": 0.22, "alignToGround": 0.35, "avoidWater": true,
+  "clusterScale": 9.0, "clustering": 0.85,
+  "tint": [0.52, 0.35, 0.82], "emissiveColor": [0.25, 0.06, 0.72], "emissiveIntensity": 5.5,
+  "seed": 38, "meshBudget": 240, "maxInstances": 6000 }
+```
+
+Densities are per square metre where that biome is at full weight, multiplied by the biome weights
+the ground colour is blended with -- so what grows somewhere and what the ground looks like there
+are the same decision. Naming a biome that does not exist is an error at load, not an empty forest.
+
+Three things worth knowing before authoring one:
+
+- **`height` is metres, not a multiplier.** Quaternius grass is 1.8 units tall and its trees are 7,
+  so a scale factor is a number about the file. The first pass put two-metre grass under
+  seven-metre trees.
+- **`clustering` uses a world-space field**, so two layers sharing a `clusterScale` clump in the
+  *same* places. That is what makes a fern and a mushroom look like they are growing together.
+- **`tint` and `emissiveColor` are how a library becomes this world.** The asset's textures stay;
+  these multiply and add. Bioluminescence is a layer saying its fungi are emissive.
+
+Each layer becomes one ordinary procedural object with `distribution.kind = "scatter"` -- placements
+supplied from outside, the way an imported mesh is a source supplied from outside. Everything
+downstream is the instancing, culling, LOD and material path that already existed.
+
 ## Looking at a world before it has triangles
 
 ```
@@ -223,3 +255,8 @@ frame; mesh bounds are now cached against `meshVersion`.
 - LOD is chosen by distance, not by screen-space error, so a `lodDistance` tuned for one focal
   length is wrong for another.
 - There is no water surface yet. A river reads as a dark notch until phase 4.
+- Nothing is placed relative to anything else: no undergrowth in a tree's shadow, no moss on the
+  boulder it is beside.
+- Quaternius meshes carry several materials each and `mergedAssetMesh` collapses an asset to one,
+  so a mushroom's cap and stem share a colour.
+- Emission is constant. Making it a living field is what the chromatic phase is for.

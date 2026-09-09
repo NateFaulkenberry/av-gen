@@ -4,8 +4,10 @@
 // meeting at a seam agree on where the ground is.
 
 #include "world/terrain.hpp"
+#include "scene/procedural.hpp"
 #include "scene/scene.hpp"
 #include "world/biome.hpp"
+#include "world/ecology.hpp"
 #include "world/world_map.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -604,4 +606,188 @@ TEST_CASE("the generated ground material is a valid program built from the palet
     CHECK(mentions(set.biomes.front().rockColor));
     // And an empty set produces an empty program rather than a broken one.
     CHECK(world::terrainMaterialProgram({}, "none").ops.empty());
+}
+
+// ---- ecology -----------------------------------------------------------------------------------
+
+namespace {
+
+world::ScatterLayer testLayer(std::string name, std::vector<world::BiomeDensity> densities) {
+    world::ScatterLayer l;
+    l.name = std::move(name);
+    l.asset = "not-loaded-by-these-tests.gltf";
+    l.densities = std::move(densities);
+    l.seed = 7;
+    return l;
+}
+
+} // namespace
+
+TEST_CASE("a scatter sits on the terrain and is a pure function of the world", "[unit][ecology]") {
+    const world::WorldMap map = world::defaultWorld();
+    world::ScatterLayer layer = testLayer("ferns", {{"forest", 0.01f}, {"marsh", 0.01f}});
+    const spatial::PointCloud a = world::scatter(map, layer);
+    const spatial::PointCloud b = world::scatter(map, layer);
+    REQUIRE(a.count() > 100);
+    REQUIRE(a.count() == b.count());
+    for (std::size_t i = 0; i < a.count(); ++i) {
+        CHECK(a.positions()[i] == b.positions()[i]);
+    }
+    // Every instance stands on the ground rather than near it.
+    for (std::size_t i = 0; i < a.count(); i += 17) {
+        const glm::vec3 p = a.positions()[i];
+        CHECK_THAT(p.y, WithinAbs(map.height({p.x, p.z}), 1e-3f));
+        CHECK(p.x >= map.min().x);
+        CHECK(p.x <= map.max().x);
+    }
+}
+
+TEST_CASE("density decides how much of a layer there is", "[unit][ecology]") {
+    const world::WorldMap map = world::defaultWorld();
+    const std::size_t sparse = world::scatter(map, testLayer("a", {{"forest", 0.002f}})).count();
+    const std::size_t dense = world::scatter(map, testLayer("a", {{"forest", 0.02f}})).count();
+    INFO("sparse " << sparse << " dense " << dense);
+    CHECK(sparse > 0);
+    CHECK(dense > sparse * 4);
+    // And a layer that asks for nothing gets nothing rather than a grid of nothings.
+    world::ScatterLayer none = testLayer("a", {{"forest", 0.0f}});
+    CHECK_FALSE(none.validate().has_value()); // every density zero is an authoring error, not silence
+}
+
+TEST_CASE("a scatter goes where its biomes are", "[unit][ecology]") {
+    // The point of reading the biome weights rather than having rules of its own: the ground and
+    // the thing standing on it cannot disagree.
+    const world::WorldMap map = world::defaultWorld();
+    const spatial::PointCloud marsh = world::scatter(map, testLayer("m", {{"marsh", 0.02f}}));
+    const spatial::PointCloud rim = world::scatter(map, testLayer("r", {{"rim", 0.02f}}));
+    REQUIRE(marsh.count() > 50);
+    REQUIRE(rim.count() > 20);
+    const auto meanMoisture = [&](const spatial::PointCloud& c) {
+        float total = 0.0f;
+        for (std::size_t i = 0; i < c.count(); ++i) {
+            const glm::vec3 p = c.positions()[i];
+            total += map.sample({p.x, p.z}, 0.5f).moisture;
+        }
+        return total / static_cast<float>(c.count());
+    };
+    const auto meanAltitude = [&](const spatial::PointCloud& c) {
+        float total = 0.0f;
+        for (std::size_t i = 0; i < c.count(); ++i) {
+            total += map.altitude01(c.positions()[i].y);
+        }
+        return total / static_cast<float>(c.count());
+    };
+    CHECK(meanMoisture(marsh) > meanMoisture(rim));
+    CHECK(meanAltitude(rim) > meanAltitude(marsh));
+}
+
+TEST_CASE("scatter filters keep things out of the water and off the cliffs", "[unit][ecology]") {
+    const world::WorldMap map = world::defaultWorld();
+    world::ScatterLayer layer = testLayer("f", {{"marsh", 0.05f}});
+    layer.avoidWater = true;
+    layer.shoreOffset = 0.4f;
+    layer.maxSlope = 0.12f;
+    const spatial::PointCloud cloud = world::scatter(map, layer);
+    REQUIRE(cloud.count() > 50);
+    for (std::size_t i = 0; i < cloud.count(); ++i) {
+        const glm::vec3 p = cloud.positions()[i];
+        const world::Sample s = map.sample({p.x, p.z}, 0.5f);
+        CHECK_FALSE(s.submerged);
+        CHECK(s.height >= s.waterSurface + layer.shoreOffset);
+        CHECK(s.slope <= layer.maxSlope + 1e-3f);
+    }
+}
+
+TEST_CASE("clustering moves a layer into patches without emptying it", "[unit][ecology]") {
+    const world::WorldMap map = world::defaultWorld();
+    world::ScatterLayer even = testLayer("e", {{"forest", 0.01f}});
+    even.clustering = 0.0f;
+    world::ScatterLayer clumped = even;
+    clumped.clustering = 0.9f;
+    clumped.clusterScale = 20.0f;
+    const spatial::PointCloud a = world::scatter(map, even);
+    const spatial::PointCloud b = world::scatter(map, clumped);
+    REQUIRE(a.count() > 200);
+    REQUIRE(b.count() > 50);
+
+    // Clumping is measured as it looks: bin the world coarsely and compare how uneven the counts
+    // are. A patchy layer has empty bins and crowded ones; an even one does not.
+    const auto unevenness = [&](const spatial::PointCloud& c) {
+        constexpr int kBins = 24;
+        std::vector<int> bins(kBins * kBins, 0);
+        for (std::size_t i = 0; i < c.count(); ++i) {
+            const glm::vec3 p = c.positions()[i];
+            const glm::vec2 uv = (glm::vec2(p.x, p.z) - map.min()) / map.size;
+            const int x = std::clamp(static_cast<int>(uv.x * kBins), 0, kBins - 1);
+            const int y = std::clamp(static_cast<int>(uv.y * kBins), 0, kBins - 1);
+            ++bins[static_cast<std::size_t>(y) * kBins + x];
+        }
+        const double mean = static_cast<double>(c.count()) / bins.size();
+        double variance = 0.0;
+        for (const int n : bins) {
+            variance += (n - mean) * (n - mean);
+        }
+        return variance / bins.size() / std::max(mean, 1e-6);  // index of dispersion
+    };
+    INFO("even " << unevenness(a) << " clumped " << unevenness(b));
+    CHECK(unevenness(b) > unevenness(a));
+}
+
+TEST_CASE("a density naming a biome that does not exist is an error, not an empty forest",
+          "[unit][ecology]") {
+    // Silently placing nothing is the worst available outcome: a layer that was authored, parsed,
+    // built, and grew no plants, with nothing anywhere saying why.
+    const world::BiomeSet biomes = world::defaultBiomes();
+    world::Ecology good;
+    good.layers.push_back(testLayer("ok", {{"forest", 0.01f}}));
+    CHECK(good.validate(biomes).has_value());
+    world::Ecology typo;
+    typo.layers.push_back(testLayer("oops", {{"forrest", 0.01f}}));
+    const auto result = typo.validate(biomes);
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().message.find("forrest") != std::string::npos);
+}
+
+TEST_CASE("an ecology round-trips through json", "[unit][ecology]") {
+    world::Ecology original;
+    world::ScatterLayer layer = testLayer("fungi", {{"marsh", 0.03f}, {"forest", 0.008f}});
+    layer.height = 0.28f;
+    layer.clustering = 0.85f;
+    layer.emissiveColor = {0.3f, 0.1f, 0.8f};
+    layer.emissiveIntensity = 5.5f;
+    layer.tint = {0.7f, 0.6f, 0.9f};
+    layer.avoidWater = false;
+    original.layers.push_back(layer);
+    auto parsed = world::ecologyFromJson(world::ecologyToJson(original));
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->structuralHash() == original.structuralHash());
+}
+
+TEST_CASE("a scatter distribution draws the cloud it was given", "[unit][procedural][ecology]") {
+    // The distribution kind exists so an ecology pass can hand placements to the ordinary
+    // instancing path. If the cloud does not come out the other side, everything above it is moot.
+    scene::ProceduralGeometry pg;
+    pg.name = "supplied";
+    pg.distribution.kind = scene::DistributionKind::Scatter;
+    auto cloud = std::make_shared<spatial::PointCloud>(3);
+    cloud->positions()[0] = {1.0f, 2.0f, 3.0f};
+    cloud->positions()[1] = {-4.0f, 5.0f, 6.0f};
+    cloud->positions()[2] = {7.0f, -8.0f, 9.0f};
+    for (int i = 0; i < 3; ++i) {
+        cloud->rotations()[static_cast<std::size_t>(i)] = {0.0f, 0.0f, 0.0f, 1.0f};
+        cloud->scales()[static_cast<std::size_t>(i)] = glm::vec3(1.0f);
+    }
+    pg.distribution.scatterCloud = cloud;
+    pg.distribution.scatterHash = 12345;
+    REQUIRE(pg.validate().has_value());
+    CHECK(pg.distribution.instanceCount() == 3);
+    const spatial::PointCloud built = pg.generateCloud();
+    REQUIRE(built.count() == 3);
+    for (std::size_t i = 0; i < 3; ++i) {
+        CHECK(built.positions()[i] == cloud->positions()[i]);
+    }
+    // The hash the generator supplied is what makes a changed cloud a structural change.
+    const std::uint64_t before = pg.structuralHash();
+    pg.distribution.scatterHash = 999;
+    CHECK(pg.structuralHash() != before);
 }

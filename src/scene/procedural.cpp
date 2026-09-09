@@ -570,6 +570,8 @@ const char* distributionKindName(DistributionKind kind) {
         return "spline";
     case DistributionKind::Grammar:
         return "grammar";
+    case DistributionKind::Scatter:
+        return "scatter";
     }
     return "single";
 }
@@ -577,7 +579,7 @@ const char* distributionKindName(DistributionKind kind) {
 std::optional<DistributionKind> distributionKindFromName(std::string_view name) {
     for (const auto kind : {DistributionKind::Single, DistributionKind::Linear, DistributionKind::Grid,
                             DistributionKind::Radial, DistributionKind::Spiral, DistributionKind::Spline,
-                            DistributionKind::Grammar}) {
+                            DistributionKind::Grammar, DistributionKind::Scatter}) {
         if (name == distributionKindName(kind)) {
             return kind;
         }
@@ -1512,7 +1514,8 @@ Result<void> Distribution::validate() const {
         if (total > kMaxInstances) {
             return fail("grid instance count {} exceeds {}", total, kMaxInstances);
         }
-    } else if (kind != DistributionKind::Single && kind != DistributionKind::Grammar) {
+    } else if (kind != DistributionKind::Single && kind != DistributionKind::Grammar &&
+               kind != DistributionKind::Scatter) {
         if (count < 1 || count > kMaxInstances) {
             return fail("count must be in 1..{} (got {})", kMaxInstances, count);
         }
@@ -1566,6 +1569,8 @@ int Distribution::instanceCount(const spatial::Spline* curve) const {
     }
     case DistributionKind::Grammar:
         return std::max(count, 1); // the owner replaces this with the expansion size
+    case DistributionKind::Scatter:
+        return scatterCloud ? std::max(static_cast<int>(scatterCloud->count()), 1) : 1;
     }
     return 1;
 }
@@ -1579,6 +1584,7 @@ Transform Distribution::placement(int index, const spatial::Spline* curve) const
     switch (kind) {
     case DistributionKind::Single:
     case DistributionKind::Grammar: // placements come from the grammar expansion (generateCloud)
+    case DistributionKind::Scatter: // placements come from the supplied cloud (generateCloud)
         break;
 
     case DistributionKind::Spline: {
@@ -1712,6 +1718,9 @@ std::uint64_t Distribution::structuralHash() const {
         break;
     case DistributionKind::Grammar:
         break; // the owner hashes its grammar (ProceduralGeometry::structuralHash)
+    case DistributionKind::Scatter:
+        h.u64(scatterHash); // the generator's own summary of the cloud it supplied
+        break;
     }
     return h.value();
 }
@@ -2099,7 +2108,15 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
     // Grammar distributions: the expansion's points are the placements (their depth/rule/branch
     // columns are kept); instanceCount() does not know the expansion size.
     const bool fromGrammar = distribution.kind == DistributionKind::Grammar;
-    const spatial::PointCloud expanded = fromGrammar ? grammar.expand() : spatial::PointCloud();
+    // Scatter placements are supplied rather than derived, so the cloud is read straight through:
+    // whoever generated it knew things this object cannot (which slopes a fern grows on), and the
+    // point of the kind is that it does not have to.
+    const bool fromScatter = distribution.kind == DistributionKind::Scatter && distribution.scatterCloud &&
+                             distribution.scatterCloud->count() > 0;
+    const spatial::PointCloud expanded = fromGrammar    ? grammar.expand()
+                                         : fromScatter ? *distribution.scatterCloud
+                                                       : spatial::PointCloud();
+    const bool supplied = fromGrammar || fromScatter;
     const spatial::Spline* curve = nullptr;
     if (distribution.kind == DistributionKind::Spline && ctx.splines != nullptr) {
         curve = ctx.splines->find(distribution.spline);
@@ -2107,8 +2124,8 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
             curve->prepare();
         }
     }
-    const auto count = fromGrammar ? expanded.count()
-                                   : static_cast<std::size_t>(std::max(distribution.instanceCount(curve), 1));
+    const auto count = supplied ? expanded.count()
+                                : static_cast<std::size_t>(std::max(distribution.instanceCount(curve), 1));
     spatial::PointCloud out(count);
     const float invLast = count > 1 ? 1.0f / static_cast<float>(count - 1) : 0.0f;
     const glm::vec3 sourceExtent = sourceHalfExtent(source) * glm::abs(sourceTransform.scale);
@@ -2128,7 +2145,7 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
         const auto signedIndex = static_cast<int>(i);
         const float u = static_cast<float>(i) * invLast;
         Transform placement;
-        if (fromGrammar) {
+        if (supplied) {
             placement.position = expanded.positions()[i];
             const glm::vec4 r = expanded.rotations()[i];
             placement.rotation = glm::quat(r.w, r.x, r.y, r.z);
@@ -2780,7 +2797,8 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
 
     // Distribution
     const Distribution& d = rest.distribution;
-    r.i("distribution/kind", static_cast<int>(d.kind), 0, 6, 0, 6);
+    r.i("distribution/kind", static_cast<int>(d.kind), 0, static_cast<int>(DistributionKind::Scatter), 0,
+        static_cast<int>(DistributionKind::Scatter));
     p.distributionCount = r.i("distribution/count", d.count, 1, kMaxInstances, 1, 256);
     r.v3("distribution/start", d.start, -1e4f, 1e4f, -20.0f, 20.0f);
     r.v3("distribution/end", d.end, -1e4f, 1e4f, -20.0f, 20.0f);
@@ -2991,7 +3009,7 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
 
     // Distribution
     Distribution& d = live.distribution;
-    copyEnum(p, "distribution/kind", d.kind, 6);
+    copyEnum(p, "distribution/kind", d.kind, static_cast<int>(DistributionKind::Scatter));
     copyValue(p, "distribution/count", d.count);
     copyValue(p, "distribution/start", d.start);
     copyValue(p, "distribution/end", d.end);

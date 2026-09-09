@@ -161,7 +161,11 @@ struct SourceSpec {
 // splineStart and splineEnd of the length) or by `spacing` (units of arc length); frame-aligned
 // when `alignToSpline` (x = binormal, y = normal, z = tangent) with `roll` about the tangent and
 // `splineOffset` in frame space. Grammar: the object's `grammar` expansion provides placements.
-enum class DistributionKind : std::uint8_t { Single, Linear, Grid, Radial, Spiral, Spline, Grammar };
+// Scatter (ADR-048): the placements come from outside. Every other kind is a formula the object
+// evaluates for itself; this one is for arrangements nothing local can derive -- an ecology pass
+// that knows which slopes a fern grows on, a scatter baked in a DCC, a survey of real positions.
+// The cloud is supplied at resolve time, exactly as an imported mesh is.
+enum class DistributionKind : std::uint8_t { Single, Linear, Grid, Radial, Spiral, Spline, Grammar, Scatter };
 [[nodiscard]] const char* distributionKindName(DistributionKind kind);
 [[nodiscard]] std::optional<DistributionKind> distributionKindFromName(std::string_view name);
 
@@ -196,6 +200,11 @@ struct Distribution {
     float turns = 3.0f;
     float spiralHeight = 8.0f;     // rise over the whole spiral along the plane normal
     float spiralAngle = 0.0f;      // extra constant rotation about the normal (radians)
+    // Scatter: runtime, filled by whoever generated the placements; never serialised, and part of
+    // no hash except through `scatterHash`, which that same generator sets to something that
+    // changes when the cloud does.
+    std::shared_ptr<const spatial::PointCloud> scatterCloud;
+    std::uint64_t scatterHash = 0;
     // Spline
     std::string spline;            // scene spline name
     float splineStart = 0.0f;      // fraction of the length

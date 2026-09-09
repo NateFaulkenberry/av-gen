@@ -1180,6 +1180,12 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
         if (auto v = node.terrain.validate(); !v) {
             return std::unexpected(v.error());
         }
+        // A density naming a biome that does not exist places nothing, silently: a layer that was
+        // authored, parsed, built and grew no plants is the worst outcome available, so it is an
+        // error at load rather than an empty forest at render.
+        if (auto v = node.ecology.validate(node.worldMap.biomes); !v) {
+            return std::unexpected(v.error());
+        }
         break;
     case NodeKind::Orb:
     case NodeKind::Grid:
@@ -1666,6 +1672,41 @@ void Composition::rebuild() {
     // Each unique asset's meshes and textures are stored once; instances share them by offset.
     std::map<std::string, std::pair<MeshId, TextureId>> assetOffsets;
 
+    // Imported-mesh resolution, shared by procedural nodes and by terrain's scatter layers: load
+    // the asset once, share its meshes and textures with anything else that names it, merge it into
+    // one mesh for instancing and take its material.
+    const auto resolveMeshSource = [&](ProceduralGeometry& pg, const std::string& owner) {
+        if (pg.source.kind != PrimitiveKind::Mesh || pg.source.asset.empty()) {
+            return;
+        }
+        auto loaded = registry_.loadScene(pg.source.asset);
+        if (!loaded) {
+            log::warn("'{}': mesh asset '{}': {}", owner, pg.source.asset, loaded.error().message);
+            return;
+        }
+        const assets::SceneAsset& asset = **loaded;
+        const std::string key = asset.path.string();
+        auto it = assetOffsets.find(key);
+        if (it == assetOffsets.end()) {
+            const auto offsets = std::make_pair(static_cast<MeshId>(scene_.meshes.size()),
+                                                static_cast<TextureId>(scene_.textures.size()));
+            for (const auto& mesh : asset.scene.meshes) {
+                scene_.meshes.push_back(mesh);
+            }
+            for (const auto& texture : asset.scene.textures) {
+                scene_.textures.push_back(texture);
+            }
+            it = assetOffsets.emplace(key, offsets).first;
+        }
+        pg.source.assetMesh = mergedAssetMesh(asset);
+        if (const Material* m = dominantAssetMaterial(asset)) {
+            Material resolved = *m;
+            offsetMaterialTextures(resolved, it->second.second);
+            resolved.program = pg.material.program;
+            pg.material = resolved;
+        }
+    };
+
     for (const auto& nodePtr : nodes_) {
         const CompositionNode& node = *nodePtr;
         NodeRange range;
@@ -1741,6 +1782,49 @@ void Composition::rebuild() {
             break;
         }
         case NodeKind::Terrain: {
+            // Scatter layers are ordinary procedural objects whose placements happen to have come
+            // from an ecology pass rather than from a formula (ADR-048). Everything downstream --
+            // instancing, GPU culling, LOD, variation, the material -- is the machinery an imported
+            // mesh already gets, which is the whole reason the ecology emits a cloud instead of a
+            // new kind of drawable.
+            for (const world::ScatterLayer& layer : node.ecology.layers) {
+                auto cloud = std::make_shared<spatial::PointCloud>(world::scatter(node.worldMap, layer));
+                if (cloud->count() == 0) {
+                    log::warn("terrain '{}': scatter '{}' placed nothing", node.name, layer.name);
+                    continue;
+                }
+                ProceduralGeometry pg;
+                pg.name = sanitise(prefix_) + node.name + "_" + layer.name;
+                pg.source.kind = PrimitiveKind::Mesh;
+                pg.source.asset = layer.asset;
+                pg.source.meshBudget = layer.meshBudget;
+                pg.distribution.kind = DistributionKind::Scatter;
+                pg.distribution.scatterCloud = cloud;
+                pg.distribution.scatterHash = layer.structuralHash() ^ node.worldMap.structuralHash();
+                pg.visible = visible;
+                pg.lod.cull = true;
+                pg.lod.maxDistance = node.terrain.viewDistance;
+                resolveMeshSource(pg, node.name);
+                // The layer says how tall the thing should be; the asset says how tall it is. The
+                // normalisation goes on sourceTransform, which scales the mesh alone --
+                // distributionTransform would scale the placements with it and move a tree scaled
+                // x2 twice as far from the origin.
+                pg.material.baseColor *= layer.tint;
+                if (layer.emissiveIntensity > 0.0f) {
+                    pg.material.emissiveColor = layer.emissiveColor;
+                    pg.material.emissiveIntensity = layer.emissiveIntensity;
+                }
+                if (layer.height > 0.0f && pg.source.assetMesh) {
+                    const auto [lo, hi] = pg.source.assetMesh->bounds();
+                    const float authored = hi.y - lo.y;
+                    if (authored > 1e-4f) {
+                        pg.sourceTransform.scale = glm::vec3(layer.height / authored);
+                    }
+                }
+                log::info("terrain '{}': scatter '{}' placed {} instances", node.name, layer.name,
+                          cloud->count());
+                scene_.procedurals.push_back(std::move(pg));
+            }
             // The whole world is built here, once. Chunk meshes are static: only which of a chunk's
             // four meshes is drawn, and whether it is drawn at all, changes per frame.
             CompositionNode& mutableNode = *nodePtr;
@@ -2780,6 +2864,9 @@ nlohmann::json Composition::toJson() const {
         }
         if (node.kind == NodeKind::Terrain) {
             n["world"] = world::worldMapToJson(node.worldMap);
+            if (!node.ecology.empty()) {
+                n["scatter"] = world::ecologyToJson(node.ecology);
+            }
             const world::TerrainSettings& ts = node.terrain;
             n["terrain"] = json{{"chunkSize", ts.chunkSize},   {"resolution", ts.resolution},
                                 {"lodLevels", ts.lodLevels},   {"lodDistance", ts.lodDistance},
@@ -3244,6 +3331,14 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         }
                         *f.target = *v;
                     }
+                }
+                if (item.contains("scatter")) {
+                    auto ecology = world::ecologyFromJson(item.at("scatter"));
+                    if (!ecology) {
+                        return fail("scene file '{}': node '{}': {}", scenePath.string(), node.name,
+                                    ecology.error().message);
+                    }
+                    node.ecology = std::move(*ecology);
                 }
                 if (item.contains("material")) {
                     const json& m = item.at("material");

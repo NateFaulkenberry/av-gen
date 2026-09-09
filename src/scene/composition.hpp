@@ -26,6 +26,7 @@
 #include "scene/spline_params.hpp"
 #include "scene/particles.hpp"
 #include "scene/scene_controller.hpp"
+#include "world/ecology.hpp"
 #include "world/terrain.hpp"
 
 #include <nlohmann/json_fwd.hpp>
@@ -69,6 +70,7 @@ struct CompositionNode {
     world::WorldMap worldMap;      // settings for kind Terrain (ADR-046): the geography
     world::TerrainSettings terrain;// settings for kind Terrain: how it is chopped up and coarsened
     Material terrainMaterial;      // settings for kind Terrain: shared by every chunk
+    world::Ecology ecology;        // settings for kind Terrain (ADR-048): what grows on it
 
     // Runtime (not serialised)
     std::shared_ptr<const assets::SceneAsset> sceneAsset; // Gltf

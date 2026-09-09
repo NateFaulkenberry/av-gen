@@ -3,7 +3,7 @@
   {
    "name": "Glowmere Valley",
    "category": "Showcase",
-   "description": "The world map turned into ground: a 640 m valley of designed geography -- rim, arms, basin, a meandering river and a tarn -- chunked, coarsened by distance and culled by the frustum.",
+   "description": "A world built in order: geography, then biomes derived from it, then an ecology that reads the same biome weights the ground is coloured with. 38,000 instances of a CC0 library, lit by a low moon.",
    "project": "world/terrain.json"
   },
   {
