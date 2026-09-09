@@ -168,6 +168,68 @@ uses a fractional carry so low rates emit evenly; bursts add particles for one f
 beyond the free slots are dropped. All settings are per-frame uniforms.
 `ParticleRenderer::readCounts(i)` reads a pool's alive/dead counts back (blocking; tests only).
 
+### Motion quality (ADR-040)
+
+Five additions, all off by default so a pre-ADR-040 scene is bit-identical.
+
+**Velocity-aligned stretching.** `velocityStretch` extends the billboard along the *screen
+projection* of the simulated velocity by
+
+```
+added = clamp(projectedSpeed * shutterSeconds * velocityStretch, 0, stretchMax)   // 0 below stretchMin
+shutterSeconds = frameDuration * camera/lens/shutterAngle / 360                   (ADR-037)
+```
+
+The quad's basis is rotated so +x runs along that velocity and only its length grows; the width
+stays the particle's size, so the radial falloff turns the disc into an ellipse and a slow
+particle is exactly the round quad it always was. `stretchMin` is a dead zone that keeps slow
+particles perfectly round rather than slightly oval. `scene::particleStretchLength()` is the CPU
+mirror of the shader's `stretchLength()`, and the unit tests check them against each other.
+Because the stretched quad *is* a shutter smear, the fraction of the shutter it already covers is
+subtracted from what the particle writes into the velocity target — otherwise the motion-blur pass
+would smear it a second time.
+
+**Trails.** `trailEnabled` gives every particle a ring of `trailLength - 1` previous positions,
+recorded by `cs_simulate` *before* integration (so the ribbon's live head is never duplicated by
+its newest history entry) every `trailStride`-th step. `vs_ribbon` draws it as `trailLength - 1`
+camera-facing quads per particle: point 0 is the live position, point *j* the *j*-th newest
+history entry, the side direction is `cross(tangent, toEye)`, and the width and colour taper along
+the length by `trailTaper`, `trailFade` and `trailTint`. Points past a particle's own write count
+collapse onto the last valid one, so a ribbon *grows* out of a newborn particle instead of
+springing from whatever the slot's previous occupant left behind. The history is part of the
+simulation state, so two runs of the same frame sequence produce the same ribbon.
+
+Memory is the whole cost: `capacity * (trailLength - 1) * 16` bytes.
+`scene::validateParticleSystem()` enforces a **64 MiB per-system budget**, which makes trails
+usable for hero emitters (32 k particles x 32 points is 15.5 MiB) and refuses them outright for
+million-particle systems. A refusal from the scene loader is an error; a refusal at render time is
+logged once and the system falls back to stretched billboards.
+
+**Lifetime curves.** `sizeCurve`, `colorCurve` and `opacityCurve` are up to eight keyframes over
+normalised age, packed into the particle uniforms and evaluated in the vertex shader as a clamped
+piecewise-linear ramp. A curve with fewer than two keys is *not authored* and the linear
+`sizeStart`/`sizeEnd`, `colorStart`/`colorEnd` ramp is used instead, so existing scenes are
+unchanged. `ParticleCurve::evaluate()` is the CPU reference for the shader's rule.
+
+**Atmosphere coupling.** Two one-directional links to `VolumeRenderer` (ADR-032):
+
+- `fogCoupling` (default 1) fixes a particle being fogged by the depth of the *surface behind it*.
+  The volume composite multiplies the whole HDR buffer by the transmittance it marched to the
+  opaque surface, so `fs_particle` divides that out and puts back the transmittance to the
+  particle's own depth. Both are estimated from the same exponential height-fog model with four
+  midpoint samples; the noise and field terms cancel to first order in the ratio. It reads the
+  ADR-035 linear-depth target, and a frame with no depth prepass disables the coupling rather than
+  guessing (there is nothing to say what depth the composite marched to).
+- `volumeGlow` reduces a system's alive emissive particles to **one aggregate sphere** — the
+  emission-weighted centroid, the standard deviation of the positions about it, the mean colour
+  and the total power — which `volume.wgsl` adds as an in-scattering source, so sparks light the
+  dust around them. The reduction is a fixed-order workgroup tree per scan block plus a serial sum
+  over blocks, so it has no atomics and is deterministic. Up to eight systems inject at once;
+  slots past that are ignored, and the volume never touches the simulation.
+
+**Motion vectors.** Particles write the velocity target from their simulated previous position,
+which is what feeds the motion blur below.
+
 ## Image formation (milestone 0.6, ADR-016; reordered by ADR-037 and ADR-039)
 
 The full treatment is `docs/image-formation.md`; this is the summary. `PostProcessor` runs the
@@ -180,7 +242,7 @@ scene HDR -> volumetrics -> user post layers
                      and read back next frame (automatic exposure only)
   2. exposure        one multiply; skipped entirely when the scale is 1
   3. depth of field  view distance from depth, circle-of-confusion gather
-  4. motion blur     reprojection with the previous view-projection, neighbourhood-max velocity
+  4. motion blur     tile-based reconstruction over the ADR-035 velocity target (ADR-040)
   5. lens            barrel/pincushion distortion, chromatic aberration
   6. bloom           soft-knee prefilter, 13-tap downsample chain, energy-conserving tent upsample
   7. halation        a wider, warm-weighted second pyramid; anamorphic streaks share its pass

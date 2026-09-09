@@ -324,7 +324,10 @@ Result<void> SceneRenderer::init() {
     if (auto r = debug_->init(kHdrFormat, kDepthFormat, frameLayout_); !r) {
         return r;
     }
-    if (auto r = volumes_->init(kHdrFormat, kDepthFormat, frameLayout_, fields_->buffer()); !r) {
+    // ADR-040: the volume march reads the particle systems' emissive aggregates, so emissive
+    // particles light the dust around them (one-directional: the fog never touches the sim).
+    if (auto r = volumes_->init(kHdrFormat, kDepthFormat, frameLayout_, fields_->buffer(), particles_->glowBuffer());
+        !r) {
         return r;
     }
     if (auto r = simulation_->init(fields_->buffer(), fields_->gridBuffer()); !r) {
@@ -1575,8 +1578,33 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     simulation_->update(encoder, scene, time);
     stats_.simulation = simulation_->stats();
 
+    // Ambient occlusion and the contact-shadow march both need the depth of the whole opaque
+    // scene while it is being shaded (ADR-034/035); the particle fog coupling reads the linear
+    // depth the same prepass resolves, so the flag is decided before either uses it.
+    const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows;
+
     // ---- particle simulation (compute) ----
-    particles_->setPreviousViewProjection(frame.prevViewProj); // ADR-035: particles write velocity
+    // ADR-040 frame context: the previous view-projection for the velocity target (ADR-035), the
+    // eye (ribbons face it, the fog coupling marches from it), the shutter open time that sets the
+    // stretch length (ADR-037), and the volumetric atmosphere the particles sit in. The linear
+    // depth is only resolved when a depth prepass ran; without it the fog coupling switches off
+    // rather than guessing what the volume composite will have marched to.
+    {
+        ParticleFrameContext particleFrame;
+        particleFrame.prevViewProj = frame.prevViewProj;
+        particleFrame.cameraPosition = scene.camera.position;
+        particleFrame.shutterSeconds = static_cast<float>(std::clamp(time.deltaTime, 0.0, 0.1)) *
+                                       std::clamp(scene.camera.lens.shutterAngle, 0.0f, 360.0f) / 360.0f;
+        if (VolumeRenderer::enabled(scene.environment)) {
+            particleFrame.fogDensity = scene.environment.volumeDensity;
+            particleFrame.fogHeight = scene.environment.fogHeight;
+            particleFrame.fogHeightFalloff = scene.environment.fogHeightFalloff;
+            particleFrame.fogAbsorption = scene.environment.volumeAbsorption;
+            particleFrame.fogMaxDistance = scene.environment.volumeMaxDistance;
+        }
+        particleFrame.linearDepth = needsDepthPrepass ? linearDepth_.view : nullptr;
+        particles_->setFrameContext(particleFrame);
+    }
     particles_->update(encoder, scene, time, view, proj, fields_.get(), splines_.get());
     stats_.particles = particles_->stats();
 
@@ -1670,10 +1698,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     }
 
     // ---- depth prepass: the scene depth, before anything reads it ----
-    // Ambient occlusion and the contact-shadow march both need the depth of the whole opaque scene
-    // while it is being shaded, which a forward pass cannot give them (ADR-034/035). The prepass is
-    // cheap - no fragment work - and the shading pass then tests LessEqual against it.
-    const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows;
+    // The prepass is cheap - no fragment work - and the shading pass then tests LessEqual
+    // against it. `needsDepthPrepass` was decided above, before the particle frame context.
     if (needsDepthPrepass) {
         wgpu::RenderPassDepthStencilAttachment depth{};
         depth.view = hdr_.depthView();
@@ -1835,7 +1861,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
 
     // ---- volumetric atmosphere (ADR-032): half-res raymarch + depth-aware composite ----
     // Skipped entirely when Environment::volumeDensity is 0, so scenes without fog are unchanged.
-    volumes_->update(scene, time, hdr_.width(), hdr_.height(), hdr_.depthView(), fields_.get());
+    volumes_->update(scene, time, hdr_.width(), hdr_.height(), hdr_.depthView(), fields_.get(),
+                     particles_->glowSystems());
     volumes_->encode(encoder, hdr_.colorView(), frameBindGroup_);
     stats_.volume = volumes_->stats();
 
@@ -1903,13 +1930,19 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         PostFrameInputs postIn;
         postIn.sceneHdr = finalHdr;
         postIn.depth = hdr_.depthView();
+        postIn.velocity = velocity_.view; // ADR-040: motion blur reconstructs from it
         postIn.width = hdr_.width();
         postIn.height = hdr_.height();
         postIn.prevViewProj = havePrevViewProj_ ? prevViewProj_ : frame.viewProj;
         postIn.invViewProj = frame.invViewProj;
         postIn.cameraPos = scene.camera.position;
         postIn.frameIndex = time.frameIndex;
-        postIn.settings = &scene.post;
+        // ADR-037/040: the shutter that sets the motion-blur length belongs to the camera. The
+        // engine already mirrors the whole lens into post settings; a scene driven through this
+        // renderer directly may not have, so the shutter is taken from the camera either way.
+        scene::PostSettings postSettings = scene.post;
+        postSettings.lens.shutterAngle = scene.camera.lens.shutterAngle;
+        postIn.settings = &postSettings;
         finalHdr = postProcessor_->run(encoder, postIn, *pool_);
         if (postProcessor_->outputTexture() != nullptr) {
             hdrOutput_ = postProcessor_->outputTexture();

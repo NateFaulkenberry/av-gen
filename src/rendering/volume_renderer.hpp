@@ -37,6 +37,7 @@ class FieldUniforms;
 
 struct VolumeStats {
     std::uint32_t steps = 0;            // raymarch samples per pixel this frame (0 = fog off)
+    std::uint32_t glowSystems = 0;      // emissive particle systems lighting the fog (ADR-040)
     bool halfResolution = true;         // the march always runs at half resolution
     double volumeMs = -1.0;             // GPU time of the march + composite passes (-1 = none)
 };
@@ -50,8 +51,9 @@ struct VolumeUniforms {
     glm::vec4 sizes;       // half width, half height, full width, full height
     glm::vec4 depthParams; // camera near, camera far, 0, 0
     glm::vec4 fogColor;    // rgb, w = 0
+    glm::vec4 glow;        // x = particle glow systems (ADR-040), yzw = 0
 };
-static_assert(sizeof(VolumeUniforms) == 112);
+static_assert(sizeof(VolumeUniforms) == 128);
 
 class VolumeRenderer {
 public:
@@ -64,8 +66,12 @@ public:
     // HDR target's colour format (`depthFormat` is accepted for symmetry with the other
     // renderers; neither pass writes depth), `fieldBlock` the FieldUniforms buffer (a zeroed
     // private one is created when null).
+    // `particleGlow` is ParticleRenderer::glowBuffer(): the emissive aggregates emissive particle
+    // systems reduce to, which the march adds as an in-scattering source (ADR-040). A zeroed
+    // private buffer is created when null, so the fog renders exactly as before without it.
     [[nodiscard]] Result<void> init(wgpu::TextureFormat colorFormat, wgpu::TextureFormat depthFormat,
-                                    const wgpu::BindGroupLayout& frameLayout, wgpu::Buffer fieldBlock = nullptr);
+                                    const wgpu::BindGroupLayout& frameLayout, wgpu::Buffer fieldBlock = nullptr,
+                                    wgpu::Buffer particleGlow = nullptr);
     [[nodiscard]] Result<void> reload(); // hot reload of volume.wgsl (keeps the old pipelines on failure)
 
     // True when this scene wants volumetrics at all (volumeDensity > 0).
@@ -74,7 +80,8 @@ public:
     // Per frame, before encode(): sizes the half-res target, resolves the density/colour field
     // names to slots and writes the uniforms. Does nothing (and clears the stats) when off.
     void update(const scene::Scene& scene, const FrameTime& time, std::uint32_t width, std::uint32_t height,
-                const wgpu::TextureView& sceneDepth, const FieldUniforms* fields = nullptr);
+                const wgpu::TextureView& sceneDepth, const FieldUniforms* fields = nullptr,
+                std::uint32_t particleGlowSystems = 0);
     // Encodes the march pass and the composite pass onto `color` (loaded and stored). Call right
     // after the lit pass. No-op when the last update() found the fog off.
     void encode(wgpu::CommandEncoder& encoder, const wgpu::TextureView& color,

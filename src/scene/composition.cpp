@@ -307,6 +307,48 @@ json particlesToJson(const ParticleSystem& s) {
     j["emissive"] = s.emissive;
     j["blend"] = blendName(s.blend);
     j["softness"] = s.softness;
+    // ADR-040. Only written when they differ from the defaults so existing files stay short and
+    // round-tripping a pre-ADR-040 scene produces the same JSON it started with.
+    if (s.velocityStretch != 0.0f) {
+        j["velocityStretch"] = s.velocityStretch;
+        j["stretchMax"] = s.stretchMax;
+        j["stretchMin"] = s.stretchMin;
+    }
+    if (s.trailEnabled) {
+        j["trailEnabled"] = true;
+        j["trailLength"] = s.trailLength;
+        j["trailStride"] = s.trailStride;
+        j["trailWidth"] = s.trailWidth;
+        j["trailTaper"] = s.trailTaper;
+        j["trailFade"] = s.trailFade;
+        j["trailTint"] = vecToJson(s.trailTint);
+    }
+    if (s.fogCoupling != 1.0f) {
+        j["fogCoupling"] = s.fogCoupling;
+    }
+    if (s.volumeGlow != 0.0f) {
+        j["volumeGlow"] = s.volumeGlow;
+    }
+    auto scalarCurve = [](const ParticleCurve& c) {
+        json keys = json::array();
+        for (const CurveKey& k : c.keys) {
+            keys.push_back(json{{"t", k.t}, {"value", k.value}});
+        }
+        return keys;
+    };
+    if (!s.sizeCurve.keys.empty()) {
+        j["sizeCurve"] = scalarCurve(s.sizeCurve);
+    }
+    if (!s.opacityCurve.keys.empty()) {
+        j["opacityCurve"] = scalarCurve(s.opacityCurve);
+    }
+    if (!s.colorCurve.keys.empty()) {
+        json keys = json::array();
+        for (const ColorKey& k : s.colorCurve.keys) {
+            keys.push_back(json{{"t", k.t}, {"color", vecToJson(k.color)}});
+        }
+        j["colorCurve"] = std::move(keys);
+    }
     if (!s.fieldForces.empty()) {
         json forces = json::array();
         for (const FieldForce& f : s.fieldForces) {
@@ -405,7 +447,76 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
         s.blend = *blend;
     }
     AVGEN_READ(softness, readFloat);
+    // ---- ADR-040: stretching, trails, atmosphere coupling and lifetime curves ----
+    AVGEN_READ(velocityStretch, readFloat);
+    AVGEN_READ(stretchMax, readFloat);
+    AVGEN_READ(stretchMin, readFloat);
+    AVGEN_READ(trailEnabled, readBool);
+    AVGEN_READ(trailWidth, readFloat);
+    AVGEN_READ(trailTaper, readFloat);
+    AVGEN_READ(trailFade, readFloat);
+    AVGEN_READ(trailTint, readVec<3>);
+    AVGEN_READ(fogCoupling, readFloat);
+    AVGEN_READ(volumeGlow, readFloat);
 #undef AVGEN_READ
+    for (const auto& [key, target] : {std::pair<const char*, std::uint32_t*>{"trailLength", &s.trailLength},
+                                      std::pair<const char*, std::uint32_t*>{"trailStride", &s.trailStride}}) {
+        if (j.contains(key)) {
+            if (!j.at(key).is_number_unsigned()) {
+                return fail("'{}' must be a positive integer", key);
+            }
+            *target = j.at(key).get<std::uint32_t>();
+        }
+    }
+    {
+        auto readScalarCurve = [&](const char* key, ParticleCurve& curve) -> Result<void> {
+            if (!j.contains(key)) {
+                return Result<void>{};
+            }
+            const json& keys = j.at(key);
+            if (!keys.is_array()) {
+                return fail("'{}' must be an array of keys", key);
+            }
+            for (const json& kj : keys) {
+                if (!kj.is_object()) {
+                    return fail("'{}' entries must be objects", key);
+                }
+                auto t = readFloat(kj, "t", 0.0f);
+                auto v = readFloat(kj, "value", 0.0f);
+                if (!t || !v) {
+                    return fail("'{}': keys need numeric 't' and 'value'", key);
+                }
+                curve.keys.push_back(CurveKey{*t, *v});
+            }
+            return Result<void>{};
+        };
+        if (auto r = readScalarCurve("sizeCurve", s.sizeCurve); !r) {
+            return std::unexpected(r.error());
+        }
+        if (auto r = readScalarCurve("opacityCurve", s.opacityCurve); !r) {
+            return std::unexpected(r.error());
+        }
+        if (j.contains("colorCurve")) {
+            const json& keys = j.at("colorCurve");
+            if (!keys.is_array()) {
+                return fail("'colorCurve' must be an array of keys");
+            }
+            for (const json& kj : keys) {
+                if (!kj.is_object()) {
+                    return fail("'colorCurve' entries must be objects");
+                }
+                auto t = readFloat(kj, "t", 0.0f);
+                auto c = readVec<3>(kj, "color", glm::vec3(1.0f));
+                if (!t || !c) {
+                    return fail("'colorCurve': keys need a numeric 't' and a 'color'");
+                }
+                s.colorCurve.keys.push_back(ColorKey{*t, *c});
+            }
+        }
+    }
+    if (auto r = validateParticleSystem(s); !r) {
+        return std::unexpected(r.error());
+    }
     if (j.contains("fieldForces")) {
         const json& forces = j.at("fieldForces");
         if (!forces.is_array()) {

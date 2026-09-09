@@ -38,7 +38,7 @@ fn fs_sky(in: SkyOut) -> SceneOut {
     var out: SceneOut;
     out.color = vec4<f32>(color, 1.0);
     out.normalRoughness = packNormalRoughness(-dir, 1.0, 8.0);
-    out.velocity = screenVelocity(in.clip, prevClip);
+    out.velocity = screenVelocityAt(in.clip, prevClip);
     out.emission = vec4<f32>(0.0, 0.0, 0.0, 0.0);
     out.ids = 0u;
     return out;

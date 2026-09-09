@@ -4,6 +4,7 @@
 // simulation lives in compute shaders (rendering/particle_renderer). Every field here is a
 // modulation target through registerParticleParameters().
 
+#include "core/error.hpp"
 #include "params/parameter_set.hpp"
 
 #include <glm/glm.hpp>
@@ -16,6 +17,45 @@
 #include <vector>
 
 namespace avgen::scene {
+
+// ---- lifetime curves (ADR-040) ------------------------------------------------------------
+// Small keyframed curves over normalised age (0 = birth, 1 = death), linearly interpolated and
+// clamped outside the first and last key. A curve with fewer than two keys is *empty* and the
+// linear start-to-end ramp is used instead, so every scene authored before curves existed
+// renders bit-identically. At most kMaxCurveKeys keys: they are packed into the particle
+// uniforms and evaluated in the vertex shader (see shaders/particles.wgsl `curveAt`).
+constexpr int kMaxCurveKeys = 8;
+
+struct CurveKey {
+    float t = 0.0f;
+    float value = 0.0f;
+};
+struct ColorKey {
+    float t = 0.0f;
+    glm::vec3 color{1.0f};
+};
+
+// evaluate() is the CPU reference for the shader: the same clamped piecewise-linear result.
+struct ParticleCurve {
+    std::vector<CurveKey> keys; // ascending t; at most kMaxCurveKeys are uploaded
+    [[nodiscard]] bool active() const { return keys.size() >= 2; }
+    [[nodiscard]] float evaluate(float t) const;
+};
+struct ParticleColorCurve {
+    std::vector<ColorKey> keys;
+    [[nodiscard]] bool active() const { return keys.size() >= 2; }
+    [[nodiscard]] glm::vec3 evaluate(float t) const;
+};
+
+// ---- trails (ADR-040) ---------------------------------------------------------------------
+// A trail keeps kMaxTrailPoints - 1 previous positions per particle in a ring that is part of
+// the simulation state, so two runs of the same frame sequence produce the same ribbon.
+constexpr std::uint32_t kMaxTrailPoints = 32;
+// 16 bytes per history point (a vec4 in a storage array). The budget is per system and is what
+// validateParticleSystem() enforces: it makes trails usable for hero emitters (32 k x 32 points
+// = 16 MiB) and refuses them for million-particle systems.
+constexpr std::uint64_t kTrailBytesPerPoint = 16;
+constexpr std::uint64_t kMaxTrailBytes = 64ull << 20;
 
 // Spline: emits along the scene spline named `spline` (position = S(u) + jitter within extent.x).
 enum class EmitterShape : std::uint8_t { Point, Sphere, Disc, Box, Spline };
@@ -80,7 +120,53 @@ struct ParticleSystem {
     float emissive = 4.0f;           // HDR intensity multiplier
     ParticleBlend blend = ParticleBlend::Additive;
     float softness = 0.2f;           // depth fade distance (world units)
+
+    // Lifetime curves (ADR-040). Empty (fewer than two keys) = the linear ramp above.
+    ParticleCurve sizeCurve;         // world units; replaces mix(sizeStart, sizeEnd)
+    ParticleColorCurve colorCurve;   // rgb; replaces mix(colorStart.rgb, colorEnd.rgb)
+    ParticleCurve opacityCurve;      // alpha; replaces mix(colorStart.a, colorEnd.a)
+
+    // ---- velocity-aligned stretching (ADR-040) -------------------------------------------
+    // The billboard grows along the screen projection of the simulated velocity by
+    // particleStretchLength(); its width stays `size`, so slow particles stay round and fast
+    // ones read as streaks. Free in memory: no history, one vertex-shader branch.
+    float velocityStretch = 0.0f;    // 0 = always round; 1 = one shutter's worth of travel
+    float stretchMax = 0.25f;        // world-unit cap on the added length
+    float stretchMin = 0.0f;         // added length below this is dropped (slow = round)
+
+    // ---- trails / ribbons (ADR-040) -------------------------------------------------------
+    // Opt in per system: memory is capacity * (trailLength - 1) * 16 bytes and
+    // validateParticleSystem() refuses anything over kMaxTrailBytes.
+    bool trailEnabled = false;
+    std::uint32_t trailLength = 16;  // ribbon points including the live head; 2..kMaxTrailPoints
+    std::uint32_t trailStride = 1;   // record a history point every N simulation steps
+    float trailWidth = 1.0f;         // head half-width as a multiple of the particle size
+    float trailTaper = 0.0f;         // tail half-width as a fraction of the head's
+    float trailFade = 0.0f;          // tail alpha as a fraction of the head's
+    glm::vec3 trailTint{1.0f};       // tail colour multiplier (head is the particle colour)
+
+    // ---- atmosphere coupling (ADR-040) ----------------------------------------------------
+    // fogCoupling scales how much of the volumetric transmittance to the particle's own depth
+    // it receives (1 = fully in the fog, 0 = the old behaviour). volumeGlow > 0 injects the
+    // system's emissive light into the volume march as one aggregate sphere, so sparks light
+    // the dust around them; the coupling is one-directional (the volume never affects the sim).
+    float fogCoupling = 1.0f;
+    float volumeGlow = 0.0f;
 };
+
+// The length the billboard gains along its velocity, in world units. The shader computes exactly
+// this (shaders/particles.wgsl `stretchLength`); tests check them against each other.
+// `shutterSeconds` is the camera's open time: shutterAngle / 360 * frame duration (ADR-037).
+[[nodiscard]] float particleStretchLength(float speed, float shutterSeconds, const ParticleSystem& s);
+
+// History points actually kept per particle (trailLength - 1; 0 when trails are off).
+[[nodiscard]] std::uint32_t trailHistoryPoints(const ParticleSystem& s);
+// Bytes the history ring costs for this system (0 when trails are off).
+[[nodiscard]] std::uint64_t trailMemoryBytes(const ParticleSystem& s);
+
+// Rejects systems the renderer cannot honour: an out-of-range trail length or stride, a curve
+// with too many or unsorted keys, and above all a trail buffer over kMaxTrailBytes.
+[[nodiscard]] Result<void> validateParticleSystem(const ParticleSystem& s);
 
 // Registers "particles/<name>/<field>" parameters for the modulatable fields and returns
 // handles; applyParticleParameters() copies their finals back into the system each frame.
@@ -105,6 +191,8 @@ struct ParticleParameters {
     params::Parameter<glm::vec4>* colorStart = nullptr;
     params::Parameter<glm::vec4>* colorEnd = nullptr;
     params::Parameter<float>* emissive = nullptr;
+    params::Parameter<float>* stretch = nullptr;    // scales velocityStretch (ADR-040)
+    params::Parameter<float>* trailWidth = nullptr; // scales trailWidth (ADR-040)
     params::Parameter<bool>* enabled = nullptr;
 };
 

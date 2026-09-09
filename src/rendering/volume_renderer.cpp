@@ -14,6 +14,13 @@
 namespace avgen::rendering {
 
 namespace {
+// Mirrors ParticleRenderer::kMaxGlowSystems / kGlowBufferSize (ADR-040). Kept as plain constants
+// rather than an include so the volume renderer does not depend on the particle renderer.
+constexpr std::uint32_t kMaxParticleGlowSystems = 8;
+constexpr std::uint64_t kParticleGlowBytes = kMaxParticleGlowSystems * 32;
+} // namespace
+
+namespace {
 
 std::uint32_t halfOf(std::uint32_t v) {
     return std::max<std::uint32_t>((v + 1) / 2, 1);
@@ -39,6 +46,7 @@ struct VolumeRenderer::Impl {
     wgpu::RenderPipeline compositePipeline;
     wgpu::Buffer uniforms;
     wgpu::Buffer fieldBlock;
+    wgpu::Buffer particleGlow; // ADR-040: the emissive aggregates of the particle systems
     gpu::RenderTarget half;
     wgpu::BindGroup marchGroup;
     wgpu::BindGroup compositeGroup;
@@ -66,7 +74,8 @@ const gpu::RenderTarget& VolumeRenderer::target() const {
 }
 
 Result<void> VolumeRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFormat depthFormat,
-                                  const wgpu::BindGroupLayout& frameLayout, wgpu::Buffer fieldBlock) {
+                                  const wgpu::BindGroupLayout& frameLayout, wgpu::Buffer fieldBlock,
+                                  wgpu::Buffer particleGlow) {
     Impl& im = *impl_;
     const auto& device = im.context.device();
     im.colorFormat = colorFormat;
@@ -81,6 +90,16 @@ Result<void> VolumeRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Texture
         const FieldBlock zero{};
         im.context.queue().WriteBuffer(im.fieldBlock, 0, &zero, sizeof(zero));
     }
+    im.particleGlow = std::move(particleGlow);
+    if (!im.particleGlow) {
+        wgpu::BufferDescriptor desc{};
+        desc.label = "volume-empty-particle-glow";
+        desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        desc.size = kParticleGlowBytes;
+        im.particleGlow = device.CreateBuffer(&desc);
+        const std::array<float, kParticleGlowBytes / sizeof(float)> zero{};
+        im.context.queue().WriteBuffer(im.particleGlow, 0, zero.data(), kParticleGlowBytes);
+    }
     {
         wgpu::BufferDescriptor desc{};
         desc.label = "volume-uniforms";
@@ -91,7 +110,7 @@ Result<void> VolumeRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Texture
     {
         // Group 1: 1 = VolumeUniforms, 2 = field block, 3 = scene depth, 4 = the half-res march
         // result. Binding 0 stays free (common.wgsl declares `object` there and nothing reads it).
-        std::array<wgpu::BindGroupLayoutEntry, 4> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
         entries[0].binding = 1;
         entries[0].visibility = wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -108,6 +127,10 @@ Result<void> VolumeRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Texture
         entries[3].visibility = wgpu::ShaderStage::Fragment;
         entries[3].texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
         entries[3].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        entries[4].binding = 5; // ADR-040 particle emissive aggregates
+        entries[4].visibility = wgpu::ShaderStage::Fragment;
+        entries[4].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[4].buffer.minBindingSize = kParticleGlowBytes;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "volume-layout";
         desc.entryCount = entries.size();
@@ -257,7 +280,7 @@ void VolumeRenderer::Impl::rebuildGroups(const wgpu::TextureView& sceneDepth) {
     }
     const auto& device = context.device();
     auto make = [&](const wgpu::TextureView& volumeView, const char* label) {
-        std::array<wgpu::BindGroupEntry, 4> entries{};
+        std::array<wgpu::BindGroupEntry, 5> entries{};
         entries[0].binding = 1;
         entries[0].buffer = uniforms;
         entries[0].size = sizeof(VolumeUniforms);
@@ -268,6 +291,9 @@ void VolumeRenderer::Impl::rebuildGroups(const wgpu::TextureView& sceneDepth) {
         entries[2].textureView = sceneDepth;
         entries[3].binding = 4;
         entries[3].textureView = volumeView;
+        entries[4].binding = 5;
+        entries[4].buffer = this->particleGlow;
+        entries[4].size = kParticleGlowBytes;
         wgpu::BindGroupDescriptor desc{};
         desc.label = label;
         desc.layout = volumeLayout;
@@ -281,7 +307,8 @@ void VolumeRenderer::Impl::rebuildGroups(const wgpu::TextureView& sceneDepth) {
 }
 
 void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, std::uint32_t width,
-                            std::uint32_t height, const wgpu::TextureView& sceneDepth, const FieldUniforms* fields) {
+                            std::uint32_t height, const wgpu::TextureView& sceneDepth, const FieldUniforms* fields,
+                            std::uint32_t particleGlowSystems) {
     Impl& im = *impl_;
     collectTimings();
     im.activeThisFrame = false;
@@ -316,10 +343,14 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
                         static_cast<float>(width), static_cast<float>(height));
     u.depthParams = glm::vec4(scene.camera.nearPlane, scene.camera.farPlane, 0.0f, 0.0f);
     u.fogColor = glm::vec4(env.fogColor, 0.0f);
+    // ADR-040: the march reads this many entries from the particle glow table.
+    const std::uint32_t glowSystems = std::min(particleGlowSystems, kMaxParticleGlowSystems);
+    u.glow = glm::vec4(static_cast<float>(glowSystems), 0.0f, 0.0f, 0.0f);
     im.context.queue().WriteBuffer(im.uniforms, 0, &u, sizeof(u));
 
     im.activeThisFrame = true;
     stats_.steps = static_cast<std::uint32_t>(steps);
+    stats_.glowSystems = glowSystems;
     stats_.halfResolution = true;
     stats_.volumeMs = im.lastMs;
 }

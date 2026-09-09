@@ -411,43 +411,141 @@ fn fs_dof(in: FsIn) -> @location(0) vec4<f32> {
     return vec4<f32>(sum / weight, 1.0);
 }
 
-// ---- motion blur from depth reprojection (camera motion) ---------------------------------------
+// ---- motion blur: tile-based reconstruction over the velocity target (ADR-035/040) -----------
+// Replaces the old depth-reprojection blur, which could only see *camera* motion. The velocity
+// target already holds the screen motion of every shading path - camera, object, instance,
+// deformation and particle - so reconstructing from it blurs all of them for the same cost.
+//
+// Three passes, following McGuire et al., "A Reconstruction Filter for Plausible Motion Blur"
+// (2012):
+//   fs_velocity_tile_max      one texel per k x k block: the longest velocity in the block, in
+//                             pixels, already scaled by the shutter and clamped to the maximum
+//                             radius (a moving object must be able to smear *outside* its own
+//                             silhouette, which a per-pixel filter can never do).
+//   fs_velocity_neighbour_max 3 x 3 maximum over those tiles, so a tile knows about the fast
+//                             thing about to sweep into it.
+//   fs_motion_blur            samples along the neighbourhood velocity, weighting each tap by a
+//                             soft depth comparison (does the tap's surface blur *over* this
+//                             pixel, or is it behind it?) and by whether the tap's own velocity
+//                             reaches this pixel.
+//
+// Blur length is `velocity * shutterAngle / 360` (ADR-037), passed in as params0.x, so a 0 degree
+// shutter produces no smear at all and 360 degrees smears a whole frame of travel.
+//
+// Determinism and temporal stability: the tap offset jitter is interleaved gradient noise of the
+// *pixel coordinate only*. It never reads the frame index or the clock, so the same frame renders
+// identically every time and a static image does not shimmer between frames.
 
-fn velocityAt(uv: vec2<f32>, amount: f32) -> vec2<f32> {
-    let d = sampleDepth(uv);
-    if (d >= 1.0) { return vec2<f32>(0.0); }
-    let world = worldFromDepth(uv, d);
-    let prevClip = post.prevViewProj * vec4<f32>(world, 1.0);
-    let prevNdc = prevClip.xy / max(prevClip.w, 1e-5);
-    let prevUv = vec2<f32>(prevNdc.x * 0.5 + 0.5, 1.0 - (prevNdc.y * 0.5 + 0.5));
-    var v = (uv - prevUv) * amount;
-    let maxLen = 0.06;
-    let len = length(v);
-    if (len > maxLen) { v *= maxLen / len; }
-    return v;
+// params0 = (blur scale, tile size px, max radius px, 0); params1 = (full width, full height, 0, 0)
+@fragment
+fn fs_velocity_tile_max(in: FsIn) -> @location(0) vec4<f32> {
+    let tile = max(i32(post.params0.y), 1);
+    let fullSize = vec2<i32>(post.params1.xy);
+    let origin = vec2<i32>(floor(in.clip.xy)) * tile;
+    var best = vec2<f32>(0.0);
+    var bestLen = 0.0;
+    for (var y = 0; y < tile; y = y + 1) {
+        for (var x = 0; x < tile; x = x + 1) {
+            let coord = min(origin + vec2<i32>(x, y), fullSize - vec2<i32>(1));
+            let v = textureLoad(source, coord, 0).xy * post.params1.xy * post.params0.x;
+            let l = length(v);
+            if (l > bestLen) {
+                bestLen = l;
+                best = v;
+            }
+        }
+    }
+    if (bestLen > post.params0.z) {
+        best *= post.params0.z / bestLen;
+    }
+    return vec4<f32>(best, 0.0, 0.0);
 }
 
 @fragment
+fn fs_velocity_neighbour_max(in: FsIn) -> @location(0) vec4<f32> {
+    let size = vec2<i32>(textureDimensions(source));
+    let center = vec2<i32>(floor(in.clip.xy));
+    var best = vec2<f32>(0.0);
+    var bestLen = 0.0;
+    for (var y = -1; y <= 1; y = y + 1) {
+        for (var x = -1; x <= 1; x = x + 1) {
+            let coord = clamp(center + vec2<i32>(x, y), vec2<i32>(0), size - vec2<i32>(1));
+            let v = textureLoad(source, coord, 0).xy;
+            let l = length(v);
+            if (l > bestLen) {
+                bestLen = l;
+                best = v;
+            }
+        }
+    }
+    return vec4<f32>(best, 0.0, 0.0);
+}
+
+// 1 when `near` really is in front of `far`, fading to 0 as it falls behind. Both are view
+// distances in metres, so the soft edge is scaled by the nearer of the two.
+fn softDepthCompare(near: f32, far: f32) -> f32 {
+    let soft = 0.05 * max(min(near, far), 1.0);
+    return clamp(1.0 - (near - far) / soft, 0.0, 1.0);
+}
+fn blurCone(dist: f32, len: f32) -> f32 { return clamp(1.0 - dist / max(len, 1e-4), 0.0, 1.0); }
+fn blurCylinder(dist: f32, len: f32) -> f32 {
+    // smoothstep with equal edges is undefined in WGSL, and a still surface has len == 0 - which
+    // is exactly the case that must return 0, or every static pixel inside a moving tile's
+    // neighbourhood would average its surroundings and erode.
+    let l = max(len, 1e-4);
+    return 1.0 - smoothstep(0.95 * l, 1.05 * l, dist);
+}
+// Interleaved gradient noise (Jimenez 2014). A function of the pixel alone: stable over time.
+fn blurJitter(pixel: vec2<f32>) -> f32 {
+    return fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715))));
+}
+
+// source = colour, second = the neighbourhood-max tiles, third = the velocity target,
+// params0 = (blur scale, samples, max radius px, tile size px)
+@fragment
 fn fs_motion_blur(in: FsIn) -> @location(0) vec4<f32> {
-    let amount = post.params0.x;
+    let center = textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb;
+    let tileSize = vec2<i32>(textureDimensions(second));
+    let tileCoord = clamp(vec2<i32>(in.uv * vec2<f32>(tileSize)), vec2<i32>(0), tileSize - vec2<i32>(1));
+    let neighbour = textureLoad(second, tileCoord, 0).xy; // pixels
+    let neighbourLen = length(neighbour);
+    // Half a pixel of motion is invisible; skipping it keeps still frames bit-identical to the
+    // unblurred image and costs nothing where nothing moves.
+    if (neighbourLen < 0.5) {
+        return vec4<f32>(center, 1.0);
+    }
+    let fullSize = vec2<f32>(textureDimensions(source));
+    let ownVel = textureSampleLevel(third, linearSampler, in.uv, 0.0).xy * fullSize * post.params0.x;
+    var ownLen = length(ownVel);
+    if (ownLen > post.params0.z) { ownLen = post.params0.z; }
+    let centerDepth = viewDistance(in.uv);
+
     let samples = max(i32(post.params0.y), 2);
-    // Neighbourhood max (a cheap stand-in for McGuire's tile max): lets moving objects smear over
-    // their static surroundings instead of only inside their own silhouette.
-    var best = velocityAt(in.uv, amount);
-    let r = 0.03;
-    var offsets = array<vec2<f32>, 8>(vec2<f32>(r, 0.0), vec2<f32>(-r, 0.0), vec2<f32>(0.0, r), vec2<f32>(0.0, -r),
-                                      vec2<f32>(r, r), vec2<f32>(-r, r), vec2<f32>(r, -r), vec2<f32>(-r, -r));
-    for (var i = 0; i < 8; i = i + 1) {
-        let nv = velocityAt(clamp(in.uv + offsets[i], vec2<f32>(0.0), vec2<f32>(1.0)), amount);
-        if (dot(nv, nv) > dot(best, best)) { best = nv; }
-    }
-    if (dot(best, best) < 1e-10) {
-        return vec4<f32>(textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb, 1.0);
-    }
-    var sum = vec3<f32>(0.0);
+    let jitter = blurJitter(in.clip.xy) - 0.5;
+    // The centre tap's weight: a pixel that is itself still keeps most of its own colour, a fast
+    // one spreads its energy over the whole streak.
+    var weight = 1.0 / max(ownLen, 0.5);
+    var sum = center * weight;
     for (var i = 0; i < samples; i = i + 1) {
-        let t = (f32(i) / f32(samples - 1)) - 0.5;
-        sum += textureSampleLevel(source, linearSampler, clamp(in.uv + best * t, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).rgb;
+        // Symmetric taps about the pixel, jittered inside their own step so the sample pattern
+        // does not band.
+        let t = (f32(i) + 0.5 + jitter) / f32(samples) - 0.5;
+        let offsetPx = neighbour * t;
+        let uv = clamp(in.uv + offsetPx / fullSize, vec2<f32>(0.0), vec2<f32>(1.0));
+        let dist = length(offsetPx);
+        let tapDepth = viewDistance(uv);
+        var tapLen = length(textureSampleLevel(third, linearSampler, uv, 0.0).xy * fullSize * post.params0.x);
+        if (tapLen > post.params0.z) { tapLen = post.params0.z; }
+        // The tap's surface is in front of this pixel and moving: it smears over us. This is the
+        // case that lets a moving object blur *outside* its own silhouette.
+        let foreground = softDepthCompare(tapDepth, centerDepth) * blurCone(dist, tapLen);
+        // The tap is behind us and *we* are moving: we uncover it.
+        let background = softDepthCompare(centerDepth, tapDepth) * blurCone(dist, ownLen);
+        // Both moving at a similar rate: the usual blur of a coherent surface.
+        let alongBoth = 2.0 * blurCylinder(dist, tapLen) * blurCylinder(dist, ownLen);
+        let w = foreground + background + alongBoth;
+        sum += textureSampleLevel(source, linearSampler, uv, 0.0).rgb * w;
+        weight += w;
     }
-    return vec4<f32>(sum / f32(samples), 1.0);
+    return vec4<f32>(sum / max(weight, 1e-4), 1.0);
 }

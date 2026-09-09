@@ -1,6 +1,7 @@
 #include "scene/particles.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 
 namespace avgen::scene {
@@ -26,6 +27,104 @@ std::optional<FieldForceMode> fieldForceModeFromName(std::string_view name) {
         }
     }
     return std::nullopt;
+}
+
+namespace {
+// The exact rule shaders/particles.wgsl `curveAt` implements: clamp below the first key, clamp
+// above the last, linear between the bracketing pair. Keys are assumed ascending in t.
+template <typename Key, typename Value, typename Get>
+Value evaluateCurve(const std::vector<Key>& keys, float t, Get get, Value fallback) {
+    if (keys.size() < 2) {
+        return keys.empty() ? fallback : get(keys.front());
+    }
+    const std::size_t n = std::min(keys.size(), static_cast<std::size_t>(kMaxCurveKeys));
+    if (t <= keys[0].t) {
+        return get(keys[0]);
+    }
+    for (std::size_t i = 1; i < n; ++i) {
+        if (t <= keys[i].t) {
+            const float span = keys[i].t - keys[i - 1].t;
+            const float u = span > 1e-6f ? (t - keys[i - 1].t) / span : 0.0f;
+            return get(keys[i - 1]) + (get(keys[i]) - get(keys[i - 1])) * u;
+        }
+    }
+    return get(keys[n - 1]);
+}
+} // namespace
+
+float ParticleCurve::evaluate(float t) const {
+    return evaluateCurve<CurveKey, float>(
+        keys, t, [](const CurveKey& k) { return k.value; }, 0.0f);
+}
+
+glm::vec3 ParticleColorCurve::evaluate(float t) const {
+    return evaluateCurve<ColorKey, glm::vec3>(
+        keys, t, [](const ColorKey& k) { return k.color; }, glm::vec3(1.0f));
+}
+
+float particleStretchLength(float speed, float shutterSeconds, const ParticleSystem& s) {
+    if (s.velocityStretch <= 0.0f || shutterSeconds <= 0.0f) {
+        return 0.0f;
+    }
+    const float length = std::max(0.0f, speed) * shutterSeconds * s.velocityStretch;
+    if (length < s.stretchMin) {
+        return 0.0f; // slow particles stay round
+    }
+    return std::min(length, std::max(0.0f, s.stretchMax));
+}
+
+std::uint32_t trailHistoryPoints(const ParticleSystem& s) {
+    if (!s.trailEnabled) {
+        return 0;
+    }
+    return std::clamp<std::uint32_t>(s.trailLength, 2, kMaxTrailPoints) - 1;
+}
+
+std::uint64_t trailMemoryBytes(const ParticleSystem& s) {
+    return static_cast<std::uint64_t>(s.capacity) * trailHistoryPoints(s) * kTrailBytesPerPoint;
+}
+
+Result<void> validateParticleSystem(const ParticleSystem& s) {
+    auto checkCurve = [&](const char* what, std::size_t count, auto at) -> Result<void> {
+        if (count > static_cast<std::size_t>(kMaxCurveKeys)) {
+            return fail("particle system '{}': {} has {} keys, at most {} are allowed", s.name, what, count,
+                        kMaxCurveKeys);
+        }
+        for (std::size_t i = 1; i < count; ++i) {
+            if (at(i) < at(i - 1)) {
+                return fail("particle system '{}': {} keys must be sorted by t", s.name, what);
+            }
+        }
+        return Result<void>{};
+    };
+    if (auto r = checkCurve("sizeCurve", s.sizeCurve.keys.size(), [&](std::size_t i) { return s.sizeCurve.keys[i].t; }); !r) {
+        return r;
+    }
+    if (auto r = checkCurve("opacityCurve", s.opacityCurve.keys.size(),
+                            [&](std::size_t i) { return s.opacityCurve.keys[i].t; });
+        !r) {
+        return r;
+    }
+    if (auto r = checkCurve("colorCurve", s.colorCurve.keys.size(), [&](std::size_t i) { return s.colorCurve.keys[i].t; });
+        !r) {
+        return r;
+    }
+    if (s.trailEnabled) {
+        if (s.trailLength < 2 || s.trailLength > kMaxTrailPoints) {
+            return fail("particle system '{}': trailLength {} is out of range 2..{}", s.name, s.trailLength,
+                        kMaxTrailPoints);
+        }
+        if (s.trailStride == 0 || s.trailStride > 64) {
+            return fail("particle system '{}': trailStride {} is out of range 1..64", s.name, s.trailStride);
+        }
+        const std::uint64_t bytes = trailMemoryBytes(s);
+        if (bytes > kMaxTrailBytes) {
+            return fail("particle system '{}': a {}-point trail over {} particles needs {} MiB of history, over the "
+                        "{} MiB budget; lower the capacity or the trail length, or use velocityStretch instead",
+                        s.name, s.trailLength, s.capacity, bytes >> 20, kMaxTrailBytes >> 20);
+        }
+    }
+    return Result<void>{};
 }
 
 namespace {
@@ -88,6 +187,8 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
     p.colorStart = &params.add(color(base, "colorStart", s.colorStart));
     p.colorEnd = &params.add(color(base, "colorEnd", s.colorEnd));
     p.emissive = &params.add(f(base, "emissive", s.emissive, 0.0f, 100.0f, 0.0f, 20.0f));
+    p.stretch = &params.add(f(base, "stretch", s.velocityStretch, 0.0f, 20.0f, 0.0f, 4.0f));
+    p.trailWidth = &params.add(f(base, "trailWidth", s.trailWidth, 0.0f, 20.0f, 0.0f, 4.0f));
     {
         params::ParamDesc<bool> d;
         d.path = base + "enabled";
@@ -133,6 +234,8 @@ void applyParticleParameters(const ParticleParameters& p, const ParticleSystem& 
     s.colorStart = p.colorStart->value();
     s.colorEnd = p.colorEnd->value();
     s.emissive = p.emissive->value();
+    s.velocityStretch = p.stretch->value();
+    s.trailWidth = p.trailWidth->value();
     s.enabled = p.enabled->value();
 }
 

@@ -40,6 +40,9 @@ struct PostFrameInputs {
     // paths without changing the image: `emission` weights bloom, `identifier` masks sharpening.
     wgpu::TextureView emission;
     wgpu::TextureView identifier;
+    // ADR-040: the RG16F per-pixel screen motion. Null skips motion blur entirely - there is no
+    // longer a camera-only fallback, because it disagreed with everything that moves on its own.
+    wgpu::TextureView velocity;
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     glm::mat4 prevViewProj{1.0f};
@@ -76,6 +79,8 @@ public:
     void resetExposure();
 
     static constexpr wgpu::TextureFormat kHdrFormat = wgpu::TextureFormat::RGBA16Float;
+    // Matches SceneRenderer's velocity target (ADR-035); the motion-blur tiles use it too.
+    static constexpr wgpu::TextureFormat kVelocityFormat = wgpu::TextureFormat::RG16Float;
 
 private:
     struct Uniforms {
@@ -110,7 +115,8 @@ private:
     };
 
     Result<void> createPipelines(const wgpu::ShaderModule& module);
-    Result<wgpu::RenderPipeline> makePipeline(const wgpu::ShaderModule& module, const char* entry);
+    Result<wgpu::RenderPipeline> makePipeline(const wgpu::ShaderModule& module, const char* entry,
+                                             wgpu::TextureFormat format = kHdrFormat);
     void runPass(wgpu::CommandEncoder& encoder, const wgpu::RenderPipeline& pipeline, const wgpu::TextureView& target,
                  const PassTextures& textures, const Uniforms& uniforms);
     // Convenience for the many passes that only bind `source` (and optionally `second`/`depth`).
@@ -145,6 +151,8 @@ private:
     wgpu::RenderPipeline sharpen_;
     wgpu::RenderPipeline dof_;
     wgpu::RenderPipeline motionBlur_;
+    wgpu::RenderPipeline velocityTileMax_;
+    wgpu::RenderPipeline velocityNeighbourMax_;
     wgpu::Sampler sampler_;
     wgpu::Buffer uniforms_;
     std::uint32_t slot_ = 0;

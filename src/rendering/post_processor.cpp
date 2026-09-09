@@ -163,9 +163,10 @@ Result<void> PostProcessor::reload() {
     return createPipelines(*module);
 }
 
-Result<wgpu::RenderPipeline> PostProcessor::makePipeline(const wgpu::ShaderModule& module, const char* entry) {
+Result<wgpu::RenderPipeline> PostProcessor::makePipeline(const wgpu::ShaderModule& module, const char* entry,
+                                                        wgpu::TextureFormat format) {
     wgpu::ColorTargetState colorTarget{};
-    colorTarget.format = kHdrFormat;
+    colorTarget.format = format;
     colorTarget.writeMask = wgpu::ColorWriteMask::All;
     wgpu::FragmentState fragment{};
     fragment.module = module;
@@ -214,6 +215,11 @@ Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
         {"fs_dof", &dof_},
         {"fs_motion_blur", &motionBlur_},
     }};
+    // The two velocity-tile passes write RG16F, not the HDR format (ADR-040).
+    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 2> tileSlots{{
+        {"fs_velocity_tile_max", &velocityTileMax_},
+        {"fs_velocity_neighbour_max", &velocityNeighbourMax_},
+    }};
     // Build every pipeline first, so a shader that fails to compile leaves the previous set intact.
     std::array<wgpu::RenderPipeline, slots.size()> built{};
     for (std::size_t i = 0; i < slots.size(); ++i) {
@@ -223,8 +229,19 @@ Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
         }
         built[i] = *pipeline;
     }
+    std::array<wgpu::RenderPipeline, tileSlots.size()> builtTiles{};
+    for (std::size_t i = 0; i < tileSlots.size(); ++i) {
+        auto pipeline = makePipeline(module, tileSlots[i].first, kVelocityFormat);
+        if (!pipeline) {
+            return std::unexpected(pipeline.error());
+        }
+        builtTiles[i] = *pipeline;
+    }
     for (std::size_t i = 0; i < slots.size(); ++i) {
         *slots[i].second = built[i];
+    }
+    for (std::size_t i = 0; i < tileSlots.size(); ++i) {
+        *tileSlots[i].second = builtTiles[i];
     }
     return {};
 }
@@ -426,14 +443,40 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         runPass(encoder, dof_, target.view, current, nullptr, in.depth, u);
         current = target.view;
     }
-    // ---- 3. motion blur (temporal; also needs undistorted depth) --------------------------------
-    if (s.motionBlurAmount > 0.0f) {
-        auto target = pool.acquire(in.width, in.height, kHdrFormat);
+    // ---- 3. motion blur: tile-based reconstruction over the velocity target (ADR-035/040) -------
+    // Blur length is the frame's screen motion times the shutter fraction (ADR-037), so a zero
+    // shutter angle is exactly no blur. Without a velocity target the pass is skipped entirely -
+    // the old depth-reprojection fallback is gone, and with it camera-only blur.
+    const float shutterFraction = std::clamp(s.lens.shutterAngle, 0.0f, 360.0f) / 360.0f;
+    const float blurScale = s.motionBlurAmount * shutterFraction;
+    if (blurScale > 1e-4f && in.velocity != nullptr) {
+        const std::uint32_t tileSize = std::clamp<std::uint32_t>(s.motionBlurTileSize, 4, 40);
+        const std::uint32_t tilesX = (in.width + tileSize - 1) / tileSize;
+        const std::uint32_t tilesY = (in.height + tileSize - 1) / tileSize;
+        const float maxRadius = std::max(1.0f, s.motionBlurMaxRadius * pixelScale);
+        auto tiles = pool.acquire(tilesX, tilesY, kVelocityFormat);
+        auto neighbours = pool.acquire(tilesX, tilesY, kVelocityFormat);
         Uniforms u = base;
-        u.params0 = glm::vec4(s.motionBlurAmount,
-                              static_cast<float>(std::clamp<std::uint32_t>(s.motionBlurSamples, 2, 32)), 0.0f, 0.0f);
-        runPass(encoder, motionBlur_, target.view, current, nullptr, in.depth, u);
+        u.outputSize = glm::vec2(static_cast<float>(tilesX), static_cast<float>(tilesY));
+        u.texelSize = 1.0f / u.outputSize;
+        u.params0 = glm::vec4(blurScale, static_cast<float>(tileSize), maxRadius, 0.0f);
+        u.params1 = glm::vec4(static_cast<float>(in.width), static_cast<float>(in.height), 0.0f, 0.0f);
+        runPass(encoder, velocityTileMax_, tiles.view, in.velocity, nullptr, nullptr, u);
+        runPass(encoder, velocityNeighbourMax_, neighbours.view, tiles.view, nullptr, nullptr, u);
+
+        auto target = pool.acquire(in.width, in.height, kHdrFormat);
+        Uniforms b = base;
+        b.params0 = glm::vec4(blurScale, static_cast<float>(std::clamp<std::uint32_t>(s.motionBlurSamples, 2, 32)),
+                              maxRadius, static_cast<float>(tileSize));
+        PassTextures textures;
+        textures.source = current;
+        textures.second = neighbours.view;
+        textures.third = in.velocity;
+        textures.depth = in.depth;
+        runPass(encoder, motionBlur_, target.view, textures, b);
         current = target.view;
+        pool.release(tiles);
+        pool.release(neighbours);
     }
     // ---- 4. lens: distortion and chromatic aberration -------------------------------------------
     if (std::abs(s.distortion) > 1e-4f || s.chromaticAberration > 1e-4f) {

@@ -25,7 +25,7 @@ fn fs_main(in: VertexOut) -> SceneOut {
     // The grid is additive and unlit; it still fills the auxiliary targets so nothing behind it
     // leaks into occlusion or motion vectors at its silhouette (ADR-035).
     out.normalRoughness = packNormalRoughness(normalize(in.normal), 1.0, 2.0);
-    out.velocity = screenVelocity(in.clip, in.prevClip);
+    out.velocity = screenVelocityAt(in.clip, in.prevClip);
     out.emission = vec4<f32>(color, 0.0);
     out.ids = packIds(object.ids.x, object.ids.y);
     return out;

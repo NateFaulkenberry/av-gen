@@ -639,7 +639,178 @@
         ],
         "emissive": 6.0,
         "blend": "additive",
-        "softness": 0.3
+        "softness": 0.3,
+        "velocityStretch": 2.5,
+        "stretchMax": 0.28,
+        "stretchMin": 0.008,
+        "fogCoupling": 1.0,
+        "volumeGlow": 0.5,
+        "sizeCurve": [
+          {
+            "t": 0.0,
+            "value": 0.008
+          },
+          {
+            "t": 0.06,
+            "value": 0.036
+          },
+          {
+            "t": 0.35,
+            "value": 0.02
+          },
+          {
+            "t": 1.0,
+            "value": 0.0
+          }
+        ],
+        "opacityCurve": [
+          {
+            "t": 0.0,
+            "value": 0.0
+          },
+          {
+            "t": 0.05,
+            "value": 1.0
+          },
+          {
+            "t": 0.5,
+            "value": 0.55
+          },
+          {
+            "t": 1.0,
+            "value": 0.0
+          }
+        ],
+        "colorCurve": [
+          {
+            "t": 0.0,
+            "color": [
+              1.0,
+              0.98,
+              0.9
+            ]
+          },
+          {
+            "t": 0.15,
+            "color": [
+              1.0,
+              0.8,
+              0.38
+            ]
+          },
+          {
+            "t": 0.55,
+            "color": [
+              1.0,
+              0.4,
+              0.1
+            ]
+          },
+          {
+            "t": 1.0,
+            "color": [
+              0.55,
+              0.09,
+              0.02
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "arcs",
+      "kind": "particles",
+      "particles": {
+        "capacity": 2048,
+        "seed": 19,
+        "shape": "disc",
+        "position": [
+          0,
+          6.2,
+          0
+        ],
+        "extent": [
+          3.4,
+          3.4,
+          3.4
+        ],
+        "spawnRate": 70,
+        "lifetimeMin": 2.2,
+        "lifetimeMax": 3.4,
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "spread": 0.25,
+        "speedMin": 1.6,
+        "speedMax": 3.0,
+        "gravity": [
+          0,
+          -0.35,
+          0
+        ],
+        "drag": 0.35,
+        "turbulence": 1.4,
+        "turbulenceScale": 0.55,
+        "turbulenceSpeed": 0.4,
+        "attractorPosition": [
+          0,
+          9.5,
+          0
+        ],
+        "attractorStrength": 2.2,
+        "attractorRadius": 9.0,
+        "orbit": 4.0,
+        "sizeStart": 0.07,
+        "sizeEnd": 0.03,
+        "colorStart": [
+          0.55,
+          0.85,
+          1.0,
+          1.0
+        ],
+        "colorEnd": [
+          0.35,
+          0.55,
+          1.0,
+          0.0
+        ],
+        "emissive": 3.0,
+        "blend": "additive",
+        "softness": 0.3,
+        "trailEnabled": true,
+        "trailLength": 28,
+        "trailStride": 1,
+        "trailWidth": 0.9,
+        "trailTaper": 0.05,
+        "trailFade": 0.0,
+        "trailTint": [
+          0.35,
+          0.6,
+          1.0
+        ],
+        "velocityStretch": 0.0,
+        "fogCoupling": 1.0,
+        "volumeGlow": 0.25,
+        "opacityCurve": [
+          {
+            "t": 0.0,
+            "value": 0.0
+          },
+          {
+            "t": 0.12,
+            "value": 1.0
+          },
+          {
+            "t": 0.7,
+            "value": 0.75
+          },
+          {
+            "t": 1.0,
+            "value": 0.0
+          }
+        ]
       }
     }
   ]

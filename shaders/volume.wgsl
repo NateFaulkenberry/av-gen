@@ -35,12 +35,16 @@ struct VolumeUniforms {
     sizes: vec4<f32>,     // half width, half height, full width, full height
     depthParams: vec4<f32>, // camera near, camera far, 0, 0
     fogColor: vec4<f32>,  // rgb = emission tint when no colour field is named
+    glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), yzw = 0
 };
 
 @group(1) @binding(1) var<uniform> vol: VolumeUniforms;
 @group(1) @binding(2) var<uniform> fieldBlock: FieldBlock;
 @group(1) @binding(3) var sceneDepth: texture_depth_2d;
 @group(1) @binding(4) var volumeTex: texture_2d<f32>;
+// ADR-040: two vec4 per particle system - (centre.xyz, spread radius) and (colour.rgb, power) -
+// written by particles.wgsl's cs_glow_top. Slots past vol.glow.x are zero.
+@group(1) @binding(5) var<storage, read> particleGlow: array<vec4<f32>>;
 
 struct FsIn {
     @builtin(position) pos: vec4<f32>,
@@ -140,6 +144,34 @@ fn keyLightAt(p: vec3<f32>) -> KeyLight {
     return out;
 }
 
+// ADR-040: emissive particles light the dust around them. Each system is reduced on the GPU to
+// one sphere - the emission-weighted centroid of its alive particles, the standard deviation of
+// their positions, the mean colour and the total power - and the march treats it as a soft
+// luminous ball whose radiance falls off as a Gaussian at the cloud's own spread. The coupling is
+// one-directional and costs one Gaussian per step per system: the volume never touches the
+// simulation, so determinism is untouched.
+// One particle at full opacity and unit emissive intensity is treated as a point emitter of this
+// radiant intensity. Small on purpose: a spark is a millimetre of hot metal, and a burst of ten
+// thousand of them should read as a glow in the dust, not as a second sun.
+const kParticleGlowIntensity: f32 = 0.0015;
+
+fn particleGlowAt(p: vec3<f32>) -> vec3<f32> {
+    let count = u32(vol.glow.x);
+    var sum = vec3<f32>(0.0);
+    for (var i = 0u; i < count; i = i + 1u) {
+        let centre = particleGlow[i * 2u];
+        let color = particleGlow[i * 2u + 1u];
+        if (color.w <= 0.0) { continue; }
+        let radius = max(centre.w, 0.25);
+        let d = p - centre.xyz;
+        let falloff = exp(-dot(d, d) / (2.0 * radius * radius));
+        // Power is the summed emissive weight of the alive particles; spreading it over the
+        // cloud's surface keeps a wide cloud from being as bright as a tight one.
+        sum += color.rgb * (color.w * kParticleGlowIntensity * falloff / (4.0 * PI * radius * radius));
+    }
+    return sum;
+}
+
 @fragment
 fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
     let halfPx = vec2<i32>(floor(in.pos.xy));
@@ -187,7 +219,9 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
             }
             emission = density * vol.params1.z * emissionColor;
         }
-        let source = scattering * phase * key.radiance + emission;
+        // The particle glow arrives as light to scatter, not as fog emission, so denser dust
+        // catches more of it - which is what reads as "the sparks are lighting the dust".
+        let source = scattering * (phase * key.radiance + particleGlowAt(p)) + emission;
         scattered = scattered + transmittance * source * stepLength;
         transmittance = transmittance * exp(-extinction * stepLength);
         if (transmittance < 0.002) {
