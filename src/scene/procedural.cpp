@@ -26,6 +26,18 @@
 //   `axis`; the GPU displaces along the vertex normal.
 // * Noise/Displacement sample the pattern at p * scale + vec3(speed * t) with `seed` (the
 //   "seed offset" is the seed argument of fbm3, no positional offset).
+// * Point sources are a pointSize x pointSize quad in XY facing +Z (billboarded by the shader);
+//   their bounds half-extent is pointSize / 2 on every axis.
+// * Field deformers (ADR-025): `applyFieldDeformer` samples the named field at the point it is
+//   given; in `deformPoint` a Local-space Field deformer therefore samples at the object-space
+//   point (the field acts in object space) and a World-space one at the world point with the
+//   normal rotated by the instance matrix. `applyDeformer` (no field set) leaves the point alone.
+//   Field deformers ignore `falloff`, `speed` and `phase`.
+// * generateCloud() writes the point cloud the instance records are projected from: position,
+//   rotation, scale from the composed transform, id = index, seed = variation.seed (so
+//   random(i, c) == hashInstance(variation.seed, i, c) and the records stay bit-identical to
+//   the pre-ADR-024 loop), density 1, index u, colour/emissive from material variation, bounds =
+//   the source half-extent x |sourceTransform.scale|.
 //
 // GPU reference (the WGSL the shader implements; the C++ below is a transliteration and must
 // stay identical to float rounding):
@@ -72,6 +84,7 @@
 
 #include "scene/procedural.hpp"
 
+#include "core/log.hpp"
 #include "core/noise.hpp"
 
 #include <glm/gtc/constants.hpp>
@@ -441,6 +454,8 @@ glm::vec3 sourceHalfExtent(const SourceSpec& s) {
         return {s.radius, s.height * 0.5f, s.radius};
     case PrimitiveKind::Sphere:
         return glm::vec3(s.radius);
+    case PrimitiveKind::Point:
+        return glm::vec3(s.pointSize * 0.5f);
     case PrimitiveKind::Torus:
     default:
         return {s.majorRadius + s.minorRadius, s.minorRadius, s.majorRadius + s.minorRadius};
@@ -463,12 +478,15 @@ const char* primitiveKindName(PrimitiveKind kind) {
         return "sphere";
     case PrimitiveKind::Torus:
         return "torus";
+    case PrimitiveKind::Point:
+        return "point";
     }
     return "cylinder";
 }
 
 std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name) {
-    for (const auto kind : {PrimitiveKind::Box, PrimitiveKind::Cylinder, PrimitiveKind::Sphere, PrimitiveKind::Torus}) {
+    for (const auto kind :
+         {PrimitiveKind::Box, PrimitiveKind::Cylinder, PrimitiveKind::Sphere, PrimitiveKind::Torus, PrimitiveKind::Point}) {
         if (name == primitiveKindName(kind)) {
             return kind;
         }
@@ -558,13 +576,15 @@ const char* deformerKindName(DeformerKind kind) {
         return "noise";
     case DeformerKind::Displacement:
         return "displacement";
+    case DeformerKind::Field:
+        return "field";
     }
     return "twist";
 }
 
 std::optional<DeformerKind> deformerKindFromName(std::string_view name) {
     for (const auto kind : {DeformerKind::Bend, DeformerKind::Twist, DeformerKind::Sine, DeformerKind::Noise,
-                            DeformerKind::Displacement}) {
+                            DeformerKind::Displacement, DeformerKind::Field}) {
         if (name == deformerKindName(kind)) {
             return kind;
         }
@@ -634,6 +654,11 @@ Result<void> SourceSpec::validate() const {
             return fail("torus minorSegments must be in 3..128 (got {})", minorSegments);
         }
         break;
+    case PrimitiveKind::Point:
+        if (!(pointSize > 0.0f)) {
+            return fail("point size must be positive");
+        }
+        break;
     }
     return {};
 }
@@ -663,6 +688,9 @@ std::uint64_t SourceSpec::structuralHash() const {
         h.f32(minorRadius);
         h.i32(majorSegments);
         h.i32(minorSegments);
+        break;
+    case PrimitiveKind::Point:
+        h.f32(pointSize);
         break;
     }
     return h.value();
@@ -848,6 +876,18 @@ MeshData makeTorus(float majorRadius, float minorRadius, int majorSegments, int 
     return mesh;
 }
 
+// A pointSize x pointSize quad in the XY plane facing +Z: 4 vertices, 2 CCW triangles, uv 0..1.
+MeshData makePointQuad(float size) {
+    MeshData mesh;
+    mesh.name = "point";
+    const float h = size * 0.5f;
+    const glm::vec3 n(0.0f, 0.0f, 1.0f);
+    mesh.vertices = {Vertex{{-h, -h, 0.0f}, n, {0.0f, 0.0f}}, Vertex{{h, -h, 0.0f}, n, {1.0f, 0.0f}},
+                     Vertex{{h, h, 0.0f}, n, {1.0f, 1.0f}}, Vertex{{-h, h, 0.0f}, n, {0.0f, 1.0f}}};
+    mesh.indices = {0, 1, 2, 0, 2, 3};
+    return mesh;
+}
+
 Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
     if (auto ok = spec.validate(); !ok) {
         return std::unexpected(ok.error());
@@ -861,6 +901,8 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
         return makeUvSphere(spec.radius, spec.segments, spec.rings);
     case PrimitiveKind::Torus:
         return makeTorus(spec.majorRadius, spec.minorRadius, spec.majorSegments, spec.minorSegments);
+    case PrimitiveKind::Point:
+        return makePointQuad(spec.pointSize);
     }
     return fail("unknown primitive kind");
 }
@@ -1153,22 +1195,48 @@ glm::vec3 applyDeformer(const Deformer& d, glm::vec3 p, double time) {
         return applyNoise(d, p, t);
     case DeformerKind::Displacement:
         return applyDisplacement(d, p, t);
+    case DeformerKind::Field:
+        return p; // needs the field set: see applyFieldDeformer
     }
     return p;
 }
 
+glm::vec3 applyFieldDeformer(const Deformer& d, glm::vec3 p, glm::vec3 normal, double time,
+                             const spatial::FieldSet& fields) {
+    if (d.kind != DeformerKind::Field || d.amount == 0.0f) {
+        return p;
+    }
+    const spatial::FieldSpec* field = fields.find(d.field);
+    if (field == nullptr || !field->enabled) {
+        return p;
+    }
+    if (field->type() == spatial::FieldType::Vector) {
+        return p + spatial::sampleVector(*field, p, time, &fields) * d.amount;
+    }
+    const float s = spatial::sampleScalar(*field, p, time, &fields);
+    const glm::vec3 dir = d.alongNormal ? unitOr(normal, glm::vec3(0.0f)) : unitOr(d.axis, glm::vec3(0.0f, 1.0f, 0.0f));
+    return p + dir * (s * d.amount);
+}
+
 glm::vec3 deformPoint(const std::vector<Deformer>& stack, glm::vec3 objectPoint, const glm::mat4& instanceWorld,
-                      double time) {
+                      double time, const spatial::FieldSet* fields, glm::vec3 normal) {
+    const auto apply = [&](const Deformer& d, const glm::vec3& p, const glm::vec3& n) {
+        if (d.kind == DeformerKind::Field) {
+            return fields != nullptr ? applyFieldDeformer(d, p, n, time, *fields) : p;
+        }
+        return applyDeformer(d, p, time);
+    };
     glm::vec3 p = objectPoint;
     for (const Deformer& d : stack) {
         if (d.enabled && d.space == DeformSpace::Local) {
-            p = applyDeformer(d, p, time);
+            p = apply(d, p, normal);
         }
     }
     p = glm::vec3(instanceWorld * glm::vec4(p, 1.0f));
+    const glm::vec3 worldNormal = unitOr(glm::mat3(instanceWorld) * normal, glm::vec3(0.0f));
     for (const Deformer& d : stack) {
         if (d.enabled && d.space == DeformSpace::World) {
-            p = applyDeformer(d, p, time);
+            p = apply(d, p, worldNormal);
         }
     }
     return p;
@@ -1206,6 +1274,32 @@ Result<void> ProceduralGeometry::validate() const {
         if (!(d.scale > 0.0f)) {
             return fail("procedural '{}': deformer {} scale must be > 0", name, i + 1);
         }
+        if (d.kind == DeformerKind::Field && d.field.empty()) {
+            return fail("procedural '{}': deformer {} (field) needs a field name", name, i + 1);
+        }
+    }
+    if (effectors.size() > static_cast<std::size_t>(kMaxEffectors)) {
+        return fail("procedural '{}': at most {} effectors (got {})", name, kMaxEffectors, effectors.size());
+    }
+    for (std::size_t i = 0; i < effectors.size(); ++i) {
+        if (effectors[i].field.empty()) {
+            return fail("procedural '{}': effector {} needs a field name", name, i + 1);
+        }
+        if (effectors[i].op == spatial::EffectorOp::Attribute && effectors[i].target.empty()) {
+            return fail("procedural '{}': effector {} (attribute) needs a target", name, i + 1);
+        }
+    }
+    for (std::size_t i = 0; i < pointOps.size(); ++i) {
+        const spatial::PointOp& op = pointOps[i];
+        if (op.copies < 0) {
+            return fail("procedural '{}': op {} copies must be >= 0", name, i + 1);
+        }
+        if (op.stride < 1) {
+            return fail("procedural '{}': op {} stride must be >= 1", name, i + 1);
+        }
+        if (op.kind == spatial::PointOpKind::Attribute && op.attributeOp.target.empty()) {
+            return fail("procedural '{}': op {} (attribute) needs a target", name, i + 1);
+        }
     }
     if (material.roughness < 0.0f || material.roughness > 1.0f || material.metallic < 0.0f || material.metallic > 1.0f) {
         return fail("procedural '{}': roughness and metallic must be in 0..1", name);
@@ -1228,26 +1322,32 @@ std::uint64_t ProceduralGeometry::structuralHash() const {
     h.f32(materialVariation.valueRandom);
     h.f32(materialVariation.emissiveRandom);
     h.f32(materialVariation.emissiveGradient);
+    h.u64(pointOps.size());
+    for (const spatial::PointOp& op : pointOps) {
+        h.u64(spatial::pointOpHash(op));
+    }
+    h.u64(extraLane.size());
+    for (const char c : extraLane) {
+        h.u32(static_cast<std::uint8_t>(c));
+    }
     return h.value();
 }
 
-bool ProceduralGeometry::rebuild() {
-    const std::uint64_t hash = structuralHash();
+spatial::PointCloud ProceduralGeometry::generateCloud() const {
     const auto count = static_cast<std::size_t>(std::max(distribution.instanceCount(), 1));
-    if (structureVersion != 0 && hash == builtHash && instances.size() == count) {
-        return false;
-    }
-    builtHash = hash;
-    meshHash = source.structuralHash();
-    ++structureVersion;
-
-    instances.clear();
-    instances.reserve(count);
+    spatial::PointCloud out(count);
     const float invLast = count > 1 ? 1.0f / static_cast<float>(count - 1) : 0.0f;
     const glm::vec3 sourceExtent = sourceHalfExtent(source) * glm::abs(sourceTransform.scale);
-    const float sourceRadius = glm::length(sourceExtent);
-    glm::vec3 lo(std::numeric_limits<float>::max());
-    glm::vec3 hi(std::numeric_limits<float>::lowest());
+    auto positions = out.positions();
+    auto rotations = out.rotations();
+    auto scales = out.scales();
+    auto ids = out.ids();
+    auto seeds = out.seeds();
+    auto densities = out.densities();
+    auto colors = out.colors();
+    auto emissives = out.emissives();
+    auto indices = out.indices();
+    auto extents = out.attributes.view<glm::vec3>(spatial::attr::bounds);
 
     for (std::size_t i = 0; i < count; ++i) {
         const auto index = static_cast<std::uint32_t>(i);
@@ -1256,12 +1356,16 @@ bool ProceduralGeometry::rebuild() {
         const Transform t =
             compose(distributionTransform, compose(distribution.placement(signedIndex), variationTransform(variation, index)));
 
-        InstanceRecord rec{};
-        rec.position = glm::vec4(t.position, 1.0f);
-        rec.rotation = glm::vec4(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w);
-        rec.scale = glm::vec4(t.scale, u);
-        rec.random = glm::vec4(hashInstance(variation.seed, index, 0), hashInstance(variation.seed, index, 1),
-                               hashInstance(variation.seed, index, 2), hashInstance(variation.seed, index, 3));
+        positions[i] = t.position;
+        rotations[i] = glm::vec4(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w);
+        scales[i] = t.scale;
+        ids[i] = signedIndex;
+        seeds[i] = static_cast<std::int32_t>(variation.seed);
+        densities[i] = 1.0f;
+        indices[i] = u;
+        if (extents) {
+            (*extents)[i] = sourceExtent;
+        }
 
         const float hueTurns = materialVariation.hueShift * hashInstance(variation.seed, index, kHueChannel) +
                                materialVariation.hueGradient * u;
@@ -1270,18 +1374,60 @@ bool ProceduralGeometry::rebuild() {
         const float emissiveMul = std::max(0.0f, 1.0f + materialVariation.emissiveRandom *
                                                                  signedRandom(variation.seed, index, kEmissiveChannel) +
                                                      materialVariation.emissiveGradient * u);
-        rec.color = glm::vec4(hueRotationMultiplier(material.baseColor, hueTurns) * value, static_cast<float>(i));
-        rec.emissive = glm::vec4(hueRotationMultiplier(material.emissiveColor, hueTurns) * emissiveMul, 0.0f);
-        instances.push_back(rec);
+        colors[i] = glm::vec4(hueRotationMultiplier(material.baseColor, hueTurns) * value, 1.0f);
+        emissives[i] = hueRotationMultiplier(material.emissiveColor, hueTurns) * emissiveMul;
+    }
+    return out;
+}
 
-        // Bounds: the source's bounding sphere carried by this instance (rotation-invariant).
-        const glm::vec3 centre = t.position + t.rotation * (sourceTransform.position * t.scale);
-        const float radius = sourceRadius * std::max({std::abs(t.scale.x), std::abs(t.scale.y), std::abs(t.scale.z)});
+bool ProceduralGeometry::rebuild() {
+    const std::uint64_t hash = structuralHash();
+    if (structureVersion != 0 && hash == builtHash) {
+        return false;
+    }
+    builtHash = hash;
+    meshHash = source.structuralHash();
+    ++structureVersion;
+
+    spatial::PointCloud built = generateCloud();
+    if (auto ok = spatial::applyPointOps(built, pointOps); !ok) {
+        log::warn("procedural '{}': {}", name, ok.error().message);
+    }
+    spatial::projectInstances(built, instances, extraLane);
+
+    // Bounds: the source's bounding sphere carried by each point (rotation-invariant), padded by
+    // the reach of the position effectors.
+    const glm::vec3 sourceExtent = sourceHalfExtent(source) * glm::abs(sourceTransform.scale);
+    const float sourceRadius = glm::length(sourceExtent);
+    glm::vec3 lo(std::numeric_limits<float>::max());
+    glm::vec3 hi(std::numeric_limits<float>::lowest());
+    const auto positions = built.positions();
+    const auto rotations = built.rotations();
+    const auto scales = built.scales();
+    for (std::size_t i = 0; i < built.count(); ++i) {
+        const glm::quat rotation(rotations[i].w, rotations[i].x, rotations[i].y, rotations[i].z);
+        const glm::vec3 centre = positions[i] + rotation * (sourceTransform.position * scales[i]);
+        const float radius = sourceRadius * std::max({std::abs(scales[i].x), std::abs(scales[i].y), std::abs(scales[i].z)});
         lo = glm::min(lo, centre - glm::vec3(radius));
         hi = glm::max(hi, centre + glm::vec3(radius));
     }
-    boundsMin = lo;
-    boundsMax = hi;
+    if (built.count() == 0) {
+        lo = hi = glm::vec3(0.0f);
+    }
+    float padding = 0.0f;
+    for (const spatial::Effector& e : effectors) {
+        if (e.enabled && e.op == spatial::EffectorOp::PositionOffset) {
+            padding += std::abs(e.strength);
+        }
+    }
+    boundsMin = lo - glm::vec3(padding);
+    boundsMax = hi + glm::vec3(padding);
+
+    if (built.count() <= kKeepCloudMax) {
+        cloud = std::move(built);
+    } else {
+        cloud.clear();
+    }
     return true;
 }
 
@@ -1310,6 +1456,7 @@ json ProceduralGeometry::toJson() const {
         s["minorRadius"] = source.minorRadius;
         s["majorSegments"] = source.majorSegments;
         s["minorSegments"] = source.minorSegments;
+        s["pointSize"] = source.pointSize;
         j["source"] = std::move(s);
     }
     j["sourceTransform"] = transformToJson(sourceTransform);
@@ -1365,10 +1512,29 @@ json ProceduralGeometry::toJson() const {
             s["seed"] = d.seed;
             s["axisMask"] = vecToJson(d.axisMask);
             s["pattern"] = d.pattern;
+            s["field"] = d.field;
+            s["alongNormal"] = d.alongNormal;
             arr.push_back(std::move(s));
         }
         j["deformers"] = std::move(arr);
     }
+    {
+        json arr = json::array();
+        for (const spatial::PointOp& op : pointOps) {
+            arr.push_back(spatial::pointOpToJson(op));
+        }
+        j["ops"] = std::move(arr);
+    }
+    {
+        json arr = json::array();
+        for (const spatial::Effector& e : effectors) {
+            arr.push_back(e.toJson());
+        }
+        j["effectors"] = std::move(arr);
+    }
+    j["emissiveField"] = emissiveField;
+    j["emissiveFieldAmount"] = emissiveFieldAmount;
+    j["extraLane"] = extraLane;
     {
         json s = json::object();
         s["baseColor"] = vecToJson(material.baseColor);
@@ -1404,6 +1570,9 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(g.visible, "visible", readBool);
         AVGEN_PROC_READ(g.sourceTransform, "sourceTransform", readTransform);
         AVGEN_PROC_READ(g.distributionTransform, "distributionTransform", readTransform);
+        AVGEN_PROC_READ(g.emissiveField, "emissiveField", readString);
+        AVGEN_PROC_READ(g.emissiveFieldAmount, "emissiveFieldAmount", readFloat);
+        AVGEN_PROC_READ(g.extraLane, "extraLane", readString);
     }
     if (root.contains("source")) {
         const json& j = root.at("source");
@@ -1427,6 +1596,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(s.minorRadius, "minorRadius", readFloat);
         AVGEN_PROC_READ(s.majorSegments, "majorSegments", readInt);
         AVGEN_PROC_READ(s.minorSegments, "minorSegments", readInt);
+        AVGEN_PROC_READ(s.pointSize, "pointSize", readFloat);
     }
     if (root.contains("distribution")) {
         const json& j = root.at("distribution");
@@ -1503,7 +1673,38 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
             AVGEN_PROC_READ(d.seed, "seed", readU32);
             AVGEN_PROC_READ(d.axisMask, "axisMask", readVec3);
             AVGEN_PROC_READ(d.pattern, "pattern", readInt);
+            AVGEN_PROC_READ(d.field, "field", readString);
+            AVGEN_PROC_READ(d.alongNormal, "alongNormal", readBool);
             g.deformers.push_back(d);
+        }
+    }
+    if (root.contains("ops")) {
+        const json& arr = root.at("ops");
+        if (!arr.is_array()) {
+            return fail("'ops' must be an array");
+        }
+        for (const json& j : arr) {
+            auto op = spatial::pointOpFromJson(j);
+            if (!op) {
+                return fail("op {}: {}", g.pointOps.size() + 1, op.error().message);
+            }
+            g.pointOps.push_back(std::move(*op));
+        }
+    }
+    if (root.contains("effectors")) {
+        const json& arr = root.at("effectors");
+        if (!arr.is_array()) {
+            return fail("'effectors' must be an array");
+        }
+        if (arr.size() > static_cast<std::size_t>(kMaxEffectors)) {
+            return fail("at most {} effectors (got {})", kMaxEffectors, arr.size());
+        }
+        for (const json& j : arr) {
+            auto e = spatial::Effector::fromJson(j);
+            if (!e) {
+                return fail("effector {}: {}", g.effectors.size() + 1, e.error().message);
+            }
+            g.effectors.push_back(std::move(*e));
         }
     }
     if (root.contains("material")) {
@@ -1648,7 +1849,7 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
 
     // Source
     const SourceSpec& s = rest.source;
-    r.i("source/kind", static_cast<int>(s.kind), 0, 3, 0, 3);
+    r.i("source/kind", static_cast<int>(s.kind), 0, 4, 0, 4);
     p.sourceSize = r.v3("source/size", s.size, 0.001f, 1000.0f, 0.01f, 10.0f);
     r.i("source/subdivisions", s.subdivisions, 1, 64, 1, 16);
     p.sourceRadius = r.f("source/radius", s.radius, 0.001f, 1000.0f, 0.01f, 10.0f);
@@ -1662,6 +1863,7 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     r.f("source/minorRadius", s.minorRadius, 0.001f, 1000.0f, 0.01f, 5.0f);
     r.i("source/majorSegments", s.majorSegments, 3, 256, 3, 96);
     r.i("source/minorSegments", s.minorSegments, 3, 128, 3, 32);
+    r.f("source/pointSize", s.pointSize, 0.0001f, 100.0f, 0.001f, 1.0f);
     r.v3("source/position", rest.sourceTransform.position, -1e4f, 1e4f, -10.0f, 10.0f);
     r.v3("source/rotation", eulerDegrees(rest.sourceTransform.rotation), -360.0f, 360.0f, -360.0f, 360.0f);
     p.sourceScale = r.v3("source/scale", rest.sourceTransform.scale, 0.001f, 100.0f, 0.01f, 5.0f);
@@ -1758,6 +1960,52 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
         }
     }
 
+    // Point ops (structural: a change rebuilds the cloud) and effectors (per frame).
+    const auto addBool = [&](const std::string& rel, const std::string& label, bool value) {
+        params::ParamDesc<bool> desc;
+        desc.defaultValue = value;
+        desc.hardMin = false;
+        desc.hardMax = true;
+        desc.path = prefix + rel;
+        desc.label = label;
+        desc.group = group;
+        auto& param = params.add(std::move(desc));
+        p.all.push_back(&param);
+        return &param;
+    };
+    const auto addFloat = [&](const std::string& rel, const std::string& label, float value, float lo, float hi, float slo,
+                              float shi) {
+        params::ParamDesc<float> desc;
+        desc.defaultValue = value;
+        desc.hardMin = lo;
+        desc.hardMax = hi;
+        desc.softMin = slo;
+        desc.softMax = shi;
+        desc.path = prefix + rel;
+        desc.label = label;
+        desc.group = group;
+        auto& param = params.add(std::move(desc));
+        p.all.push_back(&param);
+        return &param;
+    };
+    for (std::size_t slot = 0; slot < rest.pointOps.size(); ++slot) {
+        const spatial::PointOp& op = rest.pointOps[slot];
+        const std::string base = "ops/" + std::to_string(slot + 1) + "/";
+        const std::string kindName = spatial::pointOpKindName(op.kind);
+        p.opAmount.push_back(addFloat(base + "amount", kindName + "/amount", op.amount, -100.0f, 100.0f, -2.0f, 2.0f));
+        addBool(base + "enabled", kindName + "/enabled", op.enabled);
+    }
+    const std::size_t effectorSlots = std::min(rest.effectors.size(), static_cast<std::size_t>(kMaxEffectors));
+    for (std::size_t slot = 0; slot < effectorSlots; ++slot) {
+        const spatial::Effector& e = rest.effectors[slot];
+        const std::string base = "effector/" + std::to_string(slot + 1) + "/";
+        const std::string opName = spatial::effectorOpName(e.op);
+        p.effectorStrength[slot] = addFloat(base + "strength", opName + "/strength", e.strength, -100.0f, 100.0f, -5.0f, 5.0f);
+        addFloat(base + "weight", opName + "/weight", e.weight, 0.0f, 1.0f, 0.0f, 1.0f);
+        addBool(base + "enabled", opName + "/enabled", e.enabled);
+    }
+    p.emissiveFieldAmount = r.f("emissiveFieldAmount", rest.emissiveFieldAmount, 0.0f, 100.0f, 0.0f, 10.0f);
+
     // Material
     const Material& m = rest.material;
     p.baseColor = r.v3("material/baseColor", m.baseColor, 0.0f, 1.0f, 0.0f, 1.0f, true);
@@ -1784,7 +2032,7 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
     }
     // Source
     SourceSpec& s = live.source;
-    copyEnum(p, "source/kind", s.kind, 3);
+    copyEnum(p, "source/kind", s.kind, 4);
     copyValue(p, "source/size", s.size);
     copyValue(p, "source/subdivisions", s.subdivisions);
     copyValue(p, "source/radius", s.radius);
@@ -1798,6 +2046,7 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
     copyValue(p, "source/minorRadius", s.minorRadius);
     copyValue(p, "source/majorSegments", s.majorSegments);
     copyValue(p, "source/minorSegments", s.minorSegments);
+    copyValue(p, "source/pointSize", s.pointSize);
     copyTransform(p, "source/", live.sourceTransform);
 
     // Distribution
@@ -1853,6 +2102,30 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
         copyValue(p, base + "axis", def.axis);
         copyValue(p, base + "enabled", def.enabled);
     }
+
+    // Point ops and effectors: the list shapes come from rest; amount/enabled/strength/weight from
+    // the parameters.
+    if (live.pointOps.size() != rest.pointOps.size()) {
+        live.pointOps = rest.pointOps;
+    }
+    for (std::size_t slot = 0; slot < live.pointOps.size(); ++slot) {
+        const std::string base = "ops/" + std::to_string(slot + 1) + "/";
+        live.pointOps[slot].kind = rest.pointOps[slot].kind;
+        copyValue(p, base + "amount", live.pointOps[slot].amount);
+        copyValue(p, base + "enabled", live.pointOps[slot].enabled);
+    }
+    if (live.effectors.size() != rest.effectors.size()) {
+        live.effectors = rest.effectors;
+    }
+    for (std::size_t slot = 0; slot < live.effectors.size(); ++slot) {
+        const std::string base = "effector/" + std::to_string(slot + 1) + "/";
+        live.effectors[slot].op = rest.effectors[slot].op;
+        live.effectors[slot].field = rest.effectors[slot].field;
+        copyValue(p, base + "strength", live.effectors[slot].strength);
+        copyValue(p, base + "weight", live.effectors[slot].weight);
+        copyValue(p, base + "enabled", live.effectors[slot].enabled);
+    }
+    copyValue(p, "emissiveFieldAmount", live.emissiveFieldAmount);
 
     // Material
     Material& m = live.material;

@@ -3,11 +3,14 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <glm/gtc/constants.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <nlohmann/json.hpp>
 
 #include <cmath>
 #include <cstdint>
+#include <cstring>
+#include <string>
 #include <vector>
 
 using namespace avgen;
@@ -933,4 +936,416 @@ TEST_CASE("ProceduralGeometry JSON round trip covers every field", "[scene][proc
     REQUIRE(minimal.has_value());
     CHECK(minimal->distribution.kind == DistributionKind::Radial);
     CHECK(minimal->deformers.empty());
+}
+
+// ---- spatial phase: point source, ops, effectors, field deformers (ADR-024/025) ------------------
+
+TEST_CASE("Point source: quad mesh, validation, hash and names", "[scene][procedural][spatial]") {
+    CHECK(primitiveKindName(PrimitiveKind::Point) == std::string("point"));
+    CHECK(primitiveKindFromName("point") == PrimitiveKind::Point);
+    const MeshData quad = makePointQuad(2.0f);
+    REQUIRE(quad.valid());
+    CHECK(quad.vertices.size() == 4);
+    CHECK(quad.indices.size() == 6);
+    const auto [lo, hi] = quad.bounds();
+    checkVec(lo, {-1.0f, -1.0f, 0.0f});
+    checkVec(hi, {1.0f, 1.0f, 0.0f});
+    for (const Vertex& v : quad.vertices) {
+        checkVec(v.normal, {0.0f, 0.0f, 1.0f});
+        CHECK(v.uv.x == (v.position.x > 0.0f ? 1.0f : 0.0f));
+        CHECK(v.uv.y == (v.position.y > 0.0f ? 1.0f : 0.0f));
+    }
+    // CCW seen from +Z: positive signed area.
+    const glm::vec3 a = quad.vertices[quad.indices[0]].position;
+    const glm::vec3 b = quad.vertices[quad.indices[1]].position;
+    const glm::vec3 c = quad.vertices[quad.indices[2]].position;
+    CHECK(glm::cross(b - a, c - a).z > 0.0f);
+
+    SourceSpec spec;
+    spec.kind = PrimitiveKind::Point;
+    spec.pointSize = 0.5f;
+    auto mesh = makeSourceMesh(spec);
+    REQUIRE(mesh.has_value());
+    CHECK(mesh->vertices.size() == 4);
+    CHECK(sameMesh(*mesh, makePointQuad(0.5f)));
+    const std::uint64_t h = spec.structuralHash();
+    spec.pointSize = 0.25f;
+    CHECK(spec.structuralHash() != h);
+    spec.radius = 9.0f; // irrelevant to a point
+    SourceSpec other;
+    other.kind = PrimitiveKind::Point;
+    other.pointSize = 0.25f;
+    CHECK(spec.structuralHash() == other.structuralHash());
+    spec.pointSize = 0.0f;
+    CHECK_FALSE(spec.validate().has_value());
+    CHECK_FALSE(makeSourceMesh(spec).has_value());
+
+    // Bounds use half the point size.
+    ProceduralGeometry g;
+    g.source.kind = PrimitiveKind::Point;
+    g.source.pointSize = 2.0f;
+    g.distribution.kind = DistributionKind::Single;
+    REQUIRE(g.rebuild());
+    CHECK_THAT(d(g.boundsMax.x), WithinAbs(std::sqrt(3.0), 1e-5));
+}
+
+TEST_CASE("generateCloud and rebuild with point ops", "[scene][procedural][spatial]") {
+    ProceduralGeometry g;
+    g.distribution.kind = DistributionKind::Linear;
+    g.distribution.count = 10;
+    g.variation.randomPosition = {0.2f, 0.2f, 0.2f};
+    g.variation.seed = 31;
+    g.materialVariation.hueGradient = 0.3f;
+    g.materialVariation.emissiveGradient = 1.0f;
+    REQUIRE(g.rebuild());
+    REQUIRE(g.instances.size() == 10);
+    CHECK(g.cloud.count() == 10);
+
+    // The records are the projection of the base cloud; the base cloud carries the generator seed.
+    const spatial::PointCloud base = g.generateCloud();
+    CHECK(base.count() == 10);
+    std::vector<InstanceRecord> projected;
+    spatial::projectInstances(base, projected);
+    REQUIRE(projected.size() == 10);
+    for (std::size_t i = 0; i < 10; ++i) {
+        CHECK(std::memcmp(&projected[i], &g.instances[i], sizeof(InstanceRecord)) == 0);
+        CHECK(base.ids()[i] == static_cast<std::int32_t>(i));
+        CHECK(base.seeds()[i] == 31);
+        CHECK(base.densities()[i] == 1.0f);
+        CHECK(g.instances[i].position.w == 1.0f);
+        CHECK(g.instances[i].emissive.a == 0.0f);
+        for (std::uint32_t c = 0; c < 4; ++c) {
+            CHECK(g.instances[i].random[static_cast<int>(c)] == hashInstance(31, static_cast<std::uint32_t>(i), c));
+        }
+    }
+    CHECK(base.contentHash() == g.cloud.contentHash());
+
+    // A filter keeps ids (color.a) and is structural.
+    spatial::PointOp filter;
+    filter.kind = spatial::PointOpKind::FilterAttribute;
+    filter.attribute = "index";
+    filter.value = 0.5f;
+    g.pointOps.push_back(filter);
+    CHECK(g.rebuild());
+    REQUIRE(g.instances.size() == 5);
+    for (std::size_t i = 0; i < 5; ++i) {
+        CHECK(g.instances[i].color.a == static_cast<float>(i + 5));
+        CHECK(std::memcmp(&g.instances[i], &projected[i + 5], sizeof(InstanceRecord)) == 0);
+    }
+    CHECK_FALSE(g.rebuild());
+    g.pointOps[0].amount = 0.5f; // any op field is structural
+    CHECK(g.rebuild());
+    g.pointOps[0].enabled = false;
+    CHECK(g.rebuild());
+    CHECK(g.instances.size() == 10);
+
+    // Duplicate + extra lane.
+    spatial::PointOp dup;
+    dup.kind = spatial::PointOpKind::Duplicate;
+    dup.copies = 1;
+    dup.offset = {0.0f, 3.0f, 0.0f};
+    spatial::PointOp lane;
+    lane.kind = spatial::PointOpKind::Attribute;
+    lane.attributeOp.kind = spatial::AttributeOpKind::Set;
+    lane.attributeOp.target = "heat";
+    lane.attributeOp.value = glm::vec4(0.75f);
+    g.pointOps = {dup, lane};
+    g.extraLane = "heat";
+    CHECK(g.rebuild());
+    REQUIRE(g.instances.size() == 20);
+    CHECK(g.instances[19].color.a == 19.0f);
+    CHECK(g.instances[3].emissive.a == 0.75f);
+    CHECK_THAT(d(g.instances[13].position.y - g.instances[3].position.y), WithinAbs(3.0, 1e-5));
+    CHECK(g.boundsMax.y >= 3.0f);
+    g.extraLane.clear();
+    CHECK(g.rebuild()); // the lane binding is structural
+    CHECK(g.instances[3].emissive.a == 0.0f);
+
+    // A failing op is reported, not fatal: the cloud keeps the rows produced so far.
+    spatial::PointOp bad;
+    bad.kind = spatial::PointOpKind::Sort;
+    bad.attribute = "nope";
+    g.pointOps = {bad};
+    CHECK(g.rebuild());
+    CHECK(g.instances.size() == 10);
+}
+
+TEST_CASE("Effectors are per frame, pad the bounds and never rebuild", "[scene][procedural][spatial]") {
+    ProceduralGeometry g;
+    g.distribution.kind = DistributionKind::Single;
+    g.source.kind = PrimitiveKind::Sphere;
+    g.source.radius = 1.0f;
+    REQUIRE(g.rebuild());
+    const std::uint64_t h = g.structuralHash();
+    const double sphereRadius = std::sqrt(3.0); // the conservative bounding sphere of a unit-radius sphere's extent
+    CHECK_THAT(d(g.boundsMax.x), WithinAbs(sphereRadius, 1e-5));
+    spatial::Effector e;
+    e.field = "wind";
+    e.op = spatial::EffectorOp::PositionOffset;
+    e.strength = 3.0f;
+    g.effectors.push_back(e);
+    g.emissiveField = "glow";
+    g.emissiveFieldAmount = 2.0f;
+    CHECK(g.structuralHash() == h);
+    CHECK_FALSE(g.rebuild());
+    // The padding is applied at the next structural rebuild.
+    g.distribution.count = 2;
+    g.distribution.kind = DistributionKind::Linear;
+    CHECK(g.rebuild());
+    CHECK_THAT(d(g.boundsMax.x), WithinAbs(5.0 + sphereRadius + 3.0, 1e-4));
+    CHECK_THAT(d(g.boundsMin.y), WithinAbs(-sphereRadius - 3.0, 1e-4));
+
+    // Applying the effectors to the records is the CPU reference of the GPU pass.
+    spatial::FieldSet fields;
+    spatial::FieldSpec wind;
+    wind.name = "wind";
+    wind.kind = spatial::FieldKind::Direction;
+    wind.falloff.kind = spatial::FalloffKind::None;
+    fields.fields.push_back(wind);
+    std::vector<InstanceRecord> records = g.instances;
+    CHECK(spatial::applyEffectorsToRecords(records, g.effectors, fields, 0.0) == 1);
+    CHECK_THAT(d(records[0].position.y - g.instances[0].position.y), WithinAbs(3.0, 1e-5));
+    CHECK(records[0].color.a == g.instances[0].color.a);
+}
+
+TEST_CASE("Field deformer: applyFieldDeformer and deformPoint with a field set", "[scene][procedural][spatial]") {
+    CHECK(deformerKindName(DeformerKind::Field) == std::string("field"));
+    CHECK(deformerKindFromName("field") == DeformerKind::Field);
+    spatial::FieldSet fields;
+    spatial::FieldSpec up;
+    up.name = "up";
+    up.kind = spatial::FieldKind::Direction;
+    up.falloff.kind = spatial::FalloffKind::None;
+    fields.fields.push_back(up);
+    spatial::FieldSpec one;
+    one.name = "one";
+    one.kind = spatial::FieldKind::Constant;
+    one.falloff.kind = spatial::FalloffKind::None;
+    fields.fields.push_back(one);
+    spatial::FieldSpec bump;
+    bump.name = "bump";
+    bump.kind = spatial::FieldKind::Radial;
+    bump.radius = 2.0f;
+    bump.position = {10.0f, 0.0f, 0.0f};
+    bump.falloff.kind = spatial::FalloffKind::None;
+    fields.fields.push_back(bump);
+
+    Deformer d1;
+    d1.kind = DeformerKind::Field;
+    d1.field = "up";
+    d1.amount = 2.0f;
+    const glm::vec3 p(1.0f, 1.0f, 1.0f);
+    checkVec(applyFieldDeformer(d1, p, {1.0f, 0.0f, 0.0f}, 0.0, fields), {1.0f, 3.0f, 1.0f});
+    // Scalar fields displace along the normal, or along the axis when alongNormal is off.
+    d1.field = "one";
+    checkVec(applyFieldDeformer(d1, p, {1.0f, 0.0f, 0.0f}, 0.0, fields), {3.0f, 1.0f, 1.0f});
+    d1.alongNormal = false;
+    d1.axis = {0.0f, 0.0f, 1.0f};
+    checkVec(applyFieldDeformer(d1, p, {1.0f, 0.0f, 0.0f}, 0.0, fields), {1.0f, 1.0f, 3.0f});
+    d1.field = "missing";
+    checkVec(applyFieldDeformer(d1, p, {1.0f, 0.0f, 0.0f}, 0.0, fields), p);
+    d1.field = "one";
+    d1.amount = 0.0f;
+    checkVec(applyFieldDeformer(d1, p, {1.0f, 0.0f, 0.0f}, 0.0, fields), p);
+    // Other kinds are untouched by applyFieldDeformer, and applyDeformer ignores Field.
+    Deformer twist;
+    twist.amount = 1.0f;
+    checkVec(applyFieldDeformer(twist, p, {1.0f, 0.0f, 0.0f}, 0.0, fields), p);
+    d1.amount = 1.0f;
+    checkVec(applyDeformer(d1, p, 0.0), p);
+
+    // deformPoint: Local samples in object space, World at the world position with the rotated normal.
+    Deformer local;
+    local.kind = DeformerKind::Field;
+    local.field = "bump";
+    local.amount = 1.0f;
+    local.alongNormal = true;
+    const glm::mat4 world = glm::translate(glm::mat4(1.0f), glm::vec3(10.0f, 0.0f, 0.0f));
+    const std::vector<Deformer> stack{local};
+    // Object point (0,0,0) is far from the bump in object space -> no displacement; the world
+    // position is (10,0,0).
+    checkVec(deformPoint(stack, glm::vec3(0.0f), world, 0.0, &fields, {0.0f, 1.0f, 0.0f}), {10.0f, 0.0f, 0.0f});
+    Deformer worldDef = local;
+    worldDef.space = DeformSpace::World;
+    const std::vector<Deformer> worldStack{worldDef};
+    // World sampling at (10,0,0) is the bump's peak (1): displaced along the world normal.
+    checkVec(deformPoint(worldStack, glm::vec3(0.0f), world, 0.0, &fields, {0.0f, 1.0f, 0.0f}), {10.0f, 1.0f, 0.0f});
+    const glm::mat4 rotated = world * glm::mat4_cast(glm::angleAxis(glm::half_pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f)));
+    checkVec(deformPoint(worldStack, glm::vec3(0.0f), rotated, 0.0, &fields, {0.0f, 1.0f, 0.0f}), {9.0f, 0.0f, 0.0f});
+    // Without a field set the Field deformer is skipped.
+    checkVec(deformPoint(worldStack, glm::vec3(0.0f), world, 0.0), {10.0f, 0.0f, 0.0f});
+    // Disabled Field deformers are skipped too.
+    worldDef.enabled = false;
+    checkVec(deformPoint(std::vector<Deformer>{worldDef}, glm::vec3(0.0f), world, 0.0, &fields), {10.0f, 0.0f, 0.0f});
+}
+
+TEST_CASE("ProceduralGeometry validate and JSON cover ops, effectors and fields", "[scene][procedural][spatial]") {
+    ProceduralGeometry g;
+    g.name = "points";
+    g.source.kind = PrimitiveKind::Point;
+    g.source.pointSize = 0.125f;
+    Deformer fd;
+    fd.kind = DeformerKind::Field;
+    fd.field = "gust";
+    fd.alongNormal = false;
+    fd.amount = 0.5f;
+    g.deformers = {fd};
+    spatial::PointOp scatter;
+    scatter.kind = spatial::PointOpKind::Scatter;
+    scatter.range = {1.0f, 2.0f, 3.0f};
+    scatter.seed = 9;
+    spatial::PointOp attr;
+    attr.kind = spatial::PointOpKind::Attribute;
+    attr.attributeOp.kind = spatial::AttributeOpKind::Randomize;
+    attr.attributeOp.target = "heat";
+    attr.attributeOp.range = glm::vec4(2.0f);
+    g.pointOps = {scatter, attr};
+    spatial::Effector e;
+    e.field = "wave";
+    e.op = spatial::EffectorOp::Emission;
+    e.blend = spatial::EffectorBlend::Mix;
+    e.strength = 1.5f;
+    e.weight = 0.25f;
+    g.effectors = {e};
+    g.emissiveField = "wave";
+    g.emissiveFieldAmount = 2.5f;
+    g.extraLane = "heat";
+    REQUIRE(g.validate().has_value());
+
+    const nlohmann::json j = g.toJson();
+    CHECK(j.at("source").at("kind") == "point");
+    CHECK(j.at("source").at("pointSize") == 0.125f);
+    CHECK(j.at("deformers").at(0).at("kind") == "field");
+    CHECK(j.at("deformers").at(0).at("field") == "gust");
+    CHECK(j.at("ops").size() == 2);
+    CHECK(j.at("ops").at(0).at("kind") == "scatter");
+    CHECK(j.at("ops").at(1).at("attributeOp").at("target") == "heat");
+    CHECK(j.at("effectors").at(0).at("op") == "emission");
+    CHECK(j.at("emissiveField") == "wave");
+    CHECK(j.at("extraLane") == "heat");
+
+    auto back = ProceduralGeometry::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->source.kind == PrimitiveKind::Point);
+    CHECK(back->source.pointSize == 0.125f);
+    REQUIRE(back->deformers.size() == 1);
+    CHECK(back->deformers[0].kind == DeformerKind::Field);
+    CHECK(back->deformers[0].field == "gust");
+    CHECK_FALSE(back->deformers[0].alongNormal);
+    REQUIRE(back->pointOps.size() == 2);
+    CHECK(back->pointOps[0].kind == spatial::PointOpKind::Scatter);
+    CHECK(back->pointOps[0].range == scatter.range);
+    CHECK(back->pointOps[0].seed == 9);
+    CHECK(back->pointOps[1].attributeOp.kind == spatial::AttributeOpKind::Randomize);
+    CHECK(back->pointOps[1].attributeOp.range == glm::vec4(2.0f));
+    REQUIRE(back->effectors.size() == 1);
+    CHECK(back->effectors[0].field == "wave");
+    CHECK(back->effectors[0].op == spatial::EffectorOp::Emission);
+    CHECK(back->effectors[0].blend == spatial::EffectorBlend::Mix);
+    CHECK(back->effectors[0].strength == 1.5f);
+    CHECK(back->effectors[0].weight == 0.25f);
+    CHECK(back->emissiveField == "wave");
+    CHECK(back->emissiveFieldAmount == 2.5f);
+    CHECK(back->extraLane == "heat");
+    CHECK(back->structuralHash() == g.structuralHash());
+
+    // Validation.
+    ProceduralGeometry v = g;
+    v.effectors.assign(static_cast<std::size_t>(kMaxEffectors) + 1, e);
+    CHECK_FALSE(v.validate().has_value());
+    v = g;
+    v.effectors[0].field.clear();
+    CHECK_FALSE(v.validate().has_value());
+    v = g;
+    v.deformers[0].field.clear();
+    CHECK_FALSE(v.validate().has_value());
+    v = g;
+    v.pointOps[1].attributeOp.target.clear();
+    CHECK_FALSE(v.validate().has_value());
+    v = g;
+    v.pointOps[0].stride = 0;
+    CHECK_FALSE(v.validate().has_value());
+    nlohmann::json bad = j;
+    bad["ops"][0]["kind"] = "explode";
+    CHECK_FALSE(ProceduralGeometry::fromJson(bad).has_value());
+    bad = j;
+    bad["effectors"][0].erase("field");
+    CHECK_FALSE(ProceduralGeometry::fromJson(bad).has_value());
+    bad = j;
+    bad["effectors"] = 5;
+    CHECK_FALSE(ProceduralGeometry::fromJson(bad).has_value());
+}
+
+TEST_CASE("Procedural parameters: ops are structural, effectors per frame", "[scene][procedural][spatial][params]") {
+    ProceduralGeometry rest;
+    rest.name = "pts";
+    rest.source.kind = PrimitiveKind::Point;
+    rest.distribution.kind = DistributionKind::Linear;
+    rest.distribution.count = 8;
+    spatial::PointOp translate;
+    translate.kind = spatial::PointOpKind::Translate;
+    translate.offset = {0.0f, 1.0f, 0.0f};
+    spatial::PointOp sample;
+    sample.kind = spatial::PointOpKind::Sample;
+    sample.stride = 2;
+    rest.pointOps = {translate, sample};
+    spatial::Effector e;
+    e.field = "wind";
+    e.strength = 1.0f;
+    rest.effectors = {e};
+    rest.emissiveField = "glow";
+
+    params::ParameterSet params;
+    const ProceduralParameters p = registerProceduralParameters(params, rest, "procedural/pts/");
+    REQUIRE(p.opAmount.size() == 2);
+    REQUIRE(p.opAmount[0] != nullptr);
+    CHECK(p.opAmount[0]->path() == "procedural/pts/ops/1/amount");
+    CHECK(p.opAmount[0]->label() == "translate/amount");
+    CHECK(params.find("procedural/pts/ops/2/enabled")->kind() == params::ParamKind::Bool);
+    CHECK(params.find("procedural/pts/ops/3/amount") == nullptr);
+    REQUIRE(p.effectorStrength[0] != nullptr);
+    CHECK(p.effectorStrength[0]->path() == "procedural/pts/effector/1/strength");
+    CHECK(p.effectorStrength[0]->label() == "positionOffset/strength");
+    CHECK(params.find("procedural/pts/effector/1/weight") != nullptr);
+    CHECK(params.find("procedural/pts/effector/1/enabled") != nullptr);
+    CHECK(p.effectorStrength[1] == nullptr);
+    REQUIRE(p.emissiveFieldAmount != nullptr);
+    CHECK(params.find("procedural/pts/source/pointSize") != nullptr);
+
+    ProceduralGeometry live = rest;
+    params.resetFinals();
+    CHECK(applyProceduralParameters(p, rest, live));
+    CHECK(live.instances.size() == 4);
+    CHECK_THAT(d(live.instances[0].position.y), WithinAbs(1.0, 1e-6));
+    CHECK_FALSE(applyProceduralParameters(p, rest, live));
+
+    p.opAmount[0]->setBase(2.0f);
+    params.resetFinals();
+    CHECK(applyProceduralParameters(p, rest, live)); // structural: rebuilt
+    CHECK(live.pointOps[0].amount == 2.0f);
+    CHECK_THAT(d(live.instances[0].position.y), WithinAbs(2.0, 1e-6));
+    params.findAs<bool>("procedural/pts/ops/2/enabled")->setBase(false);
+    params.resetFinals();
+    CHECK(applyProceduralParameters(p, rest, live));
+    CHECK(live.instances.size() == 8);
+
+    p.effectorStrength[0]->setBase(4.0f);
+    params.findAs<float>("procedural/pts/effector/1/weight")->setBase(0.5f);
+    params.findAs<bool>("procedural/pts/effector/1/enabled")->setBase(false);
+    p.emissiveFieldAmount->setBase(3.0f);
+    params.findAs<float>("procedural/pts/source/pointSize")->setBase(0.2f);
+    params.resetFinals();
+    CHECK(applyProceduralParameters(p, rest, live)); // pointSize is structural
+    CHECK(live.effectors[0].strength == 4.0f);
+    CHECK(live.effectors[0].weight == 0.5f);
+    CHECK_FALSE(live.effectors[0].enabled);
+    CHECK(live.emissiveFieldAmount == 3.0f);
+    CHECK(live.source.pointSize == 0.2f);
+    CHECK(live.emissiveField == "glow");
+    p.effectorStrength[0]->setBase(5.0f);
+    params.resetFinals();
+    CHECK_FALSE(applyProceduralParameters(p, rest, live)); // per frame: no rebuild
+    CHECK(live.effectors[0].strength == 5.0f);
+    unregisterProceduralParameters(params, p);
+    CHECK(params.size() == 0);
 }
