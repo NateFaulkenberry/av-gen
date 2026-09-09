@@ -1317,6 +1317,16 @@ int Application::runHeadless() {
                       i, time.renderTime, f.bands[0], f.bands[2], f.bands[4], f.rms, f.onset ? 1 : 0,
                       valueOf("orb/scale", "root/scale"), valueOf("orb/emissive", "material/emissiveBoost"),
                       renderer_->stats().gpuFrameMs, lastHash);
+            // Where the frame went. Every one of these numbers already existed and nothing printed
+            // them, so a slow frame could only be bisected by deleting things from the scene and
+            // re-rendering -- which is how an afternoon goes missing. `gpuFrameMs` is the whole
+            // submitted frame; the rest are the passes that measure themselves.
+            const auto& st = renderer_->stats();
+            log::info("             passes: shadow={:.2f} ao={:.2f} volume={:.2f} cull={:.2f} effector={:.2f} "
+                      "sdf={:.2f} particles={:.2f} | draws={} tris={} instances={}/{} cpu(proc)={:.2f}ms",
+                      st.shadows.shadowMs, st.ao.aoMs, st.volume.volumeMs, st.procedural.cullMs,
+                      st.procedural.effectorPassMs, st.sdf.raymarchMs, st.particles.simulateMs, st.drawCalls,
+                      st.triangles, st.procedural.visibleInstances, st.procedural.culledInstances, st.procedural.cpuUpdateMs);
         }
         if (options_.capture && i == frames - 1) {
             if (auto r = writeCapture(*image, *options_.capture); !r) {

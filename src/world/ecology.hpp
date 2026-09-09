@@ -73,6 +73,14 @@ struct ScatterLayer {
     glm::vec3 emissiveColor{0.0f};         // linear
     float emissiveIntensity = 0.0f;        // 0 leaves the asset's own emission alone
 
+    // How small on screen this thing gets before it is dropped, in pixels of projected radius.
+    // Grass may vanish long before a tree does; both eventually should.
+    float minScreenRadius = 1.5f;
+    // How far this layer is drawn at all, in metres. 0 takes the terrain's view distance, which is
+    // right for a tree and absurd for grass: nineteen thousand grass clumps reaching half a
+    // kilometre are invisible past sixty metres and were being drawn into every shadow cascade.
+    float viewDistance = 0.0f;
+
     std::uint32_t seed = 1;
     int maxInstances = 60000;             // a hard ceiling per layer, whatever the density says
     int meshBudget = 0;                   // triangles, passed to the imported source (ADR-045)

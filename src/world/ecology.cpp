@@ -125,6 +125,7 @@ std::uint64_t ScatterLayer::structuralHash() const {
         h.f32(d->density);
     }
     for (const float v : {minSlope, maxSlope, minAltitude, maxAltitude, shoreOffset, height, minScale, maxScale, sink,
+                          minScreenRadius, viewDistance,
                           alignToGround, randomYaw, clusterScale, clustering}) {
         h.f32(v);
     }
@@ -321,7 +322,9 @@ Result<Ecology> ecologyFromJson(const json& j) {
                                Field{"minScale", &l.minScale},
                                Field{"maxScale", &l.maxScale}, Field{"sink", &l.sink},
                                Field{"alignToGround", &l.alignToGround}, Field{"randomYaw", &l.randomYaw},
-                               Field{"clusterScale", &l.clusterScale}, Field{"clustering", &l.clustering}}) {
+                               Field{"clusterScale", &l.clusterScale}, Field{"clustering", &l.clustering},
+                               Field{"minScreenRadius", &l.minScreenRadius},
+                               Field{"viewDistance", &l.viewDistance}}) {
             auto v = readFloat(e, f.key, *f.target);
             if (!v) {
                 return fail("scatter '{}': {}", l.name, v.error().message);
@@ -396,6 +399,8 @@ json ecologyToJson(const Ecology& ecology) {
                            {"randomYaw", l.randomYaw},
                            {"clusterScale", l.clusterScale},
                            {"clustering", l.clustering},
+                           {"minScreenRadius", l.minScreenRadius},
+                           {"viewDistance", l.viewDistance},
                            {"tint", json::array({l.tint.x, l.tint.y, l.tint.z})},
                            {"emissiveColor", json::array({l.emissiveColor.x, l.emissiveColor.y, l.emissiveColor.z})},
                            {"emissiveIntensity", l.emissiveIntensity},

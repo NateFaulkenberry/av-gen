@@ -110,3 +110,56 @@ probe; the before/after pair here was measured back to back on the same binary c
   arrives (1.0).
 - Memory: `AnalysisTrack` ≈ 0.8 MB per second of audio; whole-file decode ≈ 0.4 MB per second
   of stereo 48 kHz.
+
+## Where a world frame goes (2026-09-09)
+
+Measured on an M2 Max, 200 headless frames at 1440x900, Glowmere with terrain and eleven scatter
+layers. **The built-in per-pass GPU timers are not trustworthy on this setup and were actively
+misleading**: `volumeMs` reported a constant 14.5 ms at every resolution from 720x450 to 2880x1800
+*and* at every step count from 18 down to 6. A pass whose measured cost is invariant to both its
+pixel count and its loop count is not being measured. `gpuFrameMs` is flat across the same 16x pixel
+range for the same reason. Everything below is wall-clock difference between scene variants, which
+is the only instrument here that has held up.
+
+| variant | ms/frame | delta |
+|---|---|---|
+| full (terrain + ecology + shadows + volumetrics) | 41.5 | |
+| volumetrics off | 40.0 | volumetrics = 1.5 ms |
+| shadows off | 34.4 | shadows = 6.5 ms *with* ecology |
+| ecology off | 23.5 | **ecology = 18 ms** |
+| neither ecology nor shadows | 22.2 | shadows = 1.3 ms *without* ecology |
+
+Then the surprise. The ecology cost is **linear in the number of scatter objects and independent of
+what they draw**:
+
+| scatter layers | ms/frame |
+|---|---|
+| 0 | 23.5 |
+| 1 | 28.8 |
+| 3 | 32.0 |
+| 6 | 35.1 |
+| 11 | 39.8 |
+
+About **1.5 ms per procedural object per frame**, fixed. Things that did *not* change it:
+
+- **Resolution.** Flat from 720x450 to 2880x1800. The frame is not fragment-bound.
+- **Triangles.** Switching on the LOD ladder (it defaults to one level, so every surviving instance
+  was drawing its full-resolution mesh) saved 1.1 ms.
+- **Instances drawn.** Per-layer view distances, cutting grass from 520 m to 70 m, saved nothing.
+- **Terrain chunk count.** 256 chunks or 25, no difference.
+- **Volumetric steps or reach.** 18 steps over 320 m or 6 over 120, no difference.
+
+Culling itself is working: 6,400 instances survive and 31,200 are culled each frame.
+
+So the ceiling on a world is not its instance count, its triangle count or its resolution -- it is
+**how many distinct scatter layers it has**. The cull work is already batched into a single compute
+pass, so the overhead is in the draw path: each object issues up to four indirect draws in each of
+the depth prepass, the main pass and every shadow cascade -- around 264 indirect draws for eleven
+layers -- and those indirect buffers were written by a compute pass in the same command buffer.
+That is the shape of a compute-to-indirect-draw hazard serialising the render passes, and it is
+consistent with the CPU sample, which found 73% of the main thread blocked in `waitForQueue`.
+
+Confirming that needs a Metal frame capture rather than the in-engine timers. The two fixes it
+points at, in order: draw a layer's LOD levels through fewer indirect draws (or skip empty levels
+without submitting), and cull per shadow cascade instead of reusing the camera's visible set --
+cascade 0 covers about forty metres and is currently drawing everything the camera can see.

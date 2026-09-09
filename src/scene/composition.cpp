@@ -1802,8 +1802,20 @@ void Composition::rebuild() {
                 pg.distribution.scatterCloud = cloud;
                 pg.distribution.scatterHash = layer.structuralHash() ^ node.worldMap.structuralHash();
                 pg.visible = visible;
+                // The LOD ladder, switched on. It defaults to a single level, which for a scatter
+                // means every instance the frustum keeps draws its full-resolution mesh however
+                // small it is on screen -- 6,000 surviving instances were submitting twelve million
+                // triangles, and the mesh budgets were being applied to a level nothing else used.
+                // The thresholds are projected radii in pixels, so they hold at any resolution.
                 pg.lod.cull = true;
-                pg.lod.maxDistance = node.terrain.viewDistance;
+                pg.lod.maxDistance =
+                    layer.viewDistance > 0.0f ? layer.viewDistance : node.terrain.viewDistance;
+                pg.lod.lodCount = scene::kMaxLodLevels;
+                pg.lod.lodByScreenSize = true;
+                pg.lod.lodDistances[0] = 28.0f; // full mesh above 28 px of radius
+                pg.lod.lodDistances[1] = 11.0f; // half-resolution below that
+                pg.lod.lodDistances[2] = 4.0f;  // a billboard, then a dot
+                pg.lod.minScreenRadius = layer.minScreenRadius;
                 resolveMeshSource(pg, node.name);
                 // The layer says how tall the thing should be; the asset says how tall it is. The
                 // normalisation goes on sourceTransform, which scales the mesh alone --

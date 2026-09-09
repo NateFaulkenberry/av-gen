@@ -128,7 +128,9 @@
             0.1119,
             0.2384,
             0.3916
-          ]
+          ],
+          "viewDistance": 520.0,
+          "minScreenRadius": 1.0
         },
         {
           "name": "pines",
@@ -152,7 +154,9 @@
             0.0762,
             0.2016,
             0.305
-          ]
+          ],
+          "viewDistance": 520.0,
+          "minScreenRadius": 1.0
         },
         {
           "name": "deadwood",
@@ -176,7 +180,9 @@
             0.1946,
             0.1779,
             0.2789
-          ]
+          ],
+          "viewDistance": 440.0,
+          "minScreenRadius": 1.0
         },
         {
           "name": "bushes",
@@ -201,7 +207,9 @@
             0.0762,
             0.305,
             0.3515
-          ]
+          ],
+          "viewDistance": 190.0,
+          "minScreenRadius": 2.0
         },
         {
           "name": "ferns",
@@ -230,7 +238,9 @@
             0.0685,
             0.0931
           ],
-          "emissiveIntensity": 0.35
+          "emissiveIntensity": 0.35,
+          "viewDistance": 120.0,
+          "minScreenRadius": 2.5
         },
         {
           "name": "grass",
@@ -254,7 +264,9 @@
             0.1384,
             0.4342,
             0.2705
-          ]
+          ],
+          "viewDistance": 70.0,
+          "minScreenRadius": 3.0
         },
         {
           "name": "flowers",
@@ -282,7 +294,9 @@
             0.0762,
             0.6308
           ],
-          "emissiveIntensity": 2.6
+          "emissiveIntensity": 2.6,
+          "viewDistance": 95.0,
+          "minScreenRadius": 2.5
         },
         {
           "name": "fungi",
@@ -311,7 +325,9 @@
             0.0612,
             0.7454
           ],
-          "emissiveIntensity": 5.5
+          "emissiveIntensity": 5.5,
+          "viewDistance": 110.0,
+          "minScreenRadius": 2.0
         },
         {
           "name": "shelf-fungi",
@@ -339,7 +355,9 @@
             0.5776,
             0.4342
           ],
-          "emissiveIntensity": 4.0
+          "emissiveIntensity": 4.0,
+          "viewDistance": 150.0,
+          "minScreenRadius": 2.0
         },
         {
           "name": "boulders",
@@ -365,7 +383,9 @@
             0.1559,
             0.1746,
             0.2462
-          ]
+          ],
+          "viewDistance": 300.0,
+          "minScreenRadius": 1.5
         },
         {
           "name": "pebbles",
@@ -391,7 +411,9 @@
             0.1878,
             0.2159,
             0.2747
-          ]
+          ],
+          "viewDistance": 60.0,
+          "minScreenRadius": 3.0
         }
       ]
     }
