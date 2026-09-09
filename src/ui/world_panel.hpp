@@ -52,12 +52,17 @@ public:
     void drawStates(app::Engine& engine);
     void drawMacros(app::Engine& engine);
     void drawDebugOptions(app::Engine& engine);
+    // Art direction (ADR-041): the director's knobs and the shipped looks.
+    void drawDirector(app::Engine& engine);
     // The layer selector plus the filtered parameter list (used by the Parameters window).
     void drawLayerSelector();
     [[nodiscard]] bool shows(const std::string& path) const { return layerShowsPath(layer, path); }
 
 private:
     char macroName_[64] = "energy";
+    char lookName_[64] = "My Look";
+    int selectedLook_ = 0;
+    std::string lastLookResult_;
     char macroTargetPath_[192] = "";
     float macroTargetMin_ = 0.0f;
     float macroTargetMax_ = 1.0f;

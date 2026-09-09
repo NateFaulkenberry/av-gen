@@ -270,6 +270,10 @@ void ControlPanel::drawWorldWindow(app::Engine& engine) {
             world.drawStates(engine);
             ImGui::EndTabItem();
         }
+        if (ImGui::BeginTabItem("Direction")) {
+            world.drawDirector(engine);
+            ImGui::EndTabItem();
+        }
         if (ImGui::BeginTabItem("Macros")) {
             world.drawMacros(engine);
             ImGui::EndTabItem();

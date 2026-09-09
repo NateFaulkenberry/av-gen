@@ -1,6 +1,7 @@
 #include "app/application.hpp"
 
 #include "app/asset_browser.hpp"
+#include "app/world_director.hpp"
 #include "app/examples.hpp"
 #include "assets/video_writer.hpp"
 
@@ -440,6 +441,18 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->onRescanAssets = [this, assetDirs] { panel_->assets = scanAssets(assetDirs()); };
         panel_->assets = scanAssets(assetDirs());
         panel_->onOpenAsset = [this](const AssetEntry& asset) { loadAny(asset.path); };
+        // Art direction (ADR-041): the shipped looks live beside the examples.
+        {
+            std::vector<std::filesystem::path> lookDirs;
+            for (const std::filesystem::path& dir : exampleSearchDirs(executablePath)) {
+                lookDirs.push_back(dir / "looks");
+            }
+            auto looks = scanLooks(lookDirs);
+            if (!looks.empty()) {
+                log::info("looks: {} available", looks.size());
+                engine_->setLooks(std::move(looks));
+            }
+        }
         // ---- offline rendering from the UI ----
         uiRender_ = engine_->renderSettings();
         panel_->renderSettings = &uiRender_;

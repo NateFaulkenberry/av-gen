@@ -424,6 +424,80 @@ void WorldPanel::drawMacros(app::Engine& engine) {
     }
 }
 
+void WorldPanel::drawDirector(app::Engine& engine) {
+    const app::WorldDirector& director = engine.director();
+    if (director.mappings.empty()) {
+        ImGui::TextDisabled("This world has no director.");
+        ImGui::TextWrapped("A director maps artistic words onto the parameters they should move. "
+                           "Load one from the Assets window, or add world macros by hand in the "
+                           "Macros tab.");
+    } else {
+        ImGui::Text("%s", director.name.c_str());
+        ImGui::TextDisabled("%zu knob(s); each one is an ordinary macro", director.mappings.size());
+        ImGui::Separator();
+        for (const app::DirectorMapping& mapping : director.mappings) {
+            const char* name = app::directorKnobName(mapping.knob);
+            params::IParameter* knob = engine.params().find(std::string("macros/") + name);
+            if (knob == nullptr) {
+                continue;
+            }
+            ImGui::PushID(name);
+            float value = knob->baseComponent(0);
+            if (ImGui::SliderFloat(name, &value, 0.0f, 1.0f)) {
+                knob->setBaseComponent(0, value);
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s", app::directorKnobDescription(mapping.knob));
+            }
+            if (ImGui::TreeNode("targets")) {
+                for (const app::WorldMacroTarget& t : mapping.targets) {
+                    ImGui::BulletText("%s  %.2f .. %.2f", t.path.c_str(), static_cast<double>(t.min),
+                                      static_cast<double>(t.max));
+                }
+                ImGui::TreePop();
+            }
+            ImGui::PopID();
+        }
+    }
+
+    ImGui::Separator();
+    ImGui::TextDisabled("Looks");
+    const auto& looks = engine.looks();
+    if (looks.empty()) {
+        ImGui::TextDisabled("no looks loaded");
+    } else {
+        std::vector<const char*> names;
+        names.reserve(looks.size());
+        for (const app::LookPreset& look : looks) {
+            names.push_back(look.name.c_str());
+        }
+        selectedLook_ = std::clamp(selectedLook_, 0, static_cast<int>(names.size()) - 1);
+        ImGui::SetNextItemWidth(180.0f);
+        ImGui::Combo("look", &selectedLook_, names.data(), static_cast<int>(names.size()));
+        const app::LookPreset& look = looks[static_cast<std::size_t>(selectedLook_)];
+        if (!look.description.empty()) {
+            ImGui::TextWrapped("%s", look.description.c_str());
+        }
+        if (ImGui::Button("Apply look")) {
+            const app::LookApplyResult result = engine.applyLookByName(look.name);
+            lastLookResult_ = fmt::format("{}: {} applied, {} not in this world", look.name, result.applied,
+                                          result.missing);
+        }
+        if (!lastLookResult_.empty()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", lastLookResult_.c_str());
+        }
+    }
+    ImGui::InputText("name", lookName_, sizeof(lookName_));
+    ImGui::SameLine();
+    if (ImGui::Button("Capture look") && lookName_[0] != '\0') {
+        std::vector<app::LookPreset> updated = engine.looks();
+        updated.push_back(app::captureLook(engine.params(), lookName_));
+        engine.setLooks(std::move(updated));
+        selectedLook_ = static_cast<int>(engine.looks().size()) - 1;
+    }
+}
+
 void WorldPanel::drawDebugOptions(app::Engine& engine) {
     (void)engine;
     ImGui::Checkbox("Points", &debug.points);
