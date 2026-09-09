@@ -89,6 +89,20 @@ struct SourceSpec {
 [[nodiscard]] MeshData makeTorus(float majorRadius, float minorRadius, int majorSegments, int minorSegments);
 [[nodiscard]] MeshData makePointQuad(float size); // 4 vertices, 2 triangles, XY plane, normal +Z, uv 0..1
 [[nodiscard]] Result<MeshData> makeSourceMesh(const SourceSpec& spec);
+// Reduced versions of the source for LOD levels (ADR-029, GPU culling/LOD):
+//   0 = makeSourceMesh(spec) exactly;
+//   1 = the same generator at half the segment counts (radial/height/major/minor/segments/rings
+//       and box subdivisions halved; floors 3 for radial-style counts, 2 for sphere rings, 1 for
+//       height segments and subdivisions);
+//   2 = a camera-facing billboard quad circumscribing the source's bounding sphere, edge
+//       2 * impostorSize * boundingRadius(spec);
+//   3 = a single point quad (edge 2 * impostorSize * boundingRadius / 8) - a dot at distance.
+// Levels 2 and 3 are drawn through the shader's Point path (camera-facing), so they need no
+// orientation of their own. Pure and deterministic: the same spec/level always gives the same mesh.
+[[nodiscard]] Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize = 1.0f);
+// Half-diagonal of the source's axis-aligned bounds (the bounding-sphere radius the cull pass
+// scales by the instance scale).
+[[nodiscard]] float sourceBoundingRadius(const SourceSpec& spec);
 
 // ---- distributions ------------------------------------------------------------------------------
 
@@ -280,6 +294,40 @@ struct HierarchySpec {
 };
 constexpr int kMaxHierarchyDepth = 4;
 
+// ---- culling and LOD (ADR-029) -------------------------------------------------------------------
+
+// Per-object GPU culling and level of detail. The defaults are "everything off": no cull pass is
+// encoded, the draw keeps the plain `DrawIndexed(indexCount, instanceCount)` path and every buffer
+// is byte-identical to a build without this feature, so existing scenes render bit-identically.
+//
+// `cull` enables the compute pass (shaders/cull.wgsl): each instance's world bounding sphere
+// (centre = objectMatrix * record position, radius = the source's bounding radius x the largest
+// absolute instance scale component x the object matrix scale) is tested against the six frustum
+// planes of the frame's view-projection, then against `maxDistance` (0 = no limit) and
+// `minScreenRadius` (projected radius in pixels, 0 = no limit).
+//
+// `lodCount` > 1 additionally picks a level per instance and draws one indirect draw per level
+// from its own compacted list. The thresholds in `lodDistances` are LOD0->1, 1->2, 2->3; a
+// threshold of 0 ends the ladder (the level stays at the last one reached), which is why the
+// default (all zero) keeps everything at LOD0. With `lodByScreenSize` the thresholds are projected
+// radii in pixels and a level is taken when the radius drops to or below the threshold (so they
+// should descend); otherwise they are world distances and a level is taken when the distance
+// reaches the threshold (so they should ascend).
+//
+// Only `lodCount` is structural (it decides how many meshes are generated); everything else is a
+// per-frame uniform and can be modulated without a rebuild.
+struct LodSettings {
+    bool cull = false;
+    float maxDistance = 0.0f;      // world units; 0 = no distance limit
+    float minScreenRadius = 0.0f;  // pixels; 0 = no screen-size limit
+    int lodCount = 1;              // 1..kMaxLodLevels
+    float lodDistances[3] = {0.0f, 0.0f, 0.0f}; // LOD0->1, 1->2, 2->3
+    bool lodByScreenSize = true;   // thresholds are projected radii in pixels, not distances
+    float impostorSize = 1.0f;     // multiplies the LOD2/LOD3 billboard size
+    [[nodiscard]] std::uint64_t structuralHash() const; // lodCount only (the rest are uniforms)
+};
+constexpr int kMaxLodLevels = 4;
+
 // Everything a cloud generation needs from outside the object (other objects for Procedural
 // sources, splines for Spline distributions and Path deformers).
 struct ProceduralGeometry;
@@ -311,6 +359,7 @@ struct ProceduralGeometry {
     float emissiveFieldAmount = 0.0f;
     std::string extraLane;               // attribute projected into InstanceRecord::emissive.a
     HierarchySpec hierarchy;             // self-recursion (structural)
+    LodSettings lod;                     // GPU culling / LOD (only lodCount is structural)
     Grammar grammar;                     // placements when distribution.kind == Grammar (structural)
     // Structural outputs (filled by rebuild()); the renderer uploads them when the version
     // changes. `structureVersion` is bumped by rebuild() whenever the structural hash changed.
@@ -351,7 +400,7 @@ struct ProceduralGeometry {
 // Every field that makes sense as a modulation target, registered under `prefix` (e.g.
 // "procedural/columns/"): source/*, distribution/*, transform/*, variation/*, deform/<slot>/*
 // (slot = 1-based, label "<kind>/<field>"), ops/<slot>/*, effector/<slot>/*, emissiveFieldAmount,
-// material/*, materialVariation/*. Enum/kind fields are int parameters; count/segment fields are
+// lod/* (enabled, maxDistance, minScreenRadius, distance1..3), material/*, materialVariation/*. Enum/kind fields are int parameters; count/segment fields are
 // ints. Group = prefix without the trailing '/'.
 struct ProceduralParameters;
 constexpr int kMaxEffectors = spatial::kMaxEffectors;
@@ -396,6 +445,11 @@ struct ProceduralParameters {
     params::Parameter<float>* scalePerLevel = nullptr;    // hierarchy/scalePerLevel (structural)
     params::Parameter<float>* splineStart = nullptr;      // distribution/splineStart
     params::Parameter<float>* splineEnd = nullptr;        // distribution/splineEnd
+    // Culling / LOD (per frame, ADR-029)
+    params::Parameter<bool>* lodEnabled = nullptr;        // lod/enabled -> LodSettings::cull
+    params::Parameter<float>* lodMaxDistance = nullptr;   // lod/maxDistance
+    params::Parameter<float>* lodMinScreenRadius = nullptr; // lod/minScreenRadius
+    std::array<params::Parameter<float>*, 3> lodDistance{}; // lod/distance1..3
 };
 
 } // namespace avgen::scene

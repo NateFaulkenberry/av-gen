@@ -12,6 +12,14 @@
 // uniforms. The FieldBlock uniform (rendering/field_uniforms.hpp) is bound to both the draw
 // (group 1 binding 3) and the effector pass (group 0 binding 3).
 //
+// Culling and LOD (ADR-029): an object with scene::LodSettings::cull or lodCount > 1 gets a second
+// compute pass (shaders/cull.wgsl) after the effector pass. It classifies every record against the
+// frustum/distance/screen-size limits, picks a LOD level and compacts the survivors per level with
+// the same stable prefix-sum scan the particles use; the draw is then one drawIndexedIndirect per
+// level, reading its instance through the level's visible list (group 1 binding 5) and using that
+// level's mesh. Objects with the defaults (cull off, lodCount 1) keep the direct draw and every
+// buffer byte-identical.
+//
 // Splines (ADR-026): the SplineBuffers storage buffer (rendering/spline_buffers.hpp) is bound to
 // the draw at group 1 binding 4; Path deformers are resolved to a spline slot and a final
 // pathScale (units of arc length per object unit; "fit" divides the length by the source
@@ -25,6 +33,7 @@
 
 #include <webgpu/webgpu_cpp.h>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -53,6 +62,7 @@ struct ProceduralStats {
     std::uint32_t deformers = 0;        // enabled deformers over drawn objects
     double cpuUpdateMs = 0.0;           // rebuild + upload time this frame
     std::uint32_t uploads = 0;          // instance buffer uploads this frame
+    std::uint32_t drawCalls = 0;        // draws issued: one per object, or one per populated LOD level
     // Fields (ADR-025)
     std::uint32_t effectorObjects = 0;   // objects that ran the effector pass this frame
     std::uint64_t effectorInstances = 0; // records processed by the effector pass this frame
@@ -61,6 +71,41 @@ struct ProceduralStats {
     std::uint32_t pointObjects = 0;      // objects drawn as Point billboards
     std::uint32_t fieldDeformers = 0;    // enabled Field deformers bound to a slot
     std::uint32_t pathDeformers = 0;     // enabled Path deformers bound to a spline slot (ADR-026)
+    // Culling and LOD (ADR-029). Counts come from an asynchronous readback of the cull pass's
+    // stats buffer, so they lag the drawn frame by a frame or two; they cover only the objects
+    // whose cull pass ran (visibleInstances + culledInstances = those objects' instance total).
+    std::uint32_t cullObjects = 0;        // objects whose cull pass was encoded this frame
+    std::uint64_t culledInstances = 0;    // instances rejected by frustum / distance / screen size
+    std::uint64_t visibleInstances = 0;   // instances that survived, over all LOD levels
+    std::uint64_t lodCounts[4] = {0, 0, 0, 0}; // survivors per LOD level
+    double cullMs = -1.0;                 // GPU time of the last measured cull pass (-1 = none / unavailable)
+};
+
+// The six frustum planes of a view-projection in world space, in the order left, right, bottom,
+// top, near, far; xyz is a unit normal pointing inwards, w the plane offset (a point p is inside
+// when dot(n, p) + w >= 0). Gribb-Hartmann on a 0..1 depth clip range (WebGPU/Metal).
+using FrustumPlanes = std::array<glm::vec4, 6>;
+[[nodiscard]] FrustumPlanes frustumPlanes(const glm::mat4& viewProj);
+
+// The camera terms the cull pass needs beyond the planes.
+struct CullCamera {
+    glm::vec3 position{0.0f};
+    float projScale = 1.0f; // viewportHeight / (2 tan(fovY / 2)): pixels per world unit at 1 unit
+};
+[[nodiscard]] float cullProjScale(float fovYRadians, std::uint32_t viewportHeight);
+
+// CPU reference of the per-instance decision in shaders/cull.wgsl: the LOD level 0..lodCount-1,
+// or -1 when the instance is culled. `center`/`radius` are the world bounding sphere. Shared with
+// the tests, which compare the GPU's compacted lists against it.
+[[nodiscard]] int cullLodLevel(const scene::LodSettings& lod, const FrustumPlanes& planes, const CullCamera& camera,
+                               glm::vec3 center, float radius);
+
+// Per-object result of the cull pass (blocking readback; tests and tools).
+struct CullCounts {
+    std::uint32_t records = 0;  // instances the pass looked at
+    std::uint32_t visible = 0;  // sum of `lod`
+    std::uint32_t culled = 0;   // records - visible
+    std::array<std::uint32_t, 4> lod{};
 };
 
 // The deformer record as the shader sees it (64 bytes, std140-compatible). Mirrors
@@ -92,6 +137,19 @@ struct EffectorPassUniforms {
 };
 static_assert(sizeof(EffectorPassUniforms) == 128 + 16 + 48 * spatial::kMaxEffectors);
 
+// The cull pass parameters (shaders/cull.wgsl `CullParams`, 256 bytes).
+struct CullPassUniforms {
+    glm::mat4 objectToWorld;
+    glm::vec4 planes[6];      // frustum planes (left, right, bottom, top, near, far)
+    glm::vec4 cameraPos;      // xyz = camera position, w = projScale
+    glm::vec4 limits;         // x = maxDistance, y = minScreenRadius, z = source radius, w = object scale
+    glm::vec4 thresholds;     // xyz = lodDistances, w = 0
+    glm::uvec4 counts;        // x = record count, y = lod count, z = visible stride, w = scan blocks
+    glm::uvec4 flags;         // x = cull enabled, y = thresholds are screen radii, z = stats slot, w = 0
+    glm::uvec4 indexCounts;   // index count of each level's mesh
+};
+static_assert(sizeof(CullPassUniforms) == 256);
+
 class ProceduralRenderer {
 public:
     ProceduralRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders);
@@ -109,7 +167,7 @@ public:
                                     const wgpu::BindGroupLayout& materialLayout,
                                     const wgpu::BindGroupLayout& iblLayout, std::uint32_t sampleCount = 1,
                                     wgpu::Buffer fieldBlock = nullptr, wgpu::Buffer splineTable = nullptr);
-    [[nodiscard]] Result<void> reload(); // hot reload of procedural.wgsl / points.wgsl (keeps buffers)
+    [[nodiscard]] Result<void> reload(); // hot reload of procedural.wgsl / points.wgsl / cull.wgsl (keeps buffers)
 
     // Per frame, before the lit pass: uploads source meshes (cached by `meshHash`) and instance
     // buffers that changed, writes the deformer/time and object uniforms, and encodes the
@@ -133,6 +191,12 @@ public:
     // also does this at the start of the next frame).
     void collectTimings();
 
+    // The viewport the cull pass reasons about: the aspect of the frustum planes and the pixel
+    // scale of `minScreenRadius` / screen-size LOD. Call it once per frame before update() with
+    // the render target size; the default is 1920x1080. Ignored entirely when no object has
+    // culling or LOD enabled.
+    void setViewport(std::uint32_t width, std::uint32_t height);
+
     [[nodiscard]] const ProceduralStats& stats() const { return stats_; }
     // Drops cached meshes not used for `frames` frames (called by update).
     void setMeshCacheLimit(std::size_t frames) { cacheFrames_ = frames; }
@@ -140,6 +204,11 @@ public:
     // Blocking readback of the records the draw reads for the object named `name` (the live
     // buffer after the effector pass, else the base buffer). Tests and tools only.
     [[nodiscard]] Result<std::vector<scene::InstanceRecord>> readInstanceRecords(const std::string& name);
+    // Blocking readback of the last cull pass's per-level counts for the object named `name`.
+    // Tests and tools only.
+    [[nodiscard]] Result<CullCounts> readCullCounts(const std::string& name);
+    // Blocking readback of the compacted visible list of one LOD level (ascending record indices).
+    [[nodiscard]] Result<std::vector<std::uint32_t>> readVisibleIndices(const std::string& name, int level);
 
 private:
     struct Impl;

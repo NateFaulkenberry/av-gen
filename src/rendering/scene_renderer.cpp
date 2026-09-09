@@ -931,6 +931,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // The scene places its procedurals itself in this phase: identity object matrices.
     {
         const std::vector<glm::mat4> identity(scene.procedurals.size(), glm::mat4(1.0f));
+        // Culling and screen-size LOD need this frame's viewport (ADR-029).
+        procedurals_->setViewport(hdr_.width(), hdr_.height());
         procedurals_->update(encoder, scene, identity, time, fields_.get(), splines_.get());
         stats_.procedural = procedurals_->stats();
     }
@@ -996,7 +998,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         };
         drawItems(opaque, true);
         procedurals_->draw(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
-        stats_.drawCalls += stats_.procedural.objects;
+        // One indirect draw per populated LOD level when an object uses LOD, else one per object.
+        stats_.drawCalls += std::max(stats_.procedural.objects, stats_.procedural.drawCalls);
         stats_.triangles += static_cast<std::uint32_t>(
             std::min<std::uint64_t>(stats_.procedural.logicalTriangles, 0xFFFFFFFFull - stats_.triangles));
         // SDF objects (ADR-027): meshed ones draw here like entities; raymarched ones need their own

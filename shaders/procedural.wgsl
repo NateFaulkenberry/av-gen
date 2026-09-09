@@ -28,10 +28,16 @@
 // result = mix(p, p', amount). The renderer resolves pathScale to units per object unit (the
 // "fit" mode divides the spline length by the source extent along the axis).
 //
+// Culling and LOD (ADR-029, cull.wgsl): when fieldInfo.w is 1 the draw is indirect and reads its
+// instance through visibleIndices[instance_index] (binding 5), the compacted list of the LOD level
+// being drawn; the ProceduralUniforms slot is per level, so LOD2/LOD3 billboards set fieldInfo.z
+// and take the same camera-facing Point path as Point sources. fieldInfo.w = 0 keeps the original
+// path byte for byte.
+//
 // Bind groups: 0 frame (common.wgsl), 1 = {0 ObjectUniforms (dynamic offset; model = object
 // matrix, material fields), 1 instances (read-only storage; the live buffer when the object has
-// effectors), 2 ProceduralUniforms, 3 FieldBlock, 4 SplineTable}, 2 material, 3 IBL (both
-// declared in pbr_shade.wgsl). Mirrors rendering/procedural_renderer.hpp.
+// effectors), 2 ProceduralUniforms, 3 FieldBlock, 4 SplineTable, 5 visible list}, 2 material,
+// 3 IBL (both declared in pbr_shade.wgsl). Mirrors rendering/procedural_renderer.hpp.
 #include "common.wgsl"
 #include "pbr_shade.wgsl"
 #include "fields.wgsl"
@@ -57,7 +63,7 @@ struct DeformerUniform {
 
 struct ProceduralUniforms {
     timeInfo: vec4<f32>,  // x = render time, y = deformer count, z = normal epsilon, w = instance count
-    fieldInfo: vec4<f32>, // x = emissive field slot (-1 none), y = emissive field amount, z = point source (1/0), w = 0
+    fieldInfo: vec4<f32>, // x = emissive field slot (-1 none), y = emissive field amount, z = point source or LOD billboard (1/0), w = indirection enabled (1/0)
     deformers: array<DeformerUniform, 8>,
 };
 
@@ -65,6 +71,11 @@ struct ProceduralUniforms {
 @group(1) @binding(2) var<uniform> proc: ProceduralUniforms;
 @group(1) @binding(3) var<uniform> fieldBlock: FieldBlock;
 @group(1) @binding(4) var<storage, read> splineTable: SplineTable;
+// Culling / LOD (ADR-029, cull.wgsl): the compacted visible list of this draw's LOD level, bound
+// at the level's slice of the object's visible buffer. Read-only storage is allowed in a vertex
+// stage. When fieldInfo.w is 0 the object is not culled, this binding is an inert placeholder and
+// instance_index addresses `instances` directly - exactly the pre-culling path.
+@group(1) @binding(5) var<storage, read> visibleIndices: array<u32>;
 
 const DEFORM_BEND: i32 = 0;
 const DEFORM_TWIST: i32 = 1;
@@ -320,7 +331,10 @@ struct ProcVertexOut {
 
 @vertex
 fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVertexOut {
-    let inst = instances[instanceIndex];
+    // Indirection is per draw (uniform across the whole draw), so both paths stay coherent.
+    var recordIndex = instanceIndex;
+    if (proc.fieldInfo.w > 0.5) { recordIndex = visibleIndices[instanceIndex]; }
+    let inst = instances[recordIndex];
     var out: ProcVertexOut;
     out.uv = in.uv;
     out.colorMul = inst.color.rgb;

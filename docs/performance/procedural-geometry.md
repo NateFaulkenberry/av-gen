@@ -127,3 +127,48 @@ Reading the numbers:
 - Mesh mode has no per-frame GPU cost beyond an ordinary mesh draw; its cost is the CPU
   surface-nets pass in `SdfObject::rebuild` (resolution^3 tree evaluations), paid only when the
   structural hash changes.
+
+## Culling and LOD (ADR-029)
+
+Probe: `avgen_render_tests "[.perf][culling]"` (Release; `tests/rendering/test_culling_gpu.cpp`).
+Apple M2 Max, macOS 26.6.2 (build 25G83), Dawn v20260907 (Metal), headless 1920x1080, mean of
+frames 30..89. "scene+post" is the frame timer (scene pass through tone map); the cull pass runs
+before it and carries its own timestamp (`ProceduralStats::cullMs`). Two runs; the undeformed
+"culling off" rows vary by up to 2x with GPU clock state, so both samples are listed.
+
+- **100k boxes**: a 320 x 313 grid of unit boxes (24 vertices, 12 triangles each) at 1.2-unit
+  spacing, camera inside the field at eye height looking along -Z, so roughly the half behind the
+  camera plus the sides fall outside the frustum. Culling keeps 20,518 of 100,160 instances.
+- **1M points**: a 1000 x 1000 grid of 0.02-unit unlit billboards at 0.04-unit spacing seen from
+  22 units; 739,766 of 1,000,000 survive the frustum.
+
+| Case | Instances drawn | scene+post ms (run 1 / run 2) | cull pass ms | total GPU ms |
+|---|---|---|---|---|
+| 100k boxes, culling off | 100,160 | 1.45 / 1.04 | – | 1.45 / 1.04 |
+| 100k boxes, culling on | 20,518 | 0.69 / 0.69 | 0.062 | 0.75 / 0.75 |
+| 1M points, culling off | 1,000,000 | 2.82 / 1.64 | – | 2.82 / 1.64 |
+| 1M points, culling on | 739,766 | 1.85 / 1.51 | 0.38 / 0.35 | 2.23 / 1.86 |
+
+Reading the numbers against the targets (cull pass under 0.5 ms at 100k, under 2 ms at 1M):
+
+- The cull pass is **0.06 ms for 100k instances** and **0.35-0.38 ms for 1M**, comfortably inside
+  both targets. It is bandwidth-bound on the record buffer: one thread reads a 96-byte
+  `InstanceRecord` and writes 4 bytes of level, then the three compaction dispatches touch only the
+  4-byte lists (1M records = 96 MB read for classify, ~12 MB for the whole scan). Scaling from 100k
+  to 1M is a factor of 6, not 10, because the small case never fills the machine.
+- **100k boxes with half the field off screen: 1.45/1.04 ms down to 0.75 ms end to end**, cull pass
+  included. Removing 80% of the instances removes 80% of the vertex work; the pass costs 4% of what
+  it saves. This is the case culling is for.
+- **1M points break even at best.** The billboards are 4 vertices each, so the vertex work the pass
+  removes (26% of the instances) is worth roughly what the pass costs plus the extra indirection in
+  the vertex shader; the run-2 pair (1.86 vs 1.64) is a small net loss. Culling a point cloud only
+  pays when much more than a quarter of it is off screen, or when `minScreenRadius` is doing the
+  work — dropping sub-pixel points removes fragment work too, which is where the billboard cost
+  actually is.
+- The indirection itself (`instances[visibleIndices[instance_index]]`) is free within measurement
+  noise: the fully-visible A/B in the `[culling]` tests renders the identical image and the
+  100k "culling on" row is the same 0.69 ms in both runs while the direct path swings by 40%.
+
+CPU cost is unchanged: the cull parameters are one 256-byte uniform write per culling object per
+frame, and the stats readback is asynchronous (`ProceduralStats::visibleInstances` and friends lag
+the drawn frame by a frame or two and nothing waits on them).

@@ -808,6 +808,17 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
                         pr.effectorObjects, static_cast<unsigned long long>(pr.effectorInstances), pr.effectors,
                         pr.effectorPassMs, pr.fieldDeformers, pr.pointObjects);
         }
+        // Culling / LOD (ADR-029). The counts come from an asynchronous readback, so they trail
+        // the drawn frame by a frame or two; the pass time is the GPU timer's.
+        if (pr.cullObjects > 0) {
+            ImGui::Text("culling: %u objects  %llu visible  %llu culled  lod %llu/%llu/%llu/%llu  pass %.3f ms",
+                        pr.cullObjects, static_cast<unsigned long long>(pr.visibleInstances),
+                        static_cast<unsigned long long>(pr.culledInstances),
+                        static_cast<unsigned long long>(pr.lodCounts[0]),
+                        static_cast<unsigned long long>(pr.lodCounts[1]),
+                        static_cast<unsigned long long>(pr.lodCounts[2]),
+                        static_cast<unsigned long long>(pr.lodCounts[3]), pr.cullMs);
+        }
     }
     ImGui::TextDisabled("%s (%s)", stats.adapter.c_str(), stats.backend.c_str());
 }
