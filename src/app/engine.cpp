@@ -488,6 +488,13 @@ void visitSceneFileAssets(const std::filesystem::path& sceneFile,
         doc["environment"]["map"].is_string()) {
         visit(resolveFrom(doc["environment"]["map"].get<std::string>(), dir), false);
     }
+    if (doc.contains("materialPrograms") && doc["materialPrograms"].is_array()) {
+        for (const auto& entry : doc["materialPrograms"]) {
+            if (entry.is_string()) { // a library material referenced by path rather than inlined
+                visit(resolveFrom(entry.get<std::string>(), dir), false);
+            }
+        }
+    }
     if (doc.contains("nodes") && doc["nodes"].is_array()) {
         for (const auto& node : doc["nodes"]) {
             if (!node.is_object() || !node.contains("asset") || !node["asset"].is_string()) {
@@ -930,6 +937,18 @@ Result<void> Engine::exportBundle(const std::filesystem::path& dir) {
                 return std::unexpected(copied.error());
             }
             doc["environment"]["map"] = copied->filename().generic_string();
+        }
+        if (doc.contains("materialPrograms") && doc["materialPrograms"].is_array()) {
+            for (auto& entry : doc["materialPrograms"]) {
+                if (!entry.is_string()) {
+                    continue;
+                }
+                auto copied = copyFile(resolveFrom(entry.get<std::string>(), srcDir));
+                if (!copied) {
+                    return std::unexpected(copied.error());
+                }
+                entry = copied->filename().generic_string();
+            }
         }
         if (doc.contains("nodes") && doc["nodes"].is_array()) {
             for (auto& node : doc["nodes"]) {

@@ -55,6 +55,7 @@
 
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -142,6 +143,9 @@ struct MaterialProgram {
     [[nodiscard]] std::uint64_t structuralHash() const;
     [[nodiscard]] nlohmann::json toJson() const;
     static Result<MaterialProgram> fromJson(const nlohmann::json& j);
+    // Loads a program from a standalone `.material.json` file (the same object `fromJson` takes),
+    // so a library material can be shared between scenes instead of pasted into each of them.
+    static Result<MaterialProgram> loadFile(const std::filesystem::path& path);
 };
 
 // CPU evaluation context/results for tests and tools.

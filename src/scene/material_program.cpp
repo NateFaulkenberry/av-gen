@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <fstream>
 #include <utility>
 
 namespace avgen::scene {
@@ -899,6 +900,35 @@ Result<MaterialProgram> MaterialProgram::fromJson(const json& j) {
 }
 
 #undef AVGEN_MAT_READ
+
+Result<MaterialProgram> MaterialProgram::loadFile(const std::filesystem::path& path) {
+    std::ifstream in(path);
+    if (!in) {
+        return fail("cannot read material file '{}'", path.string());
+    }
+    json parsed;
+    try {
+        in >> parsed;
+    } catch (const json::exception& e) {
+        return fail("material file '{}': {}", path.string(), e.what());
+    }
+    auto program = fromJson(parsed);
+    if (!program) {
+        return fail("material file '{}': {}", path.string(), program.error().message);
+    }
+    if (!parsed.is_object() || !parsed.contains("name")) {
+        // A file that does not name itself is named by its path, minus the ".material" the library
+        // files carry, rather than taking fromJson's generic default and colliding with the next one.
+        std::string stem = path.stem().string();
+        if (const auto dot = stem.rfind(".material"); dot != std::string::npos && dot + 9 == stem.size()) {
+            stem.erase(dot);
+        }
+        if (!stem.empty()) {
+            program->name = std::move(stem);
+        }
+    }
+    return program;
+}
 
 // ---- evaluation ----------------------------------------------------------------------------------
 

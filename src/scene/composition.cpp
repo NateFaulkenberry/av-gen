@@ -2800,7 +2800,20 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("'materialPrograms' must be an array");
         }
         for (const json& pj : programs) {
-            auto mp = MaterialProgram::fromJson(pj);
+            // An entry is either the program inline or a path to a `.material.json` file, the same
+            // two forms `graph` accepts, so a library material is shared rather than pasted in.
+            Result<MaterialProgram> mp = fail("material program must be an object or a file path");
+            if (pj.is_string()) {
+                std::filesystem::path file = pj.get<std::string>();
+                if (file.is_relative() && !scenePath.empty()) {
+                    file = scenePath.parent_path() / file;
+                } else if (file.is_relative()) {
+                    file = registry.resolve(file);
+                }
+                mp = MaterialProgram::loadFile(file);
+            } else if (pj.is_object()) {
+                mp = MaterialProgram::fromJson(pj);
+            }
             if (!mp) {
                 return fail("scene file '{}': material program: {}", scenePath.string(), mp.error().message);
             }

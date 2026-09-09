@@ -1,348 +1,726 @@
 {
-  "format": "avgen-project",
-  "version": 4,
-  "app": {
-    "name": "avgen",
-    "version": "0.1.0"
-  },
-  "assets": {
-    "scene": {
-      "kind": "composition",
-      "path": "machine.scene.json"
-    }
-  },
-  "parameters": {
-    "post/bloom/enabled": true,
-    "post/bloom/intensity": 1.4,
-    "post/bloom/threshold": 0.85,
-    "post/tonemap/operator": 1,
-    "post/output/vignette": 0.4,
-    "post/output/grain": 0.03,
-    "scene/brightness": 0.85,
-    "scene/keyLight": 0.55,
-    "scene/fogDensity": 0.016,
-    "root/rotationSpeed": 0.0,
-    "macros/energy": 0.35,
-    "macros/turbulence": 0.3,
-    "macros/heat": 0.25
-  },
-  "sources": [
-    {
-      "kind": "macro",
-      "name": "macros",
-      "settings": {
-        "knobs": [
-          {
-            "name": "energy",
-            "default": 0.35
-          },
-          {
-            "name": "turbulence",
-            "default": 0.3
-          },
-          {
-            "name": "heat",
-            "default": 0.25
-          }
-        ]
-      }
-    },
-    {
-      "kind": "control",
-      "name": "control",
-      "settings": {
-        "channels": []
-      }
-    }
-  ],
-  "worldMacros": [
-    {
-      "name": "energy",
-      "label": "MACHINE ENERGY",
-      "default": 0.35,
-      "targets": [
-        {
-          "path": "field/pulse/amplitude",
-          "min": 0.2,
-          "max": 2.4
-        },
-        {
-          "path": "field/swirl/strength",
-          "min": 0.4,
-          "max": 3.4
-        },
-        {
-          "path": "particles/steam/spawnRate",
-          "min": 600,
-          "max": 6000,
-          "op": "replace"
-        },
-        {
-          "path": "scene/brightness",
-          "min": 0.6,
-          "max": 1.25
-        }
-      ]
-    },
-    {
-      "name": "turbulence",
-      "label": "TURBULENCE",
-      "default": 0.3,
-      "targets": [
-        {
-          "path": "field/churn/strength",
-          "min": 0.2,
-          "max": 4.0
-        },
-        {
-          "path": "field/churn/frequency",
-          "min": 0.03,
-          "max": 0.18
-        },
-        {
-          "path": "procedural/motes/effector/1/strength",
-          "min": 0.5,
-          "max": 4.0
-        }
-      ]
-    },
-    {
-      "name": "heat",
-      "label": "HEAT",
-      "default": 0.25,
-      "targets": [
-        {
-          "path": "field/heat/strength",
-          "min": 0.2,
-          "max": 2.6
-        },
-        {
-          "path": "procedural/ribs/emissiveFieldAmount",
-          "min": 0.5,
-          "max": 6.0
-        },
-        {
-          "path": "procedural/plates/effector/3/strength",
-          "min": 1.0,
-          "max": 8.0
-        }
-      ]
-    }
-  ],
-  "routes": [
-    {
-      "source": "audio.rms",
-      "target": "macros/energy",
-      "amount": 0.5,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 40,
-        "decayMs": 300
-      }
-    },
-    {
-      "source": "audio.bass",
-      "target": "field/core/strength",
-      "amount": 3.0,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 15,
-        "decayMs": 220
-      }
-    },
-    {
-      "source": "audio.lowMid",
-      "target": "procedural/ribs/effector/1/strength",
-      "amount": 1.2,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 20,
-        "decayMs": 260
-      }
-    },
-    {
-      "source": "audio.mid",
-      "target": "field/swirl/speed",
-      "amount": 1.6,
-      "op": "add",
-      "polarity": "unipolar"
-    },
-    {
-      "source": "audio.highMid",
-      "target": "procedural/plates/effector/2/strength",
-      "amount": 1.4,
-      "op": "add",
-      "polarity": "unipolar"
-    },
-    {
-      "source": "audio.treble",
-      "target": "procedural/motes/material/emissive",
-      "amount": 3.0,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 8,
-        "decayMs": 160
-      }
-    },
-    {
-      "source": "audio.spectralCentroid",
-      "target": "procedural/motes/materialVariation/hueShift",
-      "amount": 0.4,
-      "op": "add",
-      "polarity": "unipolar"
-    },
-    {
-      "source": "audio.spectralFlux",
-      "target": "macros/turbulence",
-      "amount": 0.5,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "attackMs": 10,
-        "decayMs": 400
-      }
-    },
-    {
-      "source": "audio.onset",
-      "target": "field/pulse/waveOrigin",
-      "amount": -6.0,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "envelope": "linearfall",
-        "decayMs": 900
-      }
-    },
-    {
-      "source": "audio.onset",
-      "target": "particles/steam/burst",
-      "amount": 900.0,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "envelope": "peakhold",
-        "decayMs": 40
-      }
-    },
-    {
-      "source": "beat.pulse",
-      "target": "procedural/hub/effector/1/strength",
-      "amount": 1.2,
-      "op": "add",
-      "polarity": "unipolar",
-      "chain": {
-        "envelope": "linearfall",
-        "decayMs": 500
-      }
-    }
-  ],
-  "presets": [
-    {
-      "name": "Idle",
-      "values": {
-        "macros/energy": [
-          0.15
-        ],
-        "macros/turbulence": [
-          0.2
-        ],
-        "macros/heat": [
-          0.1
-        ],
-        "field/pulse/amplitude": [
-          0.4
-        ],
-        "scene/fogDensity": [
-          0.02
-        ]
-      }
-    },
-    {
-      "name": "Running",
-      "values": {
-        "macros/energy": [
-          0.55
-        ],
-        "macros/turbulence": [
-          0.4
-        ],
-        "macros/heat": [
-          0.45
-        ],
-        "field/pulse/amplitude": [
-          1.2
-        ],
-        "scene/fogDensity": [
-          0.016
-        ]
-      }
-    },
-    {
-      "name": "Overdrive",
-      "values": {
-        "macros/energy": [
-          1.0
-        ],
-        "macros/turbulence": [
-          0.85
-        ],
-        "macros/heat": [
-          1.0
-        ],
-        "field/pulse/amplitude": [
-          2.2
-        ],
-        "scene/fogDensity": [
-          0.01
-        ]
-      }
-    }
-  ],
-  "states": {
-    "initial": "Idle",
-    "states": [
-      {
-        "name": "Idle",
-        "preset": "Idle",
-        "transition": {
-          "seconds": 4.0,
-          "easing": "smooth"
-        }
-      },
-      {
-        "name": "Running",
-        "preset": "Running",
-        "transition": {
-          "seconds": 6.0,
-          "easing": "smooth"
-        },
-        "triggers": [
-          {
-            "kind": "macro",
-            "signal": "energy",
-            "threshold": 0.45
-          }
-        ]
-      },
-      {
-        "name": "Overdrive",
-        "preset": "Overdrive",
-        "transition": {
-          "seconds": 2.5,
-          "easing": "easeIn"
-        },
-        "triggers": [
-          {
-            "kind": "onset",
-            "threshold": 1.6,
-            "from": "Running"
-          }
-        ]
-      }
-    ]
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "machine.scene.json"
   }
+ },
+ "parameters": {
+  "camera/lens/focalLength": 30.0,
+  "camera/lens/sensorWidth": 36.0,
+  "camera/lens/sensorHeight": 24.0,
+  "camera/lens/aperture": 2.0,
+  "camera/lens/shutterAngle": 172.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/aperture": 5.6,
+  "camera/exposure/shutterSeconds": 0.02,
+  "camera/exposure/iso": 400.0,
+  "camera/exposure/compensation": 1.7,
+  "camera/focus/mode": 2,
+  "camera/focus/speed": 14.0,
+  "scene/brightness": 0.85,
+  "scene/keyLight": 0.8,
+  "lightrig/IndustrialCold/key/azimuth": 118.0,
+  "lightrig/IndustrialCold/key/elevation": 34.0,
+  "lightrig/IndustrialCold/rim/azimuth": -138.0,
+  "lightrig/IndustrialCold/rim/elevation": 28.0,
+  "lightrig/IndustrialCold/fill/intensity": 0.06,
+  "lightrig/IndustrialCold/practical/elevation": 3.0,
+  "lightrig/IndustrialCold/practical/distance": 0.78,
+  "lightrig/IndustrialCold/practical/size": 0.55,
+  "lightrig/IndustrialCold/practical/intensity": 0.45,
+  "lightrig/IndustrialCold/practical/temperature": 1900.0,
+  "lightrig/IndustrialCold/ambientIntensity": 0.03,
+  "scene/fogDensity": 0.0035,
+  "root/rotationSpeed": 0.0,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.42,
+  "post/bloom/threshold": 1.35,
+  "post/bloom/knee": 0.45,
+  "post/bloom/radius": 1.1,
+  "post/bloom/emissionWeight": 1.2,
+  "post/halation/enabled": true,
+  "post/halation/intensity": 0.26,
+  "post/halation/threshold": 1.5,
+  "post/halation/radius": 1.5,
+  "post/halation/warmth": 0.9,
+  "post/anamorphic/enabled": false,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "post/motionBlur/amount": 0.6,
+  "post/grade/contrast": 1.22,
+  "post/grade/saturation": 0.88,
+  "post/grade/temperature": -0.02,
+  "post/grade/lift": [
+   -0.011,
+   -0.01,
+   -0.004
+  ],
+  "post/lens/chromaticAberration": 0.025,
+  "post/lens/distortion": -0.02,
+  "post/output/vignette": 0.62,
+  "post/output/grain": 0.035,
+  "macros/energy": 0.3,
+  "macros/turbulence": 0.3,
+  "macros/heat": 0.2,
+  "sources/drift/rate": 0.021,
+  "sources/drift/phase": 0.0,
+  "sources/rise/rate": 0.013,
+  "sources/rise/phase": 0.35,
+  "sources/breathe/rate": 0.047,
+  "sources/breathe/phase": 0.0,
+  "sources/turn/rate": 0.0085,
+  "sources/turn/phase": 0.6
+ },
+ "sources": [
+  {
+   "kind": "lfo",
+   "name": "drift",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "rise",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "breathe",
+   "settings": {
+    "shape": "triangle"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "turn",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "macro",
+   "name": "macros",
+   "settings": {
+    "knobs": [
+     {
+      "name": "energy",
+      "default": 0.3
+     },
+     {
+      "name": "turbulence",
+      "default": 0.3
+     },
+     {
+      "name": "heat",
+      "default": 0.2
+     }
+    ]
+   }
+  }
+ ],
+ "worldMacros": [
+  {
+   "name": "energy",
+   "label": "MACHINE ENERGY",
+   "default": 0.3,
+   "targets": [
+    {
+     "path": "field/pulse/amplitude",
+     "min": 0.2,
+     "max": 1.1
+    },
+    {
+     "path": "field/swirl/strength",
+     "min": 0.5,
+     "max": 1.9
+    },
+    {
+     "path": "particles/vents/spawnRate",
+     "min": 260,
+     "max": 1100,
+     "op": "replace"
+    }
+   ]
+  },
+  {
+   "name": "turbulence",
+   "label": "TURBULENCE",
+   "default": 0.3,
+   "targets": [
+    {
+     "path": "field/churn/strength",
+     "min": 0.3,
+     "max": 1.9
+    },
+    {
+     "path": "field/churn/frequency",
+     "min": 0.035,
+     "max": 0.08
+    },
+    {
+     "path": "procedural/embers/effector/1/strength",
+     "min": 0.8,
+     "max": 2.6
+    }
+   ]
+  },
+  {
+   "name": "heat",
+   "label": "HEAT",
+   "default": 0.2,
+   "targets": [
+    {
+     "path": "field/heat/strength",
+     "min": 0.3,
+     "max": 2.0
+    },
+    {
+     "path": "procedural/coreDiscs/effector/1/strength",
+     "min": 0.3,
+     "max": 1.6
+    }
+   ]
+  }
+ ],
+ "routes": [
+  {
+   "source": "lfo.drift",
+   "target": "camera/position",
+   "component": 0,
+   "amount": 3.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.rise",
+   "target": "camera/position",
+   "component": 1,
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.drift",
+   "target": "camera/target",
+   "component": 0,
+   "amount": -2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.rise",
+   "target": "camera/target",
+   "component": 1,
+   "amount": -1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.breathe",
+   "target": "procedural/core/deform/1/amount",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.turn",
+   "target": "procedural/rings/effector/1/strength",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "lfo.breathe",
+   "target": "procedural/housing/effector/1/strength",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {}
+  },
+  {
+   "source": "audio.rms",
+   "target": "macros/energy",
+   "amount": 0.26,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "audio.spectralCentroid",
+   "target": "macros/heat",
+   "amount": 0.16,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 2000
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "procedural/core/material/emissive",
+   "amount": 0.42,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 90,
+    "decayMs": 1200,
+    "curve": "power",
+    "curveAmount": 0.7
+   }
+  },
+  {
+   "source": "audio.onset",
+   "target": "particles/vents/burst",
+   "amount": 240.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "none"
+   }
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "field/pulse/waveOrigin",
+   "amount": -6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "linearfall",
+    "decayMs": 2400
+   }
+  }
+ ],
+ "presets": [
+  {
+   "name": "Procedural / Machine Cold",
+   "values": {
+    "procedural/core/material/emissive": [
+     0.34
+    ],
+    "procedural/coreDiscs/material/emissive": [
+     0.55
+    ],
+    "procedural/embers/material/emissive": [
+     0.3
+    ],
+    "scene/volumeDensity": [
+     0.0011
+    ],
+    "scene/fogDensity": [
+     0.0032
+    ],
+    "post/bloom/intensity": [
+     0.26
+    ],
+    "post/halation/intensity": [
+     0.14
+    ],
+    "lightrig/IndustrialCold/keyIntensity": [
+     2.3
+    ],
+    "macros/energy": [
+     0.14
+    ],
+    "macros/heat": [
+     0.1
+    ],
+    "macros/turbulence": [
+     0.2
+    ]
+   }
+  },
+  {
+   "name": "Procedural / Machine Ignition",
+   "values": {
+    "procedural/core/material/emissive": [
+     1.05
+    ],
+    "procedural/coreDiscs/material/emissive": [
+     1.65
+    ],
+    "procedural/embers/material/emissive": [
+     0.7
+    ],
+    "scene/volumeDensity": [
+     0.0021
+    ],
+    "scene/fogDensity": [
+     0.0038
+    ],
+    "post/bloom/intensity": [
+     0.42
+    ],
+    "post/halation/intensity": [
+     0.24
+    ],
+    "lightrig/IndustrialCold/keyIntensity": [
+     1.9
+    ],
+    "macros/energy": [
+     0.48
+    ],
+    "macros/heat": [
+     0.5
+    ],
+    "macros/turbulence": [
+     0.35
+    ]
+   }
+  },
+  {
+   "name": "Procedural / Machine Reveal",
+   "values": {
+    "procedural/core/material/emissive": [
+     1.25
+    ],
+    "procedural/coreDiscs/material/emissive": [
+     2.2
+    ],
+    "procedural/embers/material/emissive": [
+     0.95
+    ],
+    "scene/volumeDensity": [
+     0.0031
+    ],
+    "scene/fogDensity": [
+     0.0042
+    ],
+    "post/bloom/intensity": [
+     0.56
+    ],
+    "post/halation/intensity": [
+     0.34
+    ],
+    "lightrig/IndustrialCold/keyIntensity": [
+     1.5
+    ],
+    "macros/energy": [
+     0.78
+    ],
+    "macros/heat": [
+     0.82
+    ],
+    "macros/turbulence": [
+     0.5
+    ]
+   }
+  },
+  {
+   "name": "Procedural / Machine Settle",
+   "values": {
+    "procedural/core/material/emissive": [
+     1.25
+    ],
+    "procedural/coreDiscs/material/emissive": [
+     1.9
+    ],
+    "procedural/embers/material/emissive": [
+     0.65
+    ],
+    "scene/volumeDensity": [
+     0.0019
+    ],
+    "scene/fogDensity": [
+     0.0036
+    ],
+    "post/bloom/intensity": [
+     0.4
+    ],
+    "post/halation/intensity": [
+     0.24
+    ],
+    "lightrig/IndustrialCold/keyIntensity": [
+     1.8
+    ],
+    "macros/energy": [
+     0.42
+    ],
+    "macros/heat": [
+     0.46
+    ],
+    "macros/turbulence": [
+     0.3
+    ]
+   }
+  }
+ ],
+ "timeline": {
+  "enabled": true,
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": 0,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 40.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       52.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 12,
+      "value": [
+       26.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 25,
+      "value": [
+       -25.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 34,
+      "value": [
+       -34.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 40,
+      "value": [
+       -40.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": 1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 40.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       5.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 12,
+      "value": [
+       8.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 25,
+      "value": [
+       5.5
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 34,
+      "value": [
+       17.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 40,
+      "value": [
+       19.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": 2,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 40.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       120.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 12,
+      "value": [
+       58.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 25,
+      "value": [
+       50.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 34,
+      "value": [
+       62.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 40,
+      "value": [
+       72.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": 0,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 40.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       5.5
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 12,
+      "value": [
+       4.5
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 25,
+      "value": [
+       -5.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 34,
+      "value": [
+       3.5
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 40,
+      "value": [
+       4.5
+      ],
+      "interp": "linear"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": 1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 40.0,
+    "keys": [
+     {
+      "time": 0,
+      "value": [
+       13.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 12,
+      "value": [
+       11.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 25,
+      "value": [
+       9.5
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 34,
+      "value": [
+       11.0
+      ],
+      "interp": "easeInOut"
+     },
+     {
+      "time": 40,
+      "value": [
+       11.0
+      ],
+      "interp": "linear"
+     }
+    ]
+   }
+  ],
+  "cues": [
+   {
+    "time": 0.0,
+    "name": "cold",
+    "preset": "Procedural / Machine Cold",
+    "morphSeconds": 2.0
+   },
+   {
+    "time": 11.0,
+    "name": "ignition",
+    "preset": "Procedural / Machine Ignition",
+    "morphSeconds": 7.0
+   },
+   {
+    "time": 23.0,
+    "name": "reveal",
+    "preset": "Procedural / Machine Reveal",
+    "morphSeconds": 7.0
+   },
+   {
+    "time": 33.0,
+    "name": "settle",
+    "preset": "Procedural / Machine Settle",
+    "morphSeconds": 6.0
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 60,
+  "output": "sequence",
+  "path": "renders/machine"
+ }
 }
