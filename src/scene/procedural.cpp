@@ -660,6 +660,12 @@ Result<void> SourceSpec::validate() const {
         if (!inRange(subdivisions, 1, 64)) {
             return fail("box subdivisions must be in 1..64 (got {})", subdivisions);
         }
+        if (!(bevel >= 0.0f)) {
+            return fail("box bevel must be >= 0 (got {})", bevel);
+        }
+        if (!inRange(bevelSegments, 1, 16)) {
+            return fail("box bevelSegments must be in 1..16 (got {})", bevelSegments);
+        }
         break;
     case PrimitiveKind::Cylinder:
         if (!(radius > 0.0f) || !(height > 0.0f)) {
@@ -715,6 +721,8 @@ std::uint64_t SourceSpec::structuralHash() const {
     case PrimitiveKind::Box:
         h.v3(size);
         h.i32(subdivisions);
+        h.f32(bevel);
+        h.i32(bevelSegments);
         break;
     case PrimitiveKind::Cylinder:
         h.f32(radius);
@@ -722,6 +730,8 @@ std::uint64_t SourceSpec::structuralHash() const {
         h.i32(radialSegments);
         h.i32(heightSegments);
         h.boolean(caps);
+        h.f32(bevel);
+        h.i32(bevelSegments);
         break;
     case PrimitiveKind::Sphere:
         h.f32(radius);
@@ -793,6 +803,133 @@ MeshData makeBox(glm::vec3 size, int subdivisions) {
 
 // Side: (R+1)(H+1) vertices (seam duplicated for uv), 6RH indices; each cap adds R+2 vertices
 // (centre + ring) and 3R indices. u runs around, v along the height; caps are mapped radially.
+// A box grown from a smaller box by a sphere of radius r: six flat faces over the inner
+// rectangle, twelve quarter-cylinder fillets along the inner edges, eight spherical octants at
+// the inner corners. Every patch is parametrised so its boundary vertices land on exactly the
+// same positions and normals as its neighbour's, which is why the surface has no seam and needs
+// no welding. Normals are analytic rather than averaged, so a bevel this small still shades
+// correctly.
+MeshData makeBeveledBox(glm::vec3 size, int subdivisions, float bevel, int bevelSegments) {
+    const glm::vec3 half = glm::abs(size) * 0.5f;
+    const float smallest = std::min({half.x, half.y, half.z});
+    const float r = std::clamp(bevel, 0.0f, smallest * 0.999f);
+    if (r <= 1e-6f) {
+        return makeBox(size, subdivisions);
+    }
+    const auto n = static_cast<std::uint32_t>(std::clamp(subdivisions, 1, 64));
+    const auto b = static_cast<std::uint32_t>(std::clamp(bevelSegments, 1, 16));
+    const glm::vec3 inner = half - glm::vec3(r); // the box the sphere is swept over
+
+    MeshData mesh;
+    mesh.name = "beveled-box";
+
+    // Emits an (su+1) x (sv+1) grid of vertices from `point(u, v)` and its triangles. Winding is
+    // CCW seen from outside when point() is orientation-consistent, which the callers arrange.
+    const auto patch = [&](std::uint32_t su, std::uint32_t sv, const auto& point) {
+        const auto base = static_cast<std::uint32_t>(mesh.vertices.size());
+        for (std::uint32_t j = 0; j <= sv; ++j) {
+            const float v = static_cast<float>(j) / static_cast<float>(sv);
+            for (std::uint32_t i = 0; i <= su; ++i) {
+                const float u = static_cast<float>(i) / static_cast<float>(su);
+                mesh.vertices.push_back(point(u, v));
+            }
+        }
+        // The corner octants converge to a pole, where a quad's top edge collapses to a point.
+        // The test is for two coincident corners rather than for zero area: with FMA contraction
+        // cross(v, v) does not evaluate to exactly zero, so an area threshold cannot tell a
+        // collapsed edge from a legitimately small triangle.
+        const auto emit = [&](std::uint32_t i0, std::uint32_t i1, std::uint32_t i2) {
+            const glm::vec3& p0 = mesh.vertices[i0].position;
+            const glm::vec3& p1 = mesh.vertices[i1].position;
+            const glm::vec3& p2 = mesh.vertices[i2].position;
+            if (p0 != p1 && p1 != p2 && p0 != p2) {
+                mesh.indices.insert(mesh.indices.end(), {i0, i1, i2});
+            }
+        };
+        for (std::uint32_t j = 0; j < sv; ++j) {
+            for (std::uint32_t i = 0; i < su; ++i) {
+                const std::uint32_t a = base + j * (su + 1) + i;
+                const std::uint32_t c = a + 1;
+                const std::uint32_t d = a + su + 1;
+                const std::uint32_t e = d + 1;
+                emit(a, d, c);
+                emit(c, d, e);
+            }
+        }
+    };
+
+    constexpr float kHalfPi = 1.57079632679f;
+    // cos(pi/2) is 4e-8 rather than 0 in float, which leaves a patch's boundary vertices a hair
+    // away from its neighbour's and its pole a hair away from itself. Exact endpoints make the
+    // seams bit-identical and collapse the pole properly, so no sliver triangles survive.
+    const auto quarterCos = [](float t) { return t <= 0.0f ? 1.0f : (t >= 1.0f ? 0.0f : std::cos(t * kHalfPi)); };
+    const auto quarterSin = [](float t) { return t <= 0.0f ? 0.0f : (t >= 1.0f ? 1.0f : std::sin(t * kHalfPi)); };
+    // Axis k with its two tangents, ordered so that cross(t0, t1) == +axis.
+    const auto tangents = [](int k) { return std::pair<int, int>{(k + 1) % 3, (k + 2) % 3}; };
+    const auto axisVec = [](int k) {
+        glm::vec3 v(0.0f);
+        v[k] = 1.0f;
+        return v;
+    };
+
+    // ---- 6 flat faces, over the inner rectangle only ----
+    for (int k = 0; k < 3; ++k) {
+        const auto [j0, j1] = tangents(k);
+        for (const float s : {1.0f, -1.0f}) {
+            const glm::vec3 normal = axisVec(k) * s;
+            // patch() winds (a, d, c), so the outward face needs cross(t1, t0) == normal: the
+            // second tangent is the one that carries the sign, and they are ordered j1 then j0.
+            const glm::vec3 t0 = axisVec(j1) * s;
+            const glm::vec3 t1 = axisVec(j0);
+            patch(n, n, [&](float u, float v) {
+                const glm::vec3 p = normal * half[k] + t0 * ((u * 2.0f - 1.0f) * inner[j1]) +
+                                    t1 * ((v * 2.0f - 1.0f) * inner[j0]);
+                return Vertex{p, normal, {u, v}};
+            });
+        }
+    }
+
+    // ---- 12 edge fillets: a quarter cylinder of radius r along each inner edge ----
+    for (int k = 0; k < 3; ++k) {
+        const auto [j0, j1] = tangents(k);
+        for (const float s0 : {1.0f, -1.0f}) {
+            for (const float s1 : {1.0f, -1.0f}) {
+                // The sweep runs from the j0 face to the j1 face; reversing it for one diagonal
+                // pair keeps the winding outwards on all four edges.
+                const bool flip = s0 * s1 < 0.0f;
+                // u runs along the edge and v sweeps the fillet: patch() winds (a, d, c), so the
+                // sweep has to be the second parameter for the quads to face outwards.
+                patch(n, b, [&](float u, float v) {
+                    const float t = flip ? 1.0f - v : v;
+                    const glm::vec3 normal =
+                        axisVec(j0) * (s0 * quarterCos(t)) + axisVec(j1) * (s1 * quarterSin(t));
+                    const glm::vec3 p = axisVec(j0) * (s0 * inner[j0]) + axisVec(j1) * (s1 * inner[j1]) +
+                                        normal * r + axisVec(k) * ((u * 2.0f - 1.0f) * inner[k]);
+                    return Vertex{p, normal, {u, v}};
+                });
+            }
+        }
+    }
+
+    // ---- 8 corners: a spherical octant of radius r at each inner corner ----
+    for (const float sx : {1.0f, -1.0f}) {
+        for (const float sy : {1.0f, -1.0f}) {
+            for (const float sz : {1.0f, -1.0f}) {
+                const glm::vec3 sign(sx, sy, sz);
+                const bool flip = sx * sy * sz < 0.0f;
+                patch(b, b, [&](float u, float v) {
+                    const float t = flip ? 1.0f - u : u;      // around +Y, from +X to +Z
+                    const float cosPhi = quarterCos(v);       // v = 1 is the pole on +Y
+                    const glm::vec3 normal =
+                        glm::vec3(cosPhi * quarterCos(t), quarterSin(v), cosPhi * quarterSin(t)) * sign;
+                    return Vertex{inner * sign + normal * r, normal, {u, v}};
+                });
+            }
+        }
+    }
+    return mesh;
+}
+
 MeshData makeCylinder(float radius, float height, int radialSegments, int heightSegments, bool caps) {
     const auto rs = static_cast<std::uint32_t>(std::clamp(radialSegments, 3, 256));
     const auto hs = static_cast<std::uint32_t>(std::clamp(heightSegments, 1, 128));
@@ -854,6 +991,97 @@ MeshData makeCylinder(float radius, float height, int radialSegments, int height
 
 // (S+1)(R+1) vertices (seam and pole rows duplicated for uv), 6S(R-1) indices (pole quads are
 // single triangles). u around +Y from +X, v from the north pole (0) to the south pole (1).
+// A cylinder whose two rims are quarter-round fillets, built by revolving a profile. A sharp rim
+// is the same tell as a sharp box edge: it is the one place a real machined part always carries a
+// radius. Normals come from the profile's own 2D normal rather than from averaging, so a small
+// bevel still shades correctly. With `caps` off there is nothing for a rim fillet to meet, so the
+// bevel is ignored and the plain tube comes back.
+MeshData makeBeveledCylinder(float radius, float height, int radialSegments, int heightSegments, bool caps,
+                             float bevel, int bevelSegments) {
+    const float halfHeight = std::abs(height) * 0.5f;
+    const float r = std::clamp(bevel, 0.0f, std::min(std::abs(radius), halfHeight) * 0.999f);
+    if (r <= 1e-6f || !caps) {
+        return makeCylinder(radius, height, radialSegments, heightSegments, caps);
+    }
+    const auto radial = static_cast<std::uint32_t>(std::clamp(radialSegments, 3, 256));
+    const auto rings = static_cast<std::uint32_t>(std::clamp(heightSegments, 1, 128));
+    const auto b = static_cast<std::uint32_t>(std::clamp(bevelSegments, 1, 16));
+    constexpr float kHalfPi = 1.57079632679f;
+    constexpr float kTwoPi = 6.28318530718f;
+    const float inner = std::abs(radius) - r;
+
+    // The profile, bottom pole to top pole, as (radius, y) with its own 2D normal. Consecutive
+    // sections share their boundary point exactly, so the revolved surface has no seam.
+    struct ProfilePoint {
+        float radius;
+        float y;
+        float nr;
+        float ny;
+    };
+    std::vector<ProfilePoint> profile;
+    profile.reserve(static_cast<std::size_t>(2 * b + rings + 4));
+    profile.push_back({0.0f, -halfHeight, 0.0f, -1.0f});
+    for (std::uint32_t i = 0; i <= b; ++i) { // bottom fillet: normal swings from -Y out to +radial
+        const float t = static_cast<float>(i) / static_cast<float>(b);
+        const float angle = (t - 1.0f) * kHalfPi;
+        const float nr = std::cos(angle);
+        const float ny = std::sin(angle);
+        profile.push_back({inner + r * nr, -halfHeight + r + r * ny, nr, ny});
+    }
+    for (std::uint32_t i = 1; i < rings; ++i) { // the straight side, between the two fillets
+        const float t = static_cast<float>(i) / static_cast<float>(rings);
+        profile.push_back({std::abs(radius), -halfHeight + r + t * (2.0f * halfHeight - 2.0f * r), 1.0f, 0.0f});
+    }
+    for (std::uint32_t i = 0; i <= b; ++i) { // top fillet: +radial round to +Y
+        const float t = static_cast<float>(i) / static_cast<float>(b);
+        const float angle = t * kHalfPi;
+        const float nr = std::cos(angle);
+        const float ny = std::sin(angle);
+        profile.push_back({inner + r * nr, halfHeight - r + r * ny, nr, ny});
+    }
+    profile.push_back({0.0f, halfHeight, 0.0f, 1.0f});
+
+    MeshData mesh;
+    mesh.name = "beveled-cylinder";
+    const auto columns = radial + 1; // the seam column is duplicated so uvs run 0..1
+    mesh.vertices.reserve(profile.size() * columns);
+    for (std::size_t row = 0; row < profile.size(); ++row) {
+        const ProfilePoint& p = profile[row];
+        const float v = static_cast<float>(row) / static_cast<float>(profile.size() - 1);
+        for (std::uint32_t col = 0; col < columns; ++col) {
+            const float u = static_cast<float>(col) / static_cast<float>(radial);
+            const float theta = u * kTwoPi;
+            const float c = std::cos(theta);
+            const float sn = std::sin(theta);
+            const glm::vec3 position(p.radius * c, p.y, p.radius * sn);
+            const glm::vec3 normal = glm::normalize(glm::vec3(p.nr * c, p.ny, p.nr * sn));
+            mesh.vertices.push_back(Vertex{position, normal, {u, v}});
+        }
+    }
+    // Winding (a, d, c) puts the first edge along the profile and the second around the axis, so
+    // the geometric normal is cross(dProfile, dTheta) -- the outward one. The poles collapse, and
+    // those triangles are dropped by their coincident corners.
+    for (std::uint32_t row = 0; row + 1 < profile.size(); ++row) {
+        for (std::uint32_t col = 0; col < radial; ++col) {
+            const std::uint32_t a = row * columns + col;
+            const std::uint32_t c = a + 1;
+            const std::uint32_t d = a + columns;
+            const std::uint32_t e = d + 1;
+            const auto emit = [&](std::uint32_t i0, std::uint32_t i1, std::uint32_t i2) {
+                const glm::vec3& p0 = mesh.vertices[i0].position;
+                const glm::vec3& p1 = mesh.vertices[i1].position;
+                const glm::vec3& p2 = mesh.vertices[i2].position;
+                if (p0 != p1 && p1 != p2 && p0 != p2) {
+                    mesh.indices.insert(mesh.indices.end(), {i0, i1, i2});
+                }
+            };
+            emit(a, d, c);
+            emit(c, d, e);
+        }
+    }
+    return mesh;
+}
+
 MeshData makeUvSphere(float radius, int segments, int rings) {
     const auto ss = static_cast<std::uint32_t>(std::clamp(segments, 3, 256));
     const auto rr = static_cast<std::uint32_t>(std::clamp(rings, 2, 128));
@@ -945,9 +1173,10 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
     }
     switch (spec.kind) {
     case PrimitiveKind::Box:
-        return makeBox(spec.size, spec.subdivisions);
+        return makeBeveledBox(spec.size, spec.subdivisions, spec.bevel, spec.bevelSegments);
     case PrimitiveKind::Cylinder:
-        return makeCylinder(spec.radius, spec.height, spec.radialSegments, spec.heightSegments, spec.caps);
+        return makeBeveledCylinder(spec.radius, spec.height, spec.radialSegments, spec.heightSegments, spec.caps,
+                                   spec.bevel, spec.bevelSegments);
     case PrimitiveKind::Sphere:
         return makeUvSphere(spec.radius, spec.segments, spec.rings);
     case PrimitiveKind::Torus:
@@ -1733,6 +1962,8 @@ json ProceduralGeometry::toJson() const {
         s["kind"] = primitiveKindName(source.kind);
         s["size"] = vecToJson(source.size);
         s["subdivisions"] = source.subdivisions;
+        s["bevel"] = source.bevel;
+        s["bevelSegments"] = source.bevelSegments;
         s["radius"] = source.radius;
         s["height"] = source.height;
         s["radialSegments"] = source.radialSegments;
@@ -1913,6 +2144,8 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         }
         AVGEN_PROC_READ(s.size, "size", readVec3);
         AVGEN_PROC_READ(s.subdivisions, "subdivisions", readInt);
+        AVGEN_PROC_READ(s.bevel, "bevel", readFloat);
+        AVGEN_PROC_READ(s.bevelSegments, "bevelSegments", readInt);
         AVGEN_PROC_READ(s.radius, "radius", readFloat);
         AVGEN_PROC_READ(s.height, "height", readFloat);
         AVGEN_PROC_READ(s.radialSegments, "radialSegments", readInt);
@@ -2228,6 +2461,8 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     r.i("source/kind", static_cast<int>(s.kind), 0, 5, 0, 5);
     p.sourceSize = r.v3("source/size", s.size, 0.001f, 1000.0f, 0.01f, 10.0f);
     r.i("source/subdivisions", s.subdivisions, 1, 64, 1, 16);
+    r.f("source/bevel", s.bevel, 0.0f, 1e3f, 0.0f, 1.0f);
+    r.i("source/bevelSegments", s.bevelSegments, 1, 16, 1, 8);
     p.sourceRadius = r.f("source/radius", s.radius, 0.001f, 1000.0f, 0.01f, 10.0f);
     p.sourceHeight = r.f("source/height", s.height, 0.001f, 1000.0f, 0.01f, 20.0f);
     r.i("source/radialSegments", s.radialSegments, 3, 256, 3, 64);
@@ -2439,6 +2674,8 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
     copyEnum(p, "source/kind", s.kind, 5);
     copyValue(p, "source/size", s.size);
     copyValue(p, "source/subdivisions", s.subdivisions);
+    copyValue(p, "source/bevel", s.bevel);
+    copyValue(p, "source/bevelSegments", s.bevelSegments);
     copyValue(p, "source/radius", s.radius);
     copyValue(p, "source/height", s.height);
     copyValue(p, "source/radialSegments", s.radialSegments);

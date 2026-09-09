@@ -1,76 +1,82 @@
 {
-  "examples": [
-    {
-      "name": "Procedural Geometry Lab",
-      "category": "Lab",
-      "description": "Every primitive, distribution, variation control, deformer and stack, with audio routes and a performance readout.",
-      "project": "lab/lab.json"
-    },
-    {
-      "name": "The Temple",
-      "category": "Showcase",
-      "description": "Audio-reactive procedural architecture: radial colonnade, rings, fog, particles, bloom.",
-      "project": "temple/temple.json"
-    },
-    {
-      "name": "The Cathedral",
-      "category": "Showcase",
-      "description": "Large-scale radial architectural composition with arches and a free camera.",
-      "project": "cathedral/cathedral.json"
-    },
-    {
-      "name": "The Helix",
-      "category": "Showcase",
-      "description": "Spiral instancing and continuous deformation with a travelling camera.",
-      "project": "helix/helix.json"
-    },
-    {
-      "name": "Impossible Chamber",
-      "category": "Showcase",
-      "description": "Nested procedural geometry at extreme scale differences, camera inside.",
-      "project": "chamber/chamber.json"
-    },
-    {
-      "name": "The Living Machine",
-      "category": "Showcase",
-      "description": "A forty-second shot: a cast-iron vessel with a furnace belt, on a deck in a dark hall. Manual exposure, a re-aimed IndustrialCold rig, layered materials and a four-beat cue arc.",
-      "project": "machine/machine.json"
-    },
-    {
-      "name": "Hyperspace",
-      "category": "Showcase",
-      "description": "Combined procedural geometry and audio modulation, timeline-driven.",
-      "project": "hyperspace/hyperspace.json"
-    },
-    {
-      "name": "The Infinite Temple",
-      "category": "Showcase",
-      "description": "The flagship world: radial colonnades, rings, arches, spiral corridors and recursive chambers driven by fields, with seven world macros, eight states and a four-minute cue arc.",
-      "project": "infinite/infinite.json"
-    },
-    {
-      "name": "Metallic Reassembly",
-      "category": "Showcase",
-      "description": "A metallic assembly that separates into thousands of parts, floats, gathers and locks back together, then detonates; disassembly is a field, so assembled is simply zero strength.",
-      "project": "reassembly/reassembly.json"
-    },
-    {
-      "name": "Worlds (preset morph)",
-      "category": "Showcase",
-      "description": "One scene, four presets: Cathedral, Temple, Helix, Hyperspace morph into each other on a timeline.",
-      "project": "worlds/worlds.json"
-    },
-    {
-      "name": "Procedural Benchmark",
-      "category": "Benchmark",
-      "description": "100 / 1,000 / 10,000 instances with no, one, three and noise deformers as presets.",
-      "project": "benchmark/benchmark.json"
-    },
-    {
-      "name": "Stress Test (1K to 1M)",
-      "category": "Benchmark",
-      "description": "Point and box swarms from 1,000 to 1,000,000 instances with GPU culling and LOD, driven by curl noise and vortex fields.",
-      "project": "stress/stress.json"
-    }
-  ]
+ "examples": [
+  {
+   "name": "Procedural Geometry Lab",
+   "category": "Lab",
+   "description": "Every primitive, distribution, variation control, deformer and stack, with audio routes and a performance readout.",
+   "project": "lab/lab.json"
+  },
+  {
+   "name": "The Temple",
+   "category": "Showcase",
+   "description": "Audio-reactive procedural architecture: radial colonnade, rings, fog, particles, bloom.",
+   "project": "temple/temple.json"
+  },
+  {
+   "name": "The Cathedral",
+   "category": "Showcase",
+   "description": "Large-scale radial architectural composition with arches and a free camera.",
+   "project": "cathedral/cathedral.json"
+  },
+  {
+   "name": "The Helix",
+   "category": "Showcase",
+   "description": "Spiral instancing and continuous deformation with a travelling camera.",
+   "project": "helix/helix.json"
+  },
+  {
+   "name": "Impossible Chamber",
+   "category": "Showcase",
+   "description": "Nested procedural geometry at extreme scale differences, camera inside.",
+   "project": "chamber/chamber.json"
+  },
+  {
+   "name": "The Living Machine",
+   "category": "Showcase",
+   "description": "A forty-second shot: a cast-iron vessel with a furnace belt, on a deck in a dark hall. Manual exposure, a re-aimed IndustrialCold rig, layered materials and a four-beat cue arc.",
+   "project": "machine/machine.json"
+  },
+  {
+   "name": "Hyperspace",
+   "category": "Showcase",
+   "description": "Combined procedural geometry and audio modulation, timeline-driven.",
+   "project": "hyperspace/hyperspace.json"
+  },
+  {
+   "name": "The Infinite Temple",
+   "category": "Showcase",
+   "description": "The flagship world: radial colonnades, rings, arches, spiral corridors and recursive chambers driven by fields, with seven world macros, eight states and a four-minute cue arc.",
+   "project": "infinite/infinite.json"
+  },
+  {
+   "name": "Metallic Reassembly",
+   "category": "Showcase",
+   "description": "A metallic assembly that separates into thousands of parts, floats, gathers and locks back together, then detonates; disassembly is a field, so assembled is simply zero strength.",
+   "project": "reassembly/reassembly.json"
+  },
+  {
+   "name": "Worlds (preset morph)",
+   "category": "Showcase",
+   "description": "One scene, four presets: Cathedral, Temple, Helix, Hyperspace morph into each other on a timeline.",
+   "project": "worlds/worlds.json"
+  },
+  {
+   "name": "Procedural Benchmark",
+   "category": "Benchmark",
+   "description": "100 / 1,000 / 10,000 instances with no, one, three and noise deformers as presets.",
+   "project": "benchmark/benchmark.json"
+  },
+  {
+   "name": "Stress Test (1K to 1M)",
+   "category": "Benchmark",
+   "description": "Point and box swarms from 1,000 to 1,000,000 instances with GPU culling and LOD, driven by curl noise and vortex fields.",
+   "project": "stress/stress.json"
+  },
+  {
+   "name": "Hero Metal",
+   "category": "Look development",
+   "description": "One machined part on a plinth under two softboxes: the benchmark for whether a single object can be made to look photographed rather than generated.",
+   "project": "hero/hero.json"
+  }
+ ]
 }

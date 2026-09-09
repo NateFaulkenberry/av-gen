@@ -1,0 +1,58 @@
+{
+ "name": "hero-01-bevel-winding",
+ "recorded": "2026-09-09",
+ "hypothesis": "Flat metal faces render black while curved ones catch light. I first read this as the specular IBL being broken for metals, because a metal cube in a uniformly bright sky rendered at the background value and did not respond to sky intensity at any roughness.",
+ "change": "Two fixes in makeBeveledBox: the six flat faces and the twelve fillets were wound inward, so back-face culling removed every one of them and only the corner octants ever drew. With the faces visible the environment was far too bright, so sky intensity came back from 2.6 to 0.5.",
+ "expected": "If the diagnosis was right, the object becomes visible and reads as metal.",
+ "actual": "It does. The isolated cube went from 0.154 (the background) to 0.704 against a 0.71 sky, which is what a mirror should do. Specular IBL was never broken -- I had broken the geometry an hour earlier and then misread the symptom for several renders.",
+ "decision": "KEEP",
+ "notes": "The lesson is in the test, not the fix: the original bevel test checked positions, normals, closure and determinism, and all four passed on a surface that was invisible. A geometry test that does not check winding does not check that the surface can be seen. The test now asserts every triangle's geometric normal agrees with its vertex normals.",
+ "frames": {
+  "before": "/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/1647669e-d93e-464b-9ba8-a9aa23023e45/scratchpad/hero/part3.png",
+  "after": "/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/1647669e-d93e-464b-9ba8-a9aa23023e45/scratchpad/hero/sky0.5.png"
+ },
+ "metrics": {
+  "before": {
+   "mean": 0.10557364557161326,
+   "rms_contrast": 0.09001330455753477,
+   "p01": 0.054933333333333334,
+   "p50": 0.09077803921568628,
+   "p99": 0.6535960784313725,
+   "shadow_frac": 0.25335611979166667,
+   "mid_frac": 0.7321462673611111,
+   "highlight_frac": 0.014497612847222223,
+   "clipped_frac": 0.0005523003472222223,
+   "mean_saturation": 0.22079841084246526,
+   "bright_centroid_x": 0.4953292988355992,
+   "bright_centroid_y": 0.45797485341827715
+  },
+  "after": {
+   "mean": 0.24553400767882919,
+   "rms_contrast": 0.1908185629011906,
+   "p01": 0.04962745098039216,
+   "p50": 0.1140243137254902,
+   "p99": 0.8845396078431372,
+   "shadow_frac": 0.040789930555555555,
+   "mid_frac": 0.9239073350694444,
+   "highlight_frac": 0.035302734375,
+   "clipped_frac": 0.0,
+   "mean_saturation": 0.1507093974224634,
+   "bright_centroid_x": 0.515876521012332,
+   "bright_centroid_y": 0.6401628622315158
+  },
+  "relative_change": {
+   "mean": 1.3257,
+   "rms_contrast": 1.1199,
+   "p01": -0.0966,
+   "p50": 0.2561,
+   "p99": 0.3533,
+   "shadow_frac": -0.839,
+   "mid_frac": 0.2619,
+   "highlight_frac": 1.4351,
+   "clipped_frac": -1.0,
+   "mean_saturation": -0.3174,
+   "bright_centroid_x": 0.0415,
+   "bright_centroid_y": 0.3978
+  }
+ }
+}

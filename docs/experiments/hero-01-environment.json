@@ -1,0 +1,58 @@
+{
+ "name": "hero-01-environment",
+ "recorded": "2026-09-09",
+ "hypothesis": "The rotor reads as black silhouettes with a few highlights because a metal shows its environment, and this environment is near-black except one small sun. Giving it a bright, structured sky should make the flat faces carry a reflection instead of going dark.",
+ "change": "environment.sky: zenith 0.10 -> 0.62, horizon 0.026 -> 0.16, sunIntensity 26 -> 60, sunSize 0.22 -> 0.30, intensity 1.0 -> 2.6. Nothing else touched.",
+ "expected": "Mid-tones on the metal rise and contrast rises, with highlights growing but not clipping.",
+ "actual": "PENDING",
+ "decision": "REVISIT",
+ "notes": "",
+ "frames": {
+  "before": "/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/1647669e-d93e-464b-9ba8-a9aa23023e45/scratchpad/hero/v1.png",
+  "after": "/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/1647669e-d93e-464b-9ba8-a9aa23023e45/scratchpad/hero/v3.png"
+ },
+ "metrics": {
+  "before": {
+   "mean": 0.17282667625890624,
+   "rms_contrast": 0.20769078244158906,
+   "p01": 0.04680705882352941,
+   "p50": 0.08210117647058823,
+   "p99": 0.8647788235294118,
+   "shadow_frac": 0.4844845920138889,
+   "mid_frac": 0.4297591145833333,
+   "highlight_frac": 0.08575629340277778,
+   "clipped_frac": 0.0,
+   "mean_saturation": 0.2644902942164842,
+   "bright_centroid_x": 0.48451077380326435,
+   "bright_centroid_y": 0.555263157488366
+  },
+  "after": {
+   "mean": 0.2596099352166723,
+   "rms_contrast": 0.29376096179541306,
+   "p01": 0.05465019607843137,
+   "p50": 0.0949827450980392,
+   "p99": 0.980392156862745,
+   "shadow_frac": 0.3062749565972222,
+   "mid_frac": 0.51109375,
+   "highlight_frac": 0.18263129340277778,
+   "clipped_frac": 0.004963107638888889,
+   "mean_saturation": 0.21248884260516646,
+   "bright_centroid_x": 0.46456417527387056,
+   "bright_centroid_y": 0.5760674829283626
+  },
+  "relative_change": {
+   "mean": 0.5021,
+   "rms_contrast": 0.4144,
+   "p01": 0.1676,
+   "p50": 0.1569,
+   "p99": 0.1337,
+   "shadow_frac": -0.3678,
+   "mid_frac": 0.1893,
+   "highlight_frac": 1.1297,
+   "clipped_frac": null,
+   "mean_saturation": -0.1966,
+   "bright_centroid_x": -0.0412,
+   "bright_centroid_y": 0.0375
+  }
+ }
+}

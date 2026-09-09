@@ -1880,3 +1880,181 @@ TEST_CASE("The docs/grammar-and-hierarchy.md examples load and expand as documen
     CHECK(sameMesh(*mesh, makeBox({1.3f, 0.28f, 1.3f}, 1)));
     CHECK_THAT(d(objects[1].generateCloud(ctx).positions()[0].y), WithinAbs(8.7, 1e-5));
 }
+
+// Bevels (ADR-042). A mathematically sharp edge is the loudest tell that geometry was generated
+// rather than made, so this checks the shape is actually a rounded box -- not merely that a
+// different number of triangles came out.
+TEST_CASE("A beveled box is the box grown by a sphere, with analytic normals", "[procedural][bevel]") {
+    const glm::vec3 size{2.0f, 3.0f, 4.0f};
+    const glm::vec3 half = size * 0.5f;
+    const float r = 0.25f;
+    const MeshData beveled = makeBeveledBox(size, 2, r, 4);
+    REQUIRE(!beveled.vertices.empty());
+
+    // Zero bevel is exactly the old primitive, so no existing scene moves.
+    CHECK(sameMesh(makeBeveledBox(size, 2, 0.0f, 4), makeBox(size, 2)));
+    CHECK(sameMesh(beveled, makeBeveledBox(size, 2, r, 4))); // deterministic
+
+    const glm::vec3 inner = half - glm::vec3(r);
+    float maxSurfaceError = 0.0f;
+    float maxNormalError = 0.0f;
+    float maxExtent = 0.0f;
+    for (const Vertex& v : beveled.vertices) {
+        // Every point must sit exactly r from the inner box: that is what "grown by a sphere"
+        // means, and it is true on the faces, the fillets and the corners alike.
+        const glm::vec3 q = glm::clamp(v.position, -inner, inner);
+        const float distance = glm::length(v.position - q);
+        maxSurfaceError = std::max(maxSurfaceError, std::abs(distance - r));
+        // On a face the offset direction is degenerate (the point is its own nearest); elsewhere
+        // the analytic normal must agree with it.
+        if (distance > 1e-4f) {
+            maxNormalError = std::max(maxNormalError, glm::length(glm::normalize(v.position - q) - v.normal));
+        }
+        CHECK_THAT(static_cast<double>(glm::length(v.normal)), WithinAbs(1.0, 1e-4));
+        maxExtent = std::max({maxExtent, std::abs(v.position.x) / half.x, std::abs(v.position.y) / half.y,
+                              std::abs(v.position.z) / half.z});
+    }
+    CHECK_THAT(static_cast<double>(maxSurfaceError), WithinAbs(0.0, 1e-4));
+    CHECK_THAT(static_cast<double>(maxNormalError), WithinAbs(0.0, 1e-4));
+    CHECK_THAT(static_cast<double>(maxExtent), WithinAbs(1.0, 1e-4)); // it still fills its box
+
+    // The corner is pulled in, which is the thing a viewer reads as "this edge was made rather
+    // than computed". The surface's true sagitta along the diagonal is r(sqrt(3) - 1); no vertex
+    // lands exactly on the diagonal at this tessellation, so the nearest one sits just outside it.
+    const float sagitta = r * (std::sqrt(3.0f) - 1.0f);
+    float nearestCorner = 1e9f;
+    for (const Vertex& v : beveled.vertices) {
+        nearestCorner = std::min(nearestCorner, glm::length(v.position - half));
+    }
+    CHECK(nearestCorner >= sagitta - 1e-4f);
+    CHECK(nearestCorner < sagitta * 1.15f);
+
+    // Patches share their boundaries exactly, so the surface is closed: every triangle edge is
+    // used by exactly two triangles once positions are matched.
+    std::size_t degenerate = 0;
+    for (std::size_t i = 0; i + 2 < beveled.indices.size(); i += 3) {
+        const glm::vec3& a = beveled.vertices[beveled.indices[i]].position;
+        const glm::vec3& b = beveled.vertices[beveled.indices[i + 1]].position;
+        const glm::vec3& c = beveled.vertices[beveled.indices[i + 2]].position;
+        // Not an area threshold: FMA contraction keeps cross(v, v) from evaluating to exactly
+        // zero, so a collapsed edge is found by its coincident corners.
+        if (a == b || b == c || a == c) {
+            ++degenerate;
+        }
+    }
+    CHECK(degenerate == 0);
+
+    // Winding. Positions and normals can both be right while a patch faces inwards, in which case
+    // the surface is invisible: back-face culling removes exactly the triangles a viewer wanted.
+    // The geometric normal of every triangle must agree with the normals its vertices carry.
+    std::size_t inverted = 0;
+    for (std::size_t i = 0; i + 2 < beveled.indices.size(); i += 3) {
+        const Vertex& va = beveled.vertices[beveled.indices[i]];
+        const Vertex& vb = beveled.vertices[beveled.indices[i + 1]];
+        const Vertex& vc = beveled.vertices[beveled.indices[i + 2]];
+        const glm::vec3 geometric = glm::cross(vb.position - va.position, vc.position - va.position);
+        const glm::vec3 shading = va.normal + vb.normal + vc.normal;
+        if (glm::dot(geometric, shading) <= 0.0f) {
+            ++inverted;
+        }
+    }
+    CHECK(inverted == 0);
+
+    // A bevel wider than the box clamps instead of inverting the shape.
+    const MeshData over = makeBeveledBox({1.0f, 1.0f, 1.0f}, 1, 10.0f, 4);
+    for (const Vertex& v : over.vertices) {
+        CHECK(std::abs(v.position.x) <= 0.5f + 1e-4f);
+        CHECK(std::abs(v.position.y) <= 0.5f + 1e-4f);
+        CHECK(std::abs(v.position.z) <= 0.5f + 1e-4f);
+    }
+
+    // The spec routes through it and the hash notices, so an edited bevel re-uploads the mesh.
+    SourceSpec spec;
+    spec.kind = PrimitiveKind::Box;
+    spec.size = size;
+    spec.subdivisions = 2;
+    spec.bevel = r;
+    spec.bevelSegments = 4;
+    REQUIRE(spec.validate().has_value());
+    auto fromSpec = makeSourceMesh(spec);
+    REQUIRE(fromSpec.has_value());
+    CHECK(sameMesh(*fromSpec, beveled));
+    SourceSpec sharp = spec;
+    sharp.bevel = 0.0f;
+    CHECK(spec.structuralHash() != sharp.structuralHash());
+}
+
+// The cylinder's rims get the same treatment as the box's edges, and the same checks: a surface
+// whose winding is wrong is invisible, whatever its positions and normals say.
+TEST_CASE("A beveled cylinder is a revolved profile with rounded rims", "[procedural][bevel]") {
+    const float radius = 1.0f;
+    const float height = 2.4f;
+    const float r = 0.18f;
+    const MeshData beveled = makeBeveledCylinder(radius, height, 48, 2, true, r, 4);
+    REQUIRE(!beveled.vertices.empty());
+
+    // Zero bevel, or no caps, is exactly the old primitive.
+    CHECK(sameMesh(makeBeveledCylinder(radius, height, 48, 2, true, 0.0f, 4), makeCylinder(radius, height, 48, 2, true)));
+    CHECK(sameMesh(makeBeveledCylinder(radius, height, 48, 2, false, r, 4), makeCylinder(radius, height, 48, 2, false)));
+    CHECK(sameMesh(beveled, makeBeveledCylinder(radius, height, 48, 2, true, r, 4))); // deterministic
+
+    const float halfHeight = height * 0.5f;
+    const float inner = radius - r;
+    float maxRadius = 0.0f;
+    float maxY = 0.0f;
+    for (const Vertex& v : beveled.vertices) {
+        const float rho = std::sqrt(v.position.x * v.position.x + v.position.z * v.position.z);
+        maxRadius = std::max(maxRadius, rho);
+        maxY = std::max(maxY, std::abs(v.position.y));
+        CHECK_THAT(static_cast<double>(glm::length(v.normal)), WithinAbs(1.0, 1e-4));
+        // Every point is on the swept profile: inside the rim band it is exactly r from the
+        // circle the fillet is swept around, and elsewhere it is on the side or a cap.
+        const bool onCap = std::abs(std::abs(v.position.y) - halfHeight) < 1e-4f && rho <= inner + 1e-4f;
+        const bool onSide = std::abs(rho - radius) < 1e-4f && std::abs(v.position.y) <= halfHeight - r + 1e-4f;
+        const float dy = std::abs(v.position.y) - (halfHeight - r);
+        const float dr = rho - inner;
+        const bool onFillet = dy > -1e-4f && dr > -1e-4f &&
+                              std::abs(std::sqrt(dy * dy + dr * dr) - r) < 1e-4f;
+        INFO("rho " << rho << " y " << v.position.y);
+        CHECK((onCap || onSide || onFillet));
+    }
+    CHECK_THAT(static_cast<double>(maxRadius), WithinAbs(static_cast<double>(radius), 1e-4));
+    CHECK_THAT(static_cast<double>(maxY), WithinAbs(static_cast<double>(halfHeight), 1e-4));
+
+    // Winding and collapsed edges, as for the box.
+    std::size_t inverted = 0;
+    std::size_t degenerate = 0;
+    for (std::size_t i = 0; i + 2 < beveled.indices.size(); i += 3) {
+        const Vertex& va = beveled.vertices[beveled.indices[i]];
+        const Vertex& vb = beveled.vertices[beveled.indices[i + 1]];
+        const Vertex& vc = beveled.vertices[beveled.indices[i + 2]];
+        if (va.position == vb.position || vb.position == vc.position || va.position == vc.position) {
+            ++degenerate;
+            continue;
+        }
+        const glm::vec3 geometric = glm::cross(vb.position - va.position, vc.position - va.position);
+        if (glm::dot(geometric, va.normal + vb.normal + vc.normal) <= 0.0f) {
+            ++inverted;
+        }
+    }
+    CHECK(degenerate == 0);
+    CHECK(inverted == 0);
+
+    // The spec routes through it and the hash notices.
+    SourceSpec spec;
+    spec.kind = PrimitiveKind::Cylinder;
+    spec.radius = radius;
+    spec.height = height;
+    spec.radialSegments = 48;
+    spec.heightSegments = 2;
+    spec.caps = true;
+    spec.bevel = r;
+    spec.bevelSegments = 4;
+    REQUIRE(spec.validate().has_value());
+    auto fromSpec = makeSourceMesh(spec);
+    REQUIRE(fromSpec.has_value());
+    CHECK(sameMesh(*fromSpec, beveled));
+    SourceSpec sharp = spec;
+    sharp.bevel = 0.0f;
+    CHECK(spec.structuralHash() != sharp.structuralHash());
+}

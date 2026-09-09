@@ -1,0 +1,58 @@
+{
+ "name": "hero-02-brushed-program",
+ "recorded": "2026-09-09",
+ "hypothesis": "The metal is mathematically uniform, which is the CAD look: a real machined face carries macro variation and a directional sheen. A layered material program should break the surface up without touching the lighting.",
+ "change": "housing and boss use examples/materials/brushed-metal.material.json, ribs use dark-steel; exposure compensation -0.55 so the top faces keep their bevel roll instead of clipping. No lighting or geometry change.",
+ "expected": "Visible breakup across large flat faces, with the silhouette and lighting unchanged.",
+ "actual": "The sides gain a directional brushed streak and the flat faces gain macro variation, which is the intended effect. The program also lifts the upward faces, so exposure had to come down two thirds of a stop to keep the bevel highlight from clipping.",
+ "decision": "KEEP",
+ "notes": "The breakup reads at this camera distance, but it is macro only. Meso detail -- machining marks, edge wear, a seam where the boss meets the housing -- is still missing, and that is the next thing standing between this and a photographed part.",
+ "frames": {
+  "before": "/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/1647669e-d93e-464b-9ba8-a9aa23023e45/scratchpad/hero/sky0.5.png",
+  "after": "/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/1647669e-d93e-464b-9ba8-a9aa23023e45/scratchpad/hero/final.png"
+ },
+ "metrics": {
+  "before": {
+   "mean": 0.24553400767882919,
+   "rms_contrast": 0.1908185629011906,
+   "p01": 0.04962745098039216,
+   "p50": 0.1140243137254902,
+   "p99": 0.8845396078431372,
+   "shadow_frac": 0.040789930555555555,
+   "mid_frac": 0.9239073350694444,
+   "highlight_frac": 0.035302734375,
+   "clipped_frac": 0.0,
+   "mean_saturation": 0.1507093974224634,
+   "bright_centroid_x": 0.515876521012332,
+   "bright_centroid_y": 0.6401628622315158
+  },
+  "after": {
+   "mean": 0.21970078579939867,
+   "rms_contrast": 0.1987656641575486,
+   "p01": 0.039514509803921564,
+   "p50": 0.08600705882352941,
+   "p99": 0.9341356862745098,
+   "shadow_frac": 0.473583984375,
+   "mid_frac": 0.4906879340277778,
+   "highlight_frac": 0.035728081597222225,
+   "clipped_frac": 0.0002853732638888889,
+   "mean_saturation": 0.17396959358881145,
+   "bright_centroid_x": 0.515734133315866,
+   "bright_centroid_y": 0.6639540174404982
+  },
+  "relative_change": {
+   "mean": -0.1052,
+   "rms_contrast": 0.0416,
+   "p01": -0.2038,
+   "p50": -0.2457,
+   "p99": 0.0561,
+   "shadow_frac": 10.6103,
+   "mid_frac": -0.4689,
+   "highlight_frac": 0.012,
+   "clipped_frac": null,
+   "mean_saturation": 0.1543,
+   "bright_centroid_x": -0.0003,
+   "bright_centroid_y": 0.0372
+  }
+ }
+}

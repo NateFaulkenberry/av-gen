@@ -59,6 +59,12 @@ struct SourceSpec {
     // Box
     glm::vec3 size{1.0f, 1.0f, 1.0f};
     int subdivisions = 1;          // per edge, 1..64
+    // Bevel (ADR-042), used by Box and Cylinder. A mathematically sharp edge is the loudest tell
+    // that geometry was generated rather than made: a real edge is a small radius that catches a
+    // highlight. `bevel` is that radius in units, clamped to what the primitive can hold;
+    // `bevelSegments` is how many quads cross it. 0 leaves the primitive exactly as it was.
+    float bevel = 0.0f;
+    int bevelSegments = 3;         // 1..16
     // Cylinder (also uses height, radialSegments, heightSegments, caps)
     float radius = 0.5f;           // cylinder / sphere radius
     float height = 2.0f;           // cylinder height (centred on the origin)
@@ -84,7 +90,15 @@ struct SourceSpec {
 // Deterministic unit-tested primitive generators (positions, smooth or faceted normals as the
 // primitive dictates, uvs, CCW winding facing outwards, centred on the origin).
 [[nodiscard]] MeshData makeBox(glm::vec3 size, int subdivisions);
+// A box whose twelve edges are cylindrical fillets of radius `bevel` and whose eight corners are
+// spherical octants: the Minkowski sum of a smaller box with a sphere. Patch boundaries share
+// exact positions and normals, so the flat faces, the fillets and the corners meet without a seam.
+[[nodiscard]] MeshData makeBeveledBox(glm::vec3 size, int subdivisions, float bevel, int bevelSegments);
 [[nodiscard]] MeshData makeCylinder(float radius, float height, int radialSegments, int heightSegments, bool caps);
+// A cylinder with quarter-round rims, revolved from a profile. `bevel` 0, or `caps` off, gives
+// makeCylinder exactly.
+[[nodiscard]] MeshData makeBeveledCylinder(float radius, float height, int radialSegments, int heightSegments,
+                                           bool caps, float bevel, int bevelSegments);
 [[nodiscard]] MeshData makeUvSphere(float radius, int segments, int rings);
 [[nodiscard]] MeshData makeTorus(float majorRadius, float minorRadius, int majorSegments, int minorSegments);
 [[nodiscard]] MeshData makePointQuad(float size); // 4 vertices, 2 triangles, XY plane, normal +Z, uv 0..1

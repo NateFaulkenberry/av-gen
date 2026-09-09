@@ -1,0 +1,63 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Hero Metal"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "hero.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/lens/focalLength": 85.0,
+  "camera/lens/aperture": 4.0,
+  "camera/lens/shutterAngle": 172.0,
+  "camera/lens/focusDistance": 11.2,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": -0.55,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.22,
+  "post/bloom/threshold": 1.8,
+  "post/bloom/radius": 1.0,
+  "post/halation/enabled": true,
+  "post/halation/intensity": 0.14,
+  "post/halation/threshold": 2.6,
+  "post/halation/warmth": 0.7,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "post/grade/contrast": 1.06,
+  "post/grade/saturation": 1.0,
+  "post/grade/temperature": -0.02,
+  "post/lens/chromaticAberration": 0.04,
+  "post/output/vignette": 0.34,
+  "post/output/grain": 0.025,
+  "post/output/sharpen": 0.15,
+  "sources/turn/rate": 0.02
+ },
+ "sources": [
+  {
+   "kind": "lfo",
+   "name": "turn",
+   "settings": {
+    "shape": "sine"
+   }
+  }
+ ],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "tracks": [],
+  "cues": []
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "sequence",
+  "path": "renders/hero"
+ }
+}

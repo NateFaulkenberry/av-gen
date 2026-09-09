@@ -1,0 +1,91 @@
+{
+  "format": "avgen-lightrig",
+  "version": 1,
+  "name": "StudioSoftbox",
+  "description": "Two large softboxes and a narrow rim against near-black: built for what a metal surface will reflect, not for how much light reaches it.",
+  "keyIntensity": 3.0,
+  "ambientIntensity": 0.03,
+  "ambientColor": [
+    0.4,
+    0.46,
+    0.62
+  ],
+  "ambientTemperature": 8000,
+  "lights": [
+    {
+      "name": "key",
+      "type": "rect",
+      "role": "key",
+      "azimuth": 38.0,
+      "elevation": 46.0,
+      "distance": 2.6,
+      "intensity": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "temperature": 6200,
+      "size": 2.6,
+      "aspect": 1.7,
+      "castsShadow": true,
+      "shadowStrength": 1.0,
+      "softness": 2.4,
+      "volumetric": 0.15,
+      "followCamera": true
+    },
+    {
+      "name": "fill",
+      "type": "rect",
+      "role": "fill",
+      "azimuth": -62.0,
+      "elevation": 8.0,
+      "distance": 2.9,
+      "intensity": 0.16,
+      "color": [
+        0.82,
+        0.88,
+        1.0
+      ],
+      "temperature": 7800,
+      "size": 3.2,
+      "aspect": 2.2,
+      "castsShadow": false,
+      "softness": 3.0,
+      "volumetric": 0.0,
+      "followCamera": true
+    },
+    {
+      "name": "rim",
+      "type": "rect",
+      "role": "rim",
+      "azimuth": 158.0,
+      "elevation": 24.0,
+      "distance": 2.4,
+      "intensity": 0.85,
+      "color": [
+        1.0,
+        0.93,
+        0.84
+      ],
+      "temperature": 5200,
+      "size": 0.55,
+      "aspect": 5.0,
+      "castsShadow": false,
+      "softness": 1.2,
+      "volumetric": 0.0,
+      "followCamera": true
+    },
+    {
+      "name": "ambient",
+      "type": "directional",
+      "role": "ambient",
+      "azimuth": 0.0,
+      "elevation": 78.0,
+      "distance": 4.0,
+      "intensity": 1.0,
+      "castsShadow": false,
+      "followCamera": true
+    }
+  ]
+}

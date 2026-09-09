@@ -1,0 +1,591 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "hero",
+ "camera": {
+  "mode": 1,
+  "position": [
+   6.6,
+   4.3,
+   7.9
+  ],
+  "target": [
+   -0.1,
+   0.7,
+   0.0
+  ],
+  "fov": 22.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../lightrigs/studio-softbox.rig.json",
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   0.012,
+   0.013,
+   0.016
+  ],
+  "fogColor": [
+   0.02,
+   0.021,
+   0.026
+  ],
+  "fogDensity": 0.004,
+  "volumeDensity": 0.0,
+  "sky": {
+   "zenithColor": [
+    0.72,
+    0.75,
+    0.82
+   ],
+   "horizonColor": [
+    0.55,
+    0.58,
+    0.66
+   ],
+   "groundColor": [
+    0.012,
+    0.013,
+    0.016
+   ],
+   "haze": 0.15,
+   "sunColor": [
+    1.0,
+    0.96,
+    0.9
+   ],
+   "sunIntensity": 60.0,
+   "sunSize": 0.3,
+   "sunGlow": 0.7,
+   "intensity": 0.8,
+   "background": false
+  }
+ },
+ "composition": {
+  "focalPoints": [
+   {
+    "name": "part",
+    "position": [
+     -0.1,
+     0.85,
+     0
+    ],
+    "radius": 1.9,
+    "weight": 2.0
+   }
+  ],
+  "layers": [
+   {
+    "name": "subject",
+    "start": 0.0,
+    "end": 12.0,
+    "density": 1.0,
+    "contrast": 1.0,
+    "saturation": 1.0,
+    "detail": 1.0
+   },
+   {
+    "name": "ground",
+    "start": 12.0,
+    "end": 60.0,
+    "density": 1.0,
+    "contrast": 0.9,
+    "saturation": 0.7,
+    "detail": 0.5
+   }
+  ],
+  "cameraTarget": "part",
+  "targetScreenPosition": [
+   0.45,
+   0.52
+  ],
+  "framingStrength": 1.0
+ },
+ "nodes": [
+  {
+   "name": "plinth",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      7.0,
+      0.5,
+      7.0
+     ],
+     "subdivisions": 2,
+     "bevel": 0.06,
+     "bevelSegments": 3
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.13,
+      0.135,
+      0.145
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.36,
+     "metallic": 0.2
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      -0.25,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "housing",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.9,
+      0.86,
+      1.9
+     ],
+     "subdivisions": 4,
+     "bevel": 0.085,
+     "bevelSegments": 5
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.56,
+      0.58,
+      0.61
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.3,
+     "metallic": 1.0,
+     "program": "brushedMetal"
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      0.43,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "materialVariation": {
+     "roughnessRandom": 0.0
+    }
+   }
+  },
+  {
+   "name": "boss",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.55,
+      0.62,
+      1.42
+     ],
+     "subdivisions": 3,
+     "bevel": 0.07,
+     "bevelSegments": 5
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.56,
+      0.58,
+      0.61
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.3,
+     "metallic": 1.0,
+     "program": "brushedMetal"
+    },
+    "distributionTransform": {
+     "position": [
+      -0.28,
+      1.07,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "bore",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.46,
+     "height": 0.72,
+     "radialSegments": 96,
+     "heightSegments": 1,
+     "caps": true,
+     "bevel": 0.05,
+     "bevelSegments": 4
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.2,
+      0.21,
+      0.23
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.45,
+     "metallic": 1.0
+    },
+    "distributionTransform": {
+     "position": [
+      -0.28,
+      1.24,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "collar",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.5,
+     "minorRadius": 0.055,
+     "majorSegments": 128,
+     "minorSegments": 20
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.76,
+      0.6,
+      0.36
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.24,
+     "metallic": 1.0
+    },
+    "sourceTransform": {
+     "position": [
+      0,
+      0,
+      0
+     ],
+     "rotation": [
+      90,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      -0.28,
+      1.39,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  },
+  {
+   "name": "bolts",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.072,
+     "height": 0.1,
+     "radialSegments": 20,
+     "heightSegments": 1,
+     "caps": true,
+     "bevel": 0.018,
+     "bevelSegments": 4
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      1.02,
+      0,
+      -0.72
+     ],
+     "end": [
+      1.02,
+      0,
+      0.72
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.76,
+      0.6,
+      0.36
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.24,
+     "metallic": 1.0
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      0.9,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "variation": {
+     "seed": 5,
+     "randomRotation": [
+      0.0,
+      0.5,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "boltsBack",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.072,
+     "height": 0.1,
+     "radialSegments": 20,
+     "heightSegments": 1,
+     "caps": true,
+     "bevel": 0.018,
+     "bevelSegments": 4
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 3,
+     "start": [
+      -1.24,
+      0,
+      -0.72
+     ],
+     "end": [
+      -1.24,
+      0,
+      0.72
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.76,
+      0.6,
+      0.36
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.24,
+     "metallic": 1.0
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      0.9,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "variation": {
+     "seed": 9,
+     "randomRotation": [
+      0.0,
+      0.5,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "ribs",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.16,
+      0.44,
+      1.86
+     ],
+     "subdivisions": 2,
+     "bevel": 0.03,
+     "bevelSegments": 3
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 4,
+     "start": [
+      -1.0,
+      0,
+      0
+     ],
+     "end": [
+      1.0,
+      0,
+      0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.2,
+      0.21,
+      0.23
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.45,
+     "metallic": 1.0,
+     "program": "darkSteel"
+    },
+    "distributionTransform": {
+     "position": [
+      0,
+      0.16,
+      0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    }
+   }
+  }
+ ],
+ "materialPrograms": [
+  "../materials/brushed-metal.material.json",
+  "../materials/dark-steel.material.json"
+ ]
+}

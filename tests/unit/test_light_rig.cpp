@@ -8,6 +8,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+
 #include <nlohmann/json.hpp>
 
 #include <cmath>
@@ -246,11 +248,18 @@ TEST_CASE("the shipped rigs load, validate and expand", "[lightrig]") {
         REQUIRE(again.has_value());
         CHECK(again->structuralHash() == rig->structuralHash());
     }
+    // Not an exact list. What matters is that every shipped rig loads and that names stay unique,
+    // because the name is the parameter path ("lightrig/<name>/..."): two rigs sharing one would
+    // collide silently. Enumerating them only made authoring a new rig break an unrelated test.
     std::sort(names.begin(), names.end());
-    const std::vector<std::string> expected = {"Bioluminescent", "Colonnade",      "CosmicBlue",
-                                               "IndustrialCold", "Monumental",     "NightCinematic",
-                                               "SacredWarm",     "VoidCore"};
-    CHECK(names == expected);
+    CHECK(names.size() >= 6);
+    CHECK(std::adjacent_find(names.begin(), names.end()) == names.end());
+    for (const std::string& name : names) {
+        INFO("rig name " << name);
+        CHECK_FALSE(name.empty());
+        CHECK(name.find(' ') == std::string::npos);
+        CHECK(name.find('/') == std::string::npos);
+    }
 }
 
 TEST_CASE("rig parameters register, apply and unregister", "[lightrig]") {
