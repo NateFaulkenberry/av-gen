@@ -1,0 +1,348 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "avgen",
+    "version": "0.1.0"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "machine.scene.json"
+    }
+  },
+  "parameters": {
+    "post/bloom/enabled": true,
+    "post/bloom/intensity": 0.7,
+    "post/bloom/threshold": 0.85,
+    "post/tonemap/operator": 1,
+    "post/output/vignette": 0.4,
+    "post/output/grain": 0.03,
+    "scene/brightness": 0.85,
+    "scene/keyLight": 0.55,
+    "scene/fogDensity": 0.016,
+    "root/rotationSpeed": 0.0,
+    "macros/energy": 0.35,
+    "macros/turbulence": 0.3,
+    "macros/heat": 0.25
+  },
+  "sources": [
+    {
+      "kind": "macro",
+      "name": "macros",
+      "settings": {
+        "knobs": [
+          {
+            "name": "energy",
+            "default": 0.35
+          },
+          {
+            "name": "turbulence",
+            "default": 0.3
+          },
+          {
+            "name": "heat",
+            "default": 0.25
+          }
+        ]
+      }
+    },
+    {
+      "kind": "control",
+      "name": "control",
+      "settings": {
+        "channels": []
+      }
+    }
+  ],
+  "worldMacros": [
+    {
+      "name": "energy",
+      "label": "MACHINE ENERGY",
+      "default": 0.35,
+      "targets": [
+        {
+          "path": "field/pulse/amplitude",
+          "min": 0.2,
+          "max": 2.4
+        },
+        {
+          "path": "field/swirl/strength",
+          "min": 0.4,
+          "max": 3.4
+        },
+        {
+          "path": "particles/steam/spawnRate",
+          "min": 600,
+          "max": 6000,
+          "op": "replace"
+        },
+        {
+          "path": "scene/brightness",
+          "min": 0.6,
+          "max": 1.25
+        }
+      ]
+    },
+    {
+      "name": "turbulence",
+      "label": "TURBULENCE",
+      "default": 0.3,
+      "targets": [
+        {
+          "path": "field/churn/strength",
+          "min": 0.2,
+          "max": 4.0
+        },
+        {
+          "path": "field/churn/frequency",
+          "min": 0.03,
+          "max": 0.18
+        },
+        {
+          "path": "procedural/motes/effector/1/strength",
+          "min": 0.5,
+          "max": 4.0
+        }
+      ]
+    },
+    {
+      "name": "heat",
+      "label": "HEAT",
+      "default": 0.25,
+      "targets": [
+        {
+          "path": "field/heat/strength",
+          "min": 0.2,
+          "max": 2.6
+        },
+        {
+          "path": "procedural/ribs/emissiveFieldAmount",
+          "min": 0.5,
+          "max": 6.0
+        },
+        {
+          "path": "procedural/plates/effector/3/strength",
+          "min": 1.0,
+          "max": 8.0
+        }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "source": "audio.rms",
+      "target": "macros/energy",
+      "amount": 0.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 40,
+        "decayMs": 300
+      }
+    },
+    {
+      "source": "audio.bass",
+      "target": "field/core/strength",
+      "amount": 3.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 15,
+        "decayMs": 220
+      }
+    },
+    {
+      "source": "audio.lowMid",
+      "target": "procedural/ribs/effector/1/strength",
+      "amount": 1.2,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 20,
+        "decayMs": 260
+      }
+    },
+    {
+      "source": "audio.mid",
+      "target": "field/swirl/speed",
+      "amount": 1.6,
+      "op": "add",
+      "polarity": "unipolar"
+    },
+    {
+      "source": "audio.highMid",
+      "target": "procedural/plates/effector/2/strength",
+      "amount": 1.4,
+      "op": "add",
+      "polarity": "unipolar"
+    },
+    {
+      "source": "audio.treble",
+      "target": "procedural/motes/material/emissive",
+      "amount": 3.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 8,
+        "decayMs": 160
+      }
+    },
+    {
+      "source": "audio.spectralCentroid",
+      "target": "procedural/motes/materialVariation/hueShift",
+      "amount": 0.4,
+      "op": "add",
+      "polarity": "unipolar"
+    },
+    {
+      "source": "audio.spectralFlux",
+      "target": "macros/turbulence",
+      "amount": 0.5,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "attackMs": 10,
+        "decayMs": 400
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "field/pulse/waveOrigin",
+      "amount": -6.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "linearfall",
+        "decayMs": 900
+      }
+    },
+    {
+      "source": "audio.onset",
+      "target": "particles/steam/burst",
+      "amount": 900.0,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "peakhold",
+        "decayMs": 40
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "procedural/hub/effector/1/strength",
+      "amount": 1.2,
+      "op": "add",
+      "polarity": "unipolar",
+      "chain": {
+        "envelope": "linearfall",
+        "decayMs": 500
+      }
+    }
+  ],
+  "presets": [
+    {
+      "name": "Idle",
+      "values": {
+        "macros/energy": [
+          0.15
+        ],
+        "macros/turbulence": [
+          0.2
+        ],
+        "macros/heat": [
+          0.1
+        ],
+        "field/pulse/amplitude": [
+          0.4
+        ],
+        "scene/fogDensity": [
+          0.02
+        ]
+      }
+    },
+    {
+      "name": "Running",
+      "values": {
+        "macros/energy": [
+          0.55
+        ],
+        "macros/turbulence": [
+          0.4
+        ],
+        "macros/heat": [
+          0.45
+        ],
+        "field/pulse/amplitude": [
+          1.2
+        ],
+        "scene/fogDensity": [
+          0.016
+        ]
+      }
+    },
+    {
+      "name": "Overdrive",
+      "values": {
+        "macros/energy": [
+          1.0
+        ],
+        "macros/turbulence": [
+          0.85
+        ],
+        "macros/heat": [
+          1.0
+        ],
+        "field/pulse/amplitude": [
+          2.2
+        ],
+        "scene/fogDensity": [
+          0.01
+        ]
+      }
+    }
+  ],
+  "states": {
+    "initial": "Idle",
+    "states": [
+      {
+        "name": "Idle",
+        "preset": "Idle",
+        "transition": {
+          "seconds": 4.0,
+          "easing": "smooth"
+        }
+      },
+      {
+        "name": "Running",
+        "preset": "Running",
+        "transition": {
+          "seconds": 6.0,
+          "easing": "smooth"
+        },
+        "triggers": [
+          {
+            "kind": "macro",
+            "signal": "energy",
+            "threshold": 0.45
+          }
+        ]
+      },
+      {
+        "name": "Overdrive",
+        "preset": "Overdrive",
+        "transition": {
+          "seconds": 2.5,
+          "easing": "easeIn"
+        },
+        "triggers": [
+          {
+            "kind": "onset",
+            "threshold": 1.6,
+            "from": "Running"
+          }
+        ]
+      }
+    ]
+  }
+}

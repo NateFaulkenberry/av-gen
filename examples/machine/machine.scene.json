@@ -1,0 +1,556 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "machine",
+  "camera": {
+    "mode": 1,
+    "position": [
+      0,
+      22,
+      44
+    ],
+    "target": [
+      0,
+      3,
+      0
+    ],
+    "fov": 60.0,
+    "orbitSpeed": 0.0
+  },
+  "environment": {
+    "intensity": 0.0,
+    "fogDensity": 0.016,
+    "fogColor": [
+      0.01,
+      0.02,
+      0.03
+    ],
+    "background": [
+      0.004,
+      0.008,
+      0.012
+    ]
+  },
+  "nodes": [
+    {
+      "name": "pulse",
+      "kind": "field",
+      "position": [
+        0,
+        4,
+        0
+      ],
+      "field": {
+        "kind": "wave",
+        "waveGeometry": "spherical",
+        "amplitude": 1.0,
+        "wavelength": 7.0,
+        "waveSpeed": 9.0,
+        "waveWidth": 10.0,
+        "strength": 1.0,
+        "falloff": {
+          "kind": "smoothstep",
+          "inner": 0.0,
+          "outer": 46.0
+        }
+      }
+    },
+    {
+      "name": "swirl",
+      "kind": "field",
+      "position": [
+        0,
+        4,
+        0
+      ],
+      "field": {
+        "kind": "vortex",
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "strength": 1.6,
+        "falloff": {
+          "kind": "smooth",
+          "inner": 2.0,
+          "outer": 26.0
+        }
+      }
+    },
+    {
+      "name": "core",
+      "kind": "field",
+      "position": [
+        0,
+        4,
+        0
+      ],
+      "field": {
+        "kind": "attractor",
+        "strength": 2.2,
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "falloff": {
+          "kind": "exponential",
+          "inner": 1.0,
+          "outer": 24.0,
+          "exponent": 2.0
+        }
+      }
+    },
+    {
+      "name": "churn",
+      "kind": "field",
+      "field": {
+        "kind": "curlNoise",
+        "frequency": 0.07,
+        "speed": 0.35,
+        "seed": 12,
+        "strength": 1.4,
+        "falloff": {
+          "kind": "none"
+        }
+      }
+    },
+    {
+      "name": "heat",
+      "kind": "field",
+      "position": [
+        0,
+        4,
+        0
+      ],
+      "field": {
+        "kind": "radial",
+        "radius": 22.0,
+        "strength": 1.0,
+        "falloff": {
+          "kind": "smoothstep",
+          "inner": 0.0,
+          "outer": 24.0
+        },
+        "colorA": [
+          1.0,
+          0.45,
+          0.12,
+          1.0
+        ],
+        "colorB": [
+          0.15,
+          0.65,
+          1.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "name": "ribs",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            0.42,
+            6.5,
+            0.8
+          ]
+        },
+        "distribution": {
+          "kind": "radial",
+          "count": 72,
+          "radius": 12.0,
+          "center": [
+            0,
+            4,
+            0
+          ],
+          "orientation": "outward",
+          "plane": "xz"
+        },
+        "variation": {
+          "seed": 21,
+          "randomScale": [
+            0,
+            0.25,
+            0
+          ]
+        },
+        "effectors": [
+          {
+            "field": "pulse",
+            "op": "scale",
+            "strength": 0.55,
+            "scaleAxis": [
+              0.2,
+              1.0,
+              0.2
+            ]
+          },
+          {
+            "field": "swirl",
+            "op": "positionOffset",
+            "strength": 0.45
+          },
+          {
+            "field": "heat",
+            "op": "emission",
+            "strength": 1.6
+          }
+        ],
+        "emissiveField": "pulse",
+        "emissiveFieldAmount": 4.0,
+        "deformers": [
+          {
+            "kind": "twist",
+            "amount": 0.06,
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "speed": 0.15
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.07,
+            0.08,
+            0.09
+          ],
+          "emissiveColor": [
+            0.2,
+            0.8,
+            0.95
+          ],
+          "emissiveIntensity": 0.15,
+          "roughness": 0.28,
+          "metallic": 0.75
+        },
+        "materialVariation": {
+          "hueGradient": 0.1,
+          "valueRandom": 0.2,
+          "emissiveRandom": 0.4
+        }
+      }
+    },
+    {
+      "name": "plates",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "cylinder",
+          "radius": 1.5,
+          "height": 0.22,
+          "radialSegments": 16
+        },
+        "distribution": {
+          "kind": "spiral",
+          "count": 260,
+          "radius": 4.0,
+          "radiusGrowth": 11.0,
+          "turns": 4.0,
+          "spiralHeight": 13.0,
+          "center": [
+            0,
+            4.0,
+            0
+          ],
+          "plane": "xz",
+          "orientation": "tangent"
+        },
+        "variation": {
+          "seed": 9,
+          "randomRotation": [
+            0.1,
+            0.4,
+            0.1
+          ]
+        },
+        "ops": [
+          {
+            "kind": "filterProbability",
+            "probability": 0.85,
+            "seed": 4
+          }
+        ],
+        "effectors": [
+          {
+            "field": "core",
+            "op": "positionOffset",
+            "strength": 0.7
+          },
+          {
+            "field": "churn",
+            "op": "positionOffset",
+            "strength": 0.9
+          },
+          {
+            "field": "pulse",
+            "op": "emission",
+            "strength": 3.0
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.2,
+            0.16,
+            0.12
+          ],
+          "emissiveColor": [
+            1.0,
+            0.5,
+            0.15
+          ],
+          "emissiveIntensity": 0.25,
+          "roughness": 0.42,
+          "metallic": 0.55
+        },
+        "materialVariation": {
+          "hueShift": 0.05,
+          "emissiveGradient": 0.8
+        }
+      }
+    },
+    {
+      "name": "motes",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "point",
+          "pointSize": 0.16
+        },
+        "distribution": {
+          "kind": "grid",
+          "gridCount": [
+            26,
+            10,
+            26
+          ],
+          "gridSpacing": [
+            1.5,
+            1.6,
+            1.5
+          ],
+          "center": [
+            0,
+            4,
+            0
+          ]
+        },
+        "variation": {
+          "seed": 77,
+          "randomPosition": [
+            0.7,
+            0.7,
+            0.7
+          ]
+        },
+        "ops": [
+          {
+            "kind": "filterDistance",
+            "pivot": [
+              0,
+              4,
+              0
+            ],
+            "minDistance": 4.0,
+            "maxDistance": 21.0
+          },
+          {
+            "kind": "filterProbability",
+            "probability": 0.55,
+            "seed": 31
+          }
+        ],
+        "effectors": [
+          {
+            "field": "churn",
+            "op": "positionOffset",
+            "strength": 1.6
+          },
+          {
+            "field": "swirl",
+            "op": "positionOffset",
+            "strength": 0.8
+          },
+          {
+            "field": "pulse",
+            "op": "emission",
+            "strength": 6.0
+          },
+          {
+            "field": "heat",
+            "op": "color",
+            "strength": 1.0
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.5,
+            0.7,
+            0.8
+          ],
+          "emissiveColor": [
+            0.4,
+            0.9,
+            1.0
+          ],
+          "emissiveIntensity": 2.5,
+          "roughness": 1.0,
+          "metallic": 0.0
+        },
+        "materialVariation": {
+          "hueShift": 0.12,
+          "emissiveRandom": 0.7
+        }
+      }
+    },
+    {
+      "name": "hub",
+      "kind": "procedural",
+      "position": [
+        0,
+        4,
+        0
+      ],
+      "procedural": {
+        "source": {
+          "kind": "torus",
+          "majorRadius": 5.0,
+          "minorRadius": 0.32,
+          "majorSegments": 64,
+          "minorSegments": 12
+        },
+        "distribution": {
+          "kind": "radial",
+          "count": 5,
+          "radius": 0.0,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "orientation": "none"
+        },
+        "sourceTransform": {
+          "rotation": [
+            90,
+            0,
+            0
+          ]
+        },
+        "variation": {
+          "seed": 3,
+          "randomRotation": [
+            0.9,
+            0.9,
+            0.9
+          ]
+        },
+        "effectors": [
+          {
+            "field": "pulse",
+            "op": "scale",
+            "strength": 0.5
+          },
+          {
+            "field": "swirl",
+            "op": "rotation",
+            "strength": 0.8
+          }
+        ],
+        "material": {
+          "baseColor": [
+            0.12,
+            0.14,
+            0.16
+          ],
+          "emissiveColor": [
+            0.3,
+            1.0,
+            0.9
+          ],
+          "emissiveIntensity": 3.0,
+          "roughness": 0.25,
+          "metallic": 0.9
+        }
+      }
+    },
+    {
+      "name": "steam",
+      "kind": "particles",
+      "particles": {
+        "capacity": 65536,
+        "seed": 5,
+        "shape": "disc",
+        "position": [
+          0,
+          0.5,
+          0
+        ],
+        "extent": [
+          14,
+          1,
+          14
+        ],
+        "spawnRate": 2600,
+        "lifetimeMin": 2.0,
+        "lifetimeMax": 5.0,
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "spread": 0.5,
+        "speedMin": 0.4,
+        "speedMax": 1.6,
+        "gravity": [
+          0,
+          0.15,
+          0
+        ],
+        "drag": 0.35,
+        "turbulence": 0.2,
+        "turbulenceScale": 0.4,
+        "fieldForces": [
+          {
+            "field": "swirl",
+            "mode": "force",
+            "strength": 2.4
+          },
+          {
+            "field": "core",
+            "mode": "force",
+            "strength": 1.1
+          },
+          {
+            "field": "churn",
+            "mode": "turbulence",
+            "strength": 1.8
+          }
+        ],
+        "sizeStart": 0.05,
+        "sizeEnd": 0.0,
+        "colorStart": [
+          0.4,
+          0.95,
+          1.0,
+          0.9
+        ],
+        "colorEnd": [
+          1.0,
+          0.5,
+          0.2,
+          0.0
+        ],
+        "emissive": 3.0,
+        "blend": "additive",
+        "softness": 0.4
+      }
+    }
+  ]
+}
