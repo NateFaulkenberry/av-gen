@@ -86,6 +86,7 @@
 
 #include "core/log.hpp"
 #include "core/noise.hpp"
+#include "scene/procedural_detail.hpp"
 
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -456,6 +457,8 @@ glm::vec3 sourceHalfExtent(const SourceSpec& s) {
         return glm::vec3(s.radius);
     case PrimitiveKind::Point:
         return glm::vec3(s.pointSize * 0.5f);
+    case PrimitiveKind::Procedural:
+        return glm::vec3(0.0f); // resolved through the referenced object (detail::sourceHalfExtent)
     case PrimitiveKind::Torus:
     default:
         return {s.majorRadius + s.minorRadius, s.minorRadius, s.majorRadius + s.minorRadius};
@@ -463,6 +466,19 @@ glm::vec3 sourceHalfExtent(const SourceSpec& s) {
 }
 
 } // namespace
+
+// Internal helpers shared with hierarchy.cpp (scene/procedural_detail.hpp).
+Transform detail::composeTransforms(const Transform& outer, const Transform& inner) {
+    return compose(outer, inner);
+}
+
+glm::vec3 detail::hueMultiplier(const glm::vec3& base, float turns) {
+    return hueRotationMultiplier(base, turns);
+}
+
+glm::vec3 detail::primitiveHalfExtent(const SourceSpec& s) {
+    return scene::sourceHalfExtent(s); // the file-local one, not detail::sourceHalfExtent
+}
 
 // ================================================================================================
 // Enum names
@@ -480,13 +496,15 @@ const char* primitiveKindName(PrimitiveKind kind) {
         return "torus";
     case PrimitiveKind::Point:
         return "point";
+    case PrimitiveKind::Procedural:
+        return "procedural";
     }
     return "cylinder";
 }
 
 std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name) {
-    for (const auto kind :
-         {PrimitiveKind::Box, PrimitiveKind::Cylinder, PrimitiveKind::Sphere, PrimitiveKind::Torus, PrimitiveKind::Point}) {
+    for (const auto kind : {PrimitiveKind::Box, PrimitiveKind::Cylinder, PrimitiveKind::Sphere, PrimitiveKind::Torus,
+                            PrimitiveKind::Point, PrimitiveKind::Procedural}) {
         if (name == primitiveKindName(kind)) {
             return kind;
         }
@@ -506,13 +524,17 @@ const char* distributionKindName(DistributionKind kind) {
         return "radial";
     case DistributionKind::Spiral:
         return "spiral";
+    case DistributionKind::Spline: // wave 2 splines agent
+        break;
+    case DistributionKind::Grammar:
+        return "grammar";
     }
     return "single";
 }
 
 std::optional<DistributionKind> distributionKindFromName(std::string_view name) {
     for (const auto kind : {DistributionKind::Single, DistributionKind::Linear, DistributionKind::Grid,
-                            DistributionKind::Radial, DistributionKind::Spiral}) {
+                            DistributionKind::Radial, DistributionKind::Spiral, DistributionKind::Grammar}) {
         if (name == distributionKindName(kind)) {
             return kind;
         }
@@ -578,6 +600,8 @@ const char* deformerKindName(DeformerKind kind) {
         return "displacement";
     case DeformerKind::Field:
         return "field";
+    case DeformerKind::Path: // wave 2 splines agent
+        break;
     }
     return "twist";
 }
@@ -659,6 +683,11 @@ Result<void> SourceSpec::validate() const {
             return fail("point size must be positive");
         }
         break;
+    case PrimitiveKind::Procedural:
+        if (reference.empty()) {
+            return fail("a procedural source needs a reference (the name of another procedural object)");
+        }
+        break;
     }
     return {};
 }
@@ -691,6 +720,12 @@ std::uint64_t SourceSpec::structuralHash() const {
         break;
     case PrimitiveKind::Point:
         h.f32(pointSize);
+        break;
+    case PrimitiveKind::Procedural:
+        h.u64(reference.size());
+        for (const char c : reference) {
+            h.u32(static_cast<std::uint8_t>(c));
+        }
         break;
     }
     return h.value();
@@ -903,6 +938,8 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
         return makeTorus(spec.majorRadius, spec.minorRadius, spec.majorSegments, spec.minorSegments);
     case PrimitiveKind::Point:
         return makePointQuad(spec.pointSize);
+    case PrimitiveKind::Procedural:
+        return fail("procedural source '{}' resolves through ProceduralGeometry::resolveSourceMesh", spec.reference);
     }
     return fail("unknown primitive kind");
 }
@@ -920,7 +957,7 @@ Result<void> Distribution::validate() const {
         if (total > kMaxInstances) {
             return fail("grid instance count {} exceeds {}", total, kMaxInstances);
         }
-    } else if (kind != DistributionKind::Single) {
+    } else if (kind != DistributionKind::Single && kind != DistributionKind::Grammar) {
         if (count < 1 || count > kMaxInstances) {
             return fail("count must be in 1..{} (got {})", kMaxInstances, count);
         }
@@ -934,7 +971,7 @@ Result<void> Distribution::validate() const {
     return {};
 }
 
-int Distribution::instanceCount(const spatial::Spline* spline) const {
+int Distribution::instanceCount(const spatial::Spline* splineRef) const {
     switch (kind) {
     case DistributionKind::Single:
         return 1;
@@ -946,7 +983,7 @@ int Distribution::instanceCount(const spatial::Spline* spline) const {
         return std::max(count, 1);
     case DistributionKind::Spline:
         // TODO(wave 2, splines): spacing-driven counts need the spline length.
-        (void)spline;
+        (void)splineRef;
         return std::max(count, 1);
     case DistributionKind::Grammar:
         return std::max(count, 1); // the owner replaces this with the expansion size
@@ -954,9 +991,9 @@ int Distribution::instanceCount(const spatial::Spline* spline) const {
     return 1;
 }
 
-Transform Distribution::placement(int index, const spatial::Spline* spline) const {
+Transform Distribution::placement(int index, const spatial::Spline* splineRef) const {
     Transform t;
-    const int n = instanceCount(spline);
+    const int n = instanceCount(splineRef);
     const int i = std::clamp(index, 0, n - 1);
     const float u = n > 1 ? static_cast<float>(i) / static_cast<float>(n - 1) : 0.0f;
 
@@ -1058,6 +1095,10 @@ std::uint64_t Distribution::structuralHash() const {
         h.f32(spiralHeight);
         h.f32(spiralAngle);
         break;
+    case DistributionKind::Spline: // wave 2 splines agent
+        break;
+    case DistributionKind::Grammar:
+        break; // the owner hashes its grammar (ProceduralGeometry::structuralHash)
     }
     return h.value();
 }
@@ -1205,6 +1246,8 @@ glm::vec3 applyDeformer(const Deformer& d, glm::vec3 p, double time) {
         return applyDisplacement(d, p, t);
     case DeformerKind::Field:
         return p; // needs the field set: see applyFieldDeformer
+    case DeformerKind::Path: // wave 2 splines agent
+        break;
     }
     return p;
 }
@@ -1267,6 +1310,25 @@ Result<void> ProceduralGeometry::validate() const {
     }
     if (auto ok = distribution.validate(); !ok) {
         return fail("procedural '{}': {}", name, ok.error().message);
+    }
+    if (source.kind == PrimitiveKind::Procedural && source.reference == name) {
+        return fail("procedural '{}': a procedural source cannot reference itself", name);
+    }
+    if (hierarchy.recursionDepth < 0 || hierarchy.recursionDepth > kMaxHierarchyDepth) {
+        return fail("procedural '{}': hierarchy depth must be in 0..{} (got {})", name, kMaxHierarchyDepth,
+                    hierarchy.recursionDepth);
+    }
+    if (hierarchy.maxInstances < 1 || hierarchy.maxInstances > kMaxInstances) {
+        return fail("procedural '{}': hierarchy maxInstances must be in 1..{} (got {})", name, kMaxInstances,
+                    hierarchy.maxInstances);
+    }
+    if (!(hierarchy.scalePerLevel > 0.0f)) {
+        return fail("procedural '{}': hierarchy scalePerLevel must be > 0", name);
+    }
+    if (distribution.kind == DistributionKind::Grammar) {
+        if (auto ok = grammar.validate(); !ok) {
+            return fail("procedural '{}': {}", name, ok.error().message);
+        }
     }
     if (deformers.size() > static_cast<std::size_t>(kMaxDeformers)) {
         return fail("procedural '{}': at most {} deformers (got {})", name, kMaxDeformers, deformers.size());
@@ -1338,12 +1400,22 @@ std::uint64_t ProceduralGeometry::structuralHash() const {
     for (const char c : extraLane) {
         h.u32(static_cast<std::uint8_t>(c));
     }
+    // Hierarchy and grammar (ADR-029): structural like the distribution.
+    h.u64(hierarchy.structuralHash());
+    h.u64(grammar.structuralHash());
     return h.value();
 }
 
 spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& ctx) const {
-    (void)ctx; // TODO(wave 2): spline distributions, procedural sources, hierarchy, grammar
-    const auto count = static_cast<std::size_t>(std::max(distribution.instanceCount(), 1));
+    // Self-recursion and procedural sources compose this flat generator (hierarchy.cpp).
+    if (hierarchy.recursionDepth > 0 || source.kind == PrimitiveKind::Procedural) {
+        return detail::generateHierarchicalCloud(*this, ctx);
+    }
+    // Grammar distributions: the expansion's points are the placements (their depth/rule/branch
+    // columns are kept); instanceCount() does not know the expansion size.
+    const bool fromGrammar = distribution.kind == DistributionKind::Grammar;
+    const spatial::PointCloud expanded = fromGrammar ? grammar.expand() : spatial::PointCloud();
+    const auto count = fromGrammar ? expanded.count() : static_cast<std::size_t>(std::max(distribution.instanceCount(), 1));
     spatial::PointCloud out(count);
     const float invLast = count > 1 ? 1.0f / static_cast<float>(count - 1) : 0.0f;
     const glm::vec3 sourceExtent = sourceHalfExtent(source) * glm::abs(sourceTransform.scale);
@@ -1362,8 +1434,16 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
         const auto index = static_cast<std::uint32_t>(i);
         const auto signedIndex = static_cast<int>(i);
         const float u = static_cast<float>(i) * invLast;
-        const Transform t =
-            compose(distributionTransform, compose(distribution.placement(signedIndex), variationTransform(variation, index)));
+        Transform placement;
+        if (fromGrammar) {
+            placement.position = expanded.positions()[i];
+            const glm::vec4 r = expanded.rotations()[i];
+            placement.rotation = glm::quat(r.w, r.x, r.y, r.z);
+            placement.scale = expanded.scales()[i];
+        } else {
+            placement = distribution.placement(signedIndex);
+        }
+        const Transform t = compose(distributionTransform, compose(placement, variationTransform(variation, index)));
 
         positions[i] = t.position;
         rotations[i] = glm::vec4(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w);
@@ -1386,6 +1466,15 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
         colors[i] = glm::vec4(hueRotationMultiplier(material.baseColor, hueTurns) * value, 1.0f);
         emissives[i] = hueRotationMultiplier(material.emissiveColor, hueTurns) * emissiveMul;
     }
+    if (fromGrammar) {
+        for (const char* column : {"depth", "rule", "branch"}) {
+            auto src = expanded.attributes.view<std::int32_t>(column);
+            auto dst = out.attributes.ensure<std::int32_t>(column, spatial::AttributeType::Int);
+            if (src && dst) {
+                std::copy(src->values.begin(), src->values.end(), dst->values.begin());
+            }
+        }
+    }
     return out;
 }
 
@@ -1395,7 +1484,7 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
         return false;
     }
     builtHash = hash;
-    meshHash = source.structuralHash();
+    meshHash = detail::resolvedSourceHash(*this, ctx); // the referenced object's for a Procedural source
     ++structureVersion;
 
     spatial::PointCloud built = generateCloud(ctx);
@@ -1405,8 +1494,9 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
     spatial::projectInstances(built, instances, extraLane);
 
     // Bounds: the source's bounding sphere carried by each point (rotation-invariant), padded by
-    // the reach of the position effectors.
-    const glm::vec3 sourceExtent = sourceHalfExtent(source) * glm::abs(sourceTransform.scale);
+    // the reach of the position effectors. A Procedural source resolves to the referenced object's
+    // (leaf) primitive; every intermediate scale is already in the point scales.
+    const glm::vec3 sourceExtent = detail::sourceHalfExtent(*this, ctx) * glm::abs(sourceTransform.scale);
     const float sourceRadius = glm::length(sourceExtent);
     glm::vec3 lo(std::numeric_limits<float>::max());
     glm::vec3 hi(std::numeric_limits<float>::lowest());
@@ -1466,6 +1556,7 @@ json ProceduralGeometry::toJson() const {
         s["majorSegments"] = source.majorSegments;
         s["minorSegments"] = source.minorSegments;
         s["pointSize"] = source.pointSize;
+        s["reference"] = source.reference;
         j["source"] = std::move(s);
     }
     j["sourceTransform"] = transformToJson(sourceTransform);
@@ -1565,6 +1656,19 @@ json ProceduralGeometry::toJson() const {
         s["emissiveGradient"] = materialVariation.emissiveGradient;
         j["materialVariation"] = std::move(s);
     }
+    {
+        json s = json::object();
+        s["recursionDepth"] = hierarchy.recursionDepth;
+        s["maxInstances"] = hierarchy.maxInstances;
+        s["scalePerLevel"] = hierarchy.scalePerLevel;
+        s["offsetPerLevel"] = vecToJson(hierarchy.offsetPerLevel);
+        s["rotationPerLevel"] = vecToJson(hierarchy.rotationPerLevelDegrees);
+        s["colorPerLevel"] = hierarchy.colorPerLevel;
+        j["hierarchy"] = std::move(s);
+    }
+    if (distribution.kind == DistributionKind::Grammar || !grammar.rules.empty()) {
+        j["grammar"] = grammar.toJson();
+    }
     return j;
 }
 
@@ -1606,6 +1710,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(s.majorSegments, "majorSegments", readInt);
         AVGEN_PROC_READ(s.minorSegments, "minorSegments", readInt);
         AVGEN_PROC_READ(s.pointSize, "pointSize", readFloat);
+        AVGEN_PROC_READ(s.reference, "reference", readString);
     }
     if (root.contains("distribution")) {
         const json& j = root.at("distribution");
@@ -1743,6 +1848,26 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(v.emissiveRandom, "emissiveRandom", readFloat);
         AVGEN_PROC_READ(v.emissiveGradient, "emissiveGradient", readFloat);
     }
+    if (root.contains("hierarchy")) {
+        const json& j = root.at("hierarchy");
+        if (!j.is_object()) {
+            return fail("'hierarchy' must be an object");
+        }
+        HierarchySpec& h = g.hierarchy;
+        AVGEN_PROC_READ(h.recursionDepth, "recursionDepth", readInt);
+        AVGEN_PROC_READ(h.maxInstances, "maxInstances", readInt);
+        AVGEN_PROC_READ(h.scalePerLevel, "scalePerLevel", readFloat);
+        AVGEN_PROC_READ(h.offsetPerLevel, "offsetPerLevel", readVec3);
+        AVGEN_PROC_READ(h.rotationPerLevelDegrees, "rotationPerLevel", readVec3);
+        AVGEN_PROC_READ(h.colorPerLevel, "colorPerLevel", readBool);
+    }
+    if (root.contains("grammar")) {
+        auto grammar = Grammar::fromJson(root.at("grammar"));
+        if (!grammar) {
+            return fail("grammar: {}", grammar.error().message);
+        }
+        g.grammar = std::move(*grammar);
+    }
     if (auto ok = g.validate(); !ok) {
         return std::unexpected(ok.error());
     }
@@ -1858,7 +1983,7 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
 
     // Source
     const SourceSpec& s = rest.source;
-    r.i("source/kind", static_cast<int>(s.kind), 0, 4, 0, 4);
+    r.i("source/kind", static_cast<int>(s.kind), 0, 5, 0, 5);
     p.sourceSize = r.v3("source/size", s.size, 0.001f, 1000.0f, 0.01f, 10.0f);
     r.i("source/subdivisions", s.subdivisions, 1, 64, 1, 16);
     p.sourceRadius = r.f("source/radius", s.radius, 0.001f, 1000.0f, 0.01f, 10.0f);
@@ -1879,7 +2004,7 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
 
     // Distribution
     const Distribution& d = rest.distribution;
-    r.i("distribution/kind", static_cast<int>(d.kind), 0, 4, 0, 4);
+    r.i("distribution/kind", static_cast<int>(d.kind), 0, 6, 0, 6);
     p.distributionCount = r.i("distribution/count", d.count, 1, kMaxInstances, 1, 256);
     r.v3("distribution/start", d.start, -1e4f, 1e4f, -20.0f, 20.0f);
     r.v3("distribution/end", d.end, -1e4f, 1e4f, -20.0f, 20.0f);
@@ -1914,6 +2039,13 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     r.v3("variation/rotation", v.randomRotation, 0.0f, kPi, 0.0f, kPi);
     r.v3("variation/scale", v.randomScale, 0.0f, 1.0f, 0.0f, 1.0f);
     r.f("variation/uniformScale", v.randomUniformScale, 0.0f, 1.0f, 0.0f, 1.0f);
+
+    // Hierarchy (ADR-029; structural: every change rebuilds). source/reference is JSON only.
+    const HierarchySpec& hs = rest.hierarchy;
+    p.recursionDepth = r.i("hierarchy/depth", hs.recursionDepth, 0, kMaxHierarchyDepth, 0, kMaxHierarchyDepth);
+    p.scalePerLevel = r.f("hierarchy/scalePerLevel", hs.scalePerLevel, 0.001f, 100.0f, 0.05f, 2.0f);
+    r.v3("hierarchy/offsetPerLevel", hs.offsetPerLevel, -1e4f, 1e4f, -10.0f, 10.0f);
+    r.v3("hierarchy/rotationPerLevel", hs.rotationPerLevelDegrees, -360.0f, 360.0f, -180.0f, 180.0f);
 
     // Deformers (existing slots only; kind and space are structural and come from the file)
     const std::size_t slots = std::min(rest.deformers.size(), static_cast<std::size_t>(kMaxDeformers));
@@ -2041,7 +2173,7 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
     }
     // Source
     SourceSpec& s = live.source;
-    copyEnum(p, "source/kind", s.kind, 4);
+    copyEnum(p, "source/kind", s.kind, 5);
     copyValue(p, "source/size", s.size);
     copyValue(p, "source/subdivisions", s.subdivisions);
     copyValue(p, "source/radius", s.radius);
@@ -2060,7 +2192,7 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
 
     // Distribution
     Distribution& d = live.distribution;
-    copyEnum(p, "distribution/kind", d.kind, 4);
+    copyEnum(p, "distribution/kind", d.kind, 6);
     copyValue(p, "distribution/count", d.count);
     copyValue(p, "distribution/start", d.start);
     copyValue(p, "distribution/end", d.end);
@@ -2091,6 +2223,13 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
     copyValue(p, "variation/rotation", v.randomRotation);
     copyValue(p, "variation/scale", v.randomScale);
     copyValue(p, "variation/uniformScale", v.randomUniformScale);
+
+    // Hierarchy
+    HierarchySpec& hs = live.hierarchy;
+    copyValue(p, "hierarchy/depth", hs.recursionDepth);
+    copyValue(p, "hierarchy/scalePerLevel", hs.scalePerLevel);
+    copyValue(p, "hierarchy/offsetPerLevel", hs.offsetPerLevel);
+    copyValue(p, "hierarchy/rotationPerLevel", hs.rotationPerLevelDegrees);
 
     // Deformers: the stack shape comes from rest; per-slot fields from the parameters.
     if (live.deformers.size() != rest.deformers.size()) {

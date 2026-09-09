@@ -37,6 +37,7 @@ Parameters appear under `procedural/<node>/…`:
 | Distribution | `distribution/kind`, `count`, `radius`, `startAngle`, `endAngle`, `turns`, `radiusGrowth`, `spiralHeight`, `gridCount`, `gridSpacing`, `start`, `end`, `orientation`, `plane` | instances regenerate on change (microseconds) |
 | Transform | `transform/position|rotation|scale` | the whole arrangement |
 | Variation | `variation/seed`, `position`, `rotation`, `scale`, `uniformScale` | same seed = same world, live or offline |
+| Hierarchy | `hierarchy/depth`, `scalePerLevel`, `offsetPerLevel`, `rotationPerLevel` | self-recursion (ADR-029); structural, so a change regenerates the cloud |
 | Deformation | `deform/1/amount`, `speed`, `phase`, `frequency`, `scale`, `falloff`, `center`, `axis`, `enabled` (slot 1..8, label shows the kind) | evaluated on the GPU every frame |
 | Material | `material/baseColor`, `emissiveColor`, `emissive`, `roughness`, `metallic`; `materialVariation/hueShift|hueGradient|valueRandom|emissiveRandom|emissiveGradient` | per-instance colour is baked into the instance records |
 
@@ -51,6 +52,7 @@ own axis); world-space deformers act on the final world position (a wave across 
 - **grid**: `gridCount` × `gridSpacing`, centred.
 - **radial**: `count` around `center` at `radius` in `plane`, from `startAngle` to `endAngle` (a full turn closes the circle); orientation `none | outward | inward | tangent`.
 - **spiral**: a helix: `turns`, `radius` growing by `radiusGrowth`, rising `spiralHeight` along the plane normal.
+- **grammar**: the placements come from the object's `grammar` expansion — see [Compositional grammar and hierarchical instancing](grammar-and-hierarchy.md).
 
 ## Deformers
 
@@ -76,6 +78,41 @@ Stack order is the array order and is deterministic; `twist → noise` differs f
    which the timeline can key for fly-throughs. Compositions do not spin by default
    (`root/rotationSpeed` 0); `scene/keyLight` scales the default light, `scene/fogDensity` and
    `scene/fogColor` add distance fog.
+
+## Grammars and hierarchies
+
+Two ways to get a lot of structure out of a little data, both covered in full by
+[docs/grammar-and-hierarchy.md](grammar-and-hierarchy.md):
+
+- **A grammar** (`distribution.kind = "grammar"`) rewrites named rules — `place`, `repeat`,
+  `branch`, `alternate`, `mirror`, `choice`, `conditional` — into the object's placements, and
+  tags each point with `depth`, `rule` and `branch` columns that point ops and the `extraLane`
+  projection can select on. Six `repeat`ed bays, each `mirror`ed into two aisles, each
+  `branch`ing into a column and an arch is five rules and 24 instances.
+- **A hierarchy** composes placements with themselves or with another object's. Setting
+  `hierarchy.recursionDepth` to `d` makes the object a fractal of its own arrangement:
+  every point is a chain of `d + 1` placements composed through the per-level transform
+  (`offsetPerLevel`, `rotationPerLevel`, uniform `scalePerLevel`), so `n` placements become
+  `n^(d+1)`, truncated at `hierarchy.maxInstances`. The cloud is the *deepest* level only, so a
+  visible trunk-and-branches tree wants separate objects (one per depth) or a `branch` grammar.
+  `colorPerLevel` rotates the hue by `(root index mod (d+1)) / (d+1)` turns so the root branches
+  read as families.
+- **A procedural source** (`source.kind = "procedural"`, `source.reference = "<object>"`) makes
+  another procedural object of the same scene the source of this one: its mesh *and* its whole
+  arrangement are composed under every placement here (`n × m` instances, ids `i * m + j`,
+  colours multiplied). Chains may be up to four hops deep; cycles, missing references and
+  over-deep chains are rejected before anything is generated. Generation regenerates the
+  referenced object's cloud from the scene, so a composition may build its objects in any order.
+
+```json
+"hierarchy": { "recursionDepth": 2, "scalePerLevel": 0.45,
+               "offsetPerLevel": [0, 5, 0], "rotationPerLevel": [0, 30, 0], "colorPerLevel": true }
+```
+
+`hierarchy/depth`, `hierarchy/scalePerLevel`, `hierarchy/offsetPerLevel` and
+`hierarchy/rotationPerLevel` are ordinary parameters, so audio and the timeline drive the whole
+recursion; they are structural, so each change regenerates the cloud (microseconds at these
+sizes) rather than tinting it.
 
 ## Modulating it with audio
 
@@ -132,3 +169,7 @@ File > Examples lists the built-in scenes from `examples/index.json`:
   node path (`procedural/nodes_<outer>_<inner>/…`).
 - Point clouds, point ops, fields and effectors (ADR-024/025) are described in
   `docs/spatial-data.md`; `rebuild()` now goes through `generateCloud()` and the `ops` list.
+- Grammars and hierarchical instancing (ADR-028/029) are described in
+  `docs/grammar-and-hierarchy.md`; `generateCloud()` dispatches to them when the
+  distribution is `grammar`, `hierarchy.recursionDepth` is above 0 or the source is
+  another procedural object.

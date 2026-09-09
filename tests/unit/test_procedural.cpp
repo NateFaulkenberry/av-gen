@@ -1349,3 +1349,534 @@ TEST_CASE("Procedural parameters: ops are structural, effectors per frame", "[sc
     unregisterProceduralParameters(params, p);
     CHECK(params.size() == 0);
 }
+
+// ================================================================================================
+// Hierarchical instancing (ADR-029): self-recursion and procedural sources
+// ================================================================================================
+
+namespace {
+
+// A row of `count` placements one unit apart on +x, no variation, no material variation.
+ProceduralGeometry row(const std::string& name, int count) {
+    ProceduralGeometry g;
+    g.name = name;
+    g.source.kind = PrimitiveKind::Point;
+    g.source.pointSize = 0.2f;
+    g.distribution.kind = DistributionKind::Linear;
+    g.distribution.count = count;
+    g.distribution.start = {0.0f, 0.0f, 0.0f};
+    g.distribution.end = {static_cast<float>(count - 1), 0.0f, 0.0f};
+    g.distribution.orientAlong = false;
+    return g;
+}
+
+glm::vec3 pos(const spatial::PointCloud& c, std::size_t i) {
+    return c.positions()[i];
+}
+
+} // namespace
+
+TEST_CASE("Hierarchy: depth 1 places a copy of the arrangement under every placement",
+          "[scene][procedural][hierarchy]") {
+    ProceduralGeometry g = row("tower", 4);
+    // Level 0: x = 0, 1, 2, 3. L = (offset (0,1,0), no rotation, uniform scale 0.5).
+    g.hierarchy.recursionDepth = 1;
+    g.hierarchy.scalePerLevel = 0.5f;
+    g.hierarchy.offsetPerLevel = {0.0f, 1.0f, 0.0f};
+    g.hierarchy.colorPerLevel = false;
+    REQUIRE(g.validate().has_value());
+
+    const spatial::PointCloud c = g.generateCloud();
+    REQUIRE(c.count() == 16);
+    for (std::size_t i = 0; i < 4; ++i) {
+        for (std::size_t j = 0; j < 4; ++j) {
+            const std::size_t r = i * 4 + j;
+            // B_i * L * B_j: (i, 0, 0) + (0, 1, 0) + 0.5 * (j, 0, 0).
+            checkVec(pos(c, r), glm::vec3(static_cast<float>(i) + 0.5f * static_cast<float>(j), 1.0f, 0.0f));
+            checkVec(c.scales()[r], glm::vec3(0.5f));
+            CHECK(c.ids()[r] == static_cast<std::int32_t>(r));
+        }
+    }
+    CHECK_THAT(d(c.indices()[15]), WithinAbs(1.0, 1e-6)); // renumbered over the emitted points
+
+    // Depth 2 chains three placements: (i, 0, 0) + (0, 1.5, 0) + 0.5 (j, 0, 0) + 0.25 (k, 0, 0).
+    g.hierarchy.recursionDepth = 2;
+    const spatial::PointCloud c2 = g.generateCloud();
+    REQUIRE(c2.count() == 64);
+    for (std::size_t r = 0; r < 64; ++r) {
+        const std::size_t i = r / 16;
+        const std::size_t j = (r / 4) % 4;
+        const std::size_t k = r % 4;
+        checkVec(pos(c2, r), glm::vec3(static_cast<float>(i) + 0.5f * static_cast<float>(j) +
+                                           0.25f * static_cast<float>(k),
+                                       1.5f, 0.0f));
+        checkVec(c2.scales()[r], glm::vec3(0.25f));
+    }
+
+    // rotationPerLevel composes per level: 90 degrees about +y turns the second level onto -z.
+    ProceduralGeometry t = row("turn", 2);
+    t.hierarchy.recursionDepth = 1;
+    t.hierarchy.scalePerLevel = 1.0f;
+    t.hierarchy.offsetPerLevel = glm::vec3(0.0f);
+    t.hierarchy.rotationPerLevelDegrees = {0.0f, 90.0f, 0.0f};
+    t.hierarchy.colorPerLevel = false;
+    const spatial::PointCloud tc = t.generateCloud();
+    REQUIRE(tc.count() == 4);
+    checkVec(pos(tc, 0), glm::vec3(0.0f, 0.0f, 0.0f));
+    checkVec(pos(tc, 1), glm::vec3(0.0f, 0.0f, -1.0f)); // +x rotated by +90 deg about y
+    checkVec(pos(tc, 2), glm::vec3(1.0f, 0.0f, 0.0f));
+    checkVec(pos(tc, 3), glm::vec3(1.0f, 0.0f, -1.0f));
+
+    // The distribution transform still applies once, to every point.
+    t.distributionTransform.position = {0.0f, 10.0f, 0.0f};
+    const spatial::PointCloud tt = t.generateCloud();
+    REQUIRE(tt.count() == 4);
+    checkVec(pos(tt, 3), glm::vec3(1.0f, 10.0f, -1.0f));
+
+    // Depth 0 is exactly the flat cloud (the non-hierarchical path is untouched).
+    ProceduralGeometry flat = row("tower", 4);
+    ProceduralGeometry zero = flat;
+    zero.hierarchy.recursionDepth = 0;
+    CHECK(flat.generateCloud().contentHash() == zero.generateCloud().contentHash());
+}
+
+TEST_CASE("Hierarchy truncates at maxInstances in emission order", "[scene][procedural][hierarchy]") {
+    ProceduralGeometry g = row("tower", 4);
+    g.hierarchy.recursionDepth = 1;
+    g.hierarchy.offsetPerLevel = {0.0f, 1.0f, 0.0f};
+    g.hierarchy.colorPerLevel = false;
+    const spatial::PointCloud full = g.generateCloud();
+    REQUIRE(full.count() == 16);
+
+    g.hierarchy.maxInstances = 10;
+    REQUIRE(g.validate().has_value());
+    const spatial::PointCloud cut = g.generateCloud();
+    REQUIRE(cut.count() == 10);
+    for (std::size_t r = 0; r < 10; ++r) {
+        checkVec(pos(cut, r), pos(full, r));
+        CHECK(cut.ids()[r] == static_cast<std::int32_t>(r));
+    }
+    CHECK(g.validate().has_value()); // still valid
+    g.hierarchy.maxInstances = 0;
+    CHECK_FALSE(g.validate().has_value()); // out of range
+    g.hierarchy.maxInstances = 100;
+    g.hierarchy.recursionDepth = kMaxHierarchyDepth + 1;
+    CHECK_FALSE(g.validate().has_value());
+    g.hierarchy.recursionDepth = 1;
+    g.hierarchy.scalePerLevel = 0.0f;
+    CHECK_FALSE(g.validate().has_value());
+}
+
+TEST_CASE("Hierarchy colours rotate the hue by the chain index when colorPerLevel is set",
+          "[scene][procedural][hierarchy]") {
+    ProceduralGeometry g = row("tower", 4);
+    g.material.baseColor = {0.8f, 0.3f, 0.2f};
+    g.hierarchy.recursionDepth = 1;
+    g.hierarchy.offsetPerLevel = {0.0f, 1.0f, 0.0f};
+
+    g.hierarchy.colorPerLevel = false;
+    const spatial::PointCloud plain = g.generateCloud();
+    g.hierarchy.colorPerLevel = true;
+    const spatial::PointCloud tinted = g.generateCloud();
+    REQUIRE(plain.count() == 16);
+    REQUIRE(tinted.count() == 16);
+    // Without material variation every colour multiplier is 1; the level tint rotates the hue of
+    // the odd root branches (root % (depth + 1)) and leaves the even ones alone.
+    for (std::size_t r = 0; r < 16; ++r) {
+        CHECK(glm::vec3(plain.colors()[r]) == glm::vec3(1.0f));
+    }
+    CHECK(glm::vec3(tinted.colors()[0]) == glm::vec3(1.0f));  // root 0: 0/2 turns
+    CHECK(glm::vec3(tinted.colors()[4]) != glm::vec3(1.0f));  // root 1: 1/2 turn
+    CHECK(glm::vec3(tinted.colors()[8]) == glm::vec3(1.0f));  // root 2: 0/2 turns
+    CHECK(glm::vec3(tinted.colors()[12]) != glm::vec3(1.0f)); // root 3: 1/2 turn
+    // Every point of a chain shares its root's colour.
+    for (std::size_t j = 0; j < 4; ++j) {
+        CHECK(tinted.colors()[4 + j] == tinted.colors()[4]);
+    }
+    CHECK(tinted.contentHash() != plain.contentHash());
+}
+
+TEST_CASE("A Procedural source composes the referenced object's cloud under every placement",
+          "[scene][procedural][hierarchy]") {
+    ProceduralGeometry leaf = row("leaf", 2);
+    leaf.source.kind = PrimitiveKind::Box;
+    leaf.source.size = {0.5f, 0.5f, 0.5f};
+    leaf.sourceTransform.position = {0.0f, 0.5f, 0.0f};
+    leaf.materialVariation.valueRandom = 0.5f;
+
+    ProceduralGeometry column = row("column", 3);
+    column.distribution.end = {8.0f, 0.0f, 0.0f}; // x = 0, 4, 8
+    column.source.kind = PrimitiveKind::Procedural;
+    column.source.reference = "leaf";
+    column.materialVariation.hueShift = 0.4f;
+
+    std::vector<ProceduralGeometry> objects{leaf, column};
+    REQUIRE(ProceduralGeometry::validateReferences(objects).has_value());
+    GenerationContext ctx;
+    ctx.objects = &objects;
+
+    const spatial::PointCloud c = objects[1].generateCloud(ctx);
+    REQUIRE(c.count() == 6); // n * m = 3 * 2
+
+    // Position (i, j) = P_i * leaf_j * leaf.sourceTransform.
+    const spatial::PointCloud child = leaf.generateCloud(ctx);
+    REQUIRE(child.count() == 2);
+    for (std::size_t i = 0; i < 3; ++i) {
+        for (std::size_t j = 0; j < 2; ++j) {
+            const std::size_t r = i * 2 + j;
+            checkVec(pos(c, r), glm::vec3(4.0f * static_cast<float>(i) + static_cast<float>(j), 0.5f, 0.0f));
+            CHECK(c.ids()[r] == static_cast<std::int32_t>(r)); // ids = i * childCount + j
+        }
+    }
+
+    // Colours multiply: this object's per-placement hue rotation times the child's.
+    ProceduralGeometry outerFlat = column;
+    outerFlat.source.kind = PrimitiveKind::Point;
+    const spatial::PointCloud outer = outerFlat.generateCloud();
+    REQUIRE(outer.count() == 3);
+    for (std::size_t i = 0; i < 3; ++i) {
+        for (std::size_t j = 0; j < 2; ++j) {
+            const std::size_t r = i * 2 + j;
+            checkVec(glm::vec3(c.colors()[r]), glm::vec3(outer.colors()[i]) * glm::vec3(child.colors()[j]));
+        }
+    }
+    CHECK(glm::vec3(c.colors()[0]) != glm::vec3(c.colors()[2])); // the hue rotation varies by root
+
+    // The bounds column is the leaf primitive's half extent (every scale is in the point scale).
+    auto extents = c.attributes.view<glm::vec3>(spatial::attr::bounds);
+    REQUIRE(extents.has_value());
+    checkVec(extents->values[0], glm::vec3(0.25f));
+
+    // The child's extra attribute columns survive the composition.
+    ProceduralGeometry grammarLeaf = leaf;
+    grammarLeaf.distribution.kind = DistributionKind::Grammar;
+    grammarLeaf.grammar.axiom = "row";
+    GrammarRule r0;
+    r0.name = "row";
+    r0.op = GrammarOp::Repeat;
+    r0.count = 2;
+    r0.step.position = {0.0f, 0.0f, 1.0f};
+    r0.children = {"p"};
+    GrammarRule p0;
+    p0.name = "p";
+    p0.op = GrammarOp::Place;
+    grammarLeaf.grammar.rules = {r0, p0};
+    REQUIRE(grammarLeaf.validate().has_value());
+    std::vector<ProceduralGeometry> withGrammar{grammarLeaf, column};
+    GenerationContext gctx;
+    gctx.objects = &withGrammar;
+    const spatial::PointCloud gc = withGrammar[1].generateCloud(gctx);
+    REQUIRE(gc.count() == 6);
+    auto branches = gc.attributes.view<std::int32_t>("branch");
+    REQUIRE(branches.has_value());
+    CHECK(branches->values[0] == 0);
+    CHECK(branches->values[1] == 1); // the inner point's column, repeated per placement
+    CHECK(branches->values[3] == 1);
+
+    // Generation is pure: the referenced object is never rebuilt, so a composition may build its
+    // objects in any order.
+    CHECK(objects[0].structureVersion == 0);
+    CHECK(objects[0].instances.empty());
+    CHECK(objects[1].generateCloud(ctx).contentHash() == c.contentHash());
+
+    // rebuild() resolves the referenced mesh hash and the referenced half extent.
+    ProceduralGeometry live = column;
+    CHECK(live.rebuild(ctx));
+    CHECK(live.instances.size() == 6);
+    CHECK(live.meshHash == leaf.source.structuralHash());
+    CHECK(live.boundsMax.x > 8.0f);
+    CHECK_FALSE(live.rebuild(ctx));
+}
+
+TEST_CASE("Procedural sources nest: resolveSourceMesh follows the reference chain",
+          "[scene][procedural][hierarchy]") {
+    ProceduralGeometry leaf = row("leaf", 2);
+    leaf.source.kind = PrimitiveKind::Box;
+    leaf.source.size = {2.0f, 2.0f, 2.0f};
+    ProceduralGeometry mid = row("mid", 2);
+    mid.source.kind = PrimitiveKind::Procedural;
+    mid.source.reference = "leaf";
+    ProceduralGeometry top = row("top", 2);
+    top.source.kind = PrimitiveKind::Procedural;
+    top.source.reference = "mid";
+
+    std::vector<ProceduralGeometry> objects{leaf, mid, top};
+    REQUIRE(ProceduralGeometry::validateReferences(objects).has_value());
+    GenerationContext ctx;
+    ctx.objects = &objects;
+
+    const auto box = makeBox({2.0f, 2.0f, 2.0f}, 1);
+    const auto resolved = top.resolveSourceMesh(ctx);
+    REQUIRE(resolved.has_value());
+    CHECK(sameMesh(*resolved, box));
+    const auto direct = leaf.resolveSourceMesh(ctx);
+    REQUIRE(direct.has_value());
+    CHECK(sameMesh(*direct, box));
+
+    // 2 * 2 * 2 points: every level composes the level below.
+    CHECK(top.generateCloud(ctx).count() == 8);
+
+    // Without the scene's objects a procedural source cannot resolve.
+    CHECK_FALSE(top.resolveSourceMesh().has_value());
+    CHECK(top.generateCloud().count() == 2); // the placements alone, with a warning
+    // An empty reference and a too-deep context are errors too.
+    ProceduralGeometry blank = top;
+    blank.source.reference.clear();
+    CHECK_FALSE(blank.resolveSourceMesh(ctx).has_value());
+    GenerationContext deep = ctx;
+    deep.depth = kMaxHierarchyDepth;
+    CHECK_FALSE(top.resolveSourceMesh(deep).has_value());
+    // makeSourceMesh alone cannot build a procedural source.
+    CHECK_FALSE(makeSourceMesh(top.source).has_value());
+}
+
+TEST_CASE("validateReferences rejects missing references, cycles and over-deep chains",
+          "[scene][procedural][hierarchy]") {
+    ProceduralGeometry a = row("a", 2);
+    a.source.kind = PrimitiveKind::Procedural;
+    a.source.reference = "missing";
+    CHECK_FALSE(ProceduralGeometry::validateReferences({a}).has_value());
+
+    // A two-object cycle.
+    ProceduralGeometry b = row("b", 2);
+    b.source.kind = PrimitiveKind::Procedural;
+    b.source.reference = "a";
+    a.source.reference = "b";
+    CHECK_FALSE(ProceduralGeometry::validateReferences({a, b}).has_value());
+
+    // Self reference (also caught by validate()).
+    ProceduralGeometry self = row("self", 2);
+    self.source.kind = PrimitiveKind::Procedural;
+    self.source.reference = "self";
+    CHECK_FALSE(ProceduralGeometry::validateReferences({self}).has_value());
+    CHECK_FALSE(self.validate().has_value());
+
+    // A chain of kMaxHierarchyDepth hops is fine; one more is not.
+    std::vector<ProceduralGeometry> chain;
+    chain.push_back(row("n0", 2));
+    for (int i = 1; i <= kMaxHierarchyDepth; ++i) {
+        ProceduralGeometry g = row("n" + std::to_string(i), 2);
+        g.source.kind = PrimitiveKind::Procedural;
+        g.source.reference = "n" + std::to_string(i - 1);
+        chain.push_back(std::move(g));
+    }
+    CHECK(ProceduralGeometry::validateReferences(chain).has_value());
+    ProceduralGeometry extra = row("n" + std::to_string(kMaxHierarchyDepth + 1), 2);
+    extra.source.kind = PrimitiveKind::Procedural;
+    extra.source.reference = "n" + std::to_string(kMaxHierarchyDepth);
+    chain.push_back(std::move(extra));
+    CHECK_FALSE(ProceduralGeometry::validateReferences(chain).has_value());
+
+    // A procedural source needs a reference at all.
+    ProceduralGeometry empty = row("empty", 2);
+    empty.source.kind = PrimitiveKind::Procedural;
+    CHECK_FALSE(empty.validate().has_value());
+    CHECK_FALSE(ProceduralGeometry::validateReferences({empty}).has_value());
+}
+
+TEST_CASE("contextualHash follows the referenced object, the hierarchy and the grammar",
+          "[scene][procedural][hierarchy]") {
+    ProceduralGeometry leaf = row("leaf", 2);
+    ProceduralGeometry parent = row("parent", 3);
+    parent.source.kind = PrimitiveKind::Procedural;
+    parent.source.reference = "leaf";
+
+    std::vector<ProceduralGeometry> objects{leaf, parent};
+    GenerationContext ctx;
+    ctx.objects = &objects;
+    const std::uint64_t base = objects[1].contextualHash(ctx);
+    CHECK(base == objects[1].contextualHash(ctx)); // pure
+
+    // The referenced object's structure is part of the hash.
+    objects[0].distribution.count = 5;
+    const std::uint64_t changed = objects[1].contextualHash(ctx);
+    CHECK(changed != base);
+    // ... recursively, through a chain.
+    objects[0].source.kind = PrimitiveKind::Procedural;
+    objects[0].source.reference = "deep";
+    ProceduralGeometry deep = row("deep", 2);
+    objects.push_back(deep);
+    const std::uint64_t withDeep = objects[1].contextualHash(ctx);
+    objects[2].distribution.count = 7;
+    CHECK(objects[1].contextualHash(ctx) != withDeep);
+
+    // An unresolvable reference hashes to a constant, so resolving it later rebuilds.
+    CHECK(parent.contextualHash({}) == parent.contextualHash({}));
+    CHECK(parent.contextualHash({}) != base);
+
+    // Hierarchy and grammar are structural.
+    ProceduralGeometry g = row("g", 4);
+    const std::uint64_t flat = g.contextualHash({});
+    g.hierarchy.recursionDepth = 1;
+    CHECK(g.contextualHash({}) != flat);
+    CHECK(g.structuralHash() != row("g", 4).structuralHash());
+    ProceduralGeometry gr = row("gr", 4);
+    const std::uint64_t plain = gr.contextualHash({});
+    gr.grammar.axiom = "p";
+    GrammarRule p;
+    p.name = "p";
+    p.op = GrammarOp::Place;
+    gr.grammar.rules = {p};
+    CHECK(gr.contextualHash({}) != plain);
+}
+
+TEST_CASE("Hierarchy and grammar survive the procedural JSON round trip", "[scene][procedural][hierarchy]") {
+    ProceduralGeometry g = row("fractal", 4);
+    g.source.kind = PrimitiveKind::Procedural;
+    g.source.reference = "capital";
+    g.hierarchy.recursionDepth = 2;
+    g.hierarchy.maxInstances = 4096;
+    g.hierarchy.scalePerLevel = 0.42f;
+    g.hierarchy.offsetPerLevel = {0.0f, 3.5f, 0.25f};
+    g.hierarchy.rotationPerLevelDegrees = {0.0f, 30.0f, 5.0f};
+    g.hierarchy.colorPerLevel = false;
+    g.distribution.kind = DistributionKind::Grammar;
+    g.grammar.axiom = "row";
+    g.grammar.seed = 7;
+    GrammarRule r0;
+    r0.name = "row";
+    r0.op = GrammarOp::Repeat;
+    r0.count = 3;
+    r0.step.position = {1.0f, 0.0f, 0.0f};
+    r0.children = {"p"};
+    GrammarRule p0;
+    p0.name = "p";
+    p0.op = GrammarOp::Place;
+    p0.scaleAttribute = 1.5f;
+    g.grammar.rules = {r0, p0};
+    REQUIRE(g.validate().has_value());
+
+    const auto back = ProceduralGeometry::fromJson(g.toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->source.kind == PrimitiveKind::Procedural);
+    CHECK(back->source.reference == "capital");
+    CHECK(back->hierarchy.recursionDepth == 2);
+    CHECK(back->hierarchy.maxInstances == 4096);
+    CHECK_THAT(d(back->hierarchy.scalePerLevel), WithinAbs(0.42, 1e-6));
+    checkVec(back->hierarchy.offsetPerLevel, glm::vec3(0.0f, 3.5f, 0.25f));
+    checkVec(back->hierarchy.rotationPerLevelDegrees, glm::vec3(0.0f, 30.0f, 5.0f));
+    CHECK_FALSE(back->hierarchy.colorPerLevel);
+    CHECK(back->distribution.kind == DistributionKind::Grammar);
+    CHECK(back->grammar.structuralHash() == g.grammar.structuralHash());
+    CHECK(back->structuralHash() == g.structuralHash());
+    CHECK(std::string(primitiveKindName(PrimitiveKind::Procedural)) == "procedural");
+    CHECK(primitiveKindFromName("procedural") == PrimitiveKind::Procedural);
+    CHECK(std::string(distributionKindName(DistributionKind::Grammar)) == "grammar");
+    CHECK(distributionKindFromName("grammar") == DistributionKind::Grammar);
+}
+
+TEST_CASE("Hierarchy parameters are registered and structural", "[scene][procedural][hierarchy][params]") {
+    ProceduralGeometry rest = row("tower", 3);
+    rest.hierarchy.recursionDepth = 0;
+    rest.hierarchy.scalePerLevel = 0.5f;
+
+    params::ParameterSet set;
+    const ProceduralParameters p = registerProceduralParameters(set, rest, "procedural/tower/");
+    REQUIRE(p.recursionDepth != nullptr);
+    REQUIRE(p.scalePerLevel != nullptr);
+    CHECK(p.recursionDepth->path() == "procedural/tower/hierarchy/depth");
+    CHECK(p.recursionDepth->kind() == params::ParamKind::Int);
+    CHECK(set.find("procedural/tower/hierarchy/depth")->hardMax(0) ==
+          static_cast<float>(kMaxHierarchyDepth));
+    CHECK(set.find("procedural/tower/hierarchy/offsetPerLevel") != nullptr);
+    CHECK(set.find("procedural/tower/hierarchy/rotationPerLevel") != nullptr);
+
+    ProceduralGeometry live = rest;
+    set.resetFinals();
+    CHECK(applyProceduralParameters(p, rest, live));
+    CHECK(live.instances.size() == 3);
+    p.recursionDepth->setBase(1);
+    set.findAs<glm::vec3>("procedural/tower/hierarchy/offsetPerLevel")->setBase(glm::vec3(0.0f, 2.0f, 0.0f));
+    set.resetFinals();
+    CHECK(applyProceduralParameters(p, rest, live)); // structural: rebuilt
+    CHECK(live.hierarchy.recursionDepth == 1);
+    CHECK(live.instances.size() == 9);
+    unregisterProceduralParameters(set, p);
+    CHECK(set.size() == 0);
+}
+
+TEST_CASE("The docs/grammar-and-hierarchy.md examples load and expand as documented",
+          "[scene][procedural][hierarchy]") {
+    // A fractal tower: 4 placements, self-recursion depth 2 -> 4^3 = 64 instances.
+    const auto tower = ProceduralGeometry::fromJson(nlohmann::json::parse(R"({
+        "name": "tower",
+        "source": { "kind": "box", "size": [1.6, 4.0, 1.6] },
+        "distribution": { "kind": "radial", "count": 4, "radius": 3.0, "plane": "xz", "orientation": "outward" },
+        "hierarchy": {
+          "recursionDepth": 2,
+          "maxInstances": 20000,
+          "scalePerLevel": 0.45,
+          "offsetPerLevel": [0.0, 5.0, 0.0],
+          "rotationPerLevel": [0.0, 30.0, 0.0],
+          "colorPerLevel": true
+        },
+        "material": { "baseColor": [0.10, 0.10, 0.12], "emissiveColor": [0.55, 0.8, 1.0], "emissiveIntensity": 0.5 },
+        "materialVariation": { "hueGradient": 0.2 }
+      })"));
+    REQUIRE(tower.has_value());
+    CHECK(tower->generateCloud().count() == 64);
+
+    // A grid cathedral: 6 bays * 2 mirrored aisles * 2 places = 24 instances.
+    const auto cathedral = ProceduralGeometry::fromJson(nlohmann::json::parse(R"({
+        "name": "cathedral",
+        "source": { "kind": "cylinder", "radius": 0.35, "height": 9.0, "radialSegments": 24, "caps": true },
+        "distribution": { "kind": "grammar" },
+        "grammar": {
+          "axiom": "nave",
+          "maxDepth": 8,
+          "maxInstances": 4096,
+          "seed": 3,
+          "rules": [
+            { "name": "nave", "op": "repeat", "count": 6, "step": { "position": [4.0, 0.0, 0.0] }, "children": ["bay"] },
+            { "name": "bay", "op": "mirror", "mirrorAxis": [0.0, 0.0, 1.0], "children": ["aisle"] },
+            { "name": "aisle", "op": "branch", "pre": { "position": [0.0, 0.0, 5.0] }, "children": ["column", "arch"] },
+            { "name": "column", "op": "place" },
+            { "name": "arch", "op": "place", "scaleAttribute": 0.6,
+              "pre": { "position": [0.0, 9.0, 0.0], "rotation": [0.0, 0.0, 90.0] } }
+          ]
+        },
+        "material": { "baseColor": [0.14, 0.13, 0.15], "roughness": 0.4 },
+        "materialVariation": { "hueGradient": 0.15 }
+      })"));
+    REQUIRE(cathedral.has_value());
+    const spatial::PointCloud nave = cathedral->generateCloud();
+    REQUIRE(nave.count() == 24);
+    // Bay 0: column and arch at z = +5, then their mirror images at z = -5.
+    checkVec(nave.positions()[0], glm::vec3(0.0f, 0.0f, 5.0f));
+    checkVec(nave.positions()[1], glm::vec3(0.0f, 9.0f, 5.0f));
+    checkVec(nave.positions()[2], glm::vec3(0.0f, 0.0f, -5.0f));
+    checkVec(nave.positions()[3], glm::vec3(0.0f, 9.0f, -5.0f));
+    checkVec(nave.positions()[4], glm::vec3(4.0f, 0.0f, 5.0f)); // bay 1
+    CHECK_THAT(d(nave.scales()[1].x), WithinAbs(0.6, 1e-6));
+
+    // A colonnade with capitals: a procedural source, 24 * 3 = 72 instances.
+    const nlohmann::json scene = nlohmann::json::parse(R"({ "nodes": [
+        { "name": "capital", "visible": false,
+          "source": { "kind": "box", "size": [1.3, 0.28, 1.3] },
+          "distribution": { "kind": "linear", "count": 3, "start": [0.0, 8.7, 0.0], "end": [0.0, 9.3, 0.0] },
+          "material": { "baseColor": [0.2, 0.19, 0.22], "roughness": 0.35 } },
+        { "name": "colonnade",
+          "source": { "kind": "procedural", "reference": "capital" },
+          "distribution": { "kind": "radial", "count": 24, "radius": 14.0, "plane": "xz", "orientation": "outward" },
+          "materialVariation": { "hueGradient": 0.3 } },
+        { "name": "shafts",
+          "source": { "kind": "cylinder", "radius": 0.35, "height": 8.6 },
+          "sourceTransform": { "position": [0.0, 4.3, 0.0] },
+          "distribution": { "kind": "radial", "count": 24, "radius": 14.0, "plane": "xz", "orientation": "outward" } } ] })");
+    std::vector<ProceduralGeometry> objects;
+    for (const auto& node : scene.at("nodes")) {
+        auto parsed = ProceduralGeometry::fromJson(node);
+        REQUIRE(parsed.has_value());
+        objects.push_back(std::move(*parsed));
+    }
+    REQUIRE(ProceduralGeometry::validateReferences(objects).has_value());
+    GenerationContext ctx;
+    ctx.objects = &objects;
+    CHECK(objects[1].generateCloud(ctx).count() == 72);
+    CHECK(objects[2].generateCloud(ctx).count() == 24);
+    // The colonnade draws the capital's box, wherever the capital would draw it.
+    const auto mesh = objects[1].resolveSourceMesh(ctx);
+    REQUIRE(mesh.has_value());
+    CHECK(sameMesh(*mesh, makeBox({1.3f, 0.28f, 1.3f}, 1)));
+    CHECK_THAT(d(objects[1].generateCloud(ctx).positions()[0].y), WithinAbs(8.7, 1e-5));
+}
