@@ -122,6 +122,7 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
             ImGui::MenuItem("Modulation", nullptr, &showModulation_);
             ImGui::MenuItem("World", nullptr, &showWorld_);
             ImGui::MenuItem("Assets", nullptr, &showAssets_);
+            ImGui::MenuItem("Graph", nullptr, &showGraph_);
             ImGui::MenuItem("ImGui Demo", nullptr, &showDemo_);
             ImGui::EndMenu();
         }
@@ -182,8 +183,32 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
         }
         ImGui::End();
     }
+    if (showGraph_) {
+        ImGui::SetNextWindowSize(ImVec2(900, 560), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(80, 80), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Graph", &showGraph_)) {
+            drawGraphWindow(engine);
+        }
+        ImGui::End();
+    }
     if (showDemo_) {
         ImGui::ShowDemoWindow(&showDemo_);
+    }
+}
+
+void ControlPanel::drawGraphWindow(app::Engine& engine) {
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        ImGui::TextDisabled("The current scene is not a composition, so it cannot hold a graph.");
+        return;
+    }
+    graphEditor.onChanged = [composition] { composition->markGraphDirty(); };
+    graphEditor.draw(composition->graph());
+    if (!composition->graphWarnings().empty()) {
+        ImGui::Separator();
+        for (const std::string& warning : composition->graphWarnings()) {
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", warning.c_str());
+        }
     }
 }
 

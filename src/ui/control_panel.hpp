@@ -11,6 +11,7 @@
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "ui/graph_editor.hpp"
 #include "ui/world_panel.hpp"
 
 #include <filesystem>
@@ -84,6 +85,8 @@ public:
     // World authoring (ADR-031): layers, overview, inspector, states, macros, debug options.
     // The host reads `world.debug` to build the debug-draw geometry each frame.
     WorldPanel world;
+    // Procedural graph editor (ADR-028); the host re-installs the graph when it changes.
+    GraphEditor graphEditor;
 
     [[nodiscard]] bool showDemo() const { return showDemo_; }
     [[nodiscard]] const std::string& statusMessage() const { return status_; }
@@ -107,6 +110,7 @@ private:
     void drawOutputsTab(app::Engine& engine);
     void drawWorldWindow(app::Engine& engine);
     void drawAssetsWindow();
+    void drawGraphWindow(app::Engine& engine);
 
     bool showDemo_ = false;
     bool showParameters_ = true;
@@ -115,6 +119,7 @@ private:
     bool showRender_ = false;
     bool showWorld_ = true;
     bool showAssets_ = false;
+    bool showGraph_ = false;
     int assetKind_ = 0;
     char assetSearch_[96] = "";
     int newRouteSource_ = 0;
