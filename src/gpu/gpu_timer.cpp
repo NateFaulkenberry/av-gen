@@ -21,6 +21,9 @@ GpuTimer::GpuTimer(Context& context) : context_(context) {
     begin_.beginningOfPassWriteIndex = 0;
     end_.querySet = querySet_;
     end_.endOfPassWriteIndex = 1;
+    both_.querySet = querySet_;
+    both_.beginningOfPassWriteIndex = 0;
+    both_.endOfPassWriteIndex = 1;
 
     for (auto& slot : slots_) {
         wgpu::BufferDescriptor resolveDesc{};

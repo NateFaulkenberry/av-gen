@@ -1,0 +1,604 @@
+// Fields on the GPU (ADR-025): the WGSL side of spatial/field.hpp. A packed FieldGpu record
+// (320 bytes, spatial::packField) per slot in a uniform FieldBlock; fieldScalar / fieldVector /
+// fieldColor sample slot i at a world position p with the same maths, in the same operation
+// order, as spatial::sampleScalar / sampleVector / sampleColor (tests/rendering/test_fields_gpu.cpp
+// compares them within 1e-4, noise kinds 1e-3).
+//
+// The including module declares the binding itself, e.g.
+//   @group(1) @binding(3) var<uniform> fieldBlock: FieldBlock;
+// (module-scope declarations may appear in any order). This file includes noise.wgsl; do not
+// include it a second time.
+//
+// Conventions (p world space):
+//   q = worldToLocal * p; d = falloff distance of the kind; w = strength * falloff(d)
+//   scalar kinds : value = shape(q) [inverted: 1 - shape] * w
+//   vector kinds : value = rotateToWorld(direction(q) [inverted: -direction] * w)
+//   colour kinds : value = colour(q) (A/B swapped when inverted), alpha = w
+//   cross-type   : scalar as vector = s * nWorld; vector as scalar = length(v); colour as scalar =
+//                  luminance(rgb) * a; scalar as colour = (mix(A, B, saturate(s)), w); vector as
+//                  colour = (v * 0.5 + 0.5, w)
+//   compound     : combine(children) * own w. ONE level of nesting: a compound's children must be
+//                  non-compound fields; a compound child evaluates as 0 (WGSL has no recursion).
+//   time         : tau = strengthInnerOuterTau.w (speed * t + phase) animates noise kinds through
+//                  nv = tau * (1, 0.7, 1.3); waves use t = wave1.w directly.
+//   space        : the record's transform always applies; FieldSpace::Local is resolved by the
+//                  caller (it decides what p is), not here.
+#include "noise.wgsl"
+
+struct FieldGpu {
+    kind: u32,                       // FieldKind (FIELD_* below)
+    fieldType: u32,                  // FieldType: 0 scalar, 1 vector, 2 colour
+    falloffKind: u32,                // FalloffKind (FALLOFF_* below)
+    seed: u32,
+    worldToLocal: mat4x4<f32>,
+    localToWorldRow0: vec4<f32>,     // rotation-only rows (scale sign kept): world = (dot(r0, v), dot(r1, v), dot(r2, v))
+    localToWorldRow1: vec4<f32>,
+    localToWorldRow2: vec4<f32>,
+    strengthInnerOuterTau: vec4<f32>, // strength, falloff inner, falloff outer, tau
+    axisRadius: vec4<f32>,           // axis.xyz (normalised on use), radius
+    pointLength: vec4<f32>,          // point.xyz, length
+    sizeSoftness: vec4<f32>,         // size.xyz, softness
+    freqExpInvertBias: vec4<f32>,    // frequency, falloff exponent, invert (1/0), spiralBias
+    wave0: vec4<f32>,                // amplitude, wavelength, waveSpeed, waveWidth
+    wave1: vec4<f32>,                // waveOrigin, geometry, shape, t (seconds)
+    colorA: vec4<f32>,
+    colorB: vec4<f32>,
+    curve: vec4<f32>,                // custom falloff curve control values
+    noiseCombineMix: vec4<f32>,      // falloff noiseAmount, noiseScale, combine, mix
+    children: vec4<i32>,             // compound child slots, -1 = none
+};
+
+struct FieldBlock {
+    count: u32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
+    fields: array<FieldGpu, 16>,
+};
+
+const FIELD_CONSTANT: u32 = 0u;
+const FIELD_LINEAR_GRADIENT: u32 = 1u;
+const FIELD_RADIAL: u32 = 2u;
+const FIELD_BOX: u32 = 3u;
+const FIELD_SPHERE: u32 = 4u;
+const FIELD_PLANE: u32 = 5u;
+const FIELD_NOISE: u32 = 6u;
+const FIELD_VORONOI: u32 = 7u;
+const FIELD_DISTANCE: u32 = 8u;
+const FIELD_SDF_DISTANCE: u32 = 9u;
+const FIELD_WAVE: u32 = 10u;
+const FIELD_DIRECTION: u32 = 11u;
+const FIELD_RADIAL_VECTOR: u32 = 12u;
+const FIELD_ATTRACTOR: u32 = 13u;
+const FIELD_REPULSOR: u32 = 14u;
+const FIELD_VORTEX: u32 = 15u;
+const FIELD_CURL_NOISE: u32 = 16u;
+const FIELD_SPIRAL: u32 = 17u;
+const FIELD_WAVE_VECTOR: u32 = 18u;
+const FIELD_CONSTANT_COLOR: u32 = 19u;
+const FIELD_GRADIENT: u32 = 20u;
+const FIELD_RADIAL_GRADIENT: u32 = 21u;
+const FIELD_NOISE_COLOR: u32 = 22u;
+const FIELD_POSITION_COLOR: u32 = 23u;
+const FIELD_COMPOUND: u32 = 24u;
+
+const FIELD_TYPE_SCALAR: u32 = 0u;
+const FIELD_TYPE_VECTOR: u32 = 1u;
+const FIELD_TYPE_COLOR: u32 = 2u;
+
+const FALLOFF_NONE: u32 = 0u;
+const FALLOFF_LINEAR: u32 = 1u;
+const FALLOFF_SMOOTHSTEP: u32 = 2u;
+const FALLOFF_SMOOTH: u32 = 3u;
+const FALLOFF_EASE_IN: u32 = 4u;
+const FALLOFF_EASE_OUT: u32 = 5u;
+const FALLOFF_EASE_IN_OUT: u32 = 6u;
+const FALLOFF_EXPONENTIAL: u32 = 7u;
+const FALLOFF_CUSTOM_CURVE: u32 = 8u;
+const FALLOFF_NOISE_MODULATED: u32 = 9u;
+
+const FIELD_COMBINE_ADD: u32 = 0u;
+const FIELD_COMBINE_MULTIPLY: u32 = 1u;
+const FIELD_COMBINE_MAX: u32 = 2u;
+const FIELD_COMBINE_MIN: u32 = 3u;
+const FIELD_COMBINE_MIX: u32 = 4u;
+const FIELD_COMBINE_AVERAGE: u32 = 5u;
+
+const FIELD_TWO_PI: f32 = 6.28318530717958647692;
+
+// normalize() that returns 0 for a zero vector (the CPU does the same).
+fn fieldNormalize(v: vec3<f32>) -> vec3<f32> {
+    let l2 = dot(v, v);
+    if (l2 > 1e-20) {
+        return v / sqrt(l2);
+    }
+    return vec3<f32>(0.0);
+}
+
+fn fieldAxis(fi: u32) -> vec3<f32> {
+    return fieldNormalize(fieldBlock.fields[fi].axisRadius.xyz);
+}
+
+fn fieldLocal(fi: u32, p: vec3<f32>) -> vec3<f32> {
+    return (fieldBlock.fields[fi].worldToLocal * vec4<f32>(p, 1.0)).xyz;
+}
+
+fn fieldToWorld(fi: u32, v: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(dot(fieldBlock.fields[fi].localToWorldRow0.xyz, v), dot(fieldBlock.fields[fi].localToWorldRow1.xyz, v), dot(fieldBlock.fields[fi].localToWorldRow2.xyz, v));
+}
+
+// ---- falloff ---------------------------------------------------------------------------------
+
+fn smoothstepFalloff(t: f32) -> f32 {
+    return 1.0 - t * t * (3.0 - 2.0 * t);
+}
+
+// The curve value for t in [0, 1] (1 -> 0). `p` (world) and the seed feed NoiseModulated.
+fn falloffCurve(kind: u32, t: f32, exponent: f32, curve: vec4<f32>, noiseAmount: f32, noiseScale: f32,
+                p: vec3<f32>, seed: u32) -> f32 {
+    if (kind == FALLOFF_LINEAR) {
+        return 1.0 - t;
+    }
+    if (kind == FALLOFF_SMOOTHSTEP) {
+        return smoothstepFalloff(t);
+    }
+    if (kind == FALLOFF_SMOOTH) {
+        return 1.0 - t * t * t * (t * (6.0 * t - 15.0) + 10.0);
+    }
+    if (kind == FALLOFF_EASE_IN) {
+        return 1.0 - t * t * t;
+    }
+    if (kind == FALLOFF_EASE_OUT) {
+        let u = 1.0 - t;
+        return u * u * u;
+    }
+    if (kind == FALLOFF_EASE_IN_OUT) {
+        let a = 4.0 * t * t * t;
+        let b = -2.0 * t + 2.0;
+        let c = 1.0 - b * b * b / 2.0;
+        return 1.0 - select(c, a, t < 0.5);
+    }
+    if (kind == FALLOFF_EXPONENTIAL) {
+        return pow(1.0 - t, exponent);
+    }
+    if (kind == FALLOFF_CUSTOM_CURVE) {
+        // cubic Bezier on y with control values (1, curve.x, curve.y, curve.z), De Casteljau
+        let b01 = mix(1.0, curve.x, t);
+        let b12 = mix(curve.x, curve.y, t);
+        let b23 = mix(curve.y, curve.z, t);
+        let b012 = mix(b01, b12, t);
+        let b123 = mix(b12, b23, t);
+        return mix(b012, b123, t);
+    }
+    if (kind == FALLOFF_NOISE_MODULATED) {
+        let n = fbm3(p * noiseScale, seed) * 2.0 - 1.0;
+        return smoothstepFalloff(t) * saturate(1.0 + noiseAmount * n);
+    }
+    return 1.0;
+}
+
+// Weight of the falloff at distance d: 1 inside `inner`, 0 beyond `outer`, the curve between.
+fn falloffWeight(fi: u32, d: f32, p: vec3<f32>) -> f32 {
+    if (fieldBlock.fields[fi].falloffKind == FALLOFF_NONE) {
+        return 1.0;
+    }
+    let inner = fieldBlock.fields[fi].strengthInnerOuterTau.y;
+    let outer = fieldBlock.fields[fi].strengthInnerOuterTau.z;
+    if (d <= inner) {
+        return 1.0;
+    }
+    if (d >= outer) {
+        return 0.0;
+    }
+    let t = (d - inner) / (outer - inner);
+    return falloffCurve(fieldBlock.fields[fi].falloffKind, t, fieldBlock.fields[fi].freqExpInvertBias.y, fieldBlock.fields[fi].curve, fieldBlock.fields[fi].noiseCombineMix.x, fieldBlock.fields[fi].noiseCombineMix.y, p,
+                        fieldBlock.fields[fi].seed);
+}
+
+// The distance the falloff is measured over for each kind.
+fn fieldDistance(fi: u32, q: vec3<f32>) -> f32 {
+    let kind = fieldBlock.fields[fi].kind;
+    if (kind == FIELD_LINEAR_GRADIENT || kind == FIELD_PLANE || kind == FIELD_DIRECTION || kind == FIELD_GRADIENT) {
+        return abs(dot(q, fieldAxis(fi)));
+    }
+    if (kind == FIELD_BOX) {
+        let e = abs(q) - fieldBlock.fields[fi].sizeSoftness.xyz;
+        return max(max(e.x, max(e.y, e.z)), 0.0);
+    }
+    return length(q - fieldBlock.fields[fi].pointLength.xyz);
+}
+
+fn fieldWeightOf(fi: u32, q: vec3<f32>, p: vec3<f32>) -> f32 {
+    return fieldBlock.fields[fi].strengthInnerOuterTau.x * falloffWeight(fi, fieldDistance(fi, q), p);
+}
+
+// ---- kinds -------------------------------------------------------------------------------------
+
+fn fieldNoiseOffset(fi: u32) -> vec3<f32> {
+    return fieldBlock.fields[fi].strengthInnerOuterTau.w * vec3<f32>(1.0, 0.7, 1.3);
+}
+
+fn waveDistance(fi: u32, q: vec3<f32>) -> f32 {
+    let geometry = u32(fieldBlock.fields[fi].wave1.y + 0.5);
+    let n = fieldAxis(fi);
+    if (geometry == 0u) { // planar
+        return dot(q, n);
+    }
+    let r = q - fieldBlock.fields[fi].pointLength.xyz;
+    if (geometry == 2u) { // spherical
+        return length(r);
+    }
+    return length(r - n * dot(r, n)); // radial / cylindrical
+}
+
+// Outward direction of the wave geometry at q (for WaveVector).
+fn waveDirection(fi: u32, q: vec3<f32>) -> vec3<f32> {
+    let geometry = u32(fieldBlock.fields[fi].wave1.y + 0.5);
+    let n = fieldAxis(fi);
+    if (geometry == 0u) {
+        return n;
+    }
+    let r = q - fieldBlock.fields[fi].pointLength.xyz;
+    if (geometry == 2u) {
+        return fieldNormalize(r);
+    }
+    return fieldNormalize(r - n * dot(r, n));
+}
+
+fn waveValue(fi: u32, q: vec3<f32>) -> f32 {
+    let t = fieldBlock.fields[fi].wave1.w;
+    let s = waveDistance(fi, q) - fieldBlock.fields[fi].wave1.x - fieldBlock.fields[fi].wave0.z * t;
+    let width = fieldBlock.fields[fi].wave0.w;
+    var envelope = 1.0;
+    if (width > 0.0) {
+        envelope = smoothstepFalloff(saturate(abs(s) / width));
+    }
+    let k = FIELD_TWO_PI / max(fieldBlock.fields[fi].wave0.y, 1e-6);
+    let shape = u32(fieldBlock.fields[fi].wave1.z + 0.5);
+    var v = sin(k * s);
+    if (shape == 1u) { // pulse
+        let ks = k * s;
+        v = exp(-(ks * ks));
+    } else if (shape == 2u) { // triangle
+        v = 4.0 * abs(fract(k * s / FIELD_TWO_PI + 0.75) - 0.5) - 1.0;
+    }
+    return fieldBlock.fields[fi].wave0.x * envelope * v;
+}
+
+// Scalar shape of a scalar kind (before invert and weight).
+fn scalarShape(fi: u32, q: vec3<f32>) -> f32 {
+    let kind = fieldBlock.fields[fi].kind;
+    if (kind == FIELD_CONSTANT) {
+        return 1.0;
+    }
+    if (kind == FIELD_LINEAR_GRADIENT) {
+        return saturate(dot(q, fieldAxis(fi)) / max(fieldBlock.fields[fi].pointLength.w, 1e-6) + 0.5);
+    }
+    if (kind == FIELD_RADIAL) {
+        return 1.0 - saturate(length(q - fieldBlock.fields[fi].pointLength.xyz) / max(fieldBlock.fields[fi].axisRadius.w, 1e-6));
+    }
+    if (kind == FIELD_BOX) {
+        let e = abs(q) - fieldBlock.fields[fi].sizeSoftness.xyz;
+        return 1.0 - saturate(max(max(e.x, max(e.y, e.z)), 0.0) / max(fieldBlock.fields[fi].sizeSoftness.w, 1e-6));
+    }
+    if (kind == FIELD_SPHERE) {
+        return 1.0 - saturate((length(q - fieldBlock.fields[fi].pointLength.xyz) - fieldBlock.fields[fi].axisRadius.w) / max(fieldBlock.fields[fi].sizeSoftness.w, 1e-6));
+    }
+    if (kind == FIELD_PLANE) {
+        return saturate(dot(q, fieldAxis(fi)) / max(fieldBlock.fields[fi].sizeSoftness.w, 1e-6));
+    }
+    if (kind == FIELD_NOISE) {
+        return fbm3(q * fieldBlock.fields[fi].freqExpInvertBias.x + fieldNoiseOffset(fi), fieldBlock.fields[fi].seed);
+    }
+    if (kind == FIELD_VORONOI) {
+        return saturate(voronoiF1(q * fieldBlock.fields[fi].freqExpInvertBias.x + fieldNoiseOffset(fi), fieldBlock.fields[fi].seed));
+    }
+    if (kind == FIELD_DISTANCE) {
+        return saturate(length(q - fieldBlock.fields[fi].pointLength.xyz) / max(fieldBlock.fields[fi].axisRadius.w, 1e-6));
+    }
+    if (kind == FIELD_WAVE) {
+        return waveValue(fi, q);
+    }
+    return 0.0; // SdfDistance (unbound on the GPU) and anything unknown
+}
+
+// Direction of a vector kind (before invert and weight), in the field's local frame.
+fn vectorDirection(fi: u32, q: vec3<f32>) -> vec3<f32> {
+    let kind = fieldBlock.fields[fi].kind;
+    let n = fieldAxis(fi);
+    let r = q - fieldBlock.fields[fi].pointLength.xyz;
+    if (kind == FIELD_DIRECTION) {
+        return n;
+    }
+    if (kind == FIELD_RADIAL_VECTOR || kind == FIELD_REPULSOR) {
+        return fieldNormalize(r);
+    }
+    if (kind == FIELD_ATTRACTOR) {
+        return fieldNormalize(-r);
+    }
+    if (kind == FIELD_VORTEX) {
+        return fieldNormalize(cross(n, r));
+    }
+    if (kind == FIELD_CURL_NOISE) {
+        return curlNoise(q * fieldBlock.fields[fi].freqExpInvertBias.x + fieldNoiseOffset(fi), fieldBlock.fields[fi].seed);
+    }
+    if (kind == FIELD_SPIRAL) {
+        return fieldNormalize(fieldNormalize(cross(n, r)) + fieldBlock.fields[fi].freqExpInvertBias.w * fieldNormalize(r));
+    }
+    if (kind == FIELD_WAVE_VECTOR) {
+        return waveValue(fi, q) * waveDirection(fi, q);
+    }
+    return vec3<f32>(0.0);
+}
+
+// Colour of a colour kind (rgb; alpha is the weight, applied by the caller).
+fn colorShape(fi: u32, q: vec3<f32>, a: vec4<f32>, b: vec4<f32>) -> vec3<f32> {
+    let kind = fieldBlock.fields[fi].kind;
+    if (kind == FIELD_CONSTANT_COLOR) {
+        return a.rgb;
+    }
+    if (kind == FIELD_GRADIENT) {
+        return mix(a.rgb, b.rgb, saturate(dot(q, fieldAxis(fi)) / max(fieldBlock.fields[fi].pointLength.w, 1e-6) + 0.5));
+    }
+    if (kind == FIELD_RADIAL_GRADIENT) {
+        return mix(a.rgb, b.rgb, saturate(length(q - fieldBlock.fields[fi].pointLength.xyz) / max(fieldBlock.fields[fi].axisRadius.w, 1e-6)));
+    }
+    if (kind == FIELD_NOISE_COLOR) {
+        return mix(a.rgb, b.rgb, fbm3(q * fieldBlock.fields[fi].freqExpInvertBias.x + fieldNoiseOffset(fi), fieldBlock.fields[fi].seed));
+    }
+    if (kind == FIELD_POSITION_COLOR) {
+        return fract(q * fieldBlock.fields[fi].freqExpInvertBias.x);
+    }
+    return vec3<f32>(0.0);
+}
+
+fn fieldLuminance(c: vec3<f32>) -> f32 {
+    return dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
+}
+
+// ---- one non-compound field, with the cross-type rules -----------------------------------------
+
+// Scalar value of a scalar kind (invert and weight applied).
+fn ownScalar(fi: u32, q: vec3<f32>, w: f32) -> f32 {
+    var v = scalarShape(fi, q);
+    if (fieldBlock.fields[fi].freqExpInvertBias.z > 0.5) {
+        v = 1.0 - v;
+    }
+    return v * w;
+}
+
+// World-space vector of a vector kind (invert and weight applied).
+fn ownVector(fi: u32, q: vec3<f32>, w: f32) -> vec3<f32> {
+    var v = vectorDirection(fi, q);
+    if (fieldBlock.fields[fi].freqExpInvertBias.z > 0.5) {
+        v = -v;
+    }
+    return fieldToWorld(fi, v * w);
+}
+
+// Colour of a colour kind (A/B swapped when inverted), alpha = weight.
+fn ownColor(fi: u32, q: vec3<f32>, w: f32) -> vec4<f32> {
+    var a = fieldBlock.fields[fi].colorA;
+    var b = fieldBlock.fields[fi].colorB;
+    if (fieldBlock.fields[fi].freqExpInvertBias.z > 0.5) {
+        a = fieldBlock.fields[fi].colorB;
+        b = fieldBlock.fields[fi].colorA;
+    }
+    return vec4<f32>(colorShape(fi, q, a, b), w);
+}
+
+fn basicScalar(fi: u32, p: vec3<f32>) -> f32 {
+    let q = fieldLocal(fi, p);
+    let w = fieldWeightOf(fi, q, p);
+    if (fieldBlock.fields[fi].fieldType == FIELD_TYPE_VECTOR) {
+        return length(ownVector(fi, q, w));
+    }
+    if (fieldBlock.fields[fi].fieldType == FIELD_TYPE_COLOR) {
+        let c = ownColor(fi, q, w);
+        return fieldLuminance(c.rgb) * c.a;
+    }
+    return ownScalar(fi, q, w);
+}
+
+fn basicVector(fi: u32, p: vec3<f32>) -> vec3<f32> {
+    let q = fieldLocal(fi, p);
+    let w = fieldWeightOf(fi, q, p);
+    if (fieldBlock.fields[fi].fieldType == FIELD_TYPE_VECTOR) {
+        return ownVector(fi, q, w);
+    }
+    var s = 0.0;
+    if (fieldBlock.fields[fi].fieldType == FIELD_TYPE_COLOR) {
+        let c = ownColor(fi, q, w);
+        s = fieldLuminance(c.rgb) * c.a;
+    } else {
+        s = ownScalar(fi, q, w);
+    }
+    return s * fieldToWorld(fi, fieldAxis(fi));
+}
+
+fn basicColor(fi: u32, p: vec3<f32>) -> vec4<f32> {
+    let q = fieldLocal(fi, p);
+    let w = fieldWeightOf(fi, q, p);
+    if (fieldBlock.fields[fi].fieldType == FIELD_TYPE_COLOR) {
+        return ownColor(fi, q, w);
+    }
+    if (fieldBlock.fields[fi].fieldType == FIELD_TYPE_VECTOR) {
+        return vec4<f32>(ownVector(fi, q, w) * 0.5 + 0.5, w);
+    }
+    let s = ownScalar(fi, q, w);
+    return vec4<f32>(mix(fieldBlock.fields[fi].colorA.rgb, fieldBlock.fields[fi].colorB.rgb, saturate(s)), w);
+}
+
+// ---- compound combination (one level) -----------------------------------------------------------
+
+fn childSlot(fi: u32, c: u32) -> i32 {
+    let slot = fieldBlock.fields[fi].children[c];
+    if (slot < 0 || u32(slot) >= fieldBlock.count) {
+        return -1;
+    }
+    if (fieldBlock.fields[u32(slot)].kind == FIELD_COMPOUND) {
+        return -1; // nested compounds are not supported on the GPU (evaluate as 0)
+    }
+    return slot;
+}
+
+fn combineScalar(fi: u32, p: vec3<f32>) -> f32 {
+    let combine = u32(fieldBlock.fields[fi].noiseCombineMix.z + 0.5);
+    var acc = 0.0;
+    var n = 0u;
+    var first = 0.0;
+    var second = 0.0;
+    for (var c = 0u; c < 4u; c = c + 1u) {
+        let slot = childSlot(fi, c);
+        if (slot < 0) { continue; }
+        let v = basicScalar(u32(slot), p);
+        if (n == 0u) { first = v; }
+        if (n == 1u) { second = v; }
+        if (combine == FIELD_COMBINE_MULTIPLY) {
+            acc = select(acc * v, v, n == 0u);
+        } else if (combine == FIELD_COMBINE_MAX) {
+            acc = select(max(acc, v), v, n == 0u);
+        } else if (combine == FIELD_COMBINE_MIN) {
+            acc = select(min(acc, v), v, n == 0u);
+        } else {
+            acc = acc + v;
+        }
+        n = n + 1u;
+    }
+    if (n == 0u) {
+        return 0.0;
+    }
+    if (combine == FIELD_COMBINE_MIX) {
+        return mix(first, second, fieldBlock.fields[fi].noiseCombineMix.w);
+    }
+    if (combine == FIELD_COMBINE_AVERAGE) {
+        return acc / f32(n);
+    }
+    return acc;
+}
+
+fn combineVector(fi: u32, p: vec3<f32>) -> vec3<f32> {
+    let combine = u32(fieldBlock.fields[fi].noiseCombineMix.z + 0.5);
+    var acc = vec3<f32>(0.0);
+    var n = 0u;
+    var first = vec3<f32>(0.0);
+    var second = vec3<f32>(0.0);
+    for (var c = 0u; c < 4u; c = c + 1u) {
+        let slot = childSlot(fi, c);
+        if (slot < 0) { continue; }
+        let v = basicVector(u32(slot), p);
+        if (n == 0u) { first = v; }
+        if (n == 1u) { second = v; }
+        if (combine == FIELD_COMBINE_MULTIPLY) {
+            acc = select(acc * v, v, n == 0u);
+        } else if (combine == FIELD_COMBINE_MAX) {
+            acc = select(max(acc, v), v, n == 0u);
+        } else if (combine == FIELD_COMBINE_MIN) {
+            acc = select(min(acc, v), v, n == 0u);
+        } else {
+            acc = acc + v;
+        }
+        n = n + 1u;
+    }
+    if (n == 0u) {
+        return vec3<f32>(0.0);
+    }
+    if (combine == FIELD_COMBINE_MIX) {
+        return mix(first, second, fieldBlock.fields[fi].noiseCombineMix.w);
+    }
+    if (combine == FIELD_COMBINE_AVERAGE) {
+        return acc / f32(n);
+    }
+    return acc;
+}
+
+fn combineColor(fi: u32, p: vec3<f32>) -> vec4<f32> {
+    let combine = u32(fieldBlock.fields[fi].noiseCombineMix.z + 0.5);
+    var acc = vec4<f32>(0.0);
+    var n = 0u;
+    var first = vec4<f32>(0.0);
+    var second = vec4<f32>(0.0);
+    for (var c = 0u; c < 4u; c = c + 1u) {
+        let slot = childSlot(fi, c);
+        if (slot < 0) { continue; }
+        let v = basicColor(u32(slot), p);
+        if (n == 0u) { first = v; }
+        if (n == 1u) { second = v; }
+        if (combine == FIELD_COMBINE_MULTIPLY) {
+            acc = select(acc * v, v, n == 0u);
+        } else if (combine == FIELD_COMBINE_MAX) {
+            acc = select(max(acc, v), v, n == 0u);
+        } else if (combine == FIELD_COMBINE_MIN) {
+            acc = select(min(acc, v), v, n == 0u);
+        } else {
+            acc = acc + v;
+        }
+        n = n + 1u;
+    }
+    if (n == 0u) {
+        return vec4<f32>(0.0);
+    }
+    if (combine == FIELD_COMBINE_MIX) {
+        return mix(first, second, fieldBlock.fields[fi].noiseCombineMix.w);
+    }
+    if (combine == FIELD_COMBINE_AVERAGE) {
+        return acc / f32(n);
+    }
+    return acc;
+}
+
+// ---- public API ---------------------------------------------------------------------------------
+
+fn fieldValid(i: i32) -> bool {
+    return i >= 0 && u32(i) < fieldBlock.count;
+}
+
+// strength * falloff at p (0 for an invalid slot).
+fn fieldWeight(i: i32, p: vec3<f32>) -> f32 {
+    if (!fieldValid(i)) {
+        return 0.0;
+    }
+    let fi = u32(i);
+    return fieldWeightOf(fi, fieldLocal(fi, p), p);
+}
+
+fn fieldScalar(i: i32, p: vec3<f32>) -> f32 {
+    if (!fieldValid(i)) {
+        return 0.0;
+    }
+    let fi = u32(i);
+    if (fieldBlock.fields[fi].kind == FIELD_COMPOUND) {
+        return combineScalar(fi, p) * fieldWeightOf(fi, fieldLocal(fi, p), p);
+    }
+    return basicScalar(fi, p);
+}
+
+fn fieldVector(i: i32, p: vec3<f32>) -> vec3<f32> {
+    if (!fieldValid(i)) {
+        return vec3<f32>(0.0);
+    }
+    let fi = u32(i);
+    if (fieldBlock.fields[fi].kind == FIELD_COMPOUND) {
+        return combineVector(fi, p) * fieldWeightOf(fi, fieldLocal(fi, p), p);
+    }
+    return basicVector(fi, p);
+}
+
+fn fieldColor(i: i32, p: vec3<f32>) -> vec4<f32> {
+    if (!fieldValid(i)) {
+        return vec4<f32>(0.0);
+    }
+    let fi = u32(i);
+    if (fieldBlock.fields[fi].kind == FIELD_COMPOUND) {
+        return combineColor(fi, p) * fieldWeightOf(fi, fieldLocal(fi, p), p);
+    }
+    return basicColor(fi, p);
+}
+
+// The FieldType of a slot (scalar for invalid slots).
+fn fieldTypeOf(i: i32) -> u32 {
+    if (!fieldValid(i)) {
+        return FIELD_TYPE_SCALAR;
+    }
+    return fieldBlock.fields[u32(i)].fieldType;
+}

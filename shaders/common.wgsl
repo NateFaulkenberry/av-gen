@@ -15,6 +15,8 @@ struct FrameUniforms {
     viewProj: mat4x4<f32>,
     invViewProj: mat4x4<f32>,
     cameraPos: vec4<f32>,      // xyz = world position
+    cameraRight: vec4<f32>,    // xyz = camera right axis in world space (billboards)
+    cameraUp: vec4<f32>,       // xyz = camera up axis in world space
     params: vec4<f32>,         // x = time, y = gridIntensity, z = brightness, w = environmentIntensity
     envParams: vec4<f32>,      // x = env rotation (radians), y = prefiltered mip count - 1, z = light count, w = ibl enabled
     skyParams: vec4<f32>,      // rgb = background colour, w = skybox blur 0..1

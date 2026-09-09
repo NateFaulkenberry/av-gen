@@ -19,6 +19,13 @@
 //                       slot - r; deadList[slot - r] = slot. Both lists are therefore in slot order.
 //   Render: vs_particle reads aliveList[instance_index], so instances are drawn in slot order.
 // Randomness is a hash of (slot, frameIndex, seed, salt) - deterministic for a frame sequence.
+//
+// Field forces (ADR-025): params.fieldForces holds up to 4 (mode, slot, strength, mix) + (axis, 0)
+// pairs sampled from the FieldBlock (binding 8, fields.wgsl) at the particle position after the
+// built-in forces: Force / Turbulence add fieldVector * strength * dt to the velocity, Velocity
+// blends the velocity towards fieldVector * strength by `mix`, Kill removes the particle where
+// fieldScalar >= 0.5. Scalar fields act along the force's axis (fieldScalar * axis).
+#include "fields.wgsl"
 
 struct Particle {
     position: vec3<f32>,
@@ -46,6 +53,8 @@ struct Params {
     colorEnd: vec4<f32>,
     sim: vec4<f32>,         // dt, time, frameIndex, seed
     counts: vec4<u32>,      // emitCount, capacity, blend (0 additive, 1 alpha), scan blocks
+    fieldInfo: vec4<u32>,   // x = field force count
+    fieldForces: array<vec4<f32>, 8>, // per force: (mode, slot, strength, mix), (axis.xyz, 0)
 };
 
 // Plain values: written by one thread of cs_scan_top, read by cs_emit the next frame.
@@ -71,20 +80,15 @@ struct Indirect {
 @group(0) @binding(5) var<storage, read_write> indirect: Indirect;
 @group(0) @binding(6) var<storage, read_write> flags: array<u32>;     // 1 = alive after simulate
 @group(0) @binding(7) var<storage, read_write> blockSums: array<u32>; // per scan block
+@group(0) @binding(8) var<uniform> fieldBlock: FieldBlock;
 // Read-only views for the render stage (same bindings, used only by vs_particle).
 @group(0) @binding(1) var<storage, read> particlesRead: array<Particle>;
 @group(0) @binding(4) var<storage, read> aliveRead: array<u32>;
 
 // ---- hashing / noise ----------------------------------------------------------------------
 
-fn pcg3d(vIn: vec3<u32>) -> vec3<u32> {
-    var v = vIn * 1664525u + 1013904223u;
-    v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
-    v ^= v >> vec3<u32>(16u);
-    v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
-    return v;
-}
-
+// pcg3d comes from noise.wgsl (through fields.wgsl); the built-in turbulence keeps its own
+// hash3-based value noise (turbValueNoise / turbCurl) so existing scenes stay bit-identical.
 fn rand3(slot: u32, frame: u32, salt: u32) -> vec3<f32> {
     let h = pcg3d(vec3<u32>(slot, frame + u32(params.sim.w) * 7919u, salt));
     return vec3<f32>(h) * (1.0 / 4294967296.0);
@@ -97,7 +101,7 @@ fn hash3(p: vec3<f32>) -> f32 {
     return fract((r.x + r.y) * r.z);
 }
 
-fn valueNoise(p: vec3<f32>) -> f32 {
+fn turbValueNoise(p: vec3<f32>) -> f32 {
     let i = floor(p);
     let f = fract(p);
     let u = f * f * (3.0 - 2.0 * f);
@@ -115,10 +119,10 @@ fn valueNoise(p: vec3<f32>) -> f32 {
 
 // Three decorrelated potentials; curl of the potential field is divergence-free (Bridson 2007).
 fn potential(p: vec3<f32>) -> vec3<f32> {
-    return vec3<f32>(valueNoise(p), valueNoise(p + vec3<f32>(31.4, 47.1, 12.9)), valueNoise(p + vec3<f32>(-17.2, 5.3, 29.8))) - vec3<f32>(0.5);
+    return vec3<f32>(turbValueNoise(p), turbValueNoise(p + vec3<f32>(31.4, 47.1, 12.9)), turbValueNoise(p + vec3<f32>(-17.2, 5.3, 29.8))) - vec3<f32>(0.5);
 }
 
-fn curlNoise(p: vec3<f32>) -> vec3<f32> {
+fn turbCurl(p: vec3<f32>) -> vec3<f32> {
     let e = 0.05;
     let dx = potential(p + vec3<f32>(e, 0.0, 0.0)) - potential(p - vec3<f32>(e, 0.0, 0.0));
     let dy = potential(p + vec3<f32>(0.0, e, 0.0)) - potential(p - vec3<f32>(0.0, e, 0.0));
@@ -196,7 +200,7 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
     let turbStrength = params.gravity.w;
     if (turbStrength > 0.0) {
         let np = p.position * params.turb.x + vec3<f32>(0.0, 0.0, params.sim.y * params.turb.y);
-        force += curlNoise(np) * turbStrength;
+        force += turbCurl(np) * turbStrength;
     }
     let toA = params.attractor.xyz - p.position;
     let dist = length(toA) + 1e-4;
@@ -206,6 +210,36 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
     let tangent = cross(vec3<f32>(0.0, 1.0, 0.0), dirA);
     force += tangent * params.attractor2.y * falloff;
     p.velocity += force * dt;
+    // field forces (in order; a Kill force ends the particle here)
+    let fieldCount = min(params.fieldInfo.x, 4u);
+    for (var k = 0u; k < 4u; k = k + 1u) {
+        if (k >= fieldCount) { break; }
+        let a = params.fieldForces[k * 2u];
+        let axis = params.fieldForces[k * 2u + 1u].xyz;
+        let mode = u32(a.x + 0.5);
+        let fslot = i32(floor(a.y + 0.5));
+        if (fslot < 0) { continue; }
+        if (mode == 3u) { // kill
+            if (fieldScalar(fslot, p.position) >= 0.5) {
+                p.life = 0.0;
+                particles[slot] = p;
+                flags[slot] = 0u;
+                return;
+            }
+            continue;
+        }
+        var fv: vec3<f32>;
+        if (fieldTypeOf(fslot) == FIELD_TYPE_VECTOR) {
+            fv = fieldVector(fslot, p.position);
+        } else {
+            fv = fieldScalar(fslot, p.position) * axis;
+        }
+        if (mode == 1u) { // velocity
+            p.velocity = mix(p.velocity, fv * a.z, a.w);
+        } else {          // force / turbulence
+            p.velocity += fv * (a.z * dt);
+        }
+    }
     p.velocity *= max(0.0, 1.0 - params.direction.w * dt);
     p.position += p.velocity * dt;
     particles[slot] = p;
