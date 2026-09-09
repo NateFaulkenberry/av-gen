@@ -43,6 +43,7 @@ std::string usageText() {
            "  --input [name]      analyse a live capture device (substring of its name; default device)\n"
            "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
            "  --list-audio-devices, --list-midi   enumerate inputs and exit\n"
+           "  --output <d>[:fullscreen|:WxH]      add an output window on display index <d> (repeatable)\n"
            "  --shader <file>     add a user shader layer behind the scene (repeatable)\n"
            "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
            "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
@@ -98,6 +99,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             } catch (const std::exception&) {
                 return fail("--osc-port expects an integer");
             }
+            ++i;
+        } else if (arg == "--output") {
+            auto v = need(i, "--output");
+            if (!v) return std::unexpected(v.error());
+            options.outputs.push_back(*v);
             ++i;
         } else if (arg == "--list-audio-devices") {
             options.listAudioDevices = true;
@@ -269,6 +275,10 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
 
     shaders_ = std::make_unique<gpu::ShaderLibrary>(*context_, gpu::ShaderLibrary::defaultSearchDirs(executablePath));
     renderer_ = std::make_unique<rendering::SceneRenderer>(*context_, *shaders_);
+    mapper_ = std::make_unique<rendering::OutputMapper>(*context_, *shaders_);
+    if (auto r = mapper_->init(); !r) {
+        return r;
+    }
     if (auto r = renderer_->init(); !r) {
         return std::unexpected(r.error());
     }
@@ -338,6 +348,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->onAddGltfNode = addAssetNode(scene::NodeKind::Gltf, platform::Window::DialogKind::Scene);
         panel_->onAddSceneNode = addAssetNode(scene::NodeKind::Scene, platform::Window::DialogKind::Any);
         auto saveTo = [this](const std::filesystem::path& path) {
+            storeOutputsToProject();
             if (auto r = engine_->saveProject(path); !r) {
                 log::error("save project: {}", r.error().message);
                 panel_->setStatus(r.error().message);
@@ -418,6 +429,13 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                 return;
             }
             job_ = std::move(*job);
+        };
+        panel_->outputs = &outputs_;
+        panel_->onOutputsChanged = [this] {
+            if (auto r = outputs_.open(*context_, *shaders_); !r) {
+                panel_->setStatus(r.error().message);
+            }
+            storeOutputsToProject();
         };
         panel_->onUseAudioInput = [this](const std::string& name) {
             if (auto r = engine_->useAudioInput(name); !r) {
@@ -515,6 +533,36 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             log::warn("autoplay: {}", r.error().message);
         }
     }
+    if (!options.headless) {
+        // Output windows from the project, then from --output flags (ADR-022).
+        applyOutputsFromProject();
+        for (const auto& spec : options.outputs) {
+            OutputDesc desc;
+            desc.name = "output" + std::to_string(outputs_.outputs().size() + 1);
+            try {
+                desc.display = std::stoi(spec.substr(0, spec.find(':')));
+                if (const auto colon = spec.find(':'); colon != std::string::npos) {
+                    const std::string opt = spec.substr(colon + 1);
+                    if (opt == "fullscreen") {
+                        desc.fullscreen = true;
+                    } else if (const auto x = opt.find('x'); x != std::string::npos) {
+                        desc.width = static_cast<std::uint32_t>(std::max(1, std::stoi(opt.substr(0, x))));
+                        desc.height = static_cast<std::uint32_t>(std::max(1, std::stoi(opt.substr(x + 1))));
+                    }
+                }
+            } catch (const std::exception&) {
+                log::error("--output expects <display>[:fullscreen|:WxH], got '{}'", spec);
+                continue;
+            }
+            if (auto r = outputs_.add(desc); !r) {
+                log::error("output: {}", r.error().message);
+            }
+        }
+        if (auto r = outputs_.open(*context_, *shaders_); !r) {
+            log::warn("outputs: {}", r.error().message);
+        }
+        storeOutputsToProject();
+    }
     return {};
 }
 
@@ -554,6 +602,35 @@ void Application::loadAny(const std::filesystem::path& path) {
     }
 }
 
+Result<void> Application::ensureFinalTexture(std::uint32_t width, std::uint32_t height) {
+    if (finalTexture_ && finalWidth_ == width && finalHeight_ == height) {
+        return {};
+    }
+    wgpu::TextureDescriptor desc{};
+    desc.label = "final";
+    desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc;
+    desc.dimension = wgpu::TextureDimension::e2D;
+    desc.size = {width, height, 1};
+    desc.format = wgpu::TextureFormat::BGRA8Unorm;
+    finalTexture_ = context_->device().CreateTexture(&desc);
+    if (!finalTexture_) {
+        return fail("cannot create the {}x{} final texture", width, height);
+    }
+    finalView_ = finalTexture_.CreateView();
+    finalWidth_ = width;
+    finalHeight_ = height;
+    return {};
+}
+
+void Application::applyOutputsFromProject() {
+    outputs_.closeAll();
+    if (auto r = outputs_.fromJson(engine_->outputsJson()); !r) {
+        log::warn("outputs: {}", r.error().message);
+    }
+}
+
+void Application::storeOutputsToProject() { engine_->setOutputsJson(outputs_.toJson()); }
+
 void Application::startRenderFromUi() {
     if (job_) {
         return;
@@ -582,6 +659,12 @@ void Application::startRenderFromUi() {
 }
 
 void Application::rememberProject(const std::filesystem::path& path) {
+    if (context_ && shaders_) {
+        applyOutputsFromProject();
+        if (auto r = outputs_.open(*context_, *shaders_); !r) {
+            log::warn("outputs: {}", r.error().message);
+        }
+    }
     recent_.add(path);
     if (auto r = recent_.save(); !r) {
         log::warn("recent files: {}", r.error().message);
@@ -662,6 +745,7 @@ void stressStep(Engine& engine, Rng& rng, std::uint64_t frame) {
 int Application::run() {
     const int code = options_.headless ? runHeadless() : runLive();
     if (options_.saveProject) {
+        storeOutputsToProject();
         if (auto r = engine_->saveProject(*options_.saveProject); !r) {
             log::error("save project: {}", r.error().message);
             return code == 0 ? 6 : code;
@@ -692,6 +776,10 @@ int Application::runLive() {
     for (;;) {
         const auto frameStart = std::chrono::steady_clock::now();
         auto events = window_->pollEvents([this](const SDL_Event& event) {
+            // Output windows share the SDL queue; only the main window's input reaches ImGui.
+            if (SDL_Window* from = SDL_GetWindowFromEvent(&event); from != nullptr && from != window_->handle()) {
+                return;
+            }
             imgui_->processEvent(event);
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && !imgui_->wantsKeyboard()) {
                 if (event.key.key == SDLK_SPACE) {
@@ -774,12 +862,26 @@ int Application::runLive() {
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
             continue;
         }
-        gpu::TargetView target{*view, context_->surfaceFormat(), window_->pixelWidth(), window_->pixelHeight()};
+        const std::uint32_t pw = window_->pixelWidth();
+        const std::uint32_t ph = window_->pixelHeight();
+        if (auto r = ensureFinalTexture(pw, ph); !r) {
+            log::error("final texture: {}", r.error().message);
+            return 2;
+        }
+        // The frame renders into the offscreen final texture; the main window and every output
+        // present it through the output mapper (ADR-022).
+        gpu::TargetView finalTarget{finalView_, wgpu::TextureFormat::BGRA8Unorm, pw, ph};
+        gpu::TargetView target{*view, context_->surfaceFormat(), pw, ph};
         wgpu::CommandEncoder encoder = context_->device().CreateCommandEncoder();
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
-        if (auto r = renderer_->render(encoder, engine_->scene(), time, target, &shaderInputs); !r) {
+        if (auto r = renderer_->render(encoder, engine_->scene(), time, finalTarget, &shaderInputs); !r) {
             log::error("render: {}", r.error().message);
+            return 2;
+        }
+        if (auto r = mapper_->draw(encoder, finalView_, *view, pw, ph, rendering::OutputMapping::identity(),
+                                   context_->surfaceFormat()); !r) {
+            log::error("present: {}", r.error().message);
             return 2;
         }
         imgui_->render(encoder, target);
@@ -788,6 +890,12 @@ int Application::runLive() {
         renderer_->timer().collect();
         const auto workEnd = std::chrono::steady_clock::now();
         context_->present();
+        if (outputs_.openCount() > 0) {
+            if (auto r = outputs_.presentAll(*context_, finalTexture_, pw, ph); !r) {
+                log::warn("outputs: {}", r.error().message);
+            }
+        }
+        outputs_.pumpEvents();
         context_->processEvents();
 
         const auto frameEnd = std::chrono::steady_clock::now();

@@ -6,7 +6,11 @@
 #include "app/engine.hpp"
 #include "app/recent_files.hpp"
 #include "app/render_job.hpp"
+#include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
+#include "rendering/output_mapper.hpp"
+
+#include <webgpu/webgpu_cpp.h>
 #include "core/error.hpp"
 #include "core/file_watcher.hpp"
 #include "core/log.hpp"
@@ -65,6 +69,7 @@ struct AppOptions {
     std::optional<int> oscPort;
     bool listAudioDevices = false;
     bool listMidi = false;
+    std::vector<std::string> outputs; // --output <display>[:fullscreen|:WxH]
     std::uint32_t width = 1440;
     std::uint32_t height = 900;
     log::Level logLevel = log::Level::Info;
@@ -94,6 +99,11 @@ private:
                                                                    RenderSettings settings);
     int runQueue(const std::filesystem::path& queueFile);
     void startRenderFromUi();
+    // Outputs (1.2): keeps the offscreen final texture sized to the main window, (re)opens the
+    // output windows from the engine's project block, and stores them back before saves.
+    [[nodiscard]] Result<void> ensureFinalTexture(std::uint32_t width, std::uint32_t height);
+    void applyOutputsFromProject();
+    void storeOutputsToProject();
     Result<void> captureFrame(const FrameTime& time, const std::filesystem::path& path);
 
     AppOptions options_;
@@ -103,6 +113,12 @@ private:
     std::deque<std::pair<std::filesystem::path, RenderSettings>> uiQueue_;
     std::filesystem::path renderProjectTemp_;
     RenderProgress lastRender_;
+    std::unique_ptr<rendering::OutputMapper> mapper_;
+    OutputManager outputs_;
+    wgpu::Texture finalTexture_;
+    wgpu::TextureView finalView_;
+    std::uint32_t finalWidth_ = 0;
+    std::uint32_t finalHeight_ = 0;
     std::unique_ptr<platform::Window> window_;
     std::unique_ptr<gpu::Context> context_;
     std::unique_ptr<gpu::ShaderLibrary> shaders_;

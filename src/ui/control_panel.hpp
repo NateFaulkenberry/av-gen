@@ -6,6 +6,7 @@
 
 #include "app/engine.hpp"
 #include "app/render_job.hpp"
+#include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
 #include "rendering/scene_renderer.hpp"
 
@@ -59,6 +60,11 @@ public:
     std::function<void()> onChooseRenderOutput;
     std::function<void(const std::string&)> onUseAudioInput; // "" = default device
     std::function<void()> onStopAudioInput;
+    // Outputs (1.2): the host owns the OutputManager; the tab edits descriptors and asks to reopen.
+    app::OutputManager* outputs = nullptr;
+    std::function<void()> onOutputsChanged; // re-open windows after add/remove/edit
+    std::string shareStatus;                // describe() + live stats from the host
+    std::function<void(const std::string&, const std::string&)> onShare; // kind ("syphon"/"ndi"/"off"), name
     std::function<app::RenderProgress()> renderProgress; // empty when no job is running
     std::size_t queuedRenders = 0;
     std::string videoBackends; // describeVideoBackends()
@@ -84,6 +90,7 @@ private:
     void drawTimelineTab(app::Engine& engine);
     void drawRender(app::Engine& engine);
     void drawControlTab(app::Engine& engine);
+    void drawOutputsTab(app::Engine& engine);
 
     bool showDemo_ = false;
     bool showParameters_ = true;
@@ -107,6 +114,10 @@ private:
     int learnTarget_ = 0;
     bool learnAsEvent_ = false;
     int inputDevice_ = 0;
+    int newOutputDisplay_ = 0;
+    bool newOutputFullscreen_ = true;
+    char shareName_[64] = "avgen";
+    int shareKind_ = 0;
     int morphA_ = 0;
     int morphB_ = 0;
     float morphT_ = 0.0f;

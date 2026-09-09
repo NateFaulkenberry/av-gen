@@ -274,6 +274,9 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
     }
     doc["render"] = render_.toJson();
     doc["control"] = controlHub_.map().toJson();
+    if (outputs_.is_array() && !outputs_.empty()) {
+        doc["outputs"] = outputs_;
+    }
     nlohmann::json assets = nlohmann::json::object();
     if (!audioPath_.empty()) {
         assets["audio"] = relativeTo(audioPath_, dir);
@@ -422,6 +425,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     } else {
         controlHub_.setMap(control::ControlMap{});
     }
+    outputs_ = doc.contains("outputs") && doc["outputs"].is_array() ? doc["outputs"] : nlohmann::json::array();
     ensureControlSource();
     sources_.attach(bus_, params_);
     if (doc.contains("shaders")) {
@@ -480,6 +484,7 @@ void Engine::newProject() {
     post_ = scene::PostSettings{};
     render_ = RenderSettings{};
     controlHub_.setMap(control::ControlMap{});
+    outputs_ = nlohmann::json::array();
     ensureControlSource();
     sources_.attach(bus_, params_);
     modulator_.masterGain = 1.0f;

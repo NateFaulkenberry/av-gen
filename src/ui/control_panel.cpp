@@ -4,6 +4,7 @@
 
 #include "audio/audio_input.hpp"
 #include "control/midi.hpp"
+#include "platform/window.hpp"
 
 #include <imgui.h>
 #include <implot.h>
@@ -173,6 +174,10 @@ void ControlPanel::drawModulation(app::Engine& engine) {
         }
         if (ImGui::BeginTabItem("Control")) {
             drawControlTab(engine);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Outputs")) {
+            drawOutputsTab(engine);
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
@@ -900,6 +905,23 @@ void ControlPanel::drawTimelineTab(app::Engine& engine) {
                 const double now = track.localTime(clock.at(track.timeBase));
                 const double nowX[1] = {now};
                 ImPlot::PlotInfLines("now", nowX, 1);
+                // Curve editor: every key (component 0) is a draggable point; time re-sorts on
+                // release so the curve stays a function of time while dragging.
+                bool dragging = false;
+                for (std::size_t k = 0; k < track.keys.size(); ++k) {
+                    auto& key = track.keys[k];
+                    double kx = key.time;
+                    double ky = static_cast<double>(key.value[0]);
+                    bool held = false;
+                    if (ImPlot::DragPoint(static_cast<int>(k), &kx, &ky, ImVec4(1.0f, 0.75f, 0.3f, 1.0f), 6.0f, ImPlotDragToolFlags_None, nullptr, nullptr, &held)) {
+                        key.time = std::max(0.0, kx);
+                        key.value[0] = static_cast<float>(ky);
+                    }
+                    dragging = dragging || held;
+                }
+                if (!dragging && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                    track.sortKeys();
+                }
                 ImPlot::EndPlot();
             }
             int removeKey = -1;
@@ -1222,18 +1244,67 @@ void ControlPanel::drawControlTab(app::Engine& engine) {
     // ---- bindings ----
     ImGui::Text("Bindings: %zu MIDI, %zu OSC (applied %llu, unmatched %llu)", map.midi.size(), map.osc.size(),
                 static_cast<unsigned long long>(status.applied), static_cast<unsigned long long>(status.unmatched));
+    static const char* bindKinds[] = {"cc", "note", "noteEvent", "pitchBend", "pressure", "program"};
+    auto targetEditor = [&](control::BindingTarget& t) {
+        char sig[64];
+        std::snprintf(sig, sizeof(sig), "%s", t.signal.c_str());
+        ImGui::SetNextItemWidth(90);
+        if (ImGui::InputText("signal", sig, sizeof(sig))) {
+            t.signal = sig;
+        }
+        ImGui::SameLine();
+        int current = 0;
+        for (int i = 1; i < static_cast<int>(targets.size()); ++i) {
+            if (t.parameter == targets[static_cast<std::size_t>(i)]) {
+                current = i;
+            }
+        }
+        ImGui::SetNextItemWidth(170);
+        if (ImGui::Combo("param", &current, targets.data(), static_cast<int>(targets.size()))) {
+            t.parameter = current > 0 ? targets[static_cast<std::size_t>(current)] : "";
+        }
+        if (!t.parameter.empty()) {
+            ImGui::SameLine();
+            float range[2] = {t.min, t.max};
+            ImGui::SetNextItemWidth(110);
+            if (ImGui::DragFloat2("range", range, 0.01f)) {
+                t.min = range[0];
+                t.max = range[1];
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(40);
+            ImGui::InputInt("comp", &t.component, 0, 0);
+            t.component = std::clamp(t.component, -1, 3);
+        }
+    };
     int removeMidi = -1;
     for (std::size_t i = 0; i < map.midi.size(); ++i) {
         auto& b = map.midi[i];
         ImGui::PushID(static_cast<int>(i));
-        ImGui::Text("MIDI %s ch %d #%d%s -> %s%s%s", control::midiBindKindName(b.kind), b.channel, b.number,
-                    b.toggle ? " toggle" : "", b.target.signal.empty() ? "" : ("control." + b.target.signal).c_str(),
-                    (!b.target.signal.empty() && !b.target.parameter.empty()) ? " + " : "",
-                    b.target.parameter.c_str());
+        int kind = static_cast<int>(b.kind);
+        ImGui::SetNextItemWidth(90);
+        if (ImGui::Combo("##kind", &kind, bindKinds, 6)) {
+            b.kind = static_cast<control::MidiBindKind>(kind);
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(40);
+        ImGui::InputInt("ch", &b.channel, 0, 0);
+        b.channel = std::clamp(b.channel, -1, 15);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(40);
+        ImGui::InputInt("#", &b.number, 0, 0);
+        b.number = std::clamp(b.number, -1, 127);
+        if (b.kind == control::MidiBindKind::Note) {
+            ImGui::SameLine();
+            ImGui::Checkbox("toggle", &b.toggle);
+        }
         ImGui::SameLine();
         if (ImGui::SmallButton("x")) {
             removeMidi = static_cast<int>(i);
         }
+        ImGui::Indent();
+        targetEditor(b.target);
+        ImGui::Unindent();
         ImGui::PopID();
     }
     if (removeMidi >= 0) {
@@ -1243,13 +1314,32 @@ void ControlPanel::drawControlTab(app::Engine& engine) {
     for (std::size_t i = 0; i < map.osc.size(); ++i) {
         auto& b = map.osc[i];
         ImGui::PushID(1000 + static_cast<int>(i));
-        ImGui::Text("OSC %s [%d]%s -> %s%s%s", b.address.c_str(), b.argIndex, b.event ? " event" : "",
-                    b.target.signal.empty() ? "" : ("control." + b.target.signal).c_str(),
-                    (!b.target.signal.empty() && !b.target.parameter.empty()) ? " + " : "", b.target.parameter.c_str());
+        char addr[128];
+        std::snprintf(addr, sizeof(addr), "%s", b.address.c_str());
+        ImGui::SetNextItemWidth(160);
+        if (ImGui::InputText("OSC", addr, sizeof(addr))) {
+            b.address = addr;
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(40);
+        ImGui::InputInt("arg", &b.argIndex, 0, 0);
+        b.argIndex = std::clamp(b.argIndex, 0, 15);
+        ImGui::SameLine();
+        ImGui::Checkbox("event", &b.event);
+        ImGui::SameLine();
+        float in[2] = {b.inMin, b.inMax};
+        ImGui::SetNextItemWidth(110);
+        if (ImGui::DragFloat2("in", in, 0.5f)) {
+            b.inMin = in[0];
+            b.inMax = in[1];
+        }
         ImGui::SameLine();
         if (ImGui::SmallButton("x")) {
             removeOsc = static_cast<int>(i);
         }
+        ImGui::Indent();
+        targetEditor(b.target);
+        ImGui::Unindent();
         ImGui::PopID();
     }
     if (removeOsc >= 0) {
@@ -1257,6 +1347,135 @@ void ControlPanel::drawControlTab(app::Engine& engine) {
     }
     ImGui::TextDisabled("direct OSC: %s/param/<path> f, /signal/<ch> f, /pulse/<ch>, /preset/recall s, /transport/play",
                         map.oscPrefix.c_str());
+}
+
+
+void ControlPanel::drawOutputsTab(app::Engine& /*engine*/) {
+    if (outputs == nullptr) {
+        ImGui::TextDisabled("outputs unavailable");
+        return;
+    }
+    const auto displays = platform::Window::displays();
+    std::vector<std::string> displayLabels;
+    std::vector<const char*> displayNames;
+    for (const auto& d : displays) {
+        displayLabels.push_back(fmt::format("{}: {} ({}x{} @ {:.0f} Hz{})", d.index, d.name, d.width, d.height,
+                                            static_cast<double>(d.refreshRate), d.primary ? ", primary" : ""));
+    }
+    for (const auto& l : displayLabels) {
+        displayNames.push_back(l.c_str());
+    }
+    newOutputDisplay_ = std::clamp(newOutputDisplay_, 0, std::max(0, static_cast<int>(displayNames.size()) - 1));
+    ImGui::SetNextItemWidth(260);
+    ImGui::Combo("##display", &newOutputDisplay_, displayNames.data(), static_cast<int>(displayNames.size()));
+    ImGui::SameLine();
+    ImGui::Checkbox("fullscreen", &newOutputFullscreen_);
+    ImGui::SameLine();
+    if (ImGui::Button("Add output") && !displays.empty()) {
+        app::OutputDesc desc;
+        desc.name = "output" + std::to_string(outputs->outputs().size() + 1);
+        desc.display = displays[static_cast<std::size_t>(newOutputDisplay_)].index;
+        desc.fullscreen = newOutputFullscreen_;
+        if (auto r = outputs->add(desc); !r) {
+            status_ = r.error().message;
+        } else if (onOutputsChanged) {
+            onOutputsChanged();
+        }
+    }
+    ImGui::Separator();
+    std::string removeName;
+    bool changed = false;
+    for (auto& out : outputs->outputs()) {
+        auto& d = out->desc;
+        ImGui::PushID(d.name.c_str());
+        const bool open = ImGui::TreeNodeEx(d.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen, "%s  display %d%s  %s%s", d.name.c_str(),
+                                            d.display, d.fullscreen ? " fullscreen" : "", out->open() ? "open" : "closed",
+                                            out->lastError.empty() ? "" : "  !");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 24);
+        if (ImGui::SmallButton("x")) {
+            removeName = d.name;
+        }
+        if (open) {
+            if (!out->lastError.empty()) {
+                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", out->lastError.c_str());
+            }
+            changed |= ImGui::Checkbox("enabled", &d.enabled);
+            ImGui::SameLine();
+            changed |= ImGui::Checkbox("fullscreen", &d.fullscreen);
+            ImGui::SameLine();
+            changed |= ImGui::Checkbox("borderless", &d.borderless);
+            ImGui::SameLine();
+            changed |= ImGui::Checkbox("on top", &d.alwaysOnTop);
+            ImGui::SetNextItemWidth(60);
+            changed |= ImGui::InputInt("display", &d.display, 0, 0);
+            ImGui::SameLine();
+            int size[2] = {static_cast<int>(d.width), static_cast<int>(d.height)};
+            ImGui::SetNextItemWidth(140);
+            if (ImGui::InputInt2("size", size)) {
+                d.width = static_cast<std::uint32_t>(std::clamp(size[0], 16, 16384));
+                d.height = static_cast<std::uint32_t>(std::clamp(size[1], 16, 16384));
+                changed = true;
+            }
+            // Mapping: crop, warp corners, blend, colour. Edits apply live (no reopen needed).
+            auto& m = d.mapping;
+            float crop[4] = {m.crop.x, m.crop.y, m.crop.w, m.crop.h};
+            if (ImGui::DragFloat4("crop x y w h", crop, 0.002f, 0.0f, 1.0f)) {
+                m.crop = {crop[0], crop[1], std::max(0.001f, crop[2]), std::max(0.001f, crop[3])};
+            }
+            static const char* cornerNames[] = {"top-left", "top-right", "bottom-right", "bottom-left"};
+            for (int c = 0; c < 4; ++c) {
+                float xy[2] = {m.corners[static_cast<std::size_t>(c)].x, m.corners[static_cast<std::size_t>(c)].y};
+                ImGui::SetNextItemWidth(160);
+                if (ImGui::DragFloat2(cornerNames[c], xy, 0.002f, -0.5f, 1.5f)) {
+                    m.corners[static_cast<std::size_t>(c)] = {xy[0], xy[1]};
+                }
+            }
+            float blend[4] = {m.blend.left, m.blend.right, m.blend.top, m.blend.bottom};
+            if (ImGui::DragFloat4("blend l r t b", blend, 0.002f, 0.0f, 0.5f)) {
+                m.blend = {blend[0], blend[1], blend[2], blend[3]};
+            }
+            ImGui::SetNextItemWidth(90);
+            ImGui::DragFloat("blend gamma", &m.blendGamma, 0.01f, 0.1f, 5.0f);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(90);
+            ImGui::DragFloat("brightness", &m.brightness, 0.01f, 0.0f, 4.0f);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(90);
+            ImGui::DragFloat("gamma", &m.gamma, 0.01f, 0.2f, 4.0f);
+            ImGui::Checkbox("flip X", &m.flipX);
+            ImGui::SameLine();
+            ImGui::Checkbox("flip Y", &m.flipY);
+            ImGui::SameLine();
+            if (ImGui::SmallButton("reset mapping")) {
+                m = rendering::OutputMapping::identity();
+            }
+            ImGui::TextDisabled("%llu frames presented", static_cast<unsigned long long>(out->framesPresented));
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+    if (!removeName.empty()) {
+        outputs->remove(removeName);
+        changed = true;
+    }
+    if (changed && onOutputsChanged) {
+        onOutputsChanged();
+    }
+    ImGui::Separator();
+    ImGui::TextUnformatted("Share");
+    static const char* shareKinds[] = {"off", "syphon", "ndi"};
+    ImGui::SetNextItemWidth(90);
+    ImGui::Combo("##sharekind", &shareKind_, shareKinds, 3);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(140);
+    ImGui::InputText("name", shareName_, sizeof(shareName_));
+    ImGui::SameLine();
+    if (ImGui::Button("Apply") && onShare) {
+        onShare(shareKinds[shareKind_], shareName_);
+    }
+    if (!shareStatus.empty()) {
+        ImGui::TextWrapped("%s", shareStatus.c_str());
+    }
 }
 
 } // namespace avgen::ui

@@ -30,6 +30,8 @@
 #include "signals/signal_bus.hpp"
 #include "signals/source.hpp"
 
+#include <nlohmann/json.hpp>
+
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -138,6 +140,11 @@ public:
     [[nodiscard]] bool hasLiveInput() const { return input_ != nullptr; }
     [[nodiscard]] audio::AudioInput* audioInput() { return input_.get(); }
 
+    // ---- outputs (milestone 1.2): the application owns the windows; the engine only carries the
+    // project's "outputs" block so it saves and loads with everything else ----
+    [[nodiscard]] const nlohmann::json& outputsJson() const { return outputs_; }
+    void setOutputsJson(nlohmann::json outputs) { outputs_ = std::move(outputs); }
+
     // ---- offline render settings (milestone 1.0), saved in the project under "render" ----
     [[nodiscard]] RenderSettings& renderSettings() { return render_; }
     [[nodiscard]] const RenderSettings& renderSettings() const { return render_; }
@@ -233,6 +240,7 @@ private:
     params::Timeline timeline_;
     RenderSettings render_;
     ControlHub controlHub_;
+    nlohmann::json outputs_;
     std::unique_ptr<audio::AudioInput> input_;
     params::Parameter<float>* inputGain_ = nullptr;
     params::TimelineClock timelineClock_;

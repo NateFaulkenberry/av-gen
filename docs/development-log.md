@@ -775,3 +775,25 @@ the hub, project round trip and scene swaps keep the control source).
 Milestone 1.2 (live performance outputs): multi-output windows and displays, Syphon/NDI
 texture sharing where appropriate, projection/display workflows; then MIDI clock sync and OSC
 feedback.
+
+## 2026-09-09 — Milestone 1.2: outputs, sharing, and the remaining follow-ups
+
+### What was implemented and why
+
+- Outputs (ADR-022): the renderer draws into an offscreen final texture; the main window shows
+  it under the UI and every additional output (`app::OutputManager`, project `"outputs"`) is
+  its own SDL window on a chosen display with its own `gpu::Surface`, presented through
+  `rendering::OutputMapper` (crop, four-corner projective warp, soft-edge blend margins with
+  gamma, brightness/gamma, flips). Outputs tab, `--output <display>[:fullscreen]`.
+- Sharing (`share::TextureShare`): Syphon through Dawn's IOSurface interop and the Syphon
+  framework built from source; NDI through a runtime-loaded `libndi` fed by an async readback
+  ring. Share section in the Outputs tab, `--syphon <name>`, `--ndi <name>`.
+- Control follow-ups: MIDI clock as a tempo source (`control::MidiClockTracker`, project
+  `tempoSource`), OSC feedback and query, editable bindings in the Control tab.
+- Composition node parenting, asset relinking by size and SHA-256 when a referenced file moved.
+- Offline follow-ups: `gpu::ReadbackRing` (async staging buffers) in the render job, EXR
+  sequences of the scene-linear HDR frame (tinyexr), and a bounded investigation of the
+  first-renderer quirk.
+- Timeline curve editor: keys are draggable points on the track preview.
+- Split across four subagents (outputs; sharing; control/scene/asset follow-ups; offline
+  follow-ups) in worktrees, with the UI editors, application wiring, ADR-022 and docs on main.
