@@ -1,6 +1,9 @@
-// Frame-hash regression for the procedural showcase projects (ADR-023 / definition of done):
-// radial (Temple), spiral + noise (Helix), combined deformation and nested scenes (Chamber), and
-// an audio-reactive scene, each rendered twice with fresh engines and renderers.
+// Frame-hash regression for the showcase projects (ADR-023 / ADR-025..029, definition of done).
+// Every world is rendered twice with fresh engines and renderers and must be bit-identical, and
+// a later start time must differ (the worlds move on their own). The second case walks the
+// flagship world across its arc (frames at 0, 30, 60 and 120 in its own timeline) so a change in
+// any subsystem it touches (fields, effectors, splines, hierarchy, SDF, states, culling) shows up
+// as a hash change rather than silently altering the piece.
 
 #include "app/engine.hpp"
 #include "app/render_job.hpp"
@@ -14,6 +17,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
+#include <vector>
 
 using namespace avgen;
 namespace fs = std::filesystem;
@@ -65,7 +69,10 @@ TEST_CASE("Showcase projects render bit-identically across fresh engines and ren
         double start;
     };
     for (const Case c : {Case{"temple/temple.json", 1.0}, Case{"helix/helix.json", 2.0}, Case{"chamber/chamber.json", 0.5},
-                         Case{"hyperspace/hyperspace.json", 3.0}, Case{"lab/lab.json", 0.5}}) {
+                         Case{"hyperspace/hyperspace.json", 3.0}, Case{"lab/lab.json", 0.5},
+                         Case{"machine/machine.json", 1.5}, Case{"infinite/infinite.json", 2.0},
+                         Case{"cathedral/cathedral.json", 1.0}, Case{"worlds/worlds.json", 4.0},
+                         Case{"stress/stress.json", 0.5}}) {
         const auto project = examples / c.project;
         if (!fs::exists(project)) {
             continue;
@@ -79,6 +86,39 @@ TEST_CASE("Showcase projects render bit-identically across fresh engines and ren
         CHECK(later != a);
         CHECK(ctx->errorCount() == 0);
     }
+    fs::remove_all(tmp);
+#endif
+}
+
+TEST_CASE("The flagship world is reproducible at fixed points along its arc", "[gpu][procedural][examples]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "infinite" / "infinite.json";
+    if (!fs::exists(project)) {
+        SKIP("the flagship example is not present");
+    }
+    const auto tmp = fs::temp_directory_path() / "avgen_arc_hashes";
+    fs::remove_all(tmp);
+    std::vector<std::uint64_t> hashes;
+    // Frames 0, 30, 60 and 120 of the arc: Dormant, into Awakening, Expansion and Ascension.
+    for (const double start : {0.0, 1.0, 2.0, 4.0}) {
+        const auto a = renderSequenceHash(*ctx, shaders, project, tmp / "a", start, 2);
+        const auto b = renderSequenceHash(*ctx, shaders, project, tmp / "b", start, 2);
+        INFO("start " << start);
+        CHECK(a == b); // reproducible
+        hashes.push_back(a);
+    }
+    // The arc actually moves: no two sampled points render the same frames.
+    for (std::size_t i = 0; i < hashes.size(); ++i) {
+        for (std::size_t j = i + 1; j < hashes.size(); ++j) {
+            INFO("arc points " << i << " and " << j);
+            CHECK(hashes[i] != hashes[j]);
+        }
+    }
+    CHECK(ctx->errorCount() == 0);
     fs::remove_all(tmp);
 #endif
 }

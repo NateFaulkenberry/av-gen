@@ -53,6 +53,12 @@
       "category": "Benchmark",
       "description": "100 / 1,000 / 10,000 instances with no, one, three and noise deformers as presets.",
       "project": "benchmark/benchmark.json"
+    },
+    {
+      "name": "Stress Test (1K to 1M)",
+      "category": "Benchmark",
+      "description": "Point and box swarms from 1,000 to 1,000,000 instances with GPU culling and LOD, driven by curl noise and vortex fields.",
+      "project": "stress/stress.json"
     }
   ]
 }

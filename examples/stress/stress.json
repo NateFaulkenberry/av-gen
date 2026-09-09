@@ -1,0 +1,166 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "avgen",
+    "version": "0.1.0"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "stress.scene.json"
+    }
+  },
+  "parameters": {
+    "root/rotationSpeed": 0.0,
+    "scene/brightness": 0.8,
+    "scene/keyLight": 0.7,
+    "post/bloom/enabled": true,
+    "post/bloom/intensity": 0.4,
+    "post/bloom/threshold": 1.1
+  },
+  "sources": [],
+  "routes": [],
+  "presets": [
+    {
+      "name": "Stress / 1K points",
+      "values": {
+        "procedural/swarm/distribution/gridCountX": [
+          10
+        ],
+        "procedural/swarm/distribution/gridCountY": [
+          10
+        ],
+        "procedural/swarm/distribution/gridCountZ": [
+          10
+        ],
+        "procedural/swarm/distribution/gridSpacing": [
+          26.0,
+          26.0,
+          26.0
+        ],
+        "procedural/swarm/source/pointSize": [
+          1.2
+        ],
+        "procedural/blocks/distribution/gridCountX": [
+          10
+        ],
+        "procedural/blocks/distribution/gridCountZ": [
+          10
+        ]
+      }
+    },
+    {
+      "name": "Stress / 10K points",
+      "values": {
+        "procedural/swarm/distribution/gridCountX": [
+          22
+        ],
+        "procedural/swarm/distribution/gridCountY": [
+          22
+        ],
+        "procedural/swarm/distribution/gridCountZ": [
+          22
+        ],
+        "procedural/swarm/distribution/gridSpacing": [
+          11.818181818181818,
+          11.818181818181818,
+          11.818181818181818
+        ],
+        "procedural/swarm/source/pointSize": [
+          0.5454545454545454
+        ],
+        "procedural/blocks/distribution/gridCountX": [
+          10
+        ],
+        "procedural/blocks/distribution/gridCountZ": [
+          10
+        ]
+      }
+    },
+    {
+      "name": "Stress / 100K points",
+      "values": {
+        "procedural/swarm/distribution/gridCountX": [
+          46
+        ],
+        "procedural/swarm/distribution/gridCountY": [
+          46
+        ],
+        "procedural/swarm/distribution/gridCountZ": [
+          46
+        ],
+        "procedural/swarm/distribution/gridSpacing": [
+          5.6521739130434785,
+          5.6521739130434785,
+          5.6521739130434785
+        ],
+        "procedural/swarm/source/pointSize": [
+          0.2608695652173913
+        ],
+        "procedural/blocks/distribution/gridCountX": [
+          10
+        ],
+        "procedural/blocks/distribution/gridCountZ": [
+          10
+        ]
+      }
+    },
+    {
+      "name": "Stress / 1M points",
+      "values": {
+        "procedural/swarm/distribution/gridCountX": [
+          100
+        ],
+        "procedural/swarm/distribution/gridCountY": [
+          100
+        ],
+        "procedural/swarm/distribution/gridCountZ": [
+          100
+        ],
+        "procedural/swarm/distribution/gridSpacing": [
+          2.6,
+          2.6,
+          2.6
+        ],
+        "procedural/swarm/source/pointSize": [
+          0.12
+        ],
+        "procedural/blocks/distribution/gridCountX": [
+          10
+        ],
+        "procedural/blocks/distribution/gridCountZ": [
+          10
+        ]
+      }
+    },
+    {
+      "name": "Stress / 100K boxes with LOD",
+      "values": {
+        "procedural/swarm/distribution/gridCountX": [
+          1
+        ],
+        "procedural/swarm/distribution/gridCountY": [
+          1
+        ],
+        "procedural/swarm/distribution/gridCountZ": [
+          1
+        ],
+        "procedural/blocks/distribution/gridCountX": [
+          46
+        ],
+        "procedural/blocks/distribution/gridCountY": [
+          46
+        ],
+        "procedural/blocks/distribution/gridCountZ": [
+          46
+        ],
+        "procedural/blocks/distribution/gridSpacing": [
+          5.0,
+          5.0,
+          5.0
+        ]
+      }
+    }
+  ]
+}

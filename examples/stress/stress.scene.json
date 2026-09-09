@@ -1,0 +1,205 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "stress",
+  "camera": {
+    "mode": 1,
+    "position": [
+      0,
+      40,
+      150
+    ],
+    "target": [
+      0,
+      10,
+      0
+    ],
+    "fov": 60.0,
+    "orbitSpeed": 0.0
+  },
+  "environment": {
+    "intensity": 0.0,
+    "fogDensity": 0.004,
+    "background": [
+      0.004,
+      0.005,
+      0.01
+    ]
+  },
+  "nodes": [
+    {
+      "name": "swirl",
+      "kind": "field",
+      "field": {
+        "kind": "vortex",
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "strength": 1.0,
+        "falloff": {
+          "kind": "smooth",
+          "inner": 5.0,
+          "outer": 140.0
+        }
+      }
+    },
+    {
+      "name": "churn",
+      "kind": "field",
+      "field": {
+        "kind": "curlNoise",
+        "frequency": 0.04,
+        "speed": 0.2,
+        "seed": 5,
+        "strength": 1.0,
+        "falloff": {
+          "kind": "none"
+        }
+      }
+    },
+    {
+      "name": "swarm",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "point",
+          "pointSize": 0.35
+        },
+        "distribution": {
+          "kind": "grid",
+          "gridCount": [
+            32,
+            32,
+            32
+          ],
+          "gridSpacing": [
+            3.0,
+            3.0,
+            3.0
+          ],
+          "center": [
+            0,
+            20,
+            0
+          ]
+        },
+        "variation": {
+          "seed": 17,
+          "randomPosition": [
+            1.2,
+            1.2,
+            1.2
+          ]
+        },
+        "effectors": [
+          {
+            "field": "churn",
+            "op": "positionOffset",
+            "strength": 1.5
+          },
+          {
+            "field": "swirl",
+            "op": "positionOffset",
+            "strength": 0.8
+          }
+        ],
+        "lod": {
+          "cull": true,
+          "maxDistance": 0.0,
+          "minScreenRadius": 0.0,
+          "lodCount": 1
+        },
+        "material": {
+          "baseColor": [
+            0.5,
+            0.7,
+            0.95
+          ],
+          "emissiveColor": [
+            0.6,
+            0.85,
+            1.0
+          ],
+          "emissiveIntensity": 1.2,
+          "roughness": 1.0,
+          "metallic": 0.0
+        },
+        "materialVariation": {
+          "hueGradient": 0.3,
+          "emissiveRandom": 0.5
+        }
+      }
+    },
+    {
+      "name": "blocks",
+      "kind": "procedural",
+      "procedural": {
+        "source": {
+          "kind": "box",
+          "size": [
+            1.2,
+            1.2,
+            1.2
+          ]
+        },
+        "distribution": {
+          "kind": "grid",
+          "gridCount": [
+            10,
+            4,
+            10
+          ],
+          "gridSpacing": [
+            8.0,
+            8.0,
+            8.0
+          ],
+          "center": [
+            0,
+            14,
+            0
+          ]
+        },
+        "variation": {
+          "seed": 31,
+          "randomRotation": [
+            0.4,
+            0.4,
+            0.4
+          ]
+        },
+        "effectors": [
+          {
+            "field": "swirl",
+            "op": "rotation",
+            "strength": 0.6
+          }
+        ],
+        "lod": {
+          "cull": true,
+          "lodCount": 3,
+          "distance1": 60.0,
+          "distance2": 140.0,
+          "lodByScreenSize": false
+        },
+        "material": {
+          "baseColor": [
+            0.35,
+            0.34,
+            0.4
+          ],
+          "emissiveColor": [
+            1.0,
+            0.6,
+            0.3
+          ],
+          "emissiveIntensity": 0.2,
+          "roughness": 0.45,
+          "metallic": 0.4
+        }
+      }
+    }
+  ]
+}
