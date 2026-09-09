@@ -2,6 +2,7 @@
 
 #include "params/preset.hpp"
 
+#include <fmt/format.h>
 #include <imgui.h>
 
 #include <algorithm>
@@ -270,10 +271,13 @@ void WorldPanel::drawInspector(app::Engine& engine) {
                 case Influence::Kind::State: kind = "state"; break;
                 case Influence::Kind::Macro: kind = "macro"; break;
                 }
-                ImGui::BulletText("%s: %s (%s) %s", kind, i.source.c_str(), i.detail.c_str(),
-                                  i.kind == Influence::Kind::Route
-                                      ? ("= " + std::to_string(i.value)).c_str()
-                                      : "");
+                // Build the trailing value first: a temporary std::string's c_str() must not
+                // outlive the full expression it was created in.
+                std::string value;
+                if (i.kind == Influence::Kind::Route) {
+                    value = fmt::format("= {:.3f}", i.value);
+                }
+                ImGui::BulletText("%s: %s (%s) %s", kind, i.source.c_str(), i.detail.c_str(), value.c_str());
             }
             ImGui::Text("base %.3f  final %.3f", static_cast<double>(param->baseComponent(0)),
                         static_cast<double>(param->finalComponent(0)));

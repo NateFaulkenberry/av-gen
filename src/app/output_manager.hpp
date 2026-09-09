@@ -98,8 +98,10 @@ public:
     void closeAll();
     // Consumes the events routed to the output windows: resizes their swapchains and closes
     // windows the user closed (those outputs are disabled so they are not reopened). Call after
-    // the primary window's pollEvents each frame; pumps the SDL queue itself when nothing else does.
-    void pumpEvents();
+    // the primary window's pollEvents each frame. `pumpQueue` must be false when another window
+    // already pumped the shared SDL queue this frame: pumping again with no handler would swallow
+    // the events that window's handler has not seen yet (mouse input never reaching the UI).
+    void pumpEvents(bool pumpQueue = true);
     // For each open output: acquire, draw `finalTexture` (width x height, TextureBinding usage)
     // through its mapping in one command buffer, submit, present. Minimised windows are skipped.
     [[nodiscard]] Result<void> presentAll(gpu::Context& context, const wgpu::Texture& finalTexture,

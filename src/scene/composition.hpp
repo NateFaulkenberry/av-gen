@@ -18,6 +18,7 @@
 
 #include "assets/asset_registry.hpp"
 #include "core/error.hpp"
+#include "graph/graph.hpp"
 #include "scene/field_params.hpp"
 #include "scene/material_params.hpp"
 #include "scene/sdf_object.hpp"
@@ -103,6 +104,20 @@ public:
     // scale/rotation. Unknown parents are treated as roots.
     [[nodiscard]] Transform nodeWorldTransform(const CompositionNode& node) const;
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
+    // ---- procedural graph (ADR-028) ----
+    // A composition is either graph-driven or flat: installing a graph replaces every node this
+    // composition previously installed from a graph (hand-added nodes are left alone). The graph
+    // is evaluated on load and whenever `markGraphDirty()` is called; its emitted objects become
+    // ordinary nodes with ordinary parameters, and its routes are added to the modulator.
+    Result<void> setGraph(graph::Graph graph, params::Modulator* modulator = nullptr);
+    [[nodiscard]] const graph::Graph* graph() const { return graph_ ? &*graph_ : nullptr; }
+    [[nodiscard]] graph::Graph* graph() { return graph_ ? &*graph_ : nullptr; }
+    void markGraphDirty() { graphDirty_ = true; }
+    void clearGraph();
+    [[nodiscard]] const std::vector<std::string>& graphWarnings() const { return graphWarnings_; }
+    // Re-evaluates the graph when dirty and installs the result (called by update()).
+    Result<void> evaluateGraph(double time);
+
     // ---- material programs (scene-level, ADR-030) ----
     Result<void> addMaterialProgram(MaterialProgram program); // registers parameters when attached
     [[nodiscard]] const std::vector<MaterialProgram>& materialPrograms() const { return materialPrograms_; }
@@ -206,6 +221,12 @@ private:
     double currentTime_ = 0.0;
     // Scene-level material programs (ADR-030): "materialPrograms" in the file, parameters
     // "material/<name>/…", referenced by Material::program.
+    std::optional<graph::Graph> graph_;
+    bool graphDirty_ = false;
+    std::vector<std::string> graphNodes_;      // node names installed by the last evaluation
+    std::vector<std::string> graphMaterials_;  // material program names installed by it
+    std::vector<std::string> graphWarnings_;
+    params::Modulator* graphModulator_ = nullptr;
     std::vector<MaterialProgram> materialPrograms_;
     std::vector<MaterialProgramParameters> materialParams_;
     std::size_t ownMaterialCount_ = 0; // this composition's programs come first in scene_.materialPrograms

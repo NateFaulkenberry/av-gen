@@ -40,6 +40,9 @@ const char* bandName(std::size_t i) {
 
 void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
     ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+    // Default window placement is in ImGui coordinates (logical points), which are not the
+    // framebuffer pixels in `stats` on a scaled display: using the latter puts panels off-screen.
+    const float uiWidth = ImGui::GetMainViewport()->Size.x;
 
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
@@ -146,7 +149,7 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
     }
     if (showAnalysis_) {
         ImGui::SetNextWindowSize(ImVec2(520, 620), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowPos(ImVec2(stats.width > 0 ? std::max(16.0f, stats.width / 2.0f - 540.0f) : 460.0f, 40),
+        ImGui::SetNextWindowPos(ImVec2(std::max(16.0f, uiWidth * 0.5f - 540.0f), 40),
                                 ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Analysis", &showAnalysis_)) {
             drawAnalysis(engine);
@@ -155,7 +158,7 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
     }
     if (showModulation_) {
         ImGui::SetNextWindowSize(ImVec2(560, 420), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowPos(ImVec2(stats.width > 0 ? std::max(16.0f, stats.width / 2.0f + 20.0f) : 1000.0f, 40),
+        ImGui::SetNextWindowPos(ImVec2(std::max(16.0f, uiWidth * 0.5f + 20.0f), 40),
                                 ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Modulation", &showModulation_)) {
             drawModulation(engine);
@@ -164,7 +167,7 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
     }
     if (showWorld_) {
         ImGui::SetNextWindowSize(ImVec2(460, 520), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowPos(ImVec2(stats.width > 0 ? std::max(16.0f, stats.width - 480.0f) : 1200.0f, 40),
+        ImGui::SetNextWindowPos(ImVec2(std::max(16.0f, uiWidth - 480.0f), 40),
                                 ImGuiCond_FirstUseEver);
         if (ImGui::Begin("World", &showWorld_)) {
             drawWorldWindow(engine);

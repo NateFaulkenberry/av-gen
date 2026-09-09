@@ -632,6 +632,152 @@ void Composition::rebuildSdfs() {
     }
 }
 
+// ---- procedural graph (ADR-028) --------------------------------------------------------------
+
+Result<void> Composition::setGraph(graph::Graph g, params::Modulator* modulator) {
+    if (auto ok = g.validate(); !ok) {
+        return ok;
+    }
+    if (modulator != nullptr) {
+        graphModulator_ = modulator;
+    }
+    graph_ = std::move(g);
+    graphDirty_ = true;
+    return {};
+}
+
+void Composition::clearGraph() {
+    for (const std::string& name : graphNodes_) {
+        removeNode(name);
+    }
+    graphNodes_.clear();
+    for (const std::string& name : graphMaterials_) {
+        const auto it = std::find_if(materialPrograms_.begin(), materialPrograms_.end(),
+                                     [&](const MaterialProgram& mp) { return mp.name == name; });
+        if (it != materialPrograms_.end()) {
+            const auto index = static_cast<std::size_t>(std::distance(materialPrograms_.begin(), it));
+            if (params_ != nullptr && index < materialParams_.size()) {
+                unregisterMaterialProgramParameters(*params_, materialParams_[index]);
+                materialParams_.erase(materialParams_.begin() + static_cast<std::ptrdiff_t>(index));
+            }
+            materialPrograms_.erase(it);
+        }
+    }
+    graphMaterials_.clear();
+    if (graphModulator_ != nullptr) {
+        auto& routes = graphModulator_->routes();
+        routes.erase(std::remove_if(routes.begin(), routes.end(),
+                                    [](const params::ModRoute& r) { return r.fromGraph; }),
+                     routes.end());
+    }
+    graph_.reset();
+    graphDirty_ = false;
+    graphWarnings_.clear();
+    dirty_ = true;
+}
+
+Result<void> Composition::evaluateGraph(double time) {
+    graphDirty_ = false;
+    if (!graph_) {
+        return {};
+    }
+    graph::GraphOutput out;
+    if (auto ok = graph_->evaluate(out, time); !ok) {
+        return ok;
+    }
+    graphWarnings_ = out.warnings;
+    for (const std::string& warning : graphWarnings_) {
+        log::warn("graph '{}': {}", graph_->name, warning);
+    }
+    // Replace what the previous evaluation installed (hand-added nodes are untouched).
+    const std::vector<std::string> previousNodes = graphNodes_;
+    const std::vector<std::string> previousMaterials = graphMaterials_;
+    graphNodes_.clear();
+    graphMaterials_.clear();
+    for (const std::string& name : previousNodes) {
+        removeNode(name);
+    }
+    for (const std::string& name : previousMaterials) {
+        const auto it = std::find_if(materialPrograms_.begin(), materialPrograms_.end(),
+                                     [&](const MaterialProgram& mp) { return mp.name == name; });
+        if (it != materialPrograms_.end()) {
+            const auto index = static_cast<std::size_t>(std::distance(materialPrograms_.begin(), it));
+            if (params_ != nullptr && index < materialParams_.size()) {
+                unregisterMaterialProgramParameters(*params_, materialParams_[index]);
+                materialParams_.erase(materialParams_.begin() + static_cast<std::ptrdiff_t>(index));
+            }
+            materialPrograms_.erase(it);
+        }
+    }
+    if (graphModulator_ != nullptr) {
+        auto& routes = graphModulator_->routes();
+        routes.erase(std::remove_if(routes.begin(), routes.end(),
+                                    [](const params::ModRoute& r) { return r.fromGraph; }),
+                     routes.end());
+    }
+    // Material programs first: objects reference them by name.
+    for (MaterialProgram& mp : out.materialPrograms) {
+        const std::string name = mp.name;
+        if (auto added = addMaterialProgram(std::move(mp)); !added) {
+            log::warn("graph '{}': material program '{}': {}", graph_->name, name, added.error().message);
+            continue;
+        }
+        graphMaterials_.push_back(name);
+    }
+    const auto install = [&](CompositionNode node) {
+        const std::string wanted = node.name;
+        auto added = addNode(std::move(node));
+        if (!added) {
+            log::warn("graph '{}': node '{}': {}", graph_->name, wanted, added.error().message);
+            return;
+        }
+        graphNodes_.push_back((*added)->name);
+    };
+    for (ProceduralGeometry& pg : out.procedurals) {
+        CompositionNode node;
+        node.name = pg.name;
+        node.kind = NodeKind::Procedural;
+        node.procedural = std::move(pg);
+        install(std::move(node));
+    }
+    for (spatial::FieldSpec& f : out.fields) {
+        CompositionNode node;
+        node.name = f.name;
+        node.kind = NodeKind::Field;
+        node.field = std::move(f);
+        install(std::move(node));
+    }
+    for (spatial::Spline& sp : out.splines) {
+        CompositionNode node;
+        node.name = sp.name;
+        node.kind = NodeKind::Spline;
+        node.spline = std::move(sp);
+        install(std::move(node));
+    }
+    for (SdfObject& so : out.sdfs) {
+        CompositionNode node;
+        node.name = so.name;
+        node.kind = NodeKind::Sdf;
+        node.sdf = std::move(so);
+        install(std::move(node));
+    }
+    for (ParticleSystem& ps : out.particles) {
+        CompositionNode node;
+        node.name = ps.name;
+        node.kind = NodeKind::Particles;
+        node.particles = std::move(ps);
+        install(std::move(node));
+    }
+    if (graphModulator_ != nullptr) {
+        for (params::ModRoute& r : out.routes) {
+            r.fromGraph = true;
+            graphModulator_->addRoute(std::move(r));
+        }
+    }
+    dirty_ = true;
+    return {};
+}
+
 Result<void> Composition::addMaterialProgram(MaterialProgram program) {
     if (auto v = program.validate(); !v) {
         return std::unexpected(v.error());
@@ -861,6 +1007,7 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                          const std::string& prefix) {
     params_ = &params;
     modulator_ = &modulator;
+    graphModulator_ = &modulator;
     prefix_ = prefix;
     if (dirty_) {
         rebuild(); // camera defaults are fitted to the flattened bounds
@@ -1423,6 +1570,11 @@ void Composition::rebuild() {
 // ---- per-frame ---------------------------------------------------------------------------------
 
 void Composition::update(const FrameTime& time) {
+    if (graphDirty_) {
+        if (auto r = evaluateGraph(time.renderTime); !r) {
+            log::warn("graph '{}': {}", graph_ ? graph_->name : std::string("?"), r.error().message);
+        }
+    }
     if (dirty_) {
         rebuild();
     }
@@ -1804,6 +1956,10 @@ nlohmann::json Composition::toJson() const {
     json nodes = json::array();
     for (const auto& nodePtr : nodes_) {
         const CompositionNode& node = *nodePtr;
+        // Graph-installed nodes are re-emitted by the graph on load; only hand-made nodes are written.
+        if (std::find(graphNodes_.begin(), graphNodes_.end(), node.name) != graphNodes_.end()) {
+            continue;
+        }
         json n;
         n["name"] = node.name;
         n["kind"] = nodeKindName(node.kind);
@@ -1838,9 +1994,15 @@ nlohmann::json Composition::toJson() const {
         nodes.push_back(std::move(n));
     }
     j["nodes"] = std::move(nodes);
+    if (graph_) {
+        j["graph"] = graph_->toJson();
+    }
     if (!materialPrograms_.empty()) {
         json programs = json::array();
         for (const MaterialProgram& mp : materialPrograms_) {
+            if (std::find(graphMaterials_.begin(), graphMaterials_.end(), mp.name) != graphMaterials_.end()) {
+                continue;
+            }
             programs.push_back(mp.toJson());
         }
         j["materialPrograms"] = std::move(programs);
@@ -1886,6 +2048,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
     comp->depth_ = depth;
     comp->ancestors_ = std::move(ancestors);
     comp->sourcePath_ = std::move(sourcePath);
+    // `sourcePath` is moved-from above: everything below uses the composition's copy.
+    const std::filesystem::path& scenePath = comp->sourcePath_;
 
     if (j.contains("camera")) {
         const json& c = j.at("camera");
@@ -1966,6 +2130,27 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         }
     }
 
+    if (j.contains("graph")) {
+        const json& gj = j.at("graph");
+        Result<graph::Graph> g = graph::Graph::fromJson(gj);
+        if (gj.is_string()) {
+            // Relative to the scene file when it has a path, else through the asset registry
+            // (which knows the project's base directory).
+            std::filesystem::path file = gj.get<std::string>();
+            if (file.is_relative() && !scenePath.empty()) {
+                file = scenePath.parent_path() / file;
+            } else if (file.is_relative()) {
+                file = registry.resolve(file);
+            }
+            g = graph::Graph::loadFile(file);
+        }
+        if (!g) {
+            return fail("scene file '{}': graph: {}", scenePath.string(), g.error().message);
+        }
+        if (auto ok = comp->setGraph(std::move(*g)); !ok) {
+            return fail("scene file '{}': graph: {}", scenePath.string(), ok.error().message);
+        }
+    }
     if (j.contains("materialPrograms")) {
         const json& programs = j.at("materialPrograms");
         if (!programs.is_array()) {
@@ -1974,10 +2159,10 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         for (const json& pj : programs) {
             auto mp = MaterialProgram::fromJson(pj);
             if (!mp) {
-                return fail("scene file '{}': material program: {}", sourcePath.string(), mp.error().message);
+                return fail("scene file '{}': material program: {}", scenePath.string(), mp.error().message);
             }
             if (auto added = comp->addMaterialProgram(std::move(*mp)); !added) {
-                return fail("scene file '{}': {}", sourcePath.string(), added.error().message);
+                return fail("scene file '{}': {}", scenePath.string(), added.error().message);
             }
         }
     }
@@ -2046,7 +2231,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             if (item.contains("procedural")) {
                 auto pg = ProceduralGeometry::fromJson(item.at("procedural"));
                 if (!pg) {
-                    return fail("scene file '{}': node '{}': {}", sourcePath.string(), node.name, pg.error().message);
+                    return fail("scene file '{}': node '{}': {}", scenePath.string(), node.name, pg.error().message);
                 }
                 node.procedural = std::move(*pg);
             }
@@ -2060,21 +2245,21 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             if (item.contains("field")) {
                 auto field = spatial::FieldSpec::fromJson(item.at("field"));
                 if (!field) {
-                    return fail("scene file '{}': node '{}': {}", sourcePath.string(), node.name, field.error().message);
+                    return fail("scene file '{}': node '{}': {}", scenePath.string(), node.name, field.error().message);
                 }
                 node.field = std::move(*field);
             }
             if (item.contains("spline")) {
                 auto spline = spatial::Spline::fromJson(item.at("spline"));
                 if (!spline) {
-                    return fail("scene file '{}': node '{}': {}", sourcePath.string(), node.name, spline.error().message);
+                    return fail("scene file '{}': node '{}': {}", scenePath.string(), node.name, spline.error().message);
                 }
                 node.spline = std::move(*spline);
             }
             if (item.contains("sdf")) {
                 auto sdf = SdfObject::fromJson(item.at("sdf"));
                 if (!sdf) {
-                    return fail("scene file '{}': node '{}': {}", sourcePath.string(), node.name, sdf.error().message);
+                    return fail("scene file '{}': node '{}': {}", scenePath.string(), node.name, sdf.error().message);
                 }
                 node.sdf = std::move(*sdf);
             }

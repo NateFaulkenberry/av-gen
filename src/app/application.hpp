@@ -21,6 +21,7 @@
 #include <deque>
 #include <memory>
 #include <optional>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -97,6 +98,12 @@ private:
     void loadAudio(const std::filesystem::path& path);
     void loadAny(const std::filesystem::path& path);
     void rememberProject(const std::filesystem::path& path); // recent list + window title
+    // Input diagnostics (AVGEN_UI_SELFTEST=1): raw SDL mouse events seen this run.
+    std::uint64_t uiMotionEvents_ = 0;
+    std::uint64_t uiButtonEvents_ = 0;
+    std::uint64_t uiFilteredEvents_ = 0;
+    bool uiSelfTestEvents_ = false;
+    std::map<std::uint32_t, std::uint64_t> uiEventTypes_;
     // Offline rendering: settings from the project + CLI overrides; a job runs to completion
     // headless, or a few frames per UI frame in the live app.
     [[nodiscard]] RenderSettings renderSettingsFromOptions() const;

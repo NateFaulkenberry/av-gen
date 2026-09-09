@@ -78,9 +78,12 @@ void OutputManager::closeAll() {
     }
 }
 
-void OutputManager::pumpEvents() {
-    // Empty when the primary window already pumped this frame; needed when there is none (tests).
-    platform::Window::pumpEvents(nullptr);
+void OutputManager::pumpEvents(bool pumpQueue) {
+    // Only pump when nobody else did: the shared SDL queue is drained once per frame, and the
+    // window that pumps it is the one that routes events to the UI.
+    if (pumpQueue) {
+        platform::Window::pumpEvents(nullptr);
+    }
     for (auto& o : outputs_) {
         if (!o->open()) {
             continue;

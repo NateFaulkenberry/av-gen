@@ -18,6 +18,9 @@
 #include "platform/window.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "ui/control_panel.hpp"
+
+#include <imgui.h>
+#include <imgui_internal.h>
 #include "ui/imgui_layer.hpp"
 
 #include <SDL3/SDL.h>
@@ -860,8 +863,19 @@ int Application::runLive() {
     for (;;) {
         const auto frameStart = std::chrono::steady_clock::now();
         auto events = window_->pollEvents([this](const SDL_Event& event) {
+            if (uiSelfTestEvents_) {
+                uiEventTypes_[event.type] += 1;
+            }
+            if (event.type == SDL_EVENT_MOUSE_MOTION) {
+                ++uiMotionEvents_;
+            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                ++uiButtonEvents_;
+            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                ++uiButtonEvents_;
+            }
             // Output windows share the SDL queue; only the main window's input reaches ImGui.
             if (SDL_Window* from = SDL_GetWindowFromEvent(&event); from != nullptr && from != window_->handle()) {
+                ++uiFilteredEvents_;
                 return;
             }
             imgui_->processEvent(event);
@@ -935,8 +949,45 @@ int Application::runLive() {
                 }
             }
         }
+        // Input diagnostics (AVGEN_UI_SELFTEST=1): logs what ImGui and SDL each see of the
+        // pointer, plus the raw event counts, so "the UI does not react to clicks" can be traced
+        // to the event routing rather than the widgets.
+        static const bool uiSelfTest = std::getenv("AVGEN_UI_SELFTEST") != nullptr;
+        uiSelfTestEvents_ = uiSelfTest;
         imgui_->newFrame();
         panel_->draw(*engine_, stats);
+        if (uiSelfTest && (time.frameIndex % 30) == 0) {
+            const ImGuiIO& io = ImGui::GetIO();
+            int wx = 0;
+            int wy = 0;
+            SDL_GetWindowPosition(window_->handle(), &wx, &wy);
+            float gx = 0.0f;
+            float gy = 0.0f;
+            SDL_GetGlobalMouseState(&gx, &gy);
+            float lx = 0.0f;
+            float ly = 0.0f;
+            SDL_GetMouseState(&lx, &ly);
+            const bool keyboardFocus = SDL_GetKeyboardFocus() == window_->handle();
+            const bool mouseFocus = SDL_GetMouseFocus() == window_->handle();
+            log::info("ui-sdl: windowPos ({},{}) global ({:.1f},{:.1f}) local ({:.1f},{:.1f}) "
+                      "keyboardFocus={} mouseFocus={} winFlags=0x{:x} sdlEvents motion={} buttons={} filtered={}",
+                      wx, wy, gx, gy, lx, ly, keyboardFocus, mouseFocus,
+                      static_cast<std::uint64_t>(SDL_GetWindowFlags(window_->handle())), uiMotionEvents_,
+                      uiButtonEvents_, uiFilteredEvents_);
+            std::string types;
+            for (const auto& [type, count] : uiEventTypes_) {
+                types += fmt::format("0x{:x}:{} ", type, count);
+            }
+            log::info("ui-types: {}", types.empty() ? std::string("(none)") : types);
+            log::info("ui: display {:.0f}x{:.0f} scale {:.2f} mouse ({:.1f},{:.1f}) down={} captureMouse={} "
+                      "hovered='{}' anyItemHovered={} dt={:.4f}",
+                      io.DisplaySize.x, io.DisplaySize.y, io.DisplayFramebufferScale.x, io.MousePos.x, io.MousePos.y,
+                      io.MouseDown[0], io.WantCaptureMouse,
+                      ImGui::GetCurrentContext()->HoveredWindow != nullptr
+                          ? ImGui::GetCurrentContext()->HoveredWindow->Name
+                          : "(none)",
+                      ImGui::IsAnyItemHovered(), io.DeltaTime);
+        }
 
         const auto workBeforeAcquire = std::chrono::steady_clock::now();
         auto view = context_->acquireSurfaceView();
@@ -992,7 +1043,7 @@ int Application::runLive() {
                                                   st.lastError.empty() ? std::string() : ", error: " + st.lastError);
             }
         }
-        outputs_.pumpEvents();
+        outputs_.pumpEvents(/*pumpQueue*/ false); // the primary window already pumped this frame
         context_->processEvents();
 
         const auto frameEnd = std::chrono::steady_clock::now();
