@@ -297,3 +297,36 @@ TEST_CASE("Camera parameters register and apply finals", "[scene][camera][params
     CHECK(again.focalLength == p.focalLength);
     CHECK(params.size() == 20);
 }
+
+// A scene's authored `camera.fov` governs framing: `LensSettings::useExplicitFov` defaults true,
+// so a focal length in the project drives depth of field without silently re-framing the shot.
+// Worth pinning down: it was reported the other way round during the cinematic pass, and the two
+// readings imply very different shots.
+TEST_CASE("An authored field of view outranks the lens until the scene says otherwise", "[camera][lens]") {
+    scene::Camera cam;
+    cam.fovYRadians = glm::radians(52.0f);
+    cam.lens.focalLength = 42.0f;
+    cam.lens.sensorWidth = 36.0f;
+    cam.lens.sensorHeight = 24.0f;
+
+    CHECK(cam.lens.useExplicitFov);
+    CHECK(glm::degrees(cam.effectiveFovY()) == Catch::Approx(52.0f).margin(1e-3));
+
+    // The lens's own angle is a different number, so this is a real choice rather than a
+    // coincidence: 42 mm on a 24 mm-high sensor is about 32 degrees.
+    CHECK(glm::degrees(cam.lens.fovYRadians()) == Catch::Approx(31.86f).margin(0.1));
+
+    // Turning the flag off hands framing to the lens.
+    cam.lens.useExplicitFov = false;
+    CHECK(glm::degrees(cam.effectiveFovY()) == Catch::Approx(31.86f).margin(0.1));
+
+    // Either way the focal length still sets the circle of confusion, so depth of field follows
+    // the lens even when the framing does not.
+    cam.lens.useExplicitFov = true;
+    cam.lens.focusDistance = 10.0f;
+    const float near = cam.lens.circleOfConfusion(5.0f);
+    const float far = cam.lens.circleOfConfusion(40.0f);
+    CHECK(near > 0.0f);
+    CHECK(far > 0.0f);
+    CHECK(cam.lens.circleOfConfusion(10.0f) == Catch::Approx(0.0f).margin(1e-6));
+}

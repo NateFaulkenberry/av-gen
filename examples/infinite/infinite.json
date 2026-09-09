@@ -626,21 +626,21 @@
      {
       "time": 46,
       "value": [
-       14.0
+       15.0
       ],
-      "interp": "easeInOut"
+      "interp": "step"
      },
      {
-      "time": 52,
+      "time": 50,
       "value": [
-       24.0
+       132.0
       ],
       "interp": "easeInOut"
      },
      {
       "time": 60,
       "value": [
-       46.0
+       168.0
       ],
       "interp": "linear"
      }
@@ -686,19 +686,19 @@
       "value": [
        10.0
       ],
-      "interp": "easeInOut"
+      "interp": "step"
      },
      {
-      "time": 52,
+      "time": 50,
       "value": [
-       44.0
+       38.0
       ],
       "interp": "easeInOut"
      },
      {
       "time": 60,
       "value": [
-       66.0
+       104.0
       ],
       "interp": "linear"
      }
@@ -744,19 +744,19 @@
       "value": [
        44.0
       ],
-      "interp": "easeInOut"
+      "interp": "step"
      },
      {
-      "time": 52,
+      "time": 50,
       "value": [
-       92.0
+       224.0
       ],
       "interp": "easeInOut"
      },
      {
       "time": 60,
       "value": [
-       196.0
+       318.0
       ],
       "interp": "linear"
      }
@@ -802,19 +802,19 @@
       "value": [
        0.0
       ],
-      "interp": "easeInOut"
+      "interp": "step"
      },
      {
-      "time": 52,
+      "time": 50,
       "value": [
-       2.0
+       0.0
       ],
       "interp": "easeInOut"
      },
      {
       "time": 60,
       "value": [
-       2.0
+       0.0
       ],
       "interp": "linear"
      }
@@ -860,19 +860,19 @@
       "value": [
        13.0
       ],
-      "interp": "easeInOut"
+      "interp": "step"
      },
      {
-      "time": 52,
+      "time": 50,
       "value": [
-       22.0
+       16.0
       ],
       "interp": "easeInOut"
      },
      {
       "time": 60,
       "value": [
-       26.0
+       22.0
       ],
       "interp": "linear"
      }

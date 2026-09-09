@@ -201,3 +201,14 @@ python3 tools/image_stats.py /tmp/temple/frame_000900.png
 
 The project renders 1920x1080 at 30 fps. For iteration, copy it and override
 `render.width/height/fps` to 960x540 at 24; a 60-second preview sequence takes about 32 seconds.
+
+## The Ascent is an edit, not a move
+
+The final beat used to pull back from the altar, which meant leaving through the ring of columns:
+whichever column centred hid the subject, and for four seconds the frame was a picket fence. Rising
+first only moved the problem to the architrave. Pulling out from inside a colonnade always exits
+through the colonnade.
+
+The answer is a cut. The sanctum framing holds to 50 s on a `step` key, and the shot cuts to a wide
+outside the temple and cranes up and back from there. `KeyInterp::Step` on a camera track is the
+timeline's cut, and it is a better tool for this beat than any camera path.
