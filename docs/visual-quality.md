@@ -65,8 +65,27 @@ empty backgrounds, cluttered backgrounds, obvious procedural repetition, and a c
 observes. Each one has a fix in this phase's architecture; if a frame shows one, the fix is
 available rather than a matter of taste.
 
-## 5. Recorded state
+## 5. Measuring a change without pretending to measure beauty
+
+`tools/image_stats.py <frame.png>` reports luminance mean, RMS contrast, the 1st/50th/99th
+percentiles, the fraction of the frame in shadow/mid/highlight, clipping, mean saturation and the
+centroid of the bright mass. It has no dependencies and reads PNGs directly.
+
+Use it to confirm that a change moved the image the way the change intended, and for nothing else.
+A number here is never a score. "Mean rose from 0.09 to 0.21 across the arc with no clipped pixels"
+is a useful sentence about a shot whose light is supposed to grow; "mean 0.21" on its own says
+nothing about whether the frame is worth looking at. That judgement comes from opening the frame.
+
+## 6. Recorded state
 
 Baselines before the phase began are in the session's scratch folder, and the observations that
 started this work were: Hyperspace blew out to white at its core; the Infinite Temple read as a
 wall of evenly lit grey cylinders with pastel cubes; nothing anywhere cast a shadow.
+
+Hyperspace has since been re-authored as a shot; `docs/shot-hyperspace.md` records the composition,
+the lighting and the six traps that cost the most time. Its arc now measures as a mean of 0.07,
+0.09, 0.10, 0.21 across the four review frames with rising contrast and nothing clipped. Judged by
+eye it is a legible, atmospheric corridor with a real dramatic arc, and it still reads as stylised
+motion graphics rather than as a photographed place: the gate plates are untextured boxes with a
+flat warm tone, the tunnel slats read as a graphic spiral, and the core is a smooth bright disc
+rather than a structured source. Those are the next things to fix in it.
