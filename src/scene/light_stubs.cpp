@@ -1,7 +1,6 @@
 // TEMPORARY: minimal definitions for the cinematic-phase headers so the tree links while the
 // lighting and composition agents implement them. Every function here is replaced by a real
 // implementation in scene/light_rig.cpp and scene/composition_data.cpp; delete this file then.
-#include "scene/composition_data.hpp"
 #include "scene/light_rig.hpp"
 
 #include <nlohmann/json.hpp>
@@ -112,20 +111,5 @@ LightRigParameters registerLightRigParameters(params::ParameterSet&, const Light
 }
 void applyLightRigParameters(const LightRigParameters&, const LightRig& rest, LightRig& live) { live = rest; }
 void unregisterLightRigParameters(params::ParameterSet&, const LightRigParameters&) {}
-
-Result<void> CompositionData::validate() const { return {}; }
-const FocalPoint* CompositionData::find(std::string_view name) const {
-    for (const FocalPoint& f : focalPoints) {
-        if (f.name == name) {
-            return &f;
-        }
-    }
-    return nullptr;
-}
-void CompositionData::appendFields(spatial::FieldSet&) const {}
-DepthLayer CompositionData::layerAt(float) const { return DepthLayer{}; }
-std::uint64_t CompositionData::structuralHash() const { return 0; }
-nlohmann::json CompositionData::toJson() const { return nlohmann::json::object(); }
-Result<CompositionData> CompositionData::fromJson(const nlohmann::json&) { return CompositionData{}; }
 
 } // namespace avgen::scene

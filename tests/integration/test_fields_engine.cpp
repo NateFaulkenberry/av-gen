@@ -162,3 +162,51 @@ TEST_CASE("Audio routes drive field parameters and projects round-trip fields", 
     CHECK(third.scene().particles[0].fieldForces.size() == 1);
     fs::remove_all(dir);
 }
+
+TEST_CASE("A scene file's composition reaches the scene as fields", "[integration][composition]") {
+    const auto dir = fs::temp_directory_path() / "avgen_composition_engine";
+    fs::remove_all(dir);
+    const auto scene = writeScene(dir, "world.json", R"({"format":"avgen-scene","version":1,"name":"c",
+      "composition": {
+        "focalPoints": [ { "name": "hero", "position": [0, 5, 0], "radius": 12, "clearance": 8, "weight": 2 } ],
+        "layers": [ { "name": "near", "start": 0, "end": 25, "density": 0.4 },
+                    { "name": "far", "start": 25, "end": 300, "density": 1.5, "saturation": 0.6 } ],
+        "exclusions": [ { "name": "well", "shape": "sphere", "position": [0, 0, 0], "radius": 6 } ],
+        "cameraTarget": "hero", "targetScreenPosition": [0.333, 0.5], "framingStrength": 0.6 },
+      "nodes": [
+        { "name": "ring", "kind": "procedural", "procedural": {
+            "source": { "kind": "box", "size": [1, 4, 1] },
+            "distribution": { "kind": "radial", "count": 64, "radius": 20 },
+            "ops": [ { "kind": "filterDensity", "threshold": 0.5 } ],
+            "effectors": [ { "field": "composition.weight.hero", "op": "emission", "strength": 2.0 } ] } } ] })");
+    app::Engine engine(app::EngineMode::Offline);
+    auto loaded = engine.loadComposition(scene);
+    const std::string message = loaded.has_value() ? std::string("ok") : loaded.error().message;
+    INFO(message);
+    REQUIRE(loaded.has_value());
+    FixedStepClock clock(60.0);
+    engine.update(engine.tick(clock));
+
+    const scene::Scene& s = engine.scene();
+    // The composition data travels with the scene and its fields are addressable by name.
+    REQUIRE(s.composition.focalPoints.size() == 1);
+    CHECK(s.composition.focalPoints[0].name == "hero");
+    CHECK(s.composition.cameraTarget == "hero");
+    CHECK(s.fields.find("composition.clearance.hero") != nullptr);
+    CHECK(s.fields.find("composition.weight.hero") != nullptr);
+    CHECK(s.fields.find("composition.exclusion.well") != nullptr);
+    // An object could bind an effector to one of them, which is the point of making them fields.
+    REQUIRE(s.procedurals.size() == 1);
+    CHECK(s.procedurals[0].effectors[0].field == "composition.weight.hero");
+
+    // Saving and reloading keeps it.
+    const auto out = dir / "saved.json";
+    REQUIRE(engine.saveComposition(out).has_value());
+    app::Engine other(app::EngineMode::Offline);
+    REQUIRE(other.loadComposition(out).has_value());
+    other.update(other.tick(clock));
+    REQUIRE(other.scene().composition.layers.size() == 2);
+    CHECK(other.scene().composition.layers[1].name == "far");
+    CHECK(other.scene().fields.find("composition.weight.hero") != nullptr);
+    fs::remove_all(dir);
+}

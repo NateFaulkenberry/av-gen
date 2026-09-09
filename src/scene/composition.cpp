@@ -1588,6 +1588,11 @@ void Composition::rebuild() {
         ranges_.push_back(std::move(range));
     }
 
+    // Composition (ADR-038) contributes reserved fields, so density filters and effectors can
+    // reference them by name like any other field.
+    compositionData_.appendFields(scene_.fields);
+    scene_.composition = compositionData_;
+
     rebuildProcedurals();
     rebuildSdfs();
 
@@ -2117,6 +2122,12 @@ nlohmann::json Composition::toJson() const {
         nodes.push_back(std::move(n));
     }
     j["nodes"] = std::move(nodes);
+    {
+        const json composition = compositionData_.toJson();
+        if (!composition.empty()) {
+            j["composition"] = composition;
+        }
+    }
     if (graph_) {
         j["graph"] = graph_->toJson();
     }
@@ -2300,6 +2311,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         }
     }
 
+    if (j.contains("composition")) {
+        auto data = CompositionData::fromJson(j.at("composition"));
+        if (!data) {
+            return fail("scene file '{}': composition: {}", scenePath.string(), data.error().message);
+        }
+        comp->compositionData_ = std::move(*data);
+    }
     if (j.contains("graph")) {
         const json& gj = j.at("graph");
         Result<graph::Graph> g = graph::Graph::fromJson(gj);

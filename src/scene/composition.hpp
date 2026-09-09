@@ -104,6 +104,15 @@ public:
     // scale/rotation. Unknown parents are treated as roots.
     [[nodiscard]] Transform nodeWorldTransform(const CompositionNode& node) const;
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
+    // ---- composition (ADR-038) ----
+    // What the frame is about: focal points, depth layers and exclusion regions. Its fields are
+    // appended to the scene's field set at every rebuild under reserved "composition.*" names.
+    [[nodiscard]] const CompositionData& composition() const { return compositionData_; }
+    void setComposition(CompositionData data) {
+        compositionData_ = std::move(data);
+        dirty_ = true;
+    }
+
     // ---- procedural graph (ADR-028) ----
     // A composition is either graph-driven or flat: installing a graph replaces every node this
     // composition previously installed from a graph (hand-added nodes are left alone). The graph
@@ -243,6 +252,7 @@ private:
     double currentTime_ = 0.0;
     // Scene-level material programs (ADR-030): "materialPrograms" in the file, parameters
     // "material/<name>/…", referenced by Material::program.
+    CompositionData compositionData_;
     std::optional<graph::Graph> graph_;
     bool graphDirty_ = false;
     std::vector<std::string> graphNodes_;      // node names installed by the last evaluation
