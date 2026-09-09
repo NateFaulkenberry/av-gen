@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace avgen::app {
 
@@ -60,10 +61,13 @@ Result<void> RenderJob::start() {
     end_ = settings_.resolvedEnd(engine_->durationSeconds(), engine_->timeline().durationSeconds());
     total_ = settings_.frameCount(end_);
 
-    // Warm-up: the very first renderer in a process produced a 1-LSB difference on its second
-    // frame (cold pipeline/driver state); a throwaway renderer that renders two frames first
-    // makes the real job's output identical to any later job's. See the 1.0 development log.
-    {
+    // Warm-up: the first frames drawn with freshly compiled pipelines in a process differ by 1 LSB
+    // in a few scattered pixels from every later render (Metal replaces the pipelines' GPU
+    // binaries shortly after creation; Dawn caches pipeline objects device-wide, so a throwaway
+    // renderer warms the real one's). Rendering two frames first makes the job's output identical
+    // to any later job's. AVGEN_NO_WARMUP=1 reproduces the difference (development log,
+    // 2026-09-09 investigation).
+    if (std::getenv("AVGEN_NO_WARMUP") == nullptr) {
         rendering::SceneRenderer warm(context_, shaders_);
         if (auto r = warm.init(); !r) {
             return r;

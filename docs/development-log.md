@@ -775,3 +775,108 @@ the hub, project round trip and scene swaps keep the control source).
 Milestone 1.2 (live performance outputs): multi-output windows and displays, Syphon/NDI
 texture sharing where appropriate, projection/display workflows; then MIDI clock sync and OSC
 feedback.
+
+## 2026-09-09 — Offline follow-ups: readback ring, EXR output, first-renderer investigation
+
+### What was implemented and why
+
+- `gpu::ReadbackRing` (ADR-020 revision): three staging buffers; frame f's texture-to-buffer
+  copy is appended to the frame's own command buffer, the ring submits it and starts the map,
+  and the render thread goes on to f+1 and f+2. `poll()` returns completed frames in submission
+  order without blocking; `enqueue()` blocks only when all three slots are still on the GPU.
+  `RenderJob` renders through it (one persistent RGBA8 target with `CopySrc`), hashes in frame
+  order, keeps the per-frame hashes (`frameHashes()`), flushes on finish and on cancel (frames
+  already on the GPU are still written) and logs how long the render thread waited for the GPU
+  vs. for the encoders. `renderToImage` stays for tests and captures.
+- EXR: tinyexr v3.2.0 (classic `tinyexr.h` + bundled miniz; SHA256-pinned release archive so the
+  ZFP submodule is never fetched; `docs/dependencies.md`), `assets::writeExr/readExr`,
+  `gpu::ImageF`, `readTextureF16`, `halfToFloat` (+ a 64K table for whole images),
+  `SceneRenderer::renderToImageFloat` and `hdrOutputTexture()` (the RGBA16F image the tonemap
+  pass sampled: HDR target, last post layer or the post chain's composite; those targets and the
+  transient pool's default usage gained `CopySrc`). `RenderOutput::ExrSequence`
+  (`"output": "exr"`, `--output exr`, UI radio, default pattern `frame_{:06d}.exr`) writes half
+  EXRs from the ring's float path on the encoder threads.
+- PNG deflate now goes through miniz (level 2) instead of stb_image_write's compressor: once the
+  readback no longer stalled, the encoders were the bottleneck. Encoder threads clamp at 16.
+
+### Bugs found during the milestone
+
+- The first ring design mapped the staging buffer before the copy was submitted; WebGPU needs
+  the map to start after the submit, so `enqueue()` finishes and submits the frame's encoder.
+- My first "improvement" of PNG encoding (miniz at zlib's default level 6) was slower than stb's
+  weak compressor (63 vs 103 fps at 720p) although 30% smaller; level 1–2 is both faster and
+  smaller than stb. Measured, not assumed, from then on.
+- The scalar half-to-float conversion made the EXR path render-thread bound (37 fps at 720p);
+  a lookup table and a per-value FNV over the float bits doubled it.
+
+### Results (Release, Apple M2 Max, orb scene, 300 frames at 60 fps, `--range 0:5`)
+
+| Output | 1280x720 | 1920x1080 |
+|---|---|---|
+| PNG, synchronous readback (before) | 96 fps | 48.7 fps |
+| PNG, readback ring, stb deflate | 103 fps (+7%) | 53.5 fps (+10%) |
+| PNG, readback ring, miniz deflate (after) | 184–189 fps (1.9x) | 88–89 fps (1.8x) |
+| EXR half, readback ring (new) | 83 fps | 41 fps |
+
+The ring alone removed the GPU stall (the render thread waits 0.07–0.10 s in total for the ring
+over 300 frames) but exposed PNG encoding as the limit (0.9–1.6 s waiting for a free encoder
+slot at 8 threads); with miniz the encoder wait is 0.00 s and the remaining cost is the render
+thread itself (engine update, pass encoding, row copy and hashing). PNG files are ~19% smaller
+than before (1080p frame: 0.87 MB vs 1.13 MB). Sequence hashes are unchanged by the ring
+(`47ae193a93ac6ab0` at 720p, `bb0160373da6b8ef` at 1080p, identical to the synchronous build)
+and the ring-vs-`renderToImage` test compares 20 frames hash for hash. EXR at 720p writes
+1.34 MB frames (ZIP); the emissive orb reads > 1.0 in linear light where the PNG is clipped.
+
+### Tests
+
+353 cases (was 349): EXR round trips (half exact, float, errors), the EXR settings kind and JSON,
+ring vs. synchronous path (20 frames), EXR render job (readable, brighter than 1.0, equal to the
+synchronous float readback, byte-identical re-render). Debug and Release: all pass, zero warnings.
+
+### Investigation: the first renderer's 1-LSB difference
+
+Reproduction (`AVGEN_NO_WARMUP=1 avgen --queue jobs.json --log debug`, three identical jobs on
+the orb scene at 96x64, 10 frames each): job A's frame 1 hashes differently from jobs B and C,
+which agree with each other; with the warm-up all three agree. Bisection by project variants
+(`post/bloom/enabled` false; `particles/sparks/enabled` false; both; everything off including
+DoF, motion blur, grain, vignette, lens):
+
+| Variant | Differing frames (job A vs B/C) |
+|---|---|
+| defaults (bloom + sparks) | 1 |
+| bloom off | 1 |
+| sparks off | 3 |
+| bloom + sparks off | 3, 4, 5 |
+| everything off, 96x64 | 3, 4, 5 |
+| everything off, 640x480 | 1, 2, 3 |
+| everything off, 48x32 | none |
+
+So no pass is responsible: the difference survives with only the scene pass (lit PBR, grid) and
+the tonemap left, and *moves* with frame cost (slower frames: earlier indices; fewer passes:
+later indices), i.e. it is a window of wall time after the pipelines are created, not a frame
+count. The pixels: 1–4 per 6144, isolated, ±1 in a single channel, scattered (mostly on the
+grid), never a region or a row: a shader arithmetic (rounding/contraction) variant, not a stale
+texture, uninitialised uniform or missing clear. Confirmation: a 1 s sleep after creating the
+job's renderer, with no warm-up renderer and no draws, makes job A identical to B and C; 100 ms
+does not for the fast variant; a warm-up that only creates a renderer (pipelines compiled,
+nothing drawn) does not help, the two-frame warm-up does. Conclusion: Metal replaces the GPU
+binaries of freshly compiled pipelines shortly after creation/first use with a variant that
+rounds differently in a few pixels; Dawn caches pipeline objects device-wide by descriptor, so
+a throwaway renderer that draws two frames warms exactly the pipelines the real renderer gets.
+No engine-side fix is cheap and clearly correct (a sleep would be timing-dependent), so the
+warm-up stays, now documented at the call site with the `AVGEN_NO_WARMUP=1` switch to
+reproduce. The live application is unaffected in practice (its first frames are never captured).
+
+### Known limitations
+
+- EXR is encoder- and render-thread-bound (41 fps at 1080p): ZIP through miniz, half data only,
+  no AOVs; the per-frame float hash is FNV over the float bits (not byte-wise like PNG).
+- The render thread still copies rows and hashes on its own thread; moving the hash to the
+  encoder threads (folding in frame order at finish) would raise the PNG ceiling further.
+- The first-renderer quirk is a driver behaviour observed on one machine (macOS 26, M2 Max,
+  Dawn v20260907); the warm-up costs two small frames per job.
+
+### Next step
+
+Milestone 1.2 (live performance outputs), then AOVs (depth, velocity, emissive) as extra EXR
+channels and temporal supersampling for motion blur in the offline path.
