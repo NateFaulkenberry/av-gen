@@ -2146,3 +2146,52 @@ TEST_CASE("A tube sweeps a tapering profile along its curve", "[procedural][tube
     bent.curve.end = {1.0f, 4.0f, 0.0f};
     CHECK(spec.structuralHash() != bent.structuralHash());
 }
+
+// Decimation (ADR-045). Photogrammetry arrives at film density -- a scanned cliff is over a
+// million triangles -- and an environment made of them cannot hold a frame rate, so imported
+// meshes get a budget. What matters is that the shape survives, not that the topology does.
+TEST_CASE("Decimation cuts triangles while keeping the silhouette", "[procedural][decimate]") {
+    const MeshData dense = makeUvSphere(1.0f, 96, 64);
+    const auto denseTris = static_cast<int>(dense.indices.size() / 3);
+    REQUIRE(denseTris > 8000);
+
+    const MeshData coarse = decimateMesh(dense, 1200);
+    const auto coarseTris = static_cast<int>(coarse.indices.size() / 3);
+    INFO("dense " << denseTris << " -> coarse " << coarseTris);
+    CHECK(coarseTris < denseTris / 2);
+    CHECK(coarseTris > 100);
+    CHECK(sameMesh(coarse, decimateMesh(dense, 1200))); // deterministic
+
+    // The silhouette survives: every kept vertex still sits near the unit sphere, and the mesh
+    // still spans it. A decimator that shrank the shape would pass a triangle count and fail here.
+    float minRadius = 1e9f;
+    float maxRadius = 0.0f;
+    for (const Vertex& v : coarse.vertices) {
+        const float r = glm::length(v.position);
+        minRadius = std::min(minRadius, r);
+        maxRadius = std::max(maxRadius, r);
+        CHECK_THAT(static_cast<double>(glm::length(v.normal)), WithinAbs(1.0, 1e-3));
+    }
+    CHECK(minRadius > 0.9f);
+    CHECK(maxRadius < 1.05f);
+
+    // No triangle collapsed to a line or a point.
+    for (std::size_t i = 0; i + 2 < coarse.indices.size(); i += 3) {
+        CHECK(coarse.indices[i] != coarse.indices[i + 1]);
+        CHECK(coarse.indices[i + 1] != coarse.indices[i + 2]);
+        CHECK(coarse.indices[i] != coarse.indices[i + 2]);
+    }
+
+    // A budget at or above the input is a pass-through, so an asset under budget is untouched.
+    CHECK(sameMesh(decimateMesh(dense, denseTris), dense));
+    CHECK(sameMesh(decimateMesh(dense, 0), dense));
+
+    // Smaller budgets are monotonic: asking for less never gives more.
+    int previous = denseTris;
+    for (const int budget : {6000, 3000, 1500, 600, 200}) {
+        const auto count = static_cast<int>(decimateMesh(dense, budget).indices.size() / 3);
+        INFO("budget " << budget);
+        CHECK(count <= previous);
+        previous = count;
+    }
+}

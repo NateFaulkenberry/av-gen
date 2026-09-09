@@ -103,6 +103,10 @@ struct SourceSpec {
     // as a generated primitive. The renderer is not the artist: the asset supplies what a thing
     // looks like and the procedural system supplies where, how many, and how varied.
     std::string asset;             // path as written; resolved through the AssetRegistry
+    // Triangle budget for an imported mesh, applied once at resolve time. Photogrammetry assets
+    // arrive at film density -- a single scanned cliff can be 1.5 million triangles -- and an
+    // environment made of them will not hold a frame rate. 0 keeps the asset as authored.
+    int meshBudget = 0;
     // Runtime, filled by the Composition when it resolves `asset`; never serialised, and part of
     // no hash except through `asset` itself.
     std::shared_ptr<const MeshData> assetMesh;
@@ -142,6 +146,11 @@ struct SourceSpec {
 // Levels 2 and 3 are drawn through the shader's Point path (camera-facing), so they need no
 // orientation of their own. Pure and deterministic: the same spec/level always gives the same mesh.
 [[nodiscard]] Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize = 1.0f);
+// Vertex-clustering decimation (ADR-045): snaps vertices to a grid sized from `targetTriangles`,
+// welds each cell to one averaged vertex and drops the triangles that collapse. Deterministic and
+// linear in the input. It suits scanned organic shapes, where the silhouette matters and the
+// topology does not; it is the wrong tool for hard-surface geometry with sharp creases.
+[[nodiscard]] MeshData decimateMesh(const MeshData& mesh, int targetTriangles);
 // Half-diagonal of the source's axis-aligned bounds (the bounding-sphere radius the cull pass
 // scales by the instance scale).
 [[nodiscard]] float sourceBoundingRadius(const SourceSpec& spec);

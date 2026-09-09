@@ -1708,14 +1708,26 @@ void Composition::rebuild() {
                     // The asset's own material, unless the scene deliberately overrode it. An
                     // imported material with no textures is the same "flat grey blob" problem
                     // procedural geometry has, so its texture refs are remapped into this scene.
-                    if (!node.proceduralMaterialAuthored) {
-                        if (const Material* m = dominantAssetMaterial(asset)) {
-                            Material resolved = *m;
-                            offsetMaterialTextures(resolved, textureOffset);
-                            resolved.program = node.proceduralRest.material.program;
-                            pg.material = resolved;
-                            mutableNode.proceduralRest.material = resolved;
+                    if (const Material* m = dominantAssetMaterial(asset)) {
+                        Material resolved = *m;
+                        offsetMaterialTextures(resolved, textureOffset);
+                        resolved.program = node.proceduralRest.material.program;
+                        if (node.proceduralMaterialAuthored) {
+                            // Textures come from the asset, factors from the author. That split is
+                            // what lets one curated library become several biomes: the mesh and its
+                            // maps stay put while base colour, emission and roughness are retuned
+                            // per scene. An author who wants the asset's own colour simply omits
+                            // the material block.
+                            const Material& authored = node.proceduralRest.material;
+                            resolved.baseColor = authored.baseColor;
+                            resolved.opacity = authored.opacity;
+                            resolved.emissiveColor = authored.emissiveColor;
+                            resolved.emissiveIntensity = authored.emissiveIntensity;
+                            resolved.roughness = authored.roughness;
+                            resolved.metallic = authored.metallic;
                         }
+                        pg.material = resolved;
+                        mutableNode.proceduralRest.material = resolved;
                     }
                     (void)meshOffset;
                 }

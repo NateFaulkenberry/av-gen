@@ -113,6 +113,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <unordered_map>
 #include <string>
 #include <utility>
 
@@ -782,6 +783,7 @@ std::uint64_t SourceSpec::structuralHash() const {
         h.i32(bevelSegments);
         break;
     case PrimitiveKind::Mesh:
+        h.i32(meshBudget);
         h.u64(asset.size());
         for (const char c : asset) {
             h.u32(static_cast<std::uint8_t>(c));
@@ -1370,7 +1372,7 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
         if (!spec.assetMesh) {
             return fail("mesh source '{}' has not been resolved", spec.asset);
         }
-        return *spec.assetMesh;
+        return spec.meshBudget > 0 ? decimateMesh(*spec.assetMesh, spec.meshBudget) : *spec.assetMesh;
     case PrimitiveKind::Point:
         return makePointQuad(spec.pointSize);
     case PrimitiveKind::Procedural:
@@ -1383,7 +1385,90 @@ float sourceBoundingRadius(const SourceSpec& spec) {
     return std::max(glm::length(sourceHalfExtent(spec)), 1e-4f);
 }
 
+// Vertex-clustering decimation. The grid is sized so its occupied cells land near the requested
+// triangle count; each cell collapses to one vertex averaged over its members, and any triangle
+// whose corners fall in fewer than three distinct cells disappears. Deterministic: the grid comes
+// from the mesh's own bounds and the target, and the averaging order follows vertex order.
+MeshData decimateMesh(const MeshData& mesh, int targetTriangles) {
+    const auto triangleCount = static_cast<int>(mesh.indices.size() / 3);
+    if (targetTriangles <= 0 || triangleCount <= targetTriangles || mesh.vertices.empty()) {
+        return mesh;
+    }
+    glm::vec3 lo(std::numeric_limits<float>::max());
+    glm::vec3 hi(std::numeric_limits<float>::lowest());
+    for (const Vertex& v : mesh.vertices) {
+        lo = glm::min(lo, v.position);
+        hi = glm::max(hi, v.position);
+    }
+    const glm::vec3 size = glm::max(hi - lo, glm::vec3(1e-6f));
+    // Roughly two triangles per occupied cell on a surface, and a surface occupies about n^2 of
+    // an n^3 grid, so n ~ sqrt(target / 2). Clamped so a tiny budget still leaves a shape.
+    const float target = static_cast<float>(std::max(targetTriangles, 8));
+    const auto n = static_cast<int>(std::clamp(std::sqrt(target * 0.5f), 4.0f, 512.0f));
+    const glm::vec3 cell = size / static_cast<float>(n);
+
+    struct Cluster {
+        glm::vec3 position{0.0f};
+        glm::vec3 normal{0.0f};
+        glm::vec2 uv{0.0f};
+        int count = 0;
+    };
+    std::unordered_map<std::uint64_t, std::uint32_t> cellIndex;
+    std::vector<Cluster> clusters;
+    std::vector<std::uint32_t> remap(mesh.vertices.size());
+    cellIndex.reserve(mesh.vertices.size());
+    for (std::size_t i = 0; i < mesh.vertices.size(); ++i) {
+        const Vertex& v = mesh.vertices[i];
+        const glm::vec3 g = glm::floor((v.position - lo) / cell);
+        const auto cx = static_cast<std::uint64_t>(std::clamp(static_cast<int>(g.x), 0, n));
+        const auto cy = static_cast<std::uint64_t>(std::clamp(static_cast<int>(g.y), 0, n));
+        const auto cz = static_cast<std::uint64_t>(std::clamp(static_cast<int>(g.z), 0, n));
+        const std::uint64_t key = (cx << 42) | (cy << 21) | cz;
+        auto [it, inserted] = cellIndex.emplace(key, static_cast<std::uint32_t>(clusters.size()));
+        if (inserted) {
+            clusters.emplace_back();
+        }
+        Cluster& c = clusters[it->second];
+        c.position += v.position;
+        c.normal += v.normal;
+        c.uv += v.uv;
+        ++c.count;
+        remap[i] = it->second;
+    }
+
+    MeshData out;
+    out.name = mesh.name;
+    out.vertices.reserve(clusters.size());
+    for (const Cluster& c : clusters) {
+        const float inv = 1.0f / static_cast<float>(std::max(c.count, 1));
+        const glm::vec3 normal = c.normal * inv;
+        out.vertices.push_back(Vertex{c.position * inv,
+                                      glm::dot(normal, normal) > 1e-12f ? glm::normalize(normal)
+                                                                        : glm::vec3(0.0f, 1.0f, 0.0f),
+                                      c.uv * inv});
+    }
+    out.indices.reserve(mesh.indices.size());
+    for (std::size_t i = 0; i + 2 < mesh.indices.size(); i += 3) {
+        const std::uint32_t a = remap[mesh.indices[i]];
+        const std::uint32_t b = remap[mesh.indices[i + 1]];
+        const std::uint32_t c = remap[mesh.indices[i + 2]];
+        if (a != b && b != c && a != c) {
+            out.indices.insert(out.indices.end(), {a, b, c});
+        }
+    }
+    return out;
+}
+
 Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize) {
+    // An imported mesh has no generator parameters to halve, so its levels are decimations of
+    // whatever the budget already left.
+    if (spec.kind == PrimitiveKind::Mesh && level > 0 && level <= 3 && spec.assetMesh) {
+        const auto full = static_cast<int>(spec.assetMesh->indices.size() / 3);
+        const int budget = spec.meshBudget > 0 ? std::min(spec.meshBudget, full) : full;
+        static constexpr std::array<float, 4> kLevelShare{1.0f, 0.35f, 0.12f, 0.04f};
+        return decimateMesh(*spec.assetMesh,
+                            std::max(static_cast<int>(static_cast<float>(budget) * kLevelShare[level]), 24));
+    }
     if (level <= 0) {
         return makeSourceMesh(spec);
     }
@@ -2154,6 +2239,7 @@ json ProceduralGeometry::toJson() const {
         s["subdivisions"] = source.subdivisions;
         s["bevel"] = source.bevel;
         s["asset"] = source.asset;
+        s["meshBudget"] = source.meshBudget;
         s["tubeRadius"] = source.tubeRadius;
         s["tubeTaper"] = source.tubeTaper;
         s["tubeSides"] = source.tubeSides;
@@ -2344,6 +2430,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(s.subdivisions, "subdivisions", readInt);
         AVGEN_PROC_READ(s.bevel, "bevel", readFloat);
         AVGEN_PROC_READ(s.asset, "asset", readString);
+        AVGEN_PROC_READ(s.meshBudget, "meshBudget", readInt);
         AVGEN_PROC_READ(s.tubeRadius, "tubeRadius", readFloat);
         AVGEN_PROC_READ(s.tubeTaper, "tubeTaper", readFloat);
         AVGEN_PROC_READ(s.tubeSides, "tubeSides", readInt);

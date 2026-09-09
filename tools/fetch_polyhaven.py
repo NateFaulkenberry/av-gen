@@ -23,6 +23,10 @@ CURATED = {
     "nature/plants": ["fern_02", "moss_01", "shrub_01", "shrub_02", "shrub_03", "shrub_04",
                       "pachira_aquatica_01", "calathea_orbifolia_01", "anthurium_botany_01",
                       "nettle_plant", "grass_medium_02", "bark_debris_01"],
+    # The large end of the scale hierarchy: without something an order of magnitude bigger than a
+    # boulder, every scene reads as a field of same-sized rocks.
+    "terrain/formations": ["coastal_cliff_02", "coastal_cliff_04", "mountainside", "rock_face_01",
+                           "namaqualand_cliff_02"],
 }
 
 

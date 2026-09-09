@@ -8,8 +8,8 @@
   },
   {
    "name": "Bioluminescent World",
-   "category": "Showcase",
-   "description": "One glowing organism in a dark alien ecosystem: the visual benchmark the renderer is being built towards.",
+   "category": "Look development",
+   "description": "Procedural organism look-dev: the tube primitive and the gill structure, kept as a test rather than a showcase.",
    "project": "world/world.json"
   },
   {
