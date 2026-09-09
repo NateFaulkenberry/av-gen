@@ -1,6 +1,12 @@
 {
  "examples": [
   {
+   "name": "Bioluminescent Grove",
+   "category": "Showcase",
+   "description": "Photogrammetry rocks, roots and vegetation from Poly Haven, placed and varied procedurally under a nocturne rig.",
+   "project": "world/grove.json"
+  },
+  {
    "name": "Bioluminescent World",
    "category": "Showcase",
    "description": "One glowing organism in a dark alien ecosystem: the visual benchmark the renderer is being built towards.",

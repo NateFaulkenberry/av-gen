@@ -53,6 +53,10 @@ struct CompositionNode {
     float roughnessScale = 1.0f;
     ParticleSystem particles;      // settings for kind Particles (name is taken from the node)
     ProceduralGeometry procedural; // settings for kind Procedural (ADR-023; name is taken from the node)
+    // ADR-044: whether the scene file wrote a `material` block for this node. A mesh source takes
+    // the asset's own material unless the scene deliberately overrode it, and "the author wrote
+    // nothing" is not the same as "the author wrote the defaults".
+    bool proceduralMaterialAuthored = false;
     spatial::FieldSpec field;      // settings for kind Field (ADR-025; name is taken from the node; the node
                                    // transform is the field's frame, folded into the FieldSpec at rebuild)
     spatial::Spline spline;        // settings for kind Spline (ADR-026; the node transform is applied to the

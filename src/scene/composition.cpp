@@ -603,6 +603,64 @@ void offsetEntityIds(Entity& e, MeshId meshOffset, TextureId textureOffset) {
     offsetTextureRef(e.material.occlusionTexture, textureOffset);
 }
 
+// ---- imported meshes as instanced sources (ADR-044) ---------------------------------------------
+
+void offsetMaterialTextures(Material& m, TextureId textureOffset) {
+    offsetTextureRef(m.baseColorTexture, textureOffset);
+    offsetTextureRef(m.metallicRoughnessTexture, textureOffset);
+    offsetTextureRef(m.normalTexture, textureOffset);
+    offsetTextureRef(m.emissiveTexture, textureOffset);
+    offsetTextureRef(m.occlusionTexture, textureOffset);
+}
+
+// One instanceable mesh from every visible entity in an asset, each baked by its own transform.
+// A scanned rock is usually a single primitive; a plant is often several, and instancing wants
+// one mesh, so they are merged rather than drawn separately.
+std::shared_ptr<const MeshData> mergedAssetMesh(const assets::SceneAsset& asset) {
+    auto merged = std::make_shared<MeshData>();
+    merged->name = asset.path.stem().string();
+    for (const Entity& e : asset.scene.entities) {
+        if (!e.visible || e.mesh == kInvalidMesh || e.mesh >= asset.scene.meshes.size()) {
+            continue;
+        }
+        const MeshData& src = asset.scene.meshes[e.mesh];
+        const glm::mat4 model = e.transform.matrix();
+        const glm::mat3 normalMatrix = glm::mat3(glm::transpose(glm::inverse(model)));
+        const auto base = static_cast<std::uint32_t>(merged->vertices.size());
+        merged->vertices.reserve(merged->vertices.size() + src.vertices.size());
+        for (const Vertex& v : src.vertices) {
+            Vertex out = v;
+            out.position = glm::vec3(model * glm::vec4(v.position, 1.0f));
+            const glm::vec3 n = normalMatrix * v.normal;
+            out.normal = glm::dot(n, n) > 1e-12f ? glm::normalize(n) : v.normal;
+            merged->vertices.push_back(out);
+        }
+        merged->indices.reserve(merged->indices.size() + src.indices.size());
+        for (const std::uint32_t index : src.indices) {
+            merged->indices.push_back(base + index);
+        }
+    }
+    return merged;
+}
+
+// The material of whichever entity carries the most geometry: for a scanned asset that is the
+// asset's material, and for a multi-material one it is the one a viewer will read as its surface.
+const Material* dominantAssetMaterial(const assets::SceneAsset& asset) {
+    const Material* best = nullptr;
+    std::size_t bestVertices = 0;
+    for (const Entity& e : asset.scene.entities) {
+        if (!e.visible || e.mesh == kInvalidMesh || e.mesh >= asset.scene.meshes.size()) {
+            continue;
+        }
+        const std::size_t count = asset.scene.meshes[e.mesh].vertices.size();
+        if (count > bestVertices) {
+            bestVertices = count;
+            best = &e.material;
+        }
+    }
+    return best;
+}
+
 // Field references inside nested scenes point at the nested file's field names; after flattening
 // every field is renamed "<prefix><name>", so the references follow (idempotent: a name that
 // already starts with the prefix is left alone, which also covers the per-frame re-application).
@@ -1616,6 +1674,52 @@ void Composition::rebuild() {
         }
         case NodeKind::Procedural: {
             ProceduralGeometry pg = node.proceduralRest;
+            // ADR-044: a mesh source is an imported asset. Resolving it here rather than in the
+            // renderer keeps makeSourceMesh a pure function of the spec, and reuses the same
+            // per-asset offsets the glTF nodes use so two objects sharing an asset share its
+            // meshes and textures.
+            // The resolved mesh and material go into the node's rest copy as well as this
+            // frame's: applyProceduralParameters() rebuilds `live` from `rest` every frame, so a
+            // material written only here is overwritten before it ever reaches the GPU.
+            CompositionNode& mutableNode = *nodePtr;
+            if (pg.source.kind == PrimitiveKind::Mesh && !pg.source.asset.empty()) {
+                auto loaded = registry_.loadScene(pg.source.asset);
+                if (!loaded) {
+                    log::warn("procedural '{}': mesh asset '{}': {}", node.name, pg.source.asset,
+                              loaded.error().message);
+                } else {
+                    const assets::SceneAsset& asset = **loaded;
+                    const std::string key = asset.path.string();
+                    auto it = assetOffsets.find(key);
+                    if (it == assetOffsets.end()) {
+                        const auto offsets = std::make_pair(static_cast<MeshId>(scene_.meshes.size()),
+                                                            static_cast<TextureId>(scene_.textures.size()));
+                        for (const auto& mesh : asset.scene.meshes) {
+                            scene_.meshes.push_back(mesh);
+                        }
+                        for (const auto& texture : asset.scene.textures) {
+                            scene_.textures.push_back(texture);
+                        }
+                        it = assetOffsets.emplace(key, offsets).first;
+                    }
+                    const auto [meshOffset, textureOffset] = it->second;
+                    pg.source.assetMesh = mergedAssetMesh(asset);
+                    mutableNode.proceduralRest.source.assetMesh = pg.source.assetMesh;
+                    // The asset's own material, unless the scene deliberately overrode it. An
+                    // imported material with no textures is the same "flat grey blob" problem
+                    // procedural geometry has, so its texture refs are remapped into this scene.
+                    if (!node.proceduralMaterialAuthored) {
+                        if (const Material* m = dominantAssetMaterial(asset)) {
+                            Material resolved = *m;
+                            offsetMaterialTextures(resolved, textureOffset);
+                            resolved.program = node.proceduralRest.material.program;
+                            pg.material = resolved;
+                            mutableNode.proceduralRest.material = resolved;
+                        }
+                    }
+                    (void)meshOffset;
+                }
+            }
             pg.name = sanitise(prefix_) + node.name;
             prefixFieldReferences(pg, sanitise(prefix_));
             pg.distributionTransform = Transform::fromMatrix(nodeT.matrix() * pg.distributionTransform.matrix());
@@ -2890,6 +2994,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return fail("scene file '{}': node '{}': {}", scenePath.string(), node.name, pg.error().message);
                 }
                 node.procedural = std::move(*pg);
+                node.proceduralMaterialAuthored = item.at("procedural").contains("material");
             }
             if (item.contains("particles")) {
                 auto particles = particlesFromJson(item.at("particles"));

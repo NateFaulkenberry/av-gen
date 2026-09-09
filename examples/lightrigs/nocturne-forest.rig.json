@@ -1,0 +1,53 @@
+{
+  "format": "avgen-lightrig",
+  "version": 1,
+  "name": "NocturneForest",
+  "description": "A dim cool overhead and almost nothing else. Built for scanned natural surfaces: any tint in the rig paints itself onto every rock in frame, so the colour is left to the organisms and the atmosphere.",
+  "keyIntensity": 0.55,
+  "ambientIntensity": 0.05,
+  "ambientColor": [0.30, 0.42, 0.62],
+  "ambientTemperature": 9000,
+  "lights": [
+    {
+      "name": "moon",
+      "type": "directional",
+      "role": "key",
+      "azimuth": 148.0,
+      "elevation": 58.0,
+      "distance": 3.0,
+      "intensity": 1.0,
+      "color": [0.78, 0.86, 1.0],
+      "temperature": 8200,
+      "castsShadow": true,
+      "shadowStrength": 0.85,
+      "softness": 2.6,
+      "volumetric": 0.08,
+      "followCamera": false
+    },
+    {
+      "name": "skyfill",
+      "type": "directional",
+      "role": "fill",
+      "azimuth": -40.0,
+      "elevation": 20.0,
+      "distance": 3.0,
+      "intensity": 0.12,
+      "color": [0.52, 0.66, 1.0],
+      "temperature": 11000,
+      "castsShadow": false,
+      "volumetric": 0.0,
+      "followCamera": false
+    },
+    {
+      "name": "ambient",
+      "type": "directional",
+      "role": "ambient",
+      "azimuth": 0.0,
+      "elevation": 82.0,
+      "distance": 4.0,
+      "intensity": 1.0,
+      "castsShadow": false,
+      "followCamera": false
+    }
+  ]
+}

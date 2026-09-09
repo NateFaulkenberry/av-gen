@@ -1,0 +1,52 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Bioluminescent Grove"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "grove.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/lens/focalLength": 30.0,
+  "camera/lens/aperture": 2.0,
+  "camera/lens/focusDistance": 7.4,
+  "camera/lens/shutterAngle": 172.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 1.5,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.5,
+  "post/bloom/threshold": 1.1,
+  "post/bloom/radius": 1.15,
+  "post/bloom/emissionWeight": 1.35,
+  "post/halation/enabled": true,
+  "post/halation/intensity": 0.18,
+  "post/halation/threshold": 2.2,
+  "post/dof/enabled": true,
+  "post/dof/physical": true,
+  "post/grade/contrast": 1.06,
+  "post/grade/saturation": 1.0,
+  "post/grade/temperature": -0.04,
+  "post/output/vignette": 0.46,
+  "post/output/grain": 0.03
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "tracks": [],
+  "cues": []
+ },
+ "render": {
+  "width": 1280,
+  "height": 720,
+  "fps": 24,
+  "output": "sequence",
+  "path": "renders/grove"
+ }
+}

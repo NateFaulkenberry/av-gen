@@ -24,6 +24,8 @@
 #include "spatial/effector.hpp"
 #include "spatial/field.hpp"
 #include "spatial/spline.hpp"
+
+#include <memory>
 #include "spatial/point_cloud.hpp"
 #include "spatial/spatial_ops.hpp"
 #include "spatial/spline.hpp"
@@ -51,7 +53,7 @@ namespace avgen::scene {
 // source mesh is used and its cloud is composed under each of this object's placements
 // (hierarchical instancing, ADR-029). The referenced object may itself reference another
 // (depth <= kMaxHierarchyDepth; cycles are rejected by validate through the scene).
-enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point, Procedural, Tube };
+enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point, Procedural, Tube, Mesh };
 [[nodiscard]] const char* primitiveKindName(PrimitiveKind kind);
 [[nodiscard]] std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name);
 
@@ -96,6 +98,14 @@ struct SourceSpec {
     float pointSize = 0.05f;       // quad edge (units); scaled by the instance scale
     // Procedural
     std::string reference;         // name of the referenced procedural object (kind Procedural)
+    // Mesh (ADR-044): an imported glTF/GLB asset as the source, so a scanned rock or an authored
+    // fern goes through the same instancing, culling, LOD, variation and distribution machinery
+    // as a generated primitive. The renderer is not the artist: the asset supplies what a thing
+    // looks like and the procedural system supplies where, how many, and how varied.
+    std::string asset;             // path as written; resolved through the AssetRegistry
+    // Runtime, filled by the Composition when it resolves `asset`; never serialised, and part of
+    // no hash except through `asset` itself.
+    std::shared_ptr<const MeshData> assetMesh;
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const; // changes whenever the mesh would change

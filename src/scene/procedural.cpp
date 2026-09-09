@@ -474,6 +474,18 @@ glm::vec3 sourceHalfExtent(const SourceSpec& s) {
         return glm::vec3(s.pointSize * 0.5f);
     case PrimitiveKind::Procedural:
         return glm::vec3(0.0f); // resolved through the referenced object (detail::sourceHalfExtent)
+    case PrimitiveKind::Mesh: {
+        // The imported mesh's own bounds; without it (not yet resolved) a unit box is a safe
+        // placeholder that keeps the culler from discarding the object outright.
+        if (!s.assetMesh || s.assetMesh->vertices.empty()) {
+            return glm::vec3(0.5f);
+        }
+        glm::vec3 extent(0.0f);
+        for (const Vertex& v : s.assetMesh->vertices) {
+            extent = glm::max(extent, glm::abs(v.position));
+        }
+        return extent;
+    }
     case PrimitiveKind::Tube: {
         // A handful of samples along the curve, grown by the widest the profile ever gets. The
         // culler only needs a bound that contains the tube, and meshing it here would be waste.
@@ -524,13 +536,16 @@ const char* primitiveKindName(PrimitiveKind kind) {
         return "procedural";
     case PrimitiveKind::Tube:
         return "tube";
+    case PrimitiveKind::Mesh:
+        return "mesh";
     }
     return "cylinder";
 }
 
 std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name) {
     for (const auto kind : {PrimitiveKind::Box, PrimitiveKind::Cylinder, PrimitiveKind::Sphere, PrimitiveKind::Torus,
-                            PrimitiveKind::Point, PrimitiveKind::Procedural, PrimitiveKind::Tube}) {
+                            PrimitiveKind::Point, PrimitiveKind::Procedural, PrimitiveKind::Tube,
+                            PrimitiveKind::Mesh}) {
         if (name == primitiveKindName(kind)) {
             return kind;
         }
@@ -678,6 +693,11 @@ Result<void> SourceSpec::validate() const {
             return fail("box bevelSegments must be in 1..16 (got {})", bevelSegments);
         }
         break;
+    case PrimitiveKind::Mesh:
+        if (asset.empty()) {
+            return fail("mesh source needs an asset path");
+        }
+        break;
     case PrimitiveKind::Tube:
         if (!(tubeRadius > 0.0f)) {
             return fail("tube radius must be positive (got {})", tubeRadius);
@@ -760,6 +780,12 @@ std::uint64_t SourceSpec::structuralHash() const {
         h.boolean(caps);
         h.f32(bevel);
         h.i32(bevelSegments);
+        break;
+    case PrimitiveKind::Mesh:
+        h.u64(asset.size());
+        for (const char c : asset) {
+            h.u32(static_cast<std::uint8_t>(c));
+        }
         break;
     case PrimitiveKind::Tube:
         h.f32(tubeRadius);
@@ -1340,6 +1366,11 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
     case PrimitiveKind::Tube:
         return makeTube(spec.curve, spec.tubeRadius, spec.tubeTaper, spec.tubeSides, spec.tubeSegments,
                         spec.tubeTwist, spec.tubeCaps);
+    case PrimitiveKind::Mesh:
+        if (!spec.assetMesh) {
+            return fail("mesh source '{}' has not been resolved", spec.asset);
+        }
+        return *spec.assetMesh;
     case PrimitiveKind::Point:
         return makePointQuad(spec.pointSize);
     case PrimitiveKind::Procedural:
@@ -2122,6 +2153,7 @@ json ProceduralGeometry::toJson() const {
         s["size"] = vecToJson(source.size);
         s["subdivisions"] = source.subdivisions;
         s["bevel"] = source.bevel;
+        s["asset"] = source.asset;
         s["tubeRadius"] = source.tubeRadius;
         s["tubeTaper"] = source.tubeTaper;
         s["tubeSides"] = source.tubeSides;
@@ -2311,6 +2343,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(s.size, "size", readVec3);
         AVGEN_PROC_READ(s.subdivisions, "subdivisions", readInt);
         AVGEN_PROC_READ(s.bevel, "bevel", readFloat);
+        AVGEN_PROC_READ(s.asset, "asset", readString);
         AVGEN_PROC_READ(s.tubeRadius, "tubeRadius", readFloat);
         AVGEN_PROC_READ(s.tubeTaper, "tubeTaper", readFloat);
         AVGEN_PROC_READ(s.tubeSides, "tubeSides", readInt);
@@ -2637,7 +2670,7 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
 
     // Source
     const SourceSpec& s = rest.source;
-    r.i("source/kind", static_cast<int>(s.kind), 0, 6, 0, 6);
+    r.i("source/kind", static_cast<int>(s.kind), 0, 7, 0, 7);
     p.sourceSize = r.v3("source/size", s.size, 0.001f, 1000.0f, 0.01f, 10.0f);
     r.i("source/subdivisions", s.subdivisions, 1, 64, 1, 16);
     r.f("source/bevel", s.bevel, 0.0f, 1e3f, 0.0f, 1.0f);
@@ -2850,7 +2883,7 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
     }
     // Source
     SourceSpec& s = live.source;
-    copyEnum(p, "source/kind", s.kind, 6);
+    copyEnum(p, "source/kind", s.kind, 7);
     copyValue(p, "source/size", s.size);
     copyValue(p, "source/subdivisions", s.subdivisions);
     copyValue(p, "source/bevel", s.bevel);
