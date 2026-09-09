@@ -35,6 +35,7 @@ struct OscMessage {
     std::vector<OscArg> args;
     std::uint64_t timeTag = 1;      // NTP 64-bit; 1 = immediately (also for bare messages)
     std::string typeTags;           // as received, without the leading ','
+    std::string sender;             // "ip:port" of the packet's source (filled by the receiver; "" otherwise)
 
     // Conveniences: numeric arguments read as float (bool -> 0/1, int -> float); missing -> fallback.
     [[nodiscard]] float number(std::size_t index, float fallback = 0.0f) const;

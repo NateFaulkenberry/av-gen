@@ -8,6 +8,11 @@
 //      "<prefix>/signal/<channel> f" sets a control signal, "<prefix>/pulse/<channel> [f]" fires
 //      one, "<prefix>/preset/recall s", "<prefix>/preset/morph s s f", "<prefix>/transport/play|
 //      pause|stop|toggle", "<prefix>/transport/seek f". Prefix defaults to "/avgen".
+//   3. Query and feedback (follow-up): "<prefix>/query s<path>" (or "<prefix>/query/<path>")
+//      answers "<prefix>/param/<path> f..." to the sender (or the feedback host);
+//      "<prefix>/query/all" answers every serialised parameter in bundles; "<prefix>/query/
+//      presets" answers "<prefix>/presets s...". With feedback enabled and a host set, parameter
+//      base values that change (other than through OSC) are pushed as "<prefix>/param/<path>".
 // Saved in the project under "control". Pure functions here; sockets and devices live in the
 // osc/midi modules and the app's ControlHub.
 
@@ -65,6 +70,9 @@ struct ControlMap {
     std::string oscBind = "0.0.0.0";
     std::string oscPrefix = "/avgen";
     bool directOsc = true;       // accept the direct scheme
+    std::string feedbackHost;    // "" = replies go to the sender only, no pushed feedback
+    std::uint16_t feedbackPort = 9001;
+    bool feedbackEnabled = false; // push parameter changes to feedbackHost:feedbackPort
     bool midiEnabled = true;
     std::string midiFilter = "*";
     std::vector<MidiBinding> midi;
@@ -94,9 +102,10 @@ struct Match {
 // Direct OSC commands.
 struct DirectCommand {
     enum class Kind : std::uint8_t {
-        SetParameter, SetSignal, Pulse, PresetRecall, PresetMorph, Play, Pause, Stop, Toggle, Seek
+        SetParameter, SetSignal, Pulse, PresetRecall, PresetMorph, Play, Pause, Stop, Toggle, Seek,
+        Query, QueryAll, QueryPresets
     } kind = Kind::SetParameter;
-    std::string path;            // parameter path / channel / preset name (or preset A)
+    std::string path;            // parameter path / channel / preset name (or preset A) / queried path
     std::string second;          // preset B for morph
     std::vector<float> values;   // numeric arguments (components, morph t, seek seconds, pulse strength)
 };
@@ -105,5 +114,7 @@ struct DirectCommand {
 [[nodiscard]] std::optional<DirectCommand> parseDirectOsc(const OscMessage& message, std::string_view prefix);
 // The OSC address for a parameter path under the prefix (for the UI / feedback): "/avgen/param/orb/scale".
 [[nodiscard]] std::string parameterAddress(std::string_view prefix, std::string_view path);
+// Splits "ip:port" (as OscMessage::sender / OscReceiver::Stats::lastSender) into its parts.
+[[nodiscard]] bool splitHostPort(std::string_view text, std::string& host, std::uint16_t& port);
 
 } // namespace avgen::control

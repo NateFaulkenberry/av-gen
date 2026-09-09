@@ -483,9 +483,66 @@ Result<std::unique_ptr<Composition>> Composition::loadChild(const std::filesyste
     return loadNested(resolved, registry_, depth_ + 1, std::move(chain));
 }
 
+bool Composition::wouldCycle(const std::string& node, const std::string& parent) const {
+    // Walk up from `parent`; reaching `node` (or looping longer than the node count) is a cycle.
+    std::string current = parent;
+    for (std::size_t guard = 0; !current.empty() && guard <= nodes_.size(); ++guard) {
+        if (current == node) {
+            return true;
+        }
+        const CompositionNode* p = findNode(current);
+        if (p == nullptr) {
+            return false; // unresolved parent: a root
+        }
+        current = p->parent;
+    }
+    return !current.empty();
+}
+
+Result<void> Composition::setParent(const std::string& name, const std::string& parent) {
+    CompositionNode* node = findNode(name);
+    if (node == nullptr) {
+        return fail("node '{}' not found", name);
+    }
+    if (!parent.empty()) {
+        if (parent == name || wouldCycle(name, parent)) {
+            return fail("node '{}': parent '{}' would form a cycle", name, parent);
+        }
+        if (findNode(parent) == nullptr) {
+            log::warn("composition '{}': node '{}' parent '{}' not found (treated as root)", name_, name, parent);
+        }
+    }
+    node->parent = parent;
+    dirty_ = true;
+    return {};
+}
+
+Transform Composition::nodeWorldTransform(const CompositionNode& node) const {
+    Transform world = nodeTransform(node);
+    const CompositionNode* current = &node;
+    for (std::size_t guard = 0; !current->parent.empty() && guard < nodes_.size(); ++guard) {
+        const CompositionNode* parent = findNode(current->parent);
+        if (parent == nullptr || parent == &node) {
+            break; // unresolved parent (root) or a cycle (edited in place): stop here
+        }
+        world = compose(nodeTransform(*parent), world);
+        current = parent;
+    }
+    return world;
+}
+
 Result<CompositionNode*> Composition::addNode(CompositionNode node) {
     const std::string base = node.name.empty() ? std::string(nodeKindName(node.kind)) : sanitise(node.name);
     node.name = uniqueName(base);
+    if (!node.parent.empty()) {
+        if (node.parent == node.name || wouldCycle(node.name, node.parent)) {
+            return fail("node '{}': parent '{}' would form a cycle", node.name, node.parent);
+        }
+        if (findNode(node.parent) == nullptr) {
+            log::warn("composition '{}': node '{}' parent '{}' not found (treated as root)", name_, node.name,
+                      node.parent);
+        }
+    }
     node.sceneAsset.reset();
     node.child.reset();
     node.positionParam = nullptr;
@@ -541,12 +598,24 @@ bool Composition::removeNode(const std::string& name) {
         return false;
     }
     unregisterNodeParameters(**it);
+    const std::string grandParent = (*it)->parent;
     nodes_.erase(it);
+    for (auto& other : nodes_) {
+        if (other->parent == name) {
+            other->parent = grandParent; // children keep their local transforms under the grandparent
+        }
+    }
     dirty_ = true;
     return true;
 }
 
 CompositionNode* Composition::findNode(const std::string& name) {
+    const auto it = std::find_if(nodes_.begin(), nodes_.end(),
+                                 [&](const std::unique_ptr<CompositionNode>& n) { return n->name == name; });
+    return it == nodes_.end() ? nullptr : it->get();
+}
+
+const CompositionNode* Composition::findNode(const std::string& name) const {
     const auto it = std::find_if(nodes_.begin(), nodes_.end(),
                                  [&](const std::unique_ptr<CompositionNode>& n) { return n->name == name; });
     return it == nodes_.end() ? nullptr : it->get();
@@ -768,7 +837,7 @@ void Composition::rebuild() {
         NodeRange range;
         range.firstEntity = scene_.entities.size();
         range.firstParticle = scene_.particles.size();
-        const Transform nodeT = nodeTransform(node);
+        const Transform nodeT = nodeWorldTransform(node);
         const bool visible = nodeVisible(node);
 
         switch (node.kind) {
@@ -1015,7 +1084,7 @@ void Composition::applyParameters() {
             node.roughnessScale = node.roughnessParam->base();
         }
 
-        const Transform nodeT = nodeTransform(node);
+        const Transform nodeT = nodeWorldTransform(node);
         const bool visible = nodeVisible(node);
         const float emissiveBoost =
             node.emissiveParam != nullptr ? node.emissiveParam->value() : node.emissiveBoost;
@@ -1145,6 +1214,9 @@ nlohmann::json Composition::toJson() const {
         if (!node.asset.empty()) {
             n["asset"] = node.asset.generic_string();
         }
+        if (!node.parent.empty()) {
+            n["parent"] = node.parent;
+        }
         n["position"] = vecToJson(node.transform.position);
         n["rotation"] = vecToJson(node.rotationParam != nullptr ? node.rotationParam->base()
                                                                 : eulerDegrees(node.transform.rotation));
@@ -1254,6 +1326,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         if (!nodes.is_array()) {
             return fail("'nodes' must be an array");
         }
+        std::vector<std::pair<std::string, std::string>> pendingParents; // (node, parent)
         for (const json& item : nodes) {
             if (!item.is_object()) {
                 return fail("scene node must be an object");
@@ -1278,6 +1351,11 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return std::unexpected(asset.error());
             }
             node.asset = *asset;
+            auto parent = readString(item, "parent", "");
+            if (!parent) {
+                return std::unexpected(parent.error());
+            }
+            const std::string parentName = *parent; // applied after every node exists (forward references)
             auto position = readVec<3>(item, "position", node.transform.position);
             auto rotation = readVec<3>(item, "rotation", glm::vec3(0.0f));
             auto scale = readVec<3>(item, "scale", node.transform.scale);
@@ -1317,7 +1395,11 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             const NodeKind nodeKind = node.kind;
             const std::filesystem::path assetPath = node.asset;
             auto added = comp->addNode(std::move(node));
-            if (!added) {
+            if (added) {
+                if (!parentName.empty()) {
+                    pendingParents.emplace_back((*added)->name, parentName);
+                }
+            } else {
                 // A nested scene file that exists but fails is a structural error (cycle, depth,
                 // malformed); a missing asset only costs its node.
                 std::error_code ec;
@@ -1327,6 +1409,16 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 }
                 log::warn("scene '{}': node '{}' skipped: {}", comp->name_, label, added.error().message);
             }
+        }
+        for (const auto& [child, parentName] : pendingParents) {
+            if (parentName == child || comp->wouldCycle(child, parentName)) {
+                return fail("node '{}': parent '{}' forms a cycle", child, parentName);
+            }
+            if (comp->findNode(parentName) == nullptr) {
+                log::warn("scene '{}': node '{}' parent '{}' not found (treated as root)", comp->name_, child,
+                          parentName);
+            }
+            comp->findNode(child)->parent = parentName;
         }
     }
     return comp;

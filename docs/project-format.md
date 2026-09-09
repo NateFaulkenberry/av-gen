@@ -145,7 +145,8 @@ scene (`"kind": "scene"`, nested up to four levels; a file that includes itself 
     { "name": "floor", "kind": "grid" },
     { "name": "dust", "kind": "particles",
       "particles": { "maxParticles": 20000, "spawnRate": 400, "shape": "sphere", "blend": "additive" } },
-    { "name": "backdrop", "kind": "scene", "asset": "scenes/backdrop.json", "position": [0, 0, -6] }
+    { "name": "backdrop", "kind": "scene", "asset": "scenes/backdrop.json", "position": [0, 0, -6] },
+    { "name": "lamp", "kind": "orb", "parent": "helmet", "position": [0, 1.2, 0], "scale": [0.2, 0.2, 0.2] }
   ]
 }
 ```
@@ -154,6 +155,14 @@ Node kinds: `gltf` (a glTF 2.0 file; instances of the same file share meshes and
 `orb` (the built-in orb mesh and material), `grid` (the reference floor), `particles` (a GPU
 particle system, every `ParticleSystem` field optional with the defaults from `docs/rendering.md`),
 `scene` (another scene file). `camera.distance` 0 means "fit to the scene bounds".
+
+`parent` names another node of the same file: the node's world transform is the parent's world
+transform times its own local one (authored rest values plus the `nodes/<name>/position`,
+`rotation`, `scale` parameter offsets), evaluated up the chain, so moving, rotating or scaling
+a parent (by hand or by modulation) carries its children and grandchildren. Nodes may appear in
+any order; a parent that does not exist is a warning and the node behaves as a root; a cycle
+is an error (also for `Composition::addNode` / `setParent`). Removing a node re-parents its
+children to its parent. Parameter paths stay `nodes/<name>/…` regardless of parenting.
 
 Parameters a composition registers (all saveable in a project and modulatable):
 
@@ -171,17 +180,29 @@ Parameters a composition registers (all saveable in a project and modulatable):
 ```json
 "app": { "name": "avgen", "version": "0.1.0" },
 "assets": {
-  "audio": "media/track.wav",
-  "environment": "../hdr/studio.hdr",
-  "scene": { "kind": "composition", "path": "scenes/stage.json" }
-}
+  "audio": { "path": "media/track.wav", "size": 52920044, "sha256": "9f86d0…" },
+  "environment": { "path": "../hdr/studio.hdr", "size": 6291500, "sha256": "e3b0c4…" },
+  "scene": { "kind": "composition", "path": { "path": "scenes/stage.json", "size": 812, "sha256": "…" } }
+},
+"shaders": [ { "path": "shaders/glow.wgsl", "stage": "post", "size": 1201, "sha256": "…" } ]
 ```
 
 `assets.scene.kind` is `orb`, `gltf` (with `path`) or `composition` (with `path`, or `inline`
-holding a whole scene document when the composition was never saved to a file). Every path,
-including `shaders[].path`, is relative to the project file (`..` allowed; absolute only across
-roots). On load the assets are restored first; a missing one is reported in
-`Engine::projectWarnings()` and the rest of the document still applies.
+holding a whole scene document when the composition was never saved to a file). Every file
+reference (`audio`, `environment`, `scene.path`, `shaders[].path`) is an object
+`{ "path", "size", "sha256" }`: the path relative to the project file (`..` allowed; absolute
+only across roots), the byte size and the SHA-256 of the content (hashed on save, streaming;
+`src/core/hash.hpp`). The older bare-string form is still read. Node assets inside scene files
+stay plain paths relative to the scene file.
+
+On load the assets are restored first. A referenced file that is missing is searched for
+under the project folder (recursively, six levels deep): candidates are files with the same
+name, those with the stored size first; with a stored hash a candidate must match it (a
+same-name file with other content is rejected), without one the size (or, for legacy string
+references, the name alone) decides. A hit is used and reported as a warning
+`relinked <audio|environment|scene|shader>: <old> -> <new>` in `Engine::projectWarnings()`
+(the new location is written on the next save); otherwise the usual missing-asset warning
+stands and the rest of the document still applies.
 
 `avgen --export-bundle <dir>` (or File > Export Bundle) copies every referenced file into
 `<dir>/assets/` (scene files are rewritten so their node assets point into the bundle, glTF

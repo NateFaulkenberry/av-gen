@@ -678,6 +678,7 @@ struct OscReceiver::Impl {
             }
             stats.messages += decoded->size();
             for (OscMessage& message : *decoded) {
+                message.sender = stats.lastSender;
                 inbox.push_back(std::move(message));
             }
             const std::size_t limit = queueLimit.load(std::memory_order_relaxed);

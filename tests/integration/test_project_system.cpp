@@ -73,11 +73,14 @@ TEST_CASE("Projects save asset references relative to the file and restore the s
     const auto doc = readJson(project);
     CHECK(doc["version"].get<int>() >= 4);
     CHECK(doc["app"]["name"] == "avgen");
-    CHECK(doc["assets"]["audio"] == "media/tone.wav");
-    CHECK(doc["assets"]["environment"] == "media/sky.hdr");
+    CHECK(doc["assets"]["audio"]["path"] == "media/tone.wav");
+    CHECK(doc["assets"]["audio"]["size"] == fs::file_size(f.wav));
+    CHECK(doc["assets"]["audio"]["sha256"].get<std::string>().size() == 64);
+    CHECK(doc["assets"]["environment"]["path"] == "media/sky.hdr");
     CHECK(doc["assets"]["scene"]["kind"] == "gltf");
-    CHECK(doc["assets"]["scene"]["path"] == "media/tri.glb");
+    CHECK(doc["assets"]["scene"]["path"]["path"] == "media/tri.glb");
     CHECK(doc["shaders"][0]["path"] == "media/layer.wgsl");
+    CHECK(doc["shaders"][0]["sha256"].get<std::string>().size() == 64);
 
     // A fresh engine restores everything from the project alone; the project may be moved as
     // long as its assets move with it.
@@ -123,7 +126,7 @@ TEST_CASE("Composition projects reference the scene file or embed an unsaved com
     REQUIRE(engine.saveProject(project).has_value());
     auto doc = readJson(project);
     CHECK(doc["assets"]["scene"]["kind"] == "composition");
-    CHECK(doc["assets"]["scene"]["path"] == "media/stage.json");
+    CHECK(doc["assets"]["scene"]["path"]["path"] == "media/stage.json");
     CHECK(engine.referencedFiles().size() == 2); // scene file + tri.glb (once)
 
     // Unsaved composition: embedded inline and restored.
@@ -161,7 +164,8 @@ TEST_CASE("Bundles copy every referenced file and reopen from anywhere", "[integ
     const auto scene = readJson(bundle / "assets" / "stage.json");
     CHECK(scene["nodes"][0]["asset"] == "tri.glb");
     const auto doc = readJson(bundle / "project.json");
-    CHECK(doc["assets"]["scene"]["path"] == "assets/stage.json");
+    CHECK(doc["assets"]["scene"]["path"]["path"] == "assets/stage.json");
+    CHECK(doc["assets"]["audio"]["path"] == "assets/tone.wav");
 
     // Delete the originals: the bundle must stand on its own, wherever it is moved.
     const auto elsewhere = fs::temp_directory_path() / "avgen_project_bundle_moved";
@@ -200,4 +204,68 @@ TEST_CASE("New project resets everything but the audio", "[integration][project]
     CHECK(engine.params().find("post/bloom/intensity")->baseComponent(0) != 3.0f);
     FixedStepClock clock(60.0);
     engine.update(engine.tick(clock));
+}
+
+TEST_CASE("Moved assets are relinked by name, size and content hash", "[integration][project][relink]") {
+    Fixture f;
+    const auto project = f.dir / "relink.json";
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadAudio(f.wav).has_value());
+        REQUIRE(engine.addShaderLayer(f.shader, shaders::LayerStage::Background).has_value());
+        REQUIRE(engine.saveProject(project).has_value());
+    }
+    const auto doc = readJson(project);
+    REQUIRE(doc["assets"]["audio"].is_object());
+    CHECK(doc["assets"]["audio"]["size"] == fs::file_size(f.wav));
+    const std::string hash = doc["assets"]["audio"]["sha256"];
+    CHECK(hash.size() == 64);
+
+    SECTION("a file moved into a subfolder is found and relinked") {
+        const auto moved = f.dir / "media" / "moved" / "deeper" / "tone.wav";
+        fs::create_directories(moved.parent_path());
+        fs::rename(f.wav, moved);
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadProject(project).has_value());
+        REQUIRE(engine.projectWarnings().size() == 1);
+        CHECK(engine.projectWarnings()[0].rfind("relinked audio: media/tone.wav -> ", 0) == 0);
+        CHECK(engine.projectWarnings()[0].find("media/moved/deeper/tone.wav") != std::string::npos);
+        CHECK(engine.hasAudio());
+        CHECK(engine.audioPath() == moved.lexically_normal());
+        CHECK(engine.shaderLayers().layers().size() == 1);
+        // Saving again records the new location.
+        REQUIRE(engine.saveProject(project).has_value());
+        CHECK(readJson(project)["assets"]["audio"]["path"] == "media/moved/deeper/tone.wav");
+    }
+    SECTION("a same-name file with different content is rejected by the hash") {
+        fs::remove(f.wav);
+        constexpr std::uint32_t rate = 48000;
+        auto other = audio::AudioFile::fromInterleaved(
+            testsupport::interleave(testsupport::sine(220.0f, rate, rate, 0.5f), 2), 2, rate);
+        const auto impostor = f.dir / "media" / "other" / "tone.wav";
+        fs::create_directories(impostor.parent_path());
+        REQUIRE(other.writeWav(impostor).has_value());
+        CHECK(fs::file_size(impostor) == doc["assets"]["audio"]["size"].get<std::uintmax_t>()); // same size
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadProject(project).has_value());
+        REQUIRE(engine.projectWarnings().size() == 1);
+        CHECK(engine.projectWarnings()[0].rfind("audio: ", 0) == 0); // still missing
+        CHECK_FALSE(engine.hasAudio());
+    }
+    SECTION("a legacy string reference relinks by name alone; shaders relink too") {
+        nlohmann::json legacy = doc;
+        legacy["assets"]["audio"] = "media/tone.wav";
+        legacy["shaders"][0] = {{"path", "media/layer.wgsl"}, {"stage", doc["shaders"][0]["stage"]}};
+        std::ofstream(project) << legacy.dump(2);
+        fs::create_directories(f.dir / "media" / "moved");
+        fs::rename(f.wav, f.dir / "media" / "moved" / "tone.wav");
+        fs::rename(f.shader, f.dir / "media" / "moved" / "layer.wgsl");
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadProject(project).has_value());
+        REQUIRE(engine.projectWarnings().size() == 2);
+        CHECK(engine.projectWarnings()[0].rfind("relinked audio: ", 0) == 0);
+        CHECK(engine.projectWarnings()[1].rfind("relinked shader: ", 0) == 0);
+        CHECK(engine.hasAudio());
+        CHECK(engine.shaderLayers().layers().size() == 1);
+    }
 }
