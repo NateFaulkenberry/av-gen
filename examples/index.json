@@ -49,6 +49,12 @@
       "project": "infinite/infinite.json"
     },
     {
+      "name": "Metallic Reassembly",
+      "category": "Showcase",
+      "description": "A metallic assembly that separates into thousands of parts, floats, gathers and locks back together, then detonates; disassembly is a field, so assembled is simply zero strength.",
+      "project": "reassembly/reassembly.json"
+    },
+    {
       "name": "Worlds (preset morph)",
       "category": "Showcase",
       "description": "One scene, four presets: Cathedral, Temple, Helix, Hyperspace morph into each other on a timeline.",

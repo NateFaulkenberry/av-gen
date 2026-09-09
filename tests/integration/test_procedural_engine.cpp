@@ -120,7 +120,7 @@ TEST_CASE("Projects round-trip procedural scenes and the example worlds load", "
 #ifdef AVGEN_SOURCE_DIR
     const fs::path examples = fs::path(AVGEN_SOURCE_DIR) / "examples";
     for (const char* name : {"temple/temple.json", "lab/lab.json", "cathedral/cathedral.json", "helix/helix.json",
-                             "machine/machine.json", "infinite/infinite.json", "stress/stress.json",
+                             "machine/machine.json", "infinite/infinite.json", "stress/stress.json", "reassembly/reassembly.json",
                              "chamber/chamber.json", "hyperspace/hyperspace.json", "worlds/worlds.json",
                              "benchmark/benchmark.json"}) {
         const auto file = examples / name;
