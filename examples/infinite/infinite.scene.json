@@ -29,7 +29,8 @@
       0.004,
       0.006,
       0.012
-    ]
+    ],
+    "lightRig": "../lightrigs/monumental.rig.json"
   },
   "nodes": [
     {
@@ -255,18 +256,18 @@
         ],
         "material": {
           "baseColor": [
-            0.3,
-            0.29,
-            0.33
+            0.46,
+            0.44,
+            0.42
           ],
           "emissiveColor": [
             0.55,
             0.75,
             1.0
           ],
-          "emissiveIntensity": 0.06,
-          "roughness": 0.55,
-          "metallic": 0.15
+          "emissiveIntensity": 0.02,
+          "roughness": 0.62,
+          "metallic": 0.05
         },
         "materialVariation": {
           "hueGradient": 0.05,
@@ -345,17 +346,17 @@
         ],
         "material": {
           "baseColor": [
-            0.24,
-            0.24,
-            0.28
+            0.4,
+            0.39,
+            0.4
           ],
           "emissiveColor": [
             0.9,
             0.6,
             1.0
           ],
-          "emissiveIntensity": 0.08,
-          "roughness": 0.45,
+          "emissiveIntensity": 0.03,
+          "roughness": 0.55,
           "metallic": 0.25
         },
         "materialVariation": {
@@ -420,17 +421,17 @@
         "emissiveFieldAmount": 2.0,
         "material": {
           "baseColor": [
-            0.16,
-            0.18,
-            0.22
+            0.3,
+            0.32,
+            0.36
           ],
           "emissiveColor": [
             0.4,
             0.95,
             1.0
           ],
-          "emissiveIntensity": 0.5,
-          "roughness": 0.3,
+          "emissiveIntensity": 0.12,
+          "roughness": 0.25,
           "metallic": 0.7
         },
         "materialVariation": {
@@ -503,17 +504,17 @@
         ],
         "material": {
           "baseColor": [
-            0.26,
-            0.25,
-            0.3
+            0.44,
+            0.42,
+            0.4
           ],
           "emissiveColor": [
             1.0,
             0.7,
             0.4
           ],
-          "emissiveIntensity": 0.15,
-          "roughness": 0.5,
+          "emissiveIntensity": 0.05,
+          "roughness": 0.6,
           "metallic": 0.2
         },
         "materialVariation": {
@@ -597,7 +598,7 @@
             0.8,
             1.0
           ],
-          "emissiveIntensity": 0.25,
+          "emissiveIntensity": 0.12,
           "roughness": 0.4,
           "metallic": 0.4
         },
@@ -672,16 +673,16 @@
         "emissiveFieldAmount": 2.5,
         "material": {
           "baseColor": [
-            0.22,
-            0.21,
-            0.26
+            0.34,
+            0.33,
+            0.36
           ],
           "emissiveColor": [
             0.8,
             0.5,
             1.0
           ],
-          "emissiveIntensity": 0.6,
+          "emissiveIntensity": 0.12,
           "roughness": 0.45,
           "metallic": 0.3
         },

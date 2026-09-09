@@ -13,13 +13,13 @@
   },
   "parameters": {
     "post/bloom/enabled": true,
-    "post/bloom/intensity": 1.1,
-    "post/bloom/threshold": 1.05,
+    "post/bloom/intensity": 0.35,
+    "post/bloom/threshold": 1.25,
     "post/tonemap/operator": 1,
     "post/output/vignette": 0.35,
     "post/output/grain": 0.03,
-    "scene/brightness": 0.7,
-    "scene/keyLight": 0.45,
+    "scene/brightness": 0.85,
+    "scene/keyLight": 1.5,
     "scene/fogDensity": 0.01,
     "root/rotationSpeed": 0.0
   },
