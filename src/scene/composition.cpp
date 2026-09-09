@@ -481,13 +481,46 @@ void prefixFieldReferences(ProceduralGeometry& pg, const std::string& prefix) {
     }
     for (auto& d : pg.deformers) {
         d.field = prefixed(prefix, d.field);
+        d.spline = prefixed(prefix, d.spline);
     }
     pg.emissiveField = prefixed(prefix, pg.emissiveField);
+    pg.distribution.spline = prefixed(prefix, pg.distribution.spline);
+    pg.source.reference = prefixed(prefix, pg.source.reference);
+    pg.material.program = prefixed(prefix, pg.material.program);
 }
 void prefixFieldReferences(ParticleSystem& ps, const std::string& prefix) {
     for (auto& f : ps.fieldForces) {
         f.field = prefixed(prefix, f.field);
     }
+    ps.spline = prefixed(prefix, ps.spline);
+}
+void prefixSdfReferences(spatial::SdfNode& node, const std::string& prefix) {
+    node.reference = prefixed(prefix, node.reference);
+    for (auto& child : node.children) {
+        prefixSdfReferences(child, prefix);
+    }
+}
+void prefixFieldReferences(SdfObject& so, const std::string& prefix) {
+    prefixSdfReferences(so.tree.root, prefix);
+    so.material.program = prefixed(prefix, so.material.program);
+}
+void prefixFieldReferences(MaterialProgram& mp, const std::string& prefix) {
+    for (auto& op : mp.ops) {
+        op.field = prefixed(prefix, op.field);
+    }
+}
+// A node's transform applied to a spline: the generated control points become explicit points.
+void foldSplineFrame(spatial::Spline& sp, const Transform& outer) {
+    std::vector<spatial::SplinePoint> pts = sp.controlPoints();
+    const glm::mat4 m = outer.matrix();
+    const glm::mat3 r = glm::mat3(m);
+    for (auto& pt : pts) {
+        pt.position = glm::vec3(m * glm::vec4(pt.position, 1.0f));
+        pt.tangent = r * pt.tangent;
+    }
+    sp.points = std::move(pts);
+    sp.generator = spatial::SplineGenerator::Points;
+    sp.noiseAmount = 0.0f; // already applied by controlPoints()
 }
 void prefixFieldReferences(spatial::FieldSpec& f, const std::string& prefix) {
     for (auto& child : f.children) {
@@ -532,6 +565,10 @@ const char* nodeKindName(NodeKind kind) {
         return "procedural";
     case NodeKind::Field:
         return "field";
+    case NodeKind::Spline:
+        return "spline";
+    case NodeKind::Sdf:
+        return "sdf";
     }
     return "gltf";
 }
@@ -539,7 +576,7 @@ const char* nodeKindName(NodeKind kind) {
 Result<NodeKind> nodeKindFromName(const std::string& name) {
     for (const NodeKind kind :
          {NodeKind::Gltf, NodeKind::Orb, NodeKind::Grid, NodeKind::Particles, NodeKind::Scene, NodeKind::Procedural,
-          NodeKind::Field}) {
+          NodeKind::Field, NodeKind::Spline, NodeKind::Sdf}) {
         if (name == nodeKindName(kind)) {
             return kind;
         }
@@ -562,6 +599,40 @@ Composition::~Composition() = default;
 
 std::string Composition::nestedPrefix(const CompositionNode& node) const {
     return nestedPrefixFor(prefix_, node.name, node.child != nullptr && node.child->attached());
+}
+
+void Composition::rebuildProcedurals() {
+    // Every object sees the complete list (Procedural sources reference siblings by name, spline
+    // distributions read scene_.splines); generateCloud resolves references recursively so the
+    // order of the vector does not matter.
+    const GenerationContext ctx{&scene_.procedurals, &scene_.splines, 0};
+    for (ProceduralGeometry& pg : scene_.procedurals) {
+        pg.rebuild(ctx);
+    }
+}
+
+void Composition::rebuildSdfs() {
+    for (SdfObject& so : scene_.sdfs) {
+        so.rebuild(currentTime_, &scene_.fields);
+    }
+}
+
+Result<void> Composition::addMaterialProgram(MaterialProgram program) {
+    if (auto v = program.validate(); !v) {
+        return std::unexpected(v.error());
+    }
+    for (const auto& existing : materialPrograms_) {
+        if (existing.name == program.name) {
+            return fail("material program '{}' already exists", program.name);
+        }
+    }
+    if (params_ != nullptr) {
+        materialParams_.push_back(
+            registerMaterialProgramParameters(*params_, program, "material/" + sanitise(prefix_) + program.name + "/"));
+    }
+    materialPrograms_.push_back(std::move(program));
+    dirty_ = true;
+    return {};
 }
 
 std::string Composition::uniqueName(const std::string& base) const {
@@ -707,6 +778,20 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
         }
         node.fieldRest = node.field;
         break;
+    case NodeKind::Spline:
+        node.spline.name = node.name;
+        if (auto v = node.spline.validate(); !v) {
+            return std::unexpected(v.error());
+        }
+        node.splineRest = node.spline;
+        break;
+    case NodeKind::Sdf:
+        node.sdf.name = node.name;
+        if (auto v = node.sdf.validate(); !v) {
+            return std::unexpected(v.error());
+        }
+        node.sdfRest = node.sdf;
+        break;
     case NodeKind::Orb:
     case NodeKind::Grid:
         break;
@@ -779,13 +864,21 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     cameraMode_ = &params.add(params::ParamDesc<int>{.path = prefix_ + "camera/mode",
                                                      .defaultValue = cameraModeSetting_,
                                                      .hardMin = 0,
-                                                     .hardMax = 1,
+                                                     .hardMax = 2,
                                                      .softMin = 0,
-                                                     .softMax = 1,
-                                                     .label = "camera/mode (0 orbit, 1 free)"});
+                                                     .softMax = 2,
+                                                     .label = "camera/mode (0 orbit, 1 free, 2 spline)"});
     const float reachCam = 10.0f * std::max(radius_, 1.0f);
     cameraPosition_ = &params.add(vec3Desc(prefix_ + "camera/position", cameraPositionSetting_, -1e4f, 1e4f, -reachCam, reachCam));
     cameraTarget_ = &params.add(vec3Desc(prefix_ + "camera/target", cameraTargetSetting_, -1e4f, 1e4f, -reachCam, reachCam));
+    cameraSplineT_ = &params.add(floatDesc(prefix_ + "camera/splineT", 0.0f, -10.0f, 10.0f, 0.0f, 1.0f));
+    cameraLookAhead_ = &params.add(floatDesc(prefix_ + "camera/lookAhead", 2.0f, -100.0f, 100.0f, 0.0f, 10.0f));
+    cameraSplineOffset_ = &params.add(vec3Desc(prefix_ + "camera/splineOffset", glm::vec3(0.0f), -1e3f, 1e3f, -5.0f, 5.0f));
+    materialParams_.clear();
+    for (const MaterialProgram& mp : materialPrograms_) {
+        materialParams_.push_back(
+            registerMaterialProgramParameters(params, mp, "material/" + sanitise(prefix_) + mp.name + "/"));
+    }
     envIntensity_ =
         &params.add(floatDesc(prefix_ + "env/intensity", envIntensitySetting_, 0.0f, 20.0f, 0.0f, 4.0f));
     envRotation_ =
@@ -845,6 +938,13 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     if (node.kind == NodeKind::Field) {
         node.fieldParams = registerFieldParameters(*params_, node.fieldRest, "field/" + sanitise(prefix_) + node.name + "/");
     }
+    if (node.kind == NodeKind::Spline) {
+        node.splineParams =
+            registerSplineParameters(*params_, node.splineRest, "spline/" + sanitise(prefix_) + node.name + "/");
+    }
+    if (node.kind == NodeKind::Sdf) {
+        node.sdfParams = registerSdfParameters(*params_, node.sdfRest, "sdf/" + sanitise(prefix_) + node.name + "/");
+    }
     if (node.kind == NodeKind::Scene && node.child) {
         node.child->attach(*params_, *modulator_, base);
     }
@@ -868,12 +968,20 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
         if (node.kind == NodeKind::Field) {
             unregisterFieldParameters(*params_, node.fieldParams);
         }
+        if (node.kind == NodeKind::Spline) {
+            unregisterSplineParameters(*params_, node.splineParams);
+        }
+        if (node.kind == NodeKind::Sdf) {
+            unregisterSdfParameters(*params_, node.sdfParams);
+        }
         if (node.child) {
             node.child->unregisterParameters();
         }
     }
     node.proceduralParams = {};
     node.fieldParams = {};
+    node.splineParams = {};
+    node.sdfParams = {};
     node.positionParam = nullptr;
     node.rotationParam = nullptr;
     node.scaleParam = nullptr;
@@ -886,10 +994,15 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
 void Composition::unregisterParameters() {
     if (params_ != nullptr) {
         for (const char* path : {"camera/distance", "camera/height", "camera/orbitSpeed", "camera/fov",
+                                 "camera/splineT", "camera/lookAhead", "camera/splineOffset",
                                  "env/intensity", "env/rotation", "scene/brightness", "scene/gridIntensity",
                                  "root/scale", "root/rotationSpeed", "root/impulse"}) {
             params_->remove(prefix_ + path);
         }
+        for (const auto& mp : materialParams_) {
+            unregisterMaterialProgramParameters(*params_, mp);
+        }
+        materialParams_.clear();
         for (auto& node : nodes_) {
             unregisterNodeParameters(*node);
         }
@@ -913,6 +1026,10 @@ void Composition::detach() {
     cameraDistance_ = nullptr;
     cameraHeight_ = nullptr;
     cameraOrbitSpeed_ = nullptr;
+    cameraSplineT_ = nullptr;
+    cameraLookAhead_ = nullptr;
+    cameraSplineOffset_ = nullptr;
+    materialParams_.clear();
     cameraFov_ = nullptr;
     cameraMode_ = nullptr;
     cameraPosition_ = nullptr;
@@ -995,6 +1112,16 @@ void Composition::rebuild() {
     scene_.particles.clear();
     scene_.procedurals.clear();
     scene_.fields.fields.clear();
+    scene_.splines.splines.clear();
+    scene_.sdfs.clear();
+    scene_.materialPrograms.clear();
+    ownMaterialCount_ = materialPrograms_.size();
+    for (const MaterialProgram& src : materialPrograms_) {
+        MaterialProgram mp = src;
+        mp.name = sanitise(prefix_) + src.name;
+        prefixFieldReferences(mp, sanitise(prefix_));
+        scene_.materialPrograms.push_back(std::move(mp));
+    }
     scene_.lights.clear();
     scene_.cameras.clear();
     ranges_.clear();
@@ -1093,9 +1220,26 @@ void Composition::rebuild() {
             prefixFieldReferences(pg, sanitise(prefix_));
             pg.distributionTransform = Transform::fromMatrix(nodeT.matrix() * pg.distributionTransform.matrix());
             pg.visible = pg.visible && visible;
-            pg.rebuild();
             range.proceduralIndex = static_cast<int>(scene_.procedurals.size());
-            scene_.procedurals.push_back(std::move(pg));
+            scene_.procedurals.push_back(std::move(pg)); // generated by rebuildProcedurals() after the loop
+            break;
+        }
+        case NodeKind::Spline: {
+            spatial::Spline sp = node.splineRest;
+            sp.name = sanitise(prefix_) + node.name;
+            foldSplineFrame(sp, nodeT);
+            range.splineIndex = static_cast<int>(scene_.splines.splines.size());
+            scene_.splines.splines.push_back(std::move(sp));
+            break;
+        }
+        case NodeKind::Sdf: {
+            SdfObject so = node.sdfRest;
+            so.name = sanitise(prefix_) + node.name;
+            prefixFieldReferences(so, sanitise(prefix_));
+            so.transform = compose(nodeT, so.transform);
+            so.visible = so.visible && visible;
+            range.sdfIndex = static_cast<int>(scene_.sdfs.size());
+            scene_.sdfs.push_back(std::move(so)); // meshed by rebuildSdfs() after the loop
             break;
         }
         case NodeKind::Field: {
@@ -1161,8 +1305,33 @@ void Composition::rebuild() {
                 prefixFieldReferences(pg, childPrefix);
                 pg.distributionTransform = Transform::fromMatrix(nodeT.matrix() * src.distributionTransform.matrix());
                 pg.visible = pg.visible && visible;
-                pg.rebuild();
                 scene_.procedurals.push_back(std::move(pg));
+            }
+            range.firstSpline = scene_.splines.splines.size();
+            range.splineCount = cs.splines.splines.size();
+            for (const spatial::Spline& src : cs.splines.splines) {
+                spatial::Spline sp = src;
+                sp.name = childPrefix + src.name;
+                foldSplineFrame(sp, nodeT);
+                scene_.splines.splines.push_back(std::move(sp));
+            }
+            range.firstSdf = scene_.sdfs.size();
+            range.sdfCount = cs.sdfs.size();
+            for (const SdfObject& src : cs.sdfs) {
+                SdfObject so = src;
+                so.name = childPrefix + src.name;
+                prefixFieldReferences(so, childPrefix);
+                so.transform = compose(nodeT, src.transform);
+                so.visible = src.visible && visible;
+                scene_.sdfs.push_back(std::move(so));
+            }
+            range.firstMaterial = scene_.materialPrograms.size();
+            range.materialCount = cs.materialPrograms.size();
+            for (const MaterialProgram& src : cs.materialPrograms) {
+                MaterialProgram mp = src;
+                mp.name = childPrefix + src.name;
+                prefixFieldReferences(mp, childPrefix);
+                scene_.materialPrograms.push_back(std::move(mp));
             }
             range.firstField = scene_.fields.fields.size();
             range.fieldCount = cs.fields.fields.size();
@@ -1184,6 +1353,9 @@ void Composition::rebuild() {
         range.particleCount = scene_.particles.size() - range.firstParticle;
         ranges_.push_back(std::move(range));
     }
+
+    rebuildProcedurals();
+    rebuildSdfs();
 
     addedKeyLight_ = scene_.lights.empty();
     if (addedKeyLight_) {
@@ -1258,6 +1430,7 @@ void Composition::update(const FrameTime& time) {
         rebuild();
     }
 
+    currentTime_ = time.renderTime;
     const auto dt = static_cast<float>(time.deltaTime);
     if (rootRotationSpeed_ != nullptr) {
         rootAngle_ += rootRotationSpeed_->value() * dt;
@@ -1340,7 +1513,32 @@ void Composition::applyParameters() {
             prefixFieldReferences(pg, sanitise(prefix_));
             pg.distributionTransform = Transform::fromMatrix(full.matrix() * pg.distributionTransform.matrix());
             pg.visible = pg.visible && visible;
-            pg.rebuild();
+            // generated by rebuildProcedurals() once every object and spline has its finals
+        }
+        if (node.kind == NodeKind::Spline && range.splineIndex >= 0 &&
+            static_cast<std::size_t>(range.splineIndex) < scene_.splines.splines.size()) {
+            spatial::Spline& sp = scene_.splines.splines[static_cast<std::size_t>(range.splineIndex)];
+            const std::string name = sp.name;
+            applySplineParameters(node.splineParams, node.splineRest, sp);
+            sp.name = name;
+            foldSplineFrame(sp, full);
+        }
+        if (node.kind == NodeKind::Sdf && range.sdfIndex >= 0 &&
+            static_cast<std::size_t>(range.sdfIndex) < scene_.sdfs.size()) {
+            SdfObject& so = scene_.sdfs[static_cast<std::size_t>(range.sdfIndex)];
+            const std::string name = so.name;
+            SdfObject live = so;
+            applySdfParameters(node.sdfParams, node.sdfRest, live);
+            // keep the structural outputs (mesh cache) of the scene copy
+            live.structureVersion = so.structureVersion;
+            live.builtHash = so.builtHash;
+            live.mesh = std::move(so.mesh);
+            live.meshHash = so.meshHash;
+            so = std::move(live);
+            so.name = name;
+            prefixFieldReferences(so, sanitise(prefix_));
+            so.transform = compose(full, so.transform);
+            so.visible = so.visible && visible;
         }
         if (node.kind == NodeKind::Field && range.fieldIndex >= 0 &&
             static_cast<std::size_t>(range.fieldIndex) < scene_.fields.fields.size()) {
@@ -1387,12 +1585,58 @@ void Composition::applyParameters() {
                 const ProceduralGeometry& src = child->procedurals[k];
                 ProceduralGeometry& pg = scene_.procedurals[range.firstProcedural + k];
                 const std::string name = pg.name;
-                pg = src;
+                // keep this level's structural outputs; the child's records are regenerated below
+                ProceduralGeometry copy = src;
+                copy.instances = std::move(pg.instances);
+                copy.cloud = std::move(pg.cloud);
+                copy.structureVersion = pg.structureVersion;
+                copy.builtHash = pg.builtHash;
+                copy.meshHash = pg.meshHash;
+                copy.boundsMin = pg.boundsMin;
+                copy.boundsMax = pg.boundsMax;
+                pg = std::move(copy);
                 pg.name = name;
                 prefixFieldReferences(pg, childPrefix);
                 pg.distributionTransform = Transform::fromMatrix(full.matrix() * src.distributionTransform.matrix());
                 pg.visible = pg.visible && visible;
-                pg.rebuild();
+            }
+        }
+        if (child != nullptr && child->splines.splines.size() == range.splineCount) {
+            const std::string childPrefix = nestedPrefix(node);
+            for (std::size_t k = 0; k < range.splineCount; ++k) {
+                spatial::Spline& sp = scene_.splines.splines[range.firstSpline + k];
+                const std::string name = sp.name;
+                sp = child->splines.splines[k];
+                sp.name = name;
+                foldSplineFrame(sp, full);
+            }
+        }
+        if (child != nullptr && child->sdfs.size() == range.sdfCount) {
+            const std::string childPrefix = nestedPrefix(node);
+            for (std::size_t k = 0; k < range.sdfCount; ++k) {
+                const SdfObject& src = child->sdfs[k];
+                SdfObject& so = scene_.sdfs[range.firstSdf + k];
+                const std::string name = so.name;
+                SdfObject copy = src;
+                copy.structureVersion = so.structureVersion;
+                copy.builtHash = so.builtHash;
+                copy.mesh = std::move(so.mesh);
+                copy.meshHash = so.meshHash;
+                so = std::move(copy);
+                so.name = name;
+                prefixFieldReferences(so, childPrefix);
+                so.transform = compose(full, src.transform);
+                so.visible = src.visible && visible;
+            }
+        }
+        if (child != nullptr && child->materialPrograms.size() == range.materialCount) {
+            const std::string childPrefix = nestedPrefix(node);
+            for (std::size_t k = 0; k < range.materialCount; ++k) {
+                MaterialProgram& mp = scene_.materialPrograms[range.firstMaterial + k];
+                const std::string name = mp.name;
+                mp = child->materialPrograms[k];
+                mp.name = name;
+                prefixFieldReferences(mp, childPrefix);
             }
         }
         if (child != nullptr && child->fields.fields.size() == range.fieldCount) {
@@ -1410,6 +1654,17 @@ void Composition::applyParameters() {
         }
     }
 
+    // Own material programs: finals into the scene copies.
+    for (std::size_t i = 0; i < materialParams_.size() && i < ownMaterialCount_ && i < scene_.materialPrograms.size(); ++i) {
+        MaterialProgram& mp = scene_.materialPrograms[i];
+        const std::string name = mp.name;
+        applyMaterialProgramParameters(materialParams_[i], materialPrograms_[i], mp);
+        mp.name = name;
+        prefixFieldReferences(mp, sanitise(prefix_));
+    }
+    rebuildProcedurals();
+    rebuildSdfs();
+
     // Orbit camera around the bounds centre (distance fitted to the radius by default).
     const float fit = fitDistance();
     const float distance =
@@ -1419,7 +1674,25 @@ void Composition::applyParameters() {
                              : cameraHeightSetting_.value_or(center_.y + radius_ * 0.35f);
     const float fov = cameraFov_ != nullptr ? cameraFov_->value() : cameraFovSetting_;
     const int cameraMode = cameraMode_ != nullptr ? cameraMode_->value() : cameraModeSetting_;
-    if (cameraMode == 1) {
+    const spatial::Spline* cameraSpline =
+        cameraMode == 2 && !cameraSplineSetting_.empty() ? scene_.splines.find(prefixed(sanitise(prefix_), cameraSplineSetting_)) : nullptr;
+    if (cameraMode == 2 && cameraSpline != nullptr) {
+        // Spline camera: position at splineT (fraction of the length, wrapped for closed splines),
+        // target lookAhead units further along, offset expressed in the local frame.
+        const float length = cameraSpline->length();
+        const float tRaw = cameraSplineT_ != nullptr ? cameraSplineT_->value() : 0.0f;
+        const float t = cameraSpline->closed ? tRaw - std::floor(tRaw) : std::clamp(tRaw, 0.0f, 1.0f);
+        const float lookAhead = cameraLookAhead_ != nullptr ? cameraLookAhead_->value() : 2.0f;
+        const glm::vec3 offset = cameraSplineOffset_ != nullptr ? cameraSplineOffset_->value() : glm::vec3(0.0f);
+        const spatial::SplineSample at = cameraSpline->sampleByDistance(t * length);
+        const spatial::SplineSample ahead = cameraSpline->sampleByDistance(t * length + lookAhead);
+        const glm::vec3 frameOffset = at.binormal * offset.x + at.normal * offset.y + at.tangent * offset.z;
+        scene_.camera.position = at.position + frameOffset;
+        scene_.camera.target = ahead.position + at.binormal * offset.x + at.normal * offset.y;
+        if (glm::length(scene_.camera.target - scene_.camera.position) < 1e-4f) {
+            scene_.camera.target = scene_.camera.position + at.tangent;
+        }
+    } else if (cameraMode == 1) {
         // Free camera: explicit position and target (keyable on the timeline, modulatable).
         scene_.camera.position = cameraPosition_ != nullptr ? cameraPosition_->value() : cameraPositionSetting_;
         scene_.camera.target = cameraTarget_ != nullptr ? cameraTarget_->value() : cameraTargetSetting_;
@@ -1488,6 +1761,9 @@ nlohmann::json Composition::toJson() const {
         cameraOrbitSpeed_ != nullptr ? cameraOrbitSpeed_->base() : cameraOrbitSpeedSetting_;
     camera["fov"] = cameraFov_ != nullptr ? cameraFov_->base() : cameraFovSetting_;
     camera["mode"] = cameraMode_ != nullptr ? cameraMode_->base() : cameraModeSetting_;
+    if (!cameraSplineSetting_.empty()) {
+        camera["spline"] = cameraSplineSetting_;
+    }
     {
         const glm::vec3 cp = cameraPosition_ != nullptr ? cameraPosition_->base() : cameraPositionSetting_;
         const glm::vec3 ct = cameraTarget_ != nullptr ? cameraTarget_->base() : cameraTargetSetting_;
@@ -1538,9 +1814,22 @@ nlohmann::json Composition::toJson() const {
         if (node.kind == NodeKind::Field) {
             n["field"] = node.field.toJson();
         }
+        if (node.kind == NodeKind::Spline) {
+            n["spline"] = node.spline.toJson();
+        }
+        if (node.kind == NodeKind::Sdf) {
+            n["sdf"] = node.sdf.toJson();
+        }
         nodes.push_back(std::move(n));
     }
     j["nodes"] = std::move(nodes);
+    if (!materialPrograms_.empty()) {
+        json programs = json::array();
+        for (const MaterialProgram& mp : materialPrograms_) {
+            programs.push_back(mp.toJson());
+        }
+        j["materialPrograms"] = std::move(programs);
+    }
     return j;
 }
 
@@ -1610,7 +1899,10 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         }
         comp->cameraOrbitSpeedSetting_ = *orbit;
         if (c.contains("mode") && c["mode"].is_number_integer()) {
-            comp->cameraModeSetting_ = std::clamp(c["mode"].get<int>(), 0, 1);
+            comp->cameraModeSetting_ = std::clamp(c["mode"].get<int>(), 0, 2);
+        }
+        if (c.contains("spline") && c["spline"].is_string()) {
+            comp->cameraSplineSetting_ = c["spline"].get<std::string>();
         }
         auto readVec = [&](const char* key, glm::vec3& out) {
             if (c.contains(key) && c[key].is_array() && c[key].size() == 3 && c[key][0].is_number()) {
@@ -1659,6 +1951,21 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         }
     }
 
+    if (j.contains("materialPrograms")) {
+        const json& programs = j.at("materialPrograms");
+        if (!programs.is_array()) {
+            return fail("'materialPrograms' must be an array");
+        }
+        for (const json& pj : programs) {
+            auto mp = MaterialProgram::fromJson(pj);
+            if (!mp) {
+                return fail("scene file '{}': material program: {}", sourcePath.string(), mp.error().message);
+            }
+            if (auto added = comp->addMaterialProgram(std::move(*mp)); !added) {
+                return fail("scene file '{}': {}", sourcePath.string(), added.error().message);
+            }
+        }
+    }
     if (j.contains("nodes")) {
         const json& nodes = j.at("nodes");
         if (!nodes.is_array()) {
@@ -1741,6 +2048,20 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return fail("scene file '{}': node '{}': {}", sourcePath.string(), node.name, field.error().message);
                 }
                 node.field = std::move(*field);
+            }
+            if (item.contains("spline")) {
+                auto spline = spatial::Spline::fromJson(item.at("spline"));
+                if (!spline) {
+                    return fail("scene file '{}': node '{}': {}", sourcePath.string(), node.name, spline.error().message);
+                }
+                node.spline = std::move(*spline);
+            }
+            if (item.contains("sdf")) {
+                auto sdf = SdfObject::fromJson(item.at("sdf"));
+                if (!sdf) {
+                    return fail("scene file '{}': node '{}': {}", sourcePath.string(), node.name, sdf.error().message);
+                }
+                node.sdf = std::move(*sdf);
             }
 
             const std::string label = node.name.empty() ? std::string(nodeKindName(node.kind)) : node.name;

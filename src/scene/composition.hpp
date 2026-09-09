@@ -19,6 +19,9 @@
 #include "assets/asset_registry.hpp"
 #include "core/error.hpp"
 #include "scene/field_params.hpp"
+#include "scene/material_params.hpp"
+#include "scene/sdf_object.hpp"
+#include "scene/spline_params.hpp"
 #include "scene/particles.hpp"
 #include "scene/scene_controller.hpp"
 
@@ -33,7 +36,7 @@
 
 namespace avgen::scene {
 
-enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural, Field };
+enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural, Field, Spline, Sdf };
 const char* nodeKindName(NodeKind kind);
 Result<NodeKind> nodeKindFromName(const std::string& name);
 
@@ -50,6 +53,9 @@ struct CompositionNode {
     ProceduralGeometry procedural; // settings for kind Procedural (ADR-023; name is taken from the node)
     spatial::FieldSpec field;      // settings for kind Field (ADR-025; name is taken from the node; the node
                                    // transform is the field's frame, folded into the FieldSpec at rebuild)
+    spatial::Spline spline;        // settings for kind Spline (ADR-026; the node transform is applied to the
+                                   // generated control points at rebuild)
+    SdfObject sdf;                 // settings for kind Sdf (ADR-027; node transform folded into sdf.transform)
 
     // Runtime (not serialised)
     std::shared_ptr<const assets::SceneAsset> sceneAsset; // Gltf
@@ -66,6 +72,10 @@ struct CompositionNode {
     ProceduralGeometry proceduralRest;
     FieldParameters fieldParams;
     spatial::FieldSpec fieldRest;
+    SplineParameters splineParams;
+    spatial::Spline splineRest;
+    SdfParameters sdfParams;
+    SdfObject sdfRest;
 };
 
 class Composition final : public SceneController {
@@ -93,6 +103,10 @@ public:
     // scale/rotation. Unknown parents are treated as roots.
     [[nodiscard]] Transform nodeWorldTransform(const CompositionNode& node) const;
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
+    // ---- material programs (scene-level, ADR-030) ----
+    Result<void> addMaterialProgram(MaterialProgram program); // registers parameters when attached
+    [[nodiscard]] const std::vector<MaterialProgram>& materialPrograms() const { return materialPrograms_; }
+    void setCameraSpline(std::string name) { cameraSplineSetting_ = std::move(name); }
     [[nodiscard]] std::size_t nodeCount() const { return nodes_.size(); }
 
     // ---- parameters ----
@@ -133,6 +147,8 @@ private:
     void unregisterParameters(); // removes every parameter this composition registered, then detach()
     std::string uniqueName(const std::string& base) const;
     [[nodiscard]] std::string nestedPrefix(const CompositionNode& node) const;
+    void rebuildProcedurals();  // (re)generates every procedural object against the flattened scene
+    void rebuildSdfs();
     [[nodiscard]] Transform nodeTransform(const CompositionNode& node) const; // params or authored values (local)
     // True when making `parent` the parent of `node` would close a cycle (node and parent by name).
     [[nodiscard]] bool wouldCycle(const std::string& node, const std::string& parent) const;
@@ -181,6 +197,18 @@ private:
     int cameraModeSetting_ = 0;
     glm::vec3 cameraPositionSetting_{0.0f, 2.0f, 10.0f};
     glm::vec3 cameraTargetSetting_{0.0f, 1.0f, 0.0f};
+    // Camera mode 2 (spline, ADR-026): rides the named scene spline at camera/splineT (0..1 of the
+    // length), looks camera/lookAhead units further along, offset in the spline frame.
+    std::string cameraSplineSetting_;
+    params::Parameter<float>* cameraSplineT_ = nullptr;
+    params::Parameter<float>* cameraLookAhead_ = nullptr;
+    params::Parameter<glm::vec3>* cameraSplineOffset_ = nullptr;
+    double currentTime_ = 0.0;
+    // Scene-level material programs (ADR-030): "materialPrograms" in the file, parameters
+    // "material/<name>/…", referenced by Material::program.
+    std::vector<MaterialProgram> materialPrograms_;
+    std::vector<MaterialProgramParameters> materialParams_;
+    std::size_t ownMaterialCount_ = 0; // this composition's programs come first in scene_.materialPrograms
 
     // Flattened bookkeeping: per node, the entity index range in scene_ and the rest transforms.
     struct NodeRange {
@@ -194,6 +222,14 @@ private:
         int fieldIndex = -1;                         // index into scene_.fields.fields (Field kind)
         std::size_t firstField = 0;                  // Scene kind: the child's fields copied in
         std::size_t fieldCount = 0;
+        int splineIndex = -1;                        // index into scene_.splines.splines (Spline kind)
+        std::size_t firstSpline = 0;
+        std::size_t splineCount = 0;
+        int sdfIndex = -1;                           // index into scene_.sdfs (Sdf kind)
+        std::size_t firstSdf = 0;
+        std::size_t sdfCount = 0;
+        std::size_t firstMaterial = 0;               // Scene kind: the child's material programs copied in
+        std::size_t materialCount = 0;
         std::size_t firstProcedural = 0;             // Scene kind: the child's procedurals copied in
         std::size_t proceduralCount = 0;
         std::size_t firstParticle = 0;               // particle range (Particles and Scene kinds)
