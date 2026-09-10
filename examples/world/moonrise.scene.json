@@ -20,7 +20,7 @@
   "lightRig": "../lightrigs/valley-moon.rig.json",
   "environment": {
     "map": "../../assets/hdri/qwantani_moonrise_puresky_4k.hdr",
-    "intensity": 0.03,
+    "intensity": 0.011,
     "rotation": -1.838,
     "skyIntensity": 0.05,
     "skyBloom": 0.35,
@@ -248,7 +248,7 @@
             0.0685,
             0.0931
           ],
-          "emissiveIntensity": 0.35,
+          "emissiveIntensity": 0.63,
           "viewDistance": 120.0,
           "minScreenRadius": 2.5,
           "castsShadow": false
@@ -306,7 +306,7 @@
             0.0762,
             0.6308
           ],
-          "emissiveIntensity": 2.6,
+          "emissiveIntensity": 5.2,
           "viewDistance": 95.0,
           "minScreenRadius": 2.5,
           "castsShadow": false
@@ -338,7 +338,7 @@
             0.0612,
             0.7454
           ],
-          "emissiveIntensity": 5.5,
+          "emissiveIntensity": 11.0,
           "viewDistance": 110.0,
           "minScreenRadius": 2.0,
           "castsShadow": true
@@ -369,7 +369,7 @@
             0.5776,
             0.4342
           ],
-          "emissiveIntensity": 4.0,
+          "emissiveIntensity": 8.0,
           "viewDistance": 150.0,
           "minScreenRadius": 2.0,
           "castsShadow": true
