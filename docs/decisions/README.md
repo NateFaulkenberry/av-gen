@@ -48,3 +48,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [040](ADR-040-particles-and-motion.md) | Particle trails, velocity-aware rendering and motion blur | Accepted |
 | [041](ADR-041-world-director.md) | World Director, look presets and musical phrasing | Accepted |
 | [049](ADR-049-hdri-sky.md) | The HDRI sky: the map as the background, sky and lighting intensity split, the key light aimed from the image | Accepted |
+| [050](ADR-050-material-interpreter-cost.md) | What the material interpreter was actually spending: the register file and the field evaluator in the loop | Accepted |

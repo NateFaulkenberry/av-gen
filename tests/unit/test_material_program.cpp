@@ -646,15 +646,46 @@ TEST_CASE("structuralHash is stable and sensitive to every member", "[material]"
 
 // ---- packing ----------------------------------------------------------------------------------
 
+TEST_CASE("validate: at most kMaxMaterialFields distinct fields", "[material]") {
+    const auto fieldOp = [](int dst, const char* field) {
+        MaterialOp o;
+        o.kind = MaterialOpKind::Field;
+        o.dst = dst;
+        o.field = field;
+        return o;
+    };
+    MaterialProgram p;
+    p.name = "fields";
+    for (int i = 0; i < kMaxMaterialFields; ++i) {
+        p.ops.push_back(fieldOp(i, ("f" + std::to_string(i)).c_str()));
+    }
+    CHECK(p.validate().has_value());
+    // A repeat is not a new field: it shares an ordinal with the op that named it first.
+    p.ops.push_back(fieldOp(0, "f0"));
+    CHECK(p.validate().has_value());
+    // A disabled op is not packed, so it does not count either.
+    MaterialOp disabled = fieldOp(1, "extra");
+    disabled.enabled = false;
+    p.ops.push_back(disabled);
+    CHECK(p.validate().has_value());
+
+    p.ops.push_back(fieldOp(2, "onetoomany"));
+    const auto bad = p.validate();
+    REQUIRE(!bad.has_value());
+    CHECK(bad.error().message.find("distinct fields") != std::string::npos);
+}
+
 TEST_CASE("packMaterialProgram: layout, disabled ops skipped, field slots", "[material]") {
     CHECK(sizeof(MaterialOpGpu) == 112);
     CHECK(offsetof(MaterialOpGpu, registers) == 16);
-    CHECK(offsetof(MaterialOpGpu, valuePad) == 32);
+    CHECK(offsetof(MaterialOpGpu, value) == 32);
+    CHECK(offsetof(MaterialOpGpu, fieldOrdinal) == 36);
     CHECK(offsetof(MaterialOpGpu, constant) == 48);
     CHECK(offsetof(MaterialOpGpu, constant4) == 96);
-    CHECK(offsetof(MaterialProgramGpu, layers) == 64);
+    CHECK(offsetof(MaterialProgramGpu, fieldSlots) == 64);
+    CHECK(offsetof(MaterialProgramGpu, layers) == 80);
     CHECK(sizeof(MaterialLayerGpu) == 64);
-    CHECK(offsetof(MaterialProgramGpu, ops) == 320); // 64-byte header + 4 layer records (ADR-036)
+    CHECK(offsetof(MaterialProgramGpu, ops) == 336); // 80-byte header + 4 layer records (ADR-036/050)
 
     MaterialProgram p;
     MaterialOp in = inputOp(0, MaterialInput::Uv);
@@ -690,19 +721,24 @@ TEST_CASE("packMaterialProgram: layout, disabled ops skipped, field slots", "[ma
     CHECK(gpu.ops[0].input == static_cast<std::uint32_t>(MaterialInput::Uv));
     CHECK(gpu.ops[0].fieldSlot == -1);
     CHECK(gpu.ops[0].registers == glm::ivec4(0, 0, 0, 0));
-    CHECK(gpu.ops[0].valuePad == glm::vec4(1.0f, 0.0f, 0.0f, 0.0f));
+    CHECK(gpu.ops[0].value == 1.0f);
+    CHECK(gpu.ops[0].fieldOrdinal == -1);
 
     CHECK(gpu.ops[1].kind == static_cast<std::uint32_t>(MaterialOpKind::Field));
     CHECK(gpu.ops[1].fieldSlot == 2);
     CHECK(gpu.ops[1].registers == glm::ivec4(1, 0, 0, 0));
+    CHECK(gpu.ops[1].fieldOrdinal == 0);
     CHECK(gpu.ops[2].kind == static_cast<std::uint32_t>(MaterialOpKind::Field));
     CHECK(gpu.ops[2].fieldSlot == -1);
+    CHECK(gpu.ops[2].fieldOrdinal == 1);
+    // The header carries each distinct field's slot, which is what the shader's pre-pass samples.
+    CHECK(gpu.fieldSlots == glm::ivec4(2, -1, -1, -1));
 
     CHECK(gpu.ops[3].kind == static_cast<std::uint32_t>(MaterialOpKind::Noise));
     CHECK(gpu.ops[3].seed == 21);
     CHECK(gpu.ops[3].fieldSlot == -1);
     CHECK(gpu.ops[3].registers == glm::ivec4(3, 1, 2, 0));
-    CHECK(gpu.ops[3].valuePad == glm::vec4(4.0f, 0.0f, 0.0f, 0.0f));
+    CHECK(gpu.ops[3].value == 4.0f);
     CHECK(gpu.ops[3].constant == glm::vec4(1.0f, 2.0f, 3.0f, 4.0f));
     CHECK(gpu.ops[3].constant2 == glm::vec4(5.0f, 6.0f, 7.0f, 8.0f));
     CHECK(gpu.ops[3].constant3 == glm::vec4(9.0f, 10.0f, 11.0f, 12.0f));
