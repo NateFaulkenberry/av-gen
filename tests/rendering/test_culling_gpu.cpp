@@ -16,6 +16,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
@@ -358,6 +359,77 @@ TEST_CASE("LOD assignment matches the CPU reference by distance and by screen si
     culled.procedurals[0].lod.cull = true;
     culled.procedurals[0].lod.maxDistance = 100.0f;
     checkLevels(culled);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("The indirect args the draw reads match the counts the cull pass wrote", "[gpu][culling]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    // Every level populated, and several objects, because the failure this guards against needed
+    // both: the args a draw reads were written into a per-object buffer sized exactly to hold them,
+    // and the backend then silently handed the draw zeroes for the levels near its end. The cull
+    // pass's own stats were right the whole time, so counts alone cannot see it -- only the bytes
+    // the draw itself reads can. Two thirds of a world's ground cover went missing this way and
+    // every counter in the frame said it was there.
+    scene::Scene s;
+    s.environment.showSkybox = false;
+    s.camera.position = {0.0f, 0.0f, 0.0f};
+    s.camera.target = {0.0f, 0.0f, -1.0f};
+    scene::PunctualLight key;
+    key.direction = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.6f));
+    key.intensity = 3.0f;
+    s.addLight(key);
+    // Deliberately unalike: a different instance count and a different ladder per object, so that
+    // every object's per-level counts are distinct. Four objects that scattered the same way would
+    // pass whether or not each draw reads its own slot.
+    for (int object = 0; object < 4; ++object) {
+        scene::ProceduralGeometry g = boxGrid(1, 1, 1.0f);
+        g.name = "grid" + std::to_string(object);
+        g.instances.clear();
+        const int count = 60 + object * 37;
+        for (int i = 0; i < count; ++i) {
+            g.instances.push_back(recordAt({static_cast<float>(object) * 3.0f, 0.0f, -static_cast<float>(i)}, 1.0f,
+                                           static_cast<std::uint32_t>(i)));
+        }
+        g.lod.cull = true;
+        g.lod.lodCount = 4;
+        g.lod.lodByScreenSize = false;
+        g.lod.lodDistances[0] = 8.0f + static_cast<float>(object) * 3.0f;
+        g.lod.lodDistances[1] = 30.0f + static_cast<float>(object) * 7.0f;
+        g.lod.lodDistances[2] = 70.0f + static_cast<float>(object) * 11.0f;
+        s.procedurals.push_back(std::move(g));
+    }
+    (void)renderWith(renderer, s);
+
+    std::vector<std::array<std::uint32_t, 4>> signatures;
+    for (int object = 0; object < 4; ++object) {
+        const std::string name = "grid" + std::to_string(object);
+        auto counts = renderer.procedurals().readCullCounts(name);
+        REQUIRE(counts.has_value());
+        std::uint32_t total = 0;
+        signatures.push_back(counts->lod);
+        for (int level = 0; level < 4; ++level) {
+            INFO(name << " level " << level);
+            auto args = renderer.procedurals().readIndirectArgs(name, level);
+            REQUIRE(args.has_value());
+            const std::uint32_t expected = counts->lod[static_cast<std::size_t>(level)];
+            CHECK((*args)[1] == expected);   // instanceCount
+            CHECK((*args)[0] > 0u);          // indexCount: the level's mesh, never zero
+            total += expected;
+        }
+        CHECK(total > 0u);
+    }
+    // The premise of the check above: no two objects share a per-level signature, so reading a
+    // neighbour's slot cannot pass for reading your own.
+    for (std::size_t i = 0; i < signatures.size(); ++i) {
+        for (std::size_t j = i + 1; j < signatures.size(); ++j) {
+            INFO("objects " << i << " and " << j << " must differ");
+            CHECK(signatures[i] != signatures[j]);
+        }
+    }
     CHECK(ctx->errorCount() == 0);
 }
 
