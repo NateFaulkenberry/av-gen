@@ -561,10 +561,12 @@ scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::strin
     const std::size_t n = biomes.biomes.size();
     const std::size_t mid = n / 2;
 
-    // Op count is the whole cost of this program. Measured on an M2 Max at 2880x1800, the material
-    // interpreter costs about 1.6 ms per op over a full-screen surface -- the shape of a per-pixel
-    // read of the program's own op records -- so the first version of this, at twenty ops, was
-    // 32 ms of an 87 ms frame. A third of the frame, spent painting the ground.
+    // Op count is the cost of this program, though less of it than it once was. The first version
+    // ran to twenty ops and cost 32 ms of an 87 ms frame -- a third of the frame, spent painting the
+    // ground. That was blamed on a per-pixel read of the program's own op records; ADR-050 shows it
+    // was the interpreter's loop body instead, and fixing that took the per-op cost from 0.78 ms to
+    // 0.26 over a full-screen surface. Fewer ops is still cheaper, and a fullscreen material is
+    // still the place where that matters most.
     //
     // So the palette is one three-stop ramp rather than two crossed over. A set ordered as a
     // gradient loses its second and fourth entries as distinct stops and keeps them as the

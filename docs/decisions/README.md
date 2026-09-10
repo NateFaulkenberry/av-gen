@@ -47,5 +47,12 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [039](ADR-039-image-formation.md) | Image formation, selective post and tone mapping | Accepted |
 | [040](ADR-040-particles-and-motion.md) | Particle trails, velocity-aware rendering and motion blur | Accepted |
 | [041](ADR-041-world-director.md) | World Director, look presets and musical phrasing | Accepted |
+| [042](ADR-042-bevels.md) | Bevels as a first-class operation on generated primitives | Accepted |
+| [043](ADR-043-organic-curves.md) | Tubes: one swept curve stands in for every organ | Accepted |
+| [044](ADR-044-imported-meshes-as-sources.md) | Imported meshes as instanced sources | Accepted |
+| [045](ADR-045-vertex-clustering-decimation.md) | Vertex-clustering decimation for imported meshes | Accepted |
+| [046](ADR-046-the-world-map-and-terrain.md) | The world map and terrain: geography as data, chunked ground, water | Accepted |
+| [047](ADR-047-biomes.md) | Biomes: soft-edged rules over the map, blended as weights along one ordered axis | Accepted |
+| [048](ADR-048-ecology.md) | Ecology: what grows where, decided by the biome weights the ground is coloured with | Accepted |
 | [049](ADR-049-hdri-sky.md) | The HDRI sky: the map as the background, sky and lighting intensity split, the key light aimed from the image | Accepted |
 | [050](ADR-050-material-interpreter-cost.md) | What the material interpreter was actually spending: the register file and the field evaluator in the loop | Accepted |

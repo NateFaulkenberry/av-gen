@@ -252,6 +252,16 @@ points at, in order: draw a layer's LOD levels through fewer indirect draws (or 
 without submitting), and cull per shadow cascade instead of reusing the camera's visible set --
 cascade 0 covers about forty metres and is currently drawing everything the camera can see.
 
+## Superseded: the material interpreter's cost was diagnosed wrongly here
+
+The measurements in this section are right and the explanation offered for them is wrong. ADR-050
+has the proved mechanism: not the per-pixel fetch of op records, but the interpreter's loop body --
+a dynamically indexed register array that could not be register-allocated, and a Field evaluator
+inlined into the loop that set the occupancy for every program whether it used fields or not. Per-op
+cost is now 0.26 ms rather than 0.78, and a program of no ops at all got 2.5x cheaper.
+
+Op count still matters, and the advice below still holds. The reason given for it did not.
+
 ## The material program interpreter is priced per op, per pixel (2026-09-09)
 
 Bisecting the base frame at 2880x1800, with ecology, volumetrics and bloom all off and only 86 draws

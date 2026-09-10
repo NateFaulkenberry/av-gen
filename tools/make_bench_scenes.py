@@ -25,6 +25,9 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     rig = json.load(open('examples/lightrigs/valley-moon.rig.json'))
     noshadow = copy.deepcopy(rig)
+    # A distinct name: light rigs are validated as a set and two sharing one name fails the shipped
+    # rig test for anyone who has run this script. The benchmark should leave no trace but its scenes.
+    noshadow['name'] = 'ValleyMoonNoShadow'
     noshadow['lights'][0]['castsShadow'] = False
     json.dump(noshadow, open('examples/lightrigs/_noshadow.rig.json', 'w'), indent=1)
 
