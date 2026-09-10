@@ -13,6 +13,7 @@
 #include "scene/procedural.hpp"
 #include "scene/scene.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -642,5 +643,177 @@ TEST_CASE("Depth layers thin a distance band and move the LOD ladder", "[gpu][cu
         scene::DepthLayer{.name = "far", .start = 10.0f, .end = 200.0f, .density = 1.0f});
     CHECK(visibleCount(banded) == all);
 
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- whole-object rejection on the CPU (P2: never encode work that is certain to be empty) -----
+//
+// `objectFullyCulled` lets the renderer skip an object's cull dispatches and every one of its
+// indirect draws, in every pass, before the frame is encoded. It is only allowed to say "yes" when
+// shaders/cull.wgsl would reject every single record, so the property under test is soundness:
+// whenever it fires, the per-instance reference (`cullLodLevel`, which the GPU is separately shown
+// to match) must have culled all of them.
+
+namespace {
+
+rendering::CullCamera cullCameraOf(const scene::Scene& s, std::uint32_t height = kHeight) {
+    rendering::CullCamera camera;
+    camera.position = s.camera.position;
+    camera.projScale = rendering::cullProjScale(s.camera.fovYRadians, height);
+    return camera;
+}
+
+rendering::FrustumPlanes planesOf(const scene::Scene& s, std::uint32_t width = kWidth,
+                                  std::uint32_t height = kHeight) {
+    const float aspect = static_cast<float>(width) / static_cast<float>(height);
+    return rendering::frustumPlanes(s.camera.projection(aspect) * s.camera.view());
+}
+
+// How many of the object's instances the per-instance reference keeps.
+int survivorCount(const scene::Scene& s) {
+    const std::vector<int> levels = referenceLevels(s);
+    return static_cast<int>(std::count_if(levels.begin(), levels.end(), [](int l) { return l >= 0; }));
+}
+
+bool fullyCulledFor(const scene::Scene& s) {
+    const auto& object = s.procedurals[0];
+    return rendering::objectFullyCulled(object.lod, planesOf(s), cullCameraOf(s), glm::mat4(1.0f),
+                                        rendering::instanceBounds(object.instances),
+                                        scene::sourceBoundingRadius(object.source));
+}
+
+} // namespace
+
+TEST_CASE("Whole-object bounds summarise the record set", "[culling]") {
+    const scene::ProceduralGeometry grid = boxGrid(4, 4, 2.0f);
+    const rendering::InstanceBounds bounds = rendering::instanceBounds(grid.instances);
+    REQUIRE(bounds.valid);
+    CHECK(bounds.min.x == Catch::Approx(-3.0f));
+    CHECK(bounds.max.x == Catch::Approx(3.0f));
+    CHECK(bounds.min.y == Catch::Approx(0.0f));
+    CHECK(bounds.max.z == Catch::Approx(3.0f));
+    CHECK(bounds.maxAbsScale == Catch::Approx(1.0f));
+
+    // The largest |scale| of any record, whatever sign or axis it is on.
+    scene::ProceduralGeometry mixed = grid;
+    mixed.instances[5].scale = {-4.0f, 1.0f, 1.0f, 0.0f};
+    CHECK(rendering::instanceBounds(mixed.instances).maxAbsScale == Catch::Approx(4.0f));
+
+    CHECK_FALSE(rendering::instanceBounds({}).valid);
+}
+
+TEST_CASE("An object is rejected whole only when every instance would be culled", "[culling]") {
+    scene::Scene s = sceneWith(boxGrid(8, 8, 2.0f));
+    s.procedurals[0].lod.cull = true;
+
+    SECTION("in view, nothing is rejected") {
+        REQUIRE(survivorCount(s) > 0);
+        CHECK_FALSE(fullyCulledFor(s));
+    }
+
+    SECTION("behind the camera") {
+        s.camera.position = {0.0f, 6.0f, 40.0f};
+        s.camera.target = {0.0f, 6.0f, 80.0f};
+        REQUIRE(survivorCount(s) == 0);
+        CHECK(fullyCulledFor(s));
+    }
+
+    SECTION("past maxDistance") {
+        s.camera.position = {0.0f, 6.0f, 400.0f};
+        s.camera.target = {0.0f, 0.0f, 0.0f};
+        s.procedurals[0].lod.maxDistance = 50.0f;
+        REQUIRE(survivorCount(s) == 0);
+        CHECK(fullyCulledFor(s));
+        // Well within reach of the whole box, and it must not fire.
+        s.camera.position = {0.0f, 6.0f, 60.0f};
+        s.procedurals[0].lod.maxDistance = 500.0f;
+        REQUIRE(survivorCount(s) > 0);
+        CHECK_FALSE(fullyCulledFor(s));
+    }
+
+    SECTION("below minScreenRadius") {
+        s.camera.position = {0.0f, 6.0f, 900.0f};
+        s.camera.target = {0.0f, 0.0f, 0.0f};
+        s.procedurals[0].lod.minScreenRadius = 20.0f;
+        REQUIRE(survivorCount(s) == 0);
+        CHECK(fullyCulledFor(s));
+    }
+
+    SECTION("culling off: the shader rejects nothing, so neither may this") {
+        s.camera.position = {0.0f, 6.0f, 40.0f};
+        s.camera.target = {0.0f, 6.0f, 80.0f};
+        s.procedurals[0].lod.cull = false;
+        CHECK_FALSE(fullyCulledFor(s));
+    }
+}
+
+TEST_CASE("Whole-object rejection never drops a surviving instance", "[culling]") {
+    // A sweep of cameras and limits around a compact object. The invariant is one-directional:
+    // firing implies no survivors. Not firing when there are none is merely a missed saving, and
+    // the count of those is reported so the test also shows the test is not vacuous.
+    scene::Scene s = sceneWith(boxGrid(6, 6, 3.0f));
+    s.procedurals[0].lod.cull = true;
+    int fired = 0;
+    int emptyCases = 0;
+    int cases = 0;
+    for (int a = 0; a < 12; ++a) {
+        const float angle = static_cast<float>(a) * 0.5236f; // 30 degrees
+        for (const float radius : {12.0f, 30.0f, 120.0f, 600.0f}) {
+            for (const float maxDistance : {0.0f, 40.0f, 200.0f}) {
+                for (const float minScreenRadius : {0.0f, 2.0f, 30.0f}) {
+                    s.camera.position = {std::cos(angle) * radius, 8.0f, std::sin(angle) * radius};
+                    // Half the cameras look at the object, half look directly away from it.
+                    s.camera.target = (a % 2 == 0) ? glm::vec3(0.0f) : s.camera.position * 2.0f;
+                    s.procedurals[0].lod.maxDistance = maxDistance;
+                    s.procedurals[0].lod.minScreenRadius = minScreenRadius;
+                    ++cases;
+                    const int survivors = survivorCount(s);
+                    if (survivors == 0) {
+                        ++emptyCases;
+                    }
+                    if (fullyCulledFor(s)) {
+                        ++fired;
+                        INFO("survivors " << survivors << " at angle " << angle << " radius " << radius);
+                        CHECK(survivors == 0);
+                    }
+                }
+            }
+        }
+    }
+    INFO("cases " << cases << " empty " << emptyCases << " fired " << fired);
+    CHECK(fired > 0);
+    CHECK(emptyCases > 0);
+}
+
+TEST_CASE("A whole-object rejection encodes no draws and changes no pixel", "[gpu][culling]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    scene::Scene s = sceneWith(boxGrid(8, 8, 2.0f));
+    s.procedurals[0].lod.cull = true;
+    s.procedurals[0].lod.lodCount = 4;
+    s.camera.position = {0.0f, 6.0f, 40.0f};
+    s.camera.target = {0.0f, 6.0f, 80.0f}; // the grid is behind the camera
+
+    const gpu::Image8 rejected = renderWith(renderer, s);
+    const rendering::ProceduralStats stats = renderer.procedurals().stats();
+    CHECK(stats.culledObjects == 1);
+    CHECK(stats.indirectDraws == 0);   // over the prepass, the lit pass and every shadow cascade
+    CHECK(stats.cullObjects == 0);     // and no cull dispatches either
+
+    // The same frame with the object simply not in it: the pixels must agree exactly.
+    scene::Scene without = s;
+    without.procedurals[0].visible = false;
+    const gpu::Image8 absent = renderWith(renderer, without);
+    CHECK(gpu::hashImage(rejected) == gpu::hashImage(absent));
+
+    // Turn the camera back onto it and the object returns the same frame -- nothing pops in.
+    scene::Scene facing = s;
+    facing.camera.target = {0.0f, 0.0f, 0.0f};
+    const gpu::Image8 seen = renderWith(renderer, facing);
+    CHECK(renderer.procedurals().stats().culledObjects == 0);
+    CHECK(litPixels(seen) > 500);
     CHECK(ctx->errorCount() == 0);
 }

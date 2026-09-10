@@ -1,5 +1,113 @@
 # Performance
 
+## The ecology is drawn instances, not submitted draws (2026-09-10, P1/P2)
+
+**The optimisation spec's P1 and P2 were aimed at the wrong thing, and this section is the
+evidence.** Submitting the scatter layers' indirect draws is about **1% of the frame**. What the
+ecology costs is rasterising the instances that survive the cull, and that is not a submission
+problem.
+
+### Use the minimum, not the median, over a long run
+
+Every number below is `min` over 300 headless frames at 1440x900, not the median. Over 120 frames
+the median was usable; over 300 it is not. The same three arms, run twice in a row:
+
+| arm | median run 1 | median run 2 | median run 3 | min |
+|---|---|---|---|---|
+| sky only | 3.97 | 6.44 | 7.56 | 3.7 |
+| world | 53.29 | 25.06 | 75.44 | 22.3 |
+| world, no ecology | 10.02 | 15.74 | 10.23 | 9.7 |
+
+The medians differ by 3x between identical runs; the minima agree to a tenth of a millisecond.
+A longer run does not average the contention out, it *collects* more of it, and the median walks
+with it. Contention is never negative, so the minimum is the statistic (the same conclusion
+ADR-050's material work reached, for the same reason). Calibration for everything below:
+`examples/world/_skyonly.scene.json` at **min 3.6-4.9 ms**.
+
+### Where the ecology goes
+
+Five arms of `examples/world/terrain.scene.json` at 1440x900, interleaved, minima:
+
+| arm | min ms | what it isolates |
+|---|---|---|
+| full | **22.3** | |
+| no ecology (`scatter: []`) | **9.9** | the ecology is **12.4 ms**, 56% of the frame |
+| every record culled, all 160 draws still recorded | **11.9** | drawing the survivors is **10.4 ms** |
+| cull compute chain not encoded at all | **11.75** | the cull chain is **0.15 ms** |
+| full + 1920 extra recorded empty indirect draws | 25.1 | **1.46 us** per recorded draw |
+
+So the 12.4 ms divides as:
+
+| | ms | share of the ecology |
+|---|---|---|
+| rasterising the 1281 surviving instances over five passes | **10.4** | **84%** |
+| per-layer setup and the ADR-053 ecology light field | ~1.6 | 13% |
+| the 160 indirect draws, with all their state setting | **0.23** | **2%** |
+| the four-dispatch cull chain over 36k records | **0.15** | **1%** |
+
+The per-draw price is measured directly, by recording extra draws that are provably empty (a
+zeroed slot of the shared indirect buffer) with the full pipeline / bind group / vertex / index
+state in front of each: 1920 of them cost 2.8 ms, or **1.46 microseconds each**. A frame that
+records 120 spends **0.24 ms** doing it. There is no draw-consolidation win here to be had: even
+collapsing every scatter layer to a single draw could not return a quarter of a millisecond.
+
+The GPU's own cull timer agrees, and so does the throughput test in
+`tests/rendering/test_culling_gpu.cpp`: **0.08 ms to cull 100k boxes**.
+
+### "It scales with what the GPU culls, not what it draws" is wrong
+
+That claim was the premise of the P1/P2 brief. It does not survive an A/B in which the record
+count is held fixed and the drawn count moves. Every layer's `minScreenRadius` x4 (drawn falls,
+records do not), and every layer's `viewDistance` x0.5:
+
+| arm | records | drawn | min ms |
+|---|---|---|---|
+| full | 35,969 | 1281 | 22.3 |
+| `minScreenRadius` x4 | 36,592 | 658 | **19.4** |
+| `viewDistance` x0.5 | 36,879 | 371 | **16.9** |
+
+The record count is flat to within 2.5% across all three; the frame moves by 5.4 ms. Both arms lie
+on the same line: **about 5 microseconds per instance actually drawn**, per frame, across the depth
+prepass, the lit pass and three shadow cascades. Raising `minScreenRadius` *did* help -- 2.9 ms --
+which is the specific observation the earlier claim was built on reading the other way.
+
+Per-pass shares of that 12.4 ms, by turning one thing off: ecology shadow casting is **1.5 ms**
+(`castsShadow: false` on all twelve layers: 23.0 -> 21.5). The rest is the prepass and the lit
+pass, where the bushes -- the layer that covers the most screen -- are 4.2 ms on their own. It is
+fragment work on alpha-masked foliage with a material program, and it belongs to the overdraw and
+material-cost items of the spec, not to submission.
+
+### What P1/P2 could still be made to do, and what it bought
+
+Two things were changed, both of which are correct independently of what they save, and neither of
+which saves anything measurable on this scene:
+
+- **Whole-object rejection.** `objectFullyCulled` proves on the CPU, from the object's cached
+  record bounds, that `cull.wgsl` must reject every record; that object's cull dispatches and all
+  of its indirect draws in every pass are then never encoded. It is sound by construction and
+  tested against the per-instance reference over a sweep of cameras and limits.
+- **Redundant state.** An object's LOD levels share a material and usually a pipeline, and
+  consecutive layers often share a pipeline; only what changes is now set. The four per-LOD uniform
+  writes became one.
+
+Frame before/after, interleaved, three reps each against a 4.2-6.3 ms sky calibration: **22.29 /
+22.69 before, 22.49 / 22.59 after.** The world capture is bit-identical, 0 of 1,440,000 pixels
+differing.
+
+The whole-object rejection does not fire on this scene at all, and the reason is worth writing
+down: **a scatter's bounding box is the whole terrain, and the camera stands inside it.** No
+frustum plane can reject a box that contains the viewer, however few of its instances are visible.
+It fires for compact objects -- a hero organism, a boulder field, anything the camera can get
+outside of -- and never for ground cover. Even in `_skyonly`, where all 37,146 records are culled
+and all 36 recorded draws are empty, one box per layer cannot prove it. Making it fire there would
+need per-cell bounds over spatially sorted records, and at 1.46 us a draw it would be buying
+**0.05 ms**.
+
+**The standing conclusion: stop optimising the submission path.** It is a quarter of a millisecond.
+The ecology's cost is 1281 instances of alpha-masked foliage rasterised five times, and the levers
+that move it are overdraw, the fragment cost of the foliage material, and how many instances the
+LOD ladder and the cascades ask for -- not how many draws carry them.
+
 ## Measure a reference scene alongside, every time (2026-09-10)
 
 The machine drifts. Mid-session, `examples/world/_skyonly.scene.json` at 1280x720 went from

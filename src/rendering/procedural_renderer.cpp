@@ -19,6 +19,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <map>
 
 namespace avgen::rendering {
@@ -187,6 +188,77 @@ int cullLodLevel(const scene::LodSettings& lod, const FrustumPlanes& planes, con
     return level;
 }
 
+InstanceBounds instanceBounds(const std::vector<scene::InstanceRecord>& records) {
+    InstanceBounds bounds;
+    if (records.empty()) {
+        return bounds;
+    }
+    glm::vec3 lo(std::numeric_limits<float>::max());
+    glm::vec3 hi(std::numeric_limits<float>::lowest());
+    float maxScale = 0.0f;
+    for (const scene::InstanceRecord& r : records) {
+        const glm::vec3 p(r.position);
+        lo = glm::min(lo, p);
+        hi = glm::max(hi, p);
+        const glm::vec3 s = glm::abs(glm::vec3(r.scale));
+        maxScale = std::max(maxScale, std::max(std::max(s.x, s.y), s.z));
+    }
+    bounds.min = lo;
+    bounds.max = hi;
+    bounds.maxAbsScale = maxScale;
+    bounds.valid = true;
+    return bounds;
+}
+
+bool objectFullyCulled(const scene::LodSettings& lod, const FrustumPlanes& planes, const CullCamera& camera,
+                       const glm::mat4& objectToWorld, const InstanceBounds& bounds, float sourceRadius) {
+    if (!bounds.valid || !lod.cull) {
+        return false;
+    }
+    // The object matrix's largest column length, exactly the `limits.w` the cull pass is given.
+    float objectScale = 0.0f;
+    for (int c = 0; c < 3; ++c) {
+        objectScale = std::max(objectScale, glm::length(glm::vec3(objectToWorld[c])));
+    }
+    // No record's bounding sphere can be larger than this one, because the shader's radius is
+    // sourceRadius * max|record scale| * objectScale and maxAbsScale is the largest of those.
+    const float radius = sourceRadius * bounds.maxAbsScale * std::max(objectScale, 1e-6f);
+    // World AABB of every record centre: the eight corners of the record-space box through the
+    // object matrix. Every centre the shader computes lies inside it.
+    glm::vec3 lo(std::numeric_limits<float>::max());
+    glm::vec3 hi(std::numeric_limits<float>::lowest());
+    for (int corner = 0; corner < 8; ++corner) {
+        const glm::vec3 p((corner & 1) ? bounds.max.x : bounds.min.x, (corner & 2) ? bounds.max.y : bounds.min.y,
+                          (corner & 4) ? bounds.max.z : bounds.min.z);
+        const glm::vec3 world(objectToWorld * glm::vec4(p, 1.0f));
+        lo = glm::min(lo, world);
+        hi = glm::max(hi, world);
+    }
+    // Frustum: the shader culls a record when dot(n, centre) + w < -radius. The most positive any
+    // centre in the box can be is at the corner the normal points at, so if that corner fails, so
+    // does every record.
+    for (const glm::vec4& plane : planes) {
+        const glm::vec3 n(plane);
+        const glm::vec3 farthest(n.x >= 0.0f ? hi.x : lo.x, n.y >= 0.0f ? hi.y : lo.y, n.z >= 0.0f ? hi.z : lo.z);
+        if (glm::dot(n, farthest) + plane.w < -radius) {
+            return true;
+        }
+    }
+    // Distance and screen size both key on the *closest* the box gets to the camera, which is the
+    // most favourable any record can be: the shader keeps a record when dist - radius <= maxDistance
+    // and when radius / dist * projScale >= minScreenRadius.
+    const glm::vec3 nearest = glm::clamp(camera.position, lo, hi);
+    const float nearDistance = glm::length(nearest - camera.position);
+    if (lod.maxDistance > 0.0f && nearDistance - radius > lod.maxDistance) {
+        return true;
+    }
+    if (lod.minScreenRadius > 0.0f &&
+        radius / std::max(nearDistance, 1e-4f) * camera.projScale < lod.minScreenRadius) {
+        return true;
+    }
+    return false;
+}
+
 struct ProceduralRenderer::Impl {
     struct CachedMesh {
         wgpu::Buffer vertices;
@@ -220,6 +292,9 @@ struct ProceduralRenderer::Impl {
         wgpu::Buffer visible;                   // kMaxLodLevels slices of visibleStride elements
         wgpu::BindGroup cullGroup;              // cull pass over the base records
         wgpu::BindGroup cullGroupLive;          // cull pass over the live records
+        // Whole-object record bounds, rebuilt with the instance upload. Lets the CPU prove, before
+        // encoding anything, that the cull pass would reject every record (see objectFullyCulled).
+        InstanceBounds bounds;
         std::uint32_t cullCapacity = 0;         // records the cull buffers are sized for
         std::uint32_t cullLodCount = 0;         // levels the cull buffers are sized for
         std::uint32_t visibleStride = 0;        // elements per level in `visible`
@@ -240,6 +315,9 @@ struct ProceduralRenderer::Impl {
         std::uint32_t instanceCount;
         std::uint32_t lodCount = 1;
         bool indirect = false;          // draw through the compacted visible lists
+        // The cull pass would have zeroed every level's instance count, so nothing is recorded in
+        // any pass. Provable on the CPU from the object's whole-record bounds (objectFullyCulled).
+        bool fullyCulled = false;
     };
     struct ComputeItem {
         const ObjectState* state;
@@ -333,6 +411,9 @@ struct ProceduralRenderer::Impl {
     std::unique_ptr<gpu::GpuTimer> effectorTimer;
     std::unique_ptr<gpu::GpuTimer> cullTimer;
     std::vector<std::uint8_t> staging;
+    // Reused between objects: the object's LOD uniform slots, laid out contiguously for one write.
+    std::vector<std::uint8_t> deformerStaging;
+    std::vector<std::uint32_t> statsZero; // the cull-stats prefix cleared each frame
     std::map<std::uint64_t, CachedMesh> meshes;
     std::map<std::string, ObjectState> objects;
     std::vector<DrawItem> items;
@@ -1138,9 +1219,23 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             queue.WriteBuffer(state.instances, 0, object.instances.data(), instanceBytes);
             state.structureVersion = object.structureVersion;
             state.uploadedCount = object.instances.size();
+            // The records are what the bounds are made of, so they are rebuilt exactly here and
+            // nowhere else: once per scatter, not once per frame.
+            state.bounds = instanceBounds(object.instances);
             ++stats_.uploads;
         }
         const glm::mat4 model = i < objectMatrices.size() ? objectMatrices[i] : glm::mat4(1.0f);
+        // Empty work, eliminated before it is encoded: when the object's whole record set is
+        // outside the frustum, past maxDistance or below minScreenRadius, every level's instance
+        // count would come back zero. Its four cull dispatches and its indirect draws in every
+        // pass -- prepass, lit, each shadow cascade -- are skipped. An object with effectors is
+        // excluded because the GPU moves its records after these bounds were taken.
+        const bool fullyCulled = cullActive && !usesLive &&
+                                 objectFullyCulled(lodSettings, planes, cullCamera, model, state.bounds,
+                                                   mesh->radius);
+        if (fullyCulled) {
+            ++stats_.culledObjects;
+        }
         if (usesLive) {
             eff.objectToWorld = model;
             eff.worldToObjectRotation = glm::mat4(glm::transpose(rotationOf(model)));
@@ -1208,17 +1303,22 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // One slot per LOD level: levels 2 and 3 are camera-facing billboards, so they take the
         // same shader path as a Point source; fieldInfo.w switches the visible-list indirection on.
         // With the defaults (no culling, one level) this is the single write it has always been.
+        // The levels differ in one float, and their slots are contiguous, so they go up as one
+        // write rather than as lodCount of them (four per object, forty-eight in a world frame).
+        im.deformerStaging.assign(static_cast<std::size_t>(lodCount) * kDeformerSlotStride, 0);
         for (std::uint32_t level = 0; level < lodCount; ++level) {
             const bool billboard = isPoint || level >= 2;
             u.fieldInfo = glm::vec4(static_cast<float>(emissiveSlot), object.emissiveFieldAmount,
                                     billboard ? 1.0f : 0.0f, cullActive ? 1.0f : 0.0f);
-            queue.WriteBuffer(state.deformers, static_cast<std::uint64_t>(level) * kDeformerSlotStride, &u, sizeof(u));
+            std::memcpy(im.deformerStaging.data() + static_cast<std::size_t>(level) * kDeformerSlotStride, &u,
+                        sizeof(u));
         }
+        queue.WriteBuffer(state.deformers, 0, im.deformerStaging.data(), im.deformerStaging.size());
         if (isPoint) {
             ++stats_.pointObjects;
         }
 
-        if (cullActive) {
+        if (cullActive && !fullyCulled) {
             CullPassUniforms cull{};
             cull.objectToWorld = model;
             for (std::size_t k = 0; k < planes.size(); ++k) {
@@ -1286,7 +1386,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         const std::uint32_t offset = slot * kObjectStride;
         std::memcpy(im.staging.data() + offset, &obj, sizeof(obj));
 
-        im.items.push_back(Impl::DrawItem{i, lodMeshes, &state, offset, instanceCount, lodCount, cullActive});
+        im.items.push_back(
+            Impl::DrawItem{i, lodMeshes, &state, offset, instanceCount, lodCount, cullActive, fullyCulled});
         ++stats_.objects;
         stats_.sourceVertices += mesh->vertexCount;
         stats_.sourceTriangles += mesh->indexCount / 3;
@@ -1325,8 +1426,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // stopped culling must not linger: zero the used prefix each frame (a few KB).
         const std::size_t statsBytes = static_cast<std::size_t>(slot) * kCullStatsStride * sizeof(std::uint32_t);
         if (statsBytes > 0) {
-            const std::vector<std::uint32_t> zero(static_cast<std::size_t>(slot) * kCullStatsStride, 0u);
-            queue.WriteBuffer(im.cullStats, 0, zero.data(), statsBytes);
+            im.statsZero.assign(static_cast<std::size_t>(slot) * kCullStatsStride, 0u);
+            queue.WriteBuffer(im.cullStats, 0, im.statsZero.data(), statsBytes);
         }
         wgpu::ComputePassDescriptor desc{};
         desc.label = "procedural-cull";
@@ -1416,6 +1517,36 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
     if (!im.initialised || im.items.empty()) {
         return;
     }
+    // Redundant state is not free and it is not needed: an object's LOD levels share a material
+    // and usually a pipeline, and consecutive scatter layers often share a pipeline too. Only what
+    // actually changes is set. The trackers start null because nothing may be assumed about the
+    // pass before this renderer's first draw in it.
+    wgpu::RenderPipeline boundPipeline;
+    wgpu::BindGroup boundMaterial;
+    wgpu::Buffer boundVertices;
+    wgpu::Buffer boundIndices;
+    const auto setPipeline = [&](const wgpu::RenderPipeline& p) {
+        if (p.Get() != boundPipeline.Get()) {
+            pass.SetPipeline(p);
+            boundPipeline = p;
+        }
+    };
+    const auto setMaterial = [&](const wgpu::BindGroup& g) {
+        if (g.Get() != boundMaterial.Get()) {
+            pass.SetBindGroup(2, g);
+            boundMaterial = g;
+        }
+    };
+    const auto setMesh = [&](const Impl::CachedMesh& mesh) {
+        if (mesh.vertices.Get() != boundVertices.Get()) {
+            pass.SetVertexBuffer(0, mesh.vertices);
+            boundVertices = mesh.vertices;
+        }
+        if (mesh.indices.Get() != boundIndices.Get()) {
+            pass.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
+            boundIndices = mesh.indices;
+        }
+    };
     for (const auto& item : im.items) {
         if (item.objectIndex >= scene.procedurals.size()) {
             continue;
@@ -1424,16 +1555,22 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
         if (shadowPass && !object.castsShadow) {
             continue;
         }
+        // Nothing survived this object's cull, and the CPU knew it before the pass was encoded.
+        if (item.fullyCulled) {
+            stats_.skippedIndirectDraws += item.lodCount;
+            continue;
+        }
         const auto& material = object.material;
         // Point billboards face the camera by construction: never cull them.
         const bool twoSided = material.doubleSided || object.source.kind == scene::PrimitiveKind::Point;
         const auto& groups = item.state->usesLive ? item.state->groupsLive : item.state->groups;
+        // One lookup per object: every LOD level of it draws the same material.
+        const wgpu::BindGroup materialGroup = materialBindGroup(material);
         if (!item.indirect) {
-            pass.SetPipeline(depthOnly ? im.pipelineDepth : (twoSided ? im.pipelineNoCull : im.pipelineCull));
+            setPipeline(depthOnly ? im.pipelineDepth : (twoSided ? im.pipelineNoCull : im.pipelineCull));
             pass.SetBindGroup(1, groups[0], 1, &item.offset);
-            pass.SetBindGroup(2, materialBindGroup(material));
-            pass.SetVertexBuffer(0, item.meshes[0]->vertices);
-            pass.SetIndexBuffer(item.meshes[0]->indices, wgpu::IndexFormat::Uint32);
+            setMaterial(materialGroup);
+            setMesh(*item.meshes[0]);
             pass.DrawIndexed(item.meshes[0]->indexCount, item.instanceCount);
             if (!depthOnly) {
                 ++stats_.drawCalls;
@@ -1456,12 +1593,11 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
                 ++stats_.skippedIndirectDraws;
                 continue;
             }
-            pass.SetPipeline(depthOnly ? im.pipelineDepth
-                                       : (twoSided || level >= 2 ? im.pipelineNoCull : im.pipelineCull));
+            setPipeline(depthOnly ? im.pipelineDepth
+                                  : (twoSided || level >= 2 ? im.pipelineNoCull : im.pipelineCull));
             pass.SetBindGroup(1, groups[level], 1, &item.offset);
-            pass.SetBindGroup(2, materialBindGroup(material));
-            pass.SetVertexBuffer(0, mesh->vertices);
-            pass.SetIndexBuffer(mesh->indices, wgpu::IndexFormat::Uint32);
+            setMaterial(materialGroup);
+            setMesh(*mesh);
             const std::uint64_t argsOffset =
                 (static_cast<std::uint64_t>(item.state->statsSlot) * scene::kMaxLodLevels + level) * kIndirectStride;
             pass.DrawIndexedIndirect(im.indirectArgs, argsOffset);
