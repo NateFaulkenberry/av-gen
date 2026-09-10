@@ -110,6 +110,37 @@ std::vector<BiomeDensity> biomesFor(assets::AssetCategory c, float density) {
 }
 } // namespace
 
+BiomeSet composerBiomes() {
+    // Five biomes on the three axes a biome is defined by: altitude, slope and moisture. The ranges
+    // overlap deliberately -- BiomeSet::at blends, so hard borders would produce visible seams in
+    // the ground colour and in what grows on it.
+    const auto make = [](const char* name, Range altitude, Range slope, Range moisture,
+                         glm::vec3 ground, glm::vec3 rock) {
+        Biome b;
+        b.name = name;
+        b.rule.altitude = altitude;
+        b.rule.slope = slope;
+        b.rule.moisture = moisture;
+        b.groundColor = ground;
+        b.rockColor = rock;
+        return b;
+    };
+    BiomeSet set;
+    set.biomes = {
+        make("marsh",  {0.00f, 0.28f}, {0.00f, 0.30f}, {0.55f, 1.00f},
+             {0.020f, 0.070f, 0.055f}, {0.070f, 0.085f, 0.090f}),
+        make("forest", {0.10f, 0.62f}, {0.00f, 0.45f}, {0.25f, 0.85f},
+             {0.023f, 0.090f, 0.060f}, {0.080f, 0.090f, 0.100f}),
+        make("meadow", {0.15f, 0.55f}, {0.00f, 0.22f}, {0.10f, 0.55f},
+             {0.045f, 0.105f, 0.055f}, {0.090f, 0.095f, 0.105f}),
+        make("scree",  {0.35f, 1.00f}, {0.35f, 1.00f}, {0.00f, 0.45f},
+             {0.075f, 0.080f, 0.090f}, {0.100f, 0.105f, 0.120f}),
+        make("rim",    {0.60f, 1.00f}, {0.00f, 0.55f}, {0.00f, 0.40f},
+             {0.060f, 0.070f, 0.085f}, {0.095f, 0.100f, 0.115f}),
+    };
+    return set;
+}
+
 const char* depthBandName(DepthBand band) {
     switch (band) {
     case DepthBand::Foreground:

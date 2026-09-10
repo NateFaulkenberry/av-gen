@@ -20,6 +20,7 @@
 
 #include "assets/asset_library.hpp"
 #include "core/error.hpp"
+#include "world/biome.hpp"
 #include "world/ecology.hpp"
 #include "world/world_recipe.hpp"
 
@@ -71,6 +72,13 @@ struct ComposedWorld {
 // which is what lets a composed scene be a deterministic render target like any other.
 [[nodiscard]] Result<ComposedWorld> composeWorld(const WorldRecipe& recipe,
                                                  const assets::AssetLibrary& library);
+
+// The biome vocabulary the composer's layers are written against: forest, meadow, marsh, rim,
+// scree. A generated world's terrain has to define exactly these or every layer references a biome
+// that does not exist and the ecology refuses the lot -- which is precisely what happened the first
+// time Generate World was run against a fresh terrain. Returned from here so the composer and
+// whoever builds the terrain cannot drift apart.
+[[nodiscard]] BiomeSet composerBiomes();
 
 // Which band an asset belongs to, given its height and tags. Exposed because it is the single
 // judgement call in the composer and it deserves to be tested directly rather than inferred from
