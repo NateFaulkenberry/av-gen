@@ -1,0 +1,163 @@
+{
+ "source": "polyhaven.com",
+ "license": "CC0",
+ "note": "Fetched by tools/fetch_polyhaven.py --hdri. CC0: no attribution required, recorded here anyway so provenance survives. The .hdr files are gitignored; re-run the fetcher to restore them.",
+ "assets": [
+  {
+   "id": "kloppenheim_02_puresky",
+   "resolution": "2k",
+   "file": "hdri/kloppenheim_02_puresky_2k.hdr",
+   "source": "polyhaven",
+   "license": "CC0",
+   "url": "https://polyhaven.com/a/kloppenheim_02_puresky",
+   "authors": [
+    "Greg Zaal",
+    "Jarod Guest"
+   ],
+   "categories": [
+    "outdoor",
+    "skies",
+    "nature",
+    "night",
+    "clear",
+    "high contrast",
+    "natural light",
+    "pure skies"
+   ],
+   "tags": [
+    "pure skies"
+   ],
+   "whitebalance": 3776
+  },
+  {
+   "id": "kloppenheim_02_puresky",
+   "resolution": "4k",
+   "file": "hdri/kloppenheim_02_puresky_4k.hdr",
+   "source": "polyhaven",
+   "license": "CC0",
+   "url": "https://polyhaven.com/a/kloppenheim_02_puresky",
+   "authors": [
+    "Greg Zaal",
+    "Jarod Guest"
+   ],
+   "categories": [
+    "outdoor",
+    "skies",
+    "nature",
+    "night",
+    "clear",
+    "high contrast",
+    "natural light",
+    "pure skies"
+   ],
+   "tags": [
+    "pure skies"
+   ],
+   "whitebalance": 3776
+  },
+  {
+   "id": "kloppenheim_02_puresky",
+   "resolution": "8k",
+   "file": "hdri/kloppenheim_02_puresky_8k.hdr",
+   "source": "polyhaven",
+   "license": "CC0",
+   "url": "https://polyhaven.com/a/kloppenheim_02_puresky",
+   "authors": [
+    "Greg Zaal",
+    "Jarod Guest"
+   ],
+   "categories": [
+    "outdoor",
+    "skies",
+    "nature",
+    "night",
+    "clear",
+    "high contrast",
+    "natural light",
+    "pure skies"
+   ],
+   "tags": [
+    "pure skies"
+   ],
+   "whitebalance": 3776
+  },
+  {
+   "id": "qwantani_moonrise_puresky",
+   "resolution": "2k",
+   "file": "hdri/qwantani_moonrise_puresky_2k.hdr",
+   "source": "polyhaven",
+   "license": "CC0",
+   "url": "https://polyhaven.com/a/qwantani_moonrise_puresky",
+   "authors": [
+    "Greg Zaal",
+    "Jarod Guest"
+   ],
+   "categories": [
+    "outdoor",
+    "natural light",
+    "nature",
+    "skies",
+    "high contrast",
+    "clear",
+    "night",
+    "pure skies"
+   ],
+   "tags": [
+    "pure skies"
+   ],
+   "whitebalance": 4088
+  },
+  {
+   "id": "qwantani_moonrise_puresky",
+   "resolution": "4k",
+   "file": "hdri/qwantani_moonrise_puresky_4k.hdr",
+   "source": "polyhaven",
+   "license": "CC0",
+   "url": "https://polyhaven.com/a/qwantani_moonrise_puresky",
+   "authors": [
+    "Greg Zaal",
+    "Jarod Guest"
+   ],
+   "categories": [
+    "outdoor",
+    "natural light",
+    "nature",
+    "skies",
+    "high contrast",
+    "clear",
+    "night",
+    "pure skies"
+   ],
+   "tags": [
+    "pure skies"
+   ],
+   "whitebalance": 4088
+  },
+  {
+   "id": "qwantani_moonrise_puresky",
+   "resolution": "8k",
+   "file": "hdri/qwantani_moonrise_puresky_8k.hdr",
+   "source": "polyhaven",
+   "license": "CC0",
+   "url": "https://polyhaven.com/a/qwantani_moonrise_puresky",
+   "authors": [
+    "Greg Zaal",
+    "Jarod Guest"
+   ],
+   "categories": [
+    "outdoor",
+    "natural light",
+    "nature",
+    "skies",
+    "high contrast",
+    "clear",
+    "night",
+    "pure skies"
+   ],
+   "tags": [
+    "pure skies"
+   ],
+   "whitebalance": 4088
+  }
+ ]
+}

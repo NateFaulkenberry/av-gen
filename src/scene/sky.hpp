@@ -57,6 +57,18 @@ struct SkyRuntime {
 // between texels in the coarse mips (the analytic stand-in for downsampling the cube).
 [[nodiscard]] glm::vec3 skyRadiance(const SkyRuntime& sky, const glm::vec3& dir, float minRadius = 0.0f);
 
+// The world direction of an equirectangular environment map's brightest feature -- its sun or its
+// moon (ADR-049). Found as the radiance-weighted centroid of every texel within `coreFraction` of
+// the brightest one, which lands on the disc's centre rather than on whichever single texel won,
+// and so barely moves between a 2K and an 8K copy of the same sky. `rotationRadians` is the
+// scene's `environmentRotation`: the returned direction is in world space, already un-rotated, so
+// it can be handed straight to a light.
+//
+// The map's parameterisation is the one shaders/environment.wgsl's `equirectUv` inverts:
+// u = 0.5 + atan2(z, x) / 2pi, v = acos(y) / pi. Returns +Y for an empty or non-HDR map.
+[[nodiscard]] glm::vec3 environmentDominantDirection(const TextureData& equirect, float rotationRadians = 0.0f,
+                                                     float coreFraction = 0.25f);
+
 // Cosine-weighted irradiance arriving at a surface with normal `n`, by a fixed Fibonacci-hemisphere
 // quadrature of `samples` directions. Deterministic: the same arguments always give the same value.
 // This is the CPU reference for the irradiance cube the GPU builds.

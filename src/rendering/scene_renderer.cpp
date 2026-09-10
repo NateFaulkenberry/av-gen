@@ -177,7 +177,7 @@ Result<void> SceneRenderer::init() {
         materialLayout_ = device.CreateBindGroupLayout(&desc);
     }
     {
-        std::array<wgpu::BindGroupLayoutEntry, 4> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 6> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Fragment;
         entries[0].sampler.type = wgpu::SamplerBindingType::Filtering;
@@ -191,6 +191,14 @@ Result<void> SceneRenderer::init() {
         entries[3].visibility = wgpu::ShaderStage::Fragment;
         entries[3].texture.sampleType = wgpu::TextureSampleType::Float;
         entries[3].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        // ADR-049: the sky's own equirect, with a sampler that wraps in longitude so the
+        // antimeridian is not a visible column. Only shaders/skybox.wgsl declares these; the
+        // pipeline layout is explicit, so every other pipeline on this group simply ignores them.
+        entries[4] = entries[3];
+        entries[4].binding = 4;
+        entries[5].binding = 5;
+        entries[5].visibility = wgpu::ShaderStage::Fragment;
+        entries[5].sampler.type = wgpu::SamplerBindingType::Filtering;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "ibl-layout";
         desc.entryCount = entries.size();
@@ -289,6 +297,11 @@ Result<void> SceneRenderer::init() {
         desc.minFilter = wgpu::FilterMode::Linear;
         desc.mipmapFilter = wgpu::MipmapFilterMode::Linear;
         iblSampler_ = device.CreateSampler(&desc);
+        // ADR-049: the same filtering, wrapping in u. An equirect's u is longitude and is
+        // periodic; clamping it there blends the seam column against itself.
+        desc.label = "sky-equirect-sampler";
+        desc.addressModeU = wgpu::AddressMode::Repeat;
+        skySampler_ = device.CreateSampler(&desc);
     }
     rebuildIblBindGroup();
 
@@ -1060,7 +1073,7 @@ void SceneRenderer::setIbl(const IblResources& ibl) {
 }
 
 void SceneRenderer::rebuildIblBindGroup() {
-    std::array<wgpu::BindGroupEntry, 4> entries{};
+    std::array<wgpu::BindGroupEntry, 6> entries{};
     entries[0].binding = 0;
     entries[0].sampler = iblSampler_;
     entries[1].binding = 1;
@@ -1069,6 +1082,12 @@ void SceneRenderer::rebuildIblBindGroup() {
     entries[2].textureView = ibl_.valid ? ibl_.prefiltered : blackCubeView_;
     entries[3].binding = 3;
     entries[3].textureView = ibl_.valid ? ibl_.brdfLut : blackLut_.view;
+    // A procedural sky has no map, so the slot takes the 1x1 placeholder; skyExtra.x tells the
+    // shader which of the two to read (ADR-049).
+    entries[4].binding = 4;
+    entries[4].textureView = (ibl_.valid && ibl_.background) ? ibl_.background : blackLut_.view;
+    entries[5].binding = 5;
+    entries[5].sampler = skySampler_;
     wgpu::BindGroupDescriptor desc{};
     desc.label = "ibl-bind-group";
     desc.layout = iblLayout_;
@@ -1486,8 +1505,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                 static_cast<float>(ibl ? ibl_.prefilteredMips - 1 : 0), static_cast<float>(lightCount),
                                 ibl ? 1.0f : 0.0f);
     frame.skyParams = glm::vec4(scene.environment.backgroundColor, scene.environment.skyboxBlur);
+    // ADR-049: zw carry the two controls the background pass owns and shading does not -- how
+    // bright the sky is drawn, and how much of it the selective-bloom mask sees.
     frame.skyExtra = glm::vec4(skyIbl ? 1.0f : 0.0f,
-                               (!skyIbl || scene.environment.sky.showBackground) ? 1.0f : 0.0f, 0.0f, 0.0f);
+                               (!skyIbl || scene.environment.sky.showBackground) ? 1.0f : 0.0f,
+                               std::max(scene.environment.skyIntensity, 0.0f),
+                               std::clamp(scene.environment.skyBloom, 0.0f, 1.0f));
     frame.fogParams = glm::vec4(scene.environment.fogColor, std::max(scene.environment.fogDensity, 0.0f));
     // ---- lights, shadow views and the froxel grid (ADR-033/034) ----
     updateLights(encoder, scene, view, aspect, frame);

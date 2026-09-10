@@ -247,6 +247,22 @@ as it was before there was a world.
 vertex of every visible mesh to do it. Terrain made that a few hundred thousand vertex reads per
 frame; mesh bounds are now cached against `meshVersion`.
 
+## The sky (ADR-049)
+
+Glowmere Valley's sky is Kloppenheim 02 Pure Sky at 4K, a photographed moonlit night. The moon in
+frame and the moonlight on the terrain are the same moon: `lightFromEnvironment` aims the key light
+away from the map's brightest direction, and `rotation` turns both together, so composing the shot
+cannot desynchronise them. The sky is drawn at `skyIntensity` 0.08 and lights at `intensity` 0.3 --
+dark enough to read as night, bright enough to keep the shadowed flanks off black.
+
+`examples/world/moonrise.scene.json` is the same world under a different sky, changed by editing
+JSON alone: a different `map`, `rotation` and two intensities.
+
+One thing the sky changed that was not about the sky. The valley's volumetrics ran a
+Henyey-Greenstein `g` of 0.6, and a moon in frame is a moon near the view axis, so the mist lit up
+and swamped the ecology. `g` is now 0.12 with less in-scatter. The old value had only ever been
+seen with the key light off to the side.
+
 ## Known limitations
 
 - Frustum culling sets `Entity::visible`, which the shadow pass also honours, so a chunk behind the
@@ -260,3 +276,6 @@ frame; mesh bounds are now cached against `meshVersion`.
 - Quaternius meshes carry several materials each and `mergedAssetMesh` collapses an asset to one,
   so a mushroom's cap and stem share a colour.
 - Emission is constant. Making it a living field is what the chromatic phase is for.
+- The sky's stars are the photograph's. A camera that looks mostly at the ground, as this one does,
+  sees only the few degrees above the ridge, which on this HDRI is where the moon's haze is
+  brightest -- so the frame gets a moon and a horizon glow rather than a field of stars.

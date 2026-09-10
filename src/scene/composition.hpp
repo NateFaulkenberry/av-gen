@@ -243,6 +243,17 @@ private:
     float cameraOrbitSpeedSetting_ = 0.12f;
     float cameraFovSetting_ = 50.0f;
     float envIntensitySetting_ = 1.0f;
+    // HDRI sky (ADR-049): the scene-file values behind env/rotation and the background controls.
+    // `envRotationSetting_` in particular used to have nowhere to come from -- the parameter
+    // existed but always started at 0, so a scene file could not aim its sky at all.
+    float envRotationSetting_ = 0.0f;      // radians about +Y
+    float skyIntensitySetting_ = 1.0f;     // the visible sky only
+    float skyBloomSetting_ = 0.0f;         // how much of the sky the bloom mask sees
+    bool showSkyboxSetting_ = true;        // draw the environment behind the world at all
+    bool lightFromEnvironmentSetting_ = false;
+    // The environment map's brightest direction, in world space at rotation 0, found once when the
+    // map is loaded: an 8K scan is 33 M texels and has no business being swept every frame.
+    std::optional<glm::vec3> envDominantDirection_;
     // Procedural sky (ADR-036): the scene-file values behind the env/sky/* parameters.
     scene::SkySettings skySetting_;
     Scene scene_;

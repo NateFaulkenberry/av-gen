@@ -256,11 +256,26 @@ struct Environment {
     glm::vec3 backgroundColor{0.012f, 0.012f, 0.02f};
     float brightness = 1.0f;     // global exposure multiplier applied in tone mapping
     float gridIntensity = 0.6f;
-    TextureId environmentMap = kInvalidTexture; // equirectangular Rgba32Float
-    float environmentIntensity = 1.0f;
-    float environmentRotation = 0.0f; // radians about +Y
+    TextureId environmentMap = kInvalidTexture; // equirectangular Rgba32Float, 2:1
+    float environmentIntensity = 1.0f; // multiplies the IBL that lights surfaces
+    float environmentRotation = 0.0f;  // radians about +Y; rotates the visible sky and its lighting
+                                       // together, so the moon and the moonlight cannot separate
     bool showSkybox = true;
     float skyboxBlur = 0.0f; // 0 = sharp, 1 = fully prefiltered
+    // ADR-049. What the sky looks like and how much light it casts are two looks, not one: a night
+    // valley wants a sky dark enough to read as night and an IBL bright enough to keep shadowed
+    // rock off black. `skyIntensity` scales only the background pass; `environmentIntensity` only
+    // the shading. One number cannot be both, and before this it was one number.
+    float skyIntensity = 1.0f;
+    // How much of the sky reaches the selective-bloom mask (ADR-039's emission target). 0 is the
+    // pre-ADR-049 behaviour -- a bright environment never glows -- and is still the default,
+    // because on a sky with a real sun in it anything else blows out the frame. A moon wants
+    // about 0.3.
+    float skyBloom = 0.0f;
+    // ADR-049: aim the key light away from the environment map's brightest direction. The moon you
+    // can see and the moonlight falling on the terrain then come from the same pixel by
+    // construction, instead of by an author keeping two numbers in step by hand.
+    bool lightFromEnvironment = false;
     // Shadow cascades, overriding the quality tier when non-zero. It belongs to the scene because
     // it is a property of the world's scale rather than of the machine: on a 640 m landscape lit by
     // a low moon, dropping the third cascade cost 0.67% of pixels a difference of more than 6/255

@@ -155,6 +155,52 @@ index - never a wall clock - and the temporal history is dropped whenever the fr
 advance by exactly one. Two renders of the same frame are therefore bit-identical, which a GPU test
 checks.
 
+## The HDRI sky (ADR-049)
+
+An equirectangular `.hdr` (2:1) is a first-class sky: it lights the scene *and* stands behind it,
+at its own resolution and at its own brightness.
+
+```json
+"environment": {
+  "map": "../../assets/hdri/kloppenheim_02_puresky_4k.hdr",
+  "intensity": 0.3,
+  "rotation": -1.517,
+  "skyIntensity": 0.08,
+  "skyBloom": 0.35,
+  "lightFromEnvironment": true
+}
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `map` | — | the equirectangular `.hdr`, through the asset registry. Unset = the procedural sky below |
+| `intensity` | 1.0 | how much light the environment casts. Nothing to do with how bright it looks |
+| `rotation` | 0.0 | radians about +Y. Turns the visible sky *and* its lighting together |
+| `skyIntensity` | 1.0 | how bright the sky is drawn. Nothing to do with how much it lights |
+| `skyBloom` | 0.0 | how much of the sky the selective-bloom mask sees. Needs `post/bloom/emissionWeight` above 0 to do anything |
+| `skybox` | true | draw the environment behind the world at all |
+| `lightFromEnvironment` | false | aim the key light away from the map's brightest direction |
+
+**Two intensities, deliberately.** `intensity` and `skyIntensity` are the same number in most
+engines and that number cannot describe a night: Glowmere Valley draws its sky at 0.08 and lights
+from it at 0.3. They ride separate lanes (`params.w` and `skyExtra.z`) and neither affects the
+other, which a GPU test asserts in both directions.
+
+**The moonlight comes from the moon.** With `lightFromEnvironment`, the key light's direction is
+minus the map's brightest direction (`scene::environmentDominantDirection` — the solid-angle- and
+radiance-weighted centroid of the disc, so it is stable across a map's resolutions), rotated by
+`rotation`. Turn the sky and the light turns with it. The rig still owns the light's colour,
+intensity, shadows and softness.
+
+**Resolution.** The background samples the equirect itself, not the 128-pixel prefiltered cube the
+IBL ends with, because a star is one texel and a cube face is under three texels per degree. 4K is
+the right size for 720p–1080p output: 2K blurs stars into blobs, 8K is indistinguishable at
+1280×720 for four times the memory. Fetch them with `tools/fetch_polyhaven.py --hdri --fetch`.
+
+**Note.** Putting a moon *in frame* puts it near the view axis, where a forward-peaked volumetric
+phase function (`volumeAnisotropy` near 1) turns the whole shot into glare. That is physics, not a
+bug, but it means a scene tuned with the key off to the side will need its volumetrics revisited.
+
 ## The procedural sky (ADR-036)
 
 A scene with no HDR environment map used to fall back to a two-colour hemispheric constant, which

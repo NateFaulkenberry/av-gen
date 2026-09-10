@@ -9,6 +9,9 @@ cmake-build-*/
 
 # Asset library: CC0 downloads, reproducible with tools/fetch_polyhaven.py. The manifest and the
 # fetcher are committed; ~110 MB of textures and meshes are not.
-/assets/nature/
-/assets/terrain/
-/assets/quaternius/
+/assets/nature
+/assets/terrain
+/assets/quaternius
+# Skies (ADR-049): the .hdr files are hundreds of megabytes; assets/hdri/manifest.json records
+# which ones and at what resolution, and the fetcher restores them.
+/assets/hdri/*.hdr

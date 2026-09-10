@@ -47,3 +47,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [039](ADR-039-image-formation.md) | Image formation, selective post and tone mapping | Accepted |
 | [040](ADR-040-particles-and-motion.md) | Particle trails, velocity-aware rendering and motion blur | Accepted |
 | [041](ADR-041-world-director.md) | World Director, look presets and musical phrasing | Accepted |
+| [049](ADR-049-hdri-sky.md) | The HDRI sky: the map as the background, sky and lighting intensity split, the key light aimed from the image | Accepted |

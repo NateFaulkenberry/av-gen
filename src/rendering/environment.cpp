@@ -339,6 +339,10 @@ Result<IblResources> EnvironmentProcessor::process(const scene::TextureData& equ
     if (!out) {
         return out;
     }
+    // ADR-049: hand the caller the equirect it was built from. The view keeps the texture alive,
+    // so the background pass reads the sky at full resolution with no second upload and no
+    // per-frame conversion.
+    out->background = source->view;
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     log::info("environment '{}' ({}x{}) processed in {:.1f} ms: cube {} ({} mips), irradiance {}, prefiltered {} x {} mips",
               equirect.name, equirect.width, equirect.height, ms, settings.cubeSize, cubeMips,
