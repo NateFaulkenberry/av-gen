@@ -1301,7 +1301,14 @@ int Application::runHeadless() {
     for (int i = 0; i < frames; ++i) {
         const auto frameStart = std::chrono::steady_clock::now();
         time = engine_->tick(clock);
+        // The scene rebuild is CPU work that scales with the size of the world rather than with
+        // what is on screen, and nothing measured it: a world scene with the camera turned to
+        // face empty sky spends 12-14 ms on the GPU and 21 ms of wall clock, and the difference
+        // was invisible. See docs/performance.md.
+        const auto updateStart = std::chrono::steady_clock::now();
         engine_->update(time);
+        lastEngineUpdateMs_ =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - updateStart).count();
         // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
         // options; an empty set costs nothing.
         if (panel_) {
@@ -1357,13 +1364,14 @@ int Application::runHeadless() {
             // submitted frame; the rest are the passes that measure themselves.
             const auto& st = renderer_->stats();
             log::info("             passes: shadow={:.2f} ao={:.2f} volume={:.2f} cull={:.2f} | draws={} "
-                      "shadowDraws={} indirect={} (empty {}, skipped {}) instances={}/{} lod={}/{}/{}/{} cpu(proc)={:.2f}ms",
+                      "shadowDraws={} indirect={} (empty {}, skipped {}) instances={}/{} lod={}/{}/{}/{} "
+                      "cpu(proc)={:.2f}ms cpu(scene)={:.2f}ms",
                       st.shadows.shadowMs, st.ao.aoMs, st.volume.volumeMs, st.procedural.cullMs, st.drawCalls,
                       st.shadows.entityDraws,
                       st.procedural.indirectDraws, st.procedural.emptyIndirectDraws, st.procedural.skippedIndirectDraws,
                       st.procedural.visibleInstances, st.procedural.culledInstances, st.procedural.lodCounts[0],
                       st.procedural.lodCounts[1], st.procedural.lodCounts[2], st.procedural.lodCounts[3],
-                      st.procedural.cpuUpdateMs);
+                      st.procedural.cpuUpdateMs, lastEngineUpdateMs_);
         }
         if (options_.capture && i == frames - 1 && image) {
             if (auto r = writeCapture(*image, *options_.capture); !r) {

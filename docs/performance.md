@@ -20,6 +20,15 @@ way on the world scene at 2880x1800 (baseline 52.6 ms):
 | volumetrics | 47.7 | 5.4 ms |
 | airborne spores | 52.3 | 0.3 ms |
 
+### Where the non-GPU time goes
+
+With the camera turned to face empty sky at 1280x720, the world scene reports `gpu=12-14 ms`
+and a wall-clock median of about 21 ms. The scene rebuild is not the gap: `cpu(scene)` (new on
+the `passes:` line) measures 0.98 ms, against 0.07 for a sky-only scene. So roughly 7 ms per
+frame is spent between submitting the frame and getting it back -- the offline loop waits on the
+queue rather than pipelining, which is P3 of the optimisation spec and is still open. Every
+frame number in this document is measured through that path and therefore includes it.
+
 The frame scales at roughly 5.2 ms per megapixel. What does *not* scale with resolution is
 larger than expected: at 1280x720 a sky-only scene renders in 8.4 ms, the world in 30.8, and the
 world with the camera turned to face empty sky still costs 20.7 -- so about 12 ms goes on

@@ -97,6 +97,7 @@ public:
     int run();
 
 private:
+    double lastEngineUpdateMs_ = 0.0; // CPU cost of rebuilding the scene, per frame
     int runLive();
     int runHeadless();
     void loadAudio(const std::filesystem::path& path);
