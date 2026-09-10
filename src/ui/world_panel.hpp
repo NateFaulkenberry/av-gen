@@ -33,7 +33,11 @@ struct Influence {
 
 // Selection shared by the overview and the inspector.
 struct WorldSelection {
-    enum class Kind { None, Procedural, Field, Spline, Sdf, Particles, Material, Environment, Camera } kind = Kind::None;
+    // `Node` is a composition node selected in the viewport, whose parameters live under
+    // "nodes/<name>/". It is separate from the kinds below because those name things *inside* a
+    // flattened scene; a click in the viewport selects the node a person placed, which is the thing
+    // they can move, rename and delete.
+    enum class Kind { None, Node, Procedural, Field, Spline, Sdf, Particles, Material, Environment, Camera } kind = Kind::None;
     std::string name;        // object name in the scene
     [[nodiscard]] std::string parameterPrefix() const; // "procedural/<name>/", "field/<name>/", …
 };

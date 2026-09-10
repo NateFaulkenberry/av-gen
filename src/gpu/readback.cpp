@@ -12,7 +12,8 @@ namespace {
 
 // Copies a 2D texture into a fresh staging buffer, maps it and returns the tightly packed rows.
 Result<std::vector<std::uint8_t>> readTextureRaw(Context& context, const wgpu::Texture& texture, std::uint32_t width,
-                                                 std::uint32_t height, std::uint32_t bytesPerPixel) {
+                                                 std::uint32_t height, std::uint32_t bytesPerPixel,
+                                                 std::uint32_t originX = 0, std::uint32_t originY = 0) {
     if (width == 0 || height == 0) {
         return fail("readTexture: empty texture");
     }
@@ -29,7 +30,7 @@ Result<std::vector<std::uint8_t>> readTextureRaw(Context& context, const wgpu::T
     wgpu::TexelCopyTextureInfo source{};
     source.texture = texture;
     source.mipLevel = 0;
-    source.origin = {0, 0, 0};
+    source.origin = {originX, originY, 0};
     wgpu::TexelCopyBufferInfo destination{};
     destination.buffer = staging;
     destination.layout.offset = 0;
@@ -187,6 +188,32 @@ Result<void> writePpm(const Image8& image, const std::filesystem::path& path) {
         out.write(reinterpret_cast<const char*>(&image.rgba[i]), 3);
     }
     return {};
+}
+
+
+Result<std::uint32_t> readTexelR32Uint(Context& context, const wgpu::Texture& texture, std::uint32_t x,
+                                       std::uint32_t y) {
+    // One texel, not one frame. A full-screen identifier readback is five megabytes and a GPU
+    // stall; a click needs four bytes. The row still costs the WebGPU 256-byte alignment, which is
+    // the smallest a copy can be and is not worth avoiding.
+    auto raw = readTextureRaw(context, texture, 1, 1, 4, x, y);
+    if (!raw) {
+        return std::unexpected(raw.error());
+    }
+    std::uint32_t value = 0;
+    std::memcpy(&value, raw->data(), sizeof(value));
+    return value;
+}
+
+Result<float> readTexelR32Float(Context& context, const wgpu::Texture& texture, std::uint32_t x,
+                                std::uint32_t y) {
+    auto raw = readTextureRaw(context, texture, 1, 1, 4, x, y);
+    if (!raw) {
+        return std::unexpected(raw.error());
+    }
+    float value = 0.0f;
+    std::memcpy(&value, raw->data(), sizeof(value));
+    return value;
 }
 
 } // namespace avgen::gpu

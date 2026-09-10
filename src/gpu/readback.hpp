@@ -46,6 +46,13 @@ Result<ImageF> readTextureF16(Context& context, const wgpu::Texture& texture, st
 Result<std::vector<std::uint32_t>> readTextureR32Uint(Context& context, const wgpu::Texture& texture,
                                                       std::uint32_t width, std::uint32_t height);
 
+// Reads a single texel of an R32Uint or R32Float texture. This is what picking uses: a click needs
+// four bytes, and reading the whole identifier target to get them is five megabytes and a stall.
+Result<std::uint32_t> readTexelR32Uint(Context& context, const wgpu::Texture& texture,
+                                       std::uint32_t x, std::uint32_t y);
+Result<float> readTexelR32Float(Context& context, const wgpu::Texture& texture, std::uint32_t x,
+                                std::uint32_t y);
+
 // Reads `size` bytes of a buffer created with CopySrc usage (blocking). For tests and tools.
 Result<std::vector<std::uint8_t>> readBuffer(Context& context, const wgpu::Buffer& buffer, std::uint64_t offset,
                                              std::uint64_t size);

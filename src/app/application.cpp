@@ -938,6 +938,178 @@ void stressStep(Engine& engine, Rng& rng, std::uint64_t frame) {
 }
 } // namespace
 
+
+// ---- viewport interaction (ADR-068) -------------------------------------------------------------
+
+CameraPose Application::viewportPose() const {
+    CameraPose pose;
+    if (engine_ == nullptr) {
+        return pose;
+    }
+    pose.eye = engine_->scene().camera.position;
+    pose.target = engine_->scene().camera.target;
+    if (auto* p = engine_->params().find("camera/position")) {
+        if (auto* v = dynamic_cast<params::Parameter<glm::vec3>*>(p)) {
+            pose.eye = v->value();
+        }
+    }
+    if (auto* p = engine_->params().find("camera/target")) {
+        if (auto* v = dynamic_cast<params::Parameter<glm::vec3>*>(p)) {
+            pose.target = v->value();
+        }
+    }
+    return pose;
+}
+
+void Application::setViewportPose(const CameraPose& pose) {
+    if (engine_ == nullptr) {
+        return;
+    }
+    if (auto* p = engine_->params().find("camera/position")) {
+        if (auto* v = dynamic_cast<params::Parameter<glm::vec3>*>(p)) {
+            v->setBase(pose.eye);
+        }
+    }
+    if (auto* p = engine_->params().find("camera/target")) {
+        if (auto* v = dynamic_cast<params::Parameter<glm::vec3>*>(p)) {
+            v->setBase(pose.target);
+        }
+    }
+}
+
+void Application::ensureFreeCamera() {
+    if (engine_ == nullptr) {
+        return;
+    }
+    auto* p = engine_->params().find("camera/mode");
+    auto* mode = dynamic_cast<params::Parameter<int>*>(p);
+    if (mode == nullptr || mode->value() == 1) {
+        return;
+    }
+    // Orbit mode ignores position and target entirely and circles the scene bounds, so a drag in
+    // orbit mode moves the two parameters this writes and changes nothing on screen. Switching is
+    // the only way the gesture can mean anything, and it is said out loud because it is a change to
+    // the project the user did not ask for in so many words.
+    mode->setBase(1);
+    if (!viewportFreeModeAnnounced_) {
+        viewportFreeModeAnnounced_ = true;
+        log::info("viewport: camera switched to free mode so the mouse can move it");
+    }
+}
+
+void Application::handleViewportEvent(const SDL_Event& event) {
+    if (engine_ == nullptr) {
+        return;
+    }
+    // SDL reports mouse positions in points and the render targets are in pixels. On a retina
+    // display those differ by two, and picking without the conversion lands in the top-left quarter
+    // of the frame -- which looks like an offset bug rather than a units bug.
+    const auto scale = [this]() { return std::max(window_->pixelScale(), 1e-3f); };
+
+    switch (event.type) {
+    case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+        viewportLastMouse_ = glm::vec2(event.button.x, event.button.y);
+        viewportDragTotal_ = glm::vec2(0.0f);
+        const SDL_Keymod mods = SDL_GetModState();
+        if (event.button.button == SDL_BUTTON_MIDDLE ||
+            (event.button.button == SDL_BUTTON_LEFT && (mods & SDL_KMOD_SHIFT) != 0)) {
+            viewportGesture_ = ViewportGesture::Pan;
+        } else if (event.button.button == SDL_BUTTON_RIGHT) {
+            viewportGesture_ = ViewportGesture::Look;
+        } else if (event.button.button == SDL_BUTTON_LEFT) {
+            viewportGesture_ = ViewportGesture::Orbit;
+        }
+        break;
+    }
+    case SDL_EVENT_MOUSE_MOTION: {
+        if (viewportGesture_ == ViewportGesture::None) {
+            break;
+        }
+        const glm::vec2 now(event.motion.x, event.motion.y);
+        const glm::vec2 delta = now - viewportLastMouse_;
+        viewportLastMouse_ = now;
+        viewportDragTotal_ += glm::abs(delta);
+        ensureFreeCamera();
+        setViewportPose(applyDrag(viewportPose(), viewportGesture_, delta, ViewportControlSettings{},
+                                  engine_->scene().camera.up));
+        break;
+    }
+    case SDL_EVENT_MOUSE_BUTTON_UP: {
+        const bool wasLeft = event.button.button == SDL_BUTTON_LEFT;
+        const bool moved = viewportDragTotal_.x + viewportDragTotal_.y > 4.0f;
+        const SDL_Keymod mods = SDL_GetModState();
+        // A left button that went down and up without travelling is a click, not a tiny orbit.
+        if (wasLeft && !moved && (mods & SDL_KMOD_SHIFT) == 0) {
+            const float s = scale();
+            viewportPickPixel_ = glm::uvec2(static_cast<std::uint32_t>(std::max(event.button.x * s, 0.0f)),
+                                            static_cast<std::uint32_t>(std::max(event.button.y * s, 0.0f)));
+            viewportPickPending_ = true;
+        }
+        viewportGesture_ = ViewportGesture::None;
+        break;
+    }
+    case SDL_EVENT_MOUSE_WHEEL: {
+        ensureFreeCamera();
+        setViewportPose(applyDolly(viewportPose(), event.wheel.y, ViewportControlSettings{}));
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+void Application::serviceViewportPick() {
+    if (!viewportPickPending_ || renderer_ == nullptr || engine_ == nullptr) {
+        return;
+    }
+    viewportPickPending_ = false;
+
+    PickView view;
+    const std::uint32_t pw = window_->pixelWidth();
+    const std::uint32_t ph = window_->pixelHeight();
+    view.size = glm::uvec2(pw, ph);
+    const scene::Camera& camera = engine_->scene().camera;
+    const float aspect = static_cast<float>(pw) / static_cast<float>(std::max(ph, 1u));
+    view.invViewProj = glm::inverse(camera.projection(aspect) * camera.view());
+    view.cameraPosition = camera.position;
+    view.cameraForward = glm::normalize(camera.target - camera.position);
+
+    auto result = pickAt(*context_, renderer_->identifierTexture(), renderer_->linearDepthTexture(),
+                         view, viewportPickPixel_);
+    if (!result) {
+        log::warn("pick: {}", result.error().message);
+        return;
+    }
+    if (!result->hit) {
+        // The sky. Deselecting is what a click on nothing means everywhere else, so it means it
+        // here too rather than leaving the previous selection stuck.
+        viewportSelectedNode_.clear();
+        if (panel_ != nullptr) {
+            panel_->world.selection = ui::WorldSelection{};
+        }
+        return;
+    }
+    viewportPickPosition_ = result->position;
+    const auto* composition = engine_->composition();
+    const scene::CompositionNode* node =
+        composition != nullptr ? composition->nodeForEntity(result->objectId) : nullptr;
+    if (node == nullptr) {
+        // Geometry that no node owns: procedural instances and terrain chunks are drawn outside the
+        // entity list, so this is expected rather than broken. The position is still useful.
+        viewportSelectedNode_.clear();
+        log::info("pick: surface at ({:.2f}, {:.2f}, {:.2f})", result->position.x,
+                  result->position.y, result->position.z);
+        return;
+    }
+    viewportSelectedNode_ = node->name;
+    if (panel_ != nullptr) {
+        panel_->world.selection.kind = ui::WorldSelection::Kind::Node;
+        panel_->world.selection.name = node->name;
+    }
+    log::info("pick: '{}' at ({:.2f}, {:.2f}, {:.2f})", node->name, result->position.x,
+              result->position.y, result->position.z);
+}
+
 int Application::run() {
     const int code = options_.headless ? runHeadless() : runLive();
     if (options_.saveProject) {
@@ -988,6 +1160,13 @@ int Application::runLive() {
                 return;
             }
             imgui_->processEvent(event);
+            // The viewport gets the mouse only when no ImGui window wants it. A drag that began on
+            // the scene keeps it until the button is released, though: letting a panel steal a
+            // gesture halfway through because the cursor passed over it is how an orbit ends up
+            // jumping to a stop mid-swing.
+            if (!imgui_->wantsMouse() || viewportGesture_ != ViewportGesture::None) {
+                handleViewportEvent(event);
+            }
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && !imgui_->wantsKeyboard()) {
                 if (event.key.key == SDLK_SPACE) {
                     engine_->togglePlay();
@@ -1143,6 +1322,9 @@ int Application::runLive() {
         wgpu::CommandBuffer commands = encoder.Finish();
         context_->queue().Submit(1, &commands);
         renderer_->collectFrameTimings();
+        // After the frame is submitted, so the identifier and depth targets hold what the user
+        // actually clicked on rather than the frame before it.
+        serviceViewportPick();
         const auto workEnd = std::chrono::steady_clock::now();
         context_->present();
         if (outputs_.openCount() > 0) {

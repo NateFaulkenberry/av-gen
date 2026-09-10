@@ -4,6 +4,8 @@
 // frame loop in offline mode (ADR-012). Both modes drive the same Engine and SceneRenderer.
 
 #include "app/engine.hpp"
+#include "app/viewport_camera.hpp"
+#include "app/viewport_pick.hpp"
 #include "app/job_system.hpp"
 #include "app/world_builder.hpp"
 #include "app/recent_files.hpp"
@@ -27,6 +29,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+union SDL_Event;
 
 namespace avgen::gpu {
 class Context;
@@ -157,6 +161,33 @@ private:
     std::unique_ptr<rendering::SceneRenderer> renderer_;
     std::unique_ptr<ui::ImGuiLayer> imgui_;
     std::unique_ptr<ui::ControlPanel> panel_;
+
+    // ---- viewport interaction (ADR-068) --------------------------------------------------------
+    // Mouse gestures over the scene, and what the last click selected. The camera pose itself is
+    // *not* stored here: it lives in the `camera/position` and `camera/target` parameters, which
+    // already save, load, automate and route, and a copy beside them would be a second source of
+    // truth for the same two vectors.
+    ViewportGesture viewportGesture_ = ViewportGesture::None;
+    glm::vec2 viewportLastMouse_{0.0f};
+    glm::vec2 viewportDragTotal_{0.0f};   // how far this drag has travelled, to tell a click from a drag
+    // A click asks a question about the frame that was on screen when it happened, so it is
+    // answered after the next frame is drawn rather than inside the event handler, where the
+    // identifier target still holds the previous frame and the camera may already have moved.
+    bool viewportPickPending_ = false;
+    glm::uvec2 viewportPickPixel_{0u};
+    std::string viewportSelectedNode_;
+    glm::vec3 viewportPickPosition_{0.0f};
+    bool viewportFreeModeAnnounced_ = false;
+
+    // Reads `camera/position` and `camera/target`. Returns the scene camera's own pose when the
+    // parameters are missing, so a gesture over a scene without them still does something sensible.
+    [[nodiscard]] CameraPose viewportPose() const;
+    void setViewportPose(const CameraPose& pose);
+    // Puts the camera in free mode, because position and target are ignored in orbit mode and a
+    // gesture that silently moves nothing is indistinguishable from a dead input.
+    void ensureFreeCamera();
+    void handleViewportEvent(const SDL_Event& event);
+    void serviceViewportPick();
     // ADR-064/066: one job system for the application, and the world builder that submits to it.
     // Declared after the panel so they outlive it during teardown -- the panel holds raw pointers
     // to both, and a job finishing while the panel is being destroyed would otherwise be a race.

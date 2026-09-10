@@ -1181,6 +1181,21 @@ bool Composition::wouldCycle(const std::string& node, const std::string& parent)
     return !current.empty();
 }
 
+const CompositionNode* Composition::nodeForEntity(std::size_t entityIndex) const {
+    // Ranges are parallel to nodes_ and a node's entities are contiguous, so this is a scan over
+    // nodes rather than over entities: tens of comparisons, on a click.
+    for (std::size_t i = 0; i < ranges_.size() && i < nodes_.size(); ++i) {
+        const NodeRange& range = ranges_[i];
+        if (range.entityCount == 0) {
+            continue;
+        }
+        if (entityIndex >= range.firstEntity && entityIndex < range.firstEntity + range.entityCount) {
+            return nodes_[i].get();
+        }
+    }
+    return nullptr;
+}
+
 Result<void> Composition::setParent(const std::string& name, const std::string& parent) {
     CompositionNode* node = findNode(name);
     if (node == nullptr) {

@@ -135,6 +135,13 @@ public:
     bool removeNode(const std::string& name);
     [[nodiscard]] CompositionNode* findNode(const std::string& name);
     [[nodiscard]] const CompositionNode* findNode(const std::string& name) const;
+    // Which node owns scene entity `entityIndex`, or nullptr. This is what a viewport click
+    // resolves through: the identifier target records a scene entity index (ADR-035) and a person
+    // selects a *node*, so somebody has to hold the mapping. The composition already does -- it
+    // flattens nodes into entity ranges -- and exposing the lookup is better than a second table
+    // built beside it that would drift the first time a node stopped emitting geometry.
+    [[nodiscard]] const CompositionNode* nodeForEntity(std::size_t entityIndex) const;
+
     // Re-parents `name` under `parent` ("" = root). Errors: unknown node, a cycle.
     Result<void> setParent(const std::string& name, const std::string& parent);
     // World transform of a node (parent chain applied, parameters included), without the root

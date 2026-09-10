@@ -1,0 +1,91 @@
+#include "app/viewport_pick.hpp"
+
+#include "gpu/readback.hpp"
+
+#include <algorithm>
+#include <cmath>
+
+namespace avgen::app {
+namespace {
+
+// NDC of the centre of a pixel. The half-texel matters: without it every pick is biased half a
+// pixel up and left, which is invisible at a glance and consistently wrong.
+glm::vec2 pixelCentreNdc(const PickView& view, glm::uvec2 pixel) {
+    const float w = static_cast<float>(std::max(view.size.x, 1u));
+    const float h = static_cast<float>(std::max(view.size.y, 1u));
+    const float u = (static_cast<float>(pixel.x) + 0.5f) / w;
+    const float v = (static_cast<float>(pixel.y) + 0.5f) / h;
+    // Y is flipped: pixel rows run down the screen, NDC runs up it. This is the same convention
+    // linear_depth.wgsl uses, and the two have to agree or reconstruction lands on the wrong side
+    // of the frame.
+    return glm::vec2(u * 2.0f - 1.0f, 1.0f - v * 2.0f);
+}
+} // namespace
+
+glm::vec3 rayThroughPixel(const PickView& view, glm::uvec2 pixel) {
+    const glm::vec2 ndc = pixelCentreNdc(view, pixel);
+    // Two points on the ray, un-projected and de-homogenised. Un-projecting a single point and
+    // subtracting the camera position works for a perspective camera and silently fails for an
+    // orthographic one, where every ray starts somewhere different.
+    const glm::vec4 nearH = view.invViewProj * glm::vec4(ndc.x, ndc.y, 0.0f, 1.0f);
+    const glm::vec4 farH = view.invViewProj * glm::vec4(ndc.x, ndc.y, 1.0f, 1.0f);
+    if (std::abs(nearH.w) < 1e-9f || std::abs(farH.w) < 1e-9f) {
+        return glm::normalize(view.cameraForward);
+    }
+    const glm::vec3 near3 = glm::vec3(nearH) / nearH.w;
+    const glm::vec3 far3 = glm::vec3(farH) / farH.w;
+    const glm::vec3 direction = far3 - near3;
+    const float length = glm::length(direction);
+    return length > 1e-9f ? direction / length : glm::normalize(view.cameraForward);
+}
+
+glm::vec3 worldPositionAt(const PickView& view, glm::uvec2 pixel, float linearDepth) {
+    const glm::vec3 ray = rayThroughPixel(view, pixel);
+    const glm::vec3 forward = glm::normalize(view.cameraForward);
+    // The target stores distance along the forward axis. Travelling `linearDepth` along the ray
+    // instead lands short by exactly this cosine, and the error is zero at the frame's centre and
+    // largest at its corners -- so it looks like a small inaccuracy rather than a missing division.
+    const float cosine = glm::dot(ray, forward);
+    if (cosine < 1e-4f) {
+        return view.cameraPosition + ray * linearDepth;
+    }
+    return view.cameraPosition + ray * (linearDepth / cosine);
+}
+
+Result<PickResult> pickAt(gpu::Context& context, const wgpu::Texture& ids,
+                          const wgpu::Texture& linearDepth, const PickView& view, glm::uvec2 pixel) {
+    if (view.size.x == 0 || view.size.y == 0) {
+        return fail("pick: the render target has no size");
+    }
+    if (pixel.x >= view.size.x || pixel.y >= view.size.y) {
+        return fail("pick: ({}, {}) is outside the {}x{} target", pixel.x, pixel.y, view.size.x,
+                    view.size.y);
+    }
+    if (ids == nullptr || linearDepth == nullptr) {
+        return fail("pick: the scene has not been rendered yet");
+    }
+
+    auto depth = gpu::readTexelR32Float(context, linearDepth, pixel.x, pixel.y);
+    if (!depth) {
+        return std::unexpected(depth.error());
+    }
+    PickResult out;
+    out.distance = *depth;
+    // Sky. Reported as a miss with a valid distance rather than as an error: clicking the sky is a
+    // perfectly ordinary thing to do and it means "deselect", not "something went wrong".
+    if (!(*depth < kPickFarDistance)) {
+        return out;
+    }
+
+    auto identifier = gpu::readTexelR32Uint(context, ids, pixel.x, pixel.y);
+    if (!identifier) {
+        return std::unexpected(identifier.error());
+    }
+    out.hit = true;
+    out.objectId = *identifier & 0xffffu;
+    out.materialId = (*identifier >> 16) & 0xffffu;
+    out.position = worldPositionAt(view, pixel, *depth);
+    return out;
+}
+
+} // namespace avgen::app

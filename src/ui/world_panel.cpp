@@ -44,6 +44,7 @@ bool layerShowsPath(AuthoringLayer layer, const std::string& path) {
 
 std::string WorldSelection::parameterPrefix() const {
     switch (kind) {
+    case Kind::Node: return "nodes/" + name + "/";
     case Kind::Procedural: return "procedural/" + name + "/";
     case Kind::Field: return "field/" + name + "/";
     case Kind::Spline: return "spline/" + name + "/";
