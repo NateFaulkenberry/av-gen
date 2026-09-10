@@ -159,6 +159,46 @@ TEST_CASE("a shadow-casting key light darkens the floor under an object", "[gpu]
     CHECK(openDark > openLit * 0.9f);      // and leaves the open floor alone
 }
 
+TEST_CASE("a caster the camera cannot see still casts", "[gpu][shadows]") {
+    // ADR-046: terrain's frustum cull set Entity::visible, the shadow pass honours visible, so a
+    // hill behind the camera stopped casting into shot. `cameraCulled` is the camera's verdict and
+    // nothing else's: the camera passes skip the entity, the shadow passes still get it and apply
+    // the test that actually matters -- the cascade's own frustum.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    const std::uint32_t shadowX = kSize / 2;
+    const std::uint32_t shadowY = kSize / 2;
+
+    scene::Scene drawn = shadowScene(true);
+    auto withBox = renderer->renderToImage(drawn, frameAt(3), kSize, kSize);
+    REQUIRE(withBox.has_value());
+
+    scene::Scene offScreen = shadowScene(true);
+    offScreen.entities[1].cameraCulled = true; // "the camera cannot see it"
+    auto withoutBox = renderer->renderToImage(offScreen, frameAt(3), kSize, kSize);
+    REQUIRE(withoutBox.has_value());
+
+    scene::Scene absent = shadowScene(true);
+    absent.entities[1].visible = false; // "it is not in the scene"
+    auto withNothing = renderer->renderToImage(absent, frameAt(3), kSize, kSize);
+    REQUIRE(withNothing.has_value());
+
+    const float drawnShadow = luminanceAt(*withBox, shadowX, shadowY);
+    const float culledShadow = luminanceAt(*withoutBox, shadowX, shadowY);
+    const float absentShadow = luminanceAt(*withNothing, shadowX, shadowY);
+    INFO("floor under the box: drawn " << drawnShadow << ", camera-culled " << culledShadow
+                                       << ", hidden " << absentShadow);
+    CHECK(absentShadow > 0.05f);                     // with no caster the floor is lit
+    CHECK(drawnShadow < absentShadow * 0.75f);       // the caster darkens it
+    CHECK(culledShadow < absentShadow * 0.75f);      // and still does when the camera cannot see it
+    CHECK(std::abs(culledShadow - drawnShadow) < 0.02f); // by the same amount
+
+    // The camera really did skip it, or the shadow above proves nothing about the split.
+    CHECK(gpu::hashImage(*withBox) != gpu::hashImage(*withoutBox));
+}
+
 TEST_CASE("shadowed frames are deterministic across renderers", "[gpu][shadows]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);

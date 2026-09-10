@@ -55,5 +55,13 @@ carry per-node parameters, so a track on `nodes/<name>/position` is a node anima
 - Negative: no curve editor beyond the key table and preview; no recording of live slider moves
   as continuous curves (one key per click); cues morph from "whatever the values were", which
   after a backwards seek means the values at the seek, not at the original time.
+- A cue preset outranks the scene file, and used to do it silently. It *should* outrank it -- a cue
+  arc is a deliberate statement about time and a scene file is the starting condition -- but an
+  author editing a material that a preset pins gets no result and no explanation, which cost
+  Hyperspace a dozen iterations (docs/shot-hyperspace.md). Since 2026-09-10 `Engine::loadProject`
+  measures the overlap against the values in effect at load (`params::presetConflicts`) and reports
+  it: one line naming the paths, plus `Engine::cuePresetOverrides()` for the inspector. One line
+  and not one per cue, deduplicated, because *every* cue preset overrides something -- that is what
+  a cue is -- and a notice on every project is a notice nobody reads.
 - Follow-ups: a proper curve editor, live recording, per-track processors, scene switching on
   cues (needs asynchronous loading), export of the timeline range as the offline render range.

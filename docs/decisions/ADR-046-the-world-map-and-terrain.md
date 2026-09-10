@@ -95,10 +95,26 @@ changes that closed it. The one worth repeating here is that a chunk samples its
 at LOD 0 spacing with a one-cell border, and every level of that chunk is a stride through it --
 that is both the optimisation and the reason the levels agree exactly.
 
-Frustum culling sets `Entity::visible`, which the shadow pass also honours, so a chunk behind the
-camera stops casting into the frame. That is wrong in principle and has not been visible in
-practice with the low keys this world uses. The fix, when it is needed, is to cull against a
-frustum extended along the light direction rather than to stop culling.
+Frustum culling used to set `Entity::visible`, which the shadow pass also honours, so a chunk
+behind the camera stopped casting into the frame. Fixed 2026-09-10, and not the way this ADR
+predicted: no extended frustum was needed, because the shadow pass already culls each caster
+against the cascade's own frustum -- which *is* the light-direction test. The bug was suppressing
+the candidate before that test ever ran. `Entity::cameraCulled` is the camera's verdict and nothing
+else's: the camera passes skip it, the shadow passes still receive it, and the entity loop gives a
+camera-culled caster a uniform slot only when some cascade can see it, after every on-screen entity
+has taken one. Distance is a separate claim and still removes a chunk outright -- nothing beyond the
+view distance can reach a cascade, which only ever covers the near part of the camera's frustum.
+
+Terrain LOD was a screen-space decision fed a *reference* viewport height of 900 px rather than the
+real one, so a scene picked the same levels whatever it was being rendered into: the same ground
+came back at the same mesh in a thumbnail and on a 5K display, which is exactly backwards. That was
+a bug, not a stability choice -- the point of a screen-space metric is that it answers the question
+about the image. Fixed 2026-09-10: `Composition::setViewport` is called once per frame by whoever
+owns the render target, and the chunk cull frustum takes its aspect from the same place, floored at
+the conservative 2.5 it always used so a wider viewport widens the frustum and a narrower one cannot
+narrow it. The default is still 1440x900, so a caller that never sets it -- a test, a tool -- picks
+exactly the levels it always did, and every `lodDistance` in every scene file still means what it
+meant.
 
 Terrain exposed a renderer bug that no previous scene could: GTAO counted samples coplanar with the
 surface as occluders, so any smooth ground seen at a grazing angle lost roughly half its ambient

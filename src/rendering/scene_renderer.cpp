@@ -15,6 +15,9 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <limits>
+#include <optional>
+#include <utility>
 
 namespace avgen::rendering {
 
@@ -1594,16 +1597,52 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     std::vector<DrawItem> opaque;
     std::vector<DrawItem> grid;
     std::vector<DrawItem> blended;
-    std::uint32_t objectIndex = 0;
-    std::size_t entityIndex = 0;
-    for (const auto& entity : scene.entities) {
-        const std::size_t thisEntity = entityIndex++;
-        if (!entity.visible || entity.mesh >= meshes_.size() || meshes_[entity.mesh].indexCount == 0) {
-            continue;
+    // The shadow passes' candidate list. It is the opaque draw list plus the entities the *camera*
+    // frustum rejected that a cascade can still see, because "off screen" is not a reason to stop
+    // casting (ADR-046): a hill behind the camera throws its shadow across the frame. Camera-culled
+    // candidates are added in a second pass so they can never take a uniform slot from something
+    // that is actually on screen.
+    std::vector<DrawItem> shadowCasters;
+    // Each cascade's own frustum, built once: the entity loop uses it to decide whether an
+    // off-screen caster is worth a slot, and the passes below reuse it per view.
+    const auto& shadowViewList = shadows_->views();
+    const std::uint32_t shadowViews = toggles_.shadows ? std::min(shadows_->stats().views, kMaxShadowViews) : 0;
+    std::vector<FrustumPlanes> cascadePlanes(shadowViews);
+    for (std::uint32_t v = 0; v < shadowViews && v < shadowViewList.size(); ++v) {
+        cascadePlanes[v] = frustumPlanes(shadowViewList[v].viewProj);
+    }
+    const auto entityWorldBounds = [&](const scene::Entity& entity) {
+        const auto& [lo, hi] = scene.meshBounds(entity.mesh);
+        const glm::mat4 model = entity.transform.matrix();
+        glm::vec3 wlo(std::numeric_limits<float>::max());
+        glm::vec3 whi(std::numeric_limits<float>::lowest());
+        for (int c = 0; c < 8; ++c) {
+            const glm::vec3 corner((c & 1) ? hi.x : lo.x, (c & 2) ? hi.y : lo.y, (c & 4) ? hi.z : lo.z);
+            const glm::vec3 w = glm::vec3(model * glm::vec4(corner, 1.0f));
+            wlo = glm::min(wlo, w);
+            whi = glm::max(whi, w);
         }
+        return std::pair{wlo, whi};
+    };
+    const auto anyCascadeSees = [&](const scene::Entity& entity) {
+        if (cascadePlanes.empty()) {
+            return false;
+        }
+        const auto [wlo, whi] = entityWorldBounds(entity);
+        for (std::uint32_t v = 0; v < cascadePlanes.size() && v < shadowViewList.size(); ++v) {
+            if (aabbInsideFrustum(cascadePlanes[v], wlo, whi)) {
+                return true;
+            }
+        }
+        return false;
+    };
+    std::uint32_t objectIndex = 0;
+    // Writes one 256-byte object slot and returns the draw item, or nothing when the budget is
+    // spent. Shared by the camera pass and the shadow-only pass so the two cannot describe the
+    // same entity differently.
+    const auto makeItem = [&](const scene::Entity& entity, std::size_t thisEntity) -> std::optional<DrawItem> {
         if (objectIndex >= kMaxObjects) {
-            log::warn("more than {} visible entities; extra entities skipped", kMaxObjects);
-            break;
+            return std::nullopt;
         }
         const auto& m = entity.material;
         ObjectUniforms obj{};
@@ -1636,15 +1675,57 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
         const float depth = -(view * glm::vec4(entity.transform.position, 1.0f)).z;
-        DrawItem item{offset, &entity, depth};
-        if (entity.style == scene::MeshStyle::Grid) {
-            grid.push_back(item);
-        } else if (m.alphaMode == scene::AlphaMode::Blend) {
-            blended.push_back(item);
-        } else {
-            opaque.push_back(item);
-        }
         ++objectIndex;
+        return DrawItem{offset, &entity, depth};
+    };
+    // True when the shadow passes would draw this entity: they take the opaque list only.
+    const auto shadowEligible = [](const scene::Entity& entity) {
+        return entity.castsShadow && entity.style != scene::MeshStyle::Grid &&
+               entity.material.alphaMode != scene::AlphaMode::Blend;
+    };
+    const auto drawable = [&](const scene::Entity& entity) {
+        return entity.visible && entity.mesh < meshes_.size() && meshes_[entity.mesh].indexCount != 0;
+    };
+    std::size_t entityIndex = 0;
+    for (const auto& entity : scene.entities) {
+        const std::size_t thisEntity = entityIndex++;
+        if (!drawable(entity) || entity.cameraCulled) {
+            continue;
+        }
+        const auto item = makeItem(entity, thisEntity);
+        if (!item) {
+            log::warn("more than {} visible entities; extra entities skipped", kMaxObjects);
+            break;
+        }
+        if (entity.style == scene::MeshStyle::Grid) {
+            grid.push_back(*item);
+        } else if (entity.material.alphaMode == scene::AlphaMode::Blend) {
+            blended.push_back(*item);
+        } else {
+            opaque.push_back(*item);
+            if (entity.castsShadow) {
+                shadowCasters.push_back(*item);
+            }
+        }
+    }
+    // Second pass: casters the camera cannot see. Culling them here rather than leaving them out
+    // of the scene is the whole point -- the cascade's frustum is the right test, and it is the one
+    // being applied.
+    entityIndex = 0;
+    for (const auto& entity : scene.entities) {
+        const std::size_t thisEntity = entityIndex++;
+        if (!entity.cameraCulled || !drawable(entity) || !shadowEligible(entity)) {
+            continue;
+        }
+        if (!anyCascadeSees(entity)) {
+            ++stats_.shadows.entitiesCulled;
+            continue;
+        }
+        const auto item = makeItem(entity, thisEntity);
+        if (!item) {
+            break; // the camera's own entities have the slots; nothing more to say about it
+        }
+        shadowCasters.push_back(*item);
     }
     if (objectIndex > 0) {
         queue.WriteBuffer(objectUniforms_, 0, objectStaging_.data(),
@@ -1730,7 +1811,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // Every caster is drawn with its ordinary vertex shader against a frame block whose
     // view-projection is the light's, so entities, procedural instances and SDFs need no second
     // data path. The raymarched SDFs march their bounding box at a quarter of the steps.
-    const std::uint32_t shadowViews = toggles_.shadows ? std::min(shadows_->stats().views, kMaxShadowViews) : 0;
     for (std::uint32_t v = 0; v < shadowViews; ++v) {
         wgpu::RenderPassDepthStencilAttachment depth{};
         depth.view = shadows_->layerView(v);
@@ -1749,31 +1829,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // the light can actually see, and the cost stays whether or not the camera is looking at
         // any of it. The cascade's own frustum is the right test -- not the camera's, because a
         // caster behind the camera still throws a shadow into shot.
-        const auto& shadowViewList = shadows_->views();
-        const FrustumPlanes cascadePlanes = v < shadowViewList.size()
-                                                ? frustumPlanes(shadowViewList[v].viewProj)
-                                                : FrustumPlanes{};
-        const bool cullCascade = v < shadowViewList.size();
+        const bool cullCascade = v < shadowViewList.size() && v < cascadePlanes.size();
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetBindGroup(0, shadowFrameGroups_[v]);
         rp.SetBindGroup(3, iblBindGroup_);
         rp.SetPipeline(depthOnlyPipeline_);
-        for (const auto& item : opaque) {
-            if (!item.entity->castsShadow) {
-                continue;
-            }
+        for (const auto& item : shadowCasters) {
             if (cullCascade) {
-                const auto& [lo, hi] = scene.meshBounds(item.entity->mesh);
-                const glm::mat4 model = item.entity->transform.matrix();
-                glm::vec3 wlo(std::numeric_limits<float>::max());
-                glm::vec3 whi(std::numeric_limits<float>::lowest());
-                for (int c = 0; c < 8; ++c) {
-                    const glm::vec3 corner((c & 1) ? hi.x : lo.x, (c & 2) ? hi.y : lo.y, (c & 4) ? hi.z : lo.z);
-                    const glm::vec3 w = glm::vec3(model * glm::vec4(corner, 1.0f));
-                    wlo = glm::min(wlo, w);
-                    whi = glm::max(whi, w);
-                }
-                if (!aabbInsideFrustum(cascadePlanes, wlo, whi)) {
+                const auto [wlo, whi] = entityWorldBounds(*item.entity);
+                if (!aabbInsideFrustum(cascadePlanes[v], wlo, whi)) {
                     ++stats_.shadows.entitiesCulled;
                     continue;
                 }

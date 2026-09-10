@@ -68,6 +68,7 @@ Densities hash as a set. They are written as a JSON object, whose key order is n
 hashing them in the order they arrive makes a file that round-trips report itself as changed.
 
 Not done, and each is a phase of its own: nothing is placed *relative to* anything else (no
-undergrowth in a tree's shadow, no moss on the boulders it is next to); there is no wind; the
-emission is constant rather than a living field; and Quaternius meshes carry several materials
-each, which `mergedAssetMesh` still collapses to one, so a mushroom's cap and stem share a colour.
+undergrowth in a tree's shadow, no moss on the boulders it is next to); there is no wind; and the
+emission is constant rather than a living field. (Multi-material assets were the fourth item here
+and are done: a layer whose asset carries several materials now emits one object per material, all
+from the same cloud -- ADR-044's 2026-09-10 addendum.)

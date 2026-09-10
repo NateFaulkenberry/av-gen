@@ -92,6 +92,17 @@ Omit `world` entirely and you get the shipped one. Every chunk's meshes, at ever
 once and uploaded once; per frame the only thing that changes is which mesh each chunk entity points
 at and whether it is visible. Terrain therefore costs nothing to fly through.
 
+`lodDistance` is where level 1 begins *at a reference lens*: a 900-pixel-tall viewport at 50 degrees.
+The level actually chosen is a screen-space one -- how large a chunk's quads are in pixels -- so it
+follows both the focal length and the window. The window arrives through
+`Composition::setViewport`, which whoever owns the render target calls once per frame; a caller that
+never does keeps the reference viewport and picks exactly the levels the reference lens would.
+
+A chunk outside the camera frustum is marked `Entity::cameraCulled`, not hidden. It is skipped by
+the camera passes and still offered to the shadow passes, which test it against each cascade's own
+frustum: a hill behind the camera casts across the frame. A chunk beyond `viewDistance` is hidden
+outright -- nothing that far out can reach a cascade.
+
 Debug parameters, per node: `terrainLod`, `terrainCull`, `terrainLodDistance`, `terrainViewDistance`.
 Turn LOD off to find out whether a shading artefact is a level boundary; turn culling off to see
 what culling was removing.
@@ -265,16 +276,12 @@ seen with the key light off to the side.
 
 ## Known limitations
 
-- Frustum culling sets `Entity::visible`, which the shadow pass also honours, so a chunk behind the
-  camera stops casting into the frame. Not visible with the low keys this world uses; the fix when
-  it matters is to cull against a frustum extended along the light direction, not to stop culling.
-- Terrain LOD follows the lens but not the viewport: the composition knows the camera's focal
-  length and not the window it will be drawn into, so resizing the window does not re-pick levels.
-  The frustum used for chunk culling is waiting on the same plumbing (it assumes a 2.5 aspect).
 - Nothing is placed relative to anything else: no undergrowth in a tree's shadow, no moss on the
   boulder it is beside.
-- Quaternius meshes carry several materials each and `mergedAssetMesh` collapses an asset to one,
-  so a mushroom's cap and stem share a colour.
+- Material parameters on a multi-material asset's node bind to part 0. Where a parameter still sits
+  at part 0's authored value each part keeps its own colour and maps; move it and the move applies
+  to every part, which is what an author who wrote one material asked for -- but there is no way to
+  address the leaves alone from the node's parameters.
 - Emission is constant. Making it a living field is what the chromatic phase is for.
 - The sky's stars are the photograph's. A camera that looks mostly at the ground, as this one does,
   sees only the few degrees above the ridge, which on this HDRI is where the moon's haze is

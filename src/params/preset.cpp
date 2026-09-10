@@ -1,6 +1,8 @@
 #include "params/preset.hpp"
 
 #include <algorithm>
+#include <ranges>
+
 #include <nlohmann/json.hpp>
 #include <set>
 #include <utility>
@@ -48,6 +50,35 @@ std::size_t applyPreset(ParameterSet& params, const Preset& preset) {
         ++applied;
     }
     return applied;
+}
+
+std::vector<PresetConflict> presetConflicts(const ParameterSet& params, const Preset& preset) {
+    std::vector<PresetConflict> conflicts;
+    for (const auto& [path, values] : preset.values) {
+        const IParameter* param = params.find(path);
+        if (param == nullptr) {
+            continue; // a preset naming a parameter this world lacks applies partially, as ever
+        }
+        const std::size_t count = std::min(param->componentCount(), values.size());
+        std::vector<float> current;
+        current.reserve(count);
+        bool differs = false;
+        for (std::size_t i = 0; i < count; ++i) {
+            const float base = param->baseComponent(i);
+            current.push_back(base);
+            // Exact inequality on purpose: the question is whether the preset changes the value at
+            // all, and a tolerance here would quietly hide the small edits that are hardest to
+            // diagnose -- an author nudging a roughness by 0.02 and seeing nothing happen.
+            differs = differs || base != values[i];
+        }
+        if (differs) {
+            conflicts.push_back(PresetConflict{path, std::move(current),
+                                               std::vector<float>(values.begin(), values.begin() +
+                                                                  static_cast<std::ptrdiff_t>(count))});
+        }
+    }
+    std::ranges::sort(conflicts, {}, &PresetConflict::path);
+    return conflicts;
 }
 
 std::size_t applyPresetBlend(ParameterSet& params, const Preset& a, const Preset& b, float t) {

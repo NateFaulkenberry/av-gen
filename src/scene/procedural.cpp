@@ -804,6 +804,7 @@ std::uint64_t SourceSpec::structuralHash() const {
         break;
     case PrimitiveKind::Mesh:
         h.i32(meshBudget);
+        h.i32(assetPart);
         h.u64(asset.size());
         for (const char c : asset) {
             h.u32(static_cast<std::uint8_t>(c));
