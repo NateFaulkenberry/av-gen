@@ -104,7 +104,14 @@ private:
     void releaseSlot(std::size_t slot);
     void markDirty(std::uint32_t record);
 
-    std::vector<InstanceRecord> records_;
+    // What the simulation needs from a record, and nothing else: 32 bytes instead of 96, because
+    // this is a copy of data the scene already holds and it is walked every frame.
+    struct Plant {
+        glm::vec3 position{0.0f};
+        float radiusScale = 1.0f; // largest |scale| component: the record's contribution to size
+        glm::vec4 random{0.0f};
+    };
+    std::vector<Plant> records_;
     // Uniform XZ grid over the record positions, in the object's own space (CSR).
     glm::vec2 gridOrigin_{0.0f};
     float gridCell_ = 1.0f;
@@ -120,6 +127,7 @@ private:
     std::vector<std::uint32_t> dirtyRecords_;
     std::vector<Candidate> candidates_;
     wind::ChainTuning tuning_;
+    int budget_ = 0;
     std::uint32_t activeCount_ = 0;
     std::uint32_t awakeCount_ = 0;
     std::uint32_t examined_ = 0;

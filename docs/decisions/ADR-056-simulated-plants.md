@@ -238,11 +238,15 @@ set.
 | Tier 1 (set 1) | 399 | 21.58 21.31 21.78 21.34 21.48 | 21.50 | 0.14–0.19 |
 | Tier 0 (set 2) | 0 | 20.98 21.21 20.97 20.99 20.87 20.92 | 20.99 | 0.05–0.08 |
 | Tier 1 (set 2) | 399 | 21.54 21.17 20.84 21.14 21.01 21.14 | 21.14 | 0.12–0.16 |
+| Tier 0 (set 3) | 0 | 21.09 21.06 21.06 20.91 20.84 20.91 | 20.98 | 0.05–0.07 |
+| Tier 1 (set 3) | 399 | 21.35 21.24 21.01 21.12 21.06 21.24 | 21.17 | 0.12–0.13 |
 
-**399 simulated plants cost about +0.2 ms** — under 1% of a 21 ms frame. Set means differ by +0.31
-and +0.15; taken pair by pair in the order they were run, eleven pairs come out +0.26, +0.72, +0.45,
-+0.08, +0.05, +0.56, -0.04, -0.13, +0.15, +0.14, +0.22, so nine of eleven favour the same direction
-and the mean is +0.22 ms.
+**399 simulated plants cost about +0.2 ms** — under 1% of a 21 ms frame. The three set means differ
+by +0.31, +0.15 and +0.19; taken pair by pair in the order they were run, seventeen pairs come out
++0.26, +0.72, +0.45, +0.08, +0.05, +0.56, -0.04, -0.13, +0.15, +0.14, +0.22, +0.26, +0.18, -0.05,
++0.21, +0.22, +0.33, so fourteen of seventeen favour the same direction and the mean is +0.21 ms.
+(Set 3 was taken after the buffer-overrun fix below and is the one that describes the shipped code;
+the other two agree with it.)
 
 That is worth being careful about, because the two Tier 0 arms — the same file, the same binary, on
 either side of a set — differ by 0.2 ms between sets, which is the same size as the effect. The
@@ -273,12 +277,13 @@ is to say so rather than to quote a number nobody took.
 
 ## Does it look different?
 
-Yes, and by more than the numbers suggest. Rendering the same frame of the same scene with and
-without Tier 1: **4% of the 1440x900 frame differs**, with peak per-pixel differences of 532 out of
-765, and the difference is concentrated at the tips of individual clumps and is exactly zero at
-their bases — which is the root anchoring, visible in the diff. It appears on scattered individual
-plants near the camera rather than as a global shift, which is the per-instance level-of-detail
-decision, also visible in the diff.
+Yes, and by more than the cost suggests. Rendering the same frame of the same scene with and
+without Tier 1: **5.5% of the 1440x900 frame differs**, with peak per-pixel differences of 556 out
+of 765. Rendered as a heat map, the difference is concentrated at the tips of individual clumps and
+is exactly zero at their bases — which is the root anchoring, visible in the diff — and it appears
+on scattered individual plants near the camera rather than as a global shift, which is the
+per-instance level-of-detail decision, also visible in the diff. A strip of consecutive frames of
+one grass clump shows the blades changing lean and splay while the base does not move.
 
 Numerically, over ten seconds of the valley's own wind field, a simulated grass blade differs from
 its transfer function by a mean of half its own travel while agreeing with it to within 8% on
@@ -303,6 +308,9 @@ average amplitude. That is the shape of the thing: same size, different moment.
 - **A compute pass over the population to apply the bends.** A dispatch over 36,000 records is
   microseconds of GPU time, but it is a per-instance pass over the whole world by any honest
   reading, and it needs the "live" record buffer that only objects with effectors have.
+- **Letting a plant on its way down go unbudgeted.** It seemed harmless — it is leaving anyway — and
+  it overran the bend buffer by two slots the first time a camera moved, which Dawn's validation
+  said out loud and a regression test now says instead. A slot is a slot until it is freed.
 - **Turning it on in `terrain.scene.json`.** Deliberately not done. That file is the reference scene
   for the performance work running in parallel, and changing its cost mid-flight would corrupt
   somebody else's A/B. `_tier1.scene.json` carries the settings; promoting them is a one-line change

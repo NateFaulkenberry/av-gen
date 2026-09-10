@@ -654,3 +654,43 @@ TEST_CASE("simulation settings survive a JSON round trip", "[plant]") {
     const wind::VegetationMotion old = wind::motionFromJson(nlohmann::json{{"stiffness", 2.0f}});
     CHECK_FALSE(old.simulate.enabled);
 }
+
+TEST_CASE("the budget is a ceiling, including plants on their way out", "[plant]") {
+    // A slot is held through the hand-back, so a plant on its way down still costs budget. It has
+    // to: the GPU buffer is sized to the budget, and a camera that turns quickly can put a whole
+    // active set into release at once. Getting this wrong overran the buffer by two slots and Dawn
+    // said so, which is the only reason it was ever noticed.
+    const wind::WindParams w = breezyValley();
+    wind::VegetationMotion m = grass();
+    m.simulate.budget = 24;
+    m.simulate.release = 0.5f;
+    spatial::VegetationSim sim;
+    const std::vector<spatial::InstanceRecord> records = patch(40, 0.5f);
+    sim.setInstances(records);
+    // Walk the camera across the patch and back, fast enough that plants are always entering and
+    // leaving, and watch the two counts that must never exceed the budget.
+    for (int i = 0; i < 400; ++i) {
+        const float u = static_cast<float>(i) / 400.0f;
+        const float x = 19.0f * (u < 0.5f ? 2.0f * u : 2.0f - 2.0f * u);
+        spatial::VegetationSim::Frame f = patchFrame(w, m, glm::vec3(x, 1.0f, 9.5f));
+        f.renderTime = static_cast<float>(i) / 60.0f;
+        sim.update(f);
+        INFO("step " << i << " slots " << sim.slotCount() << " active " << sim.activeCount());
+        CHECK(sim.slotCount() <= static_cast<std::uint32_t>(m.simulate.budget));
+        CHECK(sim.activeCount() <= static_cast<std::uint32_t>(m.simulate.budget));
+        // Every slot the map points at is one this frame's dynamics array actually has, and every
+        // dirty range the renderer would upload is inside the map. Aggregated rather than asserted
+        // per record, because a per-record CHECK here is a hundred thousand assertions a run.
+        std::uint32_t highest = 0;
+        for (std::uint32_t slot : sim.slots()) {
+            highest = std::max(highest, slot);
+        }
+        CHECK(highest <= sim.slotCount());
+        bool spansFit = true;
+        for (const auto& span : sim.dirtySlots()) {
+            spansFit = spansFit && static_cast<std::size_t>(span.first) + span.count <= records.size();
+        }
+        CHECK(spansFit);
+    }
+    CHECK(sim.activeCount() > 0);
+}

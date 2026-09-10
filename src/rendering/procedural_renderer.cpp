@@ -1377,10 +1377,12 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             sf.disturbances = &im.disturbances;
             state.sim.update(sf);
 
-            const std::uint32_t slots = state.sim.slotCount();
-            if (slots > 0) {
-                queue.WriteBuffer(state.dynamics, state.bendOffset, state.sim.dynamics().data(),
-                                  static_cast<std::uint64_t>(slots) * 16);
+            // Clamped rather than assumed: the budget a layer is given varies with what the
+            // layers before it took, and the buffer only ever grows.
+            const std::uint64_t bendUsed =
+                std::min(static_cast<std::uint64_t>(state.sim.slotCount()) * 16, state.bendBytes);
+            if (bendUsed > 0) {
+                queue.WriteBuffer(state.dynamics, state.bendOffset, state.sim.dynamics().data(), bendUsed);
             }
             const std::span<const std::uint32_t> map = state.sim.slots();
             if (state.sim.slotsDirtyAll()) {

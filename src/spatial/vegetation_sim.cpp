@@ -53,12 +53,15 @@ void VegetationSim::setInstances(std::span<const InstanceRecord> records) {
     if (records.empty()) {
         return;
     }
-    records_.assign(records.begin(), records.end());
+    records_.reserve(records.size());
+    for (const InstanceRecord& r : records) {
+        records_.push_back(Plant{glm::vec3(r.position), maxAbsScale(r.scale), r.random});
+    }
     slots_.assign(records.size(), 0u);
 
-    glm::vec2 lo(records[0].position.x, records[0].position.z);
+    glm::vec2 lo(records_[0].position.x, records_[0].position.z);
     glm::vec2 hi = lo;
-    for (const InstanceRecord& r : records) {
+    for (const Plant& r : records_) {
         lo = glm::min(lo, glm::vec2(r.position.x, r.position.z));
         hi = glm::max(hi, glm::vec2(r.position.x, r.position.z));
     }
@@ -73,12 +76,12 @@ void VegetationSim::setInstances(std::span<const InstanceRecord> records) {
     // culler already spends there rebuilding its bounds, and never repeated per frame.
     const std::size_t cells = static_cast<std::size_t>(gridX_) * static_cast<std::size_t>(gridZ_);
     gridStart_.assign(cells + 1, 0u);
-    const auto cellOf = [&](const InstanceRecord& r) {
+    const auto cellOf = [&](const Plant& r) {
         const int cx = std::clamp(static_cast<int>((r.position.x - gridOrigin_.x) / gridCell_), 0, gridX_ - 1);
         const int cz = std::clamp(static_cast<int>((r.position.z - gridOrigin_.y) / gridCell_), 0, gridZ_ - 1);
         return static_cast<std::size_t>(cz) * static_cast<std::size_t>(gridX_) + static_cast<std::size_t>(cx);
     };
-    for (const InstanceRecord& r : records) {
+    for (const Plant& r : records_) {
         ++gridStart_[cellOf(r) + 1];
     }
     for (std::size_t i = 1; i <= cells; ++i) {
@@ -86,15 +89,15 @@ void VegetationSim::setInstances(std::span<const InstanceRecord> records) {
     }
     gridItems_.resize(records.size());
     std::vector<std::uint32_t> cursor(gridStart_.begin(), gridStart_.end() - 1);
-    for (std::size_t i = 0; i < records.size(); ++i) {
-        gridItems_[cursor[cellOf(records[i])]++] = static_cast<std::uint32_t>(i);
+    for (std::size_t i = 0; i < records_.size(); ++i) {
+        gridItems_[cursor[cellOf(records_[i])]++] = static_cast<std::uint32_t>(i);
     }
 }
 
 float VegetationSim::importanceOf(std::uint32_t record, const Frame& f, float objectScale,
                                   const glm::mat4& model) const {
-    const InstanceRecord& r = records_[record];
-    const glm::vec3 world = glm::vec3(model * glm::vec4(glm::vec3(r.position), 1.0f));
+    const Plant& r = records_[record];
+    const glm::vec3 world = glm::vec3(model * glm::vec4(r.position, 1.0f));
     const float distance = std::max(glm::length(world - f.cameraPosition), 1e-4f);
     if (distance > f.motion.simulate.maxDistance) {
         return 0.0f;
@@ -102,7 +105,7 @@ float VegetationSim::importanceOf(std::uint32_t record, const Frame& f, float ob
     // The same projected radius the culler and the geometric LOD ladder use (ADR-029), so "big
     // enough to be worth simulating" is measured in the same units as "big enough to draw at all"
     // and a threshold expressed in pixels means the same thing everywhere.
-    const float radius = f.sourceRadius * maxAbsScale(r.scale) * objectScale;
+    const float radius = f.sourceRadius * r.radiusScale * objectScale;
     return radius / distance * f.projScale;
 }
 
@@ -164,6 +167,9 @@ void VegetationSim::promote(std::uint32_t record, const Frame& f, const glm::mat
         slot = freeSlots_.back();
         freeSlots_.pop_back();
     } else {
+        if (active_.size() >= static_cast<std::size_t>(std::max(budget_, 0))) {
+            return; // the slot array is sized to the budget; it is a ceiling, not a target
+        }
         slot = active_.size();
         active_.emplace_back();
         dynamics_.emplace_back(0.0f);
@@ -180,8 +186,8 @@ void VegetationSim::promote(std::uint32_t record, const Frame& f, const glm::mat
     // frame's time). The tip therefore starts exactly where the shader already had it and moving at
     // the speed it was already moving, so the switch is not a blend, a fade or a tolerance -- there
     // is nothing to see because nothing changed.
-    const InstanceRecord& r = records_[record];
-    const glm::vec3 world = glm::vec3(model * glm::vec4(glm::vec3(r.position), 1.0f));
+    const Plant& r = records_[record];
+    const glm::vec3 world = glm::vec3(model * glm::vec4(r.position, 1.0f));
     const wind::WindSample now = wind::sampleWind(f.wind, world, f.renderTime - f.response.swayDelay);
     const glm::vec2 bend = wind::vegetationBend(now, f.response, r.random, f.renderTime);
     const float back = std::max(f.deltaTime, 1e-4f);
@@ -249,17 +255,19 @@ void VegetationSim::update(const Frame& f) {
             a.release += dt;
             if (a.release >= std::max(lod.release, 1e-3f)) {
                 releaseSlot(slot);
+                continue;
             }
-            continue;
-        }
-        if (importanceOf(a.record, f, objectScale, model) < demote) {
+        } else if (importanceOf(a.record, f, objectScale, model) < demote) {
             a.release = 0.0f; // start handing the pose back to Tier 0
-        } else {
-            ++live;
         }
+        // A plant on its way down still holds its slot, so it still counts against the budget. It
+        // has to: the slot array is sized to the budget, and a camera turning quickly can put a
+        // whole active set into release at once.
+        ++live;
     }
 
     // ---- promotions ---------------------------------------------------------------------------
+    budget_ = budget;
     const int room = budget - static_cast<int>(live);
     if (room > 0) {
         gatherCandidates(f, objectScale, lod.maxDistance, room);
@@ -282,8 +290,8 @@ void VegetationSim::update(const Frame& f) {
             continue;
         }
         ++activeCount_;
-        const InstanceRecord& r = records_[a.record];
-        const glm::vec3 world = glm::vec3(model * glm::vec4(glm::vec3(r.position), 1.0f));
+        const Plant& r = records_[a.record];
+        const glm::vec3 world = glm::vec3(model * glm::vec4(r.position, 1.0f));
         const bool poked = disturbed && f.disturbances->reaches(world);
         // A sleeper is not integrated and is not even asked what the wind is doing, except on one
         // frame in four -- and a disturbance always wakes it, because that test is two subtractions
