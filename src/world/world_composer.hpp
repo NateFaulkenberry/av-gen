@@ -23,6 +23,7 @@
 #include "world/biome.hpp"
 #include "world/ecology.hpp"
 #include "world/art_direction.hpp"
+#include "world/hero.hpp"
 #include "world/world_recipe.hpp"
 
 #include <glm/glm.hpp>
@@ -67,6 +68,10 @@ struct VoidRegion {
 
 // What the composer decided, kept beside the layers so a caller can explain the result, draw it in
 // a debug view, or test it without rendering anything.
+//
+// Heroes live here rather than in the layers because they are the one part of a world that is not a
+// population: each is a single object in a single place with its own importance, and a scatter
+// layer is by definition a set of interchangeable instances.
 struct CompositionPlan {
     std::vector<FocalRegion> focal;
     std::vector<VoidRegion> voids;
@@ -83,6 +88,9 @@ struct CompositionPlan {
     // standing in the lens. It is reported here as well as being folded into `voids` so a caller
     // can draw it, test it, or explain it.
     std::vector<VoidRegion> corridor;
+    // The things worth travelling towards, most important first. A camera director reads this; so
+    // does whatever decides which heroes are near enough to react to the music.
+    std::vector<HeroPoint> heroes;
     // Layer name -> the band it was assigned to, so a test can assert that a fern did not end up
     // on the ridge line.
     std::vector<std::pair<std::string, DepthBand>> bands;
@@ -149,6 +157,13 @@ struct ComposedWorld {
 // time Generate World was run against a fresh terrain. Returned from here so the composer and
 // whoever builds the terrain cannot drift apart.
 [[nodiscard]] BiomeSet composerBiomes();
+
+// The ground a recipe's world grows on. Lives here rather than in whoever installs the world so the
+// composer can *sample* it: the viewpoint, the corridor and the heroes all need to know what grows
+// where they are being put, and a composer that decides all of that blind puts its camera on a
+// scree slope and its corridor through a marsh. The first generated valley did exactly that -- the
+// viewpoint landed on bare rock and the frame was five objects on an empty hillside.
+[[nodiscard]] WorldMap terrainFor(const WorldRecipe& recipe);
 
 // Which band an asset belongs to, given its height and tags. Exposed because it is the single
 // judgement call in the composer and it deserves to be tested directly rather than inferred from

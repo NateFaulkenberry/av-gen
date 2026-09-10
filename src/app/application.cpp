@@ -1525,6 +1525,7 @@ Result<void> Application::generateWorldFromRecipe(const std::filesystem::path& p
     world.recipe = *recipe;
     world.composed = std::move(*composed);
     world.assetsConsidered = library->size();
+    world.library = *library;
     if (auto installed = installWorld(*engine_, world); !installed) {
         return installed;
     }

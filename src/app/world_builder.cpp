@@ -12,36 +12,14 @@ namespace avgen::app {
 namespace {
 using Clock = std::chrono::steady_clock;
 
-// The terrain a generated world needs when the scene has none. Sized from the recipe so a world
-// that says it is four hundred metres across is four hundred metres across, and given enough noise
-// layers to have somewhere for an ecology to prefer and avoid -- a perfectly flat plane makes every
-// slope and altitude rule in the placer a no-op, which would look like the rules were ignored.
+// The terrain node a generated world needs when the scene has none. The heightfield itself comes
+// from the composer, which has to know the ground in order to decide where the viewpoint and the
+// heroes go; this only wraps it in a node.
 scene::CompositionNode defaultTerrainFor(const world::WorldRecipe& recipe) {
     scene::CompositionNode node;
     node.name = "terrain";
     node.kind = scene::NodeKind::Terrain;
-    node.worldMap.name = recipe.world;
-    node.worldMap.seed = recipe.seed;
-    node.worldMap.size = glm::vec2(recipe.extent, recipe.extent);
-    node.worldMap.erosion = 0.55f;
-    // One NoiseLayer is one octave, so the stack is written out: a broad landform, a ridged
-    // mid scale that gives slopes something to be, and a fine layer for texture underfoot.
-    const float span = std::max(recipe.extent, 1.0f);
-    world::NoiseLayer broad;
-    broad.frequency = 1.0f / (span * 0.55f);
-    broad.amplitude = span * 0.055f;
-    broad.warp = span * 0.04f;
-    world::NoiseLayer ridges;
-    ridges.frequency = 1.0f / (span * 0.16f);
-    ridges.amplitude = span * 0.022f;
-    ridges.ridged = 0.65f;
-    world::NoiseLayer detail;
-    detail.frequency = 1.0f / (span * 0.045f);
-    detail.amplitude = span * 0.006f;
-    node.worldMap.layers = {broad, ridges, detail};
-    // Without these, every layer the composer emits names a biome the terrain has never heard of
-    // and the ecology refuses all of them. One vocabulary, defined next to the composer.
-    node.worldMap.biomes = world::composerBiomes();
+    node.worldMap = world::terrainFor(recipe);
     return node;
 }
 
@@ -217,14 +195,15 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
         log::warn("world '{}': light rig: {}", world.recipe.world, rig.error().message);
     }
 
-    // ---- the landmark --------------------------------------------------------------------------
-    // One enormous object that reads as a landmark. The focal region marks where the composition
-    // wants the eye to go; without something standing in it, that is a note about a composition
-    // rather than a composition, which is what the first generated valley was.
+    // ---- the heroes ------------------------------------------------------------------------------
+    // The things worth travelling towards, placed as ordinary glTF nodes so each can be selected,
+    // moved, retextured and deleted like anything else in the scene. A person who dislikes where
+    // the composer put one is not fighting a special case.
     //
-    // It is placed as an ordinary glTF node, so it can be selected, moved, retextured and deleted
-    // like anything else in the scene, and so a person who does not like where the composer put it
-    // is not fighting a special case.
+    // A hero is meant to be an authored assembly (ADR-072) -- Glowmere's elder is three procedural
+    // nodes plus a practical light. Placing a single asset is the fallback the composer currently
+    // produces, and it is honestly weaker than an assembly: it gives the world a large silhouette
+    // in a cleared space with a camera that knows how to approach it, and not a designed object.
     const scene::CompositionNode* terrainNode = nullptr;
     for (const auto& node : composition->nodes()) {
         if (node && node->kind == scene::NodeKind::Terrain) {
@@ -232,41 +211,43 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
             break;
         }
     }
-    for (std::size_t i = 0; i < world.composed.plan.focal.size(); ++i) {
-        const auto& focal = world.composed.plan.focal[i];
-        if (focal.landmarkPath.empty() || focal.landmarkScale <= 0.0f) {
+    const assets::AssetLibrary* library = world.library.size() > 0 ? &world.library : nullptr;
+    for (const world::HeroPoint& hero : world.composed.plan.heroes) {
+        if (hero.assetId.empty() || library == nullptr) {
             continue;
         }
-        const std::string name = "landmark_" + std::to_string(i);
-        if (composition->findNode(name) != nullptr) {
-            composition->removeNode(name);   // regenerating replaces it rather than stacking
+        const assets::AssetDescriptor* asset = library->find(hero.assetId);
+        if (asset == nullptr) {
+            log::warn("world '{}': hero '{}' names '{}', which is not in the library",
+                      world.recipe.world, hero.name, hero.assetId);
+            continue;
+        }
+        if (composition->findNode(hero.name) != nullptr) {
+            composition->removeNode(hero.name);   // regenerating replaces rather than stacking
         }
         scene::CompositionNode node;
-        node.name = name;
+        node.name = hero.name;
         node.kind = scene::NodeKind::Gltf;
-        node.asset = focal.landmarkPath;
-        // On the ground, not at y=0. A landmark floating over a valley or buried in a hillside is
-        // the most conspicuous possible way to say the placement was never checked.
+        node.asset = library->resolve(*asset).generic_string();
+        // On the ground. A hero floating over a valley or buried in a hillside is the most
+        // conspicuous possible way to say the placement was never checked.
         float ground = 0.0f;
         if (terrainNode != nullptr) {
-            ground = terrainNode->worldMap.height(focal.center);
+            ground = terrainNode->worldMap.height(glm::vec2(hero.position.x, hero.position.z));
         }
-        node.transform.position = glm::vec3(focal.center.x, ground, focal.center.y);
-        node.transform.scale = glm::vec3(focal.landmarkScale);
-        // Turned to face nowhere in particular, deterministically, so two worlds from one seed are
-        // still the same world.
-        node.transform.rotation =
-            glm::angleAxis(static_cast<float>(world.recipe.seed % 360u) * 0.0174532925f,
-                           glm::vec3(0.0f, 1.0f, 0.0f));
+        node.transform.position = glm::vec3(hero.position.x, ground + hero.position.y, hero.position.z);
+        node.transform.scale = glm::vec3(hero.scale);
+        node.transform.rotation = glm::angleAxis(hero.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
         if (auto added = engine.addNode(std::move(node)); !added) {
-            log::warn("world '{}': landmark '{}' could not be placed: {}", world.recipe.world,
-                      focal.landmarkPath, added.error().message);
+            log::warn("world '{}': hero '{}': {}", world.recipe.world, hero.name,
+                      added.error().message);
         } else {
-            log::info("world '{}': landmark {:.0f} m at ({:.0f}, {:.0f}), ground {:.1f} m",
-                      world.recipe.world, focal.landmarkHeight, focal.center.x, focal.center.y,
-                      ground);
+            log::info("world '{}': hero '{}' importance {:.2f}, {:.0f} m tall, stand-off {:.0f} m",
+                      world.recipe.world, hero.name, hero.importance,
+                      asset->naturalSize.y * hero.scale, hero.preferredCameraDistance);
         }
     }
+
     // Frame the camera on what was just composed, but only for a world that had no terrain before:
     // a generated world nobody can see is indistinguishable from one that failed to generate, while
     // a camera in an existing scene is somebody's decision and generating into that scene is not a
@@ -378,6 +359,7 @@ JobId WorldBuilder::generate(world::WorldRecipe recipe, assets::AssetLibrary lib
         out.composed = std::move(*composed);
         out.composeSeconds = seconds;
         out.assetsConsidered = library.size();
+        out.library = library;
         {
             // The worker's last act is to hand a value over. It does not touch the scene: the
             // renderer is reading that on another thread, and installing from here would be a race

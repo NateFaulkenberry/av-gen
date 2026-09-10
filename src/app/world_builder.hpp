@@ -39,6 +39,10 @@ class Engine;
 struct GeneratedWorld {
     world::WorldRecipe recipe;
     world::ComposedWorld composed;
+    // The library it was composed from, carried along so installation can resolve the heroes' asset
+    // ids to files. The alternative is for the composer to write absolute paths into every hero,
+    // which bakes this machine's filesystem into a saved world.
+    assets::AssetLibrary library;
     double composeSeconds = 0.0;
     std::size_t assetsConsidered = 0;
 };

@@ -173,7 +173,13 @@ TEST_CASE("The composition has a focal subject and deliberate empty regions", "[
     CHECK(!plan.voids.empty());
     CHECK(plan.emptyFraction > 0.0f);
     for (const auto& v : plan.voids) {
-        // No void may sit on top of the one thing worth looking at.
+        if (v.clearsAbove > 0.0f) {
+            // A canopy clearing is *supposed* to sit on a hero -- that is what gives a hero room to
+            // read when the camera arrives, and heroes did not exist when this test was written.
+            // Only regions that empty the ground as well are holes.
+            continue;
+        }
+        // No void that clears everything may sit on top of the one thing worth looking at.
         CHECK(glm::length(v.center - plan.focal[0].center) >= (v.radius + plan.focal[0].radius) * 0.9f);
     }
 
@@ -183,10 +189,27 @@ TEST_CASE("The composition has a focal subject and deliberate empty regions", "[
         auto w = world::composeWorld(recipe, lib);
         REQUIRE(w.has_value());
         // The corridor is not discretionary -- the brief makes it mandatory and it is what keeps a
-        // dense world from putting a trunk across the lens -- so `negativeSpace` sets how generous
-        // it is, not whether it exists. Everything the weight *does* govern is gone.
-        CHECK(w->plan.voids.size() == w->plan.corridor.size());
+        // dense world from putting a trunk across the lens -- and nor are the clearings around the
+        // heroes. So `negativeSpace` sets how generous the discretionary emptiness is, not whether
+        // any emptiness exists, and what must be gone is every region the weight actually governs.
         CHECK(!w->plan.corridor.empty());
+        const auto isCorridor = [&](const world::VoidRegion& v) {
+            return std::any_of(w->plan.corridor.begin(), w->plan.corridor.end(),
+                               [&](const world::VoidRegion& c) {
+                                   return glm::length(c.center - v.center) < 1e-3f &&
+                                          std::abs(c.radius - v.radius) < 1e-3f;
+                               });
+        };
+        const auto isHeroClearing = [&](const world::VoidRegion& v) {
+            return std::any_of(w->plan.heroes.begin(), w->plan.heroes.end(),
+                               [&](const world::HeroPoint& h) {
+                                   return glm::length(glm::vec2(h.position.x, h.position.z) - v.center) < 1e-3f;
+                               });
+        };
+        for (const auto& v : w->plan.voids) {
+            INFO("void at " << v.center.x << ", " << v.center.y << " r=" << v.radius);
+            CHECK((isCorridor(v) || isHeroClearing(v)));
+        }
     }
 }
 

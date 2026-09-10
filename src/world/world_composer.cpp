@@ -210,6 +210,37 @@ float shadowPullFor(DepthBand band) {
 // how much of it this particular world wants. Deriving everything from the weights alone is what
 // produced a valley in a glass of milk; taking the profile verbatim would make `atmosphere.fog` a
 // dead control.
+// How well a point supports a composition: how much of what grows there is the kind of thing that
+// fills a frame. Scree and rim score zero -- they are the bare biomes, correctly bare, and a
+// composer that puts its subject and its camera on them produces a world that is dense everywhere
+// except the two places that matter. Both the heroes and the viewpoint are chosen through this.
+//
+// Returns -1 for a point that is unusable outright: off the map, or under water.
+float groundScore(const WorldMap& map, glm::vec2 p, float extent) {
+    if (std::abs(p.x) > extent * 0.48f || std::abs(p.y) > extent * 0.48f) {
+        return -1.0f;   // the heightfield's own edge would be in shot
+    }
+    const Sample s = map.sample(p, 0.5f);
+    if (s.height < s.waterSurface) {
+        return -1.0f;
+    }
+    const BiomeWeights w = map.biomes.at(s.altitude, s.slope, s.moisture, p);
+    float score = 0.0f;
+    for (std::size_t b = 0; b < map.biomes.biomes.size() && static_cast<int>(b) < w.count; ++b) {
+        const std::string& name = map.biomes.biomes[b].name;
+        const float weight = w.weights[b];
+        if (name == "forest") {
+            score += weight;
+        } else if (name == "meadow") {
+            score += weight * 0.75f;
+        } else if (name == "marsh") {
+            score += weight * 0.5f;
+        }
+    }
+    // A subject on a cliff is a subject the camera cannot stand in front of.
+    return score * (1.0f - std::clamp(s.slope * 1.6f, 0.0f, 0.9f));
+}
+
 EnvironmentPlan planEnvironment(const WorldRecipe& recipe, const PaletteRoles& roles,
                                 const ArtDirectionProfile& profile) {
     const AtmosphereWeights& air = recipe.atmosphere;
@@ -254,6 +285,36 @@ EnvironmentPlan planEnvironment(const WorldRecipe& recipe, const PaletteRoles& r
 }
 
 } // namespace
+
+WorldMap terrainFor(const WorldRecipe& recipe) {
+    WorldMap map;
+    map.name = recipe.world;
+    map.seed = recipe.seed;
+    map.size = glm::vec2(recipe.extent, recipe.extent);
+    map.erosion = 0.55f;
+    // One NoiseLayer is one octave, so the stack is written out: a broad landform, a ridged mid
+    // scale that gives slopes something to be, and a fine layer for texture underfoot. A perfectly
+    // flat plane makes every slope and altitude rule in the placer a no-op, which looks exactly
+    // like the rules being ignored.
+    const float span = std::max(recipe.extent, 1.0f);
+    NoiseLayer broad;
+    broad.frequency = 1.0f / (span * 0.55f);
+    broad.amplitude = span * 0.055f;
+    broad.warp = span * 0.04f;
+    NoiseLayer ridges;
+    ridges.frequency = 1.0f / (span * 0.16f);
+    ridges.amplitude = span * 0.022f;
+    ridges.ridged = 0.65f;
+    NoiseLayer detail;
+    detail.frequency = 1.0f / (span * 0.045f);
+    detail.amplitude = span * 0.006f;
+    map.layers = {broad, ridges, detail};
+    // Without these, every layer the composer emits names a biome the terrain has never heard of
+    // and the ecology refuses all of them.
+    map.biomes = composerBiomes();
+    map.prepare();
+    return map;
+}
 
 BiomeSet composerBiomes() {
     // Five biomes on the three axes a biome is defined by: altitude, slope and moisture. The ranges
@@ -351,35 +412,122 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
     const PaletteRoles roles = profile->palette;
     out.environment = planEnvironment(recipe, roles, *profile);
 
-    // ---- the focal subject -------------------------------------------------------------------
-    // One thing the shot is about. Chosen as the most important asset the library offers, which is
-    // what visualImportance is for; ties break on the earlier entry so the choice is stable.
-    const assets::AssetDescriptor* hero = nullptr;
-    for (const auto& a : library.assets()) {
-        if (ecologyWeightFor(recipe.ecology, a.category) <= 0.0f) {
-            continue;
+    // ---- the heroes ------------------------------------------------------------------------------
+    // Placed before the viewpoint, because the viewpoint is chosen to look at one of them.
+    //
+    // The rule that matters is that they must differ. A set of heroes with the same importance, the
+    // same stand-off and the same prominence is a set of heroes among which a camera director
+    // cannot choose, which is the same as having none -- so importance descends, distances vary
+    // with it, and only the first is the focal subject. The spec asks for some obvious and some
+    // partially hidden, some intimate and some enormous distant silhouettes; that is what the
+    // spread of `preferredCameraDistance` and `activationRadius` below is for.
+    const WorldMap ground = terrainFor(recipe);
+    {
+        const int wanted = 1 + static_cast<int>(std::round(recipe.composition.focalStrength * 5.0f));
+        // Candidates in descending visual importance, so hero 0 is the library's best thing.
+        std::vector<const assets::AssetDescriptor*> candidates;
+        for (const auto& a : library.assets()) {
+            if (ecologyWeightFor(recipe.ecology, a.category) > 0.0f) {
+                candidates.push_back(&a);
+            }
         }
-        if (hero == nullptr || a.visualImportance > hero->visualImportance) {
-            hero = &a;
+        std::stable_sort(candidates.begin(), candidates.end(),
+                         [](const assets::AssetDescriptor* a, const assets::AssetDescriptor* b) {
+                             return a->visualImportance > b->visualImportance;
+                         });
+        const float span = std::max(recipe.extent, 1.0f);
+        for (int i = 0; i < wanted && !candidates.empty(); ++i) {
+            const assets::AssetDescriptor& asset = *candidates[static_cast<std::size_t>(i) % candidates.size()];
+            const auto salt = static_cast<std::uint32_t>(300 + i * 17);
+            HeroPoint h;
+            h.name = "hero_" + std::to_string(i) + "_" + asset.id;
+            h.assetId = asset.id;
+            // Descending, and never tied: two heroes claiming the same importance is exactly the
+            // case a director cannot resolve.
+            h.importance = std::clamp(0.95f - static_cast<float>(i) * 0.13f, 0.15f, 1.0f);
+            h.focalWeight = i == 0 ? recipe.composition.focalStrength
+                                   : recipe.composition.focalStrength * (0.55f - 0.06f * static_cast<float>(i));
+            h.focalWeight = std::clamp(h.focalWeight, 0.0f, 1.0f);
+            // Size follows importance, so the most important thing is also the largest silhouette.
+            // Sized against the world it stands in, not just against its own species. A hero is
+            // framed from about three times its height, and foreground vegetation is culled at
+            // ninety metres -- so a hero tall enough to push the camera past that renders as a
+            // large object on an empty hillside, which is what a forty-four-metre tree in a
+            // four-hundred-metre valley did. Glowmere's elder, for reference, is about twenty
+            // metres from root to cap.
+            const float height = asset.effectiveHeight() *
+                                 lerp(1.6f, 2.6f, recipe.composition.focalStrength) *
+                                 lerp(0.45f, 1.0f, h.importance);
+            h.scale = asset.naturalSize.y > 1e-3f ? height / asset.naturalSize.y : 1.0f;
+            h.height = height;
+            h.radius = std::max(asset.naturalSize.x, asset.naturalSize.z) * 0.5f * h.scale;
+            // Roughly three times its height frames it whole on a normal lens.
+            h.preferredCameraDistance = std::max(height * 3.0f, 18.0f);
+            h.preferredCameraElevationDegrees = lerp(2.0f, 16.0f, hash01(recipe.seed, salt + 3u));
+            // Comfortably outside the stand-off, or the hero is never active on the shot designed
+            // for it. Bigger, more important heroes announce themselves from further away.
+            h.activationRadius = h.preferredCameraDistance * lerp(1.8f, 4.5f, h.importance);
+            // Several candidate spots, best ground wins. Placing a hero at the first position the
+            // hash produces puts it on scree about as often as the map is scree -- and a subject on
+            // bare rock takes the camera with it, because the viewpoint is chosen to look at it.
+            // The whole frame then reads as an empty world that happens to contain some objects.
+            glm::vec2 best(0.0f);
+            float bestScore = -2.0f;
+            for (int attempt = 0; attempt < 10; ++attempt) {
+                const auto trySalt = salt + static_cast<std::uint32_t>(attempt) * 3u + 7u;
+                const float angle = hash01(recipe.seed, trySalt) * 6.2831853f;
+                const float distance = lerp(0.10f, 0.42f, hash01(recipe.seed, trySalt + 1u)) * span;
+                const glm::vec2 candidate(std::cos(angle) * distance, std::sin(angle) * distance);
+                const float score = groundScore(ground, candidate, recipe.extent);
+                if (score > bestScore + 1e-4f) {
+                    bestScore = score;
+                    best = candidate;
+                }
+            }
+            h.position = glm::vec3(best.x, 0.0f, best.y);
+            h.yaw = hash01(recipe.seed, salt + 2u) * 6.2831853f;
+            h.colorAccent = profile->heroAccent;
+            // Most heroes do almost nothing. The ones that react are worth noticing only because
+            // the others do not, so only the first two get a lively profile.
+            h.reactionProfile = i == 0 ? "organism" : (i == 1 ? "monument" : "still");
+            if (auto ok = h.validate(); !ok) {
+                log::warn("world '{}': hero '{}' rejected: {}", recipe.world, h.name,
+                          ok.error().message);
+                continue;
+            }
+            out.plan.heroes.push_back(std::move(h));
+        }
+        // Space around each, so a hero the camera arrives at is not lost in the undergrowth. This
+        // is what `focalWeight` buys, and it is why it is separate from importance.
+        for (const HeroPoint& h : out.plan.heroes) {
+            VoidRegion v;
+            v.center = glm::vec2(h.position.x, h.position.z);
+            v.radius = heroClearanceRadius(h);
+            v.softness = v.radius * 0.7f;
+            // The canopy only: a clearing with the trees gone and the ground still growing reads as
+            // a glade, and a clearing with everything gone reads as a bald patch.
+            v.clearsAbove = 1.2f;
+            out.plan.voids.push_back(v);
         }
     }
-    if (hero != nullptr && recipe.composition.focalStrength > 0.0f) {
+
+    // ---- the focal subject -----------------------------------------------------------------
+    // The composition's subject is the most important hero, rather than a second search for "the
+    // best asset" run beside the one that placed the heroes. Two independent answers to the same
+    // question is how a world ends up framed on something that is not the thing it put in the
+    // clearing.
+    if (!out.plan.heroes.empty() && recipe.composition.focalStrength > 0.0f) {
+        const HeroPoint& subject = out.plan.heroes.front();
         FocalRegion f;
-        // Off-centre, deterministically. A subject in the middle of the world is the composition
-        // nobody chose.
-        const float angle = hash01(recipe.seed, 11u) * 6.2831853f;
-        const float dist = lerp(0.12f, 0.34f, hash01(recipe.seed, 12u)) * recipe.extent;
-        f.center = glm::vec2(std::cos(angle) * dist, std::sin(angle) * dist);
-        f.radius = lerp(0.04f, 0.09f, hash01(recipe.seed, 13u)) * recipe.extent;
+        f.center = glm::vec2(subject.position.x, subject.position.z);
+        f.radius = std::max(heroClearanceRadius(subject), recipe.extent * 0.04f);
         f.strength = recipe.composition.focalStrength;
-        f.assetId = hero->id;
-        // The landmark itself, sized to be unarguable. A tree that is nine metres tall in the
-        // population is forty at the focal point: the point of a landmark is that no amount of
-        // ordinary vegetation could be mistaken for it, and "somewhat bigger" reads as an
-        // accident of the scatter's scale variation rather than as a decision.
-        f.landmarkPath = library.resolve(*hero).generic_string();
-        f.landmarkHeight = hero->effectiveHeight() * lerp(3.2f, 5.4f, recipe.composition.focalStrength);
-        f.landmarkScale = hero->naturalSize.y > 1e-3f ? f.landmarkHeight / hero->naturalSize.y : 1.0f;
+        f.assetId = subject.assetId;
+        if (const assets::AssetDescriptor* asset = library.find(subject.assetId)) {
+            f.landmarkPath = library.resolve(*asset).generic_string();
+            f.landmarkHeight = asset->naturalSize.y * subject.scale;
+        }
+        f.landmarkScale = subject.scale;
         out.plan.focal.push_back(f);
     }
 
@@ -416,10 +564,34 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
         const FocalRegion& subject = out.plan.focal.front();
         const float landmark = subject.landmarkHeight > 0.0f ? subject.landmarkHeight
                                                              : recipe.extent * 0.06f;
-        const float back = std::max(landmark * 3.0f, 45.0f);
-        // Approached off-axis so the composition is not symmetrical about the frame's centre.
-        const float bearing = 6.2831853f * (hash01(recipe.seed, 61u) * 0.25f + 0.1f);
-        out.plan.viewpoint = subject.center + glm::vec2(std::cos(bearing), std::sin(bearing)) * back;
+        // Three times its height frames a subject whole, but never so far that the world in front
+        // of the camera has been culled: the foreground band is drawn to ninety metres, so a
+        // viewpoint beyond that looks across bare ground at a distant object.
+        const float back = std::clamp(landmark * 3.0f, 30.0f, 82.0f);
+        // Approached off-axis so the composition is not symmetrical about the frame's centre, and
+        // from a direction where something actually grows.
+        //
+        // The composer used to pick a bearing and commit to it. That put the camera on a scree
+        // slope: the frame was a bare hillside with five objects on it, while the rest of the world
+        // was dense. Nothing was wrong with the ecology -- the viewpoint was simply somewhere the
+        // ecology had correctly decided not to plant anything.
+        //
+        // So several bearings are tried and the one standing on the most fertile ground wins. Ties
+        // and near-ties keep the earliest, so the choice stays a pure function of the seed.
+        float bestScore = -2.0f;
+        glm::vec2 bestPoint = subject.center + glm::vec2(0.0f, back);
+        for (int i = 0; i < 12; ++i) {
+            const float bearing =
+                6.2831853f * (hash01(recipe.seed, 61u) + static_cast<float>(i) / 12.0f);
+            const glm::vec2 candidate =
+                subject.center + glm::vec2(std::cos(bearing), std::sin(bearing)) * back;
+            const float score = groundScore(ground, candidate, recipe.extent);
+            if (score > bestScore + 1e-4f) {
+                bestScore = score;
+                bestPoint = candidate;
+            }
+        }
+        out.plan.viewpoint = bestPoint;
 
         // The lane. Wide enough at the near end that nothing is in the lens and the eye has
         // somewhere to enter the frame; narrowing toward the subject so the subject keeps the
