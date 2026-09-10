@@ -3,7 +3,10 @@
 A particle sculpture built entirely from scene data: fields, splines, GPU particles and the post
 chain. No C++ was written for it. `examples/constellation/constellation.json`.
 
-**Status: phases 1–4 built, plus a 90-second cut.** Structure, field topology, core, a second
+**Status: phases 1–5 built, plus a 90-second cut.** Listed in `examples/index.json` and
+openable with `--example "The Living Constellation"`.
+
+**Status detail:** Structure, field topology, core, a second
 orbital system, the veil, colour depth, a thirteen-route audio mapping with propagating shockwaves,
 and a nine-key camera journey. Morphing between macro states and the shard motif are not built; the
 open list is at the end.
@@ -93,6 +96,42 @@ Nine keys over ninety seconds, smooth-interpolated: a wide hold at 110 m, a slow
 descent into the disc's plane, a pass through the inner region beside the core, then a climb out
 and away to a far hold. Measured across the cut, mean frame luminance runs 0.022 → 0.039 → 0.153 →
 0.438 → 0.081, which is the shape the brief asks for: near-empty opening, build, climax, release.
+
+## The macro morph
+
+The sculpture is one set of particles throughout; what changes is the field they live in, animated
+on eighteen timeline tracks. Nothing is ever swapped, so every transition is continuous by
+construction.
+
+| field | 0 s | 40 s | 56 s | 80 s | 88 s |
+|---|---:|---:|---:|---:|---:|
+| `corePull` — the grip | 0.35 | 1.10 | 1.18 | 3.7 | 1.0 |
+| `coreVoid` — what holds the hole open | 1.6 | 1.0 | 1.0 | 0.3 | 2.6 |
+| `discSpin` — the vortex state | 0.55 | 1.15 | 1.35 | 1.3 | 0.9 |
+| `mesoWarp` — how much it writhes | 0.35 | 1.20 | 1.50 | 0.6 | 0.3 |
+
+The collapse is `corePull` overwhelming everything while `coreVoid` falls away, so the sculpture
+actually drains into its own centre instead of merely shrinking; `discSpin` stays high through it
+so it spirals inward rather than falling straight. At 87.5 s `coreVoid` snaps back to 2.6 and the
+next structure is pushed outward — the rebirth.
+
+Nine more tracks bring the populations in one at a time, so the piece has an opening: at 3 s there
+is a core and almost nothing else. The audio routes add on top of whatever the timeline sets, so
+the music still breathes through each state rather than being overridden by it.
+
+Measured across the cut:
+
+| t | mean | rms contrast | shadow frac | saturation |
+|---:|---:|---:|---:|---:|
+| 3 s | 0.007 | 0.053 | 0.989 | 0.985 |
+| 15 s | 0.018 | 0.092 | 0.966 | 0.953 |
+| 40 s | 0.116 | 0.223 | 0.763 | 0.820 |
+| 56 s | 0.378 | 0.320 | 0.324 | 0.495 |
+| 80 s | 0.042 | 0.150 | 0.927 | 0.936 |
+| 87 s | 0.022 | 0.106 | 0.963 | 0.958 |
+
+Near-empty, build, climax, collapse, hold — and saturation falls as the image approaches white at
+the peak, then recovers, which is the palette doing its job.
 
 ## Measured
 

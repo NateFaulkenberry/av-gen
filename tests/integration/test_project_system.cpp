@@ -9,6 +9,8 @@
 #include "support/synth.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include <set>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <nlohmann/json.hpp>
 
@@ -503,4 +505,39 @@ TEST_CASE("A composition's post block reaches the post parameters, and the proje
         over.params().find("post/bloom/emissionWeight"));
     REQUIRE(w != nullptr);
     CHECK_THAT(w->base(), Catch::Matchers::WithinAbs(0.75, 1e-5));       // ...and the scene's, where it said nothing
+}
+
+// examples/index.json is what the application's example list is built from, and nothing checked
+// that its entries point at anything. A renamed folder or a typo in a path produced an entry that
+// simply failed to open, at runtime, in front of whoever picked it.
+TEST_CASE("Every example in the index exists and loads", "[integration][project][examples]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path examples = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples";
+    const auto indexPath = examples / "index.json";
+    REQUIRE(std::filesystem::exists(indexPath));
+    const auto index = readJson(indexPath);
+    REQUIRE(index.contains("examples"));
+    REQUIRE(index["examples"].is_array());
+    REQUIRE(!index["examples"].empty());
+
+    std::set<std::string> names;
+    for (const auto& entry : index["examples"]) {
+        REQUIRE(entry.contains("name"));
+        REQUIRE(entry.contains("project"));
+        REQUIRE(entry.contains("category"));
+        REQUIRE(entry.contains("description"));
+        const auto name = entry["name"].get<std::string>();
+        INFO("example: " << name);
+        CHECK(names.insert(name).second);          // the list is a menu; two identical rows is a bug
+        CHECK(!entry["description"].get<std::string>().empty());
+        const auto project = examples / entry["project"].get<std::string>();
+        REQUIRE(std::filesystem::exists(project));
+        app::Engine engine(app::EngineMode::Offline);
+        const auto loaded = engine.loadProject(project);
+        INFO((loaded ? std::string() : loaded.error().message));
+        CHECK(loaded.has_value());
+    }
+#endif
 }

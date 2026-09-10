@@ -72,7 +72,8 @@ TEST_CASE("Showcase projects render bit-identically across fresh engines and ren
                          Case{"hyperspace/hyperspace.json", 3.0}, Case{"lab/lab.json", 0.5},
                          Case{"machine/machine.json", 1.5}, Case{"infinite/infinite.json", 2.0},
                          Case{"cathedral/cathedral.json", 1.0}, Case{"worlds/worlds.json", 4.0},
-                         Case{"stress/stress.json", 0.5}}) {
+                         Case{"stress/stress.json", 0.5},
+                         Case{"constellation/constellation.json", 12.0}}) {
         const auto project = examples / c.project;
         if (!fs::exists(project)) {
             continue;

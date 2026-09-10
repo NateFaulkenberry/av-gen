@@ -344,6 +344,653 @@
       "interp": "smooth"
      }
     ]
+   },
+   {
+    "target": "field/corePull/strength",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.35,
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": 0.55,
+      "interp": "smooth"
+     },
+     {
+      "time": 26.0,
+      "value": 0.95,
+      "interp": "smooth"
+     },
+     {
+      "time": 46.0,
+      "value": 1.1,
+      "interp": "smooth"
+     },
+     {
+      "time": 62.0,
+      "value": 1.25,
+      "interp": "smooth"
+     },
+     {
+      "time": 70.0,
+      "value": 1.6,
+      "interp": "smooth"
+     },
+     {
+      "time": 78.0,
+      "value": 3.4,
+      "interp": "smooth"
+     },
+     {
+      "time": 85.0,
+      "value": 3.9,
+      "interp": "smooth"
+     },
+     {
+      "time": 88.0,
+      "value": 1.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 0.7,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "field/coreVoid/strength",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 1.6,
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": 1.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": 1.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 72.0,
+      "value": 0.55,
+      "interp": "smooth"
+     },
+     {
+      "time": 84.0,
+      "value": 0.12,
+      "interp": "smooth"
+     },
+     {
+      "time": 87.5,
+      "value": 2.6,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 1.4,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "field/discSpin/strength",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.55,
+      "interp": "smooth"
+     },
+     {
+      "time": 14.0,
+      "value": 0.85,
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": 1.15,
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": 1.35,
+      "interp": "smooth"
+     },
+     {
+      "time": 72.0,
+      "value": 1.5,
+      "interp": "smooth"
+     },
+     {
+      "time": 84.0,
+      "value": 1.15,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 0.8,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "field/mesoWarp/strength",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.35,
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": 0.7,
+      "interp": "smooth"
+     },
+     {
+      "time": 44.0,
+      "value": 1.25,
+      "interp": "smooth"
+     },
+     {
+      "time": 58.0,
+      "value": 1.5,
+      "interp": "smooth"
+     },
+     {
+      "time": 74.0,
+      "value": 0.9,
+      "interp": "smooth"
+     },
+     {
+      "time": 86.0,
+      "value": 0.3,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 0.4,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/coreKnot/spawnRate",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 420.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 8.0,
+      "value": 900.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": 1400.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": 2100.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 78.0,
+      "value": 2600.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 86.0,
+      "value": 700.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 300.0,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/armMajorP/spawnRate",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 7.0,
+      "value": 120.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": 900.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": 1650.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 62.0,
+      "value": 1900.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": 700.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 120.0,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/armMinorP/spawnRate",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 13.0,
+      "value": 90.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 26.0,
+      "value": 700.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": 1000.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 66.0,
+      "value": 1100.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 82.0,
+      "value": 380.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 60.0,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/armStubP/spawnRate",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": 80.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 34.0,
+      "value": 450.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": 520.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": 180.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 40.0,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/discDust/spawnRate",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 90.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": 320.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": 900.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 44.0,
+      "value": 1300.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 68.0,
+      "value": 1500.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 84.0,
+      "value": 500.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 160.0,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/nodeAOrbit/spawnRate",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 15.0,
+      "value": 0.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 22.0,
+      "value": 320.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 38.0,
+      "value": 950.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 64.0,
+      "value": 1100.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": 420.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 90.0,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/nodeBOrbit/spawnRate",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 28.0,
+      "value": 0.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": 180.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 58.0,
+      "value": 520.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 78.0,
+      "value": 300.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 60.0,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/bridge/spawnRate",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": 0.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 38.0,
+      "value": 220.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": 760.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 74.0,
+      "value": 520.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 88.0,
+      "value": 80.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 40.0,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "particles/veil/spawnRate",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 120.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 16.0,
+      "value": 340.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 50.0,
+      "value": 520.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 76.0,
+      "value": 560.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 300.0,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "post/grade/hueShift",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": -0.22,
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": -0.1,
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": 0.06,
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": 0.3,
+      "interp": "smooth"
+     },
+     {
+      "time": 70.0,
+      "value": 0.16,
+      "interp": "smooth"
+     },
+     {
+      "time": 84.0,
+      "value": -0.12,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": -0.26,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "post/grade/temperature",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": -0.16,
+      "interp": "smooth"
+     },
+     {
+      "time": 26.0,
+      "value": -0.06,
+      "interp": "smooth"
+     },
+     {
+      "time": 52.0,
+      "value": 0.1,
+      "interp": "smooth"
+     },
+     {
+      "time": 72.0,
+      "value": 0.02,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": -0.18,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "post/grade/saturation",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 1.12,
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": 1.06,
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": 0.98,
+      "interp": "smooth"
+     },
+     {
+      "time": 74.0,
+      "value": 1.1,
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": 1.16,
+      "interp": "smooth"
+     }
+    ]
    }
   ]
  }
