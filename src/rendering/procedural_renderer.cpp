@@ -32,6 +32,10 @@ constexpr std::uint32_t kEffectorWorkgroup = 64;     // points.wgsl cs_effectors
 constexpr std::uint32_t kCullWorkgroup = 64;        // cull.wgsl cs_cull_classify
 constexpr std::uint32_t kCullScanBlock = 1024;      // cull.wgsl kScanBlock (256 threads x 4 elements)
 constexpr std::uint32_t kCullStatsStride = 8;       // u32 per object slot in the shared stats buffer
+// How many consecutive frames a LOD level must have been empty before its draw stops being
+// recorded. Long enough that a level flickering around zero keeps its draw; short enough that the
+// steady state is clean.
+constexpr std::uint32_t kEmptyLevelFrames = 3;
 constexpr std::uint32_t kIndirectStride = 20;       // drawIndexedIndirect args: five u32
 // Per-level slot in the object's deformer/time buffer. Uniform bind-group offsets must be a
 // multiple of 256, so the 672-byte ProceduralUniforms is padded out to 768.
@@ -223,6 +227,10 @@ struct ProceduralRenderer::Impl {
         glm::mat4 prevModel{1.0f};              // last frame's object matrix (ADR-035 velocity)
         bool hasPrevModel = false;
         std::uint64_t lastUsed = 0;
+            // Consecutive frames each LOD level has been empty, from the cull readback. The CPU cannot
+        // know a level is empty when it records the draw -- the GPU writes the count -- but it can
+        // know the level has been empty for a while.
+        std::array<std::uint32_t, scene::kMaxLodLevels> emptyFrames{};
     };
     struct DrawItem {
         std::size_t objectIndex;        // into scene.procedurals
@@ -1353,8 +1361,15 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         }
         std::uint64_t visible = 0;
         for (std::size_t level = 0; level < 4; ++level) {
-            stats_.lodCounts[level] += im.statsSnapshot[base + level];
-            visible += im.statsSnapshot[base + level];
+            const std::uint32_t count = im.statsSnapshot[base + level];
+            stats_.lodCounts[level] += count;
+            visible += count;
+            // How long this level has had nothing in it. The instance count is written by the GPU,
+            // so the CPU cannot know a level is empty when it records the draw -- but it can know
+            // that the level has been empty for a while, which for the far LOD levels of a scatter
+            // is almost always true and almost never about to stop being true.
+            auto& mutableState = const_cast<Impl::ObjectState&>(*item.state);
+            mutableState.emptyFrames[level] = count == 0 ? mutableState.emptyFrames[level] + 1 : 0;
         }
         const std::uint64_t records = im.statsSnapshot[base + 4];
         stats_.visibleInstances += visible;
@@ -1415,6 +1430,15 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
         for (std::uint32_t level = 0; level < item.lodCount; ++level) {
             const Impl::CachedMesh* mesh = item.meshes[level];
             if (mesh == nullptr || !groups[level]) {
+                continue;
+            }
+            // A level that has had no instances for several frames is not recorded at all. Level 0
+            // is always recorded: it is the level an object enters when it comes into view, and one
+            // frame of it missing is an object popping in. The far levels are the ones that are
+            // reliably empty -- half of every frame's indirect draws -- and an instance arriving in
+            // one of them a frame late is a distant billboard, which nobody sees arrive.
+            if (level > 0 && item.state->emptyFrames[level] >= kEmptyLevelFrames) {
+                ++stats_.skippedIndirectDraws;
                 continue;
             }
             pass.SetPipeline(depthOnly ? im.pipelineDepth

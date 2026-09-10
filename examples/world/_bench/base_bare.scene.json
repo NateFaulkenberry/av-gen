@@ -106,5 +106,8 @@
     "emissiveIntensity": 0.0
    }
   }
- ]
+ ],
+ "post": {
+  "bloomEnabled": false
+ }
 }

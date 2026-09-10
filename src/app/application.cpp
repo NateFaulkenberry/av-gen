@@ -1345,9 +1345,9 @@ int Application::runHeadless() {
             // submitted frame; the rest are the passes that measure themselves.
             const auto& st = renderer_->stats();
             log::info("             passes: shadow={:.2f} ao={:.2f} volume={:.2f} cull={:.2f} | draws={} "
-                      "indirect={} (empty {}) instances={}/{} lod={}/{}/{}/{} cpu(proc)={:.2f}ms",
+                      "indirect={} (empty {}, skipped {}) instances={}/{} lod={}/{}/{}/{} cpu(proc)={:.2f}ms",
                       st.shadows.shadowMs, st.ao.aoMs, st.volume.volumeMs, st.procedural.cullMs, st.drawCalls,
-                      st.procedural.indirectDraws, st.procedural.emptyIndirectDraws,
+                      st.procedural.indirectDraws, st.procedural.emptyIndirectDraws, st.procedural.skippedIndirectDraws,
                       st.procedural.visibleInstances, st.procedural.culledInstances, st.procedural.lodCounts[0],
                       st.procedural.lodCounts[1], st.procedural.lodCounts[2], st.procedural.lodCounts[3],
                       st.procedural.cpuUpdateMs);

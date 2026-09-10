@@ -256,3 +256,32 @@ three-stop ramps crossed over in the middle to one three-stop ramp, which for an
 means its second and fourth entries stop being distinct stops and become the interpolations between
 the ones that remain. That is what an ordered set is for, and on screen the difference is not
 visible.
+
+## P2: empty indirect draws (2026-09-09)
+
+**CHANGE.** A LOD level that has had no instances for three consecutive frames stops being recorded.
+
+**WHY.** Half of every frame's indirect draws were empty: 220 recorded, 110 with a zero instance
+count. The LOD distribution is 733/161/10/0, so level 3 is empty for every object and level 2 for
+nearly all of them. The CPU cannot know a level is empty when it records the draw -- the count is
+written by the GPU cull pass -- but it can know the level has been empty for a while, which for the
+far levels of a scatter is almost always true and almost never about to stop being true.
+
+Level 0 is always recorded. It is the level an object enters when it comes into view, and one frame
+of it missing is an object popping in. An instance arriving a frame late in level 2 or 3 is a
+distant billboard.
+
+| | before | after |
+|---|---|---|
+| indirect draws | 220 | 110 |
+| empty draws submitted | 110 | **0** |
+| frame at 2880x1800 | 85.8 ms | **79.3 ms** |
+| 6 layers | 80.5 ms | 71.9 ms |
+| 3 layers | 75.0 ms | 66.9 ms |
+
+**VISUAL IMPACT.** None: the rendered frame is bit-identical, 0 of 921,600 pixels differing.
+
+**What it did not do** is change the slope. Cost per scatter layer is 1.55 ms after and was 1.35 ms
+before -- the whole curve moved down by about 0.6 ms per object rather than tilting, because the
+draws removed are a fixed two per object rather than a share of its work. Decoupling logical
+diversity from submission count is still P1's job.

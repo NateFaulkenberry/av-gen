@@ -71,6 +71,7 @@ struct ProceduralStats {
     // because the count is written by the GPU, so this is the measure of what that costs.
     std::uint32_t indirectDraws = 0;
     std::uint32_t emptyIndirectDraws = 0;
+    std::uint32_t skippedIndirectDraws = 0; // levels not recorded because they have been empty
     // Fields (ADR-025)
     std::uint32_t effectorObjects = 0;   // objects that ran the effector pass this frame
     std::uint64_t effectorInstances = 0; // records processed by the effector pass this frame
