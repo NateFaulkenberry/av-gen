@@ -24,7 +24,8 @@ struct FrameUniforms {
     envParams: vec4<f32>,      // x = env rotation (radians), y = prefiltered mip count - 1, z = light count, w = ibl enabled
     skyParams: vec4<f32>,      // rgb = background colour, w = skybox blur 0..1
     skyExtra: vec4<f32>,       // ADR-036: x = 1 when the IBL is the procedural sky, y = draw it as
-                               // the background instead of the flat colour, zw = 0
+                               // the background instead of the flat colour; ADR-049: z = the
+                               // visible sky's intensity, w = how much of it the bloom mask sees
     fogParams: vec4<f32>,      // rgb = fog colour, w = fog density (0 = off; exp2 fog by view distance)
     audio: vec4<f32>,          // ADR-030 material inputs: rms, bass, mid, treble
     audioBands: vec4<f32>,     // lowMid, highMid, spectral centroid, flux

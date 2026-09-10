@@ -2,6 +2,7 @@
 
 #include "core/log.hpp"
 #include "scene/mesh_generators.hpp"
+#include "scene/sky.hpp"
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -1281,8 +1282,8 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     }
     envIntensity_ =
         &params.add(floatDesc(prefix_ + "env/intensity", envIntensitySetting_, 0.0f, 20.0f, 0.0f, 4.0f));
-    envRotation_ =
-        &params.add(floatDesc(prefix_ + "env/rotation", 0.0f, -6.2832f, 6.2832f, -3.1416f, 3.1416f));
+    envRotation_ = &params.add(
+        floatDesc(prefix_ + "env/rotation", envRotationSetting_, -6.2832f, 6.2832f, -3.1416f, 3.1416f));
     // Procedural sky (ADR-036). It is only consulted when the scene has no HDR environment map, so
     // leaving `enabled` on by default gives every existing scene image-based lighting for free.
     {
@@ -2144,7 +2145,19 @@ void Composition::rebuild() {
                       environmentPath_.string());
         } else {
             scene_.environment.environmentMap = scene_.addTexture((*image)->image);
+            // ADR-049: find the sun/moon once, here, so `lightFromEnvironment` costs nothing per
+            // frame. Reported because an author aiming a sky wants to see the number move.
+            const glm::vec3 dominant = environmentDominantDirection((*image)->image);
+            envDominantDirection_ = dominant;
+            log::info("composition '{}': environment '{}' ({}x{}); brightest direction "
+                      "({:.3f}, {:.3f}, {:.3f}), elevation {:.1f} deg",
+                      name_, environmentPath_.string(), (*image)->image.width, (*image)->image.height,
+                      dominant.x, dominant.y, dominant.z,
+                      std::asin(std::clamp(dominant.y, -1.0f, 1.0f)) * 57.2957795f);
         }
+    }
+    if (scene_.environment.environmentMap == kInvalidTexture) {
+        envDominantDirection_.reset();
     }
 
     // Framing: lit geometry when there is any, otherwise the particle emitters.
@@ -2568,8 +2581,27 @@ void Composition::applyParameters() {
     }
     scene_.environment.environmentIntensity =
         envIntensity_ != nullptr ? envIntensity_->value() : envIntensitySetting_;
-    if (envRotation_ != nullptr) {
-        scene_.environment.environmentRotation = envRotation_->value();
+    scene_.environment.environmentRotation =
+        envRotation_ != nullptr ? envRotation_->value() : envRotationSetting_;
+    // ADR-049: the visible sky's own two controls, independent of the shading intensity above.
+    scene_.environment.showSkybox = showSkyboxSetting_;
+    scene_.environment.skyIntensity = skyIntensitySetting_;
+    scene_.environment.skyBloom = skyBloomSetting_;
+    scene_.environment.lightFromEnvironment = lightFromEnvironmentSetting_;
+    if (lightFromEnvironmentSetting_ && envDominantDirection_.has_value()) {
+        // Aim the key light away from the map's brightest pixel, after the rig has expanded, so
+        // the moon in frame and the moonlight on the terrain are the same moon. The rig still owns
+        // the light's colour, intensity and shadow settings -- only its direction is taken over,
+        // and only when the scene asks. Rotating the sky rotates the light with it.
+        const float a = scene_.environment.environmentRotation;
+        const glm::vec3& m = *envDominantDirection_;
+        const glm::vec3 towards(std::cos(a) * m.x - std::sin(a) * m.z, m.y,
+                                std::sin(a) * m.x + std::cos(a) * m.z);
+        if (PunctualLight* key = const_cast<PunctualLight*>(skyKeyLight(scene_.lights)); key != nullptr) {
+            const float distance = glm::length(key->position - center_);
+            key->direction = -towards;
+            key->position = center_ + towards * distance; // area lights shade from the position too
+        }
     }
     {
         SkySettings& sky = scene_.environment.sky;
@@ -2808,6 +2840,13 @@ nlohmann::json Composition::toJson() const {
         environment["lightRig"] = lightRigPath_.generic_string();
     }
     environment["intensity"] = envIntensity_ != nullptr ? envIntensity_->base() : envIntensitySetting_;
+    environment["rotation"] = envRotation_ != nullptr ? envRotation_->base() : envRotationSetting_;
+    environment["skyIntensity"] = skyIntensitySetting_;
+    environment["skybox"] = showSkyboxSetting_;
+    environment["skyBloom"] = skyBloomSetting_;
+    if (lightFromEnvironmentSetting_) {
+        environment["lightFromEnvironment"] = true;
+    }
     environment["fogDensity"] = fogDensity_ != nullptr ? fogDensity_->base() : fogDensitySetting_;
     {
         // Procedural sky (ADR-036): written only when it differs from the defaults, so scene files
@@ -3126,6 +3165,33 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(fog.error());
         }
         comp->fogDensitySetting_ = *fog;
+        // ADR-049. `rotation` had a parameter but no scene-file key, so until now an HDRI could
+        // only be aimed by hand at runtime; `skyIntensity` and `skyBloom` belong to the visible
+        // sky alone, and `intensity` above stays the lighting control.
+        for (const std::pair<const char*, float*> key :
+             {std::pair<const char*, float*>{"rotation", &comp->envRotationSetting_},
+              std::pair<const char*, float*>{"skyIntensity", &comp->skyIntensitySetting_},
+              std::pair<const char*, float*>{"skyBloom", &comp->skyBloomSetting_}}) {
+            auto value = readFloat(e, key.first, *key.second);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            *key.second = *value;
+        }
+        // `showSkybox` is the other Environment field that had no scene-file key: a scene could
+        // light itself from a map but not choose whether to stand it behind the world.
+        if (e.contains("skybox")) {
+            if (!e["skybox"].is_boolean()) {
+                return fail("'skybox' must be a boolean");
+            }
+            comp->showSkyboxSetting_ = e["skybox"].get<bool>();
+        }
+        if (e.contains("lightFromEnvironment")) {
+            if (!e["lightFromEnvironment"].is_boolean()) {
+                return fail("'lightFromEnvironment' must be a boolean");
+            }
+            comp->lightFromEnvironmentSetting_ = e["lightFromEnvironment"].get<bool>();
+        }
         auto readColour = [&](const char* key, glm::vec3& out) -> bool {
             if (e.contains(key) && e[key].is_array() && e[key].size() == 3 && e[key][0].is_number()) {
                 out = glm::vec3(e[key][0].get<float>(), e[key][1].get<float>(), e[key][2].get<float>());

@@ -118,7 +118,8 @@ struct FrameUniforms {
     glm::vec4 envParams;
     glm::vec4 skyParams;
     glm::vec4 skyExtra;       // ADR-036: x = 1 when the IBL is the procedural sky, y = draw it as
-                              // the background, zw = 0
+                              // the background; ADR-049: z = sky (background) intensity,
+                              // w = how much of the sky reaches the bloom mask
     glm::vec4 fogParams;      // rgb = fog colour, w = density (0 = off)
     glm::vec4 audio;          // ADR-030 material inputs: rms, bass, mid, treble
     glm::vec4 audioBands;     // lowMid, highMid, spectral centroid, flux
@@ -162,6 +163,9 @@ struct IblResources {
     wgpu::TextureView irradiance;  // cube
     wgpu::TextureView prefiltered; // cube, mips by roughness
     wgpu::TextureView brdfLut;     // 2D RG
+    // ADR-049: the source equirect itself, mipped, kept resident so the background pass can read
+    // the sky at its own resolution. Null for a procedural sky, which has no map behind it.
+    wgpu::TextureView background;
     std::uint32_t prefilteredMips = 1;
     bool valid = false;
     bool fromSky = false; // ADR-036: synthesised from the procedural sky, not from an HDR map
@@ -424,6 +428,7 @@ private:
     wgpu::TextureView blackCubeView_;
     gpu::GpuTexture blackLut_;
     wgpu::Sampler iblSampler_;
+    wgpu::Sampler skySampler_; // ADR-049: as iblSampler_, but wrapping in longitude
     IblResources ibl_;
 
     std::vector<GpuMesh> meshes_;

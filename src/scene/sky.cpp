@@ -134,6 +134,65 @@ glm::vec3 skyRadiance(const SkyRuntime& sky, const glm::vec3& dir, float minRadi
     return (base + sun) * sky.intensity;
 }
 
+glm::vec3 environmentDominantDirection(const TextureData& equirect, float rotationRadians,
+                                       float coreFraction) {
+    constexpr glm::vec3 kFallback(0.0f, 1.0f, 0.0f);
+    if (!equirect.isHdr() || equirect.width == 0 || equirect.height == 0) {
+        return kFallback;
+    }
+    const std::size_t pixels = static_cast<std::size_t>(equirect.width) * equirect.height;
+    if (equirect.data.size() < pixels * 16) {
+        return kFallback;
+    }
+    const auto* rgba = reinterpret_cast<const float*>(equirect.data.data());
+    const auto luminance = [rgba](std::size_t i) {
+        return 0.2126f * rgba[i * 4 + 0] + 0.7152f * rgba[i * 4 + 1] + 0.0722f * rgba[i * 4 + 2];
+    };
+
+    float peak = 0.0f;
+    for (std::size_t i = 0; i < pixels; ++i) {
+        peak = std::max(peak, luminance(i));
+    }
+    if (!(peak > 0.0f)) {
+        return kFallback;
+    }
+    // A sun or moon disc is orders of magnitude above its own halo, so any cut in this range picks
+    // the disc alone; the centroid then averages away the sensor noise inside it.
+    const float cut = peak * std::clamp(coreFraction, 1e-3f, 1.0f);
+
+    constexpr float kPi = 3.14159265358979323846f;
+    glm::vec3 acc(0.0f);
+    double weightSum = 0.0;
+    for (std::uint32_t y = 0; y < equirect.height; ++y) {
+        const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(equirect.height);
+        const float theta = v * kPi;
+        const float sinTheta = std::sin(theta);
+        const float cosTheta = std::cos(theta);
+        for (std::uint32_t x = 0; x < equirect.width; ++x) {
+            const std::size_t i = static_cast<std::size_t>(y) * equirect.width + x;
+            const float lum = luminance(i);
+            if (lum < cut) {
+                continue;
+            }
+            const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(equirect.width);
+            const float phi = (u - 0.5f) * 2.0f * kPi;
+            // sin(theta) is the texel's solid angle: without it a feature near a pole would pull
+            // the centroid by however many texels the projection stretched it into.
+            const float w = lum * sinTheta;
+            acc += glm::vec3(sinTheta * std::cos(phi), cosTheta, sinTheta * std::sin(phi)) * w;
+            weightSum += static_cast<double>(w);
+        }
+    }
+    if (weightSum <= 0.0) {
+        return kFallback;
+    }
+    const glm::vec3 mapDir = safeNormalize(acc, kFallback);
+    // `envRotate` takes world -> map, so the world direction of a map feature is the inverse.
+    const float c = std::cos(rotationRadians);
+    const float s = std::sin(rotationRadians);
+    return glm::vec3(c * mapDir.x - s * mapDir.z, mapDir.y, s * mapDir.x + c * mapDir.z);
+}
+
 glm::vec3 skyIrradiance(const SkyRuntime& sky, const glm::vec3& n, int samples) {
     const int count = std::max(samples, 1);
     const glm::vec3 normal = safeNormalize(n, glm::vec3(0.0f, 1.0f, 0.0f));

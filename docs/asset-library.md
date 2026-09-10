@@ -101,3 +101,28 @@ One thing to check when it is used: these meshes carry several materials each (c
 and canopy), and `mergedAssetMesh` collapses an asset to one material chosen by triangle count. The
 Kenney fungi already read as single-colour blobs for this reason. Multi-material instancing is the
 open problem, not the assets.
+
+## Skies
+
+Added 2026-09-09 for ADR-049. CC0, from Poly Haven, fetched by
+`tools/fetch_polyhaven.py --hdri --fetch` into `assets/hdri/` with `assets/hdri/manifest.json`
+recording the provenance. The `.hdr` files are gitignored: six files at three resolutions is
+210 MB.
+
+| id | what it is | source |
+|---|---|---|
+| `kloppenheim_02_puresky` | clear moonlit night: a hard-edged moon 17 degrees up, dense stars, a faint Milky Way, a broad lunar haze along the horizon. Greg Zaal (original), Jarod Guest (sky edits) | https://polyhaven.com/a/kloppenheim_02_puresky |
+| `qwantani_moonrise_puresky` | a hazier, brighter moonrise; more atmosphere, fewer stars. Greg Zaal, Jarod Guest | https://polyhaven.com/a/qwantani_moonrise_puresky |
+
+Poly Haven's "pure sky" variants have the photographed ground replaced with a synthetic gradient,
+which is what a scene with its own terrain wants: nothing to hide below the horizon.
+
+**Fetch 2K, 4K and 8K; ship 4K.** At 2K a star is a blurred four-pixel blob at 1280x720; at 4K it
+is a crisp point; 8K resolves a handful more faint ones and is otherwise indistinguishable there,
+for four times the memory (89 MB resident against 356) and three times the load (425 ms against
+125). Higher output resolutions will want 8K. 24K exists and is never the answer.
+
+The two skies differ by about 4x in mean radiance (0.22 against 0.78), so a scene's `intensity` and
+`skyIntensity` do not carry across a swap. Both peak past the half-float range at the moon --
+1.0e5 and 1.8e5 at 4K -- which is why `gpu::uploadTextureAsHalf` saturates rather than letting a
+texel become `+inf`.

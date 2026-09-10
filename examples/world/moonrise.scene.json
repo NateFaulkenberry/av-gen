@@ -1,7 +1,7 @@
 {
   "format": "avgen-scene",
   "version": 1,
-  "name": "terrain",
+  "name": "moonrise",
   "camera": {
     "mode": 1,
     "position": [
@@ -11,7 +11,7 @@
     ],
     "target": [
       10.0,
-      -2.4,
+      12.0,
       -58.0
     ],
     "fov": 40.0,
@@ -19,10 +19,10 @@
   },
   "lightRig": "../lightrigs/valley-moon.rig.json",
   "environment": {
-    "map": "../../assets/hdri/kloppenheim_02_puresky_4k.hdr",
-    "intensity": 0.3,
-    "rotation": -1.517,
-    "skyIntensity": 0.08,
+    "map": "../../assets/hdri/qwantani_moonrise_puresky_4k.hdr",
+    "intensity": 0.03,
+    "rotation": -1.838,
+    "skyIntensity": 0.05,
     "skyBloom": 0.35,
     "lightFromEnvironment": true,
     "background": [

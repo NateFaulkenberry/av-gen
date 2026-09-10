@@ -259,8 +259,14 @@ Result<GpuTexture> uploadTextureAsHalf(Context& context, const scene::TextureDat
         std::vector<std::uint8_t> halves(static_cast<std::size_t>(lw) * lh * 8);
         const float* in = reinterpret_cast<const float*>(floats.data());
         std::uint16_t* outHalf = reinterpret_cast<std::uint16_t*>(halves.data());
+        // A real HDR sky's sun or moon disc runs past the half-float range -- Kloppenheim 02's
+        // moon peaks at 1.0e5 at 4K -- and one +inf texel does not stay local: it survives
+        // filtering, reaches the bloom pyramid and blackens a block of the frame hundreds of
+        // pixels wide. Saturating costs nothing, because no tone map resolves 65504 from 1.0e5.
+        constexpr float kHalfMax = 65504.0f;
         for (std::size_t i = 0; i < static_cast<std::size_t>(lw) * lh * 4; ++i) {
-            outHalf[i] = floatToHalf(in[i]);
+            const float v = in[i];
+            outHalf[i] = floatToHalf(std::isnan(v) ? 0.0f : std::clamp(v, -kHalfMax, kHalfMax));
         }
         writeLevel(context, out.texture, mip, lw, lh, 8, halves);
     };
