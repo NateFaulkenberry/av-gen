@@ -17,6 +17,8 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/rendering/output_mapping.cpp"
     # Light packing, the froxel grid, the LTC fit and the cascade maths are GPU-free (ADR-033/034).
     "${CMAKE_SOURCE_DIR}/src/rendering/light_data.cpp"
+    # The frame timeline's interval arithmetic is GPU-free so it can be pinned without a device.
+    "${CMAKE_SOURCE_DIR}/src/gpu/timeline_math.cpp"
     "${CMAKE_SOURCE_DIR}/src/rendering/shadow_math.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp")
 target_link_libraries(avgen_tests PRIVATE avgen_core Catch2::Catch2WithMain)

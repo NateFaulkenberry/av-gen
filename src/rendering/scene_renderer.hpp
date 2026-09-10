@@ -20,7 +20,7 @@
 #include "core/error.hpp"
 #include "core/time.hpp"
 #include "core/wind.hpp"
-#include "gpu/gpu_timer.hpp"
+#include "gpu/frame_timeline.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/render_target.hpp"
 #include "gpu/texture.hpp"
@@ -72,7 +72,20 @@ struct ShaderFrameInputs {
 
 struct RenderStats {
     double gpuFrameMs = -1.0; // -1 when timestamp queries are unavailable
-    std::uint32_t drawCalls = 0;
+    std::uint32_t drawCalls = 0;       // draws recorded by the camera-side passes
+    std::uint32_t indirectDraws = 0;   // of the frame's draws, those sourced from a GPU buffer
+    std::uint32_t emptyDraws = 0;      // indirect draws whose instance count was last read as zero
+    std::uint32_t skippedDraws = 0;    // draws not recorded because the level has been empty
+    std::uint32_t computeDispatches = 0; // compute passes encoded this frame, over every subsystem
+    std::uint32_t shadowDraws = 0;     // draws recorded across every shadow view
+    std::uint32_t gpuPasses = 0;       // render + compute passes the timeline measured
+    std::uint64_t visibleInstances = 0; // procedural instances that survived culling
+    std::uint64_t culledInstances = 0;
+    std::uint64_t lodCounts[4] = {0, 0, 0, 0};
+    // Triangles *submitted* by the camera-side passes: source triangles times instances, before
+    // the GPU cull rejects any of them. It is not the number that reaches the rasteriser -- the
+    // instance counts are written by the cull pass and the CPU never sees them for this frame.
+    // For what survived, read `visibleInstances` against `culledInstances`.
     std::uint32_t triangles = 0;
     std::uint32_t entities = 0;
     std::uint32_t lights = 0;
@@ -240,6 +253,20 @@ public:
     [[nodiscard]] const QualitySettings& qualitySettings() const { return qualitySettings_; }
     // Overrides individual counts without changing the named tier (tests and benchmarks).
     void setQualitySettings(const QualitySettings& settings) { qualitySettings_ = settings; }
+
+    // A/B switches for attributing cost. The only trustworthy way to know what a phase costs is
+    // to run the frame without it and diff the medians, so the phases the frame timeline reports
+    // separately can each be switched off without editing a scene. `--disable` on the command
+    // line drives this and logs what it turned off, so an A/B whose two arms are accidentally
+    // identical is visible in the run's own output instead of reading as a null result.
+    struct PassToggles {
+        bool shadows = true; // the depth-only cascade / spot passes
+        bool ao = true;      // GTAO + its temporal resolve
+        bool volume = true;  // the volumetric march + composite
+        bool post = true;    // the built-in post chain (bloom, DoF, grading)
+    };
+    void setPassToggles(const PassToggles& toggles) { toggles_ = toggles; }
+    [[nodiscard]] const PassToggles& passToggles() const { return toggles_; }
     [[nodiscard]] ShadowRenderer& shadows() { return *shadows_; }     // ADR-034
     [[nodiscard]] AoRenderer& ambientOcclusion() { return *ao_; }     // ADR-034
     // Displays one auxiliary target full-screen instead of the shaded frame (ADR-035).
@@ -265,7 +292,12 @@ public:
     // the lit scene. Empty by default, so a frame with no debug geometry is encoded as before.
     [[nodiscard]] DebugDraw& debugDraw() { return *debug_; }
     void setDebugDepthTest(bool on) { debugDepthTest_ = on; }
-    [[nodiscard]] gpu::GpuTimer& timer() { return *timer_; }
+    // The frame's GPU timestamp timeline (gpu/frame_timeline.hpp). Every pass marks itself on it;
+    // `passes()` is the per-pass breakdown of the last completed frame, in submission order.
+    [[nodiscard]] gpu::FrameTimeline& timeline() { return *timeline_; }
+    // Pumps the timeline and fans the per-pass numbers out into stats(). Call after Submit();
+    // never blocks. renderFrame()/renderToImage() do it for you.
+    void collectFrameTimings();
     [[nodiscard]] const gpu::RenderTarget& hdrTarget() const { return hdr_; }
     [[nodiscard]] bool initialised() const { return initialised_; }
 
@@ -328,8 +360,7 @@ private:
 
     gpu::Context& context_;
     gpu::ShaderLibrary& shaders_;
-    std::unique_ptr<gpu::GpuTimer> timer_;
-    std::unique_ptr<gpu::GpuTimer> shadowTimer_; // the depth-only shadow passes on their own
+    std::unique_ptr<gpu::FrameTimeline> timeline_;
     std::unique_ptr<gpu::SamplerCache> samplers_;
     std::unique_ptr<EnvironmentProcessor> environment_;
     std::unique_ptr<ShaderStack> shaderStack_;
@@ -351,6 +382,10 @@ private:
     bool havePrevViewProj_ = false;
     QualityTier tier_ = QualityTier::Realtime;
     QualitySettings qualitySettings_ = QualitySettings::forTier(QualityTier::Realtime);
+    PassToggles toggles_;
+    // Compute passes this frame's encoding counted for itself (the froxel build). The rest are
+    // read off the subsystems in collectFrameTimings(), which runs more than once per frame.
+    std::uint32_t clusterDispatches_ = 0;
     AuxDebugView auxDebugView_ = AuxDebugView::None;
     gpu::RenderTarget post_[2];      // ping-pong HDR colour targets for post layers
     gpu::GpuTexture spectrum_;       // binCount x 1 RGBA16F audio spectrum for user shaders

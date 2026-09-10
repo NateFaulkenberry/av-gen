@@ -63,6 +63,9 @@ struct AppOptions {
     // tier that scales shadow, occlusion and cluster sample counts.
     std::string debugTarget;
     std::string qualityTier;
+    // A/B attribution: comma-separated phases to switch off for this run
+    // (shadows, ao, volume, post). Logged at start-up so a run's own output proves which arm it is.
+    std::string disablePasses;
     // Offline rendering (1.0): --render <dir|video file>, --range a:b, --codec, --quality, --queue <file>
     std::optional<std::filesystem::path> render;
     std::optional<std::filesystem::path> queue;

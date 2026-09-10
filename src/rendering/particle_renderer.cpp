@@ -7,7 +7,7 @@
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
-#include "gpu/gpu_timer.hpp"
+#include "gpu/frame_timeline.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
 
@@ -44,9 +44,11 @@ ParticleRenderer::ParticleRenderer(gpu::Context& context, gpu::ShaderLibrary& sh
 
 ParticleRenderer::~ParticleRenderer() = default;
 
+void ParticleRenderer::setTimeline(gpu::FrameTimeline* timeline) { timeline_ = timeline; }
+
 void ParticleRenderer::collectTimings() {
-    if (timer_) {
-        const double ms = timer_->collect();
+    if (timeline_ != nullptr) {
+        const double ms = timeline_->msFor("particles");
         if (ms >= 0.0) {
             lastSimulateMs_ = ms;
         }
@@ -171,7 +173,6 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer spline
         desc.bindGroupLayouts = &renderLayout_;
         renderPipelineLayout_ = device.CreatePipelineLayout(&desc);
     }
-    timer_ = std::make_unique<gpu::GpuTimer>(context_);
     auto module = shaders_.load("particles.wgsl");
     if (!module) {
         return std::unexpected(module.error());
@@ -442,11 +443,6 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         return;
     }
     collectTimings(); // the previous frame's measurement (its command buffer was submitted by now)
-    // The timestamps span every enabled system's compute pass: begin on the first, end on the last.
-    std::size_t enabledSystems = 0;
-    for (const auto& sys : scene.particles) {
-        enabledSystems += sys.enabled ? 1 : 0;
-    }
     std::size_t encoded = 0;
     const glm::mat4 invView = glm::inverse(view);
     const glm::vec3 right = glm::normalize(glm::vec3(invView[0]));
@@ -575,21 +571,11 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         // emit consumes last frame's dead list before scatter rewrites it.
         wgpu::ComputePassDescriptor cdesc{};
         cdesc.label = "particles-compute";
-        wgpu::PassTimestampWrites writes{};
-        if (const wgpu::PassTimestampWrites* both = timer_->passWrites(); both != nullptr) {
-            writes.querySet = both->querySet;
-            if (enabledSystems == 1) {
-                writes = *both;
-            } else if (encoded == 0) {
-                writes.beginningOfPassWriteIndex = both->beginningOfPassWriteIndex;
-            } else if (encoded + 1 == enabledSystems) {
-                writes.endOfPassWriteIndex = both->endOfPassWriteIndex;
-            }
-            if (encoded == 0 || encoded + 1 == enabledSystems) {
-                cdesc.timestampWrites = &writes;
-            }
-        }
+        // One mark per system's pass; the timeline sums them under the one label, so a scene with
+        // several systems reports what all of them cost rather than what the last one did.
+        cdesc.timestampWrites = timeline_ != nullptr ? timeline_->mark("particles") : nullptr;
         ++encoded;
+        ++stats_.dispatches;
         wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&cdesc);
         cp.SetBindGroup(0, pool.computeGroup);
         if (emitCount > 0) {
@@ -626,8 +612,7 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         stats_.glowSystems += glowing ? 1 : 0;
         stats_.trailBytes += static_cast<std::uint64_t>(pool.capacity) * pool.historyPoints * scene::kTrailBytesPerPoint;
     }
-    if (encoded > 0 && timer_->available()) {
-        timer_->resolve(encoder);
+    if (encoded > 0) {
         passThisFrame_ = true;
         stats_.simulateMs = lastSimulateMs_;
     }

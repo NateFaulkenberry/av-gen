@@ -52,8 +52,7 @@ std::uint64_t materialKey(const scene::Material& m) {
 } // namespace
 
 SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
-    : context_(context), shaders_(shaders), timer_(std::make_unique<gpu::GpuTimer>(context)),
-      shadowTimer_(std::make_unique<gpu::GpuTimer>(context)),
+    : context_(context), shaders_(shaders), timeline_(std::make_unique<gpu::FrameTimeline>(context)),
       samplers_(std::make_unique<gpu::SamplerCache>(context)),
       environment_(std::make_unique<EnvironmentProcessor>(context, shaders)),
       shaderStack_(std::make_unique<ShaderStack>(context, shaders)),
@@ -355,6 +354,15 @@ Result<void> SceneRenderer::init() {
         return fail("renderer initialisation raised {} GPU error(s): {}", context_.errorCount(),
                     context_.lastError());
     }
+    // Every subsystem's passes mark themselves on the one frame timeline, so the intervals
+    // between consecutive pass ends partition the frame and each pass is charged its own work.
+    particles_->setTimeline(timeline_.get());
+    procedurals_->setTimeline(timeline_.get());
+    sdfs_->setTimeline(timeline_.get());
+    volumes_->setTimeline(timeline_.get());
+    simulation_->setTimeline(timeline_.get());
+    ao_->setTimeline(timeline_.get());
+    postProcessor_->setTimeline(timeline_.get());
     initialised_ = true;
     return {};
 }
@@ -1428,6 +1436,8 @@ void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Sce
     context_.queue().WriteBuffer(clusterParams_, 0, &params, sizeof(params));
     wgpu::ComputePassDescriptor desc{};
     desc.label = "cluster-build-pass";
+    desc.timestampWrites = timeline_->mark("clusters");
+    ++clusterDispatches_;
     wgpu::ComputePassEncoder pass = encoder.BeginComputePass(&desc);
     pass.SetPipeline(clusterPipeline_);
     pass.SetBindGroup(0, clusterBindGroup_);
@@ -1445,7 +1455,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             return r;
         }
     }
-    stats_.shadows.shadowMs = shadowTimer_->collect();
+    // Open this frame's timestamp timeline before anything is encoded: the first pass to mark
+    // itself also writes the frame origin, and every later pass's cost is the interval from the
+    // previous pass's end to its own.
+    timeline_->beginFrame();
+    clusterDispatches_ = 0;
     uploadMeshes(scene);
     uploadTextures(scene);
     updateEnvironment(scene);
@@ -1457,6 +1471,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     shaderCtx.width = hdr_.width();
     shaderCtx.height = hdr_.height();
     shaderCtx.frameIndex = time.frameIndex;
+    shaderCtx.timeline = timeline_.get();
     if (layerSet != nullptr) {
         shaderStack_->sync(*layerSet);
         updateSpectrum(shaderInputs->frame);
@@ -1551,7 +1566,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     {
         const float aoRadius = std::clamp(glm::length(scene.camera.target - scene.camera.position) * 0.05f,
                                           0.15f, 4.0f);
-        ao_->update(hdr_.width(), hdr_.height(), linearDepth_.view, qualitySettings_, time.frameIndex,
+        QualitySettings aoQuality = qualitySettings_;
+        aoQuality.ambientOcclusion = aoQuality.ambientOcclusion && toggles_.ao;
+        ao_->update(hdr_.width(), hdr_.height(), linearDepth_.view, aoQuality, time.frameIndex,
                     scene.camera.effectiveFovY(), aspect, scene.camera.nearPlane, scene.camera.farPlane,
                     aoRadius, 1.0f);
         stats_.ao = ao_->stats();
@@ -1713,7 +1730,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // Every caster is drawn with its ordinary vertex shader against a frame block whose
     // view-projection is the light's, so entities, procedural instances and SDFs need no second
     // data path. The raymarched SDFs march their bounding box at a quarter of the steps.
-    const std::uint32_t shadowViews = std::min(shadows_->stats().views, kMaxShadowViews);
+    const std::uint32_t shadowViews = toggles_.shadows ? std::min(shadows_->stats().views, kMaxShadowViews) : 0;
     for (std::uint32_t v = 0; v < shadowViews; ++v) {
         wgpu::RenderPassDepthStencilAttachment depth{};
         depth.view = shadows_->layerView(v);
@@ -1724,14 +1741,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.label = "shadow-pass";
         pass.colorAttachmentCount = 0;
         pass.depthStencilAttachment = &depth;
-        // One timer spanning every shadow view, so the budget in docs/performance is measurable.
-        if (shadowViews == 1) {
-            pass.timestampWrites = shadowTimer_->passWrites();
-        } else if (v == 0) {
-            pass.timestampWrites = shadowTimer_->beginWrites();
-        } else if (v + 1 == shadowViews) {
-            pass.timestampWrites = shadowTimer_->endWrites();
-        }
+        // Every view marks the timeline under "shadow"; their intervals sum to the whole depth
+        // phase, so a cascade that costs nothing cannot hide behind one that does.
+        pass.timestampWrites = timeline_->mark("shadow");
         // Cull each caster against this cascade (P4). Without it every shadow-casting entity is
         // drawn into every view: a world of 256 terrain chunks submits them all, twice, whatever
         // the light can actually see, and the cost stays whether or not the camera is looking at
@@ -1781,9 +1793,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                  true);
         rp.End();
     }
-    if (shadowViews > 0) {
-        shadowTimer_->resolve(encoder);
-    }
 
     // ---- background pass: the HDR clear and the background user-shader layers ----
     // These are fullscreen quads with a single colour output, so they get their own pass; the
@@ -1799,7 +1808,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.label = "background-pass";
         pass.colorAttachmentCount = 1;
         pass.colorAttachments = &color;
-        pass.timestampWrites = timer_->beginWrites();
+        pass.timestampWrites = timeline_->mark("background");
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         if (layerSet != nullptr) {
             for (const auto& layer : layerSet->layers()) {
@@ -1827,6 +1836,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.label = "depth-prepass";
         pass.colorAttachmentCount = 0;
         pass.depthStencilAttachment = &depth;
+        pass.timestampWrites = timeline_->mark("depth");
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetBindGroup(0, frameBindGroupAux_);
         rp.SetBindGroup(3, iblBindGroup_);
@@ -1867,6 +1877,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         linearPass.label = "linear-depth-pass";
         linearPass.colorAttachmentCount = 1;
         linearPass.colorAttachments = &colour;
+        linearPass.timestampWrites = timeline_->mark("depth");
         wgpu::RenderPassEncoder lrp = encoder.BeginRenderPass(&linearPass);
         lrp.SetPipeline(linearDepthPipeline_);
         lrp.SetBindGroup(0, frameBindGroupAux_);
@@ -1902,6 +1913,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.colorAttachmentCount = kSceneTargetCount;
         pass.colorAttachments = attachments.data();
         pass.depthStencilAttachment = &depth;
+        pass.timestampWrites = timeline_->mark("scene");
 
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetBindGroup(0, frameBindGroup_);
@@ -1953,6 +1965,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             }
             depth.depthLoadOp = wgpu::LoadOp::Load;
             pass.label = "scene-pass-after-sdf";
+            pass.timestampWrites = timeline_->mark("scene");
             rp = encoder.BeginRenderPass(&pass);
             rp.SetBindGroup(0, frameBindGroup_);
             rp.SetBindGroup(3, iblBindGroup_);
@@ -1981,9 +1994,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
 
     // ---- volumetric atmosphere (ADR-032): half-res raymarch + depth-aware composite ----
     // Skipped entirely when Environment::volumeDensity is 0, so scenes without fog are unchanged.
-    volumes_->update(scene, time, hdr_.width(), hdr_.height(), hdr_.depthView(), fields_.get(),
-                     particles_->glowSystems());
-    volumes_->encode(encoder, hdr_.colorView(), frameBindGroup_);
+    if (toggles_.volume) {
+        volumes_->update(scene, time, hdr_.width(), hdr_.height(), hdr_.depthView(), fields_.get(),
+                         particles_->glowSystems());
+        volumes_->encode(encoder, hdr_.colorView(), frameBindGroup_);
+    }
     stats_.volume = volumes_->stats();
 
     // ---- debug drawing (ADR-031): whatever the host queued this frame, over the lit scene ----
@@ -2002,6 +2017,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.colorAttachmentCount = 1;
         pass.colorAttachments = &colour;
         pass.depthStencilAttachment = &depth;
+        pass.timestampWrites = timeline_->mark("debug");
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         debug_->render(rp, frameBindGroup_, debugDepthTest_);
         rp.End();
@@ -2035,6 +2051,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             pass.label = "post-layer-pass";
             pass.colorAttachmentCount = 1;
             pass.colorAttachments = &color;
+            pass.timestampWrites = timeline_->mark("shaderlayer");
             wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
             gpuLayer->drawOutput(rp, kHdrFormat, false, *layer, postCtx);
             rp.End();
@@ -2064,8 +2081,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         postSettings.lens.shutterAngle = scene.camera.lens.shutterAngle;
         postIn.settings = &postSettings;
         postIn.composition = &scene.composition; // ADR-038 depth layers grade the composite
-        finalHdr = postProcessor_->run(encoder, postIn, *pool_);
-        if (postProcessor_->outputTexture() != nullptr) {
+        if (toggles_.post) {
+            finalHdr = postProcessor_->run(encoder, postIn, *pool_);
+        }
+        if (toggles_.post && postProcessor_->outputTexture() != nullptr) {
             hdrOutput_ = postProcessor_->outputTexture();
         }
         stats_.post = postProcessor_->stats();
@@ -2113,6 +2132,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.label = "aux-debug-pass";
         pass.colorAttachmentCount = 1;
         pass.colorAttachments = &colour;
+        pass.timestampWrites = timeline_->mark("auxdebug");
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetPipeline(auxDebugPipeline_);
         rp.SetBindGroup(0, auxDebugGroup_);
@@ -2136,7 +2156,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.label = "tonemap-pass";
         pass.colorAttachmentCount = 1;
         pass.colorAttachments = &color;
-        pass.timestampWrites = timer_->endWrites();
+        pass.timestampWrites = timeline_->mark("tonemap");
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetPipeline(*pipeline);
         rp.SetBindGroup(0, finalHdr.Get() == hdr_.colorView().Get() ? tonemapBindGroup_ : tonemapBindGroupFor(finalHdr));
@@ -2145,7 +2165,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         ++stats_.drawCalls;
         ++stats_.triangles;
     }
-    timer_->resolve(encoder);
+    timeline_->resolve(encoder);
     pool_->endFrame();
     return {};
 }
@@ -2185,29 +2205,56 @@ Result<wgpu::Texture> SceneRenderer::renderSubmitted(const scene::Scene& scene, 
     }
     wgpu::CommandBuffer commands = encoder.Finish();
     context_.queue().Submit(1, &commands);
-    stats_.gpuFrameMs = timer_->collect();
+    collectFrameTimings();
+    context_.waitForQueue();
+    // Again after the queue drained: a frame submitted two or three frames ago has landed in the
+    // readback ring by now, so the numbers reported alongside this frame are only that stale.
+    collectFrameTimings();
+    return texture;
+}
+
+// Pumps the frame timeline and fans its per-pass intervals out into stats(). Everything here is
+// non-blocking: the timeline reports whichever frame's readback has completed, two or three back.
+void SceneRenderer::collectFrameTimings() {
+    timeline_->collect();
+    // Each subsystem reads its own label off the timeline (msFor) and keeps the "did this pass run
+    // at all this frame" bookkeeping it already had, so a pass that is off still reports -1.
+    procedurals_->collectTimings();
+    particles_->collectTimings();
+    sdfs_->collectTimings();
+    volumes_->collectTimings();
+    simulation_->collectTimings();
+    ao_->collectTimings();
+
+    stats_.gpuFrameMs = timeline_->frameMs();
+    stats_.gpuPasses = static_cast<std::uint32_t>(timeline_->passes().size());
     // Re-read the procedural stats now that every pass has recorded its draws. The copy taken
     // during update() is made before a single draw exists, so any counter incremented while
     // recording -- indirect draws, empty draws -- was being thrown away and read back as zero.
     stats_.procedural = procedurals_->stats();
-    procedurals_->collectTimings();
-    particles_->collectTimings();
-    sdfs_->collectTimings();
-    volumes_->collectTimings();
-    simulation_->collectTimings();
-    context_.waitForQueue();
-    stats_.gpuFrameMs = timer_->collect();
-    procedurals_->collectTimings();
-    particles_->collectTimings();
-    sdfs_->collectTimings();
-    stats_.procedural.effectorPassMs = procedurals_->stats().effectorPassMs;
-    stats_.particles.simulateMs = particles_->stats().simulateMs;
-    stats_.sdf.raymarchMs = sdfs_->stats().raymarchMs;
-    volumes_->collectTimings();
-    stats_.volume.volumeMs = volumes_->stats().volumeMs;
-    simulation_->collectTimings();
-    stats_.simulation.simulateMs = simulation_->stats().simulateMs;
-    return texture;
+    stats_.particles = particles_->stats();
+    stats_.sdf = sdfs_->stats();
+    stats_.volume = volumes_->stats();
+    stats_.simulation = simulation_->stats();
+    stats_.ao = ao_->stats();
+    stats_.shadows.shadowMs = stats_.shadows.views > 0 ? timeline_->msFor("shadow") : -1.0;
+    stats_.post.postMs = timeline_->msForPrefix("post/");
+
+    // ---- frame-wide submission accounting (the performance spec's counters) ----
+    stats_.indirectDraws = stats_.procedural.indirectDraws;
+    stats_.emptyDraws = stats_.procedural.emptyIndirectDraws;
+    stats_.skippedDraws = stats_.procedural.skippedIndirectDraws;
+    stats_.visibleInstances = stats_.procedural.visibleInstances;
+    stats_.culledInstances = stats_.procedural.culledInstances;
+    for (std::size_t i = 0; i < 4; ++i) {
+        stats_.lodCounts[i] = stats_.procedural.lodCounts[i];
+    }
+    // Assigned, not accumulated: this runs twice per submitted frame (once before the queue
+    // drains and once after), and a counter that adds on each pass would double what it reports.
+    stats_.computeDispatches = clusterDispatches_ + stats_.simulation.dispatches +
+                               stats_.particles.dispatches + stats_.procedural.effectorDispatches +
+                               stats_.procedural.cullDispatches;
+    stats_.shadowDraws = stats_.shadows.entityDraws;
 }
 
 Result<void> SceneRenderer::renderFrame(const scene::Scene& scene, const FrameTime& time,

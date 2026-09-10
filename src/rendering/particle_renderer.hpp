@@ -20,7 +20,7 @@
 
 namespace avgen::gpu {
 class Context;
-class GpuTimer;
+class FrameTimeline;
 class ShaderLibrary;
 } // namespace avgen::gpu
 
@@ -86,6 +86,7 @@ struct ParticleStats {
     std::uint32_t ribbonSystems = 0;    // systems drawing trails this frame (ADR-040)
     std::uint32_t glowSystems = 0;      // systems injecting light into the volume (ADR-040)
     std::uint64_t trailBytes = 0;       // history rings currently allocated
+    std::uint32_t dispatches = 0;       // compute passes encoded this frame (one per enabled system)
     double simulateMs = -1.0;           // GPU time of the compute passes (emit..compaction) of the last measured frame; -1 = none / unavailable
 };
 
@@ -124,6 +125,9 @@ public:
     void resetAll();
     // Pumps the compute-pass timer after the frame's command buffer was submitted (update() also
     // does this at the start of the next frame).
+    // The shared frame timeline (gpu/frame_timeline.hpp) this renderer's passes mark themselves
+    // on. Null leaves them untimed.
+    void setTimeline(gpu::FrameTimeline* timeline);
     void collectTimings();
 
     [[nodiscard]] const ParticleStats& stats() const { return stats_; }
@@ -179,7 +183,7 @@ private:
     wgpu::Buffer fieldBlock_;
     wgpu::Buffer splineTable_;
     wgpu::Buffer gridTable_;
-    std::unique_ptr<gpu::GpuTimer> timer_;
+    gpu::FrameTimeline* timeline_ = nullptr;
     double lastSimulateMs_ = -1.0;
     bool passThisFrame_ = false;
     bool initialised_ = false;

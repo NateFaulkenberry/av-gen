@@ -28,6 +28,7 @@
 
 namespace avgen::gpu {
 class Context;
+class FrameTimeline;
 class ShaderLibrary;
 } // namespace avgen::gpu
 
@@ -86,7 +87,10 @@ public:
     // after the lit pass. No-op when the last update() found the fog off.
     void encode(wgpu::CommandEncoder& encoder, const wgpu::TextureView& color,
                 const wgpu::BindGroup& frameBindGroup);
-    // Pumps the pass timer after the frame's command buffer was submitted.
+    // The shared frame timeline (gpu/frame_timeline.hpp) this renderer's passes mark themselves
+    // on. Null leaves them untimed. SceneRenderer sets it once; a standalone user may not.
+    void setTimeline(gpu::FrameTimeline* timeline);
+    // Reads this frame's march + composite time back off the timeline, after it was collected.
     void collectTimings();
 
     [[nodiscard]] const VolumeStats& stats() const { return stats_; }

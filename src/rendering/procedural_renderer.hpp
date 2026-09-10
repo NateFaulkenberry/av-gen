@@ -45,6 +45,7 @@
 
 namespace avgen::gpu {
 class Context;
+class FrameTimeline;
 class ShaderLibrary;
 } // namespace avgen::gpu
 
@@ -83,6 +84,8 @@ struct ProceduralStats {
     std::uint32_t effectorObjects = 0;   // objects that ran the effector pass this frame
     std::uint64_t effectorInstances = 0; // records processed by the effector pass this frame
     std::uint32_t effectors = 0;         // usable effectors over those objects
+    std::uint32_t effectorDispatches = 0; // effector compute passes encoded this frame
+    std::uint32_t cullDispatches = 0;     // cull compute passes encoded this frame
     double effectorPassMs = -1.0;        // GPU time of the last measured effector pass (-1 = none / unavailable)
     std::uint32_t pointObjects = 0;      // objects drawn as Point billboards
     std::uint32_t fieldDeformers = 0;    // enabled Field deformers bound to a slot
@@ -257,6 +260,9 @@ public:
                        const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
     // Pumps the effector-pass timer after the frame's command buffer was submitted (update()
     // also does this at the start of the next frame).
+    // The shared frame timeline (gpu/frame_timeline.hpp) this renderer's passes mark themselves
+    // on. Null leaves them untimed.
+    void setTimeline(gpu::FrameTimeline* timeline);
     void collectTimings();
 
     // The viewport the cull pass reasons about: the aspect of the frustum planes and the pixel
