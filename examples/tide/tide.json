@@ -1,0 +1,20 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "The Tide That Hangs"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "tide.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/lens/focalLength": 24.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "post/grade/contrast": 1.06,
+  "post/grade/saturation": 1.04
+ }
+}

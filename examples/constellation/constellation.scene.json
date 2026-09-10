@@ -1857,6 +1857,87 @@
      }
     ]
    }
+  },
+  {
+   "name": "shards",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    -16.253,
+    0.0,
+    14.47
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.16,
+      0.05,
+      0.26
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "spiral",
+     "count": 260,
+     "radius": 5.5,
+     "radiusGrowth": 3.6,
+     "turns": 2.35,
+     "spiralHeight": 3.0,
+     "orientation": "tangent",
+     "plane": "xz",
+     "jitter": 2.4,
+     "seed": 17,
+     "scaleMin": 0.45,
+     "scaleMax": 2.3,
+     "randomYaw": 1.0
+    },
+    "material": {
+     "baseColor": [
+      0.28,
+      0.42,
+      0.72
+     ],
+     "roughness": 0.35,
+     "metallic": 0.55,
+     "emissiveColor": [
+      0.45,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 0.55
+    },
+    "effectors": [
+     {
+      "field": "macroWarp",
+      "op": "positionOffset",
+      "blend": "add",
+      "strength": 2.6
+     },
+     {
+      "field": "mesoWarp",
+      "op": "rotation",
+      "blend": "add",
+      "strength": 1.4
+     },
+     {
+      "field": "shock",
+      "op": "emission",
+      "blend": "add",
+      "strength": 6.0
+     },
+     {
+      "field": "shock",
+      "op": "positionOffset",
+      "blend": "add",
+      "strength": 1.8
+     }
+    ]
+   }
   }
  ],
  "post": {

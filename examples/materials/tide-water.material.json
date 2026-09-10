@@ -1,0 +1,126 @@
+{
+ "name": "tideWater",
+ "description": "Water read from underneath. A wave photographs well because its lip is translucent: light behind it comes through where the water is thin, and the thin part is exactly where the surface turns away from the eye -- so fresnel is that measurement, and it is the whole reason this material exists. A facing gradient separates water lit from the surface above from water in its own shadow, so the form is described rather than flat, and two decorrelated world-space noise scales drifting at different rates put caustics on it that crawl instead of sitting still.",
+ "ops": [
+  {
+   "kind": "input",
+   "dst": 0,
+   "input": "normal"
+  },
+  {
+   "kind": "fresnel",
+   "dst": 1,
+   "value": 2.4
+  },
+  {
+   "kind": "gradient",
+   "dst": 2,
+   "srcA": 0,
+   "value": 1.0,
+   "constant": [
+    0.0,
+    1.0,
+    0.0,
+    0.55
+   ]
+  },
+  {
+   "kind": "input",
+   "dst": 3,
+   "input": "worldPosition"
+  },
+  {
+   "kind": "noise",
+   "dst": 4,
+   "srcA": 3,
+   "value": 0.075,
+   "seed": 41
+  },
+  {
+   "kind": "noise",
+   "dst": 5,
+   "srcA": 3,
+   "value": 0.021,
+   "seed": 907
+  },
+  {
+   "kind": "multiply",
+   "dst": 4,
+   "srcA": 4,
+   "srcB": 5
+  },
+  {
+   "kind": "power",
+   "dst": 4,
+   "srcA": 4,
+   "value": 2.6
+  },
+  {
+   "kind": "ramp",
+   "dst": 6,
+   "srcA": 2,
+   "constant": [
+    0.004,
+    0.02,
+    0.028,
+    1.0
+   ],
+   "constant2": [
+    0.01,
+    0.062,
+    0.07,
+    1.0
+   ],
+   "constant3": [
+    0.03,
+    0.14,
+    0.135,
+    1.0
+   ]
+  },
+  {
+   "kind": "constant",
+   "dst": 7,
+   "constant": [
+    0.26,
+    0.92,
+    0.86,
+    1.0
+   ]
+  },
+  {
+   "kind": "multiply",
+   "dst": 7,
+   "srcA": 7,
+   "srcB": 1
+  },
+  {
+   "kind": "add",
+   "dst": 4,
+   "srcA": 4,
+   "srcB": 2
+  },
+  {
+   "kind": "multiply",
+   "dst": 7,
+   "srcA": 7,
+   "srcB": 4
+  },
+  {
+   "kind": "remap",
+   "dst": 5,
+   "srcA": 1,
+   "value": 1.0,
+   "constant": [
+    0.0,
+    1.0,
+    0.1,
+    0.34
+   ]
+  }
+ ],
+ "baseColor": 6,
+ "roughness": 5,
+ "emission": 7,
+ "emissionIntensity": 2.6
+}

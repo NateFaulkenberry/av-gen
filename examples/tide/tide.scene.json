@@ -1,0 +1,331 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "The Tide That Hangs",
+ "camera": {
+  "mode": 1,
+  "position": [
+   46.0,
+   5.0,
+   96.0
+  ],
+  "target": [
+   -14.0,
+   20.0,
+   -140.0
+  ],
+  "fov": 48.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../lightrigs/tide.rig.json",
+ "environment": {
+  "stylized": false,
+  "background": [
+   0.006,
+   0.033,
+   0.05
+  ],
+  "intensity": 0.6,
+  "lightFromEnvironment": false,
+  "sky": {
+   "enabled": false,
+   "background": false
+  },
+  "fogColor": [
+   0.014,
+   0.075,
+   0.098
+  ],
+  "fogDensity": 0.003,
+  "fogHeight": 30.0,
+  "fogHeightFalloff": 0.02,
+  "fogHeightAmount": 1.0,
+  "volumeDensity": 0.0035,
+  "volumeScattering": 0.62,
+  "volumeAnisotropy": 0.55,
+  "volumeAbsorption": 0.3,
+  "volumeMaxDistance": 200.0,
+  "volumeLocalLights": 0.6,
+  "volumeNoise": 0.35,
+  "volumeNoiseScale": 0.03,
+  "volumeSteps": 20,
+  "shadowCascades": 1
+ },
+ "nodes": [
+  {
+   "name": "the-wave",
+   "kind": "procedural",
+   "position": [
+    -34.0,
+    12.0,
+    -95.0
+   ],
+   "rotation": [
+    0.0,
+    6.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      150.0,
+      1.5,
+      320.0
+     ],
+     "subdivisions": 64
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.01,
+      0.052,
+      0.06
+     ],
+     "roughness": 0.18,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.16,
+      0.6,
+      0.7
+     ],
+     "emissiveIntensity": 0.3,
+     "program": "tideWater"
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": -0.019,
+      "axis": [
+       1,
+       0,
+       0
+      ],
+      "displacementAxis": [
+       0,
+       1,
+       0
+      ],
+      "center": [
+       56.0,
+       0.0,
+       0.0
+      ],
+      "space": "local"
+     },
+     {
+      "kind": "sine",
+      "amount": 4.6,
+      "frequency": 0.03,
+      "speed": 0.26,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "displacementAxis": [
+       0,
+       1,
+       0
+      ],
+      "phase": 0.0,
+      "space": "local"
+     },
+     {
+      "kind": "sine",
+      "amount": 2.4,
+      "frequency": 0.071,
+      "speed": 0.19,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "displacementAxis": [
+       1,
+       0,
+       0
+      ],
+      "phase": 1.7,
+      "space": "local"
+     },
+     {
+      "kind": "displacement",
+      "amount": 0.85,
+      "scale": 0.16,
+      "speed": 0.22,
+      "space": "world"
+     },
+     {
+      "kind": "displacement",
+      "amount": 0.3,
+      "scale": 0.52,
+      "speed": 0.45,
+      "space": "world"
+     },
+     {
+      "kind": "noise",
+      "amount": 0.9,
+      "scale": 0.06,
+      "speed": 0.12,
+      "space": "world"
+     }
+    ]
+   }
+  },
+  {
+   "name": "far-wave",
+   "kind": "procedural",
+   "position": [
+    110.0,
+    40.0,
+    -260.0
+   ],
+   "rotation": [
+    0.0,
+    26.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      220.0,
+      1.4,
+      300.0
+     ],
+     "subdivisions": 30
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.006,
+      0.03,
+      0.04
+     ],
+     "roughness": 0.3,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.12,
+      0.44,
+      0.58
+     ],
+     "emissiveIntensity": 0.16,
+     "program": "tideWater"
+    },
+    "deformers": [
+     {
+      "kind": "bend",
+      "amount": -0.012,
+      "axis": [
+       1,
+       0,
+       0
+      ],
+      "displacementAxis": [
+       0,
+       1,
+       0
+      ],
+      "center": [
+       70.0,
+       0.0,
+       0.0
+      ],
+      "space": "local"
+     },
+     {
+      "kind": "sine",
+      "amount": 7.5,
+      "frequency": 0.019,
+      "speed": 0.15,
+      "axis": [
+       0,
+       0,
+       1
+      ],
+      "displacementAxis": [
+       0,
+       1,
+       0
+      ],
+      "phase": 0.0,
+      "space": "local"
+     }
+    ]
+   }
+  },
+  {
+   "name": "plankton",
+   "kind": "particles",
+   "particles": {
+    "capacity": 26000,
+    "seed": 5,
+    "spawnRate": 1300.0,
+    "shape": "box",
+    "position": [
+     6.0,
+     8.0,
+     -70.0
+    ],
+    "extent": [
+     70.0,
+     26.0,
+     130.0
+    ],
+    "lifetimeMin": 22.0,
+    "lifetimeMax": 40.0,
+    "spread": 1.0,
+    "speedMin": 0.02,
+    "speedMax": 0.2,
+    "gravity": [
+     0.0,
+     0.012,
+     0.0
+    ],
+    "drag": 0.5,
+    "turbulence": 0.14,
+    "turbulenceScale": 0.09,
+    "turbulenceSpeed": 0.07,
+    "sizeStart": 0.05,
+    "sizeEnd": 0.07,
+    "blend": "additive",
+    "emissive": 2.4,
+    "softness": 1.6,
+    "colorStart": [
+     0.55,
+     1.0,
+     0.86,
+     0.3
+    ],
+    "colorEnd": [
+     0.22,
+     0.62,
+     1.0,
+     0.0
+    ],
+    "fogCoupling": 1.0
+   }
+  }
+ ],
+ "post": {
+  "tonemap": 1,
+  "chromaRetention": 0.65,
+  "bloomEnabled": true,
+  "bloomIntensity": 0.14,
+  "bloomThreshold": 1.2,
+  "bloomKnee": 0.5,
+  "bloomRadius": 1.1,
+  "bloomLevels": 6,
+  "bloomEmissionWeight": 0.55,
+  "antialias": 0.7,
+  "vignette": 0.26
+ },
+ "materialPrograms": [
+  "../materials/tide-water.material.json"
+ ]
+}
