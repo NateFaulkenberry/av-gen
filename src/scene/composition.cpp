@@ -20,6 +20,11 @@
 namespace avgen::scene {
 
 namespace {
+// Ecology lights are rebuilt every frame and identified by name, because the rig removes its own
+// lights by resizing from the back and the two sets must not be able to eat each other.
+constexpr std::string_view kEcologyLightPrefix = "ecology.glow.";
+// The clustered path takes 256 lights in total (kMaxSceneLights); leave room for the rig.
+constexpr std::size_t kMaxEcologyLights = 224;
 constexpr int kMaxTerrainLodIndex = world::kMaxTerrainLods - 1;
 // The viewport height terrain `lodDistance` values are authored against. Not the real one, which
 // the composition does not know; see the note at the call site.
@@ -1802,6 +1807,7 @@ void Composition::rebuild() {
             // instancing, GPU culling, LOD, variation, the material -- is the machinery an imported
             // mesh already gets, which is the whole reason the ecology emits a cloud instead of a
             // new kind of drawable.
+            std::vector<world::GlowCluster> nodeGlow;
             for (const world::ScatterLayer& layer : node.ecology.layers) {
                 auto cloud = std::make_shared<spatial::PointCloud>(world::scatter(node.worldMap, layer));
                 if (cloud->count() == 0) {
@@ -1849,6 +1855,12 @@ void Composition::rebuild() {
                         pg.sourceTransform.scale = glm::vec3(layer.height / authored);
                     }
                 }
+                if (layer.emissiveIntensity > 0.0f && ecologyLightGain_ > 0.0f) {
+                    auto clusters = world::aggregateGlow(*cloud, layer, ecologyGlowCell_);
+                    log::info("terrain '{}': scatter '{}' glow reduced to {} emitters", node.name,
+                              layer.name, clusters.size());
+                    nodeGlow.insert(nodeGlow.end(), clusters.begin(), clusters.end());
+                }
                 log::info("terrain '{}': scatter '{}' placed {} instances", node.name, layer.name,
                           cloud->count());
                 scene_.procedurals.push_back(std::move(pg));
@@ -1856,6 +1868,7 @@ void Composition::rebuild() {
             // The whole world is built here, once. Chunk meshes are static: only which of a chunk's
             // four meshes is drawn, and whether it is drawn at all, changes per frame.
             CompositionNode& mutableNode = *nodePtr;
+            mutableNode.glow = std::move(nodeGlow);
             const auto buildStart = std::chrono::steady_clock::now();
             mutableNode.chunks = world::buildTerrain(
                 node.worldMap, node.terrain,
@@ -2508,6 +2521,13 @@ void Composition::applyParameters() {
     scene_.camera.farPlane = std::max(radius_ * 50.0f, 2000.0f); // free cameras look across whole worlds
     applyFraming();
     updateTerrainLod();
+    // Last frame's ecology lights come off before the rig block, which removes its own lights by
+    // resizing from the back and would otherwise take these with them.
+    if (ecologyLightCount_ > 0) {
+        std::erase_if(scene_.lights,
+                      [](const PunctualLight& l) { return l.name.starts_with(kEcologyLightPrefix); });
+        ecologyLightCount_ = 0;
+    }
 
     if (brightness_ != nullptr) {
         scene_.environment.brightness = brightness_->value();
@@ -2553,6 +2573,7 @@ void Composition::applyParameters() {
             scene_.lights.push_back(std::move(light));
         }
     }
+    updateEcologyLights();
     scene_.environment.fogColor = fogColor_ != nullptr ? fogColor_->value()
                                                        : (fogColorSet_ ? fogColorSetting_ : scene_.environment.backgroundColor);
     {
@@ -2641,6 +2662,81 @@ void Composition::applyParameters() {
 // interpolates between the authored aim and the fully framed one, so a shot can be nudged rather
 // than snapped. The aspect comes from the lens's sensor, which is the authored intent; the render
 // target's aspect is not known here and would make the framing depend on the output size.
+// ADR-053: the light a glowing ecology casts. The scatter layers are reduced at build time to
+// soft emitters, one per occupied cell of a coarse grid, and this picks the ones near the camera
+// and makes them real lights. The count is bounded by the light budget rather than by how much is
+// growing, so a meadow of ten thousand glowing ferns costs the same as a hundred.
+void Composition::updateEcologyLights() {
+    ecologyLightCount_ = 0;
+    if (!ecologyLightsEnabled_) {
+        return;
+    }
+    const std::size_t budget = kMaxEcologyLights > scene_.lights.size()
+                                   ? kMaxEcologyLights - scene_.lights.size()
+                                   : 0;
+    if (budget == 0) {
+        return;
+    }
+
+    struct Candidate {
+        const world::GlowCluster* cluster;
+        float distanceSq;
+        glm::vec3 position;
+    };
+    std::vector<Candidate> candidates;
+    const glm::vec3 eye = scene_.camera.position;
+    for (std::size_t i = 0; i < nodes_.size() && i < ranges_.size(); ++i) {
+        const CompositionNode& node = *nodes_[i];
+        if (node.kind != NodeKind::Terrain || node.glow.empty()) {
+            continue;
+        }
+        const glm::mat4 m = nodeTransform(node).matrix();
+        for (const world::GlowCluster& g : node.glow) {
+            const glm::vec3 world = glm::vec3(m * glm::vec4(g.position, 1.0f));
+            const float d2 = glm::dot(world - eye, world - eye);
+            if (d2 > ecologyLightRange_ * ecologyLightRange_) {
+                continue;
+            }
+            candidates.push_back({&g, d2, world});
+        }
+    }
+    if (candidates.empty()) {
+        return;
+    }
+    // Nearest first: a patch behind the camera still lights the air and the ground it sits on, but
+    // when the budget runs out the ones the frame is actually looking at are the ones to keep.
+    if (candidates.size() > budget) {
+        std::nth_element(candidates.begin(), candidates.begin() + static_cast<std::ptrdiff_t>(budget),
+                         candidates.end(),
+                         [](const Candidate& a, const Candidate& b) { return a.distanceSq < b.distanceSq; });
+        candidates.resize(budget);
+    }
+
+    for (std::size_t i = 0; i < candidates.size(); ++i) {
+        const world::GlowCluster& g = *candidates[i].cluster;
+        PunctualLight light;
+        light.name = fmt::format("{}{}", kEcologyLightPrefix, i);
+        // A point light, not a Sphere: a sphere emitter goes through the LTC area-light
+        // integration, and at a couple of hundred of them that dominated the frame. What a patch
+        // of glow needs is a soft falloff, which the radius already gives.
+        light.type = PunctualLight::Type::Point;
+        light.role = PunctualLight::Role::Practical;
+        light.position = candidates[i].position;
+        light.color = g.color;
+        // The aggregate's power is a sum of emissive weights, not photometric candela. The scale
+        // is the one free constant here: it sets how far a patch of glowing ecology throws light,
+        // and it is authored per scene rather than guessed once.
+        light.intensity = g.power * ecologyLightGain_;
+        light.radius = std::max(g.radius, 0.25f);
+        light.range = g.radius * 4.0f;
+        light.castsShadow = false;   // hundreds of these; none of them can afford a shadow map
+        light.contactShadow = false;
+        light.volumetricStrength = 0.0f; // the volumetrics see these through the glow field, not here
+        scene_.lights.push_back(std::move(light));
+    }
+    ecologyLightCount_ = candidates.size();
+}
+
 void Composition::updateTerrainLod() {
     // The frustum is built at a deliberately wide aspect. A composition does not know the viewport
     // it will be drawn into, and culling a chunk the frame turns out to include is a hole in the
@@ -2853,6 +2949,11 @@ nlohmann::json Composition::toJson() const {
     environment["skyIntensity"] = skyIntensitySetting_;
     environment["skybox"] = showSkyboxSetting_;
     environment["skyBloom"] = skyBloomSetting_;
+    if (ecologyLightGain_ > 0.0f) {
+        environment["ecologyLight"] = ecologyLightGain_;
+        environment["ecologyLightRange"] = ecologyLightRange_;
+        environment["ecologyGlowCell"] = ecologyGlowCell_;
+    }
     if (lightFromEnvironmentSetting_) {
         environment["lightFromEnvironment"] = true;
     }
@@ -2927,6 +3028,7 @@ nlohmann::json Composition::toJson() const {
             environment["volumeScattering"] = base(volumeScattering_, volumeSetting_.volumeScattering);
             environment["volumeAbsorption"] = base(volumeAbsorption_, volumeSetting_.volumeAbsorption);
             environment["volumeAnisotropy"] = base(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
+            environment["volumeLocalLights"] = volumeSetting_.volumeLocalLights;
             environment["volumeNoise"] = base(volumeNoise_, volumeSetting_.volumeNoiseAmount);
             environment["volumeNoiseScale"] = base(volumeNoiseScale_, volumeSetting_.volumeNoiseScale);
             environment["volumeNoiseSpeed"] = base(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
@@ -3180,7 +3282,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         for (const std::pair<const char*, float*> key :
              {std::pair<const char*, float*>{"rotation", &comp->envRotationSetting_},
               std::pair<const char*, float*>{"skyIntensity", &comp->skyIntensitySetting_},
-              std::pair<const char*, float*>{"skyBloom", &comp->skyBloomSetting_}}) {
+              std::pair<const char*, float*>{"skyBloom", &comp->skyBloomSetting_},
+              // ADR-053. Off unless a scene asks for it: turning a glowing ecology into hundreds
+              // of lights changes what every other scene costs, so it is opt-in.
+              std::pair<const char*, float*>{"ecologyLight", &comp->ecologyLightGain_},
+              std::pair<const char*, float*>{"ecologyLightRange", &comp->ecologyLightRange_},
+              std::pair<const char*, float*>{"ecologyGlowCell", &comp->ecologyGlowCell_}}) {
             auto value = readFloat(e, key.first, *key.second);
             if (!value) {
                 return std::unexpected(value.error());
@@ -3221,6 +3328,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       FloatKey{"volumeScattering", &v.volumeScattering},
                                       FloatKey{"volumeAbsorption", &v.volumeAbsorption},
                                       FloatKey{"volumeAnisotropy", &v.volumeAnisotropy},
+                                      FloatKey{"volumeLocalLights", &v.volumeLocalLights},
                                       FloatKey{"volumeNoise", &v.volumeNoiseAmount},
                                       FloatKey{"volumeNoiseScale", &v.volumeNoiseScale},
                                       FloatKey{"volumeNoiseSpeed", &v.volumeNoiseSpeed},

@@ -858,3 +858,67 @@ TEST_CASE("a water surface has no vertical faces in it", "[unit][water]") {
     // A river descending a valley tilts its surface a little; a wall jumps metres in one quad.
     CHECK(worstStep < spacing * 0.5f);
 }
+
+TEST_CASE("Glow aggregation reduces a scatter layer to bounded emitters", "[unit][world][ecology]") {
+    using namespace avgen;
+    world::ScatterLayer layer;
+    layer.name = "fungi";
+    layer.height = 0.4f;
+    layer.emissiveColor = glm::vec3(0.25f, 0.05f, 1.0f);
+    layer.emissiveIntensity = 12.0f;
+
+    // Two tight clumps 40 m apart, plus one straggler, all on a 10 m grid.
+    spatial::PointCloud cloud(7);
+    auto p = cloud.positions();
+    auto s = cloud.scales();
+    const glm::vec3 clumpA(2.0f, 0.0f, 2.0f);
+    const glm::vec3 clumpB(42.0f, 0.0f, 2.0f);
+    p[0] = clumpA; p[1] = clumpA + glm::vec3(0.5f, 0.0f, 0.0f); p[2] = clumpA + glm::vec3(0.0f, 0.0f, 0.5f);
+    p[3] = clumpB; p[4] = clumpB + glm::vec3(0.4f, 0.0f, 0.3f);
+    p[5] = clumpB + glm::vec3(0.2f, 0.0f, 0.1f); p[6] = glm::vec3(-38.0f, 0.0f, -22.0f);
+    for (std::size_t i = 0; i < s.size(); ++i) {
+        s[i] = glm::vec3(1.0f);
+    }
+
+    const auto clusters = world::aggregateGlow(cloud, layer, 10.0f);
+
+    SECTION("one emitter per occupied cell, not per instance") {
+        REQUIRE(clusters.size() == 3);
+    }
+
+    SECTION("power is the emitting area of the cell, so a clump outweighs a straggler") {
+        auto near = std::ranges::find_if(clusters, [&](const world::GlowCluster& g) {
+            return std::abs(g.position.x - clumpA.x) < 5.0f;
+        });
+        auto lone = std::ranges::find_if(clusters, [](const world::GlowCluster& g) {
+            return g.position.x < -30.0f;
+        });
+        REQUIRE(near != clusters.end());
+        REQUIRE(lone != clusters.end());
+        CHECK(near->power > lone->power * 2.5f);
+    }
+
+    SECTION("the emitter sits in the glowing organ, not at the root") {
+        CHECK(clusters.front().position.y > 0.0f);
+    }
+
+    SECTION("colour is normalised to unit peak so power carries the magnitude") {
+        const glm::vec3 c = clusters.front().color;
+        CHECK_THAT(std::max({c.x, c.y, c.z}), Catch::Matchers::WithinAbs(1.0, 1e-5));
+    }
+
+    SECTION("a layer that does not emit produces nothing to light with") {
+        world::ScatterLayer dark = layer;
+        dark.emissiveIntensity = 0.0f;
+        CHECK(world::aggregateGlow(cloud, dark, 10.0f).empty());
+    }
+
+    SECTION("the order does not depend on hash iteration, because callers take a prefix") {
+        const auto again = world::aggregateGlow(cloud, layer, 10.0f);
+        REQUIRE(again.size() == clusters.size());
+        for (std::size_t i = 0; i < again.size(); ++i) {
+            CHECK(again[i].position.x == clusters[i].position.x);
+            CHECK(again[i].position.z == clusters[i].position.z);
+        }
+    }
+}

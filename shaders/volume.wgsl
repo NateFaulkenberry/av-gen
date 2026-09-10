@@ -160,6 +160,79 @@ fn inScatterAt(p: vec3<f32>, direction: vec3<f32>, anisotropy: f32) -> vec3<f32>
     return total;
 }
 
+// ADR-053: the clustered local lights, so the air near a glowing thing takes its colour. The
+// march reads the same froxel list the surface shading reads (group 0 bindings 1 and 2 of the
+// shared frame layout); the structs are declared here rather than by including lighting.wgsl,
+// which would drag the shadow atlas, the LTC tables and the whole BRDF into a pass that needs
+// none of them.
+struct VolumeGpuLight {
+    positionType: vec4<f32>,
+    directionRange: vec4<f32>,
+    colorIntensity: vec4<f32>,
+    cone: vec4<f32>,
+    sizeSoft: vec4<f32>,
+    up: vec4<f32>,
+    tangent: vec4<f32>,
+    extra: vec4<f32>,
+};
+@group(0) @binding(1) var<storage, read> volumeLights: array<VolumeGpuLight>;
+@group(0) @binding(2) var<storage, read> volumeClusters: array<u32>;
+const VOLUME_MAX_PER_CLUSTER: u32 = 32u;
+// The march samples at most this many of a froxel's lights. Fog has no detail to resolve: what it
+// needs is the colour and rough strength of the light in the air, and taking every one of 32
+// candidates at every step of every half-res pixel cost more than the whole ecology light field
+// did on the surfaces it actually lit.
+const VOLUME_LIGHT_SAMPLES: u32 = 6u;
+
+fn volumeClusterIndex(screenUv: vec2<f32>, viewDepth: f32) -> u32 {
+    let dims = vec3<u32>(u32(frame.clusterParams.x), u32(frame.clusterParams.y), u32(frame.clusterParams.z));
+    let ix = min(u32(clamp(screenUv.x, 0.0, 0.9999) * f32(dims.x)), dims.x - 1u);
+    let iy = min(u32(clamp(1.0 - screenUv.y, 0.0, 0.9999) * f32(dims.y)), dims.y - 1u);
+    let depth = max(viewDepth, frame.clusterDepth.z);
+    let slice = i32(floor(log2(depth) * frame.clusterDepth.x + frame.clusterDepth.y));
+    let iz = u32(clamp(slice, 0, i32(dims.z) - 1));
+    return (iz * dims.y + iy) * dims.x + ix;
+}
+
+// The local lights of one froxel, in-scattered. Point-like only: an area emitter contributes
+// through its centre here, because the difference between a disk and a point is not visible in
+// fog and the LTC integration is not affordable per march step.
+fn localInScatterAt(p: vec3<f32>, screenUv: vec2<f32>, viewDepth: f32, direction: vec3<f32>,
+                    anisotropy: f32) -> vec3<f32> {
+    let gain = vol.glow.y;
+    if (frame.clusterParams.w <= 0.5 || gain <= 0.0) {
+        return vec3<f32>(0.0);
+    }
+    let directional = u32(frame.lightCounts.x + 0.5);
+    let totalLights = u32(frame.lightCounts.y + 0.5);
+    let cluster = volumeClusterIndex(screenUv, viewDepth);
+    let clusterCount = u32(frame.clusterParams.x * frame.clusterParams.y * frame.clusterParams.z);
+    let count = min(min(volumeClusters[cluster], VOLUME_MAX_PER_CLUSTER), VOLUME_LIGHT_SAMPLES);
+    let base = clusterCount + cluster * VOLUME_MAX_PER_CLUSTER;
+    var sum = vec3<f32>(0.0);
+    for (var i = 0u; i < count; i = i + 1u) {
+        let index = directional + volumeClusters[base + i];
+        if (index >= totalLights) { continue; }
+        let light = volumeLights[index];
+        let toLight = light.positionType.xyz - p;
+        let d2 = max(dot(toLight, toLight), 1e-4);
+        let range = light.directionRange.w;
+        if (range > 0.0 && d2 > range * range) { continue; }
+        let dist = sqrt(d2);
+        let towards = toLight / dist;
+        // Inverse square with the same smooth window the surface shading uses, so a light does
+        // not end at a hard edge in the fog where it faded out on the ground.
+        var attenuation = 1.0 / d2;
+        if (range > 0.0) {
+            let t = clamp(1.0 - (dist / range) * (dist / range) * (dist / range) * (dist / range), 0.0, 1.0);
+            attenuation = attenuation * t * t;
+        }
+        let phase = henyeyGreenstein(dot(direction, towards), anisotropy);
+        sum = sum + light.colorIntensity.rgb * (attenuation * phase);
+    }
+    return sum * gain;
+}
+
 // ADR-040: emissive particles light the dust around them. Each system is reduced on the GPU to
 // one sphere - the emission-weighted centroid of its alive particles, the standard deviation of
 // their positions, the mean colour and the total power - and the march treats it as a soft
@@ -210,6 +283,10 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
     let jitter = stepJitter(halfPx, u32(vol.info.w));
+    let screenUv = (vec2<f32>(fullPx) + vec2<f32>(0.5)) / vol.sizes.zw;
+    // Froxel depth is measured along the camera axis, not along this pixel's ray, or a sample at
+    // the edge of a wide frame lands a slice or two deep and reads the wrong light list.
+    let depthAlongRay = dot(direction, frame.cameraForward.xyz);
     let anisotropy = clamp(vol.params1.y, -0.95, 0.95);
     let colorSlot = i32(vol.info.z);
 
@@ -235,7 +312,8 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         }
         // The particle glow arrives as light to scatter, not as fog emission, so denser dust
         // catches more of it - which is what reads as "the sparks are lighting the dust".
-        let source = scattering * (inScatterAt(p, direction, anisotropy) + particleGlowAt(p)) + emission;
+        let local = localInScatterAt(p, screenUv, max(t * depthAlongRay, 1e-3), direction, anisotropy);
+        let source = scattering * (inScatterAt(p, direction, anisotropy) + particleGlowAt(p) + local) + emission;
         scattered = scattered + transmittance * source * stepLength;
         transmittance = transmittance * exp(-extinction * stepLength);
         if (transmittance < 0.002) {

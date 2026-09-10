@@ -72,7 +72,10 @@
    "sunSize": 0.7,
    "sunGlow": 0.35
   },
-  "shadowCascades": 2
+  "shadowCascades": 2,
+  "ecologyLight": 0.006,
+  "ecologyGlowCell": 9.0,
+  "volumeLocalLights": 1.0
  },
  "nodes": [
   {

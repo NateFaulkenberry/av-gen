@@ -302,6 +302,11 @@ struct Environment {
     float volumeScattering = 1.0f;         // in-scatter strength
     float volumeAbsorption = 0.5f;         // extinction multiplier
     float volumeAnisotropy = 0.3f;         // HG g in (-1, 1)
+    // ADR-053: how strongly the clustered local lights light the air. 0 skips them entirely --
+    // the march is half-resolution but still steps every pixel, so sampling a froxel's lights
+    // costs about as much again as the same lights cost on the surfaces they lit, and a scene
+    // with thin air gets nothing for it. Scenes with real fog around glowing things turn it up.
+    float volumeLocalLights = 0.0f;
     float volumeNoiseAmount = 0.0f;
     float volumeNoiseScale = 0.1f;
     float volumeNoiseSpeed = 0.1f;

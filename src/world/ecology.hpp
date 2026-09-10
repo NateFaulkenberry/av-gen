@@ -109,6 +109,28 @@ struct Ecology {
 // and the biomes. Geography is design data with no dependencies; a scatter layer names an asset,
 // and an asset path only means anything relative to the file that wrote it.
 
+// ---- the ecology light field (ADR-053) --------------------------------------------------------
+
+// What a patch of luminous ecology does to the air and the ground around it. A glowing layer can
+// place tens of thousands of instances and none of them can afford to be a light, so the
+// placements are binned into a coarse world grid and each occupied cell is reduced to one soft
+// emitter: the emission-weighted centroid of the instances in it, how far they spread, their
+// summed power. The count then follows the area the layer covers, not the number of things
+// growing on it.
+struct GlowCluster {
+    glm::vec3 position{0.0f};
+    float radius = 1.0f;   // spread of the contributing instances, never smaller than one of them
+    glm::vec3 color{1.0f}; // the layer's emissive colour, normalised
+    float power = 0.0f;    // summed emissive weight: intensity * per-instance area
+};
+
+// Bins `cloud` into cells of `cellSize` metres and reduces each to one GlowCluster. Returns
+// nothing when the layer does not emit. `lift` raises each emitter off the ground by that
+// fraction of the layer's height, so the light sits in the glowing organ rather than at the root.
+[[nodiscard]] std::vector<GlowCluster> aggregateGlow(const spatial::PointCloud& cloud,
+                                                     const ScatterLayer& layer, float cellSize,
+                                                     float lift = 0.5f);
+
 [[nodiscard]] Result<Ecology> ecologyFromJson(const nlohmann::json& j);
 [[nodiscard]] nlohmann::json ecologyToJson(const Ecology& ecology);
 

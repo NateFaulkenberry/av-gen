@@ -419,4 +419,70 @@ json ecologyToJson(const Ecology& ecology) {
     return out;
 }
 
+std::vector<GlowCluster> aggregateGlow(const spatial::PointCloud& cloud, const ScatterLayer& layer,
+                                       float cellSize, float lift) {
+    if (layer.emissiveIntensity <= 0.0f || cloud.count() == 0 || cellSize <= 0.0f) {
+        return {};
+    }
+    const glm::vec3 colour = glm::vec3(layer.emissiveColor);
+    const float peak = std::max({colour.x, colour.y, colour.z});
+    if (peak <= 0.0f) {
+        return {};
+    }
+
+    struct Bin {
+        glm::dvec3 weighted{0.0};  // sum of position * weight
+        glm::dvec3 sqWeighted{0.0};
+        double weight = 0.0;
+        std::uint32_t count = 0;
+    };
+    std::unordered_map<std::uint64_t, Bin> bins;
+    const auto positions = cloud.positions();
+    const auto scales = cloud.scales();
+    const float inv = 1.0f / cellSize;
+
+    for (std::size_t i = 0; i < positions.size(); ++i) {
+        const glm::vec3 p = positions[i];
+        // An instance's share of the patch is its emitting area, so a large specimen counts for
+        // more than a seedling instead of every placement counting once.
+        const float s = i < scales.size() ? std::max(scales[i].x, 1e-3f) : 1.0f;
+        const double w = static_cast<double>(s) * static_cast<double>(s);
+        const auto gx = static_cast<std::int64_t>(std::floor(p.x * inv));
+        const auto gz = static_cast<std::int64_t>(std::floor(p.z * inv));
+        const auto key = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(gx)) << 32) |
+                         static_cast<std::uint32_t>(gz);
+        Bin& b = bins[key];
+        b.weighted += glm::dvec3(p) * w;
+        b.sqWeighted += glm::dvec3(p) * glm::dvec3(p) * w;
+        b.weight += w;
+        ++b.count;
+    }
+
+    std::vector<GlowCluster> out;
+    out.reserve(bins.size());
+    for (const auto& [key, b] : bins) {
+        if (b.weight <= 0.0) {
+            continue;
+        }
+        const glm::dvec3 mean = b.weighted / b.weight;
+        // Standard deviation of the placements in the cell, so a tight clump reads as a small
+        // bright source and a scattered one as a broad dim wash.
+        const glm::dvec3 var = glm::max(b.sqWeighted / b.weight - mean * mean, glm::dvec3(0.0));
+        const auto spread = static_cast<float>(std::sqrt(var.x + var.z));
+        GlowCluster g;
+        g.position = glm::vec3(mean) + glm::vec3(0.0f, layer.height * lift, 0.0f);
+        g.radius = std::max(spread, layer.height * 0.5f);
+        g.color = colour / peak;
+        g.power = layer.emissiveIntensity * peak * static_cast<float>(b.weight);
+        out.push_back(g);
+    }
+    // A stable order: the bins come out of a hash map, and the per-frame selection that follows
+    // takes a prefix of this list, which must not depend on iteration order.
+    std::sort(out.begin(), out.end(), [](const GlowCluster& a, const GlowCluster& b) {
+        if (a.position.x != b.position.x) return a.position.x < b.position.x;
+        return a.position.z < b.position.z;
+    });
+    return out;
+}
+
 } // namespace avgen::world

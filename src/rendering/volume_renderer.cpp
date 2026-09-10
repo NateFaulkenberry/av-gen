@@ -345,7 +345,8 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     u.fogColor = glm::vec4(env.fogColor, 0.0f);
     // ADR-040: the march reads this many entries from the particle glow table.
     const std::uint32_t glowSystems = std::min(particleGlowSystems, kMaxParticleGlowSystems);
-    u.glow = glm::vec4(static_cast<float>(glowSystems), 0.0f, 0.0f, 0.0f);
+    u.glow = glm::vec4(static_cast<float>(glowSystems),
+                       std::max(scene.environment.volumeLocalLights, 0.0f), 0.0f, 0.0f);
     im.context.queue().WriteBuffer(im.uniforms, 0, &u, sizeof(u));
 
     im.activeThisFrame = true;

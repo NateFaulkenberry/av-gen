@@ -92,6 +92,9 @@ struct CompositionNode {
     SdfParameters sdfParams;
     SdfObject sdfRest;
     std::vector<world::TerrainChunk> chunks;  // Terrain: built at rebuild, indexed by entity offset
+    // Terrain: the emissive scatter layers reduced to soft emitters, built at rebuild. The
+    // per-frame pass picks the ones near the camera and makes them lights (ADR-053).
+    std::vector<world::GlowCluster> glow;
     params::Parameter<bool>* terrainLodParam = nullptr;   // Terrain: LOD selection on/off (debug)
     params::Parameter<bool>* terrainCullParam = nullptr;  // Terrain: frustum culling on/off (debug)
     params::Parameter<float>* terrainLodDistanceParam = nullptr;
@@ -205,6 +208,7 @@ private:
     // outside the frustum or beyond the view distance. Changes no geometry, only which mesh each
     // chunk entity points at, which is why a camera can fly across a world for free.
     void updateTerrainLod();
+    void updateEcologyLights();
     void registerNodeParameters(CompositionNode& node);
     void unregisterNodeParameters(CompositionNode& node);
     void unregisterParameters(); // removes every parameter this composition registered, then detach()
@@ -237,6 +241,11 @@ private:
     std::optional<LightRig> lightRig_;   // the authored rig (parameter defaults)
     LightRigParameters lightRigParams_;
     std::size_t rigLightCount_ = 0;      // lights the rig appended to scene_.lights last frame
+    std::size_t ecologyLightCount_ = 0;  // ecology lights appended to scene_.lights last frame
+    bool ecologyLightsEnabled_ = true;
+    float ecologyLightGain_ = 0.0f;      // 0 disables; scenes opt in (ADR-053)
+    float ecologyLightRange_ = 120.0f;   // metres from the camera a glowing patch still lights
+    float ecologyGlowCell_ = 9.0f;       // metres per aggregation cell
     // Authored camera/environment settings (used when unattached and as parameter defaults).
     std::optional<float> cameraDistanceSetting_; // empty = fitted to the bounds
     std::optional<float> cameraHeightSetting_;
