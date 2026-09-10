@@ -704,3 +704,47 @@ TEST_CASE("Depth layers desaturate distance without touching the foreground", "[
     CHECK(gpu::hashImage(*same) == gpu::hashImage(*plain));
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("Chroma retention keeps bright narrow-band light coloured", "[gpu][post][tonemap]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FrameTime time{};
+
+    // Saturation as the eye reads it: how far apart the brightest and dimmest channels sit.
+    // 0 is white, 1 is fully saturated. No channel of the source is exactly zero, because a
+    // hard zero survives every clamp and would score 1.0 whatever the curve did.
+    const auto saturationOf = [&](glm::vec3 colour, float retention) {
+        auto s = flatScene(colour);
+        s.post.tonemap = scene::TonemapOperator::AgX;
+        s.post.bloomEnabled = false;
+        s.post.chromaRetention = retention;
+        auto img = renderer.renderToImage(s, time, 16, 16);
+        REQUIRE(img.has_value());
+        const auto* px = img->pixel(8, 8);
+        const float mx = std::max({px[0], px[1], px[2]}) / 255.0f;
+        const float mn = std::min({px[0], px[1], px[2]}) / 255.0f;
+        return mx > 1e-3f ? (mx - mn) / mx : 0.0f;
+    };
+
+    const glm::vec3 cyan(0.04f, 0.85f, 1.0f);
+
+    SECTION("a filmic curve alone turns a bright emitter white") {
+        // The failure this feature exists to fix: at 25x scene white AgX has spent nearly all
+        // the chroma. If this ever stops holding, the guard below is no longer measuring anything.
+        REQUIRE(saturationOf(cyan * 25.0f, 0.0f) < 0.12f);
+    }
+
+    SECTION("retention holds the hue through the highlight") {
+        REQUIRE(saturationOf(cyan * 25.0f, 0.6f) > 0.3f);
+        REQUIRE(saturationOf(cyan * 50.0f, 0.6f) > 0.3f);
+    }
+
+    SECTION("the operator's own look stands below scene white") {
+        // The effect ramps in above scene white, so an ordinary exposure is untouched and
+        // enabling retention cannot restyle the rest of the image.
+        const float plain = saturationOf(cyan, 0.0f);
+        REQUIRE(saturationOf(cyan, 0.6f) == Catch::Approx(plain).margin(0.02f));
+    }
+}

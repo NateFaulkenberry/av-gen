@@ -7,7 +7,7 @@ struct TonemapUniforms {
     grain: f32,
     size: vec2<f32>,
     seed: f32,
-    pad: f32,
+    chromaRetention: f32,  // 0 = the operator's own highlight rolloff, 1 = hold the source hue
 };
 
 @group(0) @binding(0) var hdrTexture: texture_2d<f32>;
@@ -85,6 +85,22 @@ fn pbrNeutral(colorIn: vec3<f32>) -> vec3<f32> {
     return clamp(mix(color, vec3<f32>(newPeak), g), vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
+// Every per-channel curve drives all three channels to 1.0 together, so a bright narrow-band
+// colour turns white exactly where it is most visible -- the failure mode for a light that is
+// meant to read as cyan or violet. This restates the source ratio at the brightness the curve
+// chose: the pixel keeps the operator's exposure and the emitter's hue. In a curve's linear
+// region the two are identical, so the ramp below confines the effect to compressed highlights.
+fn retainChroma(hdr: vec3<f32>, mapped: vec3<f32>, amount: f32) -> vec3<f32> {
+    let peakHdr = max(hdr.r, max(hdr.g, hdr.b));
+    let peakMapped = max(mapped.r, max(mapped.g, mapped.b));
+    if (amount <= 0.0 || peakHdr < 1e-5 || peakMapped < 1e-5) {
+        return mapped;
+    }
+    let hue = hdr * (peakMapped / peakHdr);
+    let overWhite = smoothstep(0.8, 3.0, peakHdr); // below scene white the operator's look stands
+    return clamp(mix(mapped, hue, amount * overWhite), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
 fn linearToSrgb(c: vec3<f32>) -> vec3<f32> {
     let lo = c * 12.92;
     let hi = 1.055 * pow(c, vec3<f32>(1.0 / 2.4)) - 0.055;
@@ -114,6 +130,7 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     } else {
         mapped = acesFitted(hdr);
     }
+    mapped = retainChroma(hdr, mapped, tonemap.chromaRetention);
     if (tonemap.vignette > 0.0) {
         let d = length((in.uv - vec2<f32>(0.5)) * vec2<f32>(1.0, size.y / max(size.x, 1.0)) * 2.0);
         mapped *= 1.0 - tonemap.vignette * smoothstep(0.35, 1.25, d);

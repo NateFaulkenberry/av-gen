@@ -154,7 +154,7 @@ struct TonemapUniforms {
     float grain;
     float size[2];
     float seed;
-    float pad;
+    float chromaRetention;
 };
 static_assert(sizeof(TonemapUniforms) == 32);
 

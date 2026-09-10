@@ -1628,6 +1628,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     tonemap.size[0] = static_cast<float>(hdr_.width());
     tonemap.size[1] = static_cast<float>(hdr_.height());
     tonemap.seed = static_cast<float>(time.frameIndex % 1024);
+    tonemap.chromaRetention = scene.post.chromaRetention;
     queue.WriteBuffer(tonemapUniforms_, 0, &tonemap, sizeof(tonemap));
 
     stats_.drawCalls = 0;

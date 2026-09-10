@@ -104,6 +104,8 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     }
     p.vignette = &params.add(f("post/output/vignette", s.vignette, 0.0f, 1.0f, 0.0f, 1.0f));
     p.grain = &params.add(f("post/output/grain", s.grain, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.chromaRetention =
+        &params.add(f("post/tonemap/chroma-retention", s.chromaRetention, 0.0f, 1.0f, 0.0f, 1.0f));
     return p;
 }
 
@@ -149,6 +151,7 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
     s.tonemap = static_cast<TonemapOperator>(std::clamp(p.tonemap->value(), 0, 4));
     s.vignette = p.vignette->value();
     s.grain = p.grain->value();
+    s.chromaRetention = p.chromaRetention->value();
 }
 
 } // namespace avgen::scene

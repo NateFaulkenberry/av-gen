@@ -56,3 +56,5 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [048](ADR-048-ecology.md) | Ecology: what grows where, decided by the biome weights the ground is coloured with | Accepted |
 | [049](ADR-049-hdri-sky.md) | The HDRI sky: the map as the background, sky and lighting intensity split, the key light aimed from the image | Accepted |
 | [050](ADR-050-material-interpreter-cost.md) | What the material interpreter was actually spending: the register file and the field evaluator in the loop | Accepted |
+| [051](ADR-051-measuring-a-frame.md) | Measuring a frame, and one shared indirect buffer | Accepted |
+| [052](ADR-052-highlight-chroma.md) | Holding hue in compressed highlights: chroma retention after the tone curve | Accepted |

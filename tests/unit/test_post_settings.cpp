@@ -11,7 +11,7 @@ TEST_CASE("Post settings register as parameters and apply finals", "[scene][post
     defaults.bloomIntensity = 0.7f;
     auto p = scene::registerPostParameters(params, defaults);
     REQUIRE(p.bloomIntensity != nullptr);
-    CHECK(params.size() == 38);
+    CHECK(params.size() == 39);
     CHECK(params.find("post/tonemap/operator")->kind() == params::ParamKind::Int);
     CHECK(params.find("post/halation/tint")->componentCount() == 3);
     CHECK(params.find("post/output/sharpen") != nullptr);
@@ -35,5 +35,5 @@ TEST_CASE("Post settings register as parameters and apply finals", "[scene][post
     // Re-registering returns the same parameters.
     auto again = scene::registerPostParameters(params, defaults);
     CHECK(again.bloomIntensity == p.bloomIntensity);
-    CHECK(params.size() == 38);
+    CHECK(params.size() == 39);
 }

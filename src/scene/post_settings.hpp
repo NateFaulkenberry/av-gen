@@ -96,6 +96,9 @@ struct PostSettings {
     TonemapOperator tonemap = TonemapOperator::AgX; // ADR-039: AgX is the default operator
     float vignette = 0.0f;         // 0..1
     float grain = 0.0f;            // 0..1
+    float chromaRetention = 0.0f;  // 0..1 how much hue to hold in compressed highlights, so a
+                                   // bright narrow-band light stays coloured instead of going
+                                   // white. 0 leaves the operator's own rolloff untouched.
 };
 
 struct PostParameters {
@@ -137,6 +140,7 @@ struct PostParameters {
     params::Parameter<int>* tonemap = nullptr;
     params::Parameter<float>* vignette = nullptr;
     params::Parameter<float>* grain = nullptr;
+    params::Parameter<float>* chromaRetention = nullptr;
 };
 
 PostParameters registerPostParameters(params::ParameterSet& params, const PostSettings& defaults);
