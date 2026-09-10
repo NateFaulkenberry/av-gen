@@ -1311,6 +1311,21 @@ const gpu::GpuTexture& SceneRenderer::textureOrDefault(const scene::TextureRef& 
     return fallback;
 }
 
+// True when any part of the world-space box is inside the frustum. The usual conservative test:
+// take the corner furthest along each plane's normal, and reject only when even that is behind
+// the plane. `world::aabbVisible` is the same construction, but rendering does not depend on
+// world/ and should not start here.
+bool aabbInsideFrustum(const FrustumPlanes& planes, const glm::vec3& min, const glm::vec3& max) {
+    for (const glm::vec4& plane : planes) {
+        const glm::vec3 far(plane.x >= 0.0f ? max.x : min.x, plane.y >= 0.0f ? max.y : min.y,
+                            plane.z >= 0.0f ? max.z : min.z);
+        if (glm::dot(glm::vec3(plane), far) + plane.w < 0.0f) {
+            return false;
+        }
+    }
+    return true;
+}
+
 const wgpu::BindGroup& SceneRenderer::materialBindGroup(const scene::Material& material) {
     // The program slot is part of the key: the same textures with a different program need their
     // own group (it binds a different 16-byte region of the select buffer).
@@ -1714,6 +1729,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         } else if (v + 1 == shadowViews) {
             pass.timestampWrites = shadowTimer_->endWrites();
         }
+        // Cull each caster against this cascade (P4). Without it every shadow-casting entity is
+        // drawn into every view: a world of 256 terrain chunks submits them all, twice, whatever
+        // the light can actually see, and the cost stays whether or not the camera is looking at
+        // any of it. The cascade's own frustum is the right test -- not the camera's, because a
+        // caster behind the camera still throws a shadow into shot.
+        const auto& shadowViewList = shadows_->views();
+        const FrustumPlanes cascadePlanes = v < shadowViewList.size()
+                                                ? frustumPlanes(shadowViewList[v].viewProj)
+                                                : FrustumPlanes{};
+        const bool cullCascade = v < shadowViewList.size();
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetBindGroup(0, shadowFrameGroups_[v]);
         rp.SetBindGroup(3, iblBindGroup_);
@@ -1721,6 +1746,22 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         for (const auto& item : opaque) {
             if (!item.entity->castsShadow) {
                 continue;
+            }
+            if (cullCascade) {
+                const auto& [lo, hi] = scene.meshBounds(item.entity->mesh);
+                const glm::mat4 model = item.entity->transform.matrix();
+                glm::vec3 wlo(std::numeric_limits<float>::max());
+                glm::vec3 whi(std::numeric_limits<float>::lowest());
+                for (int c = 0; c < 8; ++c) {
+                    const glm::vec3 corner((c & 1) ? hi.x : lo.x, (c & 2) ? hi.y : lo.y, (c & 4) ? hi.z : lo.z);
+                    const glm::vec3 w = glm::vec3(model * glm::vec4(corner, 1.0f));
+                    wlo = glm::min(wlo, w);
+                    whi = glm::max(whi, w);
+                }
+                if (!aabbInsideFrustum(cascadePlanes, wlo, whi)) {
+                    ++stats_.shadows.entitiesCulled;
+                    continue;
+                }
             }
             const GpuMesh& mesh = meshes_[item.entity->mesh];
             rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
