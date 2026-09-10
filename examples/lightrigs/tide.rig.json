@@ -1,34 +1,51 @@
 {
  "format": "avgen-lightrig",
  "version": 1,
- "name": "TideAbove",
- "description": "One source, high and slightly behind, so light comes down through the gaps between the sheets and the volumetrics turn it into shafts. Everything else is the water.",
- "keyIntensity": 3.2,
- "ambientIntensity": 0.1,
+ "name": "TideMouth",
+ "description": "A warm source beyond the barrel's far mouth and a cold fill from the surface above. Cold body, warm opening: the frame has two colours instead of one.",
+ "keyIntensity": 2.4,
+ "ambientIntensity": 0.06,
  "ambientColor": [
   0.05,
-  0.22,
+  0.24,
   0.3
  ],
- "ambientTemperature": 8000,
+ "ambientTemperature": 8200,
  "lights": [
+  {
+   "name": "mouth",
+   "type": "directional",
+   "role": "key",
+   "azimuth": 180.0,
+   "elevation": 6.0,
+   "intensity": 1.0,
+   "color": [
+    1.0,
+    0.74,
+    0.42
+   ],
+   "temperature": 4200,
+   "castsShadow": true,
+   "shadowStrength": 0.75,
+   "softness": 1.0,
+   "volumetric": 0.45,
+   "followCamera": false
+  },
   {
    "name": "surface",
    "type": "directional",
-   "role": "key",
-   "azimuth": 150.0,
-   "elevation": 30.0,
-   "intensity": 1.0,
+   "role": "fill",
+   "azimuth": 30.0,
+   "elevation": 72.0,
+   "intensity": 0.22,
    "color": [
-    0.62,
-    0.95,
+    0.42,
+    0.86,
     1.0
    ],
-   "temperature": 7200,
-   "castsShadow": true,
-   "shadowStrength": 0.9,
-   "softness": 1.0,
-   "volumetric": 0.55,
+   "temperature": 8600,
+   "castsShadow": false,
+   "volumetric": 0.35,
    "followCamera": false
   }
  ]
