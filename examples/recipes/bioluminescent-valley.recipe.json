@@ -1,0 +1,42 @@
+{
+ "world": "bioluminescent_valley",
+ "description": "A cinematic alien rainforest at night. Dense at the viewer's feet, dissolving into silhouettes and haze; lit almost entirely by its own flora, with a low moon only to give form an edge. A third of it is deliberately empty.",
+ "seed": 20260910,
+ "extent": 420.0,
+ "assetLibrary": "../../assets/manifest.json",
+ "composition": {
+  "foreground": 0.9,
+  "midground": 0.8,
+  "background": 0.6,
+  "negative_space": 0.32,
+  "focalStrength": 0.85
+ },
+ "ecology": {
+  "flora": 0.9,
+  "fungi": 0.7,
+  "rock": 0.35,
+  "crystals": 0.15,
+  "creatures": 0.25,
+  "structure": 0.0
+ },
+ "atmosphere": {
+  "fog": 0.4,
+  "spores": 0.5,
+  "floating_elements": 0.25,
+  "depthHaze": 0.7
+ },
+ "lighting": {
+  "moon": 0.35,
+  "bioluminescence": 1.0,
+  "volumetric": 0.55,
+  "bounce": 0.15
+ },
+ "art": {
+  "name": "bioluminescent_cinematic",
+  "palette": ["deep_indigo", "violet", "cyan", "emerald", "warm_amber"],
+  "contrast": 1.12,
+  "saturation": 1.06,
+  "organicMotion": 0.85,
+  "chaos": 0.18
+ }
+}
