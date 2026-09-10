@@ -38,7 +38,7 @@
   "fogDensity": 0.0022,
   "fogHeight": 26.0,
   "fogHeightFalloff": 0.045,
-  "volumeDensity": 0.0055,
+  "volumeDensity": 0.013,
   "volumeScattering": 0.7,
   "volumeAnisotropy": 0.12,
   "volumeNoiseAmount": 0.45,
