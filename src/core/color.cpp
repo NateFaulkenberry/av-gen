@@ -258,4 +258,11 @@ glm::vec3 Ramp::sample(float t, float offset) const {
     return last.color; // unreachable for ascending stops
 }
 
+float livingChromaTurns(const glm::vec3& p, float t, float amount, float invScale, float speed) {
+    const float a = std::sin(p.x * invScale + t * speed);
+    const float b = std::sin(p.z * invScale * 0.83f - t * speed * 0.71f);
+    const float c = std::sin((p.x + p.z) * invScale * 0.37f + t * speed * 0.43f);
+    return amount * (0.5f * a + 0.35f * b + 0.15f * c);
+}
+
 } // namespace avgen::color

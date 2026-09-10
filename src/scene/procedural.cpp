@@ -2104,6 +2104,9 @@ std::uint64_t ProceduralGeometry::structuralHash() const {
     h.f32(materialVariation.emissiveSparsity);
     h.f32(materialVariation.hueField);
     h.f32(materialVariation.hueFieldScale);
+    h.f32(materialVariation.chromaDrift);
+    h.f32(materialVariation.chromaDriftScale);
+    h.f32(materialVariation.chromaDriftSpeed);
     h.u32(materialVariation.perceptualHue ? 1u : 0u);
     h.f32(materialVariation.emissiveGradient);
     h.u64(pointOps.size());
@@ -2437,6 +2440,9 @@ json ProceduralGeometry::toJson() const {
         s["emissiveSparsity"] = materialVariation.emissiveSparsity;
         s["hueField"] = materialVariation.hueField;
         s["hueFieldScale"] = materialVariation.hueFieldScale;
+        s["chromaDrift"] = materialVariation.chromaDrift;
+        s["chromaDriftScale"] = materialVariation.chromaDriftScale;
+        s["chromaDriftSpeed"] = materialVariation.chromaDriftSpeed;
         s["perceptualHue"] = materialVariation.perceptualHue;
         s["emissiveGradient"] = materialVariation.emissiveGradient;
         j["materialVariation"] = std::move(s);
@@ -2678,6 +2684,9 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(v.emissiveSparsity, "emissiveSparsity", readFloat);
         AVGEN_PROC_READ(v.hueField, "hueField", readFloat);
         AVGEN_PROC_READ(v.hueFieldScale, "hueFieldScale", readFloat);
+        AVGEN_PROC_READ(v.chromaDrift, "chromaDrift", readFloat);
+        AVGEN_PROC_READ(v.chromaDriftScale, "chromaDriftScale", readFloat);
+        AVGEN_PROC_READ(v.chromaDriftSpeed, "chromaDriftSpeed", readFloat);
         AVGEN_PROC_READ(v.perceptualHue, "perceptualHue", readBool);
         AVGEN_PROC_READ(v.emissiveGradient, "emissiveGradient", readFloat);
     }

@@ -43,6 +43,7 @@
 #include "fields.wgsl"
 #include "spline.wgsl"
 #include "wind.wgsl"
+#include "chroma.wgsl"
 
 struct InstanceRecord {
     position: vec4<f32>,  // xyz, w = density
@@ -74,6 +75,8 @@ struct ProceduralUniforms {
     windSway: vec4<f32>,
     windTiming: vec4<f32>,
     windPlant: vec4<f32>,
+    // ADR-057: x = hue swing in turns (0 = off), y = 1/metres, z = radians per second, w = 0.
+    chroma: vec4<f32>,
     // Step 1 of the chain: the source mesh's own placement, applied to the vertex before any
     // deformer runs. Mirrors ProceduralGeometry::instanceMatrix()'s trailing sourceTransform.
     sourceMatrix: mat4x4<f32>,
@@ -365,7 +368,17 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     var out: ProcVertexOut;
     out.uv = in.uv;
     out.instColor = inst.color;
-    out.instEmissive = inst.emissive;
+    // ADR-057: the hue drifts where this specimen stands, sampled once per vertex at the root so
+    // it is constant across the instance and interpolates exactly.
+    var instEmissive = inst.emissive;
+    if (proc.chroma.x > 0.0) {
+        let chromaRoot = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
+        let turns = livingChromaTurns(chromaRoot, proc.timeInfo.x, proc.chroma.x, proc.chroma.y,
+                                      proc.chroma.z);
+        instEmissive = vec4<f32>(
+            livingChromaMultiplier(object.emissive.rgb, instEmissive.rgb, turns), instEmissive.w);
+    }
+    out.instEmissive = instEmissive;
     out.localPos = in.position;
     out.instRandom = inst.random;
     out.instIndex = inst.scale.w;

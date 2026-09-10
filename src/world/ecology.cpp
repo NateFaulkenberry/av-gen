@@ -139,6 +139,9 @@ std::uint64_t ScatterLayer::structuralHash() const {
     h.f32(hueFieldScale);
     h.f32(hueRandom);
     h.f32(emissiveRandom);
+    h.f32(chromaDrift);
+    h.f32(chromaDriftScale);
+    h.f32(chromaDriftSpeed);
     h.f32(emissiveSparsity);
     h.str(materialProgram);
     h.boolean(avoidWater);
@@ -339,6 +342,9 @@ Result<Ecology> ecologyFromJson(const json& j) {
                                Field{"hueFieldScale", &l.hueFieldScale},
                                Field{"hueRandom", &l.hueRandom},
                                Field{"emissiveRandom", &l.emissiveRandom},
+                               Field{"chromaDrift", &l.chromaDrift},
+                               Field{"chromaDriftScale", &l.chromaDriftScale},
+                               Field{"chromaDriftSpeed", &l.chromaDriftSpeed},
                                Field{"emissiveSparsity", &l.emissiveSparsity}}) {
             auto v = readFloat(e, f.key, *f.target);
             if (!v) {
@@ -443,6 +449,9 @@ json ecologyToJson(const Ecology& ecology) {
                            {"hueFieldScale", l.hueFieldScale},
                            {"hueRandom", l.hueRandom},
                            {"emissiveRandom", l.emissiveRandom},
+                           {"chromaDrift", l.chromaDrift},
+                           {"chromaDriftScale", l.chromaDriftScale},
+                           {"chromaDriftSpeed", l.chromaDriftSpeed},
                            {"emissiveSparsity", l.emissiveSparsity},
                            {"materialProgram", l.materialProgram},
                            {"seed", l.seed},

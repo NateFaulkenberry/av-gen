@@ -316,7 +316,10 @@
        "budget": 80,
        "enabled": true
       }
-     }
+     },
+     "chromaDrift": 0.06,
+     "chromaDriftScale": 50.0,
+     "chromaDriftSpeed": 0.035
     },
     {
      "name": "ferns",
@@ -370,7 +373,10 @@
        "budget": 140,
        "enabled": true
       }
-     }
+     },
+     "chromaDrift": 0.05,
+     "chromaDriftScale": 60.0,
+     "chromaDriftSpeed": 0.035
     },
     {
      "name": "grass",
@@ -425,7 +431,10 @@
        "budget": 200,
        "enabled": true
       }
-     }
+     },
+     "chromaDrift": 0.05,
+     "chromaDriftScale": 55.0,
+     "chromaDriftSpeed": 0.04
     },
     {
      "name": "flowers",
@@ -477,7 +486,10 @@
        "budget": 100,
        "enabled": true
       }
-     }
+     },
+     "chromaDrift": 0.07,
+     "chromaDriftScale": 42.0,
+     "chromaDriftSpeed": 0.045
     },
     {
      "name": "fungi",
@@ -524,7 +536,10 @@
       "gustResponse": 0.35,
       "bendCurve": 2.6,
       "amplitudeVariance": 0.25
-     }
+     },
+     "chromaDrift": 0.07,
+     "chromaDriftScale": 38.0,
+     "chromaDriftSpeed": 0.05
     },
     {
      "name": "shelf-fungi",
@@ -570,7 +585,10 @@
       "gustResponse": 0.25,
       "bendCurve": 2.8,
       "amplitudeVariance": 0.2
-     }
+     },
+     "chromaDrift": 0.06,
+     "chromaDriftScale": 45.0,
+     "chromaDriftSpeed": 0.04
     },
     {
      "name": "boulders",
@@ -676,7 +694,10 @@
       "gustResponse": 0.6,
       "bendCurve": 2.2,
       "amplitudeVariance": 0.3
-     }
+     },
+     "chromaDrift": 0.05,
+     "chromaDriftScale": 80.0,
+     "chromaDriftSpeed": 0.025
     }
    ]
   },

@@ -354,6 +354,12 @@ struct MaterialVariation {
     // changes lightness and chroma with the angle, which on a saturated emitter reads as the
     // brightness flickering rather than the colour turning.
     bool perceptualHue = false;
+    // ADR-057: the living chromatic field. The hue offsets above are baked once when the cloud is
+    // projected, so they cannot move; this drifts the emissive hue in world space and time, in the
+    // shader. 0 turns it off.
+    float chromaDrift = 0.0f;       // hue swing, turns
+    float chromaDriftScale = 55.0f; // metres between opposite phases
+    float chromaDriftSpeed = 0.05f; // Hz
     // What fraction of instances do not light up at all, 0..1. Random *variation* is symmetric --
     // it makes every specimen a bit brighter or dimmer than the mean -- so it cannot say "most of
     // this forest is dark and a few trees are lanterns", which is the difference between a wood

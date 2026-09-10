@@ -1480,6 +1480,14 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             u.windPlant = glm::vec4(windBaseY, 1.0f / windExtent, windExtent, r.amplitudeVariance);
             ++stats_.windObjects;
         }
+        // ADR-057: the living chromatic field. Wavelength is pre-inverted and the drift rate turned
+        // into radians per second here, so the vertex stage spends no divides.
+        const auto& mv = object.materialVariation;
+        u.chroma = glm::vec4(0.0f);
+        if (mv.chromaDrift > 0.0f && mv.chromaDriftScale > 1e-3f) {
+            u.chroma = glm::vec4(mv.chromaDrift, wind::kTau / mv.chromaDriftScale,
+                                 wind::kTau * mv.chromaDriftSpeed, 0.0f);
+        }
         // Velocity needs the same chain evaluated at the previous frame's time (ADR-035); prevInfo.y
         // switches the Tier 1 lookup on, and is uniform across the draw.
         u.prevInfo = glm::vec4(static_cast<float>(time.renderTime - time.deltaTime),

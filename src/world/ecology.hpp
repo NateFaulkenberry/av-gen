@@ -68,6 +68,11 @@ struct ScatterLayer {
     float hueFieldScale = 40.0f;
     float hueRandom = 0.0f;
     float emissiveRandom = 0.0f;
+    // ADR-057: the hue drifts in world space and time rather than being fixed when the cloud is
+    // projected. 0 leaves the colour where `hueField` put it.
+    float chromaDrift = 0.0f;
+    float chromaDriftScale = 55.0f;
+    float chromaDriftSpeed = 0.05f;
     float emissiveSparsity = 0.0f;  // fraction of specimens that stay dark
     // Names a material program (ADR-030) for this layer. Emission is otherwise constant over a
     // mesh, which lights a tree evenly from root to crown; a program can put the glow in patches

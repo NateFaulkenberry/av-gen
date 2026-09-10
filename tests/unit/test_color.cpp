@@ -285,3 +285,65 @@ TEST_CASE("Ramp: stops, clamping, cyclic wrap, offset", "[color]") {
     checkVec(single.sample(0.0f), {0.2f, 0.4f, 0.6f});
     checkVec(single.sample(1.0f), {0.2f, 0.4f, 0.6f});
 }
+
+TEST_CASE("The living chromatic field drifts without ever leaving its bounds", "[color][chroma]") {
+    // The CPU reference for shaders/chroma.wgsl. What the scene depends on is that the swing is
+    // bounded by the amount authored (so a hue cannot wander off its palette), that it actually
+    // moves in time (the whole point -- the static field this replaces could not), and that two
+    // patches far apart are not in phase (or a valley changes colour in lockstep, which is the
+    // tell this brief exists to avoid).
+    const float amount = 0.08f;
+    const float invScale = 6.2831853f / 55.0f;
+    const float speed = 6.2831853f * 0.04f;
+
+    SECTION("bounded by the amount authored") {
+        float lo = 1.0f;
+        float hi = -1.0f;
+        for (int i = 0; i < 4000; ++i) {
+            const float x = static_cast<float>(i % 200) * 1.7f - 170.0f;
+            const float z = static_cast<float>(i / 200) * 3.1f - 30.0f;
+            const float t = static_cast<float>(i) * 0.05f;
+            const float v = color::livingChromaTurns(glm::vec3(x, 0.0f, z), t, amount, invScale, speed);
+            lo = std::min(lo, v);
+            hi = std::max(hi, v);
+        }
+        CHECK(lo >= -amount);
+        CHECK(hi <= amount);
+        CHECK(lo < -amount * 0.5f); // and it actually uses the range
+        CHECK(hi > amount * 0.5f);
+    }
+
+    SECTION("deterministic: the same point and time give the same answer") {
+        const glm::vec3 p(13.0f, 0.0f, -7.0f);
+        CHECK(color::livingChromaTurns(p, 4.25f, amount, invScale, speed) ==
+              color::livingChromaTurns(p, 4.25f, amount, invScale, speed));
+    }
+
+    SECTION("it moves in time, which the field it replaces could not") {
+        const glm::vec3 p(13.0f, 0.0f, -7.0f);
+        double travel = 0.0;
+        for (int i = 1; i <= 400; ++i) {
+            travel += std::abs(color::livingChromaTurns(p, static_cast<float>(i) * 0.25f, amount, invScale, speed) -
+                               color::livingChromaTurns(p, static_cast<float>(i - 1) * 0.25f, amount, invScale, speed));
+        }
+        CHECK(travel > amount); // over 100 s it sweeps well past its own amplitude
+    }
+
+    SECTION("neighbours agree and distant patches do not") {
+        const glm::vec3 a(0.0f, 0.0f, 0.0f);
+        const float here = color::livingChromaTurns(a, 3.0f, amount, invScale, speed);
+        const float near = color::livingChromaTurns(a + glm::vec3(1.5f, 0.0f, 0.0f), 3.0f, amount, invScale, speed);
+        CHECK(std::abs(near - here) < amount * 0.25f);
+        double spread = 0.0;
+        for (int i = 0; i < 24; ++i) {
+            const float far = color::livingChromaTurns(glm::vec3(static_cast<float>(i) * 41.0f, 0.0f, 0.0f), 3.0f,
+                                                       amount, invScale, speed);
+            spread = std::max<double>(spread, std::abs(far - here));
+        }
+        CHECK(spread > amount * 0.6f);
+    }
+
+    SECTION("zero amount is exactly no drift") {
+        CHECK(color::livingChromaTurns(glm::vec3(5.0f, 0.0f, 9.0f), 2.0f, 0.0f, invScale, speed) == 0.0f);
+    }
+}

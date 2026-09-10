@@ -32,6 +32,21 @@ namespace avgen::color {
 [[nodiscard]] glm::vec3 contrast(const glm::vec3& rgb, float factor, float pivot = 0.5f);
 [[nodiscard]] glm::vec3 mixOklab(const glm::vec3& a, const glm::vec3& b, float t); // perceptual mix
 
+// ---- the living chromatic field (ADR-057) ------------------------------------------------------
+
+// How far a point's hue has drifted, in turns, at a world position and a time. The CPU reference
+// for `livingChromaTurns` in shaders/chroma.wgsl, which is a transliteration of it: three
+// incommensurate travelling plane waves, weights summing to one so the result is bounded by
+// `amount`. `invScale` is radians per metre and `speed` radians per second, pre-divided the way
+// the uniform carries them.
+//
+// It is a sum of travelling waves rather than noise for the same reason the wind field is: a
+// single `valueNoise` is about 480 scalar operations, which is the wrong tool for a smooth
+// low-frequency swell, and because every term travels, two patches a hundred metres apart are
+// never in phase.
+[[nodiscard]] float livingChromaTurns(const glm::vec3& p, float t, float amount, float invScale,
+                                      float speed);
+
 // Cosine palette (Quilez): a + b * cos(2π (c t + d)).
 struct CosinePalette {
     glm::vec3 a{0.5f}, b{0.5f}, c{1.0f}, d{0.0f, 0.33f, 0.67f};

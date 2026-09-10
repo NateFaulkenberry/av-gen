@@ -185,6 +185,9 @@ struct ProceduralUniforms {
                              // w = bend limit (fraction of the plant's height)
     glm::vec4 windPlant;     // x = base y (post-source object space), y = 1 / extent y, z = extent y,
                              // w = per-instance amplitude variance
+    // ADR-057: the living chromatic field. x = hue swing in turns (0 disables the whole path and
+    // is uniform across a draw, so a rock pays nothing), y = 1/metres, z = radians per second.
+    glm::vec4 chroma;
     // Step 1 of the transform chain (procedural.hpp): the source mesh's own placement, applied
     // before the deformer stack so it matches ProceduralGeometry::instanceMatrix() on the CPU.
     // It lives in the uniform rather than baked into the mesh because source/position|rotation|scale
@@ -193,7 +196,7 @@ struct ProceduralUniforms {
     glm::mat4 sourceNormalMatrix; // inverse transpose of sourceMatrix
     DeformerUniform deformers[scene::kMaxDeformers];
 };
-static_assert(sizeof(ProceduralUniforms) == 48 + 48 + 128 + 64 * scene::kMaxDeformers);
+static_assert(sizeof(ProceduralUniforms) == 48 + 64 + 128 + 64 * scene::kMaxDeformers);
 
 // The effector pass parameters (shaders/points.wgsl `PointsParams`, 528 bytes).
 struct EffectorPassUniforms {

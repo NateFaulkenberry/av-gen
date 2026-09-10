@@ -1981,6 +1981,9 @@ void Composition::rebuild() {
                 pg.materialVariation.hueShift = layer.hueRandom;
                 pg.materialVariation.emissiveRandom = layer.emissiveRandom;
                 pg.materialVariation.emissiveSparsity = layer.emissiveSparsity;
+                pg.materialVariation.chromaDrift = layer.chromaDrift;
+                pg.materialVariation.chromaDriftScale = layer.chromaDriftScale;
+                pg.materialVariation.chromaDriftSpeed = layer.chromaDriftSpeed;
                 if (!layer.materialProgram.empty()) {
                     // Registered programs carry the composition's prefix (see the copy into
                     // scene_.materialPrograms), so a raw name from the scene file silently matches

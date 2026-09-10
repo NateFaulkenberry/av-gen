@@ -62,3 +62,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [054](ADR-054-colour-that-clusters.md) | Colour that clusters in space, and glow that is rare | Accepted |
 | [055](ADR-055-the-wind-field.md) | A wind field, and vegetation that answers it for nothing | Accepted |
 | [056](ADR-056-simulated-plants.md) | Plants that are actually simulated, for the few hundred worth simulating | Accepted |
+| [057](ADR-057-the-living-chromatic-field.md) | The living chromatic field: hue that drifts in world space and time | Accepted |
