@@ -33,6 +33,22 @@ way on the world scene at 2880x1800 (baseline 52.6 ms):
 | volumetrics | 47.7 | 5.4 ms |
 | airborne spores | 52.3 | 0.3 ms |
 
+### Correction (2026-09-10): the ecology *is* the cost
+
+An earlier revision of this document said that removing the ecology changed nothing, and used
+that to argue the frame was spent on terrain and submission. That measurement was a silent
+no-op: `scatter` is a list on the terrain node, not an object with a `layers` key, so the edit
+deleted nothing and both arms of the A/B rendered the same scene.
+
+Redone at 1440x900 with edits that apply, against a sky-only calibration of 7.5 ms: baseline
+36.3 ms, ecology removed 12.6 ms. **The ecology is 23.7 ms, about two thirds of the frame.**
+Per layer, each interleaved against a fresh baseline: bushes 10.0 ms, ferns 3.9, fungi 1.3,
+grass 1.1, pebbles within noise.
+
+The lesson is not about JSON. It is that an A/B whose two arms are identical reports "no
+effect" in exactly the same voice as a real null result. Print something from inside the edit
+-- an instance count, a layer list -- and check it changed.
+
 ### Where the non-GPU time goes
 
 With the camera turned to face empty sky at 1280x720, the world scene reports `gpu=12-14 ms`
