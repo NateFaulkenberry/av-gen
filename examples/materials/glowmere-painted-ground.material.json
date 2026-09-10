@@ -1,12 +1,45 @@
 {
- "name":"paintedGround",
- "ops":[
-  {"kind":"input","dst":0,"input":"uv"},
-  {"kind":"ramp","dst":1,"srcA":0,
-   "constant":[0.05,0.15,0.18,1.0],
-   "constant2":[0.11,0.22,0.25,1.0],
-   "constant3":[0.21,0.25,0.36,1.0]},
-  {"kind":"constant","dst":4,"constant":[0.95,0.95,0.95,1.0]}
+ "name": "paintedGround",
+ "ops": [
+  {
+   "kind": "input",
+   "dst": 0,
+   "input": "uv"
+  },
+  {
+   "kind": "ramp",
+   "dst": 1,
+   "srcA": 0,
+   "constant": [
+    0.021,
+    0.063,
+    0.0756,
+    1.0
+   ],
+   "constant2": [
+    0.0462,
+    0.0924,
+    0.105,
+    1.0
+   ],
+   "constant3": [
+    0.0882,
+    0.105,
+    0.1512,
+    1.0
+   ]
+  },
+  {
+   "kind": "constant",
+   "dst": 4,
+   "constant": [
+    0.95,
+    0.95,
+    0.95,
+    1.0
+   ]
+  }
  ],
- "baseColor":1,"roughness":4
+ "baseColor": 1,
+ "roughness": 4
 }

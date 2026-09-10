@@ -176,9 +176,13 @@ macOS H.264 export works without ffmpeg. Do not call the full suite green or hid
     band moved 10.664% -> 10.639%, which is nothing: the metric is swamped by parallax and
     vegetation motion and cannot see the alpha edge. Crawl needs an AA answer (no MSAA, no TAA),
     not a cutoff fix. Do not claim it fixed.
-- [ ] Give the hero a less regular silhouette and authored detail hierarchy. Improve cap/stem
+- [~] Give the hero a less regular silhouette and authored detail hierarchy. Improve cap/stem
   junction, gill rhythm and close-up readability without replacing one cheap primitive with
   uncontrolled tessellation or full-scene expensive noise. Verify close-pass clearance and cost.
+  - Silhouette: done earlier with two displacement deformers on crown and stem.
+  - Cap/stem junction and gill rhythm: STILL OPEN, and neither is a deformer's job. At frame 600
+    the stem still meets the cap as a plain cylinder against a disc with no flare, and the gills
+    are perfectly periodic. Both need geometry.
 - [ ] Replace repetitive forest silhouettes and sparse hillside composition with deliberate
   ecological groups and foreground/midground/background separation. Density is not sufficient
   evidence of richness; inspect actual screen coverage and preserve habitat rules.
@@ -204,9 +208,29 @@ macOS H.264 export works without ffmpeg. Do not call the full suite green or hid
   - Frame 1200, before -> after: shadow_frac 0.0000 -> 0.2099, mid_frac 0.9990 -> 0.7890,
     p01 0.1231 -> 0.0581, mean_saturation 0.578 -> 0.645, near->far gradient 0.070 -> 0.074.
     GPU median 20.8 -> 21.5 ms at 1280x800 realtime, ecology light field included.
-  - Still open here: the mid-ground hillside is a pale uniform wash (terrain albedo), the glow
-    pools read blue-white and spotlight-ish rather than coloured, and `highlight_frac` is 0.0011
-    with p99 0.395 -- the bioluminescence still is not the brightest thing in its own valley.
+  - Second pass, three findings:
+    1. Darkening the world by 1.3 stops turned the bloom off for most emitters -- exposure is
+       applied before bloom, so a threshold of 1.0 needed 2.46x more radiance than before.
+       Emissive that stands for real light now carries the reciprocal (x2.46), which holds its
+       absolute value across the exposure change while the lit world stays 2.46x darker.
+    2. The canopy and pine "firefly" emissive is a shading trick, not a light, and scaling it
+       with the rest bleached every tree crown to cream. It is held at its old value instead,
+       and recoloured to warm amber (1.0, 0.82, 0.45) so it reads as fireflies rather than
+       frost, which is what it was asked for. Frame 1200 saturation 0.617 -> 0.687.
+    3. The terrain's colour is NOT reachable from `material.baseColor`. `paintedGround` writes
+       `baseColor` from a `ramp` op, so the node's authored colour is dead data -- scaling it by
+       0.5 and by 0.3 produced byte-identical frames, which is how it was caught. The pale wash
+       lives in the material's three ramp constants; they are now x0.42. Worth knowing before
+       anyone else tries to colour a terrain that has a program on it.
+  - Also: the moon was near-white (0.74, 0.84, 1.0) and bleached what it lit; it is now
+    (0.42, 0.62, 1.0) in Glowmere's own rig.
+  - Whole shot, committed baseline -> now: shadow_frac 0.0000/0.0000/0.0000 ->
+    0.287/0.356/0.239 at frames 120/600/1200; mid_frac 0.994/0.981/0.999 -> 0.711/0.642/0.759;
+    p01 0.118/0.116/0.123 -> 0.054/0.048/0.055; mean_saturation ~0.58 -> ~0.72.
+  - Still open here: the glow pools keep white cores where a cluster light is strong; and frame
+    600's p99 fell 0.665 -> 0.504, because the hero's brightness used to come from moonlight on
+    its cap rather than from its own emission. Whether that is a loss or the point is an art
+    call that wants the user's eye.
 - [ ] Review sustained motion for shimmer, LOD popping, exposure changes and vegetation motion.
   Check target output resolution and intended preview modes; successful encoding is not enough.
 - [ ] Audition real audio/live input, silence and transients. Verify the bounded routes feel

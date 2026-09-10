@@ -179,8 +179,8 @@
      "castsShadow": true,
      "emissiveColor": [
       1.0,
-      1.0,
-      1.0
+      0.82,
+      0.45
      ],
      "emissiveIntensity": 0.035,
      "emissiveRandom": 0.55,
@@ -229,8 +229,8 @@
      "castsShadow": true,
      "emissiveColor": [
       1.0,
-      1.0,
-      1.0
+      0.82,
+      0.45
      ],
      "emissiveIntensity": 0.035,
      "emissiveRandom": 0.55,
@@ -321,7 +321,7 @@
       0.14,
       1.0
      ],
-     "emissiveIntensity": 0.12,
+     "emissiveIntensity": 0.2952,
      "emissiveRandom": 0.6,
      "hueField": 0.1,
      "hueFieldScale": 40.0,
@@ -383,7 +383,7 @@
       1.0,
       0.58
      ],
-     "emissiveIntensity": 0.025,
+     "emissiveIntensity": 0.0615,
      "viewDistance": 170.0,
      "minScreenRadius": 1.5,
      "castsShadow": false,
@@ -444,7 +444,7 @@
       1.0,
       0.55
      ],
-     "emissiveIntensity": 0.025,
+     "emissiveIntensity": 0.0615,
      "emissiveRandom": 0.7,
      "hueField": 0.08,
      "hueFieldScale": 50.0,
@@ -508,7 +508,7 @@
       0.45,
       0.5
      ],
-     "emissiveIntensity": 0.025,
+     "emissiveIntensity": 0.0615,
      "hueField": 0.045,
      "hueFieldScale": 50.0,
      "hueRandom": 0.02,
@@ -548,7 +548,7 @@
       0.1208,
       1.0
      ],
-     "emissiveIntensity": 1.6,
+     "emissiveIntensity": 3.936,
      "viewDistance": 150.0,
      "minScreenRadius": 5.5,
      "castsShadow": false,
@@ -611,7 +611,7 @@
       0.0821,
       1.0
      ],
-     "emissiveIntensity": 2.8,
+     "emissiveIntensity": 6.888,
      "materialProgram": "glowmereTissue",
      "viewDistance": 160.0,
      "minScreenRadius": 5.5,
@@ -661,7 +661,7 @@
       1.0,
       0.62
      ],
-     "emissiveIntensity": 1.8,
+     "emissiveIntensity": 4.428,
      "materialProgram": "glowmereTissue",
      "viewDistance": 180.0,
      "minScreenRadius": 5.5,
@@ -778,7 +778,7 @@
       0.82,
       1.0
      ],
-     "emissiveIntensity": 2.5,
+     "emissiveIntensity": 6.15,
      "materialProgram": "glowmereTissue",
      "viewDistance": 420.0,
      "minScreenRadius": 1.0,
