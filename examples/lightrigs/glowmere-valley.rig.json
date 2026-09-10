@@ -1,0 +1,70 @@
+{
+ "format": "avgen-lightrig",
+ "version": 1,
+ "name": "GlowmereValley",
+ "keyIntensity": 4.5,
+ "ambientIntensity": 0.6,
+ "ambientColor": [
+  0.38,
+  0.5,
+  0.64
+ ],
+ "ambientTemperature": 8200,
+ "lights": [
+  {
+   "name": "moon",
+   "type": "directional",
+   "role": "key",
+   "azimuth": 64.0,
+   "elevation": 22.0,
+   "intensity": 1.0,
+   "color": [
+    0.74,
+    0.84,
+    1.0
+   ],
+   "temperature": 7800,
+   "castsShadow": true,
+   "shadowStrength": 0.85,
+   "softness": 1.0,
+   "volumetric": 0.12,
+   "followCamera": false
+  },
+  {
+   "name": "skyfill",
+   "type": "directional",
+   "role": "fill",
+   "azimuth": -108.0,
+   "elevation": 34.0,
+   "intensity": 0.35,
+   "color": [
+    0.38,
+    0.58,
+    0.8
+   ],
+   "temperature": 9500,
+   "castsShadow": false,
+   "volumetric": 0.0,
+   "followCamera": false
+  },
+  {
+   "name": "elder-practical",
+   "type": "point",
+   "role": "practical",
+   "azimuth": 0.0,
+   "elevation": -90.0,
+   "distance": 0.2,
+   "intensity": 3.0,
+   "color": [
+    0.12,
+    0.75,
+    0.42
+   ],
+   "temperature": 6500,
+   "castsShadow": false,
+   "volumetric": 0.04,
+   "followCamera": false
+  }
+ ],
+ "description": "The valley's moon. The key is high against a deliberately low ambient (ADR-058): the landscape's form comes from the moon raking across it, and what fills the shadows is the ecology's own light rather than a flat sky term."
+}

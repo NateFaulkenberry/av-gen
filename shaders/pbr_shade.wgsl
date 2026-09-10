@@ -115,14 +115,71 @@ fn materialGeometry(worldPos: vec3<f32>, n: vec3<f32>) -> vec4<f32> {
     return vec4<f32>(curvature, cavity, variance, footprint);
 }
 
+// How fast an alpha-masked material's cutoff falls as its texture is minified, per mip level.
+// 0.22 halves the cutoff over about three levels, which is roughly where a Quaternius leaf card
+// starts losing coverage; it is a constant rather than a knob because preserving what the artist
+// authored is not a matter of taste, and a scene that wanted the erosion could only want it by
+// accident.
+const kAlphaCoverageFade: f32 = 0.22;
+
+// How far down its mip chain a 2D texture is being read, from the UV derivatives -- the quantity
+// the sampler computes for itself and WGSL offers no way to ask it for. Uniform control flow only.
+fn textureLodFor(uv: vec2<f32>, size: vec2<f32>) -> f32 {
+    let dx = dpdx(uv) * size;
+    let dy = dpdy(uv) * size;
+    return max(0.5 * log2(max(dot(dx, dx), dot(dy, dy))), 0.0);
+}
+
+// How much air sits below height `y`, measured relative to the mist layer's top and in metres of
+// the layer's full density: the antiderivative of exp(-b * max(0, y)), zeroed at y = 0. It is
+// linear inside the layer and saturates at 1/b above it, and it is C1 across the join, so a ray
+// crossing the fog bank's surface has no seam where the two halves meet.
+fn fogHeightIntegral(y: f32, b: f32) -> f32 {
+    if (y <= 0.0) {
+        return y;
+    }
+    return (1.0 - exp(-b * y)) / b;
+}
+
 // Exponential-squared distance fog towards frame.fogParams.rgb; density 0 leaves the colour
 // untouched (the branch keeps the no-fog output bit-identical to the pre-fog shader).
+//
+// ADR-058: when frame.fogHeight.z is non-zero the geometric distance is first replaced by the
+// distance *through the mist*, integrating the same flat-topped layer the volumetric marches along
+// the view ray. Both endpoints inside the layer integrate to the ray's own length, so a scene that
+// keeps everything below the fog bank is unchanged to the last bit; what moves is the ridge line
+// and the canopy crowns standing out of it, which are now seen through the air that is actually
+// between them and the eye rather than through a uniform slab.
 fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
     let density = frame.fogParams.w;
     if (density <= 0.0) {
         return color;
     }
-    let d = distance(frame.cameraPos.xyz, worldPos) * density;
+    var travel = distance(frame.cameraPos.xyz, worldPos);
+    let amount = frame.fogHeight.z;
+    let falloff = frame.fogHeight.y;
+    if (amount > 0.0 && falloff > 0.0) {
+        let y0 = frame.cameraPos.y - frame.fogHeight.x;
+        let y1 = worldPos.y - frame.fogHeight.x;
+        let rise = y1 - y0;
+        // The mean of the layer's density along the ray. The difference quotient is the whole
+        // integral because the ray climbs at a constant rate: metres of mist per metre travelled.
+        var mean = 1.0;
+        if (max(y0, y1) > 0.0) {
+            // Both endpoints below the layer's top puts the whole segment below it, so the mean is
+            // exactly one and this branch is skipped -- which is what keeps a scene that sits
+            // inside its own fog bank bit-identical when the integration is switched on. Leaving
+            // it to the quotient would give 1.0 only to within rounding, because the numerator and
+            // the denominator are the same subtraction written twice and the compiler is free to
+            // fuse one of them and not the other.
+            mean = exp(-falloff * max(y0, 0.0)); // a level ray never leaves its own altitude
+            if (abs(rise) > 1e-3) {
+                mean = (fogHeightIntegral(y1, falloff) - fogHeightIntegral(y0, falloff)) / rise;
+            }
+        }
+        travel = travel * mix(1.0, mean, amount);
+    }
+    let d = travel * density;
     let f = exp(-d * d);
     return mix(frame.fogParams.rgb, color, f);
 }
@@ -223,6 +280,18 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     if ((programIndex >= 0 || hasNormal) && frame.lightCounts.z < 0.5) {
         tangentFrame = cotangentFrame(n, worldPos, uv);
     }
+    // A leaf card's alpha is a coverage mask, and every mip level averages it towards its own mean,
+    // so a fixed cutoff eats a little more of the leaf at each level: a crown that is solid up close
+    // erodes with distance into a handful of specks that crawl as the camera moves. Scaling the
+    // cutoff down as the texture is minified holds roughly the coverage that was authored. Castano
+    // (2010) computes the exact per-level scale offline from each mip's alpha histogram; this is the
+    // one-line approximation of it, and the derivatives are the same two the block below takes.
+    // Hoisted here because it takes them, and the guard is uniform: both terms are per-draw.
+    var alphaCutoff = object.flags.y;
+    if (object.flags.x > 0.5 && object.flags.x < 1.5 && hasBaseColor) {
+        let lod = textureLodFor(uv, vec2<f32>(textureDimensions(baseColorTex, 0)));
+        alphaCutoff = alphaCutoff * exp2(-lod * kAlphaCoverageFade);
+    }
     if (programIndex >= 0) {
         geometry = materialGeometry(worldPos, n);
         occlusion = sampleAmbientOcclusion(screenUv, viewDepth, n);
@@ -276,7 +345,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         }
     }
     let alphaMode = object.flags.x;
-    if (alphaMode > 0.5 && alphaMode < 1.5 && baseColor.a < object.flags.y) {
+    if (alphaMode > 0.5 && alphaMode < 1.5 && baseColor.a < alphaCutoff) {
         discard;
     }
     let alpha = select(1.0, baseColor.a, alphaMode > 1.5);
@@ -314,14 +383,15 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         if (!sampledOcclusion) {
             occlusion = sampleAmbientOcclusion(screenUv, viewDepth, n);
         }
-        // The styled path's ambient is the dominant light on a night landscape, so screen-space
-        // AO applied to it at full depth writes its own sampling noise straight into the largest
-        // term in the image -- visible as a faint lattice on open ground, and absent from the PBR
-        // control where ambient is one contributor among several. Half the depth keeps the contact
-        // darkening that gives the painterly look its weight, without printing the AO's noise.
-        let visibility = mix(0.68, 1.0, clamp(occlusion.visibility * programOcclusion, 0.0, 1.0));
-        let hemisphere = mix(vec3<f32>(0.12, 0.10, 0.22), vec3<f32>(0.38, 0.56, 0.65),
-                             n.y * 0.5 + 0.5);
+        // The styled path's ambient carries most of a night landscape, so screen-space AO applied
+        // to it at full depth writes its own sampling noise straight into the largest term in the
+        // image -- visible as a faint lattice on open ground, and absent from the PBR control where
+        // ambient is one contributor among several. frame.styledSky.w is the floor that keeps the
+        // contact darkening without printing the noise; a scene that wants deeper contact should
+        // reach for the ground ambient below, which is smooth, rather than for this.
+        let visibility = mix(frame.styledSky.w, 1.0,
+                             clamp(occlusion.visibility * programOcclusion, 0.0, 1.0));
+        let hemisphere = mix(frame.styledGround.rgb, frame.styledSky.rgb, n.y * 0.5 + 0.5);
         let ambient = baseColor.rgb * hemisphere * visibility;
         let edge = pow(1.0 - context.nDotV, 4.0) * smoothstep(-0.2, 0.7, n.y);
         let rim = baseColor.rgb * vec3<f32>(0.25, 0.45, 0.5) * edge * 0.16;

@@ -2884,6 +2884,12 @@ void Composition::applyParameters() {
             volumeColorFieldSetting_.empty() ? std::string() : sanitise(prefix_) + volumeColorFieldSetting_;
         // ADR-055. A live `scene/windSpeed` parameter so the whole field can be turned up, down or
         // off without editing the file -- which is also how the A/B measurement is taken.
+        // ADR-058: the distance fog's share of the mist layer and the styled hemisphere travel with
+        // the rest of the atmosphere; nothing about them is animated, so they are copied, not picked.
+        env.fogHeightAmount = volumeSetting_.fogHeightAmount;
+        env.styledSkyAmbient = volumeSetting_.styledSkyAmbient;
+        env.styledGroundAmbient = volumeSetting_.styledGroundAmbient;
+        env.styledAmbientFloor = volumeSetting_.styledAmbientFloor;
         env.wind = windSetting_;
         env.wind.speed = windSpeed_ != nullptr ? windSpeed_->value() : windSetting_.speed;
         env.wind.direction = windDirection_ != nullptr ? windDirection_->value() : windSetting_.direction;
@@ -3333,6 +3339,24 @@ nlohmann::json Composition::toJson() const {
         environment["fogColor"] = {fc.r, fc.g, fc.b};
         const glm::vec3 bg = scene_.environment.backgroundColor;
         environment["background"] = {bg.r, bg.g, bg.b};
+        // ADR-058: written only when moved, so a scene that never mentioned them round-trips
+        // byte for byte.
+        const scene::Environment envDefaults;
+        const auto& v = volumeSetting_;
+        const auto colourEq3 = [](const glm::vec3& a, const glm::vec3& b) { return a == b; };
+        if (v.fogHeightAmount != envDefaults.fogHeightAmount) {
+            environment["fogHeightAmount"] = v.fogHeightAmount;
+        }
+        if (!colourEq3(v.styledSkyAmbient, envDefaults.styledSkyAmbient)) {
+            environment["styledSkyAmbient"] = {v.styledSkyAmbient.r, v.styledSkyAmbient.g, v.styledSkyAmbient.b};
+        }
+        if (!colourEq3(v.styledGroundAmbient, envDefaults.styledGroundAmbient)) {
+            environment["styledGroundAmbient"] = {v.styledGroundAmbient.r, v.styledGroundAmbient.g,
+                                                  v.styledGroundAmbient.b};
+        }
+        if (v.styledAmbientFloor != envDefaults.styledAmbientFloor) {
+            environment["styledAmbientFloor"] = v.styledAmbientFloor;
+        }
     }
     {
         // Volumetric atmosphere (ADR-032); written only when it is on, so existing files are
@@ -3657,6 +3681,24 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return false;
         };
         comp->fogColorSet_ = readColour("fogColor", comp->fogColorSetting_);
+        // ADR-058: the surface fog's share of the mist layer, and the styled hemisphere. All four
+        // default to what the shader used to hard-code, so an existing scene is unchanged.
+        {
+            auto value = readFloat(e, "fogHeightAmount", comp->volumeSetting_.fogHeightAmount);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.fogHeightAmount = *value;
+        }
+        readColour("styledSkyAmbient", comp->volumeSetting_.styledSkyAmbient);
+        readColour("styledGroundAmbient", comp->volumeSetting_.styledGroundAmbient);
+        {
+            auto value = readFloat(e, "styledAmbientFloor", comp->volumeSetting_.styledAmbientFloor);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.styledAmbientFloor = *value;
+        }
         {
             scene::Environment& v = comp->volumeSetting_;
             struct FloatKey {

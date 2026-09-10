@@ -27,6 +27,10 @@ struct FrameUniforms {
                                // the background instead of the flat colour; ADR-049: z = the
                                // visible sky's intensity, w = how much of it the bloom mask sees
     fogParams: vec4<f32>,      // rgb = fog colour, w = fog density (0 = off; exp2 fog by view distance)
+    fogHeight: vec4<f32>,      // ADR-058: x = mist layer top (m), y = falloff per metre above it,
+                               // z = how much of that layer the surface fog integrates, w = 0
+    styledSky: vec4<f32>,      // ADR-058: rgb = styled ambient towards +Y, w = the AO floor
+    styledGround: vec4<f32>,   // ADR-058: rgb = styled ambient towards -Y, w = 0
     audio: vec4<f32>,          // ADR-030 material inputs: rms, bass, mid, treble
     audioBands: vec4<f32>,     // lowMid, highMid, spectral centroid, flux
     beat: vec4<f32>,           // beat phase 0..1, pulse (1 - phase), onset strength, bar phase

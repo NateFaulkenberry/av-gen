@@ -17,7 +17,7 @@
   "fov": 40.0,
   "orbitSpeed": 0.0
  },
- "lightRig": "../lightrigs/glowmere.rig.json",
+ "lightRig": "../lightrigs/glowmere-valley.rig.json",
  "composition": {
   "focalPoints": [
    {
@@ -44,14 +44,24 @@
    0.0192
   ],
   "fogColor": [
-   0.045,
-   0.085,
-   0.18
+   0.1,
+   0.18,
+   0.32
   ],
-  "fogDensity": 0.0036,
-  "fogHeight": 26.0,
-  "fogHeightFalloff": 0.045,
-  "volumeDensity": 0.011,
+  "fogDensity": 0.0055,
+  "fogHeight": 4.0,
+  "fogHeightFalloff": 0.1,
+  "styledSkyAmbient": [
+   0.1,
+   0.16,
+   0.21
+  ],
+  "styledGroundAmbient": [
+   0.008,
+   0.011,
+   0.024
+  ],
+  "volumeDensity": 0.006,
   "volumeScattering": 0.5,
   "volumeAnisotropy": 0.12,
   "volumeNoiseAmount": 0.45,
@@ -88,9 +98,10 @@
    "sunGlow": 0.08
   },
   "shadowCascades": 2,
-  "ecologyLight": 0.0,
+  "ecologyLight": 1.4,
   "ecologyGlowCell": 9.0,
-  "volumeLocalLights": 1.0
+  "volumeLocalLights": 1.0,
+  "fogHeightAmount": 1.0
  },
  "nodes": [
   {

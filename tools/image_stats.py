@@ -57,8 +57,14 @@ def read_png(path):
     return w, h, channels, out
 
 
-def stats(path):
+def stats(path, rows=None):
     w, h, ch, px = read_png(path)
+    # An optional row band, given as fractions of the height. Atmospheric perspective is a
+    # difference between bands -- the near ground against the far ridge -- and a whole-frame
+    # histogram averages exactly that difference away, so the bands have to be measurable apart.
+    y0, y1 = (0, h) if rows is None else (int(rows[0] * h), max(int(rows[1] * h), int(rows[0] * h) + 1))
+    px = px[y0 * w * ch:y1 * w * ch]
+    h = y1 - y0
     n = w * h
     lum = [0.0] * n
     sat_sum = 0.0
@@ -92,8 +98,11 @@ def stats(path):
 
 
 if __name__ == '__main__':
-    for path in sys.argv[1:]:
-        s = stats(path)
-        print(s.pop('file'))
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    band = next((a for a in sys.argv[1:] if a.startswith('--rows=')), None)
+    rows = tuple(float(v) for v in band.split('=', 1)[1].split(':')) if band else None
+    for path in args:
+        s = stats(path, rows)
+        print(s.pop('file') + ('' if rows is None else f'  rows {rows[0]:.2f}:{rows[1]:.2f}'))
         for k, v in s.items():
             print(f'  {k:18s} {v:.4f}')

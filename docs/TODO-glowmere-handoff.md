@@ -162,9 +162,20 @@ macOS H.264 export works without ffmpeg. Do not call the full suite green or hid
 - [ ] Review the full current movie and live camera journey; create a timestamped defect list
   and final-revision captures at opening, close pass, vista and ending. Success: evidence covers
   the whole shot, not just the first favorable frame.
-- [ ] Resolve remaining terrain patterns and noisy foliage edges. Isolate geometry/depth,
+- [~] Resolve remaining terrain patterns and noisy foliage edges. Isolate geometry/depth,
   material, lighting and sampling causes with a minimal reproducer. Add a targeted regression
   for the confirmed cause; check PBR and styled paths, then inspect moving footage.
+  - Terrain pattern: SOLVED earlier (styled AO applied to ambient at half depth).
+  - Foliage *erosion*: SOLVED. The Quaternius foliage is `alphaMode: MASK` at cutoff 0.20, and
+    a fixed cutoff eats more of the leaf at every mip level, so distant crowns dissolve. The
+    cutoff now falls with the sampled mip level (`kAlphaCoverageFade`, shaders/pbr_shade.wgsl).
+    Measured against a 2x supersampled render of the same frame, treeline band mean luminance:
+    reference 0.11781, coverage fade on 0.11774 (error 0.00007), fade off 0.11712 (0.00068).
+    Ten times closer to the truth. Changes 2.18% of pixels, none above the horizon.
+  - Foliage *edge crawl* under motion: STILL OPEN. A frame-to-frame flip count in the treeline
+    band moved 10.664% -> 10.639%, which is nothing: the metric is swamped by parallax and
+    vegetation motion and cannot see the alpha edge. Crawl needs an AA answer (no MSAA, no TAA),
+    not a cutoff fix. Do not claim it fixed.
 - [ ] Give the hero a less regular silhouette and authored detail hierarchy. Improve cap/stem
   junction, gill rhythm and close-up readability without replacing one cheap primitive with
   uncontrolled tessellation or full-scene expensive noise. Verify close-pass clearance and cost.
@@ -173,9 +184,29 @@ macOS H.264 export works without ffmpeg. Do not call the full suite green or hid
   evidence of richness; inspect actual screen coverage and preserve habitat rules.
 - [ ] Strengthen the ending's visual destination and progression. If changing camera tracks,
   update comparison projects together and rerun the complete shot-contract test.
-- [ ] Tune atmospheric perspective, shadow/fill balance and selective glow across the shot.
+- [~] Tune atmospheric perspective, shadow/fill balance and selective glow across the shot.
   Avoid turning every plant emissive or flattening depth with fog. Decide whether the sky disk
   should enter the composition; changing the shared rig also affects the prior-look comparison.
+  - The scene was measurably flat, not subjectively so. Frames 120/600/1200 all had
+    `shadow_frac = 0.0000` and `mid_frac` 0.98-0.999: no pixel anywhere in the shot fell below
+    8% luminance. Cropping near ground against far ridge gave 0.296 vs 0.226 -- seven hundredths
+    between a fern at the viewer's feet and a treeline four hundred metres away.
+  - Three causes, all structural: the styled hemisphere ambient was a shader constant that
+    outgunned the key by about 2.5x on flat ground (raising the rig key 9x moved mean 0.237 ->
+    0.462, so the key was wired correctly and simply losing); the surface fog ignored the mist
+    layer the volumetric marches; and `fogColor` sat at the same luminance as the ground, so
+    mixing towards it could neither lift nor deepen the distance. See ADR-058.
+  - Fixed by making the hemisphere authorable (defaults bit-identical: 0 of 2,304,000 pixels
+    differ), integrating the mist layer analytically in `applyFog`, giving Glowmere its own rig
+    (`glowmere-valley.rig.json`, key 4.5) so the shared terrain scene is untouched, lifting the
+    fog colour, and turning on ADR-053's ecology light field so the world's own glow fills the
+    shadows a lower ambient leaves.
+  - Frame 1200, before -> after: shadow_frac 0.0000 -> 0.2099, mid_frac 0.9990 -> 0.7890,
+    p01 0.1231 -> 0.0581, mean_saturation 0.578 -> 0.645, near->far gradient 0.070 -> 0.074.
+    GPU median 20.8 -> 21.5 ms at 1280x800 realtime, ecology light field included.
+  - Still open here: the mid-ground hillside is a pale uniform wash (terrain albedo), the glow
+    pools read blue-white and spotlight-ish rather than coloured, and `highlight_frac` is 0.0011
+    with p99 0.395 -- the bioluminescence still is not the brightest thing in its own valley.
 - [ ] Review sustained motion for shimmer, LOD popping, exposure changes and vegetation motion.
   Check target output resolution and intended preview modes; successful encoding is not enough.
 - [ ] Audition real audio/live input, silence and transients. Verify the bounded routes feel
@@ -189,9 +220,20 @@ macOS H.264 export works without ffmpeg. Do not call the full suite green or hid
 - [ ] Profile expensive views across all 90 seconds, including sustained thermal runs. Report
   warmed frame median/p90/tail, GPU passes, meaningful CPU latency, draws, submitted work if
   available, visible/logical instances, shadow/particle costs and clearly labeled memory metrics.
-- [ ] Investigate the dominant scene pass first: it is about 23.5 ms of 26.4 ms GPU time in the
+- [~] Investigate the dominant scene pass first: it is about 23.5 ms of 26.4 ms GPU time in the
   current styled sample. Use measured material/overdraw/geometry attribution before choosing
   the next optimization. Do not assume the approximately 0.9 ms shadow pass is the main blocker.
+  - The frame is roughly two thirds fixed and one third fill. `glowmere-stylized.json`, realtime
+    tier, gpu frame median: 1440x900 21.43 ms, 1920x1200 25.69 ms, 2880x1800 42.27 ms. Fitting
+    `t = a + b*Mpx` gives a = 14.5 ms resolution-independent and b = 5.4 ms per megapixel.
+  - That is the whole of the reported "sub 20 fps at standard app size": at 2880x1800 the frame
+    is 42.3 ms (23.6 FPS) and 28 ms of it is fill. Resolution scaling is the largest untried
+    lever for that complaint, and it is a P1 decision, not an art one.
+  - Three-arm benchmark, 300 frames, 1440x900, realtime, three interleaved rounds, quiet machine,
+    gpu frame median: skyonly 4.06/4.00/4.06, terrain 37.81/37.81/37.62,
+    glowmere-stylized-pbr 20.84/20.64/20.71, glowmere-stylized 20.84/20.97. Reproducible to
+    +/-0.2 ms across rounds. The styled path costs the same as its PBR control, so the painterly
+    look is free; `terrain.json` is 1.8x the product scene and is not the thing to optimise.
 - [ ] Keep the current-look control and synchronized new-scene PBR control. The latter differs
   in surface policy AND sky overlays; isolate those separately for a strict shader-only claim.
   Compare identical cameras, simulation inputs, sizes and quality settings without concurrent work.

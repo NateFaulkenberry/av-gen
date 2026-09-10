@@ -135,6 +135,10 @@ struct FrameUniforms {
                               // the background; ADR-049: z = sky (background) intensity,
                               // w = how much of the sky reaches the bloom mask
     glm::vec4 fogParams;      // rgb = fog colour, w = density (0 = off)
+    glm::vec4 fogHeight;      // ADR-058: x = layer top (m), y = falloff per metre above it,
+                              // z = how much of that layer the surface fog sees, w = 0
+    glm::vec4 styledSky;      // ADR-058: rgb = styled ambient towards +Y, w = the AO floor
+    glm::vec4 styledGround;   // ADR-058: rgb = styled ambient towards -Y, w = 0
     glm::vec4 audio;          // ADR-030 material inputs: rms, bass, mid, treble
     glm::vec4 audioBands;     // lowMid, highMid, spectral centroid, flux
     glm::vec4 beat;           // beat phase 0..1, pulse (1 - phase), onset strength, bar phase
@@ -149,7 +153,7 @@ struct FrameUniforms {
     wind::WindUniforms wind;
     LightUniform lights[kMaxLights];
 };
-static_assert(sizeof(FrameUniforms) == 192 + 288 + 64 + 512);
+static_assert(sizeof(FrameUniforms) == 192 + 336 + 64 + 512);
 
 struct ObjectUniforms {
     glm::mat4 model;

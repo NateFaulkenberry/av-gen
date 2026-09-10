@@ -1545,6 +1545,17 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                std::max(scene.environment.skyIntensity, 0.0f),
                                std::clamp(scene.environment.skyBloom, 0.0f, 1.0f));
     frame.fogParams = glm::vec4(scene.environment.fogColor, std::max(scene.environment.fogDensity, 0.0f));
+    // ADR-058: the surface fog borrows the volumetric's mist layer rather than declaring one of
+    // its own, so the air a ray is drawn through and the air it is marched through are the same
+    // air. Amount 0 (the default) leaves applyFog on its uniform-distance branch.
+    frame.fogHeight = glm::vec4(scene.environment.fogHeight,
+                                std::max(scene.environment.fogHeightFalloff, 0.0f),
+                                std::clamp(scene.environment.fogHeightAmount, 0.0f, 1.0f), 0.0f);
+    // ADR-058: the styled hemisphere, authorable because a scene that is lit mostly by its ambient
+    // needs to say how dark the side facing away from the sky is allowed to get.
+    frame.styledSky = glm::vec4(scene.environment.styledSkyAmbient,
+                                std::clamp(scene.environment.styledAmbientFloor, 0.0f, 1.0f));
+    frame.styledGround = glm::vec4(scene.environment.styledGroundAmbient, 0.0f);
     // ADR-055: the wind, packed once per frame. Wavenumbers are pre-divided here so no vertex ever
     // spends a divide on them, and the shadow views inherit the block verbatim.
     frame.wind = wind::packWind(scene.environment.wind);

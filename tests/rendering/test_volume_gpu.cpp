@@ -409,3 +409,93 @@ TEST_CASE("Volumetric fog throughput", "[.perf][volume]") {
         }
     }
 }
+
+// ---- ADR-058: the surface fog's share of the mist layer -----------------------------------------
+
+TEST_CASE("A view ray entirely inside the mist layer is fogged identically whether or not the layer "
+          "is integrated",
+          "[volume][gpu][fog]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    // The layer's top is far above the camera and both boxes, so the height term is 1 the whole
+    // way along every ray. G's difference quotient is then exactly 1 and the integrated branch
+    // must reduce to the uniform one -- not approximately, bit for bit.
+    scene::Scene s = twoBoxScene();
+    s.environment.fogDensity = 0.02f;
+    s.environment.fogHeight = 500.0f;
+    s.environment.fogHeightFalloff = 0.05f;
+
+    s.environment.fogHeightAmount = 0.0f;
+    const auto uniform = renderFloat(*renderer, s);
+    s.environment.fogHeightAmount = 1.0f;
+    const auto integrated = renderFloat(*renderer, s);
+
+    for (std::uint32_t y = 0; y < kSize; ++y) {
+        for (std::uint32_t x = 0; x < kSize; ++x) {
+            REQUIRE(luminanceAt(integrated, x, y) == luminanceAt(uniform, x, y));
+        }
+    }
+}
+
+TEST_CASE("A surface standing clear of the mist layer is fogged less than the same surface inside it",
+          "[volume][gpu][fog]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    scene::Scene s = twoBoxScene();
+    // Fog colour brighter than the boxes, so more fog means a brighter pixel and the sign of the
+    // comparison cannot be confused with the boxes' own shading.
+    s.environment.fogColor = glm::vec3(0.9f);
+    s.environment.fogDensity = 0.02f;
+    s.environment.fogHeightFalloff = 0.25f;
+    s.environment.fogHeightAmount = 1.0f;
+
+    // Buried: the layer's top is above everything, so the far box is seen through full-density air.
+    s.environment.fogHeight = 100.0f;
+    const float buried = luminanceAt(renderFloat(*renderer, s), kFarX, kMidY);
+    // Clear: the layer's top is at the ground, so the ray to the far box climbs out of the mist.
+    s.environment.fogHeight = -1.0f;
+    const float clear = luminanceAt(renderFloat(*renderer, s), kFarX, kMidY);
+
+    CHECK(clear < buried);
+    // The near box barely moves either way: it is close enough that little fog of any kind
+    // accumulates in front of it, which is what makes this a height effect and not an exposure one.
+    s.environment.fogHeight = 100.0f;
+    const float nearBuried = luminanceAt(renderFloat(*renderer, s), kNearX, kMidY);
+    s.environment.fogHeight = -1.0f;
+    const float nearClear = luminanceAt(renderFloat(*renderer, s), kNearX, kMidY);
+    CHECK(std::abs(nearClear - nearBuried) < 0.5f * std::abs(clear - buried));
+}
+
+TEST_CASE("The styled ambient defaults are the constants the shader used to carry",
+          "[volume][gpu][fog][stylized]") {
+    // ADR-058 made three shader constants authorable on the promise that a scene naming none of
+    // them renders as it did. Half of that promise is the defaults themselves: if they drift, every
+    // styled scene in the repository quietly changes and no other test would notice.
+    const scene::Environment defaults;
+    CHECK(defaults.styledSkyAmbient == glm::vec3(0.38f, 0.56f, 0.65f));
+    CHECK(defaults.styledGroundAmbient == glm::vec3(0.12f, 0.10f, 0.22f));
+    CHECK(defaults.styledAmbientFloor == 0.68f);
+    CHECK(defaults.fogHeightAmount == 0.0f);
+
+    // The other half: naming them explicitly at those values changes nothing.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+    scene::Scene s = twoBoxScene();
+    s.environment.stylized = true;
+    s.environment.fogDensity = 0.01f;
+    const auto silent = renderFloat(*renderer, s);
+    s.environment.styledSkyAmbient = defaults.styledSkyAmbient;
+    s.environment.styledGroundAmbient = defaults.styledGroundAmbient;
+    s.environment.styledAmbientFloor = defaults.styledAmbientFloor;
+    const auto spoken = renderFloat(*renderer, s);
+    for (std::uint32_t y = 0; y < kSize; ++y) {
+        for (std::uint32_t x = 0; x < kSize; ++x) {
+            REQUIRE(luminanceAt(spoken, x, y) == luminanceAt(silent, x, y));
+        }
+    }
+}

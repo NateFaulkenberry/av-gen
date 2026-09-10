@@ -299,6 +299,24 @@ struct Environment {
     // shading; the skybox is untouched. Default colour = the default background colour.
     glm::vec3 fogColor{0.012f, 0.012f, 0.02f};
     float fogDensity = 0.0f; // 0 = off; factor = exp(-(distance * density)^2)
+    // ADR-058: how much of the volumetric's mist layer the *surface* fog sees. At 0 the distance
+    // above is uniform, which is what it has always been; at 1 the view ray is integrated through
+    // the same flat-topped layer the volumetric marches (uniform up to `fogHeight`, thinning by
+    // `fogHeightFalloff` per metre above it), so a ridge or a canopy crown standing clear of the
+    // mist is seen through less of it than the valley floor behind it. The two describe the same
+    // air and share its geometry deliberately: a scene whose fog bank has one height in the march
+    // and another on the surfaces inside it does not read as one atmosphere.
+    float fogHeightAmount = 0.0f; // 0 = uniform distance fog (the default, bit-identical)
+    // ADR-058: the styled path's hemisphere ambient, and the least of it a fully occluded surface
+    // keeps. These were shader constants until a measured need moved them: across the whole of
+    // Glowmere Valley the ambient was the brightest term in the image, no pixel in any frame fell
+    // into the shadow band, and 98% of every frame sat in the midtones -- so the scene's own
+    // glowing flora had nothing darker to glow against, and distance fog lighter than the ground
+    // could not separate a far ridge from a near one. The defaults below are exactly the constants
+    // the shader used to carry, so a styled scene that names none of them renders as it did.
+    glm::vec3 styledSkyAmbient{0.38f, 0.56f, 0.65f};   // reaches an up-facing normal
+    glm::vec3 styledGroundAmbient{0.12f, 0.10f, 0.22f}; // reaches a down-facing one (bounce)
+    float styledAmbientFloor = 0.68f;                   // ambient left where occlusion is total
     // Volumetric atmosphere (ADR-032): raymarched after the lit pass (rendering::VolumeRenderer).
     // Density = volumeDensity * heightFalloff(y) * (1 + noise) * densityField(p) where the height
     // term is exp(-max(0, y - fogHeight) * fogHeightFalloff), the noise term is
