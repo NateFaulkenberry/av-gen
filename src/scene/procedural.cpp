@@ -1092,7 +1092,6 @@ MeshData makeBeveledCylinder(float radius, float height, int radialSegments, int
     const auto rings = static_cast<std::uint32_t>(std::clamp(heightSegments, 1, 128));
     const auto b = static_cast<std::uint32_t>(std::clamp(bevelSegments, 1, 16));
     constexpr float kHalfPi = 1.57079632679f;
-    constexpr float kTwoPi = 6.28318530718f;
     const float inner = std::abs(radius) - r;
 
     // The profile, bottom pole to top pole, as (radius, y) with its own 2D normal. Consecutive
@@ -1182,7 +1181,6 @@ MeshData makeTube(const spatial::Spline& curve, float radius, float taper, int s
     const auto around = static_cast<std::uint32_t>(std::clamp(sides, 3, 64));
     const auto along = static_cast<std::uint32_t>(std::clamp(segments, 2, 512));
     const float endScale = std::max(taper, 0.0f);
-    constexpr float kTwoPi = 6.28318530718f;
     const std::uint32_t columns = around + 1; // duplicated seam so uvs run 0..1
 
     struct Ring {
@@ -1262,7 +1260,6 @@ MeshData makeTube(const spatial::Spline& curve, float radius, float taper, int s
             const glm::vec3 normal = atEnd ? ring.sample.tangent : -ring.sample.tangent;
             const auto centre = static_cast<std::uint32_t>(mesh.vertices.size());
             mesh.vertices.push_back(Vertex{ring.sample.position, normal, {0.5f, 0.5f}});
-            const std::uint32_t row = atEnd ? along : 0u;
             const float roll = atEnd ? twist : 0.0f;
             for (std::uint32_t col = 0; col < around; ++col) {
                 const float u = static_cast<float>(col) / static_cast<float>(around);

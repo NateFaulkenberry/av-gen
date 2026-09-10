@@ -1140,3 +1140,78 @@ TEST_CASE("A terrain node flattens into chunk entities that pick their own level
     (*comp)->update(FrameTime{});
     CHECK(s.entities[farChunk].mesh == node->chunks[farChunk].meshes[0]);
 }
+
+TEST_CASE("A scatter layer's material program and the ground's glow reach the flattened scene",
+          "[composition][terrain][ecology]") {
+    // Both halves of this failed silently during development, which is the reason it is a test.
+    // A layer naming a material program produced no warning and no program: the emission output
+    // key is `emission`, not `emissionRegister`, and registered programs carry the composition's
+    // prefix, so a raw name from the scene file matched nothing. Either mistake leaves the layer
+    // rendering with its plain material -- visually "the whole plant glows" rather than "points on
+    // the plant glow" -- and nothing in the logs says so.
+    const std::filesystem::path asset =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets/quaternius/glTF/Mushroom_Common.gltf";
+    if (!std::filesystem::exists(asset)) {
+        SKIP("the Quaternius library is not present in this checkout");
+    }
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "eco",
+      "camera": { "mode": 1, "position": [0, 20, 40], "target": [0, 0, 0], "fov": 50.0 },
+      "materialPrograms": [
+        { "name": "spots",
+          "ops": [ { "kind": "constant", "dst": 4, "constant": [0.2, 0.9, 1.0, 1.0] } ],
+          "emission": 4, "emissionIntensity": 1.0 }
+      ],
+      "nodes": [
+        { "name": "ground", "kind": "terrain",
+          "world": { "name": "small", "size": [160, 160] },
+          "terrain": { "chunkSize": 40.0, "resolution": 8, "lodLevels": 2,
+                       "viewDistance": 400.0,
+                       "groundGlow": 0.8, "groundGlowScale": 0.05,
+                       "groundGlowCoverage": 0.3, "groundGlowColor": [0.1, 1.0, 0.7] },
+          "scatter": [
+            { "name": "lamps", "asset": "@ASSET@", "densities": { "meadow": 0.02, "forest": 0.02 },
+              "height": 0.5, "emissiveIntensity": 6.0, "emissiveColor": [0.1, 0.9, 1.0],
+              "materialProgram": "spots" }
+          ] }
+      ]
+    })";
+    Fixture fx;
+    std::string filled = text;
+    filled.replace(filled.find("@ASSET@"), 7, asset.string());
+    const auto path = writeJson("ecology_program", filled);
+    fx.files.push_back(path);
+    auto comp = scene::Composition::loadFile(path.filename(), fx.registry);
+    if (!comp) {
+        FAIL(comp.error().message);
+    }
+    params::ParameterSet params;
+    params::Modulator modulator;
+    // Attached under a prefix on purpose. Registered programs are renamed with the composition's
+    // prefix, so a layer that referenced its program by the raw name matched nothing -- and with
+    // an empty prefix that bug is invisible, which is how it shipped twice.
+    (*comp)->attach(params, modulator, "sub_");
+    (*comp)->update(FrameTime{});
+    const scene::Scene& s = (*comp)->scene();
+
+    SECTION("the ground program carries an emission output when the terrain asks for glow") {
+        const auto ground = std::ranges::find_if(s.materialPrograms, [](const scene::MaterialProgram& p) {
+            return p.name.ends_with("_ground");
+        });
+        REQUIRE(ground != s.materialPrograms.end());
+        CHECK(ground->emissionRegister >= 0);
+    }
+
+    SECTION("a layer's program name resolves to a program that exists in the scene") {
+        const auto lamps = std::ranges::find_if(s.procedurals, [](const scene::ProceduralGeometry& p) {
+            return p.name.find("lamps") != std::string::npos;
+        });
+        REQUIRE(lamps != s.procedurals.end());
+        REQUIRE(!lamps->material.program.empty());
+        // The resolved name must match a registered program exactly, or the renderer silently
+        // shades with no program at all.
+        CHECK(std::ranges::any_of(s.materialPrograms, [&](const scene::MaterialProgram& p) {
+            return p.name == lamps->material.program;
+        }));
+    }
+}

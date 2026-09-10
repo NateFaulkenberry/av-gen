@@ -2658,9 +2658,9 @@ void Composition::applyParameters() {
         const glm::vec3 towards(std::cos(a) * m.x - std::sin(a) * m.z, m.y,
                                 std::sin(a) * m.x + std::cos(a) * m.z);
         if (PunctualLight* key = const_cast<PunctualLight*>(skyKeyLight(scene_.lights)); key != nullptr) {
-            const float distance = glm::length(key->position - center_);
+            const float keyDistance = glm::length(key->position - center_);
             key->direction = -towards;
-            key->position = center_ + towards * distance; // area lights shade from the position too
+            key->position = center_ + towards * keyDistance; // area lights shade from the position too
         }
     }
     {
