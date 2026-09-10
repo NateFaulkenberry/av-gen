@@ -7,6 +7,7 @@
 #include "scene/procedural.hpp"
 #include "scene/scene.hpp"
 #include "world/biome.hpp"
+#include "core/noise.hpp"
 #include "world/ecology.hpp"
 #include "world/world_map.hpp"
 
@@ -920,5 +921,58 @@ TEST_CASE("Glow aggregation reduces a scatter layer to bounded emitters", "[unit
             CHECK(again[i].position.x == clusters[i].position.x);
             CHECK(again[i].position.z == clusters[i].position.z);
         }
+    }
+}
+
+TEST_CASE("Colour that clusters in space, and glow that is rare", "[unit][world][ecology]") {
+    using namespace avgen;
+
+    SECTION("the region field delivers the amplitude a caller asks for") {
+        // Raw fbm bunches around its midpoint, so feeding it straight into a "how far this swings"
+        // setting delivers a fraction of it. The field is stretched to fix that; if the stretch is
+        // ever removed, the spread collapses and every setting quietly means a third of itself.
+        float lo = 1.0f;
+        float hi = -1.0f;
+        double sum = 0.0;
+        int n = 0;
+        for (int x = -40; x <= 40; ++x) {
+            for (int z = -40; z <= 40; ++z) {
+                const float v = noise::regionField(glm::vec3(static_cast<float>(x) * 0.37f, 0.0f,
+                                                             static_cast<float>(z) * 0.37f), 7u);
+                lo = std::min(lo, v);
+                hi = std::max(hi, v);
+                sum += v;
+                ++n;
+            }
+        }
+        CHECK(lo < -0.75f);
+        CHECK(hi > 0.75f);
+        CHECK(std::abs(sum / n) < 0.2f);   // centred, so a hue swing goes both ways
+        // Smooth: neighbours agree, which is the whole point of a region.
+        const glm::vec3 p(3.1f, 0.0f, -2.4f);
+        CHECK(std::abs(noise::regionField(p, 7u) - noise::regionField(p + glm::vec3(0.01f, 0.0f, 0.0f), 7u)) < 0.05f);
+    }
+
+    SECTION("sparsity leaves most specimens dark and scales the light they cast") {
+        world::ScatterLayer layer;
+        layer.name = "canopy";
+        layer.height = 12.0f;
+        layer.emissiveColor = glm::vec3(0.06f, 1.0f, 0.72f);
+        layer.emissiveIntensity = 5.0f;
+
+        spatial::PointCloud cloud(64);
+        auto p = cloud.positions();
+        auto s = cloud.scales();
+        for (std::size_t i = 0; i < p.size(); ++i) {
+            p[i] = glm::vec3(static_cast<float>(i % 8), 0.0f, static_cast<float>(i / 8));
+            s[i] = glm::vec3(1.0f);
+        }
+        const auto full = world::aggregateGlow(cloud, layer, 100.0f);
+        layer.emissiveSparsity = 0.75f;
+        const auto sparse = world::aggregateGlow(cloud, layer, 100.0f);
+        REQUIRE(full.size() == 1);
+        REQUIRE(sparse.size() == 1);
+        // A quarter of the trees light up, so the patch casts a quarter of the light.
+        CHECK_THAT(sparse.front().power, Catch::Matchers::WithinRel(full.front().power * 0.25f, 1e-4f));
     }
 }

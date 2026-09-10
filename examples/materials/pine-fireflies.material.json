@@ -1,0 +1,141 @@
+{
+ "name": "pineFireflies",
+ "ops": [
+  {
+   "kind": "input",
+   "dst": 0,
+   "input": "localPosition"
+  },
+  {
+   "kind": "input",
+   "dst": 5,
+   "input": "instanceRandom"
+  },
+  {
+   "kind": "multiply",
+   "dst": 5,
+   "srcA": 5,
+   "srcB": 5
+  },
+  {
+   "kind": "add",
+   "dst": 6,
+   "srcA": 0,
+   "srcB": 5
+  },
+  {
+   "kind": "voronoi",
+   "dst": 1,
+   "srcA": 6,
+   "value": 8.5,
+   "seed": 137
+  },
+  {
+   "kind": "smoothstep",
+   "dst": 1,
+   "srcA": 1,
+   "constant": [
+    0.18,
+    0.015,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "kind": "swizzle",
+   "dst": 7,
+   "srcA": 0,
+   "constant": [
+    1,
+    1,
+    1,
+    1
+   ]
+  },
+  {
+   "kind": "smoothstep",
+   "dst": 7,
+   "srcA": 7,
+   "constant": [
+    1.2,
+    2.6,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "kind": "multiply",
+   "dst": 1,
+   "srcA": 1,
+   "srcB": 7
+  },
+  {
+   "kind": "input",
+   "dst": 6,
+   "input": "cameraDistance"
+  },
+  {
+   "kind": "smoothstep",
+   "dst": 6,
+   "srcA": 6,
+   "constant": [
+    150.0,
+    340.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "kind": "constant",
+   "dst": 5,
+   "constant": [
+    0.045,
+    0.045,
+    0.045,
+    0.045
+   ]
+  },
+  {
+   "kind": "mixBy",
+   "dst": 1,
+   "srcA": 1,
+   "srcB": 5,
+   "srcC": 6
+  },
+  {
+   "kind": "input",
+   "dst": 2,
+   "input": "instanceEmissive"
+  },
+  {
+   "kind": "constant",
+   "dst": 3,
+   "constant": [
+    0.1,
+    0.62,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "kind": "multiply",
+   "dst": 4,
+   "srcA": 3,
+   "srcB": 2
+  },
+  {
+   "kind": "multiply",
+   "dst": 4,
+   "srcA": 4,
+   "srcB": 1
+  }
+ ],
+ "emission": 4,
+ "emissionIntensity": 1.0,
+ "baseColor": -1,
+ "metallic": -1,
+ "roughness": -1,
+ "opacity": -1,
+ "normal": -1,
+ "occlusion": -1
+}

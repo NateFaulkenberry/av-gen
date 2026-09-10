@@ -31,4 +31,11 @@ struct U3 {
 [[nodiscard]] glm::vec3 curlNoise(const glm::vec3& p, std::uint32_t seed, float epsilon = 0.01f);
 [[nodiscard]] float voronoiF1(const glm::vec3& p, std::uint32_t seed);
 
+// A smooth signed field in [-1, 1] for "which region of the world is this", used where a setting
+// means "how far this swings across the map". Raw fbm3 bunches around 0.5, so feeding it straight
+// in delivers about a third of the swing the caller asked for; this stretches it about the
+// midpoint and clamps, so the amplitude a caller passes is the amplitude they get. Callers that
+// must agree with each other (a plant and the light it casts) share this.
+[[nodiscard]] float regionField(const glm::vec3& p, std::uint32_t seed);
+
 } // namespace avgen::noise

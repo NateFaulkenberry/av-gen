@@ -672,14 +672,32 @@ std::shared_ptr<const MeshData> mergedAssetMesh(const assets::SceneAsset& asset)
 // asset's material, and for a multi-material one it is the one a viewer will read as its surface.
 const Material* dominantAssetMaterial(const assets::SceneAsset& asset) {
     const Material* best = nullptr;
-    std::size_t bestVertices = 0;
+    double bestArea = 0.0;
     for (const Entity& e : asset.scene.entities) {
         if (!e.visible || e.mesh == kInvalidMesh || e.mesh >= asset.scene.meshes.size()) {
             continue;
         }
-        const std::size_t count = asset.scene.meshes[e.mesh].vertices.size();
-        if (count > bestVertices) {
-            bestVertices = count;
+        // Surface area, not vertex count. A tree's trunk is a smooth tapered tube carrying plenty
+        // of vertices for very little of what you see, while its canopy is hundreds of small leaf
+        // cards; picking by vertex count handed the whole tree the bark material and drew every
+        // leaf as a slab of bark, which is what made instanced foliage render as dark shards.
+        const MeshData& mesh = asset.scene.meshes[e.mesh];
+        const glm::mat4 model = e.transform.matrix();
+        double area = 0.0;
+        for (std::size_t i = 0; i + 2 < mesh.indices.size(); i += 3) {
+            const std::uint32_t a = mesh.indices[i];
+            const std::uint32_t b = mesh.indices[i + 1];
+            const std::uint32_t c = mesh.indices[i + 2];
+            if (a >= mesh.vertices.size() || b >= mesh.vertices.size() || c >= mesh.vertices.size()) {
+                continue;
+            }
+            const glm::vec3 pa = glm::vec3(model * glm::vec4(mesh.vertices[a].position, 1.0f));
+            const glm::vec3 pb = glm::vec3(model * glm::vec4(mesh.vertices[b].position, 1.0f));
+            const glm::vec3 pc = glm::vec3(model * glm::vec4(mesh.vertices[c].position, 1.0f));
+            area += 0.5 * static_cast<double>(glm::length(glm::cross(pb - pa, pc - pa)));
+        }
+        if (area > bestArea) {
+            bestArea = area;
             best = &e.material;
         }
     }
@@ -1848,6 +1866,21 @@ void Composition::rebuild() {
                     pg.material.emissiveColor = layer.emissiveColor;
                     pg.material.emissiveIntensity = layer.emissiveIntensity;
                 }
+                // ADR-054: colour that clusters in space, rotated perceptually so a hue change
+                // reads as the colour turning rather than the brightness moving.
+                pg.materialVariation.hueField = layer.hueField;
+                pg.materialVariation.hueFieldScale = layer.hueFieldScale;
+                pg.materialVariation.hueShift = layer.hueRandom;
+                pg.materialVariation.emissiveRandom = layer.emissiveRandom;
+                pg.materialVariation.emissiveSparsity = layer.emissiveSparsity;
+                if (!layer.materialProgram.empty()) {
+                    // Registered programs carry the composition's prefix (see the copy into
+                    // scene_.materialPrograms), so a raw name from the scene file silently matches
+                    // nothing and the layer renders with no program at all.
+                    pg.material.program = prefixed(sanitise(prefix_), layer.materialProgram);
+                }
+                pg.materialVariation.perceptualHue = true;
+                pg.variation.seed = static_cast<std::uint32_t>(layer.structuralHash());
                 if (layer.height > 0.0f && pg.source.assetMesh) {
                     const auto [lo, hi] = pg.source.assetMesh->bounds();
                     const float authored = hi.y - lo.y;
@@ -1856,7 +1889,8 @@ void Composition::rebuild() {
                     }
                 }
                 if (layer.emissiveIntensity > 0.0f && ecologyLightGain_ > 0.0f) {
-                    auto clusters = world::aggregateGlow(*cloud, layer, ecologyGlowCell_);
+                    auto clusters = world::aggregateGlow(*cloud, layer, ecologyGlowCell_,
+                                                         pg.variation.seed);
                     log::info("terrain '{}': scatter '{}' glow reduced to {} emitters", node.name,
                               layer.name, clusters.size());
                     nodeGlow.insert(nodeGlow.end(), clusters.begin(), clusters.end());

@@ -960,8 +960,9 @@ TEST_CASE("examples/materials/*.material.json parse, validate and name their pro
         names.push_back(program->name);
     }
     std::sort(names.begin(), names.end());
-    CHECK(names == std::vector<std::string>{"alienMetal", "bioluminescent", "brushedMetal", "darkSteel",
-                                            "emissiveGlass", "oxidisedMetal", "weatheredStone"});
+    CHECK(names == std::vector<std::string>{"alienMetal", "bioluminescent", "brushedMetal",
+                                            "canopyFireflies", "darkSteel", "emissiveGlass",
+                                            "oxidisedMetal", "pineFireflies", "weatheredStone"});
 }
 
 TEST_CASE("examples/machine declares its material programs inline and by file, and wires them in",

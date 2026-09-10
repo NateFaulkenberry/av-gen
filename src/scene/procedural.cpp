@@ -100,6 +100,7 @@
 #include "scene/procedural.hpp"
 
 #include "core/log.hpp"
+#include "core/color.hpp"
 #include "core/noise.hpp"
 #include "scene/procedural_detail.hpp"
 
@@ -453,6 +454,23 @@ Result<void> readEnum(const json& j, const char* key, Enum& target, std::optiona
 // axis, luminance-preserving). A pure hue rotation leaves white unchanged, so the multiplier is
 // computed against the colour it will multiply (the base at rebuild time); channels near zero
 // cannot gain energy through a multiplier, so strongly saturated bases shift less than ideal.
+// The same contract as hueRotationMultiplier -- a multiplier on the material's base colour --
+// but the rotation happens in OKLCH, where equal angles are equal perceived hue steps and L and
+// C come through unchanged.
+glm::vec3 hueRotationMultiplierOklab(const glm::vec3& base, float turns) {
+    if (std::abs(turns) < 1e-7f) {
+        return glm::vec3(1.0f);
+    }
+    const glm::vec3 safe = glm::max(base, glm::vec3(1e-3f));
+    const glm::vec3 rotated = glm::max(color::hueShift(safe, turns), glm::vec3(0.0f));
+    // A far higher ceiling than the legacy path's 8. Instance colour is carried as a per-channel
+    // multiplier of the material's, and a saturated emitter has a channel near zero -- the teal
+    // the ferns glow is (0.02, 1.0, 0.86). Turning that hue means raising the small channel by
+    // tens, and a ceiling of 8 clips exactly that, which is why rotating a saturated colour used
+    // to desaturate it into grey instead of moving it round the wheel.
+    return glm::clamp(rotated / safe, glm::vec3(0.0f), glm::vec3(96.0f));
+}
+
 glm::vec3 hueRotationMultiplier(const glm::vec3& base, float turns) {
     if (std::abs(turns) < 1e-7f) {
         return glm::vec3(1.0f);
@@ -1754,6 +1772,7 @@ constexpr std::uint32_t kVariationChannel = 16;
 constexpr std::uint32_t kHueChannel = 4;
 constexpr std::uint32_t kValueChannel = 5;
 constexpr std::uint32_t kEmissiveChannel = 6;
+constexpr std::uint32_t kSparsityChannel = 7;
 
 // Uniform in [-1, 1).
 float signedRandom(std::uint32_t seed, std::uint32_t index, std::uint32_t channel) {
@@ -2084,6 +2103,10 @@ std::uint64_t ProceduralGeometry::structuralHash() const {
     h.f32(materialVariation.hueGradient);
     h.f32(materialVariation.valueRandom);
     h.f32(materialVariation.emissiveRandom);
+    h.f32(materialVariation.emissiveSparsity);
+    h.f32(materialVariation.hueField);
+    h.f32(materialVariation.hueFieldScale);
+    h.u32(materialVariation.perceptualHue ? 1u : 0u);
     h.f32(materialVariation.emissiveGradient);
     h.u64(pointOps.size());
     for (const spatial::PointOp& op : pointOps) {
@@ -2166,15 +2189,28 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
             (*extents)[i] = sourceExtent;
         }
 
-        const float hueTurns = materialVariation.hueShift * hashInstance(variation.seed, index, kHueChannel) +
-                               materialVariation.hueGradient * u;
+        // Regions of agreement, not per-instance noise: the field is sampled where the instance
+        // stands, so a patch shares a hue and the next patch over does not.
+        float hueTurns = materialVariation.hueShift * hashInstance(variation.seed, index, kHueChannel) +
+                         materialVariation.hueGradient * u;
+        if (materialVariation.hueField != 0.0f) {
+            const float scale = std::max(materialVariation.hueFieldScale, 1e-3f);
+            hueTurns += materialVariation.hueField *
+                        noise::regionField(t.position / scale, variation.seed ^ 0x9e37u);
+        }
+        const auto rotate = materialVariation.perceptualHue ? hueRotationMultiplierOklab
+                                                            : hueRotationMultiplier;
         const float value =
             std::max(0.0f, 1.0f + materialVariation.valueRandom * signedRandom(variation.seed, index, kValueChannel));
-        const float emissiveMul = std::max(0.0f, 1.0f + materialVariation.emissiveRandom *
+        float emissiveMul = std::max(0.0f, 1.0f + materialVariation.emissiveRandom *
                                                                  signedRandom(variation.seed, index, kEmissiveChannel) +
                                                      materialVariation.emissiveGradient * u);
-        colors[i] = glm::vec4(hueRotationMultiplier(material.baseColor, hueTurns) * value, 1.0f);
-        emissives[i] = hueRotationMultiplier(material.emissiveColor, hueTurns) * emissiveMul;
+        if (materialVariation.emissiveSparsity > 0.0f) {
+            const float lit = 1.0f - std::clamp(materialVariation.emissiveSparsity, 0.0f, 1.0f);
+            emissiveMul *= hashInstance(variation.seed, index, kSparsityChannel) < lit ? 1.0f : 0.0f;
+        }
+        colors[i] = glm::vec4(rotate(material.baseColor, hueTurns) * value, 1.0f);
+        emissives[i] = rotate(material.emissiveColor, hueTurns) * emissiveMul;
     }
     if (fromGrammar) {
         for (const char* column : {"depth", "rule", "branch"}) {
@@ -2400,6 +2436,10 @@ json ProceduralGeometry::toJson() const {
         s["hueGradient"] = materialVariation.hueGradient;
         s["valueRandom"] = materialVariation.valueRandom;
         s["emissiveRandom"] = materialVariation.emissiveRandom;
+        s["emissiveSparsity"] = materialVariation.emissiveSparsity;
+        s["hueField"] = materialVariation.hueField;
+        s["hueFieldScale"] = materialVariation.hueFieldScale;
+        s["perceptualHue"] = materialVariation.perceptualHue;
         s["emissiveGradient"] = materialVariation.emissiveGradient;
         j["materialVariation"] = std::move(s);
     }
@@ -2637,6 +2677,10 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(v.hueGradient, "hueGradient", readFloat);
         AVGEN_PROC_READ(v.valueRandom, "valueRandom", readFloat);
         AVGEN_PROC_READ(v.emissiveRandom, "emissiveRandom", readFloat);
+        AVGEN_PROC_READ(v.emissiveSparsity, "emissiveSparsity", readFloat);
+        AVGEN_PROC_READ(v.hueField, "hueField", readFloat);
+        AVGEN_PROC_READ(v.hueFieldScale, "hueFieldScale", readFloat);
+        AVGEN_PROC_READ(v.perceptualHue, "perceptualHue", readBool);
         AVGEN_PROC_READ(v.emissiveGradient, "emissiveGradient", readFloat);
     }
     if (root.contains("hierarchy")) {

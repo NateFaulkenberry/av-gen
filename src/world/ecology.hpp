@@ -59,6 +59,20 @@ struct ScatterLayer {
     float alignToGround = 0.0f;           // 0 upright, 1 fully along the surface normal
     float randomYaw = 1.0f;               // 0..1 of a full turn
 
+    // Colour variation (ADR-054). A population is not one colour repeated: it is regions that
+    // agree with themselves. `hueField` is how far the hue swings across the map in turns and
+    // `hueFieldScale` how big a region is in metres; `hueRandom` adds the per-instance jitter on
+    // top, and `emissiveRandom` varies how brightly each specimen burns.
+    float hueField = 0.0f;
+    float hueFieldScale = 40.0f;
+    float hueRandom = 0.0f;
+    float emissiveRandom = 0.0f;
+    float emissiveSparsity = 0.0f;  // fraction of specimens that stay dark
+    // Names a material program (ADR-030) for this layer. Emission is otherwise constant over a
+    // mesh, which lights a tree evenly from root to crown; a program can put the glow in patches
+    // so a tree reads as full of fireflies rather than as a lamp shaped like a tree.
+    std::string materialProgram;
+
     // Clumping. Plants do not occur on a grid; they occur in patches with gaps between them. The
     // cluster field is a coarse noise, and `clustering` is how much of the layer's density it takes
     // away from the gaps and gives to the patches.
@@ -127,9 +141,11 @@ struct GlowCluster {
 // Bins `cloud` into cells of `cellSize` metres and reduces each to one GlowCluster. Returns
 // nothing when the layer does not emit. `lift` raises each emitter off the ground by that
 // fraction of the layer's height, so the light sits in the glowing organ rather than at the root.
+// `hueSeed` must be the seed the instances were varied with, or the light a patch casts will be
+// a different colour from the patch casting it.
 [[nodiscard]] std::vector<GlowCluster> aggregateGlow(const spatial::PointCloud& cloud,
                                                      const ScatterLayer& layer, float cellSize,
-                                                     float lift = 0.5f);
+                                                     std::uint32_t hueSeed = 12345u, float lift = 0.5f);
 
 [[nodiscard]] Result<Ecology> ecologyFromJson(const nlohmann::json& j);
 [[nodiscard]] nlohmann::json ecologyToJson(const Ecology& ecology);

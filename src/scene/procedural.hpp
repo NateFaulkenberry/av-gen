@@ -333,6 +333,22 @@ struct MaterialVariation {
     float valueRandom = 0.0f;       // per-instance brightness variation (relative)
     float emissiveRandom = 0.0f;    // per-instance emissive multiplier variation (relative)
     float emissiveGradient = 0.0f;  // emissive multiplier ramp across normalised index (adds 0..x)
+    // ADR-054: colour that clusters in space. Per-instance random hue makes a meadow noisy --
+    // every neighbour disagrees -- where what reads as a living population is regions that agree
+    // with themselves and differ from the next valley over. `hueField` is the swing in turns and
+    // `hueFieldScale` the size of a region in metres; the field is sampled at the instance's
+    // placement, so neighbours land in the same part of it.
+    float hueField = 0.0f;
+    float hueFieldScale = 40.0f;
+    // Rotate hue through OKLCH rather than by spinning RGB about the grey axis. The legacy path
+    // changes lightness and chroma with the angle, which on a saturated emitter reads as the
+    // brightness flickering rather than the colour turning.
+    bool perceptualHue = false;
+    // What fraction of instances do not light up at all, 0..1. Random *variation* is symmetric --
+    // it makes every specimen a bit brighter or dimmer than the mean -- so it cannot say "most of
+    // this forest is dark and a few trees are lanterns", which is the difference between a wood
+    // with something living in it and a wall of lamps. Chosen by a stable per-instance hash.
+    float emissiveSparsity = 0.0f;
 };
 
 // ---- the procedural object ----------------------------------------------------------------------

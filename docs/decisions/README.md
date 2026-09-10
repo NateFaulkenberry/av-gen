@@ -59,3 +59,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [051](ADR-051-measuring-a-frame.md) | Measuring a frame, and one shared indirect buffer | Accepted |
 | [052](ADR-052-highlight-chroma.md) | Holding hue in compressed highlights: chroma retention after the tone curve | Accepted |
 | [053](ADR-053-ecology-light-field.md) | The light a glowing ecology casts: aggregate first, then light | Accepted |
+| [054](ADR-054-colour-that-clusters.md) | Colour that clusters in space, and glow that is rare | Accepted |

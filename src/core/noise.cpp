@@ -1,5 +1,7 @@
 #include "core/noise.hpp"
 
+#include <algorithm>
+
 #include <bit>
 #include <cmath>
 
@@ -106,6 +108,10 @@ float voronoiF1(const glm::vec3& p, std::uint32_t seed) {
         }
     }
     return std::sqrt(best);
+}
+
+float regionField(const glm::vec3& p, std::uint32_t seed) {
+    return std::clamp((fbm3(p, seed) - 0.5f) * 2.6f, -1.0f, 1.0f);
 }
 
 } // namespace avgen::noise

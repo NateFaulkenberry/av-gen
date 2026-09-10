@@ -1,5 +1,6 @@
 #include "world/ecology.hpp"
 
+#include "core/color.hpp"
 #include "core/noise.hpp"
 #include "scene/struct_hash.hpp"
 
@@ -132,6 +133,12 @@ std::uint64_t ScatterLayer::structuralHash() const {
     h.v3(tint);
     h.v3(emissiveColor);
     h.f32(emissiveIntensity);
+    h.f32(hueField);
+    h.f32(hueFieldScale);
+    h.f32(hueRandom);
+    h.f32(emissiveRandom);
+    h.f32(emissiveSparsity);
+    h.str(materialProgram);
     h.boolean(avoidWater);
     h.boolean(castsShadow);
     h.u32(seed);
@@ -325,12 +332,23 @@ Result<Ecology> ecologyFromJson(const json& j) {
                                Field{"alignToGround", &l.alignToGround}, Field{"randomYaw", &l.randomYaw},
                                Field{"clusterScale", &l.clusterScale}, Field{"clustering", &l.clustering},
                                Field{"minScreenRadius", &l.minScreenRadius},
-                               Field{"viewDistance", &l.viewDistance}}) {
+                               Field{"viewDistance", &l.viewDistance},
+                               Field{"hueField", &l.hueField},
+                               Field{"hueFieldScale", &l.hueFieldScale},
+                               Field{"hueRandom", &l.hueRandom},
+                               Field{"emissiveRandom", &l.emissiveRandom},
+                               Field{"emissiveSparsity", &l.emissiveSparsity}}) {
             auto v = readFloat(e, f.key, *f.target);
             if (!v) {
                 return fail("scatter '{}': {}", l.name, v.error().message);
             }
             *f.target = *v;
+        }
+        if (e.contains("materialProgram")) {
+            if (!e.at("materialProgram").is_string()) {
+                return fail("scatter '{}': 'materialProgram' must be a string", l.name);
+            }
+            l.materialProgram = e.at("materialProgram").get<std::string>();
         }
         auto emissive = readFloat(e, "emissiveIntensity", l.emissiveIntensity);
         if (!emissive) {
@@ -412,6 +430,12 @@ json ecologyToJson(const Ecology& ecology) {
                            {"tint", json::array({l.tint.x, l.tint.y, l.tint.z})},
                            {"emissiveColor", json::array({l.emissiveColor.x, l.emissiveColor.y, l.emissiveColor.z})},
                            {"emissiveIntensity", l.emissiveIntensity},
+                           {"hueField", l.hueField},
+                           {"hueFieldScale", l.hueFieldScale},
+                           {"hueRandom", l.hueRandom},
+                           {"emissiveRandom", l.emissiveRandom},
+                           {"emissiveSparsity", l.emissiveSparsity},
+                           {"materialProgram", l.materialProgram},
                            {"seed", l.seed},
                            {"maxInstances", l.maxInstances},
                            {"meshBudget", l.meshBudget}});
@@ -420,7 +444,7 @@ json ecologyToJson(const Ecology& ecology) {
 }
 
 std::vector<GlowCluster> aggregateGlow(const spatial::PointCloud& cloud, const ScatterLayer& layer,
-                                       float cellSize, float lift) {
+                                       float cellSize, std::uint32_t hueSeed, float lift) {
     if (layer.emissiveIntensity <= 0.0f || cloud.count() == 0 || cellSize <= 0.0f) {
         return {};
     }
@@ -473,7 +497,15 @@ std::vector<GlowCluster> aggregateGlow(const spatial::PointCloud& cloud, const S
         g.position = glm::vec3(mean) + glm::vec3(0.0f, layer.height * lift, 0.0f);
         g.radius = std::max(spread, layer.height * 0.5f);
         g.color = colour / peak;
-        g.power = layer.emissiveIntensity * peak * static_cast<float>(b.weight);
+        if (layer.hueField != 0.0f) {
+            // The same field, sampled at the same place with the same seed as the instances that
+            // stand here, so the light matches the thing emitting it.
+            const float scale = std::max(layer.hueFieldScale, 1e-3f);
+            const float field = noise::regionField(glm::vec3(mean) / scale, hueSeed ^ 0x9e37u);
+            g.color = color::hueShift(g.color, layer.hueField * field);
+        }
+        g.power = layer.emissiveIntensity * peak * static_cast<float>(b.weight) *
+                  (1.0f - std::clamp(layer.emissiveSparsity, 0.0f, 1.0f));
         out.push_back(g);
     }
     // A stable order: the bins come out of a hash map, and the per-frame selection that follows

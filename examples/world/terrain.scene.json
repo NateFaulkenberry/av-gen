@@ -130,7 +130,7 @@
      "clusterScale": 46.0,
      "clustering": 0.55,
      "seed": 31,
-     "meshBudget": 1400,
+     "meshBudget": 0,
      "maxInstances": 2000,
      "height": 14.0,
      "tint": [
@@ -140,7 +140,19 @@
      ],
      "viewDistance": 520.0,
      "minScreenRadius": 1.0,
-     "castsShadow": true
+     "castsShadow": true,
+     "emissiveColor": [
+      0.06,
+      1.0,
+      0.72
+     ],
+     "emissiveIntensity": 34.0,
+     "emissiveRandom": 0.55,
+     "hueField": 0.2,
+     "hueFieldScale": 48.0,
+     "hueRandom": 0.03,
+     "emissiveSparsity": 0.15,
+     "materialProgram": "canopyFireflies"
     },
     {
      "name": "pines",
@@ -157,7 +169,7 @@
      "clusterScale": 38.0,
      "clustering": 0.6,
      "seed": 32,
-     "meshBudget": 1000,
+     "meshBudget": 0,
      "maxInstances": 1600,
      "height": 15.0,
      "tint": [
@@ -167,7 +179,19 @@
      ],
      "viewDistance": 520.0,
      "minScreenRadius": 1.0,
-     "castsShadow": true
+     "castsShadow": true,
+     "emissiveColor": [
+      0.1,
+      0.62,
+      1.0
+     ],
+     "emissiveIntensity": 30.0,
+     "emissiveRandom": 0.55,
+     "hueField": 0.18,
+     "hueFieldScale": 44.0,
+     "hueRandom": 0.03,
+     "emissiveSparsity": 0.2,
+     "materialProgram": "pineFireflies"
     },
     {
      "name": "deadwood",
@@ -220,9 +244,20 @@
       0.305,
       0.3515
      ],
-     "viewDistance": 190.0,
-     "minScreenRadius": 2.0,
-     "castsShadow": true
+     "viewDistance": 320.0,
+     "minScreenRadius": 5.5,
+     "castsShadow": true,
+     "emissiveColor": [
+      0.55,
+      0.14,
+      1.0
+     ],
+     "emissiveIntensity": 4.0,
+     "emissiveRandom": 0.6,
+     "hueField": 0.16,
+     "hueFieldScale": 40.0,
+     "hueRandom": 0.04,
+     "emissiveSparsity": 0.55
     },
     {
      "name": "ferns",
@@ -249,12 +284,16 @@
      "emissiveColor": [
       0.02,
       1.0,
-      0.86
+      0.58
      ],
-     "emissiveIntensity": 1.35,
-     "viewDistance": 120.0,
-     "minScreenRadius": 2.5,
-     "castsShadow": false
+     "emissiveIntensity": 1.8,
+     "viewDistance": 260.0,
+     "minScreenRadius": 5.5,
+     "castsShadow": false,
+     "hueField": 0.16,
+     "hueFieldScale": 42.0,
+     "hueRandom": 0.02,
+     "emissiveRandom": 0.55
     },
     {
      "name": "grass",
@@ -279,9 +318,20 @@
       0.4342,
       0.2705
      ],
-     "viewDistance": 70.0,
-     "minScreenRadius": 3.0,
-     "castsShadow": false
+     "viewDistance": 150.0,
+     "minScreenRadius": 5.5,
+     "castsShadow": false,
+     "emissiveColor": [
+      0.05,
+      1.0,
+      0.55
+     ],
+     "emissiveIntensity": 1.4,
+     "emissiveRandom": 0.7,
+     "hueField": 0.14,
+     "hueFieldScale": 50.0,
+     "hueRandom": 0.03,
+     "emissiveSparsity": 0.5
     },
     {
      "name": "flowers",
@@ -310,9 +360,13 @@
       1.0
      ],
      "emissiveIntensity": 16.0,
-     "viewDistance": 95.0,
-     "minScreenRadius": 2.5,
-     "castsShadow": false
+     "viewDistance": 240.0,
+     "minScreenRadius": 5.5,
+     "castsShadow": false,
+     "hueField": 0.17,
+     "hueFieldScale": 30.0,
+     "hueRandom": 0.03,
+     "emissiveRandom": 0.6
     },
     {
      "name": "fungi",
@@ -342,9 +396,13 @@
       1.0
      ],
      "emissiveIntensity": 34.0,
-     "viewDistance": 110.0,
-     "minScreenRadius": 2.0,
-     "castsShadow": true
+     "viewDistance": 240.0,
+     "minScreenRadius": 5.5,
+     "castsShadow": true,
+     "hueField": 0.16,
+     "hueFieldScale": 28.0,
+     "hueRandom": 0.035,
+     "emissiveRandom": 0.65
     },
     {
      "name": "shelf-fungi",
@@ -373,9 +431,13 @@
       0.62
      ],
      "emissiveIntensity": 24.0,
-     "viewDistance": 150.0,
-     "minScreenRadius": 2.0,
-     "castsShadow": true
+     "viewDistance": 270.0,
+     "minScreenRadius": 5.5,
+     "castsShadow": true,
+     "hueField": 0.14,
+     "hueFieldScale": 36.0,
+     "hueRandom": 0.03,
+     "emissiveRandom": 0.55
     },
     {
      "name": "boulders",
@@ -448,5 +510,9 @@
   "bloomRadius": 1.15,
   "bloomLevels": 6,
   "bloomEmissionWeight": 0.75
- }
+ },
+ "materialPrograms": [
+  "../materials/canopy-fireflies.material.json",
+  "../materials/pine-fireflies.material.json"
+ ]
 }
