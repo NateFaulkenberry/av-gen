@@ -106,6 +106,49 @@ void applyEnvironment(Engine& engine, const world::EnvironmentPlan& env) {
     setVec3(engine, "scene/styledSkyAmbient", env.styledSkyAmbient);
     setVec3(engine, "scene/styledGroundAmbient", env.styledGroundAmbient);
 }
+
+// Installs a hero's authored reactions as ordinary modulation routes.
+//
+// Through the modulator, deliberately. A hero reacting to music must go through the same routes as
+// everything else that reacts to music: a second reaction system beside it would be a second thing
+// to debug when a scene does not move, and it would not appear in the route list, the graph editor,
+// or a saved project.
+std::size_t installHeroReactions(Engine& engine, const world::HeroPoint& hero) {
+    if (hero.reactionProfile.empty()) {
+        return 0;
+    }
+    const world::HeroReactionProfile* profile = world::findHeroReactionProfile(hero.reactionProfile);
+    if (profile == nullptr) {
+        log::warn("hero '{}': unknown reaction profile '{}'", hero.name, hero.reactionProfile);
+        return 0;
+    }
+    std::size_t installed = 0;
+    for (const world::HeroReaction& reaction : profile->reactions) {
+        const world::HeroBehaviourTarget target = world::heroBehaviourTarget(reaction.behaviour);
+        if (!target.supported) {
+            log::info("hero '{}': {} needs {}, so it is not wired", hero.name,
+                      world::heroBehaviourName(reaction.behaviour), target.missing);
+            continue;
+        }
+        const std::string path = "nodes/" + hero.name + "/" + target.suffix;
+        if (engine.params().find(path) == nullptr) {
+            log::warn("hero '{}': no parameter '{}'", hero.name, path);
+            continue;
+        }
+        params::ModRoute route;
+        route.source = reaction.source;
+        route.target = path;
+        route.component = target.component;
+        route.amount = reaction.amount;
+        route.op = params::ModOp::Add;
+        route.chain.attackMs = reaction.attackMs;
+        route.chain.decayMs = reaction.decayMs;
+        engine.modulator().addRoute(std::move(route));
+        ++installed;
+    }
+    return installed;
+}
+
 } // namespace
 
 Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
@@ -242,9 +285,13 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
             log::warn("world '{}': hero '{}': {}", world.recipe.world, hero.name,
                       added.error().message);
         } else {
-            log::info("world '{}': hero '{}' importance {:.2f}, {:.0f} m tall, stand-off {:.0f} m",
+            // Reactions are installed after the node exists, because a route binds to a parameter
+            // and the node's parameters are registered when it is added.
+            const std::size_t routes = installHeroReactions(engine, hero);
+            log::info("world '{}': hero '{}' importance {:.2f}, {:.0f} m tall, stand-off {:.0f} m, "
+                      "{} reaction(s)",
                       world.recipe.world, hero.name, hero.importance,
-                      asset->naturalSize.y * hero.scale, hero.preferredCameraDistance);
+                      asset->naturalSize.y * hero.scale, hero.preferredCameraDistance, routes);
         }
     }
 

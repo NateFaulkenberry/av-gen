@@ -267,3 +267,51 @@ TEST_CASE("Hero placement is a pure function of the seed", "[world][hero][compos
     // A different seed is a different world, or the seed is decoration.
     CHECK(glm::length(c->plan.heroes.front().position - a->plan.heroes.front().position) > 1.0f);
 }
+
+TEST_CASE("A behaviour is only wired where it has somewhere real to go", "[world][hero]") {
+    using B = world::HeroBehaviour;
+    // The four that land on a placed node's own parameters.
+    struct Case {
+        B behaviour;
+        const char* suffix;
+        int component;
+    };
+    for (const Case c : {Case{B::EmissionPulse, "emissiveBoost", -1}, Case{B::Hover, "position", 1},
+                         Case{B::ScalePulse, "scale", -1}, Case{B::Rotation, "rotation", 1}}) {
+        const auto t = world::heroBehaviourTarget(c.behaviour);
+        INFO(world::heroBehaviourName(c.behaviour));
+        CHECK(t.supported);
+        CHECK(std::string(t.suffix) == c.suffix);
+        CHECK(t.component == c.component);
+    }
+    // A hover is vertical and a rotation is yaw. Routing either to every component would make a
+    // hero slide sideways or tumble, which looks like a bug in the modulation rather than a
+    // misrouted axis.
+    CHECK(world::heroBehaviourTarget(B::Hover).component == 1);
+    CHECK(world::heroBehaviourTarget(B::Rotation).component == 1);
+
+    // The four that need machinery a placed glTF node does not have. Each must say what it needs,
+    // because "not wired" with no reason is indistinguishable from an oversight -- and routing them
+    // at whatever is nearby would give a hero that appears to react while doing something else,
+    // which is worse than one that visibly does nothing.
+    for (const B behaviour : {B::ColorShift, B::LightBurst, B::ParticleEmission, B::Reveal}) {
+        const auto t = world::heroBehaviourTarget(behaviour);
+        INFO(world::heroBehaviourName(behaviour));
+        CHECK(!t.supported);
+        CHECK(std::string(t.suffix).empty());
+        CHECK(std::string(t.missing).length() > 8);
+    }
+}
+
+TEST_CASE("Every built-in reaction profile can actually do something", "[world][hero]") {
+    // A profile whose every behaviour is unwired is a profile that silently does nothing, which is
+    // exactly the failure the source-name validation exists to prevent one level down.
+    for (const auto& profile : world::heroReactionProfiles()) {
+        const auto wired = std::count_if(
+            profile.reactions.begin(), profile.reactions.end(), [](const world::HeroReaction& r) {
+                return world::heroBehaviourTarget(r.behaviour).supported;
+            });
+        INFO("profile '" << profile.name << "'");
+        CHECK(wired > 0);
+    }
+}

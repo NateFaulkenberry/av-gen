@@ -115,6 +115,23 @@ struct HeroPoint {
     [[nodiscard]] static Result<HeroPoint> fromJson(const nlohmann::json& j);
 };
 
+// Where a behaviour lands on a placed node: a parameter path suffix under "nodes/<hero>/" and a
+// vector component (-1 for every component).
+//
+// Only the behaviours with somewhere real to go are wired. A colour shift, a light burst, particle
+// emission and a one-shot reveal each need machinery a placed glTF node does not have -- a material
+// program with a hue input, a practical light of its own, a particle system, a trigger rather than
+// a continuous signal. Routing them at whatever happens to be nearby would produce heroes that
+// appear to react and are in fact doing something else, which is worse than a hero that visibly
+// does nothing. `missing` says what each would need.
+struct HeroBehaviourTarget {
+    const char* suffix = "";
+    int component = -1;
+    bool supported = false;
+    const char* missing = "";
+};
+[[nodiscard]] HeroBehaviourTarget heroBehaviourTarget(HeroBehaviour behaviour);
+
 // How much a hero wants to outrank the population around it, given the world's focal strength.
 // Exposed because it is the one judgement in hero placement worth testing directly.
 [[nodiscard]] float heroClearanceRadius(const HeroPoint& hero);

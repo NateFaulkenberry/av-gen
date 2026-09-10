@@ -200,6 +200,28 @@ Result<HeroPoint> HeroPoint::fromJson(const json& j) {
     return h;
 }
 
+HeroBehaviourTarget heroBehaviourTarget(HeroBehaviour behaviour) {
+    switch (behaviour) {
+    case HeroBehaviour::EmissionPulse:
+        return {"emissiveBoost", -1, true, ""};
+    case HeroBehaviour::Hover:
+        return {"position", 1, true, ""};   // Y only: a hover is vertical
+    case HeroBehaviour::ScalePulse:
+        return {"scale", -1, true, ""};
+    case HeroBehaviour::Rotation:
+        return {"rotation", 1, true, ""};   // yaw
+    case HeroBehaviour::ColorShift:
+        return {"", -1, false, "a material program with a hue input"};
+    case HeroBehaviour::LightBurst:
+        return {"", -1, false, "a practical light of its own"};
+    case HeroBehaviour::ParticleEmission:
+        return {"", -1, false, "a particle system"};
+    case HeroBehaviour::Reveal:
+        return {"", -1, false, "a one-shot trigger rather than a continuous signal"};
+    }
+    return {"", -1, false, "an unknown behaviour"};
+}
+
 float heroClearanceRadius(const HeroPoint& hero) {
     // Proportional to the hero's own footprint, not to how far the camera stands off. Tying it to
     // camera distance seems reasonable and is not: stand-off is about three times a hero's height,
