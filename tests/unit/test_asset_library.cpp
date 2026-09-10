@@ -11,6 +11,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <system_error>
 
 using namespace avgen;
 namespace fs = std::filesystem;
@@ -125,7 +126,16 @@ TEST_CASE("The grouped manifest already in the repository still loads", "[assets
 #else
     // This is the promise the whole design rests on: a semantic layer that required every existing
     // manifest to be rewritten before anything worked would not be worth having.
-    const fs::path manifest = fs::path(AVGEN_SOURCE_DIR) / "assets" / "manifest.json";
+    // Named the way the command line names it: relative to wherever the process happens to be.
+    // An absolute manifest path masks this entirely -- its parent is already absolute, so the old
+    // code produced absolute paths too and the test would pass against the bug.
+    const fs::path absolute = fs::path(AVGEN_SOURCE_DIR) / "assets" / "manifest.json";
+    REQUIRE(fs::exists(absolute));
+    std::error_code ec;
+    fs::path manifest = fs::relative(absolute, fs::current_path(), ec);
+    if (ec || manifest.empty()) {
+        SKIP("no relative path from the working directory to the manifest");
+    }
     REQUIRE(fs::exists(manifest));
     auto lib = assets::AssetLibrary::loadFile(manifest);
     INFO((lib ? std::string() : lib.error().message));
@@ -280,5 +290,48 @@ TEST_CASE("The shipped recipe loads, and its library resolves", "[world][recipe]
     INFO((lib ? std::string() : lib.error().message));
     REQUIRE(lib.has_value());
     CHECK(lib->size() > 0);
+#endif
+}
+
+TEST_CASE("a library loaded from a file resolves assets independently of the working directory",
+          "[assets][library]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    // The bug this pins: `resolve()` returned a path relative to the manifest, and its one consumer
+    // -- the AssetRegistry -- then resolved that *again* against its own base directory. For a
+    // composition that was never saved to disk that base is a temporary directory, so every layer
+    // of every generated world pointed at a file under /var/folders/.../T/ that has never existed.
+    // The render succeeded, reported no error, and drew bare terrain.
+    //
+    // Asserting "is_absolute" alone would be a weaker test than it looks: it would pass on a path
+    // that is absolute and wrong. So the file is opened.
+    // Named the way the command line names it: relative to wherever the process happens to be.
+    // An absolute manifest path masks this entirely -- its parent is already absolute, so the old
+    // code produced absolute paths too and the test would pass against the bug.
+    const fs::path absolute = fs::path(AVGEN_SOURCE_DIR) / "assets" / "manifest.json";
+    REQUIRE(fs::exists(absolute));
+    std::error_code ec;
+    fs::path manifest = fs::relative(absolute, fs::current_path(), ec);
+    if (ec || manifest.empty()) {
+        SKIP("no relative path from the working directory to the manifest");
+    }
+    REQUIRE(fs::exists(manifest));
+    auto lib = assets::AssetLibrary::loadFile(manifest);
+    REQUIRE(lib.has_value());
+    REQUIRE(lib->size() > 0);
+
+    std::size_t checked = 0;
+    for (const auto& asset : lib->assets()) {
+        if (asset.file.empty()) {
+            continue;
+        }
+        const fs::path resolved = lib->resolve(asset);
+        INFO("asset '" << asset.id << "' -> " << resolved.string());
+        CHECK(resolved.is_absolute());
+        CHECK(fs::exists(resolved));
+        ++checked;
+    }
+    CHECK(checked > 0);
 #endif
 }

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <fstream>
+#include <system_error>
 
 namespace avgen::assets {
 namespace {
@@ -307,7 +308,18 @@ Result<AssetLibrary> AssetLibrary::loadFile(const std::filesystem::path& manifes
     } catch (const json::exception& e) {
         return fail("asset manifest '{}': {}", manifest.string(), e.what());
     }
-    auto lib = fromJson(doc, manifest.parent_path());
+    // Absolute, deliberately. `resolve()` exists to hand paths to an AssetRegistry, and a registry
+    // has its own base directory -- the project file's, or a temporary one for a composition that
+    // was never saved. A relative path resolved here and then resolved *again* against that base is
+    // the bug that made every generated world render as bare terrain: 62 layers naming real files
+    // that were looked for under /var/folders/.../T/. Where the library is on disk is knowable here
+    // and nowhere downstream, so it is settled here.
+    std::error_code ec;
+    std::filesystem::path base = std::filesystem::absolute(manifest, ec).parent_path();
+    if (ec) {
+        base = manifest.parent_path();
+    }
+    auto lib = fromJson(doc, base.lexically_normal());
     if (!lib) {
         return fail("asset manifest '{}': {}", manifest.string(), lib.error().message);
     }
