@@ -15,6 +15,8 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"
     # The cinematic director is pure geometry and JSON (ADR-062); it needs no device.
     "${CMAKE_SOURCE_DIR}/src/app/cinematic.cpp"
+    # The job system is threads and state; no device needed (ADR-064).
+    "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"
     # Output mapping maths/JSON and the output set are GPU-free (milestone 1.2).
     "${CMAKE_SOURCE_DIR}/src/rendering/output_mapping.cpp"
     # Light packing, the froxel grid, the LTC fit and the cascade maths are GPU-free (ADR-033/034).
@@ -50,6 +52,8 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"
         # The cinematic director is pure geometry and JSON (ADR-062); it needs no device.
         "${CMAKE_SOURCE_DIR}/src/app/cinematic.cpp"
+        # The job system is threads and state; no device needed (ADR-064).
+        "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/output_manager_gpu.cpp")
     target_include_directories(avgen_render_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
