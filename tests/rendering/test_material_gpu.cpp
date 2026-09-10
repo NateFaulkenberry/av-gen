@@ -992,6 +992,33 @@ TEST_CASE("material field ops and program outputs match the CPU interpreter", "[
         batch.push_back(p);
     }
     checkParity(harness, batch, fields, 1.25, 1e-3f);
+
+    {
+        // Four distinct fields plus a repeat of the first (ADR-050): the shader samples each
+        // distinct field once, before the op loop, and every Field op reads its own by ordinal.
+        // Get the ordinals wrong and a Field op returns some other field's value, so this fails
+        // for any packing that does not carry them.
+        MaterialProgram p;
+        p.name = "multiField";
+        const auto fieldOp = [](int dst, const char* field) {
+            MaterialOp o = op(MaterialOpKind::Field, dst);
+            o.field = field;
+            return o;
+        };
+        p.ops.push_back(fieldOp(0, "grain"));
+        p.ops.push_back(fieldOp(1, "swirl"));
+        p.ops.push_back(fieldOp(2, "tint"));
+        p.ops.push_back(fieldOp(3, "nosuchfield"));  // a fourth distinct name, unresolved
+        p.ops.push_back(fieldOp(4, "tint"));         // the repeat shares an ordinal, not a new one
+        p.ops.push_back(op(MaterialOpKind::Add, 5, 1, 2));
+        CHECK(p.validate().has_value());
+        p.baseColorRegister = 2;
+        p.metallicRegister = 0;
+        p.roughnessRegister = 4;
+        p.emissionRegister = 5;   // the unclamped lane
+        p.opacityRegister = 3;
+        checkParity(harness, {p}, fields, 1.25, 1e-3f);
+    }
     CHECK(ctx->errorCount() == 0);
 }
 

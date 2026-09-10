@@ -1,6 +1,6 @@
 // Procedural materials on the GPU (ADR-030, layered in ADR-036): the WGSL transliteration of
 // scene::evaluateMaterialProgram (src/scene/material_program.cpp). A packed MaterialProgramGpu
-// (5696 bytes: a 64-byte header, 4 layer records of 64 bytes and 48 ops of 112 bytes,
+// (5712 bytes: an 80-byte header, 4 layer records of 64 bytes and 48 ops of 112 bytes,
 // scene::packMaterialProgram) per slot in a *storage* MaterialProgramBlock;
 // evaluateMaterialProgram(slot, ctx, base) runs the base's ops over a register file of 8 vec4s
 // (all zero at entry), reads the outputs, then runs and composites each layer, with a register
@@ -21,7 +21,10 @@ struct MaterialOpGpu {
     seed: u32,                    // noise / voronoi lattice seed
     fieldSlot: i32,               // Field op: the FieldBlock slot, -1 when unresolved
     registers: vec4<i32>,         // dst, srcA, srcB, srcC
-    valuePad: vec4<f32>,          // x = `value` (the scalar f), yzw = 0
+    value: f32,                   // the scalar `f`
+    fieldOrdinal: i32,            // Field op: which of MaterialProgramGpu.fieldSlots, -1 = none
+    pad0: f32,
+    pad1: f32,
     constant: vec4<f32>,
     constant2: vec4<f32>,
     constant3: vec4<f32>,
@@ -41,11 +44,12 @@ struct MaterialProgramGpu {
     opacityCountPad: vec4<i32>,   // opacity register, base op count, layer count, 0
     emissionIntensityPad: vec4<f32>,
     aux: vec4<i32>,               // normal, occlusion, height registers, total op count
+    fieldSlots: vec4<i32>,        // FieldBlock slot of each distinct field named, -1 = unused
     layers: array<MaterialLayerGpu, 4>,
     ops: array<MaterialOpGpu, 48>,
 };
 
-// Mirrors rendering::MaterialProgramBlock (45584 bytes; a storage buffer since ADR-036).
+// Mirrors rendering::MaterialProgramBlock (45712 bytes; a storage buffer since ADR-036).
 struct MaterialProgramBlock {
     count: u32,
     pad0: u32,
@@ -56,6 +60,7 @@ struct MaterialProgramBlock {
 
 const MAT_MAX_OPS: u32 = 48u;
 const MAT_MAX_LAYERS: u32 = 4u;
+const MAT_MAX_FIELDS: u32 = 4u;   // scene::kMaxMaterialFields
 const MAT_MAX_PROGRAMS: i32 = 8;
 const MAT_REGISTERS: i32 = 8;
 
@@ -166,7 +171,81 @@ struct MaterialResult {
     height: f32,
 };
 
-alias MatRegs = array<vec4<f32>, 8>;
+// The register file. Eight vec4s, and deliberately *not* an array: a dynamically indexed local
+// array cannot live in registers, so on Metal it becomes thread-private indexable memory, and
+// `regs[dst] = f(regs[srcA], ...)` then becomes a loop-carried dependency through memory whose very
+// addresses arrive from another load. That chain -- not the arithmetic, and not the op fetch --
+// was a third of the interpreter's cost: see ADR-050 and the probes in
+// tests/rendering/test_material_perf.cpp. Named fields plus a select tree keep the file in
+// registers and turn the chain into ALU.
+struct MatRegs {
+    r0: vec4<f32>,
+    r1: vec4<f32>,
+    r2: vec4<f32>,
+    r3: vec4<f32>,
+    r4: vec4<f32>,
+    r5: vec4<f32>,
+    r6: vec4<f32>,
+    r7: vec4<f32>,
+};
+
+// The program's distinct field samples, one per fieldSlots entry. Four named fields, again not an
+// array: the point of the pre-pass is to keep the field evaluator out of the interpreter's loop,
+// and putting its results in indexable memory would give back what that buys.
+struct MatFields {
+    f0: vec4<f32>,
+    f1: vec4<f32>,
+    f2: vec4<f32>,
+    f3: vec4<f32>,
+};
+
+fn matFieldGet(f: MatFields, index: i32) -> vec4<f32> {
+    if (index < 0) {
+        return vec4<f32>(0.0);   // more distinct fields than kMaxMaterialFields, or none at all
+    }
+    let i = index & 3;
+    let h0 = select(f.f0, f.f1, (i & 1) != 0);
+    let h1 = select(f.f2, f.f3, (i & 1) != 0);
+    return select(h0, h1, (i & 2) != 0);
+}
+
+fn matFieldSet(f: ptr<function, MatFields>, index: i32, v: vec4<f32>) {
+    let i = index & 3;
+    (*f).f0 = select((*f).f0, v, i == 0);
+    (*f).f1 = select((*f).f1, v, i == 1);
+    (*f).f2 = select((*f).f2, v, i == 2);
+    (*f).f3 = select((*f).f3, v, i == 3);
+}
+
+fn matRegsZero() -> MatRegs {
+    return MatRegs(vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0),
+                   vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0));
+}
+
+// A balanced select tree: seven selects, branch-free, no memory. Callers have already checked the
+// index is 0..7 (materialRegisterInRange); the mask makes an unchecked one wrap rather than fault.
+fn matGet(regs: MatRegs, index: i32) -> vec4<f32> {
+    let i = index & 7;
+    let h0 = select(regs.r0, regs.r1, (i & 1) != 0);
+    let h1 = select(regs.r2, regs.r3, (i & 1) != 0);
+    let h2 = select(regs.r4, regs.r5, (i & 1) != 0);
+    let h3 = select(regs.r6, regs.r7, (i & 1) != 0);
+    let q0 = select(h0, h1, (i & 2) != 0);
+    let q1 = select(h2, h3, (i & 2) != 0);
+    return select(q0, q1, (i & 4) != 0);
+}
+
+fn matSet(regs: ptr<function, MatRegs>, index: i32, v: vec4<f32>) {
+    let i = index & 7;
+    (*regs).r0 = select((*regs).r0, v, i == 0);
+    (*regs).r1 = select((*regs).r1, v, i == 1);
+    (*regs).r2 = select((*regs).r2, v, i == 2);
+    (*regs).r3 = select((*regs).r3, v, i == 3);
+    (*regs).r4 = select((*regs).r4, v, i == 4);
+    (*regs).r5 = select((*regs).r5, v, i == 5);
+    (*regs).r6 = select((*regs).r6, v, i == 6);
+    (*regs).r7 = select((*regs).r7, v, i == 7);
+}
 
 fn materialContextZero() -> MaterialContext {
     var ctx: MaterialContext;
@@ -392,35 +471,54 @@ fn materialRegisterInRange(r: i32) -> bool {
     return r >= 0 && r < MAT_REGISTERS;
 }
 
-// Evaluates one op against the register file; the caller writes the result to reg[dst].
-fn materialEvalOp(op: MaterialOpGpu, ctx: MaterialContext, regs: MatRegs) -> vec4<f32> {
-    let a = regs[op.registers.y];
-    let b = regs[op.registers.z];
-    let c = regs[op.registers.w];
-    let k = op.constant;
-    let f = op.valuePad.x;
-    if (op.kind == MAT_OP_INPUT) {
-        return materialInputValue(op.input, ctx);
+// The op record read one field at a time. `let op = ...ops[oi]` instead copies all 112 bytes into
+// the live set of every op, and on this backend the live set is what costs: the interpreter's
+// dependency chain can only be hidden by occupancy, and occupancy is what a large live set spends.
+// Reading through these lets each constant sink into the one branch that wants it, which is worth
+// 16% of the interpreter (ADR-050).
+fn matOpInput(pi: u32, oi: u32) -> u32 { return materialPrograms.programs[pi].ops[oi].input; }
+fn matOpSeed(pi: u32, oi: u32) -> u32 { return materialPrograms.programs[pi].ops[oi].seed; }
+fn matOpFieldOrdinal(pi: u32, oi: u32) -> i32 { return materialPrograms.programs[pi].ops[oi].fieldOrdinal; }
+fn matOpConstant2(pi: u32, oi: u32) -> vec4<f32> { return materialPrograms.programs[pi].ops[oi].constant2; }
+fn matOpConstant3(pi: u32, oi: u32) -> vec4<f32> { return materialPrograms.programs[pi].ops[oi].constant3; }
+fn matOpConstant4(pi: u32, oi: u32) -> vec4<f32> { return materialPrograms.programs[pi].ops[oi].constant4; }
+
+// Evaluates one op against the register file; the caller writes the result to register `dst`.
+// Takes the op by (program, index) rather than by value: a `let op = ...ops[oi]` copies all 112
+// bytes into the live set of every op, and it is that live set, not the loads, that costs --
+// the interpreter's register-to-register dependency chain is only hidable by occupancy.
+// Reading each field where it is used lets the four constants sink into the five branches
+// that want them.
+fn materialEvalOp(pi: u32, oi: u32, ctx: MaterialContext, regs: MatRegs, fields: MatFields) -> vec4<f32> {
+    let kind = materialPrograms.programs[pi].ops[oi].kind;
+    let reg = materialPrograms.programs[pi].ops[oi].registers;
+    let a = matGet(regs, reg.y);
+    let b = matGet(regs, reg.z);
+    let c = matGet(regs, reg.w);
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    if (kind == MAT_OP_INPUT) {
+        return materialInputValue(matOpInput(pi, oi), ctx);
     }
-    if (op.kind == MAT_OP_CONSTANT) {
+    if (kind == MAT_OP_CONSTANT) {
         return k;
     }
-    if (op.kind == MAT_OP_GRADIENT) {
+    if (kind == MAT_OP_GRADIENT) {
         return vec4<f32>(saturate(dot(a.xyz, k.xyz) * f + k.w));
     }
-    if (op.kind == MAT_OP_NOISE) {
-        return vec4<f32>(fbm3(a.xyz * f + k.xyz, op.seed));
+    if (kind == MAT_OP_NOISE) {
+        return vec4<f32>(fbm3(a.xyz * f + k.xyz, matOpSeed(pi, oi)));
     }
-    if (op.kind == MAT_OP_VORONOI) {
-        return vec4<f32>(voronoiF1(a.xyz * f + k.xyz, op.seed));
+    if (kind == MAT_OP_VORONOI) {
+        return vec4<f32>(voronoiF1(a.xyz * f + k.xyz, matOpSeed(pi, oi)));
     }
-    if (op.kind == MAT_OP_FRESNEL) {
+    if (kind == MAT_OP_FRESNEL) {
         return vec4<f32>(matPow1(1.0 - saturate(dot(ctx.normal, ctx.viewDirection)), f));
     }
-    if (op.kind == MAT_OP_RAMP) {
-        return ramp3(op.constant, op.constant2, op.constant3, a.x);
+    if (kind == MAT_OP_RAMP) {
+        return ramp3(k, matOpConstant2(pi, oi), matOpConstant3(pi, oi), a.x);
     }
-    if (op.kind == MAT_OP_REMAP) {
+    if (kind == MAT_OP_REMAP) {
         let inSpan = k.y - k.x;
         var u = vec4<f32>(0.0);
         if (inSpan != 0.0) {
@@ -432,80 +530,80 @@ fn materialEvalOp(op: MaterialOpGpu, ctx: MaterialContext, regs: MatRegs) -> vec
         }
         return remapped;
     }
-    if (op.kind == MAT_OP_MULTIPLY) {
+    if (kind == MAT_OP_MULTIPLY) {
         return a * b;
     }
-    if (op.kind == MAT_OP_ADD) {
+    if (kind == MAT_OP_ADD) {
         return a + b;
     }
-    if (op.kind == MAT_OP_MIX) {
+    if (kind == MAT_OP_MIX) {
         return matMix4(a, b, f);
     }
-    if (op.kind == MAT_OP_MIXBY) {
+    if (kind == MAT_OP_MIXBY) {
         return matMix4(a, b, c.x);
     }
-    if (op.kind == MAT_OP_POWER) {
+    if (kind == MAT_OP_POWER) {
         return matPow4(max(a, vec4<f32>(0.0)), f);
     }
-    if (op.kind == MAT_OP_SMOOTHSTEP) {
+    if (kind == MAT_OP_SMOOTHSTEP) {
         return matSmoothstep4(k.x, k.y, a);
     }
-    if (op.kind == MAT_OP_THRESHOLD) {
+    if (kind == MAT_OP_THRESHOLD) {
         return select(vec4<f32>(0.0), vec4<f32>(1.0), a >= vec4<f32>(f));
     }
-    if (op.kind == MAT_OP_HUESHIFT) {
+    if (kind == MAT_OP_HUESHIFT) {
         return vec4<f32>(hueShift(a.xyz, f + b.x), a.w);
     }
-    if (op.kind == MAT_OP_SATURATE) {
+    if (kind == MAT_OP_SATURATE) {
         return vec4<f32>(colorSaturate(a.xyz, f), a.w);
     }
-    if (op.kind == MAT_OP_PALETTE) {
-        return vec4<f32>(cosinePalette(op.constant.xyz, op.constant2.xyz, op.constant3.xyz, op.constant4.xyz,
-                                       a.x + f),
+    if (kind == MAT_OP_PALETTE) {
+        return vec4<f32>(cosinePalette(k.xyz, matOpConstant2(pi, oi).xyz, matOpConstant3(pi, oi).xyz,
+                                       matOpConstant4(pi, oi).xyz, a.x + f),
                          1.0);
     }
-    if (op.kind == MAT_OP_FIELD) {
-        return materialFieldValue(op.fieldSlot, ctx.worldPosition);
+    if (kind == MAT_OP_FIELD) {
+        return matFieldGet(fields, matOpFieldOrdinal(pi, oi));
     }
-    if (op.kind == MAT_OP_TRIPLANAR) {
+    if (kind == MAT_OP_TRIPLANAR) {
         let p = a.xyz * f + k.xyz;
-        let w = matTriplanarWeights(ctx.normal, op.constant2.x);
-        let sx = fbm3(vec3<f32>(p.y, p.z, 0.0), op.seed);
-        let sy = fbm3(vec3<f32>(p.z, p.x, 0.0), op.seed);
-        let sz = fbm3(vec3<f32>(p.x, p.y, 0.0), op.seed);
+        let w = matTriplanarWeights(ctx.normal, matOpConstant2(pi, oi).x);
+        let sx = fbm3(vec3<f32>(p.y, p.z, 0.0), matOpSeed(pi, oi));
+        let sy = fbm3(vec3<f32>(p.z, p.x, 0.0), matOpSeed(pi, oi));
+        let sz = fbm3(vec3<f32>(p.x, p.y, 0.0), matOpSeed(pi, oi));
         return vec4<f32>(w.x * sx + w.y * sy + w.z * sz);
     }
-    if (op.kind == MAT_OP_WORLD_PROJECT) {
+    if (kind == MAT_OP_WORLD_PROJECT) {
         return vec4<f32>(ctx.worldPosition * f + k.xyz, 1.0);
     }
-    if (op.kind == MAT_OP_OBJECT_PROJECT) {
+    if (kind == MAT_OP_OBJECT_PROJECT) {
         return vec4<f32>(ctx.localPosition * f + k.xyz, 1.0);
     }
-    if (op.kind == MAT_OP_HEIGHT_BLEND) {
+    if (kind == MAT_OP_HEIGHT_BLEND) {
         return vec4<f32>(matHeightBlend(a.x, b.x, c.x, f));
     }
-    if (op.kind == MAT_OP_DETAIL_NORMAL) {
+    if (kind == MAT_OP_DETAIL_NORMAL) {
         return vec4<f32>(matReorientNormal(a.xyz, b.xyz), 0.0);
     }
-    if (op.kind == MAT_OP_CURVATURE_MASK) {
+    if (kind == MAT_OP_CURVATURE_MASK) {
         return vec4<f32>(matSmoothstep1(k.x, k.y, ctx.curvature * f));
     }
-    if (op.kind == MAT_OP_EDGE_WEAR) {
+    if (kind == MAT_OP_EDGE_WEAR) {
         let edge = saturate(max(ctx.curvature, 0.0) * f);
-        let nz = fbm3(ctx.worldPosition * k.x + vec3<f32>(k.y, k.z, k.w), op.seed);
-        let influence = saturate(op.constant2.x);
+        let nz = fbm3(ctx.worldPosition * k.x + vec3<f32>(k.y, k.z, k.w), matOpSeed(pi, oi));
+        let influence = saturate(matOpConstant2(pi, oi).x);
         let v = edge * (1.0 - influence + influence * nz);
-        return vec4<f32>(matSmoothstep1(op.constant2.y, op.constant2.z, v));
+        return vec4<f32>(matSmoothstep1(matOpConstant2(pi, oi).y, matOpConstant2(pi, oi).z, v));
     }
-    if (op.kind == MAT_OP_DECAL_BOX) {
-        let halfExtent = max(abs(op.constant2.xyz), vec3<f32>(1e-4));
+    if (kind == MAT_OP_DECAL_BOX) {
+        let halfExtent = max(abs(matOpConstant2(pi, oi).xyz), vec3<f32>(1e-4));
         let q = (ctx.worldPosition - k.xyz) / halfExtent;
         let soft = saturate(f);
         let mask =
             matDecalFalloff(abs(q.x), soft) * matDecalFalloff(abs(q.y), soft) * matDecalFalloff(abs(q.z), soft);
         return vec4<f32>(q.x * 0.5 + 0.5, q.y * 0.5 + 0.5, mask, mask);
     }
-    if (op.kind == MAT_OP_ANISOTROPY) {
+    if (kind == MAT_OP_ANISOTROPY) {
         let roughness = max(a.x, 0.0);
         let alpha = roughness * roughness;
         let aniso = clamp(f, -0.95, 0.95);
@@ -526,18 +624,18 @@ fn materialEvalOp(op: MaterialOpGpu, ctx: MaterialContext, regs: MatRegs) -> vec
         let alphaEff = sqrt(alphaT * alphaT * cos2 + alphaB * alphaB * (1.0 - cos2));
         return vec4<f32>(sqrt(alphaEff));
     }
-    if (op.kind == MAT_OP_ROUGHNESS_FILTER) {
+    if (kind == MAT_OP_ROUGHNESS_FILTER) {
         let roughness = max(a.x, 0.0);
         let alpha = roughness * roughness;
         let kernel = min(2.0 * max(f, 0.0) * max(ctx.normalVariance, 0.0), 0.18);
         return vec4<f32>(sqrt(min(alpha + kernel, 1.0)));
     }
-    if (op.kind == MAT_OP_MICRO_DETAIL) {
+    if (kind == MAT_OP_MICRO_DETAIL) {
         let p = a.xyz * f + k.xyz;
         let fade = saturate(1.0 - ctx.footprint * abs(f) * 2.0);
-        return vec4<f32>(0.5 + (fbm3(p, op.seed) - 0.5) * fade);
+        return vec4<f32>(0.5 + (fbm3(p, matOpSeed(pi, oi)) - 0.5) * fade);
     }
-    if (op.kind == MAT_OP_SWIZZLE) {
+    if (kind == MAT_OP_SWIZZLE) {
         // `constant` names the source component of each output channel. The default all-zero
         // constant broadcasts x, which is the case that matters: it takes a value that arrived in
         // some other channel and puts it where every mask op looks for it.
@@ -546,8 +644,35 @@ fn materialEvalOp(op: MaterialOpGpu, ctx: MaterialContext, regs: MatRegs) -> vec
     return vec4<f32>(0.0);
 }
 
+// Samples the program's distinct fields once, before any op runs.
+//
+// This is the single largest thing in the interpreter's cost, and not for the reason it looks
+// like. A Field op inlines fields.wgsl's whole evaluator -- combineScalar's four-child loop over
+// basicScalar, each of those a grid fetch, a falloff and a noise -- into the *body of the op
+// loop*, and the loop body's size is what sets the shader's register allocation and so its
+// occupancy. Every material program paid for that, including ones with no Field op and including
+// programs of zero ops: measured at 2.2x on an M2 Max. The same evaluator called from outside the
+// loop costs nothing measurable.
+//
+// Hoisting is exact rather than an approximation: a Field op's value is materialFieldValue(slot,
+// ctx.worldPosition), and neither argument changes while the program runs. Ops naming the same
+// field share an ordinal, so each field is sampled once however often it is read.
+fn materialFieldPrepass(pi: u32, p: vec3<f32>) -> MatFields {
+    let slots = materialPrograms.programs[pi].fieldSlots;
+    var f = MatFields(vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0));
+    // A loop rather than four calls: one inlined copy of the evaluator is the whole point.
+    for (var k = 0; k < i32(MAT_MAX_FIELDS); k = k + 1) {
+        let slot = slots[k];
+        if (slot >= 0) {
+            matFieldSet(&f, k, materialFieldValue(slot, p));
+        }
+    }
+    return f;
+}
+
 // Runs ops [first, first + count) of program `pi` over `regs`.
-fn materialRunOps(pi: u32, first: u32, count: u32, ctx: MaterialContext, regsIn: MatRegs) -> MatRegs {
+fn materialRunOps(pi: u32, first: u32, count: u32, ctx: MaterialContext, regsIn: MatRegs,
+                  fields: MatFields) -> MatRegs {
     var regs = regsIn;
     for (var i = 0u; i < MAT_MAX_OPS; i = i + 1u) {
         if (i >= count) {
@@ -557,13 +682,13 @@ fn materialRunOps(pi: u32, first: u32, count: u32, ctx: MaterialContext, regsIn:
         if (index >= MAT_MAX_OPS) {
             break;
         }
-        let op = materialPrograms.programs[pi].ops[index];
-        let dst = op.registers.x;
-        if (!materialRegisterInRange(dst) || !materialRegisterInRange(op.registers.y) ||
-            !materialRegisterInRange(op.registers.z) || !materialRegisterInRange(op.registers.w)) {
+        let reg = materialPrograms.programs[pi].ops[index].registers;
+        let dst = reg.x;
+        if (!materialRegisterInRange(dst) || !materialRegisterInRange(reg.y) ||
+            !materialRegisterInRange(reg.z) || !materialRegisterInRange(reg.w)) {
             continue;
         }
-        regs[dst] = materialEvalOp(op, ctx, regs);
+        matSet(&regs, dst, materialEvalOp(pi, index, ctx, regs, fields));
     }
     return regs;
 }
@@ -575,39 +700,39 @@ fn evaluateMaterialProgram(programIndex: i32, ctx: MaterialContext, base: Materi
         return base;
     }
     let pi = u32(programIndex);
-    var regs = MatRegs(vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0),
-                       vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0));
+    var regs = matRegsZero();
     var local = ctx;
+    let fields = materialFieldPrepass(pi, ctx.worldPosition);
     let baseCount = u32(max(materialPrograms.programs[pi].opacityCountPad.y, 0));
-    regs = materialRunOps(pi, 0u, baseCount, local, regs);
+    regs = materialRunOps(pi, 0u, baseCount, local, regs, fields);
 
     var result = base;
     let outputs = materialPrograms.programs[pi].outputs;
     let opacityRegister = materialPrograms.programs[pi].opacityCountPad.x;
     let aux = materialPrograms.programs[pi].aux;
     if (materialRegisterInRange(outputs.x)) {
-        result.baseColor = max(regs[outputs.x].xyz, vec3<f32>(0.0));
+        result.baseColor = max(matGet(regs, outputs.x).xyz, vec3<f32>(0.0));
     }
     if (materialRegisterInRange(outputs.y)) {
-        result.metallic = saturate(regs[outputs.y].x);
+        result.metallic = saturate(matGet(regs, outputs.y).x);
     }
     if (materialRegisterInRange(outputs.z)) {
-        result.roughness = saturate(regs[outputs.z].x);
+        result.roughness = saturate(matGet(regs, outputs.z).x);
     }
     if (materialRegisterInRange(outputs.w)) {
-        result.emission = regs[outputs.w].xyz * materialPrograms.programs[pi].emissionIntensityPad.x;
+        result.emission = matGet(regs, outputs.w).xyz * materialPrograms.programs[pi].emissionIntensityPad.x;
     }
     if (materialRegisterInRange(opacityRegister)) {
-        result.opacity = saturate(regs[opacityRegister].x);
+        result.opacity = saturate(matGet(regs, opacityRegister).x);
     }
     if (materialRegisterInRange(aux.x)) {
-        result.normal = matSafeNormalize(regs[aux.x].xyz, vec3<f32>(0.0, 0.0, 1.0));
+        result.normal = matSafeNormalize(matGet(regs, aux.x).xyz, vec3<f32>(0.0, 0.0, 1.0));
     }
     if (materialRegisterInRange(aux.y)) {
-        result.occlusion = saturate(regs[aux.y].x);
+        result.occlusion = saturate(matGet(regs, aux.y).x);
     }
     if (materialRegisterInRange(aux.z)) {
-        result.height = regs[aux.z].x;
+        result.height = matGet(regs, aux.z).x;
     }
 
     // ---- layers (ADR-036) ----
@@ -618,34 +743,34 @@ fn evaluateMaterialProgram(programIndex: i32, ctx: MaterialContext, base: Materi
         }
         let layer = materialPrograms.programs[pi].layers[li];
         local.height = result.height;
-        regs = materialRunOps(pi, u32(max(layer.range.x, 0)), u32(max(layer.range.y, 0)), local, regs);
+        regs = materialRunOps(pi, u32(max(layer.range.x, 0)), u32(max(layer.range.y, 0)), local, regs, fields);
         var mask = 1.0;
         if (materialRegisterInRange(layer.aux.z)) {
-            mask = saturate(regs[layer.aux.z].x);
+            mask = saturate(matGet(regs, layer.aux.z).x);
         }
         var layerHeight = 0.0;
         if (materialRegisterInRange(layer.aux.w)) {
-            layerHeight = regs[layer.aux.w].x;
+            layerHeight = matGet(regs, layer.aux.w).x;
         }
         let t = matHeightBlend(result.height, layerHeight, mask, layer.params.y);
         if (materialRegisterInRange(layer.outputs.x)) {
-            result.baseColor = mix(result.baseColor, max(regs[layer.outputs.x].xyz, vec3<f32>(0.0)), t);
+            result.baseColor = mix(result.baseColor, max(matGet(regs, layer.outputs.x).xyz, vec3<f32>(0.0)), t);
         }
         if (materialRegisterInRange(layer.outputs.y)) {
-            result.metallic = mix(result.metallic, saturate(regs[layer.outputs.y].x), t);
+            result.metallic = mix(result.metallic, saturate(matGet(regs, layer.outputs.y).x), t);
         }
         if (materialRegisterInRange(layer.outputs.z)) {
-            result.roughness = mix(result.roughness, saturate(regs[layer.outputs.z].x), t);
+            result.roughness = mix(result.roughness, saturate(matGet(regs, layer.outputs.z).x), t);
         }
         if (materialRegisterInRange(layer.outputs.w)) {
-            result.emission = mix(result.emission, regs[layer.outputs.w].xyz * layer.params.x, t);
+            result.emission = mix(result.emission, matGet(regs, layer.outputs.w).xyz * layer.params.x, t);
         }
         if (materialRegisterInRange(layer.aux.x)) {
-            let value = matSafeNormalize(regs[layer.aux.x].xyz, vec3<f32>(0.0, 0.0, 1.0));
+            let value = matSafeNormalize(matGet(regs, layer.aux.x).xyz, vec3<f32>(0.0, 0.0, 1.0));
             result.normal = matSafeNormalize(mix(result.normal, value, t), vec3<f32>(0.0, 0.0, 1.0));
         }
         if (materialRegisterInRange(layer.aux.y)) {
-            result.occlusion = mix(result.occlusion, saturate(regs[layer.aux.y].x), t);
+            result.occlusion = mix(result.occlusion, saturate(matGet(regs, layer.aux.y).x), t);
         }
         result.height = mix(result.height, layerHeight, t);
     }

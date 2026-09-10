@@ -270,9 +270,10 @@ the ground. Cutting it from twenty ops to eight took that to 14.6 ms.
 | the original | 20 | 64.7 |
 
 That is roughly **1.6 ms per op over a full-screen surface at five megapixels**, and it is linear in
-op count, so the interpreter's loop does exit early. What it does not do is exit cheaply: the shape
-of the cost is a per-pixel read of the program's own op records out of a storage buffer, which at
-this size is gigabytes of buffer traffic per frame. The depth prepass and the shadow passes do not
+op count, so the interpreter's loop does exit early. What it does not do is exit cheaply. The reason
+given here -- a per-pixel read of the program's own op records out of a storage buffer, gigabytes of
+traffic per frame -- **is wrong, and the next section takes it apart.** The fetch is about a fifth
+of it. The depth prepass and the shadow passes do not
 run it -- `fs_depth` only does alpha masking -- so this is the main pass alone.
 
 The practical consequence for anything authoring a material program: **op count is the cost, and it
@@ -281,6 +282,70 @@ three-stop ramps crossed over in the middle to one three-stop ramp, which for an
 means its second and fourth entries stop being distinct stops and become the interpolations between
 the ones that remain. That is what an ordered set is for, and on screen the difference is not
 visible.
+
+## The interpreter, taken apart (2026-09-09, ADR-050)
+
+**The section above is right about the number and wrong about the reason.** It is not the fetch.
+
+A compute probe of 5.18 M invocations, one `evaluateMaterialProgram` each
+(`tests/rendering/test_material_perf.cpp`, `[.perf][material]`), reproduced the cost at 0.78 ms per
+op in a bare dispatch and then bisected it:
+
+| what the probe runs, 20 iterations | ms per op |
+|---|---|
+| 20 x `Constant` -- the interpreter, no arithmetic at all | 0.781 |
+| 20 x `Noise` -- the interpreter, a full fbm3 per op | 0.943 |
+| only the 112-byte storage fetch of an op record | 0.145 |
+| only a dynamically indexed `array<vec4<f32>, 8>` read-modify-write | 0.271 |
+| the fetch **plus the whole 31-branch `materialEvalOp` body** | 0.110 |
+
+A `Constant` op does no arithmetic and an fbm3 does a hundred ops' worth, and they are 21% apart:
+**it is not the arithmetic.** The fetch is a fifth of the cost, and fetching a record and running
+the entire op switch over it is *cheaper* than fetching it and adding up its fields, because the
+compiler sinks each load into the branch that wants it: **it is not the fetch either.**
+
+It was two things, both about the *loop body* rather than any op:
+
+1. **The register file lived in memory.** A dynamically indexed local array cannot be held in
+   registers, so `regs[dst] = f(regs[srcA], ...)` was a loop-carried dependency through
+   thread-private indexable memory, with the addresses themselves arriving from another load.
+2. **A Field op inlined the whole of `fields.wgsl`** -- `combineScalar`'s four-child loop over
+   `basicScalar`, each a grid fetch, a falloff and a noise -- into the op loop's body. The body's
+   size sets the shader's register allocation and so its occupancy, so **every material program paid
+   for that, including programs with no Field op and including a program of zero ops.**
+
+The second is the larger of the two and the one no amount of reasoning about buffer traffic would
+have found. Deleting that one branch took a program of *no ops at all* from 1.39 ms to 0.47.
+
+Both fixed (ADR-050): the register file is eight named vec4s reached through a select tree, and
+every distinct field is sampled once before the interpreter runs -- exact, because a Field op's
+value depends only on its slot and the world position, neither of which changes while a program
+runs. Interleaved A/B with both interpreters compiled into one process:
+
+| program | before | after |
+|---|---|---|
+| 20 x `Constant` | 0.781 ms/op | **0.263** |
+| 20 x `Mix` | 0.782 | **0.282** |
+| 20 x `Noise` | 0.943 | **0.684** |
+| terrain-shaped, 12 ops | 1.150 | **0.424** |
+| a program of zero ops (the fixed cost of having one) | 1.75 ms | **0.70 ms** |
+
+Glowmere at 2880x1800, 60 frames, two binaries interleaved four times each, minimum:
+
+| variant | before | after | saved |
+|---|---|---|---|
+| full | 60.3 ms/frame | **45.7** | 14.7 ms |
+| ecology off | 57.2 | **37.5** | 19.7 ms |
+
+`examples/world/terrain.scene.json` is bit-identical before and after.
+
+**The measurement method is the other result.** Two other agents were building and benchmarking
+throughout, and the same probe read 1.44 ms and 2.77 ms for the identical workload twenty minutes
+apart. Nothing here is a difference between two runs. Every number is an interleaved A/B inside one
+process -- for the shader, two `ShaderLibrary` search paths so both versions compile into the same
+binary; for the frame, two `avgen` binaries alternated, the older one pointed at the older shaders
+through `AVGEN_SHADER_DIR` -- and the statistic is the **minimum**, not the median, because
+contention is never negative.
 
 ## P2: empty indirect draws (2026-09-09)
 

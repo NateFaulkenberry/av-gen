@@ -753,6 +753,27 @@ Result<void> MaterialProgram::validate() const {
     if (auto ok = checkOps(ops, ""); !ok) {
         return ok;
     }
+    // The shader samples every distinct field once before the interpreter loop, into a fixed file
+    // of kMaxMaterialFields (ADR-050), so this is a hard limit rather than a performance hint.
+    std::vector<std::string> fieldNames;
+    const auto collectFields = [&fieldNames](const std::vector<MaterialOp>& list) {
+        for (const MaterialOp& op : list) {
+            if (op.enabled && op.kind == MaterialOpKind::Field &&
+                std::find(fieldNames.begin(), fieldNames.end(), op.field) == fieldNames.end()) {
+                fieldNames.push_back(op.field);
+            }
+        }
+    };
+    collectFields(ops);
+    for (const MaterialLayer& layer : layers) {
+        if (layer.enabled) {
+            collectFields(layer.ops);
+        }
+    }
+    if (fieldNames.size() > static_cast<std::size_t>(kMaxMaterialFields)) {
+        return fail("material '{}': at most {} distinct fields across the base and its layers (got {})", name,
+                    kMaxMaterialFields, fieldNames.size());
+    }
     if (!outputRegisterOk(baseColorRegister) || !outputRegisterOk(metallicRegister) ||
         !outputRegisterOk(roughnessRegister) || !outputRegisterOk(emissionRegister) ||
         !outputRegisterOk(opacityRegister) || !outputRegisterOk(normalRegister) ||
@@ -1019,6 +1040,8 @@ MaterialResult evaluateMaterialProgram(const MaterialProgram& program, const Mat
 MaterialProgramGpu packMaterialProgramWithSlots(const MaterialProgram& program,
                                                 const std::vector<std::pair<std::string, int>>& slots) {
     MaterialProgramGpu gpu{};
+    gpu.fieldSlots = glm::ivec4(-1);
+    std::vector<std::string> fieldNames; // distinct field names, in order of first use
     gpu.outputs = glm::ivec4(program.baseColorRegister, program.metallicRegister, program.roughnessRegister,
                              program.emissionRegister);
     gpu.emissionIntensityPad = glm::vec4(program.emissionIntensity, 0.0f, 0.0f, 0.0f);
@@ -1033,15 +1056,28 @@ MaterialProgramGpu packMaterialProgramWithSlots(const MaterialProgram& program,
             g.input = static_cast<std::uint32_t>(op.input);
             g.seed = op.seed;
             g.fieldSlot = -1;
+            g.fieldOrdinal = -1;
             if (op.kind == MaterialOpKind::Field) {
                 const auto it = std::find_if(slots.begin(), slots.end(),
                                              [&op](const auto& slot) { return slot.first == op.field; });
                 if (it != slots.end()) {
                     g.fieldSlot = it->second;
                 }
+                // Ops naming the same field share an ordinal, so the shader's pre-pass samples each
+                // distinct field once. Beyond kMaxMaterialFields the ordinal stays -1 and the op
+                // reads zero, which is what an unresolved field already does; validate() rejects
+                // such a program, exactly as it does one with more than kMaxMaterialOps ops.
+                const auto known = std::find(fieldNames.begin(), fieldNames.end(), op.field);
+                if (known != fieldNames.end()) {
+                    g.fieldOrdinal = static_cast<std::int32_t>(known - fieldNames.begin());
+                } else if (fieldNames.size() < static_cast<std::size_t>(kMaxMaterialFields)) {
+                    g.fieldOrdinal = static_cast<std::int32_t>(fieldNames.size());
+                    gpu.fieldSlots[static_cast<int>(fieldNames.size())] = g.fieldSlot;
+                    fieldNames.push_back(op.field);
+                }
             }
             g.registers = glm::ivec4(op.dst, op.srcA, op.srcB, op.srcC);
-            g.valuePad = glm::vec4(op.value, 0.0f, 0.0f, 0.0f);
+            g.value = op.value;
             g.constant = op.constant;
             g.constant2 = op.constant2;
             g.constant3 = op.constant3;

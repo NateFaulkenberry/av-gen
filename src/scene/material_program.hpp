@@ -109,6 +109,10 @@ struct MaterialOp {
 };
 constexpr int kMaxMaterialOps = 48;   // ADR-036 (was 16); shared by the base and every layer
 constexpr int kMaterialRegisters = 8;
+// Distinct fields one program may name (ADR-050). Field ops are evaluated once each, before the
+// interpreter's loop, because the field evaluator inlined into that loop costs every material
+// program 2.2x whether or not it uses one -- see docs/performance.md.
+constexpr int kMaxMaterialFields = 4;
 constexpr int kMaxMaterialLayers = 4;
 
 // One layer over the base (ADR-036). Its ops run after the base's, over the same registers, and
@@ -218,7 +222,7 @@ struct MaterialResult {
 [[nodiscard]] MaterialResult evaluateMaterialProgram(const MaterialProgram& program, const MaterialContext& ctx,
                                                      const MaterialResult& base);
 
-// GPU packing (see shaders/material.wgsl): a 64-byte header, kMaxMaterialLayers 64-byte layer
+// GPU packing (see shaders/material.wgsl): an 80-byte header, kMaxMaterialLayers 64-byte layer
 // records and kMaxMaterialOps 112-byte ops.
 struct alignas(16) MaterialOpGpu {
     std::uint32_t kind;
@@ -226,7 +230,10 @@ struct alignas(16) MaterialOpGpu {
     std::uint32_t seed;
     std::int32_t fieldSlot;
     glm::ivec4 registers;        // dst, srcA, srcB, srcC
-    glm::vec4 valuePad;          // value, 0, 0, 0
+    float value;                 // the scalar `f`
+    std::int32_t fieldOrdinal;   // Field op: which of MaterialProgramGpu::fieldSlots, -1 = none
+    float pad0;
+    float pad1;
     glm::vec4 constant;
     glm::vec4 constant2;
     glm::vec4 constant3;
@@ -245,10 +252,12 @@ struct alignas(16) MaterialProgramGpu {
     glm::ivec4 opacityCountPad;  // opacity register, base op count, layer count, 0
     glm::vec4 emissionIntensityPad;
     glm::ivec4 aux;              // normal, occlusion, height registers, total op count
+    glm::ivec4 fieldSlots;       // FieldBlock slot of each distinct field the program names, -1 = unused
     std::array<MaterialLayerGpu, kMaxMaterialLayers> layers;
     std::array<MaterialOpGpu, kMaxMaterialOps> ops;
 };
-static_assert(sizeof(MaterialProgramGpu) == 64 + 64 * kMaxMaterialLayers + 112 * kMaxMaterialOps);
+static_assert(sizeof(MaterialProgramGpu) == 80 + 64 * kMaxMaterialLayers + 112 * kMaxMaterialOps);
+static_assert(kMaxMaterialFields == 4); // fieldSlots is one ivec4
 // `fieldSlotOf` maps a field name to a GPU slot (-1 when unknown).
 template <typename SlotFn>
 MaterialProgramGpu packMaterialProgram(const MaterialProgram& program, SlotFn&& fieldSlotOf);

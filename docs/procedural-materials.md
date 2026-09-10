@@ -106,7 +106,7 @@ them as given so the CPU reference and the shader evaluate the same numbers.
 | `hueShift` | a, b | `rgb = hueShift(a.rgb, f + b.x)` (OKLCH, turns), `w = a.w` |
 | `saturate` | a | `rgb = saturate(a.rgb, f)` (OKLab chroma × f), `w = a.w` |
 | `palette` | a | `rgb = k.xyz + k2.xyz * cos(2π (k3.xyz * (a.x + f) + k4.xyz))`, `w = 1` |
-| `field` | – | `fieldColor(fieldSlot, worldPosition)`; scalar fields broadcast to all four components, vector fields `(x, y, z, 0)`; unknown slot (`-1`) → zeros |
+| `field` | – | `fieldColor(fieldSlot, worldPosition)`; scalar fields broadcast to all four components, vector fields `(x, y, z, 0)`; unknown slot (`-1`) → zeros. Sampled once per distinct field before any op runs (ADR-050), which is exact: the value depends on nothing the program computes |
 
 ADR-036 adds the ops below. `p` is `a.xyz * f + k.xyz` where they take a position; `N` and `V` are
 the fragment's normal and view direction.
@@ -194,6 +194,11 @@ input, so a second layer can mask itself against what the first one did.
 than that, more than four layers, and any register outside 0..7 (outputs: -1..7) in a base or a
 layer.
 
+**And so is the field budget**: a program may name at most **four distinct fields** across its base
+and its layers (`kMaxMaterialFields`; repeats of a name are free, and disabled ops do not count).
+This is not a style guide, it is what the shader can sample before the op loop starts — see ADR-050,
+which is also why Field ops became cheap.
+
 ## Multi-scale authoring
 
 Multi-scale detail is a *convention*, not a mechanism. A surface that reads as a real material
@@ -233,8 +238,8 @@ Scales, in practice, for an object a few metres across: macro at 0.2–1 cycles 
 Each op writes `"kind"` and only its non-default members: `enabled` (true), `dst`/`srcA`/
 `srcB`/`srcC` (0), `value` (1), `constant`…`constant4` (`[0,0,0,0]`), `seed` (1), `input`
 (`worldPosition`), `field` (""). `validate()` rejects more than 48 ops across the base and its
-layers, more than four layers, register indices outside 0..7, output registers outside -1..7 and
-`field` ops without a name; `fromJson` validates. `structuralHash()` covers every member (name,
+layers, more than four layers, more than four distinct field names, register indices outside 0..7,
+output registers outside -1..7 and `field` ops without a name; `fromJson` validates. `structuralHash()` covers every member (name,
 every op member, outputs, emission intensity, and every layer).
 
 The ADR-036 members are written only when they are used: a program with no layers, no normal, no
@@ -249,16 +254,18 @@ written against ADR-030 still loads, still validates and still evaluates to the 
 | 16 | `opacityCountPad` (ivec4) | opacity register, **base** op count, layer count, 0 |
 | 32 | `emissionIntensityPad` (vec4) | emissionIntensity, 0, 0, 0 |
 | 48 | `aux` (ivec4) | normal, occlusion, height registers, total packed op count |
-| 64 | `layers[4]` | 64 bytes each: `outputs` (baseColor, metallic, roughness, emission), `aux` (normal, occlusion, mask, height), `range` (firstOp, opCount, 0, 0), `params` (emissionIntensity, blendRange, 0, 0) |
-| 320 | `ops[48]` | 112 bytes each |
+| 64 | `fieldSlots` (ivec4) | the FieldBlock slot of each distinct field the program names, -1 = unused (ADR-050) |
+| 80 | `layers[4]` | 64 bytes each: `outputs` (baseColor, metallic, roughness, emission), `aux` (normal, occlusion, mask, height), `range` (firstOp, opCount, 0, 0), `params` (emissionIntensity, blendRange, 0, 0) |
+| 336 | `ops[48]` | 112 bytes each |
 
-A program is 5,696 bytes and the block of eight is 45,584, which is past the uniform-buffer size
+A program is 5,712 bytes and the block of eight is 45,712, which is past the uniform-buffer size
 limit — hence the move to a **read-only storage buffer** (ADR-036). Nothing else about the binding
 changed.
 
 Per op: `kind` (u32, enum order of `MaterialOpKind`), `input` (u32, enum order of
 `MaterialInput`), `seed` (u32), `fieldSlot` (i32, -1 when unresolved or not a field op),
-`registers` (ivec4 `dst, srcA, srcB, srcC`), `valuePad` (`value, 0, 0, 0`), `constant`,
+`registers` (ivec4 `dst, srcA, srcB, srcC`), `value` (f32), `fieldOrdinal` (i32, which of
+`fieldSlots` a Field op reads, -1 otherwise), two f32 pads, `constant`,
 `constant2`, `constant3`, `constant4`. Disabled ops are dropped and the rest packed
 contiguously — the base's ops first, then each enabled layer's, with the layer's `range` naming
 its slice — and slots past the count are zero. `packMaterialProgram(program, fieldSlotOf)`

@@ -47,3 +47,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [039](ADR-039-image-formation.md) | Image formation, selective post and tone mapping | Accepted |
 | [040](ADR-040-particles-and-motion.md) | Particle trails, velocity-aware rendering and motion blur | Accepted |
 | [041](ADR-041-world-director.md) | World Director, look presets and musical phrasing | Accepted |
+| [050](ADR-050-material-interpreter-cost.md) | What the material interpreter was actually spending: the register file and the field evaluator in the loop | Accepted |

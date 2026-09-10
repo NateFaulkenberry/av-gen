@@ -35,7 +35,7 @@ class FieldUniforms;
 
 constexpr int kMaxGpuMaterialPrograms = 8;
 
-// Mirrors `MaterialProgramBlock` in shaders/material.wgsl (45,584 bytes since ADR-036, which is
+// Mirrors `MaterialProgramBlock` in shaders/material.wgsl (45,712 bytes since ADR-036, which is
 // why it is a read-only storage buffer rather than a uniform).
 struct MaterialProgramBlock {
     std::uint32_t count = 0;
