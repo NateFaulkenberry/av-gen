@@ -26,6 +26,13 @@ using Catch::Matchers::WithinAbs;
 
 namespace {
 
+// Catch2's floating-point matchers are double-typed; this keeps float values from
+// promoting implicitly at every call site (the house pattern, see test_spline.cpp).
+double d(float v) {
+    return static_cast<double>(v);
+}
+
+
 // The extremes over a coarse survey of the map, which is what "does this have relief" means.
 std::pair<float, float> reliefOf(const world::WorldMap& map, int steps = 129) {
     float lo = std::numeric_limits<float>::max();
@@ -109,8 +116,8 @@ TEST_CASE("features move the ground where they say they do", "[unit][world]") {
         ridge.amplitude = 25.0f;
         map.features.push_back(ridge);
         map.prepare();
-        CHECK_THAT(map.height({0.0f, 0.0f}), WithinAbs(25.0f, 0.01f));
-        CHECK_THAT(map.height({0.0f, 60.0f}), WithinAbs(0.0f, 0.01f));
+        CHECK_THAT(d(map.height({0.0, 0.0f})), WithinAbs(25.0, 0.01));
+        CHECK_THAT(d(map.height({0.0, 60.0f})), WithinAbs(0.0, 0.01));
         CHECK(map.height({0.0f, 15.0f}) > 0.0f);       // inside the shoulder
         CHECK(map.height({0.0f, 15.0f}) < 25.0f);      // but not at full height
     }
@@ -124,8 +131,8 @@ TEST_CASE("features move the ground where they say they do", "[unit][world]") {
         map.baseHeight = 12.0f;
         map.features.push_back(flat);
         map.prepare();
-        CHECK_THAT(map.height({0.0f, 0.0f}), WithinAbs(-7.0f, 0.01f));
-        CHECK_THAT(map.height({0.0f, 80.0f}), WithinAbs(12.0f, 0.01f));
+        CHECK_THAT(d(map.height({0.0, 0.0f})), WithinAbs(-7.0, 0.01));
+        CHECK_THAT(d(map.height({0.0, 80.0f})), WithinAbs(12.0, 0.01));
     }
 }
 
@@ -159,7 +166,7 @@ TEST_CASE("a world map round-trips through json", "[unit][world]") {
     REQUIRE(parsed.has_value());
     CHECK(parsed->structuralHash() == original.structuralHash());
     for (const glm::vec2 p : {glm::vec2(0.0f), glm::vec2(88.0f, -164.0f), glm::vec2(-212.0f, 96.0f)}) {
-        CHECK_THAT(parsed->height(p), WithinAbs(original.height(p), 1e-3f));
+        CHECK_THAT(d(parsed->height(p)), WithinAbs(d(original.height(p)), 1e-3));
     }
 }
 
@@ -209,8 +216,8 @@ TEST_CASE("the chunk grid covers the world", "[unit][terrain]") {
     CHECK(coords.size() == 16u * 16u);
     CHECK(world::chunkOrigin(map, settings, coords.front()) == map.min());
     const glm::vec2 lastCorner = world::chunkOrigin(map, settings, coords.back()) + glm::vec2(settings.chunkSize);
-    CHECK_THAT(lastCorner.x, WithinAbs(map.max().x, 1e-3f));
-    CHECK_THAT(lastCorner.y, WithinAbs(map.max().y, 1e-3f));
+    CHECK_THAT(d(lastCorner.x), WithinAbs(d(map.max().x), 1e-3));
+    CHECK_THAT(d(lastCorner.y), WithinAbs(d(map.max().y), 1e-3));
 }
 
 TEST_CASE("neighbouring chunks meet exactly at the seam", "[unit][terrain]") {
@@ -243,10 +250,10 @@ TEST_CASE("every level of a chunk spans the same footprint", "[unit][terrain]") 
         const scene::MeshData mesh = world::buildChunkMesh(map, settings, {6, 7}, lod);
         REQUIRE(mesh.valid());
         const auto [lo, hi] = mesh.bounds();
-        CHECK_THAT(lo.x, WithinAbs(origin.x, 1e-3f));
-        CHECK_THAT(lo.z, WithinAbs(origin.y, 1e-3f));
-        CHECK_THAT(hi.x, WithinAbs(origin.x + settings.chunkSize, 1e-3f));
-        CHECK_THAT(hi.z, WithinAbs(origin.y + settings.chunkSize, 1e-3f));
+        CHECK_THAT(d(lo.x), WithinAbs(d(origin.x), 1e-3));
+        CHECK_THAT(d(lo.z), WithinAbs(d(origin.y), 1e-3));
+        CHECK_THAT(d(hi.x), WithinAbs(d(origin.x + settings.chunkSize), 1e-3));
+        CHECK_THAT(d(hi.z), WithinAbs(d(origin.y + settings.chunkSize), 1e-3));
         // A coarser level really is coarser.
         if (lod > 0) {
             const scene::MeshData finer = world::buildChunkMesh(map, settings, {6, 7}, lod - 1);
@@ -266,7 +273,7 @@ TEST_CASE("chunk uv carries the biome axis and the slope", "[unit][terrain]") {
         bool varied = false;
         const float first = mesh.vertices.front().uv.x;
         for (const scene::Vertex& v : mesh.vertices) {
-            CHECK_THAT(v.uv.y, WithinAbs(std::clamp(1.0f - v.normal.y, 0.0f, 1.0f), 1e-5f));
+            CHECK_THAT(d(v.uv.y), WithinAbs(d(std::clamp(1.0f - v.normal.y, 0.0f, 1.0f)), 1e-5));
             CHECK(v.uv.x >= 0.0f);
             CHECK(v.uv.x <= 1.0f);
             varied = varied || std::fabs(v.uv.x - first) > 1e-4f;
@@ -279,7 +286,7 @@ TEST_CASE("chunk uv carries the biome axis and the slope", "[unit][terrain]") {
         map.biomes.biomes.clear();
         const scene::MeshData mesh = world::buildChunkMesh(map, settings, {8, 8}, 0);
         for (const scene::Vertex& v : mesh.vertices) {
-            CHECK_THAT(v.uv.x, WithinAbs(map.altitude01(v.position.y), 1e-5f));
+            CHECK_THAT(d(v.uv.x), WithinAbs(d(map.altitude01(v.position.y)), 1e-5));
         }
     }
 }
@@ -343,8 +350,8 @@ TEST_CASE("the skirt hangs below the chunk and only below it", "[unit][terrain]"
     CHECK(skirted.indices.size() > plain.indices.size());
     const auto [plainLo, plainHi] = plain.bounds();
     const auto [lo, hi] = skirted.bounds();
-    CHECK_THAT(lo.y, WithinAbs(plainLo.y - settings.skirtDepth, 1e-3f));
-    CHECK_THAT(hi.y, WithinAbs(plainHi.y, 1e-3f)); // the skirt never rises above the surface
+    CHECK_THAT(d(lo.y), WithinAbs(d(plainLo.y - settings.skirtDepth), 1e-3));
+    CHECK_THAT(d(hi.y), WithinAbs(d(plainHi.y), 1e-3)); // the skirt never rises above the surface
 }
 
 TEST_CASE("lod level follows apparent size and stops at the last level", "[unit][terrain]") {
@@ -461,11 +468,11 @@ TEST_CASE("mesh bounds are cached against the mesh version", "[unit][scene]") {
 
 TEST_CASE("a biome range is a band with soft edges", "[unit][biome]") {
     world::Range r{0.3f, 0.6f, 0.1f};
-    CHECK_THAT(r.membership(0.45f), WithinAbs(1.0f, 1e-5f));
-    CHECK_THAT(r.membership(0.3f), WithinAbs(1.0f, 1e-5f));
-    CHECK_THAT(r.membership(0.6f), WithinAbs(1.0f, 1e-5f));
-    CHECK_THAT(r.membership(0.19f), WithinAbs(0.0f, 1e-5f));   // fully outside the fade
-    CHECK_THAT(r.membership(0.71f), WithinAbs(0.0f, 1e-5f));
+    CHECK_THAT(d(r.membership(0.45)), WithinAbs(1.0, 1e-5));
+    CHECK_THAT(d(r.membership(0.3)), WithinAbs(1.0, 1e-5));
+    CHECK_THAT(d(r.membership(0.6)), WithinAbs(1.0, 1e-5));
+    CHECK_THAT(d(r.membership(0.19)), WithinAbs(0.0, 1e-5));   // fully outside the fade
+    CHECK_THAT(d(r.membership(0.71)), WithinAbs(0.0, 1e-5));
     // Inside the fade it is between, and it is monotone -- a hard edge is what puts a visible line
     // on the ground where two biomes meet.
     CHECK(r.membership(0.25f) > 0.0f);
@@ -494,7 +501,7 @@ TEST_CASE("a biome has to satisfy every one of its rules", "[unit][biome]") {
     // Steep but low: `steepHigh` matches the slope and fails the altitude, so it is not here.
     const world::BiomeWeights valley = set.at(0.05f, 0.9f, 0.5f, {0.0f, 0.0f});
     CHECK(valley.dominant() == 0);
-    CHECK_THAT(valley.weights[1], WithinAbs(0.0f, 1e-5f));
+    CHECK_THAT(d(valley.weights[1]), WithinAbs(0.0, 1e-5));
     // High and steep: both terms hold.
     CHECK(set.at(0.95f, 0.9f, 0.5f, {0.0f, 0.0f}).dominant() == 1);
 }
@@ -510,7 +517,7 @@ TEST_CASE("weights are normalised and a point is always somewhere", "[unit][biom
             CHECK(w.weights[static_cast<std::size_t>(i)] >= 0.0f);
             total += w.weights[static_cast<std::size_t>(i)];
         }
-        CHECK_THAT(total, WithinAbs(1.0f, 1e-4f));
+        CHECK_THAT(d(total), WithinAbs(1.0, 1e-4));
         CHECK(w.axis() >= 0.0f);
         CHECK(w.axis() <= 1.0f);
     }
@@ -523,8 +530,8 @@ TEST_CASE("weights are normalised and a point is always somewhere", "[unit][biom
     narrow.biomes = {only, only};
     narrow.biomes[1].name = "other";
     const world::BiomeWeights nowhere = narrow.at(0.0f, 0.0f, 0.0f, {0.0f, 0.0f});
-    CHECK_THAT(nowhere.weights[0], WithinAbs(0.5f, 1e-5f));
-    CHECK_THAT(nowhere.weights[1], WithinAbs(0.5f, 1e-5f));
+    CHECK_THAT(d(nowhere.weights[0]), WithinAbs(0.5, 1e-5));
+    CHECK_THAT(d(nowhere.weights[1]), WithinAbs(0.5, 1e-5));
 }
 
 TEST_CASE("the biome axis walks the authored order", "[unit][biome]") {
@@ -542,8 +549,8 @@ TEST_CASE("the biome axis walks the authored order", "[unit][biome]") {
         CHECK(axis >= previous - 1e-4f); // monotone: the axis is an order, not a lookup
         previous = axis;
     }
-    CHECK_THAT(set.at(0.02f, 0.0f, 0.5f, {0.0f, 0.0f}).axis(), WithinAbs(0.0f, 0.05f));
-    CHECK_THAT(set.at(0.98f, 0.0f, 0.5f, {0.0f, 0.0f}).axis(), WithinAbs(1.0f, 0.05f));
+    CHECK_THAT(d(set.at(0.02, 0.0, 0.5, {0.0, 0.0f}).axis()), WithinAbs(0.0, 0.05));
+    CHECK_THAT(d(set.at(0.98, 0.0, 0.5, {0.0, 0.0f}).axis()), WithinAbs(1.0, 0.05));
 }
 
 TEST_CASE("a region puts a biome somewhere the rules would not", "[unit][biome]") {
@@ -601,7 +608,7 @@ TEST_CASE("a biome set round-trips through json", "[unit][biome]") {
     CHECK(parsed->structuralHash() == original.structuralHash());
     const world::BiomeWeights a = original.at(0.3f, 0.2f, 0.6f, {12.0f, -40.0f});
     const world::BiomeWeights b = parsed->at(0.3f, 0.2f, 0.6f, {12.0f, -40.0f});
-    CHECK_THAT(a.axis(), WithinAbs(b.axis(), 1e-5f));
+    CHECK_THAT(d(a.axis()), WithinAbs(d(b.axis()), 1e-5));
 }
 
 TEST_CASE("moisture falls away from water and rises toward the valley floor", "[unit][world]") {
@@ -669,7 +676,7 @@ TEST_CASE("a scatter sits on the terrain and is a pure function of the world", "
     // Every instance stands on the ground rather than near it.
     for (std::size_t i = 0; i < a.count(); i += 17) {
         const glm::vec3 p = a.positions()[i];
-        CHECK_THAT(p.y, WithinAbs(map.height({p.x, p.z}), 1e-3f));
+        CHECK_THAT(d(p.y), WithinAbs(d(map.height({p.x, p.z})), 1e-3));
         CHECK(p.x >= map.min().x);
         CHECK(p.x <= map.max().x);
     }
@@ -941,13 +948,13 @@ TEST_CASE("Colour that clusters in space, and glow that is rare", "[unit][world]
                                                              static_cast<float>(z) * 0.37f), 7u);
                 lo = std::min(lo, v);
                 hi = std::max(hi, v);
-                sum += v;
+                sum += static_cast<double>(v);
                 ++n;
             }
         }
         CHECK(lo < -0.75f);
         CHECK(hi > 0.75f);
-        CHECK(std::abs(sum / n) < 0.2f);   // centred, so a hue swing goes both ways
+        CHECK(std::abs(sum / n) < 0.2);   // centred, so a hue swing goes both ways
         // Smooth: neighbours agree, which is the whole point of a region.
         const glm::vec3 p(3.1f, 0.0f, -2.4f);
         CHECK(std::abs(noise::regionField(p, 7u) - noise::regionField(p + glm::vec3(0.01f, 0.0f, 0.0f), 7u)) < 0.05f);
@@ -973,6 +980,6 @@ TEST_CASE("Colour that clusters in space, and glow that is rare", "[unit][world]
         REQUIRE(full.size() == 1);
         REQUIRE(sparse.size() == 1);
         // A quarter of the trees light up, so the patch casts a quarter of the light.
-        CHECK_THAT(sparse.front().power, Catch::Matchers::WithinRel(full.front().power * 0.25f, 1e-4f));
+        CHECK_THAT(d(sparse.front().power), Catch::Matchers::WithinRel(d(full.front().power) * 0.25, 1e-4));
     }
 }
