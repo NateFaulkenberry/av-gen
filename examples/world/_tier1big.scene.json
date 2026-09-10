@@ -1,0 +1,772 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "terrain",
+  "camera": {
+    "mode": 1,
+    "position": [
+      -14.0,
+      -3.2,
+      6.0
+    ],
+    "target": [
+      10.0,
+      -2.4,
+      -58.0
+    ],
+    "fov": 40.0,
+    "orbitSpeed": 0.0
+  },
+  "lightRig": "../lightrigs/valley-moon.rig.json",
+  "environment": {
+    "map": "../../assets/hdri/kloppenheim_02_puresky_4k.hdr",
+    "intensity": 0.06,
+    "rotation": -1.517,
+    "skyIntensity": 0.006,
+    "skyBloom": 0.1,
+    "lightFromEnvironment": true,
+    "background": [
+      0.0036,
+      0.0061,
+      0.0192
+    ],
+    "fogColor": [
+      0.0028,
+      0.0072,
+      0.0231
+    ],
+    "fogDensity": 0.0022,
+    "fogHeight": 26.0,
+    "fogHeightFalloff": 0.045,
+    "volumeDensity": 0.013,
+    "volumeScattering": 0.7,
+    "volumeAnisotropy": 0.12,
+    "volumeNoiseAmount": 0.45,
+    "volumeNoiseScale": 0.02,
+    "volumeSteps": 18,
+    "volumeMaxDistance": 320.0,
+    "volumeAbsorption": 0.4,
+    "sky": {
+      "zenithColor": [
+        0.003,
+        0.0052,
+        0.0182
+      ],
+      "horizonColor": [
+        0.0071,
+        0.0412,
+        0.2015
+      ],
+      "groundColor": [
+        0.0012,
+        0.0021,
+        0.0058
+      ],
+      "haze": 0.55,
+      "sunColor": [
+        0.0092,
+        0.1512,
+        0.6012
+      ],
+      "sunIntensity": 1.0,
+      "sunSize": 0.7,
+      "sunGlow": 0.35
+    },
+    "shadowCascades": 2,
+    "ecologyLight": 0.006,
+    "ecologyGlowCell": 9.0,
+    "volumeLocalLights": 1.0
+  },
+  "nodes": [
+    {
+      "name": "valley",
+      "kind": "terrain",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "terrain": {
+        "chunkSize": 40.0,
+        "resolution": 32,
+        "lodLevels": 4,
+        "lodDistance": 70.0,
+        "viewDistance": 520.0,
+        "skirtDepth": 1.2,
+        "groundGlow": 0.9,
+        "groundGlowScale": 0.055,
+        "groundGlowCoverage": 0.3,
+        "groundGlowColor": [
+          0.08,
+          1.0,
+          0.68
+        ]
+      },
+      "material": {
+        "baseColor": [
+          0.023,
+          0.144,
+          0.087
+        ],
+        "roughness": 0.9,
+        "metallic": 0.0,
+        "emissiveIntensity": 0.0
+      },
+      "scatter": [
+        {
+          "name": "canopy",
+          "asset": "../../assets/quaternius/glTF/CommonTree_1.gltf",
+          "densities": {
+            "forest": 0.0045,
+            "meadow": 0.001
+          },
+          "maxSlope": 0.26,
+          "minScale": 0.75,
+          "maxScale": 1.35,
+          "sink": 0.25,
+          "randomYaw": 1.0,
+          "clusterScale": 46.0,
+          "clustering": 0.55,
+          "seed": 31,
+          "meshBudget": 0,
+          "maxInstances": 2000,
+          "height": 14.0,
+          "tint": [
+            0.1119,
+            0.2384,
+            0.3916
+          ],
+          "viewDistance": 520.0,
+          "minScreenRadius": 1.0,
+          "castsShadow": true,
+          "emissiveColor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "emissiveIntensity": 48.0,
+          "emissiveRandom": 0.55,
+          "hueField": 0.0,
+          "hueFieldScale": 48.0,
+          "hueRandom": 0.03,
+          "emissiveSparsity": 0.12,
+          "materialProgram": "canopyFireflies",
+          "motion": {
+            "stiffness": 9.0,
+            "mass": 40.0,
+            "damping": 0.5,
+            "windSensitivity": 1.4,
+            "bendLimit": 0.12,
+            "tipAmplitude": 0.3,
+            "gustResponse": 0.8,
+            "bendCurve": 3.2,
+            "amplitudeVariance": 0.28
+          }
+        },
+        {
+          "name": "pines",
+          "asset": "../../assets/quaternius/glTF/Pine_2.gltf",
+          "densities": {
+            "forest": 0.0022,
+            "scree": 0.0016
+          },
+          "maxSlope": 0.3,
+          "minScale": 0.7,
+          "maxScale": 1.4,
+          "sink": 0.3,
+          "alignToGround": 0.15,
+          "clusterScale": 38.0,
+          "clustering": 0.6,
+          "seed": 32,
+          "meshBudget": 0,
+          "maxInstances": 1600,
+          "height": 15.0,
+          "tint": [
+            0.0762,
+            0.2016,
+            0.305
+          ],
+          "viewDistance": 520.0,
+          "minScreenRadius": 1.0,
+          "castsShadow": true,
+          "emissiveColor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "emissiveIntensity": 42.0,
+          "emissiveRandom": 0.55,
+          "hueField": 0.0,
+          "hueFieldScale": 44.0,
+          "hueRandom": 0.03,
+          "emissiveSparsity": 0.16,
+          "materialProgram": "pineFireflies",
+          "motion": {
+            "stiffness": 12.0,
+            "mass": 55.0,
+            "damping": 0.55,
+            "windSensitivity": 1.2,
+            "bendLimit": 0.1,
+            "tipAmplitude": 0.26,
+            "gustResponse": 0.7,
+            "bendCurve": 3.5,
+            "amplitudeVariance": 0.25
+          }
+        },
+        {
+          "name": "deadwood",
+          "asset": "../../assets/quaternius/glTF/DeadTree_1.gltf",
+          "densities": {
+            "scree": 0.0009,
+            "forest": 0.0004
+          },
+          "maxSlope": 0.32,
+          "minScale": 0.7,
+          "maxScale": 1.3,
+          "sink": 0.3,
+          "alignToGround": 0.3,
+          "clusterScale": 60.0,
+          "clustering": 0.4,
+          "seed": 33,
+          "meshBudget": 800,
+          "maxInstances": 600,
+          "height": 12.0,
+          "tint": [
+            0.1946,
+            0.1779,
+            0.2789
+          ],
+          "viewDistance": 440.0,
+          "minScreenRadius": 1.0,
+          "castsShadow": true,
+          "motion": {
+            "stiffness": 20.0,
+            "mass": 60.0,
+            "damping": 0.7,
+            "windSensitivity": 0.6,
+            "bendLimit": 0.06,
+            "tipAmplitude": 0.14,
+            "gustResponse": 0.5,
+            "bendCurve": 3.6,
+            "amplitudeVariance": 0.2
+          }
+        },
+        {
+          "name": "bushes",
+          "asset": "../../assets/quaternius/glTF/Bush_Common.gltf",
+          "densities": {
+            "forest": 0.016,
+            "meadow": 0.01,
+            "marsh": 0.006
+          },
+          "maxSlope": 0.28,
+          "minScale": 0.7,
+          "maxScale": 1.4,
+          "sink": 0.1,
+          "alignToGround": 0.4,
+          "clusterScale": 22.0,
+          "clustering": 0.5,
+          "seed": 34,
+          "meshBudget": 260,
+          "maxInstances": 9000,
+          "height": 1.1,
+          "tint": [
+            0.0762,
+            0.305,
+            0.3515
+          ],
+          "viewDistance": 190.0,
+          "minScreenRadius": 5.5,
+          "castsShadow": true,
+          "emissiveColor": [
+            0.55,
+            0.14,
+            1.0
+          ],
+          "emissiveIntensity": 26.0,
+          "emissiveRandom": 0.6,
+          "hueField": 0.1,
+          "hueFieldScale": 40.0,
+          "hueRandom": 0.04,
+          "emissiveSparsity": 0.35,
+          "materialProgram": "bushGlow",
+          "motion": {
+            "stiffness": 2.6,
+            "mass": 0.09,
+            "damping": 0.45,
+            "windSensitivity": 0.8,
+            "bendLimit": 0.3,
+            "tipAmplitude": 0.22,
+            "gustResponse": 0.9,
+            "bendCurve": 2.0,
+            "amplitudeVariance": 0.3,
+            "simulate": {
+              "minScreenRadius": 3.0,
+              "maxDistance": 90.0,
+              "budget": 300,
+              "enabled": true
+            }
+          }
+        },
+        {
+          "name": "ferns",
+          "asset": "../../assets/quaternius/glTF/Fern_1.gltf",
+          "densities": {
+            "marsh": 0.045,
+            "forest": 0.03
+          },
+          "maxSlope": 0.24,
+          "minScale": 0.65,
+          "maxScale": 1.5,
+          "alignToGround": 0.5,
+          "clusterScale": 16.0,
+          "clustering": 0.65,
+          "seed": 35,
+          "meshBudget": 160,
+          "maxInstances": 16000,
+          "height": 0.65,
+          "tint": [
+            0.0931,
+            0.3916,
+            0.3515
+          ],
+          "emissiveColor": [
+            0.02,
+            1.0,
+            0.58
+          ],
+          "emissiveIntensity": 1.9,
+          "viewDistance": 170.0,
+          "minScreenRadius": 5.5,
+          "castsShadow": false,
+          "hueField": 0.085,
+          "hueFieldScale": 42.0,
+          "hueRandom": 0.02,
+          "emissiveRandom": 0.55,
+          "materialProgram": "frondGlow",
+          "motion": {
+            "stiffness": 1.1,
+            "mass": 0.007,
+            "damping": 0.35,
+            "windSensitivity": 0.95,
+            "bendLimit": 0.42,
+            "tipAmplitude": 0.17,
+            "gustResponse": 1.15,
+            "bendCurve": 1.7,
+            "amplitudeVariance": 0.38,
+            "simulate": {
+              "minScreenRadius": 2.0,
+              "maxDistance": 90.0,
+              "budget": 500,
+              "enabled": true
+            }
+          }
+        },
+        {
+          "name": "grass",
+          "asset": "../../assets/quaternius/glTF/Grass_Common_Tall.gltf",
+          "densities": {
+            "meadow": 0.11,
+            "marsh": 0.06,
+            "forest": 0.03
+          },
+          "maxSlope": 0.22,
+          "minScale": 0.6,
+          "maxScale": 1.6,
+          "alignToGround": 0.6,
+          "clusterScale": 13.0,
+          "clustering": 0.55,
+          "seed": 36,
+          "meshBudget": 140,
+          "maxInstances": 26000,
+          "height": 0.45,
+          "tint": [
+            0.1384,
+            0.4342,
+            0.2705
+          ],
+          "viewDistance": 90.0,
+          "minScreenRadius": 5.5,
+          "castsShadow": false,
+          "emissiveColor": [
+            0.05,
+            1.0,
+            0.55
+          ],
+          "emissiveIntensity": 1.4,
+          "emissiveRandom": 0.7,
+          "hueField": 0.08,
+          "hueFieldScale": 50.0,
+          "hueRandom": 0.03,
+          "emissiveSparsity": 0.5,
+          "motion": {
+            "stiffness": 0.9,
+            "mass": 0.004,
+            "damping": 0.28,
+            "windSensitivity": 1.0,
+            "bendLimit": 0.5,
+            "tipAmplitude": 0.17,
+            "gustResponse": 1.3,
+            "bendCurve": 1.5,
+            "amplitudeVariance": 0.4,
+            "simulate": {
+              "minScreenRadius": 2.0,
+              "maxDistance": 90.0,
+              "budget": 900,
+              "enabled": true
+            }
+          }
+        },
+        {
+          "name": "flowers",
+          "asset": "../../assets/quaternius/glTF/Flower_3_Group.gltf",
+          "densities": {
+            "meadow": 0.018
+          },
+          "maxSlope": 0.18,
+          "minScale": 0.7,
+          "maxScale": 1.4,
+          "alignToGround": 0.5,
+          "clusterScale": 11.0,
+          "clustering": 0.8,
+          "seed": 37,
+          "meshBudget": 200,
+          "maxInstances": 5000,
+          "height": 0.55,
+          "tint": [
+            0.3419,
+            0.2384,
+            0.6308
+          ],
+          "emissiveColor": [
+            0.3085,
+            0.1208,
+            1.0
+          ],
+          "emissiveIntensity": 16.0,
+          "viewDistance": 150.0,
+          "minScreenRadius": 5.5,
+          "castsShadow": false,
+          "hueField": 0.17,
+          "hueFieldScale": 30.0,
+          "hueRandom": 0.03,
+          "emissiveRandom": 0.6,
+          "motion": {
+            "stiffness": 0.85,
+            "mass": 0.0038,
+            "damping": 0.3,
+            "windSensitivity": 0.9,
+            "bendLimit": 0.45,
+            "tipAmplitude": 0.15,
+            "gustResponse": 1.2,
+            "bendCurve": 2.2,
+            "amplitudeVariance": 0.45,
+            "simulate": {
+              "minScreenRadius": 2.0,
+              "maxDistance": 90.0,
+              "budget": 400,
+              "enabled": true
+            }
+          }
+        },
+        {
+          "name": "fungi",
+          "asset": "../../assets/quaternius/glTF/Mushroom_Common.gltf",
+          "densities": {
+            "marsh": 0.03,
+            "forest": 0.008
+          },
+          "maxSlope": 0.22,
+          "minScale": 0.6,
+          "maxScale": 2.2,
+          "alignToGround": 0.35,
+          "clusterScale": 9.0,
+          "clustering": 0.85,
+          "seed": 38,
+          "meshBudget": 240,
+          "maxInstances": 6000,
+          "height": 0.28,
+          "tint": [
+            0.5271,
+            0.3515,
+            0.807
+          ],
+          "emissiveColor": [
+            0.341,
+            0.0821,
+            1.0
+          ],
+          "emissiveIntensity": 34.0,
+          "viewDistance": 160.0,
+          "minScreenRadius": 5.5,
+          "castsShadow": true,
+          "hueField": 0.16,
+          "hueFieldScale": 28.0,
+          "hueRandom": 0.035,
+          "emissiveRandom": 0.65,
+          "motion": {
+            "stiffness": 3.0,
+            "mass": 0.9,
+            "damping": 0.8,
+            "windSensitivity": 0.5,
+            "bendLimit": 0.12,
+            "tipAmplitude": 0.1,
+            "gustResponse": 0.35,
+            "bendCurve": 2.6,
+            "amplitudeVariance": 0.25
+          }
+        },
+        {
+          "name": "shelf-fungi",
+          "asset": "../../assets/quaternius/glTF/Mushroom_Laetiporus.gltf",
+          "densities": {
+            "marsh": 0.004
+          },
+          "maxSlope": 0.26,
+          "minScale": 0.7,
+          "maxScale": 1.8,
+          "alignToGround": 0.4,
+          "clusterScale": 14.0,
+          "clustering": 0.9,
+          "seed": 39,
+          "meshBudget": 420,
+          "maxInstances": 900,
+          "height": 0.55,
+          "tint": [
+            0.2086,
+            0.7454,
+            0.5776
+          ],
+          "emissiveColor": [
+            0.05,
+            1.0,
+            0.62
+          ],
+          "emissiveIntensity": 24.0,
+          "viewDistance": 180.0,
+          "minScreenRadius": 5.5,
+          "castsShadow": true,
+          "hueField": 0.14,
+          "hueFieldScale": 36.0,
+          "hueRandom": 0.03,
+          "emissiveRandom": 0.55,
+          "motion": {
+            "stiffness": 4.5,
+            "mass": 1.6,
+            "damping": 0.9,
+            "windSensitivity": 0.35,
+            "bendLimit": 0.08,
+            "tipAmplitude": 0.07,
+            "gustResponse": 0.25,
+            "bendCurve": 2.8,
+            "amplitudeVariance": 0.2
+          }
+        },
+        {
+          "name": "boulders",
+          "asset": "../../assets/quaternius/glTF/Rock_Medium_1.gltf",
+          "densities": {
+            "scree": 0.0055,
+            "rim": 0.003,
+            "marsh": 0.0012
+          },
+          "maxSlope": 0.6,
+          "minScale": 0.5,
+          "maxScale": 2.2,
+          "sink": 0.3,
+          "alignToGround": 0.7,
+          "avoidWater": false,
+          "clusterScale": 30.0,
+          "clustering": 0.45,
+          "seed": 40,
+          "meshBudget": 180,
+          "maxInstances": 4000,
+          "height": 1.6,
+          "tint": [
+            0.1559,
+            0.1746,
+            0.2462
+          ],
+          "viewDistance": 300.0,
+          "minScreenRadius": 1.5,
+          "castsShadow": true
+        },
+        {
+          "name": "pebbles",
+          "asset": "../../assets/quaternius/glTF/Pebble_Round_2.gltf",
+          "densities": {
+            "scree": 0.02,
+            "marsh": 0.01,
+            "rim": 0.01
+          },
+          "maxSlope": 0.6,
+          "minScale": 0.5,
+          "maxScale": 2.0,
+          "sink": 0.1,
+          "alignToGround": 0.85,
+          "avoidWater": false,
+          "clusterScale": 8.0,
+          "clustering": 0.5,
+          "seed": 41,
+          "meshBudget": 90,
+          "maxInstances": 14000,
+          "height": 0.28,
+          "tint": [
+            0.1878,
+            0.2159,
+            0.2747
+          ],
+          "viewDistance": 55.0,
+          "minScreenRadius": 3.0,
+          "castsShadow": false
+        },
+        {
+          "name": "beacons",
+          "asset": "../../assets/quaternius/glTF/Mushroom_Common.gltf",
+          "densities": {
+            "marsh": 0.00055,
+            "forest": 0.00035,
+            "meadow": 0.0003
+          },
+          "maxSlope": 0.2,
+          "minScale": 0.75,
+          "maxScale": 1.6,
+          "alignToGround": 0.15,
+          "clusterScale": 30.0,
+          "clustering": 0.35,
+          "seed": 771,
+          "meshBudget": 0,
+          "maxInstances": 400,
+          "height": 4.2,
+          "tint": [
+            0.42,
+            0.3,
+            0.72
+          ],
+          "emissiveColor": [
+            0.06,
+            0.82,
+            1.0
+          ],
+          "emissiveIntensity": 8.5,
+          "viewDistance": 420.0,
+          "minScreenRadius": 1.0,
+          "castsShadow": true,
+          "hueField": 0.1,
+          "hueFieldScale": 70.0,
+          "hueRandom": 0.03,
+          "emissiveRandom": 0.35,
+          "motion": {
+            "stiffness": 2.2,
+            "mass": 0.5,
+            "damping": 0.6,
+            "windSensitivity": 0.6,
+            "bendLimit": 0.2,
+            "tipAmplitude": 0.14,
+            "gustResponse": 0.6,
+            "bendCurve": 2.2,
+            "amplitudeVariance": 0.3
+          }
+        }
+      ]
+    },
+    {
+      "name": "spores",
+      "kind": "particles",
+      "particles": {
+        "capacity": 10240,
+        "spawnRate": 300,
+        "shape": "box",
+        "position": [
+          4.0,
+          1.0,
+          -42.0
+        ],
+        "extent": [
+          110.0,
+          16.0,
+          110.0
+        ],
+        "lifetimeMin": 14.0,
+        "lifetimeMax": 30.0,
+        "speedMin": 0.01,
+        "speedMax": 0.14,
+        "spread": 1.0,
+        "gravity": [
+          0.02,
+          0.012,
+          0.0
+        ],
+        "sizeStart": 0.075,
+        "sizeEnd": 0.0,
+        "blend": "additive",
+        "emissive": 9.0,
+        "colorStart": [
+          1.0,
+          1.0,
+          1.0,
+          0.55
+        ],
+        "colorEnd": [
+          1.0,
+          1.0,
+          1.0,
+          0.0
+        ]
+      },
+      "visible": true
+    }
+  ],
+  "post": {
+    "tonemap": 1,
+    "chromaRetention": 0.6,
+    "bloomEnabled": true,
+    "bloomIntensity": 0.45,
+    "bloomThreshold": 0.8,
+    "bloomKnee": 0.5,
+    "bloomRadius": 1.15,
+    "bloomLevels": 6,
+    "bloomEmissionWeight": 0.75
+  },
+  "materialPrograms": [
+    "../materials/canopy-fireflies.material.json",
+    "../materials/pine-fireflies.material.json",
+    "../materials/frond-glow.material.json",
+    "../materials/bush-glow.material.json"
+  ],
+  "wind": {
+    "enabled": true,
+    "direction": 0.62,
+    "speed": 0.85,
+    "regionScale": 70.0,
+    "regionAmount": 0.5,
+    "regionDrift": 0.045,
+    "turbulence": 0.35,
+    "turbulenceScale": 13.0,
+    "turbulenceSpeed": 1.4,
+    "gustAmount": 0.9,
+    "gustScale": 38.0,
+    "gustSpeed": 7.5,
+    "gustSharpness": 3.0,
+    "flutterScale": 2.4,
+    "simBudget": 2000,
+    "wake": {
+      "enabled": true,
+      "radius": 1.8,
+      "strength": 8.0,
+      "maxStrength": 40.0,
+      "lead": 0.9,
+      "decay": 0.4
+    }
+  }
+}

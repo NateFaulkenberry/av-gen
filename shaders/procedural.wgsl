@@ -65,7 +65,8 @@ struct DeformerUniform {
 struct ProceduralUniforms {
     timeInfo: vec4<f32>,  // x = render time, y = deformer count, z = normal epsilon, w = instance count
     fieldInfo: vec4<f32>, // x = emissive field slot (-1 none), y = emissive field amount, z = point source or LOD billboard (1/0), w = indirection enabled (1/0)
-    prevInfo: vec4<f32>,  // x = last frame's render time (ADR-035 velocity: deformation motion), yzw = 0
+    prevInfo: vec4<f32>,  // x = last frame's render time (ADR-035 velocity: deformation motion),
+                          // y = 1 when this draw has Tier 1 simulated instances (ADR-056), zw = 0
     // ADR-055 Tier 0 vegetation motion. See wind.wgsl for the meaning of the three vectors; every
     // number in them was resolved on the CPU by wind::motionResponse, so the vertex stage evaluates
     // no transfer function. windSway.w is 0 for anything that does not sway (rock, water, a scene
@@ -89,6 +90,15 @@ struct ProceduralUniforms {
 // stage. When fieldInfo.w is 0 the object is not culled, this binding is an inert placeholder and
 // instance_index addresses `instances` directly - exactly the pre-culling path.
 @group(1) @binding(5) var<storage, read> visibleIndices: array<u32>;
+// ADR-056 Tier 1. `plantSlots[recordIndex]` is 0 for a plant the Tier 0 transfer function draws and
+// slot+1 for one an integrator is simulating on the CPU; `plantBend[slot]` is that plant's tip
+// offset in units of its height, this frame in xy and last frame in zw. Both are inert placeholders
+// for a draw with prevInfo.y == 0, which is every draw that existed before this. The slot map is a
+// per-record array but is only ever *written* where the active set changed; the bend array is
+// compact, so what crosses the bus each frame is proportional to the number of plants being
+// simulated and not to the size of the layer.
+@group(1) @binding(6) var<storage, read> plantSlots: array<u32>;
+@group(1) @binding(7) var<storage, read> plantBend: array<vec4<f32>>;
 
 const DEFORM_BEND: i32 = 0;
 const DEFORM_TWIST: i32 = 1;
@@ -407,15 +417,32 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     // every length scale in the field; what varies per vertex is the height profile, which is
     // cheap. The same sample drives p0/p1/p2, so the finite-difference normal picks up the bend's
     // rotation for free rather than needing three more field evaluations.
+    var bend = vec2<f32>(0.0);
+    var bendPrev = vec2<f32>(0.0);
     if (proc.windSway.w > 0.5) {
         let root = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
         let w = windSampleAt(root, now - proc.windTiming.x);
-        p0 = p0 + windDisplacement(srcPos.y, w, proc.windSway, proc.windTiming, proc.windPlant,
-                                   inst.scale.y, inst.random, now);
-        p1 = p1 + windDisplacement(srcPos.y + t1.y * eps, w, proc.windSway, proc.windTiming,
-                                   proc.windPlant, inst.scale.y, inst.random, now);
-        p2 = p2 + windDisplacement(srcPos.y + t2.y * eps, w, proc.windSway, proc.windTiming,
-                                   proc.windPlant, inst.scale.y, inst.random, now);
+        bend = windBend(w, proc.windSway, proc.windTiming, proc.windPlant.w, inst.random, now);
+        let wPrev = windSampleAt((object.prevModel * vec4<f32>(inst.position.xyz, 1.0)).xyz,
+                                 proc.prevInfo.x - proc.windTiming.x);
+        bendPrev = windBend(wPrev, proc.windSway, proc.windTiming, proc.windPlant.w, inst.random,
+                            proc.prevInfo.x);
+        // ADR-056: a simulated specimen replaces the transfer function's answer with its own. The
+        // slot lookup is one storage read per vertex and only for draws that have a live active set;
+        // everything downstream is the same arithmetic, which is what makes the switch invisible.
+        if (proc.prevInfo.y > 0.5) {
+            let slot = plantSlots[recordIndex];
+            if (slot != 0u) {
+                let d = plantBend[slot - 1u];
+                bend = d.xy;
+                bendPrev = d.zw;
+            }
+        }
+        p0 = p0 + bendDisplacement(srcPos.y, bend, proc.windTiming, proc.windPlant, inst.scale.y);
+        p1 = p1 + bendDisplacement(srcPos.y + t1.y * eps, bend, proc.windTiming, proc.windPlant,
+                                   inst.scale.y);
+        p2 = p2 + bendDisplacement(srcPos.y + t2.y * eps, bend, proc.windTiming, proc.windPlant,
+                                   inst.scale.y);
     }
     var nw = cross(p1 - p0, p2 - p0);
     if (dot(nw, nw) < 1e-30) {
@@ -434,10 +461,7 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     // with last frame's time and last frame's object matrix (ADR-035).
     var pPrev = deformChain(srcPos, n, nRef, inst, proc.prevInfo.x, object.prevModel);
     if (proc.windSway.w > 0.5) {
-        let rootPrev = (object.prevModel * vec4<f32>(inst.position.xyz, 1.0)).xyz;
-        let wPrev = windSampleAt(rootPrev, proc.prevInfo.x - proc.windTiming.x);
-        pPrev = pPrev + windDisplacement(srcPos.y, wPrev, proc.windSway, proc.windTiming,
-                                         proc.windPlant, inst.scale.y, inst.random, proc.prevInfo.x);
+        pPrev = pPrev + bendDisplacement(srcPos.y, bendPrev, proc.windTiming, proc.windPlant, inst.scale.y);
     }
     out.prevClip = frame.prevViewProj * vec4<f32>(pPrev, 1.0);
     return out;

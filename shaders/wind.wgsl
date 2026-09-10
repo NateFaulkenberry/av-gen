@@ -72,23 +72,33 @@ fn windSampleAt(p: vec3<f32>, t: f32) -> WindSample {
 //   plant  x = base y in post-source object space, y = 1 / extent y, z = extent y,
 //          w = per-instance amplitude variance
 
-fn windDisplacement(objectY: f32, w: WindSample, sway: vec4<f32>, timing: vec4<f32>, plant: vec4<f32>,
-                    instanceScaleY: f32, rnd: vec4<f32>, tFlutter: f32) -> vec3<f32> {
-    // Height along the plant, 0 at the root. This is the whole anchoring story: whatever the
-    // displacement is, it is multiplied by a curve that is exactly zero where the stem meets soil.
-    let h = clamp((objectY - plant.x) * plant.y, 0.0, 1.0);
-    let profile = pow(h, timing.z);
-    let height = plant.z * instanceScaleY; // the plant's world height
+// The tip's horizontal offset, in units of the plant's height: the only thing the field and the
+// species decide. Tier 1 (ADR-056) replaces this half with a number an integrator produced on the
+// CPU and leaves the other half exactly as it is, which is why a plant can change tier between one
+// frame and the next without moving.
+fn windBend(w: WindSample, sway: vec4<f32>, timing: vec4<f32>, variance: f32, rnd: vec4<f32>,
+            tFlutter: f32) -> vec2<f32> {
     // Per-instance amplitude, so neighbours differ while the region they share stays coherent.
-    let amp = 1.0 + plant.w * (rnd.z * 2.0 - 1.0);
-
+    let amp = 1.0 + variance * (rnd.z * 2.0 - 1.0);
     let s = w.strength;
     let along = sway.x * s + sway.y * s * w.gust;
     // The flutter is the plant ringing at its own resonance, phase-offset per instance so a patch
     // rattles out of step even though it leans together.
     let flutter = sway.z * s * sin(w.phase + timing.y * tFlutter + rnd.x * WIND_TAU);
     let perp = vec2<f32>(-w.direction.y, w.direction.x);
-    var off = (w.direction * along + perp * flutter) * (amp * profile * height);
+    return (w.direction * along + perp * flutter) * amp;
+}
+
+// ...and what any such offset does to a vertex: the height profile, the soft ceiling, and the drop
+// that keeps the stem's length.
+fn bendDisplacement(objectY: f32, bend: vec2<f32>, timing: vec4<f32>, plant: vec4<f32>,
+                    instanceScaleY: f32) -> vec3<f32> {
+    // Height along the plant, 0 at the root. This is the whole anchoring story: whatever the
+    // displacement is, it is multiplied by a curve that is exactly zero where the stem meets soil.
+    let h = clamp((objectY - plant.x) * plant.y, 0.0, 1.0);
+    let profile = pow(h, timing.z);
+    let height = plant.z * instanceScaleY; // the plant's world height
+    var off = bend * (profile * height);
 
     // A soft ceiling on how far a tip may travel: len -> len for small offsets, -> maxLen for large,
     // with no corner where a hard clamp would make a stalk visibly hit a wall.
@@ -100,4 +110,10 @@ fn windDisplacement(objectY: f32, w: WindSample, sway: vec4<f32>, timing: vec4<f
     // sideways and reads as a shear rather than a bend.
     let dy = -0.5 * dot(off, off) / max(height * max(h, 0.05), 1e-4);
     return vec3<f32>(off.x, dy, off.y);
+}
+
+fn windDisplacement(objectY: f32, w: WindSample, sway: vec4<f32>, timing: vec4<f32>, plant: vec4<f32>,
+                    instanceScaleY: f32, rnd: vec4<f32>, tFlutter: f32) -> vec3<f32> {
+    return bendDisplacement(objectY, windBend(w, sway, timing, plant.w, rnd, tFlutter), timing, plant,
+                            instanceScaleY);
 }
