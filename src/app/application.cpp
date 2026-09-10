@@ -301,6 +301,8 @@ Application::Application() = default;
 Application::~Application() {
     // Destruction order matters: UI before GPU context, renderer before context, window last.
     panel_.reset();
+    worldBuilder_.reset();
+    jobs_.reset();
     imgui_.reset();
     engine_.reset();
     renderer_.reset();
@@ -408,7 +410,11 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             return std::unexpected(imgui.error());
         }
         imgui_ = std::move(*imgui);
+        jobs_ = std::make_unique<JobSystem>(2);
+        worldBuilder_ = std::make_unique<WorldBuilder>(*jobs_);
         panel_ = std::make_unique<ui::ControlPanel>();
+        panel_->jobs = jobs_.get();
+        panel_->builder = worldBuilder_.get();
         auto dialog = [this](platform::Window::DialogKind kind) {
             return [this, kind] {
                 window_->openFileDialog(kind, [this](std::string path) {

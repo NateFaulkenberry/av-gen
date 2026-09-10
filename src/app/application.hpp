@@ -4,6 +4,8 @@
 // frame loop in offline mode (ADR-012). Both modes drive the same Engine and SceneRenderer.
 
 #include "app/engine.hpp"
+#include "app/job_system.hpp"
+#include "app/world_builder.hpp"
 #include "app/recent_files.hpp"
 #include "app/render_job.hpp"
 #include "app/output_manager.hpp"
@@ -155,6 +157,11 @@ private:
     std::unique_ptr<rendering::SceneRenderer> renderer_;
     std::unique_ptr<ui::ImGuiLayer> imgui_;
     std::unique_ptr<ui::ControlPanel> panel_;
+    // ADR-064/066: one job system for the application, and the world builder that submits to it.
+    // Declared after the panel so they outlive it during teardown -- the panel holds raw pointers
+    // to both, and a job finishing while the panel is being destroyed would otherwise be a race.
+    std::unique_ptr<JobSystem> jobs_;
+    std::unique_ptr<WorldBuilder> worldBuilder_;
     std::unique_ptr<Engine> engine_;
     FileWatcher engineShaderWatcher_{0.5};
 };

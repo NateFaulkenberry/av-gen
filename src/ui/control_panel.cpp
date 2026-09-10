@@ -121,6 +121,7 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
             ImGui::MenuItem("Analysis", nullptr, &showAnalysis_);
             ImGui::MenuItem("Modulation", nullptr, &showModulation_);
             ImGui::MenuItem("World", nullptr, &showWorld_);
+            ImGui::MenuItem("World Builder", nullptr, &showWorldBuilder_);
             ImGui::MenuItem("Assets", nullptr, &showAssets_);
             ImGui::MenuItem("Graph", nullptr, &showGraph_);
             ImGui::MenuItem("ImGui Demo", nullptr, &showDemo_);
@@ -175,6 +176,14 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
         }
         ImGui::End();
     }
+    if (showWorldBuilder_) {
+        ImGui::SetNextWindowSize(ImVec2(400, 620), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(20, 60), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("World Builder", &showWorldBuilder_)) {
+            drawWorldBuilderWindow(engine);
+        }
+        ImGui::End();
+    }
     if (showAssets_) {
         ImGui::SetNextWindowSize(ImVec2(520, 420), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowPos(ImVec2(120, 120), ImGuiCond_FirstUseEver);
@@ -210,6 +219,17 @@ void ControlPanel::drawGraphWindow(app::Engine& engine) {
             ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", warning.c_str());
         }
     }
+}
+
+void ControlPanel::drawWorldBuilderWindow(app::Engine& engine) {
+    if (jobs == nullptr || builder == nullptr) {
+        ImGui::TextDisabled("The world builder is not available in this session.");
+        return;
+    }
+    // Installing is a scene mutation, so it happens here on the UI thread rather than on the
+    // worker that composed it.
+    worldBuilder.applyFinished(engine, *builder);
+    worldBuilder.draw(engine, *jobs, *builder);
 }
 
 void ControlPanel::drawAssetsWindow() {

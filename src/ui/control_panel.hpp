@@ -13,6 +13,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "rendering/sdf_renderer.hpp"
 #include "ui/graph_editor.hpp"
+#include "ui/world_builder_panel.hpp"
 #include "ui/world_panel.hpp"
 
 #include <filesystem>
@@ -88,6 +89,11 @@ public:
     // World authoring (ADR-031): layers, overview, inspector, states, macros, debug options.
     // The host reads `world.debug` to build the debug-draw geometry each frame.
     WorldPanel world;
+    // ADR-066: the recipe, Generate World, and the job monitor. Given the job system
+    // and builder by the host so the panel owns no scheduling of its own.
+    WorldBuilderPanel worldBuilder;
+    app::JobSystem* jobs = nullptr;
+    app::WorldBuilder* builder = nullptr;
     // Procedural graph editor (ADR-028); the host re-installs the graph when it changes.
     GraphEditor graphEditor;
 
@@ -113,6 +119,7 @@ private:
     void drawOutputsTab(app::Engine& engine);
     void drawWorldWindow(app::Engine& engine);
     void drawAssetsWindow();
+    void drawWorldBuilderWindow(app::Engine& engine);
     void drawGraphWindow(app::Engine& engine);
 
     bool showDemo_ = false;
@@ -122,6 +129,7 @@ private:
     bool showRender_ = false;
     bool showWorld_ = true;
     bool showAssets_ = false;
+    bool showWorldBuilder_ = true;
     bool showGraph_ = false;
     int assetKind_ = 0;
     char assetSearch_[96] = "";
