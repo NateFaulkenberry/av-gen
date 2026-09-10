@@ -119,6 +119,16 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
     // a camera in an existing scene is somebody's decision and generating into that scene is not a
     // reason to overrule it.
     if (freshWorld) {
+        // camera/position and camera/target are only read in mode 1 (free). A fresh composition
+        // defaults to the orbit mode, which ignores both and circles the bounds centre -- so
+        // framing a world without also setting the mode set two parameters nothing looked at, and
+        // the rendered frame came out byte-identical. That default is also where the orbiting
+        // camera in every scene so far came from.
+        if (auto* mode = engine.params().find("camera/mode")) {
+            if (auto* m = dynamic_cast<params::Parameter<int>*>(mode)) {
+                m->setBase(1);
+            }
+        }
         if (auto* position = engine.params().find("camera/position")) {
             if (auto* vec = dynamic_cast<params::Parameter<glm::vec3>*>(position)) {
                 const glm::vec2 focus = world.composed.plan.focal.empty()
