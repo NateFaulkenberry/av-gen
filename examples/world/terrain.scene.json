@@ -309,7 +309,13 @@
       "tipAmplitude": 0.16,
       "gustResponse": 0.9,
       "bendCurve": 2.0,
-      "amplitudeVariance": 0.3
+      "amplitudeVariance": 0.3,
+      "simulate": {
+       "minScreenRadius": 9.0,
+       "maxDistance": 50.0,
+       "budget": 80,
+       "enabled": true
+      }
      }
     },
     {
@@ -357,7 +363,13 @@
       "tipAmplitude": 0.12,
       "gustResponse": 1.15,
       "bendCurve": 1.7,
-      "amplitudeVariance": 0.38
+      "amplitudeVariance": 0.38,
+      "simulate": {
+       "minScreenRadius": 6.0,
+       "maxDistance": 45.0,
+       "budget": 140,
+       "enabled": true
+      }
      }
     },
     {
@@ -406,7 +418,13 @@
       "tipAmplitude": 0.13,
       "gustResponse": 1.3,
       "bendCurve": 1.5,
-      "amplitudeVariance": 0.4
+      "amplitudeVariance": 0.4,
+      "simulate": {
+       "minScreenRadius": 5.0,
+       "maxDistance": 40.0,
+       "budget": 200,
+       "enabled": true
+      }
      }
     },
     {
@@ -452,7 +470,13 @@
       "tipAmplitude": 0.12,
       "gustResponse": 1.2,
       "bendCurve": 2.2,
-      "amplitudeVariance": 0.45
+      "amplitudeVariance": 0.45,
+      "simulate": {
+       "minScreenRadius": 5.0,
+       "maxDistance": 40.0,
+       "budget": 100,
+       "enabled": true
+      }
      }
     },
     {
@@ -734,6 +758,7 @@
   "gustScale": 38.0,
   "gustSpeed": 4.0,
   "gustSharpness": 1.3,
-  "flutterScale": 2.4
+  "flutterScale": 2.4,
+  "simBudget": 520
  }
 }
