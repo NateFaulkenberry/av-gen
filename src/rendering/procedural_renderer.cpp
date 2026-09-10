@@ -10,6 +10,7 @@
 #include "gpu/frame_timeline.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
+#include "spatial/vegetation_sim.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 
@@ -307,6 +308,18 @@ struct ProceduralRenderer::Impl {
         // know a level is empty when it records the draw -- the GPU writes the count -- but it can
         // know the level has been empty for a while.
         std::array<std::uint32_t, scene::kMaxLodLevels> emptyFrames{};
+        // ADR-056 Tier 1. One buffer holds both halves: the per-record slot map at offset 0 and the
+        // compact per-slot bend array at `bendOffset` (256-aligned, because a bind group entry's
+        // offset must be). It is bound twice, at bindings 6 and 7, because WGSL cannot read one
+        // region as two types. `sim` is the level-of-detail decision and the integrator state; it is
+        // keyed to the object's records and rebuilt only when those change.
+        wgpu::Buffer dynamics;
+        std::uint64_t dynamicsBytes = 0;
+        std::uint64_t bendOffset = 0;
+        std::uint64_t bendBytes = 0;
+        std::uint64_t simVersion = ~0ull;   // structureVersion the sim's grid was built from
+        spatial::VegetationSim sim;
+        bool simActive = false;             // a live active set this frame
     };
     struct DrawItem {
         std::size_t objectIndex;        // into scene.procedurals
@@ -372,7 +385,8 @@ struct ProceduralRenderer::Impl {
     // Everything the object needs this frame, in dependency order: record/uniform buffers, the
     // cull buffers (when culling is on) and then every bind group that references them.
     void ensureObjectBuffers(ObjectState& state, std::uint64_t instanceBytes, bool needsLive, std::uint32_t lodCount,
-                             bool cullActive, std::uint32_t count);
+                             bool cullActive, std::uint32_t count, std::uint32_t simRecords,
+                             std::uint32_t simSlots);
     // Allocates (grow-only) the cull buffers; returns true when a buffer was replaced.
     bool ensureCullBuffers(ObjectState& state, std::uint32_t count, std::uint32_t lodCount);
     void pumpStats();
@@ -426,6 +440,13 @@ struct ProceduralRenderer::Impl {
     double lastCullMs = -1.0;       // the latest completed cull-pass measurement
     bool passThisFrame = false;      // an effector pass was encoded in the current update()
     bool cullPassThisFrame = false;  // a cull pass was encoded in the current update()
+    // ADR-056: the disturbance set is frame-global -- a body pushing through the valley pushes
+    // through every layer of it -- and so is the ceiling on how many plants may be simulated at
+    // once, because what has to stay bounded is the frame and not the meadow.
+    wind::DisturbanceField disturbances;
+    glm::vec3 lastCameraPosition{0.0f};
+    bool hasLastCamera = false;
+    int simRemaining = 0;
     std::uint32_t viewportWidth = 1920;
     std::uint32_t viewportHeight = 1080;
     std::uint64_t frame = 0;
@@ -484,7 +505,7 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         // Group 1: 0 = object uniforms (dynamic offset, 256-byte slots), 1 = instance records
         // (read-only storage), 2 = deformer/time block, 3 = field block, 4 = spline tables,
         // 5 = the LOD level's compacted visible list (ADR-029; inert when the object is not culled).
-        std::array<wgpu::BindGroupLayoutEntry, 6> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 8> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -510,6 +531,17 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         entries[5].visibility = wgpu::ShaderStage::Vertex;
         entries[5].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         entries[5].buffer.minBindingSize = 4;
+        // ADR-056: the Tier 1 slot map and the compact bend array. Objects with no simulated
+        // specimens bind the same inert placeholder the visible list uses, and the vertex stage
+        // never reads either (ProceduralUniforms::prevInfo.y is 0).
+        entries[6].binding = 6;
+        entries[6].visibility = wgpu::ShaderStage::Vertex;
+        entries[6].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[6].buffer.minBindingSize = 4;
+        entries[7].binding = 7;
+        entries[7].visibility = wgpu::ShaderStage::Vertex;
+        entries[7].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[7].buffer.minBindingSize = 16;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "procedural-object-layout";
         desc.entryCount = entries.size();
@@ -858,7 +890,8 @@ const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureLodM
 }
 
 void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint64_t instanceBytes, bool needsLive,
-                                                  std::uint32_t lodCount, bool cullActive, std::uint32_t count) {
+                                                  std::uint32_t lodCount, bool cullActive, std::uint32_t count,
+                                                  std::uint32_t simRecords, std::uint32_t simSlots) {
     const auto& device = context.device();
     const std::uint32_t levels = std::clamp(lodCount, 1u, static_cast<std::uint32_t>(scene::kMaxLodLevels));
     // Missing group for the top level this frame needs (a fresh object, or lodCount grew).
@@ -902,12 +935,30 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
     if (cullActive && ensureCullBuffers(state, count, lodCount)) {
         rebuildGroup = true; // the draw groups slice `visible`
     }
+    // ADR-056: one grow-only buffer holding the slot map and the bend array. Allocated only for a
+    // layer that asked to be simulated, so a world without Tier 1 has the buffers it always had.
+    if (simRecords > 0 && simSlots > 0) {
+        const std::uint64_t slotBytes = (static_cast<std::uint64_t>(simRecords) * 4 + 255) / 256 * 256;
+        const std::uint64_t bendBytes = std::max<std::uint64_t>(static_cast<std::uint64_t>(simSlots) * 16, 256);
+        if (!state.dynamics || state.dynamicsBytes < slotBytes + bendBytes) {
+            wgpu::BufferDescriptor desc{};
+            desc.label = "procedural-plant-dynamics";
+            desc.size = slotBytes + bendBytes;
+            desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+            state.dynamics = device.CreateBuffer(&desc);
+            state.dynamicsBytes = slotBytes + bendBytes;
+            state.bendOffset = slotBytes;
+            state.bendBytes = bendBytes;
+            state.simVersion = ~0ull; // the slot map in the new buffer is not the one we mirrored
+            rebuildGroup = true;
+        }
+    }
     if (rebuildGroup) {
         // One draw group per (record buffer, LOD level): the level picks its deformer/time slot
         // and its slice of the visible list. Uncalled objects bind the inert placeholder, which
         // the vertex shader never reads (ProceduralUniforms::fieldInfo.w is 0).
         auto drawGroup = [&](const wgpu::Buffer& records, std::uint64_t bytes, std::uint32_t level, const char* label) {
-            std::array<wgpu::BindGroupEntry, 6> entries{};
+            std::array<wgpu::BindGroupEntry, 8> entries{};
             entries[0].binding = 0;
             entries[0].buffer = objectUniforms;
             entries[0].size = sizeof(ObjectUniforms);
@@ -932,6 +983,20 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
             } else {
                 entries[5].buffer = emptyVisible;
                 entries[5].size = 256;
+            }
+            entries[6].binding = 6;
+            entries[7].binding = 7;
+            if (state.dynamics) {
+                entries[6].buffer = state.dynamics;
+                entries[6].size = state.bendOffset;
+                entries[7].buffer = state.dynamics;
+                entries[7].offset = state.bendOffset;
+                entries[7].size = state.bendBytes;
+            } else {
+                entries[6].buffer = emptyVisible;
+                entries[6].size = 256;
+                entries[7].buffer = emptyVisible;
+                entries[7].size = 256;
             }
             wgpu::BindGroupDescriptor desc{};
             desc.label = label;
@@ -1147,6 +1212,22 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     CullCamera cullCamera;
     cullCamera.position = scene.camera.position;
     cullCamera.projScale = cullProjScale(scene.camera.effectiveFovY(), im.viewportHeight);
+
+    // ---- ADR-056: the wind field, the disturbance set and the frame's simulation budget ----
+    const wind::WindUniforms frameWind = wind::packWind(scene.environment.wind);
+    const float simDt = std::clamp(static_cast<float>(time.deltaTime), 1e-5f, 0.25f);
+    im.disturbances.advance(simDt);
+    if (scene.environment.wind.wake.enabled) {
+        // The first use case: the camera walking through the vegetation. Its velocity is taken from
+        // where it was last frame rather than from any camera rig, so it works for a keyframed
+        // camera, a live one and a scripted flythrough alike.
+        const glm::vec3 velocity =
+            im.hasLastCamera ? (scene.camera.position - im.lastCameraPosition) / simDt : glm::vec3(0.0f);
+        im.disturbances.trackBody(scene.camera.position, velocity, scene.environment.wind.wake);
+    }
+    im.lastCameraPosition = scene.camera.position;
+    im.hasLastCamera = true;
+    im.simRemaining = std::max(scene.environment.wind.simBudget, 0);
     std::uint32_t slot = 0;
     for (std::size_t i = 0; i < scene.procedurals.size(); ++i) {
         const auto& object = scene.procedurals[i];
@@ -1176,6 +1257,33 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             const Impl::CachedMesh* reduced = im.ensureLodMesh(object, static_cast<int>(level));
             lodMeshes[level] = reduced != nullptr ? reduced : mesh; // a failed level falls back to the source
         }
+        // ---- ADR-055 species response ----
+        // Resolved here rather than with the rest of the uniforms because Tier 1 (ADR-056) needs the
+        // same numbers, earlier: the two tiers must be driven by one transfer function, not two.
+        const bool windActive = scene.environment.wind.active() && object.motion.active();
+        wind::MotionResponse windResponse;
+        float windBaseY = 0.0f;
+        float windExtent = 1.0f;
+        if (windActive) {
+            windResponse = wind::motionResponse(scene.environment.wind, object.motion);
+            // The height profile is measured in the space the deformer stack sees, which is after
+            // the source transform (the layer's "make this thing 0.45 m tall" scale), so the bounds
+            // have to travel through the same matrix.
+            const glm::mat4 srcMatrix = object.sourceTransform.matrix();
+            float lo = std::numeric_limits<float>::max();
+            float hi = std::numeric_limits<float>::lowest();
+            for (int corner = 0; corner < 8; ++corner) {
+                const glm::vec3 c((corner & 1) != 0 ? mesh->boundsMax.x : mesh->boundsMin.x,
+                                  (corner & 2) != 0 ? mesh->boundsMax.y : mesh->boundsMin.y,
+                                  (corner & 4) != 0 ? mesh->boundsMax.z : mesh->boundsMin.z);
+                const float y = (srcMatrix * glm::vec4(c, 1.0f)).y;
+                lo = std::min(lo, y);
+                hi = std::max(hi, y);
+            }
+            windBaseY = lo;
+            windExtent = std::max(hi - lo, 1e-4f);
+        }
+
         // ---- effectors: the usable ones (enabled, field bound to a slot), in order ----
         EffectorPassUniforms eff{};
         std::uint32_t effectorCount = 0;
@@ -1210,7 +1318,15 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         Impl::ObjectState& state = im.objects[key];
         state.lastUsed = im.frame;
         const std::uint64_t instanceBytes = static_cast<std::uint64_t>(object.instances.size()) * kInstanceStride;
-        im.ensureObjectBuffers(state, instanceBytes, usesLive, lodCount, cullActive, instanceCount);
+        // ---- ADR-056 Tier 1: does this layer ask to be simulated, and is there room ----
+        // An object with effectors is excluded: the GPU moves its records after this point, so the
+        // CPU positions the level-of-detail decision reads would be the wrong ones.
+        const wind::SimLod& simLod = object.motion.simulate;
+        const int simShare = std::min(simLod.budget, im.simRemaining);
+        const bool simWanted = simLod.enabled && windActive && !usesLive && simShare > 0;
+        im.ensureObjectBuffers(state, instanceBytes, usesLive, lodCount, cullActive, instanceCount,
+                               simWanted ? instanceCount : 0u,
+                               simWanted ? static_cast<std::uint32_t>(simShare) : 0u);
         state.usesLive = usesLive;
         state.statsSlot = slot;
         if (state.structureVersion != object.structureVersion || state.uploadedCount != object.instances.size()) {
@@ -1233,6 +1349,67 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                                                    mesh->radius);
         if (fullyCulled) {
             ++stats_.culledObjects;
+        }
+
+        // ---- ADR-056 Tier 1: choose, integrate, upload ----
+        // Everything here is proportional to the *active* set. The grid is built once per scatter;
+        // the per-frame work is one pass over the plants that hold a slot, a bounded look at the
+        // records near the camera, one contiguous write of the bend array and a handful of writes
+        // where the active set changed.
+        state.simActive = false;
+        if (simWanted && state.dynamics && !fullyCulled) {
+            if (state.simVersion != object.structureVersion) {
+                state.sim.setInstances(object.instances);
+                state.simVersion = object.structureVersion;
+            }
+            spatial::VegetationSim::Frame sf;
+            sf.objectToWorld = model;
+            sf.cameraPosition = cullCamera.position;
+            sf.projScale = cullCamera.projScale;
+            sf.sourceRadius = mesh->radius;
+            sf.extentY = windExtent;
+            sf.renderTime = static_cast<float>(time.renderTime);
+            sf.deltaTime = static_cast<float>(time.deltaTime);
+            sf.budget = simShare;
+            sf.wind = frameWind;
+            sf.response = windResponse;
+            sf.motion = object.motion;
+            sf.disturbances = &im.disturbances;
+            state.sim.update(sf);
+
+            const std::uint32_t slots = state.sim.slotCount();
+            if (slots > 0) {
+                queue.WriteBuffer(state.dynamics, state.bendOffset, state.sim.dynamics().data(),
+                                  static_cast<std::uint64_t>(slots) * 16);
+            }
+            const std::span<const std::uint32_t> map = state.sim.slots();
+            if (state.sim.slotsDirtyAll()) {
+                queue.WriteBuffer(state.dynamics, 0, map.data(), static_cast<std::uint64_t>(map.size()) * 4);
+                state.sim.markSlotsUploaded();
+            } else {
+                for (const auto& span : state.sim.dirtySlots()) {
+                    queue.WriteBuffer(state.dynamics, static_cast<std::uint64_t>(span.first) * 4,
+                                      map.data() + span.first, static_cast<std::uint64_t>(span.count) * 4);
+                    ++stats_.simSlotWrites;
+                }
+            }
+            state.simActive = state.sim.activeCount() > 0;
+            im.simRemaining -= static_cast<int>(state.sim.activeCount());
+            ++stats_.simObjects;
+            stats_.simActive += state.sim.activeCount();
+            stats_.simAwake += state.sim.awakeCount();
+            stats_.simExamined += state.sim.examinedCount();
+        } else if (state.sim.activeCount() > 0) {
+            // The layer stopped asking. Hand every slot back and let the shader fall through to
+            // Tier 0 -- which is what the buffer already says once the map is cleared.
+            spatial::VegetationSim::Frame off;
+            off.motion = object.motion;
+            off.motion.simulate.enabled = false;
+            state.sim.update(off);
+            const std::span<const std::uint32_t> map = state.sim.slots();
+            if (state.dynamics && !map.empty()) {
+                queue.WriteBuffer(state.dynamics, 0, map.data(), static_cast<std::uint64_t>(map.size()) * 4);
+            }
         }
         if (usesLive) {
             eff.objectToWorld = model;
@@ -1294,30 +1471,17 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         u.windSway = glm::vec4(0.0f);
         u.windTiming = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
         u.windPlant = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
-        if (scene.environment.wind.active() && object.motion.active()) {
-            const wind::MotionResponse r = wind::motionResponse(scene.environment.wind, object.motion);
-            // The height profile is measured in the space the deformer stack sees, which is after
-            // the source transform (the layer's "make this thing 0.45 m tall" scale), so the bounds
-            // have to travel through the same matrix.
-            const glm::mat4 srcMatrix = object.sourceTransform.matrix();
-            float lo = std::numeric_limits<float>::max();
-            float hi = std::numeric_limits<float>::lowest();
-            for (int corner = 0; corner < 8; ++corner) {
-                const glm::vec3 c((corner & 1) != 0 ? mesh->boundsMax.x : mesh->boundsMin.x,
-                                  (corner & 2) != 0 ? mesh->boundsMax.y : mesh->boundsMin.y,
-                                  (corner & 4) != 0 ? mesh->boundsMax.z : mesh->boundsMin.z);
-                const float y = (srcMatrix * glm::vec4(c, 1.0f)).y;
-                lo = std::min(lo, y);
-                hi = std::max(hi, y);
-            }
-            const float extent = std::max(hi - lo, 1e-4f);
+        if (windActive) {
+            const wind::MotionResponse& r = windResponse;
             u.windSway = glm::vec4(r.steadyGain, r.gustGain, r.flutterGain, 1.0f);
             u.windTiming = glm::vec4(r.swayDelay, r.flutterOmega, r.bendCurve, r.bendLimit);
-            u.windPlant = glm::vec4(lo, 1.0f / extent, extent, r.amplitudeVariance);
+            u.windPlant = glm::vec4(windBaseY, 1.0f / windExtent, windExtent, r.amplitudeVariance);
             ++stats_.windObjects;
         }
-        // Velocity needs the same chain evaluated at the previous frame's time (ADR-035).
-        u.prevInfo = glm::vec4(static_cast<float>(time.renderTime - time.deltaTime), 0.0f, 0.0f, 0.0f);
+        // Velocity needs the same chain evaluated at the previous frame's time (ADR-035); prevInfo.y
+        // switches the Tier 1 lookup on, and is uniform across the draw.
+        u.prevInfo = glm::vec4(static_cast<float>(time.renderTime - time.deltaTime),
+                               state.simActive ? 1.0f : 0.0f, 0.0f, 0.0f);
         // Step 1 of the transform chain. It is a uniform rather than a baked mesh because
         // source/position|rotation|scale animate; the shader applies it before the deformers so
         // the GPU matches ProceduralGeometry::instanceMatrix().

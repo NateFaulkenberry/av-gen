@@ -1480,11 +1480,12 @@ int Application::runHeadless() {
             // whose edit never applied.
             log::info("             workload: volumeSteps={} cascades={} shadowRes={} aoTarget={}x{} "
                       "aoSlices={}x{} postPasses={} bloomLevels={} sdf={}ray/{}mesh simGrids={} "
-                      "transient={}",
+                      "transient={} wind={}obj plants={}/{}awake ({} examined, {} slot writes)",
                       st.volume.steps, st.shadows.cascades, st.shadows.resolution, st.ao.width,
                       st.ao.height, st.ao.slices, st.ao.steps, st.post.passes, st.post.bloomLevels,
                       st.sdf.raymarchObjects, st.sdf.meshObjects, st.simulation.grids,
-                      st.transientTextures);
+                      st.transientTextures, st.procedural.windObjects, st.procedural.simActive,
+                      st.procedural.simAwake, st.procedural.simExamined, st.procedural.simSlotWrites);
         }
         if (options_.capture && i == frames - 1 && image) {
             if (auto r = writeCapture(*image, *options_.capture); !r) {

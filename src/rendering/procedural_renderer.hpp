@@ -31,6 +31,7 @@
 #include "core/time.hpp"
 #include "scene/procedural.hpp"
 #include "scene/scene.hpp"
+#include "core/plant_chain.hpp"
 #include "spatial/effector.hpp"
 
 #include <webgpu/webgpu_cpp.h>
@@ -64,6 +65,15 @@ struct ProceduralStats {
     std::uint64_t instanceBufferBytes = 0;
     std::uint32_t deformers = 0;        // enabled deformers over drawn objects
     std::uint32_t windObjects = 0;      // ADR-055: drawn objects whose vertex stage sways this frame
+    // ADR-056 Tier 1. `simActive` is how many specimens hold a simulation slot, `simAwake` how many
+    // were actually integrated (the rest are asleep), `simExamined` how many records the level-of-
+    // detail pass looked at -- the number that must not track the size of the population -- and
+    // `simSlotWrites` how many separate slot-map uploads the churn cost.
+    std::uint32_t simObjects = 0;
+    std::uint32_t simActive = 0;
+    std::uint32_t simAwake = 0;
+    std::uint32_t simExamined = 0;
+    std::uint32_t simSlotWrites = 0;
     double cpuUpdateMs = 0.0;           // rebuild + upload time this frame
     std::uint32_t uploads = 0;          // instance buffer uploads this frame
     std::uint32_t drawCalls = 0;        // draws issued: one per object, or one per populated LOD level

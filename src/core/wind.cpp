@@ -134,23 +134,25 @@ MotionResponse motionResponse(const WindParams& wind, const VegetationMotion& pl
     return out;
 }
 
-glm::vec3 vegetationDisplacement(float objectY, float baseY, float extentY, float instanceScaleY,
-                                 const WindSample& w, const MotionResponse& r, const glm::vec4& random,
-                                 float tFlutter) {
+glm::vec2 vegetationBend(const WindSample& w, const MotionResponse& r, const glm::vec4& random, float tFlutter) {
+    // Per-instance amplitude, so neighbours differ while the region they share stays coherent.
+    const float amp = 1.0f + r.amplitudeVariance * (random.z * 2.0f - 1.0f);
+    const float s = w.strength;
+    const float along = r.steadyGain * s + r.gustGain * s * w.gust;
+    const float flutter = r.flutterGain * s * std::sin(w.phase + r.flutterOmega * tFlutter + random.x * kTau);
+    const glm::vec2 perp(-w.direction.y, w.direction.x);
+    return (w.direction * along + perp * flutter) * amp;
+}
+
+glm::vec3 bendDisplacement(float objectY, float baseY, float extentY, float instanceScaleY, const glm::vec2& bend,
+                           const MotionResponse& r) {
     // Height along the plant, 0 at the root. This is the whole anchoring story: whatever the
     // displacement turns out to be, it is multiplied by a curve that is exactly zero where the stem
     // meets soil, so the mesh is never rotated rigidly.
     const float h = std::clamp((objectY - baseY) / std::max(extentY, 1e-6f), 0.0f, 1.0f);
     const float profile = std::pow(h, r.bendCurve);
     const float height = extentY * instanceScaleY;
-    // Per-instance amplitude, so neighbours differ while the region they share stays coherent.
-    const float amp = 1.0f + r.amplitudeVariance * (random.z * 2.0f - 1.0f);
-
-    const float s = w.strength;
-    const float along = r.steadyGain * s + r.gustGain * s * w.gust;
-    const float flutter = r.flutterGain * s * std::sin(w.phase + r.flutterOmega * tFlutter + random.x * kTau);
-    const glm::vec2 perp(-w.direction.y, w.direction.x);
-    glm::vec2 off = (w.direction * along + perp * flutter) * (amp * profile * height);
+    glm::vec2 off = bend * (profile * height);
 
     // A soft ceiling on tip travel: len for small offsets, -> maxLen for large, with no corner where
     // a hard clamp would make a stalk visibly hit a wall.
@@ -162,6 +164,12 @@ glm::vec3 vegetationDisplacement(float objectY, float baseY, float extentY, floa
     // sideways and reads as a shear rather than a bend.
     const float dy = -0.5f * glm::dot(off, off) / std::max(height * std::max(h, 0.05f), 1e-4f);
     return glm::vec3(off.x, dy, off.y);
+}
+
+glm::vec3 vegetationDisplacement(float objectY, float baseY, float extentY, float instanceScaleY,
+                                 const WindSample& w, const MotionResponse& r, const glm::vec4& random,
+                                 float tFlutter) {
+    return bendDisplacement(objectY, baseY, extentY, instanceScaleY, vegetationBend(w, r, random, tFlutter), r);
 }
 
 // ---- serialisation -----------------------------------------------------------------------------
@@ -196,6 +204,21 @@ WindParams windFromJson(const nlohmann::json& j) {
     readFloat(j, "gustSpeed", p.gustSpeed);
     readFloat(j, "gustSharpness", p.gustSharpness);
     readFloat(j, "flutterScale", p.flutterScale);
+    if (j.contains("simBudget") && j.at("simBudget").is_number()) {
+        p.simBudget = j.at("simBudget").get<int>();
+    }
+    if (j.contains("wake") && j.at("wake").is_object()) {
+        const nlohmann::json& w = j.at("wake");
+        p.wake.enabled = true;
+        if (w.contains("enabled") && w.at("enabled").is_boolean()) {
+            p.wake.enabled = w.at("enabled").get<bool>();
+        }
+        readFloat(w, "radius", p.wake.radius);
+        readFloat(w, "strength", p.wake.strength);
+        readFloat(w, "maxStrength", p.wake.maxStrength);
+        readFloat(w, "lead", p.wake.lead);
+        readFloat(w, "decay", p.wake.decay);
+    }
     return p;
 }
 
@@ -213,7 +236,15 @@ nlohmann::json windToJson(const WindParams& p) {
                           {"gustScale", p.gustScale},
                           {"gustSpeed", p.gustSpeed},
                           {"gustSharpness", p.gustSharpness},
-                          {"flutterScale", p.flutterScale}};
+                          {"flutterScale", p.flutterScale},
+                          {"simBudget", p.simBudget},
+                          {"wake",
+                           {{"enabled", p.wake.enabled},
+                            {"radius", p.wake.radius},
+                            {"strength", p.wake.strength},
+                            {"maxStrength", p.wake.maxStrength},
+                            {"lead", p.wake.lead},
+                            {"decay", p.wake.decay}}}};
 }
 
 VegetationMotion motionFromJson(const nlohmann::json& j, const VegetationMotion& base) {
@@ -230,6 +261,23 @@ VegetationMotion motionFromJson(const nlohmann::json& j, const VegetationMotion&
     readFloat(j, "gustResponse", m.gustResponse);
     readFloat(j, "bendCurve", m.bendCurve);
     readFloat(j, "amplitudeVariance", m.amplitudeVariance);
+    if (j.contains("simulate") && j.at("simulate").is_object()) {
+        const nlohmann::json& sim = j.at("simulate");
+        SimLod& s = m.simulate;
+        s.enabled = true;
+        if (sim.contains("enabled") && sim.at("enabled").is_boolean()) {
+            s.enabled = sim.at("enabled").get<bool>();
+        }
+        readFloat(sim, "maxDistance", s.maxDistance);
+        readFloat(sim, "minScreenRadius", s.minScreenRadius);
+        readFloat(sim, "hysteresis", s.hysteresis);
+        readFloat(sim, "release", s.release);
+        readFloat(sim, "sleepSpeed", s.sleepSpeed);
+        readFloat(sim, "sleepSeconds", s.sleepSeconds);
+        if (sim.contains("budget") && sim.at("budget").is_number()) {
+            s.budget = sim.at("budget").get<int>();
+        }
+    }
     return m;
 }
 
@@ -242,7 +290,16 @@ nlohmann::json motionToJson(const VegetationMotion& m) {
                           {"tipAmplitude", m.tipAmplitude},
                           {"gustResponse", m.gustResponse},
                           {"bendCurve", m.bendCurve},
-                          {"amplitudeVariance", m.amplitudeVariance}};
+                          {"amplitudeVariance", m.amplitudeVariance},
+                          {"simulate",
+                           {{"enabled", m.simulate.enabled},
+                            {"maxDistance", m.simulate.maxDistance},
+                            {"minScreenRadius", m.simulate.minScreenRadius},
+                            {"hysteresis", m.simulate.hysteresis},
+                            {"budget", m.simulate.budget},
+                            {"release", m.simulate.release},
+                            {"sleepSpeed", m.simulate.sleepSpeed},
+                            {"sleepSeconds", m.simulate.sleepSeconds}}}};
 }
 
 

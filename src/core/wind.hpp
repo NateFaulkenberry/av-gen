@@ -30,6 +30,17 @@ namespace avgen::wind {
 
 inline constexpr float kTau = 6.28318530718f;
 
+// How a body moving through vegetation disturbs it (ADR-056). The scene-file half of
+// wind::CameraWake, which lives in core/plant_chain.hpp with the rest of the disturbance model.
+struct CameraWakeParams {
+    bool enabled = false;
+    float radius = 1.6f;       // metres of vegetation the body shoves aside
+    float strength = 6.0f;     // m/s^2 per m/s of body speed
+    float maxStrength = 40.0f; // ceiling, so a teleporting camera does not flatten the valley
+    float lead = 0.8f;         // metres ahead of the body the push is centred
+    float decay = 0.4f;        // seconds the wake lingers once the body stops
+};
+
 // ---- the field -------------------------------------------------------------------------------
 
 // What the air is doing over a whole world, as authored. Metres and seconds throughout.
@@ -59,6 +70,14 @@ struct WindParams {
     // rings at its own resonance when broadband turbulence excites it), so only the spatial scale
     // lives here; `MotionResponse::flutterOmega` carries the rate.
     float flutterScale = 2.2f; // metres between neighbours that flutter out of phase
+
+    // ADR-056 Tier 1: the global ceiling on simulated plants, shared out over the layers that ask
+    // for any. It is here rather than per layer because the thing that has to stay bounded is the
+    // frame, not the meadow, and a layer's own `simulate.budget` is a second, tighter limit.
+    int simBudget = 256;
+    // How hard a body moving through the vegetation shoves it aside (the camera, in the first
+    // instance). Off by default.
+    CameraWakeParams wake;
 
     [[nodiscard]] bool active() const { return enabled && speed > 0.0f; }
 };
@@ -92,6 +111,26 @@ struct WindSample {
 
 // ---- what a plant does with it ---------------------------------------------------------------
 
+// Simulation level of detail (ADR-056): when a specimen of this layer is worth integrating as a
+// chain of control points instead of being drawn by Tier 0's transfer function. Off by default, so
+// no scene written before this existed starts simulating anything.
+//
+// The thresholds are perceptual rather than a hard-coded distance: `minScreenRadius` is the
+// specimen's projected radius in pixels, the same measure the culler and the geometric LOD ladder
+// already use, so it means the same thing at any resolution or field of view. `maxDistance` is a
+// backstop for the case where a thing is large enough on screen but far enough that nobody is
+// looking at its tips.
+struct SimLod {
+    bool enabled = false;
+    float maxDistance = 14.0f;     // metres; beyond this nothing is simulated whatever its size
+    float minScreenRadius = 26.0f; // pixels of projected radius to promote at
+    float hysteresis = 0.7f;       // demote below this fraction of the promote threshold
+    int budget = 192;              // most specimens of this layer simulated at once
+    float release = 0.3f;          // seconds spent handing the pose back to Tier 0 on the way down
+    float sleepSpeed = 0.015f;     // plant heights per second that counts as still
+    float sleepSeconds = 0.5f;     // how long it must be still before it stops being integrated
+};
+
 // Per-species physical parameters. These are the plant, not the wind: the same field moves grass
 // and mushrooms differently because these differ, which is the whole point of naming them.
 struct VegetationMotion {
@@ -105,6 +144,7 @@ struct VegetationMotion {
     float gustResponse = 1.0f;       // how much of a gust it takes on top of the steady flow
     float bendCurve = 1.8f;          // exponent of the height profile (1 = shear, 3 = tip only)
     float amplitudeVariance = 0.35f; // per-instance spread of amplitude, +-this fraction
+    SimLod simulate;                 // ADR-056 Tier 1: which specimens are integrated, if any
 
     [[nodiscard]] bool active() const { return windSensitivity > 0.0f && tipAmplitude > 0.0f; }
 };
@@ -146,6 +186,18 @@ struct MotionResponse {
 [[nodiscard]] glm::vec3 vegetationDisplacement(float objectY, float baseY, float extentY, float instanceScaleY,
                                                const WindSample& w, const MotionResponse& r,
                                                const glm::vec4& random, float tFlutter);
+
+// The two halves of it, split so Tier 1 (ADR-056) can replace the first without touching the
+// second. `vegetationBend` is the tip's horizontal offset in units of the plant's height -- the
+// only thing the field and the species decide -- and `bendDisplacement` turns any such offset into
+// a vertex displacement, applying the height profile, the soft ceiling and the length-preserving
+// drop. A simulated plant hands `bendDisplacement` a bend that came out of an integrator instead;
+// everything downstream is then identical by construction, which is why a plant can change tier
+// mid-frame without moving. Both are transliterated in shaders/wind.wgsl.
+[[nodiscard]] glm::vec2 vegetationBend(const WindSample& w, const MotionResponse& r, const glm::vec4& random,
+                                       float tFlutter);
+[[nodiscard]] glm::vec3 bendDisplacement(float objectY, float baseY, float extentY, float instanceScaleY,
+                                         const glm::vec2& bend, const MotionResponse& r);
 
 // ---- serialisation ---------------------------------------------------------------------------
 
