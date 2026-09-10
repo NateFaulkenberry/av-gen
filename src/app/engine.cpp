@@ -799,6 +799,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     rebind();
     modulator_.resetState();
     projectPath_ = path;
+    reportCuePresetOverrides();
     log::info("project '{}' loaded: {} parameters, {} routes, {} sources, {} presets, {} timeline tracks, {} cues, {} warning(s)",
               path.filename().string(), params_.size(), modulator_.routes().size(), sources_.sources().size(),
               presets_.presets().size(), timeline_.tracks().size(), timeline_.cues().size(), projectWarnings_.size());
@@ -1450,6 +1451,64 @@ void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
     sourceContext_.beatEvent = pulse;
 }
 
+void Engine::reportCuePresetOverrides() {
+    // A cue recalls its preset into the base values the moment the playhead reaches it, so a value
+    // the scene file authored and a value a cue preset names are not in competition: the preset
+    // wins, from that cue onward. That precedence is right -- a cue arc is a deliberate statement
+    // about time and a scene file is the starting condition -- and it was silent, which is not.
+    // Hyperspace's gate plates went through a dozen material edits that did exactly nothing
+    // because a preset was pinning their emission (docs/shot-hyperspace.md).
+    //
+    // Measured once, here, against the values in effect at load, which is exactly the question an
+    // author is asking when they edit a scene file and re-run. Deduplicated across cues and
+    // reported as one line, because *every* cue preset overrides something -- that is what a cue
+    // is -- and a notice per cue would be a notice nobody reads. This is not a load fault, so it
+    // does not go in projectWarnings(); `cuePresetOverrides()` is where the inspector reads it.
+    cuePresetOverrides_.clear();
+    if (!timeline_.enabled || timeline_.cues().empty()) {
+        return;
+    }
+    std::set<std::string> paths;
+    std::size_t cues = 0;
+    for (const auto& cue : timeline_.cues()) {
+        if (cue.preset.empty()) {
+            continue;
+        }
+        const auto* preset = presets_.find(cue.preset);
+        if (preset == nullptr) {
+            continue; // applyCues() warns about this when it gets there
+        }
+        const auto conflicts = params::presetConflicts(params_, *preset);
+        if (conflicts.empty()) {
+            continue;
+        }
+        ++cues;
+        for (const auto& conflict : conflicts) {
+            paths.insert(conflict.path);
+        }
+    }
+    if (paths.empty()) {
+        return;
+    }
+    cuePresetOverrides_.assign(paths.begin(), paths.end());
+    constexpr std::size_t kListed = 10;
+    std::string listed;
+    for (std::size_t i = 0; i < cuePresetOverrides_.size() && i < kListed; ++i) {
+        listed += (i == 0 ? "" : ", ") + cuePresetOverrides_[i];
+    }
+    if (cuePresetOverrides_.size() > kListed) {
+        listed += fmt::format(", and {} more", cuePresetOverrides_.size() - kListed);
+    }
+    log::warn("{} cue preset(s) take over {} value(s) the scene set; editing these in the scene "
+              "file will not survive the first cue that names them: {}",
+              cues, cuePresetOverrides_.size(), listed);
+}
+
+void Engine::setViewport(std::uint32_t width, std::uint32_t height) {
+    viewportWidth_ = width;
+    viewportHeight_ = height;
+}
+
 void Engine::updateTimelineClock(const FrameTime& time) {
     timelineClock_.seconds = audioFile_ ? positionSeconds() : time.renderTime;
     timelineClock_.beats = static_cast<double>(beatClockCount_) + beatClockPhase_;
@@ -1574,6 +1633,11 @@ void Engine::update(const FrameTime& time) {
     params_.resetFinals();
     timeline_.apply(timelineClock_); // automation: the first modulation layer (ADR-018)
     modulator_.applyRoutes(bus_, params_, time.deltaTime);
+    if (viewportHeight_ > 0) {
+        if (auto* comp = composition()) {
+            comp->setViewport(viewportWidth_, viewportHeight_);
+        }
+    }
     controller_->update(time);
     scene::applyPostParameters(postParams_, post_);
     // ---- physical camera (ADR-037) ---------------------------------------------------------

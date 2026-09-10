@@ -1013,6 +1013,7 @@ int Application::runLive() {
         }
         const FrameTime time = engine_->tick(clock);
         lastTime = time;
+        engine_->setViewport(window_->pixelWidth(), window_->pixelHeight());
         engine_->update(time);
 
         stats.width = window_->pixelWidth();
@@ -1347,6 +1348,7 @@ int Application::runHeadless() {
         // face empty sky spends 12-14 ms on the GPU and 21 ms of wall clock, and the difference
         // was invisible. See docs/performance.md.
         const auto updateStart = std::chrono::steady_clock::now();
+        engine_->setViewport(w, h);
         engine_->update(time);
         lastEngineUpdateMs_ =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - updateStart).count();

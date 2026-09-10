@@ -85,6 +85,11 @@ struct CompositionNode {
     ParticleSystem particleRest;
     ProceduralParameters proceduralParams;
     ProceduralGeometry proceduralRest;
+    // ADR-044: a multi-material asset is one procedural object per material. `proceduralRest` is
+    // part 0 -- the one carrying the most surface area, and the one the node's parameters were
+    // registered from; these are the rest copies of the others, identical to it but for their mesh
+    // and their material. Built at rebuild, applied alongside it every frame.
+    std::vector<ProceduralGeometry> proceduralSubRest;
     FieldParameters fieldParams;
     spatial::FieldSpec fieldRest;
     SplineParameters splineParams;
@@ -160,6 +165,16 @@ public:
     Result<void> addMaterialProgram(MaterialProgram program); // registers parameters when attached
     [[nodiscard]] const std::vector<MaterialProgram>& materialPrograms() const { return materialPrograms_; }
     void setCameraSpline(std::string name) { cameraSplineSetting_ = std::move(name); }
+    // ---- viewport (ADR-046) ----
+    // The window this composition will be drawn into, set by whoever renders it, once per frame
+    // before update(). Terrain LOD is a screen-space decision -- how large a chunk's quads are in
+    // pixels -- so it needs the viewport as well as the lens, and the chunk frustum cull needs its
+    // aspect. The default is the 900-pixel reference height `lodDistance` is authored against and
+    // an aspect below the conservative cull floor, so a caller that never sets it picks exactly the
+    // levels it always did.
+    void setViewport(std::uint32_t width, std::uint32_t height);
+    [[nodiscard]] std::uint32_t viewportWidth() const { return viewportWidth_; }
+    [[nodiscard]] std::uint32_t viewportHeight() const { return viewportHeight_; }
     [[nodiscard]] std::size_t nodeCount() const { return nodes_.size(); }
 
     // ---- parameters ----
@@ -335,6 +350,7 @@ private:
         std::vector<float> restRoughness;
         int particleIndex = -1;                      // index into scene_.particles (Particles kind)
         int proceduralIndex = -1;                    // index into scene_.procedurals (Procedural kind)
+        std::size_t proceduralSubCount = 0;          // the asset's other materials, immediately after it
         int fieldIndex = -1;                         // index into scene_.fields.fields (Field kind)
         std::size_t firstField = 0;                  // Scene kind: the child's fields copied in
         std::size_t fieldCount = 0;
@@ -355,6 +371,8 @@ private:
         std::size_t childParticleCount = 0;
     };
     std::vector<NodeRange> ranges_;
+    std::uint32_t viewportWidth_ = 1440;   // see setViewport(); the defaults reproduce the
+    std::uint32_t viewportHeight_ = 900;   // reference lens terrain LOD was authored against
 
     params::ParameterSet* params_ = nullptr;
     params::Modulator* modulator_ = nullptr;

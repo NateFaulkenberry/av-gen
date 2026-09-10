@@ -11,8 +11,11 @@
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <ranges>
+#include <string>
 #include <vector>
 
 using namespace avgen;
@@ -116,6 +119,69 @@ TEST_CASE("Missing project assets are warnings and the rest still loads", "[inte
     CHECK(engine.orbScene() != nullptr); // the scene load failed, so the orb stayed
     CHECK(engine.params().find("orb/scale")->baseComponent(0) == 1.75f);
     CHECK_FALSE(engine.hasAudio());
+}
+
+TEST_CASE("A cue preset that overrides a scene value says so", "[integration][project][cues]") {
+    // Cues recall presets into the base values (ADR-018), so from a cue onward the preset's value
+    // is what the scene has -- whatever the scene file said. That precedence is right and it was
+    // silent, which cost docs/shot-hyperspace.md a dozen material edits that did nothing at all.
+    // Loading a project now measures the overlap and says which values the scene will not keep.
+    Fixture f;
+    const auto sceneFile = f.dir / "media" / "lit.json";
+    std::ofstream(sceneFile) << R"({"format":"avgen-scene","version":1,"name":"lit","nodes":[
+        {"name":"plate","kind":"procedural","procedural":{
+            "source":{"kind":"box","size":[1,1,1]},
+            "distribution":{"kind":"single"},
+            "material":{"baseColor":[0.1,0.1,0.1],"emissiveIntensity":0.25,"roughness":0.8}}}]})";
+
+    // The author's value for the plate's emission is 0.25. A cue preset names 1.5.
+    nlohmann::json doc = {
+        {"format", "avgen-project"},
+        {"version", 4},
+        {"parameters", nlohmann::json::object()},
+        {"routes", nlohmann::json::array()},
+        {"assets", {{"scene", {{"kind", "composition"}, {"path", "media/lit.json"}}}}},
+        {"presets", nlohmann::json::array({nlohmann::json{
+             {"name", "big"},
+             {"values", {{"procedural/plate/material/emissive", nlohmann::json::array({1.5})}}}}})},
+        {"timeline", {{"enabled", true},
+                      {"cues", nlohmann::json::array({nlohmann::json{
+                           {"time", 0.0}, {"name", "reveal"}, {"preset", "big"}, {"morphSeconds", 0.0}}})}}}};
+    const auto project = f.dir / "cued.json";
+    std::ofstream(project) << doc.dump(2);
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project).has_value());
+    REQUIRE(engine.composition() != nullptr);
+    // The scene's value is what the parameter starts at, so the conflict is real rather than a
+    // report about a value nobody authored.
+    const params::IParameter* emissive = engine.params().find("procedural/plate/material/emissive");
+    REQUIRE(emissive != nullptr);
+    CHECK(emissive->baseComponent(0) == 0.25f);
+
+    // The engine says so, by path, so an author who edits the scene file and sees nothing has
+    // somewhere to look. It is not a load fault -- a cue is meant to take a value over -- so it
+    // does not join the missing-asset warnings.
+    CHECK(std::ranges::find(engine.cuePresetOverrides(), "procedural/plate/material/emissive") !=
+          engine.cuePresetOverrides().end());
+    CHECK(engine.projectWarnings().empty());
+
+    // A preset that agrees with the scene is not a conflict and must not be reported: a notice
+    // that fires on every project is a notice nobody reads.
+    doc["presets"][0]["values"]["procedural/plate/material/emissive"] = nlohmann::json::array({0.25});
+    const auto agreeing = f.dir / "agreeing.json";
+    std::ofstream(agreeing) << doc.dump(2);
+    app::Engine quiet(app::EngineMode::Offline);
+    REQUIRE(quiet.loadProject(agreeing).has_value());
+    CHECK(quiet.cuePresetOverrides().empty());
+
+    // And a project with no timeline at all contests nothing.
+    doc.erase("timeline");
+    const auto plain = f.dir / "plain.json";
+    std::ofstream(plain) << doc.dump(2);
+    app::Engine none(app::EngineMode::Offline);
+    REQUIRE(none.loadProject(plain).has_value());
+    CHECK(none.cuePresetOverrides().empty());
 }
 
 TEST_CASE("Composition projects reference the scene file or embed an unsaved composition", "[integration][project]") {

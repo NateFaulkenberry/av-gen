@@ -97,10 +97,10 @@ hierarchy is deliberate -- terrain, then biomes, then what grows on them. Like t
 files are gitignored; the pack is a single download and the licence permits redistribution, but
 120 MB of textures does not belong in the history.
 
-One thing to check when it is used: these meshes carry several materials each (cap and stem, trunk
-and canopy), and `mergedAssetMesh` collapses an asset to one material chosen by triangle count. The
-Kenney fungi already read as single-colour blobs for this reason. Multi-material instancing is the
-open problem, not the assets.
+These meshes carry several materials each (cap and stem, trunk and canopy). That used to collapse
+to one material per asset -- the Kenney fungi read as single-colour blobs for exactly this reason --
+and since 2026-09-10 an asset is split into one instanced object per material at flatten time
+(ADR-044), so a tree's bark and its leaves each get their own draw and their own maps.
 
 ## Skies
 

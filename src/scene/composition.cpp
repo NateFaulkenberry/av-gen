@@ -26,9 +26,6 @@ constexpr std::string_view kEcologyLightPrefix = "ecology.glow.";
 // The clustered path takes 256 lights in total (kMaxSceneLights); leave room for the rig.
 constexpr std::size_t kMaxEcologyLights = 224;
 constexpr int kMaxTerrainLodIndex = world::kMaxTerrainLods - 1;
-// The viewport height terrain `lodDistance` values are authored against. Not the real one, which
-// the composition does not know; see the note at the call site.
-constexpr float kLodReferenceHeight = 900.0f;
 } // namespace
 
 namespace {
@@ -638,70 +635,158 @@ void offsetMaterialTextures(Material& m, TextureId textureOffset) {
     offsetTextureRef(m.occlusionTexture, textureOffset);
 }
 
-// One instanceable mesh from every visible entity in an asset, each baked by its own transform.
-// A scanned rock is usually a single primitive; a plant is often several, and instancing wants
-// one mesh, so they are merged rather than drawn separately.
-std::shared_ptr<const MeshData> mergedAssetMesh(const assets::SceneAsset& asset) {
-    auto merged = std::make_shared<MeshData>();
-    merged->name = asset.path.stem().string();
-    for (const Entity& e : asset.scene.entities) {
-        if (!e.visible || e.mesh == kInvalidMesh || e.mesh >= asset.scene.meshes.size()) {
-            continue;
-        }
-        const MeshData& src = asset.scene.meshes[e.mesh];
-        const glm::mat4 model = e.transform.matrix();
-        const glm::mat3 normalMatrix = glm::mat3(glm::transpose(glm::inverse(model)));
-        const auto base = static_cast<std::uint32_t>(merged->vertices.size());
-        merged->vertices.reserve(merged->vertices.size() + src.vertices.size());
-        for (const Vertex& v : src.vertices) {
-            Vertex out = v;
-            out.position = glm::vec3(model * glm::vec4(v.position, 1.0f));
-            const glm::vec3 n = normalMatrix * v.normal;
-            out.normal = glm::dot(n, n) > 1e-12f ? glm::normalize(n) : v.normal;
-            merged->vertices.push_back(out);
-        }
-        merged->indices.reserve(merged->indices.size() + src.indices.size());
-        for (const std::uint32_t index : src.indices) {
-            merged->indices.push_back(base + index);
-        }
-    }
-    return merged;
+// ---- an asset's sub-materials (ADR-044) --------------------------------------------------------
+//
+// An asset's entities are grouped by material and each group merged into one instanceable mesh,
+// baked by each entity's own transform. Instancing wants a single mesh *per draw*, not per asset:
+// merging everything into one mesh forced one material onto the whole thing, so a tree drew its
+// leaves with the bark's texture and a mushroom's cap took its stem's colour. One part per material
+// is one procedural object per material, which is one draw per material -- everything downstream
+// (instancing, culling, LOD, variation) is untouched, because each part is an ordinary object.
+//
+// Parts come back ordered by surface area, largest first, so part 0 is the material a viewer reads
+// as the asset's own. Area rather than vertex count: a trunk is a smooth tube carrying plenty of
+// vertices for very little of what you see, while a canopy is hundreds of small leaf cards.
+struct AssetPart {
+    std::shared_ptr<const MeshData> mesh;
+    Material material;
+    bool hasMaterial = false;
+    double area = 0.0;
+    std::size_t firstEntity = 0; // for a stable order when two parts have the same area
+};
+
+bool sameMaterial(const TextureRef& a, const TextureRef& b) {
+    return a.texture == b.texture && a.uvSet == b.uvSet && a.wrapU == b.wrapU && a.wrapV == b.wrapV &&
+           a.linearFilter == b.linearFilter;
 }
 
-// The material of whichever entity carries the most geometry: for a scanned asset that is the
-// asset's material, and for a multi-material one it is the one a viewer will read as its surface.
-const Material* dominantAssetMaterial(const assets::SceneAsset& asset) {
-    const Material* best = nullptr;
-    double bestArea = 0.0;
-    for (const Entity& e : asset.scene.entities) {
-        if (!e.visible || e.mesh == kInvalidMesh || e.mesh >= asset.scene.meshes.size()) {
+bool sameMaterial(const Material& a, const Material& b) {
+    return a.baseColor == b.baseColor && a.opacity == b.opacity && a.emissiveColor == b.emissiveColor &&
+           a.emissiveIntensity == b.emissiveIntensity && a.roughness == b.roughness &&
+           a.metallic == b.metallic && a.normalScale == b.normalScale &&
+           a.occlusionStrength == b.occlusionStrength && a.alphaMode == b.alphaMode &&
+           a.alphaCutoff == b.alphaCutoff && a.doubleSided == b.doubleSided && a.unlit == b.unlit &&
+           a.program == b.program && sameMaterial(a.baseColorTexture, b.baseColorTexture) &&
+           sameMaterial(a.metallicRoughnessTexture, b.metallicRoughnessTexture) &&
+           sameMaterial(a.normalTexture, b.normalTexture) &&
+           sameMaterial(a.emissiveTexture, b.emissiveTexture) &&
+           sameMaterial(a.occlusionTexture, b.occlusionTexture);
+}
+
+double meshAreaUnder(const MeshData& mesh, const glm::mat4& model) {
+    double area = 0.0;
+    for (std::size_t i = 0; i + 2 < mesh.indices.size(); i += 3) {
+        const std::uint32_t a = mesh.indices[i];
+        const std::uint32_t b = mesh.indices[i + 1];
+        const std::uint32_t c = mesh.indices[i + 2];
+        if (a >= mesh.vertices.size() || b >= mesh.vertices.size() || c >= mesh.vertices.size()) {
             continue;
         }
-        // Surface area, not vertex count. A tree's trunk is a smooth tapered tube carrying plenty
-        // of vertices for very little of what you see, while its canopy is hundreds of small leaf
-        // cards; picking by vertex count handed the whole tree the bark material and drew every
-        // leaf as a slab of bark, which is what made instanced foliage render as dark shards.
-        const MeshData& mesh = asset.scene.meshes[e.mesh];
-        const glm::mat4 model = e.transform.matrix();
-        double area = 0.0;
-        for (std::size_t i = 0; i + 2 < mesh.indices.size(); i += 3) {
-            const std::uint32_t a = mesh.indices[i];
-            const std::uint32_t b = mesh.indices[i + 1];
-            const std::uint32_t c = mesh.indices[i + 2];
-            if (a >= mesh.vertices.size() || b >= mesh.vertices.size() || c >= mesh.vertices.size()) {
-                continue;
-            }
-            const glm::vec3 pa = glm::vec3(model * glm::vec4(mesh.vertices[a].position, 1.0f));
-            const glm::vec3 pb = glm::vec3(model * glm::vec4(mesh.vertices[b].position, 1.0f));
-            const glm::vec3 pc = glm::vec3(model * glm::vec4(mesh.vertices[c].position, 1.0f));
-            area += 0.5 * static_cast<double>(glm::length(glm::cross(pb - pa, pc - pa)));
-        }
-        if (area > bestArea) {
-            bestArea = area;
-            best = &e.material;
-        }
+        const glm::vec3 pa = glm::vec3(model * glm::vec4(mesh.vertices[a].position, 1.0f));
+        const glm::vec3 pb = glm::vec3(model * glm::vec4(mesh.vertices[b].position, 1.0f));
+        const glm::vec3 pc = glm::vec3(model * glm::vec4(mesh.vertices[c].position, 1.0f));
+        area += 0.5 * static_cast<double>(glm::length(glm::cross(pb - pa, pc - pa)));
     }
-    return best;
+    return area;
+}
+
+std::vector<AssetPart> assetMaterialParts(const assets::SceneAsset& asset) {
+    struct Group {
+        Material material;
+        std::vector<std::size_t> entities;
+        double area = 0.0;
+        std::size_t firstEntity = 0;
+    };
+    std::vector<Group> groups;
+    for (std::size_t e = 0; e < asset.scene.entities.size(); ++e) {
+        const Entity& entity = asset.scene.entities[e];
+        if (!entity.visible || entity.mesh == kInvalidMesh || entity.mesh >= asset.scene.meshes.size()) {
+            continue;
+        }
+        auto it = std::find_if(groups.begin(), groups.end(),
+                               [&](const Group& g) { return sameMaterial(g.material, entity.material); });
+        if (it == groups.end()) {
+            groups.push_back(Group{entity.material, {}, 0.0, e});
+            it = std::prev(groups.end());
+        }
+        it->entities.push_back(e);
+        it->area += meshAreaUnder(asset.scene.meshes[entity.mesh], entity.transform.matrix());
+    }
+    std::stable_sort(groups.begin(), groups.end(), [](const Group& a, const Group& b) {
+        return a.area != b.area ? a.area > b.area : a.firstEntity < b.firstEntity;
+    });
+
+    std::vector<AssetPart> parts;
+    parts.reserve(groups.size());
+    for (std::size_t g = 0; g < groups.size(); ++g) {
+        auto merged = std::make_shared<MeshData>();
+        merged->name = groups.size() > 1 ? fmt::format("{}#{}", asset.path.stem().string(), g)
+                                         : asset.path.stem().string();
+        for (const std::size_t e : groups[g].entities) {
+            const Entity& entity = asset.scene.entities[e];
+            const MeshData& src = asset.scene.meshes[entity.mesh];
+            const glm::mat4 model = entity.transform.matrix();
+            const glm::mat3 normalMatrix = glm::mat3(glm::transpose(glm::inverse(model)));
+            const auto base = static_cast<std::uint32_t>(merged->vertices.size());
+            merged->vertices.reserve(merged->vertices.size() + src.vertices.size());
+            for (const Vertex& v : src.vertices) {
+                Vertex out = v;
+                out.position = glm::vec3(model * glm::vec4(v.position, 1.0f));
+                const glm::vec3 n = normalMatrix * v.normal;
+                out.normal = glm::dot(n, n) > 1e-12f ? glm::normalize(n) : v.normal;
+                merged->vertices.push_back(out);
+            }
+            merged->indices.reserve(merged->indices.size() + src.indices.size());
+            for (const std::uint32_t index : src.indices) {
+                merged->indices.push_back(base + index);
+            }
+        }
+        parts.push_back(AssetPart{std::move(merged), groups[g].material, true, groups[g].area,
+                                  groups[g].firstEntity});
+    }
+    if (parts.empty()) {
+        // Nothing drawable in the asset. One empty part keeps every caller on one code path, and
+        // the object ends up with no mesh exactly as it did before.
+        parts.push_back(AssetPart{std::make_shared<MeshData>(), Material{}, false, 0.0, 0});
+    }
+    return parts;
+}
+
+// The bounds of the whole asset, over every part. A layer that normalises an asset to a height
+// must scale every part by the same factor, or a tree's leaves come off its trunk.
+std::pair<glm::vec3, glm::vec3> partsBounds(const std::vector<AssetPart>& parts) {
+    glm::vec3 lo(std::numeric_limits<float>::max());
+    glm::vec3 hi(std::numeric_limits<float>::lowest());
+    bool any = false;
+    for (const AssetPart& part : parts) {
+        if (!part.mesh || part.mesh->vertices.empty()) {
+            continue;
+        }
+        const auto [plo, phi] = part.mesh->bounds();
+        lo = glm::min(lo, plo);
+        hi = glm::max(hi, phi);
+        any = true;
+    }
+    return any ? std::pair{lo, hi} : std::pair{glm::vec3(0.0f), glm::vec3(0.0f)};
+}
+
+// A triangle budget authored for the whole asset, shared out between its parts in proportion to
+// how many triangles each one has. Giving every part the whole budget would multiply it by the
+// part count, which is how a "10k triangle" tree becomes 20k the moment it grows a second material.
+int partBudget(const std::vector<AssetPart>& parts, std::size_t index, int assetBudget) {
+    if (assetBudget <= 0 || parts.size() <= 1) {
+        return assetBudget;
+    }
+    std::size_t total = 0;
+    for (const AssetPart& part : parts) {
+        total += part.mesh ? part.mesh->indices.size() / 3 : 0;
+    }
+    const std::size_t mine = parts[index].mesh ? parts[index].mesh->indices.size() / 3 : 0;
+    if (total == 0 || mine == 0) {
+        return assetBudget;
+    }
+    const auto share = static_cast<double>(assetBudget) * static_cast<double>(mine) / static_cast<double>(total);
+    return std::max(1, static_cast<int>(std::lround(share)));
 }
 
 // Field references inside nested scenes point at the nested file's field names; after flattening
@@ -1722,14 +1807,15 @@ void Composition::rebuild() {
     // Imported-mesh resolution, shared by procedural nodes and by terrain's scatter layers: load
     // the asset once, share its meshes and textures with anything else that names it, merge it into
     // one mesh for instancing and take its material.
-    const auto resolveMeshSource = [&](ProceduralGeometry& pg, const std::string& owner) {
-        if (pg.source.kind != PrimitiveKind::Mesh || pg.source.asset.empty()) {
-            return;
-        }
-        auto loaded = registry_.loadScene(pg.source.asset);
+    // Loads an asset and returns one part per material it uses, with the parts' texture references
+    // remapped into this scene. Empty when the asset itself failed to load, which is a warning and
+    // not an error: the object keeps whatever source it had.
+    const auto resolveMeshParts = [&](const std::string& assetPath,
+                                      const std::string& owner) -> std::vector<AssetPart> {
+        auto loaded = registry_.loadScene(assetPath);
         if (!loaded) {
-            log::warn("'{}': mesh asset '{}': {}", owner, pg.source.asset, loaded.error().message);
-            return;
+            log::warn("'{}': mesh asset '{}': {}", owner, assetPath, loaded.error().message);
+            return {};
         }
         const assets::SceneAsset& asset = **loaded;
         const std::string key = asset.path.string();
@@ -1745,13 +1831,15 @@ void Composition::rebuild() {
             }
             it = assetOffsets.emplace(key, offsets).first;
         }
-        pg.source.assetMesh = mergedAssetMesh(asset);
-        if (const Material* m = dominantAssetMaterial(asset)) {
-            Material resolved = *m;
-            offsetMaterialTextures(resolved, it->second.second);
-            resolved.program = pg.material.program;
-            pg.material = resolved;
+        std::vector<AssetPart> parts = assetMaterialParts(asset);
+        for (AssetPart& part : parts) {
+            offsetMaterialTextures(part.material, it->second.second);
         }
+        if (parts.size() > 1) {
+            log::info("'{}': mesh asset '{}' carries {} materials; one instanced draw each", owner,
+                      assetPath, parts.size());
+        }
+        return parts;
     };
 
     for (const auto& nodePtr : nodes_) {
@@ -1841,6 +1929,11 @@ void Composition::rebuild() {
                     log::warn("terrain '{}': scatter '{}' placed nothing", node.name, layer.name);
                     continue;
                 }
+                // One part per material the asset uses (ADR-044). Each becomes its own procedural
+                // object -- same cloud, same seed, same variation, same wind -- so the parts stay
+                // registered with each other and each is drawn with its own material.
+                const std::vector<AssetPart> parts = resolveMeshParts(layer.asset, node.name);
+                const auto [assetLo, assetHi] = partsBounds(parts);
                 ProceduralGeometry pg;
                 pg.name = sanitise(prefix_) + node.name + "_" + layer.name;
                 pg.source.kind = PrimitiveKind::Mesh;
@@ -1865,7 +1958,13 @@ void Composition::rebuild() {
                 pg.lod.lodDistances[1] = 11.0f; // half-resolution below that
                 pg.lod.lodDistances[2] = 4.0f;  // a billboard, then a dot
                 pg.lod.minScreenRadius = layer.minScreenRadius;
-                resolveMeshSource(pg, node.name);
+                if (!parts.empty()) {
+                    pg.source.assetMesh = parts[0].mesh;
+                    pg.source.meshBudget = partBudget(parts, 0, layer.meshBudget);
+                    if (parts[0].hasMaterial) {
+                        pg.material = parts[0].material;
+                    }
+                }
                 // The layer says how tall the thing should be; the asset says how tall it is. The
                 // normalisation goes on sourceTransform, which scales the mesh alone --
                 // distributionTransform would scale the placements with it and move a tree scaled
@@ -1905,9 +2004,11 @@ void Composition::rebuild() {
                               r.swayDelay, r.bendCurve);
                 }
                 pg.variation.seed = static_cast<std::uint32_t>(layer.structuralHash());
-                if (layer.height > 0.0f && pg.source.assetMesh) {
-                    const auto [lo, hi] = pg.source.assetMesh->bounds();
-                    const float authored = hi.y - lo.y;
+                // Measured over the whole asset, not over this part: a tree normalised to 14 m
+                // must scale its bark and its leaves by the same number or the canopy comes off
+                // the trunk.
+                if (layer.height > 0.0f && !parts.empty()) {
+                    const float authored = assetHi.y - assetLo.y;
                     if (authored > 1e-4f) {
                         pg.sourceTransform.scale = glm::vec3(layer.height / authored);
                     }
@@ -1921,7 +2022,33 @@ void Composition::rebuild() {
                 }
                 log::info("terrain '{}': scatter '{}' placed {} instances", node.name, layer.name,
                           cloud->count());
+                // The asset's other materials, each an object identical to this one but for its
+                // mesh, its material and its share of the triangle budget. The layer's tint and
+                // emission are applied to each part's *own* colour, which is the whole point: the
+                // tint turns the leaves green and the bark brown, not both to whichever won.
+                std::vector<ProceduralGeometry> subs;
+                for (std::size_t part = 1; part < parts.size(); ++part) {
+                    ProceduralGeometry sub = pg;
+                    sub.name = pg.name + fmt::format("_m{}", part);
+                    sub.source.assetPart = static_cast<int>(part);
+                    sub.source.assetMesh = parts[part].mesh;
+                    sub.source.meshBudget = partBudget(parts, part, layer.meshBudget);
+                    if (parts[part].hasMaterial) {
+                        Material m = parts[part].material;
+                        m.program = pg.material.program;
+                        m.baseColor *= layer.tint;
+                        if (layer.emissiveIntensity > 0.0f) {
+                            m.emissiveColor = layer.emissiveColor;
+                            m.emissiveIntensity = layer.emissiveIntensity;
+                        }
+                        sub.material = m;
+                    }
+                    subs.push_back(std::move(sub));
+                }
                 scene_.procedurals.push_back(std::move(pg));
+                for (ProceduralGeometry& sub : subs) {
+                    scene_.procedurals.push_back(std::move(sub));
+                }
             }
             // The whole world is built here, once. Chunk meshes are static: only which of a chunk's
             // four meshes is drawn, and whether it is drawn at all, changes per frame.
@@ -2002,54 +2129,58 @@ void Composition::rebuild() {
             // frame's: applyProceduralParameters() rebuilds `live` from `rest` every frame, so a
             // material written only here is overwritten before it ever reaches the GPU.
             CompositionNode& mutableNode = *nodePtr;
+            mutableNode.proceduralSubRest.clear();
+            std::vector<ProceduralGeometry> subs;
             if (pg.source.kind == PrimitiveKind::Mesh && !pg.source.asset.empty()) {
-                auto loaded = registry_.loadScene(pg.source.asset);
-                if (!loaded) {
-                    log::warn("procedural '{}': mesh asset '{}': {}", node.name, pg.source.asset,
-                              loaded.error().message);
-                } else {
-                    const assets::SceneAsset& asset = **loaded;
-                    const std::string key = asset.path.string();
-                    auto it = assetOffsets.find(key);
-                    if (it == assetOffsets.end()) {
-                        const auto offsets = std::make_pair(static_cast<MeshId>(scene_.meshes.size()),
-                                                            static_cast<TextureId>(scene_.textures.size()));
-                        for (const auto& mesh : asset.scene.meshes) {
-                            scene_.meshes.push_back(mesh);
-                        }
-                        for (const auto& texture : asset.scene.textures) {
-                            scene_.textures.push_back(texture);
-                        }
-                        it = assetOffsets.emplace(key, offsets).first;
+                const std::vector<AssetPart> parts =
+                    resolveMeshParts(pg.source.asset, "procedural '" + node.name + "'");
+                // The asset's own material per part, unless the scene deliberately overrode it. An
+                // imported material with no textures is the same "flat grey blob" problem
+                // procedural geometry has, so its texture refs are remapped into this scene.
+                const auto resolveMaterial = [&](const AssetPart& part) {
+                    Material resolved = part.material;
+                    resolved.program = node.proceduralRest.material.program;
+                    if (node.proceduralMaterialAuthored) {
+                        // Textures come from the asset, factors from the author. That split is
+                        // what lets one curated library become several biomes: the mesh and its
+                        // maps stay put while base colour, emission and roughness are retuned
+                        // per scene. An author who wants the asset's own colour simply omits
+                        // the material block. An authored block speaks for every part -- the
+                        // author wrote one material and gets one set of factors.
+                        const Material& authored = node.proceduralRest.material;
+                        resolved.baseColor = authored.baseColor;
+                        resolved.opacity = authored.opacity;
+                        resolved.emissiveColor = authored.emissiveColor;
+                        resolved.emissiveIntensity = authored.emissiveIntensity;
+                        resolved.roughness = authored.roughness;
+                        resolved.metallic = authored.metallic;
                     }
-                    const auto [meshOffset, textureOffset] = it->second;
-                    pg.source.assetMesh = mergedAssetMesh(asset);
+                    return resolved;
+                };
+                if (!parts.empty()) {
+                    pg.source.assetMesh = parts[0].mesh;
+                    pg.source.meshBudget = partBudget(parts, 0, pg.source.meshBudget);
                     mutableNode.proceduralRest.source.assetMesh = pg.source.assetMesh;
-                    // The asset's own material, unless the scene deliberately overrode it. An
-                    // imported material with no textures is the same "flat grey blob" problem
-                    // procedural geometry has, so its texture refs are remapped into this scene.
-                    if (const Material* m = dominantAssetMaterial(asset)) {
-                        Material resolved = *m;
-                        offsetMaterialTextures(resolved, textureOffset);
-                        resolved.program = node.proceduralRest.material.program;
-                        if (node.proceduralMaterialAuthored) {
-                            // Textures come from the asset, factors from the author. That split is
-                            // what lets one curated library become several biomes: the mesh and its
-                            // maps stay put while base colour, emission and roughness are retuned
-                            // per scene. An author who wants the asset's own colour simply omits
-                            // the material block.
-                            const Material& authored = node.proceduralRest.material;
-                            resolved.baseColor = authored.baseColor;
-                            resolved.opacity = authored.opacity;
-                            resolved.emissiveColor = authored.emissiveColor;
-                            resolved.emissiveIntensity = authored.emissiveIntensity;
-                            resolved.roughness = authored.roughness;
-                            resolved.metallic = authored.metallic;
-                        }
-                        pg.material = resolved;
-                        mutableNode.proceduralRest.material = resolved;
+                    mutableNode.proceduralRest.source.meshBudget = pg.source.meshBudget;
+                    if (parts[0].hasMaterial) {
+                        pg.material = resolveMaterial(parts[0]);
+                        mutableNode.proceduralRest.material = pg.material;
                     }
-                    (void)meshOffset;
+                }
+                // The asset's other materials. Each is an object identical to part 0 -- the same
+                // distribution, seed, variation, deformers and effectors -- differing only in its
+                // mesh and its material, so the parts of one asset stay registered with each other
+                // by construction rather than by luck.
+                for (std::size_t part = 1; part < parts.size(); ++part) {
+                    ProceduralGeometry sub = mutableNode.proceduralRest;
+                    sub.source.assetPart = static_cast<int>(part);
+                    sub.source.assetMesh = parts[part].mesh;
+                    sub.source.meshBudget = partBudget(parts, part, node.proceduralRest.source.meshBudget);
+                    if (parts[part].hasMaterial) {
+                        sub.material = resolveMaterial(parts[part]);
+                    }
+                    mutableNode.proceduralSubRest.push_back(sub);
+                    subs.push_back(std::move(sub));
                 }
             }
             pg.name = sanitise(prefix_) + node.name;
@@ -2057,7 +2188,17 @@ void Composition::rebuild() {
             pg.distributionTransform = Transform::fromMatrix(nodeT.matrix() * pg.distributionTransform.matrix());
             pg.visible = pg.visible && visible;
             range.proceduralIndex = static_cast<int>(scene_.procedurals.size());
+            range.proceduralSubCount = subs.size();
             scene_.procedurals.push_back(std::move(pg)); // generated by rebuildProcedurals() after the loop
+            for (std::size_t part = 0; part < subs.size(); ++part) {
+                ProceduralGeometry& sub = subs[part];
+                sub.name = sanitise(prefix_) + node.name + fmt::format("_m{}", part + 1);
+                prefixFieldReferences(sub, sanitise(prefix_));
+                sub.distributionTransform =
+                    Transform::fromMatrix(nodeT.matrix() * sub.distributionTransform.matrix());
+                sub.visible = sub.visible && visible;
+                scene_.procedurals.push_back(std::move(sub));
+            }
             break;
         }
         case NodeKind::Spline: {
@@ -2377,6 +2518,38 @@ void Composition::applyParameters() {
             prefixFieldReferences(pg, sanitise(prefix_));
             pg.distributionTransform = Transform::fromMatrix(full.matrix() * pg.distributionTransform.matrix());
             pg.visible = pg.visible && visible;
+            // The asset's other materials (ADR-044) follow part 0 through exactly the same
+            // parameters, each against its own rest copy, so a live change to the count or the
+            // distribution moves every part of the asset together.
+            for (std::size_t k = 0; k < range.proceduralSubCount &&
+                                    static_cast<std::size_t>(range.proceduralIndex) + 1 + k < scene_.procedurals.size() &&
+                                    k < node.proceduralSubRest.size();
+                 ++k) {
+                const ProceduralGeometry& subRest = node.proceduralSubRest[k];
+                ProceduralGeometry& sub =
+                    scene_.procedurals[static_cast<std::size_t>(range.proceduralIndex) + 1 + k];
+                const std::string name = sub.name;
+                applyProceduralParameters(node.proceduralParams, subRest, sub);
+                sub.name = name;
+                // The material parameters were registered from part 0's material, so applying them
+                // here would repaint the leaves in the bark's colour -- the exact bug this split
+                // exists to fix. Where a parameter still sits at part 0's authored value this part
+                // keeps its own; where something moved it (an author, a preset, a route) the move
+                // applies to every part, because that is what the author asked for.
+                const Material& base = node.proceduralRest.material;
+                const Material& own = subRest.material;
+                if (sub.material.baseColor == base.baseColor) sub.material.baseColor = own.baseColor;
+                if (sub.material.opacity == base.opacity) sub.material.opacity = own.opacity;
+                if (sub.material.emissiveColor == base.emissiveColor) sub.material.emissiveColor = own.emissiveColor;
+                if (sub.material.emissiveIntensity == base.emissiveIntensity)
+                    sub.material.emissiveIntensity = own.emissiveIntensity;
+                if (sub.material.roughness == base.roughness) sub.material.roughness = own.roughness;
+                if (sub.material.metallic == base.metallic) sub.material.metallic = own.metallic;
+                prefixFieldReferences(sub, sanitise(prefix_));
+                sub.distributionTransform =
+                    Transform::fromMatrix(full.matrix() * sub.distributionTransform.matrix());
+                sub.visible = sub.visible && visible;
+            }
             // generated by rebuildProcedurals() once every object and spline has its finals
         }
         if (node.kind == NodeKind::Spline && range.splineIndex >= 0 &&
@@ -2800,12 +2973,19 @@ void Composition::updateEcologyLights() {
     ecologyLightCount_ = candidates.size();
 }
 
+void Composition::setViewport(std::uint32_t width, std::uint32_t height) {
+    viewportWidth_ = std::max(width, 1u);
+    viewportHeight_ = std::max(height, 1u);
+}
+
 void Composition::updateTerrainLod() {
-    // The frustum is built at a deliberately wide aspect. A composition does not know the viewport
-    // it will be drawn into, and culling a chunk the frame turns out to include is a hole in the
-    // ground, while keeping one it does not include costs a draw call -- so the error is taken on
-    // the safe side.
-    constexpr float kCullAspect = 2.5f;
+    // The frustum is built at no narrower than a deliberately wide aspect. The viewport is known
+    // now (setViewport), but culling a chunk the frame turns out to include is a hole in the ground
+    // while keeping one it does not include costs a draw call, so the error is still taken on the
+    // safe side: a wider viewport widens the frustum, a narrower one does not narrow it.
+    constexpr float kCullAspectFloor = 2.5f;
+    const float kCullAspect =
+        std::max(kCullAspectFloor, static_cast<float>(viewportWidth_) / static_cast<float>(viewportHeight_));
     std::optional<world::FrustumPlanes> planes;
     for (std::size_t i = 0; i < nodes_.size() && i < ranges_.size(); ++i) {
         const CompositionNode& node = *nodes_[i];
@@ -2825,7 +3005,12 @@ void Composition::updateTerrainLod() {
         if (node.terrainViewDistanceParam != nullptr) {
             settings.viewDistance = node.terrainViewDistanceParam->value();
         }
-        const float projScale = world::lodProjectionScale(scene_.camera.effectiveFovY(), kLodReferenceHeight);
+        // LOD is a screen-space decision, so it takes this frame's actual viewport height rather
+        // than the reference one `lodDistance` is authored against. Both halves now hold: changing
+        // focal length re-picks levels, and so does resizing the window -- a taller window makes
+        // the same ground larger in pixels and pulls the switch further out.
+        const float projScale =
+            world::lodProjectionScale(scene_.camera.effectiveFovY(), static_cast<float>(viewportHeight_));
         if (cullEnabled && !planes) {
             planes = world::frustumPlanes(scene_.camera.projection(kCullAspect) * scene_.camera.view());
         }
@@ -2847,6 +3032,15 @@ void Composition::updateTerrainLod() {
                     scene_.entities[water].visible = scene_.entities[water].visible && on;
                 }
             };
+            // The camera's verdict on this chunk, re-decided every frame; a chunk that was off
+            // screen last frame must be able to come back.
+            const auto setCameraCulled = [&](bool on) {
+                e.cameraCulled = on;
+                if (water < scene_.entities.size()) {
+                    scene_.entities[water].cameraCulled = on;
+                }
+            };
+            setCameraCulled(false);
             if (!e.visible) {
                 setWater(false);
                 continue; // the node itself is hidden; nothing below can turn it back on
@@ -2866,18 +3060,28 @@ void Composition::updateTerrainLod() {
             // Distance to the box, not to its centre: a chunk the camera is standing on is at
             // distance zero however big it is, and gets LOD 0.
             const float distance = glm::distance(eye, glm::clamp(eye, lo, hi));
-            if (distance > settings.viewDistance || (planes && !world::aabbVisible(*planes, lo, hi))) {
-                e.visible = false;
-                setWater(false);
-                continue;
-            }
             // A chunk casts into the shadow maps only while it is near enough for its shadow to be
             // resolvable. Beyond that it is still drawn -- it is on screen -- but not into three
             // cascades whose texels are far coarser than the shadow it would throw.
             const float shadowReach =
                 settings.shadowDistance > 0.0f ? settings.shadowDistance : settings.viewDistance;
+            if (distance > settings.viewDistance) {
+                // Past the view distance the chunk is not in this world as far as the frame is
+                // concerned: no mesh is picked for it and nothing it might cast could reach a
+                // cascade, which only ever covers the near part of the camera's frustum.
+                e.visible = false;
+                setWater(false);
+                continue;
+            }
             e.castsShadow = distance <= shadowReach;
             setWaterShadow(e.castsShadow);
+            if (planes && !world::aabbVisible(*planes, lo, hi)) {
+                // Off screen, not absent. The camera passes skip it; the shadow passes still get
+                // it as a candidate and test it against each cascade's own frustum, because a hill
+                // behind the camera casts into shot (ADR-046). Its LOD mesh is still picked below
+                // -- a caster needs geometry, and its silhouette is what the map records.
+                setCameraCulled(true);
+            }
             // LOD follows how big the ground looks, not how far away it is. The composition knows
             // the lens but not the viewport it will be drawn into, so the height is the reference
             // one `lodDistance` is authored against: changing focal length re-picks levels

@@ -72,8 +72,9 @@ invisible only because the trees used to be uniformly bright enough to hide thei
 Picking by summed triangle area fixes it, and incidentally took about 5 ms off the frame, because
 the bark material carries a normal map and the leaf material does not.
 
-The real fix is a draw per sub-material, which the procedural path cannot express: one source
-mesh, one material. Area is the right heuristic until it can.
+Area was the right heuristic while there was only one material to pick. There is a draw per
+sub-material now (ADR-044, 2026-09-10) and the heuristic survives as the ordering rule: part 0 --
+the one the node's parameters bind to -- is the largest by area.
 
 **Airborne life and organic emission.** Two more pieces of the same idea. Drifting spores are an
 ordinary particle system, which already reduces its emissive particles to one aggregate sphere for

@@ -108,8 +108,17 @@ struct SourceSpec {
     // arrive at film density -- a single scanned cliff can be 1.5 million triangles -- and an
     // environment made of them will not hold a frame rate. 0 keeps the asset as authored.
     int meshBudget = 0;
+    // Which of the asset's materials this object draws (ADR-044). An asset's entities are grouped
+    // by material and each group becomes one instanceable mesh: a scanned rock is one part, a tree
+    // is bark and leaves. Part 0 is the one carrying the most surface area.
+    //
+    // Runtime, filled by the Composition when it resolves `asset`, and never serialised -- but
+    // unlike `assetMesh` it *is* hashed, because two objects that name the same asset and differ
+    // only in their part are two different meshes and the renderer caches meshes by that hash.
+    // Without it a tree's leaves would be drawn with the bark's geometry out of the cache.
+    int assetPart = 0;
     // Runtime, filled by the Composition when it resolves `asset`; never serialised, and part of
-    // no hash except through `asset` itself.
+    // no hash except through `asset` and `assetPart`.
     std::shared_ptr<const MeshData> assetMesh;
 
     [[nodiscard]] Result<void> validate() const;

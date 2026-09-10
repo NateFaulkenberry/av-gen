@@ -103,6 +103,11 @@ public:
     [[nodiscard]] Result<void> loadProject(const std::filesystem::path& path);
     [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
     [[nodiscard]] const std::vector<std::string>& projectWarnings() const { return projectWarnings_; }
+    // Parameter paths that a timeline cue's preset will overwrite, measured at load against the
+    // values the scene file and the project put in effect (ADR-018). Sorted, deduplicated across
+    // cues, empty when nothing is contested. Not a load fault -- a cue is *meant* to take a value
+    // over -- but the thing an author needs told when a scene-file edit appears to do nothing.
+    [[nodiscard]] const std::vector<std::string>& cuePresetOverrides() const { return cuePresetOverrides_; }
     void clearProjectPath() { projectPath_.clear(); }
     // Resets everything but the audio: orb scene, no sources/presets/timeline/shaders/environment,
     // default post settings, no project path.
@@ -266,6 +271,12 @@ public:
     // Evaluates the pipeline for one frame: signals -> modulation -> scene.
     void update(const FrameTime& time);
 
+    // The size the next frames will be rendered at, forwarded to the composition every update.
+    // Terrain LOD is a screen-space decision (ADR-046) and a composition is authored without
+    // knowing its window, so whoever owns the render target tells it. Callers that never set it
+    // keep the composition's default reference viewport.
+    void setViewport(std::uint32_t width, std::uint32_t height);
+
     // ---- accessors for UI / renderer / tests ----
     [[nodiscard]] const scene::Scene& scene() const { return controller_->scene(); }
     [[nodiscard]] scene::SceneController& controller() { return *controller_; }
@@ -295,6 +306,10 @@ private:
     void addDefaultPostRoutes();
     void updateTimelineClock(const FrameTime& time);
     void applyCues();
+    // Logs (and records in projectWarnings()) every value a cue preset will overwrite that the
+    // scene file or the project set to something else. Presets are meant to win; they are not
+    // meant to win silently. Called once at the end of loadProject().
+    void reportCuePresetOverrides();
     void detachSceneParameters(); // before params_.clear(): composition, shader layers, timeline
     void ensureControlSource();   // the "control" source exists in the rack and its channels are declared
 
@@ -315,6 +330,9 @@ private:
     params::Parameter<float>* inputGain_ = nullptr;
     params::TimelineClock timelineClock_;
     params::Timeline::CueState cueState_;
+    std::vector<std::string> cuePresetOverrides_;
+    std::uint32_t viewportWidth_ = 0;   // 0 = never set; the composition keeps its own default
+    std::uint32_t viewportHeight_ = 0;
     params::Preset cueFrom_;      // base values captured when the current cue started (morphs)
     bool cueApplied_ = false;     // the current cue's preset has been applied at full weight
     StateMachine states_;

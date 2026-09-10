@@ -1121,13 +1121,14 @@ TEST_CASE("A terrain node flattens into chunk entities that pick their own level
     CHECK(s.entities[farChunk].visible);
 
     // Turn the camera around: the far chunk leaves the frustum and stops being drawn, and nothing
-    // about the geometry changed to make that happen.
+    // about the geometry changed to make that happen. Leaving the frustum is `cameraCulled`, not
+    // `visible` -- see the shadow-caster test below.
     params::Parameter<glm::vec3>* target = params.findAs<glm::vec3>("camera/target");
     REQUIRE(target != nullptr);
     target->setBase(glm::vec3(0.0f, 30.0f, 400.0f));
     params.resetFinals(); // what the modulation pass does at the start of every real frame
     (*comp)->update(FrameTime{});
-    CHECK_FALSE(s.entities[farChunk].visible);
+    CHECK(s.entities[farChunk].cameraCulled);
     CHECK(s.meshVersion == meshVersion);
     CHECK(s.meshes.size() == node->chunks.size() * 4u + wet);
 
@@ -1139,6 +1140,315 @@ TEST_CASE("A terrain node flattens into chunk entities that pick their own level
     params.resetFinals();
     (*comp)->update(FrameTime{});
     CHECK(s.entities[farChunk].mesh == node->chunks[farChunk].meshes[0]);
+}
+
+TEST_CASE("A mushroom's cap and its stem keep their own colours", "[composition][mesh][material]") {
+    // The symptom docs/world.md recorded. This asset's two materials differ in their *factors*
+    // rather than their maps -- a white stem and a red cap -- which is the half of the split that
+    // the per-frame parameter pass can undo: material parameters are registered from part 0, so
+    // applying them writes part 0's colour into every part unless each part keeps its own.
+    const std::filesystem::path asset =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets/kenney/mushroom_red.glb";
+    if (!std::filesystem::exists(asset)) {
+        SKIP("the Kenney library is not present in this checkout");
+    }
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "fungi",
+      "camera": { "mode": 1, "position": [0, 2, 5], "target": [0, 0, 0], "fov": 50.0 },
+      "nodes": [
+        { "name": "caps", "kind": "procedural",
+          "procedural": {
+            "source": { "kind": "mesh", "asset": "@ASSET@" },
+            "distribution": { "kind": "radial", "count": 4, "radius": 2.0, "plane": "xz" } } }
+      ]
+    })";
+    Fixture fx;
+    std::string filled = text;
+    filled.replace(filled.find("@ASSET@"), 7, asset.string());
+    const auto path = writeJson("mushroom_colour", filled);
+    fx.files.push_back(path);
+    auto comp = scene::Composition::loadFile(path.filename(), fx.registry);
+    if (!comp) {
+        FAIL(comp.error().message);
+    }
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    (*comp)->update(FrameTime{});
+    const scene::Scene& s = (*comp)->scene();
+
+    std::vector<const scene::ProceduralGeometry*> parts;
+    for (const scene::ProceduralGeometry& g : s.procedurals) {
+        if (g.name.rfind("caps", 0) == 0) {
+            parts.push_back(&g);
+        }
+    }
+    REQUIRE(parts.size() == 2);
+    CHECK(parts[0]->material.baseColor != parts[1]->material.baseColor);
+
+    // Every frame after the first runs the parameter pass over both parts. The cap must not turn
+    // the colour of the stem on frame two.
+    const glm::vec3 first = parts[0]->material.baseColor;
+    const glm::vec3 second = parts[1]->material.baseColor;
+    for (int frame = 0; frame < 3; ++frame) {
+        params.resetFinals();
+        (*comp)->update(FrameTime{});
+    }
+    CHECK(parts[0]->material.baseColor == first);
+    CHECK(parts[1]->material.baseColor == second);
+
+    // An author who moves the colour moves both, because they wrote one material for one asset.
+    params::Parameter<glm::vec3>* colour = params.findAs<glm::vec3>("procedural/caps/material/baseColor");
+    REQUIRE(colour != nullptr);
+    colour->setBase(glm::vec3(0.0f, 1.0f, 0.0f));
+    params.resetFinals();
+    (*comp)->update(FrameTime{});
+    CHECK(parts[0]->material.baseColor == glm::vec3(0.0f, 1.0f, 0.0f));
+    CHECK(parts[1]->material.baseColor == glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+TEST_CASE("A chunk the camera cannot see still casts into the shadow maps", "[composition][terrain][shadows]") {
+    // ADR-046 recorded this as a known limitation: frustum culling set `Entity::visible`, the
+    // shadow pass honours `visible`, so a hill behind the camera stopped casting into the frame.
+    // The camera's frustum is the wrong question for a shadow map, and the shadow pass already
+    // applies the right one -- each cascade's own frustum. So the chunk must survive as a
+    // candidate: visible, camera-culled, still casting, and still pointing at a real mesh, because
+    // a caster with no geometry casts nothing.
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "terra",
+      "camera": { "mode": 1, "position": [0, 30, 60], "target": [0, 0, -60], "fov": 50.0 },
+      "nodes": [
+        { "name": "ground", "kind": "terrain",
+          "world": { "name": "small", "size": [160, 160] },
+          "terrain": { "chunkSize": 40.0, "resolution": 8, "lodLevels": 4,
+                       "lodDistance": 50.0, "viewDistance": 400.0 },
+          "material": { "baseColor": [0.2, 0.4, 0.3], "roughness": 0.9 } }
+      ]
+    })";
+    Fixture fx;
+    const auto path = writeJson("terrain_shadow", text);
+    fx.files.push_back(path);
+    auto comp = scene::Composition::loadFile(path.filename(), fx.registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    (*comp)->update(FrameTime{});
+    const scene::Scene& s = (*comp)->scene();
+    const scene::CompositionNode* node = (*comp)->findNode("ground");
+    REQUIRE(node != nullptr);
+    const std::size_t chunkCount = node->chunks.size();
+
+    // Turn the camera around. The chunks it was looking at are now behind it; none of them is
+    // beyond the 400 m view distance, so none of them has left the world.
+    params::Parameter<glm::vec3>* target = params.findAs<glm::vec3>("camera/target");
+    REQUIRE(target != nullptr);
+    target->setBase(glm::vec3(0.0f, 30.0f, 400.0f));
+    params.resetFinals();
+    (*comp)->update(FrameTime{});
+
+    std::size_t culled = 0;
+    for (std::size_t c = 0; c < chunkCount; ++c) {
+        const scene::Entity& e = s.entities[c];
+        if (!e.cameraCulled) {
+            continue;
+        }
+        ++culled;
+        CHECK(e.visible);       // off screen is not absent
+        CHECK(e.castsShadow);   // and it is inside the shadow distance
+        CHECK(e.mesh != scene::kInvalidMesh);
+    }
+    CHECK(culled > 0); // the camera must actually be looking away, or this test proves nothing
+
+    // Distance is a different claim, and still removes a chunk outright: nothing a cascade covers
+    // reaches out there. Pull the view distance in under the near chunks and they leave the world.
+    params::Parameter<float>* viewDistance = params.findAs<float>("nodes/ground/terrainViewDistance");
+    REQUIRE(viewDistance != nullptr);
+    viewDistance->setBase(5.0f);
+    target->setBase(glm::vec3(0.0f, 0.0f, -60.0f));
+    params.resetFinals();
+    (*comp)->update(FrameTime{});
+    std::size_t dropped = 0;
+    for (std::size_t c = 0; c < chunkCount; ++c) {
+        if (!s.entities[c].visible) {
+            ++dropped;
+            CHECK_FALSE(s.entities[c].cameraCulled);
+        }
+    }
+    CHECK(dropped > 0);
+}
+
+TEST_CASE("Terrain LOD follows the viewport as well as the lens", "[composition][terrain][lod]") {
+    // ADR-046: LOD is chosen from how large a chunk's quads are on screen, which is a function of
+    // the lens *and* the viewport. The composition used to substitute a fixed 900-pixel reference
+    // height for the real one, so the same ground came back at the same level whatever it was
+    // being rendered into -- and a bigger window got exactly the same mesh it got in a small one.
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "terra",
+      "camera": { "mode": 1, "position": [0, 30, 60], "target": [0, 0, -60], "fov": 50.0 },
+      "nodes": [
+        { "name": "ground", "kind": "terrain",
+          "world": { "name": "small", "size": [320, 320] },
+          "terrain": { "chunkSize": 40.0, "resolution": 8, "lodLevels": 4,
+                       "lodDistance": 50.0, "viewDistance": 900.0 },
+          "material": { "baseColor": [0.2, 0.4, 0.3], "roughness": 0.9 } }
+      ]
+    })";
+    Fixture fx;
+    const auto path = writeJson("terrain_viewport", text);
+    fx.files.push_back(path);
+    auto comp = scene::Composition::loadFile(path.filename(), fx.registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    const scene::Scene& s = (*comp)->scene();
+
+    const auto levels = [&](std::uint32_t width, std::uint32_t height) {
+        (*comp)->setViewport(width, height);
+        params.resetFinals();
+        (*comp)->update(FrameTime{});
+        const scene::CompositionNode* node = (*comp)->findNode("ground");
+        std::vector<int> out;
+        for (std::size_t c = 0; c < node->chunks.size(); ++c) {
+            int level = -1;
+            for (int k = 0; k < world::kMaxTerrainLods; ++k) {
+                if (node->chunks[c].meshes[static_cast<std::size_t>(k)] == s.entities[c].mesh) {
+                    level = k;
+                    break;
+                }
+            }
+            out.push_back(level);
+        }
+        return out;
+    };
+
+    // All three are 16:9, which is below the conservative floor the chunk cull frustum uses, so the
+    // frustum is byte-identical across them and the only thing that changes is the pixel scale. A
+    // first version of this test varied the height alone, which also widened the cull frustum and
+    // let a chunk that had simply been culled at one size report a different level at another.
+    const std::vector<int> reference = levels(1600, 900);
+    const std::vector<int> tall = levels(3200, 1800);
+    const std::vector<int> squat = levels(800, 450);
+    REQUIRE(reference.size() == tall.size());
+    REQUIRE(reference.size() == squat.size());
+
+    // A viewport twice as tall makes the same ground twice as large in pixels, so the switch to a
+    // coarser level moves further out: no chunk may get coarser, and at least one must get finer.
+    bool finer = false;
+    bool coarser = false;
+    for (std::size_t c = 0; c < reference.size(); ++c) {
+        if (tall[c] < reference[c]) finer = true;
+        if (tall[c] > reference[c]) coarser = true;
+    }
+    CHECK(finer);
+    CHECK_FALSE(coarser);
+
+    // And a viewport half as tall goes the other way.
+    bool squatCoarser = false;
+    bool squatFiner = false;
+    for (std::size_t c = 0; c < reference.size(); ++c) {
+        if (squat[c] > reference[c]) squatCoarser = true;
+        if (squat[c] < reference[c]) squatFiner = true;
+    }
+    CHECK(squatCoarser);
+    CHECK_FALSE(squatFiner);
+}
+
+TEST_CASE("A multi-material asset is drawn with all of its materials", "[composition][mesh][material]") {
+    // ADR-044 shipped with a limitation: an asset's entities were merged into one mesh and one
+    // material was picked for all of it, so a tree drew its leaves with the bark's texture (or,
+    // after the heuristic changed, its bark with the leaves'). The asset is one *source* per
+    // material now, and each part is an ordinary procedural object: same cloud, same seed, same
+    // culling, its own material and its own draw.
+    const std::filesystem::path asset =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets/quaternius/glTF/CommonTree_1.gltf";
+    if (!std::filesystem::exists(asset)) {
+        SKIP("the Quaternius library is not present in this checkout");
+    }
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "tree",
+      "camera": { "mode": 1, "position": [0, 6, 14], "target": [0, 3, 0], "fov": 50.0 },
+      "nodes": [
+        { "name": "grove", "kind": "procedural",
+          "procedural": {
+            "source": { "kind": "mesh", "asset": "@ASSET@" },
+            "distribution": { "kind": "radial", "count": 5, "radius": 8.0, "plane": "xz" } } }
+      ]
+    })";
+    Fixture fx;
+    std::string filled = text;
+    filled.replace(filled.find("@ASSET@"), 7, asset.string());
+    const auto path = writeJson("multi_material", filled);
+    fx.files.push_back(path);
+    auto comp = scene::Composition::loadFile(path.filename(), fx.registry);
+    if (!comp) {
+        FAIL(comp.error().message);
+    }
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    (*comp)->update(FrameTime{});
+    const scene::Scene& s = (*comp)->scene();
+
+    // The asset carries bark and leaves. Two materials in, two drawables out.
+    std::vector<const scene::ProceduralGeometry*> parts;
+    for (const scene::ProceduralGeometry& g : s.procedurals) {
+        if (g.name.rfind("grove", 0) == 0) {
+            parts.push_back(&g);
+        }
+    }
+    REQUIRE(parts.size() == 2);
+
+    // Different materials, and different geometry: neither part may be a copy of the other, and
+    // between them they must account for the whole asset. The two materials of this asset differ
+    // in their maps rather than in their factors -- bark and leaves are two photographs -- which is
+    // exactly the case the old single-material merge got wrong: one of them was drawn with the
+    // other's texture.
+    REQUIRE(parts[0]->material.baseColorTexture.valid());
+    REQUIRE(parts[1]->material.baseColorTexture.valid());
+    CHECK(parts[0]->material.baseColorTexture.texture != parts[1]->material.baseColorTexture.texture);
+    REQUIRE(parts[0]->source.assetMesh);
+    REQUIRE(parts[1]->source.assetMesh);
+    CHECK(parts[0]->source.assetMesh->indices.size() > 0);
+    CHECK(parts[1]->source.assetMesh->indices.size() > 0);
+    CHECK(parts[0]->source.assetMesh != parts[1]->source.assetMesh);
+
+    // The renderer caches source meshes by the source hash, so two parts of one asset that hashed
+    // the same would both be drawn with whichever mesh got there first.
+    CHECK(parts[0]->source.structuralHash() != parts[1]->source.structuralHash());
+
+    // Every part is placed identically: they are the same tree seen through two materials, so a
+    // mismatch here is a canopy floating beside its trunk.
+    REQUIRE(parts[0]->instances.size() == parts[1]->instances.size());
+    CHECK(parts[0]->instances.size() == 5u);
+    for (std::size_t i = 0; i < parts[0]->instances.size(); ++i) {
+        CHECK(parts[0]->instances[i].position == parts[1]->instances[i].position);
+        CHECK(parts[0]->instances[i].scale == parts[1]->instances[i].scale);
+    }
+
+    // Together they are the whole asset, and neither is the whole asset on its own.
+    const std::size_t whole = parts[0]->source.assetMesh->indices.size() +
+                              parts[1]->source.assetMesh->indices.size();
+    CHECK(parts[0]->source.assetMesh->indices.size() < whole);
+    CHECK(parts[1]->source.assetMesh->indices.size() < whole);
+
+    // A live parameter change moves every part, or the tree comes apart the first time an author
+    // touches a slider.
+    params::Parameter<float>* radius = params.findAs<float>("procedural/grove/distribution/radius");
+    REQUIRE(radius != nullptr);
+    radius->setBase(20.0f);
+    params.resetFinals();
+    (*comp)->update(FrameTime{});
+    REQUIRE(parts[0]->instances.size() == parts[1]->instances.size());
+    for (std::size_t i = 0; i < parts[0]->instances.size(); ++i) {
+        CHECK(parts[0]->instances[i].position == parts[1]->instances[i].position);
+    }
+    CHECK(glm::length(parts[0]->instances[0].position) > 15.0f); // the change actually took
+    // ... and each part still has its own maps after the parameters have run: the per-frame
+    // parameter pass writes part 0's material into every object it touches, so a part that did not
+    // keep its own identity would be repainted with the bark's texture one frame in.
+    CHECK(parts[0]->material.baseColorTexture.texture != parts[1]->material.baseColorTexture.texture);
 }
 
 TEST_CASE("A scatter layer's material program and the ground's glow reach the flattened scene",

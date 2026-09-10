@@ -80,6 +80,7 @@ Result<void> RenderJob::start() {
         warmClock.restartAt(settings_.startSeconds);
         engine_->seekSeconds(settings_.startSeconds);
         const FrameTime t = engine_->tick(warmClock);
+        engine_->setViewport(settings_.width, settings_.height);
         engine_->update(t);
         const rendering::ShaderFrameInputs inputs{&engine_->shaderLayers(),
                                                   engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
@@ -196,6 +197,7 @@ void RenderJob::encoderLoop() {
 
 Result<void> RenderJob::renderOne() {
     const FrameTime time = engine_->tick(*clock_);
+    engine_->setViewport(settings_.width, settings_.height);
     engine_->update(time);
     const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                     engine_->hasFrame() ? &engine_->latestFrame() : nullptr};

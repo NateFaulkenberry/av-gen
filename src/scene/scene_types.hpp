@@ -180,6 +180,13 @@ struct Entity {
     // on screen and casts nothing anyone can see, and one behind the camera is off screen and may
     // cast across the whole frame. Terrain sets this per chunk from its own shadow distance.
     bool castsShadow = true;
+    // Set per frame by whatever culls against the *camera* frustum (terrain does, per chunk).
+    // "Off screen" and "not in the scene" are different claims, and only the second is a reason to
+    // stop casting: a hill behind the camera throws its shadow across the whole frame. An entity
+    // that is `visible` and `cameraCulled` is skipped by the camera passes and still offered to the
+    // shadow passes, which test it against each cascade's own frustum. Runtime only: never
+    // serialised, and cleared every frame by whatever set it.
+    bool cameraCulled = false;
 };
 
 // ---- lights ---------------------------------------------------------------------------------

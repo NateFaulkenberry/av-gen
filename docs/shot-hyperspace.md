@@ -53,7 +53,9 @@ to its floor and blows out everything the key touches. An authored shot wants an
 **1. Cue presets outrank the scene file.** Editing a material in the `.scene.json` does nothing
 if a cue preset names the same parameter — the preset wins from its cue onward. Hyperspace's gate
 plates rendered as flat cream slabs through a dozen iterations of material edits because a preset
-was pinning their emission to 1.5. If a scene edit appears to do nothing, grep the presets first.
+was pinning their emission to 1.5. The precedence is right and it no longer needs grepping for:
+since 2026-09-10 loading a project prints the paths its cue presets will take over, and this
+project's line names `procedural/gates/material/emissive` among ten others.
 
 **2. `sourceTransform` was a silent no-op on the GPU.** It was applied by
 `ProceduralGeometry::instanceMatrix()` and ignored by the vertex shader, so the gate rings kept the
