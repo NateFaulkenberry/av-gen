@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <filesystem>
 #include <map>
 
 using namespace avgen;
@@ -225,4 +226,58 @@ TEST_CASE("The reserved accent does not leak into the vegetation", "[world][art]
     INFO("accent " << accent.r << "," << accent.g << "," << accent.b << "  used " << used.r << ","
                    << used.g << "," << used.b);
     CHECK(glm::length(used - accent) > 0.2f);
+}
+
+TEST_CASE("The repository's own library composes into a real hierarchy", "[world][art][composer]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    // The end of the chain, on the actual manifest rather than a fixture. `material.emissive` is a
+    // fraction of a rung, so a canopy tree may legitimately carry a weight of 1.0 -- what has to
+    // hold is that after composition it is still a silhouette, and that the ladder's gap survives
+    // real data. This is the assertion test_asset_library.cpp used to make on the raw weight, moved
+    // to where the ladder is in scope and it can mean something.
+    const std::filesystem::path manifest =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "manifest.json";
+    auto library = assets::AssetLibrary::loadFile(manifest);
+    REQUIRE(library.has_value());
+
+    world::WorldRecipe recipe;
+    recipe.world = "hierarchy";
+    recipe.art.profile = "glowmere";
+    recipe.lighting.bioluminescence = 1.0f;
+    recipe.ecology.fungi = 0.7f;
+    recipe.ecology.rock = 0.35f;
+    auto composed = world::composeWorld(recipe, *library);
+    REQUIRE(composed.has_value());
+
+    std::map<std::string, float> emission;
+    for (const auto& l : composed->layers) {
+        emission[l.name] = l.emissiveIntensity;
+    }
+    REQUIRE(emission.count("tree_tall") == 1);
+
+    // A canopy that glows is a canopy that stops being a silhouette. In the Glowmere profile the
+    // whole rung is 0.035.
+    INFO("tree_tall composes to " << emission.at("tree_tall"));
+    CHECK(emission.at("tree_tall") < 0.1f);
+    CHECK(emission.at("tree_tall") > 0.0f);
+
+    // Several layers emit exactly nothing. That is what the bright things are bright against, and
+    // it is a decision rather than an oversight.
+    const auto dark = std::count_if(composed->layers.begin(), composed->layers.end(),
+                                    [](const world::ScatterLayer& l) {
+                                        return l.emissiveIntensity == 0.0f;
+                                    });
+    CHECK(dark >= 3);
+
+    // And the ladder spans: the brightest species is far above the ordinary vegetation, with the
+    // gap intact on real data rather than only on a fixture.
+    float brightest = 0.0f;
+    for (const auto& [name, value] : emission) {
+        brightest = std::max(brightest, value);
+    }
+    CHECK(brightest > 3.0f);
+    CHECK(brightest > emission.at("tree_tall") * 50.0f);
+#endif
 }

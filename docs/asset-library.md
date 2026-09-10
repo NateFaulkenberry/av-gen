@@ -126,3 +126,43 @@ The two skies differ by about 4x in mean radiance (0.22 against 0.78), so a scen
 `skyIntensity` do not carry across a swap. Both peak past the half-float range at the moon --
 1.0e5 and 1.8e5 at 4K -- which is why `gpu::uploadTextureAsHalf` saturates rather than letting a
 texel become `+inf`.
+
+## The Glowmere vegetation is in the manifest (2026-09-10)
+
+Thirteen Quaternius entries were added to `assets/manifest.json` under a new `quaternius` group, so
+the World Builder can compose from the species Glowmere is actually built out of. **This supersedes
+the sentence in "Quaternius Stylized Nature MegaKit" above that says the pack is not in the
+manifest.** The pack's own files are unchanged; what was added is a description of them.
+
+The derivation -- every height, emissive weight, density and tag, and where each number came from --
+is in `docs/glowmere-asset-families.md`. The short version:
+
+| family | entries |
+|---|---|
+| canopy | `CommonTree_1`, `TwistedTree_2`, `DeadTree_1` |
+| understorey | `Bush_Common`, `Plant_1_Big` |
+| ground cover | `Fern_1`, `Grass_Common_Short`, `Flower_3_Group` |
+| fungi | `Mushroom_Common`, `Mushroom_Laetiporus`, `Mushroom_Common_Beacon` |
+| rock | `Rock_Medium_1`, `Pebble_Round_2` |
+
+Three consequences worth knowing before touching either pack.
+
+**`material.emissive` is a weight, not an intensity.** The composer computes
+`rung x weight x bioluminescence`, where the rung comes from the art-direction profile's emission
+ladder and the tags choose which rung. So a manifest entry says how brightly a species burns *for
+its kind*, and can dim a rung but never promote a species past one. The Quaternius entries are
+written that way. The Kenney entries predate the rule and read their `emissive` more absolutely --
+`tree_tall` at 0.06 lands on 0.0021, about seventeen times dimmer than Glowmere's canopy at the same
+rung. Nothing was changed about them; they are simply not calibrated the same way.
+
+**The manifest now spans two packs, and the composer reads all of it.** A world generated from
+`assets/manifest.json` will mix Kenney and Quaternius species, which is exactly what the "one
+artistic language" rule at the top of this file is against. A recipe's `assetLibrary` field is the
+lever: a manifest per pack would keep a composed world coherent. That has not been done.
+
+**The Quaternius files are gitignored; the Kenney meshes are committed.** `assets/quaternius/` is
+excluded by `.gitignore:14`, and the pack is a manual download from quaternius.com rather than
+something `tools/fetch_polyhaven.py` restores. The manifest is committed and now names thirteen
+files that a fresh checkout does not have, so
+`tests/unit/test_asset_library.cpp`'s "resolves assets independently of the working directory" case,
+which asserts `fs::exists` for every entry's resolved path, will fail without the pack present.

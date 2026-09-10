@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
 
 using namespace avgen;
 
@@ -372,4 +373,121 @@ TEST_CASE("A composed world plans its atmosphere from the recipe", "[world][comp
     // 0.055, which is total fog by fifty metres -- the whole valley in a glass of milk.
     CHECK(thick->environment.fogDensity < 0.02f);
     CHECK(thin->environment.fogDensity > 0.0f);
+}
+
+TEST_CASE("Ecological zones make different places, not just denser patches", "[world][composer][zone]") {
+    // A world the camera travels through should pass through recognisably different chapters. The
+    // failure this guards is a set of zones that all say "more of everything", which reads as noise
+    // in the scatter rather than as arriving somewhere.
+    auto library = testLibrary();
+    world::WorldRecipe recipe;
+    recipe.world = "chapters";
+    recipe.seed = 21u;
+    recipe.extent = 400.0f;
+    recipe.composition.focalStrength = 0.9f;
+    recipe.ecology.fungi = 0.6f;
+    recipe.ecology.rock = 0.5f;
+    auto composed = world::composeWorld(recipe, library);
+    REQUIRE(composed.has_value());
+    const auto& zones = composed->plan.zones;
+    REQUIRE(zones.size() >= 2);
+
+    // Every zone is anchored on a hero: a zone the camera has no reason to enter is a zone that
+    // does not exist.
+    for (const auto& z : zones) {
+        const bool anchored =
+            std::any_of(composed->plan.heroes.begin(), composed->plan.heroes.end(),
+                        [&](const world::HeroPoint& h) {
+                            return glm::length(glm::vec2(h.position.x, h.position.z) - z.center) < 1e-3f;
+                        });
+        INFO("zone '" << z.name << "'");
+        CHECK(anchored);
+        CHECK(z.radius > 20.0f);   // a place, not a patch
+        CHECK(!z.emphasis.empty());
+    }
+
+    // The zones disagree with each other. If they did not, one zone would do.
+    const auto emphasisFor = [](const world::EcologicalZone& z, const std::string& category) {
+        for (const auto& [name, scale] : z.emphasis) {
+            if (name == category) {
+                return scale;
+            }
+        }
+        return 1.0f;
+    };
+    bool anyDisagreement = false;
+    for (std::size_t i = 1; i < zones.size(); ++i) {
+        for (const char* category : {"flora", "fungi", "rock"}) {
+            if (std::abs(emphasisFor(zones[i], category) - emphasisFor(zones[0], category)) > 0.2f) {
+                anyDisagreement = true;
+            }
+        }
+    }
+    CHECK(anyDisagreement);
+    // And at least one zone subtracts rather than adds: a world where every chapter is denser than
+    // the baseline has no baseline.
+    const bool anySubtracts = std::any_of(zones.begin(), zones.end(), [&](const auto& z) {
+        return std::any_of(z.emphasis.begin(), z.emphasis.end(),
+                           [](const auto& e) { return e.second < 0.8f; });
+    });
+    CHECK(anySubtracts);
+}
+
+TEST_CASE("A zone's emphasis reaches the placer, by category", "[world][composer][zone]") {
+    auto library = testLibrary();
+    world::WorldRecipe recipe;
+    recipe.world = "reaches";
+    recipe.seed = 21u;
+    recipe.extent = 400.0f;
+    recipe.composition.focalStrength = 0.9f;
+    recipe.ecology.fungi = 0.6f;
+    recipe.ecology.rock = 0.5f;
+    auto composed = world::composeWorld(recipe, library);
+    REQUIRE(composed.has_value());
+    REQUIRE(composed->plan.zones.size() >= 2);
+    REQUIRE(!composed->clearances.empty());
+
+    // Find the zone that most emphasises fungi, and check the placer's own weighting function
+    // agrees that fungi are commoner at its centre than far away -- and that flora are not equally
+    // affected, which is the whole point of the category filter.
+    const world::EcologicalZone* hollow = nullptr;
+    float best = 0.0f;
+    for (const auto& z : composed->plan.zones) {
+        for (const auto& [name, scale] : z.emphasis) {
+            if (name == "fungi" && scale > best) {
+                best = scale;
+                hollow = &z;
+            }
+        }
+    }
+    REQUIRE(hollow != nullptr);
+    REQUIRE(best > 1.2f);
+
+    const auto& regions = composed->clearances;
+    const glm::vec2 far = hollow->center + glm::vec2(hollow->radius * 6.0f, 0.0f);
+    // Sampled at a height below every clearance's minHeight, so canopy clearings do not confound it.
+    const float fungiHere = world::clearanceWeight(regions, hollow->center, 0.3f, "fungi");
+    const float fungiFar = world::clearanceWeight(regions, far, 0.3f, "fungi");
+    const float floraHere = world::clearanceWeight(regions, hollow->center, 0.3f, "flora");
+    INFO("fungi here " << fungiHere << ", far " << fungiFar << "; flora here " << floraHere);
+    CHECK(fungiHere > fungiFar);
+    // The category filter does its job: the hollow does not simply thicken everything.
+    CHECK(fungiHere > floraHere);
+}
+
+TEST_CASE("A region with no density scale is still a clearing", "[world][composer][zone]") {
+    // Backwards compatibility, asserted rather than assumed: densityScale defaults to 0, so every
+    // clearance authored before zones existed still empties its region completely.
+    world::ScatterClearance c;
+    c.center = glm::vec2(0.0f);
+    c.radius = 10.0f;
+    const std::array<world::ScatterClearance, 1> one{c};
+    CHECK(world::clearanceWeight(one, glm::vec2(0.0f)) == 0.0f);
+    CHECK(world::clearanceWeight(one, glm::vec2(40.0f, 0.0f)) == 1.0f);
+
+    // And a region that thickens does the opposite.
+    world::ScatterClearance dense = c;
+    dense.densityScale = 2.5f;
+    const std::array<world::ScatterClearance, 1> thick{dense};
+    CHECK(world::clearanceWeight(thick, glm::vec2(0.0f)) > 2.0f);
 }

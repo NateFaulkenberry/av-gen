@@ -26,6 +26,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace avgen::world {
@@ -64,16 +65,30 @@ struct ScatterClearance {
     // bald hillside with one tree on it -- technically a corridor, and the exact opposite of a
     // world composed to be dense at the viewer's feet. 0 clears every layer.
     float minHeight = 0.0f;
+    // What density becomes *inside* the region, before `strength` blends toward it. 0 is a
+    // clearing; values above 1 are the same mechanism used to make a region denser than the world
+    // around it, which is what an ecological zone is. Defaulting to 0 keeps every existing
+    // clearance meaning exactly what it did.
+    float densityScale = 0.0f;
+    // Which layers this applies to, by the category the composer recorded on them. Empty means all.
+    // A zone that thickens the fungi without also thickening the trees is the difference between a
+    // glowing hollow and simply more of everything.
+    std::string category;
 };
 
 // The density multiplier `clearances` impose at `p`: 1 where nothing applies, 0 inside a region at
 // full strength. Exposed so a test can assert a corridor is clear without scattering anything.
 [[nodiscard]] float clearanceWeight(std::span<const ScatterClearance> clearances, glm::vec2 p,
-                                    float layerHeight = 0.0f);
+                                    float layerHeight = 0.0f,
+                                    std::string_view layerCategory = {});
 
 struct ScatterLayer {
     std::string name;
-    std::string asset;                    // glTF path as written; resolved through the AssetRegistry
+    std::string asset;
+    // What kind of thing this is ("flora", "fungi", "rock", ...), as the composer's asset library
+    // classified it. Carried on the layer so a region can act on a category without the placer
+    // having to consult a library it does not have.
+    std::string category;                    // glTF path as written; resolved through the AssetRegistry
     std::vector<BiomeDensity> densities;
     // Filters beyond the biome. A biome says a fern belongs in the forest; these say it does not
     // grow on a cliff or under water, which is true in every biome.

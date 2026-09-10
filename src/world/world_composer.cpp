@@ -555,6 +555,44 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
         }
     }
 
+    // ---- the zones -------------------------------------------------------------------------------
+    // Visual chapters. Anchored on the heroes rather than scattered, because the camera's reason to
+    // be anywhere is a hero, and a zone the camera never enters is a zone that does not exist. Each
+    // takes a different emphasis from a small fixed set, in order, so a world with three zones has
+    // three *different* ones rather than three samples from the same distribution.
+    {
+        struct ZoneKind {
+            const char* name;
+            float flora;
+            float fungi;
+            float rock;
+        };
+        // Deliberately contrasting, and deliberately not all "more of something": a basin that
+        // subtracts is as much a chapter as a grove that adds, and a world in which every zone is
+        // denser than the baseline has no baseline.
+        static constexpr ZoneKind kKinds[] = {
+            {"dark grove", 1.55f, 0.45f, 0.55f},     // tall, close, little on the floor
+            {"glow hollow", 0.55f, 2.60f, 0.70f},    // the floor is the light
+            {"stone basin", 0.30f, 0.35f, 2.20f},    // open, bare, silhouettes against sky
+            {"deep thicket", 1.30f, 1.60f, 0.40f},   // dense at every height
+        };
+        const std::size_t zoneCount =
+            std::min<std::size_t>(out.plan.heroes.size(), std::size(kKinds));
+        for (std::size_t i = 0; i < zoneCount; ++i) {
+            const HeroPoint& anchor = out.plan.heroes[i];
+            const ZoneKind& kind = kKinds[i];
+            EcologicalZone zone;
+            zone.name = kind.name;
+            zone.center = glm::vec2(anchor.position.x, anchor.position.z);
+            // Large enough to be a place rather than a patch: a zone the camera crosses in a second
+            // reads as an inconsistency in the scatter, not as somewhere it has arrived.
+            zone.radius = std::max(recipe.extent * 0.13f, anchor.activationRadius * 0.8f);
+            zone.softness = zone.radius * 0.55f;
+            zone.emphasis = {{"flora", kind.flora}, {"fungi", kind.fungi}, {"rock", kind.rock}};
+            out.plan.zones.push_back(std::move(zone));
+        }
+    }
+
     // ---- the viewpoint and the corridor --------------------------------------------------------
     // Chosen here rather than by whoever installs the world, because everything below is arranged
     // relative to it. The distance is set by the landmark: about three times its height frames it
@@ -668,6 +706,7 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
         ScatterLayer layer;
         layer.name = asset.id;
         layer.asset = library.resolve(asset).generic_string();
+        layer.category = assets::assetCategoryName(asset.category);
         layer.densities = biomesFor(asset.category, density);
         layer.height = asset.effectiveHeight();
         layer.minScale = std::max(1.0f - asset.variation.scale, 0.05f);
@@ -804,7 +843,24 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
 
     // The negative space, handed to the placer. `plan.voids` already carries both the scattered
     // empty regions and the corridor; this is the same set in the type the ecology consumes.
-    out.clearances.reserve(out.plan.voids.size());
+    // Zones first, so a clearing punched afterwards still wins: a hero's clearing must not be
+    // filled back in by the zone the hero anchors.
+    for (const EcologicalZone& zone : out.plan.zones) {
+        for (const auto& [category, scale] : zone.emphasis) {
+            if (std::abs(scale - 1.0f) < 1e-3f) {
+                continue;   // no opinion is not worth a region
+            }
+            ScatterClearance c;
+            c.center = zone.center;
+            c.radius = zone.radius;
+            c.softness = zone.softness;
+            c.strength = 1.0f;
+            c.densityScale = scale;
+            c.category = category;
+            out.clearances.push_back(c);
+        }
+    }
+    out.clearances.reserve(out.clearances.size() + out.plan.voids.size());
     for (const VoidRegion& v : out.plan.voids) {
         ScatterClearance c;
         c.center = v.center;

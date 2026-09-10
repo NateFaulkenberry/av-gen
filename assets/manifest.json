@@ -1,7 +1,7 @@
 {
- "source": "Kenney Nature Kit (kenney.nl/assets/nature-kit)",
+ "source": "Kenney Nature Kit (kenney.nl/assets/nature-kit) and Quaternius Stylized Nature MegaKit, free tier (quaternius.com)",
  "license": "CC0",
- "note": "One curated stylized library, not a scan of a directory. Only names listed here may be placed by procedural generation. Sizes, importance, densities and material profiles are av-gen's own art direction over a CC0 pack: the meshes and their textures are Kenney's, the judgements about what each species is are ours.",
+ "note": "One curated stylized library, not a scan of a directory. Only names listed here may be placed by procedural generation. Two packs, both CC0: Kenney's Nature Kit, whose meshes are committed, and Quaternius' Stylized Nature MegaKit (free tier), licensed by quaternius/License_Standard.txt in this directory and gitignored like the other bulk downloads, so a checkout without it cannot place the quaternius group. Sizes, importance, densities and material profiles are av-gen's own art direction over CC0 packs: the meshes and their textures are the pack authors', the judgements about what each species is are ours. material.emissive is a 0..1 weight against the art-direction profile's emission ladder, not an absolute intensity: tags place a species on a rung, the weight says how brightly it burns on it.",
  "categories": {
   "largeStructures": [
    {
@@ -17,7 +17,7 @@
     "visualImportance": 0.86,
     "preferredDensity": 0.01,
     "material": {
-     "emissive": 0.06,
+     "emissive": 1.0,
      "translucency": 0.22,
      "roughness": 0.85,
      "tint": [
@@ -51,7 +51,7 @@
     "visualImportance": 0.78,
     "preferredDensity": 0.012,
     "material": {
-     "emissive": 0.06,
+     "emissive": 1.0,
      "translucency": 0.25,
      "roughness": 0.85,
      "tint": [
@@ -84,7 +84,7 @@
     "visualImportance": 0.74,
     "preferredDensity": 0.01,
     "material": {
-     "emissive": 0.05,
+     "emissive": 0.9,
      "translucency": 0.2,
      "roughness": 0.85,
      "tint": [
@@ -117,7 +117,7 @@
     "visualImportance": 0.4,
     "preferredDensity": 0.004,
     "material": {
-     "emissive": 0.3,
+     "emissive": 1.0,
      "translucency": 0.1,
      "roughness": 0.92,
      "tint": [
@@ -151,7 +151,7 @@
     "visualImportance": 0.32,
     "preferredDensity": 0.005,
     "material": {
-     "emissive": 0.25,
+     "emissive": 0.85,
      "translucency": 0.1,
      "roughness": 0.92,
      "tint": [
@@ -218,7 +218,7 @@
     "visualImportance": 0.45,
     "preferredDensity": 0.05,
     "material": {
-     "emissive": 0.08,
+     "emissive": 1.0,
      "translucency": 0.3,
      "roughness": 0.88,
      "tint": [
@@ -248,7 +248,7 @@
     "visualImportance": 0.5,
     "preferredDensity": 0.04,
     "material": {
-     "emissive": 0.1,
+     "emissive": 1.0,
      "translucency": 0.32,
      "roughness": 0.88,
      "tint": [
@@ -278,7 +278,7 @@
     "visualImportance": 0.4,
     "preferredDensity": 0.05,
     "material": {
-     "emissive": 0.12,
+     "emissive": 0.45,
      "translucency": 0.45,
      "roughness": 0.86,
      "tint": [
@@ -311,7 +311,7 @@
     "visualImportance": 0.38,
     "preferredDensity": 0.05,
     "material": {
-     "emissive": 0.08,
+     "emissive": 0.9,
      "translucency": 0.3,
      "roughness": 0.88,
      "tint": [
@@ -341,7 +341,7 @@
     "visualImportance": 0.56,
     "preferredDensity": 0.03,
     "material": {
-     "emissive": 0.7,
+     "emissive": 1.0,
      "translucency": 0.55,
      "roughness": 0.7,
      "tint": [
@@ -375,7 +375,7 @@
     "visualImportance": 0.56,
     "preferredDensity": 0.025,
     "material": {
-     "emissive": 0.75,
+     "emissive": 0.95,
      "translucency": 0.55,
      "roughness": 0.7,
      "tint": [
@@ -409,7 +409,7 @@
     "visualImportance": 0.25,
     "preferredDensity": 0.12,
     "material": {
-     "emissive": 0.05,
+     "emissive": 0.2,
      "translucency": 0.4,
      "roughness": 0.9,
      "tint": [
@@ -442,7 +442,7 @@
     "visualImportance": 0.3,
     "preferredDensity": 0.07,
     "material": {
-     "emissive": 0.1,
+     "emissive": 0.35,
      "translucency": 0.42,
      "roughness": 0.88,
      "tint": [
@@ -477,7 +477,7 @@
     "visualImportance": 0.15,
     "preferredDensity": 0.55,
     "material": {
-     "emissive": 0.03,
+     "emissive": 1.0,
      "translucency": 0.38,
      "roughness": 0.92,
      "tint": [
@@ -510,7 +510,7 @@
     "visualImportance": 0.18,
     "preferredDensity": 0.35,
     "material": {
-     "emissive": 0.04,
+     "emissive": 1.0,
      "translucency": 0.38,
      "roughness": 0.92,
      "tint": [
@@ -543,7 +543,7 @@
     "visualImportance": 0.12,
     "preferredDensity": 0.5,
     "material": {
-     "emissive": 0.03,
+     "emissive": 0.85,
      "translucency": 0.38,
      "roughness": 0.92,
      "tint": [
@@ -576,7 +576,7 @@
     "visualImportance": 0.5,
     "preferredDensity": 0.05,
     "material": {
-     "emissive": 0.8,
+     "emissive": 1.0,
      "translucency": 0.55,
      "roughness": 0.7,
      "tint": [
@@ -610,7 +610,7 @@
     "visualImportance": 0.2,
     "preferredDensity": 0.18,
     "material": {
-     "emissive": 0.06,
+     "emissive": 0.6,
      "translucency": 0.32,
      "roughness": 0.9,
      "tint": [
@@ -828,7 +828,7 @@
     "visualImportance": 0.6,
     "preferredDensity": 0.04,
     "material": {
-     "emissive": 0.85,
+     "emissive": 1.0,
      "translucency": 0.7,
      "roughness": 0.62,
      "tint": [
@@ -861,7 +861,7 @@
     "visualImportance": 0.58,
     "preferredDensity": 0.03,
     "material": {
-     "emissive": 0.85,
+     "emissive": 1.0,
      "translucency": 0.7,
      "roughness": 0.62,
      "tint": [
@@ -929,7 +929,7 @@
     "visualImportance": 0.5,
     "preferredDensity": 0.04,
     "material": {
-     "emissive": 0.6,
+     "emissive": 0.62,
      "translucency": 0.62,
      "roughness": 0.68,
      "tint": [
@@ -962,7 +962,7 @@
     "visualImportance": 0.5,
     "preferredDensity": 0.03,
     "material": {
-     "emissive": 0.6,
+     "emissive": 0.62,
      "translucency": 0.62,
      "roughness": 0.68,
      "tint": [
@@ -995,7 +995,7 @@
     "visualImportance": 0.6,
     "preferredDensity": 0.012,
     "material": {
-     "emissive": 0.95,
+     "emissive": 0.9,
      "translucency": 0.74,
      "roughness": 0.58,
      "tint": [
@@ -1015,6 +1015,486 @@
      "bioluminescent",
      "rare",
      "accent"
+    ]
+   }
+  ],
+  "quaternius": [
+   {
+    "name": "CommonTree_1",
+    "file": "quaternius/glTF/CommonTree_1.gltf",
+    "category": "flora",
+    "archetype": "broadleaf_canopy",
+    "triangles": 6265,
+    "naturalSize": [
+     4.3114,
+     7.2648,
+     4.5777
+    ],
+    "preferredScale": 14.0,
+    "visualImportance": 0.82,
+    "preferredDensity": 0.0045,
+    "material": {
+     "emissive": 1.0,
+     "translucency": 0.24,
+     "roughness": 0.85,
+     "tint": [
+      0.08,
+      0.28,
+      0.23
+     ]
+    },
+    "variation": {
+     "scale": 0.3,
+     "hue": 0.03,
+     "emissive": 0.55,
+     "yaw": 1.0,
+     "lean": 0.0
+    },
+    "tags": [
+     "background",
+     "canopy"
+    ]
+   },
+   {
+    "name": "TwistedTree_2",
+    "file": "quaternius/glTF/TwistedTree_2.gltf",
+    "category": "flora",
+    "archetype": "twisted_pine",
+    "triangles": 9134,
+    "naturalSize": [
+     10.5629,
+     18.9492,
+     9.2026
+    ],
+    "preferredScale": 15.0,
+    "visualImportance": 0.8,
+    "preferredDensity": 0.0022,
+    "material": {
+     "emissive": 1.0,
+     "translucency": 0.2,
+     "roughness": 0.86,
+     "tint": [
+      0.12,
+      0.18,
+      0.32
+     ]
+    },
+    "variation": {
+     "scale": 0.35,
+     "hue": 0.03,
+     "emissive": 0.55,
+     "yaw": 1.0,
+     "lean": 0.15
+    },
+    "tags": [
+     "background",
+     "canopy"
+    ]
+   },
+   {
+    "name": "DeadTree_1",
+    "file": "quaternius/glTF/DeadTree_1.gltf",
+    "category": "flora",
+    "archetype": "dead_tree",
+    "triangles": 6169,
+    "naturalSize": [
+     6.1489,
+     9.4955,
+     5.7487
+    ],
+    "preferredScale": 12.0,
+    "visualImportance": 0.55,
+    "preferredDensity": 0.0009,
+    "material": {
+     "emissive": 0.0,
+     "translucency": 0.0,
+     "roughness": 0.92,
+     "tint": [
+      0.1946,
+      0.1779,
+      0.2789
+     ]
+    },
+    "variation": {
+     "scale": 0.3,
+     "hue": 0.02,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.3
+    },
+    "tags": [
+     "background",
+     "deadwood",
+     "inert"
+    ]
+   },
+   {
+    "name": "Bush_Common",
+    "file": "quaternius/glTF/Bush_Common.gltf",
+    "category": "flora",
+    "archetype": "glow_bush",
+    "triangles": 900,
+    "naturalSize": [
+     1.9148,
+     1.5818,
+     1.9651
+    ],
+    "preferredScale": 1.1,
+    "visualImportance": 0.5,
+    "preferredDensity": 0.016,
+    "material": {
+     "emissive": 1.0,
+     "translucency": 0.3,
+     "roughness": 0.88,
+     "tint": [
+      0.0762,
+      0.305,
+      0.3515
+     ]
+    },
+    "variation": {
+     "scale": 0.35,
+     "hue": 0.04,
+     "emissive": 0.6,
+     "yaw": 1.0,
+     "lean": 0.4
+    },
+    "tags": [
+     "midground",
+     "understorey",
+     "bioluminescent"
+    ]
+   },
+   {
+    "name": "Plant_1_Big",
+    "file": "quaternius/glTF/Plant_1_Big.gltf",
+    "category": "flora",
+    "archetype": "fan_plant",
+    "triangles": 360,
+    "naturalSize": [
+     1.8065,
+     2.3478,
+     1.954
+    ],
+    "preferredScale": 3.2,
+    "visualImportance": 0.62,
+    "preferredDensity": 0.009,
+    "material": {
+     "emissive": 0.2085,
+     "translucency": 0.42,
+     "roughness": 0.86,
+     "tint": [
+      0.045,
+      0.24,
+      0.28
+     ]
+    },
+    "variation": {
+     "scale": 0.475,
+     "hue": 0.02,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.3
+    },
+    "tags": [
+     "midground",
+     "understorey",
+     "frond"
+    ]
+   },
+   {
+    "name": "Fern_1",
+    "file": "quaternius/glTF/Fern_1.gltf",
+    "category": "flora",
+    "archetype": "fern",
+    "triangles": 288,
+    "naturalSize": [
+     2.8269,
+     0.8402,
+     2.6523
+    ],
+    "preferredScale": 1.4,
+    "visualImportance": 0.3,
+    "preferredDensity": 0.045,
+    "material": {
+     "emissive": 1.0,
+     "translucency": 0.45,
+     "roughness": 0.88,
+     "tint": [
+      0.055,
+      0.3,
+      0.22
+     ]
+    },
+    "variation": {
+     "scale": 0.425,
+     "hue": 0.02,
+     "emissive": 0.55,
+     "yaw": 1.0,
+     "lean": 0.5
+    },
+    "tags": [
+     "foreground",
+     "groundcover",
+     "bioluminescent"
+    ]
+   },
+   {
+    "name": "Grass_Common_Short",
+    "file": "quaternius/glTF/Grass_Common_Short.gltf",
+    "category": "flora",
+    "archetype": "grass_tuft",
+    "triangles": 155,
+    "naturalSize": [
+     0.6389,
+     1.3341,
+     0.7373
+    ],
+    "preferredScale": 0.7,
+    "visualImportance": 0.15,
+    "preferredDensity": 0.48,
+    "material": {
+     "emissive": 1.0,
+     "translucency": 0.4,
+     "roughness": 0.9,
+     "tint": [
+      0.035,
+      0.18,
+      0.13
+     ]
+    },
+    "variation": {
+     "scale": 0.5,
+     "hue": 0.03,
+     "emissive": 0.7,
+     "yaw": 1.0,
+     "lean": 0.6
+    },
+    "tags": [
+     "foreground",
+     "groundcover",
+     "bioluminescent"
+    ]
+   },
+   {
+    "name": "Flower_3_Group",
+    "file": "quaternius/glTF/Flower_3_Group.gltf",
+    "category": "flora",
+    "archetype": "glow_flower_cluster",
+    "triangles": 755,
+    "naturalSize": [
+     1.4885,
+     2.0548,
+     1.5911
+    ],
+    "preferredScale": 0.55,
+    "visualImportance": 0.62,
+    "preferredDensity": 0.018,
+    "material": {
+     "emissive": 1.0,
+     "translucency": 0.55,
+     "roughness": 0.7,
+     "tint": [
+      0.3419,
+      0.2384,
+      0.6308
+     ]
+    },
+    "variation": {
+     "scale": 0.35,
+     "hue": 0.03,
+     "emissive": 0.6,
+     "yaw": 1.0,
+     "lean": 0.5
+    },
+    "tags": [
+     "foreground",
+     "special",
+     "bioluminescent"
+    ]
+   },
+   {
+    "name": "Mushroom_Common",
+    "file": "quaternius/glTF/Mushroom_Common.gltf",
+    "category": "fungi",
+    "archetype": "glow_cap",
+    "triangles": 880,
+    "naturalSize": [
+     0.5637,
+     0.4635,
+     0.7791
+    ],
+    "preferredScale": 0.28,
+    "visualImportance": 0.72,
+    "preferredDensity": 0.03,
+    "material": {
+     "emissive": 1.0,
+     "translucency": 0.78,
+     "roughness": 0.6,
+     "tint": [
+      0.5271,
+      0.3515,
+      0.807
+     ]
+    },
+    "variation": {
+     "scale": 0.8,
+     "hue": 0.035,
+     "emissive": 0.65,
+     "yaw": 1.0,
+     "lean": 0.35
+    },
+    "tags": [
+     "foreground",
+     "rare",
+     "accent",
+     "bioluminescent"
+    ]
+   },
+   {
+    "name": "Mushroom_Laetiporus",
+    "file": "quaternius/glTF/Mushroom_Laetiporus.gltf",
+    "category": "fungi",
+    "archetype": "shelf_fungus",
+    "triangles": 3216,
+    "naturalSize": [
+     1.366,
+     0.767,
+     1.1032
+    ],
+    "preferredScale": 0.55,
+    "visualImportance": 0.66,
+    "preferredDensity": 0.004,
+    "material": {
+     "emissive": 1.0,
+     "translucency": 0.7,
+     "roughness": 0.62,
+     "tint": [
+      0.2086,
+      0.7454,
+      0.5776
+     ]
+    },
+    "variation": {
+     "scale": 0.55,
+     "hue": 0.03,
+     "emissive": 0.55,
+     "yaw": 1.0,
+     "lean": 0.4
+    },
+    "tags": [
+     "foreground",
+     "bioluminescent"
+    ]
+   },
+   {
+    "name": "Mushroom_Common_Beacon",
+    "file": "quaternius/glTF/Mushroom_Common.gltf",
+    "category": "fungi",
+    "archetype": "beacon_cap",
+    "triangles": 880,
+    "naturalSize": [
+     0.5637,
+     0.4635,
+     0.7791
+    ],
+    "preferredScale": 1.5,
+    "visualImportance": 0.9,
+    "preferredDensity": 0.00055,
+    "material": {
+     "emissive": 1.0,
+     "translucency": 0.72,
+     "roughness": 0.6,
+     "tint": [
+      0.42,
+      0.3,
+      0.72
+     ]
+    },
+    "variation": {
+     "scale": 0.425,
+     "hue": 0.03,
+     "emissive": 0.35,
+     "yaw": 1.0,
+     "lean": 0.15
+    },
+    "tags": [
+     "midground",
+     "beacon",
+     "landmark",
+     "bioluminescent"
+    ]
+   },
+   {
+    "name": "Rock_Medium_1",
+    "file": "quaternius/glTF/Rock_Medium_1.gltf",
+    "category": "rock",
+    "archetype": "boulder",
+    "triangles": 342,
+    "naturalSize": [
+     3.2251,
+     2.2598,
+     2.9891
+    ],
+    "preferredScale": 1.6,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0055,
+    "material": {
+     "emissive": 0.0,
+     "translucency": 0.0,
+     "roughness": 0.95,
+     "tint": [
+      0.1559,
+      0.1746,
+      0.2462
+     ]
+    },
+    "variation": {
+     "scale": 0.85,
+     "hue": 0.0,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.7
+    },
+    "tags": [
+     "midground",
+     "inert"
+    ]
+   },
+   {
+    "name": "Pebble_Round_2",
+    "file": "quaternius/glTF/Pebble_Round_2.gltf",
+    "category": "rock",
+    "archetype": "pebble",
+    "triangles": 114,
+    "naturalSize": [
+     0.4495,
+     0.0942,
+     0.4111
+    ],
+    "preferredScale": 0.28,
+    "visualImportance": 0.1,
+    "preferredDensity": 0.02,
+    "material": {
+     "emissive": 0.0,
+     "translucency": 0.0,
+     "roughness": 0.95,
+     "tint": [
+      0.1878,
+      0.2159,
+      0.2747
+     ]
+    },
+    "variation": {
+     "scale": 0.75,
+     "hue": 0.0,
+     "emissive": 0.0,
+     "yaw": 1.0,
+     "lean": 0.85
+    },
+    "tags": [
+     "foreground",
+     "inert"
     ]
    }
   ]

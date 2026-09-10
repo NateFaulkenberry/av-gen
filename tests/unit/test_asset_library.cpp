@@ -156,7 +156,13 @@ TEST_CASE("The grouped manifest already in the repository still loads", "[assets
     // it was pinned on this one, and enriching the library broke a test about a defaulting rule
     // that had not changed.
     CHECK(tree->effectiveHeight() > 5.0f);
-    CHECK(tree->material.emissive < 0.25f);   // the canopy is a silhouette, not a light
+    // `material.emissive` is a fraction of whichever rung of the art direction's ladder this
+    // species stands on, not an absolute intensity -- so 1.0 here means "as bright as a canopy
+    // gets", which is 0.035 in the Glowmere profile. Asserting the weight is small was correct when
+    // the field meant an absolute intention and became meaningless when it stopped. What actually
+    // has to hold is that the canopy is a silhouette after composition, and that is asserted in
+    // test_art_direction.cpp where the ladder is in scope.
+    CHECK(tree->material.emissive <= 1.0f);
 
     assets::AssetDescriptor unauthored;
     unauthored.naturalSize = glm::vec3(0.4f, 1.6877f, 0.46f);
@@ -331,17 +337,36 @@ TEST_CASE("a library loaded from a file resolves assets independently of the wor
     REQUIRE(lib.has_value());
     REQUIRE(lib->size() > 0);
 
+    // Resolution is asserted for every entry; *existence* only for the packs a fresh checkout
+    // actually has. The manifest describes more than one pack and not all of them are committed --
+    // the Quaternius vegetation is gitignored and downloaded by hand -- so requiring every entry to
+    // be on disk would make this test pass here and fail for anyone who has not fetched it, which
+    // is the worst possible failure mode for a test about paths.
     std::size_t checked = 0;
+    std::size_t present = 0;
+    std::size_t absent = 0;
     for (const auto& asset : lib->assets()) {
         if (asset.file.empty()) {
             continue;
         }
         const fs::path resolved = lib->resolve(asset);
         INFO("asset '" << asset.id << "' -> " << resolved.string());
+        // The property under test: resolve() hands back something openable from any working
+        // directory. Absolute and wrong would pass this alone, which is why existence is still
+        // checked below for everything that is here.
         CHECK(resolved.is_absolute());
-        CHECK(fs::exists(resolved));
         ++checked;
+        if (fs::exists(resolved)) {
+            ++present;
+        } else {
+            ++absent;
+            WARN("asset '" << asset.id << "' is in the manifest but not on disk: "
+                           << resolved.string() << " (an optional pack that has not been fetched?)");
+        }
     }
     CHECK(checked > 0);
+    // At least one pack has to be here, or the test proved nothing about opening files.
+    CHECK(present > 0);
+    INFO(absent << " manifest entries are not on disk");
 #endif
 }

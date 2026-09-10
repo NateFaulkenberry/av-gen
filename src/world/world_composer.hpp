@@ -66,6 +66,24 @@ struct VoidRegion {
     float clearsAbove = 0.0f;
 };
 
+// A visual chapter of a world: a region with its own ecological emphasis, so a camera travelling
+// through the world passes through recognisably different places rather than through more of the
+// same. A dark forest, a glowing hollow, a bare basin.
+//
+// Expressed as density regions over the existing layers rather than as separate ecologies, because
+// a zone is a change of *emphasis* -- more fungi and fewer trees -- and a second placement system
+// per zone would fork every rule the first one has about slope, water and clustering.
+struct EcologicalZone {
+    std::string name;
+    glm::vec2 center{0.0f};
+    float radius = 60.0f;
+    float softness = 30.0f;
+    // Per-category density multipliers. 1 leaves a category alone; the interesting values are the
+    // ones that differ from each other, since a zone that doubles everything is just a denser
+    // patch and reads as noise rather than as a place.
+    std::vector<std::pair<std::string, float>> emphasis;
+};
+
 // What the composer decided, kept beside the layers so a caller can explain the result, draw it in
 // a debug view, or test it without rendering anything.
 //
@@ -91,6 +109,8 @@ struct CompositionPlan {
     // The things worth travelling towards, most important first. A camera director reads this; so
     // does whatever decides which heroes are near enough to react to the music.
     std::vector<HeroPoint> heroes;
+    // The world's visual chapters, in the order they were laid out.
+    std::vector<EcologicalZone> zones;
     // Layer name -> the band it was assigned to, so a test can assert that a fern did not end up
     // on the ridge line.
     std::vector<std::pair<std::string, DepthBand>> bands;

@@ -259,11 +259,14 @@ std::uint64_t Ecology::structuralHash() const {
         h.f32(c.softness);
         h.f32(c.strength);
         h.f32(c.minHeight);
+        h.f32(c.densityScale);
+        h.str(c.category);
     }
     return h.value();
 }
 
-float clearanceWeight(std::span<const ScatterClearance> clearances, glm::vec2 p, float layerHeight) {
+float clearanceWeight(std::span<const ScatterClearance> clearances, glm::vec2 p, float layerHeight,
+                      std::string_view layerCategory) {
     float weight = 1.0f;
     for (const ScatterClearance& c : clearances) {
         if (c.radius <= 0.0f || c.strength <= 0.0f) {
@@ -272,6 +275,9 @@ float clearanceWeight(std::span<const ScatterClearance> clearances, glm::vec2 p,
         if (c.minHeight > 0.0f && layerHeight < c.minHeight) {
             continue;   // short enough to grow in the lane
         }
+        if (!c.category.empty() && c.category != layerCategory) {
+            continue;   // this region has no opinion about this kind of thing
+        }
         const float distance = glm::length(p - c.center);
         // Smooth from the rim outwards. A hard edge reads as a stencil cut in the vegetation --
         // the eye finds the circle rather than the clearing -- so `softness` is the metres over
@@ -279,7 +285,10 @@ float clearanceWeight(std::span<const ScatterClearance> clearances, glm::vec2 p,
         const float outside = c.softness > 0.0f
                                   ? glm::smoothstep(c.radius, c.radius + c.softness, distance)
                                   : (distance >= c.radius ? 1.0f : 0.0f);
-        weight *= glm::mix(1.0f, outside, glm::clamp(c.strength, 0.0f, 1.0f));
+        // What the density becomes here: `densityScale` at the centre, 1 outside, blended across
+        // the rim. `strength` says how much of that opinion to take.
+        const float inside = glm::mix(std::max(c.densityScale, 0.0f), 1.0f, outside);
+        weight *= glm::mix(1.0f, inside, glm::clamp(c.strength, 0.0f, 1.0f));
         if (weight <= 0.0f) {
             return 0.0f;
         }
@@ -376,7 +385,7 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
                 continue;
             }
             // Before the biome is consulted: a cleared point is cleared whatever grows there.
-            const float clearing = clearanceWeight(clearances, p, layer.height);
+            const float clearing = clearanceWeight(clearances, p, layer.height, layer.category);
             if (clearing <= 0.0f) {
                 continue;
             }
@@ -466,6 +475,12 @@ Result<std::vector<ScatterClearance>> clearancesFromJson(const json& j) {
         if (e.contains("minHeight") && e.at("minHeight").is_number()) {
             c.minHeight = e.at("minHeight").get<float>();
         }
+        if (e.contains("densityScale") && e.at("densityScale").is_number()) {
+            c.densityScale = e.at("densityScale").get<float>();
+        }
+        if (e.contains("category") && e.at("category").is_string()) {
+            c.category = e.at("category").get<std::string>();
+        }
         out.push_back(c);
     }
     return out;
@@ -478,7 +493,9 @@ json clearancesToJson(const std::vector<ScatterClearance>& clearances) {
                            {"radius", c.radius},
                            {"softness", c.softness},
                            {"strength", c.strength},
-                           {"minHeight", c.minHeight}});
+                           {"minHeight", c.minHeight},
+                           {"densityScale", c.densityScale},
+                           {"category", c.category}});
     }
     return out;
 }
@@ -558,6 +575,9 @@ Result<Ecology> ecologyFromJson(const json& j) {
                 }
                 *field.target = *value;
             }
+        }
+        if (e.contains("category") && e.at("category").is_string()) {
+            l.category = e.at("category").get<std::string>();
         }
         if (e.contains("materialProgram")) {
             if (!e.at("materialProgram").is_string()) {
@@ -654,6 +674,7 @@ json ecologyToJson(const Ecology& ecology) {
                            {"chromaDriftScale", l.chromaDriftScale},
                            {"chromaDriftSpeed", l.chromaDriftSpeed},
                            {"emissiveSparsity", l.emissiveSparsity},
+                           {"category", l.category},
                            {"materialProgram", l.materialProgram},
                            {"seed", l.seed},
                            {"maxInstances", l.maxInstances},
