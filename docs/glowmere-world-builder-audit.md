@@ -238,3 +238,69 @@ claimed. Whole-shot interactive timing, base-M2 behaviour, thermal behaviour and
 remain unverified.
 
 The Syphon frame-burst failure recorded there is still unresolved and is unrelated to this work.
+
+---
+
+# Determination (milestones 3 and 4)
+
+Written after building it, not before.
+
+## Milestone 3: can Glowmere reasonably become a World Recipe?
+
+**Yes for the world, no for the hero and the shot.** That split was visible in the audit above and
+building it did not change it.
+
+What came through as a recipe, with no new engine concept:
+
+- the thirteen species, at their authored heights, from the same Quaternius pack;
+- the emission ladder, rung for rung, because the profile's rungs *are* Glowmere's numbers;
+- the palette, the fog, the volumetrics, the sky, the stylized hemisphere and the light rig's 7.5:1
+  key-to-ambient ratio;
+- the negative space, now that clearances are applied by the placer.
+
+What did not, and will not:
+
+- **The elder.** Three hand-authored procedural nodes plus a practical light. A recipe has no
+  vocabulary for "a squashed sphere with two displacement deformers on a five-point curved tube with
+  thirty-eight radial filaments", and inventing one would produce a worse elder and a generator
+  nothing else uses. `HeroPoint::assembly` (ADR-072) is the seam; the composer currently places a
+  single asset per hero, which is honestly weaker.
+- **The ninety-second camera move.** Sixteen hand-authored keys. That is a shot, not a template.
+
+## Milestone 4: what the recipe actually produces
+
+`examples/recipes/glowmere.recipe.json`, composed against `assets/glowmere.manifest.json`.
+
+The manifest is separate on purpose. A world composed from a library spanning two packs mixes two
+artistic languages, which is the opposite of what a controlled palette is for — so a recipe that
+wants Glowmere's vegetation names Glowmere's library rather than the combined one.
+
+It produces a recognisable alien night valley in the same species and the same palette: ferns and
+grass underfoot, mushrooms and a luminous specimen in the midground, tree silhouettes on the ridge,
+haze with depth in it.
+
+It is **not** the authored scene and should not be described as one. Measured against the painterly
+baseline (`--range 8:8.05`, 1280×720):
+
+| | Glowmere painterly | Glowmere recipe |
+|---|---:|---:|
+| mean | 0.163 | 0.241 |
+| rms contrast | 0.101 | 0.067 |
+| shadow fraction | 0.292 | 0.001 |
+| mean saturation | 0.716 | 0.601 |
+
+The recipe is flatter and brighter, with almost no shadow. Three reasons, none of them mysterious:
+there is no elder, so nothing large is close to the camera casting anything; the five material
+programs that do most of Glowmere's colour work are not named by the composer; and the composed
+camera is a generated viewpoint rather than a designed shot.
+
+So the fallback position in the brief applies to the parts that did not transfer: keep the authored
+Glowmere as the showcase scene, and let the World Builder supply the world *around* a design rather
+than replace it.
+
+## What this means for the remaining milestones
+
+The hero assembly is the highest-value unbuilt thing. Everything else in the spec — heroes reacting
+to music, a camera that discovers them, spotlighting — is machinery pointed at objects, and the
+objects are currently single library assets scaled up. The machinery is real and tested; what it
+points at is not yet worth pointing at.
