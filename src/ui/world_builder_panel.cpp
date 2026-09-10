@@ -92,6 +92,11 @@ void WorldBuilderPanel::draw(app::Engine& engine, app::JobSystem& jobs, app::Wor
     }
 
     ImGui::Separator();
+    if (lastWorld && ImGui::CollapsingHeader("World contents", ImGuiTreeNodeFlags_DefaultOpen)) {
+        drawWorldContents(engine);
+    }
+
+    ImGui::Separator();
     if (ImGui::CollapsingHeader("Place assets", ImGuiTreeNodeFlags_DefaultOpen)) {
         drawPlacement();
     }
@@ -228,6 +233,82 @@ void WorldBuilderPanel::drawPlacement() {
     }
 }
 
+
+void WorldBuilderPanel::drawWorldContents(app::Engine& engine) {
+    if (!lastWorld) {
+        return;
+    }
+    const app::GeneratedWorld& world = *lastWorld;
+    ImGui::TextDisabled("%zu layer(s), %zu hero(es), %zu zone(s), %zu region(s)",
+                        world.composed.layers.size(), world.composed.plan.heroes.size(),
+                        world.composed.plan.zones.size(), world.composed.clearances.size());
+
+    if (ImGui::TreeNodeEx("Heroes", ImGuiTreeNodeFlags_DefaultOpen)) {
+        // Listed in the order the composer ranked them, because that order *is* the composition:
+        // it is what a camera director sorts by, so seeing it is seeing what the shot will be about.
+        for (const world::HeroPoint& hero : world.composed.plan.heroes) {
+            ImGui::PushID(hero.name.c_str());
+            const bool open = ImGui::TreeNodeEx(hero.name.c_str(), ImGuiTreeNodeFlags_SpanAvailWidth,
+                                                "%s  (%.2f)", hero.name.c_str(),
+                                                static_cast<double>(hero.importance));
+            if (open) {
+                ImGui::Text("%.0f m tall, stand-off %.0f m, active within %.0f m",
+                            static_cast<double>(hero.height),
+                            static_cast<double>(hero.preferredCameraDistance),
+                            static_cast<double>(hero.activationRadius));
+                ImGui::Text("reacts as: %s",
+                            hero.reactionProfile.empty() ? "nothing" : hero.reactionProfile.c_str());
+                // The node this hero became is an ordinary node, so its transform is edited through
+                // the parameters every other node uses. Duplicating a transform editor here would be
+                // a second place that moves things, and the two would disagree.
+                const std::string prefix = "nodes/" + hero.name + "/";
+                if (engine.params().find(prefix + "position") != nullptr) {
+                    ImGui::TextDisabled("edit as '%s*' in the inspector", prefix.c_str());
+                } else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "not placed in the scene");
+                }
+                if (ImGui::SmallButton("Frame it")) {
+                    // Handled by the viewport, which owns the camera. The panel only asks.
+                    focusRequest = hero;
+                }
+                ImGui::TreePop();
+            }
+            ImGui::PopID();
+        }
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Zones")) {
+        for (const world::EcologicalZone& zone : world.composed.plan.zones) {
+            ImGui::PushID(zone.name.c_str());
+            if (ImGui::TreeNodeEx(zone.name.c_str(), ImGuiTreeNodeFlags_SpanAvailWidth, "%s  (%.0f m)",
+                                  zone.name.c_str(), static_cast<double>(zone.radius))) {
+                for (const auto& [category, scale] : zone.emphasis) {
+                    ImGui::Text("%s x%.2f", category.c_str(), static_cast<double>(scale));
+                }
+                ImGui::TreePop();
+            }
+            ImGui::PopID();
+        }
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Art direction")) {
+        const world::ArtDirectionProfile& p = world.composed.profile;
+        ImGui::Text("%s", p.name.c_str());
+        ImGui::TextWrapped("%s", p.description.c_str());
+        ImGui::Text("ladder %.3f .. %.2f (gap %.1fx)", static_cast<double>(p.emission.silhouette),
+                    static_cast<double>(p.emission.brightest), static_cast<double>(p.emission.gap()));
+        ImGui::Text("key %.1f : ambient %.1f  (%.1f:1)", static_cast<double>(p.lighting.keyIntensity),
+                    static_cast<double>(p.lighting.ambientIntensity),
+                    static_cast<double>(p.lighting.keyToAmbient()));
+        ImGui::ColorButton("accent", ImVec4(p.heroAccent.r, p.heroAccent.g, p.heroAccent.b, 1.0f));
+        ImGui::SameLine();
+        ImGui::TextDisabled("reserved accent%s", p.reserveAccent ? "" : " (released)");
+        ImGui::TreePop();
+    }
+}
+
 void WorldBuilderPanel::drawJobs(app::JobSystem& jobs) {
     const auto statuses = jobs.statuses();
     ImGui::Text("Jobs (%zu)", statuses.size());
@@ -300,6 +381,7 @@ void WorldBuilderPanel::applyFinished(app::Engine& engine, app::WorldBuilder& bu
             status_ = "'" + world.recipe.world + "': " +
                       std::to_string(world.composed.layers.size()) + " layer(s) in " +
                       std::to_string(world.composeSeconds) + " s";
+            lastWorld = world;
         }
     }
 }

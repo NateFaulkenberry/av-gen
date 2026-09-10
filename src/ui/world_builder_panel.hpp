@@ -53,9 +53,17 @@ public:
     // How a click places things. Public so the application can read it when a pick lands.
     app::PlacementSettings placement;
 
+    // What the last generation produced, kept so the world can be inspected and adjusted after the
+    // fact. A world you can generate and not then look at is a world you have to regenerate to
+    // change, which makes every adjustment destroy every previous one.
+    std::optional<app::GeneratedWorld> lastWorld;
+    // Set when the user asks the viewport to frame a hero. The application clears it once it has.
+    std::optional<world::HeroPoint> focusRequest;
+
 private:
     void drawRecipe();
     void drawPlacement();
+    void drawWorldContents(app::Engine& engine);
     void drawJobs(app::JobSystem& jobs);
     [[nodiscard]] Result<assets::AssetLibrary> resolveLibrary() const;
 

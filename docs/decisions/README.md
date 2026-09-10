@@ -63,3 +63,18 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [055](ADR-055-the-wind-field.md) | A wind field, and vegetation that answers it for nothing | Accepted |
 | [056](ADR-056-simulated-plants.md) | Plants that are actually simulated, for the few hundred worth simulating | Accepted |
 | [057](ADR-057-the-living-chromatic-field.md) | The living chromatic field: hue that drifts in world space and time | Accepted |
+| [058](ADR-058-the-air-and-the-ambient.md) | The air and the ambient | Accepted |
+| [059](ADR-059-edges-and-a-block-nobody-read.md) | Edges, and a block nobody read | Accepted |
+| [060](ADR-060-semantic-assets-and-world-recipes.md) | Semantic assets and world recipes | Accepted |
+| [061](ADR-061-the-world-composer.md) | The world composer | Accepted |
+| [062](ADR-062-the-cinematic-director.md) | The cinematic director | Accepted |
+| [063](ADR-063-musical-events.md) | Musical events | Accepted |
+| [064](ADR-064-the-job-system.md) | The job system | Accepted |
+| [065](ADR-065-optional-ai.md) | AI is optional, replaceable, and never in the frame loop | Accepted |
+| [066](ADR-066-generate-world.md) | Generate World | Accepted |
+| [067](ADR-067-world-art-direction.md) | A generated world's art direction, and the negative space that was never applied | Accepted |
+| [068](ADR-068-viewport-interaction.md) | Mouse control and picking in the viewport | Accepted |
+| [069](ADR-069-placement.md) | Placing assets by hand | Accepted |
+| [070](ADR-070-art-direction-profiles.md) | Art-direction profiles | Accepted |
+| [071](ADR-071-cinematic-camera.md) | A camera vocabulary, and a camera cut to the music | Accepted |
+| [072](ADR-072-heroes.md) | Heroes | Accepted |

@@ -90,10 +90,23 @@ BandTuning tuningFor(DepthBand band) {
 
 // Where a category prefers to grow. A fern in scree and a boulder in a marsh are both wrong, and
 // getting this from the category means a new asset inherits sensible ground without being told.
-std::vector<BiomeDensity> biomesFor(assets::AssetCategory c, float density) {
+std::vector<BiomeDensity> biomesFor(assets::AssetCategory c, float density, DepthBand band) {
     switch (c) {
     case assets::AssetCategory::Flora:
     case assets::AssetCategory::Organic:
+        // Where a plant grows depends on how big it is, not only on its being a plant. Assigning
+        // every flora species forest-first treats grass like a tree: Glowmere authors its grass
+        // meadow-first (0.48 meadow, 0.34 marsh, 0.22 forest) and its canopy forest-first, and
+        // composing them identically made the open ground of a generated world about half as
+        // planted as it should be. Canopy wants closed ground; ground cover wants open ground.
+        switch (band) {
+        case DepthBand::Background:
+            return {{"forest", density}, {"meadow", density * 0.25f}, {"marsh", density * 0.2f}};
+        case DepthBand::Midground:
+            return {{"forest", density}, {"meadow", density * 0.7f}, {"marsh", density * 0.5f}};
+        case DepthBand::Foreground:
+            return {{"meadow", density}, {"marsh", density * 0.72f}, {"forest", density * 0.46f}};
+        }
         return {{"forest", density}, {"meadow", density * 0.55f}, {"marsh", density * 0.4f}};
     case assets::AssetCategory::Fungi:
         return {{"marsh", density}, {"forest", density * 0.5f}};
@@ -309,6 +322,13 @@ WorldMap terrainFor(const WorldRecipe& recipe) {
     detail.frequency = 1.0f / (span * 0.045f);
     detail.amplitude = span * 0.006f;
     map.layers = {broad, ridges, detail};
+    // Damp in the basins. The default 0.35 never reaches the 0.55 that `composerBiomes`'s marsh
+    // requires, and with no water features on a generated map the lowland term is the *only* source
+    // of moisture -- so marsh covered exactly 0% of every generated world while the composer went on
+    // assigning ferns, fungi, shelf fungi and beacons to it. Those layers were placed and then had
+    // nowhere to grow, which is most of why a generated valley came out about thirteen times
+    // sparser than the authored scene it was modelled on.
+    map.lowlandMoisture = 0.78f;
     // Without these, every layer the composer emits names a biome the terrain has never heard of
     // and the ecology refuses all of them.
     map.biomes = composerBiomes();
@@ -422,6 +442,32 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
     // partially hidden, some intimate and some enormous distant silhouettes; that is what the
     // spread of `preferredCameraDistance` and `activationRadius` below is for.
     const WorldMap ground = terrainFor(recipe);
+    // What the ground actually offers. Reported because density is the product of a layer's
+    // preferred density and the *coverage of the biomes it grows in* -- so a world whose terrain is
+    // mostly bare produces a sparse world from perfectly reasonable densities, and the arithmetic
+    // that did it is invisible unless somebody prints it.
+    {
+        std::vector<float> coverage(ground.biomes.biomes.size(), 0.0f);
+        constexpr int kSamples = 48;
+        for (int j = 0; j < kSamples; ++j) {
+            for (int i = 0; i < kSamples; ++i) {
+                const glm::vec2 p = ground.min() + ground.size * glm::vec2((i + 0.5f) / kSamples,
+                                                                           (j + 0.5f) / kSamples);
+                const Sample smp = ground.sample(p, 1.0f);
+                const BiomeWeights w = ground.biomes.at(smp.altitude, smp.slope, smp.moisture, p);
+                for (std::size_t b = 0; b < coverage.size() && static_cast<int>(b) < w.count; ++b) {
+                    coverage[b] += w.weights[b];
+                }
+            }
+        }
+        std::string report;
+        const float total = static_cast<float>(kSamples * kSamples);
+        for (std::size_t b = 0; b < coverage.size(); ++b) {
+            report += (report.empty() ? "" : ", ") + ground.biomes.biomes[b].name + " " +
+                      std::to_string(static_cast<int>(coverage[b] / total * 100.0f + 0.5f)) + "%";
+        }
+        log::info("world '{}': biome coverage: {}", recipe.world, report);
+    }
     {
         const int wanted = 1 + static_cast<int>(std::round(recipe.composition.focalStrength * 5.0f));
         // Candidates in descending visual importance, so hero 0 is the library's best thing.
@@ -707,7 +753,7 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
         layer.name = asset.id;
         layer.asset = library.resolve(asset).generic_string();
         layer.category = assets::assetCategoryName(asset.category);
-        layer.densities = biomesFor(asset.category, density);
+        layer.densities = biomesFor(asset.category, density, band);
         layer.height = asset.effectiveHeight();
         layer.minScale = std::max(1.0f - asset.variation.scale, 0.05f);
         layer.maxScale = 1.0f + asset.variation.scale;

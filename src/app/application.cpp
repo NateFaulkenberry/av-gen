@@ -1411,6 +1411,23 @@ int Application::runLive() {
         if (panel_ != nullptr) {
             placementAssetId_ = panel_->worldBuilder.placementAssetId;
             placement_ = panel_->worldBuilder.placement;
+            // "Frame it" on a hero. The panel asks and the viewport answers, because the camera
+            // belongs to the viewport: a panel that moved the camera itself would be a second thing
+            // writing camera/position, and the two would fight during a drag.
+            if (panel_->worldBuilder.focusRequest) {
+                const world::HeroPoint& hero = *panel_->worldBuilder.focusRequest;
+                ensureFreeCamera();
+                // Framed on the hero's own bounding sphere at the field of view actually in use, so
+                // a two-metre artefact and a thirty-metre tree each fill the frame rather than each
+                // getting the same arbitrary stand-off.
+                const float radius = std::max(hero.radius, hero.height * 0.5f);
+                const glm::vec3 centre(hero.position.x, hero.position.y + hero.height * 0.4f,
+                                       hero.position.z);
+                setViewportPose(frameSphere(viewportPose(), centre, radius,
+                                            engine_->scene().camera.effectiveFovY()));
+                log::info("viewport: framed hero '{}'", hero.name);
+                panel_->worldBuilder.focusRequest.reset();
+            }
         }
         // After the frame is submitted, so the identifier and depth targets hold what the user
         // actually clicked on rather than the frame before it.

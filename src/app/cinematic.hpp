@@ -17,6 +17,7 @@
 // sometimes a changing silhouette is the point -- but it is one of eight, not the default.
 
 #include "core/error.hpp"
+#include "signals/musical_events.hpp"
 
 #include <glm/glm.hpp>
 #include <nlohmann/json_fwd.hpp>
@@ -40,9 +41,54 @@ enum class ShotKind : std::uint8_t {
     Ascent,     // rise towards a luminous opening
     Orbit,      // move around, when the changing silhouette is the point
     Track,      // follow the subject, holding it at a constant place in frame
+    // Milestone 9 added five more, because "zoom in, zoom out, rotate" is not a vocabulary and the
+    // five below are the moves the first nine could only approximate.
+    Discovery,  // travel towards something partly hidden, arcing so it emerges rather than appears
+    HeroReveal, // move around a hero *while* opening out: the silhouette turns and the scale lands
+    Flyby,      // pass close at speed, holding the subject in frame as it goes by
+    Drift,      // lateral travel through the world with the aim held: parallax, not a pan
+    Transition, // leave one subject and find another
 };
 [[nodiscard]] const char* shotKindName(ShotKind k);
+// Accepts the canonical names and the words a cinematographer would use for the same move --
+// "follow" for Track, "establishing" for Establish. The alias table is one-way: `shotKindName`
+// always returns the canonical name, so a round trip through JSON is stable.
 [[nodiscard]] std::optional<ShotKind> shotKindFromName(std::string_view name);
+
+// Where the camera points, which is a separate decision from where it is. Before this existed the
+// rule was hard-coded ("everything aims at its subject except Passage"), which is why there was no
+// way to express a lateral drift: the aim has to stay put while the camera does not.
+enum class LookMode : std::uint8_t {
+    Subject,  // hold the subject
+    Ahead,    // look where the move is going
+    Fixed,    // hold an explicit point, whatever the camera does
+    Parallel, // hold the *direction* set at the start; only parallax moves
+    Handoff,  // start on the subject, end on the handoff subject
+};
+[[nodiscard]] const char* lookModeName(LookMode m);
+[[nodiscard]] std::optional<LookMode> lookModeFromName(std::string_view name);
+
+// The shape of the path between the two ends, as distinct from the shape of the *timing*, which is
+// what easeIn/easeOut control. A straight line between two points has no parallax and so reads as
+// flat however well it is eased; a bow of a tenth of the chord is the difference between a move
+// through a world and a move across a photograph.
+enum class MovementCurve : std::uint8_t {
+    Straight,
+    Arc,  // bows horizontally, perpendicular to the chord
+    Rise, // bows upward through the middle
+    Dip,  // bows downward through the middle
+};
+[[nodiscard]] const char* movementCurveName(MovementCurve c);
+[[nodiscard]] std::optional<MovementCurve> movementCurveFromName(std::string_view name);
+
+// "This object is the point of this shot." The camera side of hero spotlighting and nothing more:
+// it says who and how strongly, and leaves framing, exposure and rim light to whatever reads it.
+// Kept on the shot rather than on the subject because the same object is a hero in one shot and
+// scenery in the next, which is the whole idea.
+struct Spotlight {
+    bool active = false;
+    float emphasis = 0.0f; // 0..1: how much of the frame's attention the subject should own
+};
 
 // What the shot is about. A shot with no subject is a camera move; a shot with a subject is a shot.
 struct FocalTarget {
@@ -83,10 +129,50 @@ struct Shot {
     bool easeIn = true;
     bool easeOut = true;
 
+    // ---- authored overrides --------------------------------------------------------------------
+    // Everything above derives the path from the subject, which is what makes a shot reusable. But
+    // the reference move this project is measured against (the audit, 1.4) is a valley traverse
+    // authored as two absolute points -- it is a shot about a *place*, and a place has no radius to
+    // count in. Any of these, when set, replace the derived value; unset, nothing changes.
+    std::optional<glm::vec3> startPosition;
+    std::optional<glm::vec3> endPosition;
+    std::optional<glm::vec2> heightRange; // absolute world Y at each end, as a pair or not at all
+
+    // Unset means "whatever this kind does", which is what keeps `kind` a kind rather than a label:
+    // setting `kind` alone still changes the move. A shot that names one overrides its kind.
+    std::optional<LookMode> look;
+    std::optional<MovementCurve> curve;
+    std::optional<float> curveBow;   // bow at the midpoint, as a fraction of the chord
+    glm::vec3 lookAt{0.0f};          // LookMode::Fixed
+    std::optional<FocalTarget> handoff; // LookMode::Handoff and ShotKind::Transition
+
+    // Metres per second. Zero means the duration is authored and the speed falls out of it; above
+    // zero it is the other way round and `Sequence::retime()` derives the duration from the path.
+    // A flyby is defined by its speed, not by how long somebody wanted it on screen.
+    float speed = 0.0f;
+
+    Spotlight spotlight;
+
     [[nodiscard]] double endSeconds() const { return startSeconds + durationSeconds; }
     // The camera's position and aim at a normalised time through the shot, 0..1.
     [[nodiscard]] glm::vec3 cameraAt(float t) const;
     [[nodiscard]] glm::vec3 targetAt(float t) const;
+    [[nodiscard]] LookMode lookMode() const;
+    [[nodiscard]] MovementCurve movementCurve() const;
+    [[nodiscard]] float bowAmount() const;
+
+    // What the lens should be focused on. ADR-062 recorded `focusOnSubject` and never wired it;
+    // this is the wire, and it is a distance because that is what a lens takes.
+    [[nodiscard]] float focusDistanceAt(float t) const;
+    // The fraction of the frame's height the subject spans, from its radius, the distance and the
+    // focal length. A "hero" shot in which the hero is forty pixels tall is not a hero shot, and
+    // this is the number that says so before anyone renders it.
+    [[nodiscard]] float subjectCoverageAt(float t) const;
+
+    // Path length in metres and the fastest the camera ever moves along it, both sampled. `samples`
+    // is a polyline resolution: a bowed or swept path is not its chord.
+    [[nodiscard]] float pathLength(int samples = 24) const;
+    [[nodiscard]] float peakSpeed(int samples = 24) const;
 };
 
 // A film. Shots are held in start order and may not overlap: two cameras at once is not a thing a
@@ -100,6 +186,26 @@ struct Sequence {
     // The shot covering a time, or nullptr in a gap.
     [[nodiscard]] const Shot* shotAt(double seconds) const;
 
+    // Cuts per minute. The one number that says whether a sequence is cut or chopped; a director
+    // that produces twenty of these over ninety seconds has failed however good each shot is.
+    [[nodiscard]] double cutsPerMinute() const;
+    // Separate from `validate()` because cadence is a judgement and geometry is not: a hand-authored
+    // sequence may legitimately want a two-second shot, and a generated one may not.
+    [[nodiscard]] Result<void> validateCadence(double minShotSeconds,
+                                               double maxCutsPerMinute) const;
+
+    // Rewrites the duration of every shot that named a speed, then repacks the whole cut list
+    // back-to-back from the first shot's start. Repacking is all-or-nothing on purpose: a sequence
+    // where some shots are timed and some are paced cannot have both be authoritative.
+    Result<void> retime();
+
+    // Who the film is about at this moment, or nullptr if nothing is spotlit.
+    [[nodiscard]] const FocalTarget* spotlightAt(double seconds) const;
+    // The spotlight as spans, for the systems that will frame, expose and rim-light the subject.
+    // Spans rather than keys because a lighting change wants to know when it starts and ends, not
+    // what it is halfway through.
+    [[nodiscard]] nlohmann::json spotlightSpans() const;
+
     // Bakes the sequence into timeline keyframes for `camera/position`, `camera/target` and, when
     // any shot asks for it, the lens. `samplesPerShot` sets how finely a curved move is sampled;
     // straight moves need two keys and curves need enough that the eye cannot see the segments.
@@ -108,5 +214,41 @@ struct Sequence {
     [[nodiscard]] nlohmann::json toJson() const;
     [[nodiscard]] static Result<Sequence> fromJson(const nlohmann::json& j);
 };
+
+// ---- direction ---------------------------------------------------------------------------------
+//
+// Milestone 10: a sequence built from the music rather than from a list of times somebody typed.
+//
+// The rules are almost entirely about what *not* to do. The camera does not move on every beat, it
+// does not cut on every phrase, and it never shakes -- there is no shake in this file and there is
+// not going to be one. What it does is read the structure (ADR-063) and let the shape of the piece
+// choose the shape of the move: a build starts the camera going somewhere, the drop it feeds lands
+// on the reveal, and a breakdown gets a slow close shot that a loud section could not hold.
+
+// What the world offers the director. It is a list of things worth pointing at plus one thing the
+// film is about; everything else is a preference with a defensible default.
+struct DirectionBrief {
+    FocalTarget hero;                     // the one object the film is for
+    std::vector<FocalTarget> supporting;  // everything else worth a shot, most interesting first
+    double minShotSeconds = 5.0;          // below this a sequence is chopped rather than cut
+    double minBuildShotSeconds = 2.0;     // ...except a build, which exists to end
+    float wideFocalLength = 24.0f;
+    float heroFocalLength = 50.0f;
+    // The reference camera "never orbits, never zooms, and holds its final pose" (audit 1.4), and
+    // section 8 lists that restraint among the things not to change. Continuity is therefore the
+    // default: each shot starts where the last one ended, so the sequence is one unbroken move with
+    // its intent changing rather than a cut list. Turn it off to get actual cuts.
+    bool continuous = true;
+    std::uint32_t seed = 1; // picks which supporting subject a section gets; nothing else is random
+};
+
+// Bakes a structure into a sequence. Fails rather than guesses when the structure is empty or the
+// hero has no size, for the same reason `validate()` does.
+[[nodiscard]] Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
+                                                   const DirectionBrief& brief);
+
+// Which move a section of music wants. Exposed because it is the single most arguable table in the
+// file and a caller disagreeing with it should be able to see it rather than reverse-engineer it.
+[[nodiscard]] ShotKind shotKindForSection(signals::MusicalSection section);
 
 } // namespace avgen::app

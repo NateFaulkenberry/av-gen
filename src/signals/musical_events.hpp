@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -77,6 +78,68 @@ struct MusicalEventSettings {
     double sustainSeconds = 1.6;    // how long a trend must hold before it is a trend
     double dropWindowSeconds = 2.5; // a break resolving inside this window is a drop
     double cooldownSeconds = 1.2;   // minimum gap between two events of the same kind
+};
+
+// ---- structure ---------------------------------------------------------------------------------
+//
+// Events are instants; a film is cut to *spans*. `MusicalStructure` is the second half of ADR-063:
+// the same recognised moments, folded into a list of named sections with a start and a length, so
+// something downstream can ask "what is happening at 47 seconds" and get "the final build, at
+// intensity 0.8" rather than a list of things that fired near it.
+//
+// The folding is where the taste lives, and all of it is subtractive. Beats, downbeats and bars
+// never open a section -- a structure with a boundary every 500 ms is not structure, it is the
+// metre wearing a different name, and anything cut to it cuts constantly. Energy trends never open
+// one either: a trend describes a section, it does not bound one.
+
+enum class MusicalSection : std::uint8_t {
+    Intro,      // before the piece has committed to anything
+    Build,      // going somewhere
+    Phrase,     // an ordinary passage
+    Drop,       // the payoff a build was for
+    Verse,      // the analyser's own section counter moved, without saying into what
+    Breakdown,  // energy collapsed and stayed down
+    FinalBuild, // the last build, which is a different thing from the first
+    FinalDrop,  // ...and the last drop
+    Outro,      // after the last boundary
+};
+[[nodiscard]] const char* musicalSectionName(MusicalSection s);
+[[nodiscard]] std::optional<MusicalSection> musicalSectionFromName(std::string_view name);
+
+struct StructureSection {
+    MusicalSection kind = MusicalSection::Intro;
+    double startSeconds = 0.0;
+    double durationSeconds = 0.0;
+    // How much of the thing is happening, 0..1. Carried from the moment that opened the section and
+    // nudged by any energy trend inside it, because a trend is a description of a section rather
+    // than a boundary of one.
+    float intensity = 0.5f;
+
+    [[nodiscard]] double endSeconds() const { return startSeconds + durationSeconds; }
+};
+
+// What counts as a section boundary. Every number here exists to stop the structure being finer
+// than the music: the failure mode is not missing a section, it is finding forty of them.
+struct StructureSettings {
+    double minSectionSeconds = 6.0;   // an ordinary section shorter than this is absorbed
+    double minBuildSeconds = 2.0;     // ...except a build feeding a drop, which may be brief
+    double mergeSeconds = 1.5;        // two boundaries this close are one boundary
+    double phraseSnapSeconds = 1.2;   // a boundary this near a phrase start moves onto it
+    double finalFraction = 0.55;      // a drop after this much of the piece may be *the* drop
+};
+
+struct MusicalStructure {
+    std::vector<StructureSection> sections;
+
+    [[nodiscard]] double durationSeconds() const;
+    [[nodiscard]] const StructureSection* at(double seconds) const;
+    [[nodiscard]] int count(MusicalSection kind) const;
+
+    // Folds a recorded stream of moments into sections. `totalSeconds` is the length of the piece,
+    // which the moments cannot supply: the last event is not the end.
+    [[nodiscard]] static MusicalStructure fromMoments(std::span<const MusicalMoment> moments,
+                                                      double totalSeconds,
+                                                      StructureSettings settings = {});
 };
 
 class MusicalEventDetector {
