@@ -1,5 +1,31 @@
 # Performance
 
+## Per-pass timers are not per-pass costs (2026-09-10)
+
+The `passes:` line the renderer logs is a set of timestamp deltas around each render pass, and a
+pass that follows a heavy one absorbs the drain of the work still in flight ahead of it. On the
+world scene the volumetric pass reported **39.4 ms of a 46 ms frame**. Turning volumetrics off
+took the frame from 53.1 ms to 47.7: the pass costs **5.4 ms**, and the timer was reporting the
+lit pass finishing behind it. Every other pass on that line has the same failure mode; they do
+not sum to the frame and the largest number is usually just the pass that follows the expensive
+one.
+
+Attribute cost by turning one thing off and diffing the frame median, interleaved. Measured that
+way on the world scene at 2880x1800 (baseline 52.6 ms):
+
+| removed | frame | cost |
+|---|---|---|
+| material programs (fireflies, fronds) | 46.8 | 5.8 ms |
+| ecology lights (ADR-053) | 47.2 | 5.4 ms |
+| volumetrics | 47.7 | 5.4 ms |
+| airborne spores | 52.3 | 0.3 ms |
+
+The frame scales at roughly 5.2 ms per megapixel. What does *not* scale with resolution is
+larger than expected: at 1280x720 a sky-only scene renders in 8.4 ms, the world in 30.8, and the
+world with the camera turned to face empty sky still costs 20.7 -- so about 12 ms goes on
+geometry that is not on screen, before any of it is shaded. That is the next thing worth
+attacking, and it is where the shadow cascades and the draw submission live.
+
 ## The correction that matters most (2026-09-09)
 
 **"Ecology costs ~1.5 ms per scatter object per frame" was a measurement artefact, and the world

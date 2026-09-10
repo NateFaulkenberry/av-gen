@@ -131,3 +131,20 @@ ms/frame. Timing the frames is strictly better and costs a dozen lines.
   number of draws.
 - WebGPU gaining multi-draw indirect. That changes the arithmetic behind the rejected alternative,
   because it removes the padding that made merging cost more than it saved.
+
+## Amendment, 2026-09-10: the per-pass timers mislead
+
+The `passes:` line is timestamp deltas bracketing each render pass, and a pass that follows a
+heavy one absorbs the drain of what is still in flight ahead of it. On the world scene the
+volumetric pass reported 39.4 ms of a 46 ms frame; turning volumetrics off moved the frame from
+53.1 ms to 47.7, so the pass costs 5.4 ms and the timer was reporting the lit pass finishing.
+
+The tell is that the number does not respond to the pass's own workload: halving the march step
+count, disabling its noise and halving its maximum distance each changed the reported figure by
+less than 2 ms. A cost that ignores its own inputs is not that cost.
+
+This does not change the rule this ADR already sets -- use the renderer's own frame median,
+interleave the two configurations, compare medians -- it just removes the one instrument that
+looked like it could shortcut it. Attribution comes from turning a thing off, not from reading a
+pass timer.
+

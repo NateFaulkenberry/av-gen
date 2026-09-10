@@ -2,6 +2,16 @@
 
 // GPU frame timing via timestamp queries, read back through a small ring of staging buffers so
 // the render thread never stalls. Reports -1 when the feature is unavailable.
+//
+// A per-pass number from this is NOT that pass's cost, and the passes do not sum to the frame.
+// The begin timestamp is written when the pass is reached, not when its own work starts, so a
+// pass that follows a heavy one absorbs the drain of everything still in flight ahead of it.
+// Measured on the world scene: the volumetric pass reported 39.4 ms of a 46 ms frame, and
+// removing volumetrics entirely took the frame from 53.1 ms to 47.7 -- the pass costs 5.4 ms and
+// the timer was reporting the lit pass finishing. Treat these as "the GPU was busy up to here".
+//
+// To attribute cost, turn the thing off and diff the frame median, interleaving the two
+// configurations. See docs/performance.md and ADR-051.
 
 #include <webgpu/webgpu_cpp.h>
 
