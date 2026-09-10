@@ -19,6 +19,7 @@
 #include "platform/window.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "rendering/debug_visualizer.hpp"
+#include "app/world_builder.hpp"
 #include "ui/control_panel.hpp"
 
 #include <imgui.h>
@@ -64,6 +65,7 @@ std::string usageText() {
            "  --shader <file>     add a user shader layer behind the scene (repeatable)\n"
            "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
            "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
+           "  --generate <file>   compose a world from a recipe (see examples/recipes/) at start-up\n"
            "  --save-project <f>  write the project on exit\n"
            "  --play              start playback immediately\n"
            "  --frames <n>        exit after n frames\n"
@@ -215,6 +217,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--project");
             if (!v) return std::unexpected(v.error());
             options.project = *v;
+            ++i;
+        } else if (arg == "--generate") {
+            auto v = need(i, "--generate");
+            if (!v) return std::unexpected(v.error());
+            options.generateRecipe = *v;
             ++i;
         } else if (arg == "--save-project") {
             auto v = need(i, "--save-project");
@@ -616,6 +623,15 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             if (panel_) panel_->setStatus(r.error().message);
         } else if (!options.headless) {
             rememberProject(*options.project);
+        }
+    }
+    if (options.generateRecipe) {
+        if (auto r = generateWorldFromRecipe(*options.generateRecipe); !r) {
+            log::error("generate: {}", r.error().message);
+            if (options.headless) {
+                return std::unexpected(r.error());
+            }
+            if (panel_) panel_->setStatus(r.error().message);
         }
     }
     if (options.oscPort) {
@@ -1200,6 +1216,43 @@ RenderSettings Application::renderSettingsFromOptions() const {
     if (options_.codec) s.codec = *options_.codec;
     if (options_.quality) s.quality = *options_.quality;
     return s;
+}
+
+Result<void> Application::generateWorldFromRecipe(const std::filesystem::path& path) {
+    auto recipe = world::WorldRecipe::loadFile(path);
+    if (!recipe) {
+        return std::unexpected(recipe.error());
+    }
+    // A recipe may name its own library; otherwise the repository's manifest is the default, since
+    // that is the one curated list of things allowed to be placed procedurally.
+    auto libraryPath = recipe->assetLibrary;
+    if (libraryPath.empty()) {
+        libraryPath = path.parent_path() / ".." / ".." / "assets" / "manifest.json";
+        libraryPath = libraryPath.lexically_normal();
+    }
+    auto library = assets::AssetLibrary::loadFile(libraryPath);
+    if (!library) {
+        return std::unexpected(library.error());
+    }
+    auto composed = world::composeWorld(*recipe, *library);
+    if (!composed) {
+        return std::unexpected(composed.error());
+    }
+    // A recipe with no composition to land in gets one, so `--generate` alone is a complete
+    // instruction rather than something that only works after a scene is already open.
+    if (engine_->composition() == nullptr) {
+        engine_->newComposition();
+    }
+    GeneratedWorld world;
+    world.recipe = *recipe;
+    world.composed = std::move(*composed);
+    world.assetsConsidered = library->size();
+    if (auto installed = installWorld(*engine_, world); !installed) {
+        return installed;
+    }
+    log::info("generate: '{}' from {} asset(s) -> {} layer(s)", world.recipe.world,
+              world.assetsConsidered, world.composed.layers.size());
+    return {};
 }
 
 Result<std::unique_ptr<RenderJob>> Application::makeRenderJob(const std::filesystem::path& projectFile,

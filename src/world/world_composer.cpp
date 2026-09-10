@@ -336,6 +336,41 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
                     recipe.world);
     }
 
+    // Emit in band order: background, then midground, then foreground. The ecology requires a
+    // layer's proximity host to be placed *before* it, and a host is always in a taller band than
+    // its dweller, so ordering by band satisfies that by construction rather than by a topological
+    // sort that could still fail. It is also the right order on its own terms -- the big things
+    // decide where they are and the small things grow around them, which is what the relation
+    // means. Emitting in library order instead produced "proximity layer 'tree_tall' must precede
+    // it" the first time a real manifest was composed.
+    const auto bandRank = [](DepthBand b) {
+        switch (b) {
+        case DepthBand::Background:
+            return 0;
+        case DepthBand::Midground:
+            return 1;
+        case DepthBand::Foreground:
+            return 2;
+        }
+        return 1;
+    };
+    std::vector<std::size_t> order(out.layers.size());
+    for (std::size_t i = 0; i < order.size(); ++i) {
+        order[i] = i;
+    }
+    // Stable, so two layers in the same band keep their manifest order and the world stays a pure
+    // function of its inputs.
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+        return bandRank(out.plan.bandOf(out.layers[a].name)) <
+               bandRank(out.plan.bandOf(out.layers[b].name));
+    });
+    std::vector<ScatterLayer> sorted;
+    sorted.reserve(out.layers.size());
+    for (const std::size_t i : order) {
+        sorted.push_back(std::move(out.layers[i]));
+    }
+    out.layers = std::move(sorted);
+
     // Reported rather than enforced: what the composition covers and what it deliberately gives
     // back. A caller that wants a sparser world lowers the weights; the composer does not overrule.
     const float area = recipe.extent * recipe.extent;

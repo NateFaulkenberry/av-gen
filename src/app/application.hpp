@@ -51,6 +51,9 @@ struct AppOptions {
     std::optional<std::filesystem::path> bundle;      // --export-bundle <dir>
     std::vector<std::pair<std::filesystem::path, bool>> shaders; // (file, isPost)
     std::optional<std::filesystem::path> project;      // load at start-up
+    // ADR-066: compose a world from a recipe at start-up. The same path the World Builder
+    // panel takes, reachable without a window so it can be rendered and diffed like anything else.
+    std::optional<std::filesystem::path> generateRecipe;
     std::optional<std::filesystem::path> saveProject;  // write on exit
     bool autoplay = false;
     int frames = -1; // exit after this many frames (-1 = run until closed)
@@ -115,6 +118,11 @@ private:
     // Offline rendering: settings from the project + CLI overrides; a job runs to completion
     // headless, or a few frames per UI frame in the live app.
     [[nodiscard]] RenderSettings renderSettingsFromOptions() const;
+    // ADR-066: load a recipe, compose it and install it. Runs the composition inline rather than
+    // through the job system because at start-up there is no frame to keep responsive, and blocking
+    // for the tens of milliseconds this takes is simpler than deferring it a frame.
+    [[nodiscard]] Result<void> generateWorldFromRecipe(const std::filesystem::path& path);
+
     [[nodiscard]] Result<std::unique_ptr<RenderJob>> makeRenderJob(const std::filesystem::path& projectFile,
                                                                    RenderSettings settings);
     int runQueue(const std::filesystem::path& queueFile);

@@ -2,6 +2,7 @@
 
 #include "app/engine.hpp"
 #include "core/log.hpp"
+#include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 
 #include <chrono>
@@ -65,6 +66,7 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
         }
     }
 
+    const bool freshWorld = existing == nullptr;
     if (existing != nullptr) {
         // Mutated in place rather than replaced. A CompositionNode is deliberately not copyable --
         // it owns built chunks and generated data -- and removing and re-adding it would throw away
@@ -112,6 +114,30 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
     // setComposition also marks the composition dirty, which is what schedules the rebuild; there
     // is no need to reach for the private one.
     composition->setComposition(std::move(data));
+    // Frame the camera on what was just composed, but only for a world that had no terrain before:
+    // a generated world nobody can see is indistinguishable from one that failed to generate, while
+    // a camera in an existing scene is somebody's decision and generating into that scene is not a
+    // reason to overrule it.
+    if (freshWorld) {
+        if (auto* position = engine.params().find("camera/position")) {
+            if (auto* vec = dynamic_cast<params::Parameter<glm::vec3>*>(position)) {
+                const glm::vec2 focus = world.composed.plan.focal.empty()
+                                            ? glm::vec2(0.0f)
+                                            : world.composed.plan.focal.front().center;
+                // Outside the composition looking in, and high enough to see over the near ground.
+                const float span = std::max(world.recipe.extent, 1.0f);
+                const glm::vec3 eye(focus.x - span * 0.34f, span * 0.10f, focus.y + span * 0.40f);
+                vec->setBase(eye);
+                if (auto* target = engine.params().find("camera/target")) {
+                    if (auto* t = dynamic_cast<params::Parameter<glm::vec3>*>(target)) {
+                        t->setBase(glm::vec3(focus.x, span * 0.02f, focus.y));
+                    }
+                }
+                log::info("world '{}': camera framed on the focal region", world.recipe.world);
+            }
+        }
+    }
+
     log::info("world '{}': installed {} scatter layer(s), {} focal, {} void region(s)",
               world.recipe.world, world.composed.layers.size(), world.composed.plan.focal.size(),
               world.composed.plan.voids.size());
