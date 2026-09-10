@@ -12,6 +12,8 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <cmath>
+#include "support/temp_dir.hpp"
+
 #include <filesystem>
 #include <fstream>
 #include <fmt/format.h>
@@ -24,8 +26,10 @@ using Catch::Matchers::WithinAbs;
 
 namespace {
 
+// The same directory the glTF fixtures write into, so a registry rooted here can find them. Bare
+// temp_directory_path() was shared between concurrent test processes writing identical filenames.
 std::filesystem::path tempDir() {
-    return std::filesystem::temp_directory_path();
+    return testsupport::processTempDir();
 }
 
 void checkVec(const glm::vec3& actual, const glm::vec3& expected, double tolerance = 1e-4) {

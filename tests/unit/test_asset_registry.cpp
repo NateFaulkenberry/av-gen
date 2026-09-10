@@ -6,6 +6,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include "support/temp_dir.hpp"
+
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -14,8 +16,10 @@ using namespace avgen;
 
 namespace {
 
+// Per-process, and the same directory the glTF fixtures write into. Bare temp_directory_path() is
+// shared between concurrent test processes writing identical filenames.
 std::filesystem::path tempDir() {
-    return std::filesystem::temp_directory_path();
+    return testsupport::processTempDir();
 }
 
 std::filesystem::path writePng(const char* name) {

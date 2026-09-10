@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <unistd.h>
 #include <fstream>
 #include <ranges>
 #include <string>
@@ -30,7 +31,11 @@ struct Fixture {
     fs::path dir;
     fs::path wav, glb, hdr, sceneFile, shader;
     Fixture() {
-        dir = fs::temp_directory_path() / "avgen_project_system";
+        // Per-process, for the same reason as test_composition: ctest -j runs each test in its
+        // own process of one binary, so a fixed directory name is shared mutable state between
+        // concurrent tests rather than scratch space.
+        dir = fs::temp_directory_path() /
+              ("avgen_project_system_" + std::to_string(static_cast<long long>(::getpid())));
         fs::remove_all(dir);
         fs::create_directories(dir / "media");
         constexpr std::uint32_t rate = 48000;
@@ -286,7 +291,8 @@ TEST_CASE("Bundles copy every referenced file and reopen from anywhere", "[integ
     CHECK(doc["assets"]["audio"]["path"] == "assets/tone.wav");
 
     // Delete the originals: the bundle must stand on its own, wherever it is moved.
-    const auto elsewhere = fs::temp_directory_path() / "avgen_project_bundle_moved";
+    const auto elsewhere = fs::temp_directory_path() /
+                           ("avgen_project_bundle_moved_" + std::to_string(static_cast<long long>(::getpid())));
     fs::remove_all(elsewhere);
     fs::rename(bundle, elsewhere);
     fs::remove_all(f.dir / "media");

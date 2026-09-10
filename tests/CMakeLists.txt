@@ -76,8 +76,13 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         target_link_libraries(avgen_render_tests PRIVATE syphon::syphon "-framework Metal")
     endif()
     avgen_set_warnings(avgen_render_tests)
+    # RESOURCE_LOCK, because there is one GPU. Running four GPU tests at once on a single device
+    # does not make them finish sooner -- they contend for the same hardware -- and it makes the two
+    # that measure *time* rather than pixels (the frame timeline's per-pass attribution, and the
+    # non-stalling readback ring) fail intermittently while passing alone. That reads as flakiness
+    # in the engine when it is contention in the harness. Unit tests still run in parallel alongside.
     catch_discover_tests(avgen_render_tests
         TEST_PREFIX "gpu."
-        PROPERTIES LABELS "gpu"
+        PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
         DISCOVERY_MODE PRE_TEST)
 endif()

@@ -3,6 +3,8 @@
 // In-memory GLB fixtures for scene tests (ADR-009): small, deterministic files written to the
 // temp directory so tests need no binary assets in the repository.
 
+#include "support/temp_dir.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -59,7 +61,8 @@ inline std::filesystem::path writeTriangleGlb(const std::string& name) {
     u32(0x004E4942u); // BIN
     glb.insert(glb.end(), bin.begin(), bin.end());
 
-    const auto path = std::filesystem::temp_directory_path() / ("avgen_" + name + ".glb");
+    // Per-process: a fixed name here is shared between every concurrently running test process.
+    const auto path = processTempDir() / ("avgen_" + name + ".glb");
     std::ofstream out(path, std::ios::binary);
     out.write(reinterpret_cast<const char*>(glb.data()), static_cast<std::streamsize>(glb.size()));
     return path;
