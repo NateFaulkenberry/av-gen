@@ -420,6 +420,11 @@ struct ProceduralGeometry {
     std::string extraLane;               // attribute projected into InstanceRecord::emissive.a
     HierarchySpec hierarchy;             // self-recursion (structural)
     LodSettings lod;                     // GPU culling / LOD (only lodCount is structural)
+    // Whether this object is drawn into the shadow maps. Ground cover is the case this exists for:
+    // nineteen thousand grass clumps cast shadows that are, at the sizes they are drawn, smaller
+    // than a shadow-map texel -- so the cost is real and the result is not visible. Never a
+    // structural property: it changes which passes draw the object, not what the object is.
+    bool castsShadow = true;
     Grammar grammar;                     // placements when distribution.kind == Grammar (structural)
     // Structural outputs (filled by rebuild()); the renderer uploads them when the version
     // changes. `structureVersion` is bumped by rebuild() whenever the structural hash changed.

@@ -1813,6 +1813,7 @@ void Composition::rebuild() {
                 pg.distribution.scatterCloud = cloud;
                 pg.distribution.scatterHash = layer.structuralHash() ^ node.worldMap.structuralHash();
                 pg.visible = visible;
+                pg.castsShadow = layer.castsShadow;
                 // The LOD ladder, switched on. It defaults to a single level, which for a scatter
                 // means every instance the frustum keeps draws its full-resolution mesh however
                 // small it is on screen -- 6,000 surviving instances were submitting twelve million

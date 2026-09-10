@@ -130,7 +130,8 @@
       0.3916
      ],
      "viewDistance": 520.0,
-     "minScreenRadius": 1.0
+     "minScreenRadius": 1.0,
+     "castsShadow": true
     },
     {
      "name": "pines",
@@ -156,7 +157,8 @@
       0.305
      ],
      "viewDistance": 520.0,
-     "minScreenRadius": 1.0
+     "minScreenRadius": 1.0,
+     "castsShadow": true
     },
     {
      "name": "deadwood",
@@ -182,7 +184,8 @@
       0.2789
      ],
      "viewDistance": 440.0,
-     "minScreenRadius": 1.0
+     "minScreenRadius": 1.0,
+     "castsShadow": true
     },
     {
      "name": "bushes",
@@ -209,7 +212,8 @@
       0.3515
      ],
      "viewDistance": 190.0,
-     "minScreenRadius": 2.0
+     "minScreenRadius": 2.0,
+     "castsShadow": true
     },
     {
      "name": "ferns",
@@ -240,7 +244,8 @@
      ],
      "emissiveIntensity": 0.35,
      "viewDistance": 120.0,
-     "minScreenRadius": 2.5
+     "minScreenRadius": 2.5,
+     "castsShadow": false
     },
     {
      "name": "grass",
@@ -266,7 +271,8 @@
       0.2705
      ],
      "viewDistance": 70.0,
-     "minScreenRadius": 3.0
+     "minScreenRadius": 3.0,
+     "castsShadow": false
     },
     {
      "name": "flowers",
@@ -296,7 +302,8 @@
      ],
      "emissiveIntensity": 2.6,
      "viewDistance": 95.0,
-     "minScreenRadius": 2.5
+     "minScreenRadius": 2.5,
+     "castsShadow": false
     },
     {
      "name": "fungi",
@@ -327,7 +334,8 @@
      ],
      "emissiveIntensity": 5.5,
      "viewDistance": 110.0,
-     "minScreenRadius": 2.0
+     "minScreenRadius": 2.0,
+     "castsShadow": true
     },
     {
      "name": "shelf-fungi",
@@ -357,7 +365,8 @@
      ],
      "emissiveIntensity": 4.0,
      "viewDistance": 150.0,
-     "minScreenRadius": 2.0
+     "minScreenRadius": 2.0,
+     "castsShadow": true
     },
     {
      "name": "boulders",
@@ -385,7 +394,8 @@
       0.2462
      ],
      "viewDistance": 300.0,
-     "minScreenRadius": 1.5
+     "minScreenRadius": 1.5,
+     "castsShadow": true
     },
     {
      "name": "pebbles",
@@ -413,7 +423,8 @@
       0.2747
      ],
      "viewDistance": 60.0,
-     "minScreenRadius": 3.0
+     "minScreenRadius": 3.0,
+     "castsShadow": false
     }
    ]
   }

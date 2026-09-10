@@ -133,6 +133,7 @@ std::uint64_t ScatterLayer::structuralHash() const {
     h.v3(emissiveColor);
     h.f32(emissiveIntensity);
     h.boolean(avoidWater);
+    h.boolean(castsShadow);
     h.u32(seed);
     h.i32(maxInstances);
     h.i32(meshBudget);
@@ -346,6 +347,12 @@ Result<Ecology> ecologyFromJson(const json& j) {
             }
             *target = glm::vec3(a.at(0).get<float>(), a.at(1).get<float>(), a.at(2).get<float>());
         }
+        if (e.contains("castsShadow")) {
+            if (!e.at("castsShadow").is_boolean()) {
+                return fail("scatter '{}': 'castsShadow' must be a boolean", l.name);
+            }
+            l.castsShadow = e.at("castsShadow").get<bool>();
+        }
         if (e.contains("avoidWater")) {
             if (!e.at("avoidWater").is_boolean()) {
                 return fail("scatter '{}': 'avoidWater' must be a boolean", l.name);
@@ -390,6 +397,7 @@ json ecologyToJson(const Ecology& ecology) {
                            {"minAltitude", l.minAltitude},
                            {"maxAltitude", l.maxAltitude},
                            {"avoidWater", l.avoidWater},
+                           {"castsShadow", l.castsShadow},
                            {"shoreOffset", l.shoreOffset},
                            {"height", l.height},
                            {"minScale", l.minScale},

@@ -80,6 +80,10 @@ struct ScatterLayer {
     // right for a tree and absurd for grass: nineteen thousand grass clumps reaching half a
     // kilometre are invisible past sixty metres and were being drawn into every shadow cascade.
     float viewDistance = 0.0f;
+    // Whether this layer is drawn into the shadow maps. Ground cover is what this is for: grass and
+    // pebbles cast shadows smaller than a shadow-map texel at the sizes they are drawn, so the cost
+    // is real and the result is not on screen.
+    bool castsShadow = true;
 
     std::uint32_t seed = 1;
     int maxInstances = 60000;             // a hard ceiling per layer, whatever the density says

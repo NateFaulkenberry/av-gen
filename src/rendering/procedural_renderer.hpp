@@ -212,6 +212,9 @@ public:
     // The same draws with the depth-only pipeline, for the depth prepass and the shadow passes
     // (ADR-034): the same vertex stage and the same instance buffer, so instanced procedural
     // geometry casts shadows without a second data path.
+    // The shadow passes: like drawDepthOnly, but objects that do not cast are left out.
+    void drawShadow(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
+                    const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
     void drawDepthOnly(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
                        const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
     // Pumps the effector-pass timer after the frame's command buffer was submitted (update()
@@ -240,7 +243,7 @@ public:
 private:
     void drawImpl(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
                   const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
-                  bool depthOnly);
+                  bool depthOnly, bool shadowPass);
 
     struct Impl;
     std::unique_ptr<Impl> impl_;

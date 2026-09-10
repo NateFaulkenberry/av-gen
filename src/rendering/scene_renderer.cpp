@@ -1697,7 +1697,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
         sdfs_->drawMeshes(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
                           &depthOnlyPipeline_);
-        procedurals_->drawDepthOnly(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
+        procedurals_->drawShadow(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
         sdfs_->drawRaymarchDepth(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
                                  true);
         rp.End();

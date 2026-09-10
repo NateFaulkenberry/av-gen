@@ -130,7 +130,8 @@
       0.3916
      ],
      "viewDistance": 520.0,
-     "minScreenRadius": 1.0
+     "minScreenRadius": 1.0,
+     "castsShadow": true
     },
     {
      "name": "pines",
@@ -156,7 +157,8 @@
       0.305
      ],
      "viewDistance": 520.0,
-     "minScreenRadius": 1.0
+     "minScreenRadius": 1.0,
+     "castsShadow": true
     },
     {
      "name": "deadwood",
@@ -182,7 +184,8 @@
       0.2789
      ],
      "viewDistance": 440.0,
-     "minScreenRadius": 1.0
+     "minScreenRadius": 1.0,
+     "castsShadow": true
     }
    ]
   }

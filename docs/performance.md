@@ -285,3 +285,28 @@ distant billboard.
 before -- the whole curve moved down by about 0.6 ms per object rather than tilting, because the
 draws removed are a fixed two per object rather than a share of its work. Decoupling logical
 diversity from submission count is still P1's job.
+
+## Where the frame stands (2026-09-09, after P0/P2 and the material fix)
+
+At 2880x1800, 120 frames, `tools/bench_world.sh`:
+
+| variant | ms/frame | delta |
+|---|---|---|
+| full | 79.8 | (was 93.9) |
+| shadows off | 65.2 | **shadows = 14.6 ms** |
+| ecology off | 53.6 | ecology = 26.2 ms |
+| volumetrics off | 75.1 | volumetrics = 4.7 ms |
+
+Ground cover no longer casts shadows -- grass, ferns, flowers and pebbles cast shadows smaller than
+a shadow-map texel at the sizes they are drawn. **That bought about 1 ms, not the several it looked
+like it should**, because those layers already have short view distances (70-120 m) and little of
+them reached a cascade in the first place. The casters that remain are the ones with a 500 m reach:
+trees, and the bushes and fungi that are numerous.
+
+So the shadow cost is not "too many small things casting"; it is that every camera-visible caster is
+drawn into every cascade, including cascade 0, which covers forty metres. That is P4, and it needs
+the cull pass to run per view rather than once for the camera. It is now the largest remaining
+single item after ecology.
+
+`volumeMs` continues to report ~44 ms for a pass whose removal saves 4.7. Read it as a stall
+indicator, not as volumetric cost.

@@ -1389,17 +1389,22 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
 
 void ProceduralRenderer::drawDepthOnly(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
                                        const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup) {
-    drawImpl(pass, scene, materialBindGroup, true);
+    drawImpl(pass, scene, materialBindGroup, true, false);
+}
+
+void ProceduralRenderer::drawShadow(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
+                                    const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup) {
+    drawImpl(pass, scene, materialBindGroup, true, true);
 }
 
 void ProceduralRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
                               const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup) {
-    drawImpl(pass, scene, materialBindGroup, false);
+    drawImpl(pass, scene, materialBindGroup, false, false);
 }
 
 void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
                                   const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
-                                  bool depthOnly) {
+                                  bool depthOnly, bool shadowPass) {
     Impl& im = *impl_;
     if (!im.initialised || im.items.empty()) {
         return;
@@ -1409,6 +1414,9 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             continue;
         }
         const auto& object = scene.procedurals[item.objectIndex];
+        if (shadowPass && !object.castsShadow) {
+            continue;
+        }
         const auto& material = object.material;
         // Point billboards face the camera by construction: never cull them.
         const bool twoSided = material.doubleSided || object.source.kind == scene::PrimitiveKind::Point;
