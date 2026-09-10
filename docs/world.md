@@ -252,9 +252,9 @@ frame; mesh bounds are now cached against `meshVersion`.
 - Frustum culling sets `Entity::visible`, which the shadow pass also honours, so a chunk behind the
   camera stops casting into the frame. Not visible with the low keys this world uses; the fix when
   it matters is to cull against a frustum extended along the light direction, not to stop culling.
-- LOD is chosen by distance, not by screen-space error, so a `lodDistance` tuned for one focal
-  length is wrong for another.
-- There is no water surface yet. A river reads as a dark notch until phase 4.
+- Terrain LOD follows the lens but not the viewport: the composition knows the camera's focal
+  length and not the window it will be drawn into, so resizing the window does not re-pick levels.
+  The frustum used for chunk culling is waiting on the same plumbing (it assumes a 2.5 aspect).
 - Nothing is placed relative to anything else: no undergrowth in a tree's shadow, no moss on the
   boulder it is beside.
 - Quaternius meshes carry several materials each and `mergedAssetMesh` collapses an asset to one,

@@ -20,6 +20,9 @@ namespace avgen::scene {
 
 namespace {
 constexpr int kMaxTerrainLodIndex = world::kMaxTerrainLods - 1;
+// The viewport height terrain `lodDistance` values are authored against. Not the real one, which
+// the composition does not know; see the note at the call site.
+constexpr float kLodReferenceHeight = 900.0f;
 } // namespace
 
 namespace {
@@ -2631,6 +2634,7 @@ void Composition::updateTerrainLod() {
         if (node.terrainViewDistanceParam != nullptr) {
             settings.viewDistance = node.terrainViewDistanceParam->value();
         }
+        const float projScale = world::lodProjectionScale(scene_.camera.effectiveFovY(), kLodReferenceHeight);
         if (cullEnabled && !planes) {
             planes = world::frustumPlanes(scene_.camera.projection(kCullAspect) * scene_.camera.view());
         }
@@ -2683,7 +2687,12 @@ void Composition::updateTerrainLod() {
                 settings.shadowDistance > 0.0f ? settings.shadowDistance : settings.viewDistance;
             e.castsShadow = distance <= shadowReach;
             setWaterShadow(e.castsShadow);
-            const int lod = lodEnabled ? world::chunkLod(settings, distance) : 0;
+            // LOD follows how big the ground looks, not how far away it is. The composition knows
+            // the lens but not the viewport it will be drawn into, so the height is the reference
+            // one `lodDistance` is authored against: changing focal length re-picks levels
+            // correctly, changing window size does not. Fixing that needs the viewport plumbed in,
+            // which is the same thing the cull aspect below is waiting for.
+            const int lod = lodEnabled ? world::chunkLod(settings, distance, projScale) : 0;
             const MeshId mesh = chunk.meshes[static_cast<std::size_t>(std::clamp(lod, 0, kMaxTerrainLodIndex))];
             if (mesh != kInvalidMesh) {
                 e.mesh = mesh;

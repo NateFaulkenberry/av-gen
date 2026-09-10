@@ -346,10 +346,11 @@ TEST_CASE("the skirt hangs below the chunk and only below it", "[unit][terrain]"
     CHECK_THAT(hi.y, WithinAbs(plainHi.y, 1e-3f)); // the skirt never rises above the surface
 }
 
-TEST_CASE("lod level follows distance and stops at the last level", "[unit][terrain]") {
+TEST_CASE("lod level follows apparent size and stops at the last level", "[unit][terrain]") {
     world::TerrainSettings settings;
     settings.lodDistance = 80.0f;
     settings.lodLevels = 4;
+    // With no viewport information the reference lens applies, which is what `lodDistance` means.
     CHECK(world::chunkLod(settings, 0.0f) == 0);
     CHECK(world::chunkLod(settings, 79.0f) == 0);
     CHECK(world::chunkLod(settings, 81.0f) == 1);
@@ -358,6 +359,33 @@ TEST_CASE("lod level follows distance and stops at the last level", "[unit][terr
     CHECK(world::chunkLod(settings, 100000.0f) == 3); // clamped, never past the last level built
     settings.lodLevels = 1;
     CHECK(world::chunkLod(settings, 100000.0f) == 0);
+}
+
+TEST_CASE("lod follows the lens, not just the distance", "[unit][terrain]") {
+    // The same ground through a longer lens is bigger on screen and must keep its detail longer.
+    // Chosen by distance alone, a `lodDistance` tuned at 50 mm coarsens a telephoto shot exactly
+    // where the shot is looking.
+    world::TerrainSettings settings;
+    settings.lodDistance = 80.0f;
+    settings.lodLevels = 4;
+    const float reference = world::lodProjectionScale(0.8727f, 900.0f);  // 50 degrees, the default
+    const float telephoto = world::lodProjectionScale(0.2094f, 900.0f);  // 12 degrees
+    const float wide = world::lodProjectionScale(1.7453f, 900.0f);       // 100 degrees
+    REQUIRE(telephoto > reference);
+    REQUIRE(wide < reference);
+
+    // At 300 m the reference lens has moved on from level 0; the telephoto has not.
+    CHECK(world::chunkLod(settings, 300.0f, reference) > 0);
+    CHECK(world::chunkLod(settings, 300.0f, telephoto) == 0);
+    // And the wide lens is past where the reference is, at every distance that matters.
+    for (const float d : {120.0f, 300.0f, 700.0f}) {
+        INFO("distance " << d);
+        CHECK(world::chunkLod(settings, d, wide) >= world::chunkLod(settings, d, reference));
+        CHECK(world::chunkLod(settings, d, reference) >= world::chunkLod(settings, d, telephoto));
+    }
+    // A taller viewport shows more detail, so it holds the finer level for longer.
+    const float tall = world::lodProjectionScale(0.8727f, 2160.0f);
+    CHECK(world::chunkLod(settings, 300.0f, tall) < world::chunkLod(settings, 300.0f, reference));
 }
 
 TEST_CASE("frustum culling keeps what is in front and drops what is behind", "[unit][terrain]") {

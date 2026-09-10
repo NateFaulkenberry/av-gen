@@ -347,11 +347,27 @@ scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& sett
     return mesh.indices.empty() ? scene::MeshData{} : mesh;
 }
 
-int chunkLod(const TerrainSettings& settings, float distance) {
-    if (distance <= settings.lodDistance || settings.lodLevels <= 1) {
+float lodProjectionScale(float fovYRadians, float viewportHeight) {
+    const float halfFov = std::clamp(fovYRadians, 1e-3f, 3.0f) * 0.5f;
+    return 0.5f * std::max(viewportHeight, 1.0f) / std::max(std::tan(halfFov), 1e-4f);
+}
+
+int chunkLod(const TerrainSettings& settings, float distance, float projScale) {
+    if (settings.lodLevels <= 1) {
         return 0;
     }
-    const int level = 1 + static_cast<int>(std::floor(std::log2(distance / settings.lodDistance)));
+    // The reference lens `lodDistance` was authored against: a 900-pixel-tall viewport at 50
+    // degrees. A scene keeps the number it tuned and gets the same result at that lens, and a
+    // different result -- the right one -- at any other.
+    constexpr float kReferenceProjScale = 0.5f * 900.0f / 0.466307658f; // tan(25 degrees)
+    const float scale = projScale > 0.0f ? projScale : kReferenceProjScale;
+    // How far away this chunk would have to be, at the reference lens, to look the size it looks
+    // now. Wider lens or taller viewport pushes the switch further out; longer lens pulls it in.
+    const float effective = distance * kReferenceProjScale / scale;
+    if (effective <= settings.lodDistance) {
+        return 0;
+    }
+    const int level = 1 + static_cast<int>(std::floor(std::log2(effective / settings.lodDistance)));
     return std::clamp(level, 0, settings.lodLevels - 1);
 }
 

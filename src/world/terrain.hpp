@@ -112,9 +112,21 @@ struct TerrainChunk {
 [[nodiscard]] scene::MeshData buildChunkMesh(const WorldMap& map, const TerrainSettings& settings,
                                              glm::ivec2 coord, int lod);
 
-// LOD level for a chunk whose centre is `distance` metres from the camera: 0 within `lodDistance`,
-// then one level per doubling. Returns lodLevels-1 at most.
-[[nodiscard]] int chunkLod(const TerrainSettings& settings, float distance);
+// LOD level for a chunk `distance` metres away, seen through a lens of `projScale` pixels per unit
+// of (size / distance) -- that is, `0.5 * viewportHeight / tan(fovY / 2)`.
+//
+// The level is chosen from how large a chunk's *quads* are on screen, not from how far away it is,
+// because distance alone is a statement about the world and the question is about the image. A
+// `lodDistance` tuned at 50 mm is wrong at 24 mm and wrong again at 135 mm, and wrong the moment
+// the window is resized -- the same ground gets a coarser mesh on a bigger screen, which is exactly
+// backwards. `lodDistance` is kept as the authoring knob and means what it always did: the distance
+// at which level 1 begins *at the reference lens below*. Everything else scales from there.
+//
+// `projScale` of 0 falls back to pure distance, which is what a caller with no viewport can do.
+[[nodiscard]] int chunkLod(const TerrainSettings& settings, float distance, float projScale = 0.0f);
+
+// The pixels-per-unit factor `chunkLod` wants, from a vertical field of view and a viewport height.
+[[nodiscard]] float lodProjectionScale(float fovYRadians, float viewportHeight);
 
 // The water material, generated like the ground's so the palette has one home.
 [[nodiscard]] scene::MaterialProgram waterMaterialProgram(const WaterSettings& water, std::string name);
