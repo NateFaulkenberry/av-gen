@@ -31,7 +31,11 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <sstream>
+#include <string>
 #include <thread>
+#include <utility>
+#include <vector>
 
 namespace avgen::app {
 
@@ -68,6 +72,7 @@ std::string usageText() {
            "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
            "                      emission|ids|occlusion|depth\n"
            "  --tier <t>          quality tier: preview|realtime|high|offline\n"
+           "  --disable <list>    switch phases off for cost attribution: shadows,ao,volume,post\n"
            "  --headless          no window: offline mode, fixed-step clock, precomputed analysis\n"
            "  --fps <n>           offline frame rate (default 60)\n"
            "  --size <w>x<h>      window size in points (default 1440x900)\n"
@@ -231,6 +236,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             options.qualityTier = *v;
             ++i;
+        } else if (arg == "--disable") {
+            auto v = need(i, "--disable");
+            if (!v) return std::unexpected(v.error());
+            options.disablePasses = *v;
+            ++i;
         } else if (arg == "--stress") {
             auto v = need(i, "--stress");
             if (!v) return std::unexpected(v.error());
@@ -337,6 +347,31 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             return fail("unknown quality tier '{}' (preview|realtime|high|offline)", options_.qualityTier);
         }
         renderer_->setQuality(tier);
+    }
+    if (!options_.disablePasses.empty()) {
+        rendering::SceneRenderer::PassToggles toggles;
+        std::string off;
+        std::string token;
+        std::istringstream stream(options_.disablePasses);
+        while (std::getline(stream, token, ',')) {
+            if (token == "shadows") {
+                toggles.shadows = false;
+            } else if (token == "ao") {
+                toggles.ao = false;
+            } else if (token == "volume") {
+                toggles.volume = false;
+            } else if (token == "post") {
+                toggles.post = false;
+            } else if (!token.empty()) {
+                return fail("--disable: unknown phase '{}' (shadows,ao,volume,post)", token);
+            }
+            if (!token.empty()) {
+                off += off.empty() ? token : ", " + token;
+            }
+        }
+        renderer_->setPassToggles(toggles);
+        // Printed so the two arms of an A/B can never be confused for each other after the fact.
+        log::info("A/B: phases disabled for this run: {}", off);
     }
     if (!options_.debugTarget.empty()) {
         static constexpr rendering::AuxDebugView kViews[] = {
@@ -987,7 +1022,7 @@ int Application::runLive() {
         stats.procedural = renderer_->stats().procedural;
         stats.sdf = renderer_->stats().sdf;
         stats.particles = renderer_->stats().particles;
-        stats.gpuFrameMs = renderer_->timer().lastFrameMs();
+        stats.gpuFrameMs = renderer_->timeline().frameMs();
 
         // Background render: a few frames per UI frame, then the next queued job.
         if (job_) {
@@ -1084,7 +1119,7 @@ int Application::runLive() {
         imgui_->render(encoder, target);
         wgpu::CommandBuffer commands = encoder.Finish();
         context_->queue().Submit(1, &commands);
-        renderer_->timer().collect();
+        renderer_->collectFrameTimings();
         const auto workEnd = std::chrono::steady_clock::now();
         context_->present();
         if (outputs_.openCount() > 0) {
@@ -1298,6 +1333,12 @@ int Application::runHeadless() {
     // average cannot.
     std::vector<double> frameMs;
     frameMs.reserve(static_cast<std::size_t>(frames));
+    // Per-pass GPU time, per frame, keyed by the timeline's label. Reported as a median at the
+    // end next to the frame median, because one frame's sample of a 0.066 ms-resolution counter
+    // says very little and a hundred of them say what the pass costs.
+    std::vector<std::pair<std::string, std::vector<double>>> passMs;
+    std::vector<double> gpuFrameMs;
+    gpuFrameMs.reserve(static_cast<std::size_t>(frames));
     for (int i = 0; i < frames; ++i) {
         const auto frameStart = std::chrono::steady_clock::now();
         time = engine_->tick(clock);
@@ -1345,6 +1386,32 @@ int Application::runHeadless() {
         }
         frameMs.push_back(
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameStart).count());
+        {
+            // Sum this frame's passes by label first: several passes share one (two cascades, a
+            // bloom pyramid), and it is the phase's total that a workload A/B moves.
+            std::vector<std::pair<std::string, double>> frameLabels;
+            for (const auto& entry : renderer_->timeline().passes()) {
+                auto it = std::find_if(frameLabels.begin(), frameLabels.end(),
+                                       [&](const auto& e) { return e.first == entry.label; });
+                if (it == frameLabels.end()) {
+                    frameLabels.emplace_back(entry.label, entry.ms);
+                } else {
+                    it->second += entry.ms;
+                }
+            }
+            for (const auto& [label, ms] : frameLabels) {
+                auto it = std::find_if(passMs.begin(), passMs.end(),
+                                       [&](const auto& e) { return e.first == label; });
+                if (it == passMs.end()) {
+                    passMs.emplace_back(label, std::vector<double>{ms});
+                } else {
+                    it->second.push_back(ms);
+                }
+            }
+            if (renderer_->stats().gpuFrameMs >= 0.0) {
+                gpuFrameMs.push_back(renderer_->stats().gpuFrameMs);
+            }
+        }
         if (i % 30 == 0 || i == frames - 1) {
             const auto& f = engine_->latestFrame();
             // The headline parameters differ per scene kind; a missing one reads as 0.
@@ -1358,20 +1425,66 @@ int Application::runHeadless() {
                       i, time.renderTime, f.bands[0], f.bands[2], f.bands[4], f.rms, f.onset ? 1 : 0,
                       valueOf("orb/scale", "root/scale"), valueOf("orb/emissive", "material/emissiveBoost"),
                       renderer_->stats().gpuFrameMs, lastHash);
-            // Where the frame went. Every one of these numbers already existed and nothing printed
-            // them, so a slow frame could only be bisected by deleting things from the scene and
-            // re-rendering -- which is how an afternoon goes missing. `gpuFrameMs` is the whole
-            // submitted frame; the rest are the passes that measure themselves.
+            // Where the frame went. Every pass in the frame marks one GPU timestamp on a single
+            // timeline at its end (gpu/frame_timeline.hpp), so what is printed here is the
+            // interval from the previous pass's end to this one's: the passes partition the
+            // frame and sum to it. The old per-pass begin/end pairs did not -- a pass behind a
+            // heavy one absorbed the drain of everything still in flight, and the volumetric
+            // pass reported 39.4 ms of a 46 ms frame for 5.4 ms of work.
             const auto& st = renderer_->stats();
-            log::info("             passes: shadow={:.2f} ao={:.2f} volume={:.2f} cull={:.2f} | draws={} "
-                      "shadowDraws={} indirect={} (empty {}, skipped {}) instances={}/{} lod={}/{}/{}/{} "
-                      "cpu(proc)={:.2f}ms cpu(scene)={:.2f}ms",
-                      st.shadows.shadowMs, st.ao.aoMs, st.volume.volumeMs, st.procedural.cullMs, st.drawCalls,
-                      st.shadows.entityDraws,
-                      st.procedural.indirectDraws, st.procedural.emptyIndirectDraws, st.procedural.skippedIndirectDraws,
-                      st.procedural.visibleInstances, st.procedural.culledInstances, st.procedural.lodCounts[0],
-                      st.procedural.lodCounts[1], st.procedural.lodCounts[2], st.procedural.lodCounts[3],
-                      st.procedural.cpuUpdateMs, lastEngineUpdateMs_);
+            {
+                // Passes in submission order, summed per label, printed largest first.
+                std::vector<std::pair<std::string, double>> byLabel;
+                for (const auto& entry : renderer_->timeline().passes()) {
+                    auto it = std::find_if(byLabel.begin(), byLabel.end(),
+                                           [&](const auto& p) { return p.first == entry.label; });
+                    if (it == byLabel.end()) {
+                        byLabel.emplace_back(entry.label, entry.ms);
+                    } else {
+                        it->second += entry.ms;
+                    }
+                }
+                std::stable_sort(byLabel.begin(), byLabel.end(),
+                                 [](const auto& a, const auto& b) { return a.second > b.second; });
+                std::string breakdown;
+                double sum = 0.0;
+                for (const auto& [label, ms] : byLabel) {
+                    breakdown += fmt::format(" {}={:.2f}", label, ms);
+                    sum += ms;
+                }
+                log::info("             gpu {:.2f} ms over {} passes (sum {:.2f}):{}", st.gpuFrameMs,
+                          st.gpuPasses, sum, breakdown);
+                // The same passes in submission order, for when the question is which pass a
+                // bubble landed on rather than which phase is expensive.
+                std::string ordered;
+                for (const auto& entry : renderer_->timeline().passes()) {
+                    ordered += fmt::format(" {}={:.3f}", entry.label, entry.ms);
+                }
+                log::debug("             in order:{}", ordered);
+                if (renderer_->timeline().unwritten() > 0) {
+                    log::debug("             {} pass timestamp(s) the driver did not write (an empty "
+                               "render pass); their cost folds into the pass after them",
+                               renderer_->timeline().unwritten());
+                }
+            }
+            log::info("             draws={} (indirect {}, empty {}, skipped {}) shadowDraws={} "
+                      "cascades={}/{} spots={} dispatches={} tris={} instances={}v/{}c lod={}/{}/{}/{} "
+                      "particles={}sys/{}cap/{}emit cpu(proc)={:.2f}ms cpu(scene)={:.2f}ms",
+                      st.drawCalls, st.indirectDraws, st.emptyDraws, st.skippedDraws, st.shadowDraws,
+                      st.shadows.cascades, st.shadows.views, st.shadows.spots, st.computeDispatches,
+                      st.triangles, st.visibleInstances, st.culledInstances, st.lodCounts[0], st.lodCounts[1],
+                      st.lodCounts[2], st.lodCounts[3], st.particles.systems, st.particles.capacity,
+                      st.particles.emittedThisFrame, st.procedural.cpuUpdateMs, lastEngineUpdateMs_);
+            // The workload each measured phase was actually given. Without these an A/B that edits
+            // a scene cannot prove its two arms differ, and "no effect" reads exactly like a run
+            // whose edit never applied.
+            log::info("             workload: volumeSteps={} cascades={} shadowRes={} aoTarget={}x{} "
+                      "aoSlices={}x{} postPasses={} bloomLevels={} sdf={}ray/{}mesh simGrids={} "
+                      "transient={}",
+                      st.volume.steps, st.shadows.cascades, st.shadows.resolution, st.ao.width,
+                      st.ao.height, st.ao.slices, st.ao.steps, st.post.passes, st.post.bloomLevels,
+                      st.sdf.raymarchObjects, st.sdf.meshObjects, st.simulation.grids,
+                      st.transientTextures);
         }
         if (options_.capture && i == frames - 1 && image) {
             if (auto r = writeCapture(*image, *options_.capture); !r) {
@@ -1392,6 +1505,38 @@ int Application::runHeadless() {
         };
         log::info("frame wall clock over {} steady frames: median {:.2f} ms  p10 {:.2f}  p90 {:.2f}  min {:.2f}",
                   steady.size(), at(0.5), at(0.1), at(0.9), steady.front());
+    }
+    // The GPU frame and its passes, as medians over the same steady window. The passes partition
+    // the frame (each is the interval between two consecutive pass ends on one timeline), so the
+    // medians very nearly sum to the frame median and a phase's number responds to its own
+    // workload. Sorted by cost: the top line is what to attack.
+    {
+        const auto median = [](std::vector<double> v) {
+            if (v.empty()) {
+                return -1.0;
+            }
+            std::sort(v.begin(), v.end());
+            return v[v.size() / 2];
+        };
+        const std::size_t drop = gpuFrameMs.size() > 24 ? 12 : 0;
+        const auto trim = [&](const std::vector<double>& v) {
+            return v.size() > drop ? std::vector<double>(v.begin() + static_cast<std::ptrdiff_t>(drop), v.end())
+                                   : v;
+        };
+        std::vector<std::pair<std::string, double>> medians;
+        for (const auto& [label, samples] : passMs) {
+            medians.emplace_back(label, median(trim(samples)));
+        }
+        std::stable_sort(medians.begin(), medians.end(),
+                         [](const auto& a, const auto& b) { return a.second > b.second; });
+        std::string breakdown;
+        double sum = 0.0;
+        for (const auto& [label, ms] : medians) {
+            breakdown += fmt::format(" {}={:.2f}", label, ms);
+            sum += ms;
+        }
+        log::info("gpu frame median {:.2f} ms; pass medians (sum {:.2f}):{}", median(trim(gpuFrameMs)), sum,
+                  breakdown);
     }
     log::info("headless run complete: {} frames at {} fps; GPU errors: {}", frames, options_.offlineFps,
               context_->errorCount());

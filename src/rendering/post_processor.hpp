@@ -29,6 +29,7 @@
 
 namespace avgen::gpu {
 class Context;
+class FrameTimeline;
 class ShaderLibrary;
 } // namespace avgen::gpu
 
@@ -58,6 +59,7 @@ struct PostFrameInputs {
 
 struct PostStats {
     std::uint32_t passes = 0;
+    double postMs = -1.0;            // GPU time of the whole chain (the "post/" prefix on the timeline)
     std::uint32_t bloomLevels = 0;
     std::uint32_t halationLevels = 0;
     float exposureScale = 1.0f;      // the linear scale applied before bloom
@@ -85,6 +87,9 @@ public:
     static constexpr wgpu::TextureFormat kHdrFormat = wgpu::TextureFormat::RGBA16Float;
     // Matches SceneRenderer's velocity target (ADR-035); the motion-blur tiles use it too.
     static constexpr wgpu::TextureFormat kVelocityFormat = wgpu::TextureFormat::RG16Float;
+
+    // The shared frame timeline every post pass marks itself on (gpu/frame_timeline.hpp).
+    void setTimeline(gpu::FrameTimeline* timeline) { timeline_ = timeline; }
 
 private:
     static constexpr std::uint32_t kMaxDepthLayers = 6; // shaders/post.wgsl PostUniforms
@@ -144,6 +149,8 @@ private:
 
     gpu::Context& context_;
     gpu::ShaderLibrary& shaders_;
+    gpu::FrameTimeline* timeline_ = nullptr;
+    const char* stage_ = "post"; // which stage the pass being encoded belongs to
     bool initialised_ = false;
     wgpu::BindGroupLayout layout_;
     wgpu::PipelineLayout pipelineLayout_;

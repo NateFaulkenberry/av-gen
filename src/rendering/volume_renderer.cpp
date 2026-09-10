@@ -4,7 +4,7 @@
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
-#include "gpu/gpu_timer.hpp"
+#include "gpu/frame_timeline.hpp"
 #include "gpu/shader_library.hpp"
 
 #include <algorithm>
@@ -53,7 +53,7 @@ struct VolumeRenderer::Impl {
     wgpu::Texture placeholder;      // 1x1 stand-in for binding 4 in the march pass
     wgpu::TextureView placeholderView;
     wgpu::TextureView boundDepth;
-    std::unique_ptr<gpu::GpuTimer> timer;
+    gpu::FrameTimeline* timeline = nullptr;
     double lastMs = -1.0;
     bool passThisFrame = false;
     bool activeThisFrame = false;
@@ -157,7 +157,6 @@ Result<void> VolumeRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Texture
         im.placeholder = device.CreateTexture(&desc);
         im.placeholderView = im.placeholder.CreateView();
     }
-    im.timer = std::make_unique<gpu::GpuTimer>(im.context);
     auto module = im.shaders.load("volume.wgsl");
     if (!module) {
         return std::unexpected(module.error());
@@ -372,7 +371,7 @@ void VolumeRenderer::encode(wgpu::CommandEncoder& encoder, const wgpu::TextureVi
         desc.label = "volume-march-pass";
         desc.colorAttachmentCount = 1;
         desc.colorAttachments = &attachment;
-        desc.timestampWrites = im.timer->passWrites();
+        desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("volume") : nullptr;
         wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&desc);
         pass.SetPipeline(im.marchPipeline);
         pass.SetBindGroup(0, frameBindGroup);
@@ -389,6 +388,7 @@ void VolumeRenderer::encode(wgpu::CommandEncoder& encoder, const wgpu::TextureVi
         desc.label = "volume-composite-pass";
         desc.colorAttachmentCount = 1;
         desc.colorAttachments = &attachment;
+        desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("volume") : nullptr;
         wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&desc);
         pass.SetPipeline(im.compositePipeline);
         pass.SetBindGroup(0, frameBindGroup);
@@ -396,15 +396,16 @@ void VolumeRenderer::encode(wgpu::CommandEncoder& encoder, const wgpu::TextureVi
         pass.Draw(3);
         pass.End();
     }
-    im.timer->resolve(encoder);
     im.passThisFrame = true;
     stats_.volumeMs = im.lastMs;
 }
 
+void VolumeRenderer::setTimeline(gpu::FrameTimeline* timeline) { impl_->timeline = timeline; }
+
 void VolumeRenderer::collectTimings() {
     Impl& im = *impl_;
-    if (im.timer) {
-        const double ms = im.timer->collect();
+    if (im.timeline != nullptr) {
+        const double ms = im.timeline->msFor("volume");
         if (ms >= 0.0) {
             im.lastMs = ms;
         }

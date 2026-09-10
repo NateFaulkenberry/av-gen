@@ -1,5 +1,7 @@
 #include "rendering/shader_layer.hpp"
 
+#include "gpu/frame_timeline.hpp"
+
 #include "core/log.hpp"
 #include "gpu/context.hpp"
 #include "gpu/shader_library.hpp"
@@ -288,6 +290,7 @@ void ShaderLayerGpu::renderPasses(wgpu::CommandEncoder& encoder, const shaders::
         rpDesc.label = "shader-layer-pass";
         rpDesc.colorAttachmentCount = 1;
         rpDesc.colorAttachments = &color;
+        rpDesc.timestampWrites = ctx.timeline != nullptr ? ctx.timeline->mark("shaderlayer") : nullptr;
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&rpDesc);
         rp.SetPipeline(*pipeline);
         rp.SetBindGroup(0, group);

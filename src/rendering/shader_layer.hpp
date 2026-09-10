@@ -20,6 +20,7 @@
 
 namespace avgen::gpu {
 class Context;
+class FrameTimeline;
 class ShaderLibrary;
 } // namespace avgen::gpu
 
@@ -32,6 +33,9 @@ struct ShaderFrameContext {
     wgpu::TextureView inputImage;    // post stage: the current HDR scene; else null (1x1 black used)
     wgpu::TextureView audioSpectrum; // binCount x 1 RGBA16F; null = 1x1 black
     std::uint64_t frameIndex = 0;
+    // The frame timeline a layer's intermediate passes mark themselves on (gpu/frame_timeline.hpp);
+    // null leaves them untimed, in which case their cost lands on the next marked pass.
+    gpu::FrameTimeline* timeline = nullptr;
 };
 
 class ShaderLayerGpu {

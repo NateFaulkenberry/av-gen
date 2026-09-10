@@ -13,18 +13,96 @@ cost 45 ms" and "this laptop is thermally throttled by 3x right now". If the ref
 throw the numbers away and wait -- interleaving does not save you here, because a drift that large
 swamps the effect being measured in both arms.
 
-## Per-pass timers are not per-pass costs (2026-09-10)
+## Per-pass timers were not per-pass costs -- fixed (2026-09-10)
 
-The `passes:` line the renderer logs is a set of timestamp deltas around each render pass, and a
-pass that follows a heavy one absorbs the drain of the work still in flight ahead of it. On the
-world scene the volumetric pass reported **39.4 ms of a 46 ms frame**. Turning volumetrics off
-took the frame from 53.1 ms to 47.7: the pass costs **5.4 ms**, and the timer was reporting the
-lit pass finishing behind it. Every other pass on that line has the same failure mode; they do
-not sum to the frame and the largest number is usually just the pass that follows the expensive
-one.
+**The old instrument.** Each pass carried its own begin/end timestamp pair. A pass's begin
+timestamp is written when the pass is *reached*, not when its own work starts, so a pass behind a
+heavy one absorbed the drain of everything still in flight ahead of it. On the world scene the
+volumetric pass reported **39.4 ms of a 46 ms frame**; turning volumetrics off took the frame from
+53.1 ms to 47.7, so the pass costs **5.4 ms** and the timer was reporting the lit pass finishing
+behind it. The tell was that the number did not respond to its own workload: halving the march
+steps, disabling its noise and halving its max distance each moved it by under 2 ms. Every pass on
+that line had the same failure mode; they did not sum to the frame, and the largest number was
+usually just the pass that followed the expensive one.
 
-Attribute cost by turning one thing off and diffing the frame median, interleaved. Measured that
-way on the world scene at 2880x1800 (baseline 52.6 ms):
+**What replaced it.** `gpu::FrameTimeline` (src/gpu/frame_timeline.hpp): one query set for the
+whole frame, one timestamp per pass written *at the pass's end*, in submission order. A pass costs
+`end[i] - end[i-1]` -- the interval between two consecutive "the GPU has finished everything up to
+here" markers. Consecutive intervals are contiguous, so the passes partition the frame and sum to
+it exactly; a pass cannot be charged another's work because a millisecond spent between two
+markers belongs to exactly one interval. Every pass in the frame marks itself, including the ones
+inside the post chain, the AO resolve and each shadow cascade. `--headless` prints the per-pass
+medians next to the frame median.
+
+**Validation.** `examples/world/terrain.scene.json` at 1440x900, three interleaved rounds per arm,
+against a `_skyonly` calibration of 5.57 ms before and 6.19 ms after. Each phase switched off with
+`--disable`, which logs what it turned off:
+
+| phase off | pass timer says | A/B on the frame (wall) | A/B on the frame (GPU) |
+|---|---|---|---|
+| volumetrics | 1.05 ms | +0.89 ms | +0.86 ms |
+| shadow cascades | 0.39 ms | +0.32 ms | +0.14 ms |
+| GTAO | 0.26 ms | +0.43 ms | +0.40 ms |
+| post chain | 0.20 ms | -0.03 ms | +0.00 ms |
+
+Every phase agrees with its A/B to within a few tenths of a millisecond -- which is between three
+and six ticks of the counter. The one that does not look exact is instructive: turning AO off saves
+0.43 ms against a pass that costs 0.26, and the timeline says where the rest went, because `scene`
+drops from 18.02 to 17.69 in the same run. The lit pass stops sampling the AO texture. The old
+instrument could not have told you that.
+
+The decisive test is whether a number moves with its *own* workload, which is exactly what the old
+one failed:
+
+| knob | pass timer | frame (wall min) |
+|---|---|---|
+| `volumeSteps` 18 -> 144 (8x the march) | 1.05 -> 7.67 ms (+6.62) | 20.71 -> 27.38 (+6.67) |
+| `shadowCascades` 1 -> 4 | 0.26 -> 0.59 ms (+0.33) | 20.66 -> 21.23 (+0.57) |
+
+Eight times the marching work moves the volume pass by 6.62 ms and moves the frame by 6.67. Under
+the old instrument that pass claimed 39.4 ms and halving its steps moved it by under 2.
+
+**What `--headless` now prints per frame.** Three lines: the per-pass GPU breakdown sorted by
+cost, then the submission counters, then the workload each measured phase was given.
+
+```
+gpu 20.45 ms over 26 passes (sum 20.45): scene=18.02 volume=1.05 shadow=0.39 ao=0.26 cull=0.26
+  depth=0.13 post/bloom=0.13 clusters=0.07 tonemap=0.07 particles=0.00 background=0.00
+draws=100 (indirect 120, empty 6, skipped 40) shadowDraws=48 cascades=2/2 spots=0 dispatches=3
+  tris=15690069 instances=1281v/35969c lod=338/746/191/6 particles=1sys/10240cap/1emit
+  cpu(proc)=0.06ms cpu(scene)=0.15ms
+workload: volumeSteps=18 cascades=2 shadowRes=2048 aoTarget=720x450 aoSlices=3x6 postPasses=12
+  bloomLevels=6 sdf=0ray/0mesh simGrids=0 transient=12
+```
+
+The third line exists because of the `scatter` incident below: an A/B that edits a scene has to
+prove its two arms differ, and "no effect" reads exactly like a run whose edit never applied. The
+same run prints per-pass *medians* over the steady frames at the end, next to the frame median,
+which is what to quote -- one frame's sample of a 0.066 ms counter says very little.
+
+`tris` is what is *submitted*: source triangles times instances, before the GPU cull rejects any
+of them. The counts the cull writes are never read back for the frame that used them, so the
+honest reading of what survived is `instances=Nv/Mc` and the per-LOD split beside it.
+
+**Three things to know before trusting a number.**
+
+- *Resolution is 0.066 ms.* Every timestamp this device returns is a multiple of 65,536 ns, so a
+  pass costing less than that reads 0.00. It is a floor on one pass in one frame, not on the
+  frame: over a hundred frames the medians still resolve tenths of a millisecond.
+- *A stall lands on the first pass of the frame.* The frame origin is the start of the first
+  marked pass, so if the GPU was busy with something else -- another agent's benchmark, a
+  compositor -- the wait is charged to whichever pass runs first, usually `clusters`, `particles`
+  or `cull`. A `cull` pass reporting 15 ms in a scene with nothing to cull means the machine is
+  contended, not that culling got slow.
+- *An empty render pass reports 0 and folds into the next one.* Metal does not write the
+  end-of-pass timestamp of a pass that issues no draws; the slot resolves as a literal zero. The
+  timeline detects that (`FrameTimeline::unwritten()`) and leaves the boundary where it was, so
+  the following pass's interval covers both. Left unhandled this turned the depth prepass into
+  228,832,448 ms.
+
+A/B is still the ground truth, and `--disable shadows,ao,volume,post` switches a phase off without
+editing a scene, logging what it turned off so the two arms of a comparison can never be confused
+after the fact. Measured that way on the world scene at 2880x1800 (baseline 52.6 ms):
 
 | removed | frame | cost |
 |---|---|---|

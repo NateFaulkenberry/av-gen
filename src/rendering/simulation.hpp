@@ -31,6 +31,7 @@
 
 namespace avgen::gpu {
 class Context;
+class FrameTimeline;
 class ShaderLibrary;
 } // namespace avgen::gpu
 
@@ -75,6 +76,9 @@ public:
     void update(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time);
     // Drops the simulation state; the next update() re-uploads the initial state.
     void reset();
+    // The shared frame timeline (gpu/frame_timeline.hpp) this renderer's passes mark themselves
+    // on. Null leaves them untimed.
+    void setTimeline(gpu::FrameTimeline* timeline);
     void collectTimings();
 
     [[nodiscard]] const SimulationStats& stats() const { return stats_; }

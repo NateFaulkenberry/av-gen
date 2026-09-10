@@ -21,7 +21,7 @@ grows. Decisions are recorded in `docs/decisions/`; the research behind them in 
   │   ├ pass 1: lit meshes + grid → HDR RGBA16F + depth
   │   └ pass 2: ACES tone map → swapchain (or RGBA8 texture for capture)
   │  ImGuiLayer::render(encoder, target)  (pass 3)
-  │  Queue::Submit, GpuTimer::collect, Surface::Present
+  │  Queue::Submit, FrameTimeline::collect, Surface::Present
   └──────────────────────────────────────┘
 ```
 
@@ -43,7 +43,7 @@ with `FixedStepClock`. Everything from `SignalBus` downwards is identical.
 | `spatial` | avgen_core | procedural world data (ADR-024..027): typed `AttributeSet`/`PointCloud`, point operators, `FieldSpec`/`FieldSet` sampling + GPU packing, `GridField` (simulated 3D grids + the CPU reference step; ADR-032), `Effector`, `Spline`, `SdfTree` (+ surface nets meshing); `core/noise` is the CPU twin of the WGSL noise | glm, core |
 | `scene` | avgen_core | `Scene` data model (cameras, punctual lights, materials with textures, meshes, entities, environment, particle systems), mesh generators, particle parameter registration, `SceneController` interface with `OrbScene` (built-in preset + sparks), `GltfScene` (imported file + curated parameters + dust) and `Composition` (nodes of any kind incl. `procedural`, nested scene files, flattened into one `Scene`; ADR-017), `ProceduralGeometry` (primitives, distributions, seeded variation, deformer stack, instance records; ADR-023) | glm, params, assets |
 | `control` | avgen_core | OSC 1.0 (messages, bundles, patterns, UDP receiver/sender), MIDI input (CoreMIDI on macOS, byte parser, virtual source), `ControlMap` (bindings + direct OSC scheme; ADR-021) | POSIX sockets, CoreMIDI |
-| `gpu` | avgen_gpu | `Context` (Dawn instance/adapter/device/surface), `ShaderLibrary` (WGSL files + includes + diagnostics), `RenderTarget`, `GpuTimer`, readback (synchronous helpers and `ReadbackRing`) | Dawn |
+| `gpu` | avgen_gpu | `Context` (Dawn instance/adapter/device/surface), `ShaderLibrary` (WGSL files + includes + diagnostics), `RenderTarget`, `FrameTimeline` (per-pass GPU timing), readback (synchronous helpers and `ReadbackRing`) | Dawn |
 | `rendering` | avgen_gpu | `SceneRenderer` (pass list, PBR/grid/skybox/tonemap pipelines, material bind groups, lights, background/post user layers, engine shader reload), `EnvironmentProcessor` (IBL), `ShaderStack`/`ShaderLayerGpu` (user layers), `ParticleRenderer` (compute pools, indirect draw), `ProceduralRenderer` (one instanced draw per procedural object, deformer stack in the vertex shader; ADR-023), `VolumeRenderer` (half-res raymarched atmosphere + depth-aware composite; ADR-032), `Simulation` (grid-field compute passes into the shared grid table; ADR-032), `PostProcessor` (built-in effect chain over `gpu::TransientPool`) | gpu, scene, shaders |
 | `platform` | avgen_platform | `Window` (SDL3, Metal layer, events, file dialog) | SDL3 |
 | `ui` | avgen_platform | `ImGuiLayer` (SDL3 + WebGPU backends), `ControlPanel` (transport, response, generated parameter panel, analysis plots, performance) | ImGui, ImPlot |

@@ -4,7 +4,7 @@
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
-#include "gpu/gpu_timer.hpp"
+#include "gpu/frame_timeline.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
 #include "spatial/grid_field.hpp"
@@ -70,7 +70,7 @@ struct Simulation::Impl {
     wgpu::BindGroup groupToB;      // dst = B, src = A, initial = C
     wgpu::BindGroup groupToCFromA; // dst = C, src = A (the diffusion snapshot)
     wgpu::BindGroup groupToCFromB; // dst = C, src = B
-    std::unique_ptr<gpu::GpuTimer> timer;
+    gpu::FrameTimeline* timeline = nullptr;
     std::vector<std::uint8_t> uniformStaging;
     std::vector<GridState> states;
     std::uint64_t layoutHash = 0;
@@ -149,7 +149,6 @@ Result<void> Simulation::init(wgpu::Buffer fieldBlock, wgpu::Buffer gridTable) {
         pdesc.bindGroupLayouts = &im.layout;
         im.pipelineLayout = device.CreatePipelineLayout(&pdesc);
     }
-    im.timer = std::make_unique<gpu::GpuTimer>(im.context);
     auto module = im.shaders.load("simulate.wgsl");
     if (!module) {
         return std::unexpected(module.error());
@@ -409,7 +408,7 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
     std::uint32_t encoded = 0;
     wgpu::ComputePassDescriptor passDesc{};
     passDesc.label = "simulate";
-    passDesc.timestampWrites = im.timer->passWrites();
+    passDesc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("sim") : nullptr;
     wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&passDesc);
     for (const Work& w : work) {
         const spatial::GridField& grid = grids[w.index];
@@ -474,17 +473,16 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
         encoder.CopyBufferToBuffer(current, byteOffset, im.gridTable, byteOffset, byteCount);
     }
     stats_.dispatches = encoded;
-    if (im.timer->available()) {
-        im.timer->resolve(encoder);
-        im.passThisFrame = true;
-        stats_.simulateMs = im.lastMs;
-    }
+    im.passThisFrame = true;
+    stats_.simulateMs = im.lastMs;
 }
+
+void Simulation::setTimeline(gpu::FrameTimeline* timeline) { impl_->timeline = timeline; }
 
 void Simulation::collectTimings() {
     Impl& im = *impl_;
-    if (im.timer) {
-        const double ms = im.timer->collect();
+    if (im.timeline != nullptr) {
+        const double ms = im.timeline->msFor("sim");
         if (ms >= 0.0) {
             im.lastMs = ms;
         }

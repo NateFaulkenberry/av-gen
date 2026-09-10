@@ -120,9 +120,10 @@ Per record, in effector order (`pw = objectToWorld * position`; `s = fieldScalar
 
 Blend: Add `a + b`, Multiply `a * b`, Replace `b`, Min, Max, Mix `mix(a, b, weight)`.
 
-Timing: the pass carries both timestamps of a private `gpu::GpuTimer`
+Timing: the pass marks the shared `gpu::FrameTimeline` under `effectors`
 (`ProceduralStats::effectorPassMs`; -1 when no pass ran or timestamps are unavailable). The frame
-timer starts at the scene pass, so total GPU time = `gpuFrameMs + effectorPassMs`.
+timeline now opens at the first pass of the frame, whichever that is, so the effector pass is
+inside `gpuFrameMs` rather than beside it.
 `ProceduralRenderer::readInstanceRecords(name)` reads the live (or base) buffer back for tests.
 
 ## Field deformer (DeformerKind::Field, code 5)

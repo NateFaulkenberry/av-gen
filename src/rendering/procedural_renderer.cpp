@@ -7,7 +7,7 @@
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
-#include "gpu/gpu_timer.hpp"
+#include "gpu/frame_timeline.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
 
@@ -268,7 +268,7 @@ struct ProceduralRenderer::Impl {
     }
     ~Impl() {
         // A MapAsync callback carries a raw StatsSlot pointer; let every pending one complete
-        // while the slots still exist (the same contract as gpu::GpuTimer).
+        // while the slots still exist (the same contract as gpu::FrameTimeline).
         for (StatsSlot& slot : statsSlots) {
             if (slot.inFlight) {
                 context.waitFor(slot.mapFuture, 2'000'000'000ull);
@@ -330,8 +330,7 @@ struct ProceduralRenderer::Impl {
     // same both ways. Whatever the backend does per distinct indirect buffer, it does it in every
     // pass that reads one, and this frame has five.
     wgpu::Buffer indirectArgs;
-    std::unique_ptr<gpu::GpuTimer> effectorTimer;
-    std::unique_ptr<gpu::GpuTimer> cullTimer;
+    gpu::FrameTimeline* timeline = nullptr;
     std::vector<std::uint8_t> staging;
     std::map<std::uint64_t, CachedMesh> meshes;
     std::map<std::string, ObjectState> objects;
@@ -543,8 +542,6 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
             slot.read = device.CreateBuffer(&readDesc);
         }
     }
-    im.effectorTimer = std::make_unique<gpu::GpuTimer>(im.context);
-    im.cullTimer = std::make_unique<gpu::GpuTimer>(im.context);
     auto module = im.shaders.load("procedural.wgsl");
     if (!module) {
         return std::unexpected(module.error());
@@ -1023,18 +1020,18 @@ void ProceduralRenderer::Impl::pumpStats() {
     }
 }
 
+void ProceduralRenderer::setTimeline(gpu::FrameTimeline* timeline) { impl_->timeline = timeline; }
+
 void ProceduralRenderer::collectTimings() {
     Impl& im = *impl_;
-    if (im.effectorTimer) {
-        const double ms = im.effectorTimer->collect();
-        if (ms >= 0.0) {
-            im.lastEffectorMs = ms;
+    if (im.timeline != nullptr) {
+        const double effector = im.timeline->msFor("effectors");
+        if (effector >= 0.0) {
+            im.lastEffectorMs = effector;
         }
-    }
-    if (im.cullTimer) {
-        const double ms = im.cullTimer->collect();
-        if (ms >= 0.0) {
-            im.lastCullMs = ms;
+        const double cull = im.timeline->msFor("cull");
+        if (cull >= 0.0) {
+            im.lastCullMs = cull;
         }
     }
     im.pumpStats();
@@ -1304,7 +1301,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     if (!im.computeItems.empty()) {
         wgpu::ComputePassDescriptor desc{};
         desc.label = "procedural-effectors";
-        desc.timestampWrites = im.effectorTimer->passWrites();
+        desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("effectors") : nullptr;
         wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&desc);
         cp.SetPipeline(im.effectorPipeline);
         for (const auto& item : im.computeItems) {
@@ -1312,7 +1309,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             cp.DispatchWorkgroups((item.count + kEffectorWorkgroup - 1) / kEffectorWorkgroup);
         }
         cp.End();
-        im.effectorTimer->resolve(encoder);
+        ++stats_.effectorDispatches;
         im.passThisFrame = true;
         stats_.effectorPassMs = im.lastEffectorMs;
     }
@@ -1330,7 +1327,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         }
         wgpu::ComputePassDescriptor desc{};
         desc.label = "procedural-cull";
-        desc.timestampWrites = im.cullTimer->passWrites();
+        desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("cull") : nullptr;
         wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&desc);
         cp.SetPipeline(im.cullClassifyPipeline);
         for (const auto& item : im.cullItems) {
@@ -1348,7 +1345,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         scanStage(im.cullTopPipeline, true);
         scanStage(im.cullScatterPipeline, false);
         cp.End();
-        im.cullTimer->resolve(encoder);
+        ++stats_.cullDispatches;
         im.cullPassThisFrame = true;
         stats_.cullMs = im.lastCullMs;
         // Non-blocking stats readback: copy into a free ring slot, mapped by collectTimings().

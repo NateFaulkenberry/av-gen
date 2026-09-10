@@ -32,6 +32,7 @@
 
 namespace avgen::gpu {
 class Context;
+class FrameTimeline;
 class ShaderLibrary;
 } // namespace avgen::gpu
 
@@ -119,6 +120,9 @@ public:
                            bool reducedSteps = false);
     // Pumps the raymarch-pass timer after the frame's command buffer was submitted (update()
     // also does this at the start of the next frame).
+    // The shared frame timeline (gpu/frame_timeline.hpp) this renderer's passes mark themselves
+    // on. Null leaves them untimed.
+    void setTimeline(gpu::FrameTimeline* timeline);
     void collectTimings();
 
     [[nodiscard]] const SdfStats& stats() const { return stats_; }

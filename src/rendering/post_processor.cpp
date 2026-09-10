@@ -2,6 +2,7 @@
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
+#include "gpu/frame_timeline.hpp"
 #include "gpu/shader_library.hpp"
 
 #include <algorithm>
@@ -284,6 +285,9 @@ void PostProcessor::runPass(wgpu::CommandEncoder& encoder, const wgpu::RenderPip
     pass.label = "post-pass";
     pass.colorAttachmentCount = 1;
     pass.colorAttachments = &color;
+    // Every post pass marks the timeline under the stage that set `stage_`, so "post/bloom" and
+    // "post/motionblur" are separable and the chain's total is the sum of the "post/" prefix.
+    pass.timestampWrites = timeline_ != nullptr ? timeline_->mark(stage_) : nullptr;
     wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
     rp.SetPipeline(pipeline);
     rp.SetBindGroup(0, group, 1, &offset);
@@ -341,6 +345,7 @@ void PostProcessor::encodeMetering(wgpu::CommandEncoder& encoder, const PostFram
         u.texelSize = 1.0f / base.outputSize;
         u.params0 = glm::vec4(std::clamp(in.settings->exposure.meterCenterWeight, 0.0f, 1.0f),
                               base.outputSize.x / std::max(base.outputSize.y, 1.0f), 0.0f, 0.0f);
+        stage_ = "post/meter";
         runPass(encoder, meterPrefilter_, current.view, in.sceneHdr, nullptr, nullptr, u);
     }
     while (w > 1 || h > 1) {
@@ -380,6 +385,8 @@ wgpu::TextureView PostProcessor::buildPyramid(wgpu::CommandEncoder& encoder, gpu
         Uniforms u = base;
         u.texelSize = 1.0f / glm::vec2(static_cast<float>(coarse.width), static_cast<float>(coarse.height));
         u.params0 = glm::vec4(spread, blend, 0.0f, 0.0f);
+        // No stage of its own: the pyramid is shared by bloom and halation, and the caller has
+        // already said which one this is.
         runPass(encoder, upsample_, target.view, acc, fine.view, nullptr, u);
         acc = target.view;
     }
@@ -388,6 +395,7 @@ wgpu::TextureView PostProcessor::buildPyramid(wgpu::CommandEncoder& encoder, gpu
 
 wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFrameInputs& in, gpu::TransientPool& pool) {
     stats_ = PostStats{};
+    stage_ = "post"; // each stage names itself below; nothing inherits the previous frame's label
     slot_ = 0;
     output_ = nullptr;
     if (!initialised_ || in.settings == nullptr || in.width == 0 || in.height == 0) {
@@ -430,6 +438,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         auto target = pool.acquire(in.width, in.height, kHdrFormat);
         Uniforms u = base;
         u.params0 = glm::vec4(exposure, 0.0f, 0.0f, 0.0f);
+        stage_ = "post/exposure";
         runPass(encoder, exposure_, target.view, current, nullptr, nullptr, u);
         current = target.view;
     }
@@ -440,6 +449,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         Uniforms u = base;
         u.params0 = glm::vec4(s.focusDistance, s.focusRange, s.dofMaxRadius * pixelScale, s.dofPhysical ? 1.0f : 0.0f);
         u.params1 = glm::vec4(s.lens.focalLength, s.lens.aperture, s.lens.sensorHeight, static_cast<float>(in.height));
+        stage_ = "post/dof";
         runPass(encoder, dof_, target.view, current, nullptr, in.depth, u);
         current = target.view;
     }
@@ -461,6 +471,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         u.texelSize = 1.0f / u.outputSize;
         u.params0 = glm::vec4(blurScale, static_cast<float>(tileSize), maxRadius, 0.0f);
         u.params1 = glm::vec4(static_cast<float>(in.width), static_cast<float>(in.height), 0.0f, 0.0f);
+        stage_ = "post/motionblur";
         runPass(encoder, velocityTileMax_, tiles.view, in.velocity, nullptr, nullptr, u);
         runPass(encoder, velocityNeighbourMax_, neighbours.view, tiles.view, nullptr, nullptr, u);
 
@@ -483,6 +494,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         auto target = pool.acquire(in.width, in.height, kHdrFormat);
         Uniforms u = base;
         u.params0 = glm::vec4(s.chromaticAberration, s.distortion, 0.0f, 0.0f);
+        stage_ = "post/lens";
         runPass(encoder, lens_, target.view, current, nullptr, nullptr, u);
         current = target.view;
     }
@@ -513,6 +525,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
                 PassTextures textures;
                 textures.source = current;
                 textures.emission = in.emission;
+                stage_ = "post/bloom";
                 runPass(encoder, prefilter_, target.view, textures, u);
             } else {
                 u.texelSize =
@@ -540,6 +553,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
             if (level == 0) {
                 u.texelSize = 1.0f / base.outputSize;
                 u.params0 = glm::vec4(s.halationThreshold, s.bloomKnee, std::clamp(s.halationWarmth, 0.0f, 1.0f), 0.0f);
+                stage_ = "post/halation";
                 runPass(encoder, halationPrefilter_, target.view, current, nullptr, nullptr, u);
             } else {
                 u.texelSize =
@@ -570,6 +584,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         PassTextures textures;
         textures.source = bloom;
         textures.second = halation;
+        stage_ = "post/anamorphic";
         runPass(encoder, wide_, target.view, textures, u);
         wide = target.view;
     }
@@ -597,6 +612,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         textures.second = bloom;
         textures.third = wide;
         textures.depth = in.depth; // the depth grade needs the real depth, not the placeholder
+        stage_ = "post/composite";
         runPass(encoder, composite_, target.view, textures, u);
         current = target.view;
         output_ = target.texture;
@@ -610,6 +626,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         PassTextures textures;
         textures.source = current;
         textures.identifier = in.identifier;
+        stage_ = "post/sharpen";
         runPass(encoder, sharpen_, target.view, textures, u);
         current = target.view;
         output_ = target.texture;

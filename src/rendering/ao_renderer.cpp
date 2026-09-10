@@ -2,7 +2,7 @@
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
-#include "gpu/gpu_timer.hpp"
+#include "gpu/frame_timeline.hpp"
 #include "gpu/render_target.hpp"
 #include "gpu/shader_library.hpp"
 
@@ -43,7 +43,7 @@ struct AoRenderer::Impl {
     wgpu::BindGroup occlusionGroup;
     wgpu::BindGroup temporalGroup;
     wgpu::TextureView boundDepth;
-    std::unique_ptr<gpu::GpuTimer> timer;
+    gpu::FrameTimeline* timeline = nullptr;
     double lastMs = -1.0;
     int historyIndex = 0;
     std::uint64_t lastFrameIndex = 0;
@@ -226,7 +226,6 @@ Result<void> AoRenderer::init(const wgpu::BindGroupLayout& frameLayout) {
         im.context.queue().WriteTexture(&destination, texel.data(), texel.size() * sizeof(std::uint16_t), &layout,
                                         &size);
     }
-    im.timer = std::make_unique<gpu::GpuTimer>(im.context);
     auto module = im.shaders.load("gtao.wgsl");
     if (!module) {
         return std::unexpected(module.error());
@@ -303,7 +302,7 @@ void AoRenderer::encode(wgpu::CommandEncoder& encoder, const wgpu::BindGroup& fr
         return;
     }
     auto pass = [&](const wgpu::RenderPipeline& pipeline, const wgpu::TextureView& target,
-                    const wgpu::BindGroup& group, const char* label, bool timed) {
+                    const wgpu::BindGroup& group, const char* label) {
         wgpu::RenderPassColorAttachment attachment{};
         attachment.view = target;
         attachment.loadOp = wgpu::LoadOp::Clear;
@@ -313,7 +312,7 @@ void AoRenderer::encode(wgpu::CommandEncoder& encoder, const wgpu::BindGroup& fr
         desc.label = label;
         desc.colorAttachmentCount = 1;
         desc.colorAttachments = &attachment;
-        desc.timestampWrites = timed ? im.timer->passWrites() : nullptr;
+        desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("ao") : nullptr;
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&desc);
         rp.SetPipeline(pipeline);
         rp.SetBindGroup(0, frameBindGroup);
@@ -321,19 +320,21 @@ void AoRenderer::encode(wgpu::CommandEncoder& encoder, const wgpu::BindGroup& fr
         rp.Draw(3);
         rp.End();
     };
-    pass(im.occlusionPipeline, im.raw.colorView(), im.occlusionGroup, "gtao-pass", true);
-    pass(im.temporalPipeline, im.history[im.historyIndex].colorView(), im.temporalGroup, "gtao-temporal-pass",
-         false);
-    im.timer->resolve(encoder);
+    // Both passes are marked "ao": the temporal resolve is as much a cost of switching AO on as
+    // the horizon march is, and the old timer measured only the first of the two.
+    pass(im.occlusionPipeline, im.raw.colorView(), im.occlusionGroup, "gtao-pass");
+    pass(im.temporalPipeline, im.history[im.historyIndex].colorView(), im.temporalGroup, "gtao-temporal-pass");
     im.hasHistory = true;
     im.passThisFrame = true;
     stats_.aoMs = im.lastMs;
 }
 
+void AoRenderer::setTimeline(gpu::FrameTimeline* timeline) { impl_->timeline = timeline; }
+
 void AoRenderer::collectTimings() {
     Impl& im = *impl_;
-    if (im.timer) {
-        const double ms = im.timer->collect();
+    if (im.timeline != nullptr) {
+        const double ms = im.timeline->msFor("ao");
         if (ms >= 0.0) {
             im.lastMs = ms;
         }

@@ -6,7 +6,7 @@
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
-#include "gpu/gpu_timer.hpp"
+#include "gpu/frame_timeline.hpp"
 #include "gpu/shader_library.hpp"
 #include "spatial/sdf.hpp"
 
@@ -132,7 +132,7 @@ struct SdfRenderer::Impl {
     wgpu::Buffer fieldBlock;
     wgpu::BindGroup sdfGroup;
     wgpu::BindGroup meshGroup;
-    std::unique_ptr<gpu::GpuTimer> timer;
+    gpu::FrameTimeline* timeline = nullptr;
     std::vector<std::uint8_t> objectStaging;
     std::vector<std::uint8_t> sdfStaging;
     std::vector<spatial::SdfNodeGpu> nodeStaging;
@@ -222,7 +222,6 @@ Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFor
         im.sdfUniforms = device.CreateBuffer(&desc);
     }
     im.ensureNodeBuffer(kNodeStride * 128);
-    im.timer = std::make_unique<gpu::GpuTimer>(im.context);
     auto raymarch = im.shaders.load("sdf_raymarch.wgsl");
     if (!raymarch) {
         return std::unexpected(raymarch.error());
@@ -373,10 +372,12 @@ void SdfRenderer::Impl::rebuildGroups() {
     }
 }
 
+void SdfRenderer::setTimeline(gpu::FrameTimeline* timeline) { impl_->timeline = timeline; }
+
 void SdfRenderer::collectTimings() {
     Impl& im = *impl_;
-    if (im.timer) {
-        const double ms = im.timer->collect();
+    if (im.timeline != nullptr) {
+        const double ms = im.timeline->msFor("sdf");
         if (ms >= 0.0) {
             im.lastRaymarchMs = ms;
         }
@@ -561,7 +562,7 @@ void SdfRenderer::encodeRaymarchPass(wgpu::CommandEncoder& encoder, const wgpu::
     desc.colorAttachmentCount = count;
     desc.colorAttachments = attachments.data();
     desc.depthStencilAttachment = &depthAttachment;
-    desc.timestampWrites = im.timer->passWrites();
+    desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("sdf") : nullptr;
     wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&desc);
     pass.SetPipeline(im.raymarchPipeline);
     pass.SetBindGroup(0, frameBindGroup);
@@ -576,7 +577,6 @@ void SdfRenderer::encodeRaymarchPass(wgpu::CommandEncoder& encoder, const wgpu::
         pass.Draw(6);
     }
     pass.End();
-    im.timer->resolve(encoder);
     im.passThisFrame = true;
     stats_.raymarchMs = im.lastRaymarchMs;
 }

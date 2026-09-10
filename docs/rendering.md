@@ -13,8 +13,11 @@ Decision: ADR-001 (WebGPU via Dawn). Research: `docs/research/rendering.md`,
   an error scope and reads `GetCompilationInfo` so failures carry `file:line:col` diagnostics.
 - `gpu::RenderTarget`: colour (+depth) offscreen textures. `gpu::TargetView`: a view someone else
   owns (swapchain, capture texture).
-- `gpu::GpuTimer`: two timestamps per frame resolved through a 4-slot mapped-buffer ring; never
-  stalls; reports -1 without the feature.
+- `gpu::FrameTimeline`: one timestamp per pass, written at the pass's end into a single query set
+  in submission order, so a pass costs `end[i] - end[i-1]` and the passes partition the frame.
+  Resolved once per frame through a 4-slot mapped-buffer ring; never stalls; reports -1 without
+  the feature. It replaced per-pass begin/end pairs, which measured the wrong thing entirely --
+  see docs/performance.md.
 - `gpu::readTexture8`, `readTextureF16`, `hashImage`, `writePpm`: synchronous readback for tests
   and captures; `gpu::ReadbackRing`: asynchronous readback through three staging buffers for the
   offline render job (ADR-020 revision).

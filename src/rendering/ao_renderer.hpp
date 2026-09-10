@@ -24,6 +24,7 @@
 
 namespace avgen::gpu {
 class Context;
+class FrameTimeline;
 class ShaderLibrary;
 } // namespace avgen::gpu
 
@@ -65,6 +66,9 @@ public:
     // Encodes the occlusion pass and the temporal pass. `frameBindGroup` must be the variant whose
     // AO binding is a placeholder.
     void encode(wgpu::CommandEncoder& encoder, const wgpu::BindGroup& frameBindGroup);
+    // The shared frame timeline (gpu/frame_timeline.hpp) this renderer's passes mark themselves
+    // on. Null leaves them untimed.
+    void setTimeline(gpu::FrameTimeline* timeline);
     void collectTimings();
     // Invalidates the temporal history (a scene change, a camera cut, a fresh renderer).
     void resetHistory();
