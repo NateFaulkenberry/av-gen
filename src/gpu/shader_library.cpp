@@ -23,6 +23,38 @@ std::vector<std::filesystem::path> ShaderLibrary::defaultSearchDirs(const std::f
     dirs.push_back(exeDir / ".." / "Resources" / "shaders"); // app bundle layout
 #ifdef AVGEN_SHADER_SOURCE_DIR
     dirs.emplace_back(AVGEN_SHADER_SOURCE_DIR);
+    // Shaders are read from the working tree at run time, but the structs they share with C++ --
+    // FrameUniforms above all -- are compiled into the binary. Run an old binary against newer
+    // shaders and the two disagree about a uniform block's size, which surfaces from Dawn as a
+    // pipeline-creation failure about minBindingSize and says nothing about the real cause. This
+    // has cost real time twice, so say it plainly before it happens.
+    std::error_code ec;
+    const auto exeTime = std::filesystem::last_write_time(executablePath, ec);
+    if (!ec) {
+        std::filesystem::path newest;
+        std::filesystem::file_time_type newestTime{};
+        for (const auto& entry :
+             std::filesystem::directory_iterator(std::filesystem::path(AVGEN_SHADER_SOURCE_DIR), ec)) {
+            if (ec) {
+                break;
+            }
+            if (entry.path().extension() != ".wgsl") {
+                continue;
+            }
+            const auto t = entry.last_write_time(ec);
+            if (!ec && t > newestTime) {
+                newestTime = t;
+                newest = entry.path();
+            }
+        }
+        if (!newest.empty() && newestTime > exeTime) {
+            log::warn("shaders on disk are newer than this binary ({} was modified after {} was "
+                      "linked). They are loaded from the working tree, so a uniform block that "
+                      "changed on both sides will fail pipeline creation with a minBindingSize "
+                      "mismatch. Rebuild this configuration if that happens.",
+                      newest.filename().string(), executablePath.filename().string());
+        }
+    }
 #endif
     return dirs;
 }
