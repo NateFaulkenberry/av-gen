@@ -143,6 +143,52 @@ instances submitted, or the tiles they touch. The levers that do not work, and a
 not to: draw consolidation (all indirect draws together are 0.23 ms), triangle reduction,
 resolution reduction, and impostors as currently built.
 
+## Corrected model: geometry, not instances (2026-09-10, later)
+
+An earlier section here concluded the cost was "per drawn instance, and almost nothing else".
+That was the right observation and the wrong model, and the difference matters because it points
+at a different fix.
+
+Controlled scenes (spheres on a grid, `bench_many` / `bench_few`), 1440x900, calibration 3.1-5.5 ms:
+
+| instances | tris each | total tris | frame min |
+|---|---|---|---|
+| 4096 | 960 | 3.93M | 10.4-12.2 ms |
+| 256 | 16128 | 4.13M | 12.5-13.7 ms |
+| 4096 | 960 | 3.93M | 10.42 ms |
+| 4096 | 240 | 0.92M | 6.50 ms |
+| 4096 | 60 | 0.20M | 5.68 ms |
+
+Holding total triangles fixed and collapsing 4096 instances into 256 changes nothing. Holding
+instances fixed and cutting triangles 20x takes 10.4 ms to 5.7. So the frame is **linear in
+triangles actually drawn** (about 0.75 Gtri/s here) plus a small per-instance floor near 1.3 us.
+Culling instances looked like the driver only because culling an instance also removes its
+geometry.
+
+Three consequences, all of which kill an optimisation that looked obvious:
+
+- **Merging many small instances into fewer large meshes buys nothing.** Same geometry, same cost.
+  Worth knowing before building a vegetation-clustering system.
+- **Billboard impostors make it worse.** Pushing the ladder so most instances draw as camera-facing
+  quads cost +11.6 ms at an identical drawn count: they trade geometry for fill, and a quad
+  circumscribing the source's bounding sphere covers far more pixels than the plant it replaces.
+- **Moving instances from LOD0 to LOD1 is nearly free either way** (338 -> 79 -> 29 -> 10 at LOD0
+  moves the frame 21.3 -> 20.9 -> 21.0 -> 21.6). The half-resolution mesh is not much cheaper than
+  the full one for meshes this small.
+
+Where the 21 ms goes at 1440x900: terrain and everything else about 10 ms, ground cover 7.0,
+trees 3.7, rocks free. Shadows, AO, volumetrics and post together are 2.2. Draw submission is 0.23.
+
+**And the CPU is not waiting.** Wall-clock min 20.76 against a GPU frame of 20.97 at 1440x900,
+44.30 against 42.60 at 2880x1800. P3 (queue pipelining) has nothing to recover; the earlier 7 ms
+gap was measured with the camera facing empty sky, where the GPU is idle enough for fixed costs
+to show.
+
+So there is no large algorithmic win hiding here. The renderer draws roughly the geometry it is
+asked to draw, at a sane rate. Getting the frame down means drawing less vegetation, or finding a
+distant representation that is cheaper in *both* geometry and fill -- which billboards, as built,
+are not. That is an art-direction decision as much as an engineering one.
+
 ## Measure a reference scene alongside, every time (2026-09-10)
 
 The machine drifts. Mid-session, `examples/world/_skyonly.scene.json` at 1280x720 went from
