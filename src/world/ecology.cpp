@@ -250,11 +250,46 @@ std::uint64_t Ecology::structuralHash() const {
     for (const ScatterLayer& l : layers) {
         h.u64(l.structuralHash());
     }
+    // Clearances are structural: moving a corridor has to replant the world, not merely redraw it.
+    h.u64(clearances.size());
+    for (const ScatterClearance& c : clearances) {
+        h.f32(c.center.x);
+        h.f32(c.center.y);
+        h.f32(c.radius);
+        h.f32(c.softness);
+        h.f32(c.strength);
+        h.f32(c.minHeight);
+    }
     return h.value();
 }
 
+float clearanceWeight(std::span<const ScatterClearance> clearances, glm::vec2 p, float layerHeight) {
+    float weight = 1.0f;
+    for (const ScatterClearance& c : clearances) {
+        if (c.radius <= 0.0f || c.strength <= 0.0f) {
+            continue;
+        }
+        if (c.minHeight > 0.0f && layerHeight < c.minHeight) {
+            continue;   // short enough to grow in the lane
+        }
+        const float distance = glm::length(p - c.center);
+        // Smooth from the rim outwards. A hard edge reads as a stencil cut in the vegetation --
+        // the eye finds the circle rather than the clearing -- so `softness` is the metres over
+        // which the world grows back.
+        const float outside = c.softness > 0.0f
+                                  ? glm::smoothstep(c.radius, c.radius + c.softness, distance)
+                                  : (distance >= c.radius ? 1.0f : 0.0f);
+        weight *= glm::mix(1.0f, outside, glm::clamp(c.strength, 0.0f, 1.0f));
+        if (weight <= 0.0f) {
+            return 0.0f;
+        }
+    }
+    return weight;
+}
+
 spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
-                            std::span<const glm::vec3> anchors) {
+                            std::span<const glm::vec3> anchors,
+                            std::span<const ScatterClearance> clearances) {
     spatial::PointCloud out;
     const float peak = peakDensity(layer);
     if (peak <= 0.0f || map.biomes.empty()) {
@@ -340,6 +375,11 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
                 within(s.altitude, layer.minAltitude, layer.maxAltitude) <= 0.0f) {
                 continue;
             }
+            // Before the biome is consulted: a cleared point is cleared whatever grows there.
+            const float clearing = clearanceWeight(clearances, p, layer.height);
+            if (clearing <= 0.0f) {
+                continue;
+            }
             const BiomeWeights w = map.biomes.at(s.altitude, s.slope, s.moisture, p);
             float density = 0.0f;
             for (const auto& [index, value] : byIndex) {
@@ -359,7 +399,7 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
                                                 layer.seed ^ 0x5bf03635u);
                 density *= glm::mix(1.0f, glm::clamp(patch * 2.0f, 0.0f, 1.6f), layer.clustering);
             }
-            const float expected = density * cellArea * habitatWeight;
+            const float expected = density * cellArea * habitatWeight * clearing;
             if (random01(layer.seed, cellId, kAcceptChannel) >= expected) {
                 continue;
             }
@@ -398,6 +438,50 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
 }
 
 // ---- json ----------------------------------------------------------------------------------------
+
+Result<std::vector<ScatterClearance>> clearancesFromJson(const json& j) {
+    if (!j.is_array()) {
+        return fail("'clearings' must be an array");
+    }
+    std::vector<ScatterClearance> out;
+    for (const json& e : j) {
+        if (!e.is_object()) {
+            return fail("'clearings' entries must be objects");
+        }
+        ScatterClearance c;
+        if (!e.contains("center") || !e.at("center").is_array() || e.at("center").size() != 2) {
+            return fail("a clearing needs a 'center' of [x, z]");
+        }
+        c.center = glm::vec2(e.at("center")[0].get<float>(), e.at("center")[1].get<float>());
+        if (!e.contains("radius") || !e.at("radius").is_number()) {
+            return fail("a clearing needs a numeric 'radius'");
+        }
+        c.radius = e.at("radius").get<float>();
+        if (e.contains("softness") && e.at("softness").is_number()) {
+            c.softness = e.at("softness").get<float>();
+        }
+        if (e.contains("strength") && e.at("strength").is_number()) {
+            c.strength = e.at("strength").get<float>();
+        }
+        if (e.contains("minHeight") && e.at("minHeight").is_number()) {
+            c.minHeight = e.at("minHeight").get<float>();
+        }
+        out.push_back(c);
+    }
+    return out;
+}
+
+json clearancesToJson(const std::vector<ScatterClearance>& clearances) {
+    json out = json::array();
+    for (const ScatterClearance& c : clearances) {
+        out.push_back(json{{"center", {c.center.x, c.center.y}},
+                           {"radius", c.radius},
+                           {"softness", c.softness},
+                           {"strength", c.strength},
+                           {"minHeight", c.minHeight}});
+    }
+    return out;
+}
 
 Result<Ecology> ecologyFromJson(const json& j) {
     if (!j.is_array()) {

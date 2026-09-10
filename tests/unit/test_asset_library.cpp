@@ -150,8 +150,18 @@ TEST_CASE("The grouped manifest already in the repository still loads", "[assets
     CHECK(tree->hasTag("background"));
     CHECK(tree->triangles == 72);
     CHECK(tree->naturalSize.y > 1.0f);
-    // With no preferredScale authored, height falls back to the mesh's own bounds.
-    CHECK_THAT(tree->effectiveHeight(), Catch::Matchers::WithinAbs(static_cast<double>(tree->naturalSize.y), 1e-6));
+    // The manifest is authored data and states what a tree actually is: Kenney's mesh is 1.69 units
+    // tall, and a tree in this world is nine metres. The naturalSize fallback is asserted against a
+    // descriptor built here rather than against whichever shipped entry happens to be unauthored --
+    // it was pinned on this one, and enriching the library broke a test about a defaulting rule
+    // that had not changed.
+    CHECK(tree->effectiveHeight() > 5.0f);
+    CHECK(tree->material.emissive < 0.25f);   // the canopy is a silhouette, not a light
+
+    assets::AssetDescriptor unauthored;
+    unauthored.naturalSize = glm::vec3(0.4f, 1.6877f, 0.46f);
+    CHECK_THAT(unauthored.effectiveHeight(),
+               Catch::Matchers::WithinAbs(static_cast<double>(unauthored.naturalSize.y), 1e-6));
 
     assets::AssetQuery rocks;
     rocks.category = assets::AssetCategory::Rock;

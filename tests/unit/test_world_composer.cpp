@@ -177,13 +177,16 @@ TEST_CASE("The composition has a focal subject and deliberate empty regions", "[
         CHECK(glm::length(v.center - plan.focal[0].center) >= (v.radius + plan.focal[0].radius) * 0.9f);
     }
 
-    SECTION("negative space of zero asks for no voids") {
+    SECTION("negative space of zero asks for no discretionary voids") {
         auto recipe = testRecipe();
         recipe.composition.negativeSpace = 0.0f;
         auto w = world::composeWorld(recipe, lib);
         REQUIRE(w.has_value());
-        CHECK(w->plan.voids.empty());
-        CHECK_THAT(static_cast<double>(w->plan.emptyFraction), Catch::Matchers::WithinAbs(0.0, 1e-9));
+        // The corridor is not discretionary -- the brief makes it mandatory and it is what keeps a
+        // dense world from putting a trunk across the lens -- so `negativeSpace` sets how generous
+        // it is, not whether it exists. Everything the weight *does* govern is gone.
+        CHECK(w->plan.voids.size() == w->plan.corridor.size());
+        CHECK(!w->plan.corridor.empty());
     }
 }
 
@@ -248,4 +251,102 @@ TEST_CASE("Composing rejects inputs that would produce an empty world", "[world]
         REQUIRE(!w.has_value());
         CHECK(w.error().message.find("match nothing") != std::string::npos);
     }
+}
+
+TEST_CASE("The composition clears a corridor from its viewpoint to its subject",
+          "[world][composer]") {
+    // Section 14 of the brief calls the negative-space corridor mandatory. It is also the thing
+    // that keeps a dense world from putting a tree trunk across the lens: the composer picks the
+    // viewpoint, so it is the only thing that can promise a clear line from it.
+    auto library = testLibrary();
+    world::WorldRecipe recipe;
+    recipe.world = "corridor";
+    recipe.seed = 7u;
+    recipe.extent = 400.0f;
+    recipe.composition.negativeSpace = 0.0f;   // asks for none; still gets a corridor
+    auto composed = world::composeWorld(recipe, library);
+    REQUIRE(composed.has_value());
+    REQUIRE(!composed->plan.focal.empty());
+    CHECK(!composed->plan.corridor.empty());
+    CHECK(composed->plan.viewpointClearance > 0.0f);
+
+    const glm::vec2 eye = composed->plan.viewpoint;
+    const glm::vec2 subject = composed->plan.focal.front().center;
+    CHECK(glm::length(eye - subject) > 1.0f);
+
+    // Every void region either leaves the viewpoint alone or is part of the corridor. A viewpoint
+    // standing inside an ordinary void renders as a bald hillside: everywhere is dense except the
+    // one place the world is seen from, which is precisely what it did.
+    for (const auto& v : composed->plan.voids) {
+        const bool isCorridor =
+            std::any_of(composed->plan.corridor.begin(), composed->plan.corridor.end(),
+                        [&](const world::VoidRegion& c) {
+                            return glm::length(c.center - v.center) < 1e-3f &&
+                                   std::abs(c.radius - v.radius) < 1e-3f;
+                        });
+        if (!isCorridor) {
+            INFO("void at " << v.center.x << "," << v.center.y << " r=" << v.radius);
+            CHECK(glm::length(v.center - eye) >= v.radius + v.softness);
+        }
+    }
+
+    // The lane spans the distance. Sampled along the line: nothing tall may grow anywhere on it.
+    const auto& clearances = composed->clearances;
+    REQUIRE(!clearances.empty());
+    // Sampled from the viewpoint to where the corridor actually ends, which is short of the
+    // subject on purpose: the lane leaves the ground the landmark stands on, so the last stretch is
+    // allowed to be planted and asserting over the whole distance would be asserting the wrong
+    // contract.
+    const glm::vec2 laneEnd = composed->plan.corridor.back().center;
+    CHECK(glm::length(laneEnd - eye) > glm::length(subject - eye) * 0.5f);
+    for (int i = 0; i <= 10; ++i) {
+        const float t = static_cast<float>(i) / 10.0f;
+        const glm::vec2 p = eye + (laneEnd - eye) * t;
+        INFO("t=" << t);
+        CHECK(world::clearanceWeight(clearances, p, 20.0f) < 0.5f);
+    }
+    // ...while the ground cover in the lane survives, because a lane through a forest has a floor.
+    CHECK(world::clearanceWeight(clearances, eye, 0.4f) > 0.5f);
+}
+
+TEST_CASE("A composed world's landmark is an asset, a size and a place", "[world][composer]") {
+    auto library = testLibrary();
+    world::WorldRecipe recipe;
+    recipe.world = "landmark";
+    recipe.seed = 3u;
+    auto composed = world::composeWorld(recipe, library);
+    REQUIRE(composed.has_value());
+    REQUIRE(!composed->plan.focal.empty());
+    const auto& focal = composed->plan.focal.front();
+    // A focal region that names a spot and nothing else is a note about a composition rather than
+    // a composition. The first generated valley had exactly that: one marked region, empty.
+    CHECK(!focal.landmarkPath.empty());
+    CHECK(focal.landmarkHeight > 20.0f);
+    CHECK(focal.landmarkScale > 1.0f);
+    // Sized from the mesh's own bounds, so the same intent survives a differently-authored pack.
+    const auto* hero = library.find(focal.assetId);
+    REQUIRE(hero != nullptr);
+    CHECK_THAT(focal.landmarkScale * hero->naturalSize.y,
+               Catch::Matchers::WithinRel(focal.landmarkHeight, 1e-4f));
+}
+
+TEST_CASE("A composed world plans its atmosphere from the recipe", "[world][composer]") {
+    auto library = testLibrary();
+    world::WorldRecipe recipe;
+    recipe.world = "air";
+    recipe.atmosphere.fog = 0.1f;
+    recipe.lighting.key = 0.2f;
+    auto thin = world::composeWorld(recipe, library);
+    REQUIRE(thin.has_value());
+    recipe.atmosphere.fog = 0.9f;
+    recipe.lighting.key = 0.9f;
+    auto thick = world::composeWorld(recipe, library);
+    REQUIRE(thick.has_value());
+
+    CHECK(thick->environment.fogDensity > thin->environment.fogDensity);
+    CHECK(thick->environment.sunIntensity > thin->environment.sunIntensity);
+    // Fog densities are per metre over a world hundreds of metres across. The first pass reached
+    // 0.055, which is total fog by fifty metres -- the whole valley in a glass of milk.
+    CHECK(thick->environment.fogDensity < 0.02f);
+    CHECK(thin->environment.fogDensity > 0.0f);
 }

@@ -9,6 +9,7 @@
 #include "world/biome.hpp"
 #include "core/noise.hpp"
 #include "world/ecology.hpp"
+#include "world/world_composer.hpp"
 #include "world/world_map.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -1104,5 +1105,104 @@ TEST_CASE("Colour that clusters in space, and glow that is rare", "[unit][world]
         REQUIRE(sparse.size() == 1);
         // A quarter of the trees light up, so the patch casts a quarter of the light.
         CHECK_THAT(d(sparse.front().power), Catch::Matchers::WithinRel(d(full.front().power) * 0.25, 1e-4));
+    }
+}
+
+TEST_CASE("Negative space is applied by the placer, not merely described", "[unit][world][ecology]") {
+    using namespace avgen;
+
+    // This exists because for a while none of it did anything. The composer emitted void regions,
+    // installWorld translated them into the scene's exclusion regions, those became reserved
+    // composition fields -- and no part of the ecology ever read any of it. A world's negative
+    // space was carried faithfully from end to end of a pipeline and dropped at the last step, so
+    // the corridor the brief calls mandatory was, in every world generated, absent.
+    SECTION("the weight is 0 inside, 1 outside, and smooth across the rim") {
+        world::ScatterClearance c;
+        c.center = glm::vec2(10.0f, -4.0f);
+        c.radius = 6.0f;
+        c.softness = 4.0f;
+        const std::array<world::ScatterClearance, 1> one{c};
+
+        CHECK(world::clearanceWeight(one, c.center) == 0.0f);
+        CHECK(world::clearanceWeight(one, c.center + glm::vec2(5.9f, 0.0f)) == 0.0f);
+        CHECK(world::clearanceWeight(one, c.center + glm::vec2(40.0f, 0.0f)) == 1.0f);
+        const float rim = world::clearanceWeight(one, c.center + glm::vec2(8.0f, 0.0f));
+        CHECK(rim > 0.0f);
+        CHECK(rim < 1.0f);
+    }
+
+    SECTION("a clearance can take the canopy and leave the ground") {
+        world::ScatterClearance c;
+        c.center = glm::vec2(0.0f);
+        c.radius = 20.0f;
+        c.minHeight = 1.2f;
+        const std::array<world::ScatterClearance, 1> one{c};
+        CHECK(world::clearanceWeight(one, glm::vec2(0.0f), 9.0f) == 0.0f);   // a tree goes
+        CHECK(world::clearanceWeight(one, glm::vec2(0.0f), 0.4f) == 1.0f);   // the grass stays
+    }
+
+    SECTION("scatter places nothing inside a clearance") {
+        world::WorldMap map;
+        map.size = glm::vec2(200.0f, 200.0f);
+        map.biomes = world::composerBiomes();
+
+        world::ScatterLayer layer;
+        layer.name = "fern";
+        layer.asset = "fern.glb";
+        layer.height = 0.8f;
+        layer.seed = 11u;
+        layer.avoidWater = false;
+        layer.maxSlope = 1.0f;
+        for (const auto& biome : map.biomes.biomes) {
+            layer.densities.push_back({biome.name, 0.25f});
+        }
+
+        const auto open = world::scatter(map, layer);
+        REQUIRE(open.positions().size() > 200);
+
+        world::ScatterClearance c;
+        c.center = glm::vec2(0.0f);
+        c.radius = 40.0f;
+        const std::array<world::ScatterClearance, 1> one{c};
+        const auto cleared = world::scatter(map, layer, {}, one);
+        CHECK(cleared.positions().size() < open.positions().size());
+        for (const glm::vec3& p : cleared.positions()) {
+            INFO("instance at " << p.x << "," << p.z);
+            CHECK(glm::length(glm::vec2(p.x, p.z) - c.center) >= c.radius);
+        }
+    }
+
+    SECTION("clearances survive a scene round trip") {
+        // Where they were actually lost. `scatter` is a bare JSON array -- the ecology *is* the
+        // list of layers in the file format -- so a property of the whole world has nowhere inside
+        // it to live, and an offline render reloads the project from a file before drawing it.
+        std::vector<world::ScatterClearance> before;
+        world::ScatterClearance a;
+        a.center = glm::vec2(12.5f, -30.25f);
+        a.radius = 18.0f;
+        a.softness = 6.5f;
+        a.strength = 0.75f;
+        a.minHeight = 1.2f;
+        before.push_back(a);
+
+        const auto doc = world::clearancesToJson(before);
+        auto after = world::clearancesFromJson(doc);
+        REQUIRE(after.has_value());
+        REQUIRE(after->size() == 1);
+        CHECK_THAT((*after)[0].center.x, Catch::Matchers::WithinAbs(12.5, 1e-5));
+        CHECK_THAT((*after)[0].center.y, Catch::Matchers::WithinAbs(-30.25, 1e-5));
+        CHECK_THAT((*after)[0].radius, Catch::Matchers::WithinAbs(18.0, 1e-5));
+        CHECK_THAT((*after)[0].softness, Catch::Matchers::WithinAbs(6.5, 1e-5));
+        CHECK_THAT((*after)[0].strength, Catch::Matchers::WithinAbs(0.75, 1e-5));
+        CHECK_THAT((*after)[0].minHeight, Catch::Matchers::WithinAbs(1.2, 1e-5));
+
+        // And they are structural: moving a corridor has to replant the world.
+        world::Ecology one;
+        one.clearances = before;
+        world::Ecology two;
+        two.clearances = *after;
+        CHECK(one.structuralHash() == two.structuralHash());
+        two.clearances[0].radius += 1.0f;
+        CHECK(one.structuralHash() != two.structuralHash());
     }
 }

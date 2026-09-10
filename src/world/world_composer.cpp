@@ -1,5 +1,7 @@
 #include "world/world_composer.hpp"
 
+#include "core/log.hpp"
+
 #include "core/noise.hpp"
 
 #include <algorithm>
@@ -108,6 +110,128 @@ std::vector<BiomeDensity> biomesFor(assets::AssetCategory c, float density) {
         return {{"forest", density}};
     }
 }
+
+// ---- art direction ----------------------------------------------------------------------------
+//
+// Section 15 of the brief is a luminance hierarchy, and it is a hierarchy rather than a set of
+// brightnesses: the background is mostly dark, general vegetation is subtle, special plants are
+// moderate, the landmark is strong, and rare accents are extremely bright. A world where every
+// glowing thing glows equally is the "particle screensaver" failure wearing a forest costume --
+// there is nothing to look at because everything is equally worth looking at.
+//
+// The library says what kind of thing a species is; the recipe says how brightly this world burns.
+// So the tier is chosen from tags and band, and what it produces is a multiplier -- never an
+// absolute intensity, which would let a manifest overrule the recipe.
+struct EmissionTier {
+    float intensity;    // multiplies the asset's own emissive weight
+    float sparsity;     // fraction of specimens that stay dark
+    int paletteRole;    // 0 shadow, 1 secondary, 2 primary, 3 foliage, 4 accent
+};
+
+EmissionTier emissionTierFor(const assets::AssetDescriptor& asset, DepthBand band) {
+    // Rare accents first: they are defined by being rare, so they must not be reachable by any
+    // other rule. Almost none of them are lit, and the ones that are are the brightest thing in
+    // the world by a wide margin.
+    if (asset.hasTag("rare") || asset.hasTag("accent")) {
+        return {7.5f, 0.88f, 4};
+    }
+    if (asset.hasTag("special")) {
+        return {2.4f, 0.55f, 1};
+    }
+    if (asset.category == assets::AssetCategory::Fungi) {
+        return {1.7f, 0.45f, 2};
+    }
+    switch (band) {
+    case DepthBand::Background:
+        // Silhouettes. A ridge line that glows is a ridge line that stops being a ridge line.
+        return {0.22f, 0.80f, 2};
+    case DepthBand::Midground:
+        return {0.55f, 0.65f, 3};
+    case DepthBand::Foreground:
+        return {0.40f, 0.72f, 3};
+    }
+    return {0.5f, 0.6f, 3};
+}
+
+glm::vec3 roleColor(const PaletteRoles& roles, int role) {
+    switch (role) {
+    case 0:
+        return roles.shadow;
+    case 1:
+        return roles.secondary;
+    case 2:
+        return roles.primary;
+    case 3:
+        return roles.foliage;
+    default:
+        return roles.accent;
+    }
+}
+
+// How far a band's material is pulled toward the colour of the air. This is aerial perspective
+// applied to the material rather than to the pixel: fog already handles what happens between the
+// camera and a distant object, but a ridge of trees whose *own* colour is the same saturated green
+// as the fern at the viewer's feet reads as a flat cut-out no matter how much fog is in front of
+// it. Depth is a colour relationship before it is a fog integral.
+float shadowPullFor(DepthBand band) {
+    switch (band) {
+    case DepthBand::Background:
+        return 0.62f;
+    case DepthBand::Midground:
+        return 0.30f;
+    case DepthBand::Foreground:
+        return 0.10f;
+    }
+    return 0.3f;
+}
+
+EnvironmentPlan planEnvironment(const WorldRecipe& recipe, const PaletteRoles& roles) {
+    const AtmosphereWeights& air = recipe.atmosphere;
+    const LightingWeights& light = recipe.lighting;
+    EnvironmentPlan env;
+
+    // The sky is the shadow colour, three ways: nearly black overhead, lifted at the horizon by a
+    // trace of the world's own light, and darker still on the ground half. A single flat colour is
+    // what the first generated world had, and a flat sky gives a silhouette nothing to sit against.
+    env.skyZenith = roles.shadow * 0.30f;
+    env.skyHorizon = glm::mix(roles.shadow, roles.primary, 0.10f + 0.10f * light.bioluminescence) * 0.85f;
+    env.skyGround = roles.shadow * 0.12f;
+    env.skyIntensity = glm::mix(0.06f, 0.42f, light.key);
+
+    // The key is a moon: cool, small, weak, and present only to put an edge on form. Its colour
+    // leans on the secondary rather than being white, so it belongs to the palette too.
+    env.sunColor = glm::mix(glm::vec3(0.72f, 0.80f, 1.0f), roles.secondary, 0.30f);
+    env.sunIntensity = glm::mix(0.25f, 3.6f, light.key);
+    env.sunSize = 0.022f;
+    env.sunGlow = 0.55f;
+    env.haze = glm::mix(0.12f, 0.7f, air.depthHaze);
+    env.keyLight = glm::mix(0.12f, 0.75f, light.key);
+
+    // Fog carries the palette, because fog is the colour of distance and distance is most of the
+    // frame. It is mixed toward the primary light rather than being pure shadow: air in a world
+    // that lights itself is full of that light. Kept dark, though -- the first pass mixed 40% of
+    // the way to cyan at full brightness and the result was a valley in a glass of milk.
+    env.fogColor = glm::mix(roles.shadow, roles.primary, 0.08f + 0.14f * light.bioluminescence) * 0.6f;
+    // Densities are per metre and the world is hundreds of metres across, so this range is much
+    // narrower than it looks: 0.010 already leaves 13% of a ridge at two hundred metres. The first
+    // pass topped out at 0.055, which is total fog by fifty metres.
+    env.fogDensity = glm::mix(0.0008f, 0.0105f, air.fog);
+    // Ground-hugging, and scaled to the world: fog that reaches the top of a forty-metre landmark
+    // hides the landmark. The falloff is in inverse metres, so a bigger world needs a slacker one.
+    const float span = std::max(recipe.extent, 1.0f);
+    env.fogHeight = span * 0.008f;
+    env.fogHeightFalloff = glm::mix(0.14f, 0.045f, air.fog) * (400.0f / span);
+
+    env.volumeDensity = glm::mix(0.0005f, 0.0085f, light.volumetric);
+    env.volumeScattering = glm::mix(0.3f, 0.95f, light.volumetric);
+    env.volumeAbsorption = glm::mix(0.02f, 0.16f, air.fog);
+    env.volumeAnisotropy = 0.55f;   // forward-scattering, so the moon has a direction
+    env.volumeEmission = glm::mix(0.0f, 0.22f, light.bioluminescence * air.spores);
+    env.volumeNoise = glm::mix(0.2f, 1.1f, air.spores);
+    env.volumeNoiseScale = span * 0.12f;
+    env.volumeNoiseSpeed = 0.02f + 0.05f * air.spores;
+    return env;
+}
 } // namespace
 
 BiomeSet composerBiomes() {
@@ -196,6 +320,8 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
     }
 
     ComposedWorld out;
+    const PaletteRoles roles = paletteRoles(recipe.art);
+    out.environment = planEnvironment(recipe, roles);
 
     // ---- the focal subject -------------------------------------------------------------------
     // One thing the shot is about. Chosen as the most important asset the library offers, which is
@@ -219,6 +345,13 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
         f.radius = lerp(0.04f, 0.09f, hash01(recipe.seed, 13u)) * recipe.extent;
         f.strength = recipe.composition.focalStrength;
         f.assetId = hero->id;
+        // The landmark itself, sized to be unarguable. A tree that is nine metres tall in the
+        // population is forty at the focal point: the point of a landmark is that no amount of
+        // ordinary vegetation could be mistaken for it, and "somewhat bigger" reads as an
+        // accident of the scatter's scale variation rather than as a decision.
+        f.landmarkPath = library.resolve(*hero).generic_string();
+        f.landmarkHeight = hero->effectiveHeight() * lerp(3.2f, 5.4f, recipe.composition.focalStrength);
+        f.landmarkScale = hero->naturalSize.y > 1e-3f ? f.landmarkHeight / hero->naturalSize.y : 1.0f;
         out.plan.focal.push_back(f);
     }
 
@@ -243,6 +376,68 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
         }
         if (!clashes) {
             out.plan.voids.push_back(v);
+        }
+    }
+
+    // ---- the viewpoint and the corridor --------------------------------------------------------
+    // Chosen here rather than by whoever installs the world, because everything below is arranged
+    // relative to it. The distance is set by the landmark: about three times its height frames it
+    // whole on a normal lens, and tying the stand-off to the subject rather than to the map keeps
+    // the framing when a recipe changes the world's size.
+    if (!out.plan.focal.empty()) {
+        const FocalRegion& subject = out.plan.focal.front();
+        const float landmark = subject.landmarkHeight > 0.0f ? subject.landmarkHeight
+                                                             : recipe.extent * 0.06f;
+        const float back = std::max(landmark * 3.0f, 45.0f);
+        // Approached off-axis so the composition is not symmetrical about the frame's centre.
+        const float bearing = 6.2831853f * (hash01(recipe.seed, 61u) * 0.25f + 0.1f);
+        out.plan.viewpoint = subject.center + glm::vec2(std::cos(bearing), std::sin(bearing)) * back;
+
+        // The lane. Wide enough at the near end that nothing is in the lens and the eye has
+        // somewhere to enter the frame; narrowing toward the subject so the subject keeps the
+        // material around it that gives it scale. Cleared to just short of the focal radius: a
+        // corridor that runs all the way in would strip the ground the landmark stands on.
+        // Voids are chosen before the viewpoint exists, so nothing has yet stopped one from landing
+        // on top of it. A viewpoint standing in the middle of a fifty-metre empty region renders as
+        // a bald hillside: the world is dense everywhere except the one place it is seen from. The
+        // corridor is the only emptiness the viewpoint is entitled to.
+        const std::size_t before = out.plan.voids.size();
+        std::erase_if(out.plan.voids, [&](const VoidRegion& v) {
+            return glm::length(v.center - out.plan.viewpoint) < v.radius + v.softness;
+        });
+        if (out.plan.voids.size() != before) {
+            log::debug("world '{}': dropped {} void region(s) that contained the viewpoint",
+                       recipe.world, before - out.plan.voids.size());
+        }
+
+        const glm::vec2 toSubject = subject.center - out.plan.viewpoint;
+        const float length = glm::length(toSubject);
+        if (length > 1e-3f) {
+            const glm::vec2 dir = toSubject / length;
+            // Stops at the focal region's rim rather than inside it. A corridor that runs all the
+            // way in strips the ground the landmark stands on, and the landmark loses the material
+            // around it that gives it a sense of scale.
+            const float reach = std::max(length - subject.radius * 1.15f, 0.0f);
+            // Width scales with the recipe's appetite for empty space, but never to nothing: the
+            // corridor is mandatory, so `negativeSpace` sets how generous it is and not whether it
+            // exists. A world that asks for no negative space still gets a clear line of sight.
+            const float nearWidth = std::max(landmark * (0.10f + 0.16f * recipe.composition.negativeSpace), 7.0f);
+            const float farWidth = nearWidth * 0.35f;
+            const int steps = std::max(static_cast<int>(reach / std::max(nearWidth * 0.7f, 1.0f)), 3);
+            for (int i = 0; i <= steps; ++i) {
+                const float t = static_cast<float>(i) / static_cast<float>(steps);
+                VoidRegion v;
+                v.center = out.plan.viewpoint + dir * (reach * t);
+                v.radius = lerp(nearWidth, farWidth, t);
+                v.softness = v.radius * 0.6f;
+                // Only the canopy. The lane exists so nothing large stands between the viewpoint
+                // and the subject; the ground cover in it is what gives the lane a floor.
+                v.clearsAbove = 1.2f;
+                out.plan.corridor.push_back(v);
+            }
+            out.plan.viewpointClearance = nearWidth;
+            out.plan.voids.insert(out.plan.voids.end(), out.plan.corridor.begin(),
+                                  out.plan.corridor.end());
         }
     }
 
@@ -281,7 +476,19 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
         layer.alignToGround = asset.variation.lean;
         layer.hueRandom = asset.variation.hue;
         layer.emissiveRandom = asset.variation.emissive;
-        layer.tint = asset.material.tint;
+        // The palette is applied here rather than being left to the assets, which is what section
+        // 16 means by a controlled palette: the library is one pack authored in one set of colours,
+        // and a world is a decision about colour laid over it. Living things are pulled toward the
+        // foliage colour; everything is pulled toward the colour of the air by its distance.
+        glm::vec3 tint = asset.material.tint;
+        const bool living = asset.category == assets::AssetCategory::Flora ||
+                            asset.category == assets::AssetCategory::Fungi ||
+                            asset.category == assets::AssetCategory::Organic;
+        if (living) {
+            tint = tintTowards(tint, roles.foliage, 0.45f * recipe.art.saturation);
+        }
+        layer.tint = tintTowards(tint, roles.shadow,
+                                 shadowPullFor(band) * recipe.atmosphere.depthHaze);
         layer.clusterScale = tune.clusterScale;
         layer.clustering = tune.clustering;
         layer.viewDistance = tune.viewDistance;
@@ -290,12 +497,24 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
         layer.maxInstances = tune.maxInstances;
         layer.meshBudget = asset.triangles > 0 ? std::max(asset.triangles / 2, 24) : 0;
 
-        // Emission comes from the material profile and is scaled by how much of the world's light
-        // the recipe says the world itself provides.
-        if (asset.material.emissive > 0.0f) {
-            layer.emissiveColor = asset.material.tint;
-            layer.emissiveIntensity = asset.material.emissive * recipe.lighting.bioluminescence * 3.0f;
-            layer.emissiveSparsity = std::clamp(1.0f - asset.material.emissive, 0.0f, 0.85f);
+        // Emission: the section 15 ladder. The asset's own emissive weight says whether this kind
+        // of thing glows at all; the tier says where it sits in the hierarchy; the recipe says how
+        // much of this world's light comes from the world. The colour is the palette's, by role,
+        // not the asset's -- a library authored in reds does not get to decide that a world lit in
+        // cyan has red lights in it.
+        if (asset.material.emissive > 0.0f && recipe.lighting.bioluminescence > 0.0f) {
+            const EmissionTier tier = emissionTierFor(asset, band);
+            layer.emissiveColor = roleColor(roles, tier.paletteRole);
+            layer.emissiveIntensity =
+                asset.material.emissive * tier.intensity * recipe.lighting.bioluminescence * 2.6f;
+            layer.emissiveSparsity = std::clamp(tier.sparsity, 0.0f, 0.95f);
+            // The hue of a glowing population drifts across the map and over time rather than
+            // being one colour repeated, which is what keeps a field of lights reading as biology.
+            layer.hueField = 0.06f + 0.10f * recipe.art.chaos;
+            layer.hueFieldScale = std::max(recipe.extent * 0.14f, 12.0f);
+            layer.chromaDrift = 0.35f * recipe.art.organicMotion;
+            layer.chromaDriftScale = std::max(recipe.extent * 0.16f, 18.0f);
+            layer.chromaDriftSpeed = 0.02f + 0.05f * recipe.art.organicMotion;
         }
 
         // ---- ecology relations ---------------------------------------------------------------
@@ -370,6 +589,19 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
         sorted.push_back(std::move(out.layers[i]));
     }
     out.layers = std::move(sorted);
+
+    // The negative space, handed to the placer. `plan.voids` already carries both the scattered
+    // empty regions and the corridor; this is the same set in the type the ecology consumes.
+    out.clearances.reserve(out.plan.voids.size());
+    for (const VoidRegion& v : out.plan.voids) {
+        ScatterClearance c;
+        c.center = v.center;
+        c.radius = v.radius;
+        c.softness = v.softness;
+        c.strength = 1.0f;
+        c.minHeight = v.clearsAbove;
+        out.clearances.push_back(c);
+    }
 
     // Reported rather than enforced: what the composition covers and what it deliberately gives
     // back. A caller that wants a sparser world lowers the weights; the composer does not overrule.

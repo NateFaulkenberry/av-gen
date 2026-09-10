@@ -44,6 +44,65 @@ scene::CompositionNode defaultTerrainFor(const world::WorldRecipe& recipe) {
     node.worldMap.biomes = world::composerBiomes();
     return node;
 }
+
+// Parameter writes, by path. A generated world's atmosphere is expressed as parameter *base*
+// values on purpose: it is then exactly as editable, automatable, routable and saveable as a value
+// somebody typed into the inspector, and a second "generated environment" state that overrides the
+// parameter system would be a second source of truth for the same numbers.
+void setFloat(Engine& engine, const std::string& path, float value) {
+    if (auto* p = engine.params().find(path)) {
+        if (auto* f = dynamic_cast<params::Parameter<float>*>(p)) {
+            f->setBase(value);
+            return;
+        }
+    }
+    log::debug("world: no float parameter '{}'", path);
+}
+
+void setVec3(Engine& engine, const std::string& path, const glm::vec3& value) {
+    if (auto* p = engine.params().find(path)) {
+        if (auto* v = dynamic_cast<params::Parameter<glm::vec3>*>(p)) {
+            v->setBase(value);
+            return;
+        }
+    }
+    log::debug("world: no vec3 parameter '{}'", path);
+}
+
+void setBool(Engine& engine, const std::string& path, bool value) {
+    if (auto* p = engine.params().find(path)) {
+        if (auto* b = dynamic_cast<params::Parameter<bool>*>(p)) {
+            b->setBase(value);
+        }
+    }
+}
+
+void applyEnvironment(Engine& engine, const world::EnvironmentPlan& env) {
+    setBool(engine, "env/sky/enabled", true);
+    setBool(engine, "env/sky/background", true);
+    setVec3(engine, "env/sky/zenithColor", env.skyZenith);
+    setVec3(engine, "env/sky/horizonColor", env.skyHorizon);
+    setVec3(engine, "env/sky/groundColor", env.skyGround);
+    setVec3(engine, "env/sky/sunColor", env.sunColor);
+    setFloat(engine, "env/sky/intensity", env.skyIntensity);
+    setFloat(engine, "env/sky/sunIntensity", env.sunIntensity);
+    setFloat(engine, "env/sky/sunSize", env.sunSize);
+    setFloat(engine, "env/sky/sunGlow", env.sunGlow);
+    setFloat(engine, "env/sky/haze", env.haze);
+    setFloat(engine, "scene/keyLight", env.keyLight);
+    setVec3(engine, "scene/fogColor", env.fogColor);
+    setFloat(engine, "scene/fogDensity", env.fogDensity);
+    setFloat(engine, "scene/fogHeight", env.fogHeight);
+    setFloat(engine, "scene/fogHeightFalloff", env.fogHeightFalloff);
+    setFloat(engine, "scene/volumeDensity", env.volumeDensity);
+    setFloat(engine, "scene/volumeScattering", env.volumeScattering);
+    setFloat(engine, "scene/volumeAbsorption", env.volumeAbsorption);
+    setFloat(engine, "scene/volumeAnisotropy", env.volumeAnisotropy);
+    setFloat(engine, "scene/volumeEmission", env.volumeEmission);
+    setFloat(engine, "scene/volumeNoise", env.volumeNoise);
+    setFloat(engine, "scene/volumeNoiseScale", env.volumeNoiseScale);
+    setFloat(engine, "scene/volumeNoiseSpeed", env.volumeNoiseSpeed);
+}
 } // namespace
 
 Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
@@ -76,9 +135,11 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
         // The composer owns the ecology entirely, so this replaces rather than appends; otherwise
         // generating twice would double every layer.
         existing->ecology.layers = world.composed.layers;
+        existing->ecology.clearances = world.composed.clearances;
     } else {
         auto node = defaultTerrainFor(world.recipe);
         node.ecology.layers = world.composed.layers;
+        node.ecology.clearances = world.composed.clearances;
         auto added = engine.addNode(std::move(node));
         if (!added) {
             return std::unexpected(added.error());
@@ -114,6 +175,61 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
     // setComposition also marks the composition dirty, which is what schedules the rebuild; there
     // is no need to reach for the private one.
     composition->setComposition(std::move(data));
+
+    // The atmosphere. Composed from the same recipe as the ecology and applied here because it is
+    // the only half of a world that lives in parameters rather than in nodes.
+    applyEnvironment(engine, world.composed.environment);
+
+    // ---- the landmark --------------------------------------------------------------------------
+    // One enormous object that reads as a landmark. The focal region marks where the composition
+    // wants the eye to go; without something standing in it, that is a note about a composition
+    // rather than a composition, which is what the first generated valley was.
+    //
+    // It is placed as an ordinary glTF node, so it can be selected, moved, retextured and deleted
+    // like anything else in the scene, and so a person who does not like where the composer put it
+    // is not fighting a special case.
+    const scene::CompositionNode* terrainNode = nullptr;
+    for (const auto& node : composition->nodes()) {
+        if (node && node->kind == scene::NodeKind::Terrain) {
+            terrainNode = node.get();
+            break;
+        }
+    }
+    for (std::size_t i = 0; i < world.composed.plan.focal.size(); ++i) {
+        const auto& focal = world.composed.plan.focal[i];
+        if (focal.landmarkPath.empty() || focal.landmarkScale <= 0.0f) {
+            continue;
+        }
+        const std::string name = "landmark_" + std::to_string(i);
+        if (composition->findNode(name) != nullptr) {
+            composition->removeNode(name);   // regenerating replaces it rather than stacking
+        }
+        scene::CompositionNode node;
+        node.name = name;
+        node.kind = scene::NodeKind::Gltf;
+        node.asset = focal.landmarkPath;
+        // On the ground, not at y=0. A landmark floating over a valley or buried in a hillside is
+        // the most conspicuous possible way to say the placement was never checked.
+        float ground = 0.0f;
+        if (terrainNode != nullptr) {
+            ground = terrainNode->worldMap.height(focal.center);
+        }
+        node.transform.position = glm::vec3(focal.center.x, ground, focal.center.y);
+        node.transform.scale = glm::vec3(focal.landmarkScale);
+        // Turned to face nowhere in particular, deterministically, so two worlds from one seed are
+        // still the same world.
+        node.transform.rotation =
+            glm::angleAxis(static_cast<float>(world.recipe.seed % 360u) * 0.0174532925f,
+                           glm::vec3(0.0f, 1.0f, 0.0f));
+        if (auto added = engine.addNode(std::move(node)); !added) {
+            log::warn("world '{}': landmark '{}' could not be placed: {}", world.recipe.world,
+                      focal.landmarkPath, added.error().message);
+        } else {
+            log::info("world '{}': landmark {:.0f} m at ({:.0f}, {:.0f}), ground {:.1f} m",
+                      world.recipe.world, focal.landmarkHeight, focal.center.x, focal.center.y,
+                      ground);
+        }
+    }
     // Frame the camera on what was just composed, but only for a world that had no terrain before:
     // a generated world nobody can see is indistinguishable from one that failed to generate, while
     // a camera in an existing scene is somebody's decision and generating into that scene is not a
@@ -131,25 +247,37 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
         }
         if (auto* position = engine.params().find("camera/position")) {
             if (auto* vec = dynamic_cast<params::Parameter<glm::vec3>*>(position)) {
-                const glm::vec2 focus = world.composed.plan.focal.empty()
-                                            ? glm::vec2(0.0f)
-                                            : world.composed.plan.focal.front().center;
-                // *Inside* the world, low, looking across it at the focal subject. The first
-                // version stood outside the map and the map's own edge was in shot -- a straight
-                // cut across the frame that reads as a bug, because it is the boundary of the
-                // heightfield rather than anything in the world. A tenth of the extent back from
-                // the subject keeps the far edge beyond the fog and puts vegetation between the
-                // camera and its subject, which is where a foreground comes from.
+                const world::FocalRegion* focal =
+                    world.composed.plan.focal.empty() ? nullptr : &world.composed.plan.focal.front();
+                const glm::vec2 subject = focal != nullptr ? focal->center : glm::vec2(0.0f);
                 const float span = std::max(world.recipe.extent, 1.0f);
-                const glm::vec2 toEdge = glm::length(focus) > 1e-3f ? glm::normalize(focus) : glm::vec2(0.0f, 1.0f);
-                const glm::vec2 eyeXZ = focus + toEdge * (span * 0.12f);
-                const glm::vec3 eye(eyeXZ.x, span * 0.035f, eyeXZ.y);
+                const float landmark = focal != nullptr ? focal->landmarkHeight : span * 0.06f;
+                // The composer's viewpoint, not one invented here. It cleared a corridor to the
+                // subject from that exact spot, so standing anywhere else means looking at a world
+                // arranged for somewhere else -- and, in a world this dense, means starting the
+                // shot with a tree trunk across the lens. That is what the first one did.
+                const glm::vec2 eyeXZ = world.composed.plan.viewpoint;
+
+                // On the ground, at head height. The first version put the eye at a thirty-fifth of
+                // the world's width -- fifteen metres up in a four-hundred-metre valley -- which is
+                // above the canopy and above every foreground plant, so a world composed to be
+                // dense at the viewer's feet was rendered from where it has no feet.
+                float eyeGround = 0.0f;
+                if (terrainNode != nullptr) {
+                    eyeGround = terrainNode->worldMap.height(eyeXZ);
+                }
+                const glm::vec3 eye(eyeXZ.x, eyeGround + 2.4f, eyeXZ.y);
                 vec->setBase(eye);
                 if (auto* target = engine.params().find("camera/target")) {
                     if (auto* t = dynamic_cast<params::Parameter<glm::vec3>*>(target)) {
-                        // Aim slightly above the subject so the horizon sits low and the sky is in
-                        // frame: a camera aimed at the ground has nothing to establish scale against.
-                        t->setBase(glm::vec3(focus.x, span * 0.045f, focus.y));
+                        // Aimed at the landmark's lower third rather than its middle: it puts the
+                        // horizon low in frame and the subject's mass above it, and it leaves the
+                        // top of the landmark near the top of the shot instead of the centre.
+                        float subjectGround = 0.0f;
+                        if (terrainNode != nullptr) {
+                            subjectGround = terrainNode->worldMap.height(subject);
+                        }
+                        t->setBase(glm::vec3(subject.x, subjectGround + landmark * 0.34f, subject.y));
                     }
                 }
                 log::info("world '{}': camera framed on the focal region", world.recipe.world);

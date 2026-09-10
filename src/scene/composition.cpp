@@ -1962,7 +1962,7 @@ void Composition::rebuild() {
                         anchors = found->second->positions();
                     }
                 }
-                auto cloud = std::make_shared<spatial::PointCloud>(world::scatter(node.worldMap, layer, anchors));
+                auto cloud = std::make_shared<spatial::PointCloud>(world::scatter(node.worldMap, layer, anchors, node.ecology.clearances));
                 habitats.emplace(layer.name, cloud);
                 if (cloud->count() == 0) {
                     log::warn("terrain '{}': scatter '{}' placed nothing", node.name, layer.name);
@@ -3444,6 +3444,9 @@ nlohmann::json Composition::toJson() const {
             if (!node.ecology.empty()) {
                 n["scatter"] = world::ecologyToJson(node.ecology);
             }
+            if (!node.ecology.clearances.empty()) {
+                n["clearings"] = world::clearancesToJson(node.ecology.clearances);
+            }
             const world::TerrainSettings& ts = node.terrain;
             n["terrain"] = json{{"chunkSize", ts.chunkSize},   {"resolution", ts.resolution},
                                 {"lodLevels", ts.lodLevels},   {"lodDistance", ts.lodDistance},
@@ -4052,6 +4055,14 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                     ecology.error().message);
                     }
                     node.ecology = std::move(*ecology);
+                }
+                if (item.contains("clearings")) {
+                    auto clearances = world::clearancesFromJson(item.at("clearings"));
+                    if (!clearances) {
+                        return fail("scene file '{}': node '{}': {}", scenePath.string(), node.name,
+                                    clearances.error().message);
+                    }
+                    node.ecology.clearances = std::move(*clearances);
                 }
                 if (item.contains("material")) {
                     const json& m = item.at("material");

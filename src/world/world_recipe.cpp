@@ -1,7 +1,13 @@
 #include "world/world_recipe.hpp"
 
+#include "core/log.hpp"
+
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <optional>
+#include <string_view>
+#include <vector>
 #include <cmath>
 #include <fstream>
 
@@ -265,6 +271,125 @@ json WorldRecipe::toJson() const {
     a["chaos"] = art.chaos;
     j["art"] = std::move(a);
     return j;
+}
+
+
+// ---- the palette ------------------------------------------------------------------------------
+
+namespace {
+struct NamedColor {
+    std::string_view name;
+    glm::vec3 color;
+};
+
+// Linear RGB, not sRGB: everything downstream of a recipe works in linear light, and a table
+// written in sRGB would be a table that is wrong everywhere it is used. Chosen to sit together --
+// a palette is a set of colours that agree, so these are sampled around a common chroma rather
+// than being the most saturated version of each hue.
+constexpr NamedColor kPalette[] = {
+    {"black", {0.0f, 0.0f, 0.0f}},
+    {"deep_indigo", {0.035f, 0.042f, 0.115f}},
+    {"indigo", {0.070f, 0.075f, 0.215f}},
+    {"midnight_blue", {0.028f, 0.055f, 0.125f}},
+    {"slate", {0.140f, 0.155f, 0.190f}},
+    {"violet", {0.300f, 0.130f, 0.640f}},
+    {"magenta", {0.620f, 0.110f, 0.480f}},
+    {"cyan", {0.090f, 0.610f, 0.720f}},
+    {"teal", {0.070f, 0.440f, 0.430f}},
+    {"emerald", {0.110f, 0.480f, 0.290f}},
+    {"moss", {0.130f, 0.330f, 0.180f}},
+    {"jade", {0.150f, 0.560f, 0.420f}},
+    {"warm_amber", {0.950f, 0.520f, 0.140f}},
+    {"amber", {0.900f, 0.560f, 0.180f}},
+    {"gold", {0.900f, 0.700f, 0.230f}},
+    {"rust", {0.560f, 0.180f, 0.070f}},
+    {"crimson", {0.680f, 0.070f, 0.130f}},
+    {"rose", {0.850f, 0.320f, 0.420f}},
+    {"bone", {0.880f, 0.850f, 0.780f}},
+    {"white", {1.0f, 1.0f, 1.0f}},
+    {"moonlight", {0.620f, 0.700f, 0.900f}},
+    {"ice", {0.720f, 0.850f, 0.950f}},
+};
+
+std::optional<glm::vec3> parseHex(std::string_view s) {
+    if (s.size() != 7 || s.front() != '#') {
+        return std::nullopt;
+    }
+    int v[3] = {0, 0, 0};
+    for (int c = 0; c < 3; ++c) {
+        for (int d = 0; d < 2; ++d) {
+            const char ch = s[static_cast<std::size_t>(1 + c * 2 + d)];
+            int digit = 0;
+            if (ch >= '0' && ch <= '9') {
+                digit = ch - '0';
+            } else if (ch >= 'a' && ch <= 'f') {
+                digit = ch - 'a' + 10;
+            } else if (ch >= 'A' && ch <= 'F') {
+                digit = ch - 'A' + 10;
+            } else {
+                return std::nullopt;
+            }
+            v[c] = v[c] * 16 + digit;
+        }
+    }
+    // Written the way a person writes a colour -- sRGB -- and converted, because the table above is
+    // linear and a palette that mixes the two encodings is a palette where half the entries are
+    // mysteriously wrong.
+    const auto toLinear = [](int byte) {
+        const float u = static_cast<float>(byte) / 255.0f;
+        return u <= 0.04045f ? u / 12.92f : std::pow((u + 0.055f) / 1.055f, 2.4f);
+    };
+    return glm::vec3(toLinear(v[0]), toLinear(v[1]), toLinear(v[2]));
+}
+} // namespace
+
+std::optional<glm::vec3> paletteColor(std::string_view name) {
+    if (name.empty()) {
+        return std::nullopt;
+    }
+    if (auto hex = parseHex(name)) {
+        return hex;
+    }
+    for (const auto& entry : kPalette) {
+        if (entry.name == name) {
+            return entry.color;
+        }
+    }
+    return std::nullopt;
+}
+
+PaletteRoles paletteRoles(const ArtDirection& art) {
+    PaletteRoles roles;   // the defaults are a legal palette in their own right
+    std::vector<glm::vec3> resolved;
+    resolved.reserve(art.palette.size());
+    for (const auto& name : art.palette) {
+        if (auto c = paletteColor(name)) {
+            resolved.push_back(*c);
+        } else {
+            log::warn("art direction '{}': unknown palette colour '{}', ignored", art.name, name);
+        }
+    }
+    if (resolved.empty()) {
+        return roles;
+    }
+    // Fill inwards: a two-colour palette is the air and the light, which is a complete art
+    // direction for a great many worlds, and it should not have to name three more to say so.
+    const auto pick = [&](std::size_t index, glm::vec3 fallback) {
+        return index < resolved.size() ? resolved[index] : fallback;
+    };
+    roles.shadow = resolved.front();
+    roles.primary = pick(2, resolved.back());
+    roles.secondary = pick(1, roles.primary);
+    roles.foliage = pick(3, roles.primary);
+    roles.accent = pick(4, roles.secondary);
+    return roles;
+}
+
+glm::vec3 tintTowards(glm::vec3 base, glm::vec3 target, float amount) {
+    const float peak = std::max({target.r, target.g, target.b});
+    const glm::vec3 hue = peak > 1e-4f ? target / peak : glm::vec3(1.0f);
+    const float t = std::clamp(amount, 0.0f, 1.0f);
+    return base * (glm::vec3(1.0f) * (1.0f - t) + hue * t);
 }
 
 } // namespace avgen::world

@@ -42,12 +42,26 @@ struct FocalRegion {
     float radius = 20.0f;
     float strength = 1.0f;    // how far this outranks the ordinary hierarchy
     std::string assetId;      // what occupies it, resolved from the library
+    // The landmark itself. A focal region that only marks a spot is a note about a composition
+    // rather than a composition: the first generated valley had one, and nothing stood in it.
+    // `landmarkPath` is resolved against the library so a caller can place the thing without
+    // holding the library, and `landmarkHeight` is metres -- deliberately enormous, because the
+    // whole job of a landmark is to be unmistakably larger than the population it rises out of.
+    std::string landmarkPath;
+    float landmarkHeight = 0.0f;   // metres it should stand
+    // Uniform scale to apply to the mesh to reach that height. Computed here because only the
+    // composer holds both the intended height and the asset's own bounds; a caller that placed the
+    // file and guessed would get a forty-metre tree or a two-metre one depending on the pack.
+    float landmarkScale = 1.0f;
 };
 
 struct VoidRegion {
     glm::vec2 center{0.0f};
     float radius = 30.0f;
     float softness = 12.0f;   // metres over which density returns to normal
+    // Only layers at least this tall are removed; 0 empties the region completely. A corridor uses
+    // it to take out the canopy and leave the ground growing.
+    float clearsAbove = 0.0f;
 };
 
 // What the composer decided, kept beside the layers so a caller can explain the result, draw it in
@@ -55,6 +69,19 @@ struct VoidRegion {
 struct CompositionPlan {
     std::vector<FocalRegion> focal;
     std::vector<VoidRegion> voids;
+    // Where the composition is composed *from*. A composition is a relationship between a viewpoint
+    // and what it looks at, so the composer choosing the material and leaving the viewpoint to
+    // whoever installs it means nothing in the world was ever arranged for the place it is seen
+    // from. It is also the only way the corridor below can exist: a clear line has to be clear
+    // between two known points.
+    glm::vec2 viewpoint{0.0f};
+    float viewpointClearance = 0.0f;   // metres of nothing around the viewpoint itself
+    // The negative-space corridor: an unplanted lane from the viewpoint to the focal subject. The
+    // brief makes it mandatory, and it earns that -- it is what stops a dense world from being a
+    // wall, it gives the eye a path to the subject, and it keeps whatever is at the viewpoint from
+    // standing in the lens. It is reported here as well as being folded into `voids` so a caller
+    // can draw it, test it, or explain it.
+    std::vector<VoidRegion> corridor;
     // Layer name -> the band it was assigned to, so a test can assert that a fern did not end up
     // on the ridge line.
     std::vector<std::pair<std::string, DepthBand>> bands;
@@ -63,9 +90,44 @@ struct CompositionPlan {
     [[nodiscard]] DepthBand bandOf(const std::string& layer) const;
 };
 
+// The air and the light, derived from the recipe's atmosphere, lighting and palette. These are the
+// values the scene's existing environment parameters already take -- fog, sky, volumetrics -- so
+// this is a plan for parameters that exist rather than a new environment model. It lives beside the
+// layers because a world's atmosphere is composed from the same recipe as its ecology, and because
+// a generated world whose sky is left at the default is a generated world with a flat navy sky
+// above a world that was carefully composed. That was the first one.
+struct EnvironmentPlan {
+    glm::vec3 skyZenith{0.02f, 0.025f, 0.06f};
+    glm::vec3 skyHorizon{0.05f, 0.09f, 0.14f};
+    glm::vec3 skyGround{0.012f, 0.014f, 0.025f};
+    glm::vec3 sunColor{0.62f, 0.70f, 0.90f};
+    glm::vec3 fogColor{0.04f, 0.06f, 0.11f};
+    float skyIntensity = 1.0f;
+    float sunIntensity = 2.0f;
+    float sunSize = 0.03f;
+    float sunGlow = 0.35f;
+    float haze = 0.30f;
+    float keyLight = 1.0f;
+    float fogDensity = 0.02f;
+    float fogHeight = 0.0f;
+    float fogHeightFalloff = 0.05f;
+    float volumeDensity = 0.02f;
+    float volumeScattering = 0.6f;
+    float volumeAbsorption = 0.1f;
+    float volumeAnisotropy = 0.35f;
+    float volumeEmission = 0.0f;
+    float volumeNoise = 0.6f;
+    float volumeNoiseScale = 40.0f;
+    float volumeNoiseSpeed = 0.03f;
+};
+
 struct ComposedWorld {
     std::vector<ScatterLayer> layers;
+    // The plan's void regions and corridor as the ecology's own type, so negative space is a thing
+    // the placer applies rather than a thing the plan describes.
+    std::vector<ScatterClearance> clearances;
     CompositionPlan plan;
+    EnvironmentPlan environment;
 };
 
 // Composition is a pure function of (recipe, library). Same inputs, same world, every time --

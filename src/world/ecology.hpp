@@ -45,6 +45,32 @@ struct ScatterProximity {
     float strength = 1.0f;
 };
 
+// A region the ecology leaves alone, in world XZ. Negative space is a positive instruction: a
+// composer that only ever adds material produces a uniform scatter, and a uniform scatter is the
+// thing every note about composition in this project is written against.
+//
+// This exists because for a while it did not. The composer emitted void regions, `installWorld`
+// translated them into the scene's exclusion regions, the exclusion regions became reserved
+// composition fields -- and nothing on the ecology side read any of it, so a world's negative space
+// was a value carried faithfully from end to end of a pipeline and then dropped. The corridor the
+// brief calls mandatory was, in practice, absent.
+struct ScatterClearance {
+    glm::vec2 center{0.0f};
+    float radius = 0.0f;      // metres cleared outright
+    float softness = 0.0f;    // metres over which density returns to normal
+    float strength = 1.0f;    // 1 removes everything inside; 0 is a no-op
+    // Only layers at least this tall are cleared. A lane through a forest is a lane in the canopy:
+    // the trees are gone and the ground is still growing. Clearing everything instead produced a
+    // bald hillside with one tree on it -- technically a corridor, and the exact opposite of a
+    // world composed to be dense at the viewer's feet. 0 clears every layer.
+    float minHeight = 0.0f;
+};
+
+// The density multiplier `clearances` impose at `p`: 1 where nothing applies, 0 inside a region at
+// full strength. Exposed so a test can assert a corridor is clear without scattering anything.
+[[nodiscard]] float clearanceWeight(std::span<const ScatterClearance> clearances, glm::vec2 p,
+                                    float layerHeight = 0.0f);
+
 struct ScatterLayer {
     std::string name;
     std::string asset;                    // glTF path as written; resolved through the AssetRegistry
@@ -133,6 +159,9 @@ struct ScatterLayer {
 // Everything a world grows, in draw order.
 struct Ecology {
     std::vector<ScatterLayer> layers;
+    // Applies to every layer. Negative space is a property of the world, not of a species: a
+    // clearing with the grass removed and the trees still standing in it is not a clearing.
+    std::vector<ScatterClearance> clearances;
     [[nodiscard]] Result<void> validate(const BiomeSet& biomes) const;
     [[nodiscard]] std::uint64_t structuralHash() const;
     [[nodiscard]] bool empty() const { return layers.empty(); }
@@ -141,7 +170,8 @@ struct Ecology {
 // The placements for one layer over the whole map. Positions are world space and sit on the
 // terrain; rotations carry the yaw and the ground alignment; scales carry the per-instance size.
 [[nodiscard]] spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
-                                         std::span<const glm::vec3> anchors = {});
+                                         std::span<const glm::vec3> anchors = {},
+                                         std::span<const ScatterClearance> clearances = {});
 
 // Ecology is authored in the scene file rather than shipped as a C++ default, unlike the geography
 // and the biomes. Geography is design data with no dependencies; a scatter layer names an asset,
@@ -170,6 +200,12 @@ struct GlowCluster {
 [[nodiscard]] std::vector<GlowCluster> aggregateGlow(const spatial::PointCloud& cloud,
                                                      const ScatterLayer& layer, float cellSize,
                                                      std::uint32_t hueSeed = 12345u, float lift = 0.5f);
+
+// Clearances round-trip separately from the layers because `scatter` is a bare JSON array -- the
+// ecology *is* the list of layers in the file format -- so there is nowhere inside it for a
+// property of the whole world to live. They are written as the terrain node's "clearings".
+[[nodiscard]] Result<std::vector<ScatterClearance>> clearancesFromJson(const nlohmann::json& j);
+[[nodiscard]] nlohmann::json clearancesToJson(const std::vector<ScatterClearance>& clearances);
 
 [[nodiscard]] Result<Ecology> ecologyFromJson(const nlohmann::json& j);
 [[nodiscard]] nlohmann::json ecologyToJson(const Ecology& ecology);
