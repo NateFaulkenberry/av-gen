@@ -1,0 +1,21 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "The Living Constellation"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "_disc.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/lens/focalLength": 34.0,
+  "camera/lens/aperture": 2.8,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "post/grade/contrast": 1.1,
+  "post/grade/saturation": 1.06
+ }
+}

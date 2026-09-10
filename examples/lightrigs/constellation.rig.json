@@ -1,0 +1,33 @@
+{
+ "format": "avgen-lightrig",
+ "version": 1,
+ "name": "ConstellationVoid",
+ "description": "Almost nothing. The sculpture is its own light source; this rig exists so that shards and any solid geometry have a direction, not to illuminate the particles.",
+ "keyIntensity": 0.35,
+ "ambientIntensity": 0.0,
+ "ambientColor": [
+  0.1,
+  0.12,
+  0.3
+ ],
+ "ambientTemperature": 9000,
+ "lights": [
+  {
+   "name": "rim",
+   "type": "directional",
+   "role": "rim",
+   "azimuth": 128.0,
+   "elevation": 18.0,
+   "intensity": 1.0,
+   "color": [
+    0.34,
+    0.52,
+    1.0
+   ],
+   "temperature": 9000,
+   "castsShadow": false,
+   "volumetric": 0.1,
+   "followCamera": false
+  }
+ ]
+}
