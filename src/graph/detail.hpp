@@ -37,11 +37,8 @@ struct Num {
 [[nodiscard]] glm::vec3 asVec3(const Value& value, const glm::vec3& fallback = glm::vec3(0.0f));
 [[nodiscard]] glm::vec4 asVec4(const Value& value, const glm::vec4& fallback = glm::vec4(0.0f));
 [[nodiscard]] std::string asString(const Value& value, const std::string& fallback = {});
-[[nodiscard]] bool isEmpty(const Value& value); // std::monostate
 
 [[nodiscard]] nlohmann::json valueToJson(const Value& value);
-[[nodiscard]] Value valueFromJson(PinType type, const nlohmann::json& j);
-[[nodiscard]] Value defaultValueFor(PinType type);
 
 // ---- inputs ------------------------------------------------------------------------------------
 

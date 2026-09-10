@@ -100,15 +100,4 @@ const Runtime& Runtime::get() {
     return runtime;
 }
 
-std::string searchDescription() {
-    std::string text;
-    for (const auto& path : candidatePaths()) {
-        if (!text.empty()) {
-            text += ", ";
-        }
-        text += path;
-    }
-    return text;
-}
-
 } // namespace avgen::share::ndi

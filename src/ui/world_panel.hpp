@@ -17,7 +17,6 @@ namespace avgen::ui {
 // + generators (procedural/*), fields, materials, deformers, particles, splines, sdf. Advanced:
 // everything (graph, attributes, GPU, simulation).
 enum class AuthoringLayer : int { Beginner = 0, Intermediate = 1, Advanced = 2 };
-[[nodiscard]] const char* authoringLayerName(AuthoringLayer layer);
 // True when `path` (a parameter path) belongs to the layer.
 [[nodiscard]] bool layerShowsPath(AuthoringLayer layer, const std::string& path);
 

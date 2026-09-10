@@ -96,9 +96,6 @@ Result<glm::vec<N, float>> readVecN(const nlohmann::json& j, const char* key, co
     }
     return out;
 }
-inline Result<glm::vec2> readVec2(const nlohmann::json& j, const char* key, const glm::vec2& def) {
-    return readVecN<2>(j, key, def);
-}
 inline Result<glm::vec3> readVec3(const nlohmann::json& j, const char* key, const glm::vec3& def) {
     return readVecN<3>(j, key, def);
 }

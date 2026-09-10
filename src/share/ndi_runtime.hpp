@@ -71,6 +71,5 @@ struct Runtime {
 };
 
 // Candidate library paths in search order (for diagnostics and docs).
-std::string searchDescription();
 
 } // namespace avgen::share::ndi

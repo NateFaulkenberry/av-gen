@@ -141,10 +141,6 @@ std::string asString(const Value& value, const std::string& fallback) {
     return fallback;
 }
 
-bool isEmpty(const Value& value) {
-    return std::holds_alternative<std::monostate>(value);
-}
-
 json valueToJson(const Value& value) {
     if (const float* f = std::get_if<float>(&value)) {
         return *f;
@@ -168,61 +164,6 @@ json valueToJson(const Value& value) {
         return *s;
     }
     return json();
-}
-
-Value valueFromJson(PinType type, const json& j) {
-    switch (type) {
-    case PinType::Float:
-        return j.is_number() ? j.get<float>() : 0.0f;
-    case PinType::Int:
-        return j.is_number() ? j.get<int>() : 0;
-    case PinType::Bool:
-        return j.is_boolean() ? j.get<bool>() : (j.is_number() ? j.get<float>() != 0.0f : false);
-    case PinType::Vec2:
-        if (j.is_array() && j.size() == 2) {
-            return glm::vec2(j.at(0).get<float>(), j.at(1).get<float>());
-        }
-        return glm::vec2(0.0f);
-    case PinType::Vec3:
-        if (j.is_array() && j.size() == 3) {
-            return glm::vec3(j.at(0).get<float>(), j.at(1).get<float>(), j.at(2).get<float>());
-        }
-        return glm::vec3(0.0f);
-    case PinType::Color:
-        if (j.is_array() && j.size() == 4) {
-            return glm::vec4(j.at(0).get<float>(), j.at(1).get<float>(), j.at(2).get<float>(),
-                             j.at(3).get<float>());
-        }
-        if (j.is_array() && j.size() == 3) {
-            return glm::vec4(j.at(0).get<float>(), j.at(1).get<float>(), j.at(2).get<float>(), 1.0f);
-        }
-        return glm::vec4(1.0f);
-    case PinType::String:
-        return j.is_string() ? j.get<std::string>() : std::string();
-    default:
-        return Value{};
-    }
-}
-
-Value defaultValueFor(PinType type) {
-    switch (type) {
-    case PinType::Float:
-        return 0.0f;
-    case PinType::Int:
-        return 0;
-    case PinType::Bool:
-        return false;
-    case PinType::Vec2:
-        return glm::vec2(0.0f);
-    case PinType::Vec3:
-        return glm::vec3(0.0f);
-    case PinType::Color:
-        return glm::vec4(1.0f);
-    case PinType::String:
-        return std::string();
-    default:
-        return Value{};
-    }
 }
 
 // ---- inputs ------------------------------------------------------------------------------------

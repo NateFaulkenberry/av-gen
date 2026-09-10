@@ -22,15 +22,6 @@ const char* const kIntermediatePrefixes[] = {"procedural/", "field/", "spline/",
 
 } // namespace
 
-const char* authoringLayerName(AuthoringLayer layer) {
-    switch (layer) {
-    case AuthoringLayer::Beginner: return "Beginner";
-    case AuthoringLayer::Intermediate: return "Intermediate";
-    case AuthoringLayer::Advanced: return "Advanced";
-    }
-    return "Advanced";
-}
-
 bool layerShowsPath(AuthoringLayer layer, const std::string& path) {
     if (layer == AuthoringLayer::Advanced) {
         return true;
