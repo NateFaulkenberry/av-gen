@@ -261,6 +261,12 @@ struct Environment {
     float environmentRotation = 0.0f; // radians about +Y
     bool showSkybox = true;
     float skyboxBlur = 0.0f; // 0 = sharp, 1 = fully prefiltered
+    // Shadow cascades, overriding the quality tier when non-zero. It belongs to the scene because
+    // it is a property of the world's scale rather than of the machine: on a 640 m landscape lit by
+    // a low moon, dropping the third cascade cost 0.67% of pixels a difference of more than 6/255
+    // and saved about 11 ms of an 85 ms frame at 2880x1800 -- by a distance the largest single
+    // saving found in this renderer. On an object-scale scene the third cascade earns more.
+    std::uint32_t shadowCascades = 0; // 0 = whatever the tier says
     // Procedural sky (ADR-036): used as the image-based lighting source whenever `environmentMap`
     // is unset, so metals and rough surfaces always have something to reflect. See scene/sky.hpp.
     SkySettings sky;

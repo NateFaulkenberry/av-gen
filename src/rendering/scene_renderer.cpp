@@ -1346,8 +1346,15 @@ void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Sce
     sceneRadius = std::clamp(sceneRadius, 1.0f, std::max(scene.camera.farPlane, 2.0f));
 
     const double shadowMs = stats_.shadows.shadowMs;
+    // A scene may say how many cascades its scale needs; the tier says how many the machine can
+    // afford. The scene wins when it has an opinion, because a cascade's worth depends on how much
+    // world it has to cover.
+    QualitySettings shadowQuality = qualitySettings_;
+    if (scene.environment.shadowCascades > 0) {
+        shadowQuality.cascadeCount = std::clamp(scene.environment.shadowCascades, 1u, 4u);
+    }
     shadows_->update(lightOrder_, frame.viewProj, scene.camera.nearPlane, scene.camera.farPlane, sceneRadius,
-                     qualitySettings_);
+                     shadowQuality);
     stats_.shadows = shadows_->stats();
     stats_.shadows.shadowMs = shadowMs;
 

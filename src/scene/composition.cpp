@@ -2555,6 +2555,7 @@ void Composition::applyParameters() {
         env.volumeNoiseSpeed = pick(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
         env.volumeEmission = pick(volumeEmission_, volumeSetting_.volumeEmission);
         env.volumeSteps = volumeSteps_ != nullptr ? volumeSteps_->value() : volumeSetting_.volumeSteps;
+        env.shadowCascades = volumeSetting_.shadowCascades;
         env.volumeMaxDistance = volumeSetting_.volumeMaxDistance;
         // Field names are prefixed like every other reference so a nested scene stays self-contained.
         env.volumeDensityField =
@@ -2883,6 +2884,7 @@ nlohmann::json Composition::toJson() const {
             environment["volumeNoiseSpeed"] = base(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
             environment["volumeEmission"] = base(volumeEmission_, volumeSetting_.volumeEmission);
             environment["volumeSteps"] = volumeSteps_ != nullptr ? volumeSteps_->base() : volumeSetting_.volumeSteps;
+            environment["shadowCascades"] = volumeSetting_.shadowCascades;
             environment["volumeMaxDistance"] = volumeSetting_.volumeMaxDistance;
             if (!volumeDensityFieldSetting_.empty()) {
                 environment["volumeDensityField"] = volumeDensityFieldSetting_;
@@ -3154,6 +3156,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return std::unexpected(value.error());
                 }
                 *fk.target = *value;
+            }
+            if (e.contains("shadowCascades")) {
+                if (!e["shadowCascades"].is_number_unsigned()) {
+                    return fail("'shadowCascades' must be an unsigned integer (0 = the quality tier)");
+                }
+                v.shadowCascades = std::min(e["shadowCascades"].get<std::uint32_t>(), 4u);
             }
             if (e.contains("volumeSteps")) {
                 if (!e["volumeSteps"].is_number_integer()) {

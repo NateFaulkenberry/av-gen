@@ -111,6 +111,31 @@ probe; the before/after pair here was measured back to back on the same binary c
 - Memory: `AnalysisTrack` ≈ 0.8 MB per second of audio; whole-file decode ≈ 0.4 MB per second
   of stereo 48 kHz.
 
+## How much of a difference is a difference
+
+Six identical runs of the benchmark -- same scene, same 100 frames, same 2880x1800 -- came out at
+77.0, 78.6, 79.4, 80.6, 80.2, 79.1 ms per frame. **The noise floor is about +-1.5 ms, so a claimed
+saving under about 3 ms needs interleaved repeats before it means anything.**
+
+That was learned the hard way. Running cascade counts sequentially gave 3 cascades 84.9 ms and 2
+cascades 73.8 -- an eleven millisecond saving, and very nearly written down as one. Interleaved,
+three reps each, it is 78.4 against 77.3: **1.1 ms.** The eleven was two runs of a drifting machine.
+
+Applying that threshold to everything below:
+
+| change | measured | verdict |
+|---|---|---|
+| removing the ground material program | 31.7 ms | far above the floor, and repeatable |
+| that program from twenty ops to eight | 14.4 ms | above the floor |
+| eliminating empty indirect draws | 6.5 ms | above the floor, measured once each way |
+| terrain shadow distance | 1.1 ms | at the floor |
+| ground cover not casting | ~1 ms | at the floor |
+| three shadow cascades to two | 1.1 ms | at the floor |
+
+The three at the floor are all kept, because each is *correct* independently of what it saves -- a
+chunk half a kilometre away has no business in a cascade covering forty metres -- but none of them
+should be described as an optimisation.
+
 ## Where a world frame goes (2026-09-09)
 
 **The first version of this section was wrong, and how it was wrong is the most useful thing in
@@ -322,8 +347,10 @@ they reach past a kilometre and every chunk the camera can see is a caster in ev
 including cascade 0, which covers forty metres.
 
 **RESULT.** Terrain shadow entity draws fell from **255 to 72** -- a 72% cut in casters. Frame time
-fell by **1.1 ms**, A/B'd twice at 120 frames (76.2/75.1 against 76.7/76.8). Ground cover opting out
-of casting bought about another 1 ms.
+fell by about **1.1 ms**, which is the noise floor. Ground cover opting out of casting bought about
+another 1 ms, also at the floor. Cutting the cascades from three to two, which drops the caster
+count again and is visually indistinguishable here, bought a further 1.1 ms. All three are at the
+floor.
 
 **So the shadow cost is not the number of casters.** Removing seven casters in ten bought seven per
 cent of the shadow cost. Whatever the other 13 ms is, it is in the passes themselves -- their setup,

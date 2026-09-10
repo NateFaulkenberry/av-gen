@@ -36,6 +36,7 @@ enum class QualityTier : std::uint8_t { Preview, Realtime, High, Offline };
 struct QualitySettings {
     std::uint32_t shadowResolution = 2048; // one cascade / spot map, square
     std::uint32_t cascadeCount = 3;
+
     std::uint32_t shadowPcfTaps = 12;
     std::uint32_t pcssBlockerTaps = 12;
     bool softShadows = true;               // percentage-closer soft shadows for the key light
