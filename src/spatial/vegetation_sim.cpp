@@ -42,6 +42,7 @@ void VegetationSim::clear() {
     slots_.clear();
     dirty_.clear();
     dirtyRecords_.clear();
+    budget_ = 0;
     activeCount_ = 0;
     awakeCount_ = 0;
     examined_ = 0;
