@@ -788,6 +788,20 @@ TEST_CASE("a density naming a biome that does not exist is an error, not an empt
     CHECK(result.error().message.find("forrest") != std::string::npos);
 }
 
+TEST_CASE("scatter proximity rules reject malformed habitat ranges", "[unit][ecology][habitat]") {
+    const nlohmann::json layer = {{"name", "ferns"}, {"asset", "fern.gltf"},
+                                  {"densities", {{"forest", 0.2}}}};
+    for (const auto& proximity : {
+             nlohmann::json("canopy"),
+             nlohmann::json{{"layer", "canopy"}, {"minDistance", 8.0}, {"maxDistance", 2.0}},
+             nlohmann::json{{"layer", ""}, {"maxDistance", 8.0}},
+             nlohmann::json{{"layer", "canopy"}, {"maxDistance", -1.0}}}) {
+        auto invalid = layer;
+        invalid["proximity"] = proximity;
+        CHECK_FALSE(world::ecologyFromJson(nlohmann::json::array({invalid})).has_value());
+    }
+}
+
 TEST_CASE("an ecology round-trips through json", "[unit][ecology]") {
     world::Ecology original;
     world::ScatterLayer layer = testLayer("fungi", {{"marsh", 0.03f}, {"forest", 0.008f}});
@@ -801,6 +815,115 @@ TEST_CASE("an ecology round-trips through json", "[unit][ecology]") {
     auto parsed = world::ecologyFromJson(world::ecologyToJson(original));
     REQUIRE(parsed.has_value());
     CHECK(parsed->structuralHash() == original.structuralHash());
+}
+
+TEST_CASE("habitat placement agrees with a brute force horizontal distance band",
+          "[unit][ecology][habitat]") {
+    auto map = world::defaultWorld();
+    map.size = {96.0f, 96.0f};
+    auto layer = testLayer("ferns", {{"forest", 0.2f}, {"marsh", 0.2f}, {"meadow", 0.2f},
+                                    {"scree", 0.2f}, {"rim", 0.2f}});
+    layer.maxSlope = 1.0f;
+    layer.avoidWater = false;
+    const auto independent = world::scatter(map, layer);
+    const std::vector<glm::vec3> anchors{{-12.0f, 900.0f, -14.0f}, {18.0f, -900.0f, 17.0f}};
+    layer.proximity = world::ScatterProximity{"canopy", 2.0f, 14.0f, 0.0f, 1.0f};
+    const auto nearest = [&](glm::vec3 position) {
+        float distance = std::numeric_limits<float>::max();
+        for (const glm::vec3 anchor : anchors) {
+            distance = std::min(distance, glm::length(glm::vec2(position.x - anchor.x, position.z - anchor.z)));
+        }
+        return distance;
+    };
+    const auto related = world::scatter(map, layer, anchors);
+    const auto repeated = world::scatter(map, layer, anchors);
+    REQUIRE(related.count() > 50);
+    REQUIRE(related.count() < independent.count());
+    REQUIRE(related.count() == repeated.count());
+    std::size_t expected = 0;
+    for (const auto position : independent.positions()) {
+        const float distance = nearest(position);
+        if (distance >= 2.0f && distance < 14.0f) {
+            REQUIRE(expected < related.count());
+            CHECK(related.positions()[expected] == position);
+            ++expected;
+        }
+    }
+    CHECK(related.count() == expected);
+    for (std::size_t index = 0; index < related.count(); ++index) {
+        CHECK(related.positions()[index] == repeated.positions()[index]);
+        CHECK(related.scales()[index] == repeated.scales()[index]);
+        CHECK(related.rotations()[index] == repeated.rotations()[index]);
+    }
+    CHECK(world::scatter(map, layer).count() == 0);
+
+    SECTION("zero influence preserves the original population exactly") {
+        layer.proximity->strength = 0.0f;
+        const auto bypass = world::scatter(map, layer);
+        REQUIRE(bypass.count() == independent.count());
+        for (std::size_t index = 0; index < bypass.count(); ++index) {
+            CHECK(bypass.positions()[index] == independent.positions()[index]);
+            CHECK(bypass.rotations()[index] == independent.rotations()[index]);
+            CHECK(bypass.scales()[index] == independent.scales()[index]);
+        }
+    }
+    SECTION("soft edges thin the band without changing surviving transforms") {
+        layer.proximity->fade = 4.0f;
+        const auto faded = world::scatter(map, layer, anchors);
+        REQUIRE(faded.count() > 10);
+        CHECK(faded.count() < related.count());
+        for (const auto position : faded.positions()) {
+            CHECK(nearest(position) >= 2.0f);
+            CHECK(nearest(position) < 14.0f);
+            CHECK(std::ranges::find(related.positions(), position) != related.positions().end());
+        }
+    }
+    SECTION("partial influence retains some independent growth without anchors") {
+        layer.proximity->strength = 0.5f;
+        const auto partial = world::scatter(map, layer);
+        CHECK(partial.count() > independent.count() / 4);
+        CHECK(partial.count() < independent.count() * 3 / 4);
+    }
+}
+
+TEST_CASE("habitat dependencies are ordered, unique, serializable and structural",
+          "[unit][ecology][habitat]") {
+    world::Ecology ecology;
+    ecology.layers.push_back(testLayer("canopy", {{"forest", 0.002f}}));
+    auto ferns = testLayer("ferns", {{"forest", 0.03f}});
+    ferns.proximity = world::ScatterProximity{"canopy", 1.0f, 12.0f, 2.0f, 0.9f};
+    ecology.layers.push_back(ferns);
+    const auto biomes = world::defaultBiomes();
+    REQUIRE(ecology.validate(biomes));
+    const auto parsed = world::ecologyFromJson(world::ecologyToJson(ecology));
+    REQUIRE(parsed);
+    CHECK(parsed->structuralHash() == ecology.structuralHash());
+    for (auto member : {&world::ScatterProximity::minDistance, &world::ScatterProximity::maxDistance,
+                        &world::ScatterProximity::fade, &world::ScatterProximity::strength}) {
+        auto changed = ecology;
+        (*changed.layers[1].proximity).*member += 0.1f;
+        CHECK(changed.structuralHash() != ecology.structuralHash());
+    }
+    SECTION("unknown, self and forward dependencies fail") {
+        ecology.layers[1].proximity->layer = "missing";
+        CHECK_FALSE(ecology.validate(biomes));
+        ecology.layers[1].proximity->layer = "ferns";
+        CHECK_FALSE(ecology.validate(biomes));
+        ecology.layers[1].proximity->layer = "canopy";
+        std::swap(ecology.layers[0], ecology.layers[1]);
+        CHECK_FALSE(ecology.validate(biomes));
+    }
+    SECTION("duplicate names cannot resolve ambiguously") {
+        ecology.layers.push_back(ecology.layers[0]);
+        CHECK_FALSE(ecology.validate(biomes));
+    }
+    SECTION("nonfinite and impossible fade settings fail") {
+        for (const float invalid : {-1.0f, 9.0f, std::numeric_limits<float>::infinity(),
+                                     std::numeric_limits<float>::quiet_NaN()}) {
+            ferns.proximity->fade = invalid;
+            CHECK_FALSE(ferns.validate());
+        }
+    }
 }
 
 TEST_CASE("a scatter distribution draws the cloud it was given", "[unit][procedural][ecology]") {

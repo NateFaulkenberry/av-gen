@@ -968,6 +968,47 @@ TEST_CASE("examples/materials/*.material.json parse, validate and name their pro
     CHECK(names.size() >= 7); // the library shipped before this test existed
 }
 
+TEST_CASE("Glowmere materials stay finite and reserve crown emission for the underside",
+          "[material][glowmere]") {
+    const auto directory = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "materials";
+    for (const auto* filename : {"glowmere-ground.material.json", "glowmere-crown.material.json",
+                                 "glowmere-tissue.material.json", "glowmere-painted-ground.material.json",
+                                 "glowmere-painted-crown.material.json", "glowmere-painted-frond.material.json"}) {
+        INFO(filename);
+        const auto program = MaterialProgram::loadFile(directory / filename);
+        REQUIRE(program.has_value());
+        for (int sample = 0; sample < 64; ++sample) {
+            const float fraction = static_cast<float>(sample) / 63.0f;
+            MaterialContext context = richContext();
+            context.uv = {fraction, 1.0f - fraction};
+            context.localPosition = {fraction * 8.0f - 4.0f, -0.5f, fraction * 3.0f};
+            context.worldPosition = context.localPosition + glm::vec3(-16.0f, 3.0f, -46.0f);
+            context.normal = {0.0f, -1.0f, 0.0f};
+            const auto underside = run(*program, context);
+            CHECK(std::isfinite(underside.roughness));
+            CHECK(underside.roughness >= 0.0f);
+            CHECK(underside.roughness <= 1.0f);
+            for (int component = 0; component < 3; ++component) {
+                CHECK(std::isfinite(underside.baseColor[component]));
+                CHECK(std::isfinite(underside.emission[component]));
+                CHECK(underside.emission[component] >= 0.0f);
+            }
+            if (program->name == "glowmereCrown" || program->name == "paintedCrown") {
+                context.normal = {0.0f, 1.0f, 0.0f};
+                const auto topside = run(*program, context);
+                CHECK(color::luminance(underside.emission) > 0.0f);
+                checkVec3(topside.emission, glm::vec3(0.0f));
+                checkVec3(topside.baseColor, underside.baseColor);
+                CHECK_THAT(d(topside.roughness), WithinAbs(d(underside.roughness), 1e-6));
+            }
+            if (program->name == "glowmereGround" || program->name == "paintedGround") {
+                CHECK(underside.roughness >= 0.38f);
+                checkVec3(underside.emission, glm::vec3(0.0f));
+            }
+        }
+    }
+}
+
 TEST_CASE("examples/machine declares its material programs inline and by file, and wires them in",
           "[material]") {
     const std::filesystem::path scene =

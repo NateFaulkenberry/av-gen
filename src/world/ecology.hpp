@@ -23,6 +23,8 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include <cstdint>
+#include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -33,6 +35,14 @@ namespace avgen::world {
 struct BiomeDensity {
     std::string biome;
     float density = 0.0f; // instances per square metre where that biome is at full weight
+};
+
+struct ScatterProximity {
+    std::string layer;
+    float minDistance = 0.0f;
+    float maxDistance = 12.0f;
+    float fade = 2.0f;
+    float strength = 1.0f;
 };
 
 struct ScatterLayer {
@@ -84,6 +94,7 @@ struct ScatterLayer {
     // away from the gaps and gives to the patches.
     float clusterScale = 24.0f;           // metres of the patch pattern
     float clustering = 0.0f;              // 0 even, 1 entirely in patches
+    std::optional<ScatterProximity> proximity;
 
     // Colour. The asset's textures stay; these multiply and add to them, which is the split that
     // lets one curated library become several worlds -- the mesh and its maps are the library's,
@@ -129,7 +140,8 @@ struct Ecology {
 
 // The placements for one layer over the whole map. Positions are world space and sit on the
 // terrain; rotations carry the yaw and the ground alignment; scales carry the per-instance size.
-[[nodiscard]] spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer);
+[[nodiscard]] spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
+                                         std::span<const glm::vec3> anchors = {});
 
 // Ecology is authored in the scene file rather than shipped as a C++ default, unlike the geography
 // and the biomes. Geography is design data with no dependencies; a scatter layer names an asset,

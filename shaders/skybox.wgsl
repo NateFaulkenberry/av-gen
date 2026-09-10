@@ -81,6 +81,23 @@ fn fs_sky(in: SkyOut) -> SceneOut {
         color *= frame.skyExtra.z;
         isSky = true;
     }
+    if (frame.lightCounts.z > 0.5 && frame.skyExtra.x > 0.5 && isSky) {
+        if (frame.envParams.z > 0.5 && frame.lights[0].positionType.w < 0.5) {
+            let separation = length(dir + normalize(frame.lights[0].directionRange.xyz));
+            let moon = 1.0 - smoothstep(0.014, 0.018, separation);
+            color = mix(color, vec3<f32>(1.8, 2.1, 2.4), moon);
+        }
+        let coordinate = dir.xz / max(dir.y + 1.0, 0.02) * 190.0;
+        let cell = floor(coordinate);
+        let random = hash21(cell);
+        let offset = vec2<f32>(hash21(cell + 17.0), hash21(cell + 43.0)) * 0.6 + 0.2;
+        let radius = length(fract(coordinate) - offset);
+        let footprint = max(length(fwidth(coordinate)), 0.015);
+        let star = (1.0 - smoothstep(0.02, 0.02 + footprint, radius))
+                   * min(0.0064 / (footprint * footprint), 1.0);
+        color += vec3<f32>(0.5, 0.7, 1.0) * star * step(0.988, random)
+                 * smoothstep(0.05, 0.35, dir.y) * 0.6;
+    }
     // The sky is at infinity, so its velocity is the camera's rotation alone. Its bloom weight is
     // whatever the scene grants it (ADR-049 `skyBloom`); at the default 0 a bright environment
     // still cannot glow through the emission target, exactly as under ADR-035.

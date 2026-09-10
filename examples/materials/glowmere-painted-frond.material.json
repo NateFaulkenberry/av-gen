@@ -1,0 +1,14 @@
+{
+ "name":"paintedFrond",
+ "ops":[
+  {"kind":"input","dst":0,"input":"localPosition"},
+  {"kind":"gradient","dst":1,"srcA":0,"value":1.0,"constant":[0.0,1.2,0.0,0.1]},
+  {"kind":"ramp","dst":2,"srcA":1,
+   "constant":[0.035,0.17,0.19,1.0],
+   "constant2":[0.08,0.42,0.38,1.0],
+   "constant3":[0.35,0.75,0.59,1.0]},
+  {"kind":"constant","dst":3,"constant":[0.04,0.28,0.22,1.0]},
+  {"kind":"multiply","dst":3,"srcA":3,"srcB":1}
+ ],
+ "baseColor":2,"emission":3,"emissionIntensity":0.15
+}

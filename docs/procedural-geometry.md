@@ -45,6 +45,25 @@ Parameters appear under `procedural/<node>/…`:
 Local-space deformers act on the source shape before instancing (each column twists about its
 own axis); world-space deformers act on the final world position (a wave across the whole hall).
 
+## Material parts
+
+Multi-material mesh sources in procedural composition nodes expose additional parameter paths:
+`procedural/<node>/parts/<index>/tint`, `emissiveGain`, `roughnessScale`, and `opacityScale`.
+Nested compositions include their existing prefix before the node name. All default to one.
+These multiply each part's own material after the legacy whole-node material controls have been
+applied, and are recalculated from the rest material each frame, not compounded over time.
+Texture bindings remain independent. Roughness and opacity are clamped to `[0, 1]`.
+
+Indices are zero-based in the imported asset's surface-area ordering, not glTF material names.
+An asset edit can change that ordering; inspect the parts before transferring overrides to a
+different asset. These paths belong in project parameters, timeline tracks or modulation routes.
+They do not change the scene's authored rest materials.
+
+Only multi-material procedural nodes expose this surface, not terrain scatter or ordinary glTF
+nodes. A material program can replace base color, roughness, opacity or emission downstream;
+for such outputs, use the program's own controls. In particular, `emissiveGain` is not a gain on
+the final emission register of a material program.
+
 ## Distributions
 
 - **single**: one instance.

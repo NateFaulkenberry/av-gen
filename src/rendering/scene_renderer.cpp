@@ -1550,6 +1550,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     frame.wind = wind::packWind(scene.environment.wind);
     // ---- lights, shadow views and the froxel grid (ADR-033/034) ----
     updateLights(encoder, scene, view, aspect, frame);
+    frame.lightCounts.z = scene.environment.stylized ? 1.0f : 0.0f;
     frame.shadowParams = glm::vec4(static_cast<float>(shadows_->resolution()), 1.5f,
                                    qualitySettings_.contactShadows
                                        ? static_cast<float>(qualitySettings_.contactSteps)

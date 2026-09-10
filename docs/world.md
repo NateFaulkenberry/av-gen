@@ -10,7 +10,8 @@ WORLD -> TERRAIN -> BIOMES -> ECOLOGY -> BIOLUMINESCENCE -> ATMOSPHERE -> CINEMA
 -- because each stage is a function of the one above it. Vegetation belongs on a slope, not
 scattered on a plane and then given a slope later.
 
-This document covers the first two stages (ADR-046). The rest are not built yet.
+This document covers the world map, terrain, biomes and ecology. The directed Glowmere
+candidate and its measured limitations are documented in [shot-glowmere.md](shot-glowmere.md).
 
 ## The world map
 
@@ -208,6 +209,32 @@ Each layer becomes one ordinary procedural object with `distribution.kind = "sca
 supplied from outside, the way an imported mesh is a source supplied from outside. Everything
 downstream is the instancing, culling, LOD and material path that already existed.
 
+### Placement relative to another layer
+
+A layer can optionally depend on placements from an earlier layer in the same terrain node:
+
+```json
+"proximity": {"layer": "ferns", "minDistance": 0.3, "maxDistance": 4.0,
+              "fade": 0.8, "strength": 0.75}
+```
+
+The nearest anchor is measured horizontally in terrain-local metres, ignoring its elevation.
+At full strength, placements survive only inside `[minDistance, maxDistance)`. `fade` softens
+the band's inside edges; when `minDistance` is zero there is no inner fade. The habitat weight
+multiplies the existing biome, density and clustering probability. It does not move plants
+after placement or override slope and water restrictions.
+
+`strength` blends from independent placement (zero) to strict dependence (one). No anchors
+means no placement at full strength, or proportionally reduced density at partial strength.
+Omitting the rule preserves existing scatter hashes and random streams. Distance and fade must
+be finite; `0 <= minDistance < maxDistance <= 4096`, `fade` must be at most half the band width,
+and strength must be in `[0, 1]`. Layer names must be unique; missing, self and forward references
+are rejected. Chains are allowed, cycles are not.
+
+Composition builds each anchor cloud once, then uses a spatial hash for dependent queries.
+There is no per-frame neighbourhood search. This is a proximity rule, not a shadow, root,
+competition or surface-attachment simulation.
+
 ## Looking at a world before it has triangles
 
 ```
@@ -276,13 +303,15 @@ seen with the key light off to the side.
 
 ## Known limitations
 
-- Nothing is placed relative to anything else: no undergrowth in a tree's shadow, no moss on the
-  boulder it is beside.
+- Proximity supports undergrowth near trees and stones near boulders, but not measured shade or
+  moss attached to a boulder's surface.
 - Material parameters on a multi-material asset's node bind to part 0. Where a parameter still sits
   at part 0's authored value each part keeps its own colour and maps; move it and the move applies
-  to every part, which is what an author who wrote one material asked for -- but there is no way to
-  address the leaves alone from the node's parameters.
-- Emission is constant. Making it a living field is what the chromatic phase is for.
+  to every part. Multi-material procedural mesh nodes additionally expose independent
+  [part multipliers](procedural-geometry.md#material-parts); terrain scatter layers and ordinary
+  glTF nodes do not yet expose these controls.
+- Program-authored emission can vary spatially and be modulated. A material program's emission
+  output replaces the scalar material emission, so the two are not interchangeable controls.
 - The sky's stars are the photograph's. A camera that looks mostly at the ground, as this one does,
   sees only the few degrees above the ridge, which on this HDRI is where the moon's haze is
   brightest -- so the frame gets a moon and a horizon glow rather than a field of stars.

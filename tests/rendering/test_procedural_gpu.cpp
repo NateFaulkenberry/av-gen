@@ -163,6 +163,32 @@ scene::Deformer twist(float amount, scene::DeformSpace space) {
 
 } // namespace
 
+TEST_CASE("Procedural alpha cutouts do not occlude the geometry behind them",
+          "[gpu][procedural][stylized][depth]") {
+    auto context = makeContext();
+    auto scene = columnScene(1);
+    scene.camera.position = {0.0f, 1.0f, 8.0f};
+    scene.camera.target = {0.0f, 1.0f, 0.0f};
+    scene.procedurals[0].instances = gridInstances(1, 1, 1.0f);
+    scene.procedurals[0].material.unlit = true;
+    scene.procedurals[0].material.baseColor = {0.8f, 0.15f, 0.05f};
+    const auto unobstructed = renderOnce(*context, scene, 0.0, 96, 96);
+    scene::TextureData transparent;
+    transparent.name = "transparent";
+    transparent.width = transparent.height = 1;
+    transparent.data = {255, 255, 255, 0};
+    auto foreground = columns(1, 1);
+    foreground.name = "cutout";
+    foreground.instances[0].position.z = 3.0f;
+    foreground.material.alphaMode = scene::AlphaMode::Mask;
+    foreground.material.baseColorTexture.texture = scene.addTexture(std::move(transparent));
+    scene.procedurals.push_back(std::move(foreground));
+    const auto masked = renderOnce(*context, scene, 0.0, 96, 96);
+    CHECK(gpu::hashImage(unobstructed) == gpu::hashImage(masked));
+    CHECK(coverage(masked).pixels > 40);
+    CHECK(context->errorCount() == 0);
+}
+
 TEST_CASE("Procedural instances render, coverage grows with count, frames are stable", "[gpu][procedural]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);

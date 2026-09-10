@@ -1349,6 +1349,13 @@ const CompositionNode* Composition::findNode(const std::string& name) const {
 
 // ---- parameters --------------------------------------------------------------------------------
 
+void MaterialPartParameters::apply(Material& material) const {
+    if (tint != nullptr) material.baseColor *= tint->value();
+    if (emissiveGain != nullptr) material.emissiveIntensity *= emissiveGain->value();
+    if (roughnessScale != nullptr) material.roughness = std::clamp(material.roughness * roughnessScale->value(), 0.0f, 1.0f);
+    if (opacityScale != nullptr) material.opacity = std::clamp(material.opacity * opacityScale->value(), 0.0f, 1.0f);
+}
+
 float Composition::fitDistance() const {
     return radius_ / std::tan(kFitFovRadians * 0.5f) * 1.15f;
 }
@@ -1421,6 +1428,7 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
             floatDesc(prefix_ + "env/sky/intensity", sky.intensity, 0.0f, 20.0f, 0.0f, 4.0f));
     }
     brightness_ = &params.add(floatDesc(prefix_ + "scene/brightness", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f));
+    stylized_ = &params.add(boolDesc(prefix_ + "scene/stylized", stylizedSetting_));
     fogDensity_ = &params.add(floatDesc(prefix_ + "scene/fogDensity", fogDensitySetting_, 0.0f, 2.0f, 0.0f, 0.2f));
     keyLight_ = &params.add(floatDesc(prefix_ + "scene/keyLight", 1.0f, 0.0f, 10.0f, 0.0f, 3.0f));
     // ADR-055. Speed 0 is a genuine no-op: `WindParams::active()` is false and every draw's wind
@@ -1509,6 +1517,19 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     if (node.kind == NodeKind::Procedural) {
         node.proceduralParams =
             registerProceduralParameters(*params_, node.proceduralRest, "procedural/" + sanitise(prefix_) + node.name + "/");
+        node.materialPartParams.clear();
+        if (!node.proceduralSubRest.empty()) {
+            for (std::size_t part = 0; part <= node.proceduralSubRest.size(); ++part) {
+                const std::string partBase = "procedural/" + sanitise(prefix_) + node.name +
+                                             "/parts/" + std::to_string(part) + "/";
+                MaterialPartParameters controls;
+                controls.tint = &params_->add(vec3Desc(partBase + "tint", glm::vec3(1.0f), 0.0f, 4.0f, 0.0f, 1.0f));
+                controls.emissiveGain = &params_->add(floatDesc(partBase + "emissiveGain", 1.0f, 0.0f, 50.0f, 0.0f, 2.0f));
+                controls.roughnessScale = &params_->add(floatDesc(partBase + "roughnessScale", 1.0f, 0.0f, 4.0f, 0.0f, 2.0f));
+                controls.opacityScale = &params_->add(floatDesc(partBase + "opacityScale", 1.0f, 0.0f, 1.0f, 0.0f, 1.0f));
+                node.materialPartParams.push_back(controls);
+            }
+        }
     }
     if (node.kind == NodeKind::Field) {
         node.fieldParams = registerFieldParameters(*params_, node.fieldRest, "field/" + sanitise(prefix_) + node.name + "/");
@@ -1560,6 +1581,14 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
         });
         if (node.kind == NodeKind::Procedural) {
             unregisterProceduralParameters(*params_, node.proceduralParams);
+            for (const auto& part : node.materialPartParams) {
+                for (const params::IParameter* parameter : std::array<const params::IParameter*, 4>{
+                         part.tint, part.emissiveGain,
+                         part.roughnessScale, part.opacityScale}) {
+                    if (parameter != nullptr) params_->remove(parameter->path());
+                }
+            }
+            node.materialPartParams.clear();
         }
         if (node.kind == NodeKind::Field) {
             unregisterFieldParameters(*params_, node.fieldParams);
@@ -1591,7 +1620,7 @@ void Composition::unregisterParameters() {
     if (params_ != nullptr) {
         for (const char* path : {"camera/distance", "camera/height", "camera/orbitSpeed", "camera/fov",
                                  "camera/splineT", "camera/lookAhead", "camera/splineOffset",
-                                 "env/intensity", "env/rotation", "scene/brightness", "scene/gridIntensity",
+                                 "env/intensity", "env/rotation", "scene/brightness", "scene/gridIntensity", "scene/stylized",
                                  "env/sky/enabled", "env/sky/background", "env/sky/zenithColor",
                                  "env/sky/horizonColor", "env/sky/groundColor", "env/sky/sunColor",
                                  "env/sky/haze", "env/sky/sunIntensity", "env/sky/sunSize",
@@ -1651,6 +1680,7 @@ void Composition::detach() {
     skySunSize_ = nullptr;
     skySunGlow_ = nullptr;
     skyIntensity_ = nullptr;
+    stylized_ = nullptr;
     brightness_ = nullptr;
     fogDensity_ = nullptr;
     fogColor_ = nullptr;
@@ -1923,8 +1953,17 @@ void Composition::rebuild() {
             // mesh already gets, which is the whole reason the ecology emits a cloud instead of a
             // new kind of drawable.
             std::vector<world::GlowCluster> nodeGlow;
+            std::unordered_map<std::string, std::shared_ptr<spatial::PointCloud>> habitats;
             for (const world::ScatterLayer& layer : node.ecology.layers) {
-                auto cloud = std::make_shared<spatial::PointCloud>(world::scatter(node.worldMap, layer));
+                std::span<const glm::vec3> anchors;
+                if (layer.proximity) {
+                    const auto found = habitats.find(layer.proximity->layer);
+                    if (found != habitats.end()) {
+                        anchors = found->second->positions();
+                    }
+                }
+                auto cloud = std::make_shared<spatial::PointCloud>(world::scatter(node.worldMap, layer, anchors));
+                habitats.emplace(layer.name, cloud);
                 if (cloud->count() == 0) {
                     log::warn("terrain '{}': scatter '{}' placed nothing", node.name, layer.name);
                     continue;
@@ -1942,6 +1981,9 @@ void Composition::rebuild() {
                 pg.distribution.kind = DistributionKind::Scatter;
                 pg.distribution.scatterCloud = cloud;
                 pg.distribution.scatterHash = layer.structuralHash() ^ node.worldMap.structuralHash();
+                if (layer.proximity) {
+                    pg.distribution.scatterHash ^= node.ecology.structuralHash();
+                }
                 pg.visible = visible;
                 pg.castsShadow = layer.castsShadow;
                 // The LOD ladder, switched on. It defaults to a single level, which for a scatter
@@ -2548,10 +2590,16 @@ void Composition::applyParameters() {
                     sub.material.emissiveIntensity = own.emissiveIntensity;
                 if (sub.material.roughness == base.roughness) sub.material.roughness = own.roughness;
                 if (sub.material.metallic == base.metallic) sub.material.metallic = own.metallic;
+                if (k + 1 < node.materialPartParams.size()) {
+                    node.materialPartParams[k + 1].apply(sub.material);
+                }
                 prefixFieldReferences(sub, sanitise(prefix_));
                 sub.distributionTransform =
                     Transform::fromMatrix(full.matrix() * sub.distributionTransform.matrix());
                 sub.visible = sub.visible && visible;
+            }
+            if (!node.materialPartParams.empty()) {
+                node.materialPartParams[0].apply(pg.material);
             }
             // generated by rebuildProcedurals() once every object and spline has its finals
         }
@@ -2767,6 +2815,7 @@ void Composition::applyParameters() {
         scene_.environment.brightness = brightness_->value();
     }
     scene_.environment.fogDensity = fogDensity_ != nullptr ? fogDensity_->value() : fogDensitySetting_;
+    scene_.environment.stylized = stylized_ != nullptr ? stylized_->value() : stylizedSetting_;
     if (addedKeyLight_ && !scene_.lights.empty() && keyLight_ != nullptr) {
         scene_.lights.back().intensity = defaultKeyLight().intensity * keyLight_->value();
     }
@@ -3217,6 +3266,7 @@ nlohmann::json Composition::toJson() const {
     environment["intensity"] = envIntensity_ != nullptr ? envIntensity_->base() : envIntensitySetting_;
     environment["rotation"] = envRotation_ != nullptr ? envRotation_->base() : envRotationSetting_;
     environment["skyIntensity"] = skyIntensitySetting_;
+    environment["stylized"] = stylized_ != nullptr ? stylized_->base() : stylizedSetting_;
     environment["skybox"] = showSkyboxSetting_;
     environment["skyBloom"] = skyBloomSetting_;
     if (ecologyLightGain_ > 0.0f) {
@@ -3561,6 +3611,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(fog.error());
         }
         comp->fogDensitySetting_ = *fog;
+        if (e.contains("stylized")) {
+            if (!e["stylized"].is_boolean()) {
+                return fail("'stylized' must be a boolean");
+            }
+            comp->stylizedSetting_ = e["stylized"].get<bool>();
+        }
         // ADR-049. `rotation` had a parameter but no scene-file key, so until now an HDRI could
         // only be aimed by hand at runtime; `skyIntensity` and `skyBloom` belong to the visible
         // sky alone, and `intensity` above stays the lighting control.

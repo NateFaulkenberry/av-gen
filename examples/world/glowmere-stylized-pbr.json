@@ -2,24 +2,23 @@
  "format": "avgen-project",
  "version": 4,
  "app": {
-  "name": "Glowmere Valley"
+  "name": "Glowmere Valley - Matched PBR"
  },
  "assets": {
   "scene": {
    "kind": "composition",
-   "path": "terrain.scene.json"
+   "path": "glowmere-stylized.scene.json"
   }
  },
  "parameters": {
+  "scene/stylized": false,
     "camera/lens/focalLength": 30.0,
   "camera/lens/aperture": 4.0,
     "camera/lens/focusDistance": 38.0,
   "camera/lens/shutterAngle": 172.0,
   "camera/exposure/mode": 0,
     "camera/exposure/compensation": 0.0,
-    "material/canopyFireflies/emissionIntensity": 0.12,
-    "material/pineFireflies/emissionIntensity": 0.08,
-   "material/frondGlow/emissionIntensity": 0.09,
+    "material/paintedFrond/emissionIntensity": 0.15,
     "post/grade/contrast": 1.08,
     "post/grade/saturation": 0.95,
     "post/output/vignette": 0.18
@@ -50,7 +49,7 @@
     "cues": []
  },
  "routes": [
-   {"source": "audio.bass", "target": "material/glowmereCrown/emissionIntensity", "op": "add",
+  {"source": "audio.bass", "target": "material/paintedCrown/emissionIntensity", "op": "add",
    "amount": 0.16, "chain": {"attackMs": 1200.0, "decayMs": 3000.0}},
     {"source": "audio.treble", "target": "particles/spores/spawnRate", "op": "add",
    "amount": 24.0, "chain": {"attackMs": 600.0, "decayMs": 2000.0}}

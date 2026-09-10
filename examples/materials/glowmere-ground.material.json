@@ -1,0 +1,21 @@
+{
+ "name": "glowmereGround",
+ "ops": [
+  {"kind": "input", "dst": 0, "input": "uv"},
+  {"kind": "ramp", "dst": 1, "srcA": 0,
+   "constant": [0.014, 0.042, 0.03, 1.0],
+   "constant2": [0.026, 0.065, 0.029, 1.0],
+   "constant3": [0.11, 0.13, 0.16, 1.0]},
+  {"kind": "input", "dst": 0, "input": "worldPosition"},
+  {"kind": "microDetail", "dst": 2, "srcA": 0, "value": 2.4, "seed": 419},
+  {"kind": "ramp", "dst": 3, "srcA": 2,
+   "constant": [0.12, 0.18, 0.16, 1.0],
+   "constant2": [0.65, 0.75, 0.53, 1.0],
+   "constant3": [1.35, 1.18, 0.85, 1.0]},
+  {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 3},
+  {"kind": "remap", "dst": 4, "srcA": 2, "value": 1.0, "constant": [0.2, 0.8, 0.38, 0.92]},
+    {"kind": "roughnessFilter", "dst": 4, "srcA": 4, "value": 1.0}
+ ],
+ "baseColor": 1,
+ "roughness": 4
+}

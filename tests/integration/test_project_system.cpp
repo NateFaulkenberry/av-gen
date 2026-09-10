@@ -212,6 +212,55 @@ TEST_CASE("Composition projects reference the scene file or embed an unsaved com
     CHECK(other.params().find("nodes/ball/scale") != nullptr);
 }
 
+TEST_CASE("Scene-owned environments survive project loading and project switches",
+          "[integration][project][environment]") {
+    Fixture fixture;
+    auto sceneDocument = readJson(fixture.sceneFile);
+    sceneDocument["environment"] = {{"map", "sky.hdr"}, {"intensity", 0.17}, {"skyIntensity", 0.04}};
+    std::ofstream(fixture.sceneFile) << sceneDocument.dump(2);
+    nlohmann::json document = {
+        {"format", "avgen-project"}, {"version", 4},
+        {"assets", {{"scene", {{"kind", "composition"}, {"path", "media/stage.json"}}}}}};
+    SECTION("an inline composition owns its environment too") {
+        sceneDocument["environment"]["map"] = "media/sky.hdr";
+        for (auto& node : sceneDocument["nodes"]) {
+            node["asset"] = "media/tri.glb";
+        }
+        document["assets"]["scene"] = {{"kind", "composition"}, {"inline", sceneDocument}};
+    }
+    SECTION("a referenced composition owns its environment") {}
+
+    const auto project = fixture.dir / "authored.json";
+    std::ofstream(project) << document.dump(2);
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project));
+    engine.update(FrameTime{});
+    CHECK(engine.projectWarnings().empty());
+    CHECK(fs::weakly_canonical(engine.environmentPath()) == fs::weakly_canonical(fixture.hdr));
+    CHECK(engine.scene().environment.environmentMap != scene::kInvalidTexture);
+
+    const auto alternate = fixture.dir / "media" / "alternate.hdr";
+    REQUIRE(assets::writeHdr(alternate, 8, 4, std::vector<float>(8 * 4 * 4, 0.8f)));
+    document["assets"]["environment"] = "media/alternate.hdr";
+    const auto overrideProject = fixture.dir / "override.json";
+    std::ofstream(overrideProject) << document.dump(2);
+    REQUIRE(engine.loadProject(overrideProject));
+    engine.update(FrameTime{});
+    CHECK(fs::weakly_canonical(engine.environmentPath()) == fs::weakly_canonical(alternate));
+    REQUIRE(engine.loadProject(project));
+    engine.update(FrameTime{});
+    CHECK(fs::weakly_canonical(engine.environmentPath()) == fs::weakly_canonical(fixture.hdr));
+    CHECK(engine.scene().environment.environmentMap != scene::kInvalidTexture);
+
+    document["assets"]["scene"] = {{"kind", "orb"}};
+    document["assets"].erase("environment");
+    std::ofstream(project) << document.dump(2);
+    REQUIRE(engine.loadProject(project));
+    engine.update(FrameTime{});
+    CHECK(engine.environmentPath().empty());
+    CHECK(engine.scene().environment.environmentMap == scene::kInvalidTexture);
+}
+
 TEST_CASE("Bundles copy every referenced file and reopen from anywhere", "[integration][project]") {
     Fixture f;
     app::Engine engine(app::EngineMode::Offline);
@@ -246,6 +295,73 @@ TEST_CASE("Bundles copy every referenced file and reopen from anywhere", "[integ
     CHECK(other.composition()->nodeCount() == 2);
     CHECK(other.shaderLayers().layers().size() == 1);
     fs::remove_all(elsewhere);
+}
+
+TEST_CASE("Glowmere's directed shot stays grounded, bounded and fully connected",
+          "[integration][glowmere]") {
+    const fs::path root = AVGEN_SOURCE_DIR;
+    if (!fs::exists(root / "assets/nature/plants/fern_02/fern_02_1k.gltf")) {
+        SKIP("Glowmere's optional nature asset library is not installed");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    std::string project = "terrain.json";
+    bool stylized = false;
+    SECTION("current look") {}
+    SECTION("painted look") { project = "glowmere-stylized.json"; stylized = true; }
+    SECTION("matched painted scene with PBR") { project = "glowmere-stylized-pbr.json"; }
+    REQUIRE(engine.loadProject(root / "examples/world" / project));
+    REQUIRE(engine.projectWarnings().empty());
+    REQUIRE(engine.composition() != nullptr);
+    const auto* valley = engine.composition()->findNode("valley");
+    REQUIRE(valley != nullptr);
+    REQUIRE(engine.composition()->findNode("elder-crown") != nullptr);
+    if (project == "terrain.json") {
+        REQUIRE(engine.environmentPath().filename() == "kloppenheim_02_puresky_4k.hdr");
+    } else {
+        REQUIRE(engine.environmentPath().empty());
+    }
+    REQUIRE(engine.timeline().tracks().size() == 2);
+    for (const auto& track : engine.timeline().tracks()) {
+        REQUIRE(track.param != nullptr);
+    }
+    REQUIRE(engine.modulator().routes().size() == 2);
+    for (const auto& route : engine.modulator().routes()) {
+        CHECK(route.targetParam != nullptr);
+        CHECK(route.sourceId != signals::kInvalidSignal);
+        CHECK(route.chain.attackMs >= 500.0f);
+        CHECK(route.chain.decayMs >= 1000.0f);
+    }
+    glm::vec3 previousPosition{};
+    glm::vec3 previousDirection{};
+    for (std::uint64_t frame = 0; frame <= 2700; frame += 3) {
+        const double seconds = static_cast<double>(frame) / 30.0;
+        engine.update(FrameTime{seconds, 0.1, frame});
+        CHECK(engine.scene().environment.stylized == stylized);
+        const auto& camera = engine.scene().camera;
+        INFO("shot time " << seconds);
+        const float ground = valley->worldMap.height({camera.position.x, camera.position.z});
+        CHECK(camera.position.y - ground >= 1.2f);
+        CHECK(glm::length(camera.target - camera.position) > 5.0f);
+        const auto direction = glm::normalize(camera.target - camera.position);
+        if (frame > 0) {
+            CHECK(glm::length(camera.position - previousPosition) <= 0.4f);
+            CHECK(glm::dot(previousDirection, direction) > 0.999f);
+        }
+        previousPosition = camera.position;
+        previousDirection = direction;
+    }
+    CHECK((engine.scene().environment.environmentMap != scene::kInvalidTexture) == (project == "terrain.json"));
+    for (const auto& program : engine.scene().materialPrograms) {
+        CHECK(program.validate());
+    }
+    for (const auto& object : engine.scene().procedurals) {
+        CHECK(object.validate());
+        if (!object.material.program.empty()) {
+            CHECK(std::ranges::any_of(engine.scene().materialPrograms, [&](const auto& program) {
+                return program.name == object.material.program;
+            }));
+        }
+    }
 }
 
 TEST_CASE("New project resets everything but the audio", "[integration][project]") {

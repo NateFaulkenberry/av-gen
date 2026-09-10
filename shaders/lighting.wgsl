@@ -401,8 +401,29 @@ fn fresnelSchlickL(cosTheta: f32, f0: vec3<f32>) -> vec3<f32> {
 }
 
 // Punctual (and representative-point) shading of one light.
+fn painterlyRamp(illumination: f32) -> f32 {
+    return 0.18 + 0.42 * smoothstep(0.08, 0.38, illumination)
+                + 0.40 * smoothstep(0.58, 0.88, illumination);
+}
+
+fn shadePainterly(ctx: ShadeContext, direction: vec3<f32>, radiance: vec3<f32>) -> LightSample {
+    var result: LightSample;
+    let incidence = dot(ctx.normal, direction);
+    let diffuse = painterlyRamp(incidence * 0.7 + 0.15);
+    let halfway = matSafeNormalize(direction + ctx.view, ctx.normal);
+    let highlight = smoothstep(mix(0.92, 0.72, ctx.roughness), 0.99,
+                               max(dot(ctx.normal, halfway), 0.0));
+    result.diffuse = ctx.diffuseColor * radiance * (diffuse / PI);
+    result.specular = radiance * (highlight * (1.0 - ctx.roughness) * 0.12)
+                     * smoothstep(0.0, 0.25, incidence);
+    return result;
+}
+
 fn shadePunctual(light: GpuLight, ctx: ShadeContext, l: vec3<f32>, attenuation: f32,
                  alphaOverride: f32) -> LightSample {
+    if (frame.lightCounts.z > 0.5) {
+        return shadePainterly(ctx, l, light.colorIntensity.rgb * attenuation);
+    }
     var out: LightSample;
     out.diffuse = vec3<f32>(0.0);
     out.specular = vec3<f32>(0.0);
@@ -586,6 +607,9 @@ fn uniformLightRadiance(light: Light, worldPos: vec3<f32>) -> vec4<f32> {
 }
 
 fn shadeUniform(light: Light, ctx: ShadeContext, l: vec3<f32>, attenuation: f32) -> LightSample {
+    if (frame.lightCounts.z > 0.5) {
+        return shadePainterly(ctx, l, light.colorIntensity.rgb * attenuation);
+    }
     var out: LightSample;
     out.diffuse = vec3<f32>(0.0);
     out.specular = vec3<f32>(0.0);

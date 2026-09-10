@@ -187,6 +187,57 @@ TEST_CASE("SceneRenderer renders a lit cube deterministically", "[gpu][renderer]
     }
 }
 
+TEST_CASE("Stylized shading is distinct, deterministic and reversible", "[gpu][renderer][stylized]") {
+    auto context = makeContext();
+    auto shaders = makeShaders(*context);
+    rendering::SceneRenderer renderer(*context, shaders);
+    REQUIRE(renderer.init());
+    auto scene = cubeScene();
+    const auto original = renderer.renderToImage(scene, {}, 96, 64);
+    REQUIRE(original);
+    scene.environment.stylized = true;
+    const auto styled = renderer.renderToImage(scene, {}, 96, 64);
+    REQUIRE(styled);
+    CHECK(gpu::hashImage(*original) != gpu::hashImage(*styled));
+    const auto repeated = renderer.renderToImage(scene, {}, 96, 64);
+    REQUIRE(repeated);
+    CHECK(gpu::hashImage(*styled) == gpu::hashImage(*repeated));
+    const auto* center = styled->pixel(48, 32);
+    CHECK(center[0] > center[2]);
+    CHECK(center[0] > 40);
+    scene.environment.stylized = false;
+    const auto restored = renderer.renderToImage(scene, {}, 96, 64);
+    REQUIRE(restored);
+    CHECK(gpu::hashImage(*original) == gpu::hashImage(*restored));
+    CHECK(context->errorCount() == 0);
+}
+
+TEST_CASE("Stylized lit surfaces use factors while unlit images retain texture color",
+          "[gpu][renderer][stylized]") {
+    auto context = makeContext();
+    auto shaders = makeShaders(*context);
+    rendering::SceneRenderer renderer(*context, shaders);
+    REQUIRE(renderer.init());
+    auto scene = cubeScene();
+    scene.environment.stylized = true;
+    const auto plain = renderer.renderToImage(scene, {}, 96, 64);
+    REQUIRE(plain);
+    scene::TextureData green;
+    green.name = "green";
+    green.width = green.height = 1;
+    green.data = {0, 255, 0, 255};
+    scene.entities[0].material.baseColorTexture.texture = scene.addTexture(std::move(green));
+    const auto textured = renderer.renderToImage(scene, {}, 96, 64);
+    REQUIRE(textured);
+    CHECK(gpu::hashImage(*plain) == gpu::hashImage(*textured));
+    scene.entities[0].material.unlit = true;
+    scene.entities[0].material.emissiveIntensity = 0.0f;
+    const auto unlit = renderer.renderToImage(scene, {}, 96, 64);
+    REQUIRE(unlit);
+    CHECK(unlit->pixel(48, 32)[1] > unlit->pixel(48, 32)[0] + 30);
+    CHECK(context->errorCount() == 0);
+}
+
 TEST_CASE("SceneRenderer survives resizes and invalid meshes", "[gpu][renderer]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);

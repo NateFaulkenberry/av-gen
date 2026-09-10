@@ -103,6 +103,38 @@ struct Fixture {
 
 } // namespace
 
+TEST_CASE("Stylized scene mode validates, round-trips and detaches", "[composition][stylized]") {
+    Fixture fixture;
+    auto document = nlohmann::json::parse(R"({"format":"avgen-scene","version":1,
+        "name":"style", "environment":{"stylized":true}, "nodes":[]})");
+    params::ParameterSet parameters;
+    params::Modulator modulator;
+    auto loaded = scene::Composition::fromJson(document, fixture.registry);
+    REQUIRE(loaded);
+    auto composition = std::move(*loaded);
+    composition->attach(parameters, modulator);
+    composition->update({});
+    CHECK(composition->scene().environment.stylized);
+    CHECK(composition->toJson()["environment"]["stylized"] == true);
+    auto* control = parameters.find("scene/stylized");
+    REQUIRE(control != nullptr);
+    control->setBaseComponent(0, 0.0f);
+    parameters.resetFinals();
+    composition->update({});
+    CHECK_FALSE(composition->scene().environment.stylized);
+    CHECK(composition->toJson()["environment"]["stylized"] == false);
+    composition->detach();
+    composition->update({});
+    CHECK(composition->scene().environment.stylized);
+    document["environment"]["stylized"] = "true";
+    CHECK_FALSE(scene::Composition::fromJson(document, fixture.registry));
+    document["environment"].erase("stylized");
+    auto legacy = scene::Composition::fromJson(document, fixture.registry);
+    REQUIRE(legacy);
+    (*legacy)->update({});
+    CHECK_FALSE((*legacy)->scene().environment.stylized);
+}
+
 TEST_CASE("Composition flattens every node kind, sharing glTF assets between instances",
           "[scene][composition]") {
     Fixture fx;
@@ -1449,6 +1481,34 @@ TEST_CASE("A multi-material asset is drawn with all of its materials", "[composi
     // parameter pass writes part 0's material into every object it touches, so a part that did not
     // keep its own identity would be repainted with the bark's texture one frame in.
     CHECK(parts[0]->material.baseColorTexture.texture != parts[1]->material.baseColorTexture.texture);
+
+    const auto firstColor = parts[0]->material.baseColor;
+    const auto secondColor = parts[1]->material.baseColor;
+    auto* tint = params.findAs<glm::vec3>("procedural/grove/parts/1/tint");
+    auto* firstEmission = params.findAs<float>("procedural/grove/parts/0/emissiveGain");
+    auto* secondEmission = params.findAs<float>("procedural/grove/parts/1/emissiveGain");
+    auto* globalEmission = params.findAs<float>("procedural/grove/material/emissive");
+    REQUIRE(tint != nullptr);
+    REQUIRE(firstEmission != nullptr);
+    REQUIRE(secondEmission != nullptr);
+    REQUIRE(globalEmission != nullptr);
+    tint->setBase(glm::vec3(0.25f, 0.7f, 0.9f));
+    firstEmission->setBase(0.0f);
+    secondEmission->setBase(3.0f);
+    globalEmission->setBase(2.0f);
+    for (int frame = 0; frame < 3; ++frame) {
+        params.resetFinals();
+        (*comp)->update(FrameTime{});
+        CHECK(parts[0]->material.baseColor == firstColor);
+        CHECK(parts[1]->material.baseColor == secondColor * glm::vec3(0.25f, 0.7f, 0.9f));
+        CHECK(parts[0]->material.emissiveIntensity == 0.0f);
+        CHECK(parts[1]->material.emissiveIntensity == 6.0f);
+        CHECK(parts[0]->material.baseColorTexture.texture != parts[1]->material.baseColorTexture.texture);
+        REQUIRE(parts[0]->instances.size() == parts[1]->instances.size());
+    }
+    (*comp)->removeNode("grove");
+    CHECK(params.find("procedural/grove/parts/0/emissiveGain") == nullptr);
+    CHECK(params.find("procedural/grove/parts/1/tint") == nullptr);
 }
 
 TEST_CASE("A scatter layer's material program and the ground's glow reach the flattened scene",
@@ -1482,12 +1542,16 @@ TEST_CASE("A scatter layer's material program and the ground's glow reach the fl
           "scatter": [
             { "name": "lamps", "asset": "@ASSET@", "densities": { "meadow": 0.02, "forest": 0.02 },
               "height": 0.5, "emissiveIntensity": 6.0, "emissiveColor": [0.1, 0.9, 1.0],
-              "materialProgram": "spots" }
+                            "materialProgram": "spots" },
+                        { "name": "companions", "asset": "@ASSET@", "densities": { "meadow": 0.03, "forest": 0.03 },
+                            "height": 0.2, "proximity": { "layer": "lamps", "minDistance": 1.0,
+                                                                                     "maxDistance": 5.0, "fade": 1.0 } }
           ] }
       ]
     })";
     Fixture fx;
     std::string filled = text;
+    filled.replace(filled.find("@ASSET@"), 7, asset.string());
     filled.replace(filled.find("@ASSET@"), 7, asset.string());
     const auto path = writeJson("ecology_program", filled);
     fx.files.push_back(path);
@@ -1503,6 +1567,28 @@ TEST_CASE("A scatter layer's material program and the ground's glow reach the fl
     (*comp)->attach(params, modulator, "sub_");
     (*comp)->update(FrameTime{});
     const scene::Scene& s = (*comp)->scene();
+
+    SECTION("dependent layers use actual preceding placements through composition flattening") {
+        const auto lamps = std::ranges::find_if(s.procedurals, [](const scene::ProceduralGeometry& object) {
+            return object.name.ends_with("_lamps");
+        });
+        const auto companions = std::ranges::find_if(s.procedurals, [](const scene::ProceduralGeometry& object) {
+            return object.name.ends_with("_companions");
+        });
+        REQUIRE(lamps != s.procedurals.end());
+        REQUIRE(companions != s.procedurals.end());
+        const auto& anchors = *lamps->distribution.scatterCloud;
+        const auto& followers = *companions->distribution.scatterCloud;
+        REQUIRE(followers.count() > 10);
+        for (const glm::vec3 position : followers.positions()) {
+            float nearest = std::numeric_limits<float>::max();
+            for (const glm::vec3 anchor : anchors.positions()) {
+                nearest = std::min(nearest, glm::length(glm::vec2(position.x - anchor.x, position.z - anchor.z)));
+            }
+            CHECK(nearest >= 1.0f);
+            CHECK(nearest < 5.0f);
+        }
+    }
 
     SECTION("the ground program carries an emission output when the terrain asks for glow") {
         const auto ground = std::ranges::find_if(s.materialPrograms, [](const scene::MaterialProgram& p) {

@@ -32,7 +32,7 @@ struct FrameUniforms {
     beat: vec4<f32>,           // beat phase 0..1, pulse (1 - phase), onset strength, bar phase
     clusterParams: vec4<f32>,  // xyz = froxel grid dimensions, w = 1 when the clustered path is on
     clusterDepth: vec4<f32>,   // x = slice scale, y = slice bias, z = near, w = far
-    lightCounts: vec4<f32>,    // x = directional lights (always shaded), y = total lights
+    lightCounts: vec4<f32>,    // x = directional lights, y = total lights, z = stylized shading
     shadowParams: vec4<f32>,   // x = atlas resolution, y = PCF radius (texels), z = contact steps, w = contact length
     aoParams: vec4<f32>,       // x = strength, y = 1 when AO is on, zw = the AO texture size
     targetSize: vec4<f32>,     // x = width, y = height, z = 1 / width, w = 1 / height
@@ -69,7 +69,7 @@ struct VertexIn {
 };
 
 struct VertexOut {
-    @builtin(position) clip: vec4<f32>,
+    @invariant @builtin(position) clip: vec4<f32>,
     @location(0) worldPos: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) uv: vec2<f32>,

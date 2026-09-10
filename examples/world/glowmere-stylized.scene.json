@@ -6,39 +6,49 @@
   "mode": 1,
   "position": [
    -14.0,
-    -2.4,
+   -2.4,
    6.0
   ],
   "target": [
-  -1.0,
-  4.5,
-  -46.0
+   -1.0,
+   4.5,
+   -46.0
   ],
   "fov": 40.0,
   "orbitSpeed": 0.0
  },
  "lightRig": "../lightrigs/glowmere.rig.json",
  "composition": {
-  "focalPoints": [{"name": "elder", "position": [-1.0, 4.5, -46.0], "radius": 8.0}]
+  "focalPoints": [
+   {
+    "name": "elder",
+    "position": [
+     -1.0,
+     4.5,
+     -46.0
+    ],
+    "radius": 8.0
+   }
+  ]
  },
  "environment": {
-  "map": "../../assets/hdri/kloppenheim_02_puresky_4k.hdr",
-  "intensity": 0.12,
-  "rotation": -1.517,
-  "skyIntensity": 0.01,
+  "stylized": true,
+  "intensity": 0.8,
+  "rotation": 0.0,
+  "skyIntensity": 1.0,
   "skyBloom": 0.1,
-  "lightFromEnvironment": true,
+  "lightFromEnvironment": false,
   "background": [
    0.0036,
    0.0061,
    0.0192
   ],
   "fogColor": [
-   0.0028,
-   0.0072,
-   0.0231
+   0.045,
+   0.085,
+   0.18
   ],
-  "fogDensity": 0.0022,
+  "fogDensity": 0.0036,
   "fogHeight": 26.0,
   "fogHeightFalloff": 0.045,
   "volumeDensity": 0.011,
@@ -46,37 +56,39 @@
   "volumeAnisotropy": 0.12,
   "volumeNoiseAmount": 0.45,
   "volumeNoiseScale": 0.02,
-  "volumeSteps": 18,
+  "volumeSteps": 12,
   "volumeMaxDistance": 320.0,
   "volumeAbsorption": 0.4,
   "sky": {
+   "enabled": true,
+   "background": true,
    "zenithColor": [
-    0.003,
-    0.0052,
-    0.0182
+    0.008,
+    0.016,
+    0.048
    ],
    "horizonColor": [
-    0.0071,
-    0.0412,
-    0.2015
+    0.04,
+    0.08,
+    0.17
    ],
    "groundColor": [
     0.0012,
     0.0021,
     0.0058
    ],
-   "haze": 0.55,
+   "haze": 0.24,
    "sunColor": [
-    0.0092,
-    0.1512,
-    0.6012
+    0.65,
+    0.8,
+    1.0
    ],
-   "sunIntensity": 1.0,
-   "sunSize": 0.7,
-   "sunGlow": 0.35
+   "sunIntensity": 6.0,
+   "sunSize": 0.016,
+   "sunGlow": 0.08
   },
   "shadowCascades": 2,
-  "ecologyLight": 0.006,
+  "ecologyLight": 0.0,
   "ecologyGlowCell": 9.0,
   "volumeLocalLights": 1.0
  },
@@ -117,7 +129,7 @@
     ]
    },
    "material": {
-    "program": "glowmereGround",
+    "program": "paintedGround",
     "baseColor": [
      0.023,
      0.144,
@@ -143,13 +155,13 @@
      "clusterScale": 46.0,
      "clustering": 0.55,
      "seed": 31,
-     "meshBudget": 0,
+     "meshBudget": 900,
      "maxInstances": 2000,
      "height": 14.0,
      "tint": [
-      0.1119,
-      0.2384,
-      0.3916
+      0.08,
+      0.28,
+      0.23
      ],
      "viewDistance": 520.0,
      "minScreenRadius": 1.0,
@@ -159,13 +171,13 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 48.0,
+     "emissiveIntensity": 0.035,
      "emissiveRandom": 0.55,
      "hueField": 0.0,
      "hueFieldScale": 48.0,
      "hueRandom": 0.03,
      "emissiveSparsity": 0.12,
-     "materialProgram": "canopyFireflies",
+     "materialProgram": "",
      "motion": {
       "stiffness": 9.0,
       "mass": 40.0,
@@ -180,7 +192,7 @@
     },
     {
      "name": "pines",
-     "asset": "../../assets/quaternius/glTF/Pine_2.gltf",
+     "asset": "../../assets/quaternius/glTF/TwistedTree_2.gltf",
      "densities": {
       "forest": 0.0022,
       "scree": 0.0016
@@ -193,13 +205,13 @@
      "clusterScale": 38.0,
      "clustering": 0.6,
      "seed": 32,
-     "meshBudget": 0,
+     "meshBudget": 700,
      "maxInstances": 1600,
      "height": 15.0,
      "tint": [
-      0.0762,
-      0.2016,
-      0.305
+      0.12,
+      0.18,
+      0.32
      ],
      "viewDistance": 520.0,
      "minScreenRadius": 1.0,
@@ -209,13 +221,13 @@
       1.0,
       1.0
      ],
-     "emissiveIntensity": 42.0,
+     "emissiveIntensity": 0.035,
      "emissiveRandom": 0.55,
      "hueField": 0.0,
      "hueFieldScale": 44.0,
      "hueRandom": 0.03,
      "emissiveSparsity": 0.16,
-     "materialProgram": "pineFireflies",
+     "materialProgram": "",
      "motion": {
       "stiffness": 12.0,
       "mass": 55.0,
@@ -298,13 +310,13 @@
       0.14,
       1.0
      ],
-     "emissiveIntensity": 26.0,
+     "emissiveIntensity": 0.12,
      "emissiveRandom": 0.6,
      "hueField": 0.1,
      "hueFieldScale": 40.0,
      "hueRandom": 0.04,
      "emissiveSparsity": 0.35,
-     "materialProgram": "bushGlow",
+     "materialProgram": "",
      "motion": {
       "stiffness": 2.6,
       "mass": 0.6,
@@ -319,7 +331,7 @@
        "minScreenRadius": 9.0,
        "maxDistance": 50.0,
        "budget": 80,
-       "enabled": true
+       "enabled": false
       }
      },
      "chromaDrift": 0.06,
@@ -328,8 +340,14 @@
     },
     {
      "name": "ferns",
-    "asset": "../../assets/nature/plants/fern_02/fern_02_1k.gltf",
-    "proximity": {"layer": "canopy", "minDistance": 1.5, "maxDistance": 16.0, "fade": 3.0, "strength": 0.55},
+     "asset": "../../assets/quaternius/glTF/Fern_1.gltf",
+     "proximity": {
+      "layer": "canopy",
+      "minDistance": 1.5,
+      "maxDistance": 16.0,
+      "fade": 3.0,
+      "strength": 0.55
+     },
      "densities": {
       "marsh": 0.045,
       "forest": 0.03
@@ -341,28 +359,28 @@
      "clusterScale": 16.0,
      "clustering": 0.65,
      "seed": 35,
-    "meshBudget": 2200,
+     "meshBudget": 260,
      "maxInstances": 16000,
-    "height": 0.9,
+     "height": 1.4,
      "tint": [
-      0.0931,
-      0.3916,
-      0.3515
+      0.055,
+      0.3,
+      0.22
      ],
      "emissiveColor": [
       0.02,
       1.0,
       0.58
      ],
-    "emissiveIntensity": 0.3,
+     "emissiveIntensity": 0.025,
      "viewDistance": 170.0,
-    "minScreenRadius": 1.5,
+     "minScreenRadius": 1.5,
      "castsShadow": false,
      "hueField": 0.085,
      "hueFieldScale": 42.0,
      "hueRandom": 0.02,
      "emissiveRandom": 0.55,
-     "materialProgram": "frondGlow",
+     "materialProgram": "",
      "motion": {
       "stiffness": 1.1,
       "mass": 0.075,
@@ -377,7 +395,7 @@
        "minScreenRadius": 6.0,
        "maxDistance": 45.0,
        "budget": 140,
-       "enabled": true
+       "enabled": false
       }
      },
      "chromaDrift": 0.05,
@@ -386,11 +404,11 @@
     },
     {
      "name": "grass",
-    "asset": "../../assets/nature/plants/grass_medium_02/grass_medium_02_1k.gltf",
+     "asset": "../../assets/quaternius/glTF/Grass_Common_Short.gltf",
      "densities": {
-     "meadow": 0.32,
-     "marsh": 0.22,
-     "forest": 0.14
+      "meadow": 0.48,
+      "marsh": 0.34,
+      "forest": 0.22
      },
      "maxSlope": 0.22,
      "minScale": 0.6,
@@ -399,23 +417,23 @@
      "clusterScale": 13.0,
      "clustering": 0.55,
      "seed": 36,
-    "meshBudget": 400,
-    "maxInstances": 80000,
-     "height": 0.45,
+     "meshBudget": 80,
+     "maxInstances": 120000,
+     "height": 0.7,
      "tint": [
-      0.1384,
-      0.4342,
-      0.2705
+      0.035,
+      0.18,
+      0.13
      ],
      "viewDistance": 90.0,
-    "minScreenRadius": 1.2,
+     "minScreenRadius": 1.2,
      "castsShadow": false,
      "emissiveColor": [
       0.05,
       1.0,
       0.55
      ],
-    "emissiveIntensity": 0.08,
+     "emissiveIntensity": 0.025,
      "emissiveRandom": 0.7,
      "hueField": 0.08,
      "hueFieldScale": 50.0,
@@ -435,12 +453,63 @@
        "minScreenRadius": 5.0,
        "maxDistance": 40.0,
        "budget": 200,
-       "enabled": true
+       "enabled": false
       }
      },
      "chromaDrift": 0.05,
      "chromaDriftScale": 55.0,
      "chromaDriftSpeed": 0.04
+    },
+    {
+     "name": "fan-plants",
+     "asset": "../../assets/quaternius/glTF/Plant_1_Big.gltf",
+     "densities": {
+      "forest": 0.009,
+      "marsh": 0.006,
+      "meadow": 0.003
+     },
+     "proximity": {
+      "layer": "canopy",
+      "minDistance": 1.0,
+      "maxDistance": 22.0,
+      "fade": 3.0,
+      "strength": 0.65
+     },
+     "height": 3.2,
+     "minScale": 0.65,
+     "maxScale": 1.6,
+     "maxSlope": 0.26,
+     "alignToGround": 0.3,
+     "clustering": 0.8,
+     "clusterScale": 20.0,
+     "meshBudget": 280,
+     "maxInstances": 3000,
+     "seed": 83,
+     "tint": [
+      0.045,
+      0.24,
+      0.28
+     ],
+     "viewDistance": 220.0,
+     "minScreenRadius": 2.0,
+     "emissiveColor": [
+      0.04,
+      0.45,
+      0.5
+     ],
+     "emissiveIntensity": 0.025,
+     "hueField": 0.045,
+     "hueFieldScale": 50.0,
+     "hueRandom": 0.02,
+     "castsShadow": true,
+     "motion": {
+      "stiffness": 3.0,
+      "mass": 1.5,
+      "damping": 0.9,
+      "windSensitivity": 0.65,
+      "bendLimit": 0.16,
+      "tipAmplitude": 0.08
+     }
     },
     {
      "name": "flowers",
@@ -468,7 +537,7 @@
       0.1208,
       1.0
      ],
-    "emissiveIntensity": 1.6,
+     "emissiveIntensity": 1.6,
      "viewDistance": 150.0,
      "minScreenRadius": 5.5,
      "castsShadow": false,
@@ -490,7 +559,7 @@
        "minScreenRadius": 5.0,
        "maxDistance": 40.0,
        "budget": 100,
-       "enabled": true
+       "enabled": false
       }
      },
      "chromaDrift": 0.07,
@@ -500,7 +569,13 @@
     {
      "name": "fungi",
      "asset": "../../assets/quaternius/glTF/Mushroom_Common.gltf",
-    "proximity": {"layer": "ferns", "minDistance": 0.3, "maxDistance": 4.0, "fade": 0.8, "strength": 0.75},
+     "proximity": {
+      "layer": "ferns",
+      "minDistance": 0.3,
+      "maxDistance": 4.0,
+      "fade": 0.8,
+      "strength": 0.75
+     },
      "densities": {
       "marsh": 0.03,
       "forest": 0.008
@@ -525,8 +600,8 @@
       0.0821,
       1.0
      ],
-    "emissiveIntensity": 2.8,
-    "materialProgram": "glowmereTissue",
+     "emissiveIntensity": 2.8,
+     "materialProgram": "glowmereTissue",
      "viewDistance": 160.0,
      "minScreenRadius": 5.5,
      "castsShadow": true,
@@ -575,8 +650,8 @@
       1.0,
       0.62
      ],
-    "emissiveIntensity": 1.8,
-    "materialProgram": "glowmereTissue",
+     "emissiveIntensity": 1.8,
+     "materialProgram": "glowmereTissue",
      "viewDistance": 180.0,
      "minScreenRadius": 5.5,
      "castsShadow": true,
@@ -631,7 +706,13 @@
     {
      "name": "pebbles",
      "asset": "../../assets/quaternius/glTF/Pebble_Round_2.gltf",
-    "proximity": {"layer": "boulders", "minDistance": 0.7, "maxDistance": 5.0, "fade": 1.0, "strength": 0.8},
+     "proximity": {
+      "layer": "boulders",
+      "minDistance": 0.7,
+      "maxDistance": 5.0,
+      "fade": 1.0,
+      "strength": 0.8
+     },
      "densities": {
       "scree": 0.02,
       "marsh": 0.01,
@@ -675,7 +756,7 @@
      "seed": 771,
      "meshBudget": 0,
      "maxInstances": 400,
-    "height": 1.5,
+     "height": 1.5,
      "tint": [
       0.42,
       0.3,
@@ -686,8 +767,8 @@
       0.82,
       1.0
      ],
-    "emissiveIntensity": 2.5,
-    "materialProgram": "glowmereTissue",
+     "emissiveIntensity": 2.5,
+     "materialProgram": "glowmereTissue",
      "viewDistance": 420.0,
      "minScreenRadius": 1.0,
      "castsShadow": true,
@@ -713,78 +794,310 @@
    ]
   },
   {
-  "name": "elder-crown",
-  "kind": "procedural",
-  "position": [-1.0, 5.5, -46.0],
-  "procedural": {
-  "source": {"kind": "sphere", "radius": 1.0, "segments": 96, "rings": 48},
-  "sourceTransform": {"scale": [8.2, 2.0, 7.4]},
-   "distribution": {"kind": "single"},
-  "material": {"program": "glowmereCrown", "baseColor": [0.06, 0.13, 0.08],
-            "roughness": 0.44, "emissiveColor": [0.12, 1.0, 0.6], "emissiveIntensity": 1.0},
-   "motion": {"stiffness": 18.0, "mass": 120.0, "damping": 0.95,
-          "windSensitivity": 0.16, "bendLimit": 0.015, "tipAmplitude": 0.01}
-  }
+   "name": "elder-crown",
+   "kind": "procedural",
+   "position": [
+    -1.0,
+    5.5,
+    -46.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 96,
+     "rings": 48
+    },
+    "sourceTransform": {
+     "scale": [
+      8.2,
+      2.0,
+      7.4
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "program": "paintedCrown",
+     "baseColor": [
+      0.06,
+      0.13,
+      0.08
+     ],
+     "roughness": 0.44,
+     "emissiveColor": [
+      0.12,
+      1.0,
+      0.6
+     ],
+     "emissiveIntensity": 1.0
+    },
+    "motion": {
+     "stiffness": 18.0,
+     "mass": 120.0,
+     "damping": 0.95,
+     "windSensitivity": 0.16,
+     "bendLimit": 0.015,
+     "tipAmplitude": 0.01
+    },
+    "deformers": [
+     {
+      "kind": "displacement",
+      "amount": 0.115,
+      "scale": 1.45,
+      "seed": 41,
+      "speed": 0.0
+     },
+     {
+      "kind": "displacement",
+      "amount": 0.038,
+      "scale": 4.8,
+      "seed": 97,
+      "speed": 0.0
+     }
+    ]
+   }
   },
   {
-  "name": "elder-stem",
-  "kind": "procedural",
-  "position": [-1.0, -9.0, -46.0],
-  "procedural": {
-   "source": {
-    "kind": "tube", "tubeRadius": 1.25, "tubeTaper": 0.65,
-    "tubeSides": 32, "tubeSegments": 40, "tubeCaps": true,
-    "curve": {"kind": "catmullRom", "generator": "points", "points": [
-    {"position": [0.0, 0.0, 0.0], "scale": 1.5},
-    {"position": [-0.8, 3.0, 0.7], "scale": 0.85},
-    {"position": [-0.6, 7.0, 0.5], "scale": 0.7},
-    {"position": [0.5, 11.0, -0.3], "scale": 0.9},
-    {"position": [0.0, 14.5, 0.0], "scale": 1.4}
-    ]}
-   },
-   "distribution": {"kind": "single"},
-   "material": {"baseColor": [0.07, 0.12, 0.075], "roughness": 0.62,
-            "emissiveColor": [0.04, 0.25, 0.12], "emissiveIntensity": 0.12}
-  }
+   "name": "elder-stem",
+   "kind": "procedural",
+   "position": [
+    -1.0,
+    -9.0,
+    -46.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 1.25,
+     "tubeTaper": 0.65,
+     "tubeSides": 32,
+     "tubeSegments": 40,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.5
+       },
+       {
+        "position": [
+         -0.8,
+         3.0,
+         0.7
+        ],
+        "scale": 0.85
+       },
+       {
+        "position": [
+         -0.6,
+         7.0,
+         0.5
+        ],
+        "scale": 0.7
+       },
+       {
+        "position": [
+         0.5,
+         11.0,
+         -0.3
+        ],
+        "scale": 0.9
+       },
+       {
+        "position": [
+         0.0,
+         14.5,
+         0.0
+        ],
+        "scale": 1.4
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.24,
+      0.12,
+      0.25
+     ],
+     "roughness": 0.62,
+     "emissiveColor": [
+      0.3,
+      0.09,
+      0.16
+     ],
+     "emissiveIntensity": 0.1
+    },
+    "deformers": [
+     {
+      "kind": "displacement",
+      "amount": 0.085,
+      "scale": 0.55,
+      "seed": 23,
+      "speed": 0.0
+     },
+     {
+      "kind": "displacement",
+      "amount": 0.03,
+      "scale": 2.1,
+      "seed": 71,
+      "speed": 0.0
+     }
+    ]
+   }
   },
   {
-  "name": "elder-filaments",
-  "kind": "procedural",
-  "position": [-1.0, 5.5, -46.0],
-  "procedural": {
-   "source": {
-    "kind": "tube", "tubeRadius": 0.045, "tubeTaper": 0.15,
-    "tubeSides": 6, "tubeSegments": 24,
-    "curve": {"kind": "catmullRom", "generator": "points", "points": [
-    {"position": [0.0, 0.0, 0.0]}, {"position": [0.2, -1.2, 0.2]},
-    {"position": [-0.1, -2.5, 0.5]}, {"position": [0.4, -3.4, 0.2]}
-    ]}
-   },
-   "distribution": {"kind": "radial", "count": 38, "radius": 6.8},
-   "variation": {"seed": 616, "scale": [0.12, 0.3, 0.12]},
-   "material": {"baseColor": [0.02, 0.1, 0.07], "roughness": 0.45,
-            "emissiveColor": [0.2, 0.95, 0.58], "emissiveIntensity": 2.1},
-   "materialVariation": {"emissiveRandom": 0.7},
-   "motion": {"stiffness": 0.6, "mass": 0.12, "damping": 0.92,
-          "windSensitivity": 0.5, "bendLimit": 0.12, "tipAmplitude": 0.12}
-  }
+   "name": "elder-filaments",
+   "kind": "procedural",
+   "position": [
+    -1.0,
+    5.5,
+    -46.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 0.045,
+     "tubeTaper": 0.15,
+     "tubeSides": 6,
+     "tubeSegments": 24,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ]
+       },
+       {
+        "position": [
+         0.2,
+         -1.2,
+         0.2
+        ]
+       },
+       {
+        "position": [
+         -0.1,
+         -2.5,
+         0.5
+        ]
+       },
+       {
+        "position": [
+         0.4,
+         -3.4,
+         0.2
+        ]
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 38,
+     "radius": 6.8
+    },
+    "variation": {
+     "seed": 616,
+     "scale": [
+      0.12,
+      0.3,
+      0.12
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.1,
+      0.07
+     ],
+     "roughness": 0.45,
+     "emissiveColor": [
+      1.0,
+      0.47,
+      0.15
+     ],
+     "emissiveIntensity": 1.2
+    },
+    "materialVariation": {
+     "emissiveRandom": 0.7
+    },
+    "motion": {
+     "stiffness": 0.6,
+     "mass": 0.12,
+     "damping": 0.92,
+     "windSensitivity": 0.5,
+     "bendLimit": 0.12,
+     "tipAmplitude": 0.12
+    }
+   }
   },
   {
-  "name": "foreground-leaves",
-  "kind": "procedural",
-  "position": [-19.0, -8.8, -3.0],
-  "procedural": {
-   "source": {"kind": "mesh", "asset": "../../assets/nature/plants/calathea_orbifolia_01/calathea_orbifolia_01_1k.gltf", "meshBudget": 6000},
-  "sourceTransform": {"scale": [6.0, 14.0, 6.0]},
-   "distribution": {"kind": "single"},
-   "material": {"baseColor": [0.15, 0.25, 0.14], "roughness": 0.48,
-            "emissiveColor": [0.04, 0.22, 0.12], "emissiveIntensity": 0.04},
-   "motion": {"stiffness": 2.0, "mass": 0.25, "damping": 0.9,
-          "windSensitivity": 0.5, "bendLimit": 0.14, "tipAmplitude": 0.09}
-  }
+   "name": "foreground-leaves",
+   "kind": "procedural",
+   "position": [
+    -19.0,
+    -8.8,
+    -3.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/Plant_1_Big.gltf",
+     "meshBudget": 1200
+    },
+    "sourceTransform": {
+     "scale": [
+      2.0,
+      2.4,
+      2.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "program": "paintedFrond",
+     "baseColor": [
+      0.35,
+      0.65,
+      0.55
+     ],
+     "roughness": 0.48,
+     "emissiveColor": [
+      0.04,
+      0.22,
+      0.12
+     ],
+     "emissiveIntensity": 0.04
+    },
+    "motion": {
+     "stiffness": 2.0,
+     "mass": 0.25,
+     "damping": 0.9,
+     "windSensitivity": 0.5,
+     "bendLimit": 0.14,
+     "tipAmplitude": 0.09
+    }
+   }
   },
   {
-  "name": "spores",
+   "name": "spores",
    "kind": "particles",
    "particles": {
     "capacity": 10240,
@@ -834,21 +1147,19 @@
   "tonemap": 1,
   "chromaRetention": 0.6,
   "bloomEnabled": true,
-    "bloomIntensity": 0.18,
-    "bloomThreshold": 1.0,
+  "bloomIntensity": 0.18,
+  "bloomThreshold": 1.0,
   "bloomKnee": 0.5,
   "bloomRadius": 1.15,
   "bloomLevels": 6,
   "bloomEmissionWeight": 0.75
  },
  "materialPrograms": [
-  "../materials/canopy-fireflies.material.json",
-  "../materials/pine-fireflies.material.json",
-  "../materials/frond-glow.material.json",
-    "../materials/bush-glow.material.json",
-    "../materials/glowmere-tissue.material.json",
-    "../materials/glowmere-ground.material.json",
-    "../materials/glowmere-crown.material.json"
+  "../materials/glowmere-painted-frond.material.json",
+  "../materials/bush-glow.material.json",
+  "../materials/glowmere-tissue.material.json",
+  "../materials/glowmere-painted-ground.material.json",
+  "../materials/glowmere-painted-crown.material.json"
  ],
  "wind": {
   "enabled": true,

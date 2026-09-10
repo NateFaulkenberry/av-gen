@@ -633,6 +633,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
 
     // ---- assets first: they define the parameter surface the rest of the document targets ----
     if (const auto assets = doc.find("assets"); assets != doc.end() && assets->is_object()) {
+        std::filesystem::path sceneEnvironment;
         if (assets->contains("audio")) {
             if (const auto audio = resolveAsset((*assets)["audio"], "audio"); audio && *audio != audioPath_) {
                 if (auto r = loadAudio(*audio); !r) {
@@ -656,10 +657,13 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                 }
             } else if (kind == "composition" && sceneRef.contains("path")) {
                 const auto scenePath = resolveAsset(sceneRef["path"], "scene").value_or(std::filesystem::path());
-                if (composition() == nullptr || compositionPath_ != scenePath) {
-                    if (auto r = loadComposition(scenePath); !r) {
-                        warn("scene: " + r.error().message);
-                    }
+                const auto previousEnvironment = environmentPath_;
+                environmentPath_.clear();
+                if (auto r = loadComposition(scenePath); !r) {
+                    environmentPath_ = previousEnvironment;
+                    warn("scene: " + r.error().message);
+                } else {
+                    sceneEnvironment = environmentPath_;
                 }
             } else if (kind == "composition" && sceneRef.contains("inline")) {
                 registry_.setBaseDirectory(dir);
@@ -673,6 +677,10 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                     modulator_.clearRoutes();
                     modulator_.masterGain = masterGain;
                     (*comp)->attach(params_, modulator_);
+                    if (!(*comp)->environmentMap().empty()) {
+                        sceneEnvironment = registry_.resolve((*comp)->environmentMap());
+                    }
+                    environmentPath_ = sceneEnvironment;
                     compositionPath_.clear();
                     installController(std::move(*comp));
                 }
@@ -690,7 +698,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                     warn("environment: " + r.error().message);
                 }
             }
-        } else if (!environmentPath_.empty()) {
+        } else if (sceneEnvironment.empty() && !environmentPath_.empty()) {
             environmentPath_.clear();
             controller_->scene().environment.environmentMap = scene::kInvalidTexture;
             if (auto* comp = composition()) {

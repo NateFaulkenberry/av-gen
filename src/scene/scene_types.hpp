@@ -262,6 +262,7 @@ struct SkySettings {
 };
 
 struct Environment {
+    bool stylized = false;
     glm::vec3 backgroundColor{0.012f, 0.012f, 0.02f};
     float brightness = 1.0f;     // global exposure multiplier applied in tone mapping
     float gridIntensity = 0.6f;

@@ -47,6 +47,15 @@ enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedur
 const char* nodeKindName(NodeKind kind);
 Result<NodeKind> nodeKindFromName(const std::string& name);
 
+struct MaterialPartParameters {
+    params::Parameter<glm::vec3>* tint = nullptr;
+    params::Parameter<float>* emissiveGain = nullptr;
+    params::Parameter<float>* roughnessScale = nullptr;
+    params::Parameter<float>* opacityScale = nullptr;
+
+    void apply(Material& material) const;
+};
+
 struct CompositionNode {
     std::string name;
     NodeKind kind = NodeKind::Gltf;
@@ -90,6 +99,7 @@ struct CompositionNode {
     // registered from; these are the rest copies of the others, identical to it but for their mesh
     // and their material. Built at rebuild, applied alongside it every frame.
     std::vector<ProceduralGeometry> proceduralSubRest;
+    std::vector<MaterialPartParameters> materialPartParams;
     FieldParameters fieldParams;
     spatial::FieldSpec fieldRest;
     SplineParameters splineParams;
@@ -275,6 +285,8 @@ private:
     float skyBloomSetting_ = 0.0f;         // how much of the sky the bloom mask sees
     bool showSkyboxSetting_ = true;        // draw the environment behind the world at all
     bool lightFromEnvironmentSetting_ = false;
+    bool stylizedSetting_ = false;
+    params::Parameter<bool>* stylized_ = nullptr;
     // The environment map's brightest direction, in world space at rotation 0, found once when the
     // map is loaded: an 8K scan is 33 M texels and has no business being swept every frame.
     std::optional<glm::vec3> envDominantDirection_;

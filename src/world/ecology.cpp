@@ -13,6 +13,8 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace avgen::world {
 namespace {
@@ -53,6 +55,45 @@ Result<float> readFloat(const json& j, const char* key, float def) {
     }
     return j.at(key).get<float>();
 }
+
+class HabitatIndex {
+public:
+    HabitatIndex(std::span<const glm::vec3> anchors, float radius) : radius_(radius) {
+        for (const glm::vec3& anchor : anchors) {
+            const glm::vec2 position(anchor.x, anchor.z);
+            bins_[key(cell(position))].push_back(position);
+        }
+    }
+
+    float nearest(glm::vec2 position) const {
+        const glm::ivec2 center = cell(position);
+        float nearestSquared = radius_ * radius_;
+        for (int offsetZ = -1; offsetZ <= 1; ++offsetZ) {
+            for (int offsetX = -1; offsetX <= 1; ++offsetX) {
+                const auto found = bins_.find(key(center + glm::ivec2(offsetX, offsetZ)));
+                if (found == bins_.end()) {
+                    continue;
+                }
+                for (const glm::vec2 anchor : found->second) {
+                    const glm::vec2 delta = position - anchor;
+                    nearestSquared = std::min(nearestSquared, glm::dot(delta, delta));
+                }
+            }
+        }
+        return std::sqrt(nearestSquared);
+    }
+
+private:
+    glm::ivec2 cell(glm::vec2 position) const {
+        return glm::ivec2(glm::floor(position / radius_));
+    }
+    static std::uint64_t key(glm::ivec2 coordinate) {
+        return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(coordinate.x)) << 32u) |
+               static_cast<std::uint32_t>(coordinate.y);
+    }
+    float radius_;
+    std::unordered_map<std::uint64_t, std::vector<glm::vec2>> bins_;
+};
 
 } // namespace
 
@@ -105,6 +146,22 @@ Result<void> ScatterLayer::validate() const {
     if (maxInstances < 1 || maxInstances > 1000000) {
         return fail("scatter '{}': maxInstances must be in [1, 1000000]", name);
     }
+    if (proximity) {
+        const auto& rule = *proximity;
+        if (rule.layer.empty() || rule.layer == name) {
+            return fail("scatter '{}': proximity needs another layer's name", name);
+        }
+        if (!std::isfinite(rule.minDistance) || !std::isfinite(rule.maxDistance) ||
+            rule.minDistance < 0.0f || rule.maxDistance <= rule.minDistance ||
+            rule.maxDistance > 4096.0f) {
+            return fail("scatter '{}': proximity distances must be finite, ordered and in [0, 4096]", name);
+        }
+        if (!std::isfinite(rule.fade) || rule.fade < 0.0f ||
+            rule.fade > (rule.maxDistance - rule.minDistance) * 0.5f ||
+            !std::isfinite(rule.strength) || rule.strength < 0.0f || rule.strength > 1.0f) {
+            return fail("scatter '{}': proximity fade must fit the band and strength must be in [0, 1]", name);
+        }
+    }
     return {};
 }
 
@@ -149,6 +206,13 @@ std::uint64_t ScatterLayer::structuralHash() const {
     h.u32(seed);
     h.i32(maxInstances);
     h.i32(meshBudget);
+    if (proximity) {
+        h.str(proximity->layer);
+        h.f32(proximity->minDistance);
+        h.f32(proximity->maxDistance);
+        h.f32(proximity->fade);
+        h.f32(proximity->strength);
+    }
     return h.value();
 }
 
@@ -156,9 +220,16 @@ Result<void> Ecology::validate(const BiomeSet& biomes) const {
     if (layers.size() > 64) {
         return fail("{} scatter layers (max 64)", layers.size());
     }
+    std::unordered_set<std::string> preceding;
     for (const ScatterLayer& l : layers) {
         if (auto r = l.validate(); !r) {
             return r;
+        }
+        if (l.proximity && !preceding.contains(l.proximity->layer)) {
+            return fail("scatter '{}': proximity layer '{}' must precede it", l.name, l.proximity->layer);
+        }
+        if (!preceding.insert(l.name).second) {
+            return fail("duplicate scatter layer '{}'", l.name);
         }
         // A density naming a biome that does not exist is silently nothing, which is the worst
         // possible outcome: a layer that was authored, validated, built, and grew no plants.
@@ -182,11 +253,22 @@ std::uint64_t Ecology::structuralHash() const {
     return h.value();
 }
 
-spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer) {
+spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
+                            std::span<const glm::vec3> anchors) {
     spatial::PointCloud out;
     const float peak = peakDensity(layer);
     if (peak <= 0.0f || map.biomes.empty()) {
         return out;
+    }
+    std::optional<HabitatIndex> habitat;
+    if (layer.proximity && layer.proximity->strength > 0.0f) {
+        if (!layer.validate()) {
+            return out;
+        }
+        if (anchors.empty() && layer.proximity->strength == 1.0f) {
+            return out;
+        }
+        habitat.emplace(anchors, layer.proximity->maxDistance);
     }
     // One cell per expected instance at the layer's peak density, so the grid is as coarse as the
     // layer is sparse. A tree layer at 0.002 per square metre walks a 22 m grid; grass at 0.4 walks
@@ -229,6 +311,22 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer) {
             if (p.x > map.max().x || p.y > map.max().y) {
                 continue;
             }
+            float habitatWeight = 1.0f;
+            if (habitat) {
+                const auto& rule = *layer.proximity;
+                const float distance = habitat->nearest(p);
+                float band = distance >= rule.minDistance && distance < rule.maxDistance ? 1.0f : 0.0f;
+                if (rule.fade > 0.0f) {
+                    band *= 1.0f - glm::smoothstep(rule.maxDistance - rule.fade, rule.maxDistance, distance);
+                    if (rule.minDistance > 0.0f) {
+                        band *= glm::smoothstep(rule.minDistance, rule.minDistance + rule.fade, distance);
+                    }
+                }
+                habitatWeight = glm::mix(1.0f, band, rule.strength);
+                if (habitatWeight <= 0.0f) {
+                    continue;
+                }
+            }
             // A fixed half-metre, not the layer's cell size. Deriving the epsilon from the cell
             // would measure a sparse tree layer's slope over eleven metres and a dense grass
             // layer's over one, so the same point would be steep for one layer and flat for
@@ -261,7 +359,7 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer) {
                                                 layer.seed ^ 0x5bf03635u);
                 density *= glm::mix(1.0f, glm::clamp(patch * 2.0f, 0.0f, 1.6f), layer.clustering);
             }
-            const float expected = density * cellArea;
+            const float expected = density * cellArea * habitatWeight;
             if (random01(layer.seed, cellId, kAcceptChannel) >= expected) {
                 continue;
             }
@@ -357,6 +455,25 @@ Result<Ecology> ecologyFromJson(const json& j) {
                 return fail("scatter '{}': 'motion' must be an object", l.name);
             }
             l.motion = wind::motionFromJson(e.at("motion"));
+        }
+        if (e.contains("proximity")) {
+            const json& proximity = e.at("proximity");
+            if (!proximity.is_object() || !proximity.contains("layer") ||
+                !proximity.at("layer").is_string()) {
+                return fail("scatter '{}': 'proximity' needs an object with a string 'layer'", l.name);
+            }
+            l.proximity.emplace();
+            l.proximity->layer = proximity.at("layer").get<std::string>();
+            for (const Field& field : {Field{"minDistance", &l.proximity->minDistance},
+                                       Field{"maxDistance", &l.proximity->maxDistance},
+                                       Field{"fade", &l.proximity->fade},
+                                       Field{"strength", &l.proximity->strength}}) {
+                auto value = readFloat(proximity, field.key, *field.target);
+                if (!value) {
+                    return fail("scatter '{}': proximity {}", l.name, value.error().message);
+                }
+                *field.target = *value;
+            }
         }
         if (e.contains("materialProgram")) {
             if (!e.at("materialProgram").is_string()) {
@@ -457,6 +574,13 @@ json ecologyToJson(const Ecology& ecology) {
                            {"seed", l.seed},
                            {"maxInstances", l.maxInstances},
                            {"meshBudget", l.meshBudget}});
+        if (l.proximity) {
+            out.back()["proximity"] = {{"layer", l.proximity->layer},
+                                        {"minDistance", l.proximity->minDistance},
+                                        {"maxDistance", l.proximity->maxDistance},
+                                        {"fade", l.proximity->fade},
+                                        {"strength", l.proximity->strength}};
+        }
     }
     return out;
 }

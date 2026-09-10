@@ -220,7 +220,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     occlusion.visibility = 1.0;
     occlusion.bentNormal = n;
     var sampledOcclusion = false;
-    if (programIndex >= 0 || hasNormal) {
+    if ((programIndex >= 0 || hasNormal) && frame.lightCounts.z < 0.5) {
         tangentFrame = cotangentFrame(n, worldPos, uv);
     }
     if (programIndex >= 0) {
@@ -269,7 +269,11 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
 
     var baseColor = matColor * vec4<f32>(colorMul, 1.0);
     if (hasBaseColor) {
-        baseColor = baseColor * textureSample(baseColorTex, materialSampler, uv);
+        if (frame.lightCounts.z < 0.5 || object.flags.z > 0.5) {
+            baseColor = baseColor * textureSample(baseColorTex, materialSampler, uv);
+        } else if (object.flags.x > 0.5) {
+            baseColor.a *= textureSample(baseColorTex, materialSampler, uv).a;
+        }
     }
     let alphaMode = object.flags.x;
     if (alphaMode > 0.5 && alphaMode < 1.5 && baseColor.a < object.flags.y) {
@@ -288,6 +292,48 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         result.normal = n;
         result.emission = baseColor.rgb + emissive;
         result.flags = 2.0;
+        return result;
+    }
+
+    if (frame.lightCounts.z > 0.5) {
+        let roughness = clamp(matRoughMetal.x, 0.15, 1.0);
+        var context: ShadeContext;
+        context.worldPos = worldPos;
+        context.normal = n;
+        context.view = v;
+        context.diffuseColor = baseColor.rgb;
+        context.f0 = vec3<f32>(0.04);
+        context.roughness = roughness;
+        context.alpha = roughness * roughness;
+        context.nDotV = max(dot(n, v), 0.0);
+        context.screenUv = screenUv;
+        context.viewDepth = viewDepth;
+        context.rotation = gradientNoise(screenUv * frame.targetSize.xy) * 6.28318531;
+        context.jitter = 0.5;
+        let lighting = directLighting(context);
+        if (!sampledOcclusion) {
+            occlusion = sampleAmbientOcclusion(screenUv, viewDepth, n);
+        }
+        // The styled path's ambient is the dominant light on a night landscape, so screen-space
+        // AO applied to it at full depth writes its own sampling noise straight into the largest
+        // term in the image -- visible as a faint lattice on open ground, and absent from the PBR
+        // control where ambient is one contributor among several. Half the depth keeps the contact
+        // darkening that gives the painterly look its weight, without printing the AO's noise.
+        let visibility = mix(0.68, 1.0, clamp(occlusion.visibility * programOcclusion, 0.0, 1.0));
+        let hemisphere = mix(vec3<f32>(0.12, 0.10, 0.22), vec3<f32>(0.38, 0.56, 0.65),
+                             n.y * 0.5 + 0.5);
+        let ambient = baseColor.rgb * hemisphere * visibility;
+        let edge = pow(1.0 - context.nDotV, 4.0) * smoothstep(-0.2, 0.7, n.y);
+        let rim = baseColor.rgb * vec3<f32>(0.25, 0.45, 0.5) * edge * 0.16;
+        result.color = vec4<f32>(applyFog(lighting.diffuse + lighting.specular + ambient + emissive + rim,
+                                         worldPos), alpha);
+        result.normal = n;
+        result.roughness = roughness;
+        result.emission = emissive;
+        result.flags = select(1.0, 3.0, dot(emissive, emissive) > 1e-6);
+        if (alphaMode > 1.5) {
+            result.flags = result.flags + 4.0;
+        }
         return result;
     }
 

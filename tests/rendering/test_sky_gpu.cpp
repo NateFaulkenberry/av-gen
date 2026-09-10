@@ -137,6 +137,42 @@ SurfaceStats surfaceStats(const gpu::Image8& img) {
 
 } // namespace
 
+TEST_CASE("Stylized sky is deterministic and remains at infinity", "[sky][gpu][stylized]") {
+    auto context = makeContext();
+    auto shaders = makeShaders(*context);
+    rendering::SceneRenderer renderer(*context, shaders);
+    REQUIRE(renderer.init());
+    auto scene = metalSphereScene(1.0f);
+    scene.entities.clear();
+    scene.environment.stylized = true;
+    scene.environment.showSkybox = true;
+    scene.environment.sky.showBackground = true;
+    scene.environment.environmentIntensity = 1.0f;
+    scene.environment.sky.zenithColor = {0.008f, 0.016f, 0.048f};
+    scene.environment.sky.horizonColor = {0.04f, 0.08f, 0.17f};
+    scene.camera.position = glm::vec3(0.0f);
+    scene.camera.target = -scene.lights[0].direction * 10.0f;
+    const auto original = renderWith(renderer, scene, 256, 256);
+    const auto repeated = renderWith(renderer, scene, 256, 256);
+    CHECK(gpu::hashImage(original) == gpu::hashImage(repeated));
+    CHECK(luminance8(original.pixel(128, 128)) > 0.8f);
+    const glm::vec3 offset{16.0f, 4.0f, -8.0f};
+    scene.camera.position += offset;
+    scene.camera.target += offset;
+    const auto translated = renderWith(renderer, scene, 256, 256);
+    int changed = 0;
+    for (std::uint32_t row = 0; row < original.height; ++row) {
+        for (std::uint32_t column = 0; column < original.width; ++column) {
+            for (int channel = 0; channel < 3; ++channel) {
+                if (std::abs(int(original.pixel(column, row)[channel]) -
+                             int(translated.pixel(column, row)[channel])) > 2) ++changed;
+            }
+        }
+    }
+    CHECK(changed < 100);
+    CHECK(context->errorCount() == 0);
+}
+
 TEST_CASE("a metallic sphere under the procedural sky is not flat grey", "[sky][gpu]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);

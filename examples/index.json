@@ -1,5 +1,17 @@
 {
  "examples": [
+    {
+     "name": "Glowmere Valley - Painterly",
+     "category": "Look development",
+     "description": "A cool alien valley with a warm luminous crown, broad foliage shapes, soft lighting bands and an analytic night sky.",
+     "project": "world/glowmere-stylized.json"
+    },
+    {
+     "name": "Glowmere Valley - Matched PBR",
+     "category": "Look development",
+     "description": "The same painterly scene and camera using the PBR surface mode, for controlled style comparisons.",
+     "project": "world/glowmere-stylized-pbr.json"
+    },
   {
    "name": "Glowmere Valley",
    "category": "Showcase",

@@ -346,7 +346,7 @@ fn deformChain(pIn: vec3<f32>, nLocal: vec3<f32>, nWorld: vec3<f32>, inst: Insta
 // ---- vertex / fragment -------------------------------------------------------------------------
 
 struct ProcVertexOut {
-    @builtin(position) clip: vec4<f32>,
+    @invariant @builtin(position) clip: vec4<f32>,
     @location(0) worldPos: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) uv: vec2<f32>,
@@ -511,4 +511,13 @@ fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
 // matches the lit pass and instanced procedural geometry casts shadows (ADR-034).
 @fragment
 fn fs_proc_depth(in: ProcVertexOut) {
+    if (object.flags.x > 0.5 && object.flags.x < 1.5) {
+        var opacity = object.baseColor.a;
+        if ((u32(object.flags.w + 0.5) & 1u) != 0u) {
+            opacity *= textureSample(baseColorTex, materialSampler, in.uv).a;
+        }
+        if (opacity < object.flags.y) {
+            discard;
+        }
+    }
 }
