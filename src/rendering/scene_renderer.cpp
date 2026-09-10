@@ -2131,6 +2131,16 @@ Result<wgpu::Texture> SceneRenderer::renderSubmitted(const scene::Scene& scene, 
     return texture;
 }
 
+Result<void> SceneRenderer::renderFrame(const scene::Scene& scene, const FrameTime& time,
+                                        std::uint32_t width, std::uint32_t height,
+                                        const ShaderFrameInputs* shaderInputs) {
+    auto texture = renderSubmitted(scene, time, width, height, shaderInputs);
+    if (!texture) {
+        return std::unexpected(texture.error());
+    }
+    return {};
+}
+
 Result<gpu::Image8> SceneRenderer::renderToImage(const scene::Scene& scene, const FrameTime& time,
                                                  std::uint32_t width, std::uint32_t height,
                                                  const ShaderFrameInputs* shaderInputs) {

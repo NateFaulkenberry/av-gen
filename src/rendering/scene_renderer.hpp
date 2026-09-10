@@ -181,6 +181,13 @@ public:
                                       const FrameTime& time, const gpu::TargetView& target,
                                       const ShaderFrameInputs* shaderInputs = nullptr);
 
+    // A full frame, submitted, with nothing read back. Offline rendering only needs pixels on the
+    // frames it writes; reading a 2880x1800 image back every frame is twenty megabytes of
+    // synchronous transfer the live path never performs, and it dominated every headless
+    // measurement taken before anyone noticed.
+    [[nodiscard]] Result<void> renderFrame(const scene::Scene& scene, const FrameTime& time,
+                                           std::uint32_t width, std::uint32_t height,
+                                           const ShaderFrameInputs* shaderInputs = nullptr);
     // Full frame into a fresh RGBA8 texture, submitted and read back. For tests and offline use.
     [[nodiscard]] Result<gpu::Image8> renderToImage(const scene::Scene& scene, const FrameTime& time,
                                                     std::uint32_t width, std::uint32_t height,

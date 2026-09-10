@@ -1,0 +1,65 @@
+{
+ "format": "avgen-lightrig",
+ "version": 1,
+ "name": "ValleyMoon",
+ "description": "A low raking moon for landscape. Terrain has no silhouette of its own at close range -- what tells you a hillside is a hillside is the difference between its lit and shadowed flanks, and a high key flattens exactly that. The key sits at 17 degrees so ridges throw long shadows down the slopes behind them, and the fill is a broad cool sky term at a fifth of the key so the shadowed flanks stay readable instead of going to black.",
+ "keyIntensity": 2.6,
+ "ambientIntensity": 0.22,
+ "ambientColor": [
+  0.34,
+  0.48,
+  0.72
+ ],
+ "ambientTemperature": 9200,
+ "lights": [
+  {
+   "name": "moon",
+   "type": "directional",
+   "role": "key",
+   "azimuth": 64.0,
+   "elevation": 22.0,
+   "distance": 3.0,
+   "intensity": 1.0,
+   "color": [
+    0.74,
+    0.84,
+    1.0
+   ],
+   "temperature": 8600,
+   "castsShadow": false,
+   "shadowStrength": 0.9,
+   "softness": 1.2,
+   "volumetric": 0.1,
+   "followCamera": false
+  },
+  {
+   "name": "skyfill",
+   "type": "directional",
+   "role": "fill",
+   "azimuth": -108.0,
+   "elevation": 34.0,
+   "distance": 3.0,
+   "intensity": 0.3,
+   "color": [
+    0.46,
+    0.62,
+    1.0
+   ],
+   "temperature": 11500,
+   "castsShadow": false,
+   "volumetric": 0.0,
+   "followCamera": false
+  },
+  {
+   "name": "bounce",
+   "type": "directional",
+   "role": "ambient",
+   "azimuth": 0.0,
+   "elevation": 80.0,
+   "distance": 4.0,
+   "intensity": 1.0,
+   "castsShadow": false,
+   "followCamera": false
+  }
+ ]
+}

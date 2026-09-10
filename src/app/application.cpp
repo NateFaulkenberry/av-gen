@@ -1301,17 +1301,28 @@ int Application::runHeadless() {
         }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
-        auto image = renderer_->renderToImage(engine_->scene(), time, w, h, &shaderInputs);
-        if (!image) {
-            log::error("render: {}", image.error().message);
+        // Pixels are only pulled back on the frames something reads them: the captured frame, or
+        // every frame when debug logging wants a determinism hash. The rest render and submit and
+        // stop there, as the live path does.
+        const bool wantPixels = options_.logLevel <= log::Level::Debug ||
+                                (options_.capture && i == frames - 1);
+        std::optional<gpu::Image8> image;
+        if (wantPixels) {
+            auto rendered = renderer_->renderToImage(engine_->scene(), time, w, h, &shaderInputs);
+            if (!rendered) {
+                log::error("render: {}", rendered.error().message);
+                return 2;
+            }
+            image = std::move(*rendered);
+        } else if (auto r = renderer_->renderFrame(engine_->scene(), time, w, h, &shaderInputs); !r) {
+            log::error("render: {}", r.error().message);
             return 2;
         }
         // The determinism hash is a full scan of the frame and scales with its area: at 2880x1800
         // it was a fifth of the wall time of every headless run, which is a fifth of every
         // performance measurement taken with one. It exists to diff two runs frame by frame, so it
         // is computed when someone is actually looking -- debug logging, or the captured frame.
-        const bool wantHash = options_.logLevel <= log::Level::Debug || i == frames - 1;
-        if (wantHash) {
+        if (image) {
             lastHash = gpu::hashImage(*image);
             log::debug("offline frame {:4d} hash={:016x}", i, lastHash);
         }
@@ -1341,7 +1352,7 @@ int Application::runHeadless() {
                       st.procedural.lodCounts[1], st.procedural.lodCounts[2], st.procedural.lodCounts[3],
                       st.procedural.cpuUpdateMs);
         }
-        if (options_.capture && i == frames - 1) {
+        if (options_.capture && i == frames - 1 && image) {
             if (auto r = writeCapture(*image, *options_.capture); !r) {
                 log::error("capture: {}", r.error().message);
                 return 4;

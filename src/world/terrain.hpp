@@ -60,6 +60,10 @@ struct TerrainSettings {
     // away faster than the skirt does, which is exactly where a gorge or a cliff is.
     float skirtDepth = 1.2f;
     WaterSettings water;
+    // World-space noise over the ground colour, so a hillside is not one flat colour across two
+    // hundred metres. It is an fbm evaluated per pixel inside the material program, and on this
+    // renderer that is not cheap: measure before assuming it is free.
+    bool groundMottle = true;
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const;
@@ -115,7 +119,8 @@ struct TerrainChunk {
 // week's palette. The program blends both palettes along the vertex's biome axis and crosses from
 // ground to rock on its slope, so an artist retunes a biome and the ground follows with no shader
 // editing at all. A scene that wants something else names its own program and this is not used.
-[[nodiscard]] scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::string name);
+[[nodiscard]] scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::string name,
+                                                          bool mottle = true);
 
 // The six frustum planes (left, right, bottom, top, near, far) of a view-projection, in world
 // space, normalised, pointing inwards. rendering::frustumPlanes is the same construction for GPU

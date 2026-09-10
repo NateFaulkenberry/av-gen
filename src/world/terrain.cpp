@@ -469,22 +469,6 @@ scene::MaterialOp materialOp(scene::MaterialOpKind kind, int dst, int srcA = 0, 
     return op;
 }
 
-// A three-stop ramp over a sub-range of the axis. Ramp carries exactly three colours, so a set of
-// more than three biomes is two ramps crossed over in the middle -- which is also why the set is
-// ordered: the crossover is only meaningful if neighbours in the list are neighbours on the ground.
-void appendRamp(std::vector<scene::MaterialOp>& ops, int scratch, int axisRegister, float from, float to,
-                glm::vec3 a, glm::vec3 b, glm::vec3 c) {
-    scene::MaterialOp remap = materialOp(scene::MaterialOpKind::Remap, scratch, axisRegister);
-    remap.value = 1.0f; // clamp
-    remap.constant = {from, to, 0.0f, 1.0f};
-    ops.push_back(remap);
-    scene::MaterialOp ramp = materialOp(scene::MaterialOpKind::Ramp, scratch, scratch);
-    ramp.constant = glm::vec4(a, 1.0f);
-    ramp.constant2 = glm::vec4(b, 1.0f);
-    ramp.constant3 = glm::vec4(c, 1.0f);
-    ops.push_back(ramp);
-}
-
 glm::vec3 ground(const BiomeSet& set, std::size_t i) {
     return set.biomes[std::min(i, set.biomes.size() - 1)].groundColor;
 }
@@ -548,7 +532,7 @@ scene::MaterialProgram waterMaterialProgram(const WaterSettings& water, std::str
     return program;
 }
 
-scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::string name) {
+scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::string name, bool mottle) {
     using Kind = scene::MaterialOpKind;
     scene::MaterialProgram program;
     program.name = std::move(name);
@@ -558,7 +542,14 @@ scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::strin
     const std::size_t n = biomes.biomes.size();
     const std::size_t mid = n / 2;
 
-    // r0 uv, r1 axis broadcast, r2 slope broadcast, r3/r4 scratch, r5 crossover, r6 colour, r7 rough.
+    // Op count is the whole cost of this program. Measured on an M2 Max at 2880x1800, the material
+    // interpreter costs about 1.6 ms per op over a full-screen surface -- the shape of a per-pixel
+    // read of the program's own op records -- so the first version of this, at twenty ops, was
+    // 32 ms of an 87 ms frame. A third of the frame, spent painting the ground.
+    //
+    // So the palette is one three-stop ramp rather than two crossed over. A set ordered as a
+    // gradient loses its second and fourth entries as distinct stops and keeps them as the
+    // interpolations between the ones that remain, which is what an ordered set means. Eight ops.
     std::vector<scene::MaterialOp>& ops = program.ops;
     scene::MaterialOp uv = materialOp(Kind::Input, 0);
     uv.input = scene::MaterialInput::Uv;
@@ -570,60 +561,49 @@ scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::strin
     slope.constant = {1.0f, 1.0f, 1.0f, 1.0f}; // uv.y is the slope
     ops.push_back(slope);
 
-    // The crossover between the two ramps, a soft step either side of the middle biome.
-    const float centre = n > 1 ? static_cast<float>(mid) / static_cast<float>(n - 1) : 0.5f;
-    scene::MaterialOp cross = materialOp(Kind::Smoothstep, 5, 1);
-    cross.constant = {std::max(centre - 0.06f, 0.0f), std::min(centre + 0.06f, 1.0f), 0.0f, 0.0f};
-    ops.push_back(cross);
-
-    const auto palette = [&](glm::vec3 (*pick)(const BiomeSet&, std::size_t), int into) {
-        appendRamp(ops, 3, 1, 0.0f, centre, pick(biomes, 0), pick(biomes, mid / 2), pick(biomes, mid));
-        appendRamp(ops, 4, 1, centre, 1.0f, pick(biomes, mid), pick(biomes, (mid + n - 1) / 2), pick(biomes, n - 1));
-        ops.push_back(materialOp(Kind::MixBy, into, 3, 4, 5));
+    const auto ramp = [&](int dst, glm::vec3 (*pick)(const BiomeSet&, std::size_t)) {
+        scene::MaterialOp r = materialOp(Kind::Ramp, dst, 1); // the axis already spans 0..1
+        r.constant = glm::vec4(pick(biomes, 0), 1.0f);
+        r.constant2 = glm::vec4(pick(biomes, mid), 1.0f);
+        r.constant3 = glm::vec4(pick(biomes, n - 1), 1.0f);
+        ops.push_back(r);
     };
-    palette(ground, 6); // ground colour into r6
-    palette(rock, 7);   // rock colour into r7
+    ramp(3, ground);
+    ramp(4, rock);
 
     // Where the ground gives way to bare rock. Slope is already one of the three things a biome
-    // rule is written in, so a broad slope mask here double-counts it: the first version put rock
-    // over a third of the frame and turned every mesh-scale ripple into a band. This one fires only
-    // on a genuine cliff -- the 99th percentile of this terrain's slope is 0.31 -- which is the
-    // part a biome cannot express, because a cliff inside a marsh is still a cliff.
-    scene::MaterialOp rockMask = materialOp(Kind::Smoothstep, 3, 2);
+    // rule is written in, so a broad mask here double-counts it: this fires only on a genuine
+    // cliff -- the 99th percentile of this terrain's slope is 0.31 -- which is the part a biome
+    // cannot express, because a cliff inside a marsh is still a cliff.
+    scene::MaterialOp rockMask = materialOp(Kind::Smoothstep, 5, 2);
     rockMask.constant = {0.28f, 0.50f, 0.0f, 0.0f};
     ops.push_back(rockMask);
-    ops.push_back(materialOp(Kind::MixBy, 6, 6, 7, 3));
+    ops.push_back(materialOp(Kind::MixBy, 6, 3, 4, 5));
 
-    // Mottling in world space, so it does not swim with the camera and does not tile with a chunk.
-    scene::MaterialOp world = materialOp(Kind::Input, 4);
-    world.input = scene::MaterialInput::WorldPosition;
-    ops.push_back(world);
-    scene::MaterialOp scale = materialOp(Kind::Constant, 7);
-    scale.constant = {0.045f, 0.045f, 0.045f, 0.0f};
-    ops.push_back(scale);
-    ops.push_back(materialOp(Kind::Multiply, 4, 4, 7));
-    scene::MaterialOp mottle = materialOp(Kind::Noise, 7, 4);
-    mottle.value = 1.0f;
-    mottle.seed = 41;
-    ops.push_back(mottle);
-    scene::MaterialOp mottleRange = materialOp(Kind::Remap, 7, 7);
-    mottleRange.value = 1.0f;
-    mottleRange.constant = {0.0f, 1.0f, 0.80f, 1.20f};
-    ops.push_back(mottleRange);
-    ops.push_back(materialOp(Kind::Multiply, 6, 6, 7));
+    if (mottle) {
+        // World-space, so it does not swim with the camera and does not tile with a chunk. Four
+        // more ops and an fbm: measured at 7.7 ms of that same frame, so it is a knob, not a given.
+        scene::MaterialOp world = materialOp(Kind::Input, 4);
+        world.input = scene::MaterialInput::WorldPosition;
+        ops.push_back(world);
+        scene::MaterialOp mottleNoise = materialOp(Kind::Noise, 7, 4);
+        mottleNoise.value = 0.045f;
+        mottleNoise.seed = 41;
+        ops.push_back(mottleNoise);
+        scene::MaterialOp mottleRange = materialOp(Kind::Remap, 7, 7);
+        mottleRange.value = 1.0f;
+        mottleRange.constant = {0.0f, 1.0f, 0.80f, 1.20f};
+        ops.push_back(mottleRange);
+        ops.push_back(materialOp(Kind::Multiply, 6, 6, 7));
+    }
 
-    // Roughness: the biomes' own values, crossed to a smoother rock on the same slope mask.
-    scene::MaterialOp groundRough = materialOp(Kind::Constant, 7);
     float roughSum = 0.0f;
     for (const Biome& b : biomes.biomes) {
         roughSum += b.roughness;
     }
-    groundRough.constant = glm::vec4(roughSum / static_cast<float>(n));
-    ops.push_back(groundRough);
-    scene::MaterialOp rockRough = materialOp(Kind::Constant, 4);
-    rockRough.constant = glm::vec4(0.62f);
-    ops.push_back(rockRough);
-    ops.push_back(materialOp(Kind::MixBy, 7, 7, 4, 3));
+    scene::MaterialOp roughness = materialOp(Kind::Constant, 7);
+    roughness.constant = glm::vec4(roughSum / static_cast<float>(n));
+    ops.push_back(roughness);
 
     program.baseColorRegister = 6;
     program.roughnessRegister = 7;

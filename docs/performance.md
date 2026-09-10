@@ -226,3 +226,33 @@ Confirming that needs a Metal frame capture rather than the in-engine timers. Th
 points at, in order: draw a layer's LOD levels through fewer indirect draws (or skip empty levels
 without submitting), and cull per shadow cascade instead of reusing the camera's visible set --
 cascade 0 covers about forty metres and is currently drawing everything the camera can see.
+
+## The material program interpreter is priced per op, per pixel (2026-09-09)
+
+Bisecting the base frame at 2880x1800, with ecology, volumetrics and bloom all off and only 86 draws
+in the frame, found 64.7 ms. An empty scene is 9 ms. So the terrain -- 86 draws of one material --
+was 55 ms.
+
+Removing the generated ground material program entirely (a world with no biomes gets none) took the
+frame to 33 ms. **The program cost 31.7 ms of an 87 ms frame**: a third of the frame spent painting
+the ground. Cutting it from twenty ops to eight took that to 14.6 ms.
+
+| | ops | ms at 2880x1800 |
+|---|---|---|
+| no program at all | 0 | 35.7 |
+| eight-op palette | 8 | 48.1 |
+| eight ops plus mottling | 12 | 50.3 |
+| the original | 20 | 64.7 |
+
+That is roughly **1.6 ms per op over a full-screen surface at five megapixels**, and it is linear in
+op count, so the interpreter's loop does exit early. What it does not do is exit cheaply: the shape
+of the cost is a per-pixel read of the program's own op records out of a storage buffer, which at
+this size is gigabytes of buffer traffic per frame. The depth prepass and the shadow passes do not
+run it -- `fs_depth` only does alpha masking -- so this is the main pass alone.
+
+The practical consequence for anything authoring a material program: **op count is the cost, and it
+is not a small cost.** A full-screen material can afford single-figure ops. The palette went from two
+three-stop ramps crossed over in the middle to one three-stop ramp, which for an ordered biome set
+means its second and fourth entries stop being distinct stops and become the interpolations between
+the ones that remain. That is what an ordered set is for, and on screen the difference is not
+visible.

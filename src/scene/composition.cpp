@@ -1660,7 +1660,8 @@ void Composition::rebuild() {
             }
         };
         install(terrainGroundProgramName(node.name),
-                world::terrainMaterialProgram(node.worldMap.biomes, terrainGroundProgramName(node.name)));
+                world::terrainMaterialProgram(node.worldMap.biomes, terrainGroundProgramName(node.name),
+                                              node.terrain.groundMottle));
         if (node.terrain.water.enabled) {
             install(terrainWaterProgramName(node.name),
                     world::waterMaterialProgram(node.terrain.water, terrainWaterProgramName(node.name)));
@@ -3386,6 +3387,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                             return fail("node '{}': terrain: {}", node.name, v.error().message);
                         }
                         *f.target = *v;
+                    }
+                    if (t.contains("groundMottle")) {
+                        if (!t.at("groundMottle").is_boolean()) {
+                            return fail("node '{}': terrain 'groundMottle' must be a boolean", node.name);
+                        }
+                        ts.groundMottle = t.at("groundMottle").get<bool>();
                     }
                     if (t.contains("water")) {
                         const json& wj = t.at("water");
