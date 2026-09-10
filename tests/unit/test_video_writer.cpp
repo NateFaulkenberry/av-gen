@@ -211,6 +211,39 @@ TEST_CASE("video writer: native backend muxes audio", "[assets][video]") {
     }
 }
 
+// A render whose video outlasts its soundtrack. AVAssetWriter holds the video input closed until
+// every track has either supplied data past the video's timestamp or been marked finished, so
+// running out of audio used to deadlock the writer: it presented as "the video input accepted no
+// data for 30 s", about twenty-six frames from the end of a 2700 frame render, on every codec, and
+// it made a full-length render with sound impossible. Nothing caught it because every other audio
+// test writes a clip shorter than its tone.
+TEST_CASE("video writer: video that outlasts its audio still finishes", "[assets][video]") {
+    if (!assets::hasNativeVideo()) {
+        SKIP("no native video backend on this platform");
+    }
+    TempFile wav("short_tone.wav");
+    writeToneWav(wav.path, 0.05);           // far shorter than kFrames at kFps
+    for (const char* codec : {"h264", "prores422"}) {
+        DYNAMIC_SECTION(codec) {
+            TempFile out(std::string("outlasts_") + codec + (std::string(codec) == "h264" ? ".mp4" : ".mov"));
+            auto settings = smallClip(codec);
+            settings.width = 1280; settings.height = 720;
+            settings.audio = wav.path;
+            auto writer = assets::openVideoWriter(out.path, settings);
+            REQUIRE(writer.has_value());
+            for (std::size_t i = 0; i < 400; ++i) {
+                const auto wrote = (*writer)->writeFrame(std::vector<std::uint8_t>(1280*720*4, static_cast<std::uint8_t>(i)));
+                INFO((wrote ? std::string() : wrote.error().message));
+                REQUIRE(wrote.has_value());
+            }
+            const auto finished = (*writer)->finish();
+            INFO((finished ? std::string() : finished.error().message));
+            REQUIRE(finished.has_value());
+            CHECK(std::filesystem::file_size(out.path) > 0);
+        }
+    }
+}
+
 TEST_CASE("video writer: a wrong-size frame is a sticky error", "[assets][video]") {
     if (!assets::hasNativeVideo()) {
         SKIP("no native video backend on this platform");

@@ -3,8 +3,9 @@
 A particle sculpture built entirely from scene data: fields, splines, GPU particles and the post
 chain. No C++ was written for it. `examples/constellation/constellation.json`.
 
-**Status: phase 1 of six.** The structure, the field topology and the core exist and the still
-holds up. Audio, camera choreography, morphing and the remaining motifs are not built yet; the
+**Status: phases 1–4 built, plus a 90-second cut.** Structure, field topology, core, a second
+orbital system, the veil, colour depth, a thirteen-route audio mapping with propagating shockwaves,
+and a nine-key camera journey. Morphing between macro states and the shard motif are not built; the
 open list is at the end.
 
 ## The idea
@@ -63,17 +64,51 @@ Five, each with a different visual job and a different representation.
 The arms are unequal on purpose: 27.6 m, 17.2 m and 9.6 m outer radius, at three brightnesses. One
 dominant, one counterpart, one that never completes a turn.
 
+## Audio
+
+Thirteen routes. The rule is that each musical feature drives a different *physical* phenomenon on
+its own time constant; nothing is routed to global brightness.
+
+| feature | drives | attack / decay |
+|---|---|---|
+| `audio.rms` | `corePull` strength, veil emission — the organism's grip and the air's glow | 1400 / 3000 ms |
+| `audio.bass` | core extent and emission, `coreVoid` strength — the core swells and the void it pushes against widens, deforming the inner disc | 90–180 / 620–900 ms |
+| `audio.onset` | **`shock` strength** and a core burst | 5–10 / 240–900 ms |
+| `audio.mid` | bridge spawn rate, `mesoWarp` strength — the tendrils writhe | 220–320 / 1100–1400 ms |
+| `audio.treble` | arm spawn rate, core turbulence — micro activity only | 70–90 / 600–800 ms |
+| `audio.spectralCentroid` | `post/grade/hueShift`, bipolar — where the palette sits | 2200 / 3600 ms |
+| `beat.pulse` | `discSpin` strength — the rotation itself pulses | 60 / 520 ms |
+
+**The shockwave is the point.** An onset raises the strength of a radial travelling `wave` field
+centred on the core. The wave moves outward at 19 m/s with a 12 m front, and the populations sample
+it as a force. A beat therefore reaches the core first and the rim of the disc about a second and a
+half later: the sound is seen crossing the sculpture rather than flashing it.
+
+Proof the routes are live rather than silent: the same frame rendered with `routes` emptied differs
+in 612,814 of 1,024,000 pixels.
+
+## Camera
+
+Nine keys over ninety seconds, smooth-interpolated: a wide hold at 110 m, a slow approach, a
+descent into the disc's plane, a pass through the inner region beside the core, then a climb out
+and away to a far hold. Measured across the cut, mean frame luminance runs 0.022 → 0.039 → 0.153 →
+0.438 → 0.081, which is the shape the brief asks for: near-empty opening, build, climax, release.
+
 ## Measured
 
-M2 Max, realtime tier, gpu frame median:
+M2 Max, realtime tier, minimum gpu frame median over three interleaved rounds (system load ~3.6
+during measurement, so these are conservative):
 
 | resolution | gpu frame | FPS |
 |---|---:|---:|
-| 1280 × 800 | 3.87 ms | 258 |
-| 1920 × 1200 | 5.64 ms | 177 |
-| 2880 × 1800 | 10.88 ms | 92 |
+| 1280 × 800 | 4.39 ms | 228 |
+| 1920 × 1200 | 6.88 ms | 145 |
+| 2880 × 1800 | 12.78 ms | 78 |
 
-Fits **t = 2.1 ms + 1.7 ms per megapixel**. At full retina the frame is 10.9 ms against a 16.67 ms
+Fits **t = 2.3 ms + 2.0 ms per megapixel**. Full retina is 12.8 ms against a 16.67 ms budget, so the
+complete scene — every population, audio, camera — holds 60 FPS at native resolution.
+
+The 90-second cut renders at 1920×1080 in 32 s (84 fps), audio muxed. At full retina the frame is 10.9 ms against a 16.67 ms
 budget, so the scene meets 60 FPS at native resolution with room for the phases still to come. For
 comparison, Glowmere is 42.3 ms at the same size: this scene is about four times cheaper because
 its complexity is particles and fill rather than 15 million triangles.
@@ -95,14 +130,15 @@ cmake --build build/release -j8
 
 ## Not built yet
 
-- **Phase 2** — orbital population around `nodeA`, the veil layer, colour depth. The palette is
-  currently one blue-white family; the brief asks for indigo → violet → cyan → white with magenta
-  used sparingly, and for colour to encode distance.
-- **Phase 3** — camera choreography, bursts.
-- **Phase 4** — audio. `shock` is authored and dormant, waiting for an onset route.
-- **Phase 5** — the timeline, morphing between macro states, the 60–90 second piece.
-- **Phase 6** — a measured performance pass with populations at their final counts.
-- **Shards** (motif 6) and the SDF core are not in yet; the core is currently a particle knot,
-  which may prove sufficient.
-- Composition: the major arm exits the frame at bottom right in the current camera. Fine for a
-  test still, wrong for a final frame.
+- **Morphing between macro states** (brief §22) is not built. The sculpture is one topology
+  throughout; sphere / flower / vortex / collapse transitions would need the field strengths
+  animated on the timeline, which is authorable today and simply has not been authored.
+- **Shards** (motif 6) are not in. The core is a particle knot rather than an SDF, and so far that
+  reads better than a raymarched primitive would — worth leaving unless a close pass exposes it.
+- **Trails could be longer on the bridge** and shorter on the arms; the current single trail length
+  per population is a blunt instrument.
+- **The node knot is still slightly diffuse** at close range. It reads as an orbital system in the
+  wide shots and as a smudge when the camera is inside 15 m.
+- **The palette is narrow.** Indigo through cyan to white with one violet organ, which is coherent,
+  but the brief's plasma and alien palettes are unexplored and nothing yet drives palette *state*
+  from musical section.

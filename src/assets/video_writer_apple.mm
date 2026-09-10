@@ -466,7 +466,7 @@ private:
         [videoInput_ markAsFinished];
         if (audioInput_ != nil) {
             auto pumped = pumpAudio(end, end);
-            [audioInput_ markAsFinished];
+            markAudioFinished();
             [reader_ cancelReading];
             if (!pumped) {
                 cancel();
@@ -564,6 +564,19 @@ private:
         return true;
     }
 
+    // The audio track has run out. AVAssetWriter's interleaver will hold the video input closed
+    // until every track has either supplied data past the video's timestamp or been marked
+    // finished, so a render whose audio is shorter than its video -- which includes every render
+    // that reaches the last frame of its own soundtrack -- deadlocks here without this. It used to
+    // present as a 30 s timeout about twenty-six frames from the end of a 2700 frame render, on
+    // every codec, and it made a full-length render with sound impossible.
+    void markAudioFinished() {
+        if (audioInput_ != nil && !audioMarkedFinished_) {
+            audioMarkedFinished_ = true;
+            [audioInput_ markAsFinished];
+        }
+    }
+
     // Appends audio until the appended audio reaches `target` or there is nothing more to append.
     Result<void> pumpAudio(CMTime target, CMTime limit) {
         while (!audioDone_ && CMTimeCompare(audioEnd_, target) < 0) {
@@ -597,6 +610,10 @@ private:
                     deadline = std::chrono::steady_clock::now() + kReadyTimeout; // progress
                     continue;
                 }
+            }
+            // Nothing left to give it: say so, rather than waiting out the clock.
+            if (audioDone_) {
+                markAudioFinished();
             }
             if (std::chrono::steady_clock::now() > deadline) {
                 return fail("video: before frame {} of '{}': {}", frames_, path_.string(),
@@ -637,7 +654,8 @@ private:
     AVAssetWriterInput* audioInput_ = nil;
     CMSampleBufferRef pendingAudio_ = nullptr;
     CMTime audioEnd_ = kCMTimeZero; // end of the last appended audio buffer (movie time)
-    bool audioDone_ = false;        // reader exhausted or the video's end reached
+    bool audioDone_ = false;
+    bool audioMarkedFinished_ = false;        // reader exhausted or the video's end reached
     std::size_t frames_ = 0;
     bool finished_ = false;
     std::optional<Error> error_;

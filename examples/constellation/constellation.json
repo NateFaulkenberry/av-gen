@@ -8,6 +8,9 @@
   "scene": {
    "kind": "composition",
    "path": "constellation.scene.json"
+  },
+  "audio": {
+   "path": "../../assets/audio/glowmere-valley.wav"
   }
  },
  "parameters": {
@@ -17,5 +20,331 @@
   "camera/exposure/compensation": 0.0,
   "post/grade/contrast": 1.1,
   "post/grade/saturation": 1.06
+ },
+ "routes": [
+  {
+   "source": "audio.rms",
+   "target": "field/corePull/strength",
+   "op": "add",
+   "amount": 0.55,
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 1400.0,
+    "decayMs": 3000.0
+   }
+  },
+  {
+   "source": "audio.rms",
+   "target": "particles/veil/emissive",
+   "op": "add",
+   "amount": 0.1,
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 1800.0,
+    "decayMs": 3600.0
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "particles/coreKnot/extent",
+   "op": "add",
+   "amount": 1.3,
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "particles/coreKnot/emissive",
+   "op": "add",
+   "amount": 7.0,
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 90.0,
+    "decayMs": 620.0
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "field/coreVoid/strength",
+   "op": "add",
+   "amount": 0.75,
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 180.0,
+    "decayMs": 900.0
+   }
+  },
+  {
+   "source": "audio.onset",
+   "target": "field/shock/strength",
+   "op": "add",
+   "amount": 1.0,
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 10.0,
+    "decayMs": 900.0
+   }
+  },
+  {
+   "source": "audio.onset",
+   "target": "particles/coreKnot/burst",
+   "op": "add",
+   "amount": 260.0,
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 5.0,
+    "decayMs": 240.0
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "particles/bridge/spawnRate",
+   "op": "add",
+   "amount": 900.0,
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 220.0,
+    "decayMs": 1100.0
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "field/mesoWarp/strength",
+   "op": "add",
+   "amount": 0.5,
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 320.0,
+    "decayMs": 1400.0
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "particles/armMajorP/spawnRate",
+   "op": "add",
+   "amount": 1500.0,
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 90.0,
+    "decayMs": 800.0
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "particles/coreKnot/turbulence",
+   "op": "add",
+   "amount": 0.45,
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 70.0,
+    "decayMs": 600.0
+   }
+  },
+  {
+   "source": "audio.spectralCentroid",
+   "target": "post/grade/hueShift",
+   "op": "add",
+   "amount": 0.3,
+   "polarity": "bipolar",
+   "chain": {
+    "attackMs": 2200.0,
+    "decayMs": 3600.0
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "field/discSpin/strength",
+   "op": "add",
+   "amount": 0.16,
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60.0,
+    "decayMs": 520.0
+   }
+  }
+ ],
+ "timeline": {
+  "enabled": true,
+  "tracks": [
+   {
+    "target": "camera/position",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       64,
+       30,
+       88
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       54,
+       26,
+       74
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 26.0,
+      "value": [
+       41,
+       17,
+       54
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       26,
+       7,
+       33
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 52.0,
+      "value": [
+       11,
+       2,
+       15
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       -2,
+       -1.5,
+       6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 70.0,
+      "value": [
+       -19,
+       8,
+       -15
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       -36,
+       23,
+       -31
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -48,
+       31,
+       -44
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "timeBase": "seconds",
+    "mode": "replace",
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0,
+       0,
+       0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       0,
+       0,
+       0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 26.0,
+      "value": [
+       2,
+       -1,
+       -2
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       4,
+       0,
+       -2
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 52.0,
+      "value": [
+       1,
+       0,
+       -1
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       3,
+       1,
+       -4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 70.0,
+      "value": [
+       0,
+       0,
+       0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0,
+       0,
+       0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       0,
+       0,
+       0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
  }
 }
