@@ -551,7 +551,9 @@ scene::MaterialProgram waterMaterialProgram(const WaterSettings& water, std::str
     return program;
 }
 
-scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::string name, bool mottle) {
+scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::string name, bool mottle,
+                                             float glow, float glowScale, float glowCoverage,
+                                             glm::vec3 glowColor) {
     using Kind = scene::MaterialOpKind;
     scene::MaterialProgram program;
     program.name = std::move(name);
@@ -616,6 +618,31 @@ scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::strin
         mottleRange.constant = {0.0f, 1.0f, 0.80f, 1.20f};
         ops.push_back(mottleRange);
         ops.push_back(materialOp(Kind::Multiply, 6, 6, 7));
+    }
+
+    // ADR-056: patches of the ground itself are alive. Four ops, and unlike a scatter layer the
+    // cost does not grow with how far away it has to reach -- which is the only way the far
+    // hillside gets any bioluminescence at all without quadrupling the instance count.
+    if (glow > 0.0f) {
+        if (!mottle) { // `mottle` already left world position in register 4
+            scene::MaterialOp world = materialOp(Kind::Input, 4);
+            world.input = scene::MaterialInput::WorldPosition;
+            ops.push_back(world);
+        }
+        scene::MaterialOp patches = materialOp(Kind::Voronoi, 3, 4);
+        patches.value = std::max(glowScale, 1e-4f);
+        patches.seed = 907;
+        ops.push_back(patches);
+        // Voronoi F1 is small at a cell's centre, so the mask runs from the coverage edge inwards.
+        scene::MaterialOp mask = materialOp(Kind::Smoothstep, 3, 3);
+        mask.constant = {std::clamp(glowCoverage, 0.0f, 1.0f) * 0.55f, 0.0f, 0.0f, 0.0f};
+        ops.push_back(mask);
+        scene::MaterialOp tint = materialOp(Kind::Constant, 5);
+        tint.constant = glm::vec4(glowColor * glow, 1.0f);
+        ops.push_back(tint);
+        ops.push_back(materialOp(Kind::Multiply, 5, 5, 3));
+        program.emissionRegister = 5;
+        program.emissionIntensity = 1.0f;
     }
 
     float roughSum = 0.0f;

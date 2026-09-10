@@ -1,5 +1,18 @@
 # Performance
 
+## Measure a reference scene alongside, every time (2026-09-10)
+
+The machine drifts. Mid-session, `examples/world/_skyonly.scene.json` at 1280x720 went from
+**8.4 ms to 27.4 ms** with nothing touched, and the world scene read 97 ms where it had read 52.
+Read on its own, that looks exactly like a catastrophic regression in whatever was committed last,
+and the next hour goes on bisecting a change that was never at fault.
+
+So measure the reference scene in the same session, immediately before or after the thing being
+measured, and quote the pair. It costs one extra run and it is the difference between "this change
+cost 45 ms" and "this laptop is thermally throttled by 3x right now". If the reference has moved,
+throw the numbers away and wait -- interleaving does not save you here, because a drift that large
+swamps the effect being measured in both arms.
+
 ## Per-pass timers are not per-pass costs (2026-09-10)
 
 The `passes:` line the renderer logs is a set of timestamp deltas around each render pass, and a

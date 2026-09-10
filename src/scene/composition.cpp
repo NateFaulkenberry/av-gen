@@ -1688,7 +1688,9 @@ void Composition::rebuild() {
         };
         install(terrainGroundProgramName(node.name),
                 world::terrainMaterialProgram(node.worldMap.biomes, terrainGroundProgramName(node.name),
-                                              node.terrain.groundMottle));
+                                              node.terrain.groundMottle, node.terrain.groundGlow,
+                                              node.terrain.groundGlowScale, node.terrain.groundGlowCoverage,
+                                              node.terrain.groundGlowColor));
         if (node.terrain.water.enabled) {
             install(terrainWaterProgramName(node.name),
                     world::waterMaterialProgram(node.terrain.water, terrainWaterProgramName(node.name)));
@@ -3621,12 +3623,23 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                          {TerrainFloat{"chunkSize", &ts.chunkSize}, TerrainFloat{"lodDistance", &ts.lodDistance},
                           TerrainFloat{"viewDistance", &ts.viewDistance},
                           TerrainFloat{"shadowDistance", &ts.shadowDistance},
-                          TerrainFloat{"skirtDepth", &ts.skirtDepth}}) {
+                          TerrainFloat{"skirtDepth", &ts.skirtDepth},
+                          TerrainFloat{"groundGlow", &ts.groundGlow},
+                          TerrainFloat{"groundGlowScale", &ts.groundGlowScale},
+                          TerrainFloat{"groundGlowCoverage", &ts.groundGlowCoverage}}) {
                         auto v = readFloat(t, f.key, *f.target);
                         if (!v) {
                             return fail("node '{}': terrain: {}", node.name, v.error().message);
                         }
                         *f.target = *v;
+                    }
+                    if (t.contains("groundGlowColor")) {
+                        const json& a = t.at("groundGlowColor");
+                        if (!a.is_array() || a.size() != 3 || !a.at(0).is_number()) {
+                            return fail("node '{}': 'groundGlowColor' must be an array of 3 numbers", node.name);
+                        }
+                        ts.groundGlowColor = glm::vec3(a.at(0).get<float>(), a.at(1).get<float>(),
+                                                       a.at(2).get<float>());
                     }
                     if (t.contains("groundMottle")) {
                         if (!t.at("groundMottle").is_boolean()) {

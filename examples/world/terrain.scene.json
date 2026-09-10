@@ -102,7 +102,15 @@
     "lodLevels": 4,
     "lodDistance": 70.0,
     "viewDistance": 520.0,
-    "skirtDepth": 1.2
+    "skirtDepth": 1.2,
+    "groundGlow": 0.9,
+    "groundGlowScale": 0.055,
+    "groundGlowCoverage": 0.3,
+    "groundGlowColor": [
+     0.08,
+     1.0,
+     0.68
+    ]
    },
    "material": {
     "baseColor": [
@@ -236,7 +244,7 @@
      "clusterScale": 22.0,
      "clustering": 0.5,
      "seed": 34,
-     "meshBudget": 260,
+     "meshBudget": 0,
      "maxInstances": 9000,
      "height": 1.1,
      "tint": [
@@ -252,12 +260,13 @@
       0.14,
       1.0
      ],
-     "emissiveIntensity": 4.0,
+     "emissiveIntensity": 26.0,
      "emissiveRandom": 0.6,
      "hueField": 0.1,
      "hueFieldScale": 40.0,
      "hueRandom": 0.04,
-     "emissiveSparsity": 0.55
+     "emissiveSparsity": 0.35,
+     "materialProgram": "bushGlow"
     },
     {
      "name": "ferns",
@@ -561,6 +570,7 @@
  "materialPrograms": [
   "../materials/canopy-fireflies.material.json",
   "../materials/pine-fireflies.material.json",
-  "../materials/frond-glow.material.json"
+  "../materials/frond-glow.material.json",
+  "../materials/bush-glow.material.json"
  ]
 }

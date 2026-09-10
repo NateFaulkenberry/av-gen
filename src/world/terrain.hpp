@@ -70,6 +70,15 @@ struct TerrainSettings {
     // hundred metres. It is an fbm evaluated per pixel inside the material program, and on this
     // renderer that is not cheap: measure before assuming it is free.
     bool groundMottle = true;
+    // Bioluminescence in the ground itself (ADR-056). Scatter layers put real plants on the
+    // ground, but a layer costs the number of instances inside its view distance, which grows
+    // with the square of it -- reaching the far hillside that way quadrupled the instance count
+    // for a band of pixels near the horizon. This is four full-screen ops, so it costs the same
+    // whether it is lighting a metre of ground or a kilometre. 0 = off.
+    float groundGlow = 0.0f;
+    float groundGlowScale = 0.06f;    // cycles per metre of the patch field
+    float groundGlowCoverage = 0.30f; // how much of the ground lights up, 0..1
+    glm::vec3 groundGlowColor{0.10f, 1.0f, 0.70f};
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const;
@@ -138,7 +147,9 @@ struct TerrainChunk {
 // ground to rock on its slope, so an artist retunes a biome and the ground follows with no shader
 // editing at all. A scene that wants something else names its own program and this is not used.
 [[nodiscard]] scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::string name,
-                                                          bool mottle = true);
+                                                          bool mottle = true, float glow = 0.0f,
+                                                          float glowScale = 0.06f, float glowCoverage = 0.30f,
+                                                          glm::vec3 glowColor = glm::vec3(0.1f, 1.0f, 0.7f));
 
 // The six frustum planes (left, right, bottom, top, near, far) of a view-projection, in world
 // space, normalised, pointing inwards. rendering::frustumPlanes is the same construction for GPU
