@@ -239,8 +239,18 @@ set.
 | Tier 0 (set 2) | 0 | 20.98 21.21 20.97 20.99 20.87 20.92 | 20.99 | 0.05–0.08 |
 | Tier 1 (set 2) | 399 | 21.54 21.17 20.84 21.14 21.01 21.14 | 21.14 | 0.12–0.16 |
 
-**399 simulated plants cost +0.15 to +0.31 ms** — call it a fifth of a millisecond, under 1.5% of a
-21 ms frame — of which the directly attributable CPU half is +0.07 to +0.11 ms.
+**399 simulated plants cost about +0.2 ms** — under 1% of a 21 ms frame. Set means differ by +0.31
+and +0.15; taken pair by pair in the order they were run, eleven pairs come out +0.26, +0.72, +0.45,
++0.08, +0.05, +0.56, -0.04, -0.13, +0.15, +0.14, +0.22, so nine of eleven favour the same direction
+and the mean is +0.22 ms.
+
+That is worth being careful about, because the two Tier 0 arms — the same file, the same binary, on
+either side of a set — differ by 0.2 ms between sets, which is the same size as the effect. The
+frame minimum on this machine simply does not resolve a fifth of a millisecond in one pair. What
+does resolve it is `cpu(proc)`, the renderer's own CPU timer, which is unambiguous and moves the
+right way every single run: **0.05–0.09 ms with nothing simulated, 0.12–0.19 ms with 399 plants,
+0.38–0.43 ms with 1681**. The frame-min A/B and the CPU timer agree on the order of magnitude, and
+the slope below is large enough to be clear of the noise on its own.
 
 The slope, from a deliberately over-budget arm (`_tier1big.scene.json`, every threshold dropped):
 
@@ -254,9 +264,12 @@ few hundred that is a fifth of a millisecond; at four times the design point it 
 budget is a hard ceiling and the cost is linear in it, which is the property that was asked for.
 
 What is *not* claimed: the cost of the new shader branch and the two extra bind group entries when
-nothing at all is simulated was not measured against a pre-change binary. Both arms above are the
-same binary, so the +0.15 ms is the cost of the physics and its transport, not of the feature
-existing.
+nothing at all is simulated was **not** measured against a pre-change binary. Both arms above are
+the same binary, so everything above is the cost of the physics and its transport, not of the
+feature existing. On inspection there is nothing per-frame to pay — the branch is on a uniform that
+is zero for every draw that existed before this, and the two extra entries point at a shared
+256-byte placeholder created once — but that is an argument, not a measurement, and the honest thing
+is to say so rather than to quote a number nobody took.
 
 ## Does it look different?
 
