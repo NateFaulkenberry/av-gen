@@ -20,8 +20,14 @@ for v in $VARIANTS; do
   S=examples/world/_bench/$v.scene.json
   [ -f "$S" ] || { echo "missing $S"; exit 1; }
   P=$($BIN --headless --composition "$S" --frames "$FRAMES" --fps 30 --size "$SIZE" --capture "$OUT/$v.png" 2>&1 | grep -E "passes:" | tail -1)
-  T=$( { /usr/bin/time -p $BIN --headless --composition "$S" --frames "$FRAMES" --fps 30 --size "$SIZE" --capture "$OUT/$v.png" >/dev/null; } 2>&1 | awk '/^real/{print $2}')
-  MS=$(echo "$T $FRAMES" | awk '{printf "%.1f", $1*1000/$2}')
+  # The renderer's own per-frame median, not the process wall clock divided by the frame count.
+  # That division charges scene build to every frame -- eleven scatter layers take two seconds
+  # longer to load than none, which over a hundred frames is twenty milliseconds a frame of
+  # one-time work, linear in layer count and utterly convincing. It is what produced this
+  # project's "1.5 ms per scatter layer" and the optimisation spec written against it.
+  MS=$($BIN --headless --composition "$S" --frames "$FRAMES" --fps 30 --size "$SIZE" \
+        --capture "$OUT/$v.png" 2>&1 | sed -nE 's/.*median ([0-9.]+) ms.*/\1/p' | tail -1)
+  [ -n "$MS" ] || MS="n/a"
   VOL=$(echo "$P" | sed -nE 's/.*volume=([0-9.-]+).*/\1/p')
   SHA=$(echo "$P" | sed -nE 's/.*shadow=([0-9.-]+).*/\1/p')
   AO=$(echo "$P" | sed -nE 's/.*ao=([0-9.-]+).*/\1/p')

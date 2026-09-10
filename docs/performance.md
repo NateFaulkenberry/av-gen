@@ -1,128 +1,58 @@
 # Performance
 
-Measurement infrastructure exists from day one; nothing is optimised yet.
+## The correction that matters most (2026-09-09)
 
-## What is measured
+**"Ecology costs ~1.5 ms per scatter object per frame" was a measurement artefact, and the world
+renderer optimisation spec was written against it.**
 
-| Metric | Where | How |
+`tools/bench_world.sh` timed the whole process with `/usr/bin/time` and divided by the frame count.
+Eleven scatter layers take about **two seconds longer to load** than none -- eleven glTF decodes and
+eleven scatter placements -- and over a hundred frames that is twenty milliseconds a frame of
+one-time work charged to the frames. Linear in layer count. Independent of resolution, triangle
+count and instances drawn, *because it happens before any of them are involved*. Every property that
+made it look like a submission bottleneck follows from it being scene build.
+
+The renderer now times its own frames and reports a median after warm-up. The same runs:
+
+| | process wall / frames | the renderer's own median |
 |---|---|---|
-| CPU frame time, FPS | `Application::runLive` → `ui::FrameStats` | steady_clock around the frame; FPS averaged every 0.5 s |
-| GPU frame time | `gpu::GpuTimer` | timestamp queries at the start of the scene pass and end of the tone-map pass, 4-slot mapped ring, no stalls |
-| Draw calls, triangles, entities | `rendering::RenderStats` | counted per frame |
-| Analysis time per hop | `AnalysisRunner::averageHopMicros` | steady_clock per hop, EMA 0.1 |
-| Modulation + scene update time | `EngineStats::modulationMicros` | steady_clock around `Engine::update` |
+| 1 scatter layer | 51.8 | 38.3 |
+| 11 scatter layers | 68.9 | 42.1 |
+| no ecology | 40.0 | 33.9 |
+| **implied cost of 11 layers** | **28.9 ms** | **8.3 ms** |
+| **implied slope** | **1.7 ms/layer** | **~0.4 ms/layer** |
 
-All of these are displayed in the Control window and logged every 120 frames at debug level.
+So the spec's P1 target -- take the slope from 1.5 to 0.3 -- had already been met before it was
+written, by a renderer that was never doing the thing it was accused of.
 
-## Milestone 0.1 numbers (Apple M2 Max, macOS 26.6, Debug build unless stated)
+**What survives.** Any comparison between two variants that build the *same* scene is unaffected,
+because the build time cancels: the shadow numbers, the volumetric numbers, the resolution sweep,
+the shadow-distance and cascade A/Bs, and the material interpreter work (which the material agent
+measured in-process anyway). **What does not survive** is anything comparing a scene with ecology
+against one without, which is where the 21 ms ecology figure came from.
 
-| Metric | Value |
-|---|---|
-| GPU frame (scene + tone map) at 1280x720, headless | 0.07-0.13 ms |
-| GPU frame at 2880x1800 window (scene + tone map, UI excluded from the timer) | 0.39-0.59 ms |
-| Live window, Release | 120 fps (ProMotion vsync), CPU work 1.4-1.8 ms/frame |
-| Live window, Debug | 60 fps (vsync), CPU work ~3 ms/frame (the earlier 16.6 ms figure included the vsync wait) |
-| Analysis per hop (N=2048, H=512) | ~100 µs Debug, ~17 µs Release (0.16% of the hop period) |
-| Offline frame incl. synchronous readback, 1280x720 | ~6 ms Release (250 frames in 1.53 s wall), ~43 ms Debug |
-| Decode 24 s stereo 48 kHz WAV | ~100-150 ms |
-| Test suite | 146 tests, ~5 s Debug |
+## Current baseline (2026-09-09, honest instrument)
 
-## Milestone 0.2 numbers (Apple M2 Max, Release unless stated)
+`tools/bench_world.sh 2880x1800 100`, the renderer's own per-frame median:
 
-| Metric | Value |
-|---|---|
-| DamagedHelmet load (3.8 MB, five 2048² PNGs) | 161 ms Release, 835 ms Debug (stb PNG decode) |
-| Environment preprocessing, 1k HDRI (cube 256 + 9 mips, irradiance 32, prefiltered 128 x 6, BRDF 128) | 18 ms Release, 127 ms Debug |
-| Helmet + IBL + skybox, 2880x1800 window | 120 fps (vsync), CPU work 0.3 ms, GPU 1.0-1.2 ms |
-| Helmet headless 1280x720 incl. readback | ~6 ms per frame |
+| variant | ms/frame | delta |
+|---|---|---|
+| full | 42.8 | |
+| shadows off | 27.4 | **shadows = 15.4 ms** |
+| ecology off | 33.8 | ecology = 9.0 ms |
+| volumetrics off | 38.2 | volumetrics = 4.7 ms |
+| 1 / 3 / 6 layers | 38.1 / 35.0 / 37.1 | no measurable slope |
 
-## Milestone 0.5 numbers (Apple M2 Max)
-
-| Metric | Value |
-|---|---|
-| Orb scene + 131k-capacity sparks, 2880x1800 window | 120 fps, GPU 0.79 ms (was 0.4 ms without particles), CPU work 1.2 ms (Debug) |
-| One-million-particle pool, ~1M alive, 1280x720 headless (`[.perf]` probe) | 3.4 ms GPU per frame (emit + simulate + indirect draw) |
-| Particle uniform update per system | one 288-byte write; no readback |
-
-## Milestone 0.6 numbers (Apple M2 Max, Debug window 2880x1800)
-
-| Metric | Value |
-|---|---|
-| Orb scene + sparks + default post chain (bloom 6 levels + composite + tone map) | 120 fps, GPU 3.3 ms (2.5 ms is the post chain at full 2880x1800) |
-| Post chain passes at 1280x720 with DoF + motion blur + bloom | 13 passes, ~13 transient textures reused every frame |
-
-Bloom at native Retina resolution dominates; starting the chain at quarter resolution is the
-obvious optimisation when the budget tightens.
-
-Superseded for the post chain by the ADR-037/ADR-039 reordering: see
-`docs/performance/image-formation.md` for 1080p and 4K measurements of exposure, bloom, halation,
-anamorphic and depth of field on and off (bloom 0.3 ms at 1080p; depth of field is now the
-expensive stage).
-
-## Procedural geometry (ADR-023)
-
-Instanced procedural objects with the GPU deformer stack: 1k/10k-instance probe in
-`docs/performance/procedural-geometry.md` (10k instances of a 24-segment cylinder, 2.4 M
-triangles, one draw: 3.6 ms undeformed, 4.5-5.6 ms with one to three deformers at 720p).
-
-## Milestone 0.7 numbers (Apple M2 Max, Release)
-
-| Metric | Value |
-|---|---|
-| Six-node composition (2x DamagedHelmet, orb, grid, BoxTextured, nested MetalRoughSpheres + particles, studio HDRI), 2880x1800 window | 120 fps (vsync), GPU 1.9 ms, CPU work 1.8-2.4 ms |
-| Same composition headless 1280x720 | GPU 0.59 ms per frame |
-| Scene file load (three glTF assets, one nested scene) | 163 ms Release, of which DamagedHelmet decode 153 ms; second helmet instance free (registry cache) |
-| Composition rebuild (flatten) | structural changes only; per-frame cost is one TRS compose per entity |
-
-## Milestone 0.8 numbers (Apple M2 Max, Release)
-
-| Metric | Value |
-|---|---|
-| Orb scene + 3 timeline tracks + 2 cues, 2880x1800 window | 120 fps, GPU 1.4 ms, CPU work ~1 ms |
-| Timeline evaluation | binary search per track per frame; negligible next to modulation |
-
-## Milestone 1.0 numbers (Apple M2 Max, Release): deterministic particle compaction
-
-| Metric | Value |
-|---|---|
-| One-million-particle pool, ~1M alive, 1280x720 headless (`[.perf]` probe), atomic dead/alive lists (before) | 2.29 ms GPU per frame |
-| Same probe with stable prefix-sum compaction (after: emit + simulate + reduce + top scan + scatter + indirect draw) | 2.61-2.73 ms GPU per frame (+15%, two runs) |
-| Orb scene headless 1280x720, 240 frames at 30 fps, run twice | 240/240 identical per-frame hashes, 0 GPU errors |
-
-The extra cost is two passes over the 4 MB flag buffer plus a 4 KB block-sum scan; curl-noise
-simulation still dominates. The earlier 3.4 ms figure above was a different build of the same
-probe; the before/after pair here was measured back to back on the same binary configuration.
-
-## Milestone 1.0 offline rendering numbers (Apple M2 Max, Release)
-
-| Metric | Value |
-|---|---|
-| Six-node composition + HDRI + timeline, 1920x1080 PNG sequence, 8 encoder threads | 50 fps (60 frames in 1.2 s incl. readback and PNG encode) |
-| Orb scene + sparks, 1280x720 PNG sequence | 102 fps (300 frames in 2.9 s) |
-| Readback | synchronous per frame; the GPU idles while the CPU maps (a staging ring is the next step) |
-
-## Budget and revisit triggers
-
-- Analysis: switch FFT backend (pffft/vDSP) if hop time exceeds 10% of the hop period.
-- Render: MSAA and post-processing will add cost; the frame graph in 0.6 introduces a transient
-  pool so intermediate targets are not reallocated.
-- Offline: replace the synchronous readback with a 3-deep staging ring when the render-job runner
-  arrives (1.0).
-- Memory: `AnalysisTrack` ≈ 0.8 MB per second of audio; whole-file decode ≈ 0.4 MB per second
-  of stereo 48 kHz.
-
-> **Superseded from "Where a world frame goes" onwards by "The benchmark was measuring the scene
-> build" at the end of this file (ADR-051).** Every per-frame number below was the whole process
-> under `/usr/bin/time` divided by the frame count, which charges the scene build to the frames.
-> Differences between variants that load the *same* scene (shadows on/off, volumetrics on/off,
-> op counts) are unaffected and still stand. Differences between variants that load *different*
-> amounts of ecology -- above all the 1.5 ms per scatter layer -- are mostly load time.
+**Shadows are now the largest single item**, and neither of the two things that ought to explain them
+does: cutting casters by 72% bought ~1 ms, and dropping a cascade bought ~1 ms. That remains open.
 
 ## How much of a difference is a difference
 
 Six identical runs of the benchmark -- same scene, same 100 frames, same 2880x1800 -- came out at
-77.0, 78.6, 79.4, 80.6, 80.2, 79.1 ms per frame. **The noise floor is about +-1.5 ms, so a claimed
-saving under about 3 ms needs interleaved repeats before it means anything.**
+77.0, 78.6, 79.4, 80.6, 80.2, 79.1 ms per frame. **The noise floor was about +-1.5 ms, so a claimed
+saving under about 3 ms needed interleaved repeats before it meant anything.** With the renderer
+timing its own frames and reporting a median after warm-up, and `tools/bench_ab.sh` interleaving,
+that floor is now about +-0.3 ms.
 
 That was learned the hard way. Running cascade counts sequentially gave 3 cascades 84.9 ms and 2
 cascades 73.8 -- an eleven millisecond saving, and very nearly written down as one. Interleaved,
