@@ -74,6 +74,10 @@ struct ProceduralStats {
     std::uint32_t indirectDraws = 0;
     std::uint32_t emptyIndirectDraws = 0;
     std::uint32_t skippedIndirectDraws = 0; // levels not recorded because they have been empty
+    // Objects whose whole record set is provably outside the frustum / distance / screen-size
+    // limits this frame. Their cull dispatches and every one of their indirect draws, in every
+    // pass, are skipped: the GPU would have written zero to each level's instance count.
+    std::uint32_t culledObjects = 0;
     // Fields (ADR-025)
     std::uint32_t effectorObjects = 0;   // objects that ran the effector pass this frame
     std::uint64_t effectorInstances = 0; // records processed by the effector pass this frame
@@ -110,6 +114,29 @@ struct CullCamera {
 // the tests, which compare the GPU's compacted lists against it.
 [[nodiscard]] int cullLodLevel(const scene::LodSettings& lod, const FrustumPlanes& planes, const CullCamera& camera,
                                glm::vec3 center, float radius);
+
+// The whole object's records reduced to two numbers that do not change until the record set does:
+// the AABB of the instance positions (record space, before the object matrix) and the largest
+// |scale| any record carries. Cached per object and recomputed on a structureVersion change.
+struct InstanceBounds {
+    glm::vec3 min{0.0f};
+    glm::vec3 max{0.0f};
+    float maxAbsScale = 1.0f;
+    bool valid = false;
+};
+[[nodiscard]] InstanceBounds instanceBounds(const std::vector<scene::InstanceRecord>& records);
+
+// True when shaders/cull.wgsl is certain to reject *every* record of the object: the conservative
+// whole-object bound fails the same frustum / maxDistance / minScreenRadius tests the per-instance
+// path applies, so every LOD level's instance count will be zero. Skipping the object's cull
+// dispatches and all of its indirect draws is then bit-exact -- there is nothing to pop in,
+// because a level that would have drawn nothing draws nothing either way.
+//
+// Only valid when the records the GPU culls are the ones these bounds were built from: an object
+// with effectors moves its records on the GPU, so the caller must not use this for those.
+[[nodiscard]] bool objectFullyCulled(const scene::LodSettings& lod, const FrustumPlanes& planes,
+                                     const CullCamera& camera, const glm::mat4& objectToWorld,
+                                     const InstanceBounds& bounds, float sourceRadius);
 
 // Per-object result of the cull pass (blocking readback; tests and tools).
 struct CullCounts {
