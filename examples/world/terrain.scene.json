@@ -93,7 +93,7 @@
         "lodLevels": 4,
         "lodDistance": 70.0,
         "viewDistance": 520.0,
-        "skirtDepth": 5.0
+        "skirtDepth": 1.2
       },
       "material": {
         "baseColor": [

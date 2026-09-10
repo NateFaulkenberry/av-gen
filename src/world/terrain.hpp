@@ -28,6 +28,25 @@
 namespace avgen::world {
 
 constexpr int kMaxTerrainLods = 4;
+// The `lod` value `buildTerrain` passes to `emit` for a chunk's water surface: past the last real
+// level, so a caller that switches on the level cannot mistake water for a coarser ground.
+constexpr int kWaterLevel = kMaxTerrainLods;
+
+// How water looks. It lives with the terrain settings rather than with the world map because it is
+// a rendering decision: the map decides where water *is*, this decides what it looks like.
+struct WaterSettings {
+    bool enabled = true;
+    float shallow = 2.2f;                       // metres of depth over which the colour reaches deep
+    glm::vec3 shallowColor{0.045f, 0.16f, 0.15f}; // linear; the edge, where the bed shows through
+    glm::vec3 deepColor{0.004f, 0.020f, 0.043f};  // linear; the channel
+    float roughness = 0.06f;                    // low: water is a mirror before it is a colour
+    float shoreFade = 1.6f;                     // metres over which the surface fades into the bank
+    float emissiveIntensity = 0.0f;             // for a world whose water carries light
+    glm::vec3 emissiveColor{0.0f};
+
+    [[nodiscard]] Result<void> validate() const;
+    [[nodiscard]] std::uint64_t structuralHash() const;
+};
 
 struct TerrainSettings {
     float chunkSize = 40.0f;    // metres per chunk edge
@@ -35,7 +54,12 @@ struct TerrainSettings {
     int lodLevels = 4;          // 1..kMaxTerrainLods
     float lodDistance = 80.0f;  // metres at which LOD 1 begins; each level doubles the distance
     float viewDistance = 460.0f;// metres beyond which a chunk is not drawn at all
-    float skirtDepth = 4.0f;    // metres the seam curtain hangs below the chunk edge
+    // Metres the seam curtain hangs below the chunk edge. It only has to cover the gap between two
+    // resolutions of the same surface, which at metre-scale spacing is decimetres -- and a curtain
+    // longer than that is a row of vertical panels standing in the open wherever the ground falls
+    // away faster than the skirt does, which is exactly where a gorge or a cliff is.
+    float skirtDepth = 1.2f;
+    WaterSettings water;
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const;
@@ -49,6 +73,7 @@ struct TerrainChunk {
     glm::vec3 boundsMin{0.0f};       // world AABB, from the LOD 0 mesh (the tallest of the set)
     glm::vec3 boundsMax{0.0f};
     std::array<scene::MeshId, kMaxTerrainLods> meshes{};
+    scene::MeshId water = scene::kInvalidMesh; // the chunk's water surface, or none where it is dry
 };
 
 // The chunk grid covering the map, in row-major order from -X/-Z. The world extent is covered
@@ -81,6 +106,9 @@ struct TerrainChunk {
 // then one level per doubling. Returns lodLevels-1 at most.
 [[nodiscard]] int chunkLod(const TerrainSettings& settings, float distance);
 
+// The water material, generated like the ground's so the palette has one home.
+[[nodiscard]] scene::MaterialProgram waterMaterialProgram(const WaterSettings& water, std::string name);
+
 // The ground material for a biome set, generated rather than authored (ADR-047). A biome's colours
 // live in the world JSON, and a scene that also wrote them into a material program would have two
 // copies of them to keep in step -- which is how a scene ends up with the ground painted in last
@@ -112,6 +140,22 @@ struct ChunkField {
     [[nodiscard]] glm::vec3 normalAt(int i, int j, int spread = 1) const;
 };
 [[nodiscard]] ChunkField sampleChunkField(const WorldMap& map, const TerrainSettings& settings, glm::ivec2 coord);
+
+// The water surface of one chunk, or an empty mesh where the chunk is dry. Water is built from the
+// same height field the ground is, for the same reason the ground is chunked: a river descends, so
+// a single plane cannot be its surface, and a mesh that samples `waterSurface` follows the course
+// down the valley for free.
+//
+// Vertex uv carries (depth, shore) rather than a texture coordinate, the same trade the ground makes
+// -- depth is how far the bed is below the surface, normalised over `waterShallow` metres, and shore
+// is how close this point is to dry land. Between them a material can be clear at the edge and dark
+// in the channel without knowing anything about the world.
+//
+// A quad is emitted wherever any of its corners is under water, and the terrain occludes the rest by
+// depth test, so the shoreline is where the two surfaces actually cross rather than where a mesh
+// boundary happened to fall.
+[[nodiscard]] scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& settings,
+                                              glm::ivec2 coord, const ChunkField* field = nullptr);
 
 // Builds every chunk at every level. `emit(chunkIndex, lod, mesh)` receives each mesh in build
 // order; the caller decides where meshes live. Returns the chunks with bounds filled in.

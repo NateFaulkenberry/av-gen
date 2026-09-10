@@ -1088,8 +1088,14 @@ TEST_CASE("A terrain node flattens into chunk entities that pick their own level
     const scene::CompositionNode* node = (*comp)->findNode("ground");
     REQUIRE(node != nullptr);
     CHECK(node->chunks.size() == 16u);            // 160 m of world in 40 m chunks
-    CHECK(s.entities.size() == node->chunks.size());
-    CHECK(s.meshes.size() == node->chunks.size() * 4u); // every level of every chunk, uploaded once
+    // One entity per chunk, plus one per chunk that has water; one mesh per level per chunk, plus
+    // one water surface per wet chunk. A dry chunk contributes neither.
+    const auto wet = static_cast<std::size_t>(std::count_if(
+        node->chunks.begin(), node->chunks.end(),
+        [](const world::TerrainChunk& c) { return c.water != scene::kInvalidMesh; }));
+    CHECK(wet > 0); // the shipped world has a river through it, or this test proves nothing
+    CHECK(s.entities.size() == node->chunks.size() + wet);
+    CHECK(s.meshes.size() == node->chunks.size() * 4u + wet);
     const std::uint64_t meshVersion = s.meshVersion;
 
     // The chunk the camera is looking at from close range takes the finest level; a chunk the same
@@ -1123,7 +1129,7 @@ TEST_CASE("A terrain node flattens into chunk entities that pick their own level
     (*comp)->update(FrameTime{});
     CHECK_FALSE(s.entities[farChunk].visible);
     CHECK(s.meshVersion == meshVersion);
-    CHECK(s.meshes.size() == node->chunks.size() * 4u);
+    CHECK(s.meshes.size() == node->chunks.size() * 4u + wet);
 
     // Debug switches: with LOD off every visible chunk draws its finest mesh, whatever the distance.
     params::Parameter<bool>* lod = params.findAs<bool>("nodes/ground/terrainLod");

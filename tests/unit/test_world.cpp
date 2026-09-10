@@ -387,7 +387,11 @@ TEST_CASE("building a terrain emits every level of every chunk", "[unit][terrain
         return static_cast<scene::MeshId>(emitted++);
     });
     CHECK(chunks.size() == 16u);
-    CHECK(emitted == chunks.size() * static_cast<std::size_t>(settings.lodLevels));
+    // Every level of every chunk, plus one water surface for each chunk that has any. A dry chunk
+    // emits no water mesh at all, so the count is levels x chunks plus however many are wet.
+    const auto wet = static_cast<std::size_t>(std::count_if(
+        chunks.begin(), chunks.end(), [](const world::TerrainChunk& c) { return c.water != scene::kInvalidMesh; }));
+    CHECK(emitted == chunks.size() * static_cast<std::size_t>(settings.lodLevels) + wet);
     for (const world::TerrainChunk& c : chunks) {
         CHECK(c.boundsMax.y > c.boundsMin.y);
         for (int lod = 0; lod < settings.lodLevels; ++lod) {
@@ -790,4 +794,39 @@ TEST_CASE("a scatter distribution draws the cloud it was given", "[unit][procedu
     const std::uint64_t before = pg.structuralHash();
     pg.distribution.scatterHash = 999;
     CHECK(pg.structuralHash() != before);
+}
+
+TEST_CASE("a water surface has no vertical faces in it", "[unit][water]") {
+    // The artefact this pins down, and the one the shipped world produced: a body whose level sits
+    // above the ground beside it reaches only to the edge of its own carve and stops there, and the
+    // quads of that edge stand up as a wall -- on screen, a flat slab with a row of vertical fins
+    // under it. A body that ends where the ground rises through it has no such faces.
+    //
+    // Deliberately not measured as "depth at a vertex": a six-metre-deep channel is deep water, not
+    // a wall, and the first version of this test failed the world for having a river in it.
+    const world::WorldMap map = world::defaultWorld();
+    world::TerrainSettings settings;
+    settings.resolution = 32;
+    const float spacing = settings.chunkSize / static_cast<float>(settings.resolution);
+
+    int wetChunks = 0;
+    float worstStep = 0.0f;
+    for (const glm::ivec2 coord : world::chunkGrid(map, settings)) {
+        const scene::MeshData mesh = world::buildChunkWater(map, settings, coord, nullptr);
+        if (!mesh.valid()) {
+            continue;
+        }
+        ++wetChunks;
+        for (std::size_t t = 0; t + 2 < mesh.indices.size(); t += 3) {
+            const glm::vec3 a = mesh.vertices[mesh.indices[t]].position;
+            const glm::vec3 b = mesh.vertices[mesh.indices[t + 1]].position;
+            const glm::vec3 c = mesh.vertices[mesh.indices[t + 2]].position;
+            const float step = std::max({std::fabs(a.y - b.y), std::fabs(b.y - c.y), std::fabs(a.y - c.y)});
+            worstStep = std::max(worstStep, step);
+        }
+    }
+    INFO("wet chunks " << wetChunks << ", worst height step across one " << spacing << " m quad " << worstStep);
+    CHECK(wetChunks > 4); // there is a river, or this proves nothing
+    // A river descending a valley tilts its surface a little; a wall jumps metres in one quad.
+    CHECK(worstStep < spacing * 0.5f);
 }

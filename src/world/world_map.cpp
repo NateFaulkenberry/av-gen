@@ -506,15 +506,22 @@ WorldMap defaultWorld() {
                                  132.0f, 22.0f, 0.7f, 0.5f, 0.85f));
 
     // The river. Narrow, shallow and meandering: 7 m of half-width, 2.4 m of bed under the water
-    // line, and fourteen path points that wander either side of the valley centre. Straightness is
+    // line, and fourteen path points that wander either side of the valley centre.
+    //
+    // Its levels sit about five metres under the valley floor's, and that margin is load bearing.
+    // A water surface is flat across its width and stops where the ground rises through it; author
+    // it above the ground beside it and it stops instead at the edge of its own channel, as a wall
+    // of water standing over the floodplain. The floor here wanders several metres either side of
+    // the line `basin-floor` flattens toward, so the margin has to cover that wander, not just the
+    // nominal difference between the two paths. Straightness is
     // the single loudest tell that a river was generated, and it costs nothing to author away --
     // each point is a bend, and the levels descend monotonically so the water always runs downhill.
     w.features.push_back(feature("glowmere-run", FeatureKind::River,
-                                 {{-24.0f, 22.0f, -246.0f},  {-10.0f, 18.4f, -222.0f}, {-16.0f, 15.2f, -196.0f},
-                                  {2.0f, 12.0f, -172.0f},    {12.0f, 8.6f, -146.0f},   {2.0f, 5.4f, -118.0f},
-                                  {14.0f, 2.2f, -92.0f},     {26.0f, -0.8f, -64.0f},   {14.0f, -3.4f, -38.0f},
-                                  {6.0f, -5.6f, -12.0f},     {12.0f, -7.8f, 18.0f},    {-4.0f, -10.2f, 56.0f},
-                                  {-20.0f, -12.6f, 104.0f},  {-14.0f, -14.4f, 152.0f}, {-38.0f, -17.0f, 248.0f}},
+                                 {{-24.0f, 17.0f, -246.0f},  {-10.0f, 13.4f, -222.0f}, {-16.0f, 10.2f, -196.0f},
+                                  {2.0f, 7.0f, -172.0f},    {12.0f, 3.6f, -146.0f},   {2.0f, 0.4f, -118.0f},
+                                  {14.0f, -2.8f, -92.0f},     {26.0f, -5.8f, -64.0f},   {14.0f, -8.4f, -38.0f},
+                                  {6.0f, -10.6f, -12.0f},     {12.0f, -12.8f, 18.0f},    {-4.0f, -15.2f, 56.0f},
+                                  {-20.0f, -17.6f, 104.0f},  {-14.0f, -19.4f, 152.0f}, {-38.0f, -22.0f, 248.0f}},
                                  7.0f, 2.4f, 1.4f, 0.0f, 0.12f));
     w.features.back().water = true;
     w.features.back().waterDepth = 0.0f;
@@ -523,7 +530,11 @@ WorldMap defaultWorld() {
     // water body at a different height is what tells the eye the ground is not one plane.
     w.features.push_back(feature("west-tarn", FeatureKind::Valley, {{-104.0f, 0.0f, -34.0f}}, 44.0f, 11.0f,
                                  1.0f, 0.0f, 0.6f));
-    w.features.push_back(feature("west-tarn-bed", FeatureKind::Flat, {{-104.0f, -6.5f, -34.0f}}, 30.0f, 0.0f,
+    // The tarn's bed sits well under the ground around its bowl, for the same reason the river's
+    // water line does: a still body is flat, and the ground at the edge of its basin has to be
+    // above it or the surface ends in a wall. The first version was authored at -6.5 in ground
+    // that runs about -7, and flooded outward until its own width cut it off.
+    w.features.push_back(feature("west-tarn-bed", FeatureKind::Flat, {{-104.0f, -13.5f, -34.0f}}, 30.0f, 0.0f,
                                  1.4f, 0.9f, 0.2f));
     w.features.back().water = true;
     w.features.back().waterDepth = 1.4f;

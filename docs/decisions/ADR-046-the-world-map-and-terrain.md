@@ -106,3 +106,33 @@ light to a false grey wash. Objects viewed from a normal angle never showed it. 
 against the tangent plane fixes it, and `tests/rendering/test_shadows_gpu.cpp` now asserts that a
 plane keeps its ambient -- an assertion the previous AO tests, which only checked a crease and
 determinism, had no reason to make.
+
+## Addendum, 2026-09-09: water
+
+A water surface is built from the same chunk height field the ground is, at the same resolution, and
+for the same reason: a river descends, so no single plane can be its surface. Vertex uv carries
+(depth, shore) rather than a texture coordinate, and the material -- generated from `WaterSettings`
+like the ground's is from the biome set -- colours by depth and fades opacity at the edge. A quad is
+emitted wherever a corner is under water, and the terrain occludes the rest by depth test, so the
+shoreline is where the two surfaces actually cross.
+
+Getting there took four wrong guesses, which is worth recording because three of them were
+plausible and one was checkable in a second.
+
+The artefact was a flat slab of water standing several metres over the floodplain with a row of
+vertical fins under it. I blamed, in order: the shoreline quantisation, the dry-corner fallback, the
+terrain skirts, and the world's authored river level. The third was disproved by a hash of two
+renders -- the change had reached the screen and the artefact had not moved -- and the fourth was
+real but only a contributing cause.
+
+The actual cause was that `waterSurface` returns `seaLevel` where there is no water, and `seaLevel`
+defaults to -1000 as a sentinel for "this world has no sea". That is a *finite* number, so the mesh
+builder's test for a missing surface (`!isfinite`) never fired, and every dry corner of a wet quad
+was placed a kilometre underground. The fins were those quads. A test asserting that no water quad
+contains a large vertical step finds it in one run; the first version of that test measured depth at
+a vertex instead and failed the world for having a river in it.
+
+Two authoring facts came out of it and are now written where the world is authored: a body's level
+must sit below the ground beside it, by enough to cover how far the floor wanders around the line it
+was flattened toward -- five metres here, not the two the paths nominally differed by. And a river's
+`width` is its channel, not its floodplain.

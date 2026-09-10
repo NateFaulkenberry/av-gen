@@ -686,6 +686,10 @@ std::string terrainGroundProgramName(const std::string& node) {
     return node + "_ground";
 }
 
+std::string terrainWaterProgramName(const std::string& node) {
+    return node + "_water";
+}
+
 std::string prefixed(const std::string& prefix, const std::string& name) {
     if (name.empty() || prefix.empty() || name.compare(0, prefix.size(), prefix) == 0) {
         return name;
@@ -1642,18 +1646,24 @@ void Composition::rebuild() {
         if (node.kind != NodeKind::Terrain || !node.terrainMaterial.program.empty() || node.worldMap.biomes.empty()) {
             continue;
         }
-        const std::string name = terrainGroundProgramName(node.name);
-        const auto existing = std::find_if(materialPrograms_.begin(), materialPrograms_.end(),
-                                           [&](const MaterialProgram& mp) { return mp.name == name; });
-        MaterialProgram mp = world::terrainMaterialProgram(node.worldMap.biomes, name);
-        if (auto v = mp.validate(); !v) {
-            log::warn("terrain '{}': generated ground material: {}", node.name, v.error().message);
-            continue;
-        }
-        if (existing != materialPrograms_.end()) {
-            *existing = std::move(mp); // a retuned biome set repaints the ground on the next rebuild
-        } else {
-            materialPrograms_.push_back(std::move(mp));
+        const auto install = [&](const std::string& name, MaterialProgram mp) {
+            if (auto v = mp.validate(); !v) {
+                log::warn("terrain '{}': generated material '{}': {}", node.name, name, v.error().message);
+                return;
+            }
+            const auto existing = std::find_if(materialPrograms_.begin(), materialPrograms_.end(),
+                                               [&](const MaterialProgram& p) { return p.name == name; });
+            if (existing != materialPrograms_.end()) {
+                *existing = std::move(mp); // a retuned palette repaints on the next rebuild
+            } else {
+                materialPrograms_.push_back(std::move(mp));
+            }
+        };
+        install(terrainGroundProgramName(node.name),
+                world::terrainMaterialProgram(node.worldMap.biomes, terrainGroundProgramName(node.name)));
+        if (node.terrain.water.enabled) {
+            install(terrainWaterProgramName(node.name),
+                    world::waterMaterialProgram(node.terrain.water, terrainWaterProgramName(node.name)));
         }
     }
     scene_.materialPrograms.clear();
@@ -1858,6 +1868,26 @@ void Composition::rebuild() {
                 range.restEmissive.push_back(node.terrainMaterial.emissiveIntensity);
                 range.restRoughness.push_back(node.terrainMaterial.roughness);
             }
+            // Water second, so it draws after the ground it sits in: the surface is translucent at
+            // its edge and the bank has to be there behind it.
+            for (std::size_t c = 0; c < mutableNode.chunks.size(); ++c) {
+                const world::TerrainChunk& chunk = mutableNode.chunks[c];
+                if (chunk.water == kInvalidMesh) {
+                    continue;
+                }
+                Entity& e = scene_.addEntity(fmt::format("{}.water{}", node.name, c), chunk.water);
+                e.style = MeshStyle::Lit;
+                e.material.baseColor = node.terrain.water.shallowColor;
+                e.material.roughness = node.terrain.water.roughness;
+                e.material.metallic = 0.0f;
+                e.material.doubleSided = true; // a surface seen from under it is still a surface
+                e.material.program = prefixed(sanitise(prefix_), terrainWaterProgramName(node.name));
+                e.transform = nodeT;
+                e.visible = visible;
+                range.restTransforms.emplace_back();
+                range.restEmissive.push_back(0.0f);
+                range.restRoughness.push_back(node.terrain.water.roughness);
+            }
             const auto triangles = [&] {
                 std::size_t t = 0;
                 for (const world::TerrainChunk& chunk : mutableNode.chunks) {
@@ -1868,8 +1898,11 @@ void Composition::rebuild() {
             const auto buildMs = std::chrono::duration<double, std::milli>(
                                      std::chrono::steady_clock::now() - buildStart)
                                      .count();
-            log::info("terrain '{}': {} chunks, {} triangles at LOD 0, built in {:.0f} ms", node.name,
-                      mutableNode.chunks.size(), triangles, buildMs);
+            const auto wet = static_cast<std::size_t>(std::count_if(
+                mutableNode.chunks.begin(), mutableNode.chunks.end(),
+                [](const world::TerrainChunk& c) { return c.water != kInvalidMesh; }));
+            log::info("terrain '{}': {} chunks ({} with water), {} triangles at LOD 0, built in {:.0f} ms",
+                      node.name, mutableNode.chunks.size(), wet, triangles, buildMs);
             break;
         }
         case NodeKind::Particles: {
@@ -2583,7 +2616,7 @@ void Composition::updateTerrainLod() {
             continue;
         }
         const NodeRange& range = ranges_[i];
-        if (range.entityCount != node.chunks.size()) {
+        if (range.entityCount < node.chunks.size()) {
             continue; // a rebuild is pending; the entities and the chunks do not correspond yet
         }
         const bool lodEnabled = node.terrainLodParam == nullptr || node.terrainLodParam->value();
@@ -2599,10 +2632,20 @@ void Composition::updateTerrainLod() {
             planes = world::frustumPlanes(scene_.camera.projection(kCullAspect) * scene_.camera.view());
         }
         const glm::vec3 eye = scene_.camera.position;
+        // Water entities follow the ground chunks, one per chunk that has any, in chunk order. A
+        // chunk's water is visible exactly when the chunk is: it is the same piece of world.
+        std::size_t waterEntity = range.firstEntity + node.chunks.size();
         for (std::size_t c = 0; c < node.chunks.size(); ++c) {
             const world::TerrainChunk& chunk = node.chunks[c];
             Entity& e = scene_.entities[range.firstEntity + c];
+            const std::size_t water = chunk.water != kInvalidMesh ? waterEntity++ : scene_.entities.size();
+            const auto setWater = [&](bool on) {
+                if (water < scene_.entities.size()) {
+                    scene_.entities[water].visible = scene_.entities[water].visible && on;
+                }
+            };
             if (!e.visible) {
+                setWater(false);
                 continue; // the node itself is hidden; nothing below can turn it back on
             }
             // Chunk bounds are in the world map's own space; the node transform moves the world.
@@ -2622,6 +2665,7 @@ void Composition::updateTerrainLod() {
             const float distance = glm::distance(eye, glm::clamp(eye, lo, hi));
             if (distance > settings.viewDistance || (planes && !world::aabbVisible(*planes, lo, hi))) {
                 e.visible = false;
+                setWater(false);
                 continue;
             }
             const int lod = lodEnabled ? world::chunkLod(settings, distance) : 0;
@@ -2882,7 +2926,16 @@ nlohmann::json Composition::toJson() const {
             const world::TerrainSettings& ts = node.terrain;
             n["terrain"] = json{{"chunkSize", ts.chunkSize},   {"resolution", ts.resolution},
                                 {"lodLevels", ts.lodLevels},   {"lodDistance", ts.lodDistance},
-                                {"viewDistance", ts.viewDistance}, {"skirtDepth", ts.skirtDepth}};
+                                {"viewDistance", ts.viewDistance}, {"skirtDepth", ts.skirtDepth},
+                                {"water",
+                                 json{{"enabled", ts.water.enabled},
+                                      {"shallow", ts.water.shallow},
+                                      {"roughness", ts.water.roughness},
+                                      {"shoreFade", ts.water.shoreFade},
+                                      {"shallowColor", vecToJson(ts.water.shallowColor)},
+                                      {"deepColor", vecToJson(ts.water.deepColor)},
+                                      {"emissiveColor", vecToJson(ts.water.emissiveColor)},
+                                      {"emissiveIntensity", ts.water.emissiveIntensity}}}};
             const Material& m = node.terrainMaterial;
             json mat{{"baseColor", vecToJson(m.baseColor)},
                      {"opacity", m.opacity},
@@ -3333,6 +3386,38 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                             return fail("node '{}': terrain: {}", node.name, v.error().message);
                         }
                         *f.target = *v;
+                    }
+                    if (t.contains("water")) {
+                        const json& wj = t.at("water");
+                        if (!wj.is_object()) {
+                            return fail("node '{}': terrain 'water' must be an object", node.name);
+                        }
+                        world::WaterSettings& w = ts.water;
+                        if (wj.contains("enabled")) {
+                            if (!wj.at("enabled").is_boolean()) {
+                                return fail("node '{}': water 'enabled' must be a boolean", node.name);
+                            }
+                            w.enabled = wj.at("enabled").get<bool>();
+                        }
+                        for (const TerrainFloat& f :
+                             {TerrainFloat{"shallow", &w.shallow}, TerrainFloat{"roughness", &w.roughness},
+                              TerrainFloat{"shoreFade", &w.shoreFade},
+                              TerrainFloat{"emissiveIntensity", &w.emissiveIntensity}}) {
+                            auto v = readFloat(wj, f.key, *f.target);
+                            if (!v) {
+                                return fail("node '{}': water: {}", node.name, v.error().message);
+                            }
+                            *f.target = *v;
+                        }
+                        for (const auto& [key, target] : {std::pair{"shallowColor", &w.shallowColor},
+                                                          std::pair{"deepColor", &w.deepColor},
+                                                          std::pair{"emissiveColor", &w.emissiveColor}}) {
+                            auto v = readVec<3>(wj, key, *target);
+                            if (!v) {
+                                return fail("node '{}': water: {}", node.name, v.error().message);
+                            }
+                            *target = *v;
+                        }
                     }
                     struct TerrainInt { const char* key; int* target; };
                     for (const TerrainInt& f :
