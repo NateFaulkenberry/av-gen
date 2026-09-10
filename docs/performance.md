@@ -113,9 +113,72 @@ probe; the before/after pair here was measured back to back on the same binary c
 
 ## Where a world frame goes (2026-09-09)
 
-Measured on an M2 Max, 200 headless frames at 1440x900, Glowmere with terrain and eleven scatter
-layers. **The built-in per-pass GPU timers are not trustworthy on this setup and were actively
-misleading**: `volumeMs` reported a constant 14.5 ms at every resolution from 720x450 to 2880x1800
+**The first version of this section was wrong, and how it was wrong is the most useful thing in
+it.** It is kept below the corrected numbers because the mistake is a standing hazard.
+
+`--size` was ignored in headless mode: `runHeadless` rendered a hard-coded 1280x720 whatever was
+asked for. Every headless measurement that varied resolution therefore compared 1280x720 against
+1280x720, three times, and concluded that the frame was not fragment-bound. It is. With the flag
+honoured, and with the per-frame determinism hash (a full scan of the image, a fifth of the wall
+time at 2880x1800) computed only when something reads it:
+
+| resolution | ms/frame |
+|---|---|
+| 720x450 | 42.8 |
+| 1440x900 | 52.6 |
+| 2880x1800 | 110.2 |
+
+### Baseline at the resolution the app actually runs
+
+`tools/bench_world.sh 2880x1800 120`, wall clock, Glowmere with terrain, water and eleven scatter
+layers:
+
+| variant | ms/frame | delta |
+|---|---|---|
+| full | 87.0 | |
+| ecology off | 65.8 | **ecology = 21.2 ms** |
+| shadows off | 71.3 | shadows = 15.7 ms |
+| volumetrics off | 80.8 | volumetrics = 6.2 ms |
+| 1 scatter layer | 71.6 | |
+| 3 scatter layers | 75.0 | |
+| 6 scatter layers | 80.5 | ~1.6 ms per layer |
+
+The per-layer slope survives the correction: ecology still costs about 1.6 ms per scatter object per
+frame and is roughly resolution-independent (18 ms at 720p, 21 ms at 5 Mpixels), which is what a
+submission-bound cost looks like. What did not survive is the claim that the *frame* is not
+fragment-bound. It is: two thirds of it scales with pixels.
+
+### The pass timers measure a stall, not the pass
+
+`volumeMs` reports 51 ms of an 87 ms frame. Turning volumetrics off saves 6.2 ms. Both numbers are
+repeatable. A timer that brackets a pass costing six milliseconds and reports fifty-one is bracketing
+something else -- on this backend the GPU is idle inside that pass waiting on work queued before it,
+and removing the pass moves the wait rather than removing it. The same applies to `gpuFrameMs`.
+
+They are not, however, inert: a 64x change in volumetric steps moves `volumeMs` by 20% and wall clock
+by 16%, in step. So they respond to workload while misattributing where it happened. **Use them to
+detect that something changed; use wall-clock differences between scene variants to say what.** An
+earlier version of this note declared them simply INVALID on the strength of a 3x workload change
+that moved neither -- too small a change to see past a pass that is not dominated by it.
+
+### Submission accounting
+
+At 2880x1800, per frame: **220 indirect draws, 110 of them empty.** That is 11 scatter objects x 4
+LOD levels x 5 passes (depth prepass, main, three shadow cascades). The LOD distribution is
+733/161/10/0 instances, so LOD 3 is empty for every object and LOD 2 for nearly all of them -- the
+CPU records those draws anyway, because the instance count is written by the GPU cull pass and is
+not knowable when the draw is recorded.
+
+Those counters read zero when they were first added, because `stats_.procedural` is snapshotted
+during `update()`, before a single draw is recorded. Anything counted while recording was being
+thrown away. It is now re-read after the passes.
+
+
+
+### Superseded: the original note, kept for the mistake
+
+Measured on an M2 Max, 200 headless frames at what was believed to be 1440x900 but was in fact
+1280x720 for all of them. **The built-in per-pass GPU timers were called untrustworthy**: `volumeMs` reported a constant 14.5 ms at every resolution from 720x450 to 2880x1800
 *and* at every step count from 18 down to 6. A pass whose measured cost is invariant to both its
 pixel count and its loop count is not being measured. `gpuFrameMs` is flat across the same 16x pixel
 range for the same reason. Everything below is wall-clock difference between scene variants, which

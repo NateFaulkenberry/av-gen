@@ -1277,8 +1277,12 @@ int Application::runHeadless() {
     }
     const int frames = options_.frames > 0 ? options_.frames : 120;
     FixedStepClock clock(options_.offlineFps);
-    const std::uint32_t w = 1280;
-    const std::uint32_t h = 720;
+    // `--size` in points, as the window takes it. Headless ignored it and rendered 1280x720
+    // whatever was asked for, which silently invalidated every headless measurement that varied
+    // resolution: three sizes, one frame size, and a confident conclusion that the frame was not
+    // fragment-bound. A benchmark that cannot set its own resolution is not a benchmark.
+    const std::uint32_t w = std::max(options_.width, 16u);
+    const std::uint32_t h = std::max(options_.height, 16u);
     if (auto r = renderer_->resize(w, h); !r) {
         log::error("resize: {}", r.error().message);
         return 2;
@@ -1302,8 +1306,15 @@ int Application::runHeadless() {
             log::error("render: {}", image.error().message);
             return 2;
         }
-        lastHash = gpu::hashImage(*image);
-        log::debug("offline frame {:4d} hash={:016x}", i, lastHash); // every frame, for determinism diffs
+        // The determinism hash is a full scan of the frame and scales with its area: at 2880x1800
+        // it was a fifth of the wall time of every headless run, which is a fifth of every
+        // performance measurement taken with one. It exists to diff two runs frame by frame, so it
+        // is computed when someone is actually looking -- debug logging, or the captured frame.
+        const bool wantHash = options_.logLevel <= log::Level::Debug || i == frames - 1;
+        if (wantHash) {
+            lastHash = gpu::hashImage(*image);
+            log::debug("offline frame {:4d} hash={:016x}", i, lastHash);
+        }
         if (i % 30 == 0 || i == frames - 1) {
             const auto& f = engine_->latestFrame();
             // The headline parameters differ per scene kind; a missing one reads as 0.
@@ -1322,11 +1333,13 @@ int Application::runHeadless() {
             // re-rendering -- which is how an afternoon goes missing. `gpuFrameMs` is the whole
             // submitted frame; the rest are the passes that measure themselves.
             const auto& st = renderer_->stats();
-            log::info("             passes: shadow={:.2f} ao={:.2f} volume={:.2f} cull={:.2f} effector={:.2f} "
-                      "sdf={:.2f} particles={:.2f} | draws={} tris={} instances={}/{} cpu(proc)={:.2f}ms",
-                      st.shadows.shadowMs, st.ao.aoMs, st.volume.volumeMs, st.procedural.cullMs,
-                      st.procedural.effectorPassMs, st.sdf.raymarchMs, st.particles.simulateMs, st.drawCalls,
-                      st.triangles, st.procedural.visibleInstances, st.procedural.culledInstances, st.procedural.cpuUpdateMs);
+            log::info("             passes: shadow={:.2f} ao={:.2f} volume={:.2f} cull={:.2f} | draws={} "
+                      "indirect={} (empty {}) instances={}/{} lod={}/{}/{}/{} cpu(proc)={:.2f}ms",
+                      st.shadows.shadowMs, st.ao.aoMs, st.volume.volumeMs, st.procedural.cullMs, st.drawCalls,
+                      st.procedural.indirectDraws, st.procedural.emptyIndirectDraws,
+                      st.procedural.visibleInstances, st.procedural.culledInstances, st.procedural.lodCounts[0],
+                      st.procedural.lodCounts[1], st.procedural.lodCounts[2], st.procedural.lodCounts[3],
+                      st.procedural.cpuUpdateMs);
         }
         if (options_.capture && i == frames - 1) {
             if (auto r = writeCapture(*image, *options_.capture); !r) {

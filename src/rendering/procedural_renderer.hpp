@@ -63,6 +63,14 @@ struct ProceduralStats {
     double cpuUpdateMs = 0.0;           // rebuild + upload time this frame
     std::uint32_t uploads = 0;          // instance buffer uploads this frame
     std::uint32_t drawCalls = 0;        // draws issued: one per object, or one per populated LOD level
+    // Submission accounting (the world optimisation spec's P1/P2). `indirectDraws` counts every
+    // indirect draw actually recorded, over every pass -- the camera's, the depth prepass's and
+    // each shadow cascade's -- because that is the number the frame pays for, not the number the
+    // camera pass alone issues. `emptyIndirectDraws` is how many of those had no instances in the
+    // last completed cull readback: the CPU cannot know a level is empty when it records the draw,
+    // because the count is written by the GPU, so this is the measure of what that costs.
+    std::uint32_t indirectDraws = 0;
+    std::uint32_t emptyIndirectDraws = 0;
     // Fields (ADR-025)
     std::uint32_t effectorObjects = 0;   // objects that ran the effector pass this frame
     std::uint64_t effectorInstances = 0; // records processed by the effector pass this frame

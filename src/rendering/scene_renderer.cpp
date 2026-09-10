@@ -2107,6 +2107,10 @@ Result<wgpu::Texture> SceneRenderer::renderSubmitted(const scene::Scene& scene, 
     wgpu::CommandBuffer commands = encoder.Finish();
     context_.queue().Submit(1, &commands);
     stats_.gpuFrameMs = timer_->collect();
+    // Re-read the procedural stats now that every pass has recorded its draws. The copy taken
+    // during update() is made before a single draw exists, so any counter incremented while
+    // recording -- indirect draws, empty draws -- was being thrown away and read back as zero.
+    stats_.procedural = procedurals_->stats();
     procedurals_->collectTimings();
     particles_->collectTimings();
     sdfs_->collectTimings();

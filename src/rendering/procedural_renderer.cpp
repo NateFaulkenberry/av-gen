@@ -1424,6 +1424,12 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             pass.SetVertexBuffer(0, mesh->vertices);
             pass.SetIndexBuffer(mesh->indices, wgpu::IndexFormat::Uint32);
             pass.DrawIndexedIndirect(item.state->indirect, static_cast<std::uint64_t>(level) * kIndirectStride);
+            ++stats_.indirectDraws; // every pass, because every pass pays for it
+            const std::size_t base = static_cast<std::size_t>(item.state->statsSlot) * kCullStatsStride;
+            if (base + kCullStatsStride <= im.statsSnapshot.size() && im.statsSnapshot[base + 5] != 0 &&
+                im.statsSnapshot[base + level] == 0) {
+                ++stats_.emptyIndirectDraws;
+            }
             if (!depthOnly) {
                 ++stats_.drawCalls;
             }
