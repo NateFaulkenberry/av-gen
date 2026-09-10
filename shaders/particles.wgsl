@@ -221,9 +221,22 @@ fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
     } else if (shape > 2.5) {
         offset = (r1 * 2.0 - 1.0) * params.extent.xyz;
     } else if (shape > 1.5) {
+        // A disc in the plane the emitter faces, with extent.x and extent.z as its two radii. It
+        // used to be nailed to XZ and to read only extent.x, which made a disc emitter unable to
+        // point anywhere and unable to be an ellipse -- and the shipped scenes had already been
+        // authored as though it could be: `[11, 1, 11]` and `[46, 2, 46]` are somebody writing two
+        // radii and a thickness into a field that was using one of them.
+        //
+        // The basis is built so that the default +Y direction gives exactly the old X/Z plane, in
+        // that order, which is why the helper axis is +Z rather than the usual +Y: every scene that
+        // emitted a disc before this renders the same particles afterwards.
+        let n = normalize(params.direction.xyz + vec3<f32>(1e-5, 0.0, 0.0));
+        let helper = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(0.0, 0.0, 1.0), abs(n.y) > 0.99);
+        let u = normalize(cross(n, helper));
+        let v = cross(u, n);
         let ang = 6.28318530 * r1.x;
-        let rad = sqrt(r1.y) * params.extent.x;
-        offset = vec3<f32>(cos(ang) * rad, 0.0, sin(ang) * rad);
+        let rad = sqrt(r1.y);
+        offset = u * (cos(ang) * rad * params.extent.x) + v * (sin(ang) * rad * params.extent.z);
     } else if (shape > 0.5) {
         offset = sphereDir(r1.xy) * pow(r1.z, 1.0 / 3.0) * params.extent.x;
     }

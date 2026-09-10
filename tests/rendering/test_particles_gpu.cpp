@@ -39,6 +39,28 @@ int brightness(const gpu::Image8& img) {
     }
     return static_cast<int>(sum / static_cast<long>(img.width * img.height));
 }
+// The bounding box of pixels brighter than `threshold`, as (width, height) in pixels. Zero when
+// nothing is lit. Used to ask what shape a cloud of particles actually is on screen.
+std::pair<int, int> litExtent(const gpu::Image8& img, int threshold = 24) {
+    int minX = static_cast<int>(img.width);
+    int minY = static_cast<int>(img.height);
+    int maxX = -1;
+    int maxY = -1;
+    for (std::uint32_t y = 0; y < img.height; ++y) {
+        for (std::uint32_t x = 0; x < img.width; ++x) {
+            const std::size_t i = (static_cast<std::size_t>(y) * img.width + x) * 4;
+            const int v = std::max({img.rgba[i], img.rgba[i + 1], img.rgba[i + 2]});
+            if (v >= threshold) {
+                minX = std::min(minX, static_cast<int>(x));
+                maxX = std::max(maxX, static_cast<int>(x));
+                minY = std::min(minY, static_cast<int>(y));
+                maxY = std::max(maxY, static_cast<int>(y));
+            }
+        }
+    }
+    return maxX < 0 ? std::pair{0, 0} : std::pair{maxX - minX + 1, maxY - minY + 1};
+}
+
 } // namespace
 
 TEST_CASE("Particles emit, live, and die according to their parameters", "[gpu][particles]") {
@@ -371,4 +393,71 @@ TEST_CASE("One million particles simulate and draw", "[.perf][particles]") {
     CHECK(ctx->errorCount() == 0);
     WARN("1M particles: mean GPU " << (counted ? gpuSum / counted : -1.0) << " ms/frame at 1280x720 (steady state ~"
                                     << std::min<double>(sys.capacity, 400000.0 * 2.5) << " alive)");
+}
+
+TEST_CASE("a disc emitter faces its direction and has two radii", "[gpu][particles]") {
+    // The disc used to be nailed to the XZ plane and to read only extent.x, so it could neither
+    // point anywhere nor be an ellipse. The shipped scenes had been authored as though it could:
+    // `[11, 1, 11]` and `[46, 2, 46]` are two radii and a thickness written into a field that was
+    // using one of them.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    const auto emit = [&](glm::vec3 direction, glm::vec3 extent, glm::vec3 cameraPos) {
+        scene::Scene s;
+        s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+        s.environment.showSkybox = false;
+        s.environment.environmentIntensity = 0.0f;
+        s.post.bloomEnabled = false; // bloom smears the cloud across the frame and hides its shape
+        s.post.tonemap = scene::TonemapOperator::Clamp;
+        s.camera.position = cameraPos;
+        s.camera.target = {0.0f, 0.0f, 0.0f};
+        s.camera.fovYRadians = 0.9f;
+        scene::ParticleSystem sys;
+        sys.name = "disc";
+        sys.capacity = 8192;
+        sys.shape = scene::EmitterShape::Disc;
+        sys.position = {0.0f, 0.0f, 0.0f};
+        sys.direction = direction;
+        sys.extent = extent;
+        sys.spawnRate = 60000.0f;
+        sys.lifetimeMin = sys.lifetimeMax = 4.0f;
+        sys.speedMin = sys.speedMax = 0.0f; // stay where they were emitted: the disc *is* the cloud
+        sys.spread = 0.0f;
+        sys.gravity = {0.0f, 0.0f, 0.0f};
+        sys.turbulence = 0.0f;
+        sys.sizeStart = sys.sizeEnd = 0.05f;
+        sys.colorStart = sys.colorEnd = {1.0f, 1.0f, 1.0f, 1.0f};
+        sys.emissive = 4.0f;
+        s.particles.push_back(sys);
+        FixedStepClock clock(60.0);
+        gpu::Image8 last;
+        for (int i = 0; i < 12; ++i) {
+            auto img = renderer.renderToImage(s, clock.tick(), 128, 128);
+            REQUIRE(img.has_value());
+            last = std::move(*img);
+        }
+        return litExtent(last);
+    };
+
+    SECTION("the disc lies in the plane its direction is normal to") {
+        // Facing +Z: a disc in XY. Seen from +Z it is a filled circle; from +Y it is edge on.
+        const auto faceOn = emit({0.0f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 9.0f});
+        const auto edgeOn = emit({0.0f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 9.0f, 0.0f});
+        INFO("face-on " << faceOn.first << "x" << faceOn.second << ", edge-on " << edgeOn.first << "x"
+                        << edgeOn.second);
+        REQUIRE(faceOn.second > 0);
+        CHECK(faceOn.second > edgeOn.second * 2); // a circle from the front, a line from above
+    }
+
+    SECTION("extent.x and extent.z are the two radii") {
+        // Facing +Y, the old orientation, so this section isolates the second radius from the
+        // orientation change. Seen from above, x = 2 and z = 0.5 must be four times as wide as tall.
+        const auto wide = emit({0.0f, 1.0f, 0.0f}, {2.0f, 1.0f, 0.5f}, {0.0f, 14.0f, 0.01f});
+        INFO("wide disc from above: " << wide.first << "x" << wide.second);
+        REQUIRE(wide.first > 0);
+        CHECK(wide.first > wide.second * 2);
+    }
 }
