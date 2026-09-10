@@ -19,6 +19,7 @@
 
 #include "core/error.hpp"
 #include "core/time.hpp"
+#include "core/wind.hpp"
 #include "gpu/gpu_timer.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/render_target.hpp"
@@ -130,9 +131,12 @@ struct FrameUniforms {
     glm::vec4 shadowParams;   // x = atlas resolution, y = PCF radius (texels), z = contact steps, w = contact length
     glm::vec4 aoParams;       // x = strength, y = 1 when AO is on, zw = the AO texture size
     glm::vec4 targetSize;     // x = width, y = height, z = 1 / width, w = 1 / height
+    // ADR-055: the wind field, packed by wind::packWind. Frame-global because the air is; the
+    // shadow views copy the whole block, so a swaying plant and its shadow cannot disagree.
+    wind::WindUniforms wind;
     LightUniform lights[kMaxLights];
 };
-static_assert(sizeof(FrameUniforms) == 192 + 288 + 512);
+static_assert(sizeof(FrameUniforms) == 192 + 288 + 64 + 512);
 
 struct ObjectUniforms {
     glm::mat4 model;

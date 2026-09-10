@@ -1338,6 +1338,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     brightness_ = &params.add(floatDesc(prefix_ + "scene/brightness", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f));
     fogDensity_ = &params.add(floatDesc(prefix_ + "scene/fogDensity", fogDensitySetting_, 0.0f, 2.0f, 0.0f, 0.2f));
     keyLight_ = &params.add(floatDesc(prefix_ + "scene/keyLight", 1.0f, 0.0f, 10.0f, 0.0f, 3.0f));
+    // ADR-055. Speed 0 is a genuine no-op: `WindParams::active()` is false and every draw's wind
+    // gate goes to 0, which is also how the A/B measurement of what this costs is taken.
+    windSpeed_ = &params.add(floatDesc(prefix_ + "scene/windSpeed", windSetting_.speed, 0.0f, 4.0f, 0.0f, 1.5f));
+    windDirection_ = &params.add(
+        floatDesc(prefix_ + "scene/windDirection", windSetting_.direction, -6.2832f, 6.2832f, -3.1416f, 3.1416f));
     // Volumetric atmosphere (ADR-032). volumeDensity 0 keeps the pass off, so these are free
     // until someone turns them up; every one is an ordinary parameter, so audio, the timeline,
     // presets, OSC/MIDI and macros drive fog through the usual routes.
@@ -1567,6 +1572,8 @@ void Composition::detach() {
     volumeDensity_ = nullptr;
     fogHeight_ = nullptr;
     fogHeightFalloff_ = nullptr;
+    windSpeed_ = nullptr;
+    windDirection_ = nullptr;
     volumeScattering_ = nullptr;
     volumeAbsorption_ = nullptr;
     volumeAnisotropy_ = nullptr;
@@ -1882,6 +1889,21 @@ void Composition::rebuild() {
                     pg.material.program = prefixed(sanitise(prefix_), layer.materialProgram);
                 }
                 pg.materialVariation.perceptualHue = true;
+                // ADR-055: how this species answers the wind, straight through. Nothing else in the
+                // scatter path changes -- Tier 0 is a vertex-stage deformation over instances that
+                // already exist, so there is no new buffer, no new pass and no new draw.
+                pg.motion = layer.motion;
+                if (pg.motion.active()) {
+                    const wind::MotionResponse r = wind::motionResponse(windSetting_, pg.motion);
+                    // The wind speed is in the line on purpose: it is the proof that an A/B which
+                    // edits the scene file actually took, without which a benchmark of "wind off"
+                    // is a benchmark of nothing in particular.
+                    log::info("terrain '{}': scatter '{}' in wind {:.2f}: steady {:.3f} gust {:.3f} "
+                              "flutter {:.3f} of height, ring {:.2f} Hz, lag {:.2f} s, curve {:.1f}",
+                              node.name, layer.name, windSetting_.active() ? windSetting_.speed : 0.0f,
+                              r.steadyGain, r.gustGain, r.flutterGain, r.flutterOmega / wind::kTau,
+                              r.swayDelay, r.bendCurve);
+                }
                 pg.variation.seed = static_cast<std::uint32_t>(layer.structuralHash());
                 if (layer.height > 0.0f && pg.source.assetMesh) {
                     const auto [lo, hi] = pg.source.assetMesh->bounds();
@@ -2635,6 +2657,11 @@ void Composition::applyParameters() {
             volumeDensityFieldSetting_.empty() ? std::string() : sanitise(prefix_) + volumeDensityFieldSetting_;
         env.volumeColorField =
             volumeColorFieldSetting_.empty() ? std::string() : sanitise(prefix_) + volumeColorFieldSetting_;
+        // ADR-055. A live `scene/windSpeed` parameter so the whole field can be turned up, down or
+        // off without editing the file -- which is also how the A/B measurement is taken.
+        env.wind = windSetting_;
+        env.wind.speed = windSpeed_ != nullptr ? windSpeed_->value() : windSetting_.speed;
+        env.wind.direction = windDirection_ != nullptr ? windDirection_->value() : windSetting_.direction;
     }
     if (gridIntensity_ != nullptr) {
         scene_.environment.gridIntensity = gridIntensity_->value();
@@ -3081,6 +3108,12 @@ nlohmann::json Composition::toJson() const {
         }
     }
     j["environment"] = std::move(environment);
+    if (windSetting_.enabled) {
+        json w = wind::windToJson(windSetting_);
+        w["speed"] = windSpeed_ != nullptr ? windSpeed_->base() : windSetting_.speed;
+        w["direction"] = windDirection_ != nullptr ? windDirection_->base() : windSetting_.direction;
+        j["wind"] = std::move(w);
+    }
 
     json nodes = json::array();
     for (const auto& nodePtr : nodes_) {
@@ -3281,6 +3314,15 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 log::warn("composition '{}': light rig: {}", comp->name_, r.error().message);
             }
         }
+    }
+    // ADR-055: the wind is a top-level block, a sibling of `environment` rather than a member of
+    // it, because it is the weather rather than the sky: it moves geometry, and a later tier will
+    // move cloth and particles with the same numbers.
+    if (j.contains("wind")) {
+        if (!j.at("wind").is_object()) {
+            return fail("'wind' must be an object");
+        }
+        comp->windSetting_ = wind::windFromJson(j.at("wind"));
     }
     if (j.contains("environment")) {
         const json& e = j.at("environment");

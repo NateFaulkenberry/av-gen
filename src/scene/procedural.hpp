@@ -19,6 +19,7 @@
 // per-frame uniform.
 
 #include "core/error.hpp"
+#include "core/wind.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/scene_types.hpp"
 #include "spatial/effector.hpp"
@@ -424,6 +425,10 @@ struct ProceduralGeometry {
     std::vector<Deformer> deformers;     // ordered stack, at most kMaxDeformers
     Material material;
     MaterialVariation materialVariation;
+    // ADR-055: how this species answers the wind. Purely a per-frame uniform -- two layers that
+    // differ only in how they move share every mesh, every placement and every buffer -- so it is
+    // deliberately not part of `structureVersion`.
+    wind::VegetationMotion motion;
     // Spatial processing (ADR-024/025). Structural: `pointOps` run on the point cloud at rebuild
     // (after distribution + variation, before projection), in order. Per frame: `effectors`
     // (≤ kMaxEffectors) act on the instance records on the GPU (CPU reference:

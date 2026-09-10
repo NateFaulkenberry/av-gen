@@ -160,7 +160,18 @@
      "hueFieldScale": 48.0,
      "hueRandom": 0.03,
      "emissiveSparsity": 0.12,
-     "materialProgram": "canopyFireflies"
+     "materialProgram": "canopyFireflies",
+     "motion": {
+      "stiffness": 9.0,
+      "mass": 40.0,
+      "damping": 0.5,
+      "windSensitivity": 1.4,
+      "bendLimit": 0.12,
+      "tipAmplitude": 0.3,
+      "gustResponse": 0.8,
+      "bendCurve": 3.2,
+      "amplitudeVariance": 0.28
+     }
     },
     {
      "name": "pines",
@@ -199,7 +210,18 @@
      "hueFieldScale": 44.0,
      "hueRandom": 0.03,
      "emissiveSparsity": 0.16,
-     "materialProgram": "pineFireflies"
+     "materialProgram": "pineFireflies",
+     "motion": {
+      "stiffness": 12.0,
+      "mass": 55.0,
+      "damping": 0.55,
+      "windSensitivity": 1.2,
+      "bendLimit": 0.1,
+      "tipAmplitude": 0.26,
+      "gustResponse": 0.7,
+      "bendCurve": 3.5,
+      "amplitudeVariance": 0.25
+     }
     },
     {
      "name": "deadwood",
@@ -226,7 +248,18 @@
      ],
      "viewDistance": 440.0,
      "minScreenRadius": 1.0,
-     "castsShadow": true
+     "castsShadow": true,
+     "motion": {
+      "stiffness": 20.0,
+      "mass": 60.0,
+      "damping": 0.7,
+      "windSensitivity": 0.6,
+      "bendLimit": 0.06,
+      "tipAmplitude": 0.14,
+      "gustResponse": 0.5,
+      "bendCurve": 3.6,
+      "amplitudeVariance": 0.2
+     }
     },
     {
      "name": "bushes",
@@ -266,7 +299,18 @@
      "hueFieldScale": 40.0,
      "hueRandom": 0.04,
      "emissiveSparsity": 0.35,
-     "materialProgram": "bushGlow"
+     "materialProgram": "bushGlow",
+     "motion": {
+      "stiffness": 2.6,
+      "mass": 0.09,
+      "damping": 0.45,
+      "windSensitivity": 0.8,
+      "bendLimit": 0.3,
+      "tipAmplitude": 0.22,
+      "gustResponse": 0.9,
+      "bendCurve": 2.0,
+      "amplitudeVariance": 0.3
+     }
     },
     {
      "name": "ferns",
@@ -303,7 +347,18 @@
      "hueFieldScale": 42.0,
      "hueRandom": 0.02,
      "emissiveRandom": 0.55,
-     "materialProgram": "frondGlow"
+     "materialProgram": "frondGlow",
+     "motion": {
+      "stiffness": 1.1,
+      "mass": 0.007,
+      "damping": 0.35,
+      "windSensitivity": 0.95,
+      "bendLimit": 0.42,
+      "tipAmplitude": 0.17,
+      "gustResponse": 1.15,
+      "bendCurve": 1.7,
+      "amplitudeVariance": 0.38
+     }
     },
     {
      "name": "grass",
@@ -341,7 +396,18 @@
      "hueField": 0.08,
      "hueFieldScale": 50.0,
      "hueRandom": 0.03,
-     "emissiveSparsity": 0.5
+     "emissiveSparsity": 0.5,
+     "motion": {
+      "stiffness": 0.9,
+      "mass": 0.004,
+      "damping": 0.28,
+      "windSensitivity": 1.0,
+      "bendLimit": 0.5,
+      "tipAmplitude": 0.17,
+      "gustResponse": 1.3,
+      "bendCurve": 1.5,
+      "amplitudeVariance": 0.4
+     }
     },
     {
      "name": "flowers",
@@ -376,7 +442,18 @@
      "hueField": 0.17,
      "hueFieldScale": 30.0,
      "hueRandom": 0.03,
-     "emissiveRandom": 0.6
+     "emissiveRandom": 0.6,
+     "motion": {
+      "stiffness": 0.85,
+      "mass": 0.0038,
+      "damping": 0.3,
+      "windSensitivity": 0.9,
+      "bendLimit": 0.45,
+      "tipAmplitude": 0.15,
+      "gustResponse": 1.2,
+      "bendCurve": 2.2,
+      "amplitudeVariance": 0.45
+     }
     },
     {
      "name": "fungi",
@@ -412,7 +489,18 @@
      "hueField": 0.16,
      "hueFieldScale": 28.0,
      "hueRandom": 0.035,
-     "emissiveRandom": 0.65
+     "emissiveRandom": 0.65,
+     "motion": {
+      "stiffness": 3.0,
+      "mass": 0.9,
+      "damping": 0.8,
+      "windSensitivity": 0.5,
+      "bendLimit": 0.12,
+      "tipAmplitude": 0.1,
+      "gustResponse": 0.35,
+      "bendCurve": 2.6,
+      "amplitudeVariance": 0.25
+     }
     },
     {
      "name": "shelf-fungi",
@@ -447,7 +535,18 @@
      "hueField": 0.14,
      "hueFieldScale": 36.0,
      "hueRandom": 0.03,
-     "emissiveRandom": 0.55
+     "emissiveRandom": 0.55,
+     "motion": {
+      "stiffness": 4.5,
+      "mass": 1.6,
+      "damping": 0.9,
+      "windSensitivity": 0.35,
+      "bendLimit": 0.08,
+      "tipAmplitude": 0.07,
+      "gustResponse": 0.25,
+      "bendCurve": 2.8,
+      "amplitudeVariance": 0.2
+     }
     },
     {
      "name": "boulders",
@@ -542,7 +641,18 @@
      "hueField": 0.1,
      "hueFieldScale": 70.0,
      "hueRandom": 0.03,
-     "emissiveRandom": 0.35
+     "emissiveRandom": 0.35,
+     "motion": {
+      "stiffness": 2.2,
+      "mass": 0.5,
+      "damping": 0.6,
+      "windSensitivity": 0.6,
+      "bendLimit": 0.2,
+      "tipAmplitude": 0.14,
+      "gustResponse": 0.6,
+      "bendCurve": 2.2,
+      "amplitudeVariance": 0.3
+     }
     }
    ]
   },
@@ -609,5 +719,21 @@
   "../materials/pine-fireflies.material.json",
   "../materials/frond-glow.material.json",
   "../materials/bush-glow.material.json"
- ]
+ ],
+ "wind": {
+  "enabled": true,
+  "direction": 0.62,
+  "speed": 0.85,
+  "regionScale": 70.0,
+  "regionAmount": 0.5,
+  "regionDrift": 0.045,
+  "turbulence": 0.35,
+  "turbulenceScale": 13.0,
+  "turbulenceSpeed": 1.4,
+  "gustAmount": 0.9,
+  "gustScale": 38.0,
+  "gustSpeed": 7.5,
+  "gustSharpness": 3.0,
+  "flutterScale": 2.4
+ }
 }

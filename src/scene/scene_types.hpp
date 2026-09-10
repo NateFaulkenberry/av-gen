@@ -9,6 +9,8 @@
 // materials, punctual lights that shine down -Z, cameras that look down -Z.
 
 
+#include "core/wind.hpp"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -315,6 +317,10 @@ struct Environment {
     float volumeMaxDistance = 200.0f;
     std::string volumeDensityField;        // scalar field name ("" = none)
     std::string volumeColorField;          // colour field name ("" = fogColor)
+    // ADR-055: what the air is doing over this world. It sits on the environment because it is a
+    // property of the weather rather than of any one object, and because every consumer (vegetation
+    // now, particles and cloth later) has to agree about it or the world stops being one place.
+    wind::WindParams wind;
 };
 
 } // namespace avgen::scene

@@ -14,6 +14,7 @@
 #include <glm/gtc/matrix_inverse.hpp>
 
 #include <algorithm>
+#include <limits>
 #include <array>
 #include <bit>
 #include <chrono>
@@ -1193,6 +1194,36 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         }
         u.timeInfo = glm::vec4(static_cast<float>(time.renderTime), static_cast<float>(deformerCount),
                                1e-3f * mesh->radius, static_cast<float>(object.instances.size()));
+        // ---- ADR-055 Tier 0 vegetation motion ----
+        // The whole species model is resolved here, once per draw: two oscillator transfer
+        // functions and a phase lag become three gains and a delay, and the vertex stage does
+        // arithmetic. windSway.w gates it, and is uniform across the draw, so a boulder layer with
+        // no sensitivity costs exactly what it cost before this existed.
+        u.windSway = glm::vec4(0.0f);
+        u.windTiming = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
+        u.windPlant = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
+        if (scene.environment.wind.active() && object.motion.active()) {
+            const wind::MotionResponse r = wind::motionResponse(scene.environment.wind, object.motion);
+            // The height profile is measured in the space the deformer stack sees, which is after
+            // the source transform (the layer's "make this thing 0.45 m tall" scale), so the bounds
+            // have to travel through the same matrix.
+            const glm::mat4 srcMatrix = object.sourceTransform.matrix();
+            float lo = std::numeric_limits<float>::max();
+            float hi = std::numeric_limits<float>::lowest();
+            for (int corner = 0; corner < 8; ++corner) {
+                const glm::vec3 c((corner & 1) != 0 ? mesh->boundsMax.x : mesh->boundsMin.x,
+                                  (corner & 2) != 0 ? mesh->boundsMax.y : mesh->boundsMin.y,
+                                  (corner & 4) != 0 ? mesh->boundsMax.z : mesh->boundsMin.z);
+                const float y = (srcMatrix * glm::vec4(c, 1.0f)).y;
+                lo = std::min(lo, y);
+                hi = std::max(hi, y);
+            }
+            const float extent = std::max(hi - lo, 1e-4f);
+            u.windSway = glm::vec4(r.steadyGain, r.gustGain, r.flutterGain, 1.0f);
+            u.windTiming = glm::vec4(r.swayDelay, r.flutterOmega, r.bendCurve, r.bendLimit);
+            u.windPlant = glm::vec4(lo, 1.0f / extent, extent, r.amplitudeVariance);
+            ++stats_.windObjects;
+        }
         // Velocity needs the same chain evaluated at the previous frame's time (ADR-035).
         u.prevInfo = glm::vec4(static_cast<float>(time.renderTime - time.deltaTime), 0.0f, 0.0f, 0.0f);
         // Step 1 of the transform chain. It is a uniform rather than a baked mesh because
