@@ -108,6 +108,41 @@ The ecology's cost is 1281 instances of alpha-masked foliage rasterised five tim
 that move it are overdraw, the fragment cost of the foliage material, and how many instances the
 LOD ladder and the cascades ask for -- not how many draws carry them.
 
+## What the ecology actually costs, and why the obvious levers do nothing (2026-09-10)
+
+Five measurements, each repeatable to about 0.05 ms, all at a stable `_skyonly` calibration of
+2.6-2.9 ms. Together they rule out every explanation I started with.
+
+| what was varied | result |
+|---|---|
+| framebuffer 0.32 MP -> 5.18 MP (16x) | ecology 16.9 -> 19.4 ms. **Not fill-bound.** |
+| triangle budget, 15.7M -> 5.3M submitted (-66%) | 21.6 -> 23.4 ms, i.e. slightly *worse*. **Not vertex-throughput-bound.** |
+| drawn instances, records held fixed (`minScreenRadius` 2.5 -> 200) | 21.7 -> 5.7 ms. **Linear in instances drawn.** |
+| view distance x0.5 at fixed 720x450 | 21.6 -> 9.8 ms, consistent with the above |
+| shadows + AO + volumetrics + post all disabled | 21.7 -> 19.5 ms. Everything outside the lit pass is 2.2 ms. |
+
+So the cost is **per drawn instance**, and almost nothing else: not pixels, not triangles, not
+the passes around it. About 6 us per instance.
+
+Then the lever that should have followed from that made it worse. Pushing the LOD ladder so most
+instances draw as camera-facing billboards instead of meshes -- same 1281 instances drawn, split
+29/178/831/243 across levels instead of 338/746/191/6 -- cost **+11.6 ms** (21.0 -> 32.6).
+
+The hypothesis that fits all six results is tile binning. This is a tile-based deferred GPU:
+geometry is binned into tiles before any shading, and that work scales with primitives and with
+*how many tiles each primitive touches*, largely independently of framebuffer resolution and of
+shading. A billboard circumscribes the source's bounding sphere, so it covers far more tiles than
+the plant it replaces -- which is exactly the wrong trade here, and explains why fewer, larger
+primitives lost to more, smaller ones.
+
+Treat that as the leading explanation rather than a proven one: it is consistent with all five
+rows plus the billboard result, but it has not been confirmed against a GPU trace.
+
+**Consequences for optimisation.** The levers that work are the ones that reduce the number of
+instances submitted, or the tiles they touch. The levers that do not work, and are now measured
+not to: draw consolidation (all indirect draws together are 0.23 ms), triangle reduction,
+resolution reduction, and impostors as currently built.
+
 ## Measure a reference scene alongside, every time (2026-09-10)
 
 The machine drifts. Mid-session, `examples/world/_skyonly.scene.json` at 1280x720 went from
