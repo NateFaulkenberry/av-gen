@@ -134,13 +134,22 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
                 const glm::vec2 focus = world.composed.plan.focal.empty()
                                             ? glm::vec2(0.0f)
                                             : world.composed.plan.focal.front().center;
-                // Outside the composition looking in, and high enough to see over the near ground.
+                // *Inside* the world, low, looking across it at the focal subject. The first
+                // version stood outside the map and the map's own edge was in shot -- a straight
+                // cut across the frame that reads as a bug, because it is the boundary of the
+                // heightfield rather than anything in the world. A tenth of the extent back from
+                // the subject keeps the far edge beyond the fog and puts vegetation between the
+                // camera and its subject, which is where a foreground comes from.
                 const float span = std::max(world.recipe.extent, 1.0f);
-                const glm::vec3 eye(focus.x - span * 0.34f, span * 0.10f, focus.y + span * 0.40f);
+                const glm::vec2 toEdge = glm::length(focus) > 1e-3f ? glm::normalize(focus) : glm::vec2(0.0f, 1.0f);
+                const glm::vec2 eyeXZ = focus + toEdge * (span * 0.12f);
+                const glm::vec3 eye(eyeXZ.x, span * 0.035f, eyeXZ.y);
                 vec->setBase(eye);
                 if (auto* target = engine.params().find("camera/target")) {
                     if (auto* t = dynamic_cast<params::Parameter<glm::vec3>*>(target)) {
-                        t->setBase(glm::vec3(focus.x, span * 0.02f, focus.y));
+                        // Aim slightly above the subject so the horizon sits low and the sky is in
+                        // frame: a camera aimed at the ground has nothing to establish scale against.
+                        t->setBase(glm::vec3(focus.x, span * 0.045f, focus.y));
                     }
                 }
                 log::info("world '{}': camera framed on the focal region", world.recipe.world);
