@@ -42,6 +42,7 @@
 #include "pbr_shade.wgsl"
 #include "fields.wgsl"
 #include "spline.wgsl"
+#include "wind.wgsl"
 
 struct InstanceRecord {
     position: vec4<f32>,  // xyz, w = density
@@ -65,6 +66,13 @@ struct ProceduralUniforms {
     timeInfo: vec4<f32>,  // x = render time, y = deformer count, z = normal epsilon, w = instance count
     fieldInfo: vec4<f32>, // x = emissive field slot (-1 none), y = emissive field amount, z = point source or LOD billboard (1/0), w = indirection enabled (1/0)
     prevInfo: vec4<f32>,  // x = last frame's render time (ADR-035 velocity: deformation motion), yzw = 0
+    // ADR-055 Tier 0 vegetation motion. See wind.wgsl for the meaning of the three vectors; every
+    // number in them was resolved on the CPU by wind::motionResponse, so the vertex stage evaluates
+    // no transfer function. windSway.w is 0 for anything that does not sway (rock, water, a scene
+    // with no wind), and it is uniform across a draw.
+    windSway: vec4<f32>,
+    windTiming: vec4<f32>,
+    windPlant: vec4<f32>,
     // Step 1 of the chain: the source mesh's own placement, applied to the vertex before any
     // deformer runs. Mirrors ProceduralGeometry::instanceMatrix()'s trailing sourceTransform.
     sourceMatrix: mat4x4<f32>,
@@ -390,9 +398,25 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
 
     let eps = proc.timeInfo.z;
     let now = proc.timeInfo.x;
-    let p0 = deformChain(srcPos, n, nRef, inst, now, object.model);
-    let p1 = deformChain(srcPos + t1 * eps, n, nRef, inst, now, object.model);
-    let p2 = deformChain(srcPos + t2 * eps, n, nRef, inst, now, object.model);
+    var p0 = deformChain(srcPos, n, nRef, inst, now, object.model);
+    var p1 = deformChain(srcPos + t1 * eps, n, nRef, inst, now, object.model);
+    var p2 = deformChain(srcPos + t2 * eps, n, nRef, inst, now, object.model);
+
+    // ---- ADR-055 Tier 0 wind ----
+    // The field is sampled ONCE, at the instance's root, because a plant is small compared with
+    // every length scale in the field; what varies per vertex is the height profile, which is
+    // cheap. The same sample drives p0/p1/p2, so the finite-difference normal picks up the bend's
+    // rotation for free rather than needing three more field evaluations.
+    if (proc.windSway.w > 0.5) {
+        let root = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
+        let w = windSampleAt(root, now - proc.windTiming.x);
+        p0 = p0 + windDisplacement(srcPos.y, w, proc.windSway, proc.windTiming, proc.windPlant,
+                                   inst.scale.y, inst.random, now);
+        p1 = p1 + windDisplacement(srcPos.y + t1.y * eps, w, proc.windSway, proc.windTiming,
+                                   proc.windPlant, inst.scale.y, inst.random, now);
+        p2 = p2 + windDisplacement(srcPos.y + t2.y * eps, w, proc.windSway, proc.windTiming,
+                                   proc.windPlant, inst.scale.y, inst.random, now);
+    }
     var nw = cross(p1 - p0, p2 - p0);
     if (dot(nw, nw) < 1e-30) {
         nw = nRef;
@@ -408,7 +432,13 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     out.normal = nw;
     // Velocity covers camera, object, instance and deformation motion: the same chain evaluated
     // with last frame's time and last frame's object matrix (ADR-035).
-    let pPrev = deformChain(srcPos, n, nRef, inst, proc.prevInfo.x, object.prevModel);
+    var pPrev = deformChain(srcPos, n, nRef, inst, proc.prevInfo.x, object.prevModel);
+    if (proc.windSway.w > 0.5) {
+        let rootPrev = (object.prevModel * vec4<f32>(inst.position.xyz, 1.0)).xyz;
+        let wPrev = windSampleAt(rootPrev, proc.prevInfo.x - proc.windTiming.x);
+        pPrev = pPrev + windDisplacement(srcPos.y, wPrev, proc.windSway, proc.windTiming,
+                                         proc.windPlant, inst.scale.y, inst.random, proc.prevInfo.x);
+    }
     out.prevClip = frame.prevViewProj * vec4<f32>(pPrev, 1.0);
     return out;
 }

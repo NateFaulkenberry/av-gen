@@ -1,5 +1,7 @@
 #include "world/ecology.hpp"
 
+#include "core/wind.hpp"
+
 #include "core/color.hpp"
 #include "core/noise.hpp"
 #include "scene/struct_hash.hpp"
@@ -344,6 +346,12 @@ Result<Ecology> ecologyFromJson(const json& j) {
             }
             *f.target = *v;
         }
+        if (e.contains("motion")) {
+            if (!e.at("motion").is_object()) {
+                return fail("scatter '{}': 'motion' must be an object", l.name);
+            }
+            l.motion = wind::motionFromJson(e.at("motion"));
+        }
         if (e.contains("materialProgram")) {
             if (!e.at("materialProgram").is_string()) {
                 return fail("scatter '{}': 'materialProgram' must be a string", l.name);
@@ -427,6 +435,7 @@ json ecologyToJson(const Ecology& ecology) {
                            {"clustering", l.clustering},
                            {"minScreenRadius", l.minScreenRadius},
                            {"viewDistance", l.viewDistance},
+                           {"motion", wind::motionToJson(l.motion)},
                            {"tint", json::array({l.tint.x, l.tint.y, l.tint.z})},
                            {"emissiveColor", json::array({l.emissiveColor.x, l.emissiveColor.y, l.emissiveColor.z})},
                            {"emissiveIntensity", l.emissiveIntensity},

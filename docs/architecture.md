@@ -199,7 +199,7 @@ OSC/MIDI and macros reach fields, effectors and materials through the ordinary r
 scenes prefix field names and every reference to them (`<node>_<field>`), so a scene file is
 self-contained. CPU and GPU implement the same maths (`core/noise` ↔ `noise.wgsl`,
 `spatial::sample*` ↔ `fields.wgsl`, `applyEffectorsToRecords` ↔ `points.wgsl`,
-`GridField::step` ↔ `simulate.wgsl`) and the render tests compare them. Simulated grids and the
+`GridField::step` ↔ `simulate.wgsl`, `core/wind` ↔ `wind.wgsl`) and the render tests compare them. Simulated grids and the
 volumetric atmosphere (ADR-032) are documented in
 [volumetrics-and-simulation.md](volumetrics-and-simulation.md): the grid table is one storage
 buffer every `fields.wgsl` consumer binds at group 0 binding 15, the simulation steps it with a

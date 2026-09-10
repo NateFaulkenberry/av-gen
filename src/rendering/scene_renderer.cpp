@@ -1527,6 +1527,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                std::max(scene.environment.skyIntensity, 0.0f),
                                std::clamp(scene.environment.skyBloom, 0.0f, 1.0f));
     frame.fogParams = glm::vec4(scene.environment.fogColor, std::max(scene.environment.fogDensity, 0.0f));
+    // ADR-055: the wind, packed once per frame. Wavenumbers are pre-divided here so no vertex ever
+    // spends a divide on them, and the shadow views inherit the block verbatim.
+    frame.wind = wind::packWind(scene.environment.wind);
     // ---- lights, shadow views and the froxel grid (ADR-033/034) ----
     updateLights(encoder, scene, view, aspect, frame);
     frame.shadowParams = glm::vec4(static_cast<float>(shadows_->resolution()), 1.5f,

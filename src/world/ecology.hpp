@@ -14,6 +14,7 @@
 // function of the map, the layer and its seed: the same world always grows the same forest.
 
 #include "core/error.hpp"
+#include "core/wind.hpp"
 
 #include <glm/glm.hpp>
 #include "spatial/point_cloud.hpp"
@@ -98,6 +99,12 @@ struct ScatterLayer {
     // pebbles cast shadows smaller than a shadow-map texel at the sizes they are drawn, so the cost
     // is real and the result is not on screen.
     bool castsShadow = true;
+
+    // How this species answers the wind (ADR-055). It is per-layer because "soft and responsive"
+    // versus "stiff and slow" is what separates grass from a mushroom, and one global setting
+    // cannot say both. Deliberately absent from `structuralHash`: motion is a per-frame uniform,
+    // so retuning how a fern moves does not replant the forest.
+    wind::VegetationMotion motion;
 
     std::uint32_t seed = 1;
     int maxInstances = 60000;             // a hard ceiling per layer, whatever the density says

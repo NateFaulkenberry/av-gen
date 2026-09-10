@@ -278,6 +278,9 @@ private:
     params::Parameter<float>* volumeDensity_ = nullptr;
     params::Parameter<float>* fogHeight_ = nullptr;
     params::Parameter<float>* fogHeightFalloff_ = nullptr;
+    // ADR-055: the two wind controls worth touching live. The rest of the field is authored.
+    params::Parameter<float>* windSpeed_ = nullptr;
+    params::Parameter<float>* windDirection_ = nullptr;
     params::Parameter<float>* volumeScattering_ = nullptr;
     params::Parameter<float>* volumeAbsorption_ = nullptr;
     params::Parameter<float>* volumeAnisotropy_ = nullptr;
@@ -292,6 +295,7 @@ private:
     params::Parameter<glm::vec3>* fogColor_ = nullptr;
     float fogDensitySetting_ = 0.0f;
     scene::Environment volumeSetting_; // the scene-file values behind the scene/volume* parameters
+    wind::WindParams windSetting_;     // the scene-file values behind the scene/wind* parameters
     std::string volumeDensityFieldSetting_;
     std::string volumeColorFieldSetting_;
     glm::vec3 fogColorSetting_{0.012f, 0.012f, 0.02f};

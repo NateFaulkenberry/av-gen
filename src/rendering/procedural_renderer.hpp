@@ -62,6 +62,7 @@ struct ProceduralStats {
     std::uint64_t logicalTriangles = 0; // sourceTriangles * instances
     std::uint64_t instanceBufferBytes = 0;
     std::uint32_t deformers = 0;        // enabled deformers over drawn objects
+    std::uint32_t windObjects = 0;      // ADR-055: drawn objects whose vertex stage sways this frame
     double cpuUpdateMs = 0.0;           // rebuild + upload time this frame
     std::uint32_t uploads = 0;          // instance buffer uploads this frame
     std::uint32_t drawCalls = 0;        // draws issued: one per object, or one per populated LOD level
@@ -163,6 +164,14 @@ struct ProceduralUniforms {
     glm::vec4 timeInfo;      // x = render time, y = deformer count, z = epsilon for normals, w = instance count
     glm::vec4 fieldInfo;     // x = emissive field slot (-1 none), y = emissive field amount, z = point source (1/0), w = 0
     glm::vec4 prevInfo;      // x = last frame's render time (ADR-035 velocity: deformation motion), yzw = 0
+    // ADR-055 Tier 0 vegetation motion: the species response, resolved on the CPU by
+    // wind::motionResponse so the vertex stage evaluates no physics at all. windSway.w gates the
+    // whole path, and is uniform across a draw, so a boulder pays nothing.
+    glm::vec4 windSway;      // x = steady gain, y = gust gain, z = flutter gain, w = 1 when it sways
+    glm::vec4 windTiming;    // x = sway delay (s), y = flutter omega (rad/s), z = bend curve exponent,
+                             // w = bend limit (fraction of the plant's height)
+    glm::vec4 windPlant;     // x = base y (post-source object space), y = 1 / extent y, z = extent y,
+                             // w = per-instance amplitude variance
     // Step 1 of the transform chain (procedural.hpp): the source mesh's own placement, applied
     // before the deformer stack so it matches ProceduralGeometry::instanceMatrix() on the CPU.
     // It lives in the uniform rather than baked into the mesh because source/position|rotation|scale
@@ -171,7 +180,7 @@ struct ProceduralUniforms {
     glm::mat4 sourceNormalMatrix; // inverse transpose of sourceMatrix
     DeformerUniform deformers[scene::kMaxDeformers];
 };
-static_assert(sizeof(ProceduralUniforms) == 48 + 128 + 64 * scene::kMaxDeformers);
+static_assert(sizeof(ProceduralUniforms) == 48 + 48 + 128 + 64 * scene::kMaxDeformers);
 
 // The effector pass parameters (shaders/points.wgsl `PointsParams`, 528 bytes).
 struct EffectorPassUniforms {
