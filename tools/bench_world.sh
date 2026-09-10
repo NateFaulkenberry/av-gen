@@ -1,7 +1,13 @@
 #!/bin/sh
 # The deterministic world benchmark. Same scene, same camera, same seed, same frame count; only the
-# one variable under test changes. Wall clock per frame is the headline because it is the number
-# that cannot be wrong about itself; the pass timers beside it say where it went.
+# one variable under test changes.
+#
+# WARNING (ADR-051): the ms/frame column here is the whole process divided by the frame count, so it
+# contains the scene build. That is fine for variants that load the same scene and differ in what
+# they render; it is badly wrong for variants that load different amounts of ecology, because
+# eleven scatter layers take two seconds longer to load than none and this charges all of it to the
+# frames. That is where "1.5 ms per scatter layer" came from, and it was not a frame cost at all.
+# Use tools/bench_ab.sh, which reads the per-frame median avgen reports for itself.
 #
 #   tools/bench_world.sh [resolution] [frames] [variant ...]
 set -e

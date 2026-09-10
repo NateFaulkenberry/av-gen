@@ -12,3 +12,6 @@ cmake-build-*/
 /assets/nature/
 /assets/terrain/
 /assets/quaternius/
+
+# Generated benchmark scene variants (tools/bench_ab.sh); derived from examples/world/terrain.scene.json
+/examples/world/_bench/

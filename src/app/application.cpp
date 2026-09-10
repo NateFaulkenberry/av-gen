@@ -28,6 +28,7 @@
 #include <SDL3/SDL.h>
 #include <imgui.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <thread>
@@ -1289,7 +1290,16 @@ int Application::runHeadless() {
     }
     FrameTime time{};
     std::uint64_t lastHash = 0;
+    // Per-frame wall clock, reported as a median at the end. The benchmark used to be the whole
+    // process under /usr/bin/time divided by the frame count, which charges the scene build to
+    // the frames: eleven scatter layers take two seconds longer to load than none, and over a
+    // hundred frames that is twenty milliseconds a frame of glTF decode masquerading as draw
+    // cost. A median also ignores the handful of frames a concurrent build steals, which an
+    // average cannot.
+    std::vector<double> frameMs;
+    frameMs.reserve(static_cast<std::size_t>(frames));
     for (int i = 0; i < frames; ++i) {
+        const auto frameStart = std::chrono::steady_clock::now();
         time = engine_->tick(clock);
         engine_->update(time);
         // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
@@ -1326,6 +1336,8 @@ int Application::runHeadless() {
             lastHash = gpu::hashImage(*image);
             log::debug("offline frame {:4d} hash={:016x}", i, lastHash);
         }
+        frameMs.push_back(
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameStart).count());
         if (i % 30 == 0 || i == frames - 1) {
             const auto& f = engine_->latestFrame();
             // The headline parameters differ per scene kind; a missing one reads as 0.
@@ -1360,6 +1372,18 @@ int Application::runHeadless() {
             }
             log::info("captured frame {} to {}", i, options_.capture->string());
         }
+    }
+    // The first frames build pipelines, meshes and shadow maps, and the empty-LOD suppression has
+    // not settled; they are not what a steady frame costs. Drop them when there are enough left.
+    const std::size_t warmup = frameMs.size() > 24 ? 12 : 0;
+    if (frameMs.size() > warmup) {
+        std::vector<double> steady(frameMs.begin() + static_cast<std::ptrdiff_t>(warmup), frameMs.end());
+        std::sort(steady.begin(), steady.end());
+        const auto at = [&](double q) {
+            return steady[std::min(steady.size() - 1, static_cast<std::size_t>(q * (steady.size() - 1)))];
+        };
+        log::info("frame wall clock over {} steady frames: median {:.2f} ms  p10 {:.2f}  p90 {:.2f}  min {:.2f}",
+                  steady.size(), at(0.5), at(0.1), at(0.9), steady.front());
     }
     log::info("headless run complete: {} frames at {} fps; GPU errors: {}", frames, options_.offlineFps,
               context_->errorCount());

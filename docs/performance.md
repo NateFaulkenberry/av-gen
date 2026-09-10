@@ -111,6 +111,13 @@ probe; the before/after pair here was measured back to back on the same binary c
 - Memory: `AnalysisTrack` ≈ 0.8 MB per second of audio; whole-file decode ≈ 0.4 MB per second
   of stereo 48 kHz.
 
+> **Superseded from "Where a world frame goes" onwards by "The benchmark was measuring the scene
+> build" at the end of this file (ADR-051).** Every per-frame number below was the whole process
+> under `/usr/bin/time` divided by the frame count, which charges the scene build to the frames.
+> Differences between variants that load the *same* scene (shadows on/off, volumetrics on/off,
+> op counts) are unaffected and still stand. Differences between variants that load *different*
+> amounts of ecology -- above all the 1.5 ms per scatter layer -- are mostly load time.
+
 ## How much of a difference is a difference
 
 Six identical runs of the benchmark -- same scene, same 100 frames, same 2880x1800 -- came out at
@@ -168,8 +175,9 @@ layers:
 | 3 scatter layers | 75.0 | |
 | 6 scatter layers | 80.5 | ~1.6 ms per layer |
 
-The per-layer slope survives the correction: ecology still costs about 1.6 ms per scatter object per
-frame and is roughly resolution-independent (18 ms at 720p, 21 ms at 5 Mpixels), which is what a
+The per-layer slope survives *this* correction, but not the next one (see the last section of this
+file): it is the scene build, not the frame. As measured here ecology looks like about 1.6 ms per
+scatter object per frame, roughly resolution-independent (18 ms at 720p, 21 ms at 5 Mpixels), which is what a
 submission-bound cost looks like. What did not survive is the claim that the *frame* is not
 fragment-bound. It is: two thirds of it scales with pixels.
 
@@ -228,7 +236,8 @@ what they draw**:
 | 6 | 35.1 |
 | 11 | 39.8 |
 
-About **1.5 ms per procedural object per frame**, fixed. Things that did *not* change it:
+About **1.5 ms per procedural object per frame**, fixed -- or so this said. It is scene-build time;
+see the last section. Things that did *not* change it:
 
 - **Resolution.** Flat from 720x450 to 2880x1800. The frame is not fragment-bound.
 - **Triangles.** Switching on the LOD ladder (it defaults to one level, so every surviving instance
@@ -364,3 +373,99 @@ which is a quality-tier decision, not a culling one.
 The change is kept because it is *correct* -- a chunk half a kilometre away has no business in a
 cascade covering forty metres -- and because the counters it added are what made the negative result
 legible. 95 pixels of 921,600 differ, all at the far shadow boundary.
+
+
+## The benchmark was measuring the scene build (2026-09-09, ADR-051)
+
+**The 1.5 ms per scatter layer was not a frame cost.** `tools/bench_world.sh` timed the whole
+process and divided by the frame count. Eleven scatter layers take about two seconds longer to load
+than none -- eleven glTF decodes, eleven scatter placements, eleven sets of LOD meshes -- and over a
+100-frame run that is 20 ms a frame of one-time work charged to the frames.
+
+| scatter layers | process load, s | old ms/frame (process / frames) | actual ms/frame |
+|---|---|---|---|
+| 0 | 0.79 | 54.1 | 43.7 |
+| 1 | 1.08 | 61.2 | 52.2 |
+| 3 | 1.80 | 68.2 | 54.1 |
+| 6 | 2.29 | 73.2 | 51.4 |
+| 11 | 2.78 | 79.4 | 52.7 |
+
+Least squares over 1, 3, 6 and 11 layers: the old slope is **1.73 ms per layer**, the real one is
+**-0.03**. Zero. The predicted phantom is 1.99 s of extra load over ten layers, over 100 frames:
+2.0 ms per layer, which is the whole of it.
+
+It survived scrutiny because it behaved exactly like a submission cost. It did not move with
+resolution, triangle count, instances drawn or chunk count -- because it happens before any of them.
+**A cost that is invariant to everything about the work may not be a cost of the work at all; it may
+not be in the frame.**
+
+### The instrument
+
+`avgen --headless` now times each frame and reports `median / p10 / p90 / min` over the run after a
+twelve-frame warm-up. The median matters as much as the per-frame timing: a typical run's p90 is
+twice its median, because a concurrent build steals whole frames outright, and an average of a
+hundred frames is an average of that theft. `tools/bench_ab.sh` interleaves configurations round by
+round and takes the median over rounds.
+
+**The noise floor is now about ±0.3 ms, not ±1.5.** Repeat runs of one binary land within 0.3 ms of
+each other (48.44, 48.53, 48.61, 48.61, 48.62, 48.64, 48.72, 50.86). The earlier ±1.5 ms was mostly
+the instrument, not the machine.
+
+One trap it does not remove: **shaders are read from the working tree at run time**, so a stashed
+baseline binary run today runs today's shaders. Pairing an old binary with a new `cull.wgsl` here
+produced a frame missing two thirds of its ground cover, which is indistinguishable from a real
+rendering bug and was chased as one for half an hour. `bench_ab.sh` takes `binary@shaderdir`; pin
+both sides of every comparison.
+
+### Where the ecology actually goes
+
+At 2880x1800, 11 layers, ~37,000 instances of which ~900 survive culling, by disabling one stage at
+a time in the same binary (so the scene build is identical on both sides):
+
+| | ms/frame | |
+|---|---|---|
+| procedural renderer entirely inert | 43.4 | = a world with no ecology at all (43.7) |
+| every state change recorded, no draws | 44.0 | recording state: **0.6 ms** |
+| normal | 51.7 | the draws: **7.7 ms** |
+| normal, cheapest LOD mesh at every level | 45.6 | of which geometry: **6.1 ms** |
+
+So the ecology costs about 8 ms, not the 26 the old table said, and it is **geometry, not
+submission**. Setting the pipeline, the bind groups and the vertex and index buffers 72 times a
+frame -- five passes' worth -- costs six tenths of a millisecond.
+
+### One shared indirect buffer
+
+The exception, and the only part that scaled with the number of layers, was the indirect buffers
+themselves: one per object. Replacing every `DrawIndexedIndirect` with a direct `DrawIndexed` of a
+CPU-supplied count saved 1.4 ms; keeping the indirect draws but pointing all 72 at a single buffer
+saved 1.56 ms. Once there is one buffer an indirect draw costs what a direct one costs, so the
+overhead was per buffer, not per draw.
+
+They are now slots in one 20 KB buffer, indexed by the slot each object already uses for its cull
+stats.
+
+| | before | after |
+|---|---|---|
+| indirect buffers per frame | 11 | **1** |
+| indirect draws | 72 | 72 (unchanged) |
+| 11 layers at 2880x1800 | 55.48 ms | **54.02 ms** |
+| 1 layer | 52.32 | 52.64 (nothing, correctly) |
+| slope, 1 -> 11 layers | 0.32 ms/layer | **0.14 ms/layer** |
+
+Medians of six interleaved rounds each, every round within 0.5 ms of its median. The saving at
+eleven layers reproduced in three separate sessions -- **-1.24, -1.27 and -1.46 ms** -- whose
+absolute levels differed by 6 ms, which is what a machine that drifts and a delta that does not
+look like. **Visual impact: none** -- 0 of 921,600 pixels differ.
+
+At one layer it saves nothing, because there was one buffer either way. That is the mechanism
+confirming itself, and it is the reason to believe the 1.3 ms at eleven.
+
+### What this says about the rest of P1
+
+The spec's remaining directions -- a shared instance buffer with a per-instance `speciesId`, merging
+LOD levels into one draw, texture arrays so a material family shares a pipeline -- all trade
+submissions for vertex work, because a single indexed draw cannot vary its index count per instance
+and the meshes must be padded to a common size (1,400 triangles against a mean of 445) or drawn
+through vertex pulling. Submissions here are worth about a millisecond in total; geometry is worth
+six. **There is no per-layer submission cost left to remove.** The lever on the remaining 6 ms is
+the LOD ladder and the mesh budgets.

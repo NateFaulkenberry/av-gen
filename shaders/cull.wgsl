@@ -62,6 +62,7 @@ struct CullParams {
 
 const kCulled: u32 = 0xFFFFFFFFu;
 const kStatsStride: u32 = 8u; // per object: [0..3] per-level counts, [4] records, [5] used marker
+const kMaxLodLevels: u32 = 4u; // scene::kMaxLodLevels: indirect-arg slots per object
 
 // vec4 components by dynamic index without indexing a uniform vector.
 fn thresholdAt(k: u32) -> f32 {
@@ -240,7 +241,9 @@ fn cs_cull_top(@builtin(local_invocation_id) lid: vec3<u32>, @builtin(workgroup_
     }
     if (tid == 0u) {
         let count = min(carry, cullParams.counts.x);
-        let a = level * 5u; // drawIndexedIndirect: indexCount, instanceCount, firstIndex, baseVertex, firstInstance
+        // One indirect buffer holds every object's args, kMaxLodLevels slots of five u32 each,
+        // indexed by the object's slot (flags.z, the same slot it writes its stats to).
+        let a = (cullParams.flags.z * kMaxLodLevels + level) * 5u; // indexCount, instanceCount, firstIndex, baseVertex, firstInstance
         indirectArgs[a + 0u] = indexCountAt(level);
         indirectArgs[a + 1u] = count;
         indirectArgs[a + 2u] = 0u;

@@ -37,6 +37,7 @@ constexpr std::uint32_t kCullStatsStride = 8;       // u32 per object slot in th
 // steady state is clean.
 constexpr std::uint32_t kEmptyLevelFrames = 3;
 constexpr std::uint32_t kIndirectStride = 20;       // drawIndexedIndirect args: five u32
+static_assert(scene::kMaxLodLevels == 4, "shaders/cull.wgsl hardcodes kMaxLodLevels to stride the shared indirect buffer");
 // Per-level slot in the object's deformer/time buffer. Uniform bind-group offsets must be a
 // multiple of 256, so the 672-byte ProceduralUniforms is padded out to 768.
 constexpr std::uint32_t kDeformerSlotStride = ((sizeof(ProceduralUniforms) + 255) / 256) * 256;
@@ -217,7 +218,6 @@ struct ProceduralRenderer::Impl {
         wgpu::Buffer lodIndex;                  // per record: level, or 0xFFFFFFFF when culled
         wgpu::Buffer blockSums;                 // kMaxLodLevels x scan blocks
         wgpu::Buffer visible;                   // kMaxLodLevels slices of visibleStride elements
-        wgpu::Buffer indirect;                  // kMaxLodLevels x drawIndexedIndirect args
         wgpu::BindGroup cullGroup;              // cull pass over the base records
         wgpu::BindGroup cullGroupLive;          // cull pass over the live records
         std::uint32_t cullCapacity = 0;         // records the cull buffers are sized for
@@ -323,6 +323,13 @@ struct ProceduralRenderer::Impl {
     wgpu::Buffer gridTable; // the simulated-grid table fields.wgsl binds at group 0 binding 15
     wgpu::Buffer emptyVisible;      // inert placeholder at group 1 binding 5 for uncalled objects
     wgpu::Buffer cullStats;         // kMaxProceduralObjects slots of kCullStatsStride u32
+    // Every object's drawIndexedIndirect args, kMaxLodLevels to a slot, indexed by the object's
+    // stats slot. One buffer rather than one per object, because the cost measured per *buffer* and
+    // not per draw (ADR-051): eleven layers issuing 72 indirect draws against eleven buffers cost
+    // 1.2 ms more than the same 72 against one, and one layer -- one buffer either way -- costs the
+    // same both ways. Whatever the backend does per distinct indirect buffer, it does it in every
+    // pass that reads one, and this frame has five.
+    wgpu::Buffer indirectArgs;
     std::unique_ptr<gpu::GpuTimer> effectorTimer;
     std::unique_ptr<gpu::GpuTimer> cullTimer;
     std::vector<std::uint8_t> staging;
@@ -522,6 +529,12 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
         desc.size = static_cast<std::uint64_t>(kMaxProceduralObjects) * kCullStatsStride * sizeof(std::uint32_t);
         im.cullStats = device.CreateBuffer(&desc);
+        wgpu::BufferDescriptor idesc{};
+        idesc.label = "procedural-cull-indirect";
+        idesc.usage = wgpu::BufferUsage::Indirect | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst |
+                      wgpu::BufferUsage::CopySrc;
+        idesc.size = static_cast<std::uint64_t>(kMaxProceduralObjects) * scene::kMaxLodLevels * kIndirectStride;
+        im.indirectArgs = device.CreateBuffer(&idesc);
         for (Impl::StatsSlot& slot : im.statsSlots) {
             wgpu::BufferDescriptor readDesc{};
             readDesc.label = "procedural-cull-stats-read";
@@ -907,8 +920,8 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
         entries[4].buffer = state.visible;
         entries[4].size = state.visible.GetSize();
         entries[5].binding = 5;
-        entries[5].buffer = state.indirect;
-        entries[5].size = state.indirect.GetSize();
+        entries[5].buffer = indirectArgs;
+        entries[5].size = indirectArgs.GetSize();
         entries[6].binding = 6;
         entries[6].buffer = cullStats;
         entries[6].size = cullStats.GetSize();
@@ -948,12 +961,6 @@ bool ProceduralRenderer::Impl::ensureCullBuffers(ObjectState& state, std::uint32
         desc.label = "procedural-visible";
         desc.size = static_cast<std::uint64_t>(stride) * lodCount * sizeof(std::uint32_t);
         state.visible = device.CreateBuffer(&desc);
-        wgpu::BufferDescriptor idesc{};
-        idesc.label = "procedural-cull-indirect";
-        idesc.usage = wgpu::BufferUsage::Indirect | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst |
-                      wgpu::BufferUsage::CopySrc;
-        idesc.size = static_cast<std::uint64_t>(scene::kMaxLodLevels) * kIndirectStride;
-        state.indirect = device.CreateBuffer(&idesc);
         state.cullCapacity = count;
         state.cullLodCount = lodCount;
         state.visibleStride = stride;
@@ -1455,7 +1462,9 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             pass.SetBindGroup(2, materialBindGroup(material));
             pass.SetVertexBuffer(0, mesh->vertices);
             pass.SetIndexBuffer(mesh->indices, wgpu::IndexFormat::Uint32);
-            pass.DrawIndexedIndirect(item.state->indirect, static_cast<std::uint64_t>(level) * kIndirectStride);
+            const std::uint64_t argsOffset =
+                (static_cast<std::uint64_t>(item.state->statsSlot) * scene::kMaxLodLevels + level) * kIndirectStride;
+            pass.DrawIndexedIndirect(im.indirectArgs, argsOffset);
             ++stats_.indirectDraws; // every pass, because every pass pays for it
             const std::size_t base = static_cast<std::size_t>(item.state->statsSlot) * kCullStatsStride;
             if (base + kCullStatsStride <= im.statsSnapshot.size() && im.statsSnapshot[base + 5] != 0 &&
@@ -1508,6 +1517,28 @@ Result<CullCounts> ProceduralRenderer::readCullCounts(const std::string& name) {
     }
     counts.culled = counts.records > counts.visible ? counts.records - counts.visible : 0;
     return counts;
+}
+
+Result<std::array<std::uint32_t, 5>> ProceduralRenderer::readIndirectArgs(const std::string& name, int level) {
+    Impl& im = *impl_;
+    const auto it = im.objects.find(name);
+    if (it == im.objects.end() || !it->second.visible) {
+        return fail("procedural object '{}' has no cull state", name);
+    }
+    const Impl::ObjectState& state = it->second;
+    if (level < 0 || static_cast<std::uint32_t>(level) >= state.cullLodCount) {
+        return fail("procedural object '{}' has no LOD level {}", name, level);
+    }
+    const std::uint64_t offset =
+        (static_cast<std::uint64_t>(state.statsSlot) * scene::kMaxLodLevels + static_cast<std::uint64_t>(level)) *
+        kIndirectStride;
+    auto data = gpu::readBuffer(im.context, im.indirectArgs, offset, kIndirectStride);
+    if (!data) {
+        return std::unexpected(data.error());
+    }
+    std::array<std::uint32_t, 5> args{};
+    std::memcpy(args.data(), data->data(), sizeof(args));
+    return args;
 }
 
 Result<std::vector<std::uint32_t>> ProceduralRenderer::readVisibleIndices(const std::string& name, int level) {

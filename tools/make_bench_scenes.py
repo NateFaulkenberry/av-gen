@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Writes the deterministic benchmark variants into examples/world/_bench.
 
+Run this before tools/bench_ab.sh; the variants are derived rather than committed, because a
+benchmark comparing against a stale copy of the world is measuring the copy.
+
 Each variant is the shipped world with exactly one thing changed, so a wall-clock difference between
 two of them is attributable to that thing. The scenes live one directory deeper than the one they
 were copied from, so every relative asset path is rewritten -- getting that wrong silently produces
@@ -46,7 +49,10 @@ def main():
     write('base_nobloom', lambda d: (strip(d), d.setdefault('post', {}).update(bloomEnabled=False)))
     write('base_bare', lambda d: (strip(d), d['environment'].update(volumeDensity=0.0),
                                   d.setdefault('post', {}).update(bloomEnabled=False)))
-    for n in (1, 3, 6):
+    # The layer-count ladder the per-layer slope is measured on. n0 and n11 are the ends of it and
+    # duplicate noeco and full, but a sweep reads better when every point is named the same way, and
+    # bench_ab.sh takes scene names.
+    for n in (0, 1, 3, 6, 11):
         write('n%d' % n, lambda d, n=n: d['nodes'][0].__setitem__('scatter', d['nodes'][0]['scatter'][:n]))
     print('wrote', len(os.listdir(OUT)), 'variants to', OUT)
 

@@ -17,7 +17,9 @@
 // frustum/distance/screen-size limits, picks a LOD level and compacts the survivors per level with
 // the same stable prefix-sum scan the particles use; the draw is then one drawIndexedIndirect per
 // level, reading its instance through the level's visible list (group 1 binding 5) and using that
-// level's mesh. Objects with the defaults (cull off, lodCount 1) keep the direct draw and every
+// level's mesh. Every object's indirect args live in one shared buffer, kMaxLodLevels slots each,
+// addressed by the object's stats slot (ADR-051): a draw against one of eleven separate buffers
+// measured about a tenth of a millisecond more per buffer than the same draw against a shared one. Objects with the defaults (cull off, lodCount 1) keep the direct draw and every
 // buffer byte-identical.
 //
 // Splines (ADR-026): the SplineBuffers storage buffer (rendering/spline_buffers.hpp) is bound to
@@ -239,6 +241,12 @@ public:
     [[nodiscard]] Result<CullCounts> readCullCounts(const std::string& name);
     // Blocking readback of the compacted visible list of one LOD level (ascending record indices).
     [[nodiscard]] Result<std::vector<std::uint32_t>> readVisibleIndices(const std::string& name, int level);
+    // Blocking readback of the drawIndexedIndirect args the draw will read for one LOD level:
+    // {indexCount, instanceCount, firstIndex, baseVertex, firstInstance}. The bytes the draw
+    // addresses, not the counts the cull pass believes it wrote -- since every object's args now
+    // share one buffer, those are two different claims and only the first one draws anything.
+    // Tests and tools only.
+    [[nodiscard]] Result<std::array<std::uint32_t, 5>> readIndirectArgs(const std::string& name, int level);
 
 private:
     void drawImpl(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
