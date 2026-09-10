@@ -142,16 +142,16 @@
      "minScreenRadius": 1.0,
      "castsShadow": true,
      "emissiveColor": [
-      0.06,
       1.0,
-      0.72
+      1.0,
+      1.0
      ],
-     "emissiveIntensity": 34.0,
+     "emissiveIntensity": 48.0,
      "emissiveRandom": 0.55,
-     "hueField": 0.2,
+     "hueField": 0.0,
      "hueFieldScale": 48.0,
      "hueRandom": 0.03,
-     "emissiveSparsity": 0.15,
+     "emissiveSparsity": 0.12,
      "materialProgram": "canopyFireflies"
     },
     {
@@ -181,16 +181,16 @@
      "minScreenRadius": 1.0,
      "castsShadow": true,
      "emissiveColor": [
-      0.1,
-      0.62,
+      1.0,
+      1.0,
       1.0
      ],
-     "emissiveIntensity": 30.0,
+     "emissiveIntensity": 42.0,
      "emissiveRandom": 0.55,
-     "hueField": 0.18,
+     "hueField": 0.0,
      "hueFieldScale": 44.0,
      "hueRandom": 0.03,
-     "emissiveSparsity": 0.2,
+     "emissiveSparsity": 0.16,
      "materialProgram": "pineFireflies"
     },
     {
@@ -254,7 +254,7 @@
      ],
      "emissiveIntensity": 4.0,
      "emissiveRandom": 0.6,
-     "hueField": 0.16,
+     "hueField": 0.1,
      "hueFieldScale": 40.0,
      "hueRandom": 0.04,
      "emissiveSparsity": 0.55
@@ -286,14 +286,15 @@
       1.0,
       0.58
      ],
-     "emissiveIntensity": 1.8,
+     "emissiveIntensity": 1.9,
      "viewDistance": 260.0,
      "minScreenRadius": 5.5,
      "castsShadow": false,
-     "hueField": 0.16,
+     "hueField": 0.085,
      "hueFieldScale": 42.0,
      "hueRandom": 0.02,
-     "emissiveRandom": 0.55
+     "emissiveRandom": 0.55,
+     "materialProgram": "frondGlow"
     },
     {
      "name": "grass",
@@ -328,7 +329,7 @@
      ],
      "emissiveIntensity": 1.4,
      "emissiveRandom": 0.7,
-     "hueField": 0.14,
+     "hueField": 0.08,
      "hueFieldScale": 50.0,
      "hueRandom": 0.03,
      "emissiveSparsity": 0.5
@@ -498,6 +499,52 @@
      "castsShadow": false
     }
    ]
+  },
+  {
+   "name": "spores",
+   "kind": "particles",
+   "particles": {
+    "capacity": 10240,
+    "spawnRate": 300,
+    "shape": "box",
+    "position": [
+     4.0,
+     1.0,
+     -42.0
+    ],
+    "extent": [
+     110.0,
+     16.0,
+     110.0
+    ],
+    "lifetimeMin": 14.0,
+    "lifetimeMax": 30.0,
+    "speedMin": 0.01,
+    "speedMax": 0.14,
+    "spread": 1.0,
+    "gravity": [
+     0.02,
+     0.012,
+     0.0
+    ],
+    "sizeStart": 0.075,
+    "sizeEnd": 0.0,
+    "blend": "additive",
+    "emissive": 9.0,
+    "colorStart": [
+     1.0,
+     1.0,
+     1.0,
+     0.55
+    ],
+    "colorEnd": [
+     1.0,
+     1.0,
+     1.0,
+     0.0
+    ]
+   },
+   "visible": true
   }
  ],
  "post": {
@@ -513,6 +560,7 @@
  },
  "materialPrograms": [
   "../materials/canopy-fireflies.material.json",
-  "../materials/pine-fireflies.material.json"
+  "../materials/pine-fireflies.material.json",
+  "../materials/frond-glow.material.json"
  ]
 }

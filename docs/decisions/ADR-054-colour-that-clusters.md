@@ -75,6 +75,24 @@ the bark material carries a normal map and the leaf material does not.
 The real fix is a draw per sub-material, which the procedural path cannot express: one source
 mesh, one material. Area is the right heuristic until it can.
 
+**Airborne life and organic emission.** Two more pieces of the same idea. Drifting spores are an
+ordinary particle system, which already reduces its emissive particles to one aggregate sphere for
+the volume march (ADR-040), so the air they fill is lit by them without any new machinery. And the
+dense frond layer gets a material program of its own: emission broken up by a noise in the mesh's
+own space and pushed toward the tips by the leaf's uv, so a frond has internal structure instead
+of reading as one flat sticker of colour.
+
+That last one interacts with ADR-052 in a way worth recording. A uniformly lit frond at about
+1.9x scene white sits exactly in the band where the tone curve desaturates hardest and where
+chroma retention deliberately does not act, which is why the layer looked pale however its hue was
+authored. Breaking the emission up carries the bright pools above that band while the mean stays
+put, so the plant keeps its colour without the layer becoming a wall of light.
+
+Both are easy to overdo. The first frond pass multiplied a noise ramp by a tip ramp and peaked
+near 7x, which blew the tips to cream; and a regional hue swing wide enough to be obvious on
+fungi (0.16 turns) reaches amber on a green-teal plant, which reads as autumn rather than as
+something alive. The swings are per layer for that reason.
+
 ## Consequences
 
 The background participates: trees carrying points of light in their canopies across a dark

@@ -1,5 +1,5 @@
 {
- "name": "pineFireflies",
+ "name": "frondGlow",
  "ops": [
   {
    "kind": "input",
@@ -24,27 +24,33 @@
    "srcB": 5
   },
   {
-   "kind": "voronoi",
+   "kind": "noise",
    "dst": 1,
    "srcA": 6,
-   "value": 2.4,
-   "seed": 137
+   "value": 5.5,
+   "seed": 211
   },
   {
-   "kind": "smoothstep",
+   "kind": "remap",
    "dst": 1,
    "srcA": 1,
+   "value": 1,
    "constant": [
-    0.32,
-    0.03,
     0.0,
-    0.0
+    1.0,
+    0.3,
+    1.42
    ]
+  },
+  {
+   "kind": "input",
+   "dst": 7,
+   "input": "uv"
   },
   {
    "kind": "swizzle",
    "dst": 7,
-   "srcA": 0,
+   "srcA": 7,
    "constant": [
     1,
     1,
@@ -53,14 +59,15 @@
    ]
   },
   {
-   "kind": "smoothstep",
+   "kind": "remap",
    "dst": 7,
    "srcA": 7,
+   "value": 1,
    "constant": [
-    1.2,
-    2.6,
     0.0,
-    0.0
+    1.0,
+    0.78,
+    1.24
    ]
   },
   {
@@ -71,39 +78,6 @@
   },
   {
    "kind": "input",
-   "dst": 6,
-   "input": "cameraDistance"
-  },
-  {
-   "kind": "smoothstep",
-   "dst": 6,
-   "srcA": 6,
-   "constant": [
-    150.0,
-    340.0,
-    0.0,
-    0.0
-   ]
-  },
-  {
-   "kind": "constant",
-   "dst": 5,
-   "constant": [
-    0.045,
-    0.045,
-    0.045,
-    0.045
-   ]
-  },
-  {
-   "kind": "mixBy",
-   "dst": 1,
-   "srcA": 1,
-   "srcB": 5,
-   "srcC": 6
-  },
-  {
-   "kind": "input",
    "dst": 2,
    "input": "instanceEmissive"
   },
@@ -111,9 +85,9 @@
    "kind": "constant",
    "dst": 3,
    "constant": [
+    0.02,
     1.0,
-    1.0,
-    1.0,
+    0.58,
     1.0
    ]
   },
