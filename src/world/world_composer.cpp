@@ -123,34 +123,52 @@ std::vector<BiomeDensity> biomesFor(assets::AssetCategory c, float density) {
 // So the tier is chosen from tags and band, and what it produces is a multiplier -- never an
 // absolute intensity, which would let a manifest overrule the recipe.
 struct EmissionTier {
-    float intensity;    // multiplies the asset's own emissive weight
+    float intensity;    // absolute, from the profile's ladder
     float sparsity;     // fraction of specimens that stay dark
     int paletteRole;    // 0 shadow, 1 secondary, 2 primary, 3 foliage, 4 accent
 };
 
-EmissionTier emissionTierFor(const assets::AssetDescriptor& asset, DepthBand band) {
+// Which rung of the profile's ladder a species stands on. The rung values are the art direction's;
+// this only decides *which* rung, from what the library says the species is.
+//
+// The intensities used to be multipliers invented here, which meant the hierarchy was the
+// composer's opinion and a profile could not change its shape. Reading them off a ladder is what
+// lets Glowmere's 200:1 spread and a bleached fen's 60:1 spread both be expressible, and it is why
+// the gap between `noticeable` and `special` is validated on the profile rather than hoped for
+// here.
+EmissionTier emissionTierFor(const assets::AssetDescriptor& asset, DepthBand band,
+                             const EmissionLadder& ladder) {
     // Rare accents first: they are defined by being rare, so they must not be reachable by any
     // other rule. Almost none of them are lit, and the ones that are are the brightest thing in
     // the world by a wide margin.
     if (asset.hasTag("rare") || asset.hasTag("accent")) {
-        return {7.5f, 0.88f, 4};
+        return {ladder.brightest, 0.88f, 4};
+    }
+    if (asset.hasTag("beacon")) {
+        return {ladder.beacon, 0.82f, 2};
     }
     if (asset.hasTag("special")) {
-        return {2.4f, 0.55f, 1};
+        return {ladder.special, 0.55f, 1};
     }
     if (asset.category == assets::AssetCategory::Fungi) {
-        return {1.7f, 0.45f, 2};
+        return {ladder.rare, 0.45f, 2};
+    }
+    // Rock and anything else inert stays inert. Several layers emitting exactly nothing is part of
+    // the hierarchy rather than an oversight -- it is what the bright things are bright against.
+    if (asset.category == assets::AssetCategory::Rock ||
+        asset.category == assets::AssetCategory::Crystal) {
+        return {ladder.inert, 1.0f, 0};
     }
     switch (band) {
     case DepthBand::Background:
         // Silhouettes. A ridge line that glows is a ridge line that stops being a ridge line.
-        return {0.22f, 0.80f, 2};
+        return {ladder.silhouette, 0.80f, 2};
     case DepthBand::Midground:
-        return {0.55f, 0.65f, 3};
+        return {ladder.noticeable, 0.65f, 3};
     case DepthBand::Foreground:
-        return {0.40f, 0.72f, 3};
+        return {ladder.groundCover, 0.72f, 3};
     }
-    return {0.5f, 0.6f, 3};
+    return {ladder.groundCover, 0.6f, 3};
 }
 
 glm::vec3 roleColor(const PaletteRoles& roles, int role) {
@@ -185,53 +203,56 @@ float shadowPullFor(DepthBand band) {
     return 0.3f;
 }
 
-EnvironmentPlan planEnvironment(const WorldRecipe& recipe, const PaletteRoles& roles) {
+// The atmosphere the profile describes, then bent by the recipe's weights.
+//
+// The two do different jobs and both are needed. The profile knows what this *kind* of world's air
+// looks like -- a colour, a scattering character, whether the mist has a direction. The recipe knows
+// how much of it this particular world wants. Deriving everything from the weights alone is what
+// produced a valley in a glass of milk; taking the profile verbatim would make `atmosphere.fog` a
+// dead control.
+EnvironmentPlan planEnvironment(const WorldRecipe& recipe, const PaletteRoles& roles,
+                                const ArtDirectionProfile& profile) {
     const AtmosphereWeights& air = recipe.atmosphere;
     const LightingWeights& light = recipe.lighting;
+    const AtmosphereProfile& a = profile.atmosphere;
     EnvironmentPlan env;
 
-    // The sky is the shadow colour, three ways: nearly black overhead, lifted at the horizon by a
-    // trace of the world's own light, and darker still on the ground half. A single flat colour is
-    // what the first generated world had, and a flat sky gives a silhouette nothing to sit against.
-    env.skyZenith = roles.shadow * 0.30f;
-    env.skyHorizon = glm::mix(roles.shadow, roles.primary, 0.10f + 0.10f * light.bioluminescence) * 0.85f;
-    env.skyGround = roles.shadow * 0.12f;
-    env.skyIntensity = glm::mix(0.06f, 0.42f, light.key);
-
-    // The key is a moon: cool, small, weak, and present only to put an edge on form. Its colour
-    // leans on the secondary rather than being white, so it belongs to the palette too.
-    env.sunColor = glm::mix(glm::vec3(0.72f, 0.80f, 1.0f), roles.secondary, 0.30f);
-    env.sunIntensity = glm::mix(0.25f, 3.6f, light.key);
+    // Character from the profile; quantity from the recipe. A weight of 0.5 means "as the profile
+    // intends"; the ends of the range are half and double that.
+    const auto scaled = [](float base, float weight) {
+        return base * glm::mix(0.35f, 2.0f, glm::clamp(weight, 0.0f, 1.0f));
+    };
+    env.fogColor = a.fogColor;
+    env.fogDensity = scaled(a.fogDensity, air.fog);
+    env.fogHeight = a.fogHeight;
+    env.fogHeightFalloff = a.fogHeightFalloff;
+    env.skyZenith = a.skyZenith;
+    env.skyHorizon = a.skyHorizon;
+    env.skyGround = a.skyGround;
+    env.haze = glm::mix(a.skyHaze * 0.5f, a.skyHaze * 1.6f, air.depthHaze);
+    env.volumeDensity = scaled(a.volumeDensity, light.volumetric);
+    env.volumeScattering = a.volumeScattering;
+    env.volumeAbsorption = a.volumeAbsorption;
+    env.volumeAnisotropy = a.volumeAnisotropy;
+    env.volumeNoise = glm::mix(a.volumeNoise * 0.4f, a.volumeNoise * 1.8f, air.spores);
+    env.volumeNoiseScale = a.volumeNoiseScale;
+    env.volumeNoiseSpeed = 0.02f + 0.05f * air.spores;
+    env.styledSkyAmbient = a.styledSkyAmbient;
+    env.styledGroundAmbient = a.styledGroundAmbient;
+    env.volumeEmission = glm::mix(0.0f, 0.22f, light.bioluminescence * air.spores);
+    // The rig, as the profile states it, scaled by how much key the recipe wants. The ratio between
+    // key and ambient is the profile's and is not something a weight may quietly flatten.
+    env.skyIntensity = glm::mix(profile.lighting.ambientIntensity * 0.3f,
+                                profile.lighting.ambientIntensity * 1.4f, light.key);
+    env.sunColor = profile.lighting.keyColor;
+    env.sunIntensity = glm::mix(profile.lighting.keyIntensity * 0.25f,
+                                profile.lighting.keyIntensity * 1.5f, light.key);
+    env.keyLight = glm::mix(0.35f, 1.25f, light.key);
     env.sunSize = 0.022f;
     env.sunGlow = 0.55f;
-    env.haze = glm::mix(0.12f, 0.7f, air.depthHaze);
-    env.keyLight = glm::mix(0.12f, 0.75f, light.key);
-
-    // Fog carries the palette, because fog is the colour of distance and distance is most of the
-    // frame. It is mixed toward the primary light rather than being pure shadow: air in a world
-    // that lights itself is full of that light. Kept dark, though -- the first pass mixed 40% of
-    // the way to cyan at full brightness and the result was a valley in a glass of milk.
-    env.fogColor = glm::mix(roles.shadow, roles.primary, 0.08f + 0.14f * light.bioluminescence) * 0.6f;
-    // Densities are per metre and the world is hundreds of metres across, so this range is much
-    // narrower than it looks: 0.010 already leaves 13% of a ridge at two hundred metres. The first
-    // pass topped out at 0.055, which is total fog by fifty metres.
-    env.fogDensity = glm::mix(0.0008f, 0.0105f, air.fog);
-    // Ground-hugging, and scaled to the world: fog that reaches the top of a forty-metre landmark
-    // hides the landmark. The falloff is in inverse metres, so a bigger world needs a slacker one.
-    const float span = std::max(recipe.extent, 1.0f);
-    env.fogHeight = span * 0.008f;
-    env.fogHeightFalloff = glm::mix(0.14f, 0.045f, air.fog) * (400.0f / span);
-
-    env.volumeDensity = glm::mix(0.0005f, 0.0085f, light.volumetric);
-    env.volumeScattering = glm::mix(0.3f, 0.95f, light.volumetric);
-    env.volumeAbsorption = glm::mix(0.02f, 0.16f, air.fog);
-    env.volumeAnisotropy = 0.55f;   // forward-scattering, so the moon has a direction
-    env.volumeEmission = glm::mix(0.0f, 0.22f, light.bioluminescence * air.spores);
-    env.volumeNoise = glm::mix(0.2f, 1.1f, air.spores);
-    env.volumeNoiseScale = span * 0.12f;
-    env.volumeNoiseSpeed = 0.02f + 0.05f * air.spores;
     return env;
 }
+
 } // namespace
 
 BiomeSet composerBiomes() {
@@ -320,8 +341,15 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
     }
 
     ComposedWorld out;
-    const PaletteRoles roles = paletteRoles(recipe.art);
-    out.environment = planEnvironment(recipe, roles);
+    // The art direction, resolved once. An unknown profile name is an error rather than a silent
+    // fallback to whichever profile happens to be first.
+    auto profile = resolveArtDirection(recipe.art);
+    if (!profile) {
+        return fail("world '{}': {}", recipe.world, profile.error().message);
+    }
+    out.profile = *profile;
+    const PaletteRoles roles = profile->palette;
+    out.environment = planEnvironment(recipe, roles, *profile);
 
     // ---- the focal subject -------------------------------------------------------------------
     // One thing the shot is about. Chosen as the most important asset the library offers, which is
@@ -503,10 +531,22 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
         // not the asset's -- a library authored in reds does not get to decide that a world lit in
         // cyan has red lights in it.
         if (asset.material.emissive > 0.0f && recipe.lighting.bioluminescence > 0.0f) {
-            const EmissionTier tier = emissionTierFor(asset, band);
-            layer.emissiveColor = roleColor(roles, tier.paletteRole);
-            layer.emissiveIntensity =
-                asset.material.emissive * tier.intensity * recipe.lighting.bioluminescence * 2.6f;
+            const EmissionTier tier = emissionTierFor(asset, band, profile->emission);
+            // The accent is reserved. A world in which several species wear the hero's colour is a
+            // world with no hero colour, and it is the cheapest of all the art-direction rules to
+            // lose by accident -- so a scatter layer may only reach the accent role when the
+            // profile has released it.
+            int role = tier.paletteRole;
+            if (role == 4 && profile->reserveAccent) {
+                role = 2;
+            }
+            layer.emissiveColor = roleColor(roles, role);
+            // Absolute, from the ladder, scaled by how much of this world's light comes from the
+            // world itself and by how strongly the species emits at all. The asset's weight can
+            // dim a rung but never promote a species past one.
+            layer.emissiveIntensity = tier.intensity *
+                                      std::clamp(asset.material.emissive, 0.0f, 1.0f) *
+                                      recipe.lighting.bioluminescence;
             layer.emissiveSparsity = std::clamp(tier.sparsity, 0.0f, 0.95f);
             // The hue of a glowing population drifts across the map and over time rather than
             // being one colour repeated, which is what keeps a field of lights reading as biology.

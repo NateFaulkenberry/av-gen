@@ -22,6 +22,7 @@
 #include "core/error.hpp"
 #include "world/biome.hpp"
 #include "world/ecology.hpp"
+#include "world/art_direction.hpp"
 #include "world/world_recipe.hpp"
 
 #include <glm/glm.hpp>
@@ -119,10 +120,17 @@ struct EnvironmentPlan {
     float volumeNoise = 0.6f;
     float volumeNoiseScale = 40.0f;
     float volumeNoiseSpeed = 0.03f;
+    glm::vec3 styledSkyAmbient{0.10f, 0.16f, 0.21f};
+    glm::vec3 styledGroundAmbient{0.008f, 0.011f, 0.024f};
 };
 
 struct ComposedWorld {
     std::vector<ScatterLayer> layers;
+    // The art direction this world was composed under, resolved from the recipe's profile and its
+    // own overrides. Kept so a caller can apply the parts that are not layers -- post-processing
+    // restraint, the light rig's ratio, the painterly surface mode -- without resolving it again
+    // and risking a different answer.
+    ArtDirectionProfile profile;
     // The plan's void regions and corridor as the ecology's own type, so negative space is a thing
     // the placer applies rather than a thing the plan describes.
     std::vector<ScatterClearance> clearances;

@@ -75,6 +75,10 @@ struct LightingWeights {
 // name the same colour without agreeing on its exact value.
 struct ArtDirection {
     std::string name;
+    // A named art-direction profile (ADR-070): "glowmere", "emberwaste", "palefen". Empty means the
+    // recipe supplies its own look. A profile is a starting point rather than a cage -- anything the
+    // recipe states explicitly wins over what the profile provides.
+    std::string profile;
     std::vector<std::string> palette;
     float contrast = 1.0f;
     float saturation = 1.0f;

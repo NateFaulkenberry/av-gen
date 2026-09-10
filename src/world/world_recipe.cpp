@@ -179,6 +179,9 @@ Result<WorldRecipe> WorldRecipe::fromJson(const json& j) {
         if (a.contains("name") && a.at("name").is_string()) {
             r.art.name = a.at("name").get<std::string>();
         }
+        if (a.contains("profile") && a.at("profile").is_string()) {
+            r.art.profile = a.at("profile").get<std::string>();
+        }
         if (a.contains("palette")) {
             if (!a.at("palette").is_array()) {
                 return fail("art.palette must be an array of colour names");
@@ -261,6 +264,9 @@ json WorldRecipe::toJson() const {
     json a = json::object();
     if (!art.name.empty()) {
         a["name"] = art.name;
+    }
+    if (!art.profile.empty()) {
+        a["profile"] = art.profile;
     }
     if (!art.palette.empty()) {
         a["palette"] = art.palette;

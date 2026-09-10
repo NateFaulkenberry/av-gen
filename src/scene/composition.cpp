@@ -1487,6 +1487,23 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         fogDesc.isColor = true;
         fogColor_ = &params.add(fogDesc);
     }
+    {
+        // The painterly hemisphere (ADR-058). These were copied from the scene file rather than
+        // registered, on the grounds that nothing animates them. That was true and is no longer
+        // sufficient: they are the two values that decide how dark a stylized world is, so a
+        // generated world's art direction has to be able to set them, and anything an art direction
+        // sets should be as editable, saveable and routable as everything else it sets. The
+        // defaults are the same values the scene struct carries, so a scene that says nothing is
+        // unchanged.
+        auto skyDesc = vec3Desc(prefix_ + "scene/styledSkyAmbient", volumeSetting_.styledSkyAmbient,
+                                0.0f, 4.0f, 0.0f, 1.0f);
+        skyDesc.isColor = true;
+        styledSkyAmbient_ = &params.add(skyDesc);
+        auto groundDesc = vec3Desc(prefix_ + "scene/styledGroundAmbient",
+                                   volumeSetting_.styledGroundAmbient, 0.0f, 4.0f, 0.0f, 1.0f);
+        groundDesc.isColor = true;
+        styledGroundAmbient_ = &params.add(groundDesc);
+    }
     gridIntensity_ = &params.add(floatDesc(prefix_ + "scene/gridIntensity", 0.6f, 0.0f, 4.0f, 0.0f, 2.0f));
     rootScale_ = &params.add(floatDesc(prefix_ + "root/scale", 1.0f, 0.05f, 8.0f, 0.2f, 3.0f));
     // Nested compositions do not spin on their own by default; the enclosing root does.
@@ -1699,6 +1716,8 @@ void Composition::detach() {
     brightness_ = nullptr;
     fogDensity_ = nullptr;
     fogColor_ = nullptr;
+    styledSkyAmbient_ = nullptr;
+    styledGroundAmbient_ = nullptr;
     volumeDensity_ = nullptr;
     fogHeight_ = nullptr;
     fogHeightFalloff_ = nullptr;
@@ -2902,8 +2921,10 @@ void Composition::applyParameters() {
         // ADR-058: the distance fog's share of the mist layer and the styled hemisphere travel with
         // the rest of the atmosphere; nothing about them is animated, so they are copied, not picked.
         env.fogHeightAmount = volumeSetting_.fogHeightAmount;
-        env.styledSkyAmbient = volumeSetting_.styledSkyAmbient;
-        env.styledGroundAmbient = volumeSetting_.styledGroundAmbient;
+        env.styledSkyAmbient =
+            styledSkyAmbient_ != nullptr ? styledSkyAmbient_->value() : volumeSetting_.styledSkyAmbient;
+        env.styledGroundAmbient = styledGroundAmbient_ != nullptr ? styledGroundAmbient_->value()
+                                                                  : volumeSetting_.styledGroundAmbient;
         env.styledAmbientFloor = volumeSetting_.styledAmbientFloor;
         env.wind = windSetting_;
         env.wind.speed = windSpeed_ != nullptr ? windSpeed_->value() : windSetting_.speed;
@@ -3233,7 +3254,25 @@ Result<void> Composition::setLightRig(const std::filesystem::path& path) {
     if (!rig) {
         return std::unexpected(rig.error());
     }
-    lightRig_ = std::move(*rig);
+    return installLightRig(std::move(*rig), path);
+}
+
+Result<void> Composition::installLightRig(LightRig rig, const std::filesystem::path& sourcePath) {
+    if (auto ok = rig.validate(); !ok) {
+        return std::unexpected(ok.error());
+    }
+    // Same teardown as the path overload, because installing a rig built in memory has to leave the
+    // parameter set in the same state as installing one read from a file. Registering over the top
+    // of the previous rig's parameters is how a scene ends up with two "lightrig/.../keyIntensity"
+    // entries, one of which nothing reads.
+    if (params_ != nullptr && !lightRigParams_.all.empty()) {
+        unregisterLightRigParameters(*params_, lightRigParams_);
+        lightRigParams_ = {};
+    }
+    lightRigPath_ = sourcePath;
+    lightRig_ = std::move(rig);
+    rigLightCount_ = 0;
+    dirty_ = true;
     if (params_ != nullptr) {
         lightRigParams_ = registerLightRigParameters(*params_, *lightRig_, prefix_);
     }
@@ -3283,6 +3322,12 @@ nlohmann::json Composition::toJson() const {
     }
     if (!lightRigPath_.empty()) {
         environment["lightRig"] = lightRigPath_.generic_string();
+    } else if (lightRig_) {
+        // A rig built in memory has no file to point at, so it is written out in full. Without this
+        // a generated world's rig survives exactly as long as the process: an offline render saves
+        // the project and reloads it in a fresh engine, and the world came back lit by the default
+        // key with the art direction's key-to-ambient ratio silently gone.
+        environment["lightRig"] = lightRig_->toJson();
     }
     environment["intensity"] = envIntensity_ != nullptr ? envIntensity_->base() : envIntensitySetting_;
     environment["rotation"] = envRotation_ != nullptr ? envRotation_->base() : envRotationSetting_;
@@ -3609,13 +3654,22 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
     // A rig is a scene-level idea, so it is accepted at the top level as well as inside
     // `environment`; the environment block wins when both name one.
     if (j.contains("lightRig")) {
-        auto topRig = readString(j, "lightRig", "");
-        if (!topRig) {
-            return std::unexpected(topRig.error());
-        }
-        if (!topRig->empty()) {
-            if (auto r = comp->setLightRig(*topRig); !r) {
+        if (j.at("lightRig").is_object()) {
+            auto inline_ = LightRig::fromJson(j.at("lightRig"));
+            if (!inline_) {
+                log::warn("composition '{}': light rig: {}", comp->name_, inline_.error().message);
+            } else if (auto r = comp->installLightRig(std::move(*inline_)); !r) {
                 log::warn("composition '{}': light rig: {}", comp->name_, r.error().message);
+            }
+        } else {
+            auto topRig = readString(j, "lightRig", "");
+            if (!topRig) {
+                return std::unexpected(topRig.error());
+            }
+            if (!topRig->empty()) {
+                if (auto r = comp->setLightRig(*topRig); !r) {
+                    log::warn("composition '{}': light rig: {}", comp->name_, r.error().message);
+                }
             }
         }
     }
@@ -3642,14 +3696,26 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(map.error());
         }
         comp->environmentPath_ = *map;
-        auto lightRig = readString(e, "lightRig", "");
-        if (!lightRig) {
-            return std::unexpected(lightRig.error());
-        }
-        if (!lightRig->empty()) {
-            // A missing or malformed rig is a warning: the world still loads, lit by its default key.
-            if (auto r = comp->setLightRig(*lightRig); !r) {
+        // Either a path to a rig file or the rig itself. Generated worlds write the latter, because
+        // their rig comes from an art-direction profile rather than from a file somebody authored.
+        if (e.contains("lightRig") && e.at("lightRig").is_object()) {
+            auto inline_ = LightRig::fromJson(e.at("lightRig"));
+            if (!inline_) {
+                log::warn("composition '{}': light rig: {}", comp->name_, inline_.error().message);
+            } else if (auto r = comp->installLightRig(std::move(*inline_)); !r) {
                 log::warn("composition '{}': light rig: {}", comp->name_, r.error().message);
+            }
+        } else {
+            auto lightRig = readString(e, "lightRig", "");
+            if (!lightRig) {
+                return std::unexpected(lightRig.error());
+            }
+            if (!lightRig->empty()) {
+                // A missing or malformed rig is a warning: the world still loads, lit by its
+                // default key.
+                if (auto r = comp->setLightRig(*lightRig); !r) {
+                    log::warn("composition '{}': light rig: {}", comp->name_, r.error().message);
+                }
             }
         }
         auto intensity = readFloat(e, "intensity", comp->envIntensitySetting_);

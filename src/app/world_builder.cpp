@@ -77,6 +77,29 @@ void setBool(Engine& engine, const std::string& path, bool value) {
     }
 }
 
+// The half of an art direction that is not the air: the painterly surface mode, and the
+// post-processing restraint that decides whether the emission ladder's top rungs read as luminous
+// or as smeared. Bloom belongs to the art direction for exactly that reason -- a threshold of 1.0
+// with an intensity of 0.18 is what makes a glow selective, and the same ladder under a threshold
+// of 0.2 is a fog of light with no hierarchy left in it.
+void applyArtDirection(Engine& engine, const world::ArtDirectionProfile& profile) {
+    setBool(engine, "scene/stylized", profile.stylized);
+    const world::PostProfile& post = profile.post;
+    setBool(engine, "post/bloom/enabled", post.bloomEnabled);
+    setFloat(engine, "post/bloom/intensity", post.bloomIntensity);
+    setFloat(engine, "post/bloom/threshold", post.bloomThreshold);
+    setFloat(engine, "post/bloom/knee", post.bloomKnee);
+    setFloat(engine, "post/bloom/radius", post.bloomRadius);
+    setFloat(engine, "post/bloom/emissionWeight", post.bloomEmissionWeight);
+    setFloat(engine, "post/tonemap/chroma-retention", post.chromaRetention);
+    setFloat(engine, "post/output/antialias", post.antialias);
+    if (auto* p = engine.params().find("post/tonemap/operator")) {
+        if (auto* i = dynamic_cast<params::Parameter<int>*>(p)) {
+            i->setBase(post.tonemap);
+        }
+    }
+}
+
 void applyEnvironment(Engine& engine, const world::EnvironmentPlan& env) {
     setBool(engine, "env/sky/enabled", true);
     setBool(engine, "env/sky/background", true);
@@ -102,6 +125,8 @@ void applyEnvironment(Engine& engine, const world::EnvironmentPlan& env) {
     setFloat(engine, "scene/volumeNoise", env.volumeNoise);
     setFloat(engine, "scene/volumeNoiseScale", env.volumeNoiseScale);
     setFloat(engine, "scene/volumeNoiseSpeed", env.volumeNoiseSpeed);
+    setVec3(engine, "scene/styledSkyAmbient", env.styledSkyAmbient);
+    setVec3(engine, "scene/styledGroundAmbient", env.styledGroundAmbient);
 }
 } // namespace
 
@@ -138,6 +163,12 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
         existing->ecology.clearances = world.composed.clearances;
     } else {
         auto node = defaultTerrainFor(world.recipe);
+        // Faint luminous mottling on the ground itself, which is an art-direction decision rather
+        // than a terrain one -- it is the difference between ground and ground that is alive.
+        node.terrain.groundMottle = true;
+        node.terrain.groundGlow = world.composed.profile.groundGlow;
+        node.terrain.groundGlowColor = world.composed.profile.groundGlowColor;
+        node.terrain.groundGlowCoverage = world.composed.profile.groundGlowCoverage;
         node.ecology.layers = world.composed.layers;
         node.ecology.clearances = world.composed.clearances;
         auto added = engine.addNode(std::move(node));
@@ -179,6 +210,12 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
     // The atmosphere. Composed from the same recipe as the ecology and applied here because it is
     // the only half of a world that lives in parameters rather than in nodes.
     applyEnvironment(engine, world.composed.environment);
+    applyArtDirection(engine, world.composed.profile);
+    // The rig. Without one, a generated world is lit by whatever the scene defaults to, and the
+    // profile's key-to-ambient ratio -- which is what makes a night a night -- has nowhere to go.
+    if (auto rig = composition->installLightRig(world::rigFor(world.composed.profile)); !rig) {
+        log::warn("world '{}': light rig: {}", world.recipe.world, rig.error().message);
+    }
 
     // ---- the landmark --------------------------------------------------------------------------
     // One enormous object that reads as a landmark. The focal region marks where the composition

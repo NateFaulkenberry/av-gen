@@ -33,10 +33,17 @@
  },
  "art": {
   "name": "bioluminescent_cinematic",
-  "palette": ["deep_indigo", "violet", "cyan", "emerald", "warm_amber"],
+  "palette": [
+   "deep_indigo",
+   "violet",
+   "cyan",
+   "emerald",
+   "warm_amber"
+  ],
   "contrast": 1.12,
   "saturation": 1.06,
   "organicMotion": 0.85,
-  "chaos": 0.18
+  "chaos": 0.18,
+  "profile": "glowmere"
  }
 }

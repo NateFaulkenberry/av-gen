@@ -228,6 +228,12 @@ public:
     // so `followCamera` rig lights track the camera. An empty path clears the rig and restores the
     // default key light. A rig that fails to load is a warning, not an error.
     Result<void> setLightRig(const std::filesystem::path& path);
+    // Installs a rig built in memory. Named apart from setLightRig so `setLightRig({})` keeps
+    // meaning "clear the rig" rather than becoming ambiguous. A generated world's art direction describes a rig -- a key
+    // that rakes over an ambient that stays out of its way -- and writing that to a temporary file
+    // so the path overload could read it back would be a file nobody asked for. `sourcePath` is
+    // what the scene will remember it as, and may be empty for a rig that has no file.
+    Result<void> installLightRig(LightRig rig, const std::filesystem::path& sourcePath = {});
     [[nodiscard]] const std::filesystem::path& lightRigPath() const { return lightRigPath_; }
     [[nodiscard]] const LightRig* lightRig() const { return lightRig_ ? &*lightRig_ : nullptr; }
     [[nodiscard]] const std::filesystem::path& sourcePath() const { return sourcePath_; }
@@ -327,6 +333,8 @@ private:
     params::Parameter<float>* volumeNoiseScale_ = nullptr;
     params::Parameter<float>* volumeNoiseSpeed_ = nullptr;
     params::Parameter<float>* volumeEmission_ = nullptr;
+    params::Parameter<glm::vec3>* styledSkyAmbient_ = nullptr;
+    params::Parameter<glm::vec3>* styledGroundAmbient_ = nullptr;
     params::Parameter<int>* volumeSteps_ = nullptr;
     params::Parameter<float>* keyLight_ = nullptr;   // multiplier on the default key light
     bool addedKeyLight_ = false;
