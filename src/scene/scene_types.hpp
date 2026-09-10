@@ -173,6 +173,11 @@ struct Entity {
     Material material;
     MeshStyle style = MeshStyle::Lit;
     bool visible = true;
+    // Whether the shadow passes draw this entity. Separate from `visible` because the camera's
+    // visibility is the wrong question for a shadow map: a chunk of ground half a kilometre away is
+    // on screen and casts nothing anyone can see, and one behind the camera is off screen and may
+    // cast across the whole frame. Terrain sets this per chunk from its own shadow distance.
+    bool castsShadow = true;
 };
 
 // ---- lights ---------------------------------------------------------------------------------

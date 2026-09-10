@@ -310,3 +310,30 @@ single item after ecology.
 
 `volumeMs` continues to report ~44 ms for a pass whose removal saves 4.7. Read it as a stall
 indicator, not as volumetric cost.
+
+## P4/P5: the shadow cost is not the casters (2026-09-09)
+
+**CHANGE.** `Entity::castsShadow` and `ProceduralGeometry::castsShadow`, a `shadowDistance` on the
+terrain, and a `castsShadow` on each scatter layer. The shadow passes skip what does not cast.
+
+**WHY.** Shadows measured 15.6 ms of an 81.5 ms frame at 2880x1800, and 9.2 ms of that was the
+*terrain*, not the ecology. The cascades are fitted from the scene's radius, so on a 640 m world
+they reach past a kilometre and every chunk the camera can see is a caster in every cascade,
+including cascade 0, which covers forty metres.
+
+**RESULT.** Terrain shadow entity draws fell from **255 to 72** -- a 72% cut in casters. Frame time
+fell by **1.1 ms**, A/B'd twice at 120 frames (76.2/75.1 against 76.7/76.8). Ground cover opting out
+of casting bought about another 1 ms.
+
+**So the shadow cost is not the number of casters.** Removing seven casters in ten bought seven per
+cent of the shadow cost. Whatever the other 13 ms is, it is in the passes themselves -- their setup,
+their depth targets, the fixed cost of three cascades -- and not in the geometry submitted to them.
+
+That is a result about the spec's P4 more than about this change: **per-cascade culling is unlikely
+to repay its complexity.** It is a more precise way of doing the thing that has just been shown to
+be worth about a millisecond. The lever that is left is the number and resolution of the cascades,
+which is a quality-tier decision, not a culling one.
+
+The change is kept because it is *correct* -- a chunk half a kilometre away has no business in a
+cascade covering forty metres -- and because the counters it added are what made the negative result
+legible. 95 pixels of 921,600 differ, all at the far shadow boundary.

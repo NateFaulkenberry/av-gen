@@ -41,6 +41,7 @@ struct ShadowStats {
     std::uint32_t spots = 0;
     std::uint32_t resolution = 0; // one square map
     double shadowMs = -1.0;       // GPU time of the depth passes (-1 = unavailable)
+    std::uint32_t entityDraws = 0; // entity draws recorded across every cascade this frame
 };
 
 class ShadowRenderer {

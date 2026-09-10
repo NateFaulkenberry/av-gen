@@ -60,6 +60,9 @@ Result<void> TerrainSettings::validate() const {
     if (!(viewDistance > 0.0f)) {
         return fail("terrain: viewDistance must be positive");
     }
+    if (shadowDistance < 0.0f) {
+        return fail("terrain: shadowDistance must be >= 0 (0 = the view distance)");
+    }
     if (skirtDepth < 0.0f || skirtDepth > 10000.0f) {
         return fail("terrain: skirtDepth must be in [0, 10000]");
     }

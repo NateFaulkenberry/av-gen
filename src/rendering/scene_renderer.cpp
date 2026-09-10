@@ -1688,12 +1688,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         rp.SetBindGroup(3, iblBindGroup_);
         rp.SetPipeline(depthOnlyPipeline_);
         for (const auto& item : opaque) {
+            if (!item.entity->castsShadow) {
+                continue;
+            }
             const GpuMesh& mesh = meshes_[item.entity->mesh];
             rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
             rp.SetBindGroup(2, materialBindGroup(item.entity->material));
             rp.SetVertexBuffer(0, mesh.vertices);
             rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
             rp.DrawIndexed(mesh.indexCount);
+            ++stats_.shadows.entityDraws;
         }
         sdfs_->drawMeshes(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
                           &depthOnlyPipeline_);

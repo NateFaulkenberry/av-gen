@@ -54,6 +54,12 @@ struct TerrainSettings {
     int lodLevels = 4;          // 1..kMaxTerrainLods
     float lodDistance = 80.0f;  // metres at which LOD 1 begins; each level doubles the distance
     float viewDistance = 460.0f;// metres beyond which a chunk is not drawn at all
+    // Metres beyond which a chunk is not drawn into the shadow maps. The cascades are fitted from
+    // the scene's radius, so on a 640 m world they reach well over a kilometre and every chunk the
+    // camera can see is a caster in every cascade -- including cascade 0, which covers forty
+    // metres. Terrain shadows measured 9.2 ms of a 15.6 ms shadow cost at 2880x1800 for that
+    // reason. 0 falls back to `viewDistance`, which is the old behaviour.
+    float shadowDistance = 140.0f;
     // Metres the seam curtain hangs below the chunk edge. It only has to cover the gap between two
     // resolutions of the same surface, which at metre-scale spacing is decimetres -- and a curtain
     // longer than that is a row of vertical panels standing in the open wherever the ground falls

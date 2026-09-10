@@ -2641,6 +2641,11 @@ void Composition::updateTerrainLod() {
             const world::TerrainChunk& chunk = node.chunks[c];
             Entity& e = scene_.entities[range.firstEntity + c];
             const std::size_t water = chunk.water != kInvalidMesh ? waterEntity++ : scene_.entities.size();
+            const auto setWaterShadow = [&](bool on) {
+                if (water < scene_.entities.size()) {
+                    scene_.entities[water].castsShadow = on;
+                }
+            };
             const auto setWater = [&](bool on) {
                 if (water < scene_.entities.size()) {
                     scene_.entities[water].visible = scene_.entities[water].visible && on;
@@ -2670,6 +2675,13 @@ void Composition::updateTerrainLod() {
                 setWater(false);
                 continue;
             }
+            // A chunk casts into the shadow maps only while it is near enough for its shadow to be
+            // resolvable. Beyond that it is still drawn -- it is on screen -- but not into three
+            // cascades whose texels are far coarser than the shadow it would throw.
+            const float shadowReach =
+                settings.shadowDistance > 0.0f ? settings.shadowDistance : settings.viewDistance;
+            e.castsShadow = distance <= shadowReach;
+            setWaterShadow(e.castsShadow);
             const int lod = lodEnabled ? world::chunkLod(settings, distance) : 0;
             const MeshId mesh = chunk.meshes[static_cast<std::size_t>(std::clamp(lod, 0, kMaxTerrainLodIndex))];
             if (mesh != kInvalidMesh) {
@@ -2928,7 +2940,8 @@ nlohmann::json Composition::toJson() const {
             const world::TerrainSettings& ts = node.terrain;
             n["terrain"] = json{{"chunkSize", ts.chunkSize},   {"resolution", ts.resolution},
                                 {"lodLevels", ts.lodLevels},   {"lodDistance", ts.lodDistance},
-                                {"viewDistance", ts.viewDistance}, {"skirtDepth", ts.skirtDepth},
+                                {"viewDistance", ts.viewDistance}, {"shadowDistance", ts.shadowDistance},
+                                {"skirtDepth", ts.skirtDepth},
                                 {"water",
                                  json{{"enabled", ts.water.enabled},
                                       {"shallow", ts.water.shallow},
@@ -3382,6 +3395,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     for (const TerrainFloat& f :
                          {TerrainFloat{"chunkSize", &ts.chunkSize}, TerrainFloat{"lodDistance", &ts.lodDistance},
                           TerrainFloat{"viewDistance", &ts.viewDistance},
+                          TerrainFloat{"shadowDistance", &ts.shadowDistance},
                           TerrainFloat{"skirtDepth", &ts.skirtDepth}}) {
                         auto v = readFloat(t, f.key, *f.target);
                         if (!v) {
