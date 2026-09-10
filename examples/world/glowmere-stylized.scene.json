@@ -1163,7 +1163,8 @@
   "bloomKnee": 0.5,
   "bloomRadius": 1.15,
   "bloomLevels": 6,
-  "bloomEmissionWeight": 0.75
+  "bloomEmissionWeight": 0.75,
+  "antialias": 0.75
  },
  "materialPrograms": [
   "../materials/glowmere-painted-frond.material.json",

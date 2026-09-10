@@ -1,6 +1,11 @@
 #include "scene/post_settings.hpp"
 
+#include "core/log.hpp"
+
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
+#include <cstdint>
 
 namespace avgen::scene {
 
@@ -81,6 +86,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     p.dofMaxRadius = &params.add(f("post/dof/maxRadius", s.dofMaxRadius, 0.0f, 32.0f, 0.0f, 16.0f));
     p.dofPhysical = &params.add(b("post/dof/physical", s.dofPhysical));
     p.motionBlurAmount = &params.add(f("post/motionBlur/amount", s.motionBlurAmount, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.antialias = &params.add(f("post/output/antialias", s.antialias, 0.0f, 1.0f, 0.0f, 1.0f));
     p.sharpen = &params.add(f("post/output/sharpen", s.sharpen, 0.0f, 1.0f, 0.0f, 1.0f));
     {
         params::ParamDesc<int> d;
@@ -107,6 +113,86 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     p.chromaRetention =
         &params.add(f("post/tonemap/chroma-retention", s.chromaRetention, 0.0f, 1.0f, 0.0f, 1.0f));
     return p;
+}
+
+// A composition's own `post` block, applied as parameter *base* values (ADR-059).
+//
+// Ten scene files in this repository carried one of these and none of them did anything: nothing
+// read the block, so `chromaRetention` and `bloomEmissionWeight` -- the two controls that make a
+// scene's own glow read -- sat at their defaults of zero in every scene that asked for them. The
+// block is authored intent about a shot's look and belongs with the shot.
+//
+// Base values rather than a separate settings path, so the result behaves exactly as though an
+// author had moved those sliders: the project's `parameters` block is applied after the scene
+// loads and still wins, presets and automation still work, and a round trip writes back what was
+// read. Unknown keys are reported, because a misspelt one is otherwise silent.
+Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
+    if (j.is_null()) {
+        return {};
+    }
+    if (!j.is_object()) {
+        return fail("'post' must be an object");
+    }
+    const std::pair<const char*, params::Parameter<float>*> floats[] = {
+        {"bloomIntensity", p.bloomIntensity}, {"bloomThreshold", p.bloomThreshold},
+        {"bloomKnee", p.bloomKnee},           {"bloomRadius", p.bloomRadius},
+        {"bloomEmissionWeight", p.bloomEmissionWeight},
+        {"halationIntensity", p.halationIntensity}, {"halationThreshold", p.halationThreshold},
+        {"halationRadius", p.halationRadius}, {"halationWarmth", p.halationWarmth},
+        {"anamorphicIntensity", p.anamorphicIntensity},
+        {"chromaticAberration", p.chromaticAberration},
+        {"distortion", p.distortion},         {"antialias", p.antialias},
+        {"sharpen", p.sharpen},               {"vignette", p.vignette},
+        {"grain", p.grain},                   {"chromaRetention", p.chromaRetention},
+        {"contrast", p.contrast},             {"saturation", p.saturation},
+    };
+    const std::pair<const char*, params::Parameter<bool>*> bools[] = {
+        {"bloomEnabled", p.bloomEnabled}, {"halationEnabled", p.halationEnabled},
+    };
+    for (const auto& [key, value] : j.items()) {
+        bool handled = false;
+        for (const auto& [name, param] : floats) {
+            if (key == name && param != nullptr) {
+                if (!value.is_number()) {
+                    return fail("post.{} must be a number", key);
+                }
+                param->setBase(value.get<float>());
+                handled = true;
+                break;
+            }
+        }
+        if (handled) {
+            continue;
+        }
+        for (const auto& [name, param] : bools) {
+            if (key == name && param != nullptr) {
+                if (!value.is_boolean()) {
+                    return fail("post.{} must be a boolean", key);
+                }
+                param->setBase(value.get<bool>());
+                handled = true;
+                break;
+            }
+        }
+        if (handled) {
+            continue;
+        }
+        if (key == "tonemap" && p.tonemap != nullptr) {
+            if (!value.is_number_unsigned()) {
+                return fail("post.tonemap must be an unsigned integer (0 aces, 1 agx, 2 reinhard, "
+                            "3 pbr-neutral, 4 clamp)");
+            }
+            p.tonemap->setBase(static_cast<int>(std::min(value.get<std::uint32_t>(), 4u)));
+            continue;
+        }
+        if (key == "bloomLevels") {
+            // Fixed when the bloom pyramid is created, so there is no parameter to move. Accepted
+            // and ignored rather than warned about: the scenes that name it are not wrong to.
+            continue;
+        }
+        log::warn("post.{}: unknown key, ignored", key);
+    }
+    return {};
 }
 
 void applyPostParameters(const PostParameters& p, PostSettings& s) {
@@ -146,6 +232,7 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
     s.dofMaxRadius = p.dofMaxRadius->value();
     s.dofPhysical = p.dofPhysical->value();
     s.motionBlurAmount = p.motionBlurAmount->value();
+    s.antialias = p.antialias->value();
     s.sharpen = p.sharpen->value();
     s.sharpenId = static_cast<std::uint32_t>(std::max(p.sharpenId->value(), 0));
     s.tonemap = static_cast<TonemapOperator>(std::clamp(p.tonemap->value(), 0, 4));

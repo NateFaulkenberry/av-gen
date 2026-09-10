@@ -584,3 +584,149 @@ fn fs_motion_blur(in: FsIn) -> @location(0) vec4<f32> {
     }
     return vec4<f32>(sum / max(weight, 1e-4), 1.0);
 }
+
+// ---- edge antialiasing (ADR-059) ---------------------------------------------------------------
+//
+// This renderer has no MSAA -- `multisample.count` is 1 everywhere, because Apple's TBDR pays for
+// it in tile memory -- and no TAA. Its worlds are full of alpha-tested foliage, which is the worst
+// case for both: a leaf edge is a one-pixel feature, so any sub-pixel movement of the camera flips
+// it fully on or off and the crown appears to crawl.
+//
+// That this is aliasing rather than popping is measured, not assumed. Two consecutive frames of
+// Glowmere with the wind switched off, so the only thing moving is five centimetres of camera:
+// 5.775% of pixels jumped by more than 24/255 at native resolution, and 3.711% when the same two
+// frames were rendered at twice the linear resolution and box-filtered back down. Culling and LOD
+// do not care how many samples you take; aliasing does. Better than a third of the churn is
+// therefore aliasing, and supersampling the whole frame to remove it would cost four times the
+// fill on a frame that is already a third fill-bound.
+//
+// So: Lottes's FXAA. It runs inside the HDR chain on a tone-mapped luminance proxy, because every
+// threshold below is perceptual and unbounded scene radiance would either never reach them or
+// always exceed them.
+
+const kFxaaAbsolute: f32 = 0.0312;   // below this local contrast, leave the pixel alone
+const kFxaaRelative: f32 = 0.125;    // ...or below this fraction of the neighbourhood's maximum
+const kFxaaSearchSteps: i32 = 12;
+
+// Reinhard, so the thresholds above are in display terms rather than in scene radiance. Monotone,
+// so it cannot invert an edge, and two taps cheaper than an actual tone map.
+fn fxaaLuma(c: vec3<f32>) -> f32 {
+    let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
+    return l / (1.0 + l);
+}
+
+fn fxaaLumaAt(uv: vec2<f32>) -> f32 {
+    return fxaaLuma(textureSampleLevel(source, linearSampler, uv, 0.0).rgb);
+}
+
+@fragment
+fn fs_fxaa(in: FsIn) -> @location(0) vec4<f32> {
+    let texel = post.texelSize;
+    let uv = in.uv;
+    let rgbM = textureSampleLevel(source, linearSampler, uv, 0.0).rgb;
+
+    let lumaM = fxaaLuma(rgbM);
+    let lumaN = fxaaLumaAt(uv + vec2<f32>(0.0, -texel.y));
+    let lumaS = fxaaLumaAt(uv + vec2<f32>(0.0,  texel.y));
+    let lumaW = fxaaLumaAt(uv + vec2<f32>(-texel.x, 0.0));
+    let lumaE = fxaaLumaAt(uv + vec2<f32>( texel.x, 0.0));
+
+    let lumaMin = min(lumaM, min(min(lumaN, lumaS), min(lumaW, lumaE)));
+    let lumaMax = max(lumaM, max(max(lumaN, lumaS), max(lumaW, lumaE)));
+    let range = lumaMax - lumaMin;
+    // Flat enough to leave alone. The absolute floor is what keeps the filter out of the deep
+    // shadows, which on a night landscape is most of the frame and is where a luminance-relative
+    // test alone would happily smear sensor-grade noise.
+    if (range < max(kFxaaAbsolute, lumaMax * kFxaaRelative)) {
+        return vec4<f32>(rgbM, 1.0);
+    }
+
+    let lumaNW = fxaaLumaAt(uv + vec2<f32>(-texel.x, -texel.y));
+    let lumaNE = fxaaLumaAt(uv + vec2<f32>( texel.x, -texel.y));
+    let lumaSW = fxaaLumaAt(uv + vec2<f32>(-texel.x,  texel.y));
+    let lumaSE = fxaaLumaAt(uv + vec2<f32>( texel.x,  texel.y));
+
+    // Which way the edge runs, from the second differences across the 3x3. The centre row and
+    // column are weighted double because they pass through the pixel being shaded.
+    let edgeHorz = abs((lumaNW + lumaNE) - 2.0 * lumaN) +
+                   abs((lumaW  + lumaE ) - 2.0 * lumaM) * 2.0 +
+                   abs((lumaSW + lumaSE) - 2.0 * lumaS);
+    let edgeVert = abs((lumaNW + lumaSW) - 2.0 * lumaW) +
+                   abs((lumaN  + lumaS ) - 2.0 * lumaM) * 2.0 +
+                   abs((lumaNE + lumaSE) - 2.0 * lumaE);
+    let horizontal = edgeHorz >= edgeVert;
+
+    // The two neighbours across the edge, and which side of it has the steeper gradient: the blend
+    // is towards that side, which is where the geometric edge actually lies.
+    var luma1 = select(lumaW, lumaN, horizontal);
+    var luma2 = select(lumaE, lumaS, horizontal);
+    let grad1 = luma1 - lumaM;
+    let grad2 = luma2 - lumaM;
+    let steeper1 = abs(grad1) >= abs(grad2);
+    let gradScaled = 0.25 * max(abs(grad1), abs(grad2));
+
+    var stepLength = select(texel.x, texel.y, horizontal);
+    if (steeper1) { stepLength = -stepLength; } else { luma1 = luma2; }
+    // Half a texel towards the edge, and the local average across it: the value the edge would have
+    // had if the pixel had been sampled with any area at all.
+    let lumaLocal = (luma1 + lumaM) * 0.5;
+
+    var currentUv = uv;
+    if (horizontal) { currentUv.y += stepLength * 0.5; } else { currentUv.x += stepLength * 0.5; }
+
+    // Walk along the edge in both directions until its contrast dies out. How far it runs sets how
+    // much of the neighbour to blend in: a long clean edge gets a strong blend, a two-pixel speckle
+    // barely any, which is what stops the filter softening genuine detail.
+    let offset = select(vec2<f32>(0.0, texel.y), vec2<f32>(texel.x, 0.0), horizontal);
+    var uv1 = currentUv - offset;
+    var uv2 = currentUv + offset;
+    var lumaEnd1 = fxaaLumaAt(uv1) - lumaLocal;
+    var lumaEnd2 = fxaaLumaAt(uv2) - lumaLocal;
+    var done1 = abs(lumaEnd1) >= gradScaled;
+    var done2 = abs(lumaEnd2) >= gradScaled;
+    if (!done1) { uv1 -= offset; }
+    if (!done2) { uv2 += offset; }
+
+    for (var i = 2; i < kFxaaSearchSteps; i = i + 1) {
+        if (done1 && done2) { break; }
+        // The step grows once the search is past the first few texels, so a long edge is still
+        // found inside a bounded number of taps.
+        let scale = select(1.0, 2.0, i > 5);
+        if (!done1) {
+            lumaEnd1 = fxaaLumaAt(uv1) - lumaLocal;
+            done1 = abs(lumaEnd1) >= gradScaled;
+            if (!done1) { uv1 -= offset * scale; }
+        }
+        if (!done2) {
+            lumaEnd2 = fxaaLumaAt(uv2) - lumaLocal;
+            done2 = abs(lumaEnd2) >= gradScaled;
+            if (!done2) { uv2 += offset * scale; }
+        }
+    }
+
+    let distance1 = select(abs(uv.y - uv1.y), abs(uv.x - uv1.x), horizontal);
+    let distance2 = select(abs(uv.y - uv2.y), abs(uv.x - uv2.x), horizontal);
+    let nearer1 = distance1 < distance2;
+    let distanceFinal = min(distance1, distance2);
+    let edgeLength = distance1 + distance2;
+    var pixelOffset = -distanceFinal / max(edgeLength, 1e-6) + 0.5;
+
+    // If the end we are nearest to sits on the same side of the local average as this pixel, then
+    // this pixel is not on the edge after all and blending it would be wrong.
+    let lumaCentreSmaller = lumaM < lumaLocal;
+    let correctVariation = ((select(lumaEnd2, lumaEnd1, nearer1) < 0.0) != lumaCentreSmaller);
+    if (!correctVariation) { pixelOffset = 0.0; }
+
+    // The sub-pixel term: a feature smaller than a pixel produces no long edge for the search to
+    // find, but it does move the pixel away from its own neighbourhood's mean. This is what
+    // actually catches thin foliage.
+    let lumaAverage = (2.0 * (lumaN + lumaS + lumaW + lumaE) + lumaNW + lumaNE + lumaSW + lumaSE) / 12.0;
+    let subPixel1 = clamp(abs(lumaAverage - lumaM) / max(range, 1e-6), 0.0, 1.0);
+    let subPixel2 = (-2.0 * subPixel1 + 3.0) * subPixel1 * subPixel1; // smoothstep
+    let subPixelOffset = subPixel2 * subPixel2 * post.params0.x;
+
+    let finalOffset = max(pixelOffset, subPixelOffset);
+    var finalUv = uv;
+    if (horizontal) { finalUv.y += finalOffset * stepLength; } else { finalUv.x += finalOffset * stepLength; }
+    return vec4<f32>(textureSampleLevel(source, linearSampler, finalUv, 0.0).rgb, 1.0);
+}

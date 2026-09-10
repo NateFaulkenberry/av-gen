@@ -3389,6 +3389,11 @@ nlohmann::json Composition::toJson() const {
         }
     }
     j["environment"] = std::move(environment);
+    // ADR-059: written back as it was read. The live values are parameters and belong to the
+    // project; what the scene owns is the look it was authored with.
+    if (!postJson_.is_null() && !postJson_.empty()) {
+        j["post"] = postJson_;
+    }
     if (windSetting_.enabled) {
         json w = wind::windToJson(windSetting_);
         w["speed"] = windSpeed_ != nullptr ? windSpeed_->base() : windSetting_.speed;
@@ -3604,6 +3609,10 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("'wind' must be an object");
         }
         comp->windSetting_ = wind::windFromJson(j.at("wind"));
+    }
+    // ADR-059: kept verbatim; the Engine turns it into parameter base values when the scene loads.
+    if (j.contains("post")) {
+        comp->postJson_ = j.at("post");
     }
     if (j.contains("environment")) {
         const json& e = j.at("environment");

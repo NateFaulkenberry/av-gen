@@ -9,6 +9,7 @@
 #include "support/synth.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -450,4 +451,56 @@ TEST_CASE("Moved assets are relinked by name, size and content hash", "[integrat
         CHECK(engine.hasAudio());
         CHECK(engine.shaderLayers().layers().size() == 1);
     }
+}
+
+// ADR-059. Ten scene files in this repository carried a `post` block and not one of them did
+// anything: nothing read it, so `chromaRetention` and `bloomEmissionWeight` -- the two controls
+// that decide whether a scene's own glow reads -- sat at zero in every scene that asked for them.
+// Nothing caught it for the life of the feature, which is what this test is for.
+TEST_CASE("A composition's post block reaches the post parameters, and the project still wins",
+          "[integration][project][post]") {
+    Fixture f;
+    const auto scenePath = f.dir / "media" / "posty.json";
+    std::ofstream(scenePath) << R"({"format":"avgen-scene","version":1,"name":"posty","nodes":[],
+      "post":{"chromaRetention":0.6,"bloomEmissionWeight":0.75,"antialias":0.5,"tonemap":3,
+              "bloomEnabled":false,"bloomLevels":6}})";
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(scenePath).has_value());
+    const auto& params = engine.params();
+    auto valueOf = [&](const char* path) {
+        const auto* p = dynamic_cast<const params::Parameter<float>*>(params.find(path));
+        REQUIRE(p != nullptr);
+        return p->base();
+    };
+    CHECK_THAT(valueOf("post/tonemap/chroma-retention"), Catch::Matchers::WithinAbs(0.6, 1e-5));
+    CHECK_THAT(valueOf("post/bloom/emissionWeight"), Catch::Matchers::WithinAbs(0.75, 1e-5));
+    CHECK_THAT(valueOf("post/output/antialias"), Catch::Matchers::WithinAbs(0.5, 1e-5));
+    {
+        const auto* op = dynamic_cast<const params::Parameter<int>*>(params.find("post/tonemap/operator"));
+        REQUIRE(op != nullptr);
+        CHECK(op->base() == 3);
+        const auto* on = dynamic_cast<const params::Parameter<bool>*>(params.find("post/bloom/enabled"));
+        REQUIRE(on != nullptr);
+        CHECK(on->base() == false);
+    }
+    // `bloomLevels` is fixed when the pyramid is built, so it has no parameter; naming it must be
+    // accepted rather than rejected, because several shipped scenes do.
+
+    // A project that names the same paths is applied after the scene loads and overrides it, which
+    // is the whole reason the scene's values go in as base values rather than as a separate path.
+    const auto project = f.dir / "posty-project.json";
+    std::ofstream(project) << R"({"format":"avgen-project","version":4,
+      "assets":{"scene":{"kind":"composition","path":"media/posty.json"}},
+      "parameters":{"post/tonemap/chroma-retention":0.2}})";
+    app::Engine over(app::EngineMode::Offline);
+    REQUIRE(over.loadProject(project).has_value());
+    const auto* p = dynamic_cast<const params::Parameter<float>*>(
+        over.params().find("post/tonemap/chroma-retention"));
+    REQUIRE(p != nullptr);
+    CHECK_THAT(p->base(), Catch::Matchers::WithinAbs(0.2, 1e-5));        // the project's value
+    const auto* w = dynamic_cast<const params::Parameter<float>*>(
+        over.params().find("post/bloom/emissionWeight"));
+    REQUIRE(w != nullptr);
+    CHECK_THAT(w->base(), Catch::Matchers::WithinAbs(0.75, 1e-5));       // ...and the scene's, where it said nothing
 }

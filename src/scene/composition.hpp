@@ -29,7 +29,7 @@
 #include "world/ecology.hpp"
 #include "world/terrain.hpp"
 
-#include <nlohmann/json_fwd.hpp>
+#include <nlohmann/json.hpp>
 
 #include <cstdint>
 #include <filesystem>
@@ -212,6 +212,10 @@ public:
     // Environment map path (relative or absolute as given); empty = none.
     void setEnvironmentMap(const std::filesystem::path& path);
     [[nodiscard]] const std::filesystem::path& environmentMap() const { return environmentPath_; }
+    // ADR-059: the file's `post` block, verbatim. The composition does not interpret it -- post is
+    // the Engine's, and these become parameter base values when the scene loads -- but it holds it
+    // so a round trip writes back exactly what was read.
+    [[nodiscard]] const nlohmann::json& postJson() const { return postJson_; }
     // Light rig (ADR-033): `"lightRig"` in the scene file's environment block, resolved through the
     // asset registry and expanded into `Scene::lights` around the composition's bounds every frame,
     // so `followCamera` rig lights track the camera. An empty path clears the rig and restores the
@@ -303,6 +307,7 @@ private:
     params::Parameter<float>* fogDensity_ = nullptr;
     // Volumetric atmosphere (ADR-032): scene/volume* next to scene/fog*.
     params::Parameter<float>* volumeDensity_ = nullptr;
+    nlohmann::json postJson_;
     params::Parameter<float>* fogHeight_ = nullptr;
     params::Parameter<float>* fogHeightFalloff_ = nullptr;
     // ADR-055: the two wind controls worth touching live. The rest of the field is authored.

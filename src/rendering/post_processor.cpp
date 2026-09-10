@@ -201,7 +201,7 @@ Result<wgpu::RenderPipeline> PostProcessor::makePipeline(const wgpu::ShaderModul
 }
 
 Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
-    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 13> slots{{
+    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 14> slots{{
         {"fs_exposure", &exposure_},
         {"fs_meter_prefilter", &meterPrefilter_},
         {"fs_meter_reduce", &meterReduce_},
@@ -212,6 +212,7 @@ Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
         {"fs_wide", &wide_},
         {"fs_lens", &lens_},
         {"fs_composite", &composite_},
+        {"fs_fxaa", &fxaa_},
         {"fs_sharpen", &sharpen_},
         {"fs_dof", &dof_},
         {"fs_motion_blur", &motionBlur_},
@@ -618,7 +619,22 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         output_ = target.texture;
     }
 
-    // ---- 7. output: sharpening (the tone map, vignette and grain follow in tonemap.wgsl) ----------
+    // ---- 7. output: edge antialiasing (ADR-059) ---------------------------------------------------
+    // Before sharpening, because sharpening an aliased edge fixes the contrast and keeps the stair
+    // step; and inside the HDR chain, where the pass can still be skipped without a target copy.
+    if (s.antialias > 1e-4f) {
+        auto target = pool.acquire(in.width, in.height, kHdrFormat);
+        Uniforms u = base;
+        u.params0 = glm::vec4(std::clamp(s.antialias, 0.0f, 1.0f), 0.0f, 0.0f, 0.0f);
+        PassTextures textures;
+        textures.source = current;
+        stage_ = "post/fxaa";
+        runPass(encoder, fxaa_, target.view, textures, u);
+        current = target.view;
+        output_ = target.texture;
+    }
+
+    // ---- 8. output: sharpening (the tone map, vignette and grain follow in tonemap.wgsl) ----------
     if (s.sharpen > 1e-4f) {
         auto target = pool.acquire(in.width, in.height, kHdrFormat);
         Uniforms u = base;

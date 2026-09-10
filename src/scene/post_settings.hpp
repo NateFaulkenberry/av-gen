@@ -13,6 +13,8 @@
 #include "params/parameter_set.hpp"
 #include "scene/scene_types.hpp"
 
+#include <nlohmann/json_fwd.hpp>
+
 #include <glm/glm.hpp>
 
 #include <cstdint>
@@ -88,6 +90,12 @@ struct PostSettings {
     std::uint32_t motionBlurTileSize = 20; // velocity tile edge in pixels; also the reach in tiles
 
     // ---- output effects ------------------------------------------------------------------------
+    // ADR-059: FXAA. This renderer has no MSAA and no TAA, so a scene of alpha-tested foliage
+    // crawls at the edges under any camera movement; measured on Glowmere with the wind off, better
+    // than a third of the frame-to-frame pixel churn is aliasing rather than geometry. 0 is off and
+    // costs nothing; 0.75 is a good default for foliage, and above that the filter starts to soften
+    // real detail as well as the edges.
+    float antialias = 0.0f;        // 0..1 sub-pixel blend strength; 0 skips the pass entirely
     float sharpen = 0.0f;          // 0..1 contrast-adaptive sharpening, last in the post chain
     std::uint32_t sharpenId = 0;   // 0 = whole image; else only pixels with this identifier
                                    // (ADR-035 identifier target; ignored when absent)
@@ -135,6 +143,7 @@ struct PostParameters {
     params::Parameter<float>* dofMaxRadius = nullptr;
     params::Parameter<bool>* dofPhysical = nullptr;
     params::Parameter<float>* motionBlurAmount = nullptr;
+    params::Parameter<float>* antialias = nullptr;
     params::Parameter<float>* sharpen = nullptr;
     params::Parameter<int>* sharpenId = nullptr;
     params::Parameter<int>* tonemap = nullptr;
@@ -144,6 +153,9 @@ struct PostParameters {
 };
 
 PostParameters registerPostParameters(params::ParameterSet& params, const PostSettings& defaults);
+// ADR-059: apply a composition's own `post` block as parameter base values. The project's
+// `parameters` block is applied after the scene loads and therefore still wins.
+Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p);
 void applyPostParameters(const PostParameters& p, PostSettings& settings);
 const char* tonemapOperatorName(TonemapOperator op);
 

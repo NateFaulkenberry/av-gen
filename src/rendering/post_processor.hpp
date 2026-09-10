@@ -7,7 +7,7 @@
 //             -> [lens distortion + chromatic aberration]
 //             -> [bloom: prefilter, downsample chain, energy-conserving upsample chain]
 //             -> [halation pyramid + anamorphic streaks: the "wide" tier]
-//             -> composite (bloom + wide tier + colour grade) -> [sharpen]
+//             -> composite (bloom + wide tier + colour grade) -> [fxaa] -> [sharpen]
 //             -> HDR result for tone mapping.
 //
 // Passes run only when their settings are active; with everything off and a unit exposure the
@@ -164,6 +164,7 @@ private:
     wgpu::RenderPipeline wide_;
     wgpu::RenderPipeline lens_;
     wgpu::RenderPipeline composite_;
+    wgpu::RenderPipeline fxaa_;
     wgpu::RenderPipeline sharpen_;
     wgpu::RenderPipeline dof_;
     wgpu::RenderPipeline motionBlur_;

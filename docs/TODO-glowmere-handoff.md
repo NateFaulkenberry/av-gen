@@ -2,6 +2,32 @@
 
 Updated: 2026-09-10. This is the primary continuation checklist for the next agent.
 
+> **PARKED, 10 September 2026.** Glowmere is a working, reproducible scene and is no longer the
+> active project; the flagship effort has moved to *The Living Constellation*. It loads, saves,
+> round-trips and renders deterministically, and its remaining defects are listed below rather
+> than fixed. Do not delete it and do not break it: it is the control that engine work is measured
+> against, and `glowmere-stylized-pbr.json` is its synchronized PBR comparison.
+>
+> Reproduce the current look:
+> ```sh
+> cmake --build build/release -j8
+> ./build/release/src/avgen --headless --project examples/world/glowmere-stylized.json \
+>     --frames 2700 --fps 30 --size 1920x1200 --tier realtime --capture out/glowmere.png
+> ```
+> M2 Max: 22.1 ms gpu frame median at 1280x800 realtime, 42.3 ms at 2880x1800.
+>
+> **Deliberately left unfinished:**
+> - The hero's cap/stem junction is a cylinder meeting a disc with no flare, and the gill rhythm is
+>   perfectly periodic. Both need geometry, not deformers.
+> - Foliage edge crawl is improved, not solved. ADR-059's FXAA removes about 16% of the
+>   frame-to-frame churn; 2x supersampling would remove 36%. There is still no MSAA and no TAA.
+> - 23.7 FPS at 2880x1800 against a 60 FPS goal. The frame fits `14.5 ms + 5.4 ms/megapixel`, so
+>   render scale is the lever and it is not built.
+> - The Syphon burst failure is still undiagnosed.
+> - Two routes are wired to audio; the full musical mapping was never authored.
+> - `tools/make_glowmere_score.py` renders the rights-clean 90-second score. The wav is gitignored;
+>   `assets/audio/manifest.json` carries the command, seed and sha256.
+
 **Status: tested scene-development and painterly-style candidates, NOT a finished product.**
 The visual bar, sustained target performance, soundtrack review and clean full regression gate
 remain open. Checked items below describe implemented work, not final artistic acceptance.

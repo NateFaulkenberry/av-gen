@@ -682,7 +682,11 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                     }
                     environmentPath_ = sceneEnvironment;
                     compositionPath_.clear();
+                    const nlohmann::json inlinePost = (*comp)->postJson();
                     installController(std::move(*comp));
+                    if (auto r = scene::applyPostJson(inlinePost, postParams_); !r) {
+                        warn("scene: " + r.error().message);
+                    }
                 }
             } else {
                 warn("scene: unknown kind '" + kind + "'");
@@ -1104,11 +1108,21 @@ Result<void> Engine::loadComposition(const std::filesystem::path& rawPath) {
     modulator_.masterGain = masterGain;
     (*comp)->attach(params_, modulator_);
     compositionPath_ = path;
+    // ADR-059: the composition's own `post` block, kept until the parameters it names exist again.
+    // `params_.clear()` above destroyed the previous set, and installController below is what
+    // re-registers the post parameters -- reading postParams_ before that point is a dangling
+    // pointer, which is exactly the bug the first version of this had.
+    const nlohmann::json postJson = (*comp)->postJson();
     // A scene file may carry its own environment map.
     if (!(*comp)->environmentMap().empty()) {
         environmentPath_ = registry_.resolve((*comp)->environmentMap());
     }
     installController(std::move(*comp));
+    // Now the parameters exist. The project's own `parameters` block is applied at the end of the
+    // project load and still overrides anything set here.
+    if (auto r = scene::applyPostJson(postJson, postParams_); !r) {
+        return r;
+    }
     return reapplyEnvironment();
 }
 
