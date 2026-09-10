@@ -12,6 +12,7 @@
 // because "what is the application doing" is one question and it deserves one answer.
 
 #include "app/job_system.hpp"
+#include "app/placement.hpp"
 #include "app/world_builder.hpp"
 #include "assets/asset_library.hpp"
 #include "world/world_recipe.hpp"
@@ -37,9 +38,24 @@ public:
     void applyFinished(app::Engine& engine, app::WorldBuilder& builder);
 
     [[nodiscard]] const std::string& status() const { return status_; }
+    // The loaded library, or nullptr before one is found. Cached rather than re-read: the panel
+    // already resolves it once, and placement needs the same one the Generate button would use --
+    // two independently loaded copies would be two libraries the moment somebody edited the
+    // manifest between them.
+    [[nodiscard]] const assets::AssetLibrary* library() const {
+        return library_ ? &*library_ : nullptr;
+    }
+    // What the viewport is armed to place, and how. Held here because the panel is where they are
+    // chosen; the application reads them when a click lands on a surface.
+    std::string placementAssetId;
+    bool placementChanged = false;
+
+    // How a click places things. Public so the application can read it when a pick lands.
+    app::PlacementSettings placement;
 
 private:
     void drawRecipe();
+    void drawPlacement();
     void drawJobs(app::JobSystem& jobs);
     [[nodiscard]] Result<assets::AssetLibrary> resolveLibrary() const;
 
@@ -49,6 +65,8 @@ private:
     bool librarySearched_ = false;
     std::size_t libraryCount_ = 0;
     std::string libraryLabel_;
+    char assetFilter_[64] = {};
+    std::optional<assets::AssetLibrary> library_;
 };
 
 } // namespace avgen::ui

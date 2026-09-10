@@ -5,6 +5,7 @@
 
 #include "app/engine.hpp"
 #include "app/viewport_camera.hpp"
+#include "app/placement.hpp"
 #include "app/viewport_pick.hpp"
 #include "app/job_system.hpp"
 #include "app/world_builder.hpp"
@@ -178,6 +179,16 @@ private:
     std::string viewportSelectedNode_;
     glm::vec3 viewportPickPosition_{0.0f};
     bool viewportFreeModeAnnounced_ = false;
+
+    // The armed placement tool (ADR-069). Empty asset id means the click selects instead of placing,
+    // which is the default: a viewport that places something every time you click on it is a
+    // viewport you cannot look around in.
+    PlacementSettings placement_;
+    std::string placementAssetId_;
+    std::uint32_t placementSeed_ = 1u;
+
+    // Places whatever the tool is armed with at a picked surface. Returns how many nodes it made.
+    std::size_t placeAt(glm::vec3 position, glm::vec3 normal);
 
     // Reads `camera/position` and `camera/target`. Returns the scene camera's own pose when the
     // parameters are missing, so a gesture over a scene without them still does something sensible.

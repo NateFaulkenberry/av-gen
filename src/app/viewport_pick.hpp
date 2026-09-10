@@ -59,6 +59,17 @@ struct PickResult {
                                         const wgpu::Texture& linearDepth, const PickView& view,
                                         glm::uvec2 pixel);
 
+// Estimates the surface normal at `pixel` from the depth of its neighbours, `step` pixels away.
+//
+// The scene pass does write a real normal target, and reading that would be exact. It is octahedral
+// half-float, so using it would couple this to the encoding in pbr_shade.wgsl -- and the one thing
+// this normal is for is the optional "lie along the slope" placement, where an estimate from three
+// depth samples is entirely sufficient. On a silhouette edge the neighbours land on different
+// surfaces and the estimate is poor; that is reported as no normal rather than as a wrong one.
+[[nodiscard]] Result<glm::vec3> pickNormalAt(gpu::Context& context, const wgpu::Texture& linearDepth,
+                                             const PickView& view, glm::uvec2 pixel,
+                                             std::uint32_t step = 2);
+
 // The distance the linear-depth target uses for "nothing was drawn here". Matches
 // shaders/linear_depth.wgsl; anything at or beyond it is sky.
 inline constexpr float kPickFarDistance = 1.0e6f;

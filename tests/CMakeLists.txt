@@ -21,6 +21,8 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/world_builder.cpp"
     # Viewport camera gestures are vector arithmetic over an eye and a target (ADR-068).
     "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
+    # Placement layout is geometry over a click and a surface (ADR-069).
+    "${CMAKE_SOURCE_DIR}/src/app/placement.cpp"
     # Output mapping maths/JSON and the output set are GPU-free (milestone 1.2).
     "${CMAKE_SOURCE_DIR}/src/rendering/output_mapping.cpp"
     # Light packing, the froxel grid, the LTC fit and the cascade maths are GPU-free (ADR-033/034).
@@ -64,6 +66,7 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         # even though its reconstruction maths is pure (ADR-068).
         "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/viewport_pick.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/placement.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/output_manager_gpu.cpp")
     target_include_directories(avgen_render_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")

@@ -53,6 +53,7 @@ void WorldBuilderPanel::draw(app::Engine& engine, app::JobSystem& jobs, app::Wor
         if (auto lib = resolveLibrary()) {
             libraryCount_ = lib->size();
             libraryLabel_ = lib->license().empty() ? std::string("unknown licence") : lib->license();
+            library_ = std::move(*lib);
         }
     }
 
@@ -88,6 +89,11 @@ void WorldBuilderPanel::draw(app::Engine& engine, app::JobSystem& jobs, app::Wor
     }
     if (!status_.empty()) {
         ImGui::TextWrapped("%s", status_.c_str());
+    }
+
+    ImGui::Separator();
+    if (ImGui::CollapsingHeader("Place assets", ImGuiTreeNodeFlags_DefaultOpen)) {
+        drawPlacement();
     }
 
     ImGui::Separator();
@@ -143,6 +149,82 @@ void WorldBuilderPanel::drawRecipe() {
         weightSlider("Volumetric", recipe.lighting.volumetric, nullptr);
         weightSlider("Bounce", recipe.lighting.bounce, nullptr);
         ImGui::TreePop();
+    }
+}
+
+
+void WorldBuilderPanel::drawPlacement() {
+    if (!library_ || library_->size() == 0) {
+        ImGui::TextDisabled("no asset library");
+        return;
+    }
+
+    // Arming is explicit and shown as a mode, because a viewport that places something every time
+    // you click is a viewport you cannot look around in. "None" is the resting state and the button
+    // to get back to it is always visible.
+    if (placementAssetId.empty()) {
+        ImGui::TextDisabled("Click selects. Choose an asset to place instead.");
+    } else {
+        ImGui::TextColored(ImVec4(0.55f, 0.85f, 0.55f, 1.0f), "Placing: %s", placementAssetId.c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Stop")) {
+            placementAssetId.clear();
+            placementChanged = true;
+        }
+    }
+
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputTextWithHint("##assetfilter", "filter assets", assetFilter_, sizeof(assetFilter_));
+    const std::string filter = assetFilter_;
+
+    if (ImGui::BeginListBox("##assets", ImVec2(-1.0f, 140.0f))) {
+        for (const auto& asset : library_->assets()) {
+            if (!filter.empty() && asset.id.find(filter) == std::string::npos &&
+                asset.name.find(filter) == std::string::npos) {
+                continue;
+            }
+            const bool selected = asset.id == placementAssetId;
+            if (ImGui::Selectable(asset.id.c_str(), selected)) {
+                placementAssetId = selected ? std::string() : asset.id;
+                placementChanged = true;
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s\n%s, %.1f m tall, importance %.2f",
+                                  asset.name.c_str(), assets::assetCategoryName(asset.category),
+                                  static_cast<double>(asset.effectiveHeight()),
+                                  static_cast<double>(asset.visualImportance));
+            }
+        }
+        ImGui::EndListBox();
+    }
+
+    int mode = static_cast<int>(placement.mode);
+    if (ImGui::Combo("Mode", &mode, "Single\0Brush\0Cluster\0Landmark\0")) {
+        placement.mode = static_cast<app::PlacementMode>(mode);
+        placementChanged = true;
+    }
+    switch (placement.mode) {
+    case app::PlacementMode::Brush:
+        ImGui::SliderFloat("Radius (m)", &placement.brushRadius, 0.5f, 40.0f, "%.1f");
+        ImGui::SliderFloat("Spacing (m)", &placement.spacing, 0.1f, 10.0f, "%.2f");
+        break;
+    case app::PlacementMode::Cluster:
+        ImGui::SliderInt("Count", &placement.clusterCount, 1, 40);
+        ImGui::SliderFloat("Spread (m)", &placement.clusterRadius, 0.1f, 12.0f, "%.2f");
+        break;
+    case app::PlacementMode::Landmark:
+        ImGui::SliderFloat("Times normal size", &placement.landmarkScale, 1.0f, 20.0f, "%.1fx");
+        break;
+    case app::PlacementMode::Single:
+        break;
+    }
+    ImGui::SliderFloat("Scale jitter", &placement.scaleJitter, 0.0f, 0.9f, "%.2f");
+    ImGui::SliderFloat("Yaw jitter", &placement.yawJitter, 0.0f, 1.0f, "%.2f");
+    ImGui::SliderFloat("Sink (m)", &placement.sink, 0.0f, 2.0f, "%.2f");
+    ImGui::Checkbox("Lie along the slope", &placement.alignToNormal);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Stand along the surface normal rather than upright. Right for rocks and "
+                          "fallen logs, wrong for anything that grows toward the sky.");
     }
 }
 

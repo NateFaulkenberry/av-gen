@@ -27,6 +27,7 @@
 #include "ui/imgui_layer.hpp"
 
 #include <SDL3/SDL.h>
+#include <glm/gtx/quaternion.hpp>
 #include <imgui.h>
 
 #include <algorithm>
@@ -1058,6 +1059,76 @@ void Application::handleViewportEvent(const SDL_Event& event) {
     }
 }
 
+
+std::size_t Application::placeAt(glm::vec3 position, glm::vec3 normal) {
+    if (placementAssetId_.empty() || engine_ == nullptr || panel_ == nullptr) {
+        return 0;
+    }
+    const assets::AssetLibrary* library = panel_->worldBuilder.library();
+    if (library == nullptr) {
+        log::warn("place: no asset library is loaded");
+        return 0;
+    }
+    const assets::AssetDescriptor* asset = library->find(placementAssetId_);
+    if (asset == nullptr) {
+        log::warn("place: '{}' is not in the library", placementAssetId_);
+        return 0;
+    }
+    const std::string file = library->resolve(*asset).generic_string();
+    if (file.empty()) {
+        log::warn("place: '{}' has no file", placementAssetId_);
+        return 0;
+    }
+
+    const auto plan = planPlacements(placement_, position, normal, placementSeed_++);
+    // The library's own sizing, applied once. The placement's jitter multiplies it, so a plan can be
+    // reasoned about in "how much bigger than usual" without knowing anything about the pack the
+    // asset came from.
+    const float base = normalisingScale(*asset);
+
+    std::vector<std::string> taken;
+    if (const auto* composition = engine_->composition()) {
+        for (const auto& node : composition->nodes()) {
+            if (node) {
+                taken.push_back(node->name);
+            }
+        }
+    }
+
+    std::size_t made = 0;
+    for (const Placement& p : plan) {
+        scene::CompositionNode node;
+        node.name = uniquePlacementName(placementAssetId_, taken);
+        taken.push_back(node.name);
+        node.kind = scene::NodeKind::Gltf;
+        node.asset = file;
+        node.transform.position = p.position;
+        node.transform.scale = glm::vec3(base * p.scale);
+        glm::quat rotation = glm::angleAxis(p.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+        if (placement_.alignToNormal) {
+            // Stand along the surface rather than along the world's up. The shortest rotation from
+            // up to the normal, then the yaw about that -- applied in this order, or the yaw is
+            // about the wrong axis and objects on a slope all face the same way regardless of it.
+            const glm::vec3 up(0.0f, 1.0f, 0.0f);
+            const glm::vec3 n = glm::normalize(p.normal);
+            if (glm::dot(up, n) < 0.9999f) {
+                rotation = glm::rotation(up, n) * rotation;
+            }
+        }
+        node.transform.rotation = rotation;
+        if (auto added = engine_->addNode(std::move(node)); !added) {
+            log::warn("place: {}", added.error().message);
+        } else {
+            ++made;
+        }
+    }
+    if (made > 0) {
+        log::info("place: {} x '{}' ({}) at ({:.2f}, {:.2f}, {:.2f})", made, placementAssetId_,
+                  placementModeName(placement_.mode), position.x, position.y, position.z);
+    }
+    return made;
+}
+
 void Application::serviceViewportPick() {
     if (!viewportPickPending_ || renderer_ == nullptr || engine_ == nullptr) {
         return;
@@ -1090,6 +1161,18 @@ void Application::serviceViewportPick() {
         return;
     }
     viewportPickPosition_ = result->position;
+    // Armed tool: the click places rather than selects. Placement needs a surface normal and the
+    // identifier target does not carry one, so it is estimated from two neighbouring picks -- which
+    // is enough for "lie along the slope" and costs two more four-byte reads.
+    if (!placementAssetId_.empty()) {
+        glm::vec3 normal(0.0f, 1.0f, 0.0f);
+        if (auto surface = pickNormalAt(*context_, renderer_->linearDepthTexture(), view,
+                                        viewportPickPixel_)) {
+            normal = *surface;
+        }
+        placeAt(result->position, normal);
+        return;
+    }
     const auto* composition = engine_->composition();
     const scene::CompositionNode* node =
         composition != nullptr ? composition->nodeForEntity(result->objectId) : nullptr;
@@ -1322,6 +1405,13 @@ int Application::runLive() {
         wgpu::CommandBuffer commands = encoder.Finish();
         context_->queue().Submit(1, &commands);
         renderer_->collectFrameTimings();
+        // What the panel armed this frame. Copied rather than read through the panel at click time
+        // so the application does not reach into UI state from the event handler, and so a headless
+        // or scripted caller can arm a placement without a panel existing at all.
+        if (panel_ != nullptr) {
+            placementAssetId_ = panel_->worldBuilder.placementAssetId;
+            placement_ = panel_->worldBuilder.placement;
+        }
         // After the frame is submitted, so the identifier and depth targets hold what the user
         // actually clicked on rather than the frame before it.
         serviceViewportPick();

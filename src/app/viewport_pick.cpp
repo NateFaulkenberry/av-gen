@@ -88,4 +88,52 @@ Result<PickResult> pickAt(gpu::Context& context, const wgpu::Texture& ids,
     return out;
 }
 
+
+Result<glm::vec3> pickNormalAt(gpu::Context& context, const wgpu::Texture& linearDepth,
+                               const PickView& view, glm::uvec2 pixel, std::uint32_t step) {
+    if (linearDepth == nullptr) {
+        return fail("pick normal: the scene has not been rendered yet");
+    }
+    step = std::max(step, 1u);
+    // Sampled toward the middle of the frame, so a click near an edge still has both neighbours
+    // inside the target rather than failing or clamping onto itself.
+    const std::uint32_t maxX = view.size.x > 0 ? view.size.x - 1 : 0;
+    const std::uint32_t maxY = view.size.y > 0 ? view.size.y - 1 : 0;
+    const std::uint32_t rightX = pixel.x + step <= maxX ? pixel.x + step : (pixel.x >= step ? pixel.x - step : pixel.x);
+    const std::uint32_t downY = pixel.y + step <= maxY ? pixel.y + step : (pixel.y >= step ? pixel.y - step : pixel.y);
+    if (rightX == pixel.x || downY == pixel.y) {
+        return fail("pick normal: no room for neighbours at ({}, {})", pixel.x, pixel.y);
+    }
+
+    const glm::uvec2 centre = pixel;
+    const glm::uvec2 right(rightX, pixel.y);
+    const glm::uvec2 down(pixel.x, downY);
+    glm::vec3 points[3];
+    const glm::uvec2 taps[3] = {centre, right, down};
+    for (int i = 0; i < 3; ++i) {
+        auto depth = gpu::readTexelR32Float(context, linearDepth, taps[i].x, taps[i].y);
+        if (!depth) {
+            return std::unexpected(depth.error());
+        }
+        if (!(*depth < kPickFarDistance)) {
+            return fail("pick normal: a neighbour is sky");
+        }
+        points[i] = worldPositionAt(view, taps[i], *depth);
+    }
+
+    // The winding is chosen so the result points back toward the camera for a surface facing it.
+    const glm::vec3 a = points[1] - points[0];
+    const glm::vec3 b = points[2] - points[0];
+    const glm::vec3 cross = glm::cross(b, a);
+    const float length = glm::length(cross);
+    if (length < 1e-9f) {
+        return fail("pick normal: the neighbourhood is degenerate");
+    }
+    glm::vec3 normal = cross / length;
+    if (glm::dot(normal, view.cameraPosition - points[0]) < 0.0f) {
+        normal = -normal;
+    }
+    return normal;
+}
+
 } // namespace avgen::app
