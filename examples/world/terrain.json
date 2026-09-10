@@ -16,6 +16,6 @@
   "camera/lens/focusDistance": 120.0,
   "camera/lens/shutterAngle": 172.0,
   "camera/exposure/mode": 0,
-  "camera/exposure/compensation": 1.0
+  "camera/exposure/compensation": 0.0
  }
 }
