@@ -17,6 +17,7 @@
 #include "app/render_settings.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "rendering/sdf_renderer.hpp"
+#include "ui/composition_panel.hpp"
 #include "ui/editor_layout.hpp"
 #include "ui/graph_editor.hpp"
 #include "ui/world_builder_panel.hpp"
@@ -125,6 +126,8 @@ public:
     app::WorldBuilder* builder = nullptr;
     // Procedural graph editor (ADR-028); the host re-installs the graph when it changes.
     GraphEditor graphEditor;
+    // The 2D composition over the frame (ADR-081): the layer stack and its inspector.
+    CompositionPanel composition;
 
     [[nodiscard]] const EditorLayout& layout() const { return layout_; }
     [[nodiscard]] const std::string& statusMessage() const { return status_; }

@@ -107,7 +107,13 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
         }
         let glowWidth = style.params.w;
         if (glowWidth > 0.0) {
-            let t = clamp(1.0 - max(shapeDistance, 0.0) / glowWidth, 0.0, 1.0);
+            // Measured from what is actually drawn, not from the shape's outline. A stroke-only
+            // rectangle -- a border, the commonest shape in a composition -- has nothing in its
+            // middle, and a glow measured from the outline would fill the whole picture with a
+            // wash. So a hollow shape's glow hugs its stroke and a filled one's spreads outward.
+            let filled = style.color.a > 0.0;
+            let fromDrawn = select(max(abs(shapeDistance) - stroke, 0.0), max(shapeDistance, 0.0), filled);
+            let t = clamp(1.0 - fromDrawn / glowWidth, 0.0, 1.0);
             glowAlpha = t * t;
         }
     }

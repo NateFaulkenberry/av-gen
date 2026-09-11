@@ -13,6 +13,7 @@
 #include "app/render_job.hpp"
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
+#include "rendering/composition_renderer.hpp"
 #include "rendering/output_mapper.hpp"
 #include "ui/editor_layout.hpp"
 #include "share/texture_share.hpp"
@@ -168,6 +169,9 @@ private:
     std::unique_ptr<gpu::Context> context_;
     std::unique_ptr<gpu::ShaderLibrary> shaders_;
     std::unique_ptr<rendering::SceneRenderer> renderer_;
+    // The 2D composition over the finished frame (ADR-081). Installed on the renderer as its one
+    // overlay hook; fed the engine's layer stack and timeline clock once per frame.
+    std::unique_ptr<rendering::CompositionRenderer> compositor_;
     std::unique_ptr<ui::ImGuiLayer> imgui_;
     std::unique_ptr<ui::ControlPanel> panel_;
 

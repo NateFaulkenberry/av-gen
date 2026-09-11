@@ -9,8 +9,12 @@
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
 #include "rendering/composition_renderer.hpp"
+#include "app/engine.hpp"
+#include "app/render_job.hpp"
+#include "assets/image.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
+#include "support/temp_dir.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -22,6 +26,7 @@
 
 using namespace avgen;
 using Catch::Approx;
+namespace fs = std::filesystem;
 
 namespace {
 
@@ -315,4 +320,160 @@ TEST_CASE("a hundred text layers stay one pass and a handful of draws",
     CHECK(statsHundred.layers == 100);
     // The same eleven letters in a hundred layers rasterise once.
     CHECK(statsHundred.glyphs <= 12);
+}
+
+// ---- the offline path ---------------------------------------------------------------------
+// The one that has caught this engine out before: a feature that is correct in memory and absent
+// from the render, because the offline renderer reloads the project from a file. These drive the
+// real RenderJob over a real project document.
+
+TEST_CASE("an offline render contains the composition, reproducibly",
+          "[gpu][composition][determinism]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    const fs::path dir = testsupport::processTempDir() / "composition_offline";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    const fs::path previous = fs::current_path();
+    fs::current_path(dir);
+
+    // Two projects that differ only in whether they carry a composition.
+    const auto writeProject = [&](const fs::path& file, bool withText) {
+        app::Engine engine(app::EngineMode::Offline);
+        if (withText) {
+            auto& text = engine.addTextLayer("OFFLINE", 0.0, 0.0);
+            text.size = 0.3f;
+            text.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+            text.pushAuthored();
+        }
+        engine.renderSettings().width = 160;
+        engine.renderSettings().height = 90;
+        engine.renderSettings().fps = 30.0;
+        engine.renderSettings().startSeconds = 0.0;
+        engine.renderSettings().endSeconds = 0.2;
+        engine.renderSettings().output = app::RenderOutput::PngSequence;
+        engine.renderSettings().outputPath = file.stem().string() + "_frames";
+        REQUIRE(engine.saveProject(file).has_value());
+    };
+    writeProject("plain.json", false);
+    writeProject("titled.json", true);
+
+    const auto run = [&](const fs::path& project) {
+        auto engine = std::make_unique<app::Engine>(app::EngineMode::Offline);
+        REQUIRE(engine->loadProject(project).has_value());
+        app::RenderSettings settings = engine->renderSettings();
+        app::RenderJob job(*ctx, shaders, std::move(engine), settings, fs::path("."));
+        REQUIRE(job.start().has_value());
+        REQUIRE(job.run().has_value());
+        return job.progress().sequenceHash;
+    };
+
+    const std::uint64_t plain = run("plain.json");
+    const std::uint64_t titled = run("titled.json");
+    const std::uint64_t titledAgain = run("titled.json");
+
+    // The composition survived the save, the load and the render...
+    CHECK(plain != titled);
+    // ...and the render is reproducible, which is what the sequence hash is for.
+    CHECK(titled == titledAgain);
+
+    // And it is really text on the picture, not just different bytes.
+    auto image = assets::loadImage("titled_frames/frame_000000.png", false);
+    REQUIRE(image.has_value());
+    std::uint64_t lit = 0;
+    for (std::size_t i = 0; i + 3 < image->data.size(); i += 4) {
+        if (image->data[i] > 128) {
+            ++lit;
+        }
+    }
+    CHECK(lit > 50);
+
+    fs::current_path(previous);
+    fs::remove_all(dir);
+}
+
+TEST_CASE("a frame rendered offline matches the same frame rendered live",
+          "[gpu][composition][determinism]") {
+    // The live window path encodes SceneRenderer::render into a target and presents it; the
+    // offline path encodes the same call into a texture it reads back. Same engine, same second,
+    // so the pixels have to agree -- and would not if the composition were driven by a frame
+    // counter, a wall clock or anything else the two paths do not share.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    const fs::path dir = testsupport::processTempDir() / "composition_equivalence";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    const fs::path previous = fs::current_path();
+    fs::current_path(dir);
+
+    constexpr std::uint32_t kWidth = 160;
+    constexpr std::uint32_t kHeight = 90;
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        auto& text = engine.addTextLayer("MATCH", 0.5, 0.0);
+        text.size = 0.28f;
+        text.pushAuthored();
+        params::Track track;
+        track.target = text.parameterPath("opacity");
+        track.addKey(params::Key{0.5, {0.0f, 0, 0, 0}, params::KeyInterp::EaseInOut, {}, {}});
+        track.addKey(params::Key{2.5, {1.0f, 0, 0, 0}, params::KeyInterp::EaseInOut, {}, {}});
+        engine.timeline().addTrack(track);
+        engine.renderSettings().width = kWidth;
+        engine.renderSettings().height = kHeight;
+        engine.renderSettings().fps = 30.0;
+        engine.renderSettings().startSeconds = 1.0;
+        engine.renderSettings().endSeconds = 1.05;
+        engine.renderSettings().output = app::RenderOutput::PngSequence;
+        engine.renderSettings().outputPath = "frames";
+        REQUIRE(engine.saveProject("show.json").has_value());
+    }
+    {
+        auto engine = std::make_unique<app::Engine>(app::EngineMode::Offline);
+        REQUIRE(engine->loadProject("show.json").has_value());
+        app::RenderSettings settings = engine->renderSettings();
+        app::RenderJob job(*ctx, shaders, std::move(engine), settings, fs::path("."));
+        REQUIRE(job.start().has_value());
+        REQUIRE(job.run().has_value());
+    }
+    auto offline = assets::loadImage("frames/frame_000000.png", false);
+    REQUIRE(offline.has_value());
+
+    // The same project, the same second, through the interactive path's encode.
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject("show.json").has_value());
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    rendering::CompositionRenderer compositor(*ctx, shaders);
+    REQUIRE(compositor.init().has_value());
+    renderer.setOverlay(&compositor);
+    FixedStepClock clock(30.0);
+    clock.restartAt(1.0);
+    const FrameTime time = engine.tick(clock);
+    engine.setViewport(kWidth, kHeight);
+    engine.update(time);
+    compositor.setInput(&engine.layers(), engine.timelineClock().seconds);
+    auto live = renderer.renderToImage(engine.scene(), time, kWidth, kHeight);
+    REQUIRE(live.has_value());
+
+    REQUIRE(offline->data.size() == live->rgba.size());
+    std::size_t differing = 0;
+    int worst = 0;
+    for (std::size_t i = 0; i < live->rgba.size(); ++i) {
+        const int delta = std::abs(static_cast<int>(offline->data[i]) - static_cast<int>(live->rgba[i]));
+        if (delta != 0) {
+            ++differing;
+            worst = std::max(worst, delta);
+        }
+    }
+    INFO("differing bytes " << differing << ", worst delta " << worst);
+    CHECK(differing == 0);
+
+    // The keyframe is doing something at this second: a quarter of the way into a two-second ease.
+    const comp::Layer* layer = engine.layers().at(0);
+    REQUIRE(layer != nullptr);
+    CHECK(layer->resolvedOpacity() > 0.0f);
+    CHECK(layer->resolvedOpacity() < 1.0f);
+
+    fs::current_path(previous);
+    fs::remove_all(dir);
 }
