@@ -1,0 +1,38 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Alien - Skinned Character"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "alien.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": -0.2,
+  "post/tonemap/operator": 1,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.14,
+  "post/bloom/threshold": 2.0,
+  "post/grade/contrast": 1.05,
+  "post/output/vignette": 0.28,
+  "post/output/grain": 0.015
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": false,
+  "tracks": [],
+  "cues": []
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "sequence"
+ }
+}

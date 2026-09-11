@@ -1,0 +1,84 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "alien-walk",
+ "camera": {
+  "mode": 1,
+  "position": [2.35, 1.15, 3.1],
+  "target": [0.0, 0.62, 0.0],
+  "fov": 34.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../lightrigs/studio-softbox.rig.json",
+ "environment": {
+  "intensity": 0.35,
+  "background": [0.016, 0.018, 0.024],
+  "fogColor": [0.02, 0.022, 0.03],
+  "fogDensity": 0.008,
+  "volumeDensity": 0.0,
+  "sky": {
+   "zenithColor": [0.30, 0.35, 0.46],
+   "horizonColor": [0.32, 0.33, 0.36],
+   "groundColor": [0.02, 0.021, 0.024],
+   "haze": 0.2,
+   "sunColor": [1.0, 0.95, 0.88],
+   "sunIntensity": 18.0,
+   "sunSize": 0.35,
+   "sunGlow": 0.6,
+   "intensity": 0.5
+  }
+ },
+ "nodes": [
+  {
+   "name": "floor",
+   "kind": "procedural",
+   "position": [0.0, -0.06, 0.0],
+   "procedural": {
+    "source": {"kind": "box", "size": [9.0, 0.12, 6.0], "subdivisions": 2, "bevel": 0.02, "bevelSegments": 2},
+    "distribution": {"kind": "single"},
+    "material": {
+     "baseColor": [0.10, 0.105, 0.115],
+     "emissiveColor": [0, 0, 0],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.55,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "idle",
+   "kind": "gltf",
+   "asset": "../../assets/imported/alien.gltf",
+   "position": [-1.25, 0.0, 0.0],
+   "rotation": [0, 18, 0],
+   "scale": [0.01, 0.01, 0.01],
+   "animation": {"state": "Idle", "blend": 0.35}
+  },
+  {
+   "name": "walk",
+   "kind": "gltf",
+   "asset": "../../assets/imported/alien.gltf",
+   "position": [0.0, 0.0, 0.0],
+   "rotation": [0, 0, 0],
+   "scale": [0.01, 0.01, 0.01],
+   "animation": {"state": "Walk", "blend": 0.35}
+  },
+  {
+   "name": "run",
+   "kind": "gltf",
+   "asset": "../../assets/imported/alien.gltf",
+   "position": [1.25, 0.0, 0.0],
+   "rotation": [0, -18, 0],
+   "scale": [0.01, 0.01, 0.01],
+   "animation": {"state": "Run", "blend": 0.35}
+  }
+ ],
+ "composition": {
+  "focalPoints": [
+   {"name": "walker", "position": [0.0, 0.7, 0.0], "radius": 1.4, "weight": 2.0}
+  ],
+  "cameraTarget": "walker",
+  "targetScreenPosition": [0.5, 0.52],
+  "framingStrength": 0.0
+ }
+}

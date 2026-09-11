@@ -1925,6 +1925,7 @@ void Composition::rebuild() {
     scene_.meshes.clear();
     scene_.textures.clear();
     scene_.entities.clear();
+    scene_.rigs.clear(); // ADR-086: rebuilt from the nodes' assets below
     scene_.particles.clear();
     scene_.procedurals.clear();
     scene_.fields.fields.clear();
@@ -2031,7 +2032,9 @@ void Composition::rebuild() {
     };
 
     for (const auto& nodePtr : nodes_) {
-        const CompositionNode& node = *nodePtr;
+        // Non-const because a Gltf node records which rigs the flatten gave it (ADR-086); nothing
+        // else in this loop writes to the node.
+        CompositionNode& node = *nodePtr;
         NodeRange range;
         range.firstEntity = scene_.entities.size();
         range.firstParticle = scene_.particles.size();
@@ -2058,9 +2061,32 @@ void Composition::rebuild() {
                 it = assetOffsets.emplace(key, offsets).first;
             }
             const auto [meshOffset, textureOffset] = it->second;
+            // ADR-086: rigs are copied per node instance, not per asset. Two nodes on the same
+            // character file are two characters, and they must be able to be doing different
+            // things; sharing one pose between them is the bug, not the saving.
+            const auto rigOffset = static_cast<RigId>(scene_.rigs.size());
+            range.firstRig = scene_.rigs.size();
+            for (const SkinnedRig& src : asset.scene.rigs) {
+                SkinnedRig rig = src;
+                rig.name = node.name + "/" + src.name;
+                rig.updateHz = node.animation.updateHz;
+                rig.cullDistance = node.animation.cullDistance;
+                scene_.rigs.push_back(std::move(rig));
+            }
+            range.rigCount = scene_.rigs.size() - range.firstRig;
+            node.rigs.clear();
+            for (std::size_t r = 0; r < range.rigCount; ++r) {
+                node.rigs.push_back(rigOffset + static_cast<RigId>(r));
+            }
+            // Re-apply the node's request to the fresh rigs, at the timeline second it was first
+            // made: a rebuild must not restart a walk cycle, so `animationAppliedAt` is kept.
+            node.animationPushed = false;
             for (const Entity& src : asset.scene.entities) {
                 Entity e = src;
                 offsetEntityIds(e, meshOffset, textureOffset);
+                if (e.rig != kInvalidRig) {
+                    e.rig += rigOffset;
+                }
                 e.name = node.name + "/" + src.name;
                 e.transform = compose(nodeT, src.transform);
                 e.visible = visible && src.visible;
@@ -2650,6 +2676,69 @@ void Composition::update(const FrameTime& time) {
         cameraAngle_ += cameraOrbitSpeed_->value() * dt;
     }
     applyParameters();
+    updateCharacters(time);
+}
+
+// ADR-086. Two things, in order: push each node's authored animation request into its rigs (only
+// when the request changed, so a behaviour driving a player directly is left alone), then pose
+// every rig in the scene against this frame's timeline second.
+void Composition::updateCharacters(const FrameTime& time) {
+    if (scene_.rigs.empty()) {
+        rigStats_ = RigStats{};
+        return;
+    }
+    for (const auto& nodePtr : nodes_) {
+        CompositionNode& node = *nodePtr;
+        if (node.rigs.empty() || node.animation.state.empty()) {
+            continue;
+        }
+        if (node.animation.state != node.animationApplied) {
+            // A new request: it is made now, and it keeps that second for the rest of its life.
+            node.animationApplied = node.animation.state;
+            node.animationAppliedAt = time.renderTime;
+            node.animationPushed = false;
+        }
+        if (node.animationPushed) {
+            continue; // already in the rigs, and a behaviour may have moved them on since
+        }
+        bool applied = false;
+        for (const RigId id : node.rigs) {
+            if (id >= scene_.rigs.size()) {
+                continue;
+            }
+            SkinnedRig& rig = scene_.rigs[id];
+            const int index = rig.player.stateIndex(node.animation.state);
+            if (index < 0) {
+                continue;
+            }
+            const float blend = node.animation.blend >= 0.0f
+                                    ? node.animation.blend
+                                    : rig.player.blendTimeFor(rig.player.currentState(), node.animation.state);
+            if (rig.player.play(node.animation.state, node.animationAppliedAt, blend)) {
+                rig.player.setSpeed(node.animation.speed, node.animationAppliedAt);
+                applied = true;
+            }
+        }
+        if (!applied) {
+            log::warn("node '{}': no animation state named '{}'", node.name, node.animation.state);
+        }
+        node.animationPushed = true; // whether or not it landed: do not warn again every frame
+    }
+    rigStats_ = updateRigs(scene_, time);
+}
+
+bool Composition::setNodeAnimation(const std::string& nodeName, const std::string& state, double now,
+                                   float blend) {
+    CompositionNode* node = findNode(nodeName);
+    if (node == nullptr) {
+        return false;
+    }
+    node->animation.state = state;
+    node->animation.blend = blend;
+    node->animationApplied = state;
+    node->animationAppliedAt = now;
+    node->animationPushed = false;
+    return true;
 }
 
 void Composition::applyParameters() {
@@ -3632,6 +3721,25 @@ nlohmann::json Composition::toJson() const {
         n["visible"] = node.visible;
         n["emissiveBoost"] = node.emissiveBoost;
         n["roughnessScale"] = node.roughnessScale;
+        if (node.kind == NodeKind::Gltf && node.animation.authored()) { // ADR-086
+            json anim = json::object();
+            if (!node.animation.state.empty()) {
+                anim["state"] = node.animation.state;
+            }
+            if (node.animation.blend >= 0.0f) {
+                anim["blend"] = node.animation.blend;
+            }
+            if (node.animation.speed != 1.0f) {
+                anim["speed"] = node.animation.speed;
+            }
+            if (node.animation.updateHz != 0.0f) {
+                anim["updateHz"] = node.animation.updateHz;
+            }
+            if (node.animation.cullDistance != 120.0f) {
+                anim["cullDistance"] = node.animation.cullDistance;
+            }
+            n["animation"] = anim;
+        }
         if (node.kind == NodeKind::Particles) {
             n["particles"] = particlesToJson(node.particles);
         }
@@ -4213,6 +4321,27 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             node.visible = *visible;
             node.emissiveBoost = *emissive;
             node.roughnessScale = *roughness;
+            if (item.contains("animation")) { // ADR-086: a skinned character's opening state
+                const json& anim = item.at("animation");
+                if (!anim.is_object()) {
+                    return fail("node '{}': 'animation' must be an object", node.name);
+                }
+                auto state = readString(anim, "state", "");
+                auto blend = readFloat(anim, "blend", -1.0f);
+                auto speed = readFloat(anim, "speed", 1.0f);
+                auto hz = readFloat(anim, "updateHz", 0.0f);
+                auto cull = readFloat(anim, "cullDistance", 120.0f);
+                if (!state) return std::unexpected(state.error());
+                if (!blend) return std::unexpected(blend.error());
+                if (!speed) return std::unexpected(speed.error());
+                if (!hz) return std::unexpected(hz.error());
+                if (!cull) return std::unexpected(cull.error());
+                node.animation.state = *state;
+                node.animation.blend = *blend;
+                node.animation.speed = *speed;
+                node.animation.updateHz = *hz;
+                node.animation.cullDistance = *cull;
+            }
             if (item.contains("procedural")) {
                 auto pg = ProceduralGeometry::fromJson(item.at("procedural"));
                 if (!pg) {

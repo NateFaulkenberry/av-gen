@@ -161,6 +161,12 @@
    "category": "Performance",
    "description": "1,100 m of the same valley: 160,766 placed, 3,111 visible, 33.6 ms -- heavier than the authored showcase scene. The renderer's stress rung.",
    "project": "recipes/glowmere-extreme.recipe.json"
+  },
+  {
+   "name": "Alien - Skinned Character",
+   "category": "Lab",
+   "description": "Three copies of one CC0 character, idling, walking and running from the same glTF skin: 49 joints, three clips, GPU skinning through the shared PBR shading. Each node declares its own opening state, and the pose is a pure function of the timeline, so the window and an offline render agree.",
+   "project": "characters/alien.json"
   }
  ]
 }
