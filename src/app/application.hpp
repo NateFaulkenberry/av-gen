@@ -142,6 +142,11 @@ private:
     // sluggish" is actually about -- a frame rate says how often the picture changes, not how old
     // the picture is. Zero when no input arrived this frame.
     std::uint64_t newestInputNs_ = 0;
+    // A resize that arrived during the late input pump, i.e. after this frame's surface was
+    // already configured and its image already acquired. It has to be carried to the next
+    // frame rather than acted on here, and carried explicitly: the FrameEvents that held it
+    // is a per-frame local, so without this the resize would simply be dropped.
+    bool pendingResize_ = false;
     std::map<std::uint32_t, std::uint64_t> uiEventTypes_;
     // Offline rendering: settings from the project + CLI overrides; a job runs to completion
     // headless, or a few frames per UI frame in the live app.
@@ -239,6 +244,7 @@ private:
     // Puts the camera in free mode, because position and target are ignored in orbit mode and a
     // gesture that silently moves nothing is indistinguishable from a dead input.
     void ensureFreeCamera();
+    // One raw SDL event on its way to ImGui, the viewport and the shortcut table.
     void handleInputEvent(const SDL_Event& event);
     void handleViewportEvent(const SDL_Event& event);
     // Scripted mouse input for checking the viewport end to end; see the definition.

@@ -1172,6 +1172,56 @@ void Application::handleViewportEvent(const SDL_Event& event) {
 //     does not if the canvas origin is not subtracted from the click.
 //   - A drag that ends outside the canvas must keep moving the camera after it leaves, or a panel
 //     has stolen a gesture halfway through (ADR-068).
+// One raw SDL event on its way to ImGui, the viewport and the shortcut table. A member rather
+// than a lambda in the loop because the loop now pumps the queue twice: once before the
+// swapchain wait for window-level events, and once after it so the frame is built on the
+// freshest input there is. See runLive().
+void Application::handleInputEvent(const SDL_Event& event) {
+            if (uiSelfTestEvents_) {
+                uiEventTypes_[event.type] += 1;
+            }
+            if (event.type == SDL_EVENT_MOUSE_MOTION) {
+                ++uiMotionEvents_;
+                newestInputNs_ = std::max(newestInputNs_, event.motion.timestamp);
+            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                ++uiButtonEvents_;
+            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                ++uiButtonEvents_;
+            }
+            // Output windows share the SDL queue; only the main window's input reaches ImGui.
+            if (SDL_Window* from = SDL_GetWindowFromEvent(&event); from != nullptr && from != window_->handle()) {
+                ++uiFilteredEvents_;
+                return;
+            }
+            imgui_->processEvent(event);
+            // The viewport gets the mouse when the pointer is over the canvas. Since the canvas is
+            // an ImGui window of its own (ADR-076), ImGui's WantCaptureMouse is true whenever the
+            // pointer is on the world, so it can no longer be the test -- the canvas's own hover
+            // state is, and it is false when a panel, a popup or a menu is over it.
+            //
+            // A drag that began on the canvas keeps the mouse until the button is released:
+            // letting a panel steal a gesture halfway through because the cursor passed over it is
+            // how an orbit ends up jumping to a stop mid-swing.
+            if (canvas_.hovered || viewportGesture_ != ViewportGesture::None) {
+                handleViewportEvent(event);
+            }
+            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && !imgui_->wantsKeyboard()) {
+                if (event.key.key == SDLK_SPACE) {
+                    engine_->togglePlay();
+                } else if (event.key.key == SDLK_O && panel_ && panel_->onOpenAudio) {
+                    panel_->onOpenAudio();
+                } else if (event.key.key == SDLK_S && panel_ && panel_->onOpenScene) {
+                    panel_->onOpenScene();
+                } else if (event.key.key == SDLK_E && panel_ && panel_->onOpenEnvironment) {
+                    panel_->onOpenEnvironment();
+                } else if (event.key.key == SDLK_LEFT) {
+                    engine_->seekSeconds(engine_->positionSeconds() - 5.0);
+                } else if (event.key.key == SDLK_RIGHT) {
+                    engine_->seekSeconds(engine_->positionSeconds() + 5.0);
+                }
+            }
+}
+
 void Application::runViewportProbe(int frameIndex) {
     static const char* const clickSpec = std::getenv("AVGEN_VIEWPORT_PROBE");
     static const char* const dragSpec = std::getenv("AVGEN_VIEWPORT_DRAG");
@@ -1479,10 +1529,6 @@ int Application::runLive() {
         const auto frameStart = std::chrono::steady_clock::now();
         prof.beginFrame();
         const std::uint64_t allocsAtFrameStart = core::allocCounters().allocations;
-        if (uiScript_.active()) {
-            core::PhaseProfiler::Scope scope(prof, kPhScript);
-            uiScript_.step(*engine_, panel_.get(), *window_, static_cast<std::uint64_t>(framesRendered));
-        }
         // Last frame's canvas. Events are read before this frame is laid out, so this is the most
         // recent answer there is; on a still window it is the current one.
         if (panel_ != nullptr) {
@@ -1490,51 +1536,7 @@ int Application::runLive() {
         }
         const auto eventsStart = std::chrono::steady_clock::now();
         newestInputNs_ = 0;
-        auto events = window_->pollEvents([this](const SDL_Event& event) {
-            if (uiSelfTestEvents_) {
-                uiEventTypes_[event.type] += 1;
-            }
-            if (event.type == SDL_EVENT_MOUSE_MOTION) {
-                ++uiMotionEvents_;
-                newestInputNs_ = std::max(newestInputNs_, event.motion.timestamp);
-            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-                ++uiButtonEvents_;
-            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
-                ++uiButtonEvents_;
-            }
-            // Output windows share the SDL queue; only the main window's input reaches ImGui.
-            if (SDL_Window* from = SDL_GetWindowFromEvent(&event); from != nullptr && from != window_->handle()) {
-                ++uiFilteredEvents_;
-                return;
-            }
-            imgui_->processEvent(event);
-            // The viewport gets the mouse when the pointer is over the canvas. Since the canvas is
-            // an ImGui window of its own (ADR-076), ImGui's WantCaptureMouse is true whenever the
-            // pointer is on the world, so it can no longer be the test -- the canvas's own hover
-            // state is, and it is false when a panel, a popup or a menu is over it.
-            //
-            // A drag that began on the canvas keeps the mouse until the button is released:
-            // letting a panel steal a gesture halfway through because the cursor passed over it is
-            // how an orbit ends up jumping to a stop mid-swing.
-            if (canvas_.hovered || viewportGesture_ != ViewportGesture::None) {
-                handleViewportEvent(event);
-            }
-            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && !imgui_->wantsKeyboard()) {
-                if (event.key.key == SDLK_SPACE) {
-                    engine_->togglePlay();
-                } else if (event.key.key == SDLK_O && panel_ && panel_->onOpenAudio) {
-                    panel_->onOpenAudio();
-                } else if (event.key.key == SDLK_S && panel_ && panel_->onOpenScene) {
-                    panel_->onOpenScene();
-                } else if (event.key.key == SDLK_E && panel_ && panel_->onOpenEnvironment) {
-                    panel_->onOpenEnvironment();
-                } else if (event.key.key == SDLK_LEFT) {
-                    engine_->seekSeconds(engine_->positionSeconds() - 5.0);
-                } else if (event.key.key == SDLK_RIGHT) {
-                    engine_->seekSeconds(engine_->positionSeconds() + 5.0);
-                }
-            }
-        });
+        auto events = window_->pollEvents([this](const SDL_Event& e) { handleInputEvent(e); });
         prof.add(kPhEvents, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
                                                                         eventsStart).count());
         if (events.quit) {
@@ -1547,7 +1549,8 @@ int Application::runLive() {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
             continue;
         }
-        if (events.resized) {
+        if (events.resized || pendingResize_) {
+            pendingResize_ = false;
             context_->configureSurface(window_->pixelWidth(), window_->pixelHeight());
             if (auto r = renderer_->resize(window_->pixelWidth(), window_->pixelHeight()); !r) {
                 log::error("resize: {}", r.error().message);
@@ -1619,6 +1622,68 @@ int Application::runLive() {
         }
         prof.add(kPhResize, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
                                                                       resizeStart).count());
+
+        // ---- the swapchain wait, and then the frame ------------------------------------------
+        //
+        // The wait comes *before* the input is sampled and the frame is built, which is the reverse
+        // of the obvious order and the point of it.
+        //
+        // Under Fifo this wait is however long the CPU must stand still before a swapchain image is
+        // free: the vsync pace when the frame is cheap, the GPU's backlog when it is not -- 15.6 ms
+        // of a 17.2 ms frame on the world scene. Building the UI before it meant the picture that
+        // reached the screen was built from input sampled a whole wait earlier, so every millisecond
+        // the GPU fell behind was also a millisecond of staleness in the pointer. The frame rate did
+        // not show it; input-to-present latency did, at 17.2 ms median where the work is 1.6.
+        //
+        // So: wait first, then read whatever the device produced during the wait, then build the
+        // frame from it. The queue is pumped twice per frame -- the first pass takes the
+        // window-level events (resize, close, dropped files) that have to be acted on before a
+        // surface image is asked for at all, and this pass takes the input. Nothing is dropped:
+        // both passes go through the same handler and the same ImGui backend, and the second pass's
+        // window events are merged into the first's.
+        const auto workBeforeAcquire = std::chrono::steady_clock::now();
+        auto view = context_->acquireSurfaceView();
+        const auto workAfterAcquire = std::chrono::steady_clock::now();
+        // A WAIT, not work, and not GPU time either: this is how long the CPU stood still because
+        // no swapchain image was free. Under Fifo it is the vsync pace when the frame is cheap and
+        // the GPU's backlog when it is not. Naming it as a wait is the whole point -- a number that
+        // grows when the GPU is the bottleneck must not be read as the CPU getting slower.
+        prof.add(kPhAcquire,
+                 std::chrono::duration<double, std::milli>(workAfterAcquire - workBeforeAcquire).count());
+        if (!view) {
+            // Nothing has been submitted to ImGui yet this frame -- the UI is built below, after
+            // the wait -- so there is no frame to end here.
+            log::warn("frame skipped: {}", view.error().message);
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+            continue;
+        }
+        // Late input. Anything the pointer or keyboard produced while the CPU was waiting above is
+        // in the queue now, and this frame uses it rather than showing it one frame later.
+        {
+            const auto lateStart = std::chrono::steady_clock::now();
+            if (uiScript_.active()) {
+                // The script stands in for the device, so it produces its events where a device's
+                // would be: just before the poll that consumes them. Pushing them at the top of the
+                // frame instead would date every synthetic event by a whole wait and quietly make
+                // the measurement insensitive to the very thing being measured.
+                core::PhaseProfiler::Scope scope(prof, kPhScript);
+                uiScript_.step(*engine_, panel_.get(), *window_, static_cast<std::uint64_t>(framesRendered));
+            }
+            const platform::FrameEvents late =
+                window_->pollEvents([this](const SDL_Event& e) { handleInputEvent(e); });
+            events.quit = events.quit || late.quit;
+            // This frame's surface is already configured and its image already acquired, so a
+            // resize that arrives now is next frame's business.
+            pendingResize_ = pendingResize_ || late.resized;
+            for (const std::string& dropped : late.droppedFiles) {
+                loadAny(dropped);
+            }
+            prof.add(kPhEvents,
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - lateStart).count());
+            if (events.quit) {
+                break;
+            }
+        }
 
         const FrameTime time = engine_->tick(clock);
         lastTime = time;
@@ -1704,21 +1769,6 @@ int Application::runLive() {
                       ImGui::IsAnyItemHovered(), io.DeltaTime);
         }
 
-        const auto workBeforeAcquire = std::chrono::steady_clock::now();
-        auto view = context_->acquireSurfaceView();
-        const auto workAfterAcquire = std::chrono::steady_clock::now();
-        // A WAIT, not work, and not GPU time either: this is how long the CPU stood still because
-        // no swapchain image was free. Under Fifo it is the vsync pace when the frame is cheap and
-        // the GPU's backlog when it is not. Naming it as a wait is the whole point -- a number that
-        // grows when the GPU is the bottleneck must not be read as the CPU getting slower.
-        prof.add(kPhAcquire,
-                 std::chrono::duration<double, std::milli>(workAfterAcquire - workBeforeAcquire).count());
-        if (!view) {
-            log::warn("frame skipped: {}", view.error().message);
-            ImGui::EndFrame();
-            std::this_thread::sleep_for(std::chrono::milliseconds(16));
-            continue;
-        }
         const std::uint32_t pw = window_->pixelWidth();
         const std::uint32_t ph = window_->pixelHeight();
         // The frame renders into the offscreen final texture; every projection output still
