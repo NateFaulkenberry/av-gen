@@ -120,6 +120,7 @@ struct CompositionNode {
     std::string animationApplied;  // the state `animationAppliedAt` refers to
     double animationAppliedAt = 0.0; // the timeline second the request was made (kept across rebuilds)
     bool animationPushed = false;  // cleared by a rebuild: push the same request at the same second
+    bool animationRebase = false;  // ADR-089: force the phase origin, even re-entering the same state
     std::unique_ptr<class Composition> child;              // Scene (nested)
     params::Parameter<glm::vec3>* positionParam = nullptr;
     params::Parameter<glm::vec3>* rotationParam = nullptr; // Euler degrees
@@ -187,10 +188,18 @@ public:
 
     // ---- skinned characters (ADR-086) ----
     // Asks every rig `nodeName` owns to enter `state` at timeline second `now`, cross-fading over
-    // `blend` seconds (< 0 = the state's own). False when there is no such node. The declarative
-    // route; a behaviour wanting frame-by-frame control drives scene().rigs[...].player itself.
+    // `blend` seconds (< 0 = the state's own) and running at `speed` clip seconds per timeline
+    // second. False when there is no such node. The declarative route; a behaviour wanting
+    // frame-by-frame control drives scene().rigs[...].player itself.
+    //
+    // `rebase` (ADR-089) forces the clip's phase origin to `now` even when that state is already
+    // the current one. The two callers want opposite things and both are right: a *behaviour* calls
+    // this every frame and must not restart the walk it is already walking, while a *sequencer*
+    // cues the same walk at 0:12 and again at 1:04 and means two different phases -- and a scrub
+    // backwards means the earlier one again. Idempotent either way: a request identical to the one
+    // already in force returns immediately, so calling it per frame costs a string compare.
     bool setNodeAnimation(const std::string& nodeName, const std::string& state, double now,
-                          float blend = -1.0f);
+                          float blend = -1.0f, float speed = 1.0f, bool rebase = false);
     // What the last update() spent on posing, and how many rigs it skipped.
     [[nodiscard]] const RigStats& rigStats() const { return rigStats_; }
 

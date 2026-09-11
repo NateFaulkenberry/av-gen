@@ -2976,6 +2976,13 @@ void Composition::updateCharacters(const FrameTime& time) {
                                     ? node.animation.blend
                                     : rig.player.blendTimeFor(rig.player.currentState(), node.animation.state);
             if (rig.player.play(node.animation.state, node.animationAppliedAt, blend)) {
+                if (node.animationRebase) {
+                    // play() returns true without restarting a state it is already in, which is
+                    // exactly right for a behaviour and exactly wrong for a timeline cue (ADR-089).
+                    rig.player.restart(node.animationAppliedAt);
+                }
+                // setSpeed rebases to keep local clip time continuous; called at the phase origin
+                // the elapsed time is zero, so the origin survives.
                 rig.player.setSpeed(node.animation.speed, node.animationAppliedAt);
                 applied = true;
             }
@@ -2989,16 +2996,25 @@ void Composition::updateCharacters(const FrameTime& time) {
 }
 
 bool Composition::setNodeAnimation(const std::string& nodeName, const std::string& state, double now,
-                                   float blend) {
+                                   float blend, float speed, bool rebase) {
     CompositionNode* node = findNode(nodeName);
     if (node == nullptr) {
         return false;
     }
+    // Idempotent, so a sequencer may call this every frame: the same state at the same phase origin
+    // with the same rate is already in force and re-pushing it would restart the cross-fade.
+    if (node->animationPushed && node->animation.state == state && node->animationApplied == state &&
+        node->animationAppliedAt == now && node->animation.blend == blend &&
+        node->animation.speed == speed && node->animationRebase == rebase) {
+        return true;
+    }
     node->animation.state = state;
     node->animation.blend = blend;
+    node->animation.speed = speed;
     node->animationApplied = state;
     node->animationAppliedAt = now;
     node->animationPushed = false;
+    node->animationRebase = rebase;
     return true;
 }
 

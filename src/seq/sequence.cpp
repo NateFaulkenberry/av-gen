@@ -1,0 +1,1241 @@
+#include "seq/sequence.hpp"
+
+
+#include <nlohmann/json.hpp>
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <numbers>
+#include <unordered_map>
+#include <utility>
+
+namespace avgen::seq {
+namespace {
+using nlohmann::json;
+
+constexpr std::array<std::pair<MarkerKind, const char*>, 3> kMarkerKinds{{
+    {MarkerKind::Section, "section"},
+    {MarkerKind::Cue, "cue"},
+    {MarkerKind::Beat, "beat"},
+}};
+
+constexpr std::array<std::pair<CameraKind, const char*>, 3> kCameraKinds{{
+    {CameraKind::Inherit, "inherit"},
+    {CameraKind::Move, "move"},
+    {CameraKind::Keys, "keys"},
+}};
+
+constexpr std::array<std::pair<TransitionKind, const char*>, 3> kTransitionKinds{{
+    {TransitionKind::Cut, "cut"},
+    {TransitionKind::FadeIn, "fadeIn"},
+    {TransitionKind::FadeOut, "fadeOut"},
+}};
+
+constexpr std::array<std::pair<CameraPreset, const char*>, 7> kCameraPresets{{
+    {CameraPreset::Isometric, "isometric"},
+    {CameraPreset::Follow, "follow"},
+    {CameraPreset::Wide, "wide"},
+    {CameraPreset::Close, "close"},
+    {CameraPreset::TopDown, "topDown"},
+    {CameraPreset::Tracking, "tracking"},
+    {CameraPreset::Reveal, "reveal"},
+}};
+
+constexpr std::array<std::pair<SnapMode, const char*>, 4> kSnapModes{{
+    {SnapMode::Off, "off"},
+    {SnapMode::Frames, "frames"},
+    {SnapMode::Beats, "beats"},
+    {SnapMode::Markers, "markers"},
+}};
+
+template <typename E, std::size_t N>
+const char* nameOf(const std::array<std::pair<E, const char*>, N>& table, E value) {
+    for (const auto& [e, n] : table) {
+        if (e == value) {
+            return n;
+        }
+    }
+    return table[0].second;
+}
+
+template <typename E, std::size_t N>
+std::optional<E> valueOf(const std::array<std::pair<E, const char*>, N>& table, std::string_view name) {
+    for (const auto& [e, n] : table) {
+        if (name == n) {
+            return e;
+        }
+    }
+    return std::nullopt;
+}
+
+// The camera's distance in radii is the whole reason a shot is reusable; true isometric is 35.264
+// degrees above the horizon, which in this parameterisation (y = elevation * radius, xz = radius)
+// is tan(35.264 deg).
+constexpr float kIsometricElevation = 0.70711f;
+
+// ---- track accumulation -----------------------------------------------------------------------
+
+// Keys land on named tracks from six different places (scene switching, transitions, camera moves,
+// shot automation, actor transforms, clip poses), and two of them legitimately write the same
+// target -- a fade at the end of one shot and a fade at the start of the next both key
+// `scene/brightness`. So there is one builder, and every producer goes through it.
+class TrackBuilder {
+public:
+    params::Track& track(const std::string& target, int component, params::TrackMode mode) {
+        const std::string key = target + "#" + std::to_string(component) + "#" +
+                                std::to_string(static_cast<int>(mode));
+        const auto it = index_.find(key);
+        if (it != index_.end()) {
+            return tracks_[it->second];
+        }
+        params::Track t;
+        t.target = target;
+        t.component = component;
+        t.timeBase = params::TimeBase::Seconds;
+        t.mode = mode;
+        index_.emplace(key, tracks_.size());
+        tracks_.push_back(std::move(t));
+        return tracks_.back();
+    }
+
+    void key(const std::string& target, double time, float value,
+             params::KeyInterp interp = params::KeyInterp::Linear,
+             params::TrackMode mode = params::TrackMode::Replace) {
+        params::Key k;
+        k.time = time;
+        k.value[0] = value;
+        k.interp = interp;
+        track(target, -1, mode).addKey(k);
+    }
+
+    void key3(const std::string& target, double time, const glm::vec3& value,
+              params::KeyInterp interp = params::KeyInterp::Linear,
+              params::TrackMode mode = params::TrackMode::Replace) {
+        params::Key k;
+        k.time = time;
+        k.value[0] = value.x;
+        k.value[1] = value.y;
+        k.value[2] = value.z;
+        k.interp = interp;
+        track(target, -1, mode).addKey(k);
+    }
+
+    void merge(params::Track incoming, double timeOffset) {
+        params::Track& dst = track(incoming.target, incoming.component, incoming.mode);
+        dst.loopLength = incoming.loopLength;
+        dst.enabled = incoming.enabled;
+        for (params::Key k : incoming.keys) {
+            k.time += timeOffset;
+            dst.addKey(k);
+        }
+    }
+
+    [[nodiscard]] std::vector<params::Track> take() { return std::move(tracks_); }
+    [[nodiscard]] bool has(const std::string& target) const {
+        return std::any_of(tracks_.begin(), tracks_.end(),
+                           [&](const params::Track& t) { return t.target == target; });
+    }
+
+private:
+    std::vector<params::Track> tracks_;
+    std::unordered_map<std::string, std::size_t> index_;
+};
+
+float headingDegrees(const glm::vec3& direction) {
+    if (glm::length(glm::vec2(direction.x, direction.z)) < 1e-5f) {
+        return 0.0f;
+    }
+    // +Z is the character's forward axis (the convention makeWalkerScene builds to), so a heading
+    // of zero faces +Z and rotation is about +Y.
+    return std::atan2(direction.x, direction.z) * 180.0f / std::numbers::pi_v<float>;
+}
+
+glm::vec3 readVec3(const json& j, const char* key, glm::vec3 fallback) {
+    const auto it = j.find(key);
+    if (it == j.end() || !it->is_array() || it->size() != 3) {
+        return fallback;
+    }
+    glm::vec3 out = fallback;
+    for (std::size_t i = 0; i < 3; ++i) {
+        if ((*it)[i].is_number()) {
+            out[static_cast<glm::length_t>(i)] = (*it)[i].get<float>();
+        }
+    }
+    return out;
+}
+
+double readNumber(const json& j, const char* key, double fallback) {
+    const auto it = j.find(key);
+    return it != j.end() && it->is_number() ? it->get<double>() : fallback;
+}
+
+std::string readString(const json& j, const char* key) {
+    const auto it = j.find(key);
+    return it != j.end() && it->is_string() ? it->get<std::string>() : std::string{};
+}
+
+// params::Track has no per-track JSON of its own; Timeline owns the serialiser. Going through a
+// scratch timeline rather than writing a second one is what keeps a baked track and a hand-authored
+// track the same kind of object -- the lesson ADR-075 already paid for.
+json tracksToJson(std::vector<params::Track> tracks) {
+    params::Timeline scratch;
+    for (auto& t : tracks) {
+        scratch.addTrack(std::move(t));
+    }
+    json doc = scratch.toJson();
+    return doc["tracks"];
+}
+
+std::vector<params::Track> tracksFromJson(const json& j, const char* what) {
+    params::Timeline scratch;
+    json doc{{"enabled", true}, {"tracks", j}, {"cues", json::array()}};
+    if (auto ok = scratch.fromJson(doc); !ok) {
+        // Caller turns this into an error with context; the message already names the track.
+        (void)what;
+        return {};
+    }
+    return std::move(scratch.tracks());
+}
+
+} // namespace
+
+const char* markerKindName(MarkerKind kind) { return nameOf(kMarkerKinds, kind); }
+std::optional<MarkerKind> markerKindFromName(std::string_view name) { return valueOf(kMarkerKinds, name); }
+const char* cameraKindName(CameraKind kind) { return nameOf(kCameraKinds, kind); }
+std::optional<CameraKind> cameraKindFromName(std::string_view name) { return valueOf(kCameraKinds, name); }
+const char* transitionKindName(TransitionKind kind) { return nameOf(kTransitionKinds, kind); }
+std::optional<TransitionKind> transitionKindFromName(std::string_view name) {
+    return valueOf(kTransitionKinds, name);
+}
+const char* cameraPresetName(CameraPreset preset) { return nameOf(kCameraPresets, preset); }
+std::optional<CameraPreset> cameraPresetFromName(std::string_view name) {
+    return valueOf(kCameraPresets, name);
+}
+const char* snapModeName(SnapMode mode) { return nameOf(kSnapModes, mode); }
+std::optional<SnapMode> snapModeFromName(std::string_view name) { return valueOf(kSnapModes, name); }
+
+// ---- camera presets (spec 11) -----------------------------------------------------------------
+
+ShotCamera cameraFromPreset(CameraPreset preset, const app::FocalTarget& subject) {
+    ShotCamera cam;
+    cam.kind = CameraKind::Move;
+    app::Shot& m = cam.move;
+    m.subject = subject;
+    m.easeIn = true;
+    m.easeOut = true;
+    switch (preset) {
+    case CameraPreset::Isometric:
+        // The diorama shot: a fixed three-quarter view from above, holding still. It is the one
+        // preset that does not move, because an isometric view that drifts stops being isometric.
+        m.kind = app::ShotKind::Establish;
+        m.startDistance = m.endDistance = 9.0f;
+        m.startAzimuth = m.endAzimuth = 0.785398f; // 45 degrees
+        m.startElevation = m.endElevation = kIsometricElevation;
+        m.composition.focalLength = 55.0f;
+        cam.samples = 2;
+        break;
+    case CameraPreset::Follow:
+        m.kind = app::ShotKind::Track;
+        m.startDistance = m.endDistance = 5.0f;
+        m.startAzimuth = 0.9f;
+        m.endAzimuth = 0.55f;
+        m.startElevation = m.endElevation = 0.42f;
+        m.composition.focalLength = 42.0f;
+        m.look = app::LookMode::Subject;
+        break;
+    case CameraPreset::Wide:
+        m.kind = app::ShotKind::Establish;
+        m.startDistance = 14.0f;
+        m.endDistance = 12.0f;
+        m.startAzimuth = m.endAzimuth = 0.62f;
+        m.startElevation = m.endElevation = 0.5f;
+        m.composition.focalLength = 24.0f;
+        break;
+    case CameraPreset::Close:
+        m.kind = app::ShotKind::Approach;
+        m.startDistance = 3.4f;
+        m.endDistance = 2.4f;
+        m.startAzimuth = m.endAzimuth = 0.35f;
+        m.startElevation = m.endElevation = 0.16f;
+        m.composition.focalLength = 70.0f;
+        break;
+    case CameraPreset::TopDown:
+        m.kind = app::ShotKind::Establish;
+        m.startDistance = m.endDistance = 1.2f;
+        m.startAzimuth = m.endAzimuth = 0.0f;
+        m.startElevation = m.endElevation = 7.0f; // straight down, at 7 radii of height
+        m.composition.focalLength = 40.0f;
+        cam.samples = 2;
+        break;
+    case CameraPreset::Tracking:
+        // Lateral travel with the aim held: parallax, not a pan (ADR-071's Drift).
+        m.kind = app::ShotKind::Drift;
+        m.startDistance = m.endDistance = 6.0f;
+        m.startAzimuth = 1.25f;
+        m.endAzimuth = 0.25f;
+        m.startElevation = m.endElevation = 0.3f;
+        m.curve = app::MovementCurve::Straight;
+        m.composition.focalLength = 45.0f;
+        break;
+    case CameraPreset::Reveal:
+        m.kind = app::ShotKind::Reveal;
+        m.startDistance = 3.0f;
+        m.endDistance = 16.0f;
+        m.startAzimuth = 0.5f;
+        m.endAzimuth = 0.95f;
+        m.startElevation = 0.2f;
+        m.endElevation = 0.85f;
+        m.curve = app::MovementCurve::Rise;
+        m.composition.focalLength = 28.0f;
+        break;
+    }
+    return cam;
+}
+
+// ---- actor evaluation -------------------------------------------------------------------------
+
+glm::vec3 Actor::positionAt(double seconds) const {
+    if (path.active && path.endSeconds > path.startSeconds) {
+        const double clamped = std::clamp(seconds, path.startSeconds, path.endSeconds);
+        const double span = path.endSeconds - path.startSeconds;
+        const float w = static_cast<float>((clamped - path.startSeconds) / span);
+        const float u = std::lerp(path.startU, path.endU, w);
+        // By distance rather than by parameter: a Catmull-Rom's parameter is not its arc length, so
+        // a character walking by `t` speeds up through the tight corners and slows on the straights.
+        const float length = path.spline.length();
+        return path.spline.sampleByDistance(u * length).position;
+    }
+    if (keys.empty()) {
+        return glm::vec3(0.0f);
+    }
+    if (seconds <= keys.front().timeSeconds) {
+        return keys.front().position;
+    }
+    if (seconds >= keys.back().timeSeconds) {
+        return keys.back().position;
+    }
+    for (std::size_t i = 1; i < keys.size(); ++i) {
+        if (seconds <= keys[i].timeSeconds) {
+            const double a = keys[i - 1].timeSeconds;
+            const double b = keys[i].timeSeconds;
+            const float t = b > a ? static_cast<float>((seconds - a) / (b - a)) : 0.0f;
+            // Smoothstep, matching the Smooth default the keys are emitted with, so the position a
+            // look-at camera aims at agrees with the position the baked track will produce.
+            const float s = keys[i - 1].interp == params::KeyInterp::Linear ? t : t * t * (3.0f - 2.0f * t);
+            return glm::mix(keys[i - 1].position, keys[i].position, s);
+        }
+    }
+    return keys.back().position;
+}
+
+float Actor::headingAt(double seconds) const {
+    if (path.active && path.endSeconds > path.startSeconds && path.faceTangent) {
+        const double clamped = std::clamp(seconds, path.startSeconds, path.endSeconds);
+        const double span = path.endSeconds - path.startSeconds;
+        const float w = static_cast<float>((clamped - path.startSeconds) / span);
+        const float u = std::lerp(path.startU, path.endU, w);
+        const float length = path.spline.length();
+        glm::vec3 tangent = path.spline.sampleByDistance(u * length).tangent;
+        if (path.endU < path.startU) {
+            tangent = -tangent;
+        }
+        return headingDegrees(tangent);
+    }
+    if (keys.size() < 2) {
+        return keys.empty() ? 0.0f : 0.0f;
+    }
+    // The direction between the surrounding keys: a character walking from A to B faces B.
+    for (std::size_t i = 1; i < keys.size(); ++i) {
+        if (seconds <= keys[i].timeSeconds || i + 1 == keys.size()) {
+            return headingDegrees(keys[i].position - keys[i - 1].position);
+        }
+    }
+    return 0.0f;
+}
+
+const ClipCue* Actor::clipAt(double seconds) const {
+    const ClipCue* current = nullptr;
+    for (const auto& c : clips) {
+        if (c.timeSeconds <= seconds) {
+            current = &c;
+        } else {
+            break;
+        }
+    }
+    return current;
+}
+
+double Actor::endSeconds() const {
+    double end = 0.0;
+    for (const auto& k : keys) {
+        end = std::max(end, k.timeSeconds);
+    }
+    for (const auto& c : clips) {
+        end = std::max(end, c.timeSeconds);
+    }
+    if (path.active) {
+        end = std::max(end, path.endSeconds);
+    }
+    return end;
+}
+
+// ---- sequence ---------------------------------------------------------------------------------
+
+Result<void> Sequence::validate() const {
+    for (std::size_t i = 0; i < scenes.size(); ++i) {
+        if (scenes[i].id.empty()) {
+            return fail("sequence '{}': scene slot {} has no id", name, i);
+        }
+        for (std::size_t j = i + 1; j < scenes.size(); ++j) {
+            if (scenes[i].id == scenes[j].id) {
+                return fail("sequence '{}': two scene slots are both called '{}'", name, scenes[i].id);
+            }
+        }
+    }
+    double previousEnd = -1.0;
+    for (std::size_t i = 0; i < shots.size(); ++i) {
+        const Shot& s = shots[i];
+        if (!std::isfinite(s.startSeconds) || !std::isfinite(s.durationSeconds)) {
+            return fail("sequence '{}': shot '{}' has a non-finite time", name, s.name);
+        }
+        if (s.durationSeconds <= 0.0) {
+            return fail("sequence '{}': shot '{}' lasts {:.3f}s", name, s.name, s.durationSeconds);
+        }
+        if (s.startSeconds < previousEnd - 1e-6) {
+            // Two cameras at once is not something a single-camera engine can honour, and quietly
+            // picking one is worse than refusing. The same rule app::Sequence already applies.
+            return fail("sequence '{}': shot '{}' starts at {:.3f}s, inside the shot before it",
+                        name, s.name, s.startSeconds);
+        }
+        previousEnd = s.endSeconds();
+        if (!s.scene.empty() && slotNamed(s.scene) == nullptr) {
+            return fail("sequence '{}': shot '{}' names scene '{}', which is not a slot", name,
+                        s.name, s.scene);
+        }
+        if (!s.camera.lookAtActor.empty() && actorNamed(s.camera.lookAtActor) == nullptr) {
+            return fail("sequence '{}': shot '{}' looks at actor '{}', which does not exist", name,
+                        s.name, s.camera.lookAtActor);
+        }
+        if (s.camera.kind == CameraKind::Keys && s.camera.keys.empty()) {
+            return fail("sequence '{}': shot '{}' has a keyed camera with no keys", name, s.name);
+        }
+    }
+    for (std::size_t i = 0; i < actors.size(); ++i) {
+        if (actors[i].id.empty()) {
+            return fail("sequence '{}': actor {} has no id", name, i);
+        }
+        for (std::size_t j = i + 1; j < actors.size(); ++j) {
+            if (actors[i].id == actors[j].id) {
+                return fail("sequence '{}': two actors are both called '{}'", name, actors[i].id);
+            }
+        }
+        if (actors[i].path.active) {
+            if (auto ok = actors[i].path.spline.validate(); !ok) {
+                return fail("sequence '{}': actor '{}' path: {}", name, actors[i].id,
+                            ok.error().message);
+            }
+            if (actors[i].path.endSeconds <= actors[i].path.startSeconds) {
+                return fail("sequence '{}': actor '{}' walks its path in {:.3f}s", name,
+                            actors[i].id, actors[i].path.endSeconds - actors[i].path.startSeconds);
+            }
+        }
+    }
+    for (std::size_t i = 0; i < overlays.size(); ++i) {
+        if (auto ok = overlays[i].validate(); !ok) {
+            return fail("sequence '{}': {}", name, ok.error().message);
+        }
+        for (std::size_t j = i + 1; j < overlays.size(); ++j) {
+            if (overlays[i].id == overlays[j].id) {
+                return fail("sequence '{}': two overlays are both called '{}'", name, overlays[i].id);
+            }
+        }
+    }
+    return {};
+}
+
+double Sequence::duration() const {
+    if (durationSeconds > 0.0) {
+        return durationSeconds;
+    }
+    double end = 0.0;
+    for (const auto& s : shots) {
+        end = std::max(end, s.endSeconds());
+    }
+    for (const auto& a : actors) {
+        end = std::max(end, a.endSeconds());
+    }
+    for (const auto& o : overlays) {
+        end = std::max(end, o.endSeconds);
+    }
+    for (const auto& t : tracks) {
+        if (t.timeBase == params::TimeBase::Seconds && !t.keys.empty()) {
+            end = std::max(end, t.keys.back().time);
+        }
+    }
+    return end;
+}
+
+const Shot* Sequence::shotAt(double seconds) const {
+    for (const auto& s : shots) {
+        if (seconds >= s.startSeconds && seconds < s.endSeconds()) {
+            return &s;
+        }
+    }
+    return nullptr;
+}
+
+const Shot* Sequence::shotNamed(std::string_view n) const {
+    for (const auto& s : shots) {
+        if (s.name == n) {
+            return &s;
+        }
+    }
+    return nullptr;
+}
+
+const Actor* Sequence::actorNamed(std::string_view id) const {
+    for (const auto& a : actors) {
+        if (a.id == id) {
+            return &a;
+        }
+    }
+    return nullptr;
+}
+
+const SceneSlot* Sequence::slotNamed(std::string_view id) const {
+    for (const auto& s : scenes) {
+        if (s.id == id) {
+            return &s;
+        }
+    }
+    return nullptr;
+}
+
+const SceneSlot* Sequence::sceneAt(double seconds) const {
+    const SceneSlot* current = nullptr;
+    for (const auto& s : shots) {
+        if (!s.scene.empty()) {
+            const SceneSlot* slot = slotNamed(s.scene);
+            if (slot != nullptr && s.startSeconds <= seconds) {
+                current = slot;
+            }
+            if (slot != nullptr && current == nullptr && seconds < s.startSeconds) {
+                // Before the first shot the first named slot is what will be showing.
+                return slot;
+            }
+        }
+        if (s.startSeconds > seconds) {
+            break;
+        }
+    }
+    if (current == nullptr) {
+        for (const auto& s : shots) {
+            if (!s.scene.empty()) {
+                return slotNamed(s.scene);
+            }
+        }
+    }
+    return current;
+}
+
+void Sequence::setSectionMarkers(const signals::MusicalStructure& structure) {
+    std::erase_if(markers, [](const Marker& m) { return m.kind == MarkerKind::Section; });
+    for (const auto& s : structure.sections) {
+        markers.push_back(
+            Marker{s.startSeconds, signals::musicalSectionName(s.kind), MarkerKind::Section});
+    }
+    std::stable_sort(markers.begin(), markers.end(),
+                     [](const Marker& a, const Marker& b) { return a.timeSeconds < b.timeSeconds; });
+}
+
+void Sequence::setBeatMarkers(std::span<const double> beatTimes) {
+    std::erase_if(markers, [](const Marker& m) { return m.kind == MarkerKind::Beat; });
+    markers.reserve(markers.size() + beatTimes.size());
+    for (std::size_t i = 0; i < beatTimes.size(); ++i) {
+        markers.push_back(Marker{beatTimes[i], std::to_string(i + 1), MarkerKind::Beat});
+    }
+    std::stable_sort(markers.begin(), markers.end(),
+                     [](const Marker& a, const Marker& b) { return a.timeSeconds < b.timeSeconds; });
+}
+
+std::vector<double> Sequence::markerTimes(MarkerKind kind) const {
+    std::vector<double> out;
+    for (const auto& m : markers) {
+        if (m.kind == kind) {
+            out.push_back(m.timeSeconds);
+        }
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+// ---- the bake ---------------------------------------------------------------------------------
+
+std::vector<AnimationCue> Sequence::animationAt(double seconds) const {
+    std::vector<AnimationCue> out;
+    out.reserve(actors.size());
+    for (const Actor& actor : actors) {
+        const ClipCue* cue = actor.clipAt(seconds);
+        if (cue == nullptr || cue->clip.empty()) {
+            continue;
+        }
+        out.push_back(AnimationCue{.node = actor.nodeName(),
+                                   .clip = cue->clip,
+                                   .startSeconds = cue->timeSeconds,
+                                   .speed = cue->speed,
+                                   .blendSeconds = cue->blendSeconds});
+    }
+    return out;
+}
+
+Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) const {
+    if (auto ok = validate(); !ok) {
+        return std::unexpected(ok.error());
+    }
+    BakeResult result;
+    TrackBuilder builder;
+
+    // A composition ignores `camera/position` and `camera/target` entirely unless `camera/mode` is
+    // 1 (free); in orbit mode the tracks bind, evaluate, write their values and change nothing you
+    // can see. That is the exact failure ADR-075 exists to record, so the mode is part of the bake
+    // rather than something an author has to remember.
+    const bool anyCamera = std::any_of(shots.begin(), shots.end(), [](const Shot& s) {
+        return s.camera.kind != CameraKind::Inherit;
+    });
+    if (options.emitCameraMode && anyCamera) {
+        builder.key("camera/mode", 0.0, 1.0f, params::KeyInterp::Step);
+    }
+    if (!shots.empty() && shots.front().camera.kind == CameraKind::Inherit) {
+        result.warnings.push_back(fmt::format(
+            "shot '{}' is the first shot and inherits its camera, so nothing places the camera "
+            "before it",
+            shots.front().name));
+    }
+
+    // ---- scene switching (spec 6) -------------------------------------------------------------
+    // One Step-keyed visibility track per slot. Step because a cut is a cut: an interpolated bool
+    // would have both scenes half-visible for a frame, which in a bool parameter means one of them
+    // flickers.
+    if (!scenes.empty() && !shots.empty()) {
+        std::string active;
+        // What is showing before the first shot: the slot that shot names, so a scrub to 0 is not a
+        // black frame.
+        for (const auto& s : shots) {
+            if (!s.scene.empty()) {
+                active = s.scene;
+                break;
+            }
+        }
+        for (const auto& slot : scenes) {
+            builder.key("nodes/" + slot.nodeName() + "/visible", 0.0,
+                        slot.id == active ? 1.0f : 0.0f, params::KeyInterp::Step);
+        }
+        for (const auto& s : shots) {
+            if (s.scene.empty() || s.scene == active) {
+                continue;
+            }
+            active = s.scene;
+            for (const auto& slot : scenes) {
+                builder.key("nodes/" + slot.nodeName() + "/visible", s.startSeconds,
+                            slot.id == active ? 1.0f : 0.0f, params::KeyInterp::Step);
+            }
+        }
+    }
+
+    // ---- transitions (spec 7) -----------------------------------------------------------------
+    const bool anyFade = std::any_of(shots.begin(), shots.end(), [](const Shot& s) {
+        return s.in.kind != TransitionKind::Cut || s.out.kind != TransitionKind::Cut;
+    });
+    if (anyFade) {
+        builder.key("scene/brightness", 0.0, 1.0f, params::KeyInterp::Linear);
+        for (const auto& s : shots) {
+            if (s.in.kind == TransitionKind::FadeIn && s.in.seconds > 0.0) {
+                builder.key("scene/brightness", s.startSeconds, options.fadeFloor);
+                builder.key("scene/brightness", s.startSeconds + s.in.seconds, 1.0f,
+                            params::KeyInterp::EaseOut);
+            }
+            if (s.out.kind == TransitionKind::FadeOut && s.out.seconds > 0.0) {
+                builder.key("scene/brightness", std::max(s.startSeconds, s.endSeconds() - s.out.seconds),
+                            1.0f, params::KeyInterp::EaseIn);
+                builder.key("scene/brightness", s.endSeconds(), options.fadeFloor);
+            }
+        }
+    }
+
+    // ---- camera (spec 8-11) -------------------------------------------------------------------
+    for (const auto& s : shots) {
+        const ShotCamera& cam = s.camera;
+        const Actor* lookAt = cam.lookAtActor.empty() ? nullptr : actorNamed(cam.lookAtActor);
+        const float weight = std::clamp(cam.lookAtWeight, 0.0f, 1.0f);
+        const auto aim = [&](double time, glm::vec3 derived) {
+            if (lookAt == nullptr || weight <= 0.0f) {
+                return derived;
+            }
+            const glm::vec3 subject = lookAt->positionAt(time) + glm::vec3(0.0f, cam.lookAtHeight, 0.0f);
+            return glm::mix(derived, subject, weight);
+        };
+        if (cam.kind == CameraKind::Move) {
+            int samples = cam.samples > 0 ? cam.samples : options.cameraSamplesPerShot;
+            samples = std::clamp(samples, 2, 256);
+            for (int i = 0; i < samples; ++i) {
+                const float t = static_cast<float>(i) / static_cast<float>(samples - 1);
+                const double time = s.startSeconds + s.durationSeconds * static_cast<double>(t);
+                // The keys carry eased values, so the interpolation between them is linear and the
+                // shape of the move is entirely the shot's own -- handing eased values to a smooth
+                // interpolator eases them twice (the same reasoning as cinematic.cpp).
+                builder.key3("camera/position", time, cam.move.cameraAt(t));
+                builder.key3("camera/target", time, aim(time, cam.move.targetAt(t)));
+            }
+            // The lens is per shot: a focal length that slides through a shot is a zoom, and a zoom
+            // is something you ask for rather than something you get by accident.
+            if (cam.move.composition.focalLength > 0.0f) {
+                builder.key("camera/lens/focalLength", s.startSeconds, cam.move.composition.focalLength,
+                            params::KeyInterp::Step);
+            }
+        } else if (cam.kind == CameraKind::Keys) {
+            for (const auto& k : cam.keys) {
+                const double time = s.startSeconds + k.timeSeconds;
+                builder.key3("camera/position", time, k.position, k.interp);
+                builder.key3("camera/target", time, aim(time, k.target), k.interp);
+                if (k.focalLength > 0.0f) {
+                    builder.key("camera/lens/focalLength", time, k.focalLength, k.interp);
+                }
+            }
+        }
+        // Shot-local parameter animation (spec 17): times are relative to the shot.
+        for (const auto& t : s.tracks) {
+            builder.merge(t, s.startSeconds);
+        }
+    }
+
+    // ---- sequence-level tracks (spec 16, 17) --------------------------------------------------
+    for (const auto& t : tracks) {
+        builder.merge(t, 0.0);
+    }
+
+    // ---- actors (spec 12-16) ------------------------------------------------------------------
+    for (const auto& actor : actors) {
+        const std::string node = actor.nodeName();
+        const std::string positionPath = "nodes/" + node + "/position";
+        const std::string rotationPath = "nodes/" + node + "/rotation";
+
+        if (actor.path.active) {
+            const int samples = std::clamp(actor.path.samples, 2, 512);
+            for (int i = 0; i < samples; ++i) {
+                const double w = static_cast<double>(i) / static_cast<double>(samples - 1);
+                const double time = std::lerp(actor.path.startSeconds, actor.path.endSeconds, w);
+                builder.key3(positionPath, time, actor.positionAt(time));
+                if (actor.path.faceTangent) {
+                    builder.key3(rotationPath, time, glm::vec3(0.0f, actor.headingAt(time), 0.0f));
+                }
+            }
+        }
+        for (const auto& k : actor.keys) {
+            builder.key3(positionPath, k.timeSeconds, k.position, k.interp);
+            if (k.rotationDegrees) {
+                builder.key3(rotationPath, k.timeSeconds, *k.rotationDegrees, k.interp);
+            } else if (!actor.path.active && actor.keys.size() > 1) {
+                builder.key3(rotationPath, k.timeSeconds,
+                             glm::vec3(0.0f, actor.headingAt(k.timeSeconds), 0.0f), k.interp);
+            }
+            if (k.scale) {
+                builder.key3("nodes/" + node + "/scale", k.timeSeconds, *k.scale, k.interp);
+            }
+        }
+
+        // spec 12: an actor that is not in the piece is hidden, rather than parked off camera.
+        if (!actor.visible) {
+            builder.key("nodes/" + node + "/visible", 0.0, 0.0f, params::KeyInterp::Step);
+        }
+
+        // Animation clips are deliberately *not* baked (spec 13, 33). A clip is a state on the
+        // node's skinned rig, and a track carries numbers -- so the only thing a track could
+        // carry is a state index, and the index alone loses the one fact the pose needs: the
+        // second the state was entered. `animationAt()` keeps that fact and `seq::Director`
+        // applies it every frame, which is the same pure function of time the tracks are.
+    }
+
+    // ---- overlays: the seam (spec 22-27) ------------------------------------------------------
+    // Realised in (order, start) order, because most layer systems draw in creation order and
+    // spec 26 requires the ordering to be explicit rather than accidental.
+    std::vector<const OverlayCue*> ordered;
+    ordered.reserve(overlays.size());
+    for (const auto& o : overlays) {
+        ordered.push_back(&o);
+    }
+    std::stable_sort(ordered.begin(), ordered.end(), [](const OverlayCue* a, const OverlayCue* b) {
+        return a->order != b->order ? a->order < b->order : a->startSeconds < b->startSeconds;
+    });
+    int deferred = 0;
+    for (const OverlayCue* cue : ordered) {
+        auto layerId = sink.realise(*cue);
+        if (!layerId) {
+            return std::unexpected(layerId.error());
+        }
+        result.overlays.push_back(OverlayBinding{cue->id, *layerId});
+        if (layerId->empty()) {
+            ++deferred;
+            continue;
+        }
+        for (auto& t : overlayPresetTracks(*cue, sink, *layerId)) {
+            builder.merge(std::move(t), 0.0);
+        }
+    }
+    if (deferred > 0) {
+        result.warnings.push_back(fmt::format(
+            "{} overlay cue(s) were not realised: no layer system is installed, so the sequence's "
+            "text and graphics carry timing but draw nothing",
+            deferred));
+    }
+
+    // ---- finish -------------------------------------------------------------------------------
+    std::vector<params::Track> baked = builder.take();
+    for (const auto& t : baked) {
+        result.keyCount += static_cast<int>(t.keys.size());
+        result.targets.push_back(t.target);
+    }
+    result.trackCount = static_cast<int>(baked.size());
+    std::sort(result.targets.begin(), result.targets.end());
+    result.targets.erase(std::unique(result.targets.begin(), result.targets.end()),
+                         result.targets.end());
+    result.timeline = json{{"enabled", true},
+                           {"tracks", tracksToJson(std::move(baked))},
+                           {"cues", json::array()}};
+    return result;
+}
+
+// ---- snapping (spec 21) -----------------------------------------------------------------------
+
+double snapTime(double seconds, SnapMode mode, std::span<const double> points, double fps,
+                double toleranceSeconds) {
+    switch (mode) {
+    case SnapMode::Off:
+        return seconds;
+    case SnapMode::Frames: {
+        if (!(fps > 0.0)) {
+            return seconds;
+        }
+        const double snapped = std::round(seconds * fps) / fps;
+        return toleranceSeconds > 0.0 && std::abs(snapped - seconds) > toleranceSeconds ? seconds
+                                                                                       : snapped;
+    }
+    case SnapMode::Beats:
+    case SnapMode::Markers:
+        break;
+    }
+    if (points.empty()) {
+        return seconds;
+    }
+    const auto it = std::lower_bound(points.begin(), points.end(), seconds);
+    double best = points.back();
+    if (it == points.begin()) {
+        best = points.front();
+    } else if (it == points.end()) {
+        best = points.back();
+    } else {
+        const double after = *it;
+        const double before = *(it - 1);
+        best = (seconds - before) <= (after - seconds) ? before : after;
+    }
+    if (toleranceSeconds > 0.0 && std::abs(best - seconds) > toleranceSeconds) {
+        return seconds;
+    }
+    return best;
+}
+
+// ---- JSON -------------------------------------------------------------------------------------
+
+namespace {
+
+json cameraToJson(const ShotCamera& cam) {
+    json j{{"kind", cameraKindName(cam.kind)}, {"samples", cam.samples}};
+    if (cam.kind == CameraKind::Move) {
+        // The move is an app::Shot, which already has a serialiser covering fourteen kinds, five
+        // look modes and every override. Writing a second one here would be a second thing to keep
+        // in step with it.
+        app::Sequence wrapper;
+        wrapper.name = "move";
+        wrapper.shots.push_back(cam.move);
+        j["move"] = wrapper.toJson()["shots"][0];
+    }
+    if (cam.kind == CameraKind::Keys) {
+        json keys = json::array();
+        for (const auto& k : cam.keys) {
+            json e{{"time", k.timeSeconds},
+                   {"position", json::array({k.position.x, k.position.y, k.position.z})},
+                   {"target", json::array({k.target.x, k.target.y, k.target.z})},
+                   {"interp", params::keyInterpName(k.interp)}};
+            if (k.focalLength > 0.0f) {
+                e["focalLength"] = k.focalLength;
+            }
+            keys.push_back(std::move(e));
+        }
+        j["keys"] = std::move(keys);
+    }
+    if (!cam.lookAtActor.empty()) {
+        j["lookAtActor"] = cam.lookAtActor;
+        j["lookAtHeight"] = cam.lookAtHeight;
+        j["lookAtWeight"] = cam.lookAtWeight;
+    }
+    return j;
+}
+
+Result<ShotCamera> cameraFromJson(const json& j) {
+    ShotCamera cam;
+    if (!j.is_object()) {
+        return fail("shot camera must be an object");
+    }
+    if (const auto k = j.find("kind"); k != j.end() && k->is_string()) {
+        const auto parsed = cameraKindFromName(k->get<std::string>());
+        if (!parsed) {
+            return fail("unknown camera kind '{}'", k->get<std::string>());
+        }
+        cam.kind = *parsed;
+    }
+    cam.samples = static_cast<int>(readNumber(j, "samples", cam.samples));
+    if (const auto m = j.find("move"); m != j.end()) {
+        json wrapper{{"name", "move"}, {"shots", json::array({*m})}};
+        auto parsed = app::Sequence::fromJson(wrapper);
+        if (!parsed) {
+            return std::unexpected(parsed.error());
+        }
+        if (!parsed->shots.empty()) {
+            cam.move = parsed->shots.front();
+        }
+    }
+    if (const auto keys = j.find("keys"); keys != j.end()) {
+        if (!keys->is_array()) {
+            return fail("shot camera 'keys' must be an array");
+        }
+        for (const auto& e : *keys) {
+            if (!e.is_object()) {
+                return fail("every camera key must be an object");
+            }
+            CameraKey k;
+            k.timeSeconds = readNumber(e, "time", 0.0);
+            k.position = readVec3(e, "position", glm::vec3(0.0f));
+            k.target = readVec3(e, "target", glm::vec3(0.0f));
+            k.focalLength = static_cast<float>(readNumber(e, "focalLength", 0.0));
+            if (const auto i = e.find("interp"); i != e.end() && i->is_string()) {
+                const auto parsed = params::keyInterpFromName(i->get<std::string>());
+                if (!parsed) {
+                    return fail("unknown key interpolation '{}'", i->get<std::string>());
+                }
+                k.interp = *parsed;
+            }
+            cam.keys.push_back(k);
+        }
+    }
+    cam.lookAtActor = readString(j, "lookAtActor");
+    cam.lookAtHeight = static_cast<float>(readNumber(j, "lookAtHeight", cam.lookAtHeight));
+    cam.lookAtWeight = static_cast<float>(readNumber(j, "lookAtWeight", cam.lookAtWeight));
+    return cam;
+}
+
+json actorToJson(const Actor& a) {
+    json keys = json::array();
+    for (const auto& k : a.keys) {
+        json e{{"time", k.timeSeconds},
+               {"position", json::array({k.position.x, k.position.y, k.position.z})},
+               {"interp", params::keyInterpName(k.interp)}};
+        if (k.rotationDegrees) {
+            e["rotation"] = json::array({k.rotationDegrees->x, k.rotationDegrees->y, k.rotationDegrees->z});
+        }
+        if (k.scale) {
+            e["scale"] = json::array({k.scale->x, k.scale->y, k.scale->z});
+        }
+        keys.push_back(std::move(e));
+    }
+    json clips = json::array();
+    for (const auto& c : a.clips) {
+        json e{{"time", c.timeSeconds}, {"clip", c.clip}, {"speed", c.speed}};
+        if (c.blendSeconds >= 0.0f) {
+            e["blend"] = c.blendSeconds;
+        }
+        clips.push_back(std::move(e));
+    }
+    json j{{"id", a.id},
+           {"node", a.node},
+           {"visible", a.visible},
+           {"keys", std::move(keys)},
+           {"clips", std::move(clips)}};
+    if (a.path.active) {
+        j["path"] = json{{"spline", a.path.spline.toJson()},
+                         {"start", a.path.startSeconds},
+                         {"end", a.path.endSeconds},
+                         {"samples", a.path.samples},
+                         {"faceTangent", a.path.faceTangent},
+                         {"startU", a.path.startU},
+                         {"endU", a.path.endU}};
+    }
+    return j;
+}
+
+Result<Actor> actorFromJson(const json& j) {
+    if (!j.is_object()) {
+        return fail("actor must be an object");
+    }
+    Actor a;
+    a.id = readString(j, "id");
+    if (a.id.empty()) {
+        return fail("actor is missing a string 'id'");
+    }
+    a.node = readString(j, "node");
+    if (const auto v = j.find("visible"); v != j.end() && v->is_boolean()) {
+        a.visible = v->get<bool>();
+    }
+    if (const auto keys = j.find("keys"); keys != j.end()) {
+        if (!keys->is_array()) {
+            return fail("actor '{}': 'keys' must be an array", a.id);
+        }
+        for (const auto& e : *keys) {
+            ActorKey k;
+            k.timeSeconds = readNumber(e, "time", 0.0);
+            k.position = readVec3(e, "position", glm::vec3(0.0f));
+            if (e.contains("rotation")) {
+                k.rotationDegrees = readVec3(e, "rotation", glm::vec3(0.0f));
+            }
+            if (e.contains("scale")) {
+                k.scale = readVec3(e, "scale", glm::vec3(1.0f));
+            }
+            if (const auto i = e.find("interp"); i != e.end() && i->is_string()) {
+                const auto parsed = params::keyInterpFromName(i->get<std::string>());
+                if (!parsed) {
+                    return fail("actor '{}': unknown key interpolation '{}'", a.id,
+                                i->get<std::string>());
+                }
+                k.interp = *parsed;
+            }
+            a.keys.push_back(k);
+        }
+        std::stable_sort(a.keys.begin(), a.keys.end(),
+                         [](const ActorKey& x, const ActorKey& y) { return x.timeSeconds < y.timeSeconds; });
+    }
+    if (const auto clips = j.find("clips"); clips != j.end()) {
+        if (!clips->is_array()) {
+            return fail("actor '{}': 'clips' must be an array", a.id);
+        }
+        for (const auto& e : *clips) {
+            ClipCue c;
+            c.timeSeconds = readNumber(e, "time", 0.0);
+            c.clip = readString(e, "clip");
+            c.speed = static_cast<float>(readNumber(e, "speed", 1.0));
+            c.blendSeconds = static_cast<float>(readNumber(e, "blend", -1.0));
+            a.clips.push_back(c);
+        }
+        std::stable_sort(a.clips.begin(), a.clips.end(),
+                         [](const ClipCue& x, const ClipCue& y) { return x.timeSeconds < y.timeSeconds; });
+    }
+    if (const auto p = j.find("path"); p != j.end()) {
+        if (!p->is_object()) {
+            return fail("actor '{}': 'path' must be an object", a.id);
+        }
+        const auto spline = p->find("spline");
+        if (spline == p->end()) {
+            return fail("actor '{}': path has no spline", a.id);
+        }
+        auto parsed = spatial::Spline::fromJson(*spline);
+        if (!parsed) {
+            return fail("actor '{}' path: {}", a.id, parsed.error().message);
+        }
+        a.path.spline = std::move(*parsed);
+        a.path.active = true;
+        a.path.startSeconds = readNumber(*p, "start", 0.0);
+        a.path.endSeconds = readNumber(*p, "end", 0.0);
+        a.path.samples = static_cast<int>(readNumber(*p, "samples", a.path.samples));
+        a.path.startU = static_cast<float>(readNumber(*p, "startU", 0.0));
+        a.path.endU = static_cast<float>(readNumber(*p, "endU", 1.0));
+        if (const auto f = p->find("faceTangent"); f != p->end() && f->is_boolean()) {
+            a.path.faceTangent = f->get<bool>();
+        }
+    }
+    return a;
+}
+
+} // namespace
+
+json Sequence::toJson() const {
+    json scenesJson = json::array();
+    for (const auto& s : scenes) {
+        scenesJson.push_back(json{{"id", s.id}, {"node", s.node}, {"file", s.file}});
+    }
+    json shotsJson = json::array();
+    for (const auto& s : shots) {
+        json j{{"name", s.name},
+               {"start", s.startSeconds},
+               {"duration", s.durationSeconds},
+               {"scene", s.scene},
+               {"camera", cameraToJson(s.camera)},
+               {"in", json{{"kind", transitionKindName(s.in.kind)}, {"seconds", s.in.seconds}}},
+               {"out", json{{"kind", transitionKindName(s.out.kind)}, {"seconds", s.out.seconds}}}};
+        if (!s.tracks.empty()) {
+            j["tracks"] = tracksToJson(s.tracks);
+        }
+        shotsJson.push_back(std::move(j));
+    }
+    json actorsJson = json::array();
+    for (const auto& a : actors) {
+        actorsJson.push_back(actorToJson(a));
+    }
+    json overlaysJson = json::array();
+    for (const auto& o : overlays) {
+        overlaysJson.push_back(o.toJson());
+    }
+    json markersJson = json::array();
+    for (const auto& m : markers) {
+        // Beat markers are copied from the analysis every time a track is loaded, so writing
+        // thousands of them into a project would be storing a derived value -- and a stale one the
+        // moment somebody changes the audio.
+        if (m.kind == MarkerKind::Beat) {
+            continue;
+        }
+        markersJson.push_back(
+            json{{"time", m.timeSeconds}, {"name", m.name}, {"kind", markerKindName(m.kind)}});
+    }
+    json j{{"name", name},
+           {"duration", durationSeconds},
+           {"scenes", std::move(scenesJson)},
+           {"shots", std::move(shotsJson)},
+           {"actors", std::move(actorsJson)},
+           {"overlays", std::move(overlaysJson)},
+           {"markers", std::move(markersJson)}};
+    if (!tracks.empty()) {
+        j["tracks"] = tracksToJson(tracks);
+    }
+    return j;
+}
+
+Result<Sequence> Sequence::fromJson(const json& j) {
+    if (!j.is_object()) {
+        return fail("sequence must be an object");
+    }
+    Sequence seq;
+    seq.name = readString(j, "name");
+    if (seq.name.empty()) {
+        seq.name = "sequence";
+    }
+    seq.durationSeconds = readNumber(j, "duration", 0.0);
+    if (const auto scenes = j.find("scenes"); scenes != j.end()) {
+        if (!scenes->is_array()) {
+            return fail("sequence '{}': 'scenes' must be an array", seq.name);
+        }
+        for (const auto& e : *scenes) {
+            if (!e.is_object()) {
+                return fail("sequence '{}': every scene slot must be an object", seq.name);
+            }
+            seq.scenes.push_back(SceneSlot{readString(e, "id"), readString(e, "node"), readString(e, "file")});
+        }
+    }
+    if (const auto actors = j.find("actors"); actors != j.end()) {
+        if (!actors->is_array()) {
+            return fail("sequence '{}': 'actors' must be an array", seq.name);
+        }
+        for (const auto& e : *actors) {
+            auto actor = actorFromJson(e);
+            if (!actor) {
+                return std::unexpected(actor.error());
+            }
+            seq.actors.push_back(std::move(*actor));
+        }
+    }
+    if (const auto shots = j.find("shots"); shots != j.end()) {
+        if (!shots->is_array()) {
+            return fail("sequence '{}': 'shots' must be an array", seq.name);
+        }
+        for (const auto& e : *shots) {
+            if (!e.is_object()) {
+                return fail("sequence '{}': every shot must be an object", seq.name);
+            }
+            Shot s;
+            s.name = readString(e, "name");
+            s.startSeconds = readNumber(e, "start", 0.0);
+            s.durationSeconds = readNumber(e, "duration", 8.0);
+            s.scene = readString(e, "scene");
+            if (const auto cam = e.find("camera"); cam != e.end()) {
+                auto parsed = cameraFromJson(*cam);
+                if (!parsed) {
+                    return fail("sequence '{}' shot '{}': {}", seq.name, s.name,
+                                parsed.error().message);
+                }
+                s.camera = std::move(*parsed);
+            }
+            const auto readTransition = [&](const char* key, Transition& out) -> Result<void> {
+                const auto t = e.find(key);
+                if (t == e.end()) {
+                    return {};
+                }
+                if (!t->is_object()) {
+                    return fail("sequence '{}' shot '{}': '{}' must be an object", seq.name, s.name, key);
+                }
+                const std::string kind = readString(*t, "kind");
+                if (!kind.empty()) {
+                    const auto parsed = transitionKindFromName(kind);
+                    if (!parsed) {
+                        return fail("sequence '{}' shot '{}': unknown transition '{}'", seq.name,
+                                    s.name, kind);
+                    }
+                    out.kind = *parsed;
+                }
+                out.seconds = readNumber(*t, "seconds", out.seconds);
+                return {};
+            };
+            if (auto ok = readTransition("in", s.in); !ok) {
+                return std::unexpected(ok.error());
+            }
+            if (auto ok = readTransition("out", s.out); !ok) {
+                return std::unexpected(ok.error());
+            }
+            if (const auto t = e.find("tracks"); t != e.end()) {
+                s.tracks = tracksFromJson(*t, "shot");
+                if (s.tracks.empty() && t->is_array() && !t->empty()) {
+                    return fail("sequence '{}' shot '{}': 'tracks' could not be read", seq.name, s.name);
+                }
+            }
+            seq.shots.push_back(std::move(s));
+        }
+    }
+    if (const auto overlays = j.find("overlays"); overlays != j.end()) {
+        if (!overlays->is_array()) {
+            return fail("sequence '{}': 'overlays' must be an array", seq.name);
+        }
+        for (const auto& e : *overlays) {
+            auto cue = OverlayCue::fromJson(e);
+            if (!cue) {
+                return std::unexpected(cue.error());
+            }
+            seq.overlays.push_back(std::move(*cue));
+        }
+    }
+    if (const auto markers = j.find("markers"); markers != j.end()) {
+        if (!markers->is_array()) {
+            return fail("sequence '{}': 'markers' must be an array", seq.name);
+        }
+        for (const auto& e : *markers) {
+            Marker m;
+            m.timeSeconds = readNumber(e, "time", 0.0);
+            m.name = readString(e, "name");
+            const std::string kind = readString(e, "kind");
+            if (!kind.empty()) {
+                const auto parsed = markerKindFromName(kind);
+                if (!parsed) {
+                    return fail("sequence '{}': unknown marker kind '{}'", seq.name, kind);
+                }
+                m.kind = *parsed;
+            }
+            seq.markers.push_back(std::move(m));
+        }
+    }
+    if (const auto t = j.find("tracks"); t != j.end()) {
+        seq.tracks = tracksFromJson(*t, "sequence");
+        if (seq.tracks.empty() && t->is_array() && !t->empty()) {
+            return fail("sequence '{}': 'tracks' could not be read", seq.name);
+        }
+    }
+    if (auto ok = seq.validate(); !ok) {
+        return std::unexpected(ok.error());
+    }
+    return seq;
+}
+
+} // namespace avgen::seq
