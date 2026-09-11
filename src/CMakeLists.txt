@@ -16,7 +16,7 @@ add_library(avgen_core STATIC ${AVGEN_CORE_SOURCES})
 target_include_directories(avgen_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(avgen_core
     PUBLIC fmt::fmt spdlog::spdlog glm::glm nlohmann_json::nlohmann_json Threads::Threads
-    PRIVATE miniaudio::miniaudio kissfft::kissfft fastgltf::fastgltf stb::stb tinyexr::tinyexr)
+    PRIVATE miniaudio::miniaudio kissfft::kissfft fastgltf::fastgltf stb::stb tinyexr::tinyexr meshoptimizer)
 if(NOT MSVC)
     # The tinyexr implementation is third-party code compiled inside avgen_core: no warnings for it.
     set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/assets/exr_impl.cpp" PROPERTIES COMPILE_OPTIONS "-w")

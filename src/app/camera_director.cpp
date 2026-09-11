@@ -51,6 +51,7 @@ Result<DirectionBrief> briefFromHeroes(std::span<const world::HeroPoint> heroes)
         // twenty-metre tree half a metre wide would be framed as if it were half a metre across --
         // so the larger of the two is what a camera has to fit in frame.
         t.radius = std::max(h.radius, h.height * 0.5f);
+        t.preferredDistance = h.preferredCameraDistance;
         return t;
     };
 
@@ -169,6 +170,18 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
     // A directed camera in a disabled timeline is a camera that does not move, which looks
     // exactly like the director having failed.
     timeline.enabled = true;
+    // Bind, or none of the above reaches a camera.
+    //
+    // `Track::param` is runtime state resolved by `bind()`, and the timeline's apply loop writes
+    // only *bound* tracks -- an unbound one is skipped in silence. Tracks that arrive with a
+    // project are bound when the engine rebinds after a load; these arrive afterwards and never
+    // were, so the director reported six tracks installed, the keys were correct, the timeline was
+    // enabled, and the camera sat perfectly still.
+    if (auto bound = timeline.bind(engine.params()); !bound) {
+        // A target that does not resolve is worth naming rather than swallowing: it means the
+        // director is shooting at a parameter this scene does not have.
+        log::warn("camera director: {}", bound.error().message);
+    }
     log::info("camera director: {} shot(s), {} track(s) installed, {} replaced",
               sequence.shots.size(), added, removed);
     return added;

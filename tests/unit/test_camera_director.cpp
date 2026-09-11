@@ -159,6 +159,11 @@ TEST_CASE("Installing a sequence puts real keys on the engine's timeline", "[dir
         return t.target == "camera/position";
     });
     REQUIRE(position != tracks.end());
+    // Bound, which is what makes the difference between a track and a camera that moves. The
+    // timeline writes only bound tracks and skips the rest silently, so this assertion is the one
+    // that separates "six tracks installed" from "the camera went somewhere". Its absence is why
+    // the director looked correct in tests and did nothing in the application.
+    CHECK(position->param != nullptr);
     CHECK(position->keys.size() > 4);
     CHECK(position->lastKeyTime() > 40.0);
 

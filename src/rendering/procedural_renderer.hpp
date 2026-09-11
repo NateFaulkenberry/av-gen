@@ -29,6 +29,7 @@
 
 #include "core/error.hpp"
 #include "core/time.hpp"
+#include "rendering/render_stats.hpp"
 #include "scene/procedural.hpp"
 #include "scene/scene.hpp"
 #include "core/plant_chain.hpp"
@@ -61,7 +62,10 @@ struct ProceduralStats {
     std::uint32_t sourceVertices = 0;   // sum over drawn objects
     std::uint32_t sourceTriangles = 0;
     std::uint64_t instances = 0;        // sum over drawn objects
-    std::uint64_t logicalTriangles = 0; // sourceTriangles * instances
+    // sourceTriangles * instances: the geometry these objects CONTAIN, counted before LOD picks a
+    // level and before the cull pass rejects anything. It is not what any pass drew -- for that,
+    // read the `submitted*` counters below, which are accumulated as the draws are recorded.
+    std::uint64_t logicalTriangles = 0;
     std::uint64_t instanceBufferBytes = 0;
     std::uint32_t deformers = 0;        // enabled deformers over drawn objects
     std::uint32_t windObjects = 0;      // ADR-055: drawn objects whose vertex stage sways this frame
@@ -77,6 +81,17 @@ struct ProceduralStats {
     double cpuUpdateMs = 0.0;           // rebuild + upload time this frame
     std::uint32_t uploads = 0;          // instance buffer uploads this frame
     std::uint32_t drawCalls = 0;        // draws issued: one per object, or one per populated LOD level
+    // ADR-077: the geometry actually handed to each class of pass, accumulated while the draws are
+    // recorded. A direct draw's instance count is the CPU's own; an indirect draw's was written by
+    // the cull pass on the GPU, so it is taken from the last completed cull readback and counted in
+    // `estimatedDraws` -- which is why these three and `logicalTriangles` must never be added up or
+    // swapped for each other.
+    SubmittedGeometry submittedCamera;
+    SubmittedGeometry submittedDepth;
+    SubmittedGeometry submittedShadow;
+    // Pipeline, bind-group and buffer binds this renderer recorded, over every pass. It tracks what
+    // it has bound and skips the rest, so `redundantBindsAvoided` is what that tracking saved.
+    StateChangeCounters state;
     // Submission accounting (the world optimisation spec's P1/P2). `indirectDraws` counts every
     // indirect draw actually recorded, over every pass -- the camera's, the depth prepass's and
     // each shadow cascade's -- because that is the number the frame pays for, not the number the

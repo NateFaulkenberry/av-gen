@@ -166,3 +166,45 @@ something `tools/fetch_polyhaven.py` restores. The manifest is committed and now
 files that a fresh checkout does not have, so
 `tests/unit/test_asset_library.cpp`'s "resolves assets independently of the working directory" case,
 which asserts `fs::exists` for every entry's resolved path, will fail without the pack present.
+
+## Mesh LOD generation: meshoptimizer (2026-09-10)
+
+Added for ADR-078, ahead of the renderer's Phase 3. `src/assets/mesh_lod.hpp` builds LOD chains
+from a `scene::MeshData`; nothing consumes them yet and nothing in `src/rendering/` changed.
+
+**Licence: MIT.** Verified from the files that actually land in the tree rather than from memory:
+`.cache/cpm/meshoptimizer/3811/LICENSE.md` at tag `v1.2` (commit `9d9890c`), "MIT License,
+Copyright (c) 2016-2026 Arseny Kapoulkine", with the same notice repeated at the head and foot of
+`src/meshoptimizer.h`. MIT is compatible with this project and with every other dependency here;
+the obligation is to preserve the copyright and permission notice, which the library's own headers
+and `LICENSE.md` carry and which the source cache keeps intact.
+
+Pinned in `cmake/Dependencies.cmake` with `MESHOPT_BUILD_DEMO`, `MESHOPT_BUILD_GLTFPACK`,
+`MESHOPT_BUILD_SHARED_LIBS` and `MESHOPT_INSTALL` all off, so only `src/*.cpp` compiles. That
+matters for licensing as well as for build time: the repository vendors `extern/cgltf.h`,
+`extern/fast_obj.h` and `extern/sdefl.h` for gltfpack and the demo, and with those targets off none
+of them is compiled, linked or shipped. **`docs/dependencies.md` still lists meshoptimizer under
+"Planned, not yet added"; it needs a row.**
+
+### What it changes about the budgets above
+
+The "Budgets" section says an imported mesh is decimated once at resolve time by vertex clustering,
+with LOD levels at 35%, 12% and 4%. That is still true and still the code that runs. What ADR-078
+adds is a second, measured route, and what it found is worth knowing before either is used:
+
+- **`source.meshBudget` frequently does not hit its budget.** Measured on the Quaternius pack,
+  `scene::decimateMesh` returned 100% of `Bush_Common` when asked for 50%, and 14.2% of
+  `Grass_Common_Short` whether asked for 12%, 7% or 4%. The grid saturates, and the result carries
+  no indication that the budget was missed. A mesh budget in a scene file is a request, not a
+  guarantee.
+- **meshoptimizer is decisively better on connected geometry** — rocks, fungi, ferns, grasses —
+  where it hits the requested ratio to within a percent and holds the bounding box still. On
+  `Grass_Common_Short` at 50% it had a tenth the geometric error of the clustered version.
+- **Vertex clustering is still the better tool for the far levels of the trees**, which are
+  non-manifold enough that meshoptimizer's preserving simplifier will not go below 90% of their
+  triangles, and whose sloppy-simplified far levels drift further than the clustered ones. ADR-045
+  is not superseded.
+
+The Quaternius pack is what the calibration was measured on; the full table is in ADR-078 and the
+harness is `tests/unit/test_mesh_lod.cpp` under the hidden `[.lodmeasure]` tag, which skips when
+the pack is absent.

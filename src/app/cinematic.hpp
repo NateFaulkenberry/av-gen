@@ -95,6 +95,17 @@ struct FocalTarget {
     glm::vec3 position{0.0f};
     float radius = 8.0f;         // how big the subject is, which sets how far "close" is
     std::string name;            // for the UI and for error messages
+    // How far this subject wants to be seen from, in metres. 0 means "no opinion, use the radii".
+    //
+    // Shot distances are in radii so a shot is reusable against a subject of any size, and that is
+    // right — but it is not the whole story. An establishing shot at 14 radii on a 16-metre subject
+    // stands 115 metres away, which in this engine is past the distance foreground vegetation is
+    // drawn to: the camera ends up staring across culled ground at a small object, moving 7 metres
+    // over 31 seconds, and reads as broken rather than as wide. A hero that states a stand-off is
+    // stating the range in which it actually reads, and the director honours it as a *bound* on the
+    // radii rather than replacing them, so the difference between a wide shot and a close one
+    // survives.
+    float preferredDistance = 0.0f;
 };
 
 // Where the subject sits in the frame and how the lens treats it. Thirds are the default because

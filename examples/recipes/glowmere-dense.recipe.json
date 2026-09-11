@@ -1,0 +1,39 @@
+{
+ "world": "glowmere-dense",
+ "description": "Glowmere over four times the ground: every weight is glowmere-medium's, so the per-square-metre density and the proportions between the species are unchanged, and the extent is doubled to 840 m. The mid and background view distances are fixed in metres, so a larger world puts more of itself inside them -- this is the rung that dials the geometry the scene pass pays for without touching the art direction. The terrain grows with it: 441 chunks against medium's 121.",
+ "seed": 19740211,
+ "extent": 840.0,
+ "assetLibrary": "../../assets/glowmere.manifest.json",
+ "composition": {
+  "foreground": 0.95,
+  "midground": 0.8,
+  "background": 0.55,
+  "negative_space": 0.28,
+  "focalStrength": 0.8
+ },
+ "ecology": {
+  "flora": 0.95,
+  "fungi": 0.75,
+  "rock": 0.4,
+  "crystals": 0.0,
+  "creatures": 0.0,
+  "structure": 0.0
+ },
+ "atmosphere": {
+  "fog": 0.5,
+  "spores": 0.45,
+  "floating_elements": 0.15,
+  "depthHaze": 0.5
+ },
+ "lighting": {
+  "moon": 0.55,
+  "bioluminescence": 1.0,
+  "volumetric": 0.5,
+  "bounce": 0.15
+ },
+ "art": {
+  "profile": "glowmere",
+  "organicMotion": 0.8,
+  "chaos": 0.16
+ }
+}

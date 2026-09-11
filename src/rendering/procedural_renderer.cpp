@@ -1607,7 +1607,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     if (!im.computeItems.empty()) {
         wgpu::ComputePassDescriptor desc{};
         desc.label = "procedural-effectors";
-        desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("effectors") : nullptr;
+        desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("effectors", gpu::FrameTimeline::PassKind::Compute) : nullptr;
         wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&desc);
         cp.SetPipeline(im.effectorPipeline);
         for (const auto& item : im.computeItems) {
@@ -1633,7 +1633,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         }
         wgpu::ComputePassDescriptor desc{};
         desc.label = "procedural-cull";
-        desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("cull") : nullptr;
+        desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("cull", gpu::FrameTimeline::PassKind::Compute) : nullptr;
         wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&desc);
         cp.SetPipeline(im.cullClassifyPipeline);
         for (const auto& item : im.cullItems) {
@@ -1727,26 +1727,44 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
     wgpu::BindGroup boundMaterial;
     wgpu::Buffer boundVertices;
     wgpu::Buffer boundIndices;
+    // Which of this frame's three submission budgets this pass spends. The depth prepass and the
+    // shadow views draw the same instances as the camera does; charging them all to one number
+    // would make a shadow change read as a scene change.
+    SubmittedGeometry& submitted = shadowPass  ? stats_.submittedShadow
+                                   : depthOnly ? stats_.submittedDepth
+                                               : stats_.submittedCamera;
     const auto setPipeline = [&](const wgpu::RenderPipeline& p) {
         if (p.Get() != boundPipeline.Get()) {
             pass.SetPipeline(p);
             boundPipeline = p;
+            ++stats_.state.pipelineBinds;
+        } else {
+            ++stats_.state.redundantBindsAvoided;
         }
     };
     const auto setMaterial = [&](const wgpu::BindGroup& g) {
         if (g.Get() != boundMaterial.Get()) {
             pass.SetBindGroup(2, g);
             boundMaterial = g;
+            ++stats_.state.bindGroupBinds;
+        } else {
+            ++stats_.state.redundantBindsAvoided;
         }
     };
     const auto setMesh = [&](const Impl::CachedMesh& mesh) {
         if (mesh.vertices.Get() != boundVertices.Get()) {
             pass.SetVertexBuffer(0, mesh.vertices);
             boundVertices = mesh.vertices;
+            ++stats_.state.vertexBufferBinds;
+        } else {
+            ++stats_.state.redundantBindsAvoided;
         }
         if (mesh.indices.Get() != boundIndices.Get()) {
             pass.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
             boundIndices = mesh.indices;
+            ++stats_.state.indexBufferBinds;
+        } else {
+            ++stats_.state.redundantBindsAvoided;
         }
     };
     for (const auto& item : im.items) {
@@ -1771,9 +1789,12 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
         if (!item.indirect) {
             setPipeline(depthOnly ? im.pipelineDepth : (twoSided ? im.pipelineNoCull : im.pipelineCull));
             pass.SetBindGroup(1, groups[0], 1, &item.offset);
+            ++stats_.state.bindGroupBinds;
             setMaterial(materialGroup);
             setMesh(*item.meshes[0]);
             pass.DrawIndexed(item.meshes[0]->indexCount, item.instanceCount);
+            // A direct draw's instance count is the CPU's own number, so this one is exact.
+            submitted.record(item.meshes[0]->indexCount, item.instanceCount, false);
             if (!depthOnly) {
                 ++stats_.drawCalls;
             }
@@ -1798,6 +1819,7 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             setPipeline(depthOnly ? im.pipelineDepth
                                   : (twoSided || level >= 2 ? im.pipelineNoCull : im.pipelineCull));
             pass.SetBindGroup(1, groups[level], 1, &item.offset);
+            ++stats_.state.bindGroupBinds;
             setMaterial(materialGroup);
             setMesh(*mesh);
             const std::uint64_t argsOffset =
@@ -1805,9 +1827,20 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             pass.DrawIndexedIndirect(im.indirectArgs, argsOffset);
             ++stats_.indirectDraws; // every pass, because every pass pays for it
             const std::size_t base = static_cast<std::size_t>(item.state->statsSlot) * kCullStatsStride;
-            if (base + kCullStatsStride <= im.statsSnapshot.size() && im.statsSnapshot[base + 5] != 0 &&
-                im.statsSnapshot[base + level] == 0) {
+            const bool haveCounts = base + kCullStatsStride <= im.statsSnapshot.size() &&
+                                    im.statsSnapshot[base + 5] != 0;
+            if (haveCounts && im.statsSnapshot[base + level] == 0) {
                 ++stats_.emptyIndirectDraws;
+            }
+            // The instance count of this draw is written by the cull pass, on the GPU, after the
+            // draw is recorded. The CPU cannot have it without stalling the frame it is measuring,
+            // so what is counted is the last completed readback's -- exact in a still scene, one to
+            // three frames behind under a moving camera, and flagged as such either way. Before the
+            // first readback lands there is no number at all, and none is invented.
+            if (haveCounts) {
+                submitted.record(mesh->indexCount, im.statsSnapshot[base + level], true);
+            } else {
+                submitted.recordUnmeasured();
             }
             if (!depthOnly) {
                 ++stats_.drawCalls;

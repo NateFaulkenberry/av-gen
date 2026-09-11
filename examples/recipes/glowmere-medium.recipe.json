@@ -1,0 +1,39 @@
+{
+ "world": "glowmere-medium",
+ "description": "The reference rung of the renderer laboratory's ladder (docs/renderer-2-benchmark-world.md), and byte-for-byte the density of the shipped glowmere recipe: this is the world every other rung is quoted against. A comparison that moves here has moved on the world av-gen actually ships, not on a synthetic stress scene.",
+ "seed": 19740211,
+ "extent": 420.0,
+ "assetLibrary": "../../assets/glowmere.manifest.json",
+ "composition": {
+  "foreground": 0.95,
+  "midground": 0.8,
+  "background": 0.55,
+  "negative_space": 0.28,
+  "focalStrength": 0.8
+ },
+ "ecology": {
+  "flora": 0.95,
+  "fungi": 0.75,
+  "rock": 0.4,
+  "crystals": 0.0,
+  "creatures": 0.0,
+  "structure": 0.0
+ },
+ "atmosphere": {
+  "fog": 0.5,
+  "spores": 0.45,
+  "floating_elements": 0.15,
+  "depthHaze": 0.5
+ },
+ "lighting": {
+  "moon": 0.55,
+  "bioluminescence": 1.0,
+  "volumetric": 0.5,
+  "bounce": 0.15
+ },
+ "art": {
+  "profile": "glowmere",
+  "organicMotion": 0.8,
+  "chaos": 0.16
+ }
+}

@@ -33,6 +33,7 @@
 #include "rendering/post_processor.hpp"
 #include "rendering/procedural_renderer.hpp"
 #include "rendering/render_quality.hpp"
+#include "rendering/render_stats.hpp"
 #include "rendering/sdf_renderer.hpp"
 #include "rendering/shader_layer.hpp"
 #include "rendering/shadow_renderer.hpp"
@@ -82,11 +83,33 @@ struct RenderStats {
     std::uint64_t visibleInstances = 0; // procedural instances that survived culling
     std::uint64_t culledInstances = 0;
     std::uint64_t lodCounts[4] = {0, 0, 0, 0};
-    // Triangles *submitted* by the camera-side passes: source triangles times instances, before
-    // the GPU cull rejects any of them. It is not the number that reaches the rasteriser -- the
-    // instance counts are written by the cull pass and the CPU never sees them for this frame.
-    // For what survived, read `visibleInstances` against `culledInstances`.
+    // Triangles the lit scene pass submitted: entity meshes, procedural instances at the LOD
+    // levels the cull pass chose, and meshed SDFs. It used to fold in
+    // `ProceduralStats::logicalTriangles` -- source triangles times every instance record, before
+    // LOD and before culling -- which made Glowmere report 15.1 M triangles for a frame that
+    // submitted a fraction of that, and made every LOD or culling change invisible to the one
+    // geometry number anybody reads (ADR-077). The pre-cull figure is still there, under a name
+    // that says what it is: `geometry.logicalTriangles`.
+    //
+    // Four things are deliberately not in it. Particles and raymarched SDFs are billboards and
+    // fullscreen boxes whose cost is fragments, not vertices, and "two triangles per raymarched
+    // object" says nothing true about either. The skybox, the tone map and the other fullscreen
+    // passes are one triangle each for the same reason -- a geometry budget that moves when the
+    // resolution changes is not a geometry budget. Their draws are still in `drawCalls`.
     std::uint32_t triangles = 0;
+    // ADR-077. The full geometry split -- what the world contains against what each class of pass
+    // was handed -- and the CPU and state counters that go with it. `triangles` above is
+    // `geometry.camera.triangles`, kept because the editor status line and the profile capture
+    // read it by that name.
+    GeometryCounters geometry;
+    StateChangeCounters state;
+    CpuFrameBreakdown cpu;
+    // Entities selected as shadow casters this frame, before each cascade culls its own. Draws
+    // are `shadowDraws`: one caster drawn into two cascades is one caster and two draws.
+    std::uint32_t shadowCasters = 0;
+    // Passes whose caller did not say whether they were render or compute, so `state.renderPasses`
+    // and `state.computePasses` do not cover them. Non-zero means the pass split is a floor.
+    std::uint32_t unclassifiedPasses = 0;
     std::uint32_t entities = 0;
     std::uint32_t lights = 0;
     std::uint32_t textures = 0;

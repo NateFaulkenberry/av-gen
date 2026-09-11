@@ -18,6 +18,15 @@
 // Passes that are not marked do not vanish; their cost is charged to the next marked pass. So
 // mark every pass in the frame, or knowingly group a run of them under one label.
 //
+// Two limits of the instrument, stated here because they decide what its numbers can be used for
+// (ADR-077). Slot 0 is written at the *beginning of the first marked pass*, and the frame ends at
+// the last pass's end, so `frameMs` is the span from the first pass starting to the last pass
+// finishing -- not the command buffer's whole life. Anything the driver does before the first pass
+// or after the last is outside every number here. And because the intervals partition that span
+// exactly, no pass's cost can go missing: a cost a pass is not charged has been charged to another
+// pass, which is what makes a removal A/B attributable rather than merely surprising (see
+// rendering::attributeRemoval).
+//
 // Readback is the same non-stalling ring as before: resolve once per frame into a staging slot,
 // map asynchronously, and read whichever slot has landed. The render thread never waits.
 
@@ -52,11 +61,19 @@ public:
     // Starts a frame's encoding: forgets last frame's marks. Call once, before the first pass.
     void beginFrame();
 
+    // What kind of pass a mark describes. A render pass is also a render-target switch, and on a
+    // tile-based GPU a tile load and store as well; a compute pass switches no target. Callers
+    // that do not say default to Unknown rather than being guessed at, and the unclassified count
+    // below says how much of the frame is unaccounted for -- a statistic with a hole in it that
+    // admits to the hole is usable; one that quietly fills the hole is not.
+    enum class PassKind : std::uint8_t { Unknown, Render, Compute };
+
     // Reserves this pass's slot and returns the timestamp writes to hand to the pass descriptor.
     // The first mark of a frame also opens the timeline (it writes slot 0 at the start of its own
     // pass). Returns nullptr when timestamps are unavailable or the timeline is full, which a
     // caller can assign straight to `timestampWrites`.
-    [[nodiscard]] const wgpu::PassTimestampWrites* mark(std::string_view label);
+    [[nodiscard]] const wgpu::PassTimestampWrites* mark(std::string_view label,
+                                                        PassKind kind = PassKind::Unknown);
 
     // Call after every pass is encoded and before Finish(): resolves the used range into a
     // staging slot. Cheap and does nothing when the frame marked nothing.
@@ -84,6 +101,26 @@ public:
     // timestamp of a render pass with no draws (an empty clear), so those passes report 0 and
     // their cost, such as it is, lands on the next pass. Non-zero is expected, not an error.
     [[nodiscard]] std::uint32_t unwritten() const { return unwritten_; }
+    // Which passes those were, in submission order. Without the names, `unwritten() == 1` says
+    // some pass's cost was charged to its successor without saying which successor is therefore
+    // over-reported -- and that is the one question the number is ever asked.
+    [[nodiscard]] const std::vector<std::string>& unwrittenLabels() const { return unwrittenLabels_; }
+    // The last completed frame's raw timestamps, origin first, as the driver resolved them. The
+    // only way to tell a pass that genuinely cost nothing from a slot nothing was written into,
+    // and the only way to check the counter's unit rather than assume it.
+    [[nodiscard]] const std::vector<std::uint64_t>& timestamps() const { return timestamps_; }
+    // How many frames' readbacks have landed. The ring is deliberately non-stalling, so several
+    // render() calls in a row can report the same frame; a caller sampling per-pass numbers over
+    // many frames uses this to avoid counting one frame's numbers five times.
+    [[nodiscard]] std::uint64_t completedFrames() const { return completed_; }
+
+    // Pass kinds marked so far in the frame being *encoded* -- not the completed frame the
+    // interval numbers describe. Encode-side counters, like the draw counts they sit beside.
+    [[nodiscard]] std::uint32_t renderPasses() const { return renderPasses_; }
+    [[nodiscard]] std::uint32_t computePasses() const { return computePasses_; }
+    // Marks whose caller did not say what kind of pass it was. Every one of these is a pass the
+    // render/compute split does not cover.
+    [[nodiscard]] std::uint32_t unclassifiedPasses() const { return unclassifiedPasses_; }
 
 private:
     struct Slot {
@@ -109,9 +146,15 @@ private:
     std::array<Slot, kSlots> slots_{};
     std::uint32_t count_ = 0;
     std::uint32_t overflow_ = 0;
+    std::uint32_t renderPasses_ = 0;
+    std::uint32_t computePasses_ = 0;
+    std::uint32_t unclassifiedPasses_ = 0;
     std::size_t next_ = 0;
     int pendingSlot_ = -1;
     std::vector<Entry> passes_;
+    std::vector<std::string> unwrittenLabels_;
+    std::vector<std::uint64_t> timestamps_;
+    std::uint64_t completed_ = 0;
     std::uint32_t unwritten_ = 0;
     double frameMs_ = -1.0;
 };

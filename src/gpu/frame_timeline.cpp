@@ -60,9 +60,26 @@ FrameTimeline::~FrameTimeline() {
 void FrameTimeline::beginFrame() {
     count_ = 0;
     overflow_ = 0;
+    renderPasses_ = 0;
+    computePasses_ = 0;
+    unclassifiedPasses_ = 0;
 }
 
-const wgpu::PassTimestampWrites* FrameTimeline::mark(std::string_view label) {
+const wgpu::PassTimestampWrites* FrameTimeline::mark(std::string_view label, PassKind kind) {
+    // Counted before anything else, and before the availability check. How many passes of which
+    // kind a frame encodes is a property of the frame, not of whether this adapter can time them;
+    // an adapter without timestamp queries would otherwise report a frame with no passes in it.
+    switch (kind) {
+    case PassKind::Render:
+        ++renderPasses_;
+        break;
+    case PassKind::Compute:
+        ++computePasses_;
+        break;
+    case PassKind::Unknown:
+        ++unclassifiedPasses_;
+        break;
+    }
     if (!available_) {
         return nullptr;
     }
@@ -128,6 +145,24 @@ void FrameTimeline::collect() {
                 passes_ = std::move(span.passes);
                 unwritten_ = span.unwritten;
                 frameMs_ = span.frameMs;
+                timestamps_.assign(data, data + slot.count);
+                // Which slots the driver skipped, by name. This repeats timelineIntervals' rule
+                // for believing a timestamp -- non-zero and not behind the last believed one --
+                // because that function returns a count and not the names, and it lives in the
+                // GPU-free half where the labels are an input rather than an output. Kept next to
+                // its source so the two cannot drift unnoticed: they read the same array, here.
+                unwrittenLabels_.clear();
+                {
+                    std::uint64_t believed = data[0];
+                    for (std::uint32_t i = 1; i < slot.count; ++i) {
+                        if (data[i] != 0 && data[i] >= believed) {
+                            believed = data[i];
+                        } else {
+                            unwrittenLabels_.push_back(slot.labels[i]);
+                        }
+                    }
+                }
+                ++completed_;
                 if (rawDump_) {
                     std::string line;
                     for (std::uint32_t i = 0; i < slot.count; ++i) {

@@ -141,7 +141,13 @@ KindDefaults defaultsFor(ShotKind k) {
 
 glm::vec3 orbitPoint(const FocalTarget& subject, float distance, float azimuth, float elevation) {
     // Distance is in radii, so a shot works against a subject of any size.
-    const float r = std::max(subject.radius, 0.01f) * distance;
+    float r = std::max(subject.radius, 0.01f) * distance;
+    // ...bounded by what the subject says about itself, when it says anything. The band is wide
+    // enough that a close shot is still close and a wide one still wide; it only stops a kind's
+    // multiplier from placing the camera somewhere the subject cannot be read from.
+    if (subject.preferredDistance > 0.0f) {
+        r = std::clamp(r, subject.preferredDistance * 0.35f, subject.preferredDistance * 1.5f);
+    }
     return subject.position + glm::vec3(std::cos(azimuth) * r, elevation * std::abs(r),
                                         std::sin(azimuth) * r);
 }

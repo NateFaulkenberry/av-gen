@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -1439,7 +1440,7 @@ void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Sce
     context_.queue().WriteBuffer(clusterParams_, 0, &params, sizeof(params));
     wgpu::ComputePassDescriptor desc{};
     desc.label = "cluster-build-pass";
-    desc.timestampWrites = timeline_->mark("clusters");
+    desc.timestampWrites = timeline_->mark("clusters", gpu::FrameTimeline::PassKind::Compute);
     ++clusterDispatches_;
     wgpu::ComputePassEncoder pass = encoder.BeginComputePass(&desc);
     pass.SetPipeline(clusterPipeline_);
@@ -1463,6 +1464,24 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // previous pass's end to its own.
     timeline_->beginFrame();
     clusterDispatches_ = 0;
+    // The CPU side of the frame, stage by stage (ADR-077). The boundary rolls: every interval
+    // between two marks is charged to the stage the mark names, so the stages partition render()
+    // in submission order the way the timeline's intervals partition the GPU frame. What is left
+    // after the last mark is `unattributedMs()`, and it should be microseconds.
+    const auto renderStart = std::chrono::steady_clock::now();
+    CpuFrameBreakdown& cpu = stats_.cpu;
+    cpu = CpuFrameBreakdown{};
+    auto stageStart = renderStart;
+    const auto stage = [&stageStart](double& field) {
+        const auto now = std::chrono::steady_clock::now();
+        field += std::chrono::duration<double, std::milli>(now - stageStart).count();
+        stageStart = now;
+    };
+    // Reset here rather than beside the draw counters below: the shadow-caster selection and the
+    // shadow passes both record into these, and they run before that point.
+    stats_.geometry = GeometryCounters{};
+    stats_.state = StateChangeCounters{};
+    stats_.shadowCasters = 0;
     uploadMeshes(scene);
     uploadTextures(scene);
     updateEnvironment(scene);
@@ -1487,6 +1506,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             }
         }
     }
+
+    stage(cpu.uploadsMs);
 
     const auto& queue = context_.queue();
     const float aspect = static_cast<float>(hdr_.width()) / static_cast<float>(hdr_.height());
@@ -1599,6 +1620,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // The AO output and the shadow atlas are bound through the frame group, and both change layer
     // count / target as the frame is set up.
     rebuildFrameBindGroups();
+    stage(cpu.lightsMs);
 
     // ---- object uniforms (one 256-byte slot per visible entity) ----
     struct DrawItem {
@@ -1739,6 +1761,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
         shadowCasters.push_back(*item);
     }
+    stats_.shadowCasters = static_cast<std::uint32_t>(shadowCasters.size());
     if (objectIndex > 0) {
         queue.WriteBuffer(objectUniforms_, 0, objectStaging_.data(),
                           static_cast<std::size_t>(objectIndex) * kObjectStride);
@@ -1764,6 +1787,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     stats_.entities = objectIndex;
     stats_.lights = lightCount;
     stats_.ibl = ibl;
+    stage(cpu.objectsMs);
 
     // ---- fields (ADR-025): the per-frame field block shared by particles and procedurals ----
     fields_->update(scene.fields, time.renderTime);
@@ -1771,9 +1795,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     materialPrograms_->update(scene.materialPrograms, fields_.get());
     // ---- splines (ADR-026): the sample tables, re-uploaded only when a spline changed ----
     splines_->update(scene.splines);
+    stage(cpu.fieldsMs);
     // ---- simulated grid fields (ADR-032): fixed sub-steps into the shared grid table ----
     simulation_->update(encoder, scene, time);
     stats_.simulation = simulation_->stats();
+    stage(cpu.simulationMs);
 
     // Ambient occlusion and the contact-shadow march both need the depth of the whole opaque
     // scene while it is being shaded (ADR-034/035); the particle fog coupling reads the linear
@@ -1804,6 +1830,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     }
     particles_->update(encoder, scene, time, view, proj, fields_.get(), splines_.get());
     stats_.particles = particles_->stats();
+    stage(cpu.particlesMs);
 
     // ---- procedural geometry (ADR-023): mesh/instance uploads, per-frame uniforms, effector pass ----
     // The scene places its procedurals itself in this phase: identity object matrices.
@@ -1814,10 +1841,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         procedurals_->update(encoder, scene, identity, time, fields_.get(), splines_.get());
         stats_.procedural = procedurals_->stats();
     }
+    stage(cpu.proceduralMs);
 
     // ---- SDF objects (ADR-027): node packing, mesh uploads, per-object uniforms ----
     sdfs_->update(scene, time, frame.viewProj, fields_.get());
     stats_.sdf = sdfs_->stats();
+    stage(cpu.sdfMs);
 
     // ---- shadow depth passes (ADR-034): one per cascade / spot map, depth only ----
     // Every caster is drawn with its ordinary vertex shader against a frame block whose
@@ -1835,7 +1864,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.depthStencilAttachment = &depth;
         // Every view marks the timeline under "shadow"; their intervals sum to the whole depth
         // phase, so a cascade that costs nothing cannot hide behind one that does.
-        pass.timestampWrites = timeline_->mark("shadow");
+        pass.timestampWrites = timeline_->mark("shadow", gpu::FrameTimeline::PassKind::Render);
         // Cull each caster against this cascade (P4). Without it every shadow-casting entity is
         // drawn into every view: a world of 256 terrain chunks submits them all, twice, whatever
         // the light can actually see, and the cost stays whether or not the camera is looking at
@@ -1846,6 +1875,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         rp.SetBindGroup(0, shadowFrameGroups_[v]);
         rp.SetBindGroup(3, iblBindGroup_);
         rp.SetPipeline(depthOnlyPipeline_);
+        stats_.state.bindGroupBinds += 2;
+        ++stats_.state.pipelineBinds;
         for (const auto& item : shadowCasters) {
             if (cullCascade) {
                 const auto [wlo, whi] = entityWorldBounds(*item.entity);
@@ -1860,6 +1891,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             rp.SetVertexBuffer(0, mesh.vertices);
             rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
             rp.DrawIndexed(mesh.indexCount);
+            stats_.geometry.shadow.record(mesh.indexCount, 1, false);
+            stats_.state.bindGroupBinds += 2;
+            ++stats_.state.vertexBufferBinds;
+            ++stats_.state.indexBufferBinds;
             ++stats_.shadows.entityDraws;
         }
         sdfs_->drawMeshes(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
@@ -1869,6 +1904,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                  true);
         rp.End();
     }
+    stage(cpu.shadowEncodeMs);
 
     // ---- background pass: the HDR clear and the background user-shader layers ----
     // These are fullscreen quads with a single colour output, so they get their own pass; the
@@ -1884,7 +1920,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.label = "background-pass";
         pass.colorAttachmentCount = 1;
         pass.colorAttachments = &color;
-        pass.timestampWrites = timeline_->mark("background");
+        pass.timestampWrites = timeline_->mark("background", gpu::FrameTimeline::PassKind::Render);
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         if (layerSet != nullptr) {
             for (const auto& layer : layerSet->layers()) {
@@ -1898,6 +1934,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
         rp.End();
     }
+    stage(cpu.backgroundEncodeMs);
 
     // ---- depth prepass: the scene depth, before anything reads it ----
     // The prepass is cheap - no fragment work - and the shading pass then tests LessEqual
@@ -1912,11 +1949,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.label = "depth-prepass";
         pass.colorAttachmentCount = 0;
         pass.depthStencilAttachment = &depth;
-        pass.timestampWrites = timeline_->mark("depth");
+        pass.timestampWrites = timeline_->mark("depth", gpu::FrameTimeline::PassKind::Render);
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetBindGroup(0, frameBindGroupAux_);
         rp.SetBindGroup(3, iblBindGroup_);
         rp.SetPipeline(depthOnlyPipeline_);
+        stats_.state.bindGroupBinds += 2;
+        ++stats_.state.pipelineBinds;
         for (const auto& item : opaque) {
             const GpuMesh& mesh = meshes_[item.entity->mesh];
             rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
@@ -1924,6 +1963,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             rp.SetVertexBuffer(0, mesh.vertices);
             rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
             rp.DrawIndexed(mesh.indexCount);
+            stats_.geometry.depth.record(mesh.indexCount, 1, false);
+            stats_.state.bindGroupBinds += 2;
+            ++stats_.state.vertexBufferBinds;
+            ++stats_.state.indexBufferBinds;
         }
         sdfs_->drawMeshes(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
                           &depthOnlyPipeline_);
@@ -1953,17 +1996,20 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         linearPass.label = "linear-depth-pass";
         linearPass.colorAttachmentCount = 1;
         linearPass.colorAttachments = &colour;
-        linearPass.timestampWrites = timeline_->mark("depth");
+        linearPass.timestampWrites = timeline_->mark("depth", gpu::FrameTimeline::PassKind::Render);
         wgpu::RenderPassEncoder lrp = encoder.BeginRenderPass(&linearPass);
         lrp.SetPipeline(linearDepthPipeline_);
         lrp.SetBindGroup(0, frameBindGroupAux_);
         lrp.SetBindGroup(1, linearDepthGroup_);
         lrp.Draw(3);
         lrp.End();
+        ++stats_.state.pipelineBinds;
+        stats_.state.bindGroupBinds += 2;
 
         // ---- ground-truth ambient occlusion (ADR-034) ----
         ao_->encode(encoder, frameBindGroupAux_);
     }
+    stage(cpu.depthEncodeMs);
 
     // ---- pass 1: scene -> HDR + the auxiliary targets (ADR-035) ----
     {
@@ -1989,11 +2035,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.colorAttachmentCount = kSceneTargetCount;
         pass.colorAttachments = attachments.data();
         pass.depthStencilAttachment = &depth;
-        pass.timestampWrites = timeline_->mark("scene");
+        pass.timestampWrites = timeline_->mark("scene", gpu::FrameTimeline::PassKind::Render);
 
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetBindGroup(0, frameBindGroup_);
         rp.SetBindGroup(3, iblBindGroup_);
+        stats_.state.bindGroupBinds += 2;
         auto drawItems = [&](const std::vector<DrawItem>& items, bool lit) {
             for (const auto& item : items) {
                 const GpuMesh& mesh = meshes_[item.entity->mesh];
@@ -2011,22 +2058,39 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                 rp.SetVertexBuffer(0, mesh.vertices);
                 rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
                 rp.DrawIndexed(mesh.indexCount);
+                // One draw, one instance, and the CPU knows both: no estimate here.
+                stats_.geometry.camera.record(mesh.indexCount, 1, false);
+                // Counted as recorded, not as changed. This loop sets the pipeline and both groups
+                // for every item whether or not they differ from the last, which is precisely the
+                // redundancy a later phase is meant to remove -- so the number that would hide it
+                // is not the one kept.
+                ++stats_.state.pipelineBinds;
+                stats_.state.bindGroupBinds += 2;
+                ++stats_.state.vertexBufferBinds;
+                ++stats_.state.indexBufferBinds;
                 ++stats_.drawCalls;
-                stats_.triangles += mesh.indexCount / 3;
             }
         };
         drawItems(opaque, true);
         procedurals_->draw(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
-        // One indirect draw per populated LOD level when an object uses LOD, else one per object.
-        stats_.drawCalls += std::max(stats_.procedural.objects, stats_.procedural.drawCalls);
-        stats_.triangles += static_cast<std::uint32_t>(
-            std::min<std::uint64_t>(stats_.procedural.logicalTriangles, 0xFFFFFFFFull - stats_.triangles));
+        // The procedural draws and triangles are folded in at the end of the frame instead of
+        // here. The copy of ProceduralStats taken during update() is made before a single draw
+        // exists, so reading its counters at this point read `objects` -- one draw per object --
+        // for a renderer that issues up to four indirect draws per object, which is how `draws=112`
+        // came to be reported alongside `indirect 154` in the same line.
         // SDF objects (ADR-027): meshed ones draw here like entities; raymarched ones need their own
         // pass (own timestamps, frag_depth writes), so the lit pass is split around it only when
         // there is raymarch work, keeping the no-SDF frame identical.
         sdfs_->drawMeshes(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
         stats_.drawCalls += stats_.sdf.meshObjects;
-        stats_.triangles += stats_.sdf.meshTriangles;
+        // ADR-027 reports the meshed SDFs for the frame, not per pass, so their contribution is
+        // charged to the camera. drawMeshes() also runs in the depth prepass and in every shadow
+        // view; those are not counted, so `geometry.depth` and `geometry.shadow` are floors in a
+        // scene that has meshed SDFs in it. The SDF renderer is not instrumented here (it is not
+        // this phase's file to change).
+        stats_.geometry.camera.triangles += stats_.sdf.meshTriangles;
+        stats_.geometry.camera.instances += stats_.sdf.meshObjects;
+        stats_.geometry.camera.draws += stats_.sdf.meshObjects;
         if (sdfs_->hasRaymarchWork()) {
             rp.End();
             const std::array<wgpu::TextureView, kAuxTargetCount> raymarchAux = {normalRough_.view, velocity_.view,
@@ -2035,13 +2099,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                       scene, [this](const scene::Material& m) { return materialBindGroup(m); },
                                       raymarchAux.data(), kAuxTargetCount);
             stats_.drawCalls += stats_.sdf.raymarchObjects;
-            stats_.triangles += stats_.sdf.raymarchObjects * 2;
             for (auto& attachment : attachments) {
                 attachment.loadOp = wgpu::LoadOp::Load;
             }
             depth.depthLoadOp = wgpu::LoadOp::Load;
             pass.label = "scene-pass-after-sdf";
-            pass.timestampWrites = timeline_->mark("scene");
+            pass.timestampWrites = timeline_->mark("scene", gpu::FrameTimeline::PassKind::Render);
             rp = encoder.BeginRenderPass(&pass);
             rp.SetBindGroup(0, frameBindGroup_);
             rp.SetBindGroup(3, iblBindGroup_);
@@ -2056,7 +2119,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             rp.SetBindGroup(2, materialBindGroup(scene::Material{}));
             rp.Draw(3);
             ++stats_.drawCalls;
-            ++stats_.triangles;
+            ++stats_.state.pipelineBinds;
+            stats_.state.bindGroupBinds += 2;
         }
         drawItems(grid, false);
         particles_->draw(rp, scene);
@@ -2067,6 +2131,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         drawItems(blended, true);
         rp.End();
     }
+    stage(cpu.sceneEncodeMs);
 
     // ---- volumetric atmosphere (ADR-032): half-res raymarch + depth-aware composite ----
     // Skipped entirely when Environment::volumeDensity is 0, so scenes without fog are unchanged.
@@ -2093,12 +2158,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.colorAttachmentCount = 1;
         pass.colorAttachments = &colour;
         pass.depthStencilAttachment = &depth;
-        pass.timestampWrites = timeline_->mark("debug");
+        pass.timestampWrites = timeline_->mark("debug", gpu::FrameTimeline::PassKind::Render);
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         debug_->render(rp, frameBindGroup_, debugDepthTest_);
         rp.End();
         debug_->clear();
     }
+    stage(cpu.volumeEncodeMs);
 
     // ---- post layers: HDR -> ping-pong HDR ----
     wgpu::TextureView finalHdr = hdr_.colorView();
@@ -2127,7 +2193,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             pass.label = "post-layer-pass";
             pass.colorAttachmentCount = 1;
             pass.colorAttachments = &color;
-            pass.timestampWrites = timeline_->mark("shaderlayer");
+            pass.timestampWrites = timeline_->mark("shaderlayer", gpu::FrameTimeline::PassKind::Render);
             wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
             gpuLayer->drawOutput(rp, kHdrFormat, false, *layer, postCtx);
             rp.End();
@@ -2168,6 +2234,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     }
     prevViewProj_ = frame.viewProj;
     havePrevViewProj_ = true;
+    stage(cpu.postEncodeMs);
 
     // ---- auxiliary-target debug view (ADR-035): one target full-screen, before tone mapping ----
     if (auxDebugView_ != AuxDebugView::None) {
@@ -2208,13 +2275,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.label = "aux-debug-pass";
         pass.colorAttachmentCount = 1;
         pass.colorAttachments = &colour;
-        pass.timestampWrites = timeline_->mark("auxdebug");
+        pass.timestampWrites = timeline_->mark("auxdebug", gpu::FrameTimeline::PassKind::Render);
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetPipeline(auxDebugPipeline_);
         rp.SetBindGroup(0, auxDebugGroup_);
         rp.Draw(3);
         rp.End();
         ++stats_.drawCalls;
+        ++stats_.state.pipelineBinds;
+        ++stats_.state.bindGroupBinds;
     }
 
     // ---- pass 2: tonemap -> target ----
@@ -2232,17 +2301,43 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.label = "tonemap-pass";
         pass.colorAttachmentCount = 1;
         pass.colorAttachments = &color;
-        pass.timestampWrites = timeline_->mark("tonemap");
+        pass.timestampWrites = timeline_->mark("tonemap", gpu::FrameTimeline::PassKind::Render);
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetPipeline(*pipeline);
         rp.SetBindGroup(0, finalHdr.Get() == hdr_.colorView().Get() ? tonemapBindGroup_ : tonemapBindGroupFor(finalHdr));
         rp.Draw(3);
         rp.End();
         ++stats_.drawCalls;
-        ++stats_.triangles;
+        ++stats_.state.pipelineBinds;
+        ++stats_.state.bindGroupBinds;
     }
     timeline_->resolve(encoder);
     pool_->endFrame();
+
+    // ---- what the frame actually submitted (ADR-077) ----
+    // Folded here, at the end of encoding, because this is the first moment every draw has been
+    // recorded. The procedural renderer counts its own three budgets as it records them, and the
+    // instance counts behind its indirect draws come from the last completed cull readback -- see
+    // SubmittedGeometry::estimatedDraws for what that means.
+    {
+        const ProceduralStats& proc = procedurals_->stats();
+        stats_.geometry.camera += proc.submittedCamera;
+        stats_.geometry.depth += proc.submittedDepth;
+        stats_.geometry.shadow += proc.submittedShadow;
+        // The pre-cull figure, kept under a name that says so. Entities have neither LOD nor a
+        // cull pass, so for them submitted and logical are the same number; this is the ecology's.
+        stats_.geometry.logicalTriangles = proc.logicalTriangles;
+        stats_.geometry.logicalInstances = proc.instances;
+        stats_.drawCalls += proc.drawCalls;
+        stats_.state += proc.state;
+        stats_.state.renderPasses = timeline_->renderPasses();
+        stats_.state.computePasses = timeline_->computePasses();
+        stats_.unclassifiedPasses = timeline_->unclassifiedPasses();
+        stats_.triangles = static_cast<std::uint32_t>(
+            std::min<std::uint64_t>(stats_.geometry.camera.triangles, 0xFFFFFFFFull));
+    }
+    stage(cpu.tonemapEncodeMs);
+    cpu.totalMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - renderStart).count();
     return {};
 }
 
@@ -2279,10 +2374,23 @@ Result<wgpu::Texture> SceneRenderer::renderSubmitted(const scene::Scene& scene, 
     if (auto r = render(encoder, scene, time, target, shaderInputs); !r) {
         return std::unexpected(r.error());
     }
+    // The three costs the live path does not pay here and the offline one does. They are outside
+    // render(), so without them the CPU breakdown of an offline frame would stop at the last pass
+    // encoded and the wall clock around it would be unexplained (ADR-077).
+    const auto elapsed = [](std::chrono::steady_clock::time_point from) {
+        return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - from).count();
+    };
+    auto mark = std::chrono::steady_clock::now();
     wgpu::CommandBuffer commands = encoder.Finish();
+    stats_.cpu.finishMs = elapsed(mark);
+    mark = std::chrono::steady_clock::now();
     context_.queue().Submit(1, &commands);
+    stats_.cpu.submitMs = elapsed(mark);
     collectFrameTimings();
+    mark = std::chrono::steady_clock::now();
     context_.waitForQueue();
+    stats_.cpu.queueWaitMs = elapsed(mark);
+    stats_.cpu.totalMs += stats_.cpu.finishMs + stats_.cpu.submitMs + stats_.cpu.queueWaitMs;
     // Again after the queue drained: a frame submitted two or three frames ago has landed in the
     // readback ring by now, so the numbers reported alongside this frame are only that stale.
     collectFrameTimings();

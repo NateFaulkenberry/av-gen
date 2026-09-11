@@ -38,6 +38,9 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/rendering/light_data.cpp"
     # The frame timeline's interval arithmetic is GPU-free so it can be pinned without a device.
     "${CMAKE_SOURCE_DIR}/src/gpu/timeline_math.cpp"
+    # The frame statistics' arithmetic is GPU-free for the same reason (ADR-077): submitted-triangle
+    # widening, the per-label medians and the removal attribution are where these can be wrong.
+    "${CMAKE_SOURCE_DIR}/src/rendering/render_stats.cpp"
     "${CMAKE_SOURCE_DIR}/src/rendering/shadow_math.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp")
 target_link_libraries(avgen_tests PRIVATE avgen_core Catch2::Catch2WithMain)

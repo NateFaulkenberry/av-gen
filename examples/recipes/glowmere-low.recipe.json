@@ -1,0 +1,39 @@
+{
+ "world": "glowmere-low",
+ "description": "Glowmere at a sixth of its density: the floor of the renderer laboratory's ladder (docs/renderer-2-benchmark-world.md). Every density weight is the shipped glowmere recipe's multiplied by 0.40, which multiplies every layer's density by 0.16 and leaves the proportions between the species exactly as they were -- the same valley, the same air, the same light, thinned. Art direction, seed, extent, negative space and focal strength are identical to glowmere-medium, so the two are the same shot and differ only in how much grows in it.",
+ "seed": 19740211,
+ "extent": 420.0,
+ "assetLibrary": "../../assets/glowmere.manifest.json",
+ "composition": {
+  "foreground": 0.38,
+  "midground": 0.32,
+  "background": 0.22,
+  "negative_space": 0.28,
+  "focalStrength": 0.8
+ },
+ "ecology": {
+  "flora": 0.38,
+  "fungi": 0.3,
+  "rock": 0.16,
+  "crystals": 0.0,
+  "creatures": 0.0,
+  "structure": 0.0
+ },
+ "atmosphere": {
+  "fog": 0.5,
+  "spores": 0.45,
+  "floating_elements": 0.15,
+  "depthHaze": 0.5
+ },
+ "lighting": {
+  "moon": 0.55,
+  "bioluminescence": 1.0,
+  "volumetric": 0.5,
+  "bounce": 0.15
+ },
+ "art": {
+  "profile": "glowmere",
+  "organicMotion": 0.8,
+  "chaos": 0.16
+ }
+}
