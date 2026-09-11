@@ -849,8 +849,22 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->onOpenExample = [this](const ExampleInfo& ex) { loadAny(ex.file); };
         // ---- asset browser (ADR-031): the example directories plus the current project's folder
         const auto assetDirs = [executablePath]() { return exampleSearchDirs(executablePath); };
-        panel_->onRescanAssets = [this, assetDirs] { panel_->assets = scanAssets(assetDirs()); };
+        panel_->onRescanAssets = [this, assetDirs] {
+            panel_->assets = scanAssets(assetDirs());
+            std::vector<std::filesystem::path> roots = assetDirs();
+            if (!engine_->projectPath().empty()) roots.push_back(engine_->projectPath().parent_path());
+            if (auto catalog = assets::catalogAssets(roots, engine_->projectPath().parent_path())) {
+                panel_->catalogAssets = std::move(*catalog);
+            }
+        };
         panel_->assets = scanAssets(assetDirs());
+        {
+            std::vector<std::filesystem::path> roots = assetDirs();
+            if (!engine_->projectPath().empty()) roots.push_back(engine_->projectPath().parent_path());
+            if (auto catalog = assets::catalogAssets(roots, engine_->projectPath().parent_path())) {
+                panel_->catalogAssets = std::move(*catalog);
+            }
+        }
         panel_->onOpenAsset = [this](const AssetEntry& asset) { loadAny(asset.path); };
         // Art direction (ADR-041): the shipped looks live beside the examples.
         {

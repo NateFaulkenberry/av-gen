@@ -10,6 +10,7 @@
 // moved.
 
 #include "app/engine.hpp"
+#include "assets/asset_catalog.hpp"
 #include "app/asset_browser.hpp"
 #include "app/examples.hpp"
 #include "app/render_job.hpp"
@@ -82,6 +83,7 @@ public:
     std::function<void(const app::ExampleInfo&)> onOpenExample;
     // Asset browser (ADR-031): the host scans directories and opens what the user picks.
     std::vector<app::AssetEntry> assets;
+    std::vector<assets::AssetRecord> catalogAssets;
     std::function<void()> onRescanAssets;
     std::function<void(const app::AssetEntry&)> onOpenAsset;
     // Offline rendering (1.0): the host owns the settings, the job and the queue.

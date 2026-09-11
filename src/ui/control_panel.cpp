@@ -519,6 +519,8 @@ void ControlPanel::drawAssetsWindow() {
         onRescanAssets();
     }
     ImGui::SameLine();
+    ImGui::TextDisabled("%zu catalog asset(s)", catalogAssets.size());
+    ImGui::SameLine();
     const char* kinds[] = {"all", "project", "scene", "graph", "preset", "model", "environment", "shader", "audio"};
     ImGui::SetNextItemWidth(140.0f);
     ImGui::Combo("kind", &assetKind_, kinds, IM_ARRAYSIZE(kinds));
@@ -554,6 +556,16 @@ void ControlPanel::drawAssetsWindow() {
             ImGui::TextDisabled("%s", a->thumbnail.empty() ? "-" : "png");
         }
         ImGui::EndTable();
+    }
+    if (!catalogAssets.empty() && ImGui::TreeNodeEx("Ownership catalog", ImGuiTreeNodeFlags_DefaultOpen)) {
+        for (const auto& asset : catalogAssets) {
+            const bool project = asset.source == assets::AssetSource::Project;
+            ImGui::BulletText("[%s] %s  %s", project ? "PROJECT" : "BUILT-IN", asset.name.c_str(), asset.type.c_str());
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s\n%s", asset.id.c_str(), asset.path.string().c_str());
+            }
+        }
+        ImGui::TreePop();
     }
 }
 
