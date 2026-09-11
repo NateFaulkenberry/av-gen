@@ -3302,6 +3302,27 @@ Result<void> Composition::installLightRig(LightRig rig, const std::filesystem::p
 }
 
 void Composition::setEnvironmentMap(const std::filesystem::path& path) {
+    // Setting the same map twice changes nothing about the flattened scene, and `dirty_` is not a
+    // request to re-read the file -- the registry caches images by path, so a second rebuild would
+    // resolve to the identical texture. It is a request to rebuild everything: 256 terrain chunks,
+    // 260k scatter cells, every procedural cloud.
+    //
+    // Which is what the load path was asking for. `attach()` rebuilds (it fits the camera to the
+    // flattened bounds), and `loadComposition` then calls `reapplyEnvironment()`, which called this
+    // unconditionally with the path the scene had just been loaded with -- so every scene carrying
+    // an environment map built its world twice on open. Measured on
+    // examples/world/terrain.scene.json: 775 ms in the first frame's engine update, 397 ms after.
+    //
+    // Compared as resolved paths, because the two sides genuinely differ in form: the scene file
+    // stores a relative path and the engine hands back the absolute one it resolved in order to
+    // load the image. Comparing the raw strings would never match and the guard would never fire.
+    const bool same = environmentPath_.empty() && path.empty()
+                          ? true
+                          : (!environmentPath_.empty() && !path.empty() &&
+                             registry_.resolve(environmentPath_) == registry_.resolve(path));
+    if (same) {
+        return;
+    }
     environmentPath_ = path;
     dirty_ = true;
 }

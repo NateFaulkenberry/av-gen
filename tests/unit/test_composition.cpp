@@ -1827,3 +1827,62 @@ TEST_CASE("examples/world/glowmere-stylized.scene.json declares the elder as its
     CHECK(hero->activationRadius > 100.0f);
 #endif
 }
+
+// ---- rebuild invalidation (docs/application-performance.md) -------------------------------------
+//
+// `dirty_` is not a request to re-read a file. It is a request to flatten the whole world again --
+// every terrain chunk, every scatter layer, every procedural cloud -- and on
+// examples/world/terrain.scene.json that is about 390 ms of frozen main thread. So anything that
+// sets it has to have actually changed something.
+//
+// The load path set it for nothing. `attach()` flattens once (it fits the camera to the resulting
+// bounds), and `Engine::loadComposition` then called `setEnvironmentMap()` with the path the scene
+// had just been loaded with, which dirtied it again -- so every scene carrying an environment map
+// built its world twice on open, and the second build landed inside the editor's first frame.
+//
+// The observable here is `scene().meshVersion`, which `rebuild()` increments. Deliberately not a
+// getter for the flag: what matters is whether the world is flattened again, and the version is
+// what the renderer watches to decide whether to re-upload every buffer.
+TEST_CASE("Setting the same environment map again does not re-flatten the world",
+          "[scene][composition][performance]") {
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(tempDir());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "composition");
+    comp.attach(params, modulator);
+
+    const FrameTime time{};
+    comp.update(time);
+    const std::uint64_t settled = comp.scene().meshVersion;
+
+    comp.setEnvironmentMap("env/studio.hdr");
+    comp.update(time);
+    const std::uint64_t afterFirstSet = comp.scene().meshVersion;
+    CHECK(afterFirstSet > settled); // a new map is a real change
+
+    // The same map again, by the same name: nothing about the flattened scene depends on it.
+    comp.setEnvironmentMap("env/studio.hdr");
+    comp.update(time);
+    CHECK(comp.scene().meshVersion == afterFirstSet);
+
+    // And the same map by its absolute name, which is the form the engine hands back after
+    // resolving it in order to load the image. This is the case the load path actually hits; a
+    // guard that only compared the raw strings would never fire here, which is why it is pinned
+    // separately from the one above.
+    comp.setEnvironmentMap(registry.resolve("env/studio.hdr"));
+    comp.update(time);
+    CHECK(comp.scene().meshVersion == afterFirstSet);
+    CHECK(!comp.environmentMap().empty());
+
+    // A different map is still a change.
+    comp.setEnvironmentMap("env/sunset.hdr");
+    comp.update(time);
+    CHECK(comp.scene().meshVersion > afterFirstSet);
+
+    // So is clearing it.
+    const std::uint64_t afterSunset = comp.scene().meshVersion;
+    comp.setEnvironmentMap({});
+    comp.update(time);
+    CHECK(comp.scene().meshVersion > afterSunset);
+}
