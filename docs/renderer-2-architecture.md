@@ -67,26 +67,32 @@ Two consequences:
 
 ## 3. The geometry statistics do not measure what they appear to
 
-Reported for Glowmere at 1440×900:
+**Superseded by Phase 1 (ADR-077). Kept because the reasoning is what motivated the phase, but
+the numbers below describe the profiler as it stood before the fix, not as it stands now.**
+
+Reported for Glowmere at 1440x900, *before* Phase 1:
 
 ```
 draws=112 (indirect 154, empty 2, skipped 62)  shadowDraws=123  cascades=2/2
-tris=15154902  instances=2316v/114296c  lod=485/1453/373/5
-cpu(proc)=0.14ms  cpu(scene)=0.77ms
+tris=15154902  instances=2316v/114296c
 ```
 
-**`tris` is `sourceTriangles × instances`** — `ProceduralStats::logicalTriangles`, computed before
-LOD selection and before culling. It is the geometry the world *contains*, not the geometry
-submitted. The submitted triangle count is **not measured anywhere in the renderer.**
+`tris` was `sourceTriangles x instances` -- computed before LOD selection and before culling, so
+it was the geometry the world *contains*, not the geometry submitted. The submitted count was
+measured nowhere. `draws=112` beside `indirect 154` in the same line was the same kind of error:
+it read a `ProceduralStats` copy taken before any draw was recorded.
 
-That matters more than it sounds. The brief (§6) asks the profiler to report triangle count so that
-"why did this frame take 24 ms" has an answer, and the most prominent geometry number currently
-answers a different question. 15.1 M is not what the GPU drew; 2,316 visible instances out of
-114,296 candidates were, at LOD distribution 485/1453/373/5 — and how many triangles that came to is
-unknown.
+**As of Phase 1 both report what their names say.** The same scene now reads:
 
-**Phase 1 must add submitted-primitive counting before any geometry optimisation is attempted**, or
-there is no way to show that a LOD or culling change did anything.
+```
+draws=143 (indirect 154, empty 6, skipped 62)  tris=636397  instances=2340v/114272c/116612
+submitted: camera 636397 tris / 2479 inst / 140 draws; shadow 1176964 / 1615 / 197
+```
+
+Submitted geometry is 4.2% of logical. `tris` is therefore resolution-dependent now, which it was
+not before -- that is correct behaviour for a submitted count and is the point of the change.
+
+The split made something visible that was not: **shadows submit 1.85x the camera's geometry.**
 
 ## 4. The CPU is not the bottleneck
 

@@ -2078,12 +2078,19 @@ int Application::runHeadless() {
                                renderer_->timeline().unwritten());
                 }
             }
+            // `instances=Av/Bc/T` carries its own total, because A + B is *not* the world: it covers
+            // only the objects whose cull pass ran, and it counts the renderer's instance records
+            // rather than the composer's per-layer placement log, which excludes terrain chunks and
+            // hero nodes. Without the denominator the two invite being compared, and a benchmark
+            // pass duly reported "101,822 culled against 99,515 placed" as a defect when both
+            // numbers were right and measuring different things.
             log::info("             draws={} (indirect {}, empty {}, skipped {}) shadowDraws={} "
-                      "cascades={}/{} spots={} dispatches={} tris={} instances={}v/{}c lod={}/{}/{}/{} "
+                      "cascades={}/{} spots={} dispatches={} tris={} instances={}v/{}c/{} lod={}/{}/{}/{} "
                       "particles={}sys/{}cap/{}emit cpu(proc)={:.2f}ms cpu(scene)={:.2f}ms",
                       st.drawCalls, st.indirectDraws, st.emptyDraws, st.skippedDraws, st.shadowDraws,
                       st.shadows.cascades, st.shadows.views, st.shadows.spots, st.computeDispatches,
-                      st.triangles, st.visibleInstances, st.culledInstances, st.lodCounts[0], st.lodCounts[1],
+                      st.triangles, st.visibleInstances, st.culledInstances,
+                      st.visibleInstances + st.culledInstances, st.lodCounts[0], st.lodCounts[1],
                       st.lodCounts[2], st.lodCounts[3], st.particles.systems, st.particles.capacity,
                       st.particles.emittedThisFrame, st.procedural.cpuUpdateMs, lastEngineUpdateMs_);
             // The workload each measured phase was actually given. Without these an A/B that edits
