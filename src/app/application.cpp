@@ -614,6 +614,35 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // argument makes a folder here instead of writing across the machine. A session with no
         // preferences directory installs nothing and those tools refuse, which is the honest
         // failure -- better than defaulting to the working directory and surprising somebody.
+        // What the assistant may *read*: the example and recipe folders it ships with, and the open
+        // project's own directory. Reading is bounded separately from writing and more widely, but
+        // it is still bounded -- without a list, an import tool is an arbitrary-file-read primitive
+        // handed to a language model.
+        {
+            std::vector<std::filesystem::path> roots = exampleSearchDirs(executablePath);
+            roots.push_back(std::filesystem::path(AVGEN_SOURCE_DIR) / "assets");
+            if (!engine_->projectPath().empty()) {
+                roots.push_back(engine_->projectPath().parent_path());
+            }
+            // Where a person keeps the file they are about to point at. Deliberate, and the
+            // narrowest set that makes "import the track on my desktop" work at all: Desktop and
+            // Downloads, read only, and nothing else of the home directory. An assistant cannot
+            // write to either -- the only directory these tools write into is the projects root
+            // above -- and `resolveContent` resolves `..` and symlinks before deciding a path is
+            // inside one, so a name cannot climb out of them.
+            if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') {
+                const std::filesystem::path homeDir(home);
+                for (const char* folder : {"Desktop", "Downloads"}) {
+                    std::error_code folderEc;
+                    const std::filesystem::path candidate = homeDir / folder;
+                    if (std::filesystem::is_directory(candidate, folderEc)) {
+                        roots.push_back(candidate);
+                    }
+                }
+            }
+            ai_->setContentRoots(roots);
+            log::info("ai: {} content root(s) readable", roots.size());
+        }
         if (!prefs.empty()) {
             const std::filesystem::path projects = prefs / "projects";
             std::error_code projectsEc;
@@ -2456,40 +2485,20 @@ Result<void> Application::openAny(const std::filesystem::path& path) {
 }
 
 Result<void> Application::generateWorldFromRecipe(const std::filesystem::path& path) {
-    auto recipe = world::WorldRecipe::loadFile(path);
-    if (!recipe) {
-        return std::unexpected(recipe.error());
-    }
-    // A recipe may name its own library; otherwise the repository's manifest is the default, since
-    // that is the one curated list of things allowed to be placed procedurally.
-    auto libraryPath = recipe->assetLibrary;
-    if (libraryPath.empty()) {
-        libraryPath = path.parent_path() / ".." / ".." / "assets" / "manifest.json";
-        libraryPath = libraryPath.lexically_normal();
-    }
-    auto library = assets::AssetLibrary::loadFile(libraryPath);
-    if (!library) {
-        return std::unexpected(library.error());
-    }
-    auto composed = world::composeWorld(*recipe, *library);
-    if (!composed) {
-        return std::unexpected(composed.error());
+    auto world = composeFromRecipeFile(path);
+    if (!world) {
+        return std::unexpected(world.error());
     }
     // A recipe with no composition to land in gets one, so `--generate` alone is a complete
     // instruction rather than something that only works after a scene is already open.
     if (engine_->composition() == nullptr) {
         engine_->newComposition();
     }
-    GeneratedWorld world;
-    world.recipe = *recipe;
-    world.composed = std::move(*composed);
-    world.assetsConsidered = library->size();
-    world.library = *library;
-    if (auto installed = installWorld(*engine_, world); !installed) {
+    if (auto installed = installWorld(*engine_, *world); !installed) {
         return installed;
     }
-    log::info("generate: '{}' from {} asset(s) -> {} layer(s)", world.recipe.world,
-              world.assetsConsidered, world.composed.layers.size());
+    log::info("generate: '{}' from {} asset(s) -> {} layer(s)", world->recipe.world,
+              world->assetsConsidered, world->composed.layers.size());
     return {};
 }
 

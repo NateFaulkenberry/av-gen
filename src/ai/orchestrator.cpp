@@ -121,6 +121,9 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
             if (!projectsRoot_.empty()) {
                 ctx.setProjectsRoot(projectsRoot_);
             }
+            if (!contentRoots_.empty()) {
+                ctx.setContentRoots(contentRoots_);
+            }
             if (performance_) {
                 ctx.setPerformanceSource(performance_);
             }

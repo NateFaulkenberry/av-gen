@@ -4,6 +4,7 @@
 #include "ai/tool_context.hpp"
 #include "ai/transaction.hpp"
 #include "app/engine.hpp"
+#include "app/world_builder.hpp"
 #include "analysis/analysis_track.hpp"
 #include "core/log.hpp"
 #include "params/serialization.hpp"
@@ -691,6 +692,257 @@ void registerParameterTools(ToolRegistry& registry) {
                 out["warningNote"] = "the project opened, but these assets did not resolve";
             }
             return ToolResult::ok(std::move(out), fmt::format("opened '{}'", name));
+        });
+
+    // ---- generating a world ---------------------------------------------------------------------
+    //
+    // The composer is the one part of this engine that can fill a world without a human placing
+    // anything, and until now the assistant had no way to ask it to. `world.generate` is a wrapper
+    // over exactly what `--generate` and the Generate World button already do -- the same
+    // `composeFromRecipeFile` and the same `installWorld` -- so a world an assistant makes is the
+    // same object a person makes.
+    //
+    // Know the limit before promising anything with it: the composer places by *density* and a
+    // world is capped at 64 scatter layers. It dresses a landscape. It does not lay out a street.
+    add(registry, "world.list_recipes", "List world recipes",
+        "The world recipes this session can reach, by name. A recipe is a seed, an extent, an asset "
+        "library and a set of ecology weights; generating one fills a world with what the library "
+        "allows. Read this before generating rather than guessing a name.",
+        noArgs(), readOnly(),
+        [](const json&, ToolContext& ctx) -> ToolResult {
+            json found = json::array();
+            std::error_code ec;
+            for (const std::filesystem::path& root : ctx.contentRoots()) {
+                if (!std::filesystem::is_directory(root, ec)) {
+                    continue;
+                }
+                for (const auto& entry : std::filesystem::recursive_directory_iterator(
+                         root, std::filesystem::directory_options::skip_permission_denied, ec)) {
+                    if (!entry.is_regular_file(ec)) {
+                        continue;
+                    }
+                    const std::string name = entry.path().filename().string();
+                    if (name.size() < 13 || name.compare(name.size() - 12, 12, ".recipe.json") != 0) {
+                        continue;
+                    }
+                    found.push_back(json{{"name", name.substr(0, name.size() - 12)},
+                                         {"file", entry.path().string()}});
+                }
+            }
+            const auto count = found.size();
+            return ToolResult::ok(json{{"recipes", std::move(found)}},
+                                  fmt::format("{} recipe(s)", count));
+        });
+
+    add(registry, "world.generate", "Generate a world",
+        "Compose a world from a recipe and install it into the scene, replacing whatever ecology the "
+        "terrain had. This is the same path as the Generate World button. Reports what was placed, "
+        "which is the answer worth reading: a recipe whose library has nothing the weights ask for "
+        "composes successfully and puts nothing in the world.",
+        schema::object({{"recipe", schema::string("Recipe name, as reported by world.list_recipes")}}),
+        sessionWrite(true),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string name = args.value("recipe", std::string{});
+            if (name.empty()) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "no recipe named");
+            }
+            std::error_code ec;
+            std::filesystem::path file;
+            for (const std::filesystem::path& root : ctx.contentRoots()) {
+                if (!std::filesystem::is_directory(root, ec)) {
+                    continue;
+                }
+                for (const auto& entry : std::filesystem::recursive_directory_iterator(
+                         root, std::filesystem::directory_options::skip_permission_denied, ec)) {
+                    if (entry.is_regular_file(ec) &&
+                        entry.path().filename().string() == name + ".recipe.json") {
+                        file = entry.path();
+                        break;
+                    }
+                }
+                if (!file.empty()) {
+                    break;
+                }
+            }
+            if (file.empty()) {
+                return ToolResult::failure(ToolErrorCode::NotFound,
+                                           fmt::format("no recipe called '{}'", name),
+                                           "world.list_recipes reports what is reachable");
+            }
+            auto world = app::composeFromRecipeFile(file);
+            if (!world) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, world.error().message);
+            }
+            app::Engine& engine = ctx.engine();
+            if (engine.composition() == nullptr) {
+                engine.newComposition();
+            }
+            if (auto installed = app::installWorld(engine, *world); !installed) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, installed.error().message);
+            }
+            json out;
+            out["recipe"] = name;
+            out["world"] = world->recipe.world;
+            out["seed"] = world->recipe.seed;
+            out["extent"] = world->recipe.extent;
+            out["assetsConsidered"] = world->assetsConsidered;
+            out["layers"] = world->composed.layers.size();
+            out["focalRegions"] = world->composed.plan.focal.size();
+            out["voidRegions"] = world->composed.plan.voids.size();
+            out["composeSeconds"] = world->composeSeconds;
+            // Layers, not instances. Composing produces the *rule* for each scatter -- which asset,
+            // which category, which biomes and slopes it may sit on -- and the instances themselves
+            // only exist once the terrain is built from it. Reporting an instance count here would
+            // be inventing a number this stage has not computed.
+            json layers = json::array();
+            for (const auto& layer : world->composed.layers) {
+                layers.push_back(json{{"name", layer.name},
+                                      {"asset", layer.asset},
+                                      {"category", layer.category},
+                                      {"maxSlope", layer.maxSlope}});
+            }
+            out["layerDetail"] = std::move(layers);
+            if (world->composed.layers.empty()) {
+                out["warning"] =
+                    "the recipe composed but produced no layers: the library has nothing in the "
+                    "categories the ecology weights ask for";
+            }
+            return ToolResult::ok(std::move(out),
+                                  fmt::format("{} layer(s) from {} asset(s)",
+                                              world->composed.layers.size(),
+                                              world->assetsConsidered));
+        });
+
+    // ---- bringing media in ------------------------------------------------------------------------
+    //
+    // Reading a file the user points at is a different question from writing one, and it gets a
+    // different answer: `ToolContext::resolveContent` bounds it to the directories the host listed,
+    // with `..` and symlinks resolved *before* the containment test. Without that an import tool is
+    // an arbitrary-file-read primitive handed to a language model.
+    add(registry, "asset.list_importable", "List importable media",
+        "Audio, glTF scenes and HDR environments the session can reach, by path. Use this to find a "
+        "file rather than guessing where it lives -- a path outside the folders this session was "
+        "given is refused, and guessing produces that refusal rather than a file.",
+        schema::object({{"kind", schema::string("audio, scene or environment; omit for all")},
+                        {"limit", schema::integer("Maximum results (default 40)", 1, kMaxLimit)}}),
+        readOnly(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string kind = args.value("kind", std::string{});
+            const std::size_t limit = limitOf(args);
+            const auto wanted = [&kind](const std::string& ext) {
+                const bool audio = ext == ".wav" || ext == ".mp3" || ext == ".flac" || ext == ".aiff" ||
+                                   ext == ".aif" || ext == ".ogg" || ext == ".m4a";
+                const bool scene = ext == ".gltf" || ext == ".glb";
+                const bool env = ext == ".hdr";
+                if (kind.empty()) return audio || scene || env;
+                if (kind == "audio") return audio;
+                if (kind == "scene") return scene;
+                if (kind == "environment") return env;
+                return false;
+            };
+            json found = json::array();
+            std::error_code ec;
+            for (const std::filesystem::path& root : ctx.contentRoots()) {
+                if (!std::filesystem::is_directory(root, ec) || found.size() >= limit) {
+                    continue;
+                }
+                for (const auto& entry : std::filesystem::recursive_directory_iterator(
+                         root, std::filesystem::directory_options::skip_permission_denied, ec)) {
+                    if (found.size() >= limit) {
+                        break;
+                    }
+                    if (!entry.is_regular_file(ec)) {
+                        continue;
+                    }
+                    std::string ext = entry.path().extension().string();
+                    std::transform(ext.begin(), ext.end(), ext.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    if (!wanted(ext)) {
+                        continue;
+                    }
+                    found.push_back(json{{"file", entry.path().string()},
+                                         {"name", entry.path().filename().string()},
+                                         {"kind", ext == ".hdr" ? "environment"
+                                                                : (ext == ".gltf" || ext == ".glb" ? "scene"
+                                                                                                   : "audio")}});
+                }
+            }
+            const auto count = found.size();
+            json roots = json::array();
+            for (const auto& r : ctx.contentRoots()) {
+                roots.push_back(r.string());
+            }
+            return ToolResult::ok(json{{"files", std::move(found)}, {"searched", std::move(roots)}},
+                                  fmt::format("{} file(s)", count));
+        });
+
+    add(registry, "asset.import_audio", "Import audio",
+        "Copy an audio file into the open project and make it the session's track, then analyse it. "
+        "Copied rather than referenced on purpose: a project that points at a file on somebody's "
+        "desktop stops working the day that file moves, and the project format stores a relative "
+        "path and a hash precisely so it does not have to. Reports the duration, rate and channel "
+        "count read back from the decoder, because an import that silently decoded nothing is the "
+        "failure worth catching.",
+        schema::object({{"file", schema::string("Path to the audio file, as reported by "
+                                                "asset.list_importable")}}),
+        sessionWrite(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string given = args.value("file", std::string{});
+            if (given.empty()) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "no file named");
+            }
+            const auto resolved = ctx.resolveContent(given);
+            if (!resolved) {
+                return ToolResult::failure(
+                    ToolErrorCode::NotFound,
+                    fmt::format("'{}' is not inside a folder this session may read", given),
+                    "asset.list_importable reports what is reachable");
+            }
+            std::error_code ec;
+            if (!std::filesystem::is_regular_file(*resolved, ec)) {
+                return ToolResult::failure(ToolErrorCode::NotFound,
+                                           fmt::format("'{}' is not a file", resolved->string()));
+            }
+            app::Engine& engine = ctx.engine();
+            if (engine.projectPath().empty()) {
+                return ToolResult::failure(
+                    ToolErrorCode::InvalidArguments,
+                    "this session has no project to import into",
+                    "use project.create first: the copy goes beside the project file, and without "
+                    "one there is nowhere for it to live");
+            }
+            const std::filesystem::path audioDir = engine.projectPath().parent_path() / "audio";
+            std::filesystem::create_directories(audioDir, ec);
+            const std::filesystem::path target = audioDir / resolved->filename();
+            std::filesystem::copy_file(*resolved, target,
+                                       std::filesystem::copy_options::overwrite_existing, ec);
+            if (ec) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           fmt::format("cannot copy into the project: {}", ec.message()));
+            }
+            const auto duration = engine.loadAudio(target);
+            if (!duration) {
+                std::filesystem::remove(target, ec); // do not leave a copy of a file that will not decode
+                return ToolResult::failure(ToolErrorCode::Unsupported, duration.error().message,
+                                           "the file was copied in and removed again; nothing in the "
+                                           "project points at it");
+            }
+            json out;
+            out["file"] = target.string();
+            out["source"] = resolved->string();
+            out["durationSeconds"] = *duration;
+            if (const auto file = engine.audioFile(); file != nullptr) {
+                out["sampleRate"] = file->sampleRate();
+                out["channels"] = file->channels();
+                out["frames"] = file->frameCount();
+            }
+            out["analysed"] = engine.track() != nullptr;
+            if (engine.track() != nullptr) {
+                out["beatCount"] = engine.track()->beats().beatTimes.size();
+            }
+            return ToolResult::ok(std::move(out),
+                                  fmt::format("imported {} ({:.1f} s)",
+                                              target.filename().string(), *duration));
         });
 
     add(registry, "parameter.list_groups", "Parameter groups",

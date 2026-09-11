@@ -22,6 +22,7 @@
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <functional>
 #include <memory>
 #include <string>
@@ -128,6 +129,38 @@ public:
     [[nodiscard]] const std::filesystem::path& projectsRoot() const { return projectsRoot_; }
     [[nodiscard]] bool hasProjectsRoot() const { return !projectsRoot_.empty(); }
 
+    // Directories the assistant may *read* content from: the example and recipe folders, the open
+    // project's own folder, and wherever the host decides a person keeps files they might import.
+    //
+    // Reading is not writing, and the two get different answers on purpose. `projectsRoot()` is one
+    // directory the tools write into; these are several the tools read from, and a path that is not
+    // under one of them is refused. Without this an `import` tool would be an arbitrary-file-read
+    // primitive handed to a language model.
+    void setContentRoots(std::vector<std::filesystem::path> roots) { contentRoots_ = std::move(roots); }
+    [[nodiscard]] const std::vector<std::filesystem::path>& contentRoots() const { return contentRoots_; }
+
+    // Resolves `path` against the content roots, or nothing when it escapes all of them. Symlinks
+    // and `..` are resolved *before* the check (`weakly_canonical`), because a prefix test on an
+    // unresolved path is not a containment test -- "<root>/../../etc/passwd" starts with the root.
+    [[nodiscard]] std::optional<std::filesystem::path> resolveContent(const std::filesystem::path& path) const {
+        std::error_code ec;
+        const std::filesystem::path full = std::filesystem::weakly_canonical(path, ec);
+        if (ec) {
+            return std::nullopt;
+        }
+        for (const std::filesystem::path& root : contentRoots_) {
+            const std::filesystem::path base = std::filesystem::weakly_canonical(root, ec);
+            if (ec) {
+                continue;
+            }
+            const auto rel = full.lexically_relative(base);
+            if (!rel.empty() && *rel.begin() != "..") {
+                return full;
+            }
+        }
+        return std::nullopt;
+    }
+
     void setPerformanceSource(PerformanceSource source) { performance_ = std::move(source); }
     [[nodiscard]] PerformanceSnapshot performance() const {
         return performance_ ? performance_() : PerformanceSnapshot{};
@@ -150,6 +183,7 @@ private:
     app::Engine* engine_ = nullptr;
     CancelToken cancel_;
     std::filesystem::path projectsRoot_;
+    std::vector<std::filesystem::path> contentRoots_;
     PerformanceSource performance_;
     ChangeLog changes_;
 };

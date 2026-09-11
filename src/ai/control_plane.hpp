@@ -116,6 +116,8 @@ public:
     void setPerformanceSource(PerformanceSource source);
     // Where projects live, for the project life-cycle tools.
     void setProjectsRoot(std::filesystem::path root);
+    // Directories the assistant may read content from.
+    void setContentRoots(std::vector<std::filesystem::path> roots);
 
     // ---- running a task -------------------------------------------------------------------------
     // Submits to the job system and returns immediately. Null when a task is already running or

@@ -14,11 +14,14 @@
 #include "ai/tool_context.hpp"
 #include "ai/transaction.hpp"
 #include "app/engine.hpp"
+#include "support/synth.hpp"
+#include "audio/audio_file.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <filesystem>
+#include <fstream>
 #include <unistd.h>
 
 using namespace avgen;
@@ -966,4 +969,150 @@ TEST_CASE("Saving without a project says which tool to use instead", "[ai][tools
     CHECK_FALSE(created.success);
     REQUIRE(created.error.has_value());
     CHECK(created.error->code == ai::ToolErrorCode::Unavailable);
+}
+
+// ---- generating a world -------------------------------------------------------------------------
+
+TEST_CASE("The assistant can find a recipe and generate the world it describes", "[ai][tools][world]") {
+    const std::filesystem::path recipes = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "recipes";
+    if (!std::filesystem::is_directory(recipes)) {
+        SKIP("examples/recipes is not present in this checkout");
+    }
+    Fixture f;
+    f.ctx.setContentRoots({std::filesystem::path(AVGEN_SOURCE_DIR) / "examples",
+                           std::filesystem::path(AVGEN_SOURCE_DIR) / "assets"});
+
+    const auto listed = f.call("world.list_recipes");
+    REQUIRE(listed.success);
+    REQUIRE(!listed.value["recipes"].empty());
+    const std::string name = listed.value["recipes"][0]["name"].get<std::string>();
+
+    const auto made = f.call("world.generate", json{{"recipe", name}});
+    INFO((made.error ? made.error->message : std::string{}));
+    REQUIRE(made.success);
+    // Layers, not instances: composing produces the rule for each scatter and the instances only
+    // exist once terrain is built from it. A tool that reported an instance count here would be
+    // inventing a number this stage has not computed.
+    CHECK(made.value["layers"].get<std::size_t>() > 0);
+    CHECK(made.value["assetsConsidered"].get<std::size_t>() > 0);
+    CHECK_FALSE(made.value.contains("warning"));
+    REQUIRE(made.value.contains("layerDetail"));
+    CHECK(made.value["layerDetail"][0].contains("category"));
+    // It installed into the session, not merely composed in the air.
+    REQUIRE(f.engine.composition() != nullptr);
+}
+
+TEST_CASE("A recipe outside the content roots cannot be reached", "[ai][tools][world]") {
+    Fixture f; // no content roots at all
+    const auto listed = f.call("world.list_recipes");
+    REQUIRE(listed.success);
+    CHECK(listed.value["recipes"].empty()); // nothing reachable, reported as nothing
+
+    const auto made = f.call("world.generate", json{{"recipe", "glowmere-dense"}});
+    CHECK_FALSE(made.success);
+    REQUIRE(made.error.has_value());
+    CHECK(made.error->code == ai::ToolErrorCode::NotFound);
+}
+
+TEST_CASE("Content resolution refuses a path that climbs out of its root", "[ai][tools][world]") {
+    // The containment test resolves symlinks and `..` before comparing, because a prefix test on an
+    // unresolved path is not a containment test: "<root>/../../etc/passwd" starts with the root.
+    const auto root = std::filesystem::temp_directory_path() /
+                      ("avgen_ai_content_" + std::to_string(static_cast<long long>(getpid())));
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root / "inside");
+    std::ofstream(root / "inside" / "ok.txt") << "x";
+
+    Fixture f;
+    f.ctx.setContentRoots({root});
+    CHECK(f.ctx.resolveContent(root / "inside" / "ok.txt").has_value());
+    CHECK_FALSE(f.ctx.resolveContent(root / ".." / ".." / "etc" / "passwd").has_value());
+    CHECK_FALSE(f.ctx.resolveContent("/etc/passwd").has_value());
+    CHECK_FALSE(f.ctx.resolveContent(std::filesystem::path("/tmp")).has_value());
+
+    std::filesystem::remove_all(root);
+}
+
+// ---- bringing media in --------------------------------------------------------------------------
+
+TEST_CASE("The assistant can create a project and import a track into it", "[ai][tools][import]") {
+    // The bootstrap prompt's first two sections, in order, as one test: make a project, find the
+    // audio, import it, and have the project own the copy rather than the original.
+    const auto root = std::filesystem::temp_directory_path() /
+                      ("avgen_ai_import_" + std::to_string(static_cast<long long>(getpid())));
+    std::filesystem::remove_all(root);
+    const auto projects = root / "projects";
+    const auto desktop = root / "desktop";
+    std::filesystem::create_directories(projects);
+    std::filesystem::create_directories(desktop);
+
+    // A real decodable file, written the way the audio tests make fixtures.
+    constexpr std::uint32_t rate = 48000;
+    const auto tone = audio::AudioFile::fromInterleaved(
+        testsupport::interleave(testsupport::sine(220.0f, rate, rate * 2, 0.4f), 2), 2, rate);
+    const auto source = desktop / "test.wav";
+    REQUIRE(tone.writeWav(source).has_value());
+
+    Fixture f;
+    f.ctx.setProjectsRoot(projects);
+    f.ctx.setContentRoots({desktop});
+
+    // Importing before there is a project says which tool to reach for, rather than writing the
+    // copy somewhere arbitrary.
+    auto early = f.call("asset.import_audio", json{{"file", source.string()}});
+    CHECK_FALSE(early.success);
+    REQUIRE(early.error.has_value());
+    CHECK(early.error->recovery.find("project.create") != std::string::npos);
+
+    REQUIRE(f.call("project.create", json{{"name", "All You Got"}}).success);
+
+    const auto found = f.call("asset.list_importable", json{{"kind", "audio"}});
+    REQUIRE(found.success);
+    REQUIRE(found.value["files"].size() == 1);
+    CHECK(found.value["files"][0]["name"].get<std::string>() == "test.wav");
+
+    const auto imported = f.call("asset.import_audio", json{{"file", source.string()}});
+    INFO((imported.error ? imported.error->message : std::string{}));
+    REQUIRE(imported.success);
+    CHECK_THAT(imported.value["durationSeconds"].get<double>(), WithinAbs(2.0, 0.05));
+    CHECK(imported.value["sampleRate"].get<std::uint32_t>() == rate);
+    CHECK(imported.value["channels"].get<std::uint32_t>() == 2);
+    CHECK(f.engine.hasAudio());
+
+    // The project owns a copy. This is the property the prompt asks for in so many words: the
+    // project must survive the original moving.
+    const auto copy = std::filesystem::path(imported.value["file"].get<std::string>());
+    CHECK(std::filesystem::exists(copy));
+    CHECK(copy.parent_path().parent_path() == projects / "All You Got");
+    std::filesystem::remove(source);
+    CHECK(std::filesystem::exists(copy)); // the original is gone and the project still has it
+
+    std::filesystem::remove_all(root);
+}
+
+TEST_CASE("Importing refuses a file outside the readable folders", "[ai][tools][import]") {
+    const auto root = std::filesystem::temp_directory_path() /
+                      ("avgen_ai_import_guard_" + std::to_string(static_cast<long long>(getpid())));
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root / "allowed");
+    std::filesystem::create_directories(root / "secret");
+    std::ofstream(root / "secret" / "private.wav") << "not audio";
+
+    Fixture f;
+    f.ctx.setProjectsRoot(root / "projects");
+    f.ctx.setContentRoots({root / "allowed"});
+    REQUIRE(f.call("project.create", json{{"name", "Guarded"}}).success);
+
+    for (const auto& bad : {root / "secret" / "private.wav",
+                            root / "allowed" / ".." / "secret" / "private.wav"}) {
+        INFO(bad.string());
+        const auto r = f.call("asset.import_audio", json{{"file", bad.string()}});
+        CHECK_FALSE(r.success);
+        REQUIRE(r.error.has_value());
+        CHECK(r.error->code == ai::ToolErrorCode::NotFound);
+    }
+    // And nothing was copied into the project by the attempts.
+    CHECK_FALSE(std::filesystem::exists(root / "projects" / "Guarded" / "audio"));
+
+    std::filesystem::remove_all(root);
 }

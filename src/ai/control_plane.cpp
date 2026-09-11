@@ -116,6 +116,10 @@ void ControlPlane::setProjectsRoot(std::filesystem::path root) {
     orchestrator_.setProjectsRoot(std::move(root));
 }
 
+void ControlPlane::setContentRoots(std::vector<std::filesystem::path> roots) {
+    orchestrator_.setContentRoots(std::move(roots));
+}
+
 void ControlPlane::setPerformanceSource(PerformanceSource source) {
     orchestrator_.setPerformanceSource(std::move(source));
 }

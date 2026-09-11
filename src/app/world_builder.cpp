@@ -152,6 +152,37 @@ std::size_t installHeroReactions(Engine& engine, const world::HeroPoint& hero) {
 
 } // namespace
 
+Result<GeneratedWorld> composeFromRecipeFile(const std::filesystem::path& path) {
+    auto recipe = world::WorldRecipe::loadFile(path);
+    if (!recipe) {
+        return std::unexpected(recipe.error());
+    }
+    // A recipe may name its own library; otherwise the repository's manifest is the default, since
+    // that is the one curated list of things allowed to be placed procedurally.
+    auto libraryPath = recipe->assetLibrary;
+    if (libraryPath.empty()) {
+        libraryPath = path.parent_path() / ".." / ".." / "assets" / "manifest.json";
+        libraryPath = libraryPath.lexically_normal();
+    }
+    auto library = assets::AssetLibrary::loadFile(libraryPath);
+    if (!library) {
+        return std::unexpected(library.error());
+    }
+    const auto started = std::chrono::steady_clock::now();
+    auto composed = world::composeWorld(*recipe, *library);
+    if (!composed) {
+        return std::unexpected(composed.error());
+    }
+    GeneratedWorld out;
+    out.recipe = *recipe;
+    out.composed = std::move(*composed);
+    out.library = *library;
+    out.assetsConsidered = library->size();
+    out.composeSeconds =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+    return out;
+}
+
 Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
     auto* composition = engine.composition();
     if (composition == nullptr) {

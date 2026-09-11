@@ -27,6 +27,7 @@
 
 #include <memory>
 #include <mutex>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
@@ -53,6 +54,15 @@ struct GeneratedWorld {
 //
 // Main thread only.
 [[nodiscard]] Result<void> installWorld(Engine& engine, const GeneratedWorld& world);
+
+// Reads a recipe file and composes the world it describes, resolving the asset library the recipe
+// names -- relative to the recipe, because a recipe that carried an absolute library path would
+// only work on the machine that wrote it.
+//
+// Extracted from `Application::generateWorldFromRecipe` rather than copied, because the assistant's
+// `world.generate` tool has to do exactly this and a second copy of "which library does this recipe
+// mean" is a second place for that answer to drift.
+[[nodiscard]] Result<GeneratedWorld> composeFromRecipeFile(const std::filesystem::path& path);
 
 // Runs generation as a job and holds the results until somebody collects them.
 class WorldBuilder {
