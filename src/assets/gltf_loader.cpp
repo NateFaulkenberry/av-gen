@@ -115,6 +115,7 @@ public:
 
     void run() {
         noteUnsupportedTopLevel();
+        importRigs();
         if (!asset_.scenes.empty()) {
             std::size_t sceneIndex = 0;
             if (asset_.defaultScene.has_value() && *asset_.defaultScene < asset_.scenes.size()) {
@@ -157,12 +158,9 @@ private:
     }
 
     void noteUnsupportedTopLevel() {
-        if (!asset_.animations.empty()) {
-            warn(fmt::format("{} animation(s) ignored (not supported in 0.2)", asset_.animations.size()));
-        }
-        if (!asset_.skins.empty()) {
-            warn(fmt::format("{} skin(s) ignored (skinning not supported in 0.2)", asset_.skins.size()));
-        }
+        // ADR-086 replaced the two warnings that used to live here ("animations ignored", "skins
+        // ignored"). An animation that targets no joint of any skin is still dropped, and says so
+        // per animation in importRigs(), because this engine animates rigs and nothing else yet.
     }
 
     // Fallback traversal for assets without a scene list; mirrors fastgltf::iterateSceneNodes.
@@ -203,7 +201,273 @@ private:
         }
     }
 
+    // ---- skins and animations (ADR-086) ---------------------------------------------------------
+
+    // A rig per skin. The joints a skin names are not the whole hierarchy that drives it: their
+    // ancestors carry transforms too, and an exporter that wraps a Mixamo skeleton in an armature
+    // node animates *that* node's translation. Keeping only the skin's own joints would import a
+    // character whose limbs move and whose body never leaves the origin, silently.
+    void importRigs() {
+        if (asset_.skins.empty()) {
+            if (!asset_.animations.empty()) {
+                warn(fmt::format("{} animation(s) ignored: the file has no skin to drive",
+                                 asset_.animations.size()));
+            }
+            return;
+        }
+        std::vector<int> parent(asset_.nodes.size(), -1);
+        for (std::size_t i = 0; i < asset_.nodes.size(); ++i) {
+            for (const std::size_t child : asset_.nodes[i].children) {
+                if (child < parent.size()) {
+                    parent[child] = static_cast<int>(i);
+                }
+            }
+        }
+        nodeToJoint_.assign(asset_.skins.size(), {});
+        for (std::size_t s = 0; s < asset_.skins.size(); ++s) {
+            auto rig = buildRig(s, parent);
+            if (!rig) {
+                rigForSkin_.push_back(-1);
+                continue;
+            }
+            rigForSkin_.push_back(static_cast<int>(local_.rigs.size()));
+            local_.rigs.push_back(std::move(*rig));
+        }
+        importClips();
+        for (scene::SkinnedRig& rig : local_.rigs) {
+            rig.addDefaultStates();
+        }
+    }
+
+    std::optional<scene::SkinnedRig> buildRig(std::size_t skinIndex, const std::vector<int>& parent) {
+        const auto& skin = asset_.skins[skinIndex];
+        const std::string label = skin.name.empty() ? fmt::format("skin{}", skinIndex) : toStd(skin.name);
+        if (skin.joints.empty()) {
+            warn(fmt::format("skin '{}': no joints; skin skipped", label));
+            return std::nullopt;
+        }
+        if (skin.joints.size() > scene::kMaxPaletteJoints) {
+            warn(fmt::format("skin '{}': {} joints exceeds the {} the palette holds; skin skipped", label,
+                             skin.joints.size(), scene::kMaxPaletteJoints));
+            return std::nullopt;
+        }
+        // Every joint, and every ancestor of one, up to the root.
+        std::vector<bool> needed(asset_.nodes.size(), false);
+        for (const std::size_t joint : skin.joints) {
+            if (joint >= asset_.nodes.size()) {
+                warn(fmt::format("skin '{}': joint index {} out of range; skin skipped", label, joint));
+                return std::nullopt;
+            }
+            for (int n = static_cast<int>(joint); n >= 0; n = parent[static_cast<std::size_t>(n)]) {
+                if (needed[static_cast<std::size_t>(n)]) {
+                    break; // this branch is already marked all the way up
+                }
+                needed[static_cast<std::size_t>(n)] = true;
+            }
+        }
+        // Depth-first from the roots, in index order, so a parent always precedes its children and
+        // two loads of the same file produce the same joint order.
+        std::vector<int>& order = nodeToJoint_[skinIndex];
+        order.assign(asset_.nodes.size(), -1);
+        scene::SkinnedRig rig;
+        rig.name = options_.namePrefix + label;
+        std::vector<std::size_t> stack;
+        for (std::size_t i = asset_.nodes.size(); i-- > 0;) {
+            if (parent[i] < 0) {
+                stack.push_back(i);
+            }
+        }
+        while (!stack.empty()) {
+            const std::size_t node = stack.back();
+            stack.pop_back();
+            if (needed[node]) {
+                scene::Joint joint;
+                joint.name = nodeLabel(asset_.nodes[node]);
+                joint.parent = parent[node] >= 0 ? order[static_cast<std::size_t>(parent[node])] : -1;
+                joint.rest = restTransform(asset_.nodes[node]);
+                order[node] = static_cast<int>(rig.skeleton.joints.size());
+                rig.skeleton.joints.push_back(std::move(joint));
+            }
+            const auto& children = asset_.nodes[node].children;
+            for (std::size_t c = children.size(); c-- > 0;) {
+                if (children[c] < asset_.nodes.size()) {
+                    stack.push_back(children[c]);
+                }
+            }
+        }
+        rig.skeleton.name = label;
+        rig.skeleton.palette.reserve(skin.joints.size());
+        for (const std::size_t joint : skin.joints) {
+            rig.skeleton.palette.push_back(static_cast<std::uint32_t>(order[joint]));
+        }
+        rig.skeleton.inverseBind.assign(skin.joints.size(), glm::mat4(1.0f));
+        if (skin.inverseBindMatrices.has_value() && *skin.inverseBindMatrices < asset_.accessors.size()) {
+            const auto& accessor = asset_.accessors[*skin.inverseBindMatrices];
+            if (accessor.type == fastgltf::AccessorType::Mat4 && accessor.count >= skin.joints.size()) {
+                fastgltf::iterateAccessorWithIndex<fastgltf::math::fmat4x4>(
+                    asset_, accessor, [&](fastgltf::math::fmat4x4 m, std::size_t i) {
+                        if (i < rig.skeleton.inverseBind.size()) {
+                            rig.skeleton.inverseBind[i] = toGlm(m);
+                        }
+                    });
+            } else {
+                warn(fmt::format("skin '{}': inverseBindMatrices malformed; identity binds used", label));
+            }
+        }
+        if (!rig.skeleton.valid()) {
+            warn(fmt::format("skin '{}': hierarchy could not be ordered; skin skipped", label));
+            return std::nullopt;
+        }
+        rig.pose = scene::restPose(rig.skeleton);
+        scene::skinningPalette(rig.skeleton, rig.pose, rig.scratchModel, rig.palette);
+        rig.previousPalette = rig.palette;
+        return rig;
+    }
+
+    static scene::Transform restTransform(const fastgltf::Node& node) {
+        scene::Transform out;
+        // Options::DecomposeNodeMatrices guarantees TRS; the matrix branch is the belt and braces.
+        if (const auto* trs = std::get_if<fastgltf::TRS>(&node.transform)) {
+            out.position = {trs->translation.x(), trs->translation.y(), trs->translation.z()};
+            out.rotation = glm::quat(trs->rotation.w(), trs->rotation.x(), trs->rotation.y(), trs->rotation.z());
+            out.scale = {trs->scale.x(), trs->scale.y(), trs->scale.z()};
+            return out;
+        }
+        if (const auto* m = std::get_if<fastgltf::math::fmat4x4>(&node.transform)) {
+            return scene::Transform::fromMatrix(toGlm(*m));
+        }
+        return out;
+    }
+
+    void importClips() {
+        for (std::size_t a = 0; a < asset_.animations.size(); ++a) {
+            const auto& animation = asset_.animations[a];
+            const std::string name =
+                animation.name.empty() ? fmt::format("animation{}", a) : toStd(animation.name);
+            std::size_t placed = 0;
+            for (std::size_t s = 0; s < rigForSkin_.size(); ++s) {
+                if (rigForSkin_[s] < 0) {
+                    continue;
+                }
+                scene::AnimationClip clip = buildClip(animation, name, s);
+                if (clip.channels.empty()) {
+                    continue;
+                }
+                local_.rigs[static_cast<std::size_t>(rigForSkin_[s])].clips.push_back(std::move(clip));
+                ++placed;
+            }
+            if (placed == 0) {
+                warn(fmt::format("animation '{}': no channel targets a joint of any skin; clip dropped",
+                                 name));
+            }
+        }
+    }
+
+    scene::AnimationClip buildClip(const fastgltf::Animation& animation, const std::string& name,
+                                   std::size_t skinIndex) {
+        scene::AnimationClip clip;
+        clip.name = name;
+        const std::vector<int>& order = nodeToJoint_[skinIndex];
+        for (const auto& channel : animation.channels) {
+            if (!channel.nodeIndex.has_value() || *channel.nodeIndex >= order.size()) {
+                continue;
+            }
+            const int joint = order[*channel.nodeIndex];
+            if (joint < 0 || channel.samplerIndex >= animation.samplers.size()) {
+                continue;
+            }
+            const auto& sampler = animation.samplers[channel.samplerIndex];
+            if (sampler.inputAccessor >= asset_.accessors.size() ||
+                sampler.outputAccessor >= asset_.accessors.size()) {
+                continue;
+            }
+            const auto& input = asset_.accessors[sampler.inputAccessor];
+            const auto& output = asset_.accessors[sampler.outputAccessor];
+            if (input.type != fastgltf::AccessorType::Scalar || input.count == 0) {
+                warn(fmt::format("animation '{}': sampler input is not a scalar keyframe list; channel dropped",
+                                 name));
+                continue;
+            }
+            scene::AnimationChannel out;
+            out.joint = static_cast<std::uint32_t>(joint);
+            switch (channel.path) {
+            case fastgltf::AnimationPath::Rotation:
+                out.path = scene::AnimationPath::Rotation;
+                break;
+            case fastgltf::AnimationPath::Scale:
+                out.path = scene::AnimationPath::Scale;
+                break;
+            case fastgltf::AnimationPath::Translation:
+                out.path = scene::AnimationPath::Translation;
+                break;
+            default:
+                // Morph-target weights: this engine has no morph targets, and convertPrimitive
+                // already warns that the targets themselves were ignored.
+                continue;
+            }
+            switch (sampler.interpolation) {
+            case fastgltf::AnimationInterpolation::Step:
+                out.interpolation = scene::Interpolation::Step;
+                break;
+            case fastgltf::AnimationInterpolation::CubicSpline:
+                out.interpolation = scene::Interpolation::CubicSpline;
+                break;
+            case fastgltf::AnimationInterpolation::Linear:
+                out.interpolation = scene::Interpolation::Linear;
+                break;
+            }
+            out.times.resize(input.count);
+            fastgltf::iterateAccessorWithIndex<float>(asset_, input,
+                                                      [&](float t, std::size_t i) { out.times[i] = t; });
+            const std::size_t perKey = out.interpolation == scene::Interpolation::CubicSpline ? 3 : 1;
+            const std::size_t expected = input.count * perKey;
+            if (output.count != expected) {
+                warn(fmt::format("animation '{}': sampler output has {} values for {} keys; channel dropped",
+                                 name, output.count, input.count));
+                continue;
+            }
+            out.values.assign(expected, glm::vec4(0.0f));
+            if (out.path == scene::AnimationPath::Rotation) {
+                if (output.type != fastgltf::AccessorType::Vec4) {
+                    warn(fmt::format("animation '{}': rotation sampler is not vec4; channel dropped", name));
+                    continue;
+                }
+                fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(
+                    asset_, output, [&](fastgltf::math::fvec4 v, std::size_t i) {
+                        out.values[i] = {v.x(), v.y(), v.z(), v.w()};
+                    });
+            } else {
+                if (output.type != fastgltf::AccessorType::Vec3) {
+                    warn(fmt::format("animation '{}': {} sampler is not vec3; channel dropped", name,
+                                     scene::animationPathName(out.path)));
+                    continue;
+                }
+                fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                    asset_, output, [&](fastgltf::math::fvec3 v, std::size_t i) {
+                        out.values[i] = {v.x(), v.y(), v.z(), 0.0f};
+                    });
+            }
+            if (!out.valid()) {
+                warn(fmt::format("animation '{}': keyframe times are not ascending; channel dropped", name));
+                continue;
+            }
+            clip.duration = std::max(clip.duration, out.times.back());
+            clip.channels.push_back(std::move(out));
+        }
+        return clip;
+    }
+
     // ---- meshes --------------------------------------------------------------------------------
+
+    // The rig a mesh node's skin resolves to, or kInvalidRig when it has none (or its skin was
+    // rejected, in which case the mesh is still imported and simply renders in its bind pose).
+    [[nodiscard]] scene::RigId rigFor(const fastgltf::Node& node) const {
+        if (!node.skinIndex.has_value() || *node.skinIndex >= rigForSkin_.size()) {
+            return scene::kInvalidRig;
+        }
+        const int rig = rigForSkin_[*node.skinIndex];
+        return rig < 0 ? scene::kInvalidRig : static_cast<scene::RigId>(rig);
+    }
 
     void importMeshNode(const fastgltf::Node& node, const std::string& label, const glm::mat4& world) {
         const std::size_t meshIndex = *node.meshIndex;
@@ -212,7 +476,13 @@ private:
             return;
         }
         const auto& mesh = asset_.meshes[meshIndex];
-        const scene::Transform transform = scene::Transform::fromMatrix(world);
+        // ADR-086 / glTF 2.0 "Skins": a skinned mesh node's own transform is ignored. The joint
+        // matrices already carry the chain from the file's scene root, so applying the node
+        // transform as well would apply it twice; the entity's transform is left identity for
+        // whatever places the character in the world.
+        const scene::RigId rig = rigFor(node);
+        const scene::Transform transform =
+            rig == scene::kInvalidRig ? scene::Transform::fromMatrix(world) : scene::Transform{};
         const bool multi = mesh.primitives.size() > 1;
         for (std::size_t p = 0; p < mesh.primitives.size(); ++p) {
             const auto& primitive = mesh.primitives[p];
@@ -226,6 +496,7 @@ private:
             }
             scene::Entity& entity = local_.addEntity(std::move(entityName), meshId);
             entity.transform = transform;
+            entity.rig = rig;
             entity.material = materialFor(primitive, label);
         }
     }
@@ -341,7 +612,55 @@ private:
                 warn(fmt::format("{}: no normals and generateNormals is off", where));
             }
         }
+        readSkinInfluences(primitive, data, where);
         return data;
+    }
+
+    // ADR-086: JOINTS_0 / WEIGHTS_0 into MeshData::skin. Only the first influence set is read;
+    // JOINTS_1 and beyond are warned about and dropped, which costs a vertex its fifth-heaviest
+    // influence and never its heaviest, because glTF orders them by weight.
+    void readSkinInfluences(const fastgltf::Primitive& primitive, scene::MeshData& data,
+                            const std::string& where) {
+        const auto* joints = accessorFor(primitive, "JOINTS_0", fastgltf::AccessorType::Vec4);
+        const auto* weights = accessorFor(primitive, "WEIGHTS_0", fastgltf::AccessorType::Vec4);
+        if (joints == nullptr || weights == nullptr) {
+            if (joints != nullptr || weights != nullptr) {
+                warn(fmt::format("{}: JOINTS_0 without WEIGHTS_0 (or the reverse); mesh left unskinned",
+                                 where));
+            }
+            return;
+        }
+        if (joints->count != data.vertices.size() || weights->count != data.vertices.size()) {
+            warn(fmt::format("{}: skin attributes do not match the vertex count; mesh left unskinned", where));
+            return;
+        }
+        if (primitive.findAttribute("JOINTS_1") != primitive.attributes.cend()) {
+            warn(fmt::format("{}: more than four influences per vertex; JOINTS_1 and beyond ignored", where));
+        }
+        data.skin.assign(data.vertices.size(), scene::SkinInfluence{});
+        bool clamped = false;
+        fastgltf::iterateAccessorWithIndex<fastgltf::math::u32vec4>(
+            asset_, *joints, [&](fastgltf::math::u32vec4 j, std::size_t i) {
+                for (std::size_t k = 0; k < 4; ++k) {
+                    const std::uint32_t index = j[k];
+                    clamped = clamped || index >= scene::kMaxPaletteJoints;
+                    data.skin[i].joints[k] =
+                        static_cast<std::uint16_t>(std::min<std::uint32_t>(index, scene::kMaxPaletteJoints - 1));
+                }
+            });
+        fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(
+            asset_, *weights, [&](fastgltf::math::fvec4 w, std::size_t i) {
+                glm::vec4 v(w.x(), w.y(), w.z(), w.w());
+                v = glm::max(v, glm::vec4(0.0f));
+                const float sum = v.x + v.y + v.z + v.w;
+                // Exporters drift, and an unnormalised weight shrinks or inflates the whole
+                // vertex rather than distorting it locally, which reads as the mesh collapsing.
+                data.skin[i].weights = sum > 1e-6f ? v / sum : glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+            });
+        if (clamped) {
+            warn(fmt::format("{}: joint index beyond the {}-joint palette; clamped", where,
+                             scene::kMaxPaletteJoints));
+        }
     }
 
     // ---- materials -----------------------------------------------------------------------------
@@ -587,12 +906,16 @@ private:
     std::map<std::pair<std::size_t, std::size_t>, scene::MeshId> meshCache_;
     std::map<std::pair<std::size_t, bool>, scene::TextureId> textureCache_;
     std::set<std::size_t> materialsUsed_;
+    // ADR-086: skin index -> rig index in `local_`, and per skin, node index -> joint index.
+    std::vector<int> rigForSkin_;
+    std::vector<std::vector<int>> nodeToJoint_;
 };
 
 // Appends everything from `from` into `into`, offsetting mesh and texture ids.
 void merge(scene::Scene& from, scene::Scene& into) {
     const auto meshOffset = static_cast<scene::MeshId>(into.meshes.size());
     const auto textureOffset = static_cast<scene::TextureId>(into.textures.size());
+    const auto rigOffset = static_cast<scene::RigId>(into.rigs.size());
     const auto offsetRef = [textureOffset](scene::TextureRef& ref) {
         if (ref.valid()) {
             ref.texture += textureOffset;
@@ -601,6 +924,9 @@ void merge(scene::Scene& from, scene::Scene& into) {
     for (auto& entity : from.entities) {
         if (entity.mesh != scene::kInvalidMesh) {
             entity.mesh += meshOffset;
+        }
+        if (entity.rig != scene::kInvalidRig) {
+            entity.rig += rigOffset;
         }
         offsetRef(entity.material.baseColorTexture);
         offsetRef(entity.material.metallicRoughnessTexture);
@@ -622,6 +948,9 @@ void merge(scene::Scene& from, scene::Scene& into) {
     }
     for (auto& camera : from.cameras) {
         into.cameras.push_back(std::move(camera));
+    }
+    for (auto& rig : from.rigs) {
+        into.rigs.push_back(std::move(rig));
     }
 }
 
@@ -662,6 +991,11 @@ Result<GltfLoadSummary> loadGltf(const std::filesystem::path& path, scene::Scene
     summary.textures = local.textures.size();
     summary.lights = local.lights.size();
     summary.cameras = local.cameras.size();
+    summary.rigs = local.rigs.size();
+    for (const auto& rig : local.rigs) {
+        summary.joints += rig.skeleton.jointCount();
+        summary.clips += rig.clips.size();
+    }
     std::tie(summary.boundsMin, summary.boundsMax) = local.bounds();
     summary.warnings = std::move(importer.warnings());
 
@@ -672,10 +1006,12 @@ Result<GltfLoadSummary> loadGltf(const std::filesystem::path& path, scene::Scene
         log::warn("glTF '{}': {}", path.filename().string(), warning);
     }
     log::info(
-        "loaded glTF '{}': {} meshes, {} entities, {} materials, {} textures, {} lights, {} cameras, bounds "
+        "loaded glTF '{}': {} meshes, {} entities, {} materials, {} textures, {} lights, {} cameras, "
+        "{} rig(s)/{} joints/{} clips, bounds "
         "[{:.3f} {:.3f} {:.3f}]..[{:.3f} {:.3f} {:.3f}], {} warning(s), {:.1f} ms",
         path.filename().string(), summary.meshes, summary.entities, summary.materials, summary.textures,
-        summary.lights, summary.cameras, static_cast<double>(summary.boundsMin.x),
+        summary.lights, summary.cameras, summary.rigs, summary.joints, summary.clips,
+        static_cast<double>(summary.boundsMin.x),
         static_cast<double>(summary.boundsMin.y), static_cast<double>(summary.boundsMin.z),
         static_cast<double>(summary.boundsMax.x), static_cast<double>(summary.boundsMax.y),
         static_cast<double>(summary.boundsMax.z), summary.warnings.size(), elapsed);
