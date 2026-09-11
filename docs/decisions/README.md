@@ -99,3 +99,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [091](ADR-091-simulation-authority.md) | Two-tier simulation authority: what bakes, what lives, and what a scrub may do | Accepted |
 | [092](ADR-092-the-world-editor.md) | The world editor: a ghost under the cursor, a record of every edit | Accepted |
 | [093](ADR-093-world-navigation.md) | World navigation: a hybrid graph, per-instance obstacles, and a character with somewhere to go | Accepted |
+| [095](ADR-095-the-help-system.md) | The Help system, staged around "Help should never lie" | Accepted |

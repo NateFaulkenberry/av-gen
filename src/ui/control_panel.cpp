@@ -247,7 +247,35 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
         drawViewMenu();
         ImGui::EndMenu();
     }
+    if (ImGui::BeginMenu("Help")) {
+        drawHelpMenu();
+        ImGui::EndMenu();
+    }
     ImGui::EndMainMenuBar();
+}
+
+void ControlPanel::drawHelpMenu() {
+    // Every entry opens the Help panel on a topic. The panel is a panel like any other, so the flag
+    // it toggles is the same one the View menu toggles; there is no second way for Help to be open.
+    const auto go = [this](const char* label, const char* topic, const char* hint) {
+        if (ImGui::MenuItem(label)) {
+            if (bool* open = layout_.slot("Help"); open != nullptr) {
+                *open = true;
+            }
+            help.open(topic);
+        }
+        if (hint != nullptr) {
+            helpTooltip(hint, topic);
+        }
+    };
+    go("Help Contents", "start/welcome", "the documentation, from the beginning");
+    ImGui::Separator();
+    go("How AV Gen Works", "start/how-it-works", "audio to analysis to signals to parameters to a frame");
+    go("The Interface", "start/interface", "the dockspace, the panels, the status bar");
+    go("Keyboard Shortcuts", "reference/keyboard-shortcuts", "every key this build binds");
+    go("Modulation Recipes", "modulation/recipes", "worked examples: bass-reactive glow, a beat-synced camera");
+    go("Troubleshooting", "troubleshooting/index", "symptoms, and the topic that explains each one");
+    go("Performance Guide", "performance/diagnosis", "how to find out what a frame is spent on");
 }
 
 void ControlPanel::drawViewMenu() {
@@ -408,6 +436,19 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     panel("Analysis", ImVec2(520, 620), [&] { drawAnalysis(engine); });
     panel("Modulation", ImVec2(560, 420), [&] { drawModulation(engine); });
     panel("Graph", ImVec2(900, 560), [&] { drawGraphWindow(engine); });
+    // Full item width: the label column the other panels reserve is for sliders, and an article
+    // laid out against it would wrap two inches short of the panel edge.
+    if (bool* open = layout_.slot("Help"); open != nullptr && *open) {
+        help.openFlag = open;
+        if (const std::uint32_t node = layout_.regionNode(DockRegion::Right); node != 0) {
+            ImGui::SetNextWindowDockID(node, ImGuiCond_FirstUseEver);
+        }
+        ImGui::SetNextWindowSize(ImVec2(560, 720), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Help", open)) {
+            help.draw();
+        }
+        ImGui::End();
+    }
     if (bool* demo = layout_.slot("Dear ImGui Demo"); demo != nullptr && *demo) {
         ImGui::ShowDemoWindow(demo);
     }
@@ -543,6 +584,9 @@ void ControlPanel::drawWorldWindow(app::Engine& engine) {
 }
 
 void ControlPanel::drawModulation(app::Engine& engine) {
+    helpLink("? Help", "modulation/overview");
+    ImGui::SameLine();
+
     if (ImGui::BeginTabBar("modtabs")) {
         if (ImGui::BeginTabItem("Routes")) {
             drawRoutesTab(engine);
@@ -894,6 +938,9 @@ void ControlPanel::drawResponse(app::Engine& engine) {
 }
 
 void ControlPanel::drawParameters(app::Engine& engine) {
+    helpLink("? Help", "modulation/parameters");
+    ImGui::SameLine();
+
     using namespace params;
     // Gathered by group before anything is drawn, rather than emitting a header whenever the group
     // changes from one parameter to the next.
@@ -999,6 +1046,9 @@ void ControlPanel::drawParameters(app::Engine& engine) {
 }
 
 void ControlPanel::drawAnalysis(app::Engine& engine) {
+    helpLink("? Help", "audio/analysis");
+    ImGui::SameLine();
+
     const auto& frame = engine.latestFrame();
     const bool have = engine.hasFrame();
 
@@ -1091,6 +1141,9 @@ void ControlPanel::drawAnalysis(app::Engine& engine) {
 }
 
 void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats) {
+    helpLink("? Help", "performance/diagnosis");
+    ImGui::SameLine();
+
     ImGui::Text("%.1f fps (%.1f ms)  cpu work %.2f ms  gpu %s", stats.fps, stats.frameIntervalMs, stats.cpuFrameMs,
                 stats.gpuFrameMs >= 0.0 ? (std::to_string(stats.gpuFrameMs).substr(0, 5) + " ms").c_str() : "n/a");
     ImGui::Text("%ux%u  %u draws  %u tris  analysis %.0f us/hop (%llu frames)  modulation %.0f us", stats.width,
@@ -1145,6 +1198,9 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
 
 
 void ControlPanel::drawShadersTab(app::Engine& engine) {
+    helpLink("? Help", "shaders/overview");
+    ImGui::SameLine();
+
     if (ImGui::Button("Add background...") && onOpenShader) {
         onOpenShader();
     }
@@ -1476,6 +1532,9 @@ void ControlPanel::drawTimelineTab(app::Engine& engine) {
 
 
 void ControlPanel::drawRender(app::Engine& engine) {
+    helpLink("? Help", "rendering/offline-render");
+    ImGui::SameLine();
+
     if (renderSettings == nullptr) {
         ImGui::TextDisabled("render settings unavailable");
         return;
