@@ -55,6 +55,10 @@ const char* placementModeName(PlacementMode mode) {
         return "cluster";
     case PlacementMode::Landmark:
         return "landmark";
+    case PlacementMode::Eraser:
+        return "eraser";
+    case PlacementMode::Replace:
+        return "replace";
     }
     return "single";
 }
@@ -86,18 +90,29 @@ std::vector<Placement> planPlacements(const PlacementSettings& settings, glm::ve
         surfaceBasis(normal, u, v);
         const int count = std::max(settings.clusterCount, 1);
         const float radius = std::max(settings.clusterRadius, 0.0f);
+        const float clustering = std::clamp(settings.clustering, 0.0f, 1.0f);
         for (int i = 0; i < count; ++i) {
             const auto salt = static_cast<std::uint32_t>(100 + i * 13);
             const float angle = hash01(seed, salt) * 6.2831853f;
             // sqrt so the disc fills evenly. Without it a cluster is dense in the middle and thins
             // toward its edge, which reads as a target rather than as a patch of something growing.
-            const float distance = std::sqrt(hash01(seed, salt + 1u)) * radius;
+            // `clustering` interpolates back toward that uneven fill on purpose: at 1 the sqrt is
+            // dropped and the instances pile toward the centre, which is what "clumpy" means.
+            const float u01 = hash01(seed, salt + 1u);
+            const float spread = glm::mix(std::sqrt(u01), u01 * u01, clustering);
+            const float distance = spread * radius;
             const glm::vec3 offset = (u * std::cos(angle) + v * std::sin(angle)) * distance;
             out.push_back(makeOne(settings, center + offset, normal, orientation, seed, salt + 2u));
         }
         break;
     }
 
+    case PlacementMode::Eraser:
+        // Nothing is laid out. The editor removes what the brush covers; the radius is the whole
+        // of the eraser's geometry and it is not this function's to draw.
+        break;
+
+    case PlacementMode::Replace:
     case PlacementMode::Brush: {
         glm::vec3 u;
         glm::vec3 v;
@@ -107,8 +122,13 @@ std::vector<Placement> planPlacements(const PlacementSettings& settings, glm::ve
         // How many would fit if they packed perfectly, with a generous allowance for the fact that
         // dart throwing does not pack perfectly. The attempt budget is what bounds the loop; the
         // spacing test is what decides the result.
-        const auto target =
-            static_cast<int>(std::ceil((radius * radius) / (spacing * spacing) * 1.2f)) + 1;
+        const float density = std::clamp(settings.density, 0.0f, 1.0f);
+        const auto packed = static_cast<int>(std::ceil((radius * radius) / (spacing * spacing) * 1.2f)) + 1;
+        // Density scales how many of the available slots are filled, never the spacing: two plants
+        // are never closer together than the spacing says, whatever the density. A density that
+        // moved the spacing would make "thinner" and "more scattered" the same control, and they
+        // are not -- a thin even meadow and a thin clumpy one look nothing alike.
+        const int target = std::max(1, static_cast<int>(std::lround(static_cast<float>(packed) * density)));
         const int attempts = target * 12;
         for (int i = 0; i < attempts && static_cast<int>(out.size()) < target; ++i) {
             const auto salt = static_cast<std::uint32_t>(1000 + i * 7);

@@ -22,6 +22,16 @@ target_sources(avgen_tests PRIVATE
     # The editor shell's panel registry and layout file (ADR-076). Deliberately ImGui-free so it
     # can be checked here; the dock builder that reads it lives in avgen_platform.
     "${CMAKE_SOURCE_DIR}/src/ui/editor_layout.cpp"
+    # The world editor (ADR-092). Every decision it makes -- what the ghost says, which handle the
+    # pointer is over, what a drag means, what undo restores -- is ImGui-free for exactly this
+    # reason: an editor whose behaviour can only be checked by looking at it is an editor nobody
+    # checks. The drawing half (viewport_overlay.cpp, world_edit_panel.cpp) is not on this list.
+    "${CMAKE_SOURCE_DIR}/src/ui/edit_history.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/world_edit.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/world_probe.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/brush.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/gizmo.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/world_editor.cpp"
     # The camera director's join: heroes to a brief, a sequence onto the timeline (ADR-075).
     "${CMAKE_SOURCE_DIR}/src/app/camera_director.cpp"
     # Musical events published as signals (ADR-073). engine.cpp holds a MusicRuntime, so this has to

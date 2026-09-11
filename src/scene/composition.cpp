@@ -117,34 +117,6 @@ void forEachParticleParam(ParticleParameters& p, F&& f) {
 
 // ---- transforms --------------------------------------------------------------------------------
 
-glm::quat quatFromEulerDegrees(const glm::vec3& degrees) {
-    return glm::quat(glm::radians(degrees));
-}
-
-// Inverse of glm::quat(vec3): that constructor builds Rz * Ry * Rx. glm::eulerAngles recovers
-// the middle angle with asin, which loses precision near +-90 degrees; atan2 does not.
-glm::vec3 eulerDegrees(const glm::quat& q) {
-    const glm::mat3 m = glm::mat3_cast(q); // m[column][row]
-    const float m00 = m[0][0];
-    const float m10 = m[0][1];
-    const float m20 = m[0][2];
-    const float m01 = m[1][0];
-    const float m11 = m[1][1];
-    const float m21 = m[1][2];
-    const float m22 = m[2][2];
-    const float cy = std::sqrt(m00 * m00 + m10 * m10);
-    const float y = std::atan2(-m20, cy);
-    float x = 0.0f;
-    float z = 0.0f;
-    if (cy > 1e-6f) {
-        x = std::atan2(m21, m22);
-        z = std::atan2(m10, m00);
-    } else {
-        x = std::atan2(-m20 * m01, m11); // gimbal lock: fold roll into pitch
-    }
-    return glm::degrees(glm::vec3(x, y, z));
-}
-
 bool uniformScale(const glm::vec3& s) {
     return std::abs(s.x - s.y) < 1e-6f && std::abs(s.x - s.z) < 1e-6f;
 }
@@ -886,6 +858,35 @@ std::string nestedPrefixFor(const std::string& outerPrefix, const std::string& n
 
 } // namespace
 
+glm::quat quatFromEulerDegrees(const glm::vec3& degrees) {
+    return glm::quat(glm::radians(degrees));
+}
+
+// Inverse of glm::quat(vec3): that constructor builds Rz * Ry * Rx. glm::eulerAngles recovers
+// the middle angle with asin, which loses precision near +-90 degrees; atan2 does not.
+glm::vec3 eulerDegrees(const glm::quat& q) {
+    const glm::mat3 m = glm::mat3_cast(q); // m[column][row]
+    const float m00 = m[0][0];
+    const float m10 = m[0][1];
+    const float m20 = m[0][2];
+    const float m01 = m[1][0];
+    const float m11 = m[1][1];
+    const float m21 = m[1][2];
+    const float m22 = m[2][2];
+    const float cy = std::sqrt(m00 * m00 + m10 * m10);
+    const float y = std::atan2(-m20, cy);
+    float x = 0.0f;
+    float z = 0.0f;
+    if (cy > 1e-6f) {
+        x = std::atan2(m21, m22);
+        z = std::atan2(m10, m00);
+    } else {
+        x = std::atan2(-m20 * m01, m11); // gimbal lock: fold roll into pitch
+    }
+    return glm::degrees(glm::vec3(x, y, z));
+}
+
+
 // ---- node kinds --------------------------------------------------------------------------------
 
 const char* nodeKindName(NodeKind kind) {
@@ -910,6 +911,8 @@ const char* nodeKindName(NodeKind kind) {
         return "sdf";
     case NodeKind::Terrain:
         return "terrain";
+    case NodeKind::Group:
+        return "group";
     }
     return "gltf";
 }
@@ -917,7 +920,7 @@ const char* nodeKindName(NodeKind kind) {
 Result<NodeKind> nodeKindFromName(const std::string& name) {
     for (const NodeKind kind :
          {NodeKind::Gltf, NodeKind::Orb, NodeKind::Grid, NodeKind::Particles, NodeKind::Scene, NodeKind::Procedural,
-          NodeKind::Field, NodeKind::Spline, NodeKind::Sdf, NodeKind::Terrain}) {
+          NodeKind::Field, NodeKind::Spline, NodeKind::Sdf, NodeKind::Terrain, NodeKind::Group}) {
         if (name == nodeKindName(kind)) {
             return kind;
         }
@@ -1572,6 +1575,92 @@ Transform Composition::nodeWorldTransform(const CompositionNode& node) const {
     return world;
 }
 
+CompositionNode cloneNodeSpec(const CompositionNode& node) {
+    CompositionNode copy;
+    copy.name = node.name;
+    copy.kind = node.kind;
+    copy.asset = node.asset;
+    copy.parent = node.parent;
+    copy.transform = node.transform;
+    copy.visible = node.visible;
+    copy.emissiveBoost = node.emissiveBoost;
+    copy.roughnessScale = node.roughnessScale;
+    copy.particles = node.particles;
+    copy.procedural = node.procedural;
+    copy.proceduralMaterialAuthored = node.proceduralMaterialAuthored;
+    copy.field = node.field;
+    copy.spline = node.spline;
+    copy.sdf = node.sdf;
+    copy.worldMap = node.worldMap;
+    copy.terrain = node.terrain;
+    copy.terrainMaterial = node.terrainMaterial;
+    copy.ecology = node.ecology;
+    copy.animation = node.animation;
+    // The live transform, not the one the node was born with: duplicating something you have just
+    // moved has to duplicate it where it is now. The parameter is the value the flattened scene
+    // uses, so it is the one that is true.
+    if (node.positionParam != nullptr) {
+        copy.transform.position = node.positionParam->base();
+    }
+    if (node.rotationParam != nullptr) {
+        copy.transform.rotation = quatFromEulerDegrees(node.rotationParam->base());
+    }
+    if (node.scaleParam != nullptr) {
+        copy.transform.scale = node.scaleParam->base();
+    }
+    return copy;
+}
+
+WorldBounds Composition::nodeBounds(const std::string& name) {
+    WorldBounds out;
+    const auto it = std::find_if(nodes_.begin(), nodes_.end(),
+                                 [&](const std::unique_ptr<CompositionNode>& n) { return n->name == name; });
+    if (it == nodes_.end()) {
+        return out;
+    }
+    ensureBuilt(); // ranges_ indexes scene_.entities, and a dirty scene has neither
+    const std::size_t index = static_cast<std::size_t>(std::distance(nodes_.begin(), it));
+    if (index < ranges_.size()) {
+        const NodeRange& range = ranges_[index];
+        for (std::size_t e = range.firstEntity; e < range.firstEntity + range.entityCount && e < scene_.entities.size(); ++e) {
+            const Entity& entity = scene_.entities[e];
+            if (entity.mesh >= scene_.meshes.size()) {
+                continue;
+            }
+            const auto [lo, hi] = scene_.meshes[entity.mesh].bounds();
+            // Eight corners through the entity's own transform: transforming min and max alone is
+            // wrong the moment anything is rotated, and everything a brush places is rotated.
+            for (int corner = 0; corner < 8; ++corner) {
+                const glm::vec3 p((corner & 1) ? hi.x : lo.x, (corner & 2) ? hi.y : lo.y,
+                                  (corner & 4) ? hi.z : lo.z);
+                out.include(transformPoint(entity.transform, p));
+            }
+        }
+        // A procedural object (a scatter layer, a generated plant) draws through its own cloud
+        // rather than through entities. Its instances are not enumerated here; the node's own
+        // world position stands in, which is enough to find and grab it.
+        if (!out.valid && range.proceduralIndex >= 0) {
+            out.include(nodeWorldTransform(**it).position);
+        }
+    }
+    // A group owns no geometry: it is the union of what hangs off it, recursively.
+    if ((*it)->kind == NodeKind::Group) {
+        for (const auto& other : nodes_) {
+            if (other->parent == name) {
+                out.include(nodeBounds(other->name));
+            }
+        }
+        if (!out.valid) {
+            // An empty group still has to be findable, or a group whose contents were all deleted
+            // becomes an object that exists, saves, loads and cannot be selected or removed.
+            const glm::vec3 p = nodeWorldTransform(**it).position;
+            out.include(p - glm::vec3(0.5f));
+            out.include(p + glm::vec3(0.5f));
+        }
+    }
+    return out;
+}
+
 Result<CompositionNode*> Composition::addNode(CompositionNode node) {
     const std::string base = node.name.empty() ? std::string(nodeKindName(node.kind)) : sanitise(node.name);
     node.name = uniqueName(base);
@@ -1664,6 +1753,7 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
         break;
     case NodeKind::Orb:
     case NodeKind::Grid:
+    case NodeKind::Group:
         break;
     }
 
@@ -1677,13 +1767,18 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
 }
 
 bool Composition::removeNode(const std::string& name) {
+    return detachNode(name) != nullptr;
+}
+
+std::unique_ptr<CompositionNode> Composition::detachNode(const std::string& name) {
     const auto it = std::find_if(nodes_.begin(), nodes_.end(),
                                  [&](const std::unique_ptr<CompositionNode>& n) { return n->name == name; });
     if (it == nodes_.end()) {
-        return false;
+        return nullptr;
     }
     unregisterNodeParameters(**it);
     const std::string grandParent = (*it)->parent;
+    std::unique_ptr<CompositionNode> taken = std::move(*it);
     nodes_.erase(it);
     for (auto& other : nodes_) {
         if (other->parent == name) {
@@ -1691,7 +1786,7 @@ bool Composition::removeNode(const std::string& name) {
         }
     }
     dirty_ = true;
-    return true;
+    return taken;
 }
 
 CompositionNode* Composition::findNode(const std::string& name) {
@@ -2362,6 +2457,13 @@ void Composition::rebuild() {
             range.restRoughness.push_back(0.35f);
             break;
         }
+        case NodeKind::Group:
+            // Nothing. A group is a transform its children read through nodeWorldTransform(), and a
+            // transform that draws is not a group -- an artist who has to hide the handle of every
+            // group they made has been given a chore rather than a tool. Its selection outline and
+            // its gizmo are drawn by the editor, over the frame, where they cannot be rendered into
+            // an offline take by accident.
+            break;
         case NodeKind::Grid: {
             const MeshId mesh = scene_.addMesh(makePlane(12.0f, 48));
             Entity& grid = scene_.addEntity(node.name, mesh);
@@ -3991,10 +4093,19 @@ nlohmann::json Composition::toJson() const {
         if (!node.parent.empty()) {
             n["parent"] = node.parent;
         }
-        n["position"] = vecToJson(node.transform.position);
+        // The parameter's base value when there is one, the authored transform when there is not.
+        // Rotation always did this; position and scale did not, so a node moved or resized through
+        // its parameter -- which is the only way the editor can move it, and what a preset writes --
+        // came back where it started the moment the scene was saved and reloaded. Three fields that
+        // disagreed about where a node's transform lives is exactly the class of bug where an edit
+        // silently does nothing (ADR-092).
+        n["position"] = vecToJson(node.positionParam != nullptr ? node.positionParam->base()
+                                                                : node.transform.position);
         n["rotation"] = vecToJson(node.rotationParam != nullptr ? node.rotationParam->base()
                                                                 : eulerDegrees(node.transform.rotation));
-        n["scale"] = vecToJson(node.transform.scale);
+        n["scale"] = vecToJson(node.scaleParam != nullptr ? node.scaleParam->base()
+                                                          : node.transform.scale);
+        
         n["visible"] = node.visible;
         n["emissiveBoost"] = node.emissiveBoost;
         n["roughnessScale"] = node.roughnessScale;
