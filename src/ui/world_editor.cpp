@@ -437,10 +437,11 @@ void WorldEditor::updateBox(app::Engine& engine, const scene::Camera& camera, fl
     if (input.leftPressed && input.overCanvas && visuals_.hovered == GizmoHandle::None && !drag_.active) {
         boxFrom_ = input.ndc;
         boxAdditive_ = input.shift;
-        boxing_ = false; // not yet: a press is a click until it travels
+        boxing_ = false;   // not yet: a press is a click until it travels
+        boxArmed_ = true;  // but it did land on the world, which is what makes the travel ours
         return;
     }
-    if (input.leftDown && !drag_.active) {
+    if (input.leftDown && boxArmed_ && !drag_.active) {
         if (!boxing_ && glm::length(input.ndc - boxFrom_) > kDragThreshold) {
             boxing_ = true;
         }
@@ -451,6 +452,9 @@ void WorldEditor::updateBox(app::Engine& engine, const scene::Camera& camera, fl
             visuals_.boxTo = input.ndc;
         }
         return;
+    }
+    if (!input.leftDown) {
+        boxArmed_ = false; // the button is up; the next box needs its own press on the world
     }
     if (boxing_ && !input.leftDown) {
         boxing_ = false;

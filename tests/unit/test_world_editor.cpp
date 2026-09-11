@@ -1059,3 +1059,68 @@ TEST_CASE("rotating an object inside a turned group turns it about the world axi
     editor.update(f.engine, nullptr, camera, aspect, input);
     CHECK(editor.history.undoSize() == 1); // and the whole drag is one thing to undo
 }
+
+TEST_CASE("A drag that began on a panel does not open a selection box", "[ui][editor][box]") {
+    // The bug: dragging a slider in the Parameters panel, or scrubbing the sequencer's timeline,
+    // opened a selection box across the world.
+    //
+    // `EditorInput::leftDown` is a global fact about the mouse -- the button is down, somewhere --
+    // and the box only ever asked that. Its *start* correctly required a press that landed on the
+    // canvas, so a press on a panel left `boxFrom_` holding the last canvas press's position; then
+    // the next frame saw "button down, and the pointer is a long way from boxFrom_" and called that
+    // a drag. The further the panel from wherever you last clicked on the world, the more certain.
+    Fixture f;
+    f.add("a", glm::vec3(-2.0f, 0.0f, 0.0f));
+    f.add("b", glm::vec3(2.0f, 0.0f, 0.0f));
+
+    ui::WorldEditor editor;
+    const scene::Camera camera = lookingDown();
+    const float aspect = 16.0f / 9.0f;
+
+    // A real box first, so `boxFrom_` holds a live position -- which is what made the bug reachable.
+    ui::EditorInput input;
+    input.overCanvas = true;
+    input.ndc = glm::vec2(-0.8f, -0.8f);
+    input.leftPressed = true;
+    input.leftDown = true;
+    editor.update(f.engine, nullptr, camera, aspect, input);
+    input.leftPressed = false;
+    input.ndc = glm::vec2(0.8f, 0.8f);
+    editor.update(f.engine, nullptr, camera, aspect, input);
+    CHECK(editor.visuals().boxing); // the ordinary case still works
+    input.leftDown = false;
+    input.leftReleased = true;
+    editor.update(f.engine, nullptr, camera, aspect, input);
+    CHECK_FALSE(editor.visuals().boxing);
+
+    // The legitimate box above selected what it swept, which is the point of it. Cleared here so
+    // the checks below are about the phantom box and nothing else.
+    editor.selection.clear();
+
+    // Now a press that never touches the world: the button goes down over a panel, so `leftPressed`
+    // is true but `overCanvas` is false -- exactly what ImGui reports when a slider takes the press,
+    // or when a panel is being dragged by its tab.
+    input.leftReleased = false;
+    input.overCanvas = false;
+    input.ndc = glm::vec2(-0.9f, 0.2f);
+    input.leftPressed = true;
+    input.leftDown = true;
+    editor.update(f.engine, nullptr, camera, aspect, input);
+    CHECK_FALSE(editor.visuals().boxing);
+
+    // Held, and travelling far -- a slider drag. Nothing on the world may open.
+    input.leftPressed = false;
+    for (const float x : {-0.5f, 0.0f, 0.5f, 0.9f}) {
+        input.ndc = glm::vec2(x, 0.2f);
+        editor.update(f.engine, nullptr, camera, aspect, input);
+        INFO("panel drag reached ndc x " << x);
+        CHECK_FALSE(editor.visuals().boxing);
+        CHECK_FALSE(editor.wantsMouse());
+    }
+
+    // And releasing it selects nothing, rather than catching whatever the phantom box swept.
+    input.leftDown = false;
+    input.leftReleased = true;
+    editor.update(f.engine, nullptr, camera, aspect, input);
+    CHECK(editor.selection.empty());
+}

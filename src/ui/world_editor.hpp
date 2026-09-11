@@ -180,6 +180,11 @@ private:
     std::uint32_t strokeSeed_ = 1u;
 
     bool boxing_ = false;
+    // A press that actually landed on the world armed this box. Without it, holding the button down
+    // anywhere -- dragging a slider in a panel, scrubbing the timeline -- satisfied "the left button
+    // is down" and opened a selection box on the canvas from wherever the *last* canvas press had
+    // been. `leftDown` is a global fact about the mouse; only a press knows where it began.
+    bool boxArmed_ = false;
     glm::vec2 boxFrom_{0.0f};
     bool boxAdditive_ = false;
 
