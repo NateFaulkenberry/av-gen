@@ -27,6 +27,7 @@
 #include "gpu/transient_pool.hpp"
 #include "rendering/ao_renderer.hpp"
 #include "rendering/shadow_mask_renderer.hpp"
+#include "rendering/water_renderer.hpp"
 #include "rendering/field_uniforms.hpp"
 #include "rendering/frame_overlay.hpp"
 #include "rendering/light_data.hpp"
@@ -432,6 +433,7 @@ private:
     std::unique_ptr<SkinningRenderer> skinning_; // ADR-086
     std::unique_ptr<AoRenderer> ao_;          // ADR-034
     std::unique_ptr<ShadowMaskRenderer> shadowMask_; // ADR-087
+    std::unique_ptr<WaterRenderer> water_;           // ADR-099
     std::unique_ptr<PostProcessor> postProcessor_;
     std::unique_ptr<gpu::TransientPool> pool_;
     glm::mat4 prevViewProj_{1.0f};
@@ -536,6 +538,7 @@ private:
     std::uint64_t textureVersion_ = ~0ull;
     std::unordered_map<std::uint64_t, wgpu::BindGroup> materialBindGroups_;
     std::vector<std::uint8_t> objectStaging_;
+    std::vector<WaterUniforms> waterUniforms_; // ADR-099; rebuilt each frame from Scene::waters
     // Previous-frame model matrices by entity name, so velocity survives reordering (ADR-035).
     std::unordered_map<std::string, glm::mat4> prevModels_;
     std::unordered_map<std::string, glm::mat4> prevModelsNext_;

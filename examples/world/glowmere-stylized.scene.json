@@ -259,7 +259,81 @@
      0.08,
      1.0,
      0.68
-    ]
+    ],
+    "water": {
+     "enabled": true,
+     "shallow": 2.0,
+     "shallowColor": [
+      0.05,
+      0.22,
+      0.24
+     ],
+     "deepColor": [
+      0.006,
+      0.035,
+      0.075
+     ],
+     "roughness": 0.17,
+     "shoreFade": 1.6,
+     "emissiveColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveIntensity": 0.0,
+     "clarity": 1.25,
+     "maxOpacity": 0.93,
+     "edgeFade": 0.8,
+     "fresnel": 0.3,
+     "reflection": 8.0,
+     "reflectionTint": [
+      0.55,
+      0.74,
+      0.98
+     ],
+     "specular": 3.0,
+     "ripple": 1.0,
+     "rippleScale": 0.42,
+     "rippleSpeed": 1.0,
+     "chop": 0.35,
+     "foam": 0.6,
+     "foamWidth": 0.22,
+     "foamColor": [
+      0.7,
+      0.88,
+      0.95
+     ],
+     "refraction": 0.25,
+     "glow": 1.2,
+     "glowColor": [
+      0.15,
+      1.0,
+      0.75
+     ],
+     "glowScale": 0.16,
+     "glowCoverage": 0.22,
+     "glowDepth": 0.55,
+     "sparkle": 0.6,
+     "sparkleColor": [
+      0.72,
+      0.95,
+      1.0
+     ],
+     "swell": 0.0
+    },
+    "flow": {
+     "speedScale": 1.0,
+     "speedOverride": 0.0,
+     "bankShear": 0.7,
+     "meander": 0.18,
+     "stillFactor": 0.12,
+     "stillSpeed": 0.55,
+     "windDirection": [
+      0.7,
+      0.7
+     ],
+     "turbulence": 0.25
+    }
    },
    "material": {
     "program": "paintedGround",
@@ -1623,6 +1697,310 @@
      0.0,
      -2.05,
      0.0
+    ]
+   },
+   "visible": true
+  },
+  {
+   "name": "river-lilies",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/Plant_7.gltf",
+     "meshBudget": 600
+    },
+    "sourceTransform": {
+     "scale": [
+      2.3,
+      0.5,
+      2.3
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "lod": {
+     "lodCount": 2,
+     "maxDistance": 150.0,
+     "minScreenRadius": 1.5
+    },
+    "material": {
+     "program": "paintedFrond",
+     "baseColor": [
+      0.16,
+      0.44,
+      0.32
+     ],
+     "roughness": 0.55,
+     "emissiveColor": [
+      0.05,
+      0.3,
+      0.18
+     ],
+     "emissiveIntensity": 0.05
+    },
+    "motion": {
+     "stiffness": 1.6,
+     "mass": 0.2,
+     "damping": 0.92,
+     "windSensitivity": 0.35,
+     "bendLimit": 0.1,
+     "tipAmplitude": 0.05
+    }
+   },
+   "float": {
+    "water": "valley",
+    "body": "glowmere-run",
+    "count": 150,
+    "seed": 9101,
+    "sizeMin": 0.55,
+    "sizeMax": 1.25,
+    "driftScale": 1.0,
+    "driftSpread": 0.38,
+    "lateral": 0.82,
+    "margin": 0.24,
+    "clustering": 0.62,
+    "clusters": 11,
+    "spin": 0.05,
+    "bob": 0.035,
+    "bobRate": 0.28,
+    "tilt": 0.09,
+    "sink": 0.015,
+    "minDepth": 0.25
+   },
+   "visible": true
+  },
+  {
+   "name": "tarn-lilies",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/Plant_7_Big.gltf",
+     "meshBudget": 600
+    },
+    "sourceTransform": {
+     "scale": [
+      2.0,
+      0.45,
+      2.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "lod": {
+     "lodCount": 2,
+     "maxDistance": 150.0,
+     "minScreenRadius": 1.5
+    },
+    "material": {
+     "program": "paintedFrond",
+     "baseColor": [
+      0.14,
+      0.4,
+      0.34
+     ],
+     "roughness": 0.55,
+     "emissiveColor": [
+      0.05,
+      0.28,
+      0.2
+     ],
+     "emissiveIntensity": 0.05
+    },
+    "motion": {
+     "stiffness": 1.6,
+     "mass": 0.2,
+     "damping": 0.92,
+     "windSensitivity": 0.35,
+     "bendLimit": 0.1,
+     "tipAmplitude": 0.05
+    }
+   },
+   "float": {
+    "water": "valley",
+    "body": "west-tarn-bed",
+    "count": 70,
+    "seed": 9102,
+    "sizeMin": 0.7,
+    "sizeMax": 1.5,
+    "driftScale": 1.0,
+    "driftSpread": 0.5,
+    "lateral": 0.78,
+    "margin": 0.22,
+    "clustering": 0.5,
+    "clusters": 6,
+    "spin": 0.03,
+    "bob": 0.025,
+    "bobRate": 0.19,
+    "tilt": 0.07,
+    "sink": 0.015,
+    "minDepth": 0.2
+   },
+   "visible": true
+  },
+  {
+   "name": "river-petals",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/Petal_5.gltf",
+     "meshBudget": 600
+    },
+    "sourceTransform": {
+     "scale": [
+      0.55,
+      0.4,
+      0.55
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "lod": {
+     "lodCount": 2,
+     "maxDistance": 150.0,
+     "minScreenRadius": 1.5
+    },
+    "material": {
+     "program": "",
+     "baseColor": [
+      0.42,
+      0.2,
+      0.4
+     ],
+     "roughness": 0.65,
+     "emissiveColor": [
+      0.55,
+      0.18,
+      0.62
+     ],
+     "emissiveIntensity": 0.1
+    },
+    "motion": {
+     "stiffness": 1.6,
+     "mass": 0.2,
+     "damping": 0.92,
+     "windSensitivity": 0.35,
+     "bendLimit": 0.1,
+     "tipAmplitude": 0.05
+    }
+   },
+   "float": {
+    "water": "valley",
+    "count": 90,
+    "seed": 9103,
+    "sizeMin": 0.3,
+    "sizeMax": 0.7,
+    "driftScale": 1.25,
+    "driftSpread": 0.55,
+    "lateral": 0.9,
+    "margin": 0.18,
+    "clustering": 0.3,
+    "clusters": 14,
+    "spin": 0.22,
+    "bob": 0.05,
+    "bobRate": 0.5,
+    "tilt": 0.18,
+    "sink": 0.0,
+    "minDepth": 0.12
+   },
+   "visible": true
+  },
+  {
+   "name": "river-motes",
+   "kind": "particles",
+   "particles": {
+    "capacity": 6144,
+    "seed": 916,
+    "shape": "spline",
+    "spline": "valley.glowmere-run",
+    "extent": [
+     4.0,
+     1.0,
+     1.0
+    ],
+    "position": [
+     0.0,
+     0.35,
+     0.0
+    ],
+    "spawnRate": 45,
+    "lifetimeMin": 9.0,
+    "lifetimeMax": 20.0,
+    "direction": [
+     0.0,
+     0.35,
+     1.0
+    ],
+    "spread": 0.35,
+    "speedMin": 0.1,
+    "speedMax": 0.42,
+    "gravity": [
+     0.0,
+     0.012,
+     0.0
+    ],
+    "drag": 0.35,
+    "turbulence": 0.16,
+    "turbulenceScale": 0.5,
+    "turbulenceSpeed": 0.12,
+    "sizeStart": 0.05,
+    "sizeEnd": 0.012,
+    "blend": "additive",
+    "emissive": 2.6,
+    "softness": 0.6,
+    "fogCoupling": 1.0,
+    "colorStart": [
+     0.22,
+     1.0,
+     0.72,
+     0.0
+    ],
+    "colorEnd": [
+     0.35,
+     0.85,
+     1.0,
+     0.0
+    ],
+    "opacityCurve": [
+     {
+      "t": 0.0,
+      "value": 0.0
+     },
+     {
+      "t": 0.22,
+      "value": 0.6
+     },
+     {
+      "t": 0.7,
+      "value": 0.5
+     },
+     {
+      "t": 1.0,
+      "value": 0.0
+     }
     ]
    },
    "visible": true

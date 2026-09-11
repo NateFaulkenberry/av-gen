@@ -21,6 +21,10 @@
 #include "material.wgsl"
 #include "lighting.wgsl"
 
+// applyFog / fogHeightIntegral moved to common.wgsl in ADR-099: water.wgsl needs the same fog and
+// does not include this file, and two copies of a fog curve is how two surfaces end up in
+// different weather.
+
 // Which program the bound material runs; a 16-byte slice of the shared select buffer.
 struct MaterialSelect {
     program: i32,   // material program slot, -1 = none
@@ -128,60 +132,6 @@ fn textureLodFor(uv: vec2<f32>, size: vec2<f32>) -> f32 {
     let dx = dpdx(uv) * size;
     let dy = dpdy(uv) * size;
     return max(0.5 * log2(max(dot(dx, dx), dot(dy, dy))), 0.0);
-}
-
-// How much air sits below height `y`, measured relative to the mist layer's top and in metres of
-// the layer's full density: the antiderivative of exp(-b * max(0, y)), zeroed at y = 0. It is
-// linear inside the layer and saturates at 1/b above it, and it is C1 across the join, so a ray
-// crossing the fog bank's surface has no seam where the two halves meet.
-fn fogHeightIntegral(y: f32, b: f32) -> f32 {
-    if (y <= 0.0) {
-        return y;
-    }
-    return (1.0 - exp(-b * y)) / b;
-}
-
-// Exponential-squared distance fog towards frame.fogParams.rgb; density 0 leaves the colour
-// untouched (the branch keeps the no-fog output bit-identical to the pre-fog shader).
-//
-// ADR-058: when frame.fogHeight.z is non-zero the geometric distance is first replaced by the
-// distance *through the mist*, integrating the same flat-topped layer the volumetric marches along
-// the view ray. Both endpoints inside the layer integrate to the ray's own length, so a scene that
-// keeps everything below the fog bank is unchanged to the last bit; what moves is the ridge line
-// and the canopy crowns standing out of it, which are now seen through the air that is actually
-// between them and the eye rather than through a uniform slab.
-fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
-    let density = frame.fogParams.w;
-    if (density <= 0.0) {
-        return color;
-    }
-    var travel = distance(frame.cameraPos.xyz, worldPos);
-    let amount = frame.fogHeight.z;
-    let falloff = frame.fogHeight.y;
-    if (amount > 0.0 && falloff > 0.0) {
-        let y0 = frame.cameraPos.y - frame.fogHeight.x;
-        let y1 = worldPos.y - frame.fogHeight.x;
-        let rise = y1 - y0;
-        // The mean of the layer's density along the ray. The difference quotient is the whole
-        // integral because the ray climbs at a constant rate: metres of mist per metre travelled.
-        var mean = 1.0;
-        if (max(y0, y1) > 0.0) {
-            // Both endpoints below the layer's top puts the whole segment below it, so the mean is
-            // exactly one and this branch is skipped -- which is what keeps a scene that sits
-            // inside its own fog bank bit-identical when the integration is switched on. Leaving
-            // it to the quotient would give 1.0 only to within rounding, because the numerator and
-            // the denominator are the same subtraction written twice and the compiler is free to
-            // fuse one of them and not the other.
-            mean = exp(-falloff * max(y0, 0.0)); // a level ray never leaves its own altitude
-            if (abs(rise) > 1e-3) {
-                mean = (fogHeightIntegral(y1, falloff) - fogHeightIntegral(y0, falloff)) / rise;
-            }
-        }
-        travel = travel * mix(1.0, mean, amount);
-    }
-    let d = travel * density;
-    let f = exp(-d * d);
-    return mix(frame.fogParams.rgb, color, f);
 }
 
 // The material-program inputs only the caller knows: the object-space position (before the

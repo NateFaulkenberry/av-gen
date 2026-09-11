@@ -19,30 +19,7 @@ int lodResolution(const TerrainSettings& settings, int lod) {
 
 } // namespace
 
-Result<void> WaterSettings::validate() const {
-    if (!(shallow > 0.0f) || shallow > 10000.0f) {
-        return fail("water: shallow must be in (0, 10000] metres");
-    }
-    if (roughness < 0.0f || roughness > 1.0f) {
-        return fail("water: roughness must be in [0, 1]");
-    }
-    if (shoreFade < 0.0f || shoreFade > 1000.0f) {
-        return fail("water: shoreFade must be in [0, 1000]");
-    }
-    if (emissiveIntensity < 0.0f || emissiveIntensity > 1000.0f) {
-        return fail("water: emissiveIntensity must be in [0, 1000]");
-    }
-    return {};
-}
-
-std::uint64_t WaterSettings::structuralHash() const {
-    StructHash h;
-    h.boolean(enabled);
-    h.f32(shallow);
-    h.f32(shoreFade);
-    // Only the fields that change the *mesh* are structural; colours are material uniforms.
-    return h.value();
-}
+// WaterSettings::validate / structuralHash moved to scene/water_surface.cpp with the struct.
 
 Result<void> TerrainSettings::validate() const {
     if (!(chunkSize > 0.0f) || chunkSize > 100000.0f) {
@@ -240,7 +217,7 @@ scene::MeshData buildChunkMesh(const WorldMap& map, const TerrainSettings& setti
 }
 
 scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& settings, glm::ivec2 coord,
-                                const ChunkField* field) {
+                                const ChunkField* field, const WaterBodySet* bodies) {
     scene::MeshData mesh;
     if (!settings.water.enabled) {
         return mesh;
@@ -277,6 +254,9 @@ scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& sett
 
     mesh.name = fmt::format("water_{}_{}", coord.x, coord.y);
     mesh.vertices.resize(static_cast<std::size_t>(side) * side);
+    // Speed is baked as a fraction of the fastest body in the world rather than in metres per
+    // second, so the lane stays in [0, 1] and a world of slow water does not come out still.
+    const float maxSpeed = bodies != nullptr ? bodies->fastest() : 0.0f;
     for (int j = 0; j <= res; ++j) {
         for (int i = 0; i <= res; ++i) {
             const std::size_t k = static_cast<std::size_t>(j) * side + i;
@@ -321,9 +301,26 @@ scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& sett
             const float depth = std::max(surface - q.bed, 0.0f);
             scene::Vertex v;
             v.position = glm::vec3(p.x, surface, p.y);
+            // ADR-099: the normal slot carries the flow, because a flat sheet's normal is the one
+            // thing already known. xz is the downstream direction, y is the speed as a fraction of
+            // the fastest body in the world, so the water surface shader can scroll its layers
+            // along the real course without the GPU ever hearing of a river. A world with no
+            // bodies derived leaves it at +Y, which is exactly the vertex the sheet used to carry.
             v.normal = glm::vec3(0.0f, 1.0f, 0.0f);
-            v.uv = glm::vec2(glm::clamp(depth / std::max(settings.water.shallow, 1e-3f), 0.0f, 1.0f),
-                             glm::clamp(depth / std::max(settings.water.shoreFade, 1e-3f), 0.0f, 1.0f));
+            float channel = 0.0f;
+            if (bodies != nullptr && !bodies->empty()) {
+                const FlowSample flow = bodies->flowAt(p);
+                const float scale = maxSpeed > 1e-4f ? flow.speed / maxSpeed : 0.0f;
+                v.normal = glm::vec3(flow.direction.x, glm::clamp(scale, 0.0f, 1.0f), flow.direction.y);
+                // 1 at the centreline, 0 at the bank. The bed's depth does not answer this: a wide
+                // shallow reach is shallow everywhere, and the middle of it is still the middle.
+                // It falls out of the same query the flow does, so it costs nothing.
+                channel = 1.0f - std::fabs(flow.across);
+            }
+            // uv.x is the bed depth in *metres* -- the shader curves it itself, and the shoreline it
+            // draws is sub-quad because it comes from the scene depth rather than from this. uv.y is
+            // where across the channel this is, 1 at the centreline and 0 at the bank.
+            v.uv = glm::vec2(depth, channel);
             mesh.vertices[k] = v;
         }
     }
@@ -400,7 +397,8 @@ bool aabbVisible(const FrustumPlanes& planes, const glm::vec3& min, const glm::v
 
 std::vector<TerrainChunk> buildTerrain(
     const WorldMap& map, const TerrainSettings& settings,
-    const std::function<scene::MeshId(std::size_t, int, scene::MeshData&&)>& emit) {
+    const std::function<scene::MeshId(std::size_t, int, scene::MeshData&&)>& emit,
+    const WaterBodySet* bodies) {
     const std::vector<glm::ivec2> coords = chunkGrid(map, settings);
     const std::size_t levels = static_cast<std::size_t>(std::max(settings.lodLevels, 1));
     std::vector<scene::MeshData> built(coords.size() * levels);
@@ -419,7 +417,7 @@ std::vector<TerrainChunk> buildTerrain(
             chunk.center = chunkOrigin(map, settings, coords[c]) + glm::vec2(settings.chunkSize * 0.5f);
             chunk.meshes.fill(scene::kInvalidMesh);
             chunk.water = scene::kInvalidMesh;
-            water[c] = buildChunkWater(map, settings, coords[c], &field);
+            water[c] = buildChunkWater(map, settings, coords[c], &field, bodies);
             for (std::size_t lod = 0; lod < levels; ++lod) {
                 scene::MeshData mesh = buildChunkMeshFrom(map, settings, coords[c], static_cast<int>(lod), &field);
                 if (lod == 0) {
@@ -496,60 +494,6 @@ glm::vec3 rock(const BiomeSet& set, std::size_t i) {
 }
 
 } // namespace
-
-scene::MaterialProgram waterMaterialProgram(const WaterSettings& water, std::string name) {
-    using Kind = scene::MaterialOpKind;
-    scene::MaterialProgram program;
-    program.name = std::move(name);
-    // uv.x is depth over `shallow`, uv.y is the shore fade. Both arrive in channels no mask op
-    // reads, so both are swizzled into x first -- the reason that op exists.
-    scene::MaterialOp uv = materialOp(Kind::Input, 0);
-    uv.input = scene::MaterialInput::Uv;
-    program.ops.push_back(uv);
-    scene::MaterialOp depth = materialOp(Kind::Swizzle, 1, 0);
-    depth.constant = {0.0f, 0.0f, 0.0f, 0.0f};
-    program.ops.push_back(depth);
-    scene::MaterialOp shore = materialOp(Kind::Swizzle, 2, 0);
-    shore.constant = {1.0f, 1.0f, 1.0f, 1.0f};
-    program.ops.push_back(shore);
-
-    // Colour by depth. Shallow water shows its bed and deep water does not, which is the single
-    // cue that reads as water rather than as a coloured plane -- more than any amount of specular.
-    scene::MaterialOp shallowColor = materialOp(Kind::Constant, 3);
-    shallowColor.constant = glm::vec4(water.shallowColor, 1.0f);
-    program.ops.push_back(shallowColor);
-    scene::MaterialOp deepColor = materialOp(Kind::Constant, 4);
-    deepColor.constant = glm::vec4(water.deepColor, 1.0f);
-    program.ops.push_back(deepColor);
-    scene::MaterialOp curve = materialOp(Kind::Smoothstep, 5, 1);
-    curve.constant = {0.0f, 1.0f, 0.0f, 0.0f};
-    program.ops.push_back(curve);
-    program.ops.push_back(materialOp(Kind::MixBy, 6, 3, 4, 5));
-
-    // The shore. A hard waterline is the other giveaway; fading opacity over the last metre or two
-    // lets the bank come through and turns the edge into a wet margin.
-    scene::MaterialOp edge = materialOp(Kind::Smoothstep, 7, 2);
-    edge.constant = {0.0f, 1.0f, 0.0f, 0.0f};
-    program.ops.push_back(edge);
-
-    scene::MaterialOp roughness = materialOp(Kind::Constant, 3);
-    roughness.constant = glm::vec4(water.roughness);
-    program.ops.push_back(roughness);
-
-    program.baseColorRegister = 6;
-    program.roughnessRegister = 3;
-    program.opacityRegister = 7;
-    if (water.emissiveIntensity > 0.0f) {
-        scene::MaterialOp emissive = materialOp(Kind::Constant, 4);
-        emissive.constant = glm::vec4(water.emissiveColor * water.emissiveIntensity, 1.0f);
-        program.ops.push_back(emissive);
-        // Brightest where it is deepest: a channel that carries light rather than a lit surface.
-        program.ops.push_back(materialOp(Kind::Multiply, 4, 4, 5));
-        program.emissionRegister = 4;
-        program.emissionIntensity = 1.0f;
-    }
-    return program;
-}
 
 scene::MaterialProgram terrainMaterialProgram(const BiomeSet& biomes, std::string name, bool mottle,
                                              float glow, float glowScale, float glowCoverage,
