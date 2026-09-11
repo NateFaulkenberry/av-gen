@@ -118,14 +118,6 @@ snapshot, two mechanisms for one transaction. Decide which of these before writi
    reports what is backing it), and leave parameter tools on snapshots. Smallest, and honest, but
    node creation then does not work headless.
 
-## 8. `render.capture`
-
-So the agent can verify instead of assert. Everything above is worth less without it: the prompt's
-§26 and §30 ask the assistant to confirm its own work, and it currently has no eyes. The control
-plane's capability registry already declares `vision: false` per provider, so the honest first
-version is a frame probe the *agent* reads as numbers — draw counts, triangle counts, whether a
-named node is on screen — rather than an image it cannot see.
-
 ## Three things no amount of tooling reaches
 
 A plan that treats these as tool work will slip. They are engine features that do not exist.
