@@ -1,0 +1,1255 @@
+{
+ "source": "Kenney city, car, furniture, mini-character and modular-building kits (kenney.nl) and Quaternius Downtown City MegaKit, free Standard tier (quaternius.com)",
+ "license": "CC0 1.0 Universal, both packs. Kenney's License.txt and Quaternius' License_Standard.txt are kept beside the meshes they cover.",
+ "note": "A curated *scatter* library: the composer builds one scatter layer per entry and caps a world at 64, so this file is a short list on purpose -- glowmere.manifest.json is 13 entries for the same reason. The other ~900 meshes imported alongside these (buildings, roads, the downtown modules, furniture, the concert stage, the instruments, the rigged characters) are on disk and load fine, but they are placed by hand in a scene by file, the way assets/imported/alien.gltf is, because a building is not something you scatter by density. assets/imported/ATTRIBUTION.md lists every pack and where it came from. The scales here are av-gen's own art direction and they are the point of the file: Kenney's kit is modelled on a 1x1 unit tile with a 0.79-unit person and Quaternius' downtown reaches 28 units, neither of which is metres. preferredScale states the height in metres an instance wants, so a Kenney sedan and a Quaternius tower stand on the same street at the same scale.",
+ "categories": {
+  "streetTrees": [
+   {
+    "name": "tree_blocks",
+    "file": "kenney/city/nature-kit/tree_blocks.glb",
+    "category": "flora",
+    "archetype": "street_tree",
+    "triangles": 132,
+    "naturalSize": [
+     0.6,
+     1.185,
+     0.6
+    ],
+    "preferredScale": 7.0,
+    "visualImportance": 0.55,
+    "preferredDensity": 0.006,
+    "tags": [
+     "tree",
+     "canopy",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.35,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "tree_blocks_dark",
+    "file": "kenney/city/nature-kit/tree_blocks_dark.glb",
+    "category": "flora",
+    "archetype": "street_tree",
+    "triangles": 132,
+    "naturalSize": [
+     0.6,
+     1.185,
+     0.6
+    ],
+    "preferredScale": 7.0,
+    "visualImportance": 0.55,
+    "preferredDensity": 0.006,
+    "tags": [
+     "tree",
+     "canopy",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.35,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "tree_blocks_fall",
+    "file": "kenney/city/nature-kit/tree_blocks_fall.glb",
+    "category": "flora",
+    "archetype": "street_tree",
+    "triangles": 264,
+    "naturalSize": [
+     0.6,
+     1.185,
+     0.6
+    ],
+    "preferredScale": 7.0,
+    "visualImportance": 0.55,
+    "preferredDensity": 0.006,
+    "tags": [
+     "tree",
+     "canopy",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.35,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "tree_default",
+    "file": "kenney/city/nature-kit/tree_default.glb",
+    "category": "flora",
+    "archetype": "street_tree",
+    "triangles": 114,
+    "naturalSize": [
+     0.755,
+     1.7079,
+     0.6538
+    ],
+    "preferredScale": 7.0,
+    "visualImportance": 0.55,
+    "preferredDensity": 0.006,
+    "tags": [
+     "tree",
+     "canopy",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.35,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "tree_default_dark",
+    "file": "kenney/city/nature-kit/tree_default_dark.glb",
+    "category": "flora",
+    "archetype": "street_tree",
+    "triangles": 114,
+    "naturalSize": [
+     0.755,
+     1.7079,
+     0.6538
+    ],
+    "preferredScale": 7.0,
+    "visualImportance": 0.55,
+    "preferredDensity": 0.006,
+    "tags": [
+     "tree",
+     "canopy",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.35,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "tree_default_fall",
+    "file": "kenney/city/nature-kit/tree_default_fall.glb",
+    "category": "flora",
+    "archetype": "street_tree",
+    "triangles": 228,
+    "naturalSize": [
+     0.755,
+     1.7079,
+     0.6538
+    ],
+    "preferredScale": 7.0,
+    "visualImportance": 0.55,
+    "preferredDensity": 0.006,
+    "tags": [
+     "tree",
+     "canopy",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.35,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "tree_oak",
+    "file": "kenney/city/nature-kit/tree_oak.glb",
+    "category": "flora",
+    "archetype": "street_tree",
+    "triangles": 196,
+    "naturalSize": [
+     0.6406,
+     1.2262,
+     0.7396
+    ],
+    "preferredScale": 7.0,
+    "visualImportance": 0.55,
+    "preferredDensity": 0.006,
+    "tags": [
+     "tree",
+     "canopy",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.35,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "tree_oak_dark",
+    "file": "kenney/city/nature-kit/tree_oak_dark.glb",
+    "category": "flora",
+    "archetype": "street_tree",
+    "triangles": 196,
+    "naturalSize": [
+     0.6406,
+     1.2262,
+     0.7396
+    ],
+    "preferredScale": 7.0,
+    "visualImportance": 0.55,
+    "preferredDensity": 0.006,
+    "tags": [
+     "tree",
+     "canopy",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.35,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   }
+  ],
+  "cityFoliage": [
+   {
+    "name": "grass",
+    "file": "kenney/city/nature-kit/grass.glb",
+    "category": "flora",
+    "archetype": "planting",
+    "triangles": 132,
+    "naturalSize": [
+     0.3811,
+     0.254,
+     0.3922
+    ],
+    "preferredScale": 0.9,
+    "visualImportance": 0.2,
+    "preferredDensity": 0.05,
+    "tags": [
+     "planting",
+     "detail"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.3,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "grass_large",
+    "file": "kenney/city/nature-kit/grass_large.glb",
+    "category": "flora",
+    "archetype": "planting",
+    "triangles": 224,
+    "naturalSize": [
+     0.409,
+     0.254,
+     0.4079
+    ],
+    "preferredScale": 0.9,
+    "visualImportance": 0.2,
+    "preferredDensity": 0.05,
+    "tags": [
+     "planting",
+     "detail"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.3,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "grass_leafs",
+    "file": "kenney/city/nature-kit/grass_leafs.glb",
+    "category": "flora",
+    "archetype": "planting",
+    "triangles": 36,
+    "naturalSize": [
+     0.2345,
+     0.1425,
+     0.2573
+    ],
+    "preferredScale": 0.9,
+    "visualImportance": 0.2,
+    "preferredDensity": 0.05,
+    "tags": [
+     "planting",
+     "detail"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.3,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "grass_leafslarge",
+    "file": "kenney/city/nature-kit/grass_leafsLarge.glb",
+    "category": "flora",
+    "archetype": "planting",
+    "triangles": 144,
+    "naturalSize": [
+     0.4759,
+     0.1425,
+     0.4873
+    ],
+    "preferredScale": 0.9,
+    "visualImportance": 0.2,
+    "preferredDensity": 0.05,
+    "tags": [
+     "planting",
+     "detail"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.3,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "plant_bush",
+    "file": "kenney/city/nature-kit/plant_bush.glb",
+    "category": "flora",
+    "archetype": "planting",
+    "triangles": 32,
+    "naturalSize": [
+     0.396,
+     0.2444,
+     0.396
+    ],
+    "preferredScale": 0.9,
+    "visualImportance": 0.2,
+    "preferredDensity": 0.05,
+    "tags": [
+     "planting",
+     "detail"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.3,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "plant_bushdetailed",
+    "file": "kenney/city/nature-kit/plant_bushDetailed.glb",
+    "category": "flora",
+    "archetype": "planting",
+    "triangles": 104,
+    "naturalSize": [
+     0.6025,
+     0.3604,
+     0.6025
+    ],
+    "preferredScale": 0.9,
+    "visualImportance": 0.2,
+    "preferredDensity": 0.05,
+    "tags": [
+     "planting",
+     "detail"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.15
+    },
+    "variation": {
+     "scale": 0.3,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   }
+  ],
+  "cityRocks": [
+   {
+    "name": "rock_smalla",
+    "file": "kenney/city/nature-kit/rock_smallA.glb",
+    "category": "rock",
+    "archetype": "rock",
+    "triangles": 16,
+    "naturalSize": [
+     0.3608,
+     0.1912,
+     0.3608
+    ],
+    "preferredScale": 1.2,
+    "visualImportance": 0.2,
+    "preferredDensity": 0.004,
+    "tags": [
+     "rock",
+     "detail"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.0
+    },
+    "variation": {
+     "scale": 0.4,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "rock_smallb",
+    "file": "kenney/city/nature-kit/rock_smallB.glb",
+    "category": "rock",
+    "archetype": "rock",
+    "triangles": 24,
+    "naturalSize": [
+     0.3608,
+     0.1768,
+     0.3608
+    ],
+    "preferredScale": 1.2,
+    "visualImportance": 0.2,
+    "preferredDensity": 0.004,
+    "tags": [
+     "rock",
+     "detail"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.0
+    },
+    "variation": {
+     "scale": 0.4,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "rock_smallc",
+    "file": "kenney/city/nature-kit/rock_smallC.glb",
+    "category": "rock",
+    "archetype": "rock",
+    "triangles": 16,
+    "naturalSize": [
+     0.3608,
+     0.1227,
+     0.3608
+    ],
+    "preferredScale": 1.2,
+    "visualImportance": 0.2,
+    "preferredDensity": 0.004,
+    "tags": [
+     "rock",
+     "detail"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.0
+    },
+    "variation": {
+     "scale": 0.4,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "rock_smalld",
+    "file": "kenney/city/nature-kit/rock_smallD.glb",
+    "category": "rock",
+    "archetype": "rock",
+    "triangles": 32,
+    "naturalSize": [
+     0.4257,
+     0.2309,
+     0.3687
+    ],
+    "preferredScale": 1.2,
+    "visualImportance": 0.2,
+    "preferredDensity": 0.004,
+    "tags": [
+     "rock",
+     "detail"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.0
+    },
+    "variation": {
+     "scale": 0.4,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   },
+   {
+    "name": "rock_smalle",
+    "file": "kenney/city/nature-kit/rock_smallE.glb",
+    "category": "rock",
+    "archetype": "rock",
+    "triangles": 64,
+    "naturalSize": [
+     0.3608,
+     0.2562,
+     0.3125
+    ],
+    "preferredScale": 1.2,
+    "visualImportance": 0.2,
+    "preferredDensity": 0.004,
+    "tags": [
+     "rock",
+     "detail"
+    ],
+    "material": {
+     "roughness": 0.85,
+     "translucency": 0.0
+    },
+    "variation": {
+     "scale": 0.4,
+     "yaw": 1.0,
+     "hue": 0.06
+    }
+   }
+  ],
+  "streetProps": [
+   {
+    "name": "roads-construction-light",
+    "file": "kenney/city/city-kit-roads/construction-light.glb",
+    "category": "structure",
+    "archetype": "street_prop",
+    "triangles": 144,
+    "naturalSize": [
+     0.075,
+     0.2337,
+     0.075
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.004,
+    "tags": [
+     "street",
+     "dressing"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.08
+    }
+   },
+   {
+    "name": "roads-light-curved",
+    "file": "kenney/city/city-kit-roads/light-curved.glb",
+    "category": "structure",
+    "archetype": "street_prop",
+    "triangles": 92,
+    "naturalSize": [
+     0.05,
+     0.675,
+     0.225
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.004,
+    "tags": [
+     "street",
+     "dressing"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.08
+    }
+   },
+   {
+    "name": "roads-light-curved-cross",
+    "file": "kenney/city/city-kit-roads/light-curved-cross.glb",
+    "category": "structure",
+    "archetype": "street_prop",
+    "triangles": 270,
+    "naturalSize": [
+     0.4,
+     0.675,
+     0.4
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.004,
+    "tags": [
+     "street",
+     "dressing"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.08
+    }
+   },
+   {
+    "name": "roads-light-curved-double",
+    "file": "kenney/city/city-kit-roads/light-curved-double.glb",
+    "category": "structure",
+    "archetype": "street_prop",
+    "triangles": 152,
+    "naturalSize": [
+     0.05,
+     0.675,
+     0.4
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.004,
+    "tags": [
+     "street",
+     "dressing"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.08
+    }
+   },
+   {
+    "name": "roads-light-square",
+    "file": "kenney/city/city-kit-roads/light-square.glb",
+    "category": "structure",
+    "archetype": "street_prop",
+    "triangles": 60,
+    "naturalSize": [
+     0.05,
+     0.6,
+     0.2375
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.004,
+    "tags": [
+     "street",
+     "dressing"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.08
+    }
+   },
+   {
+    "name": "roads-light-square-cross",
+    "file": "kenney/city/city-kit-roads/light-square-cross.glb",
+    "category": "structure",
+    "archetype": "street_prop",
+    "triangles": 134,
+    "naturalSize": [
+     0.425,
+     0.6,
+     0.425
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.004,
+    "tags": [
+     "street",
+     "dressing"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.08
+    }
+   },
+   {
+    "name": "roads-light-square-double",
+    "file": "kenney/city/city-kit-roads/light-square-double.glb",
+    "category": "structure",
+    "archetype": "street_prop",
+    "triangles": 88,
+    "naturalSize": [
+     0.05,
+     0.6,
+     0.425
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.004,
+    "tags": [
+     "street",
+     "dressing"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.08
+    }
+   },
+   {
+    "name": "roads-road-sign-empty-2",
+    "file": "kenney/city/city-kit-roads/road-sign-empty.glb",
+    "category": "structure",
+    "archetype": "street_prop",
+    "triangles": 42,
+    "naturalSize": [
+     0.05,
+     0.475,
+     0.05
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.004,
+    "tags": [
+     "street",
+     "dressing"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.08
+    }
+   },
+   {
+    "name": "roads-road-sign-empty-hanging-2",
+    "file": "kenney/city/city-kit-roads/road-sign-empty-hanging.glb",
+    "category": "structure",
+    "archetype": "street_prop",
+    "triangles": 112,
+    "naturalSize": [
+     0.09,
+     0.475,
+     0.295
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.004,
+    "tags": [
+     "street",
+     "dressing"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.08
+    }
+   },
+   {
+    "name": "roads-road-sign-object-stop-2",
+    "file": "kenney/city/city-kit-roads/road-sign-object-stop.glb",
+    "category": "structure",
+    "archetype": "street_prop",
+    "triangles": 62,
+    "naturalSize": [
+     0.0775,
+     0.1256,
+     0.1256
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.004,
+    "tags": [
+     "street",
+     "dressing"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.08
+    }
+   }
+  ],
+  "pedestrians": [
+   {
+    "name": "character-female-a",
+    "file": "kenney/city/mini-characters/character-female-a.glb",
+    "category": "creature",
+    "archetype": "pedestrian",
+    "triangles": 876,
+    "naturalSize": [
+     1.0988,
+     0.7755,
+     0.4995
+    ],
+    "preferredScale": 1.75,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0009,
+    "tags": [
+     "character",
+     "crowd"
+    ],
+    "material": {
+     "roughness": 0.7
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.06,
+     "hue": 0.05
+    }
+   },
+   {
+    "name": "character-female-b",
+    "file": "kenney/city/mini-characters/character-female-b.glb",
+    "category": "creature",
+    "archetype": "pedestrian",
+    "triangles": 742,
+    "naturalSize": [
+     0.7672,
+     0.7234,
+     0.4185
+    ],
+    "preferredScale": 1.75,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0009,
+    "tags": [
+     "character",
+     "crowd"
+    ],
+    "material": {
+     "roughness": 0.7
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.06,
+     "hue": 0.05
+    }
+   },
+   {
+    "name": "character-female-c",
+    "file": "kenney/city/mini-characters/character-female-c.glb",
+    "category": "creature",
+    "archetype": "pedestrian",
+    "triangles": 732,
+    "naturalSize": [
+     0.7672,
+     0.7755,
+     0.4995
+    ],
+    "preferredScale": 1.75,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0009,
+    "tags": [
+     "character",
+     "crowd"
+    ],
+    "material": {
+     "roughness": 0.7
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.06,
+     "hue": 0.05
+    }
+   },
+   {
+    "name": "character-female-d",
+    "file": "kenney/city/mini-characters/character-female-d.glb",
+    "category": "creature",
+    "archetype": "pedestrian",
+    "triangles": 797,
+    "naturalSize": [
+     0.7672,
+     0.7755,
+     0.4995
+    ],
+    "preferredScale": 1.75,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0009,
+    "tags": [
+     "character",
+     "crowd"
+    ],
+    "material": {
+     "roughness": 0.7
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.06,
+     "hue": 0.05
+    }
+   },
+   {
+    "name": "character-female-e",
+    "file": "kenney/city/mini-characters/character-female-e.glb",
+    "category": "creature",
+    "archetype": "pedestrian",
+    "triangles": 756,
+    "naturalSize": [
+     0.7672,
+     0.7165,
+     0.5271
+    ],
+    "preferredScale": 1.75,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0009,
+    "tags": [
+     "character",
+     "crowd"
+    ],
+    "material": {
+     "roughness": 0.7
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.06,
+     "hue": 0.05
+    }
+   },
+   {
+    "name": "character-female-f",
+    "file": "kenney/city/mini-characters/character-female-f.glb",
+    "category": "creature",
+    "archetype": "pedestrian",
+    "triangles": 788,
+    "naturalSize": [
+     0.7672,
+     0.6713,
+     0.4411
+    ],
+    "preferredScale": 1.75,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0009,
+    "tags": [
+     "character",
+     "crowd"
+    ],
+    "material": {
+     "roughness": 0.7
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.06,
+     "hue": 0.05
+    }
+   },
+   {
+    "name": "character-male-a",
+    "file": "kenney/city/mini-characters/character-male-a.glb",
+    "category": "creature",
+    "archetype": "pedestrian",
+    "triangles": 723,
+    "naturalSize": [
+     0.7672,
+     0.6713,
+     0.34
+    ],
+    "preferredScale": 1.75,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0009,
+    "tags": [
+     "character",
+     "crowd"
+    ],
+    "material": {
+     "roughness": 0.7
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.06,
+     "hue": 0.05
+    }
+   },
+   {
+    "name": "character-male-b",
+    "file": "kenney/city/mini-characters/character-male-b.glb",
+    "category": "creature",
+    "archetype": "pedestrian",
+    "triangles": 690,
+    "naturalSize": [
+     0.7672,
+     0.6613,
+     0.3895
+    ],
+    "preferredScale": 1.75,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0009,
+    "tags": [
+     "character",
+     "crowd"
+    ],
+    "material": {
+     "roughness": 0.7
+    },
+    "variation": {
+     "yaw": 1.0,
+     "scale": 0.06,
+     "hue": 0.05
+    }
+   }
+  ],
+  "vehicles": [
+   {
+    "name": "car-kit-firetruck",
+    "file": "kenney/city/car-kit/firetruck.glb",
+    "category": "structure",
+    "archetype": "vehicle",
+    "triangles": 2767,
+    "naturalSize": [
+     1.5,
+     1.8,
+     3.25
+    ],
+    "preferredScale": 1.6,
+    "visualImportance": 0.45,
+    "preferredDensity": 0.0006,
+    "tags": [
+     "vehicle",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.45
+    }
+   },
+   {
+    "name": "car-kit-garbage-truck",
+    "file": "kenney/city/car-kit/garbage-truck.glb",
+    "category": "structure",
+    "archetype": "vehicle",
+    "triangles": 3124,
+    "naturalSize": [
+     1.6,
+     1.775,
+     3.45
+    ],
+    "preferredScale": 1.6,
+    "visualImportance": 0.45,
+    "preferredDensity": 0.0006,
+    "tags": [
+     "vehicle",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.45
+    }
+   },
+   {
+    "name": "car-kit-hatchback-sports",
+    "file": "kenney/city/car-kit/hatchback-sports.glb",
+    "category": "structure",
+    "archetype": "vehicle",
+    "triangles": 2088,
+    "naturalSize": [
+     1.3,
+     1.25,
+     2.85
+    ],
+    "preferredScale": 1.6,
+    "visualImportance": 0.45,
+    "preferredDensity": 0.0006,
+    "tags": [
+     "vehicle",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.45
+    }
+   },
+   {
+    "name": "car-kit-sedan",
+    "file": "kenney/city/car-kit/sedan.glb",
+    "category": "structure",
+    "archetype": "vehicle",
+    "triangles": 2032,
+    "naturalSize": [
+     1.5,
+     1.45,
+     2.55
+    ],
+    "preferredScale": 1.6,
+    "visualImportance": 0.45,
+    "preferredDensity": 0.0006,
+    "tags": [
+     "vehicle",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.45
+    }
+   },
+   {
+    "name": "car-kit-sedan-sports",
+    "file": "kenney/city/car-kit/sedan-sports.glb",
+    "category": "structure",
+    "archetype": "vehicle",
+    "triangles": 2088,
+    "naturalSize": [
+     1.3,
+     1.25,
+     2.55
+    ],
+    "preferredScale": 1.6,
+    "visualImportance": 0.45,
+    "preferredDensity": 0.0006,
+    "tags": [
+     "vehicle",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.45
+    }
+   },
+   {
+    "name": "car-kit-suv",
+    "file": "kenney/city/car-kit/suv.glb",
+    "category": "structure",
+    "archetype": "vehicle",
+    "triangles": 2474,
+    "naturalSize": [
+     1.5,
+     1.4,
+     2.55
+    ],
+    "preferredScale": 1.6,
+    "visualImportance": 0.45,
+    "preferredDensity": 0.0006,
+    "tags": [
+     "vehicle",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.45
+    }
+   },
+   {
+    "name": "car-kit-suv-luxury",
+    "file": "kenney/city/car-kit/suv-luxury.glb",
+    "category": "structure",
+    "archetype": "vehicle",
+    "triangles": 2086,
+    "naturalSize": [
+     1.5,
+     1.475,
+     2.85
+    ],
+    "preferredScale": 1.6,
+    "visualImportance": 0.45,
+    "preferredDensity": 0.0006,
+    "tags": [
+     "vehicle",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.45
+    }
+   },
+   {
+    "name": "car-kit-taxi",
+    "file": "kenney/city/car-kit/taxi.glb",
+    "category": "structure",
+    "archetype": "vehicle",
+    "triangles": 2072,
+    "naturalSize": [
+     1.5,
+     1.65,
+     2.75
+    ],
+    "preferredScale": 1.6,
+    "visualImportance": 0.45,
+    "preferredDensity": 0.0006,
+    "tags": [
+     "vehicle",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.45
+    }
+   },
+   {
+    "name": "car-kit-truck",
+    "file": "kenney/city/car-kit/truck.glb",
+    "category": "structure",
+    "archetype": "vehicle",
+    "triangles": 2082,
+    "naturalSize": [
+     1.5,
+     1.45,
+     2.95
+    ],
+    "preferredScale": 1.6,
+    "visualImportance": 0.45,
+    "preferredDensity": 0.0006,
+    "tags": [
+     "vehicle",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.45
+    }
+   },
+   {
+    "name": "car-kit-truck-flat",
+    "file": "kenney/city/car-kit/truck-flat.glb",
+    "category": "structure",
+    "archetype": "vehicle",
+    "triangles": 2488,
+    "naturalSize": [
+     1.5,
+     1.45,
+     2.7451
+    ],
+    "preferredScale": 1.6,
+    "visualImportance": 0.45,
+    "preferredDensity": 0.0006,
+    "tags": [
+     "vehicle",
+     "street"
+    ],
+    "material": {
+     "roughness": 0.45
+    }
+   }
+  ]
+ }
+}

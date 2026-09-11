@@ -23,3 +23,13 @@ cmake-build-*/
 # down to the byte, and 16 MB. The manifest carries the command and the hash; the wav does not
 # belong in history any more than a build output does.
 /assets/audio/*.wav
+
+# The city, character and concert packs (assets/city.manifest.json, ADR-none): 700+ meshes and
+# their texture atlases, imported 2026-09-11 for the music video. Gitignored for size, not for
+# licence -- both Kenney and Quaternius are CC0, and assets/imported/ATTRIBUTION.md records where
+# every one came from and which two have terms nobody has confirmed. The manifest is the part the
+# repository keeps: it is the curation and the art direction, and it is what a scene names.
+/assets/kenney/city/
+/assets/quaternius/street/
+/assets/imported/concert/
+/assets/imported/instruments/

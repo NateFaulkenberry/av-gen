@@ -71,3 +71,50 @@ different frequency bands drive different parts of the craft rather than tinting
 **`alien.gltf`** — 1 mesh, 1 material, 61 nodes, one skin of **49 joints**, and three clips:
 `Idle` (3.63 s), `Walk` (1.10 s), `Run` (0.90 s). Authored in centimetres: the bind pose is about
 121 units tall, so roughly a 1.2 m character at 0.01 scale.
+
+## The city, characters and concert (imported 2026-09-11)
+
+Brought in for the *All You Got* music video. **742 models, every one verified to load** through
+`avgen --scene`; the curated library over them is `assets/city.manifest.json`.
+
+| Asset | Source | Author | Licence |
+|---|---|---|---|
+| `assets/kenney/city/` (537 GLB: roads, commercial, industrial, suburban, modular buildings, cars, furniture, mini-characters) | https://kenney.nl/assets | Kenney | CC0 1.0 |
+| `assets/quaternius/downtown/` (153 glTF) | https://quaternius.com — Downtown City MegaKit, free Standard tier | Quaternius | CC0 1.0 |
+| `assets/quaternius/characters/` (18 glTF, 66-joint rigs) | https://quaternius.com — Universal Base Characters, free Standard tier | Quaternius | CC0 1.0 |
+| `assets/quaternius/animations/` (5 GLB, **43 clips** on the same 66-joint rig) | https://quaternius.com — Universal Animation Library 1 and 2 | Quaternius | CC0 1.0 |
+| `assets/quaternius/street/` (25 glTF) | https://quaternius.com — Street Pack | Quaternius | CC0 1.0 |
+| `assets/imported/concert/concert.gltf` (30 meshes: stage, truss, speakers, spotlights, barricade, mic) | lowpoly concert pack | iPoly3D (https://www.patreon.com/ipoly3d/) | **not stated in the download — verify before redistributing** |
+| `assets/imported/instruments/` (drumset, guitar, vintage news microphone) | supplied with the same batch | unrecorded | **unknown — verify before redistributing** |
+
+Every Kenney and Quaternius licence file travels with its meshes. The Quaternius packs marked
+`[Standard]` are the **free** tier and their `License_Standard.txt` states CC0 1.0, the same terms
+as the Stylized Nature MegaKit already here.
+
+**Two entries above have no licence I could verify**, and they are flagged rather than assumed. The
+concert pack ships a README with a Patreon link and no licence text; the three loose instrument
+files arrived with no accompanying terms at all. They load and they are usable for private work;
+they should not be shipped in a public build until somebody confirms the terms.
+
+## What was changed
+
+- **Formats.** The engine reads `.gltf` and `.glb` only. Kenney and the Quaternius city, character
+  and animation packs all ship glTF or GLB, so those were copied unmodified. The Quaternius Street
+  Pack and the three instruments ship OBJ (and `.blend`, which nothing here reads), and were
+  converted with `assimp` 6.0 — the same tool and the same reason as the alien and the UFO above:
+
+  ```
+  assimp export Street_4Way.obj              assets/quaternius/street/street_4way.gltf
+  assimp export drumset.obj                  assets/imported/instruments/drumset.gltf
+  ```
+
+- **Two textures that do not exist.** `Superhero_Male_FullBody.gltf` and its female counterpart
+  reference `T_Eye_Normal_png.png` and `T_Hair_1_Normal_png.png`, and the free tier does not ship
+  them. A glTF whose image is missing does not load at all — fastgltf reports "an external buffer
+  was not found" and the whole character is lost. Rather than edit the asset, a 1x1 neutral normal
+  (128, 128, 255 — straight out of the surface) was written at each path. Both characters load now,
+  and the materials ask for exactly what they were authored to ask for.
+
+- **Nothing else was edited.** No mesh was re-authored, rescaled or re-materialled on disk. The
+  scale differences between the packs are reconciled in the manifest, not in the geometry, which is
+  what `preferredScale` is for.
