@@ -200,8 +200,9 @@ tone mapping and composition overlay.
   bounds, origins/axes and selected-entity filtering. Camera-culled entities are highlighted red.
   Procedural bounds/IDs remain available through the original options; depth/motion/water masks
   still use auxiliary-target work below.
-- [ ] Add runtime toggles for culling, animation, LOD, water, transparency, post, bloom, shadows,
-  particles, terrain and VFX. These are isolation switches only, never production fixes.
+- [x] Existing runtime isolation controls are available through `--disable shadows,ao,volume,post,
+  shadowmask`, with A/B logging and documentation. The new entity diagnostics are exposed in the
+  existing Debug tab. Fine-grained culling/animation/LOD/water/VFX toggles remain open.
 - [ ] Create `RendererQA` with labeled static cube, glTF, disabled-animation mesh, terrain, water,
   transparent object, particles, character, UFO, near/far/behind-camera/extreme-angle objects.
   Include camera path, resize, seek and reverse controls.
