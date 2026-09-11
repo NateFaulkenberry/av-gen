@@ -69,6 +69,67 @@ std::string levelName(const std::string& base, std::size_t level) {
     return level == 0 ? base : base + "#lod" + std::to_string(level);
 }
 
+// One level's two attempts over `src`: the preserving simplifier, then meshoptimizer's sloppy one
+// when the first stalled far short of the target or returned nothing at all. `indices` is empty
+// when neither produced a triangle -- an empty level is not a small level, it is an object that
+// vanishes at a distance, and the caller must be able to tell the two apart.
+struct SimplifyAttempt {
+    std::vector<std::uint32_t> indices;
+    float relativeError = 0.0f;
+    bool sloppy = false;
+};
+
+SimplifyAttempt simplifyTo(const scene::MeshData& src, std::size_t targetIndices,
+                           const LodChainSettings& settings,
+                           const float (&attributeWeights)[kAttributeCount]) {
+    SimplifyAttempt result;
+    if (src.indices.size() < 3 || src.vertices.empty()) {
+        return result;
+    }
+    std::vector<std::uint32_t> primary(src.indices.size());
+    std::size_t produced = 0;
+    float relativeError = 0.0f;
+    if (settings.attributes.any()) {
+        produced = meshopt_simplifyWithAttributes(
+            primary.data(), src.indices.data(), src.indices.size(), positionData(src), src.vertices.size(),
+            sizeof(scene::Vertex), attributeData(src), sizeof(scene::Vertex), attributeWeights,
+            kAttributeCount, nullptr, targetIndices, settings.maxError, simplifyOptions(settings),
+            &relativeError);
+    } else {
+        produced = meshopt_simplify(primary.data(), src.indices.data(), src.indices.size(),
+                                    positionData(src), src.vertices.size(), sizeof(scene::Vertex),
+                                    targetIndices, settings.maxError, simplifyOptions(settings),
+                                    &relativeError);
+    }
+    bool sloppy = false;
+    const bool stalled = produced > targetIndices;
+    const bool trySloppy =
+        produced < 3 ||
+        (settings.sloppyFallback > 0.0f && stalled &&
+         static_cast<float>(produced) > static_cast<float>(targetIndices) * settings.sloppyFallback);
+    if (trySloppy) {
+        std::vector<std::uint32_t> alternative(src.indices.size());
+        float sloppyError = 0.0f;
+        const std::size_t sloppyProduced =
+            meshopt_simplifySloppy(alternative.data(), src.indices.data(), src.indices.size(),
+                                   positionData(src), src.vertices.size(), sizeof(scene::Vertex), nullptr,
+                                   targetIndices, settings.maxError, &sloppyError);
+        if (sloppyProduced >= 3 && (produced < 3 || sloppyProduced < produced)) {
+            primary.swap(alternative);
+            produced = sloppyProduced;
+            relativeError = sloppyError;
+            sloppy = true;
+        }
+    }
+    if (produced < 3) {
+        return result;
+    }
+    result.indices.assign(primary.begin(), primary.begin() + static_cast<std::ptrdiff_t>(produced));
+    result.relativeError = relativeError;
+    result.sloppy = sloppy;
+    return result;
+}
+
 } // namespace
 
 scene::MeshData optimiseMesh(const scene::MeshData& mesh, const MeshOptimiseSettings& settings) {
@@ -185,17 +246,6 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
     const float attributeWeights[kAttributeCount] = {settings.attributes.normal, settings.attributes.normal,
                                                      settings.attributes.normal, settings.attributes.uv,
                                                      settings.attributes.uv};
-    // One attempt's output, and a second buffer for the fallback so the first is not lost when the
-    // fallback turns out to be the worse of the two.
-    std::vector<std::uint32_t> primary(source.indices.size());
-    std::vector<std::uint32_t> alternative(source.indices.size());
-
-    struct Attempt {
-        std::size_t produced = 0;
-        float relativeError = 0.0f;
-        bool sloppy = false;
-    };
-
     for (std::size_t level = 0; level < settings.ratios.size(); ++level) {
         const float ratio = settings.ratios[level];
         const auto wanted = static_cast<std::uint32_t>(
@@ -214,44 +264,68 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
         }
 
         const std::size_t targetIndices = static_cast<std::size_t>(targetTriangles) * 3;
-        Attempt best;
-        if (settings.attributes.any()) {
-            best.produced = meshopt_simplifyWithAttributes(
-                primary.data(), source.indices.data(), source.indices.size(), positionData(source),
-                source.vertices.size(), sizeof(scene::Vertex), attributeData(source), sizeof(scene::Vertex),
-                attributeWeights, kAttributeCount, nullptr, targetIndices, settings.maxError,
-                simplifyOptions(settings), &best.relativeError);
-        } else {
-            best.produced = meshopt_simplify(primary.data(), source.indices.data(), source.indices.size(),
-                                             positionData(source), source.vertices.size(),
-                                             sizeof(scene::Vertex), targetIndices, settings.maxError,
-                                             simplifyOptions(settings), &best.relativeError);
+        // Every level is simplified from the source, so errors do not compound down the chain.
+        SimplifyAttempt best = simplifyTo(source, targetIndices, settings, attributeWeights);
+
+        // A chain must *descend*. `validate()` enforces that of the ratios asked for; nothing
+        // enforced it of the ratios achieved, and on CommonTree_1 the achieved ones do not descend:
+        // the sloppy simplifier reaches 7.6% at the 35% rung and then returns nothing at all at the
+        // 12% and 4% rungs, leaving both of those stalled on the 93% the preserving simplifier
+        // could not get past. The result was a ladder of 100 / 7.6 / 93 / 93 -- the far levels the
+        // expensive ones, which is precisely the arrangement the ratio validator exists to refuse,
+        // and a fifteen-triangle pop between adjacent distance bands on top of it.
+        //
+        // When a level comes back *larger* than the one before it -- or cannot be built at all,
+        // which used to fall back to the whole source and is the same inversion in its worst form
+        // -- it is tried again from that level rather than from the source. One step of compounding
+        // error is the price, and it is paid only by a level that had already failed; the level
+        // above has usually had exactly the topology the source stalled on removed from it, so the
+        // second attempt tends to succeed where the first could not. If it still cannot, the
+        // previous level's mesh is reused: two distance bands drawing the same thing is wasteful,
+        // and very much better than the far one drawing more than the near one.
+        //
+        // Strictly larger, not "no smaller": a chain whose levels come back *equal* is a chain that
+        // stalled, and a hero that will not simplify is supposed to say so and be drawn (the
+        // calibration note on heroLodSettings). The retry does not reach for the sloppy simplifier
+        // either -- it runs whatever `settings` already permits -- so a hero is never quietly
+        // swapped for an approximation by this path.
+        const scene::MeshData* previous = chain.levels.empty() ? nullptr : &chain.levels.back().mesh;
+        const auto trianglesOf = [](const scene::MeshData& m) { return m.indices.size() / 3; };
+        if (previous != nullptr &&
+            (best.indices.empty() || best.indices.size() / 3 > trianglesOf(*previous))) {
+            SimplifyAttempt again = simplifyTo(*previous, targetIndices, settings, attributeWeights);
+            if (!again.indices.empty() && again.indices.size() / 3 < trianglesOf(*previous)) {
+                std::vector<std::uint32_t> indices = std::move(again.indices);
+                if (settings.optimise) {
+                    cacheOptimise(indices, previous->vertices.size());
+                }
+                out.mesh = compact(*previous, std::move(indices), levelName(source.name, level));
+                const auto levelTriangles = static_cast<std::uint32_t>(trianglesOf(out.mesh));
+                out.achievedRatio = static_cast<float>(levelTriangles) / static_cast<float>(sourceTriangles);
+                out.relativeError = again.relativeError;
+                out.error = again.relativeError * errorScale;
+                out.reachedTarget = levelTriangles <= targetTriangles;
+                out.sloppy = again.sloppy;
+                chain.levels.push_back(std::move(out));
+                continue;
+            }
+            out.mesh = *previous;
+            out.mesh.name = levelName(source.name, level);
+            const auto levelTriangles = static_cast<std::uint32_t>(trianglesOf(out.mesh));
+            out.achievedRatio = static_cast<float>(levelTriangles) / static_cast<float>(sourceTriangles);
+            out.relativeError = chain.levels.back().relativeError;
+            out.error = chain.levels.back().error;
+            out.reachedTarget = levelTriangles <= targetTriangles;
+            out.sloppy = chain.levels.back().sloppy;
+            chain.levels.push_back(std::move(out));
+            continue;
         }
 
         // Either simplifier can return nothing at all -- the preserving one when pruning eats the
         // last component, the sloppy one when its grid search cannot land near the target. An empty
-        // level is not a small level; it is an object that disappears at a distance. Both results
-        // are checked for it, and a level that cannot be built falls back to the source with
-        // `reachedTarget` false rather than to a mesh with no triangles in it.
-        const bool stalled = best.produced > targetIndices;
-        const bool trySloppy =
-            best.produced < 3 ||
-            (settings.sloppyFallback > 0.0f && stalled &&
-             static_cast<float>(best.produced) > static_cast<float>(targetIndices) * settings.sloppyFallback);
-        if (trySloppy) {
-            Attempt sloppy;
-            sloppy.sloppy = true;
-            sloppy.produced =
-                meshopt_simplifySloppy(alternative.data(), source.indices.data(), source.indices.size(),
-                                       positionData(source), source.vertices.size(), sizeof(scene::Vertex),
-                                       nullptr, targetIndices, settings.maxError, &sloppy.relativeError);
-            if (sloppy.produced >= 3 && (best.produced < 3 || sloppy.produced < best.produced)) {
-                best = sloppy;
-                primary.swap(alternative);
-            }
-        }
-
-        if (best.produced < 3) {
+        // level is not a small level; it is an object that disappears at a distance, so a level that
+        // cannot be built at all falls back to the source with `reachedTarget` false.
+        if (best.indices.empty()) {
             out.mesh = source;
             out.mesh.name = levelName(source.name, level);
             out.reachedTarget = false;
@@ -259,13 +333,12 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
             continue;
         }
 
-        std::vector<std::uint32_t> indices(primary.begin(),
-                                           primary.begin() + static_cast<std::ptrdiff_t>(best.produced));
+        std::vector<std::uint32_t> indices = std::move(best.indices);
         if (settings.optimise) {
             cacheOptimise(indices, source.vertices.size());
         }
         out.mesh = compact(source, std::move(indices), levelName(source.name, level));
-        const auto levelTriangles = static_cast<std::uint32_t>(out.mesh.indices.size() / 3);
+        const auto levelTriangles = static_cast<std::uint32_t>(trianglesOf(out.mesh));
         out.achievedRatio = static_cast<float>(levelTriangles) / static_cast<float>(sourceTriangles);
         out.relativeError = best.relativeError;
         out.error = best.relativeError * errorScale;
