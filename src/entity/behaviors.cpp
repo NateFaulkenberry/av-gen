@@ -322,7 +322,8 @@ public:
           minRangeDefault_(readFloat(s, "minRange", 8.0f)),
           maxRangeDefault_(readFloat(s, "maxRange", 30.0f)),
           pauseMinDefault_(readFloat(s, "pauseMin", 1.5f)),
-          pauseMaxDefault_(readFloat(s, "pauseMax", 6.0f)) {}
+          pauseMaxDefault_(readFloat(s, "pauseMax", 6.0f)),
+          homeDefault_(readFloat(s, "homeRadius", 0.0f)) {}
 
     [[nodiscard]] std::string_view kind() const override { return "wander"; }
 
@@ -335,8 +336,10 @@ public:
         maxRange_ = &params.add(floatDesc(prefix + "maxRange", maxRangeDefault_, 0.5f, 1000.0f));
         pauseMin_ = &params.add(floatDesc(prefix + "pauseMin", pauseMinDefault_, 0.0f, 300.0f));
         pauseMax_ = &params.add(floatDesc(prefix + "pauseMax", pauseMaxDefault_, 0.0f, 600.0f));
-        paths_ = {prefix + "speed",    prefix + "runSpeed", prefix + "turnRate", prefix + "arrive",
-                  prefix + "minRange", prefix + "maxRange", prefix + "pauseMin", prefix + "pauseMax"};
+        home_ = &params.add(floatDesc(prefix + "homeRadius", homeDefault_, 0.0f, 4000.0f));
+        paths_ = {prefix + "speed",     prefix + "runSpeed", prefix + "turnRate", prefix + "arrive",
+                  prefix + "minRange",  prefix + "maxRange", prefix + "pauseMin", prefix + "pauseMax",
+                  prefix + "homeRadius"};
     }
     void collectParameterPaths(std::vector<std::string>& out) const override {
         out.insert(out.end(), paths_.begin(), paths_.end());
@@ -348,6 +351,13 @@ public:
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
         (void)motion;
+        // Something with the character's attention has it. Travel is what a character does when
+        // nothing else is happening, so it yields rather than competing: the destination and the
+        // pause timer are kept, and the walk resumes from where it stopped.
+        if (state.activity == Activity::Observe || state.activity == Activity::React) {
+            state.speed = 0.0f;
+            return;
+        }
         const float speed = speed_ != nullptr ? speed_->value() : speedDefault_;
         const float arrive = arrive_ != nullptr ? arrive_->value() : arriveDefault_;
         const float turnRate = (turn_ != nullptr ? turn_->value() : turnDefault_) / kDegrees;
@@ -365,8 +375,17 @@ public:
         if (!hasDestination_) {
             const float lo = minRange_ != nullptr ? minRange_->value() : minRangeDefault_;
             const float hi = maxRange_ != nullptr ? maxRange_->value() : maxRangeDefault_;
+            // An unleashed wander is a random walk, and a random walk leaves. When a home radius is
+            // set, a character that has strayed past it picks its next destination around *home*
+            // rather than around itself, so it drifts back without ever being pushed: the walk
+            // stays a walk instead of becoming a return trip.
+            const float home = home_ != nullptr ? home_->value() : homeDefault_;
+            const glm::vec2 anchor(state.anchor.x, state.anchor.z);
+            const glm::vec2 from =
+                (home > 0.0f && glm::length(flat - anchor) > home) ? anchor : flat;
             if (ctx.nav != nullptr && ctx.rng != nullptr &&
-                ctx.nav->pickDestination(*ctx.rng, flat, lo, hi, destination_)) {
+                ctx.nav->pickDestination(*ctx.rng, from, lo, std::min(hi, home > 0.0f ? home : hi),
+                                         destination_)) {
                 hasDestination_ = true;
             } else {
                 // Nowhere to go. Wait a beat and ask again rather than retrying every frame: a
@@ -432,7 +451,7 @@ public:
 
 private:
     float speedDefault_, runSpeedDefault_, turnDefault_, arriveDefault_;
-    float minRangeDefault_, maxRangeDefault_, pauseMinDefault_, pauseMaxDefault_;
+    float minRangeDefault_, maxRangeDefault_, pauseMinDefault_, pauseMaxDefault_, homeDefault_;
     params::Parameter<float>* speed_ = nullptr;
     params::Parameter<float>* runSpeed_ = nullptr;
     params::Parameter<float>* turn_ = nullptr;
@@ -441,6 +460,7 @@ private:
     params::Parameter<float>* maxRange_ = nullptr;
     params::Parameter<float>* pauseMin_ = nullptr;
     params::Parameter<float>* pauseMax_ = nullptr;
+    params::Parameter<float>* home_ = nullptr;
     std::vector<std::string> paths_;
     glm::vec2 destination_{0.0f};
     bool hasDestination_ = false;
@@ -487,6 +507,15 @@ public:
         if (!have) {
             return;
         }
+        // A character that is going somewhere faces where it is going. Turning the *body* towards
+        // something while walking elsewhere is not a compromise between the two, it is a character
+        // that strafes -- and worse, it drives the travel speed to zero, because locomotion scales
+        // its pace by how well the body is aligned with its heading. So while travelling this
+        // publishes the look target and leaves the yaw alone: where the eyes and head go on top of
+        // a walk cycle is the animation layer's business, and LocomotionState carries it there.
+        if (state.activity == Activity::Walk || state.activity == Activity::Run) {
+            return;
+        }
         const float weight = weight_ != nullptr ? weight_->value() : weightDefault_;
         if (weight <= 0.0f) {
             return;
@@ -531,7 +560,8 @@ public:
           minDwellDefault_(readFloat(s, "minDwell", 2.0f)),
           maxDwellDefault_(readFloat(s, "maxDwell", 7.0f)),
           thresholdDefault_(readFloat(s, "alertThreshold", 0.45f)),
-          decayDefault_(readFloat(s, "reactionDecay", 1.4f)) {}
+          decayDefault_(readFloat(s, "reactionDecay", 1.4f)),
+          cooldownDefault_(readFloat(s, "reactionCooldown", 3.0f)) {}
 
     [[nodiscard]] std::string_view kind() const override { return "interest"; }
 
@@ -541,8 +571,9 @@ public:
         maxDwell_ = &params.add(floatDesc(prefix + "maxDwell", maxDwellDefault_, 0.0f, 600.0f));
         threshold_ = &params.add(floatDesc(prefix + "alertThreshold", thresholdDefault_, 0.0f, 4.0f));
         decay_ = &params.add(floatDesc(prefix + "reactionDecay", decayDefault_, 0.01f, 40.0f));
-        paths_ = {prefix + "observeChance", prefix + "minDwell", prefix + "maxDwell",
-                  prefix + "alertThreshold", prefix + "reactionDecay"};
+        cooldown_ = &params.add(floatDesc(prefix + "reactionCooldown", cooldownDefault_, 0.0f, 120.0f));
+        paths_ = {prefix + "observeChance",  prefix + "minDwell",      prefix + "maxDwell",
+                  prefix + "alertThreshold", prefix + "reactionDecay", prefix + "reactionCooldown"};
     }
     void collectParameterPaths(std::vector<std::string>& out) const override {
         out.insert(out.end(), paths_.begin(), paths_.end());
@@ -552,6 +583,7 @@ public:
         dwell_ = rng.range(0.5f, 3.0f);
         subject_ = subjects_.empty() ? 0 : rng.nextU32() % static_cast<std::uint32_t>(subjects_.size());
         reaction_ = 0.0f;
+        cooldownLeft_ = 0.0f;
     }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
@@ -559,18 +591,22 @@ public:
         const float decay = decay_ != nullptr ? decay_->value() : decayDefault_;
         reaction_ = std::max(0.0f, reaction_ - decay * static_cast<float>(ctx.dt));
 
-        // A strong event interrupts whatever was happening and points the character at it. The
-        // threshold is a parameter so it is itself keyframeable: what counts as startling is a
-        // direction an editor gives, not a constant this file gets to decide.
+        // A strong event turns the character's attention, briefly. Deliberately *not* a state
+        // change: an earlier version set `observing_` here and re-rolled the dwell, which on a
+        // percussive track meant every impact interrupted the one before it and the character
+        // never walked again -- it stood still for ninety seconds looking startled. A reaction is
+        // punctuation. It decays on its own, it does not stop a walk (the animation layer blends a
+        // flinch over whatever gait is playing, which is what LocomotionState::reaction is for),
+        // and a cooldown stops a dense passage from firing it continuously.
         const float threshold = threshold_ != nullptr ? threshold_->value() : thresholdDefault_;
-        if (ctx.event(signal_) && ctx.signal(signal_) >= threshold) {
+        cooldownLeft_ = std::max(0.0f, cooldownLeft_ - static_cast<float>(ctx.dt));
+        if (cooldownLeft_ <= 0.0f && ctx.event(signal_) && ctx.signal(signal_) >= threshold) {
             reaction_ = std::min(1.0f, ctx.signal(signal_));
-            observing_ = true;
-            dwell_ = pickDwell(ctx);
+            cooldownLeft_ = cooldown_ != nullptr ? cooldown_->value() : cooldownDefault_;
             if (!subjects_.empty() && ctx.rng != nullptr) {
                 subject_ = ctx.rng->nextU32() % static_cast<std::uint32_t>(subjects_.size());
+                startled_ = true;
             }
-            state.activity = Activity::React;
         }
 
         dwell_ -= static_cast<float>(ctx.dt);
@@ -585,16 +621,21 @@ public:
         }
 
         state.reaction = std::max(state.reaction, reaction_);
-        if (!observing_) {
+        if (reaction_ <= 0.15f) {
+            startled_ = false;
+        }
+        // Attend while observing, or while a fresh reaction is still fading. Only *observing*
+        // stops the feet; a reaction turns the head and lets the walk carry on.
+        if (!observing_ && !startled_) {
             return;
+        }
+        if (observing_) {
+            state.speed = 0.0f;
+            state.activity = Activity::Observe;
         }
         // While observing, hold still and attend to the subject. `lookAt` does the turning; this
         // only says what is worth turning towards, which is the division that lets either be
         // replaced without touching the other.
-        state.speed = 0.0f;
-        if (state.activity != Activity::React) {
-            state.activity = Activity::Observe;
-        }
         if (subjects_.empty() || ctx.world == nullptr) {
             return;
         }
@@ -618,13 +659,17 @@ private:
     std::string signal_;
     std::vector<std::string> subjects_;
     float observeDefault_, minDwellDefault_, maxDwellDefault_, thresholdDefault_, decayDefault_;
+    float cooldownDefault_;
     params::Parameter<float>* observe_ = nullptr;
     params::Parameter<float>* minDwell_ = nullptr;
     params::Parameter<float>* maxDwell_ = nullptr;
     params::Parameter<float>* threshold_ = nullptr;
     params::Parameter<float>* decay_ = nullptr;
+    params::Parameter<float>* cooldown_ = nullptr;
     std::vector<std::string> paths_;
     bool observing_ = false;
+    bool startled_ = false;
+    float cooldownLeft_ = 0.0f;
     float dwell_ = 0.0f;
     float reaction_ = 0.0f;
     std::uint32_t subject_ = 0;

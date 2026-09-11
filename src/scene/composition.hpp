@@ -499,6 +499,27 @@ private:
     CompositionData compositionData_;
     [[nodiscard]] entity::Navigator buildNavigator() const;
     [[nodiscard]] std::uint32_t worldSeed() const;
+    // Marks the entities of entity-driven nodes that fall outside the camera frustum, so the rig
+    // pass can skip posing a character nobody can see (ADR-086's cullDistance handles the far ones;
+    // nothing was setting cameraCulled for anything but terrain). Deliberately only for nodes an
+    // entity drives: every other node's visibility is somebody else's decision and flipping it
+    // here would be a rendering change smuggled in as an optimisation.
+    void cullEntityNodes();
+
+    // Turns a behaviour's Activity into an animation state on the node it drives (ADR-086/087).
+    // Owned by the composition because only the composition knows which node holds which rig.
+    class AnimationSink final : public entity::IPoseSink {
+    public:
+        AnimationSink(Composition& owner, std::string node, const entity::Entity& entity)
+            : owner_(owner), node_(std::move(node)), entity_(entity) {}
+        void setLocomotion(const entity::LocomotionState& state) override;
+
+    private:
+        Composition& owner_;
+        std::string node_;
+        const entity::Entity& entity_;
+    };
+    std::vector<std::unique_ptr<AnimationSink>> animationSinks_;
 
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
     std::vector<entity::EntityDesc> entityDescs_; // ADR-087: authored, round-tripped as "entities"

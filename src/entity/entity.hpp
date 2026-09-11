@@ -85,6 +85,11 @@ struct EntityDesc {
     std::vector<ReactionDesc> reactions;
     std::vector<SocketDesc> sockets;
     std::vector<AttachmentDesc> attachments;
+    // Which animation state plays for each activity, by activity name ("idle", "walk", "run",
+    // "turn", "observe", "react"). Declared here rather than chosen in a behaviour because a clip
+    // name belongs to an asset: a behaviour that named one would break the day a character shipped
+    // with a different set, and the same `wander` has to drive an alien, a deer and a robot.
+    std::vector<std::pair<std::string, std::string>> clips;
 
     // Behaviour level of detail. Beyond `fullDetailDistance` metres from the view, the entity is
     // updated every `coarseInterval` seconds instead of every frame, with the accumulated dt; past
@@ -125,6 +130,9 @@ public:
     Entity(EntityDesc desc, std::uint32_t sceneSeed);
 
     [[nodiscard]] const EntityDesc& desc() const { return desc_; }
+    // The animation state for `activity`, or empty when the entity declared none. Falls back to
+    // "idle" so a character with one clip still plays it rather than standing in its bind pose.
+    [[nodiscard]] const std::string& clipFor(Activity activity) const;
     [[nodiscard]] const std::string& name() const { return desc_.name; }
     [[nodiscard]] const EntityState& state() const { return state_; }
     [[nodiscard]] const LocomotionState& locomotion() const { return locomotion_; }

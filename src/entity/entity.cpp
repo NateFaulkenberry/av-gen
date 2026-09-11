@@ -76,6 +76,24 @@ Entity::Entity(EntityDesc desc, std::uint32_t sceneSeed)
       seed_(desc_.seed != 0 ? desc_.seed : nameSeed(desc_.name, sceneSeed)),
       rng_(seed_) {}
 
+const std::string& Entity::clipFor(Activity activity) const {
+    static const std::string kNone;
+    const auto find = [&](std::string_view name) -> const std::string* {
+        const auto it = std::find_if(desc_.clips.begin(), desc_.clips.end(),
+                                     [&](const std::pair<std::string, std::string>& c) {
+                                         return c.first == name;
+                                     });
+        return it == desc_.clips.end() ? nullptr : &it->second;
+    };
+    if (const std::string* exact = find(activityName(activity))) {
+        return *exact;
+    }
+    if (const std::string* idle = find("idle")) {
+        return *idle;
+    }
+    return kNone;
+}
+
 bool Entity::socketTransform(std::string_view socket, scene::Transform& out) const {
     const auto it = std::find_if(desc_.sockets.begin(), desc_.sockets.end(),
                                  [&](const SocketDesc& s) { return s.name == socket; });
@@ -435,7 +453,14 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
             }
         }
 
+        // A character doing nothing else, with a reaction still ringing, is reacting. Resolved
+        // here rather than in the behaviour that raised it, because whether there was anything
+        // else to do is only known once every behaviour has had its turn.
+        if (entity.state_.activity == Activity::Idle && entity.state_.reaction > 0.4f) {
+            entity.state_.activity = Activity::React;
+        }
         entity.locomotion_.activity = entity.state_.activity;
+        entity.locomotion_.time = ctx.time;
         entity.locomotion_.position = entity.state_.position() + entity.motion_.position;
         entity.locomotion_.yaw = entity.state_.yaw;
         entity.locomotion_.speed = entity.state_.speed;
@@ -561,6 +586,14 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j) {
             desc.reactions.push_back(std::move(reaction));
         }
     }
+    if (j.contains("clips") && j["clips"].is_object()) {
+        for (const auto& [activity, state] : j["clips"].items()) {
+            if (!state.is_string()) {
+                return fail("entity '{}': clip for '{}' must be a string", desc.name, activity);
+            }
+            desc.clips.emplace_back(activity, state.get<std::string>());
+        }
+    }
     if (j.contains("sockets") && j["sockets"].is_array()) {
         for (const auto& item : j["sockets"]) {
             if (!item.is_object() || !item.contains("name") || !item["name"].is_string()) {
@@ -654,6 +687,13 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
             reactions.push_back(std::move(r));
         }
         j["reactions"] = std::move(reactions);
+    }
+    if (!entity.clips.empty()) {
+        nlohmann::json clips = nlohmann::json::object();
+        for (const auto& [activity, state] : entity.clips) {
+            clips[activity] = state;
+        }
+        j["clips"] = std::move(clips);
     }
     if (!entity.sockets.empty()) {
         nlohmann::json sockets = nlohmann::json::array();

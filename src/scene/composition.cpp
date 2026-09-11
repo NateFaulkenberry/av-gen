@@ -1314,6 +1314,19 @@ void Composition::installEntities() {
     entityWorld_.registerParameters(*params_, prefix_ + "entity/");
     entityWorld_.bind(*params_, prefix_ + "entity/");
 
+    // Hand every entity that declared clips a sink onto the node's rig. An entity that declared
+    // none gets one too and it does nothing -- which is the point: a craft, a rock and a character
+    // are the same kind of thing here, and only the data says which.
+    animationSinks_.clear();
+    for (const entity::EntityDesc& desc : entityDescs_) {
+        entity::Entity* live = entityWorld_.find(desc.name);
+        if (live == nullptr) {
+            continue;
+        }
+        animationSinks_.push_back(std::make_unique<AnimationSink>(*this, desc.driven(), *live));
+        live->setPoseSink(animationSinks_.back().get());
+    }
+
     if (modulator_ != nullptr) {
         auto& routes = modulator_->routes();
         routes.erase(std::remove_if(routes.begin(), routes.end(),
@@ -1369,6 +1382,65 @@ std::uint32_t Composition::worldSeed() const {
         }
     }
     return 1u;
+}
+
+void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& state) {
+    const std::string& want = entity_.clipFor(state.activity);
+    if (want.empty()) {
+        return; // this entity declared no clips: it drives a craft or a prop, not a character
+    }
+    // Unconditional every frame: the player treats a request for the state it is already in as a
+    // no-op rather than a restart, so "what should be playing now" is the only thing a behaviour
+    // has to know. The timeline second rather than a wall clock is what keeps an offline render
+    // reproducible (ADR-086).
+    owner_.setNodeAnimation(node_, want, state.time);
+}
+
+void Composition::cullEntityNodes() {
+    if (entityWorld_.empty() || viewportHeight_ == 0) {
+        return;
+    }
+    const float aspect = static_cast<float>(viewportWidth_) / static_cast<float>(viewportHeight_);
+    const world::FrustumPlanes planes = world::frustumPlanes(scene_.camera.projection(aspect) * scene_.camera.view());
+    for (const auto& entityPtr : entityWorld_.entities()) {
+        const CompositionNode* node = findNode(entityPtr->desc().driven());
+        if (node == nullptr) {
+            continue;
+        }
+        const std::size_t index = static_cast<std::size_t>(node - nodes_.front().get());
+        (void)index;
+        for (std::size_t i = 0; i < nodes_.size() && i < ranges_.size(); ++i) {
+            if (nodes_[i].get() != node) {
+                continue;
+            }
+            const NodeRange& range = ranges_[i];
+            for (std::size_t k = 0; k < range.entityCount && range.firstEntity + k < scene_.entities.size(); ++k) {
+                Entity& e = scene_.entities[range.firstEntity + k];
+                if (e.mesh == kInvalidMesh || e.mesh >= scene_.meshes.size()) {
+                    e.cameraCulled = false;
+                    continue;
+                }
+                const auto [lo, hi] = scene_.meshes[e.mesh].bounds();
+                // The mesh's bounds are its bind pose; a posed skeleton can reach outside them, so
+                // pad by a quarter of the box before testing. A character culled one frame early
+                // is a character that pops.
+                const glm::vec3 pad = (hi - lo) * 0.25f + glm::vec3(0.25f);
+                const glm::mat4 m = e.transform.matrix();
+                glm::vec3 wlo(std::numeric_limits<float>::max());
+                glm::vec3 whi(std::numeric_limits<float>::lowest());
+                for (int corner = 0; corner < 8; ++corner) {
+                    const glm::vec3 p((corner & 1) ? hi.x + pad.x : lo.x - pad.x,
+                                      (corner & 2) ? hi.y + pad.y : lo.y - pad.y,
+                                      (corner & 4) ? hi.z + pad.z : lo.z - pad.z);
+                    const glm::vec3 w = glm::vec3(m * glm::vec4(p, 1.0f));
+                    wlo = glm::min(wlo, w);
+                    whi = glm::max(whi, w);
+                }
+                e.cameraCulled = !world::aabbVisible(planes, wlo, whi);
+            }
+            break;
+        }
+    }
 }
 
 void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) {
@@ -2864,6 +2936,7 @@ void Composition::update(const FrameTime& time) {
         cameraAngle_ += cameraOrbitSpeed_->value() * dt;
     }
     applyParameters();
+    cullEntityNodes();
     updateCharacters(time);
 }
 

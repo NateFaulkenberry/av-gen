@@ -39,6 +39,10 @@ enum class Activity : std::uint8_t {
 // Everything an animation layer needs from a behaviour layer, and nothing else.
 struct LocomotionState {
     Activity activity = Activity::Idle;
+    // The timeline second this decision was made at, never a wall clock. The animation layer
+    // stores *when* a state was entered rather than how long it has run, so passing the render
+    // time is what makes a scrubbed or offline frame reproduce exactly (ADR-086).
+    double time = 0.0;
     glm::vec3 position{0.0f}; // world
     float yaw = 0.0f;         // radians about +Y; the facing the body should adopt
     float speed = 0.0f;       // horizontal m/s -- selects the gait and its playback rate
