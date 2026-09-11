@@ -5,13 +5,16 @@
 #include "gpu/render_target.hpp"
 #include "gpu/shader_library.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <array>
 #include <cstdlib>
 #include <filesystem>
+#include <limits>
 #include <memory>
 
 using namespace avgen;
@@ -68,6 +71,42 @@ scene::Scene cubeScene() {
     key.direction = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.6f));
     key.intensity = 3.0f;
     s.addLight(key);
+    return s;
+}
+
+scene::Scene waterTestScene() {
+    scene::Scene s;
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.environment.showSkybox = false;
+    s.environment.sky.enabled = false;
+    s.environment.environmentIntensity = 0.0f;
+    s.camera.position = {0.0f, 2.5f, 4.5f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+
+    const auto ground = s.addMesh(scene::makePlane(3.0f, 8));
+    auto& bed = s.addEntity("bed", ground);
+    bed.transform.position = {0.0f, -0.35f, 0.0f};
+    bed.material.baseColor = {0.05f, 0.2f, 0.08f};
+    bed.material.roughness = 1.0f;
+
+    const auto surface = s.addMesh(scene::makePlane(3.0f, 8));
+    auto& water = s.addEntity("water", surface);
+    water.style = scene::MeshStyle::Water;
+    water.material.program = "qaWater";
+    scene::WaterSurface qa;
+    qa.program = "qaWater";
+    qa.fastestFlow = 0.4f;
+    qa.settings.shallow = 10.0f;
+    qa.settings.shallowColor = {0.15f, 0.65f, 0.9f};
+    qa.settings.deepColor = qa.settings.shallowColor;
+    qa.settings.clarity = 10.0f;
+    qa.settings.maxOpacity = 0.55f;
+    qa.settings.fresnel = 0.0f;
+    qa.settings.reflection = 0.0f;
+    qa.settings.specular = 0.0f;
+    qa.settings.ripple = 0.0f;
+    qa.settings.foam = 0.0f;
+    s.waters.push_back(qa);
     return s;
 }
 
@@ -186,6 +225,106 @@ TEST_CASE("SceneRenderer renders a lit cube deterministically", "[gpu][renderer]
         CHECK(renderer.stats().gpuFrameMs >= 0.0);
     }
 }
+
+    TEST_CASE("camera motion never mutates a static entity transform", "[gpu][renderer][transform]") {
+        auto ctx = makeContext();
+        auto shaders = makeShaders(*ctx);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        auto scene = cubeScene();
+        scene.entities[0].transform.position = {1000.0f, 1.0f, -1000.0f};
+        scene.camera.position = {1000.0f, 1.5f, -995.0f};
+        scene.camera.target = {1000.0f, 1.0f, -1000.0f};
+        const scene::Transform authored = scene.entities[0].transform;
+        FrameTime time{};
+        auto first = renderer.renderToImage(scene, time, 96, 64);
+        REQUIRE(first.has_value());
+
+        scene.camera.position = {1004.0f, 2.0f, -997.0f};
+        scene.camera.target = {1000.0f, 1.0f, -1000.0f};
+        time.frameIndex = 1;
+        time.renderTime = 17.0;
+        auto movedCamera = renderer.renderToImage(scene, time, 96, 64);
+        REQUIRE(movedCamera.has_value());
+        CHECK(scene.entities[0].transform.position == authored.position);
+        CHECK(scene.entities[0].transform.rotation == authored.rotation);
+        CHECK(scene.entities[0].transform.scale == authored.scale);
+
+        auto resized = renderer.renderToImage(scene, time, 128, 80);
+        REQUIRE(resized.has_value());
+        CHECK(scene.entities[0].transform.position == authored.position);
+
+        scene.camera.position = {1000.0f, 1.5f, -995.0f};
+        scene.camera.target = {1000.0f, 1.0f, -1000.0f};
+        time.frameIndex = 2;
+        time.renderTime = 0.0;
+        auto returned = renderer.renderToImage(scene, time, 96, 64);
+        REQUIRE(returned.has_value());
+        CHECK(gpu::hashImage(*returned) == gpu::hashImage(*first));
+        CHECK(ctx->errorCount() == 0);
+    }
+
+    TEST_CASE("renderer rejects non-finite camera and entity transforms", "[gpu][renderer][validation]") {
+        auto ctx = makeContext();
+        auto shaders = makeShaders(*ctx);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        FrameTime time{};
+
+        auto badEntity = cubeScene();
+        badEntity.entities[0].transform.position.x = std::numeric_limits<float>::quiet_NaN();
+        CHECK_FALSE(renderer.renderToImage(badEntity, time, 64, 64).has_value());
+
+        auto badCamera = cubeScene();
+        badCamera.camera.position.y = std::numeric_limits<float>::infinity();
+        CHECK_FALSE(renderer.renderToImage(badCamera, time, 64, 64).has_value());
+        CHECK(ctx->errorCount() == 0);
+    }
+
+    TEST_CASE("water composites over an opaque bed and remains deterministic", "[gpu][renderer][water]") {
+        auto ctx = makeContext();
+        auto shaders = makeShaders(*ctx);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        auto scene = waterTestScene();
+        FrameTime time{};
+        auto withWater = renderer.renderToImage(scene, time, 128, 96);
+        REQUIRE(withWater.has_value());
+        auto repeated = renderer.renderToImage(scene, time, 128, 96);
+        REQUIRE(repeated.has_value());
+        CHECK(gpu::hashImage(*withWater) == gpu::hashImage(*repeated));
+        CHECK(withWater->pixel(64, 48)[2] > withWater->pixel(64, 48)[0]);
+
+        scene.entities[1].cameraCulled = true;
+        auto withoutWater = renderer.renderToImage(scene, time, 128, 96);
+        REQUIRE(withoutWater.has_value());
+        CHECK(gpu::hashImage(*withWater) != gpu::hashImage(*withoutWater));
+        CHECK(ctx->errorCount() == 0);
+    }
+
+    TEST_CASE("water remains stable across above, grazing and below-surface views", "[gpu][renderer][water]") {
+        auto ctx = makeContext();
+        auto shaders = makeShaders(*ctx);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        auto scene = waterTestScene();
+        FrameTime time{};
+        const std::array<std::pair<glm::vec3, glm::vec3>, 4> views = {
+            std::pair{glm::vec3(0.0f, 2.5f, 4.5f), glm::vec3(0.0f, 0.0f, 0.0f)},
+            std::pair{glm::vec3(0.0f, 1.0f, 8.0f), glm::vec3(2.8f, 0.0f, 0.0f)},
+            std::pair{glm::vec3(0.0f, 0.2f, 8.0f), glm::vec3(2.8f, 0.0f, 0.0f)},
+            std::pair{glm::vec3(0.0f, -2.0f, 4.5f), glm::vec3(0.0f, 0.0f, 0.0f)}};
+        for (const auto& [position, target] : views) {
+            scene.camera.position = position;
+            scene.camera.target = target;
+            const auto first = renderer.renderToImage(scene, time, 128, 96);
+            REQUIRE(first.has_value());
+            const auto second = renderer.renderToImage(scene, time, 128, 96);
+            REQUIRE(second.has_value());
+            CHECK(gpu::hashImage(*first) == gpu::hashImage(*second));
+        }
+        CHECK(ctx->errorCount() == 0);
+    }
 
 TEST_CASE("Stylized shading is distinct, deterministic and reversible", "[gpu][renderer][stylized]") {
     auto context = makeContext();

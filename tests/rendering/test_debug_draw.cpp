@@ -4,6 +4,7 @@
 #include "rendering/debug_visualizer.hpp"
 #include "gpu/context.hpp"
 #include "gpu/shader_library.hpp"
+#include "scene/mesh_generators.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -15,6 +16,9 @@ namespace fs = std::filesystem;
 namespace {
 scene::Scene makeScene() {
     scene::Scene s;
+    const auto mesh = s.addMesh(scene::makeCube(0.5f));
+    auto& entity = s.addEntity("debug-entity", mesh);
+    entity.transform.position = {2.0f, 0.5f, -1.0f};
     scene::ProceduralGeometry pg;
     pg.name = "grid";
     pg.source.kind = scene::PrimitiveKind::Box;
@@ -63,9 +67,18 @@ TEST_CASE("The debug builder emits only what the options ask for", "[debug]") {
     draw.clear();
     options.points = false;
     options.bounds = true;
+    options.entityBounds = true;
     rendering::buildDebugGeometry(draw, scene, options, 0.0);
-    CHECK(draw.lineVertexCount() == 24); // twelve edges
+    CHECK(draw.lineVertexCount() == 48); // procedural and entity boxes
     CHECK(draw.pointVertexCount() == 0);
+
+    draw.clear();
+    options = rendering::DebugViewOptions{};
+    options.entityOrigins = true;
+    options.selectedEntity = "debug-entity";
+    rendering::buildDebugGeometry(draw, scene, options, 0.0);
+    CHECK(draw.pointVertexCount() == 1);
+    CHECK(draw.lineVertexCount() == 6); // three origin axes
 
     draw.clear();
     options.bounds = false;

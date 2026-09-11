@@ -22,7 +22,9 @@ public:
 
     // Waits for a frame newer than the last one returned by readFrame(). False on timeout.
     bool waitForFrame(std::chrono::milliseconds timeout);
-    // Current frame as RGBA8 (swizzled from Syphon's BGRA8 surface).
+    // Current frame as RGBA8 (swizzled from Syphon's BGRA8 surface). A notification can arrive
+    // just before Syphon exposes the latest Metal texture during a coalesced burst; callers should
+    // retry a null result rather than treating that transient as transport failure.
     std::optional<gpu::Image8> readFrame();
     [[nodiscard]] std::uint64_t framesReceived() const;
 

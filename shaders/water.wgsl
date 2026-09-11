@@ -396,7 +396,10 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     color = applyFog(color, in.worldPos);
 
     var out: SceneOut;
-    out.color = vec4<f32>(color * alpha, alpha); // premultiplied by the blend's SrcAlpha factor
+    // The pipeline uses the conventional non-premultiplied SrcAlpha blend state. Keep alpha in
+    // the target and let the blend state apply it once; multiplying RGB here would apply alpha
+    // twice and make shallow water and shoreline transitions too dark.
+    out.color = vec4<f32>(color, alpha);
     out.normalRoughness = packNormalRoughness(n, water.surface.z, 5.0);
     out.velocity = screenVelocityAt(in.clip, in.prevClip);
     // The glint and the sparkle are what should bloom; the body colour should not, or a wide river

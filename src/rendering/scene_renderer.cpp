@@ -54,6 +54,17 @@ std::uint64_t materialKey(const scene::Material& m) {
     return h;
 }
 
+bool finiteMatrix(const glm::mat4& matrix) {
+    for (int column = 0; column < 4; ++column) {
+        for (int row = 0; row < 4; ++row) {
+            if (!std::isfinite(matrix[column][row])) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 } // namespace
 
 SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
@@ -1513,6 +1524,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // itself also writes the frame origin, and every later pass's cost is the interval from the
     // previous pass's end to its own.
     timeline_->beginFrame();
+    if (time.renderTime < previousRenderTime_) {
+        // A seek/reverse is a discontinuity, not motion. Reusing forward temporal history would
+        // create false object/camera velocities and make the first reversed frame differ from a
+        // fresh renderer at the same timeline second.
+        havePrevViewProj_ = false;
+        prevModels_.clear();
+        prevModelsNext_.clear();
+    }
+    previousRenderTime_ = time.renderTime;
     clusterDispatches_ = 0;
     // The CPU side of the frame, stage by stage (ADR-077). The boundary rolls: every interval
     // between two marks is charged to the stage the mark names, so the stages partition render()
@@ -1567,6 +1587,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     const float aspect = static_cast<float>(hdr_.width()) / static_cast<float>(hdr_.height());
     const glm::mat4 view = scene.camera.view();
     const glm::mat4 proj = scene.camera.projection(aspect);
+    if (!finiteMatrix(view) || !finiteMatrix(proj)) {
+        return fail("scene render: camera produced a non-finite view or projection matrix");
+    }
+    for (const scene::Entity& entity : scene.entities) {
+        const glm::mat4 model = entity.transform.matrix();
+        if (!finiteMatrix(model)) {
+            return fail("scene render: entity '{}' produced a non-finite model matrix", entity.name);
+        }
+    }
 
     // ---- frame uniforms ----
     FrameUniforms frame{};
@@ -1718,6 +1747,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     std::vector<DrawItem> grid;
     std::vector<DrawItem> blended;
     std::vector<DrawItem> water;
+    // Model history belongs to the scene entity, not to whether this frame happened to submit a
+    // camera or shadow draw. Advancing it for every entity prevents a moving object from carrying
+    // a stale transform through several culled frames and producing a false re-entry velocity.
+    prevModelsNext_.clear();
+    for (const scene::Entity& entity : scene.entities) {
+        prevModelsNext_.insert_or_assign(entity.name, entity.transform.matrix());
+    }
     // ADR-086. Everything a skinned entity does differently at a draw site: the skinned pipeline, a
     // second dynamic offset naming its slice of the joint buffer, and the influence stream in
     // vertex slot 1. A frame with no skinned entity in it never reaches this, and records exactly
@@ -1789,7 +1825,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         {
             const auto previous = prevModels_.find(entity.name);
             obj.prevModel = previous != prevModels_.end() ? previous->second : obj.model;
-            prevModelsNext_.insert_or_assign(entity.name, obj.model);
         }
         obj.baseColor = glm::vec4(m.baseColor, m.opacity);
         obj.emissive = glm::vec4(m.emissiveColor, m.emissiveIntensity);

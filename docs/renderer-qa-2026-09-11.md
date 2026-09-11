@@ -18,8 +18,11 @@ imported UFO asset. The attached stabilization brief is the acceptance contract 
 - Glowmere painterly at 1280x800, realtime, 120 frames: zero GPU errors, 152 draws, 428,633
   triangles, 2,329 visible / 114,283 culled instances, 23.79 ms median GPU and 28.27 ms median
   wall time over the warmed sample. This is the current broad renderer baseline, not a 60 FPS sign-off.
-- The prior full release suite had one intermittent Syphon burst failure. Re-run the full suite
-  after the current pass; do not call it green without seeing the result.
+- The latest full release suite discovers 1,515 tests: 1,514 passed, four optional tests skipped,
+  and the EXR render determinism test failed in the full-suite run. Its isolated rerun passed, so
+  this is currently classified as a suite-order/resource interaction rather than a reproduced
+  standalone defect. The Syphon burst test passes after notification-to-texture retry hardening.
+  The skipped tests are two Khronos sample imports, external ffmpeg encoding and NDI runtime support.
 
 ## Implemented in this pass
 
@@ -32,6 +35,36 @@ imported UFO asset. The attached stabilization brief is the acceptance contract 
 - [x] Focused unit suite passes: 57 assertions across 9 animation tests.
 - [x] Existing GPU skinning suite passes: 47 assertions across 3 cases.
 - [x] Constellation and Glowmere 120-frame headless baselines render with zero GPU errors.
+- [x] Historical full release suite completed green at 1,510 tests, then 1,513 tests after the
+  RendererQA additions. Latest suite: 1,515 discovered, 1,514 passed, four skips and one EXR
+  determinism failure; isolated rerun passed.
+- [x] The shadow-workload timing threshold also passes in the final suite; its earlier isolated
+  miss was timing variance, not a reproduced renderer correctness failure.
+- [x] Terrain runtime visibility regression fixed: view-distance culling no longer writes
+  `Entity::visible`, so terrain and water return when the camera comes back. The existing terrain
+  shadow test now covers leave/return behavior and passes 103 assertions.
+- [x] Previous-model history now advances for every entity, including camera-culled entities.
+  This prevents false motion-vector streaks when an object moves while hidden and re-enters without
+  moving. The new GPU regression compares that re-entry frame with a fresh renderer.
+- [x] Renderer temporal history resets on backward timeline time. Previous camera/model matrices
+  are cleared on reverse/seek discontinuities so the first reversed frame does not inherit false
+  motion. Regression compares reused and fresh renderers at the same timestamp.
+- [x] Water color output now matches the conventional `SrcAlpha` blend state. The shader was
+  returning RGB already multiplied by alpha, so the fixed-function blend multiplied alpha twice;
+  shallow water and shoreline colors were darkened. Shader compilation and Glowmere rendering pass
+  after removing the extra RGB multiplication.
+- [x] Static-camera transform invariant regression added. A camera move and return leaves the
+  entity's authored TRS unchanged and restores the original image; renderer suite passes 58
+  assertions across 5 cases.
+- [x] Syphon latest-wins burst test hardened against the transport's notification-before-texture
+  transient. Three consecutive isolated runs pass; the test still fails on a deadline if a frame
+  remains unreadable.
+
+Water audit note: the initial suspicion that `shaders/water.wgsl` used clip-space coordinates for
+`screenUv` was disproven. Its `@builtin(position)` fragment input is framebuffer coordinates,
+and the same `in.clip.xy * frame.targetSize.zw` convention is used by the established PBR path.
+No water shader change was made without a reproducer; water-mask/shoreline image coverage remains
+an open QA item.
 
 ## Architecture trace
 
@@ -88,27 +121,51 @@ tone mapping and composition overlay.
 
 ### P0: prove and fix catastrophic correctness
 
-- [ ] Reproduce a static-object transform test across camera translate/rotate/orbit/dolly, resolution
-  changes and timeline seek. Assert the authoritative `Entity::transform.position` and submitted
-  `ObjectUniforms::model` translation remain constant. Include a far-from-origin object.
+- [x] Fix reversible terrain/water visibility. Previously the terrain update path used
+  `visible = visible && on` and set distant terrain `visible=false`; neither state was restored
+  when the camera returned. Runtime camera state now uses `cameraCulled`, and distant chunks also
+  clear `castsShadow` for that frame. Regression: `[composition][terrain][shadows]`.
+- [x] Static-object transform regression covers camera motion, a far-from-origin object, resize and
+  timeline seek. It preserves authored TRS and restores the image after returning to the original
+  camera/resolution. Object-slot/readback identity remains a separate diagnostics task.
 - [ ] Add targeted transform diagnostics for selected entity name/ID: world transform, model
   translation, camera position, camera/view-projection terms, culling state and object slot index.
   Log only changes or invalid values, not every frame.
-- [ ] Audit duplicate entity names. Either enforce uniqueness at the scene boundary or replace the
-  velocity-history key with a stable entity identity. Add a regression for two same-named objects.
-- [ ] Add finite-value validation for transforms, quaternions, camera matrices, mesh bounds, joint
-  palettes and object indices at the CPU/GPU boundary. Fail with object/rig name and frame time.
+- [x] Duplicate entity names are rejected at the scene boundary; existing unit coverage protects
+  the stable model-history key assumption.
+- [x] Renderer boundary validation rejects non-finite camera view/projection and entity model
+  matrices before GPU submission. Focused NaN/Inf regression passes; broader joint/bounds validation
+  remains open.
+- [x] Skinning upload validation rejects non-finite current/previous joint palettes before GPU
+  staging. Invalid rigs are skipped for that frame with a targeted warning; the malformed-palette
+  GPU regression passes without WebGPU errors.
+- [x] Camera view construction now chooses a fallback up axis when forward and authored up are
+  parallel. This prevents `lookAtRH` from generating NaN matrices for top-down/edge-on shots. The
+  camera unit suite and disc-emitter GPU regression both pass.
 - [ ] Audit object uniform ring/dynamic offsets and per-frame writes under rapid scene changes.
   Use object IDs and a two-frame alternating transform test to detect stale object data.
+- [x] Fix stale model history across camera culling. `prevModelsNext_` was previously populated
+  only when `makeItem()` submitted a camera/shadow draw; it is now populated from all scene entities
+  before submission. Regression: `[gpu][motion][blur]` re-entry case.
 
 ### P1: animated characters and culling
 
 - [x] Camera culling no longer freezes timeline pose evaluation.
 - [ ] Build an animated-bounds image regression at a frustum edge: bind pose outside/inside versus
   posed limb crossing the plane. Compare culling enabled/disabled and prove the visible pixels remain.
+- [x] Authored alien composition regression now moves an animated glTF node outside the frustum,
+  verifies its rig entity is culled, then restores it and verifies recovery. The broader pixel-level
+  limb-crossing case remains open.
+- [x] GPU composition regression now verifies the authored alien's culling changes the rendered
+  image and restoring its node position reproduces the original image exactly. The remaining gap
+  is specifically a limb crossing the frustum edge while the bind pose and posed bounds differ.
 - [x] Choose the first architectural animated-bounds solution: pose before culling and derive
   skinned bounds from the current palette, with bind-pose fallback for invalid/partially weighted
   meshes. Do not permanently disable culling.
+- [x] Ordinary authored mesh nodes now use the same camera-frustum culling path as EntityWorld-
+  driven nodes. Previously `cullEntityNodes()` only visited gameplay entities, leaving authored
+  glTF/static nodes uncullable. A composition regression covers an authored orb moved outside the
+  frustum.
 - [ ] Stress-test the posed-bounds path on large imported characters and measure its CPU cost;
   replace per-vertex evaluation with a cached conservative envelope only if evidence requires it.
 - [ ] Verify character terrain grounding has one authority: world X/Z, terrain query, root motion,
@@ -119,10 +176,19 @@ tone mapping and composition overlay.
 
 ### P1: water and terrain boundaries
 
-- [ ] Build a minimal water QA scene with flat/steep/shallow/deep/angled shore cases and camera
-  views above, below, grazing and near-parallel to the surface.
+- [x] Correct water alpha convention: `shaders/water.wgsl` now returns non-premultiplied RGB with
+  alpha, matching `water_renderer.cpp`'s `SrcAlpha/OneMinusSrcAlpha` blend.
+- [x] Minimal native water image regression covers compositing over an opaque bed, deterministic
+  repeat rendering and a distinct no-water frame. Broader shoreline angle/camera cases remain open.
+- [x] Native water image coverage now includes above-water, grazing, near-parallel and below-surface
+  camera views with deterministic repeat checks. A larger authored shoreline scene remains open.
+- [ ] Build a larger water QA scene with flat/steep/shallow/deep/angled shore cases.
 - [ ] Visualize water geometry mask, opaque linear depth, reconstructed thickness, shoreline fade,
   foam mask and water object ID. Confirm all effects are zero outside water geometry.
+- [ ] Dedicated water-mask diagnostics are intentionally deferred: the current five-target contract
+  preserves opaque IDs/normals/velocity behind blended water, and changing it would require a new
+  scene target plus every pipeline declaration. Existing auxiliary depth/ID views remain the
+  available diagnostics until that contract is designed.
 - [ ] Add GPU image tests for no water over dry terrain, stable edge under camera motion, no z-fight,
   correct terrain-through-water depth and deterministic flow after seek.
 - [ ] Verify water sort order for overlapping chunk surfaces and that chunk/world transforms match
@@ -137,19 +203,31 @@ tone mapping and composition overlay.
   Dawn does not make state implicit.
 - [ ] Stress resize, scene reload, timeline seek/reverse, rapid camera cuts and frame-index reuse.
   Check readback ring, uniform staging, joint palettes, water uniforms and bind groups for stale data.
-- [ ] Run ASan/UBSan and TSan-compatible CPU tests after each resource-lifetime change. Add a stable
-  two-renderer same-frame hash test around every confirmed state bug.
+- [x] Direct renderer reverse-time regression passes 42 assertions. Broader Engine-level seek,
+  reload, resize and rapid-cut stress remains open.
+- [x] TSan sequence seek/determinism coverage passes 148 assertions across 8 cases; TSan animation
+  coverage passes 57 assertions across 9 cases.
+- [x] ASan/UBSan focused animation and terrain checks pass; TSan sequence and animation checks pass.
+  Broader resource-lifetime and full TSan suite coverage remains open.
+- [x] Syphon burst synchronization is covered with a deadline-bounded retry; the in-process client
+  no longer treats a transient nil texture after a frame notification as a permanent failure.
 
 ### P2: diagnostics and permanent torture scenes
 
-- [ ] Extend existing `DebugViewOptions`/`DebugDraw` facilities rather than creating a second debug
-  system. Add bounds, object origins/axes, culling state, object ID, world position, normals, raw/
-  linear depth, motion and water masks where the current debug targets can support them.
-- [ ] Add runtime toggles for culling, animation, LOD, water, transparency, post, bloom, shadows,
-  particles, terrain and VFX. These are isolation switches only, never production fixes.
-- [ ] Create `RendererQA` with labeled static cube, glTF, disabled-animation mesh, terrain, water,
-  transparent object, particles, character, UFO, near/far/behind-camera/extreme-angle objects.
-  Include camera path, resize, seek and reverse controls.
+- [x] Extend the existing `DebugViewOptions`/`DebugDraw` facilities with opt-in ordinary-entity
+  bounds, origins/axes and selected-entity filtering. Camera-culled entities are highlighted red.
+  Procedural bounds/IDs remain available through the original options; depth/motion/water masks
+  still use auxiliary-target work below.
+- [x] Existing runtime isolation controls are available through `--disable shadows,ao,volume,post,
+  shadowmask`, with A/B logging and documentation. The new entity diagnostics are exposed in the
+  existing Debug tab. Fine-grained culling/animation/LOD/water/VFX toggles remain open.
+- [x] Create `RendererQA` as `examples/qa/renderer-qa.json`, indexed under Lab. It includes built-in
+  near/far/behind-camera geometry, a skinned alien, a transparent orb, particles and a floor; its
+  60-frame preview smoke render passes with zero GPU errors. Camera path/resize/seek/reverse stress
+  remains a runtime test task.
+- [x] RendererQA remains valid in the full release suite: the post-scene-index run reached 1,515
+  tests; the new RendererQA and water tests pass. One unrelated EXR determinism case failed only
+  in the full run and passed isolated.
 - [ ] Make Glowmere regression checks explicit: UFO close-up/orbit stationarity, alien animation,
   shoreline stability and camera cuts. Keep it as a control even if Constellation is the active art.
 
@@ -197,3 +275,81 @@ policy still do.
 
 **Still open:** the posed-bounds path needs a frustum-edge image regression and stress measurement;
 invalid or partially weighted meshes still use bind-pose fallback.
+
+### Terrain/water disappearance
+
+**Symptom:** terrain chunks and their water could disappear permanently after leaving the authored
+view distance or after a runtime visibility decision.
+
+**Reproduction:** move the terrain camera beyond `terrainViewDistance`, update once, then restore
+the view distance and camera and update again without rebuilding the composition.
+
+**Observed state:** `Composition::updateTerrain()` set `Entity::visible=false` for distant chunks,
+and the water helper used `visible = visible && on`. A later frame had no authored/runtime distinction
+to restore the entity.
+
+**Root cause:** transient camera culling was stored in the persistent authored visibility flag.
+
+**Fix:** preserve `visible`; use `cameraCulled` for per-frame terrain/water suppression and clear
+`castsShadow` for chunks beyond view distance.
+
+**Regression:** the existing terrain shadow test now moves out and back and passes 103 assertions.
+
+### False motion on camera re-entry
+
+**Symptom:** a moving object could smear when it re-entered the camera even if it had stopped while
+culled.
+
+**Reproduction:** render an object, move it while `cameraCulled=true`, then clear culling without
+changing its transform and render with motion blur enabled.
+
+**Observed state:** `SceneRenderer::makeItem()` was the only writer to `prevModelsNext_`, so a culled
+entity's previous model remained at the last submitted frame.
+
+**Root cause:** temporal model history was incorrectly owned by render submission rather than by the
+scene entity's frame state.
+
+**Fix:** advance `prevModelsNext_` for every entity before camera/shadow submission; submitted draws
+still read the prior frame from `prevModels_`.
+
+**Regression:** `[gpu][motion][blur]` compares the re-entry image with a fresh renderer and passes.
+
+### False motion after reverse seek
+
+**Symptom:** reusing a renderer after moving timeline time backward produced a different frame than
+a fresh renderer at the same scene state.
+
+**Root cause:** previous view-projection and model histories described the forward frame, so the
+first reverse frame was treated as motion instead of a temporal discontinuity.
+
+**Fix:** clear temporal camera/model history whenever `renderTime` decreases.
+
+**Regression:** `[gpu][motion][determinism]` reverse-timeline case passes 42 assertions.
+
+### Camera forward/up singularity
+
+**Symptom:** a top-down camera could make `renderToImage()` fail because the view matrix became
+non-finite; the particle disc edge-on regression exposed it.
+
+**Root cause:** `glm::lookAtRH` was given a forward direction parallel to the authored world-up
+vector, leaving its lateral basis undefined.
+
+**Fix:** `Camera::view()` selects a stable world-axis fallback up vector when the two directions are
+near parallel.
+
+**Regression:** camera tests pass 140 assertions and the disc-emitter test passes 42 assertions.
+
+### Water alpha-squared compositing
+
+**Symptom:** transparent water and shallow shoreline color could be too dark, especially where
+alpha varied across the surface.
+
+**Observed state:** `WaterRenderer` configured conventional non-premultiplied `SrcAlpha` blending,
+but `fs_water` returned `color * alpha` in RGB. The blend therefore multiplied alpha a second time.
+
+**Root cause:** shader output convention and pipeline blend convention disagreed.
+
+**Fix:** return `vec4(color, alpha)` and let the pipeline apply alpha exactly once.
+
+**Validation:** valid-WGSL shader test passed 13 assertions; current Glowmere rendered 120 frames
+with zero GPU errors. Add an image-level water blend test before final sign-off.

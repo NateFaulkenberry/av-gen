@@ -149,6 +149,19 @@ TEST_CASE("Camera view looks down -Z from the position", "[scene][camera]") {
     CHECK_THAT(d(glm::length(glm::vec3(self))), WithinAbs(0.0, 1e-5));
 }
 
+TEST_CASE("Camera view remains finite when forward is parallel to up", "[scene][camera]") {
+    Camera cam;
+    cam.position = glm::vec3(0.0f, 9.0f, 0.0f);
+    cam.target = glm::vec3(0.0f);
+    const glm::mat4 view = cam.view();
+    for (int column = 0; column < 4; ++column) {
+        for (int row = 0; row < 4; ++row) {
+            CHECK(std::isfinite(view[column][row]));
+        }
+    }
+    CHECK_THAT(d(glm::length(glm::vec3(view * glm::vec4(cam.position, 1.0f)))), WithinAbs(0.0, 1e-5));
+}
+
 TEST_CASE("Camera projection maps near to depth 0 and far to depth 1", "[scene][camera]") {
     Camera cam;
     cam.nearPlane = 0.5f;

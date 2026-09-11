@@ -180,7 +180,7 @@ struct SkinnedRig {
     // Set `cullDistance` to 0 to opt a hero out of all of it.
     float nearDistance = 15.0f;   // nearer than this: posed every frame
     float farHz = 20.0f;          // between nearDistance and cullDistance: this rate
-    float cullDistance = 120.0f;  // beyond this, or with no visible entity: not posed at all
+    float cullDistance = 120.0f;  // beyond this, or with no authored-visible entity: not posed
 
     // ---- evaluated -------------------------------------------------------------------------
     Pose pose;                              // the local pose the player produced
@@ -219,14 +219,15 @@ struct RigStats {
     std::uint32_t rigs = 0;      // rigs in the scene
     std::uint32_t posed = 0;     // re-posed this frame
     std::uint32_t rateLimited = 0; // enabled, in range, but not due a new pose this frame
-    std::uint32_t culled = 0;    // too far away, or with no visible entity
+    std::uint32_t culled = 0;    // too far away, or with no authored-visible entity
     std::uint32_t joints = 0;    // joint matrices recomputed this frame
     double cpuMs = 0.0;          // wall time spent posing (this is the only clock in here, and it
                                  // reports, it never drives)
 };
 
 // Advances every rig in `scene` to `time.renderTime`, applying each rig's distance policy against
-// the scene camera and its own entities. The scene renderer never calls this: posing is the
+// the scene camera and its authored-visible entities. Camera-frustum culling is deliberately not
+// included: it suppresses drawing, but must not freeze a timeline pose. The scene renderer never calls this: posing is the
 // controller's business, so the renderer keeps taking a const Scene& and a frame cannot be made to
 // look different by rendering it twice.
 RigStats updateRigs(Scene& scene, const FrameTime& time);

@@ -1492,7 +1492,7 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
 }
 
 void Composition::cullEntityNodes() {
-    if (entityWorld_.empty() || viewportHeight_ == 0) {
+    if (viewportHeight_ == 0) {
         return;
     }
     const float aspect = static_cast<float>(viewportWidth_) / static_cast<float>(viewportHeight_);
@@ -1531,6 +1531,26 @@ void Composition::cullEntityNodes() {
             any = true;
         }
         return any ? std::pair{posedLo, posedHi} : std::pair{lo, hi};
+    };
+    const auto cullEntity = [&](Entity& entity) {
+        if (entity.mesh == kInvalidMesh || entity.mesh >= scene_.meshes.size() || entity.style == MeshStyle::Water) {
+            return;
+        }
+        const auto [meshLo, meshHi] = scene_.meshes[entity.mesh].bounds();
+        const auto [lo, hi] = posedBounds(entity, meshLo, meshHi);
+        const glm::vec3 pad = (hi - lo) * 0.25f + glm::vec3(0.25f);
+        const glm::mat4 model = entity.transform.matrix();
+        glm::vec3 worldLo(std::numeric_limits<float>::max());
+        glm::vec3 worldHi(std::numeric_limits<float>::lowest());
+        for (int corner = 0; corner < 8; ++corner) {
+            const glm::vec3 local((corner & 1) ? hi.x + pad.x : lo.x - pad.x,
+                                  (corner & 2) ? hi.y + pad.y : lo.y - pad.y,
+                                  (corner & 4) ? hi.z + pad.z : lo.z - pad.z);
+            const glm::vec3 world = glm::vec3(model * glm::vec4(local, 1.0f));
+            worldLo = glm::min(worldLo, world);
+            worldHi = glm::max(worldHi, world);
+        }
+        entity.cameraCulled = !world::aabbVisible(planes, worldLo, worldHi);
     };
     for (const auto& entityPtr : entityWorld_.entities()) {
         const CompositionNode* node = findNode(entityPtr->desc().driven());
@@ -1571,6 +1591,12 @@ void Composition::cullEntityNodes() {
             }
             break;
         }
+    }
+    // EntityWorld-driven characters are handled above so their semantic node ranges remain
+    // authoritative. Ordinary authored mesh nodes have no EntityWorld entry, but they still need
+    // the same camera visibility contract for characters and static glTF objects.
+    for (Entity& entity : scene_.entities) {
+        cullEntity(entity);
     }
 }
 
@@ -4286,9 +4312,9 @@ void Composition::updateTerrainLod() {
             const world::TerrainChunk& chunk = node.chunks[c];
             Entity& e = scene_.entities[range.firstEntity + c];
             const std::size_t water = chunk.water != kInvalidMesh ? waterEntity++ : scene_.entities.size();
-            const auto setWater = [&](bool on) {
+            const auto setWaterCulled = [&](bool culled) {
                 if (water < scene_.entities.size()) {
-                    scene_.entities[water].visible = scene_.entities[water].visible && on;
+                    scene_.entities[water].cameraCulled = culled;
                 }
             };
             // The camera's verdict on this chunk, re-decided every frame; a chunk that was off
@@ -4301,7 +4327,7 @@ void Composition::updateTerrainLod() {
             };
             setCameraCulled(false);
             if (!e.visible) {
-                setWater(false);
+                setWaterCulled(true);
                 continue; // the node itself is hidden; nothing below can turn it back on
             }
             // Chunk bounds are in the world map's own space; the node transform moves the world.
@@ -4328,8 +4354,8 @@ void Composition::updateTerrainLod() {
                 // Past the view distance the chunk is not in this world as far as the frame is
                 // concerned: no mesh is picked for it and nothing it might cast could reach a
                 // cascade, which only ever covers the near part of the camera's frustum.
-                e.visible = false;
-                setWater(false);
+                e.castsShadow = false;
+                setCameraCulled(true);
                 continue;
             }
             e.castsShadow = distance <= shadowReach;

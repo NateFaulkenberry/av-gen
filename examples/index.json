@@ -1,5 +1,11 @@
 {
  "examples": [
+    {
+     "name": "Renderer QA",
+     "category": "Lab",
+     "description": "A deliberately difficult renderer test scene with near/far/behind-camera geometry, a skinned alien, transparency and particles.",
+     "project": "qa/renderer-qa.json"
+    },
   {
    "name": "Night Shift",
    "category": "Showcase",

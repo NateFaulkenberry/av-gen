@@ -436,6 +436,7 @@ TEST_CASE("a disc emitter faces its direction and has two radii", "[gpu][particl
         gpu::Image8 last;
         for (int i = 0; i < 12; ++i) {
             auto img = renderer.renderToImage(s, clock.tick(), 128, 128);
+            INFO("particle frame " << i << ": " << (img ? "ok" : img.error().message));
             REQUIRE(img.has_value());
             last = std::move(*img);
         }

@@ -11,9 +11,11 @@
 #include "rendering/composition_renderer.hpp"
 #include "app/engine.hpp"
 #include "app/render_job.hpp"
+#include "assets/asset_registry.hpp"
 #include "assets/image.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
+#include "scene/composition.hpp"
 #include "support/temp_dir.hpp"
 
 #include <fmt/format.h>
@@ -25,6 +27,7 @@
 #include <cmath>
 #include <filesystem>
 #include <memory>
+#include <string>
 
 using namespace avgen;
 using Catch::Approx;
@@ -123,6 +126,60 @@ struct Harness {
 };
 
 } // namespace
+
+TEST_CASE("authored animated character culling changes pixels and recovers", "[gpu][composition][skinning]") {
+    const fs::path sceneFile = fs::path(AVGEN_SOURCE_DIR) / "examples" / "characters" / "alien.scene.json";
+    if (!fs::is_regular_file(sceneFile)) {
+        SKIP("the alien composition is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    assets::AssetRegistry registry(sceneFile.parent_path());
+    auto loaded = scene::Composition::loadFile(sceneFile, registry);
+    REQUIRE(loaded.has_value());
+    auto& composition = **loaded;
+    params::ParameterSet parameters;
+    params::Modulator modulator;
+    composition.attach(parameters, modulator);
+    composition.setViewport(640, 360);
+
+    FrameTime time{};
+    time.renderTime = 0.4;
+    composition.update(time);
+    const auto original = renderer.renderToImage(composition.scene(), time, 640, 360);
+    REQUIRE(original.has_value());
+
+    auto* idlePosition = parameters.findAs<glm::vec3>("nodes/idle/position");
+    REQUIRE(idlePosition != nullptr);
+    idlePosition->setBase({100.0f, 0.0f, 0.0f});
+    parameters.resetFinals();
+    composition.update(time);
+    bool idleCulled = false;
+    for (const scene::Entity& entity : composition.scene().entities) {
+        if (entity.rig == 0) {
+            idleCulled = idleCulled || entity.cameraCulled;
+        }
+    }
+    CHECK(idleCulled);
+    const auto hidden = renderer.renderToImage(composition.scene(), time, 640, 360);
+    REQUIRE(hidden.has_value());
+    CHECK(gpu::hashImage(*hidden) != gpu::hashImage(*original));
+
+    idlePosition->setBase({-1.25f, 0.0f, 0.0f});
+    parameters.resetFinals();
+    composition.update(time);
+    for (const scene::Entity& entity : composition.scene().entities) {
+        if (entity.rig == 0) {
+            CHECK_FALSE(entity.cameraCulled);
+        }
+    }
+    const auto restored = renderer.renderToImage(composition.scene(), time, 640, 360);
+    REQUIRE(restored.has_value());
+    CHECK(gpu::hashImage(*restored) == gpu::hashImage(*original));
+    CHECK(ctx->errorCount() == 0);
+}
 
 TEST_CASE("text appears over the 3D frame", "[gpu][composition]") {
     Harness h = Harness::make();

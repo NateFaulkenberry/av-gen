@@ -85,6 +85,9 @@ std::optional<gpu::Image8> SyphonTestClient::readFrame() {
         impl_->consumed = impl_->received->load(std::memory_order_relaxed);
         id<MTLTexture> texture = [impl_->client newFrameImage];
         if (texture == nil || texture.width == 0 || texture.height == 0) {
+            // Syphon's notification and texture publication are separate main-run-loop events
+            // under a coalesced latest-wins burst. A caller can observe the notification first;
+            // leave consumed advanced and let its wait/retry loop observe the next notification.
             return std::nullopt;
         }
         const auto width = static_cast<std::uint32_t>(texture.width);

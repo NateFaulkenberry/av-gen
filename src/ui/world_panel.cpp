@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 namespace avgen::ui {
 
@@ -460,6 +461,10 @@ void WorldPanel::drawDirector(app::Engine& engine) {
 
 void WorldPanel::drawDebugOptions(app::Engine& engine) {
     (void)engine;
+    static char selectedEntity[128] = {};
+    if (std::string(selectedEntity) != debug.selectedEntity) {
+        std::snprintf(selectedEntity, sizeof(selectedEntity), "%s", debug.selectedEntity.c_str());
+    }
     ImGui::Checkbox("Points", &debug.points);
     ImGui::SameLine();
     ImGui::Checkbox("Bounds", &debug.bounds);
@@ -477,6 +482,12 @@ void WorldPanel::drawDebugOptions(app::Engine& engine) {
     ImGui::Checkbox("LOD", &debug.lod);
     ImGui::SameLine();
     ImGui::Checkbox("Culling", &debug.culling);
+    ImGui::Checkbox("Entity bounds", &debug.entityBounds);
+    ImGui::SameLine();
+    ImGui::Checkbox("Entity origins", &debug.entityOrigins);
+    if (ImGui::InputText("Selected entity", selectedEntity, sizeof(selectedEntity))) {
+        debug.selectedEntity = selectedEntity;
+    }
     ImGui::Checkbox("SDF slice", &debug.sdfSlice);
     ImGui::SameLine();
     ImGui::SliderFloat("slice y", &debug.sliceHeight, -20.0f, 20.0f);

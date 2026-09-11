@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace avgen::rendering {
 
@@ -31,6 +32,36 @@ glm::vec4 idColour(int id, float alpha) {
 
 void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugViewOptions& options, double time) {
     int budget = std::max(0, options.maxPoints);
+
+    for (const scene::Entity& entity : scene.entities) {
+        if (!entity.visible || (!options.selectedEntity.empty() && entity.name != options.selectedEntity) ||
+            entity.mesh >= scene.meshes.size()) {
+            continue;
+        }
+        const auto [meshLo, meshHi] = scene.meshes[entity.mesh].bounds();
+        const glm::mat4 model = entity.transform.matrix();
+        glm::vec3 worldLo(std::numeric_limits<float>::max());
+        glm::vec3 worldHi(std::numeric_limits<float>::lowest());
+        for (int corner = 0; corner < 8; ++corner) {
+            const glm::vec3 local((corner & 1) ? meshHi.x : meshLo.x,
+                                  (corner & 2) ? meshHi.y : meshLo.y,
+                                  (corner & 4) ? meshHi.z : meshLo.z);
+            const glm::vec3 world = glm::vec3(model * glm::vec4(local, 1.0f));
+            worldLo = glm::min(worldLo, world);
+            worldHi = glm::max(worldHi, world);
+        }
+        if (options.entityBounds) {
+            draw.box(worldLo, worldHi, entity.cameraCulled ? glm::vec4(1.0f, 0.2f, 0.1f, 0.9f)
+                                                           : kBoundsColour);
+        }
+        if (options.entityOrigins && budget > 0) {
+            draw.point(glm::vec3(model[3]), options.pointSize * 0.08f,
+                       entity.cameraCulled ? glm::vec4(1.0f, 0.2f, 0.1f, 0.9f)
+                                           : glm::vec4(1.0f, 0.9f, 0.2f, 0.9f));
+            draw.axis(model, std::max(0.25f, glm::length(worldHi - worldLo) * 0.2f));
+            --budget;
+        }
+    }
 
     for (const scene::ProceduralGeometry& pg : scene.procedurals) {
         if (!pg.visible) {
