@@ -26,10 +26,11 @@ constexpr std::array<std::pair<CameraKind, const char*>, 3> kCameraKinds{{
     {CameraKind::Keys, "keys"},
 }};
 
-constexpr std::array<std::pair<TransitionKind, const char*>, 3> kTransitionKinds{{
+constexpr std::array<std::pair<TransitionKind, const char*>, 4> kTransitionKinds{{
     {TransitionKind::Cut, "cut"},
     {TransitionKind::FadeIn, "fadeIn"},
     {TransitionKind::FadeOut, "fadeOut"},
+    {TransitionKind::MatchCut, "matchCut"},
 }};
 
 constexpr std::array<std::pair<CameraPreset, const char*>, 7> kCameraPresets{{
@@ -121,6 +122,36 @@ public:
         track(target, -1, mode).addKey(k);
     }
 
+    // A key on an explicit component, with an explicit mode and an arbitrary number of values.
+    // The event bake needs all three; the shot bake never did, which is why they were not here.
+    void keyN(const std::string& target, int component, params::TrackMode mode, double time,
+              const params::KeyValue& value, params::KeyInterp interp) {
+        params::Key k;
+        k.time = time;
+        k.value = value;
+        k.interp = interp;
+        track(target, component, mode).addKey(k);
+    }
+
+    // What the track being built would evaluate to at `time`, or nothing when no key at or before
+    // `time` states it. A track holds its first key's value backwards forever, so "there is a key
+    // before this one" is exactly the condition under which a ramp has something to ramp *from*.
+    [[nodiscard]] std::optional<params::KeyValue> valueAt(const std::string& target, int component,
+                                                          params::TrackMode mode,
+                                                          double time) const {
+        const std::string key = target + "#" + std::to_string(component) + "#" +
+                                std::to_string(static_cast<int>(mode));
+        const auto it = index_.find(key);
+        if (it == index_.end()) {
+            return std::nullopt;
+        }
+        const params::Track& t = tracks_[it->second];
+        if (t.keys.empty() || t.keys.front().time > time + 1e-9) {
+            return std::nullopt;
+        }
+        return t.evaluate(time);
+    }
+
     void merge(params::Track incoming, double timeOffset) {
         params::Track& dst = track(incoming.target, incoming.component, incoming.mode);
         dst.loopLength = incoming.loopLength;
@@ -141,6 +172,26 @@ private:
     std::vector<params::Track> tracks_;
     std::unordered_map<std::string, std::size_t> index_;
 };
+
+// ---- events (section 17 of the cinematic world brief) -----------------------------------------
+
+// A change is instantaneous when the key before it holds. `Track::addKey` replaces a key within a
+// microsecond, so a millisecond is short enough that no frame rate this engine renders at can see
+// the step and long enough that both values survive -- the same reasoning, and the same number, the
+// camera bake already uses for a cut.
+constexpr double kStepSeconds = 1e-3;
+
+// The camera shake block (section 14). Ordinary parameters, so a beat can drive the amplitude
+// through a modulation route exactly like anything else; `start` is a *time*, which is the trick
+// ADR-089 already used for a clip cue's phase origin. Holding the impulse's origin in a Step-keyed
+// parameter is what lets the decay be a pure function of the playhead instead of a timer.
+constexpr const char* kShakeStart = "camera/shake/start";
+constexpr const char* kShakeAmplitude = "camera/shake/amplitude";
+constexpr const char* kShakeFrequency = "camera/shake/frequency";
+constexpr const char* kShakeDecay = "camera/shake/decay";
+constexpr const char* kShakeRotation = "camera/shake/rotation";
+
+params::KeyValue scalar(float v) { return params::KeyValue{v, v, v, v}; }
 
 float headingDegrees(const glm::vec3& direction) {
     if (glm::length(glm::vec2(direction.x, direction.z)) < 1e-5f) {
@@ -196,6 +247,224 @@ std::vector<params::Track> tracksFromJson(const json& j, const char* what) {
         return {};
     }
     return std::move(scratch.tracks());
+}
+
+// One value change on one parameter path, with its ramp, its mode and its optional return. This is
+// the whole of "an event changes something": a light, a material, a particle rate, the fog and an
+// overlay's opacity all arrive here, because in this engine all of them are a parameter path.
+void writeValueChange(TrackBuilder& builder, const std::string& path, int component,
+                      const EventAction& action, double time, const std::string& id,
+                      std::vector<std::string>& warnings) {
+    const params::TrackMode mode = action.mode;
+    const params::KeyValue value{action.amount.x, action.amount.y, action.amount.z, action.amount.w};
+    const float identity = mode == params::TrackMode::Multiply ? 1.0f : 0.0f;
+
+    std::optional<params::KeyValue> before = builder.valueAt(path, component, mode, time);
+    if (!before && mode != params::TrackMode::Replace) {
+        // Add and Multiply know their own identity, so the baseline needs no knowledge of the
+        // scene: nothing before the event, the delta afterwards, whatever the author set the
+        // property to. This is the mode an event that means "a change" should be authored in.
+        builder.keyN(path, component, mode, 0.0, scalar(identity), params::KeyInterp::Step);
+        before = scalar(identity);
+    }
+    if (!before && action.seconds <= 0.0) {
+        warnings.push_back(fmt::format(
+            "event '{}' replaces '{}' at {:.3f}s and nothing states its value before then, so the "
+            "new value also holds backwards from t = 0; key a baseline, or author the event in add "
+            "or multiply mode where the identity is known",
+            id, path, time));
+    }
+    const double arriveAt = time + std::max(action.seconds, 0.0);
+    if (action.seconds > 0.0) {
+        if (before) {
+            builder.keyN(path, component, mode, time, *before, action.interp);
+        } else {
+            warnings.push_back(fmt::format(
+                "event '{}' ramps '{}' over {:.3f}s from {:.3f}s, but nothing states the value it "
+                "should ramp from, so the destination value holds backwards from t = 0 and there "
+                "is no ramp; key a baseline, or author the event in add or multiply mode where the "
+                "identity is known",
+                id, path, action.seconds, time));
+        }
+        builder.keyN(path, component, mode, arriveAt, value, action.interp);
+    } else {
+        if (before) {
+            builder.keyN(path, component, mode, time - kStepSeconds, *before, params::KeyInterp::Step);
+        }
+        builder.keyN(path, component, mode, time, value, params::KeyInterp::Step);
+    }
+    if (action.holdSeconds > 0.0) {
+        const double holdUntil = arriveAt + action.holdSeconds;
+        if (!before) {
+            warnings.push_back(fmt::format(
+                "event '{}' holds '{}' for {:.3f}s and then returns, but nothing states what it "
+                "returns to; the change is permanent",
+                id, path, action.holdSeconds));
+            return;
+        }
+        builder.keyN(path, component, mode, holdUntil, value,
+                     action.seconds > 0.0 ? action.interp : params::KeyInterp::Step);
+        builder.keyN(path, component, mode,
+                     holdUntil + (action.seconds > 0.0 ? action.seconds : kStepSeconds), *before,
+                     action.interp);
+    }
+}
+
+// What a cue says an overlay property is *before* any event moves it. A layer's authored anchor,
+// scale and rotation are facts the sequence already holds, so an event that moves a pointer across
+// the frame has something to move it from -- without which the move's single key would hold
+// backwards and the pointer would start the piece already at its destination.
+std::optional<float> overlayAuthoredValue(const OverlayCue& cue, std::string_view property) {
+    if (property == overlay_property::kPositionX) {
+        return cue.anchor.x;
+    }
+    if (property == overlay_property::kPositionY) {
+        return cue.anchor.y;
+    }
+    if (property == overlay_property::kScaleX || property == overlay_property::kScaleY) {
+        return 1.0f; // the layer's own scale; `size` is type size and is not animated here
+    }
+    if (property == overlay_property::kRotation) {
+        return cue.rotationDegrees;
+    }
+    return std::nullopt; // opacity is already keyed by the cue's preset
+}
+
+// The baked tier: every firing whose action is a value over time, folded onto the track builder in
+// ascending time order. After this function there is no event left -- only keys, and a frame is an
+// evaluation. That sentence is the whole design (seq/events.hpp).
+void bakeEventFirings(const Sequence& sequence, const EventSchedule& schedule,
+                      TrackBuilder& builder, const LayerSink& sink,
+                      const std::vector<OverlayBinding>& overlayBindings,
+                      std::vector<std::string>& warnings) {
+    bool shakeBaseline = false;
+    for (const Firing& firing : schedule.baked) {
+        if (firing.eventIndex >= sequence.events.size()) {
+            continue;
+        }
+        const SequenceEvent& event = sequence.events[firing.eventIndex];
+        const EventAction& action = event.what;
+        const std::string id = event.id.empty() ? fmt::format("#{}", firing.eventIndex) : event.id;
+        const double time = firing.timeSeconds;
+        switch (action.kind) {
+        case EventActionKind::SetParameter: {
+            if (action.target.empty()) {
+                warnings.push_back(fmt::format("event '{}' sets no parameter path", id));
+                break;
+            }
+            writeValueChange(builder, action.target, action.component, action, time, id, warnings);
+            break;
+        }
+        case EventActionKind::CameraShake: {
+            if (!shakeBaseline) {
+                // Still before the first shake, whatever the playhead does. Without this the
+                // amplitude track's first key would hold backwards and the piece would open shaking.
+                builder.keyN(kShakeAmplitude, -1, params::TrackMode::Replace, 0.0, scalar(0.0f),
+                             params::KeyInterp::Step);
+                builder.keyN(kShakeStart, -1, params::TrackMode::Replace, 0.0, scalar(0.0f),
+                             params::KeyInterp::Step);
+                shakeBaseline = true;
+            }
+            builder.keyN(kShakeStart, -1, params::TrackMode::Replace, time,
+                         scalar(static_cast<float>(time)), params::KeyInterp::Step);
+            builder.keyN(kShakeAmplitude, -1, params::TrackMode::Replace, time,
+                         scalar(action.amount.x), params::KeyInterp::Step);
+            if (action.amount.y > 0.0f) {
+                builder.keyN(kShakeFrequency, -1, params::TrackMode::Replace, time,
+                             scalar(action.amount.y), params::KeyInterp::Step);
+            }
+            if (action.amount.z > 0.0f) {
+                builder.keyN(kShakeRotation, -1, params::TrackMode::Replace, time,
+                             scalar(action.amount.z), params::KeyInterp::Step);
+            }
+            if (action.seconds > 0.0) {
+                builder.keyN(kShakeDecay, -1, params::TrackMode::Replace, time,
+                             scalar(static_cast<float>(action.seconds)), params::KeyInterp::Step);
+            }
+            break;
+        }
+        case EventActionKind::PlayClip: {
+            // Already a `ScheduledClip` in the schedule: a clip is not a track (ADR-089). The only
+            // thing left to do here is say so when the actor does not exist, because a clip cue
+            // aimed at nobody is the silent no-op ADR-075 exists to record.
+            if (sequence.actorNamed(action.target) == nullptr) {
+                warnings.push_back(fmt::format(
+                    "event '{}' plays clip '{}' on actor '{}', which the sequence does not have", id,
+                    action.value, action.target));
+            }
+            break;
+        }
+        case EventActionKind::Overlay: {
+            const auto binding = std::find_if(
+                overlayBindings.begin(), overlayBindings.end(),
+                [&](const OverlayBinding& b) { return b.cueId == action.target; });
+            if (binding == overlayBindings.end()) {
+                warnings.push_back(fmt::format(
+                    "event '{}' addresses overlay '{}', which is not a cue in this sequence", id,
+                    action.target));
+                break;
+            }
+            if (binding->layerId.empty()) {
+                warnings.push_back(fmt::format(
+                    "event '{}' addresses overlay '{}', which no layer system realised", id,
+                    action.target));
+                break;
+            }
+            const std::string property =
+                action.value.empty() ? std::string(overlay_property::kOpacity) : action.value;
+            const LayerTarget target = sink.target(binding->layerId, property);
+            if (!target.valid()) {
+                warnings.push_back(fmt::format(
+                    "event '{}' addresses overlay property '{}', which the layer system does not "
+                    "expose",
+                    id, property));
+                break;
+            }
+            // Seed the property with what the cue authored, once, so a move has something to move
+            // from. Without it the move's single key would hold backwards and the pointer would
+            // open the piece already at its destination.
+            const auto cue = std::find_if(sequence.overlays.begin(), sequence.overlays.end(),
+                                          [&](const OverlayCue& c) { return c.id == action.target; });
+            if (cue != sequence.overlays.end() && action.mode == params::TrackMode::Replace &&
+                !builder.valueAt(target.path, target.component, action.mode, time)) {
+                if (const auto authored = overlayAuthoredValue(*cue, property)) {
+                    builder.keyN(target.path, target.component, action.mode, 0.0, scalar(*authored),
+                                 params::KeyInterp::Step);
+                }
+            }
+            writeValueChange(builder, target.path, target.component, action, time, id, warnings);
+            break;
+        }
+        case EventActionKind::SceneTransition: {
+            const SceneSlot* slot = sequence.slotNamed(action.target);
+            if (slot == nullptr) {
+                warnings.push_back(fmt::format(
+                    "event '{}' cuts to scene slot '{}', which does not exist", id, action.target));
+                break;
+            }
+            const TransitionKind kind =
+                transitionKindFromName(action.value).value_or(TransitionKind::Cut);
+            for (const SceneSlot& candidate : sequence.scenes) {
+                builder.key("nodes/" + candidate.nodeName() + "/visible", time,
+                            candidate.id == slot->id ? 1.0f : 0.0f, params::KeyInterp::Step);
+            }
+            // The dip, spelled the way the shot bake spells it, on the same track.
+            if (kind == TransitionKind::FadeOut && action.seconds > 0.0) {
+                builder.key("scene/brightness", time - action.seconds, 1.0f, params::KeyInterp::EaseIn);
+                builder.key("scene/brightness", time, 0.0f);
+            } else if (kind == TransitionKind::FadeIn && action.seconds > 0.0) {
+                builder.key("scene/brightness", time, 0.0f);
+                builder.key("scene/brightness", time + action.seconds, 1.0f, params::KeyInterp::EaseOut);
+            }
+            break;
+        }
+        case EventActionKind::EntityAction:
+        case EventActionKind::Notify:
+            // Not baked, and not reached: `resolveEvents` puts these in `dispatches`. Listed so the
+            // switch stays exhaustive and a new action kind cannot be added without deciding.
+            break;
+        }
+    }
 }
 
 } // namespace
@@ -473,6 +742,14 @@ double Sequence::duration() const {
             end = std::max(end, t.keys.back().time);
         }
     }
+    for (const auto& e : events) {
+        // Only an absolute time can extend the piece. Every other trigger is derived from something
+        // already counted above (a shot edge, a marker, an actor's clip), so counting those again
+        // would be circular.
+        if (e.enabled && e.when.kind == TriggerKind::Time) {
+            end = std::max(end, e.when.timeSeconds + e.when.delaySeconds);
+        }
+    }
     return end;
 }
 
@@ -589,6 +866,89 @@ std::vector<AnimationCue> Sequence::animationAt(double seconds) const {
     return out;
 }
 
+std::vector<AnimationCue> Sequence::animationAt(double seconds,
+                                                std::span<const ScheduledClip> scheduled) const {
+    std::vector<AnimationCue> out = animationAt(seconds);
+    if (scheduled.empty()) {
+        return out;
+    }
+    for (const Actor& actor : actors) {
+        const ScheduledClip* latest = nullptr;
+        for (const ScheduledClip& c : scheduled) {
+            if (c.actor != actor.id || c.timeSeconds > seconds) {
+                continue;
+            }
+            if (latest == nullptr || c.timeSeconds >= latest->timeSeconds) {
+                latest = &c;
+            }
+        }
+        if (latest == nullptr) {
+            continue;
+        }
+        // A scheduled clip and an authored cue are the same object, so the later of the two is
+        // simply the actor's state. Still one pure function of the second: both lists are sorted
+        // and neither depends on how the playhead arrived.
+        const ClipCue* authored = actor.clipAt(seconds);
+        if (authored != nullptr && authored->timeSeconds > latest->timeSeconds) {
+            continue;
+        }
+        const std::string node = actor.nodeName();
+        std::erase_if(out, [&](const AnimationCue& c) { return c.node == node; });
+        if (latest->clip.empty()) {
+            continue;
+        }
+        out.push_back(AnimationCue{.node = node,
+                                   .clip = latest->clip,
+                                   .startSeconds = latest->timeSeconds,
+                                   .speed = latest->speed,
+                                   .blendSeconds = latest->blendSeconds});
+    }
+    return out;
+}
+
+TriggerContext Sequence::triggerContext(int beatsPerBar) const {
+    TriggerContext ctx;
+    ctx.durationSeconds = duration();
+    ctx.beatTimes = markerTimes(MarkerKind::Beat);
+    // A bar is every Nth beat. The analysis has its own bar counter, but a sequence carries beats
+    // and not bars, and folding here means the editor's ruler and an event agree about where bar 9
+    // is rather than each deriving it.
+    const std::size_t per = static_cast<std::size_t>(std::max(1, beatsPerBar));
+    for (std::size_t i = 0; i < ctx.beatTimes.size(); i += per) {
+        ctx.barTimes.push_back(ctx.beatTimes[i]);
+    }
+    for (const Marker& m : markers) {
+        if (m.kind == MarkerKind::Section) {
+            ctx.sections.push_back(TriggerContext::NamedSpan{m.name, m.timeSeconds, 0.0});
+        } else if (m.kind == MarkerKind::Cue) {
+            ctx.cues.emplace_back(m.name, m.timeSeconds);
+        }
+    }
+    for (std::size_t i = 0; i < ctx.sections.size(); ++i) {
+        ctx.sections[i].endSeconds = i + 1 < ctx.sections.size()
+                                         ? ctx.sections[i + 1].startSeconds
+                                         : ctx.durationSeconds;
+    }
+    for (const Shot& s : shots) {
+        ctx.shots.push_back(TriggerContext::NamedSpan{s.name, s.startSeconds, s.endSeconds()});
+    }
+    for (const Actor& a : actors) {
+        for (std::size_t i = 0; i < a.clips.size(); ++i) {
+            const ClipCue& c = a.clips[i];
+            if (c.clip.empty()) {
+                continue;
+            }
+            // The sequence knows when a clip stops being the actor's state only when a following
+            // cue says so. It never knows how long the clip itself is -- that is the asset's fact,
+            // not the piece's -- so an unbounded cue is reported as unbounded rather than guessed.
+            const double end = i + 1 < a.clips.size() ? a.clips[i + 1].timeSeconds : -1.0;
+            ctx.clips.push_back(
+                TriggerContext::ClipSpan{a.id, c.clip, c.timeSeconds, end});
+        }
+    }
+    return ctx;
+}
+
 Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) const {
     if (auto ok = validate(); !ok) {
         return std::unexpected(ok.error());
@@ -644,8 +1004,13 @@ Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) c
     }
 
     // ---- transitions (spec 7) -----------------------------------------------------------------
-    const bool anyFade = std::any_of(shots.begin(), shots.end(), [](const Shot& s) {
-        return s.in.kind != TransitionKind::Cut || s.out.kind != TransitionKind::Cut;
+    // Only the two that touch `scene/brightness`. A match cut is a hard cut that changes where the
+    // *camera* starts, so it must not pull a brightness track into a sequence that has no fades.
+    const auto dips = [](TransitionKind k) {
+        return k == TransitionKind::FadeIn || k == TransitionKind::FadeOut;
+    };
+    const bool anyFade = std::any_of(shots.begin(), shots.end(), [&](const Shot& s) {
+        return dips(s.in.kind) || dips(s.out.kind);
     });
     if (anyFade) {
         builder.key("scene/brightness", 0.0, 1.0f, params::KeyInterp::Linear);
@@ -674,7 +1039,51 @@ Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) c
     constexpr double kCutSeconds = 1e-3;
     for (std::size_t si = 0; si < shots.size(); ++si) {
         const Shot& s = shots[si];
-        const ShotCamera& cam = s.camera;
+        ShotCamera cam = s.camera;
+        // ---- match cut (section 35) -----------------------------------------------------------
+        // A match cut is a hard cut whose two frames rhyme: the incoming subject lands at the same
+        // apparent size and the same place in frame as the outgoing one, so the eye reads
+        // continuity across a change of subject, scene and lighting. `subjectCoverageAt` already
+        // states the apparent size as a fraction of frame height, and a shot's opening distance is
+        // in radii -- so the match is one inversion of that expression, decided here, costing the
+        // renderer nothing. Crossfade is still not implemented; ADR-096 records why a second look
+        // did not change the answer.
+        if (si > 0 && s.in.kind == TransitionKind::MatchCut) {
+            const ShotCamera& previous = shots[si - 1].camera;
+            if (cam.kind != CameraKind::Move || previous.kind != CameraKind::Move) {
+                result.warnings.push_back(fmt::format(
+                    "shot '{}' asks for a match cut, but a match cut is a statement about two "
+                    "subject-relative moves and one of the two shots is not one",
+                    s.name));
+            } else if (cam.move.startPosition || cam.move.subject.radius <= 0.0f) {
+                result.warnings.push_back(fmt::format(
+                    "shot '{}' asks for a match cut, but its opening is an authored position (or "
+                    "its subject has no radius), so there is no distance to match with",
+                    s.name));
+            } else {
+                const float target = previous.move.subjectCoverageAt(1.0f);
+                // coverage = atan(radius / distance) / atan(sensorHalfHeight / focal), and the
+                // distance the shot carries is in radii -- so the radius cancels and the match is a
+                // function of the incoming lens alone.
+                const float halfFrame =
+                    std::atan(12.0f / std::max(cam.move.composition.focalLength, 1.0f));
+                const float angle = std::clamp(target * halfFrame, 1e-4f, 1.5f);
+                cam.move.startDistance = std::clamp(1.0f / std::tan(angle), 0.2f, 400.0f);
+                // The framing offset is the other half of "the same place in frame".
+                cam.move.composition.framing = previous.move.composition.framing;
+                cam.move.composition.headroom = previous.move.composition.headroom;
+                const float achieved = cam.move.subjectCoverageAt(0.0f);
+                if (target > 1e-3f && std::abs(achieved - target) > target * 0.15f) {
+                    // `preferredDistance` is a bound the director honours (ADR-071), so a subject
+                    // that states a stand-off can refuse to be matched. Said out loud rather than
+                    // leaving the author to wonder why the cut does not read.
+                    result.warnings.push_back(fmt::format(
+                        "shot '{}' match-cuts to {:.3f} of frame height but lands at {:.3f}; the "
+                        "subject's preferred distance is bounding the match",
+                        s.name, target, achieved));
+                }
+            }
+        }
         // Only when something actually cuts here. A following shot that inherits its camera is an
         // author saying "keep going", and nudging the key would put a stutter in a continuous move.
         const bool cutAfter = si + 1 < shots.size() &&
@@ -802,6 +1211,72 @@ Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) c
             "{} overlay cue(s) were not realised: no layer system is installed, so the sequence's "
             "text and graphics carry timing but draw nothing",
             deferred));
+    }
+
+    // ---- shot-driven quality (section 34) -----------------------------------------------------
+    //
+    // A `Spotlight` already says "this object is the point of this shot" (ADR-062). Letting it
+    // raise the subject's level-of-detail floor is what turns that from a note into a decision the
+    // renderer acts on: a close-up protagonist gets the expensive treatment for the length of its
+    // shot and a distant building does not.
+    //
+    // Emitted as **Multiply** tracks, which is the whole trick. Every one of these knobs treats
+    // zero as "no limit" (procedural.hpp: a ladder threshold of 0 ends the ladder, a minimum
+    // screen radius of 0 never culls), so multiplying by 1 - emphasis pins a fully spotlit subject
+    // at its best level and leaves an unemphasised one exactly as the author set it -- without the
+    // bake ever having to know, or restore, the values the author chose. A Replace track would have
+    // had to guess them.
+    if (options.spotlightQuality) {
+        for (const Shot& s : shots) {
+            if (s.camera.kind != CameraKind::Move || !s.camera.move.spotlight.active) {
+                continue;
+            }
+            const float emphasis = std::clamp(s.camera.move.spotlight.emphasis, 0.0f, 1.0f);
+            const std::string& subject = s.camera.move.subject.name;
+            if (emphasis <= 0.0f) {
+                continue;
+            }
+            if (subject.empty()) {
+                result.warnings.push_back(fmt::format(
+                    "shot '{}' spotlights an unnamed subject, so nothing can be given its level of "
+                    "detail; name the subject after the node it is",
+                    s.name));
+                continue;
+            }
+            const float factor = 1.0f - emphasis;
+            for (const char* suffix : {"lod/minScreenRadius", "lod/distance1", "lod/distance2",
+                                       "lod/distance3"}) {
+                // The node's own procedural parameter block. When the subject is not a procedural
+                // node the track resolves to nothing, which `seq::install` reports as an unresolved
+                // target -- visible, rather than the silent no-op ADR-075 exists to record.
+                const std::string path = "procedural/" + subject + "/" + suffix;
+                builder.keyN(path, -1, params::TrackMode::Multiply, 0.0, scalar(1.0f),
+                             params::KeyInterp::Step);
+                builder.keyN(path, -1, params::TrackMode::Multiply, s.startSeconds, scalar(factor),
+                             params::KeyInterp::Step);
+                builder.keyN(path, -1, params::TrackMode::Multiply, s.endSeconds(), scalar(1.0f),
+                             params::KeyInterp::Step);
+            }
+        }
+    }
+
+    // ---- events (section 17) ------------------------------------------------------------------
+    //
+    // Last, because an overlay event addresses a layer the sink has just issued a path for, and a
+    // parameter event that ramps needs to see the keys the shots already wrote in order to know
+    // what it is ramping from. Resolution is pure and the fold over it is pure, so the baked tier
+    // of the event system is exactly as scrub-safe as the rest of this function -- which is the
+    // point, and the argument is in seq/events.hpp.
+    result.events = resolveEvents(events, triggerContext(options.beatsPerBar));
+    for (const std::string& w : result.events.warnings) {
+        result.warnings.push_back(w);
+    }
+    bakeEventFirings(*this, result.events, builder, sink, result.overlays, result.warnings);
+    if (!result.events.dispatches.empty()) {
+        result.warnings.push_back(fmt::format(
+            "{} event firing(s) act on a live system and cannot be baked; forward play delivers "
+            "each once and a seek restores the latest standing one per target (ADR-096)",
+            result.events.dispatches.size()));
     }
 
     // ---- finish -------------------------------------------------------------------------------
@@ -1115,6 +1590,13 @@ json Sequence::toJson() const {
            {"actors", std::move(actorsJson)},
            {"overlays", std::move(overlaysJson)},
            {"markers", std::move(markersJson)}};
+    if (!events.empty()) {
+        json eventsJson = json::array();
+        for (const auto& e : events) {
+            eventsJson.push_back(e.toJson());
+        }
+        j["events"] = std::move(eventsJson);
+    }
     if (!tracks.empty()) {
         j["tracks"] = tracksToJson(tracks);
     }
@@ -1239,6 +1721,17 @@ Result<Sequence> Sequence::fromJson(const json& j) {
                 m.kind = *parsed;
             }
             seq.markers.push_back(std::move(m));
+        }
+    }
+    if (const auto ev = j.find("events"); ev != j.end()) {
+        if (!ev->is_array()) {
+            return fail("sequence '{}': 'events' must be an array", seq.name);
+        }
+        for (const auto& e : *ev) {
+            if (!e.is_object()) {
+                return fail("sequence '{}': every event must be an object", seq.name);
+            }
+            seq.events.push_back(SequenceEvent::fromJson(e));
         }
     }
     if (const auto t = j.find("tracks"); t != j.end()) {

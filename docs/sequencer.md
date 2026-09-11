@@ -198,6 +198,134 @@ as well as to dragging in the strip — so "cut on the downbeat" is a drag, not 
 
 ---
 
+## Events: when X happens, do Y
+
+An event is a **when** and a **what** (ADR-096). It is not a second sequencer: almost all of them
+stop being events at bake and become the same timeline keys everything else in a sequence becomes.
+
+```cpp
+seq::SequenceEvent e;
+e.id      = "drop-shake";
+e.when    = {.kind = seq::TriggerKind::Section, .name = "FinalDrop"};
+e.what.kind   = seq::EventActionKind::CameraShake;
+e.what.amount = {0.22f, 12.0f, 0.4f, 0.0f};   // metres, hertz, degrees of aim swing
+e.what.seconds = 0.9;                          // decay
+piece.events.push_back(e);
+```
+
+### The three tiers, and what a scrub does to each
+
+This is the one thing to know before authoring events, and the bake tells you which tier each of
+yours is in.
+
+| Tier | When | What | A scrub |
+|---|---|---|---|
+| **Baked** | time, beat, bar, section, shot start/end, cue, a clip the sequence bounds | a parameter, camera shake, a clip, an overlay, a scene transition | **Exact.** The event became keys; there is nothing left to fire, skip or double-fire. |
+| **Scheduled** | the same | an entity action, a notification | Forward play delivers each once. A jump delivers the *latest standing one per target*, marked `restored`, and drops the rest. |
+| **Live** | a volume crossing, an action or interaction completing | anything | Posted by the world when it happens. A seek discards anything pending. |
+
+`seq::triggerIsScheduled(kind)` and `seq::actionIsBaked(kind)` answer this without running anything.
+
+### Triggers
+
+```cpp
+{.kind = TriggerKind::Time,   .timeSeconds = 42.5}
+{.kind = TriggerKind::Beat,   .every = 4, .index = 0}         // every downbeat
+{.kind = TriggerKind::Bar,    .every = 8, .fromSeconds = 60}  // every eighth bar, after a minute
+{.kind = TriggerKind::Section, .name = "Drop"}                // "" = every section
+{.kind = TriggerKind::ShotStart, .name = "reveal"}            // "" = every shot
+{.kind = TriggerKind::Cue,    .name = "hit"}                  // an author's own marker
+{.kind = TriggerKind::ClipEnd, .subject = "elder", .name = "Wave"}
+{.kind = TriggerKind::VolumeEnter, .name = "porch", .subject = "elder"}  // "" = anyone
+```
+
+Every trigger also takes `fromSeconds`/`toSeconds` (a window), `delaySeconds` and `repeat`.
+
+Beat and bar triggers read the sequence's **beat markers**, so run `setBeatMarkers()` first — a beat
+event in a sequence with no analysis fires nothing and the bake says so.
+
+### Actions
+
+```cpp
+EventActionKind::SetParameter    // target = any parameter path. A light, a material, a particle
+                                 // rate and the fog are all parameter paths; this is the one verb.
+EventActionKind::CameraShake     // amount = (metres, hertz, degrees), seconds = decay
+EventActionKind::PlayClip        // target = actor id, value = clip, amount.x = speed
+EventActionKind::Overlay         // target = cue id, value = "position.x" | "opacity" | ...
+EventActionKind::SceneTransition // target = slot id, value = "cut" | "fadeIn" | "fadeOut"
+EventActionKind::EntityAction    // target = entity, value = verb, argument = the verb's object
+EventActionKind::Notify          // target = a name the host knows about
+```
+
+### Use `add` or `multiply` when the event means *a change*
+
+A track holds its first key's value backwards forever. So a `replace` event that sets the fog at
+0:12 has also set it at 0:00, and the bake warns about exactly that. An event authored in `add` or
+`multiply` mode has a known identity (0 or 1), so it contributes nothing until it fires and its
+delta afterwards — whatever the author set the property to — and `holdSeconds` then returns to that
+value exactly:
+
+```cpp
+e.what = {.kind = EventActionKind::SetParameter,
+          .target = "procedural/lamp/parts/1/emissiveGain",
+          .amount = {4.0f, 0, 0, 0},
+          .seconds = 0.05,        // ramp up
+          .holdSeconds = 0.20,    // ...hold, then return to x1
+          .mode = params::TrackMode::Multiply};
+```
+
+### Camera shake
+
+Four ordinary parameters, so a beat can drive it through a modulation route like anything else:
+
+```
+camera/shake/amplitude   metres of camera-space displacement
+camera/shake/frequency   hertz
+camera/shake/decay       seconds to fall to exactly zero; 0 = sustained
+camera/shake/rotation    degrees of aim swing
+camera/shake/start       the second the impulse began
+```
+
+`start` is why a decaying shake still scrubs correctly: the engine evaluates `now - start` rather
+than running a timer, which is the same trick a clip cue uses for its phase origin. A `CameraShake`
+event keys all five. A shake applies in every camera mode because it is an offset on whatever placed
+the camera, not a fourth way to place one.
+
+### A scripted cursor (breaking the fourth wall)
+
+There is no cursor feature. A pointer is an overlay cue plus events:
+
+```cpp
+seq::OverlayCue pointer{.id = "pointer", .kind = seq::OverlayKind::Shape};
+pointer.content = "ellipse";
+pointer.startSeconds = 4.0; pointer.endSeconds = 12.0;
+pointer.anchor = {0.10f, 0.90f};          // where it starts
+piece.overlays.push_back(pointer);
+
+// ...then two Overlay events moving position.x and position.y over two seconds, one more shrinking
+// scale.x for 50 ms as the click, and a Notify carrying the selection.
+```
+
+The moves are baked keys on `layers/<id>/position`, so the pointer scrubs exactly. Only the
+selection leaves the baked tier, because "the host now considers the elder selected" is not a value
+over time.
+
+### Shot-driven quality
+
+A shot whose camera move carries an active `Spotlight` raises its subject's level-of-detail floor
+for the length of the shot, and hands it back afterwards. The subject's `name` must be the node's
+name for this to bind; when it does not, `install()` lists the path under **unresolved** rather than
+doing nothing quietly. `BakeOptions::spotlightQuality = false` turns it off.
+
+### Match cuts
+
+`TransitionKind::MatchCut` on a shot's `in` makes it a hard cut whose incoming subject lands at the
+same apparent size and frame position as the outgoing one. Both shots must use a subject-relative
+camera move; the incoming shot's opening distance is rewritten at bake, so it costs nothing at
+render time. A subject with a `preferredDistance` can refuse the match, and the bake says so.
+
+---
+
 ## The Sequence panel
 
 One horizontal time axis. A ruler with the song's sections and beats on it, a lane of shots, a lane
@@ -252,5 +380,7 @@ difference between 8.7 and 63.3 frames per second over the whole piece at 1280x7
   a character and ends on a city — has to author its targets.
 - Every scene slot is resident.
 - Entity behaviours are not scrub-deterministic; see above.
+- An event that acts on a live system (an entity action, a notification) is not scrub-exact. A seek
+  restores the latest standing intent per target rather than replaying the history (ADR-096).
 - Procedurally instanced geometry does not reliably reach the shadow cascades in a large scene. This
   is a renderer-side limitation, not a sequencer one; see `docs/renderer-2-backlog.md`.

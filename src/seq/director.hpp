@@ -54,6 +54,10 @@ struct InstallReport {
     // they are the one kind of problem that must never be left to the log alone.
     std::vector<std::string> unresolved;
     std::vector<OverlayBinding> overlays;
+    // What the sequence's events resolved to (seq/events.hpp). The baked tier is already in the
+    // timeline tracks above; this is what the host needs to keep: the clips for `applyAnimation`,
+    // and the scheduled and live halves for an `EventDispatcher`.
+    EventSchedule events;
     int layersRealised = 0;
     int tracksReplaced = 0;
 };
@@ -78,5 +82,8 @@ void uninstall(params::Timeline& timeline, params::ParameterSet& params, LayerSi
 // Cheap enough to call unconditionally -- it is a handful of string comparisons per actor, and the
 // composition ignores a request identical to the one already in force.
 void applyAnimation(const Sequence& sequence, scene::Composition& composition, double seconds);
+// ...including the clips a `PlayClip` event scheduled. Same guarantee: pure in `seconds`.
+void applyAnimation(const Sequence& sequence, std::span<const ScheduledClip> scheduled,
+                    scene::Composition& composition, double seconds);
 
 } // namespace avgen::seq

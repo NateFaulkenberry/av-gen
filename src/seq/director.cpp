@@ -48,6 +48,7 @@ Result<InstallReport> install(const Sequence& sequence, params::Timeline& timeli
     report.warnings = std::move(baked->warnings);
     report.overlays = std::move(baked->overlays);
     report.targets = baked->targets;
+    report.events = std::move(baked->events);
     report.trackCount = baked->trackCount;
     report.keyCount = baked->keyCount;
     report.layersRealised = sink.realisedCount();
@@ -110,10 +111,15 @@ void uninstall(params::Timeline& timeline, params::ParameterSet& params, LayerSi
 }
 
 void applyAnimation(const Sequence& sequence, scene::Composition& composition, double seconds) {
+    applyAnimation(sequence, {}, composition, seconds);
+}
+
+void applyAnimation(const Sequence& sequence, std::span<const ScheduledClip> scheduled,
+                    scene::Composition& composition, double seconds) {
     if (sequence.actors.empty()) {
         return;
     }
-    for (const AnimationCue& cue : sequence.animationAt(seconds)) {
+    for (const AnimationCue& cue : sequence.animationAt(seconds, scheduled)) {
         // `rebase` is the whole point: the same clip cued twice in a piece is two different phase
         // origins, and AnimationPlayer::play() deliberately refuses to restart a state it is
         // already in. Without it, a character who walks at 0:12 and walks again at 1:04 would take

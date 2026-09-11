@@ -517,6 +517,14 @@ private:
     params::Parameter<float>* cameraSplineT_ = nullptr;
     params::Parameter<float>* cameraLookAhead_ = nullptr;
     params::Parameter<glm::vec3>* cameraSplineOffset_ = nullptr;
+    // Camera shake (ADR-096): a camera-space offset, in every camera mode. `start` is the second
+    // the impulse began -- a parameter and not a timer, which is what keeps a decaying shake a pure
+    // function of the playhead. See scene::CameraShake.
+    params::Parameter<float>* cameraShakeAmplitude_ = nullptr;
+    params::Parameter<float>* cameraShakeFrequency_ = nullptr;
+    params::Parameter<float>* cameraShakeDecay_ = nullptr;
+    params::Parameter<float>* cameraShakeRotation_ = nullptr;
+    params::Parameter<float>* cameraShakeStart_ = nullptr;
     double currentTime_ = 0.0;
     void updateCharacters(const FrameTime& time); // ADR-086
     RigStats rigStats_;   // ADR-086: what the last update() spent posing skinned characters

@@ -97,3 +97,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [089](ADR-089-the-cinematic-sequence.md) | The cinematic sequence: choreography through time | Accepted |
 | [090](ADR-090-terrain-generation-and-queries.md) | Terrain with geography in it, and one place to ask where the ground is | Accepted |
 | [091](ADR-091-simulation-authority.md) | Two-tier simulation authority: what bakes, what lives, and what a scrub may do | Accepted |
+| [096](ADR-096-cinematic-events.md) | Cinematic events: three tiers, and where the bake stops | Accepted |
