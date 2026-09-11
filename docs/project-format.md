@@ -179,7 +179,7 @@ Parameters a composition registers (all saveable in a project and modulatable):
 | `particles/<name>/…` | the particle node's system (see `docs/rendering.md`) |
 | `camera/distance`, `height`, `orbitSpeed`, `fov`; `env/intensity`, `env/rotation`; `scene/brightness`, `scene/gridIntensity`; `root/scale`, `root/rotationSpeed`, `root/impulse` | as in the orb and glTF scenes |
 
-### `"entities"` — what moves on its own, and how it answers the music (ADR-087)
+### `"entities"` — what moves on its own, and how it answers the music (ADR-088)
 
 A sibling of `"nodes"` and `"heroes"`. An entity does not add geometry: it *drives* a node the
 scene has already placed, which is what lets one entity type drive an imported craft, a procedural

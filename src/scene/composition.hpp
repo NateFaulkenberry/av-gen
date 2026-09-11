@@ -226,7 +226,7 @@ public:
     // dropped is a camera director that frames nothing with no explanation of why.
     Result<void> setHeroes(std::vector<world::HeroPoint> heroes);
 
-    // ---- entities (ADR-087) ------------------------------------------------------------------
+    // ---- entities (ADR-088) ------------------------------------------------------------------
     //
     // The `entities` array of a scene file: what in this scene moves on its own and how it answers
     // the music. A peer of `heroes` for the same reason heroes are a peer of the composition data
@@ -522,7 +522,7 @@ private:
     std::vector<std::unique_ptr<AnimationSink>> animationSinks_;
 
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
-    std::vector<entity::EntityDesc> entityDescs_; // ADR-087: authored, round-tripped as "entities"
+    std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
     entity::EntityWorld entityWorld_;
     std::optional<graph::Graph> graph_;
     bool graphDirty_ = false;

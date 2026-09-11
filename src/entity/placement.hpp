@@ -1,6 +1,6 @@
 #pragma once
 
-// Choosing where a hero element goes, from what the world and the frame already know (ADR-087).
+// Choosing where a hero element goes, from what the world and the frame already know (ADR-088).
 //
 // Placing something well is a search, and every term in it is already answerable:
 //

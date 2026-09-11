@@ -1808,7 +1808,7 @@ void Engine::update(const FrameTime& time) {
     params_.resetFinals();
     timeline_.apply(timelineClock_); // automation: the first modulation layer (ADR-018)
     modulator_.applyRoutes(bus_, params_, time.deltaTime);
-    // Autonomous behaviour, after the routes and before the scene reads the finals (ADR-087): a
+    // Autonomous behaviour, after the routes and before the scene reads the finals (ADR-088): a
     // behaviour's own knobs have been modulated by now, and the offsets it writes land on top of
     // whatever the routes wrote, so a route and a behaviour compose on one property.
     controller_->updateBehaviour(time, bus_);

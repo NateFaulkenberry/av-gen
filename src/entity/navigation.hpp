@@ -1,6 +1,6 @@
 #pragma once
 
-// Where a thing may stand and where it may walk (ADR-087).
+// Where a thing may stand and where it may walk (ADR-088).
 //
 // This is deliberately not a navmesh. The world already answers every question a walker has, and
 // it answers them analytically:

@@ -1,6 +1,6 @@
 #pragma once
 
-// The seam between a behaviour layer and an animation layer (ADR-087).
+// The seam between a behaviour layer and an animation layer (ADR-088).
 //
 // The behaviour layer decides *what a character is doing*: where it is going, how fast, which way
 // it is facing, whether it is reacting to something. The animation layer decides *what that looks

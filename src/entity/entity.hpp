@@ -1,6 +1,6 @@
 #pragma once
 
-// Entities: things in a world that move, attend and answer the music (ADR-087).
+// Entities: things in a world that move, attend and answer the music (ADR-088).
 //
 // An entity is not a new kind of geometry and not a new scene graph. It is a *driver* for a node
 // that already exists: the scene file places the node, and the entity says how it behaves. That

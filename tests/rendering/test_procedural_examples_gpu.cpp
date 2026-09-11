@@ -73,7 +73,7 @@ TEST_CASE("Showcase projects render bit-identically across fresh engines and ren
                          Case{"machine/machine.json", 1.5}, Case{"infinite/infinite.json", 2.0},
                          Case{"cathedral/cathedral.json", 1.0}, Case{"worlds/worlds.json", 4.0},
                          Case{"stress/stress.json", 0.5},
-                         // ADR-087. An entity's behaviours are seeded and clocked on the timeline
+                         // ADR-088. An entity's behaviours are seeded and clocked on the timeline
                          // rather than accumulated, and a character's pose is a request stamped
                          // with the second it was made at (ADR-086) -- so a world with autonomous
                          // things in it has to reproduce exactly like one without, and the only

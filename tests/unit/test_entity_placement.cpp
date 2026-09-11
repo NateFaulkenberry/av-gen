@@ -1,5 +1,5 @@
 // Where a hero element may hang in a world, answered by the world rather than by a person nudging
-// numbers (ADR-087).
+// numbers (ADR-088).
 //
 // The scene's own queries already know how high the ground is, what grows there, and how far
 // inside a hero a point is. Composition -- is it in frame, is it against the sky, is it clear of

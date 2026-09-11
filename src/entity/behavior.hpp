@@ -1,6 +1,6 @@
 #pragma once
 
-// Reusable behaviours (ADR-087).
+// Reusable behaviours (ADR-088).
 //
 // A behaviour is a small, named, data-configured piece of autonomous motion. It owns state, it is
 // ticked once per frame, and everything it exposes is an ordinary params::Parameter -- so every

@@ -1,4 +1,4 @@
-# ADR-087: An entity drives a node; it does not become one
+# ADR-088: An entity drives a node; it does not become one
 
 Status: accepted
 Date: 2026-09-11

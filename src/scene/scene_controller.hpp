@@ -19,7 +19,7 @@ public:
     virtual ~SceneController() = default;
     [[nodiscard]] virtual std::string name() const = 0;
     virtual void update(const FrameTime& time) = 0;
-    // Autonomous behaviour, run after modulation and before update() (ADR-087).
+    // Autonomous behaviour, run after modulation and before update() (ADR-088).
     //
     // The split exists because the two halves want opposite orders. A behaviour's own knobs
     // (a hover's amplitude, a wander's speed) have to be modulatable, so the routes must have run

@@ -1213,7 +1213,7 @@ animation code was written, and no second timeline exists.
 - Image, Video, Shader and Nested Composition layers are not implemented; the abstraction that
   would carry them is the one Text and Shape already use.
 
-## 2026-09-11 — Entities: behaviour, navigation and reactions declared in data (ADR-087)
+## 2026-09-11 — Entities: behaviour, navigation and reactions declared in data (ADR-088)
 
 A UFO over Glowmere was the brief; the layer underneath it was the work. An entity drives a node the
 scene has already placed, so the same thing configures an imported craft, a procedural rock and a

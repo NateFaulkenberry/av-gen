@@ -1,4 +1,4 @@
-// The entity layer's contracts (ADR-087): determinism, addressing, diagnostics and budget.
+// The entity layer's contracts (ADR-088): determinism, addressing, diagnostics and budget.
 //
 // The addressing tests matter more than they look. This project has five times built a system,
 // tested it, and wired it into nothing, and the failure has the same shape every time: a name that
