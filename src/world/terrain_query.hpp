@@ -138,7 +138,7 @@ struct TerrainQuery {
     [[nodiscard]] bool isWater(glm::vec2 p) const;
     // Metres of water over the bed at p; 0 on dry land. The one number a water renderer, a floating
     // object and a wading walker all need, and the continuous half of the water seam (see
-    // `waterBodies` in terrain_water.hpp for the described half).
+    // `waterCourses` in terrain_water.hpp for the described half).
     [[nodiscard]] float waterDepthAt(glm::vec2 p) const;
     // The tallest thing that grows here, in metres above the ground. Statistical (ADR-080).
     [[nodiscard]] float canopyHeightAt(glm::vec2 p) const;
