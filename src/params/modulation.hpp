@@ -28,6 +28,7 @@ struct ModRoute {
 
     // Runtime (not serialised)
     bool fromGraph = false;        // installed by a procedural graph evaluation (ADR-028)
+    bool fromEntity = false;       // compiled from an entity's `reactions` block (ADR-087)
     ProcessorChain::State state{};
     signals::SignalId sourceId = signals::kInvalidSignal;
     IParameter* targetParam = nullptr;

@@ -226,7 +226,7 @@ private:
             }
             scene::Entity& entity = local_.addEntity(std::move(entityName), meshId);
             entity.transform = transform;
-            entity.material = materialFor(primitive, label);
+            entity.material = materialFor(primitive, label, &entity.materialName);
         }
     }
 
@@ -346,7 +346,8 @@ private:
 
     // ---- materials -----------------------------------------------------------------------------
 
-    scene::Material materialFor(const fastgltf::Primitive& primitive, const std::string& label) {
+    scene::Material materialFor(const fastgltf::Primitive& primitive, const std::string& label,
+                                std::string* nameOut = nullptr) {
         scene::Material material;
         // Defaults for primitives without a material: glTF's white, rough dielectric.
         material.baseColor = glm::vec3(1.0f);
@@ -390,6 +391,9 @@ private:
 
         const std::string materialLabel =
             src.name.empty() ? fmt::format("material{}", index) : toStd(src.name);
+        if (nameOut != nullptr) {
+            *nameOut = materialLabel;
+        }
         if (pbr.baseColorTexture.has_value()) {
             material.baseColorTexture = textureRef(*pbr.baseColorTexture, true, materialLabel, "baseColor");
         }

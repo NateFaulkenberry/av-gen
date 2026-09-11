@@ -25,6 +25,7 @@
 #include "scene/sdf_object.hpp"
 #include "scene/spline_params.hpp"
 #include "scene/particles.hpp"
+#include "entity/entity.hpp"
 #include "scene/scene_controller.hpp"
 #include "world/ecology.hpp"
 #include "world/hero.hpp"
@@ -102,6 +103,11 @@ struct CompositionNode {
     // and their material. Built at rebuild, applied alongside it every frame.
     std::vector<ProceduralGeometry> proceduralSubRest;
     std::vector<MaterialPartParameters> materialPartParams;
+    // Part index -> the material name the asset gave it, filled at rebuild for an imported mesh
+    // source (ADR-044) and empty for everything else. This is what lets a reaction be written
+    // against a name an artist can see in the model file rather than against an area-ordered index
+    // nobody can predict: see entity::EntityWorld::resolveTarget.
+    std::vector<std::string> materialPartNames;
     FieldParameters fieldParams;
     spatial::FieldSpec fieldRest;
     SplineParameters splineParams;
@@ -126,6 +132,7 @@ public:
     // ---- SceneController ----
     [[nodiscard]] std::string name() const override { return name_; }
     void update(const FrameTime& time) override;
+    void updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) override;
     [[nodiscard]] const Scene& scene() const override { return scene_; }
     [[nodiscard]] Scene& scene() override { return scene_; }
 
@@ -175,6 +182,27 @@ public:
     // Rejects the whole set rather than dropping the bad member, and names it. A hero silently
     // dropped is a camera director that frames nothing with no explanation of why.
     Result<void> setHeroes(std::vector<world::HeroPoint> heroes);
+
+    // ---- entities (ADR-087) ------------------------------------------------------------------
+    //
+    // The `entities` array of a scene file: what in this scene moves on its own and how it answers
+    // the music. A peer of `heroes` for the same reason heroes are a peer of the composition data
+    // -- the nodes are already placed, and this says what drives them.
+    //
+    // Setting entities does not mark the composition dirty: an entity moves a node by writing its
+    // transform parameters, and nothing it can do requires geometry to be rebuilt.
+    [[nodiscard]] const std::vector<entity::EntityDesc>& entities() const { return entityDescs_; }
+    [[nodiscard]] const entity::EntityWorld& entityWorld() const { return entityWorld_; }
+    [[nodiscard]] entity::EntityWorld& entityWorld() { return entityWorld_; }
+    // Rejects the whole set and names the offender rather than dropping one, for the same reason
+    // setHeroes does: an entity silently missing is a scene that does nothing with no explanation.
+    Result<void> setEntities(std::vector<entity::EntityDesc> entities);
+    // Rebuilds the entity layer's view of this composition -- which node each entity drives, what
+    // its material parts are called, where the ground is -- and reinstalls its reaction routes on
+    // the modulator. Called from attach() and after a rebuild; safe to call again.
+    void installEntities();
+    // Everything the entity layer could not resolve. Empty when all of it resolved.
+    [[nodiscard]] const std::vector<std::string>& entityProblems() const { return entityWorld_.problems(); }
 
     // ---- procedural graph (ADR-028) ----
     // A composition is either graph-driven or flat: installing a graph replaces every node this
@@ -424,7 +452,12 @@ private:
     // Scene-level material programs (ADR-030): "materialPrograms" in the file, parameters
     // "material/<name>/…", referenced by Material::program.
     CompositionData compositionData_;
+    [[nodiscard]] entity::Navigator buildNavigator() const;
+    [[nodiscard]] std::uint32_t worldSeed() const;
+
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
+    std::vector<entity::EntityDesc> entityDescs_; // ADR-087: authored, round-tripped as "entities"
+    entity::EntityWorld entityWorld_;
     std::optional<graph::Graph> graph_;
     bool graphDirty_ = false;
     double interactiveRebuildBudgetMs_ = 0.0;
