@@ -1071,6 +1071,18 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
         ImGui::Text("particles: %u systems  %u capacity  %u emitted  simulate %.3f ms", stats.particles.systems,
                     stats.particles.capacity, stats.particles.emittedThisFrame, stats.particles.simulateMs);
     }
+    ImGui::Separator();
+    // The one lever in the editor that moves the GPU's share of the frame, and the reason it is
+    // here rather than buried: on a Retina display the canvas is several times the pixel count of
+    // the sizes the renderer is benchmarked at, and nothing in the interface said so.
+    ImGui::SliderFloat("Canvas scale", &canvasRenderScale, 0.25f, 1.0f, "%.2f");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Render the world at a fraction of the canvas's pixels and show it "
+                          "stretched. 1.00 is every pixel. Lower is softer and much faster; it "
+                          "changes nothing about the picture itself, and nothing about a render.");
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%.2f Mpx", static_cast<double>(stats.width) * stats.height / 1.0e6);
     ImGui::TextDisabled("%s (%s)", stats.adapter.c_str(), stats.backend.c_str());
 }
 

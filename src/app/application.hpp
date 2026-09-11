@@ -75,6 +75,8 @@ struct AppOptions {
     // repeatable interaction so "it feels sluggish" can be measured rather than described;
     // --profile-cpu prints the main thread's per-phase distribution on the way out.
     std::string uiScript;
+    float canvasScale = 1.0f; // --canvas-scale: the world's share of the canvas's pixels
+
     bool profileCpu = false;
     std::optional<std::filesystem::path> profileCsv; // --profile-csv <file>: one row per frame
     bool headless = false;

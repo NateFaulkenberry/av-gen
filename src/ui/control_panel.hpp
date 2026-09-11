@@ -126,6 +126,20 @@ public:
     // Procedural graph editor (ADR-028); the host re-installs the graph when it changes.
     GraphEditor graphEditor;
 
+    // How much of the canvas's pixel count the world is actually rendered at, before being shown
+    // stretched to fill it (ADR-083). One means every canvas pixel, which is what the editor has
+    // always done and remains the default.
+    //
+    // Worth a control because of what the canvas actually is. The editor renders the world at the
+    // canvas's size times the display's backing scale, and on this machine that is 2880x1166 --
+    // 3.36 Mpx, against the 1.30 Mpx of the "1440x900" the renderer benchmarks quote. The world is
+    // 2.6x the size everyone thinks it is, and at 0.75 or 0.5 it is 1.9 Mpx or 0.84 Mpx, which is
+    // the difference between an editor whose frame is the GPU's and one whose frame is the
+    // display's. Sharpness for responsiveness is a trade the person doing the work should get to
+    // make, and it belongs to the editor rather than the renderer: nothing about the picture
+    // changes, only how many pixels of it are computed before it is shown.
+    float canvasRenderScale = 1.0f;
+
     [[nodiscard]] const EditorLayout& layout() const { return layout_; }
     // Writable for the host: the scripted-interaction driver (app/ui_script.hpp) toggles
     // panels through the same flags the View menu writes, so a benchmark opens and closes a

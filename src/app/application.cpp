@@ -77,6 +77,7 @@ std::string usageText() {
            "  --stress <seed>     apply random slider-like actions every frame (seek, params, routes, volume)\n"
            "  --ui-script <arms>  drive the editor with a repeatable interaction: comma-separated from\n"
            "                      hover,sliders,panels,select,scrub,camera,tabs -- or idle, or all\n"
+           "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
            "  --profile-cpu       print the main thread's per-phase frame distribution on exit\n"
            "  --profile-csv <f>   write one row per frame (every phase) to <f> on exit\n"
            "  --capture <file>    write the last frame as a PPM image\n"
@@ -273,6 +274,14 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             }
             options.uiScript = *v;
             ++i;
+        } else if (arg == "--canvas-scale") {
+            auto v = need(i, "--canvas-scale");
+            if (!v) return std::unexpected(v.error());
+            options.canvasScale = std::strtof(v->c_str(), nullptr);
+            if (options.canvasScale < 0.25f || options.canvasScale > 1.0f) {
+                return fail("--canvas-scale must be between 0.25 and 1.0");
+            }
+            ++i;
         } else if (arg == "--profile-cpu") {
             options.profileCpu = true;
         } else if (arg == "--profile-csv") {
@@ -449,6 +458,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         jobs_ = std::make_unique<JobSystem>(2);
         worldBuilder_ = std::make_unique<WorldBuilder>(*jobs_);
         panel_ = std::make_unique<ui::ControlPanel>();
+        panel_->canvasRenderScale = options_.canvasScale;
         panel_->setLayoutStore(prefs.empty() ? std::filesystem::path{} : prefs / "editor-layout.json",
                                imgui_->hadSavedLayout());
         panel_->jobs = jobs_.get();
@@ -1576,9 +1586,16 @@ int Application::runLive() {
         const float pixelScale = std::max(window_->pixelScale(), 1e-3f);
         std::uint32_t cw = window_->pixelWidth();
         std::uint32_t ch = window_->pixelHeight();
+        // The canvas's pixels, times the editor's render scale. The scale is the editor's one
+        // lever on what the world costs: the canvas is the display's backing scale times its own
+        // size, so on a Retina screen it is several times the pixel count the renderer's benchmarks
+        // quote, and the person at the keyboard had no way to say "softer, but keep up". The
+        // default is 1.0, which is every canvas pixel and exactly what this did before.
+        const float renderScale =
+            panel_ != nullptr ? std::clamp(panel_->canvasRenderScale, 0.25f, 1.0f) : 1.0f;
         if (canvas_.valid()) {
-            cw = std::max(1u, static_cast<std::uint32_t>(std::lround(canvas_.width * pixelScale)));
-            ch = std::max(1u, static_cast<std::uint32_t>(std::lround(canvas_.height * pixelScale)));
+            cw = std::max(1u, static_cast<std::uint32_t>(std::lround(canvas_.width * pixelScale * renderScale)));
+            ch = std::max(1u, static_cast<std::uint32_t>(std::lround(canvas_.height * pixelScale * renderScale)));
         }
         // A new size only takes effect once it has held still for a few frames. Following every
         // frame of a splitter drag would be more correct and much worse: each size is a new render
