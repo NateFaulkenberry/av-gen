@@ -1628,7 +1628,11 @@ WorldBounds Composition::nodeBounds(const std::string& name) {
             if (entity.mesh >= scene_.meshes.size()) {
                 continue;
             }
-            const auto [lo, hi] = scene_.meshes[entity.mesh].bounds();
+            // The *cached* bounds, not MeshData::bounds(). That one scans every vertex, and this is
+            // called for every node on every frame the brush is showing a ghost -- which on a
+            // painted meadow is a few hundred thousand vertex reads per frame for an answer the
+            // scene already memoised against its own mesh version.
+            const auto& [lo, hi] = scene_.meshBounds(entity.mesh);
             // Eight corners through the entity's own transform: transforming min and max alone is
             // wrong the moment anything is rotated, and everything a brush places is rotated.
             for (int corner = 0; corner < 8; ++corner) {

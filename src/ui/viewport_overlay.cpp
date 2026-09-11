@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 
 namespace avgen::ui {
 namespace {
@@ -183,8 +184,20 @@ void drawViewportOverlay(const WorldEditor& editor, const scene::Camera& camera,
     const EditorVisuals& visuals = editor.visuals();
 
     // ---- what is selected ----
-    for (const scene::WorldBounds& bounds : visuals.selectionBoxes) {
-        painter.box(bounds, kSelection, 1.6f);
+    for (const EditorVisuals::SelectedBox& selected : visuals.selectionBoxes) {
+        painter.box(selected.bounds, kSelection, 1.6f);
+        // The name goes at the top of the box, not the centre: the centre is inside the object and
+        // this is the one label that must stay legible over anything.
+        char text[160];
+        if (selected.isGroup) {
+            std::snprintf(text, sizeof(text), "%s  (%zu in group)", selected.name.c_str(),
+                          selected.members);
+        } else {
+            std::snprintf(text, sizeof(text), "%s", selected.name.c_str());
+        }
+        painter.label(glm::vec3(selected.bounds.centre().x, selected.bounds.max.y,
+                                selected.bounds.centre().z),
+                      text, kSelection);
     }
 
     // ---- the ghost ----
@@ -211,11 +224,12 @@ void drawViewportOverlay(const WorldEditor& editor, const scene::Camera& camera,
         for (const GhostInstance& ghost : preview.instances) {
             drawGhost(painter, ghost, detailed);
         }
-        // What is about to be erased, outlined in the refusal colour so a Replace or an Eraser
-        // stroke never removes anything the artist had not seen it about to remove.
-        for (const std::string& name : preview.erasing) {
-            static_cast<void>(name);
-        }
+    }
+
+    // What is about to be erased, outlined in the refusal colour, whether or not there is an asset
+    // armed -- an Eraser has no ghost of its own and its whole preview is this.
+    for (const scene::WorldBounds& bounds : visuals.erasingBoxes) {
+        painter.box(bounds, kGhostBad, 2.0f);
     }
 
     // ---- the gizmo ----

@@ -810,3 +810,42 @@ TEST_CASE("reusing a terrain's products builds the same scene as re-meshing it")
     CHECK_THAT(reused.lo.y, Catch::Matchers::WithinAbs(rebuilt.lo.y, 1e-4));
     CHECK_THAT(reused.hi.y, Catch::Matchers::WithinAbs(rebuilt.hi.y, 1e-4));
 }
+
+TEST_CASE("duplicating a group and one of its members does not move the member twice") {
+    // `topmostOf` drops the member from the set that gets the offset, but the member is still in the
+    // batch as a descendant, and an earlier version of `duplicateNodes` treated anything the caller
+    // named as a root. The child's local transform is relative to its parent, which has already
+    // moved, so it came out twice as far away as the group it belongs to.
+    Fixture f;
+    const std::string a = f.add("a", glm::vec3(-1.0f, 0.0f, 0.0f));
+    const std::string b = f.add("b", glm::vec3(1.0f, 0.0f, 0.0f));
+    auto* composition = f.engine.composition();
+    std::string group;
+    static_cast<void>(ui::groupNodes(f.engine, std::vector<std::string>{a, b}, "g", &group));
+
+    const glm::vec3 worldA = composition->nodeWorldTransform(*composition->findNode(a)).position;
+    const glm::vec3 offset(25.0f, 0.0f, 0.0f);
+    std::vector<std::string> created;
+    // The group *and* one of its members, which is what a shift-click and a Cmd+D produce.
+    static_cast<void>(
+        ui::duplicateNodes(f.engine, std::vector<std::string>{group, a}, offset, &created));
+
+    // Find the copy of `a`: the child of the new group whose name is not `b`'s copy.
+    std::string copiedGroup;
+    for (const auto& node : composition->nodes()) {
+        if (node && node->kind == scene::NodeKind::Group && node->name != group) {
+            copiedGroup = node->name;
+        }
+    }
+    REQUIRE_FALSE(copiedGroup.empty());
+    const std::vector<std::string> children = ui::descendantsOf(*composition, copiedGroup);
+    REQUIRE(children.size() == 2);
+    for (const std::string& child : children) {
+        const glm::vec3 world = composition->nodeWorldTransform(*composition->findNode(child)).position;
+        // Every member of the copy is exactly one offset from its original, never two.
+        const float dx = world.x - (child.find(a) == 0 ? worldA.x
+                                                       : composition->nodeWorldTransform(
+                                                             *composition->findNode(b)).position.x);
+        CHECK_THAT(dx, Catch::Matchers::WithinAbs(offset.x, 1e-3));
+    }
+}

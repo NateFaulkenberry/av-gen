@@ -310,12 +310,13 @@ EditCommand duplicateNodes(app::Engine& engine, std::span<const std::string> nam
             continue;
         }
         scene::CompositionNode copy = scene::cloneNodeSpec(*source);
-        // Only the topmost copies move: a child's local transform is relative to its parent, which
-        // has already moved, so offsetting it too would double the offset.
-        const bool root = std::find(names.begin(), names.end(), name) != names.end() ||
-                          std::find_if(sources.begin(), sources.end(), [&](const std::string& other) {
-                              return other == source->parent;
-                          }) == sources.end();
+        // Only the copies whose parent is *not* also being copied move. A child's local transform
+        // is relative to its parent, and the parent's copy has already taken the offset, so
+        // offsetting the child too would move it twice as far. The test for that is exactly "is my
+        // parent in this batch" and nothing else -- an earlier version also treated anything the
+        // caller named explicitly as a root, which double-offset every child of a group that the
+        // caller had happened to select alongside the group itself.
+        const bool root = std::find(sources.begin(), sources.end(), source->parent) == sources.end();
         if (root) {
             copy.transform.position += offset;
         }

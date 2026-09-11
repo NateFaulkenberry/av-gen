@@ -258,6 +258,7 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
 //   150  Select mode, click
 //   165  group two objects
 //   180  undo the group
+//   190  drag a selection box over most of the frame; 205 release, 212 report
 void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
                         std::uint64_t frame) {
     const ui::CanvasRect& canvas = panel.canvas();
@@ -334,6 +335,7 @@ void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Windo
     }
     case 92: {
         const auto [x, y] = at(0.60f, 0.86f);
+        pushMotion(window, x, y);
         pushButton(window, x, y, false);
         break;
     }
@@ -389,6 +391,29 @@ void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Windo
         say(fmt::format("edit: ungrouped by undo, {} nodes, selection {}", nodes(),
                         editor.selection.size()));
         break;
+    case 190: {
+        // A drag box over most of the frame. Press and move together for the same reason as the
+        // paint stroke: a synthetic pointer only survives while a button is held.
+        editor.selection.clear();
+        const auto [x, y] = at(0.06f, 0.10f);
+        pushMotion(window, x, y);
+        pushButton(window, x, y, true);
+        break;
+    }
+    case 205: {
+        // The motion goes with the release, not before it. On the frame the button comes up the
+        // backend is free to overwrite the pointer with the operating system's cursor again, and
+        // the box would be closed at wherever the physical mouse happens to be -- which is how the
+        // first version of this closed a full-frame box into a degenerate one and selected the one
+        // thing under the real cursor.
+        const auto [x, y] = at(0.94f, 0.94f);
+        pushMotion(window, x, y);
+        pushButton(window, x, y, false);
+        break;
+    }
+    case 212:
+        say(fmt::format("edit: a box over the frame selected {} object(s)", editor.selection.size()));
+        break;
     default:
         break;
     }
@@ -397,6 +422,12 @@ void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Windo
     if (frame > 34 && frame < 92) {
         const float t = static_cast<float>(frame - 34) / 58.0f;
         const auto [x, y] = at(0.45f + 0.15f * t, 0.78f + 0.08f * t);
+        pushMotion(window, x, y);
+    }
+    // ... and the box's own drag, which has to travel far enough to stop being a click.
+    if (frame > 190 && frame < 205) {
+        const float t = static_cast<float>(frame - 190) / 15.0f;
+        const auto [x, y] = at(0.06f + 0.88f * t, 0.10f + 0.84f * t);
         pushMotion(window, x, y);
     }
 }

@@ -36,7 +36,6 @@ private:
 
     char filter_[64] = {};
     int categoryFilter_ = 0;
-    bool showHistory_ = false;
 };
 
 } // namespace avgen::ui

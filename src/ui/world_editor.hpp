@@ -61,11 +61,22 @@ struct EditorVisuals {
     GizmoHandle hovered = GizmoHandle::None;
     GizmoHandle dragging = GizmoHandle::None;
     std::string dragReadout;
+    // What an Eraser or Replace stroke would take away, outlined so that nothing is ever removed
+    // that the artist had not seen it about to remove.
+    std::vector<scene::WorldBounds> erasingBoxes;
     // Box selection in progress, in NDC.
     bool boxing = false;
     glm::vec2 boxFrom{0.0f};
     glm::vec2 boxTo{0.0f};
-    std::vector<scene::WorldBounds> selectionBoxes;
+    // What is selected, with its name: §23 asks for the object's identity on screen, and an
+    // outline with no name is an outline you have to go and look up in a panel.
+    struct SelectedBox {
+        std::string name;
+        scene::WorldBounds bounds;
+        bool isGroup = false;
+        std::size_t members = 0; // for a group
+    };
+    std::vector<SelectedBox> selectionBoxes;
 };
 
 class WorldEditor {
@@ -79,8 +90,6 @@ public:
     std::string brushAssetId;
     // A brush stroke becomes one group, so a thicket painted in one gesture is one thing to move.
     bool groupStrokes = false;
-    // Draw the ghost even while the mouse is down, so a paint drag shows what it is about to add.
-    bool showFootprints = true;
 
     Selection selection;
     EditHistory history;
@@ -170,7 +179,6 @@ private:
     bool boxAdditive_ = false;
 
     std::vector<std::string> clipboard_;
-    bool wasDown_ = false;
 };
 
 } // namespace avgen::ui

@@ -72,9 +72,19 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
     // what is chosen, and losing the outline on a mode change reads as losing the selection.
     for (const std::string& name : selection.nodes()) {
         const scene::WorldBounds bounds = composition->nodeBounds(name);
-        if (bounds.valid) {
-            visuals_.selectionBoxes.push_back(bounds);
+        if (!bounds.valid) {
+            continue;
         }
+        EditorVisuals::SelectedBox box;
+        box.name = name;
+        box.bounds = bounds;
+        if (const scene::CompositionNode* node = composition->findNode(name)) {
+            box.isGroup = node->kind == scene::NodeKind::Group;
+            if (box.isGroup) {
+                box.members = descendantsOf(*composition, name).size();
+            }
+        }
+        visuals_.selectionBoxes.push_back(std::move(box));
     }
 
     // The status line. Whatever else is true, it says what the next click does.
@@ -91,7 +101,6 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
         status_ = fmt::format("{} objects  |  {} in {} space", selection.size(), gizmoModeName(gizmoMode),
                               localSpace ? "local" : "world");
     }
-    wasDown_ = input.leftDown;
 }
 
 void WorldEditor::updateGhost(app::Engine& engine, const assets::AssetLibrary* library,
@@ -120,6 +129,12 @@ void WorldEditor::updateGhost(app::Engine& engine, const assets::AssetLibrary* l
     }
     preview_ = planBrush(*composition, brush, asset, ground, strokeSeed_);
     visuals_.showGhost = preview_.armed && ground.valid;
+    for (const std::string& name : preview_.erasing) {
+        const scene::WorldBounds bounds = composition->nodeBounds(name);
+        if (bounds.valid) {
+            visuals_.erasingBoxes.push_back(bounds);
+        }
+    }
 
     const bool eraser = brush.mode == app::PlacementMode::Eraser;
     const bool replacing = brush.mode == app::PlacementMode::Replace;
