@@ -4,9 +4,10 @@
 // no such targets, in which case the `available` flags in the uniforms are 0 and every effect
 // falls back to its luminance-only behaviour). Uniforms carry per-pass data.
 //
-// Order (docs/image-formation.md): exposure, depth of field, motion blur, lens distortion and
-// chromatic aberration, bloom / halation / anamorphic, colour grade, sharpen; the tone map,
-// vignette and grain follow in shaders/tonemap.wgsl.
+// Order (docs/image-formation.md): exposure, defocus (depth of field and the ADR-079 tilt-shift
+// band, which share one gather), motion blur, lens distortion and chromatic aberration, bloom /
+// halation / anamorphic, colour grade, sharpen; the tone map, vignette and grain follow in
+// shaders/tonemap.wgsl.
 
 struct PostUniforms {
     texelSize: vec2<f32>,    // 1 / source size
@@ -397,11 +398,19 @@ fn fs_sharpen(in: FsIn) -> @location(0) vec4<f32> {
     return vec4<f32>(mix(c, clamp(sharpened, lo, hi), mask), 1.0);
 }
 
-// ---- depth of field: circle-of-confusion gather -------------------------------------------------
+// ---- defocus: one circle-of-confusion gather, two ways of deciding the circle -------------------
+// Depth of field asks "how far is this point from the focus *distance*"; a tilt-shift lens, whose
+// focal plane is swung away from parallel with the sensor, asks "how far is it from the in-focus
+// *band* across the frame" (ADR-079). Only the circle-of-confusion function differs, so both drive
+// the same gather: same taps, same reach test, same energy.
+//
 // params0 = (focus distance m, focus range m, max radius px, physical flag)
 // params1 = (focal length mm, f-number, sensor height mm, image height px)
+// params2 = (band centre x, band centre y, cos rotation, sin rotation)
+// params3 = (band half-width, falloff, band max radius px, band flag)
+// params4 = (depth-of-field flag, aspect, 0, 0)
 
-fn circleOfConfusion(dist: f32) -> f32 {
+fn depthCircleOfConfusion(dist: f32) -> f32 {
     let focus = post.params0.x;
     let maxRadius = post.params0.z;
     if (post.params0.w > 0.5) {
@@ -420,24 +429,74 @@ fn circleOfConfusion(dist: f32) -> f32 {
     return clamp(offset / max(focus, 1e-3), 0.0, 1.0) * maxRadius;
 }
 
+// The twin of scene::tiltShiftCoverage in src/scene/post_settings.cpp, which is where the unit
+// tests pin this shape. Scaling x by the aspect ratio puts both axes in units of frame height, so
+// the rotation is an angle on screen rather than in texture space -- measured in raw uv, a 45
+// degree band on a 16:9 frame comes out at 28 degrees and changes width as it turns.
+fn tiltShiftCoverage(uv: vec2<f32>) -> f32 {
+    let p = (uv - post.params2.xy) * vec2<f32>(post.params4.y, 1.0);
+    let normal = vec2<f32>(-post.params2.w, post.params2.z); // normal to the band's axis
+    let d = abs(dot(p, normal));
+    let t = clamp((d - post.params3.x) / max(post.params3.y, 1e-4), 0.0, 1.0);
+    // Smoothstep, not a linear ramp: the band's edge is exactly where the eye looks for a seam and
+    // a linear ramp creases there, because its slope jumps from zero to the full falloff.
+    return t * t * (3.0 - 2.0 * t);
+}
+
+fn circleOfConfusion(uv: vec2<f32>) -> f32 {
+    var coc = 0.0;
+    if (post.params3.w > 0.5) {
+        coc = tiltShiftCoverage(uv) * post.params3.z;
+    }
+    if (post.params4.x > 0.5) {
+        // The larger circle wins rather than the sum: two ways of being out of focus are not two
+        // defocus energies to add, and the wider blur is the only one you can see anyway. Reading
+        // depth stays behind this flag so a tilt-shift with no depth of field pays for no samples.
+        coc = max(coc, depthCircleOfConfusion(viewDistance(uv)));
+    }
+    return coc;
+}
+
+// 24 taps is what the depth path has always used and is kept exactly, so no existing render moves.
+// A tilt-shift wants a much wider circle than a depth blur usually does -- a miniature fake is 20+
+// pixels -- and 24 taps thrown over a 12 pixel disc is one sample per 12 square pixels, which does
+// not read as defocus at all: it reads as noise, because neighbouring pixels average different
+// samples. So when the band is in play the count follows the disc's *area*, at roughly one tap per
+// two square pixels, which bilinear filtering then closes up. The ceiling is where the cost stops
+// being worth it: 192 taps covers a 20 pixel radius, and a blur wider than that wants a downsampled
+// pyramid rather than a bigger spiral (ADR-079).
+fn defocusTaps(coc: f32) -> u32 {
+    if (post.params3.w < 0.5) {
+        return 24u;
+    }
+    return clamp(u32(coc * coc * 0.5), 24u, 192u);
+}
+
 @fragment
 fn fs_dof(in: FsIn) -> @location(0) vec4<f32> {
-    let centreDist = viewDistance(in.uv);
-    let coc = circleOfConfusion(centreDist);
+    let coc = circleOfConfusion(in.uv);
     let centre = textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb;
     if (coc < 0.5) {
         return vec4<f32>(centre, 1.0);
     }
     var sum = centre;
     var weight = 1.0;
-    let taps = 24u;
+    let taps = defocusTaps(coc);
     let golden = 2.39996323;
+    // The spiral is deliberately *not* rotated per pixel. Interleaved gradient noise is the usual
+    // answer to a sparse gather's rings, and it was tried here: it turns the rings into noise, and
+    // on a broadband test pattern that noise was the largest artefact left in the blurred region
+    // (the worst pixel-to-pixel step went from 2.6 to 3.1 out of an original 13.7, measured in
+    // tests/rendering/test_tilt_shift_gpu.cpp). Unrotated, every pixel applies the same irregular
+    // kernel, which is a filter rather than an estimator, and neighbours differ only by their
+    // offset. With the tap count following the disc's area there is nothing left for a dither to
+    // hide.
     for (var i = 1u; i <= taps; i = i + 1u) {
         let r = sqrt(f32(i) / f32(taps)) * coc;
         let a = f32(i) * golden;
         let offset = vec2<f32>(cos(a), sin(a)) * r * post.texelSize;
         let uv = in.uv + offset;
-        let tapCoc = circleOfConfusion(viewDistance(uv));
+        let tapCoc = circleOfConfusion(uv);
         // Only taps whose own blur radius reaches this pixel contribute (avoids sharp halos).
         let w = clamp(tapCoc - r + 1.0, 0.0, 1.0);
         sum += textureSampleLevel(source, linearSampler, uv, 0.0).rgb * w;

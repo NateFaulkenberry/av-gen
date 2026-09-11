@@ -444,13 +444,28 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         current = target.view;
     }
 
-    // ---- 2. depth of field (a lens effect, but it needs undistorted depth) ---------------------
-    if (s.dofEnabled && s.dofMaxRadius > 0.0f) {
+    // ---- 2. defocus: depth of field and the tilt-shift band (a lens effect, but it needs
+    // undistorted depth) ---------------------------------------------------------------------
+    // ADR-079: one pass serves both. They differ only in how the circle of confusion is decided -
+    // by distance from a focus plane, or by distance from a band across the frame - and the shader
+    // takes the larger of the two circles, so a scene may run either or both. The timeline stage
+    // stays "post/dof" because it is still one pass and splitting the label would only make the
+    // same microseconds harder to find.
+    const bool dofOn = s.dofEnabled && s.dofMaxRadius > 0.0f;
+    const bool tiltShiftOn = s.tiltShiftEnabled && s.tiltShiftMaxRadius > 0.0f;
+    if (dofOn || tiltShiftOn) {
         auto target = pool.acquire(in.width, in.height, kHdrFormat);
         Uniforms u = base;
         u.params0 = glm::vec4(s.focusDistance, s.focusRange, s.dofMaxRadius * pixelScale, s.dofPhysical ? 1.0f : 0.0f);
         u.params1 = glm::vec4(s.lens.focalLength, s.lens.aperture, s.lens.sensorHeight, static_cast<float>(in.height));
+        const float rotation = glm::radians(s.tiltShiftRotation);
+        u.params2 = glm::vec4(s.tiltShiftCentre, std::cos(rotation), std::sin(rotation));
+        u.params3 = glm::vec4(std::max(s.tiltShiftBandWidth, 0.0f) * 0.5f, std::max(s.tiltShiftFalloff, 1e-4f),
+                              s.tiltShiftMaxRadius * pixelScale, tiltShiftOn ? 1.0f : 0.0f);
+        u.params4 = glm::vec4(dofOn ? 1.0f : 0.0f, base.outputSize.x / std::max(base.outputSize.y, 1.0f), 0.0f, 0.0f);
         stage_ = "post/dof";
+        // The depth view is still bound when only the band is running: binding the placeholder
+        // instead would cost a bind group rebuild for a texture the shader never reads.
         runPass(encoder, dof_, target.view, current, nullptr, in.depth, u);
         current = target.view;
     }
