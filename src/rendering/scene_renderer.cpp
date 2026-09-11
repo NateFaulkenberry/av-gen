@@ -2358,17 +2358,27 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     static const bool dumpCounters = std::getenv("AVGEN_FRAME_COUNTERS") != nullptr;
     if (dumpCounters && time.frameIndex % 30 == 0) {
         const GeometryCounters& g = stats_.geometry;
+        const SubmittedGeometry procShadow = procedurals_->stats().submittedShadow;
         log::info("submitted: camera {} tris / {} inst / {} draws ({} estimated, {} unmeasured); "
                   "depth {} / {} / {}; shadow {} / {} / {} over {} casters; logical {} tris / {} inst; "
                   "binds {}pipe {}group {}vb {}ib ({} redundant avoided); passes {}render {}compute "
-                  "{}unclassified",
+                  "{}unclassified; shadow split: ecology {} tris / {} inst, entities {} tris / {} inst",
                   g.camera.triangles, g.camera.instances, g.camera.draws, g.camera.estimatedDraws,
                   g.camera.unmeasuredDraws, g.depth.triangles, g.depth.instances, g.depth.draws,
                   g.shadow.triangles, g.shadow.instances, g.shadow.draws, stats_.shadowCasters,
                   g.logicalTriangles, g.logicalInstances, stats_.state.pipelineBinds,
                   stats_.state.bindGroupBinds, stats_.state.vertexBufferBinds,
                   stats_.state.indexBufferBinds, stats_.state.redundantBindsAvoided,
-                  stats_.state.renderPasses, stats_.state.computePasses, stats_.unclassifiedPasses);
+                  stats_.state.renderPasses, stats_.state.computePasses, stats_.unclassifiedPasses,
+                  // The shadow budget split by who spent it. `geometry.shadow` sums the ecology's
+                  // instanced draws and the entity meshes (terrain chunks among them), and those
+                  // two have very different shapes -- thousands of small instanced draws against a
+                  // handful of large single ones -- so the combined figure's triangles-per-instance
+                  // says nothing about either. Without the split, "shadows submit 1.85x the
+                  // camera's geometry" cannot be turned into a decision about what to change.
+                  procShadow.triangles, procShadow.instances,
+                  g.shadow.triangles - procShadow.triangles,
+                  g.shadow.instances - procShadow.instances);
     }
     // AVGEN_CPU_STAGES=1 prints the breakdown. It is reachable from the API as stats().cpu, but the
     // headless benchmark's own log line is in src/app and a measurement nobody can get at from a
