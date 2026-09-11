@@ -325,6 +325,16 @@ ToolAnnotations sessionWrite(bool destructive = false) {
     return a;
 }
 
+// Replaces a large part of the project in one go -- an ecology, a scene -- but is still inside the
+// snapshot domain, so it is undoable. `destructive` says the previous contents are gone if it is
+// *not* rolled back, which is a different claim from "cannot be undone".
+ToolAnnotations mutatingDestructive() {
+    ToolAnnotations a = mutating();
+    a.destructive = true;
+    a.idempotent = false;
+    return a;
+}
+
 // A project name, used as a directory name. Refused rather than sanitised when it would escape the
 // projects root: an agent that asked for "../../etc" has made a mistake worth reporting, and
 // quietly rewriting it to something safe teaches it nothing and hides the bug.
@@ -743,7 +753,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "which is the answer worth reading: a recipe whose library has nothing the weights ask for "
         "composes successfully and puts nothing in the world.",
         schema::object({{"recipe", schema::string("Recipe name, as reported by world.list_recipes")}}),
-        sessionWrite(true),
+        mutatingDestructive(),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string name = args.value("recipe", std::string{});
             if (name.empty()) {
@@ -967,7 +977,7 @@ void registerParameterTools(ToolRegistry& registry) {
         schema::object({{"time", schema::number("Seconds from the start of the piece")},
                         {"name", schema::string("What this moment is, e.g. CHORUS")},
                         {"kind", schema::string("section (default) or cue")}}),
-        sessionWrite(),
+        mutating(),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             if (!args.contains("time") || !args.at("time").is_number()) {
                 return ToolResult::failure(ToolErrorCode::InvalidArguments, "a marker needs a time");
@@ -1013,7 +1023,7 @@ void registerParameterTools(ToolRegistry& registry) {
                         {"start", schema::number("Seconds from the start of the piece")},
                         {"duration", schema::number("Seconds (default 8)")},
                         {"scene", schema::string("Scene slot id; empty inherits the previous shot's")}}),
-        sessionWrite(),
+        mutating(),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string name = args.value("name", std::string{});
             if (name.empty()) {
@@ -1075,7 +1085,7 @@ void registerParameterTools(ToolRegistry& registry) {
                         {"end", schema::number("Seconds; must be after start")},
                         {"id", schema::string("Stable id; derived from the text when omitted")},
                         {"style", schema::string("A named style the composition owns")}}),
-        sessionWrite(),
+        mutating(),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string text = args.value("text", std::string{});
             if (text.empty()) {
@@ -1207,7 +1217,7 @@ void registerParameterTools(ToolRegistry& registry) {
                         {"falloff", schema::string("constant, linear, smooth (default) or inverseSquare")},
                         {"tags", schema::array(schema::string("tag"),
                                                "Entity tags or profile names it governs; empty means all")}}),
-        sessionWrite(),
+        mutating(),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             scene::Composition* comp = ctx.engine().composition();
             if (comp == nullptr) {
@@ -1403,6 +1413,227 @@ void registerParameterTools(ToolRegistry& registry) {
                                  "the frustum";
             }
             return ToolResult::ok(std::move(out), fmt::format("{} node(s) in frame", shown));
+        });
+
+    // ---- making and unmaking objects ---------------------------------------------------------------
+    //
+    // The verb the whole tool surface was missing. Everything else here edits something a person
+    // already placed; these three put an object in the world, take one out, and say what belongs to
+    // what.
+    //
+    // They are `mutating()` -- inside the snapshot domain -- which is only true because the
+    // transaction now captures the composition as well as the parameters (see
+    // `SnapshotStore::captureDocument`). Before that, a rollback would have restored a tool's
+    // numbers and left the object it made standing in the scene.
+    add(registry, "scene.create_node", "Create a node",
+        "Put an object in the scene: a glTF asset by file, or an empty Group to parent things to. "
+        "The asset path is resolved against the folders this session may read, so a model that is "
+        "not reachable is refused here rather than becoming a node that renders nothing.",
+        schema::object({{"name", schema::string("Node name; must not already exist")},
+                        {"kind", schema::string("gltf (default) or group")},
+                        {"asset", schema::string("Path to the .gltf/.glb, for kind gltf")},
+                        {"parent", schema::string("Parent node name; omit for the root")},
+                        {"position", schema::array(schema::number("metres"), "World position", 3, 3)},
+                        {"scale", schema::number("Uniform scale (default 1)")},
+                        {"rotationDegrees", schema::array(schema::number("degrees"), "Euler XYZ", 3, 3)}}),
+        mutating(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            app::Engine& engine = ctx.engine();
+            scene::Composition* comp = engine.composition();
+            if (comp == nullptr) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "this session has no composition to put a node in",
+                                           "open a project with a scene, or generate a world first");
+            }
+            const std::string name = args.value("name", std::string{});
+            if (name.empty()) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "a node needs a name");
+            }
+            if (comp->findNode(name) != nullptr) {
+                return ToolResult::failure(ToolErrorCode::Conflict,
+                                           fmt::format("a node called '{}' already exists", name),
+                                           "names address nodes everywhere else in this API, so two "
+                                           "of them would make one unreachable");
+            }
+            const std::string kindName = args.value("kind", std::string("gltf"));
+            auto kind = scene::nodeKindFromName(kindName);
+            if (!kind) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                           fmt::format("'{}' is not a node kind", kindName),
+                                           "use gltf for a model, or group for an empty transform");
+            }
+            if (*kind != scene::NodeKind::Gltf && *kind != scene::NodeKind::Group) {
+                return ToolResult::failure(
+                    ToolErrorCode::Unsupported,
+                    fmt::format("this tool does not create a '{}' node", kindName),
+                    "gltf and group are what an assistant can place meaningfully; terrain, "
+                    "procedural and particle nodes carry settings blocks that belong in a scene file");
+            }
+            scene::CompositionNode node;
+            node.name = name;
+            node.kind = *kind;
+            if (*kind == scene::NodeKind::Gltf) {
+                const std::string asset = args.value("asset", std::string{});
+                if (asset.empty()) {
+                    return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                               "a gltf node needs an asset");
+                }
+                const auto resolved = ctx.resolveContent(asset);
+                if (!resolved) {
+                    return ToolResult::failure(
+                        ToolErrorCode::NotFound,
+                        fmt::format("'{}' is not inside a folder this session may read", asset),
+                        "asset.list_importable reports the models that are reachable");
+                }
+                std::error_code ec;
+                if (!std::filesystem::is_regular_file(*resolved, ec)) {
+                    return ToolResult::failure(ToolErrorCode::NotFound,
+                                               fmt::format("'{}' is not a file", resolved->string()));
+                }
+                node.asset = *resolved;
+            }
+            const std::string parent = args.value("parent", std::string{});
+            if (!parent.empty()) {
+                if (comp->findNode(parent) == nullptr) {
+                    return ToolResult::failure(ToolErrorCode::NotFound,
+                                               fmt::format("no parent node called '{}'", parent));
+                }
+                node.parent = parent;
+            }
+            if (args.contains("position") && args.at("position").is_array() &&
+                args.at("position").size() == 3) {
+                node.transform.position = glm::vec3(args.at("position")[0].get<float>(),
+                                                    args.at("position")[1].get<float>(),
+                                                    args.at("position")[2].get<float>());
+            }
+            if (args.contains("rotationDegrees") && args.at("rotationDegrees").is_array() &&
+                args.at("rotationDegrees").size() == 3) {
+                node.transform.rotation = glm::vec3(args.at("rotationDegrees")[0].get<float>(),
+                                                    args.at("rotationDegrees")[1].get<float>(),
+                                                    args.at("rotationDegrees")[2].get<float>());
+            }
+            const auto uniform = static_cast<float>(args.value("scale", 1.0));
+            node.transform.scale = glm::vec3(uniform);
+
+            const auto added = comp->addNode(std::move(node));
+            if (!added) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, added.error().message);
+            }
+            // What it actually came out as, read back: a model whose bounds are empty loaded
+            // nothing, and that is invisible in every other report.
+            const scene::WorldBounds bounds = comp->nodeBounds(name);
+            json out{{"name", name},
+                     {"kind", scene::nodeKindName(*kind)},
+                     {"parent", (*added)->parent},
+                     {"nodes", comp->nodes().size()}};
+            out["bounds"] = json{{"valid", bounds.valid},
+                                 {"size", {bounds.size().x, bounds.size().y, bounds.size().z}}};
+            if (*kind == scene::NodeKind::Gltf && !bounds.valid) {
+                out["warning"] = "the node was created but has no geometry: the asset loaded nothing";
+            }
+            return ToolResult::ok(std::move(out), fmt::format("created '{}'", name));
+        });
+
+    add(registry, "scene.delete_node", "Delete a node",
+        "Remove a node from the scene. Its children go with it, so deleting a group deletes what it "
+        "holds -- the count is reported rather than left to be discovered.",
+        schema::object({{"name", schema::string("Node name")}}), mutating(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            scene::Composition* comp = ctx.engine().composition();
+            if (comp == nullptr) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, "this session has no composition");
+            }
+            const std::string name = args.value("name", std::string{});
+            if (comp->findNode(name) == nullptr) {
+                return ToolResult::failure(ToolErrorCode::NotFound,
+                                           fmt::format("no node called '{}'", name),
+                                           "scene.find_nodes reports the canonical names");
+            }
+            const std::size_t before = comp->nodes().size();
+            // The subtree, deepest first. `Composition::removeNode` takes one node and leaves its
+            // children behind pointing at a parent that no longer exists -- an orphan whose world
+            // transform is then whatever the root's is, which reads as an object that teleported.
+            // Deleting a group has to mean deleting what it holds.
+            std::vector<std::string> doomed{name};
+            for (std::size_t i = 0; i < doomed.size(); ++i) {
+                for (const auto& candidate : comp->nodes()) {
+                    if (candidate->parent == doomed[i] &&
+                        std::ranges::find(doomed, candidate->name) == doomed.end()) {
+                        doomed.push_back(candidate->name);
+                    }
+                }
+            }
+            for (auto it = doomed.rbegin(); it != doomed.rend(); ++it) {
+                comp->removeNode(*it);
+            }
+            const std::size_t after = comp->nodes().size();
+            return ToolResult::ok(json{{"name", name},
+                                       {"removed", before - after},
+                                       {"nodes", after}},
+                                  fmt::format("removed {} node(s)", before - after));
+        });
+
+    add(registry, "scene.set_parent", "Re-parent a node",
+        "Move a node under another, or to the root. The node keeps its own local transform, so it "
+        "moves with its new parent rather than staying where it looked -- which is what parenting "
+        "means and is worth knowing before using it to tidy a scene.",
+        schema::object({{"name", schema::string("Node to move")},
+                        {"parent", schema::string("New parent; empty moves it to the root")}}),
+        mutating(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            app::Engine& engine = ctx.engine();
+            scene::Composition* comp = engine.composition();
+            if (comp == nullptr) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, "this session has no composition");
+            }
+            const std::string name = args.value("name", std::string{});
+            scene::CompositionNode* node = comp->findNode(name);
+            if (node == nullptr) {
+                return ToolResult::failure(ToolErrorCode::NotFound,
+                                           fmt::format("no node called '{}'", name));
+            }
+            const std::string parent = args.value("parent", std::string{});
+            if (!parent.empty()) {
+                if (comp->findNode(parent) == nullptr) {
+                    return ToolResult::failure(ToolErrorCode::NotFound,
+                                               fmt::format("no node called '{}'", parent));
+                }
+                if (parent == name) {
+                    return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                               "a node cannot be its own parent");
+                }
+                // Walking up from the proposed parent: if this node is on that path, the assignment
+                // would make a cycle, and a cycle in the transform hierarchy is an infinite loop the
+                // next frame rather than an error anybody sees.
+                for (const scene::CompositionNode* up = comp->findNode(parent); up != nullptr;) {
+                    if (up->name == name) {
+                        return ToolResult::failure(
+                            ToolErrorCode::Conflict,
+                            fmt::format("'{}' is already inside '{}'", parent, name),
+                            "that would make the hierarchy a loop");
+                    }
+                    up = up->parent.empty() ? nullptr : comp->findNode(up->parent);
+                }
+            }
+            const std::string was = node->parent;
+            // Detach and re-add rather than writing `parent` in place: `addNode` is what marks the
+            // composition dirty and rebuilds the hierarchy, and a field written behind its back
+            // would take effect at whatever unrelated moment something else caused a rebuild.
+            std::unique_ptr<scene::CompositionNode> detached = comp->detachNode(name);
+            if (detached == nullptr) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           fmt::format("'{}' could not be detached", name));
+            }
+            detached->parent = parent;
+            const auto added = comp->addNode(std::move(*detached));
+            if (!added) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, added.error().message);
+            }
+            return ToolResult::ok(json{{"name", name},
+                                       {"parent", parent},
+                                       {"previousParent", was}},
+                                  parent.empty() ? fmt::format("'{}' moved to the root", name)
+                                                 : fmt::format("'{}' is now under '{}'", name, parent));
         });
 
     add(registry, "parameter.list_groups", "Parameter groups",

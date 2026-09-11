@@ -1,6 +1,8 @@
 #include "ai/transaction.hpp"
 
 #include "app/engine.hpp"
+#include "seq/sequence.hpp"
+#include "scene/composition.hpp"
 #include "core/log.hpp"
 #include "params/serialization.hpp"
 
@@ -47,6 +49,18 @@ nlohmann::json SnapshotStore::captureDocument(const app::Engine& engine) {
     nlohmann::json doc = params::saveProject(mutableEngine.params(), mutableEngine.modulator(),
                                              nullptr, &mutableEngine.presets());
     doc["timeline"] = mutableEngine.timeline().toJson();
+    // The scene graph, and the piece. Both are project state the assistant can now *create* things
+    // in -- a node, an entity, a field, a shot, an overlay -- and a transaction that covered only
+    // the parameter half would have rolled back a tool's numbers while leaving the object it made
+    // standing in the scene. Captured as documents rather than as edits because the composition
+    // already knows how to describe itself exactly, and a partial description is how a rollback
+    // quietly loses something.
+    if (const scene::Composition* comp = mutableEngine.composition(); comp != nullptr) {
+        doc["composition"] = comp->toJson();
+    }
+    if (mutableEngine.hasSequence()) {
+        doc["sequence"] = mutableEngine.sequence().toJson();
+    }
     return doc;
 }
 
@@ -62,6 +76,34 @@ Result<void> SnapshotStore::applyDocument(app::Engine& engine, const nlohmann::j
         }
     } else {
         engine.timeline().clear();
+    }
+    // The scene graph goes back *before* the parameters are rebound, because rebuilding a
+    // composition destroys and recreates every parameter it owns: binding first and rebuilding
+    // second would leave every route and track pointing at freed parameters.
+    if (const auto composition = doc.find("composition"); composition != doc.end()) {
+        if (auto r = engine.setCompositionJson(*composition); !r) {
+            return r;
+        }
+        // The composition's own parameters exist again but hold the values the *document* gave
+        // them, not the ones the snapshot recorded, so the parameter half is applied a second time
+        // over the top. Cheap, and it is the difference between restoring a scene and restoring a
+        // scene with the wrong numbers in it.
+        if (auto r = params::loadProject(doc, engine.params(), engine.modulator(), nullptr,
+                                         &engine.presets());
+            !r) {
+            return r;
+        }
+    }
+    if (const auto sequence = doc.find("sequence"); sequence != doc.end()) {
+        auto piece = seq::Sequence::fromJson(*sequence);
+        if (!piece) {
+            return std::unexpected(piece.error());
+        }
+        if (auto r = engine.setSequence(std::move(*piece)); !r) {
+            return std::unexpected(r.error());
+        }
+    } else if (engine.hasSequence()) {
+        engine.clearSequence();
     }
     // Routes and tracks hold raw parameter pointers; after a load they name paths again and have
     // to be resolved. Skipping this is the exact failure ADR-019 hit once already -- a loadProject

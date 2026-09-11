@@ -65,7 +65,10 @@ struct ProjectSnapshot {
     std::string id;      // "snap-1", stable for the session
     std::string label;   // why it was taken
     double createdAt = 0.0; // seconds since the store was constructed
-    nlohmann::json document; // an avgen-project document restricted to the parameter domain
+    // An avgen-project document: the parameter domain, plus the composition and the sequence,
+    // which is everything the tool surface can change. Anything a tool cannot touch is left
+    // out deliberately rather than captured for completeness -- see captureDocument.
+    nlohmann::json document;
 
     [[nodiscard]] nlohmann::json describe() const; // id/label/time/counts, without the payload
 };

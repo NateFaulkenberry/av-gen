@@ -95,6 +95,10 @@ public:
     // file, saving the current composition, and node editing.
     void newComposition();
     [[nodiscard]] Result<void> loadComposition(const std::filesystem::path& path);
+    // The same install from a document already in memory. Exists for the assistant's transaction:
+    // rolling back a created node means putting the previous composition back, and going through a
+    // temporary file to do it would make a rollback depend on the disk.
+    [[nodiscard]] Result<void> setCompositionJson(const nlohmann::json& document);
     [[nodiscard]] Result<void> saveComposition(const std::filesystem::path& path);
     [[nodiscard]] scene::Composition* composition() { return dynamic_cast<scene::Composition*>(controller_.get()); }
     // Adds a node to the current composition (converting the orb/glTF controller into one first).
@@ -376,6 +380,8 @@ public:
 
 private:
     void publishFrame(const analysis::AnalysisFrame& frame);
+    // Shared by loadComposition and setCompositionJson: detach, swap, attach, reapply.
+    [[nodiscard]] Result<void> installComposition(std::unique_ptr<scene::Composition> composition);
     void installController(std::unique_ptr<scene::SceneController> controller);
     Result<void> reapplyEnvironment();
     void updateTimeSignals(const FrameTime& time, bool newAnalysisFrame);

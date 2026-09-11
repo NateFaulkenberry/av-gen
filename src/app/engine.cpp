@@ -1360,23 +1360,38 @@ Result<void> Engine::loadComposition(const std::filesystem::path& rawPath) {
     if (!comp) {
         return std::unexpected(comp.error());
     }
+    compositionPath_ = path;
+    return installComposition(std::move(*comp));
+}
+
+Result<void> Engine::setCompositionJson(const nlohmann::json& document) {
+    // The registry keeps whatever base directory the current composition was loaded against, so a
+    // document restored from memory resolves its assets exactly as the one it replaces did.
+    auto comp = scene::Composition::fromJson(document, registry_);
+    if (!comp) {
+        return std::unexpected(comp.error());
+    }
+    return installComposition(std::move(*comp));
+}
+
+Result<void> Engine::installComposition(std::unique_ptr<scene::Composition> composition) {
+    auto comp = std::move(composition);
     const float masterGain = modulator_.masterGain;
     detachSceneParameters();
     params_.clear();
     modulator_.clearRoutes();
     modulator_.masterGain = masterGain;
-    (*comp)->attach(params_, modulator_);
-    compositionPath_ = path;
+    comp->attach(params_, modulator_);
     // ADR-059: the composition's own `post` block, kept until the parameters it names exist again.
     // `params_.clear()` above destroyed the previous set, and installController below is what
     // re-registers the post parameters -- reading postParams_ before that point is a dangling
     // pointer, which is exactly the bug the first version of this had.
-    const nlohmann::json postJson = (*comp)->postJson();
+    const nlohmann::json postJson = comp->postJson();
     // A scene file may carry its own environment map.
-    if (!(*comp)->environmentMap().empty()) {
-        environmentPath_ = registry_.resolve((*comp)->environmentMap());
+    if (!comp->environmentMap().empty()) {
+        environmentPath_ = registry_.resolve(comp->environmentMap());
     }
-    installController(std::move(*comp));
+    installController(std::move(comp));
     // Now the parameters exist. The project's own `parameters` block is applied at the end of the
     // project load and still overrides anything set here.
     if (auto r = scene::applyPostJson(postJson, postParams_); !r) {

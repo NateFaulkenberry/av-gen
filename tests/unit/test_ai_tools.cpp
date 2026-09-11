@@ -14,6 +14,7 @@
 #include "ai/tool_context.hpp"
 #include "ai/transaction.hpp"
 #include "app/engine.hpp"
+#include "scene/composition.hpp"
 #include "support/synth.hpp"
 #include "audio/audio_file.hpp"
 
@@ -1320,4 +1321,86 @@ TEST_CASE("The frame probe uses the whole bounding box, not the centre", "[ai][t
     INFO("visible " << probe.value["visible"].size() << ", offScreen "
                     << probe.value["offScreen"].get<std::size_t>());
     CHECK(anythingSeen);
+}
+
+// ---- making and unmaking objects ----------------------------------------------------------------
+
+TEST_CASE("The assistant can put an object in the scene and take it out", "[ai][tools][node]") {
+    Fixture f;
+    REQUIRE(f.engine.loadFile(helixScene()).has_value());
+    REQUIRE(f.engine.composition() != nullptr);
+    f.ctx.setContentRoots({std::filesystem::path(AVGEN_SOURCE_DIR) / "assets"});
+    const std::size_t before = f.engine.composition()->nodes().size();
+
+    // A group: an empty transform, which is how a scene gets tidied.
+    const auto group = f.call("scene.create_node", json{{"name", "block-a"}, {"kind", "group"},
+                                                        {"position", {10.0, 0.0, -4.0}}});
+    INFO((group.error ? group.error->message : std::string{}));
+    REQUIRE(group.success);
+    CHECK(f.engine.composition()->nodes().size() == before + 1);
+    REQUIRE(f.engine.composition()->findNode("block-a") != nullptr);
+
+    // A name already in use is a conflict: names address nodes everywhere else in this API, so two
+    // of them would make one unreachable.
+    const auto dup = f.call("scene.create_node", json{{"name", "block-a"}, {"kind", "group"}});
+    CHECK_FALSE(dup.success);
+    REQUIRE(dup.error.has_value());
+    CHECK(dup.error->code == ai::ToolErrorCode::Conflict);
+
+    // An asset outside the readable folders is refused here rather than becoming a node that
+    // renders nothing.
+    const auto outside = f.call("scene.create_node",
+                                json{{"name", "smuggled"}, {"asset", "/etc/passwd"}});
+    CHECK_FALSE(outside.success);
+    REQUIRE(outside.error.has_value());
+    CHECK(outside.error->code == ai::ToolErrorCode::NotFound);
+
+    // Parenting, and the cycle it must refuse.
+    REQUIRE(f.call("scene.create_node", json{{"name", "child"}, {"kind", "group"},
+                                             {"parent", "block-a"}}).success);
+    CHECK(f.engine.composition()->findNode("child")->parent == "block-a");
+    const auto loop = f.call("scene.set_parent", json{{"name", "block-a"}, {"parent", "child"}});
+    CHECK_FALSE(loop.success);
+    REQUIRE(loop.error.has_value());
+    CHECK(loop.error->code == ai::ToolErrorCode::Conflict);
+    CHECK_FALSE(f.call("scene.set_parent", json{{"name", "block-a"}, {"parent", "block-a"}}).success);
+
+    // Moving to the root works and reports what it was.
+    const auto moved = f.call("scene.set_parent", json{{"name", "child"}, {"parent", ""}});
+    REQUIRE(moved.success);
+    CHECK(moved.value["previousParent"].get<std::string>() == "block-a");
+    CHECK(f.engine.composition()->findNode("child")->parent.empty());
+
+    // Deleting a group takes its children with it, and says how many went.
+    REQUIRE(f.call("scene.set_parent", json{{"name", "child"}, {"parent", "block-a"}}).success);
+    const auto removed = f.call("scene.delete_node", json{{"name", "block-a"}});
+    REQUIRE(removed.success);
+    CHECK(removed.value["removed"].get<std::size_t>() == 2);
+    CHECK(f.engine.composition()->findNode("child") == nullptr);
+    CHECK(f.engine.composition()->nodes().size() == before);
+}
+
+TEST_CASE("A created node is inside the transaction that made it", "[ai][tools][node]") {
+    // The reason item 3 waited. A snapshot used to cover the parameter domain only, so rolling a
+    // task back would have restored its numbers and left the object it made standing in the scene.
+    // The snapshot now captures the composition too, and this is what says so.
+    Fixture f;
+    REQUIRE(f.engine.loadFile(helixScene()).has_value());
+    const std::size_t before = f.engine.composition()->nodes().size();
+
+    ai::SnapshotStore store;
+    const std::string id = store.capture(f.engine, "before the assistant ran").id;
+
+    REQUIRE(f.call("scene.create_node", json{{"name", "regrettable"}, {"kind", "group"}}).success);
+    REQUIRE(f.engine.composition()->findNode("regrettable") != nullptr);
+    // ...and a parameter change alongside it, so the test proves the two halves roll back together
+    // rather than one of them happening to work.
+    REQUIRE(f.call("parameter.set", json{{"path", "scene/fogDensity"}, {"value", 0.77}}).success);
+
+    REQUIRE(store.restore(f.engine, id).has_value());
+    CHECK(f.engine.composition()->findNode("regrettable") == nullptr);
+    CHECK(f.engine.composition()->nodes().size() == before);
+    const auto* fog = f.engine.params().find("scene/fogDensity");
+    REQUIRE(fog != nullptr);
+    CHECK(fog->baseComponent(0) < 0.7f); // back to whatever the scene said, not 0.77
 }

@@ -1,8 +1,8 @@
 # The AI control plane's missing verbs
 
-A handoff. **Seven of the eight items are done and on `main`** — the plane went from 35 tools to
-51, and from *no verb that creates anything* to one for each of project, world, media, shot,
-overlay and field, plus a way for the assistant to check its own framing. **Item 3 is the work.**
+**All eight items are done and on `main`.** The plane went from 35 tools to 54, and from *no verb
+that creates anything* to one for each of project, world, media, shot, overlay, field and — the
+last and hardest — the objects in the scene itself.
 
 ## Why this exists
 
@@ -83,40 +83,42 @@ Three decisions in there that the rest of the list should follow:
 Tests: `tests/unit/test_ai_tools.cpp`, tags `[project]`, `[import]`, `[world]`, `[authoring]`,
 `[field]`, `[probe]`. Full suite **1538, green**.
 
-## The one that remains
+## Item 3, and the thing that made it possible
 
-### 3. `scene.create_node` · `delete_node` · `set_parent`
+**`scene.create_node · delete_node · set_parent`.** A glTF asset by file, or an empty Group to
+parent things to. The asset is resolved against the readable folders, so a model that cannot be
+reached is refused here rather than becoming a node that renders nothing.
 
-The big one. The prompt's §6–§12, §21 and §22 all hang off it — city, apartment, bedroom, bathroom,
-stage, band, the walking route.
+The obstacle was never the tools. It was that **a rollback could not undo them**: `SnapshotStore`
+captured `params::saveProject` — parameters, routes, presets, timeline — and a created node is none
+of those. A transaction would have restored a task's numbers and left the object it made standing in
+the scene.
 
-Previously blocked on the transaction story: node creation is outside the snapshot domain, so a
-rollback would leave the node behind. **The editor's undo has since landed** (ADR-092, command
-records rather than snapshots), so the path is now to write a `TransactionSink` over its
-compound-group API and call `ControlPlane::setTransactionSink()`. `ai::TransactionSink` is one
-virtual with `begin`/`commit`/`abort`; nothing else changes — not the orchestrator, not a tool, not
-a test. That was designed as the seam and this is the thing it was designed for.
+The earlier draft of this document offered three ways round that, all of them about reconciling two
+undo mechanisms. The answer turned out to be simpler and is worth recording because the three
+options were all worse: **make the snapshot cover what the tools change.** `Composition::toJson` and
+`seq::Sequence::toJson` already round-trip exactly, and the composition document carries entities and
+fields with it, so the snapshot now captures the scene graph and the piece alongside the parameters.
+One mechanism, widened, instead of two mechanisms kept in step.
 
-Do not add node creation until that sink exists. A create tool with a snapshot-backed transaction
-would report a rollback it cannot perform.
+Two details that are easy to get wrong:
 
-**What I found looking at it, so the next person does not have to.** `ui::EditHistory` has no
-compound-group API — no `beginGroup`/`endGroup`. It has `push(EditCommand)`, `undo`, `redo` and
-`undoSize()`, plus `beginDrag`/`commitDrag` for coalescing a drag. A sink can be written over that:
-record `undoSize()` at `begin`, and on `abort` undo until it is back to that mark.
+- **The scene graph goes back before the parameters are rebound.** Rebuilding a composition destroys
+  and recreates every parameter it owns, so binding first and rebuilding second leaves every route
+  and track pointing at freed parameters. The parameter half is then applied a second time over the
+  restored scene, because otherwise you get the right scene with the wrong numbers in it.
+- **Deleting a node has to delete its children.** `Composition::removeNode` takes one node and
+  leaves them pointing at a parent that no longer exists, which makes their world transform the
+  root's — an object that appears to teleport. The tool walks the subtree and removes it deepest
+  first. A test pins the count.
 
-The harder half is not the sink. **The AI tools do not push `EditCommand`s at all** — `parameter.set`
-writes the parameter directly, and the snapshot sink is what makes that undoable. So a session with
-the editor sink installed would have node creation on the undo stack and parameter edits in a
-snapshot, two mechanisms for one transaction. Decide which of these before writing code:
+Because the snapshot now reaches them, `sequence.add_*`, `field.create` and `world.generate` were
+re-annotated from `mutatesSession` to `mutatesProject` — which was the honest answer all along and
+became true rather than being asserted.
 
-1. Route every mutating tool through `EditHistory` and drop the snapshot sink when an editor exists.
-   Cleanest end state; touches every existing tool.
-2. Give the editor sink both: an undo mark *and* a snapshot, aborting both. Smaller change, two
-   things to keep in step.
-3. Let node CRUD refuse unless the editor sink is installed (`TransactionSink::kind()` already
-   reports what is backing it), and leave parameter tools on snapshots. Smallest, and honest, but
-   node creation then does not work headless.
+`Engine::setCompositionJson` was added for the restore: rolling back a created node means putting
+the previous composition back, and going through a temporary file would make a rollback depend on
+the disk.
 
 ## Three things no amount of tooling reaches
 
@@ -151,5 +153,10 @@ generate a world (§6 in part), wire audio reactivity (§15), and put a music in
 What it still cannot do is **make an object**: no building, no bed, no stage, no protagonist. That
 is item 3, and it is why the city sections remain out of reach.
 
-So run it, but read §30 knowing which boxes cannot tick yet. The honest next acceptance test is the
-prompt with §7–§12 struck out — everything else in it now has a verb.
+Every section of it now has a verb behind it. What remains unreachable is not tooling: the three
+things below are engine features that do not exist, and §8's apartment interior, §21's bathroom and
+§23's traffic are the sections that depend on them.
+
+Run it whole. The honest expectation is that the city gets *built* — nodes placed, block by block —
+and that it does not yet get *laid out*, because a street grid is not something the composer can
+scatter and nothing else places one.
