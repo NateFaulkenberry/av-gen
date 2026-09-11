@@ -1539,14 +1539,20 @@
   {
    "name": "visitor-beam",
    "kind": "particles",
+   "parent": "visitor",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
    "particles": {
     "capacity": 16384,
     "spawnRate": 1050.0,
     "shape": "disc",
     "position": [
-     29.0,
-     46.948845999999996,
-     -126.8
+     0.0,
+     -2.05,
+     0.0
     ],
     "extent": [
      3.6,
@@ -1589,7 +1595,12 @@
      0.0
     ],
     "seed": 20260911,
-    "velocityStretch": 4.5
+    "velocityStretch": 4.5,
+    "attractorPosition": [
+     0.0,
+     -2.05,
+     0.0
+    ]
    },
    "visible": true
   }
