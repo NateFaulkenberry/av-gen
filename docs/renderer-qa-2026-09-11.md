@@ -152,6 +152,10 @@ tone mapping and composition overlay.
 - [x] Choose the first architectural animated-bounds solution: pose before culling and derive
   skinned bounds from the current palette, with bind-pose fallback for invalid/partially weighted
   meshes. Do not permanently disable culling.
+- [x] Ordinary authored mesh nodes now use the same camera-frustum culling path as EntityWorld-
+  driven nodes. Previously `cullEntityNodes()` only visited gameplay entities, leaving authored
+  glTF/static nodes uncullable. A composition regression covers an authored orb moved outside the
+  frustum.
 - [ ] Stress-test the posed-bounds path on large imported characters and measure its CPU cost;
   replace per-vertex evaluation with a cached conservative envelope only if evidence requires it.
 - [ ] Verify character terrain grounding has one authority: world X/Z, terrain query, root motion,

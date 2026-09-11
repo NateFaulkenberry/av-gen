@@ -1179,6 +1179,28 @@ TEST_CASE("A terrain node flattens into chunk entities that pick their own level
     CHECK(s.entities[farChunk].mesh == node->chunks[farChunk].meshes[0]);
 }
 
+TEST_CASE("ordinary authored mesh nodes participate in camera culling", "[composition][culling]") {
+    Fixture fx;
+    scene::Composition composition(fx.registry, "culling");
+    params::ParameterSet parameters;
+    params::Modulator modulator;
+    auto node = makeNode(scene::NodeKind::Orb, "orb");
+    node.transform.position = {0.0f, 0.0f, -8.0f};
+    REQUIRE(composition.addNode(std::move(node)).has_value());
+    composition.attach(parameters, modulator);
+    composition.setViewport(320, 180);
+    composition.update(FrameTime{});
+    REQUIRE(composition.scene().entities.size() == 1);
+    CHECK_FALSE(composition.scene().entities[0].cameraCulled);
+
+    auto* nodePosition = parameters.findAs<glm::vec3>("nodes/orb/position");
+    REQUIRE(nodePosition != nullptr);
+    nodePosition->setBase(glm::vec3(100.0f, 0.0f, -8.0f));
+    parameters.resetFinals();
+    composition.update(FrameTime{});
+    CHECK(composition.scene().entities[0].cameraCulled);
+}
+
 TEST_CASE("A mushroom's cap and its stem keep their own colours", "[composition][mesh][material]") {
     // The symptom docs/world.md recorded. This asset's two materials differ in their *factors*
     // rather than their maps -- a white stem and a red cap -- which is the half of the split that
