@@ -65,9 +65,8 @@ void CompositionPanel::draw(app::Engine& engine) {
     }
     if (stats != nullptr) {
         ImGui::Separator();
-        ImGui::TextDisabled("%u drawn, %u draw call(s), %u item(s), %u glyph(s)%s", stats->layers, stats->draws,
-                            stats->items, stats->glyphs,
-                            stats->gpuMs >= 0.0 ? "" : "");
+        ImGui::TextDisabled("%u drawn, %u draw call(s), %u item(s), %u glyph(s)", stats->layers, stats->draws,
+                            stats->items, stats->glyphs);
         if (stats->gpuMs >= 0.0) {
             ImGui::SameLine();
             ImGui::TextDisabled("  %.3f ms GPU", stats->gpuMs);
@@ -131,9 +130,8 @@ void CompositionPanel::drawList(app::Engine& engine) {
                 continue;
             }
             ImGui::PushID(static_cast<int>(layer->id));
-            if (ImGui::Checkbox("##on", &layer->enabled) && !layer->enabled) {
-                // Nothing else to do: the stack skips a disabled layer when it builds the frame.
-            }
+            // Nothing to do on a change: the stack skips a disabled layer when it builds the frame.
+            ImGui::Checkbox("##on", &layer->enabled);
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("visible");
             }
@@ -237,7 +235,6 @@ void CompositionPanel::drawInspector(app::Engine& engine, comp::Layer& layer) {
         layer.name = nameBuffer_;
     }
 
-    bool changed = false;
     if (auto* text = dynamic_cast<comp::TextLayer*>(&layer)) {
         drawTextInspector(engine, *text);
     } else if (auto* shape = dynamic_cast<comp::ShapeLayer*>(&layer)) {
@@ -247,20 +244,20 @@ void CompositionPanel::drawInspector(app::Engine& engine, comp::Layer& layer) {
     if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
         keyDot(engine, layer.parameterPath("position"));
         rowLabel("position");
-        changed |= ImGui::DragFloat2("##position", &layer.position.x, 0.002f, -4.0f, 5.0f, "%.3f");
+        ImGui::DragFloat2("##position", &layer.position.x, 0.002f, -4.0f, 5.0f, "%.3f");
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("fraction of the frame, origin bottom left. (0.5, 0.5) is the centre "
                               "at every resolution.");
         }
         keyDot(engine, layer.parameterPath("scale"));
         rowLabel("scale");
-        changed |= ImGui::DragFloat2("##scale", &layer.scale.x, 0.005f, 0.0f, 20.0f, "%.3f");
+        ImGui::DragFloat2("##scale", &layer.scale.x, 0.005f, 0.0f, 20.0f, "%.3f");
         keyDot(engine, layer.parameterPath("rotation"));
         rowLabel("rotation");
-        changed |= ImGui::DragFloat("##rotation", &layer.rotation, 0.25f, -3600.0f, 3600.0f, "%.1f deg");
+        ImGui::DragFloat("##rotation", &layer.rotation, 0.25f, -3600.0f, 3600.0f, "%.1f deg");
         keyDot(engine, layer.parameterPath("anchor"));
         rowLabel("anchor");
-        changed |= ImGui::DragFloat2("##anchor", &layer.anchor.x, 0.005f, -2.0f, 3.0f, "%.3f");
+        ImGui::DragFloat2("##anchor", &layer.anchor.x, 0.005f, -2.0f, 3.0f, "%.3f");
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("what the layer turns and scales about, as a fraction of its own box");
         }

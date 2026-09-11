@@ -70,8 +70,8 @@
         ],
         "blend": "normal",
         "color": [
-          0.93,
-          0.99,
+          0.96,
+          1.0,
           1.0,
           1.0
         ],
@@ -96,13 +96,18 @@
         "opacity": 1.0,
         "position": [
           0.5,
-          0.52
+          0.655
         ],
         "rotation": 0.0,
         "scale": [
           1.0,
           1.0
         ],
+        "shadowOffset": [
+          0.01,
+          -0.012
+        ],
+        "shadowOpacity": 0.35,
         "size": 0.075,
         "start": 0.8,
         "text": "GLOWMERE",

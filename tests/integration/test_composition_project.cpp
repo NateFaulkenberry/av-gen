@@ -242,3 +242,72 @@ TEST_CASE("a layer property is a modulation target like any other", "[compositio
     REQUIRE(it != routes.end());
     CHECK(it->targetParam != nullptr);
 }
+
+TEST_CASE("the authoring loop: add, type, place, key, play", "[composition][project][authoring]") {
+    // The sequence the Composition panel performs, through the same engine calls it makes. The
+    // panel's pixels cannot be tested here; the loop underneath them can, and it is the loop the
+    // whole feature is judged by.
+    app::Engine engine(app::EngineMode::Offline);
+    const comp::Frame frame{1920, 1080};
+
+    // 1. "+ Add Layer -> Text" at the playhead.
+    comp::TextLayer& text = engine.addTextLayer("Your words here", 0.0);
+    CHECK(engine.layers().size() == 1);
+    CHECK(engine.layers().build(frame, 0.0).drawnLayers == 1);
+
+    // 2. Type.
+    text.setText("hold the light");
+    // 3. Drag it into the lower third.
+    text.position = glm::vec2(0.5f, 0.2f);
+    text.size = 0.07f;
+    text.pushAuthored();
+    const std::uint64_t afterTyping = engine.layers().vertexVersion();
+    engine.layers().build(frame, 0.0);
+
+    // 4. Choose a face. The one on this machine, whatever it is called: the point is that picking
+    //    a family re-shapes and the layer says what it got.
+    comp::FontDesc font = text.font();
+    if (!comp::fontBackend().families().empty()) {
+        font.family = comp::fontBackend().families().front();
+        font.postScriptName.clear();
+        text.setFont(font);
+    }
+    engine.layers().build(frame, 0.0);
+    CHECK(engine.layers().vertexVersion() > afterTyping); // a new face re-shapes; a new size does not
+
+    // 5. Move the playhead, set the value, press the key dot. Twice.
+    const std::string path = text.parameterPath("opacity");
+    text.opacity = 0.0f;
+    text.pushAuthored();
+    REQUIRE(engine.timeline().recordKey(engine.params(), path, -1, 8.0) != nullptr);
+    text.opacity = 1.0f;
+    text.pushAuthored();
+    REQUIRE(engine.timeline().recordKey(engine.params(), path, -1, 9.0) != nullptr);
+    CHECK(engine.timeline().isAutomated(path)); // the dot lights up
+
+    // 6. Play. The engine's own update drives it: signals, timeline, modulation, then the layers.
+    FixedStepClock clock(60.0);
+    clock.restartAt(0.0);
+    std::vector<float> opacityOverTime;
+    for (int f = 0; f <= 600; ++f) {
+        const FrameTime time = engine.tick(clock);
+        engine.update(time);
+        engine.layers().build(frame, engine.timelineClock().seconds);
+        opacityOverTime.push_back(text.resolvedOpacity());
+    }
+    CHECK(opacityOverTime[0] == Approx(0.0f).margin(1e-4f));      // t = 0
+    CHECK(opacityOverTime[8 * 60] == Approx(0.0f).margin(1e-3f)); // t = 8, the first key
+    CHECK(opacityOverTime[9 * 60] == Approx(1.0f).margin(1e-3f)); // t = 9, the second
+    CHECK(opacityOverTime[10 * 60] == Approx(1.0f).margin(1e-4f));
+    // It really is a fade and not a jump.
+    CHECK(opacityOverTime[8 * 60 + 30] > 0.3f);
+    CHECK(opacityOverTime[8 * 60 + 30] < 0.7f);
+
+    // 7. Duplicate it for the second line, which is what an author does next.
+    comp::Layer* second = engine.duplicateLayer(text.id);
+    REQUIRE(second != nullptr);
+    CHECK(engine.layers().indexOf(second->id) == 1);
+    CHECK(engine.params().find(second->parameterPath("opacity")) != nullptr);
+    // The copy has its own parameters, so keying one does not move the other.
+    CHECK(second->parameterPath("opacity") != path);
+}

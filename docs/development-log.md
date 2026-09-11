@@ -1142,3 +1142,73 @@ against a stable contract.
   can pop at the frustum edge; it is opt-in per object for that reason.
 - The graph is an authoring layer: a scene is either graph-driven or hand-made, since re-evaluation
   replaces what the graph installed.
+
+## 2026-09-10 — The 2D composition: text, shapes and layers above the render (ADR-081)
+
+The engine could make a picture. It could not make a finished piece: no titles, no lyrics, no
+captions, no framing. The gap between "this looks extraordinary" and "this is a music video" was
+entirely made of things that live above the render.
+
+### What was built
+
+`avgen::comp::LayerStack` — an ordered stack of 2D layers drawn over the tone-mapped frame,
+knowing nothing about the scene behind it. Named `LayerStack` and not `Composition` because
+`scene::Composition` already means the 3D authoring tree and the CLI already spends
+`--composition` on it; the word keeps its artist meaning in the UI and the project file.
+
+The coupling to the renderer is one virtual call — `rendering::FrameOverlay`, six lines in
+`scene_renderer.cpp`, null by default — placed after the tone map and before the frame timeline
+resolves. Because it is inside `render()`, every path the renderer already has gets the
+composition: the editor window, the offline job, `renderToImage`, screenshots, projection outputs.
+
+Layers composite **after** the tone map, in display-referred space. Compositing into the HDR
+buffer would put every layer through AgX, so `#FFFFFF` would come out a desaturated off-white
+whose value depended on the scene's exposure that frame. The price of the choice is that layers
+cannot bloom and EXR output does not contain them; the render job says so when asked for that
+combination, rather than shipping a sequence somebody finds has no captions in a grade.
+
+Text is shaped by CoreText and rasterised from glyph **outlines** rather than drawn — drawing goes
+through hinting and font smoothing, which are tuned for a screen and vary with system preferences,
+and an atlas that depends on appearance settings is an atlas that breaks determinism. The coverage
+is rasterised at 4x and turned into a signed distance field by an exact Euclidean distance
+transform, with the distances averaged down rather than the coverage. Fields are cached by face
+and glyph id and **not by size**, so an animated font size rebuilds nothing, and the fill, the
+outline, the glow and the drop shadow all read one field in one pass.
+
+Every animatable property is an ordinary parameter under `layers/<id>/<property>`, registered
+before the timeline binds. So layers keyframe on the existing timeline with the existing
+interpolation, and follow the bass through the existing modulation routes. No text-specific
+animation code was written, and no second timeline exists.
+
+### Results
+
+- 995 unit tests and 171 of 173 GPU tests pass. The two failures are pre-existing and unrelated
+  (an ADR-077 triangle-count expectation, and a shadow-pass timing ratio measuring at the
+  timestamp resolution floor); both fail identically with the composition hook removed.
+- 1920x1080 GPU pass cost: 1 layer 0.016 ms, 10 layers 0.016 ms, 100 layers 0.101 ms, 200 layers
+  0.219 ms. All of them one draw call, because runs that are normally switched off are packed at
+  the end of the vertex buffer so skipping them does not break contiguity. With no layers the
+  pass is not encoded at all.
+- A frame produced by the real `RenderJob` is byte-identical to the same second produced through
+  the interactive encode path. `examples/composition/glowmere-lyrics.json` renders to the same
+  sequence hash on repeated runs of the process.
+
+### Bugs found and fixed
+
+- A stroke-only shape's glow was measured from the shape's outline rather than from what it
+  actually draws, so a border's glow filled the whole picture with a milky wash. Found by looking
+  at the first showcase render, not by a test.
+- `Timeline::bind` could only log its unresolved targets. `Timeline::unboundTargets()` now keeps
+  them, and the Composition panel shows them — the silence here is what made two earlier features
+  do nothing without saying so (ADR-075, ADR-080).
+
+### Known limitations
+
+- Layers do not bloom, and EXR output does not carry them.
+- Font portability is not solved, only made honest: a project moved to a machine without the face
+  renders with different type and says so at error level.
+- Tracking, line spacing, alignment and the text itself rebuild geometry and therefore do not
+  keyframe. Position, scale, rotation, anchor, opacity, colour, size, outline, glow and shadow do.
+- No viewport direct manipulation: the inspector is the only way to place a layer.
+- Image, Video, Shader and Nested Composition layers are not implemented; the abstraction that
+  would carry them is the one Text and Shape already use.
