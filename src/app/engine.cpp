@@ -1278,11 +1278,24 @@ Result<double> Engine::loadAudio(const std::filesystem::path& path) {
         }
         runner_ = std::make_unique<analysis::AnalysisRunner>(analyzerConfig_, player_->analysisStream());
         runner_->start();
-    } else {
-        track_ = std::make_unique<analysis::AnalysisTrack>(analysis::AnalysisTrack::analyze(*shared, analyzerConfig_));
-        offlineFrameCursor_ = 0;
-        log::info("offline analysis: {} frames", track_->frames().size());
     }
+    // The whole-track analysis, in *both* modes.
+    //
+    // Live playback reads the runner's per-frame stream and never touches this, so it was only
+    // built offline -- which meant `track()` was null in the windowed application and anything
+    // needing the whole piece could not exist there. The camera director is exactly that: a musical
+    // structure is a fold over a complete track, so "Direct to Music" could never enable no matter
+    // how much audio was loaded. A loaded *file* is a finite, known signal and can be analysed up
+    // front whatever mode is playing it; a live input genuinely has no track and correctly gets
+    // none.
+    //
+    // It costs one pass over the file at load -- about 130 ms for ninety seconds -- and both of the
+    // places that read `track_` are already behind a mode or player check, so this is inert for
+    // live rendering.
+    track_ = std::make_unique<analysis::AnalysisTrack>(
+        analysis::AnalysisTrack::analyze(*shared, analyzerConfig_));
+    offlineFrameCursor_ = 0;
+    log::info("analysed '{}': {} frames", path.filename().string(), track_->frames().size());
     audioFile_ = shared;
     audioPath_ = path;
     modulator_.resetState();
