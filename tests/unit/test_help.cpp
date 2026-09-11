@@ -644,14 +644,22 @@ TEST_CASE("Every shortcut in the reference is bound, and every binding is in the
     const help::AppSurface surface = help::scanApplicationSource(sourceRoot());
     REQUIRE(surface.coverage.ok());
 
-    // This is the pair of checks that makes §9 safe to leave short. If the editor pass adds a key,
-    // the second half fails; if it removes one, the first half does.
+    // This is the pair of checks that makes the short §9 reference safe to ship. If a later pass
+    // removes a key, the first half fails; if it adds one, the second half does. Both failures are
+    // the point, so both messages say exactly what to do about them.
     for (const help::HelpShortcut& shortcut : db.featureTable().shortcuts()) {
-        INFO("documented: " << shortcut.command << " = " << shortcut.keys);
+        INFO("docs/help/features.json documents '" << shortcut.command << "' as '" << shortcut.keys
+             << "', and the source scan found no handler that binds it. Either the binding was "
+                "removed -- delete the row -- or the scan can no longer see it, which "
+                "help::scanApplicationSource needs teaching about.");
         CHECK(surface.hasShortcutKeys(shortcut.keys));
     }
     for (const help::AppShortcut& bound : surface.shortcuts) {
-        INFO("bound at " << bound.sourceRef << ": " << bound.keys);
+        INFO("'" << bound.keys << "' is bound at " << bound.sourceRef
+             << " and is in no Help topic. Add a row to docs/help/features.json under "
+                "\"shortcuts\" (command, keys, context, description, document) and list it in "
+                "docs/help/reference-shortcuts.md. This check is how a new binding gets documented "
+                "instead of going unmentioned.");
         CHECK(db.getShortcut(bound.keys) != nullptr);
     }
 }
