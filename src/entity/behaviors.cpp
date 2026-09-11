@@ -4,11 +4,13 @@
 #include "core/noise.hpp"
 #include "entity/entity.hpp"
 #include "entity/grounding.hpp"
+#include "entity/nav_grid.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <limits>
+#include <span>
 
 namespace avgen::entity {
 namespace {
@@ -735,6 +737,26 @@ public:
 
     [[nodiscard]] std::string_view kind() const override { return "explore"; }
 
+    // What this character is doing, for a debug overlay (§46) and for a diagnostic. The editor owns
+    // the drawing; navigation owes it the data, and a route nobody outside this class can see is a
+    // route nobody can tell is wrong.
+    [[nodiscard]] std::span<const glm::vec2> route() const { return path_; }
+    [[nodiscard]] std::size_t routeLeg() const { return leg_; }
+    [[nodiscard]] glm::vec3 destination() const { return goal_; }
+    [[nodiscard]] bool hasDestination() const { return hasGoal_; }
+    [[nodiscard]] PathStatus lastPathStatus() const { return lastStatus_; }
+    [[nodiscard]] std::string_view phaseName() const {
+        switch (phase_) {
+        case Phase::Idle: return "idle";
+        case Phase::Select: return "select";
+        case Phase::Navigate: return "navigate";
+        case Phase::Walk: return "walk";
+        case Phase::Arrive: return "arrive";
+        case Phase::Observe: return "observe";
+        }
+        return "idle";
+    }
+
     void registerParameters(params::ParameterSet& params, const std::string& prefix) override {
         speed_ = &params.add(floatDesc(prefix + "speed", speedDefault_, 0.0f, 40.0f));
         runSpeed_ = &params.add(floatDesc(prefix + "runSpeed", runSpeedDefault_, 0.0f, 60.0f));
@@ -781,12 +803,16 @@ public:
         bestProgress_ = std::numeric_limits<float>::max();
         failures_ = 0;
         running_ = false;
+        lastStatus_ = PathStatus::Ok;
         recent_.clear();
         ground_.reset();
     }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
         refreshWalker(ctx);
+        // Declare a body, so other characters have something to walk around (§11). Zero -- the
+        // default -- means "not a body", which is the right answer for anything that flies.
+        state.radius = param(bodyRadius_, bodyRadiusDefault_);
         // Another behaviour has stopped the feet -- `interest` looking at something, a scripted
         // beat. Travel yields rather than competing: the route and the phase are kept, and the walk
         // resumes from where it stopped rather than being re-rolled.
@@ -905,18 +931,43 @@ private:
         const glm::vec2 flat(here.x, here.z);
         const glm::vec2 target(goal_.x, goal_.z);
         const Navigator* navigator = nav(ctx);
-        if (navigator != nullptr && navigator->findPath(flat, target, path_) && !path_.empty()) {
+        if (navigator == nullptr) {
+            phase_ = Phase::Idle;
+            timer_ = 1.0f;
+            return false;
+        }
+        PathRequest request;
+        request.from = flat;
+        request.to = target;
+        request.goalTolerance = param(arrive_, arriveDefault_) * 2.0f;
+        const PathResult route = navigator->requestPath(request);
+        lastStatus_ = route.status;
+        if (route.ok() && !route.waypoints.empty()) {
+            path_ = route.waypoints;
+            goal_ = glm::vec3(route.goal.x, navigator->groundHeight(route.goal), route.goal.y);
             leg_ = 0;
             sinceRepath_ = 0.0f;
             stuckFor_ = 0.0f;
-            bestProgress_ = glm::length(target - flat);
+            bestProgress_ = glm::length(route.goal - flat);
             failures_ = 0;
             phase_ = Phase::Walk;
             return true;
         }
-        // No route. Two more goals, then stand down for a moment: a character that re-planned every
-        // frame from a spot with nowhere to go would spend the whole render planning.
+        if (route.status == PathStatus::AlreadyThere) {
+            phase_ = Phase::Arrive;
+            timer_ = 1.0f;
+            return true;
+        }
+        // No route, and *why* decides what to do about it -- which is the whole reason the seam
+        // returns a reason. §6: a character must not freeze when its destination becomes
+        // unavailable, and one told only "no" has nothing to change.
         ++failures_;
+        // An unreachable goal is not bad luck, it is a fact about the world: this character is on
+        // one side of something and the goal is on the other, and re-rolling will keep landing over
+        // there. Remembering it is what stops the loop from picking the same island repeatedly.
+        if (route.status == PathStatus::Unreachable || route.status == PathStatus::NoGoal) {
+            remember(goal_);
+        }
         if (failures_ >= 3) {
             failures_ = 0;
             hasGoal_ = false;
@@ -1012,9 +1063,25 @@ private:
         state.travel.x += move.x;
         state.travel.z += move.y;
 
+        // Other characters. Separation rather than avoidance: a body that planned around everyone
+        // else would replan every time anyone walked past, and two bodies that each waited for the
+        // other would deadlock. A gentle push out of an overlap is what reads as people making room.
+        if (ctx.world != nullptr && state.radius > 0.0f) {
+            const glm::vec3 among = state.position();
+            const glm::vec2 apart =
+                ctx.world->crowdSeparation(ctx.self, glm::vec2(among.x, among.z), state.radius);
+            const float distance = glm::length(apart);
+            if (distance > 1e-4f) {
+                const float limit = std::min(distance, std::max(speed, 1.0f) * dt);
+                state.travel.x += apart.x / distance * limit;
+                state.travel.z += apart.y / distance * limit;
+            }
+        }
+
         // Whatever the steering did not prevent, the field corrects. This is the guarantee rather
         // than the effort: a body may not end a frame inside a solid, however it got there --
         // terrain regenerated under it, an author dropped a rock on it, a seek put it somewhere.
+        // Last, so a push out of a crowd can never leave a body inside a rock.
         if (navigator != nullptr) {
             const glm::vec3 after = state.position();
             const glm::vec2 push =
@@ -1050,11 +1117,16 @@ private:
             phase_ = Phase::Navigate;
             return false;
         }
-        // A periodic re-plan, because the world is not static: the craft moves, and an editor may
-        // have put something across the route since it was chosen.
+        // Re-plan when the route stops being walkable, rather than only on a timer. The world is
+        // not static: the craft moves, an editor drops a rock across a leg, terrain is regenerated
+        // under a character mid-walk. Checked on the timer's cadence because it re-walks the
+        // remaining legs, which is cheap next to a search and not free.
         if (sinceRepath_ > std::max(repathSeconds_, 1.0f)) {
-            phase_ = Phase::Navigate;
-            return false;
+            if (navigator == nullptr || !navigator->pathValid(flat, path_, leg_)) {
+                phase_ = Phase::Navigate;
+                return false;
+            }
+            sinceRepath_ = 0.0f;
         }
         return false;
     }
@@ -1297,6 +1369,7 @@ private:
     float stuckFor_ = 0.0f;
     float bestProgress_ = 0.0f;
     int failures_ = 0;
+    PathStatus lastStatus_ = PathStatus::Ok;
     std::vector<glm::vec3> recent_;
     GroundFollower ground_;
     // Scratch for the weighted pick, kept so a selection every few seconds does not allocate.

@@ -252,6 +252,21 @@ public:
     // interests without asking; call it directly after moving something that is one.
     void refreshInterestPoints();
 
+    // Characters not walking through each other (§11 of the world-authoring brief).
+    //
+    // Rebuilt once per update from every entity that declared a radius, into the same uniform grid
+    // the static obstacles use -- so separation costs a disc query per character rather than a pass
+    // over every other character. With three entities that distinction is academic; with a crowd it
+    // is the whole thing, and building it on N^2 now would mean rewriting it later.
+    //
+    // It is deliberately *not* part of the navigator's obstacle set. A route is planned over a world
+    // that is not moving; who is standing where is a fact about this frame, and folding it into the
+    // graph would have every character replanning every time anyone walked past.
+    [[nodiscard]] const spatial::ObstacleField& crowd() const { return crowd_; }
+    // The push that takes entity `self` out of the other bodies it is overlapping, in world XZ.
+    // Zero when it is clear, which is the usual answer.
+    [[nodiscard]] glm::vec2 crowdSeparation(std::size_t self, glm::vec2 p, float radius) const;
+
     // Registers every behaviour's knobs. Must run before any route or track is bound: a route
     // bound before its target exists is a route that does nothing, silently, forever.
     void registerParameters(params::ParameterSet& params, const std::string& prefix = "entity/");
@@ -344,6 +359,10 @@ private:
     std::vector<std::pair<std::string, glm::vec3>> landmarks_;
     std::vector<InterestPoint> interests_;
     std::vector<InterestPoint> extraInterests_;
+    // One obstacle per entity with a body, in entity order, so an index into `entities()` is an
+    // index into this. Rebuilt every update: bodies move.
+    spatial::ObstacleField crowd_;
+    std::vector<std::size_t> crowdOwner_; // crowd obstacle index -> entity index
     std::vector<std::string> problems_;
     std::vector<std::string> registered_;
     std::string prefix_ = "entity/";

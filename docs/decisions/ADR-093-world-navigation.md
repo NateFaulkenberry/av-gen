@@ -133,6 +133,57 @@ point and a radius.
 `NavSettings` keeps three fields `WalkRules` does not have — `stepHeight`, `bodyRadius`, `stepOver`.
 Those are properties of a thing that *moves*, and a query about a point has no business knowing them.
 
+### §5 continued — connectivity, and a path request that answers with a reason
+
+A grid of walkable cells does not know that two of them are reachable from each other, and A* finds
+that out the hard way: by opening every cell on one side of a divide before concluding there is no
+other side. In Glowmere that is 9,500 expansions and 1.3 ms to learn a fact that was settled the
+moment the grid was built.
+
+So the walkable set is flood-filled into **connected regions** once, at build time, with *literally*
+the same step rule A* uses — one `stepAllowed` function, shared, because a fill more generous than
+the search would call two cells connected and then never find a route between them. Glowmere's ground
+is 24 regions: one of 21,694 cells and twenty-three pockets totalling 49, which is a fair description
+of a valley with some crevices in it. Islands are now explicit, and the build says so in the log when
+there is more than one.
+
+On top of that sits the seam an action layer uses, and the reason it exists is §6's "characters
+should not freeze forever when their desired destination becomes unavailable". A caller told `false`
+cannot avoid freezing, because it has nothing to change. `Navigator::requestPath` returns a
+`PathStatus`:
+
+| status | what the caller should do about it |
+|---|---|
+| `Ok` | walk it |
+| `AlreadyThere` | you have arrived; the goal was within tolerance |
+| `NoStart` | the mover is somewhere the graph does not recognise — put it back on the ground |
+| `NoGoal` | nothing standable near the destination — pick a nearer or different goal |
+| `Unreachable` | a different region — pick a goal of a different *kind*, not another one over there |
+| `SearchExhausted` | a route may exist; try again, or from somewhere else |
+| `NoGraph` | this world has no navigation graph; only a straight line was checked |
+
+`explore` acts on the distinction: an `Unreachable` or `NoGoal` destination is *remembered* as
+visited, so the weighted pick stops offering the same island over and over, which is exactly the
+freeze §6 names. And `Navigator::pathValid` re-checks a route already in hand without repeating the
+search, which is the replanning trigger — a walker checks it on a cadence rather than replanning on
+a timer, so a route that is still good is kept and one that an editor dropped a rock across is not.
+
+### §11 — Characters not standing in each other
+
+Separation, not avoidance. Two bodies that each planned around the other would replan every time
+anyone walked past, and two that each waited would deadlock facing each other.
+
+`EntityWorld` rebuilds a `spatial::ObstacleField` of `Creature` discs once per update from every
+entity that declared a `radius`, and a behaviour asks it for a push. The same uniform grid as the
+static obstacles, so separation costs a disc query rather than a pass over every other character —
+with three entities that distinction is academic, and building it on N² now would mean rewriting it
+when there is a crowd. `radius` defaults to 0 and that means *not a body*, so a craft hovering over a
+crowd does not shove it.
+
+It is deliberately not part of the navigator's obstacle set: a route is planned over a world that is
+not moving, and who is standing where is a fact about this frame. The push is half-strength and
+applied before the static resolve, so making room for someone can never end with a body inside a rock.
+
 ### §4 — Grounding: a footprint, not a point
 
 `entity::GroundFollower` reads the ground over the body's own footprint — four points on a circle
@@ -223,6 +274,7 @@ Measured on `examples/world/glowmere-stylized.json`, over 60 s of its timeline, 
 | frames under way | 52% | **76%** |
 | frames inside a solid | not measured; walked through trees | **0 of 3,601** |
 | frames in water, or outside the world | not measured | **0 of 3,601** |
+| two bodies started 3.5 m inside each other | — | **clear within 1 s, and after** |
 | float above the surface | unbounded (snapped) | **≤ 0.32 m** |
 | below its own footprint | — | **0** |
 
@@ -233,8 +285,9 @@ frames under way. The floors in the test are set well below all of these.)
 Costs, stated as numbers:
 
 - `isOccupied` over 2,355 obstacles: **24 ns**.
-- A corner-to-corner route across the 640 m valley: **1.3 ms**, about 9,500 cells expanded. A
-  character asks for one every few seconds.
+- A corner-to-corner route across the 640 m valley: **1.3–2 ms**, about 9,500 cells expanded. A
+  character asks for one every few seconds. An *unreachable* one costs a region comparison: two
+  array lookups.
 - Navigation grid build: **~165 ms**, once, at scene load, beside a 50 ms terrain build and about a
   second of glTF decoding. 23,716 cells at 190 KB. Dominated by two full `WorldMap` evaluations per
   cell — one for the ground and one inside `canopyHeightAt` — which is where to look if it ever

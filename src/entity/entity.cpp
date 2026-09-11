@@ -478,13 +478,72 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
     }
 }
 
+glm::vec2 EntityWorld::crowdSeparation(std::size_t self, glm::vec2 p, float radius) const {
+    if (crowd_.empty() || radius <= 0.0f) {
+        return glm::vec2(0.0f);
+    }
+    glm::vec2 push(0.0f);
+    // A disc query into the grid, not a pass over every body. `query` allocates into a caller's
+    // vector, so this keeps its own and pays one allocation the first time rather than one per call.
+    static thread_local std::vector<std::uint32_t> hits;
+    crowd_.query(p, radius, hits);
+    for (const std::uint32_t i : hits) {
+        if (i < crowdOwner_.size() && crowdOwner_[i] == self) {
+            continue; // a body does not push itself
+        }
+        const spatial::NavigationObstacle& other = crowd_.obstacles()[i];
+        const float reach = other.radius + radius;
+        glm::vec2 d = p - other.center;
+        const float distSq = glm::dot(d, d);
+        if (distSq >= reach * reach) {
+            continue;
+        }
+        if (distSq < 1e-6f) {
+            // Exactly coincident. Nothing in the geometry says which way to go, so take a direction
+            // from the pair's own indices: arbitrary, and the same arbitrary answer every frame,
+            // which is what stops two bodies jittering against each other forever.
+            const float angle = static_cast<float>((self + i) % 97u) * 0.06479f;
+            push += glm::vec2(std::cos(angle), std::sin(angle)) * reach;
+            continue;
+        }
+        const float dist = std::sqrt(distSq);
+        // Softer than the static push: bodies yield to each other rather than bouncing, and a
+        // separation that resolved fully in one frame reads as two people repelling like magnets.
+        push += (d / dist) * (reach - dist) * 0.5f;
+    }
+    return push;
+}
+
 void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) {
     if (!parametersLive_) {
         return;
     }
     params_ = &params;
     counts_ = {};
-    for (auto& entityPtr : entities_) {
+    // The crowd, as it was at the end of the last update. Built before anything moves so every
+    // character separates against the same snapshot: building it as they go would make the answer
+    // depend on the order they happen to be stored in.
+    crowd_.clear();
+    crowdOwner_.clear();
+    for (std::size_t i = 0; i < entities_.size(); ++i) {
+        const Entity& entity = *entities_[i];
+        if (!entity.active_ || entity.state_.radius <= 0.0f) {
+            continue;
+        }
+        const glm::vec3 at = entity.state_.position();
+        spatial::NavigationObstacle body;
+        body.center = glm::vec2(at.x, at.z);
+        body.radius = entity.state_.radius;
+        body.base = at.y;
+        body.height = std::max(entity.state_.radius * 2.0f, 1.0f);
+        body.type = spatial::ObstacleType::Creature;
+        crowd_.add(body);
+        crowdOwner_.push_back(i);
+    }
+    crowd_.build();
+
+    for (std::size_t entityIndex = 0; entityIndex < entities_.size(); ++entityIndex) {
+        auto& entityPtr = entities_[entityIndex];
         Entity& entity = *entityPtr;
         const glm::vec3 here = entity.state_.position();
         const float distance = glm::length(here - ctx.viewPosition);
@@ -532,6 +591,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         bc.bus = ctx.bus;
         bc.nav = &nav_;
         bc.world = this;
+        bc.self = entityIndex;
         bc.rng = &entity.rng_;
         for (auto& behavior : entity.behaviors_) {
             behavior->update(bc, entity.state_, entity.motion_);

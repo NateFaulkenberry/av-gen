@@ -28,6 +28,7 @@
 #include <glm/glm.hpp>
 
 #include <memory>
+#include <span>
 #include <vector>
 
 namespace avgen::entity {
@@ -90,6 +91,8 @@ struct NavSample {
 };
 
 class NavGrid;
+struct PathRequest;
+struct PathResult;
 
 class Navigator {
 public:
@@ -170,6 +173,22 @@ public:
     // straight line is clear, which keeps every caller written against this working in a scene
     // that never built a graph.
     [[nodiscard]] bool findPath(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out) const;
+
+    // The path request seam (ADR-093). This is the one an action layer should use: it gets a route
+    // or a *reason*, and the reasons are different things to do about. §6 asks that a character not
+    // freeze forever when its destination becomes unavailable, and a caller told only "false"
+    // cannot tell "try a nearer goal" from "try a different kind of goal" from "try again".
+    //
+    // Deterministic in the sense ADR-091 needs: the same world, the same start and the same goal
+    // give the same waypoints, every time, with no seed and no clock involved. A baked actor's
+    // route survives a re-bake unchanged.
+    [[nodiscard]] PathResult requestPath(const PathRequest& request) const;
+
+    // Whether a route already in hand is still walkable from where the mover now is, checking from
+    // `nextLeg` onwards. This is the replanning trigger: cheap enough to run every second or two,
+    // and it re-checks the legs rather than repeating the search. False means ask for a new path.
+    [[nodiscard]] bool pathValid(glm::vec2 from, std::span<const glm::vec2> waypoints,
+                                 std::size_t nextLeg = 0) const;
 
     // Whether a walker of this size may stand at `p` without being inside a solid. Separate from
     // `sample` so a caller that already has the ground height does not pay for it twice.

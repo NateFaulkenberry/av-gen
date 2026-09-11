@@ -5,18 +5,23 @@
 // (`test_world_navigation.cpp`) measures the same things on Glowmere itself, which is what proves
 // they were wired in; this is what says what they are supposed to do.
 
+#include "entity/entity.hpp"
 #include "entity/grounding.hpp"
 #include "entity/nav_grid.hpp"
 #include "entity/navigation.hpp"
 #include "entity/obstacles.hpp"
 #include "spatial/obstacle_field.hpp"
+#include "params/parameter_set.hpp"
 #include "world/world_map.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <cmath>
 #include <memory>
+#include <string>
 #include <vector>
 
 using namespace avgen;
@@ -317,6 +322,60 @@ TEST_CASE("the navigation graph routes around what steering cannot", "[navigatio
         CHECK(path.size() < 16);
     }
 
+    SECTION("a route is asked for by request and answered with a reason") {
+        // The seam an action layer uses (§6). A reason rather than `false`, because "try a nearer
+        // goal", "try a different kind of goal" and "try again" are three different things to do.
+        entity::PathRequest request;
+        request.from = from;
+        request.to = to;
+        const entity::PathResult route = nav.requestPath(request);
+        INFO("status: " << entity::pathStatusName(route.status));
+        CHECK(route.status == entity::PathStatus::Ok);
+        CHECK(route.ok());
+        CHECK(!route.waypoints.empty());
+        CHECK(route.length > 55.0f);
+        CHECK(route.expansions > 0);
+        CHECK(glm::length(route.goal - to) < 3.0f);
+    }
+
+    SECTION("asking to go where you already are is not a failure") {
+        entity::PathRequest request;
+        request.from = from;
+        request.to = from + glm::vec2(0.4f, 0.0f);
+        request.goalTolerance = 2.0f;
+        const entity::PathResult route = nav.requestPath(request);
+        CHECK(route.status == entity::PathStatus::AlreadyThere);
+        CHECK(route.ok());
+        CHECK(route.waypoints.empty());
+    }
+
+    SECTION("a destination outside the world is named as such, not searched for") {
+        entity::PathRequest request;
+        request.from = from;
+        request.to = glm::vec2(5000.0f, 5000.0f);
+        const entity::PathResult route = nav.requestPath(request);
+        CHECK(route.status == entity::PathStatus::NoGoal);
+        CHECK_FALSE(route.ok());
+        CHECK(route.waypoints.empty());
+    }
+
+    SECTION("a route in hand is re-checked without repeating the search") {
+        std::vector<glm::vec2> path;
+        REQUIRE(nav.findPath(from, to, path));
+        CHECK(nav.pathValid(from, path, 0));
+        // Drop a wall across it. The route is now a route through a rock, and the point of
+        // `pathValid` is that a walker finds that out before walking into it.
+        auto blocked = std::make_shared<spatial::ObstacleField>();
+        for (float z = -95.0f; z <= 95.0f; z += 1.5f) {
+            blocked->add(solid(0.0f, z, 1.2f, 6.0f));
+        }
+        blocked->build();
+        entity::Navigator changed(&map, clearance);
+        changed.setObstacles(blocked);
+        CHECK_FALSE(changed.pathValid(from, path, 0));
+        CHECK_FALSE(changed.pathValid(from, {}, 0)); // an empty route is not a valid one
+    }
+
     SECTION("a wall with no gap is reported as no route, not walked into") {
         // The failure that must not be silent. A planner that shrugged and returned the straight
         // line would put a character into a rock and call it arrival, which is what the rejection
@@ -341,6 +400,48 @@ TEST_CASE("the navigation graph routes around what steering cannot", "[navigatio
             REQUIRE(!path.empty());
             CHECK_FALSE(obstacles->isOccupied(path.back().x, path.back().y, 0.4f));
         }
+    }
+
+    SECTION("the walkable ground is one connected region, and it knows it") {
+        // §5: islands must be explicit. A wall with a gap in it does not divide the world, and the
+        // flood fill has to agree with the search about that -- if it were more generous, two cells
+        // would be called connected and no route would ever be found between them.
+        const entity::NavGridStats& s = nav.grid()->stats();
+        INFO("regions " << s.regions << ", largest " << s.largestRegion << " of " << s.walkable);
+        CHECK(s.regions >= 1);
+        CHECK(nav.grid()->connected(from, to));
+        CHECK(nav.grid()->regionAt(from) != 0);
+        CHECK(nav.grid()->regionAt(from) == nav.grid()->regionAt(to));
+        CHECK(nav.grid()->regionSize(nav.grid()->regionAt(from)) > 100);
+        // A point outside the world belongs to no region.
+        CHECK(nav.grid()->regionAt(glm::vec2(5000.0f, 5000.0f)) == 0);
+    }
+
+    SECTION("a sealed wall makes two regions, and unreachable is answered without searching") {
+        auto sealed = std::make_shared<spatial::ObstacleField>();
+        for (float z = -95.0f; z <= 95.0f; z += 1.5f) {
+            sealed->add(solid(0.0f, z, 1.2f, 6.0f));
+        }
+        sealed->build();
+        entity::Navigator split(&map, clearance);
+        split.setObstacles(sealed);
+        split.buildGrid(2.0f);
+        REQUIRE(split.grid() != nullptr);
+        const entity::NavGridStats& s = split.grid()->stats();
+        INFO("regions " << s.regions << ", largest " << s.largestRegion << " of " << s.walkable);
+        CHECK(s.regions >= 2);
+        CHECK_FALSE(split.grid()->connected(from, to));
+
+        entity::PathRequest request;
+        request.from = from;
+        request.to = to;
+        const entity::PathResult route = split.requestPath(request);
+        CHECK(route.status == entity::PathStatus::Unreachable);
+        CHECK_FALSE(route.ok());
+        // And it cost nothing. Without regions this answer required opening every cell on this side
+        // of the wall first -- in Glowmere, nine and a half thousand of them, for a fact already
+        // known the moment the grid was built.
+        CHECK(route.expansions == 0);
     }
 
     SECTION("the same request always produces the same route") {
@@ -520,5 +621,107 @@ TEST_CASE("a grounded body follows the surface without inheriting its noise", "[
             orphan.update(nowhere, glm::vec2(500.0f, 500.0f), 0.0f, 0.0f, kStep, settings);
         CHECK(result.height == 0.0f);
         CHECK(result.grounded);
+    }
+}
+
+// ---- agent-agent separation (§11) ---------------------------------------------------------------
+
+TEST_CASE("characters make room for each other rather than standing in each other",
+          "[navigation][crowd]") {
+    // Two walkers given the same destination from opposite sides converge on it, and §11 asks that
+    // they not end up inside one another. The mechanism is separation rather than avoidance: bodies
+    // that each planned around the other would replan whenever anyone walked past, and two that each
+    // waited for the other would deadlock facing each other forever.
+    //
+    // The scene is deliberately a flat empty world, because what is being tested is the bodies, not
+    // the terrain.
+    world::WorldMap map;
+    map.name = "flat";
+    map.size = glm::vec2(160.0f, 160.0f);
+    map.prepare();
+    world::Ecology ecology;
+    world::ClearanceField clearance;
+    clearance.map = &map;
+    clearance.ecology = &ecology;
+    const entity::Navigator nav(&map, clearance);
+
+    params::ParameterSet params;
+    entity::EntityWorld world;
+    std::vector<entity::EntityDesc> descs;
+    for (int i = 0; i < 2; ++i) {
+        entity::EntityDesc desc;
+        desc.name = i == 0 ? "one" : "two";
+        desc.seed = static_cast<std::uint32_t>(7717 + i * 13);
+        entity::BehaviorDesc walk;
+        walk.kind = "explore";
+        walk.settings = nlohmann::json{{"speed", 3.0f},     {"runSpeed", 3.0f}, {"bodyRadius", 2.0f},
+                                       {"minRange", 4.0f},  {"maxRange", 60.0f}, {"strollChance", 1.0f},
+                                       {"idleMin", 0.0f},   {"idleMax", 0.0f},  {"observeChance", 0.0f}};
+        desc.behaviors.push_back(walk);
+        descs.push_back(std::move(desc));
+    }
+    world.setEntities(std::move(descs), 4242u);
+    // Two bindings the entities drive nothing through: this test is about the behaviour layer, and
+    // an entity with no node still runs its behaviours (that is the ADR-088 split).
+    std::vector<entity::NodeBinding> bindings;
+    for (const char* name : {"one", "two"}) {
+        entity::NodeBinding binding;
+        binding.node = name;
+        binding.exists = true;
+        binding.transformPrefix = std::string("nodes/") + name + "/";
+        // Half a metre apart, with two-metre bodies: they start three metres inside each other.
+        // Waiting for two wanderers to happen to collide tests nothing -- over nine hundred frames
+        // of an earlier version of this they never met once, and it passed.
+        binding.anchor = glm::vec3(name[0] == 'o' ? -0.25f : 0.25f, 0.0f, 0.0f);
+        bindings.push_back(std::move(binding));
+    }
+    world.setBindings(std::move(bindings));
+    world.setNavigator(nav);
+    world.registerParameters(params, "entity/");
+    world.bind(params, "entity/");
+
+    float worstOverlap = 0.0f;
+    std::size_t framesTouching = 0;
+    float gapAtStart = 0.0f;
+    float worstLateOverlap = 0.0f;
+    for (std::uint64_t frame = 0; frame < 900; ++frame) {
+        entity::EntityUpdate tick;
+        tick.time = static_cast<double>(frame) / 60.0;
+        tick.dt = 1.0 / 60.0;
+        tick.frameIndex = frame;
+        world.update(tick, params);
+        const glm::vec3 a = world.find("one")->locomotion().position;
+        const glm::vec3 b = world.find("two")->locomotion().position;
+        const float gap = glm::length(glm::vec2(a.x - b.x, a.z - b.z));
+        const float overlap = 4.0f - gap; // two 2 m bodies
+        if (frame == 0) {
+            gapAtStart = gap;
+        }
+        if (overlap > 0.0f) {
+            ++framesTouching;
+            worstOverlap = std::max(worstOverlap, overlap);
+            // After a second they have had every chance to resolve it.
+            if (frame > 60) {
+                worstLateOverlap = std::max(worstLateOverlap, overlap);
+            }
+        }
+    }
+    INFO("gap at start " << gapAtStart << " m; worst overlap " << worstOverlap << " m over "
+                         << framesTouching << " frames of 900, worst after the first second "
+                         << worstLateOverlap << " m");
+    // They began three metres inside each other, so the test is only meaningful if that was real.
+    REQUIRE(gapAtStart < 1.5f);
+    // And they got out of each other. Half a metre of a four-metre separation is contact rather
+    // than co-location; anything more is two characters occupying the same ground.
+    CHECK(worstLateOverlap < 0.5f);
+
+    SECTION("a body that declared no radius takes no part in it") {
+        // A craft flies over a crowd. `radius` defaults to 0 and that has to mean "not a body"
+        // rather than "a body of no size", or every hovering thing would shove the ground traffic.
+        CHECK(world.crowd().size() <= world.size());
+        for (const spatial::NavigationObstacle& body : world.crowd().obstacles()) {
+            CHECK(body.radius > 0.0f);
+            CHECK(body.type == spatial::ObstacleType::Creature);
+        }
     }
 }

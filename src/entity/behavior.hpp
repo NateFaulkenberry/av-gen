@@ -21,6 +21,7 @@
 #include <glm/glm.hpp>
 #include <nlohmann/json.hpp>
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -49,6 +50,10 @@ struct EntityState {
     float speed = 0.0f;       // horizontal m/s
     float turnRate = 0.0f;    // rad/s, signed
     Activity activity = Activity::Idle;
+    // How wide this thing is, in metres. 0 means "not a body": it takes part in nothing that
+    // separates crowds, which is right for a craft that flies over them. A behaviour that knows its
+    // character's size writes it here, and `EntityWorld` collects them into the crowd field (§11).
+    float radius = 0.0f;
     float reaction = 0.0f;    // 0..1, decaying
     glm::vec3 lookTarget{0.0f};
     bool hasLookTarget = false;
@@ -65,6 +70,9 @@ struct BehaviorContext {
     const signals::SignalBus* bus = nullptr;
     const Navigator* nav = nullptr;
     const EntityWorld* world = nullptr;
+    // Which entity this is, as an index into `EntityWorld::entities()`. What lets a behaviour ask
+    // the crowd field to push it away from everyone *except itself* without a name comparison.
+    std::size_t self = 0;
     Rng* rng = nullptr;  // this entity's own stream, seeded from the scene seed and the entity name
 
     // Reads a signal by name, 0 when the bus has no such signal. Behaviours resolve names once and

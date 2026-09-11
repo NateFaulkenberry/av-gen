@@ -28,7 +28,35 @@ struct Frontier {
     }
 };
 
+// Whether a step from `c` to `c + d` is one A* would take. Kept as one function because the region
+// flood fill and the search must agree exactly: if the fill is more generous than the search, two
+// cells are called connected and no route is ever found between them, which is the worst of both.
+template <typename Walkable>
+bool stepAllowed(glm::ivec2 c, glm::ivec2 d, Walkable&& walkable) {
+    if (!walkable(c + d)) {
+        return false;
+    }
+    if (d.x != 0 && d.y != 0) {
+        // No cutting a corner a body would not fit round.
+        return walkable(glm::ivec2(c.x + d.x, c.y)) && walkable(glm::ivec2(c.x, c.y + d.y));
+    }
+    return true;
+}
+
 } // namespace
+
+const char* pathStatusName(PathStatus status) {
+    switch (status) {
+    case PathStatus::Ok: return "ok";
+    case PathStatus::AlreadyThere: return "already there";
+    case PathStatus::NoGraph: return "no navigation graph";
+    case PathStatus::NoStart: return "nowhere to start from";
+    case PathStatus::NoGoal: return "nowhere to stand at the destination";
+    case PathStatus::Unreachable: return "unreachable: a different region";
+    case PathStatus::SearchExhausted: return "search budget exhausted";
+    }
+    return "unknown";
+}
 
 void NavGrid::clear() {
     cells_.clear();
@@ -38,6 +66,9 @@ void NavGrid::clear() {
     cameFrom_.clear();
     visitStamp_.clear();
     cellPath_.clear();
+    regions_.clear();
+    regionSizes_.clear();
+    floodStack_.clear();
     stamp_ = 0;
     lastExpansions_ = 0;
     stats_ = {};
@@ -143,13 +174,22 @@ void NavGrid::build(const Navigator& nav, float cellSize) {
     gScore_.assign(total, 0.0f);
     cameFrom_.assign(total, -1);
     visitStamp_.assign(total, 0u);
+    buildRegions();
     extractInterestPoints();
 
     stats_.buildMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
     log::info("nav grid: {}x{} at {:.1f} m ({} cells, {} walkable, {} water, {} blocked), "
-              "{} shore and {} vista points, built in {:.1f} ms",
+              "{} region{} (largest {} cells), {} shore and {} vista points, built in {:.1f} ms",
               width, height, cell, total, stats_.walkable, stats_.water, stats_.blocked,
-              shore_.size(), vistas_.size(), stats_.buildMs);
+              stats_.regions, stats_.regions == 1 ? "" : "s", stats_.largestRegion, shore_.size(),
+              vistas_.size(), stats_.buildMs);
+    if (stats_.regions > 1) {
+        // Worth saying out loud. An archipelago is a legitimate world and a character stranded on
+        // an islet in one is not, and the difference is invisible until something fails to path.
+        log::info("nav grid: the walkable ground is in {} disconnected pieces; {} of {} cells are "
+                  "in the largest",
+                  stats_.regions, stats_.largestRegion, stats_.walkable);
+    }
 }
 
 std::size_t NavGrid::index(glm::ivec2 c) const {
@@ -297,6 +337,15 @@ bool NavGrid::findPath(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out
         out.push_back(goalPoint);
         return true;
     }
+    // The lookup that saves the search. Two points in different connected regions are not reachable
+    // from each other, full stop, and A* would only discover it by opening every cell on this side
+    // of the divide first -- nine and a half thousand of them in Glowmere, for a fact the flood fill
+    // settled when the grid was built. The fill uses `stepAllowed`, the same rule the search below
+    // uses, so the two can never disagree about what "connected" means.
+    if (!regions_.empty() && regions_[index(start)] != regions_[index(goal)]) {
+        lastExpansions_ = 0;
+        return false;
+    }
 
     ++stamp_;
     const auto startIndex = static_cast<std::int32_t>(index(start));
@@ -343,14 +392,11 @@ bool NavGrid::findPath(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out
                 if (dx == 0 && dy == 0) {
                     continue;
                 }
-                const glm::ivec2 n = c + glm::ivec2(dx, dy);
-                if (!walkable(n)) {
+                const glm::ivec2 d(dx, dy);
+                if (!stepAllowed(c, d, [&](glm::ivec2 at) { return walkable(at); })) {
                     continue;
                 }
-                if (dx != 0 && dy != 0 &&
-                    (!walkable(glm::ivec2(c.x + dx, c.y)) || !walkable(glm::ivec2(c.x, c.y + dy)))) {
-                    continue; // no cutting a corner a body would not fit round
-                }
+                const glm::ivec2 n = c + d;
                 const NavCell& target = cells_[index(n)];
                 const float step = (dx != 0 && dy != 0 ? kSqrt2 : 1.0f) * cell;
                 // Distance is not the only cost. A character that minimised it alone would cross
@@ -411,6 +457,133 @@ bool NavGrid::findPath(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out
         out.push_back(goalPoint);
     }
     return true;
+}
+
+void NavGrid::buildRegions() {
+    regions_.assign(stats_.cells, 0u);
+    regionSizes_.assign(1, stats_.cells - stats_.walkable); // region 0 is everything unwalkable
+    stats_.regions = 0;
+    stats_.largestRegion = 0;
+    if (cells_.empty()) {
+        return;
+    }
+    const auto walkableAt = [&](glm::ivec2 c) { return walkable(c); };
+    // An explicit stack rather than recursion: a walkable set of twenty thousand cells is twenty
+    // thousand frames deep in the worst case, and a stack overflow in a world build is not a
+    // failure mode anyone would diagnose quickly.
+    floodStack_.clear();
+    std::uint16_t next = 1;
+    for (int y = 0; y < stats_.height; ++y) {
+        for (int x = 0; x < stats_.width; ++x) {
+            const glm::ivec2 seed(x, y);
+            if (!walkable(seed) || regions_[index(seed)] != 0) {
+                continue;
+            }
+            if (next == 0xFFFFu) {
+                // 65,534 disconnected pieces is not a world, it is a bug in whatever made it. Stop
+                // labelling rather than wrap the counter and silently merge two regions into one.
+                log::warn("nav grid: more than {} disconnected regions; the rest are unlabelled",
+                          next - 1);
+                return;
+            }
+            std::size_t size = 0;
+            floodStack_.push_back(static_cast<std::int32_t>(index(seed)));
+            regions_[index(seed)] = next;
+            while (!floodStack_.empty()) {
+                const std::int32_t at = floodStack_.back();
+                floodStack_.pop_back();
+                ++size;
+                const glm::ivec2 c(at % stats_.width, at / stats_.width);
+                for (int dy = -1; dy <= 1; ++dy) {
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        if (dx == 0 && dy == 0) {
+                            continue;
+                        }
+                        const glm::ivec2 d(dx, dy);
+                        if (!stepAllowed(c, d, walkableAt)) {
+                            continue;
+                        }
+                        const std::size_t ni = index(c + d);
+                        if (regions_[ni] != 0) {
+                            continue;
+                        }
+                        regions_[ni] = next;
+                        floodStack_.push_back(static_cast<std::int32_t>(ni));
+                    }
+                }
+            }
+            regionSizes_.push_back(size);
+            stats_.largestRegion = std::max(stats_.largestRegion, size);
+            ++stats_.regions;
+            ++next;
+        }
+    }
+}
+
+std::uint16_t NavGrid::regionAt(glm::vec2 p) const {
+    const glm::ivec2 c = cellOf(p);
+    return inside(c) && index(c) < regions_.size() ? regions_[index(c)] : 0;
+}
+
+bool NavGrid::connected(glm::vec2 a, glm::vec2 b) const {
+    const std::uint16_t ra = regionAt(a);
+    return ra != 0 && ra == regionAt(b);
+}
+
+std::size_t NavGrid::regionSize(std::uint16_t region) const {
+    return region < regionSizes_.size() ? regionSizes_[region] : 0;
+}
+
+PathResult NavGrid::path(const PathRequest& request, const NavPathCost& cost) const {
+    PathResult out;
+    out.goal = request.to;
+    if (!valid()) {
+        out.status = PathStatus::NoGraph;
+        return out;
+    }
+    // Resolve both ends to somewhere a body could actually stand, and say which one failed. A
+    // walker standing between cell centres is normal, not an error; a goal inside a rock is a
+    // different problem from a goal across a lake, and an action layer wants to tell them apart.
+    glm::vec2 start = request.from;
+    if (!walkable(start) && !nearestWalkable(request.from, stats_.cellSize * 3.0f, start)) {
+        out.status = PathStatus::NoStart;
+        return out;
+    }
+    glm::vec2 goal = request.to;
+    const float reach = std::max(request.goalTolerance, stats_.cellSize * 4.0f);
+    if (!walkable(goal) && !nearestWalkable(request.to, reach, goal)) {
+        out.status = PathStatus::NoGoal;
+        return out;
+    }
+    out.goal = goal;
+    // The lookup that saves the search. Two points in different regions are not reachable from each
+    // other, full stop, and A* would only discover that by opening every cell on this side of the
+    // divide first -- nine and a half thousand of them in Glowmere, for an answer already known.
+    if (!connected(start, goal)) {
+        out.status = PathStatus::Unreachable;
+        return out;
+    }
+    if (cellOf(start) == cellOf(goal)) {
+        out.status = PathStatus::AlreadyThere;
+        return out;
+    }
+    if (!findPath(start, goal, out.waypoints, cost)) {
+        // Both ends are standable and in the same region, so a route exists; the budget ran out.
+        out.status = PathStatus::SearchExhausted;
+        out.waypoints.clear();
+        return out;
+    }
+    out.status = PathStatus::Ok;
+    out.expansions = lastExpansions_;
+    glm::vec2 previous = start;
+    for (const glm::vec2& point : out.waypoints) {
+        out.length += glm::length(point - previous);
+        previous = point;
+    }
+    if (!out.waypoints.empty()) {
+        out.goal = out.waypoints.back();
+    }
+    return out;
 }
 
 void NavGrid::extractInterestPoints() {

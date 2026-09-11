@@ -126,6 +126,43 @@ void Navigator::buildGrid(float cellSize) {
     grid_ = std::move(grid);
 }
 
+PathResult Navigator::requestPath(const PathRequest& request) const {
+    if (grid_ != nullptr && grid_->valid()) {
+        return grid_->path(request);
+    }
+    // No graph. A straight line is the only thing that can be checked, and saying so by name is
+    // what lets a caller distinguish "this world has no navigation" from "there is no way there".
+    PathResult out;
+    out.goal = request.to;
+    if (glm::length(request.to - request.from) <= std::max(request.goalTolerance, 0.01f)) {
+        out.status = PathStatus::AlreadyThere;
+        return out;
+    }
+    if (!pathClear(request.from, request.to)) {
+        out.status = PathStatus::NoGraph;
+        return out;
+    }
+    out.status = PathStatus::Ok;
+    out.waypoints.push_back(request.to);
+    out.length = glm::length(request.to - request.from);
+    return out;
+}
+
+bool Navigator::pathValid(glm::vec2 from, std::span<const glm::vec2> waypoints,
+                          std::size_t nextLeg) const {
+    if (waypoints.empty() || nextLeg >= waypoints.size()) {
+        return false;
+    }
+    glm::vec2 previous = from;
+    for (std::size_t i = nextLeg; i < waypoints.size(); ++i) {
+        if (!pathClear(previous, waypoints[i])) {
+            return false;
+        }
+        previous = waypoints[i];
+    }
+    return true;
+}
+
 bool Navigator::findPath(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out) const {
     out.clear();
     if (grid_ != nullptr && grid_->valid()) {
