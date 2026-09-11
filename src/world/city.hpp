@@ -95,6 +95,13 @@ struct CitySettings {
     // How wide a road is, in cells. Two is a carriageway each way and is what the Kenney road pieces
     // are modelled for; one reads as an alley.
     int roadCells = 1;
+    // How many cells deep the band of buildings is, measured in from the block's core edge. One is
+    // a perimeter block -- buildings round the edge, a yard behind them -- and that is right for a
+    // block of five or six cells. It stops being right as blocks grow: the band stays one cell while
+    // the yard grows with the square of the block, so a nine-cell block is a ring of houses round a
+    // field. Clamped to what the core can hold, so it can be set larger than any block and simply
+    // fill it.
+    int buildDepth = 1;
     std::uint32_t seed = 0;
     // Blocks left open instead of built on, as a fraction. A city with no plazas has nowhere to put
     // a stage, a crowd or a shot that needs air.
@@ -127,6 +134,13 @@ struct CitySettings {
     // read as a rule. Corners only, because a shop on the corner is where a shop goes -- a bungalow
     // dropped in the middle of a terrace is not variety, it is a mistake.
     float cornerMix = 0.5f;
+    // How often a surface that has a matching overlay gets it -- a guard rail on a road, a barrier
+    // round a junction. Decided per *run* rather than per cell (see `overlayRun`), because a guard
+    // rail on one cell in the middle of an otherwise open road is not a guard rail, it is litter.
+    float overlayChance = 0.35f;
+    // How many cells a run of overlay shares one decision. Three is about 24 m at the default
+    // module: long enough to read as a length of railing rather than a fence panel.
+    int overlayRun = 3;
 
     [[nodiscard]] Result<void> validate() const;
     // Cells across the whole plan, in each direction.
@@ -181,6 +195,13 @@ struct CityLibrary {
     std::vector<std::string> courtyard; // what fills the inside of a block
     std::vector<std::string> prop;      // things that stand *on* a cell rather than being it
     std::vector<std::string> streetProp; // lamps, signals and signs, for the footway
+
+    // Overlays, keyed by the surface asset each belongs to. The Kenney road kit is built in pairs --
+    // `road-straight` and `road-straight-barrier`, `road-crossroad` and `road-crossroad-barrier` --
+    // where the second is a rail or kerb drawn to sit exactly on the first and has no surface of its
+    // own. So an overlay is not "some decoration near a road": it names the one piece it belongs to,
+    // and it is placed with that piece's transform exactly.
+    std::vector<std::pair<std::string, std::vector<std::string>>> overlays;
     std::vector<std::string> plaza;    // ground for an open block
 
     // Buildings grouped by the family they belong to, from a `family:<name>` tag. A block picks one
@@ -221,6 +242,8 @@ struct CityLibrary {
     [[nodiscard]] const std::vector<std::string>& propsFor(const std::string& family) const;
     // Every family that declares buildings, in a fixed order. The corner rule picks from this.
     [[nodiscard]] std::vector<std::string> families() const;
+    // Overlays belonging to one surface asset, empty when it has none.
+    [[nodiscard]] const std::vector<std::string>& overlaysFor(const std::string& surface) const;
     // Builds a library by reading the tags of an asset library: an entry tagged "road" dresses road
     // cells, and so on. Keeps the role vocabulary in the manifest, where an artist can change it,
     // rather than in this header.

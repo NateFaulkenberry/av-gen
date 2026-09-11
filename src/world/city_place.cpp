@@ -45,6 +45,11 @@ constexpr const char* kPropTag = "prop";
 // Street furniture: what stands on a footway rather than in a yard. A separate vocabulary because
 // pavements do not split by family -- a street is the same street whichever block it runs past.
 constexpr const char* kStreetPropTag = "streetprop";
+// An overlay declares the surface it belongs to: `overlays:road-straight`. Named explicitly rather
+// than inferred from the `-barrier` suffix, because a naming convention is a coincidence the day
+// somebody adds a piece that breaks it, and this one already has exceptions -- `road-slant-barrier`
+// belongs to `road-slant`, but `road-straight-barrier-half` belongs to `road-straight` too.
+constexpr const char* kOverlayPrefix = "overlays:";
 
 // The family an asset declares, or empty. One definition, used by every role that splits by family.
 [[nodiscard]] std::string familyOf(const assets::AssetDescriptor& asset) {
@@ -129,6 +134,27 @@ CityLibrary CityLibrary::fromTags(const assets::AssetLibrary& library) {
     collect(kPropTag, out.prop);
     collect(kStreetPropTag, out.streetProp);
 
+    // Overlays, grouped by the surface each names.
+    for (const assets::AssetDescriptor& asset : library.assets()) {
+        for (const std::string& tag : asset.tags) {
+            if (!tag.starts_with(kOverlayPrefix)) {
+                continue;
+            }
+            const std::string surface = tag.substr(std::string_view(kOverlayPrefix).size());
+            auto it = std::ranges::find_if(out.overlays,
+                                           [&surface](const auto& e) { return e.first == surface; });
+            if (it == out.overlays.end()) {
+                out.overlays.emplace_back(surface, std::vector<std::string>{});
+                it = out.overlays.end() - 1;
+            }
+            it->second.push_back(asset.name);
+        }
+    }
+    std::ranges::sort(out.overlays, {}, &std::pair<std::string, std::vector<std::string>>::first);
+    for (auto& [surface, list] : out.overlays) {
+        std::ranges::sort(list);
+    }
+
     // Families, from a `family:<name>` tag. A prefix rather than a bare tag because the code has to
     // be able to tell a family from any other word an artist writes: every one of these buildings is
     // also tagged "city" and "building", and "a tag that only some of them carry" is a rule that
@@ -166,6 +192,13 @@ const std::vector<std::string>& CityLibrary::forFamily(CellKind role,
         }
     }
     return forKind(role);
+}
+
+const std::vector<std::string>& CityLibrary::overlaysFor(const std::string& surface) const {
+    static const std::vector<std::string> none;
+    const auto it = std::ranges::find_if(overlays,
+                                         [&surface](const auto& e) { return e.first == surface; });
+    return it == overlays.end() ? none : it->second;
 }
 
 std::vector<std::string> CityLibrary::families() const {
@@ -345,6 +378,31 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
         g.positions.push_back(position);
         g.rotations.emplace_back(rotation.x, rotation.y, rotation.z, rotation.w);
         g.scales.emplace_back(scale);
+
+        // The overlay that belongs to this piece, if it drew one. Exactly the surface's transform:
+        // an overlay is drawn to sit on one specific tile, so anything else -- a jitter, a turn of
+        // its own -- puts a guard rail through the middle of the road it is meant to edge.
+        const std::vector<std::string>& over = roles.overlaysFor(name);
+        if (over.empty() || plan.settings.overlayChance <= 0.0f || building) {
+            return;
+        }
+        // Per run, not per cell. A rail on one cell in the middle of an open road is not a rail, it
+        // is litter -- so neighbouring cells along the same band share one decision. The run index
+        // is quantised on both axes, so a run reads the same whichever way its road happens to go.
+        const int runLen = std::max(1, plan.settings.overlayRun);
+        const glm::ivec2 run{coord.x / runLen, coord.y / runLen};
+        Rng runRng = cellRng(plan.settings.seed ^ 0x85EBCA77u, run);
+        if (runRng.nextFloat() >= plan.settings.overlayChance) {
+            return;
+        }
+        const std::string& overlay = over[runRng.nextU32() % over.size()];
+        if (library.find(overlay) == nullptr) {
+            return;
+        }
+        Gather& og = gatherFor(overlay, role, true);
+        og.positions.push_back(position);
+        og.rotations.emplace_back(rotation.x, rotation.y, rotation.z, rotation.w);
+        og.scales.emplace_back(scale);
     };
 
     // Props: several on one cell, jittered, and free to face any way. A prop is not a tile -- it

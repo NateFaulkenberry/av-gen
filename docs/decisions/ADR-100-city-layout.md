@@ -260,3 +260,45 @@ does not know that "commercial" exists — it is a word an artist wrote in a man
 "a family other than this block's".
 
 The corner's *ground* follows its trade, since a shop standing on a lawn is the stranger result.
+
+## An overlay names its surface
+
+The road kit is built in pairs: 28 of its 95 pieces cover no part of their tile and 32 cover all of
+it, and every one of the former is a rail or kerb drawn to sit on one of the latter. So a decoration
+here is not "something near a road". It names the one piece it belongs to — `overlays:road-straight`
+— and is laid with that piece's transform exactly: same cell, same quarter turn, same scale. A rail
+offset by anything runs through the middle of the road it is meant to edge.
+
+Declared, not inferred from the `-barrier` suffix. A naming convention is a coincidence the day
+somebody adds a piece that breaks it, and this one already has exceptions.
+
+Overlays are decided per **run** of cells rather than per cell. A guard rail on one cell of an
+otherwise open road is not a guard rail, it is litter. This is also why the test for it asserts the
+rule *exactly* — every run group wholly overlaid or wholly bare — rather than statistically: a first
+version required that most overlaid cells adjoin another, and a placer deciding per cell passed it,
+because at a 35% chance a cell's odds of having an overlaid neighbour are already about 58%.
+
+## How deep a block builds
+
+`buildDepth` is the band of buildings measured in from the core's edge, clamped to what the core
+holds. It exists because the band was fixed at one cell while the yard grew with the square of the
+block, so a nine-cell block came out as a ring of houses round a field.
+
+Depth one is a perimeter block and carries a guarantee: every plot touches a footway, so every
+building has clear frontage. Deeper bands give that up — inner rows face the nearest street through
+their neighbours, the way a mews does. That is a real arrangement rather than a fault, but it is not
+the same guarantee, and the test records the trade so nothing downstream quietly assumes frontage.
+
+## The footway is a cell wide, and should not be
+
+A block's pavement ring is one cell — 8 m at the default module, where a footway wants 2.5 m. A
+uniform lattice cannot express that, so the ring reads as a plaza.
+
+The kit already answers it: `road-side` is 1.0 x 1.31, a road tile whose kerb overhangs by 0.31
+units — **2.5 m at an 8 m module**, which is a footway. With `roadCells` 2, each road band has an
+edge lane facing each way, a street becomes two lanes plus two footways, and the block's pavement
+ring is unnecessary — those cells go back to buildings.
+
+Not done here, because it changes what `CellKind::Pavement` means and restates "a building is never
+flush against a carriageway" — under this arrangement a building *is* flush against the kerb, which
+is what a street is. It is written down so it is chosen rather than drifted into.

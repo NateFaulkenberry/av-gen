@@ -181,17 +181,25 @@ Result<CityPlan> planCity(const CitySettings& settings) {
                     const bool edge = dx == 0 || dz == 0 || dx == settings.blockCells - 1 ||
                                       dz == settings.blockCells - 1;
                     // Inside the pavement ring is the block's core, and inside *that* is the part
-                    // of a block no street reaches. Buildings take the core's perimeter and what is
-                    // left becomes a courtyard -- the back of the block, where the bins and the
-                    // parking are. Without this, a block five cells across has a plot in the middle
-                    // with no frontage in any direction: a building whose front door opens onto the
-                    // back of the building in front of it. A test found exactly that.
-                    const bool coreEdge = dx == 1 || dz == 1 || dx == settings.blockCells - 2 ||
-                                          dz == settings.blockCells - 2;
-                    // Both axes at the core's edge: the corner of the block, where two streets meet.
-                    const bool coreCorner =
-                        (dx == 1 || dx == settings.blockCells - 2) &&
-                        (dz == 1 || dz == settings.blockCells - 2);
+                    // of a block no street reaches. Buildings take a band round the core's edge and
+                    // what is left becomes a courtyard -- the back of the block, where the bins and
+                    // the parking are. Without this, a block five cells across has a plot in the
+                    // middle with no frontage in any direction: a building whose front door opens
+                    // onto the back of the building in front of it. A test found exactly that.
+                    //
+                    // How deep the band goes is `buildDepth`, clamped to what the core can hold. One
+                    // cell is a perimeter block and is right up to about six cells across; past that
+                    // the band stays one cell while the yard grows with the square of the block, and
+                    // a nine-cell block becomes a ring of houses round a field.
+                    const int core = settings.blockCells - 2; // the core, inside the pavement ring
+                    const int depth = std::clamp(settings.buildDepth, 1, (core + 1) / 2);
+                    const int inX = std::min(dx - 1, core - dx);   // cells in from the core's edge
+                    const int inZ = std::min(dz - 1, core - dz);
+                    const bool coreEdge = std::min(inX, inZ) < depth;
+                    // Both axes at the core's own edge: the corner of the block, where two streets
+                    // meet. Still the outermost ring however deep the band is -- a shop two rows
+                    // back is not on the corner.
+                    const bool coreCorner = inX == 0 && inZ == 0;
                     if (plaza) {
                         cell.kind = CellKind::Plaza;
                     } else if (edge) {

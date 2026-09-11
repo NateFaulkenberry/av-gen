@@ -434,16 +434,56 @@ exclusions would quietly remove the coverage they look like they preserve. Both 
 negative-controlled: disabling the corner draw fails at "0 of 64 corners trade", and placing
 furniture at the cell centre instead of the kerb fails its offset check.
 
+**Layered decoration, done as the kit intends it.** Classifying all 95 road pieces by the tile-
+coverage check written for the last bug turned up the pattern: the kit is built in **pairs**.
+`road-straight` + `road-straight-barrier`, `road-crossroad` + `road-crossroad-barrier`, `road-square`
++ `road-square-barrier`, `road-side` + `road-side-barrier` — 28 pieces cover no part of their tile
+and 32 cover all of it, and every one of the former is a rail drawn to sit on one of the latter.
+
+So an overlay is not "decoration near a road": it **names the surface it belongs to**
+(`overlays:road-straight`) and is placed with that surface's transform exactly — same cell, same
+quarter turn, same scale. Anything else puts a guard rail through the middle of the road it is meant
+to edge. Named explicitly rather than inferred from the `-barrier` suffix, because a naming
+convention is a coincidence the day someone adds a piece that breaks it, and this one already has
+exceptions (`road-straight-barrier-half` belongs to `road-straight` too).
+
+Decided per **run** of three cells, not per cell: a rail on one cell of an otherwise open road is not
+a rail, it is litter. `road-straight-barrier` — the piece that punched holes through every render
+until it was untagged — is now back in the city, correctly.
+
+**`buildDepth`, because the band was always one cell.** A block's buildings occupied the core's
+perimeter regardless of block size, so the yard grew with the square of the block: at `blockCells` 9
+a block is a ring of houses round a field, which a render made obvious immediately. The band is now
+`buildDepth` cells deep, clamped to what the core holds.
+
+It trades something, and the test says so rather than hiding it. At depth one every plot has clear
+frontage — "Every building faces a street" proves a plot reaches a road without passing through
+another building. Deeper, the inner rows cannot: they still face the nearest street, but through
+their neighbours, the way a mews does. A real arrangement, not a defect, but not the guarantee depth
+one gives, so nothing downstream should assume it.
+
+**The pavement ring: measured, not guessed at, and it needs a decision.** The ring is one cell — 8 m
+at the default module — and a cell lattice cannot hold a 2.5 m footway. Two ways out, and the kit
+points at the second:
+
+1. **Bigger blocks.** The ring is one cell whatever the block, so its share falls: 64% of a block at
+   `blockCells` 5, 49% at 7, 39% at 9. Free, and `buildDepth` now makes big blocks worth having.
+2. **Let the road carry its own footway.** `road-side` measures 1.0 x 1.31 — a road tile with a
+   0.31-unit kerb overhanging, which is **2.5 m at an 8 m module**: exactly a footway. Used as the
+   kit intends, with `roadCells` 2 so each band has an outward-facing edge lane each way, a street
+   becomes 2 lanes + 2 footways and the block's pavement ring disappears entirely, giving those
+   cells back to buildings.
+
+Option 2 is the right answer and is not a small change: `CellKind::Pavement` stops being a block's
+edge ring, and "A building never stands in the road, and never flush against one" has to be restated
+— a building would be flush against the kerb, which is what a street is. Worth doing deliberately
+rather than as a side effect, so it is written down here rather than half-started.
+
 ## Next
 
-1. **Layered decoration on roads.** `road-straight-barrier` is waiting on it, and so are the ~80
-   still-untagged pieces in `city-kit-roads` (bends, roundabouts, driveways, highway signs). A road
-   cell that can carry a decoration as well as a surface is the same two-piece arrangement a plot
-   already uses.
-2. **The pavement ring is 8 m wide.** A block's edge cells are all footway, so at one module per cell
-   the footways read as plazas. Either the ring should be a fraction of a cell, or blocks want a
-   finer module than roads do.
-3. **The road graph** (§2) and **interiors** (§3), still as the brief describes them.
+1. **The road-carried footway** (option 2 above). The measurement is done; what remains is the plan
+   change and restating the frontage test.
+2. **The road graph** (§2) and **interiors** (§3), still as the brief describes them.
 
 ## Not started
 

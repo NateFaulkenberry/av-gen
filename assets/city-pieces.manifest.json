@@ -44,7 +44,8 @@
     "tags": [
      "city",
      "module",
-     "roadside"
+     "overlay",
+     "overlays:road-straight"
     ],
     "material": {
      "roughness": 0.9
@@ -1292,6 +1293,103 @@
      -0.0731,
      0.0,
      0.0731
+    ]
+   },
+   {
+    "name": "road-straight-barrier-half",
+    "file": "kenney/city/city-kit-roads/road-straight-barrier-half.glb",
+    "category": "architectural",
+    "archetype": "barrier",
+    "triangles": 24,
+    "naturalSize": [
+     1.0,
+     0.08,
+     0.5
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.25,
+    "preferredDensity": 0.0,
+    "tags": [
+     "overlay",
+     "city",
+     "overlays:road-straight"
+    ],
+    "material": {
+     "roughness": 0.8
+    }
+   },
+   {
+    "name": "road-crossroad-barrier",
+    "file": "kenney/city/city-kit-roads/road-crossroad-barrier.glb",
+    "category": "architectural",
+    "archetype": "barrier",
+    "triangles": 112,
+    "naturalSize": [
+     1.0,
+     0.08,
+     1.0
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.25,
+    "preferredDensity": 0.0,
+    "tags": [
+     "overlay",
+     "city",
+     "overlays:road-crossroad"
+    ],
+    "material": {
+     "roughness": 0.8
+    }
+   },
+   {
+    "name": "road-square-barrier",
+    "file": "kenney/city/city-kit-roads/road-square-barrier.glb",
+    "category": "architectural",
+    "archetype": "barrier",
+    "triangles": 32,
+    "naturalSize": [
+     1.0,
+     0.08,
+     1.0
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.25,
+    "preferredDensity": 0.0,
+    "tags": [
+     "overlay",
+     "city",
+     "overlays:road-square"
+    ],
+    "material": {
+     "roughness": 0.8
+    }
+   },
+   {
+    "name": "road-side-barrier",
+    "file": "kenney/city/city-kit-roads/road-side-barrier.glb",
+    "category": "architectural",
+    "archetype": "barrier",
+    "triangles": 24,
+    "naturalSize": [
+     1.31,
+     0.08,
+     1.0
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.25,
+    "preferredDensity": 0.0,
+    "tags": [
+     "overlay",
+     "city",
+     "overlays:road-side"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "naturalCentre": [
+     -0.155,
+     0.0,
+     -0.0
     ]
    }
   ]

@@ -1330,3 +1330,196 @@ TEST_CASE("Street furniture stands at the kerb and faces the road", "[world][cit
     INFO(placedCount << " pieces over " << plan.countOf(world::CellKind::Pavement) << " pavements");
     CHECK(placedCount < plan.countOf(world::CellKind::Pavement) / 2);
 }
+
+TEST_CASE("An overlay sits exactly on the surface it names", "[world][city][place]") {
+    // The Kenney road kit is built in pairs: `road-straight` and `road-straight-barrier`, where the
+    // second is a rail drawn to sit on the first and has no surface of its own. That is what made
+    // `road-straight-barrier` punch holes through the city when it was tagged as a road. Placed as
+    // an overlay it is correct -- but only if it lands on its own piece, with its own transform. A
+    // rail offset by half a module runs through the middle of the road it is meant to edge.
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+    REQUIRE_FALSE(roles.overlays.empty());
+
+    world::CitySettings s;
+    s.blocksX = 3;
+    s.blocksZ = 3;
+    s.blockCells = 5;
+    s.seed = 2024u;
+    const world::CityPlan plan = planOrFail(s);
+    auto placed = world::placeCity(plan, roles, *library);
+    REQUIRE(placed.has_value());
+
+    // Which surface each overlay belongs to, and where every surface was laid.
+    std::map<std::string, std::string> surfaceOf;
+    for (const auto& [surface, list] : roles.overlays) {
+        for (const std::string& o : list) {
+            surfaceOf[o] = surface;
+        }
+    }
+    const auto key = [](const glm::vec3& p) {
+        return std::pair{static_cast<int>(std::lround(p.x * 100.0f)),
+                         static_cast<int>(std::lround(p.z * 100.0f))};
+    };
+    std::map<std::string, std::map<std::pair<int, int>, glm::vec4>> laid;
+    for (const world::CityPlacement& p : placed->placements) {
+        if (surfaceOf.contains(p.asset)) {
+            continue; // an overlay, not a surface
+        }
+        const auto rotations = p.cloud->rotations();
+        const auto positions = p.cloud->positions();
+        for (std::size_t i = 0; i < p.cloud->count(); ++i) {
+            laid[p.asset][key(positions[i])] = rotations[i];
+        }
+    }
+
+    std::size_t overlaid = 0;
+    std::set<std::string> distinct;
+    for (const world::CityPlacement& p : placed->placements) {
+        const auto it = surfaceOf.find(p.asset);
+        if (it == surfaceOf.end()) {
+            continue;
+        }
+        CHECK(p.prop); // it stands on a cell; it is not the cell
+        const auto& under = laid[it->second];
+        const auto rotations = p.cloud->rotations();
+        const auto positions = p.cloud->positions();
+        const auto scales = p.cloud->scales();
+        for (std::size_t i = 0; i < p.cloud->count(); ++i) {
+            const auto at = under.find(key(positions[i]));
+            INFO(p.asset << " at " << positions[i].x << "," << positions[i].z
+                         << " should be sitting on a " << it->second);
+            REQUIRE(at != under.end());
+            // Same facing, or the rail runs across the road instead of along it.
+            CHECK_THAT(at->second.y, WithinAbs(rotations[i].y, 1e-5f));
+            CHECK_THAT(at->second.w, WithinAbs(rotations[i].w, 1e-5f));
+            // Same scale, or it does not span the piece it edges.
+            CHECK_THAT(scales[i].x, WithinAbs(s.moduleSize / s.tileUnits, 1e-4f));
+            ++overlaid;
+        }
+        distinct.insert(p.asset);
+    }
+    CHECK(overlaid > 0);
+    CHECK_FALSE(distinct.empty());
+
+    // Runs, not single cells -- and asserted exactly rather than statistically. A first version of
+    // this counted overlaid cells that adjoin another and required more than half; a placer deciding
+    // per cell at 35% passed it, because a cell's chance of having an overlaid neighbour is already
+    // about 58%. A measure that a broken placer passes is not a measure.
+    //
+    // The rule is exact: cells sharing a run bucket, laid with the same surface, share one decision.
+    // So every such group is either wholly overlaid or wholly bare, and a per-cell placer breaks it
+    // the first time a group comes out mixed.
+    std::map<std::pair<int, int>, std::string> surfaceAt;
+    std::set<std::pair<int, int>> overlaidAt;
+    const auto cellOf = [&](const glm::vec3& pos) {
+        const float m = s.moduleSize;
+        return std::pair{
+            static_cast<int>(std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m)),
+            static_cast<int>(std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m))};
+    };
+    for (const world::CityPlacement& p : placed->placements) {
+        const bool isOverlay = surfaceOf.contains(p.asset);
+        for (const glm::vec3& pos : p.cloud->positions()) {
+            if (isOverlay) {
+                overlaidAt.insert(cellOf(pos));
+            } else {
+                surfaceAt[cellOf(pos)] = p.asset;
+            }
+        }
+    }
+    // (run bucket, surface) -> whether each of its cells carries an overlay.
+    std::map<std::tuple<int, int, std::string>, std::set<bool>> perGroup;
+    for (const auto& [cell, surface] : surfaceAt) {
+        if (roles.overlaysFor(surface).empty()) {
+            continue; // nothing could have been laid here either way
+        }
+        const auto [cx, cz] = cell;
+        perGroup[{cx / s.overlayRun, cz / s.overlayRun, surface}].insert(overlaidAt.contains(cell));
+    }
+    REQUIRE_FALSE(perGroup.empty());
+    std::size_t mixed = 0;
+    for (const auto& [group, decisions] : perGroup) {
+        if (decisions.size() != 1) {
+            ++mixed;
+        }
+    }
+    INFO(mixed << " of " << perGroup.size() << " run groups are split between overlaid and bare");
+    CHECK(mixed == 0);
+    // And the run rule is not vacuously satisfied by overlaying everything, or nothing.
+    CHECK_FALSE(overlaidAt.empty());
+    CHECK(overlaidAt.size() < surfaceAt.size());
+}
+
+TEST_CASE("A deeper band of building fills a block, and says what it costs", "[world][city]") {
+    // `buildDepth` exists because the band was always one cell while the yard grew with the square
+    // of the block: a nine-cell block came out a ring of houses round a field.
+    //
+    // It also trades something away, and this records the trade rather than hiding it. One cell deep
+    // is a perimeter block and every plot has clear frontage -- "Every building faces a street"
+    // proves it can reach a road without passing through another building. Deeper than that and the
+    // inner rows cannot: they still face the nearest street, but through their neighbours, the way
+    // a mews does. That is a real arrangement, not a defect, but it is not the guarantee depth one
+    // gives, so nothing should be written that quietly assumes it.
+    const auto plotsAndYards = [](int depth) {
+        world::CitySettings s;
+        s.blocksX = 1;
+        s.blocksZ = 1;
+        s.blockCells = 9;
+        s.plazaFraction = 0.0f;
+        s.buildDepth = depth;
+        auto plan = world::planCity(s);
+        REQUIRE(plan.has_value());
+        return std::pair{plan->countOf(world::CellKind::Plot),
+                         plan->countOf(world::CellKind::Courtyard)};
+    };
+
+    const auto [plots1, yards1] = plotsAndYards(1);
+    const auto [plots2, yards2] = plotsAndYards(2);
+    const auto [plots3, yards3] = plotsAndYards(3);
+
+    // A 9-cell block has a 7x7 core. One deep is its perimeter: 24 plots round 25 of yard.
+    CHECK(plots1 == 24);
+    CHECK(yards1 == 25);
+    // Deeper builds more and leaves less, and the two always account for the whole core.
+    CHECK(plots2 > plots1);
+    CHECK(plots3 > plots2);
+    CHECK(yards2 < yards1);
+    CHECK(yards3 < yards2);
+    CHECK(plots1 + yards1 == 49);
+    CHECK(plots2 + yards2 == 49);
+    CHECK(plots3 + yards3 == 49);
+
+    // Clamped rather than refused: a depth past what the core can hold fills it, and asking for ten
+    // on a 9-cell block is a recipe being generous, not a mistake worth stopping a render for.
+    const auto [plotsMax, yardsMax] = plotsAndYards(10);
+    CHECK(plotsMax == 49);
+    CHECK(yardsMax == 0);
+
+    // At depth one -- the default, and what the frontage guarantee rests on -- every plot touches
+    // the core's edge, so the ring is genuinely a ring.
+    world::CitySettings s;
+    s.blocksX = 1;
+    s.blocksZ = 1;
+    s.blockCells = 9;
+    s.plazaFraction = 0.0f;
+    const world::CityPlan plan = planOrFail(s);
+    for (int z = 0; z < plan.depth; ++z) {
+        for (int x = 0; x < plan.width; ++x) {
+            if (plan.kindAt({x, z}) != world::CellKind::Plot) {
+                continue;
+            }
+            // A plot one deep always has a pavement cell orthogonally beside it.
+            const bool touchesFootway = plan.kindAt({x + 1, z}) == world::CellKind::Pavement ||
+                                        plan.kindAt({x - 1, z}) == world::CellKind::Pavement ||
+                                        plan.kindAt({x, z + 1}) == world::CellKind::Pavement ||
+                                        plan.kindAt({x, z - 1}) == world::CellKind::Pavement;
+            INFO("plot at " << x << "," << z << " at depth one");
+            CHECK(touchesFootway);
+        }
+    }
+}

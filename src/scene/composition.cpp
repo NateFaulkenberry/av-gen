@@ -4861,7 +4861,10 @@ nlohmann::json Composition::toJson() const {
                              {"propsPerCell", cs.propsPerCell},
                              {"propSpread", cs.propSpread},
                              {"streetPropChance", cs.streetPropChance},
-                             {"cornerMix", cs.cornerMix}};
+                             {"cornerMix", cs.cornerMix},
+                             {"overlayChance", cs.overlayChance},
+                             {"overlayRun", cs.overlayRun},
+                             {"buildDepth", cs.buildDepth}};
             if (!node.cityLibrary.empty()) {
                 n["cityLibrary"] = node.cityLibrary.generic_string();
             }
@@ -5576,6 +5579,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     cs.propSpread = c.value("propSpread", cs.propSpread);
                     cs.streetPropChance = c.value("streetPropChance", cs.streetPropChance);
                     cs.cornerMix = c.value("cornerMix", cs.cornerMix);
+                    cs.overlayChance = c.value("overlayChance", cs.overlayChance);
+                    cs.overlayRun = c.value("overlayRun", cs.overlayRun);
+                    cs.buildDepth = c.value("buildDepth", cs.buildDepth);
                     // Refused at load rather than at rebuild: a city that cannot be planned is a
                     // scene file somebody has to fix, and the error names the field.
                     if (auto r = cs.validate(); !r) {
