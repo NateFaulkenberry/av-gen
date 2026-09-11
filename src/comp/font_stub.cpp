@@ -1,4 +1,4 @@
-// The font backend for builds without a platform type engine (ADR-081). Text layers keep their
+// The font backend for builds without a platform type engine (ADR-083). Text layers keep their
 // content, their parameters and their place in the timeline; they draw nothing, and say so once.
 
 #include "comp/font.hpp"

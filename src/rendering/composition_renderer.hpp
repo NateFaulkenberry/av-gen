@@ -1,6 +1,6 @@
 #pragma once
 
-// The GPU half of the 2D composition (ADR-081).
+// The GPU half of the 2D composition (ADR-083).
 //
 // One vertex buffer, one storage buffer of per-frame item styles, one atlas, one render pass.
 // Layers are drawn in stack order into the tone-mapped target; adjacent layers that share a blend

@@ -2311,7 +2311,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         ++stats_.state.pipelineBinds;
         ++stats_.state.bindGroupBinds;
     }
-    // ---- pass 3: the 2D composition over the finished picture (ADR-081) ----
+    // ---- pass 3: the 2D composition over the finished picture (ADR-083) ----
     // Display-referred, after the tone map, loading the target rather than clearing it. Nothing
     // here knows what the scene was; that is the point.
     if (overlay_ != nullptr) {

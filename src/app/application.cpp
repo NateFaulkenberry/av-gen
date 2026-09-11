@@ -360,7 +360,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     if (auto r = renderer_->init(); !r) {
         return std::unexpected(r.error());
     }
-    // The 2D composition (ADR-081): installed as the renderer's overlay, so it draws over the
+    // The 2D composition (ADR-083): installed as the renderer's overlay, so it draws over the
     // tone-mapped frame in every path the renderer already has -- window, offline render,
     // screenshot, projection output -- rather than in one of them.
     compositor_ = std::make_unique<rendering::CompositionRenderer>(*context_, *shaders_);

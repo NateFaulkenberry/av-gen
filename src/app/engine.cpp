@@ -114,7 +114,7 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
     }
     resetCameraState();
     shaderLayers_.reattach();
-    // The composition's layer parameters (ADR-081), with everything else that has to survive a
+    // The composition's layer parameters (ADR-083), with everything else that has to survive a
     // scene swap -- and before rebind(), because a timeline track naming a parameter that does not
     // exist yet binds to nothing and then does nothing, quietly (ADR-075, ADR-080).
     layers_.detach();
@@ -604,7 +604,7 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
         }
         doc["worldMacros"] = std::move(macros);
     }
-    // The 2D composition (ADR-081). Pulled back from the parameters first: the inspector and the
+    // The 2D composition (ADR-083). Pulled back from the parameters first: the inspector and the
     // timeline write through the parameter set, and a project saved from the authored fields alone
     // would lose every edit made with a slider.
     layers_.pullAuthored();
@@ -789,7 +789,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         }
     }
 
-    // ---- the 2D composition (ADR-081) ----
+    // ---- the 2D composition (ADR-083) ----
     // Here, and not later: the parameter block below carries "layers/<id>/..." values, and the
     // timeline below carries tracks aimed at them. Both need the parameters to exist first, and a
     // project written before this feature existed simply has no "composition" key.

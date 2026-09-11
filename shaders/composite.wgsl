@@ -1,4 +1,4 @@
-// The 2D composition pass (ADR-081): text, shapes and overlays drawn over the finished frame.
+// The 2D composition pass (ADR-083): text, shapes and overlays drawn over the finished frame.
 //
 // Display-referred, after tone mapping. #FFFFFF is white here; nothing in this pass goes through
 // AgX, and nothing in it is tone mapped twice. See docs/composition.md for the argument.

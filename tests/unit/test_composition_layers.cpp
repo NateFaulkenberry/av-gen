@@ -1,4 +1,4 @@
-// The 2D composition layer system (ADR-081). Behaviour, not setters: what the model *produces* --
+// The 2D composition layer system (ADR-083). Behaviour, not setters: what the model *produces* --
 // geometry, per-frame items, JSON, parameter paths -- rather than whether a field round-trips
 // through its own accessor.
 

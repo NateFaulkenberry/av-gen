@@ -1,6 +1,6 @@
 #pragma once
 
-// The 2D composition layer model (ADR-081).
+// The 2D composition layer model (ADR-083).
 //
 // A composition is an ordered stack of layers drawn over the finished 3D frame. Layer 0 of the
 // *picture* is the 3D render; every layer in this list composites above it, in list order, and the

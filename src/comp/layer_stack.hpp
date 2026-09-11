@@ -1,6 +1,6 @@
 #pragma once
 
-// The 2D composition (ADR-081): an ordered stack of layers drawn over the finished 3D frame.
+// The 2D composition (ADR-083): an ordered stack of layers drawn over the finished 3D frame.
 //
 // Named LayerStack and not Composition on purpose. `avgen::scene::Composition` already exists and
 // is the *3D* authoring object -- a tree of nodes flattened into a Scene -- and the two would be

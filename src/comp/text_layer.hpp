@@ -1,6 +1,6 @@
 #pragma once
 
-// The text layer (ADR-081): the first layer kind, and the reason the composition system exists.
+// The text layer (ADR-083): the first layer kind, and the reason the composition system exists.
 //
 // Geometry is one quad per glyph in **em units** -- the font size is in the per-frame transform,
 // not in the vertices -- so a keyframed or beat-driven size animates without re-shaping the string

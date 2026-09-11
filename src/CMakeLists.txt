@@ -7,7 +7,7 @@ if(APPLE)
     file(GLOB_RECURSE AVGEN_CORE_OBJCXX_SOURCES CONFIGURE_DEPENDS assets/*.mm comp/*.mm)
     list(APPEND AVGEN_CORE_SOURCES ${AVGEN_CORE_OBJCXX_SOURCES})
     list(REMOVE_ITEM AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/assets/video_writer_native_stub.cpp")
-    # Fonts: CoreText on macOS (ADR-081); the stub is for platforms with no type engine.
+    # Fonts: CoreText on macOS (ADR-083); the stub is for platforms with no type engine.
     list(REMOVE_ITEM AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/comp/font_stub.cpp")
     # MIDI: CoreMIDI on macOS; the stub is for other platforms.
     list(REMOVE_ITEM AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/control/midi_stub.cpp")

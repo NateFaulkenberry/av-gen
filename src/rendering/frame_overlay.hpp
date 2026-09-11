@@ -1,6 +1,6 @@
 #pragma once
 
-// The one hook the 3D renderer offers the 2D composition (ADR-081).
+// The one hook the 3D renderer offers the 2D composition (ADR-083).
 //
 // SceneRenderer calls this once per frame, after the tone map has written the target and before
 // the frame timeline is resolved. It is deliberately the whole of the coupling between the two

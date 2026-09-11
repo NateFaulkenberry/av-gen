@@ -169,7 +169,7 @@ private:
     std::unique_ptr<gpu::Context> context_;
     std::unique_ptr<gpu::ShaderLibrary> shaders_;
     std::unique_ptr<rendering::SceneRenderer> renderer_;
-    // The 2D composition over the finished frame (ADR-081). Installed on the renderer as its one
+    // The 2D composition over the finished frame (ADR-083). Installed on the renderer as its one
     // overlay hook; fed the engine's layer stack and timeline clock once per frame.
     std::unique_ptr<rendering::CompositionRenderer> compositor_;
     std::unique_ptr<ui::ImGuiLayer> imgui_;

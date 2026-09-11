@@ -1,6 +1,6 @@
 #pragma once
 
-// Signed distance fields from glyph coverage (ADR-081).
+// Signed distance fields from glyph coverage (ADR-083).
 //
 // A glyph is rasterised once, at `scale` times the atlas resolution, into an 8-bit coverage
 // bitmap. This turns that bitmap into a single-channel SDF at 1x: exact Euclidean distances

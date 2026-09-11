@@ -1,6 +1,6 @@
 #pragma once
 
-// One signed-distance atlas for every glyph in the composition (ADR-081).
+// One signed-distance atlas for every glyph in the composition (ADR-083).
 //
 // Shared across layers and across fonts, so a lyric repeated in ten layers rasterises its letters
 // once. Entries are keyed by face and glyph id -- not by size -- because the field is scale-free:

@@ -1,6 +1,6 @@
 #pragma once
 
-// Fonts for the composition layer (ADR-081).
+// Fonts for the composition layer (ADR-083).
 //
 // Text is shaped and rasterised by the platform's own type engine -- CoreText on macOS. Nothing
 // is bundled: a project stores a font by family and PostScript name, and the machine that opens

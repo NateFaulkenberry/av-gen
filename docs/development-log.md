@@ -1143,7 +1143,7 @@ against a stable contract.
 - The graph is an authoring layer: a scene is either graph-driven or hand-made, since re-evaluation
   replaces what the graph installed.
 
-## 2026-09-10 — The 2D composition: text, shapes and layers above the render (ADR-081)
+## 2026-09-10 — The 2D composition: text, shapes and layers above the render (ADR-083)
 
 The engine could make a picture. It could not make a finished piece: no titles, no lyrics, no
 captions, no framing. The gap between "this looks extraordinary" and "this is a music video" was

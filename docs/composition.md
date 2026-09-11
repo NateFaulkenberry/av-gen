@@ -1,6 +1,6 @@
 # The 2D composition
 
-Decision: ADR-081. Model in `src/comp/`, GPU in `src/rendering/composition_renderer.cpp` and
+Decision: ADR-083. Model in `src/comp/`, GPU in `src/rendering/composition_renderer.cpp` and
 `shaders/composite.wgsl`, editor in `src/ui/composition_panel.cpp`.
 
 The 3D render is **one compositing source**, not the whole picture. Above it sits an ordered stack

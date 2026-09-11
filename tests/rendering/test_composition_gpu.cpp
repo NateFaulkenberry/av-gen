@@ -1,4 +1,4 @@
-// The 2D composition over the finished 3D frame (ADR-081), on the device: that text actually
+// The 2D composition over the finished 3D frame (ADR-083), on the device: that text actually
 // appears, that it appears in the right place at any resolution, that compositing order is the
 // stack order, that a layer outside its time range is absent, and -- the one that matters most --
 // that the frame an offline render produces is the frame live playback produces.

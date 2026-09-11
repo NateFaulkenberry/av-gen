@@ -1,6 +1,6 @@
 #pragma once
 
-// The Composition panel (ADR-081): the layer stack, and an inspector for the selected layer.
+// The Composition panel (ADR-083): the layer stack, and an inspector for the selected layer.
 //
 // The authoring loop this exists to make fast: Add Text, type the words, drag it where you want
 // it, pick a font, move the playhead, press the key dot, move the playhead, change the value,

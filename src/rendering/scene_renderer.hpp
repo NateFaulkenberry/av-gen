@@ -316,7 +316,7 @@ public:
     [[nodiscard]] const wgpu::Buffer& lightBuffer() const { return lightBuffer_; }
     [[nodiscard]] const wgpu::Buffer& clusterBuffer() const { return clusterBuffer_; }
 
-    // The 2D composition (ADR-081). The one hook the renderer offers whatever draws over the
+    // The 2D composition (ADR-083). The one hook the renderer offers whatever draws over the
     // finished picture: it is called after the tone map has written `target` and before the frame
     // timeline is resolved, and the renderer knows nothing else about it. Null by default, so a
     // frame with no composition is encoded exactly as it was before.

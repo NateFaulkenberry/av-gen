@@ -1,4 +1,4 @@
-// CoreText font backend (ADR-081). macOS only; font_stub.cpp stands in elsewhere.
+// CoreText font backend (ADR-083). macOS only; font_stub.cpp stands in elsewhere.
 //
 // Two deliberate choices here:
 //

@@ -1,4 +1,4 @@
-# ADR-081: A 2D composition above the 3D render
+# ADR-083: A 2D composition above the 3D render
 
 Status: accepted
 Date: 2026-09-10

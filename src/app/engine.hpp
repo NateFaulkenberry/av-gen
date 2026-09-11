@@ -121,7 +121,7 @@ public:
     // references) and writes <dir>/project.json pointing at the copies.
     [[nodiscard]] Result<void> exportBundle(const std::filesystem::path& dir);
 
-    // ---- the 2D composition (ADR-081) ----
+    // ---- the 2D composition (ADR-083) ----
     // The layer stack drawn over the finished 3D frame. Every layer property is a parameter in
     // params(), registered before the timeline binds, so layers keyframe on the *same* timeline as
     // the scene and the camera and modulate from the *same* signal routes. Saved with the project

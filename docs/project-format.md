@@ -9,7 +9,7 @@ Version 2 (milestone 0.3) adds modulation sources, presets and per-route polarit
 (`{ "name", "version" }` of the writer); both are filled in by the engine.
 
 Version 4 also carries two blocks that are *optional and unversioned by the envelope*, because
-their absence is meaningful and needs no migration: `"composition"` (ADR-081, the 2D layer stack,
+their absence is meaningful and needs no migration: `"composition"` (ADR-083, the 2D layer stack,
 with a `version` of its own) and `"timeline"`. A project written before either existed simply has
 no such key, and loads with none.
 
@@ -269,7 +269,7 @@ duplicate or empty name are errors.
 Run with `avgen --queue jobs.json`. Each job's settings are the project's `render` block with
 the job's `render` fields merged over it; paths in the queue file are relative to it.
 
-## `"composition"` — the 2D layer stack (ADR-081)
+## `"composition"` — the 2D layer stack (ADR-083)
 
 Optional, versioned separately from the envelope, and read *before* `"parameters"` so that the
 `layers/<id>/...` paths exist when their saved values arrive.
@@ -306,7 +306,7 @@ Optional, versioned separately from the envelope, and read *before* `"parameters
 within the composition and is what the parameter paths and the timeline tracks use, so renaming a
 layer never orphans a track. `end` at or before `start` means "until the end". `reference` is the
 frame the composition was authored against; nothing about layout depends on it, because positions
-are normalised and sizes are relative to the frame height (ADR-081).
+are normalised and sizes are relative to the frame height (ADR-083).
 
 Every animatable layer property is also an ordinary parameter and therefore also appears in
 `"parameters"`. The two are kept in agreement by pulling the parameter bases back into the

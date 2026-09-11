@@ -1,6 +1,6 @@
 #pragma once
 
-// The shape layer (ADR-081): rectangles, ellipses and lines, filled and/or stroked.
+// The shape layer (ADR-083): rectangles, ellipses and lines, filled and/or stroked.
 //
 // Here because framing is a stated need -- a thin border around the picture, a rule under a lyric,
 // a plate behind a caption -- and because it is the cheapest possible proof that the layer

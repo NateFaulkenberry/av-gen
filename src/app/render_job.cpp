@@ -106,7 +106,7 @@ Result<void> RenderJob::start() {
     if (!engine_->layers().empty() && settings_.output == RenderOutput::ExrSequence) {
         // Worth saying out loud rather than shipping a sequence somebody discovers is missing its
         // captions in a grade. EXR carries the scene-linear image from *before* the tone map, and
-        // the composition is display-referred and drawn after it (ADR-081).
+        // the composition is display-referred and drawn after it (ADR-083).
         log::warn("render: EXR output is the scene-linear image before tone mapping; the {} "
                   "composition layer(s) are display-referred and will not appear in it",
                   engine_->layers().size());
