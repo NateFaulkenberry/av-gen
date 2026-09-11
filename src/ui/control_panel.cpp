@@ -314,14 +314,17 @@ void ControlPanel::drawStatusBar(app::Engine& engine, const FrameStats& stats) {
         return;
     }
     // Every number here is measured, not estimated. An unmeasured one says so.
-    ImGui::Text("%.0f fps", stats.fps);
+    const ImVec4 healthy(0.42f, 0.86f, 0.64f, 1.0f);
+    const ImVec4 caution(0.96f, 0.72f, 0.34f, 1.0f);
+    ImGui::TextColored(static_cast<double>(stats.fps) >= 30.0 ? healthy : caution, "%.0f fps",
+                      static_cast<double>(stats.fps));
     ImGui::Separator();
     ImGui::Text("%.1f ms frame", stats.frameIntervalMs);
     ImGui::Separator();
     ImGui::Text("%.1f ms cpu", stats.cpuFrameMs);
     ImGui::Separator();
     if (stats.gpuFrameMs >= 0.0) {
-        ImGui::Text("%.2f ms gpu", stats.gpuFrameMs);
+        ImGui::TextColored(stats.gpuFrameMs <= 16.67 ? healthy : caution, "%.2f ms gpu", stats.gpuFrameMs);
     } else {
         ImGui::TextDisabled("gpu n/a");
     }
@@ -339,7 +342,7 @@ void ControlPanel::drawStatusBar(app::Engine& engine, const FrameStats& stats) {
     } else if (world.selection.kind == WorldSelection::Kind::Node && !world.selection.name.empty()) {
         ImGui::Text("selected %s", world.selection.name.c_str());
     } else {
-        ImGui::TextDisabled("no selection");
+        ImGui::TextDisabled("No selection");
     }
     ImGui::Separator();
     // What the next click does, and what the last edit was. Both are things an artist checks
