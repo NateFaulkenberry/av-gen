@@ -79,6 +79,19 @@ to the image, which is an art decision and not a default.
   other but cannot serialise against another process. The harness could detect a busy GPU and skip
   rather than fail.
 
+  Sharpened 2026-09-11: `the shadow passes respond to shadow workload` failed **standalone, twice in
+  four runs**, at a load average of 2.65 with no build and no other test running. The caster A/B
+  measured ratios of 1.02 and 1.13 against a threshold of 1.8, and passed the other two runs. The
+  competing work was **CrashPlan** (two processes, ~40% CPU between them) and WindowServer at 24% --
+  so "another process" does not have to be another agent, and on a normal desktop it usually is not.
+  Ruled out as a cause: water's forced depth prepass, which only adds `|| !scene.waters.empty()` and
+  this scene has none.
+
+  The test's own comment says the workload ratio is 6.2x and the threshold is 1.8, so a measurement
+  of 1.02 is not a marginal miss -- the shadow pass timing is not tracking the work at all on those
+  runs. Worth finding out whether the timestamp pair is being attributed to the wrong pass under
+  preemption before loosening anything.
+
 ## Rejected on measurement, with numbers — do not retry without new evidence
 
 - **Dynamic resolution.** It saturates *above* the target: a quarter of the pixels still leaves the

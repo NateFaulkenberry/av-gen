@@ -22,6 +22,7 @@
 #include <filesystem>
 #include <unistd.h>
 #include <fstream>
+#include <array>
 #include <ranges>
 #include <string>
 #include <vector>
@@ -350,6 +351,7 @@ TEST_CASE("Glowmere's directed shot stays grounded, bounded and fully connected"
     // of them: a route whose source or target does not resolve is silently inert, which looks
     // exactly like a scene that is not reacting, and the loader only warns.
     REQUIRE(!engine.modulator().routes().empty());
+    constexpr std::size_t kAmbientWashCount = 2;
     std::size_t slowContinuous = 0;
     for (const auto& route : engine.modulator().routes()) {
         INFO("route " << route.source << " -> " << route.target);
@@ -377,43 +379,46 @@ TEST_CASE("Glowmere's directed shot stays grounded, bounded and fully connected"
                              route.sourceId < engine.signals().size() &&
                              engine.signals().info(route.sourceId).isEvent;
         if (route.source.starts_with("audio.") && !isEvent) {
-            // Whose look is this? A route into a node an entity drives is that entity author's
-            // decision -- a hero craft's lamps answering the bass are meant to be punchy, and its
-            // beam is not the valley's weather. A route into anything else is the world's shared
-            // ambient wash, which is where the half-second was learned and where it still holds.
+            // Which of these is the ambient wash? The half-second was learned on exactly two
+            // routes -- the valley's luminous crown and its spore field -- and those two are named
+            // below rather than derived, because every attempt to derive it has been a guess about
+            // node kind rather than about the look. The prefix guess put the UFO's tractor beam in
+            // with the spore field, because both are `particles/`. An ownership guess then had to
+            // grow an exemption for the water, and then another for the motes that run along it,
+            // and a rule that acquires an exemption per feature is a rule that has stopped saying
+            // anything.
             //
-            // The question is asked of the composition rather than guessed from the target's
-            // prefix. Guessing put the UFO's own tractor beam in with Glowmere's spore field,
-            // because both are `particles/`, which is a statement about node kind and not about
-            // who owns the look.
-            const bool entityOwned =
-                std::any_of(engine.composition()->entities().begin(), engine.composition()->entities().end(),
-                            [&](const entity::EntityDesc& e) {
-                                const std::string& node = e.node.empty() ? e.name : e.node;
-                                return route.target.find("/" + node + "/") != std::string::npos ||
-                                       route.target.starts_with(node + "/");
-                            });
-            if (!entityOwned) {
+            // So the claim is split into the part that is universal and the part that is not.
+            // Universal: a continuous band driving anything must be an envelope. Not universal: how
+            // slow. The two routes where "slow" was actually measured are pinned by name, so an
+            // author who speeds the valley up has to argue with this test -- which a count of slow
+            // routes would let them past, by adding a slow one somewhere else.
+            // All three projects this case loads carry the same pair, and only the crown's material
+            // is named differently between them (`glowmereCrown` in the current look,
+            // `paintedCrown` in the two painted ones), so the crown is matched by what it is rather
+            // than by which look is loaded.
+            const bool ambient = route.target == "particles/spores/spawnRate" ||
+                                 route.target.ends_with("Crown/emissionIntensity");
+            if (ambient) {
                 CHECK(route.chain.attackMs >= 500.0f);
                 CHECK(route.chain.decayMs >= 1000.0f);
                 ++slowContinuous;
-            } else {
-                // No threshold is asserted, because there is no defensible universal one: sparkle
-                // on a peripheral lens wants six milliseconds and the valley wants six hundred.
-                // What must still hold is that smoothing *exists* -- a raw band written straight
-                // through is the flicker this guards against -- and that the chain is sane.
-                CHECK(route.chain.attackMs > 0.0f);
-                CHECK(route.chain.decayMs >= route.chain.attackMs);
-                CHECK(std::isfinite(route.chain.attackMs));
-                CHECK(std::isfinite(route.chain.decayMs));
             }
+            // Every continuous route, ambient or not: smoothing has to exist and be sane. A raw
+            // band written straight through is the flicker this whole block is about, and that is
+            // true of a river's sparkle at fourteen milliseconds as much as of the valley at six
+            // hundred -- the difference between them is a tempo, not whether there is an envelope.
+            CHECK(route.chain.attackMs > 0.0f);
+            CHECK(route.chain.decayMs >= route.chain.attackMs);
+            CHECK(std::isfinite(route.chain.attackMs));
+            CHECK(std::isfinite(route.chain.decayMs));
         }
     }
-    // The count was pinned at 2 when the scene had exactly two continuous routes and no event
-    // routes existed. Pinning a total is pinning an authoring decision: adding a musical reaction
-    // to the scene should not fail a test about whether routes bind. What must hold is that the
-    // continuous pair is still there and still smoothed.
-    CHECK(slowContinuous >= 2);
+    // Both of the calibrated ambient routes must still be there. Pinning a *total* would pin an
+    // authoring decision -- adding a musical reaction should not fail a test about whether routes
+    // bind -- but the pair the number was learned on is not an authoring decision, it is the
+    // evidence.
+    CHECK(slowContinuous == kAmbientWashCount);
     if (!authoredCameraPath) {
         // No path to walk. What must still hold is that the scene is loadable and its camera is
         // somewhere sane, since the editor starts from wherever the scene left it.
