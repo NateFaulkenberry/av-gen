@@ -241,6 +241,151 @@ TEST_CASE("the same second is the same state however the playhead reached it",
     }
 }
 
+// The same sequence with events on it. Separate from `piece()` so the tests above keep measuring
+// what they were written to measure.
+seq::Sequence eventPiece() {
+    seq::Sequence s = piece();
+
+    // Baked tier: a parameter change on a shot edge, and a camera shake on a cue.
+    seq::SequenceEvent fog;
+    fog.id = "fog-up";
+    fog.when = {.kind = seq::TriggerKind::ShotStart, .name = "night"};
+    fog.what.kind = seq::EventActionKind::SetParameter;
+    fog.what.target = "scene/fogDensity";
+    fog.what.amount = glm::vec4(0.08f, 0.0f, 0.0f, 0.0f);
+    fog.what.mode = params::TrackMode::Add;
+    s.events.push_back(std::move(fog));
+
+    s.markers.push_back(seq::Marker{10.0, "impact", seq::MarkerKind::Cue});
+    seq::SequenceEvent shake;
+    shake.id = "impact-shake";
+    shake.when = {.kind = seq::TriggerKind::Cue, .name = "impact"};
+    shake.what.kind = seq::EventActionKind::CameraShake;
+    shake.what.amount = glm::vec4(0.35f, 11.0f, 0.0f, 0.0f);
+    shake.what.seconds = 1.4;
+    s.events.push_back(std::move(shake));
+
+    // Scheduled tier: an imperative effect at a known time. Nothing consumes it here -- the point
+    // is what the engine delivers, and when.
+    seq::SequenceEvent act;
+    act.id = "walk";
+    act.when = {.kind = seq::TriggerKind::Time, .timeSeconds = 4.0};
+    act.what.kind = seq::EventActionKind::EntityAction;
+    act.what.target = "hero";
+    act.what.value = "walkTo";
+    act.what.argument = "door";
+    s.events.push_back(std::move(act));
+    seq::SequenceEvent act2 = s.events.back();
+    act2.id = "stop";
+    act2.when.timeSeconds = 11.0;
+    act2.what.value = "idle";
+    s.events.push_back(std::move(act2));
+    return s;
+}
+
+TEST_CASE("a baked event is the same state however the playhead reached it",
+          "[integration][sequence][events][determinism]") {
+    Scratch scratch("sequence_events_scrub");
+    const fs::path stage = writeStage(scratch.dir, "stage.json");
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadFile(stage).has_value());
+    auto installed = engine.setSequence(eventPiece());
+    REQUIRE(installed.has_value());
+    // Two tiers, reported rather than inferred.
+    CHECK(installed->events.baked.size() == 2);
+    CHECK(installed->events.dispatches.size() == 2);
+    CHECK(installed->events.live.empty());
+
+    const std::vector<double> probes{3.0, 7.5, 9.25, 10.5, 12.0, 15.5};
+    std::vector<Snapshot> forwards;
+    std::uint64_t frame = 0;
+    for (double t = 0.0; t <= 16.0; t += 0.25, ++frame) {
+        for (double probe : probes) {
+            if (std::abs(t - probe) < 1e-9) {
+                forwards.push_back(sampleAt(engine, t, frame));
+            }
+        }
+    }
+    REQUIRE(forwards.size() == probes.size());
+
+    app::Engine jumped(app::EngineMode::Offline);
+    REQUIRE(jumped.loadFile(stage).has_value());
+    REQUIRE(jumped.setSequence(eventPiece()).has_value());
+    std::vector<Snapshot> scrubbed(probes.size());
+    const std::vector<std::size_t> order{4, 1, 5, 0, 3, 2};
+    std::uint64_t jumpFrame = 2000;
+    for (std::size_t i : order) {
+        scrubbed[i] = sampleAt(jumped, probes[i], jumpFrame++);
+    }
+    for (std::size_t i = 0; i < probes.size(); ++i) {
+        INFO("t = " << probes[i]);
+        CHECK(forwards[i] == scrubbed[i]);
+    }
+
+    // ...and the events actually did something, so the equality above is not two identical
+    // sequences of zeros. 10.5 s is inside the shake's decay; 15.5 s is past it.
+    const auto shakeAmplitude = [&](double t) {
+        sampleAt(jumped, t, jumpFrame++);
+        const params::IParameter* p = jumped.params().find("camera/shake/amplitude");
+        REQUIRE(p != nullptr);
+        return p->finalComponent(0);
+    };
+    CHECK(shakeAmplitude(3.0) == Approx(0.0f));
+    CHECK(shakeAmplitude(10.5) == Approx(0.35f));
+    const params::IParameter* fogParam = jumped.params().find("scene/fogDensity");
+    REQUIRE(fogParam != nullptr);
+    sampleAt(jumped, 3.0, jumpFrame++);
+    const float fogBefore = fogParam->finalComponent(0);
+    sampleAt(jumped, 12.0, jumpFrame++);
+    CHECK(fogParam->finalComponent(0) == Approx(fogBefore + 0.08f));
+}
+
+TEST_CASE("the engine delivers a scheduled event once forward and restores it on a seek",
+          "[integration][sequence][events]") {
+    Scratch scratch("sequence_events_dispatch");
+    const fs::path stage = writeStage(scratch.dir, "stage.json");
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadFile(stage).has_value());
+    REQUIRE(engine.setSequence(eventPiece()).has_value());
+
+    // Played forward without a seek between frames, which is what `sampleAt` cannot do.
+    FixedStepClock clock(30.0, 0.0);
+    int walkTo = 0;
+    int idle = 0;
+    int restored = 0;
+    for (int i = 0; i < 480; ++i) { // sixteen seconds at thirty frames
+        FrameTime time = clock.tick();
+        time.frameIndex = static_cast<std::uint64_t>(i);
+        engine.update(time);
+        for (const seq::FiredEvent& f : engine.firedEvents()) {
+            const seq::SequenceEvent& e = engine.sequence().events[f.eventIndex];
+            walkTo += e.what.value == "walkTo" ? 1 : 0;
+            idle += e.what.value == "idle" ? 1 : 0;
+            restored += f.restored ? 1 : 0;
+        }
+    }
+    CHECK(walkTo == 1);
+    CHECK(idle == 1);
+    CHECK(restored == 0);
+
+    // A seek does not replay both; it restores the one that is standing at the new playhead.
+    engine.seekSeconds(6.0);
+    FixedStepClock after(30.0, 6.0);
+    FrameTime time = after.tick();
+    time.frameIndex = 1000;
+    engine.update(time);
+    REQUIRE(engine.firedEvents().size() == 1);
+    CHECK(engine.sequence().events[engine.firedEvents()[0].eventIndex].what.value == "walkTo");
+    CHECK(engine.firedEvents()[0].restored);
+    // ...and it does not keep re-delivering it on every subsequent frame.
+    FrameTime next = after.tick();
+    next.frameIndex = 1001;
+    engine.update(next);
+    CHECK(engine.firedEvents().empty());
+}
+
 TEST_CASE("a sequence survives a project save and load", "[integration][sequence][project]") {
     Scratch scratch("sequence_project");
     const fs::path stage = writeStage(scratch.dir, "stage.json");

@@ -42,6 +42,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -173,6 +174,22 @@ public:
     [[nodiscard]] const seq::InstallReport& sequenceReport() const { return sequenceReport_; }
     // Parameter paths the installed sequence owns. Anything else on the timeline is the author's.
     [[nodiscard]] const std::vector<std::string>& sequenceTargets() const { return sequenceTargets_; }
+
+    // ---- cinematic events (ADR-098) ----
+    //
+    // Most of a sequence's events are not here: they stopped being events at bake and are now keys
+    // on the timeline above. What is here is the two tiers a track cannot carry -- an imperative
+    // action at a known time, and a trigger only a running world can supply.
+    //
+    // The engine advances the scheduled tier from the timeline clock once per frame and drains
+    // whatever fired into `firedEvents()`, which is therefore this frame's list and no longer. It
+    // does not *apply* them: an EntityAction belongs to the action system and a Notify belongs to
+    // the host, and the engine inventing an interpretation for either would be the second event
+    // system this design exists to avoid.
+    [[nodiscard]] seq::EventDispatcher& sequenceEvents() { return sequenceEvents_; }
+    [[nodiscard]] const seq::EventDispatcher& sequenceEvents() const { return sequenceEvents_; }
+    // What fired during the most recent `update()`, in (time, priority, declaration) order.
+    [[nodiscard]] std::span<const seq::FiredEvent> firedEvents() const { return firedEvents_; }
 
     // ---- built-in post-processing ----
     [[nodiscard]] scene::PostSettings& post() { return post_; }
@@ -408,6 +425,8 @@ private:
     seq::Sequence sequence_;
     std::vector<std::string> sequenceTargets_;
     seq::InstallReport sequenceReport_;
+    seq::EventDispatcher sequenceEvents_;
+    std::vector<seq::FiredEvent> firedEvents_;
     void removeLayerParameters(); // drops "layers/*" from params_ (before a reload or a delete)
     scene::PostSettings post_;
     scene::PostParameters postParams_;

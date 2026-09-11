@@ -2,6 +2,7 @@
 
 #include "core/log.hpp"
 #include "entity/obstacles.hpp"
+#include "scene/camera.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/sky.hpp"
 
@@ -2025,6 +2026,19 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     cameraSplineT_ = &params.add(floatDesc(prefix_ + "camera/splineT", 0.0f, -10.0f, 10.0f, 0.0f, 1.0f));
     cameraLookAhead_ = &params.add(floatDesc(prefix_ + "camera/lookAhead", 2.0f, -100.0f, 100.0f, 0.0f, 10.0f));
     cameraSplineOffset_ = &params.add(vec3Desc(prefix_ + "camera/splineOffset", glm::vec3(0.0f), -1e3f, 1e3f, -5.0f, 5.0f));
+    // Camera shake (ADR-098). Ordinary parameters, so a beat drives the amplitude through an
+    // ordinary modulation route and a sequence keys it like anything else; `start` carries the
+    // second the impulse began so the decay is `now - start` rather than an accumulated timer.
+    cameraShakeAmplitude_ =
+        &params.add(floatDesc(prefix_ + "camera/shake/amplitude", 0.0f, 0.0f, 100.0f, 0.0f, 1.0f));
+    cameraShakeFrequency_ =
+        &params.add(floatDesc(prefix_ + "camera/shake/frequency", 9.0f, 0.01f, 200.0f, 0.5f, 30.0f));
+    cameraShakeDecay_ =
+        &params.add(floatDesc(prefix_ + "camera/shake/decay", 0.0f, 0.0f, 120.0f, 0.0f, 4.0f));
+    cameraShakeRotation_ =
+        &params.add(floatDesc(prefix_ + "camera/shake/rotation", 0.0f, 0.0f, 45.0f, 0.0f, 3.0f));
+    cameraShakeStart_ =
+        &params.add(floatDesc(prefix_ + "camera/shake/start", 0.0f, -1e6f, 1e6f, 0.0f, 600.0f));
     materialParams_.clear();
     for (const MaterialProgram& mp : materialPrograms_) {
         materialParams_.push_back(
@@ -2326,6 +2340,11 @@ void Composition::detach() {
     cameraMode_ = nullptr;
     cameraPosition_ = nullptr;
     cameraTarget_ = nullptr;
+    cameraShakeAmplitude_ = nullptr;
+    cameraShakeFrequency_ = nullptr;
+    cameraShakeDecay_ = nullptr;
+    cameraShakeRotation_ = nullptr;
+    cameraShakeStart_ = nullptr;
     envIntensity_ = nullptr;
     envRotation_ = nullptr;
     skyEnabled_ = nullptr;
@@ -3726,6 +3745,19 @@ void Composition::applyParameters() {
             center_ + glm::vec3(std::sin(cameraAngle_) * distance, 0.0f, std::cos(cameraAngle_) * distance);
         scene_.camera.position.y = height;
         scene_.camera.target = center_;
+    }
+    // Shake last, and in every mode: it is an offset applied to whatever placed the camera, which
+    // is what makes it compose with an orbit, a spline ride and a baked cinematic move alike
+    // instead of being a fourth way to position a camera (ADR-098, brief section 14).
+    if (cameraShakeAmplitude_ != nullptr) {
+        CameraShake shake;
+        shake.amplitude = cameraShakeAmplitude_->value();
+        shake.frequency = cameraShakeFrequency_ != nullptr ? cameraShakeFrequency_->value() : 9.0f;
+        shake.decaySeconds = cameraShakeDecay_ != nullptr ? cameraShakeDecay_->value() : 0.0f;
+        shake.rotationDegrees = cameraShakeRotation_ != nullptr ? cameraShakeRotation_->value() : 0.0f;
+        shake.startSeconds =
+            cameraShakeStart_ != nullptr ? static_cast<double>(cameraShakeStart_->value()) : 0.0;
+        applyCameraShake(shake, currentTime_, scene_.camera.position, scene_.camera.target);
     }
     scene_.camera.fovYRadians = glm::radians(fov);
     scene_.camera.nearPlane = std::clamp(radius_ * 0.005f, 0.01f, 0.5f);

@@ -46,6 +46,7 @@
 #include "app/cinematic.hpp"
 #include "core/error.hpp"
 #include "params/timeline.hpp"
+#include "seq/events.hpp"
 #include "seq/layers.hpp"
 #include "signals/musical_events.hpp"
 #include "spatial/spline.hpp"
@@ -148,11 +149,20 @@ enum class CameraPreset : std::uint8_t { Isometric, Follow, Wide, Close, TopDown
 
 // ---- transitions (spec 7) ---------------------------------------------------------------------
 
-// Hard cuts, and a dip to or from black. A crossfade between two 3D scenes would need both drawn
-// into separate targets and blended, which is a renderer change for one transition; a dip is the
-// transition a cutter actually reaches for and it is two keys on `scene/brightness`, which the
-// engine already maps onto the tonemap exposure. Named honestly rather than called a crossfade.
-enum class TransitionKind : std::uint8_t { Cut, FadeIn, FadeOut };
+// Hard cuts, a dip to or from black, and a match cut. A crossfade between two 3D scenes would need
+// both drawn into separate targets and blended, which is a renderer change for one transition; a
+// dip is the transition a cutter actually reaches for and it is two keys on `scene/brightness`,
+// which the engine already maps onto the tonemap exposure. Named honestly rather than called a
+// crossfade, and still not implemented -- see ADR-092 for the second evaluation and what it cost.
+//
+// `MatchCut` is the one that turned out to be cheap. A match cut is a hard cut whose two frames
+// *rhyme*: the outgoing subject and the incoming subject sit in the same place in frame at the same
+// apparent size, so the eye reads continuity across a change of everything else. In an engine where
+// a shot is a subject, a radius, a distance in radii and a framing offset, that is arithmetic --
+// `app::Shot::subjectCoverageAt` already computes the apparent size, so matching it is inverting
+// one expression. It costs no renderer change, no second target and no frame time; it is a
+// different opening distance for the incoming shot, decided at bake.
+enum class TransitionKind : std::uint8_t { Cut, FadeIn, FadeOut, MatchCut };
 [[nodiscard]] const char* transitionKindName(TransitionKind kind);
 [[nodiscard]] std::optional<TransitionKind> transitionKindFromName(std::string_view name);
 
@@ -264,6 +274,14 @@ struct BakeOptions {
     // mode is free (scene/composition.cpp), so without this the whole camera track does nothing and
     // says nothing -- exactly the failure ADR-075 is about. Off only for tests that check it.
     bool emitCameraMode = true;
+    // Section 34: let a shot's `Spotlight` raise its subject's level-of-detail floor for the length
+    // of the shot. Emitted as Multiply tracks so the bake does not have to know -- or restore --
+    // the values the author chose; see `bake()`.
+    bool spotlightQuality = true;
+    // How many beats are in a bar, for `TriggerKind::Bar`. The analysis publishes a beat list and a
+    // bar counter but a sequence only carries the beats, so the fold back into bars is stated here
+    // rather than assumed to be four everywhere.
+    int beatsPerBar = 4;
 };
 
 struct OverlayBinding {
@@ -279,6 +297,10 @@ struct BakeResult {
     std::vector<std::string> targets;   // every parameter path written, sorted, deduplicated
     std::vector<std::string> warnings;  // things an author should be told, not failures
     std::vector<OverlayBinding> overlays;
+    // What the events resolved to, split by tier (seq/events.hpp). The baked half is already in
+    // `timeline`; the dispatched and live halves are handed to a `seq::EventDispatcher`, and the
+    // clip half to `animationAt`.
+    EventSchedule events;
     int trackCount = 0;
     int keyCount = 0;
 };
@@ -293,6 +315,9 @@ struct Sequence {
     std::vector<Actor> actors;
     std::vector<OverlayCue> overlays;
     std::vector<Marker> markers;
+    // spec 17 of the cinematic world brief: "when X happens, do Y". Most of these stop being
+    // events at bake and become keys; the rest are dispatched. seq/events.hpp is the argument.
+    std::vector<SequenceEvent> events;
     // spec 16/17: animation that belongs to the piece rather than to one shot. Times are absolute.
     std::vector<params::Track> tracks;
 
@@ -316,6 +341,15 @@ struct Sequence {
     // part of a sequence that is not a baked track, because a clip's phase origin is a *time* and
     // a track carries values. Pure, cheap, and evaluated per frame by seq::Director.
     [[nodiscard]] std::vector<AnimationCue> animationAt(double seconds) const;
+    // ...including the clips events scheduled. A scheduled clip and an authored one are the same
+    // object, so the later of the two simply wins: this is still one pure function of the second.
+    [[nodiscard]] std::vector<AnimationCue> animationAt(double seconds,
+                                                        std::span<const ScheduledClip> scheduled) const;
+
+    // Everything the event resolver can know before the piece runs: the shot edges, the markers the
+    // analysis put here, the cues an author placed and the clip spans the actors state. Pure, and
+    // public because the editor wants to show what an event would resolve to without baking.
+    [[nodiscard]] TriggerContext triggerContext(int beatsPerBar = 4) const;
 
     // Turns the whole thing into timeline tracks. Pure: the same sequence bakes to the same JSON.
     [[nodiscard]] Result<BakeResult> bake(LayerSink& sink, const BakeOptions& options = {}) const;

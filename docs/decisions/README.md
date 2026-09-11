@@ -103,3 +103,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [095](ADR-095-the-help-system.md) | The Help system, staged around "Help should never lie" | Accepted |
 | [096](ADR-096-actions-and-intent.md) | Actions, schedules and interactions: the intent layer | Accepted |
 | [097](ADR-097-spatial-reactivity.md) | A field scales the reactions an entity already has | Accepted |
+| [098](ADR-098-cinematic-events.md) | Cinematic events: three tiers, and where the bake stops | Accepted |

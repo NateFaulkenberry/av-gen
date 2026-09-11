@@ -167,10 +167,17 @@ Result<seq::InstallReport> Engine::installSequence() {
         // forget the targets: there is nothing left for the next install to erase.
         sequenceTargets_.clear();
         sequenceReport_ = seq::InstallReport{};
+        sequenceEvents_.clear();
+        firedEvents_.clear();
         return report;
     }
     sequenceTargets_ = report->targets;
     sequenceReport_ = *report;
+    // The dispatcher copies the events, so an editor may keep editing `sequence().events` between
+    // installs without the running frame reading a reallocated vector.
+    sequenceEvents_.setEvents(sequence_.events, sequenceReport_.events);
+    sequenceEvents_.reset(timelineClock_.seconds);
+    firedEvents_.clear();
     for (const std::string& warning : report->warnings) {
         noteBindingProblem(warning);
     }
@@ -190,6 +197,8 @@ void Engine::clearSequence() {
     seq::uninstall(timeline_, params_, sink, sequenceTargets_);
     sequenceTargets_.clear();
     sequenceReport_ = seq::InstallReport{};
+    sequenceEvents_.clear();
+    firedEvents_.clear();
     sequence_ = seq::Sequence{};
 }
 
@@ -1608,6 +1617,11 @@ void Engine::seekSeconds(double seconds) {
         composition->entityWorld().seek(seconds, &params_, nullptr,
                                         composition->scene().camera.position);
     }
+    // A live event belongs to the moment it happened and the moment is gone; the scheduled tier is
+    // rebased rather than cleared, so the next frame restores the standing intents at the new
+    // playhead instead of replaying everything between here and there (ADR-098).
+    sequenceEvents_.reset(seconds);
+    firedEvents_.clear();
 }
 
 bool Engine::isPlaying() const { return player_ && player_->isPlaying(); }
@@ -1971,8 +1985,13 @@ void Engine::update(const FrameTime& time) {
     // character is doing wins over a behaviour that guessed; before controller_->update(), which is
     // what poses the rigs. Pure in the clock, so a scrub lands the same pose as a play-through.
     if (auto* comp = composition(); comp != nullptr && !sequence_.actors.empty()) {
-        seq::applyAnimation(sequence_, *comp, timelineClock_.seconds);
+        seq::applyAnimation(sequence_, sequenceReport_.events.clips, *comp, timelineClock_.seconds);
     }
+    // The two tiers of the event system a track cannot carry (ADR-098). `advanceTo` decides for
+    // itself whether the playhead stepped or jumped; the drain is per frame so nothing accumulates
+    // when no host is listening.
+    sequenceEvents_.advanceTo(timelineClock_.seconds);
+    firedEvents_ = sequenceEvents_.drain(timelineClock_.seconds);
     stats_.allocsModulation = allocsNow() - allocMark;
     allocMark = allocsNow();
     controller_->update(time);

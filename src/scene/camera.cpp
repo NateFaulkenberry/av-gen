@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace avgen::scene {
 
@@ -204,6 +205,108 @@ const char* focusModeName(FocusSettings::Mode mode) {
 }
 
 // ---- parameters ----------------------------------------------------------------------------------
+
+// ---- camera shake ------------------------------------------------------------------------------
+
+namespace {
+
+// A hash, not a generator. There is no state to seed, reset or get wrong on a seek: the value at a
+// given integer step is a pure function of that step.
+float shakeHash(int step, int channel) {
+    auto h = static_cast<std::uint32_t>(step) * 0x9E3779B9u;
+    h ^= static_cast<std::uint32_t>(channel + 1) * 0x85EBCA6Bu;
+    h ^= h >> 15;
+    h *= 0x2545F491u;
+    h ^= h >> 13;
+    return static_cast<float>(h & 0xFFFFFFu) / static_cast<float>(0xFFFFFF) * 2.0f - 1.0f;
+}
+
+// Smoothstep-interpolated value noise: continuous, band-limited at `frequency`, and zero-mean over
+// any whole number of steps. White noise would read as a buzz and a sine would read as a wobble.
+float shakeNoise(float t, int channel) {
+    const float floored = std::floor(t);
+    const auto step = static_cast<int>(floored);
+    const float u = t - floored;
+    const float s = u * u * (3.0f - 2.0f * u);
+    return std::lerp(shakeHash(step, channel), shakeHash(step + 1, channel), s);
+}
+
+// Two octaves, normalised: the second gives the motion a jitter the first cannot, and without it a
+// shake at 9 Hz reads as a slow sway.
+float shakeChannel(float t, int channel) {
+    return (shakeNoise(t, channel) + 0.5f * shakeNoise(t * 2.17f + 31.0f, channel + 8)) / 1.5f;
+}
+
+} // namespace
+
+float cameraShakeEnvelope(const CameraShake& shake, double seconds) {
+    if (!(shake.amplitude > 0.0f) && !(shake.rotationDegrees > 0.0f)) {
+        return 0.0f;
+    }
+    const double elapsed = seconds - shake.startSeconds;
+    if (elapsed < 0.0) {
+        return 0.0f;
+    }
+    if (!(shake.decaySeconds > 0.0f)) {
+        return 1.0f; // sustained: the amplitude is whatever a keyframe or a route says it is
+    }
+    const auto linear = static_cast<float>(1.0 - elapsed / shake.decaySeconds);
+    if (linear <= 0.0f) {
+        return 0.0f;
+    }
+    return linear * linear;
+}
+
+glm::vec3 cameraShakeOffset(const CameraShake& shake, double seconds) {
+    const float envelope = cameraShakeEnvelope(shake, seconds);
+    if (envelope <= 0.0f || !(shake.amplitude > 0.0f)) {
+        return glm::vec3(0.0f);
+    }
+    const auto t = static_cast<float>(seconds * static_cast<double>(std::max(shake.frequency, 0.01f)));
+    return glm::vec3(shakeChannel(t, 0), shakeChannel(t, 1), shakeChannel(t, 2)) *
+           (shake.amplitude * envelope);
+}
+
+void applyCameraShake(const CameraShake& shake, double seconds, glm::vec3& position,
+                      glm::vec3& target) {
+    const float envelope = cameraShakeEnvelope(shake, seconds);
+    if (envelope <= 0.0f) {
+        return;
+    }
+    glm::vec3 forward = target - position;
+    const float distance = glm::length(forward);
+    if (distance < 1e-4f) {
+        return;
+    }
+    forward /= distance;
+    // The same world up every other camera in this engine uses; a shake must not invent a basis.
+    const glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
+    glm::vec3 right = glm::cross(forward, worldUp);
+    if (glm::length(right) < 1e-4f) {
+        right = glm::vec3(1.0f, 0.0f, 0.0f); // straight down: any horizontal axis will do
+    }
+    right = glm::normalize(right);
+    const glm::vec3 up = glm::normalize(glm::cross(right, forward));
+
+    const glm::vec3 offset = cameraShakeOffset(shake, seconds);
+    position += right * offset.x + up * offset.y + forward * offset.z;
+    // The aim moves with the body, so a positional shake alone does not swing the frame; the
+    // angular term is what does, and it is deliberately separate so a handheld feel and a rumble
+    // can be authored independently.
+    glm::vec3 aim = position + forward * distance;
+    if (shake.rotationDegrees > 0.0f) {
+        const auto t = static_cast<float>(seconds *
+                                          static_cast<double>(std::max(shake.frequency, 0.01f)));
+        const float yaw = shakeChannel(t + 7.0f, 3) * shake.rotationDegrees * envelope;
+        const float pitch = shakeChannel(t + 13.0f, 4) * shake.rotationDegrees * envelope;
+        // Small angles: a degree of swing at distance d is d * tan(theta), and the linearisation is
+        // exact enough for the amplitudes a shake is ever authored at.
+        constexpr float kDegToRad = 0.01745329252f;
+        aim += right * (std::tan(yaw * kDegToRad) * distance) +
+               up * (std::tan(pitch * kDegToRad) * distance);
+    }
+    target = aim;
+}
 
 CameraParameters registerCameraParameters(params::ParameterSet& params, const LensSettings& lens,
                                           const ExposureSettings& exposure, const FocusSettings& focus) {
