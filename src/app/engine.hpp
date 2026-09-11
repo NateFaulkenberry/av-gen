@@ -397,6 +397,10 @@ private:
     std::filesystem::path environmentPath_;
     std::filesystem::path compositionPath_;
     std::filesystem::path projectPath_;
+    // Appends to projectWarnings_ if it is not already there. Unresolved bindings are re-reported
+    // on every rebind, and a warning list that grew a duplicate per scene swap would stop being
+    // read.
+    void noteBindingProblem(std::string message);
     std::vector<std::string> projectWarnings_;
     // Beat clock extrapolated per render frame from the analysis tempo (ADR-012).
     double beatClockPhase_ = 0.0;

@@ -228,10 +228,27 @@ void Engine::rebind() {
     }
     if (auto r = modulator_.bind(bus_, params_); !r) {
         log::warn("modulation bind: {}", r.error().message);
+        noteBindingProblem(fmt::format("modulation: {}", r.error().message));
     }
     if (auto r = timeline_.bind(params_); !r) {
         log::warn("{}", r.error().message);
+        noteBindingProblem(r.error().message);
     }
+    // An entity whose reaction resolved to nothing is the same class of failure and belongs in the
+    // same list: a binding that does nothing must be visible somewhere a person looks, not only in
+    // a log line that scrolled past at start-up.
+    if (const auto* comp = composition()) {
+        for (const std::string& problem : comp->entityProblems()) {
+            noteBindingProblem(problem);
+        }
+    }
+}
+
+void Engine::noteBindingProblem(std::string message) {
+    if (std::find(projectWarnings_.begin(), projectWarnings_.end(), message) != projectWarnings_.end()) {
+        return;
+    }
+    projectWarnings_.push_back(std::move(message));
 }
 
 void Engine::detachSceneParameters() {
@@ -1791,6 +1808,10 @@ void Engine::update(const FrameTime& time) {
     params_.resetFinals();
     timeline_.apply(timelineClock_); // automation: the first modulation layer (ADR-018)
     modulator_.applyRoutes(bus_, params_, time.deltaTime);
+    // Autonomous behaviour, after the routes and before the scene reads the finals (ADR-088): a
+    // behaviour's own knobs have been modulated by now, and the offsets it writes land on top of
+    // whatever the routes wrote, so a route and a behaviour compose on one property.
+    controller_->updateBehaviour(time, bus_);
     if (viewportHeight_ > 0) {
         if (auto* comp = composition()) {
             comp->setViewport(viewportWidth_, viewportHeight_);

@@ -105,6 +105,30 @@
    "reactionProfile": "still"
   },
   {
+   "name": "visitor",
+   "assembly": "visitor-craft",
+   "position": [
+    29.0,
+    47.548846,
+    -126.8
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 8.2,
+   "height": 7.1,
+   "importance": 0.68,
+   "focalWeight": 0.5,
+   "preferredCameraDistance": 34.0,
+   "preferredCameraElevation": -4.0,
+   "activationRadius": 260.0,
+   "colorAccent": [
+    0.16,
+    0.66,
+    1.0
+   ],
+   "reactionProfile": ""
+  },
+  {
    "name": "beacon-grove",
    "assembly": "beacon-grove",
    "position": [
@@ -1460,6 +1484,125 @@
      }
     ]
    }
+  },
+  {
+   "name": "visitor",
+   "kind": "procedural",
+   "position": [
+    29.0,
+    49.0,
+    -126.8
+   ],
+   "rotation": [
+    3.5,
+    -24.0,
+    -5.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/imported/ufo.gltf"
+    },
+    "sourceTransform": {
+     "scale": [
+      0.0347,
+      0.0347,
+      0.0347
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.052,
+      0.058,
+      0.076
+     ],
+     "roughness": 0.3,
+     "metallic": 0.88,
+     "emissiveColor": [
+      0.1,
+      0.52,
+      1.0
+     ],
+     "emissiveIntensity": 0.0
+    }
+   },
+   "visible": true
+  },
+  {
+   "name": "visitor-beam",
+   "kind": "particles",
+   "parent": "visitor",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "particles": {
+    "capacity": 16384,
+    "spawnRate": 1050.0,
+    "shape": "disc",
+    "position": [
+     0.0,
+     -2.05,
+     0.0
+    ],
+    "extent": [
+     3.6,
+     3.6,
+     3.6
+    ],
+    "direction": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "spread": 0.042,
+    "lifetimeMin": 3.6,
+    "lifetimeMax": 5.0,
+    "speedMin": 8.5,
+    "speedMax": 12.5,
+    "gravity": [
+     0.0,
+     -0.35,
+     0.0
+    ],
+    "drag": 0.05,
+    "turbulence": 0.16,
+    "turbulenceScale": 0.08,
+    "turbulenceSpeed": 0.15,
+    "sizeStart": 0.44,
+    "sizeEnd": 0.05,
+    "blend": "additive",
+    "emissive": 0.45,
+    "colorStart": [
+     0.26,
+     0.78,
+     1.0,
+     0.13
+    ],
+    "colorEnd": [
+     0.1,
+     0.95,
+     0.86,
+     0.0
+    ],
+    "seed": 20260911,
+    "velocityStretch": 4.5,
+    "attractorPosition": [
+     0.0,
+     -2.05,
+     0.0
+    ]
+   },
+   "visible": true
   }
  ],
  "post": {
@@ -1497,5 +1640,118 @@
   "gustSharpness": 1.3,
   "flutterScale": 2.4,
   "simBudget": 520
- }
+ },
+ "entities": [
+  {
+   "name": "visitor",
+   "profile": "../entities/craft-lights.profile.json",
+   "node": "visitor",
+   "seed": 20260911,
+   "fullDetailDistance": 420.0,
+   "coarseInterval": 0.1,
+   "cullDistance": 900.0,
+   "behaviors": [
+    {
+     "kind": "hover",
+     "amplitude": 0.85,
+     "rate": 0.055,
+     "tilt": 1.7
+    },
+    {
+     "kind": "drift",
+     "radius": 2.4,
+     "rate": 0.031
+    },
+    {
+     "kind": "bank",
+     "degrees": 5.0,
+     "responseMs": 1500.0
+    },
+    {
+     "kind": "spin",
+     "signal": "audio.beat",
+     "baseRate": 1.1,
+     "impulse": 13.0,
+     "damping": 0.5,
+     "maxRate": 30.0
+    }
+   ],
+   "reactions": [
+    {
+     "signal": "audio.bass",
+     "target": "position",
+     "depth": -0.95,
+     "component": 1,
+     "chain": {
+      "attackMs": 55.0,
+      "curve": "power",
+      "curveAmount": 1.4,
+      "decayMs": 340.0
+     }
+    },
+    {
+     "signal": "audio.onset",
+     "target": "position",
+     "depth": -0.28,
+     "component": 1,
+     "chain": {
+      "attackMs": 2.0,
+      "decayMs": 150.0,
+      "envelope": "peakhold",
+      "envelopeFallPerSecond": 6.0,
+      "envelopeHoldMs": 8.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "visitor-beam",
+   "node": "visitor-beam",
+   "seed": 771155,
+   "cullDistance": 900.0,
+   "reactions": [
+    {
+     "signal": "audio.bass",
+     "target": "spawnRate",
+     "depth": 900.0,
+     "chain": {
+      "attackMs": 60.0,
+      "curve": "power",
+      "curveAmount": 1.5,
+      "decayMs": 420.0
+     }
+    },
+    {
+     "signal": "audio.rms",
+     "target": "emissive",
+     "depth": 1.5,
+     "chain": {
+      "attackMs": 90.0,
+      "decayMs": 520.0
+     }
+    },
+    {
+     "signal": "audio.onset",
+     "target": "size",
+     "depth": 0.45,
+     "chain": {
+      "attackMs": 5.0,
+      "decayMs": 220.0,
+      "envelope": "peakhold",
+      "envelopeFallPerSecond": 5.0,
+      "envelopeHoldMs": 15.0
+     }
+    },
+    {
+     "signal": "audio.lowMid",
+     "target": "speed",
+     "depth": 0.25,
+     "chain": {
+      "attackMs": 140.0,
+      "decayMs": 700.0
+     }
+    }
+   ]
+  }
+ ]
 }

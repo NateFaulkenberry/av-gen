@@ -1212,3 +1212,60 @@ animation code was written, and no second timeline exists.
 - No viewport direct manipulation: the inspector is the only way to place a layer.
 - Image, Video, Shader and Nested Composition layers are not implemented; the abstraction that
   would carry them is the one Text and Shape already use.
+
+## 2026-09-11 — Entities: behaviour, navigation and reactions declared in data (ADR-088)
+
+A UFO over Glowmere was the brief; the layer underneath it was the work. An entity drives a node the
+scene has already placed, so the same thing configures an imported craft, a procedural rock and a
+skinned character. Behaviours (hover, drift, bank, spin, orbit, wander, lookAt, interest) are code
+because aperiodic motion has to be; reactions are data, and compile to ordinary modulation routes —
+the chain in `params/processor.hpp` was already the whole "signal → curve → smoothing → depth →
+property" pipeline and building a second one beside it would have been the fifth parallel system
+this codebase has grown.
+
+What made the data spelling possible was addressing. An imported asset's materials became parts
+ordered by surface area, so a scene file could only say `parts/2`. `scene::Entity` now carries the
+material name its source asset gave it, and a reaction may write `parts/Blue/emissiveGain`.
+
+The craft's position was chosen by `entity::findPlacement`, which samples candidates in screen space,
+unprojects them, and rejects each against the scene's own camera matrices, the WorldMap's slope and
+water, and the ClearanceField's canopy and hero capsules. It also says *why* things failed, which is
+how the right-of-centre sky turned out to be unusable (77,380 of 120,000 samples on the east ridge)
+rather than merely unlucky.
+
+Navigation has no navmesh. `WorldMap::sample` and `ClearanceField` already answer every question a
+walker has, analytically; a baked second description of the same ground would be wrong the first
+time somebody moved a hill.
+
+### Found by looking at the picture
+
+- `params::loadProject` called `Modulator::clearRoutes()` and installed only the document's routes,
+  so anything a subsystem had installed was destroyed a few hundred lines after it was installed.
+  Entity reactions bound, logged, and vanished — and so had every route a procedural graph emitted
+  since ADR-028. `saveProject` had the mirror of it, writing subsystem routes into the file so a
+  project gained a duplicate of each one every time it was saved.
+- `lookAt` turned the body towards its subject while `wander` walked somewhere else. Locomotion
+  scales its pace by alignment, so the two multiplied to a standstill rather than averaging.
+- `interest` treated a strong audio event as a state change, so on a percussive track every impact
+  interrupted the one before it and the character stood still for ninety seconds looking startled.
+- An unleashed wander is a random walk, and a random walk leaves.
+
+### Numbers
+
+- 64 entities carrying four behaviours each: 35.3 µs per frame, 551 ns per entity (minimum of five
+  runs). Glowmere carries two.
+- The whole feature — craft, beam, behaviours, reactions — costs +0.33 ms of GPU frame time at
+  1920×1080 (28.05 → 28.38 ms, minimum of four interleaved runs); the beam's particle pass is below
+  the 65,536 ns timestamp quantum.
+- Between the score's quietest bar and its loudest the craft is 1.73× brighter, the beam 1.94×, and
+  the bloom around it 2.19×.
+
+### Known limitations
+
+- A part is one *material*. An asset whose belly lamp and dome ring share a material is one
+  addressable part; separating them means editing the asset or changing how parts are grouped,
+  which would move every existing part index.
+- No path planning and no inter-entity avoidance: steering is a fan of local deviations.
+- Sockets resolve against the entity's own frame until something implements `ISkeletonQuery`.
+- A behaviour profile is take-it-or-extend-it. There is no override-by-name, because an override
+  that could not survive a save would be worse than not having one.

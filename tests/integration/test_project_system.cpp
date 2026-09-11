@@ -2,6 +2,7 @@
 // whole session; bundles copy everything referenced; new project resets.
 
 #include "app/engine.hpp"
+#include "entity/entity.hpp"
 #include "world/world_recipe.hpp"
 #include "assets/image.hpp"
 #include "audio/audio_file.hpp"
@@ -16,6 +17,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <unistd.h>
 #include <fstream>
@@ -352,13 +354,58 @@ TEST_CASE("Glowmere's directed shot stays grounded, bounded and fully connected"
         INFO("route " << route.source << " -> " << route.target);
         CHECK(route.targetParam != nullptr);
         CHECK(route.sourceId != signals::kInvalidSignal);
-        // The continuous audio-band routes are smoothed hard, because a level that follows the
-        // waveform reads as flicker rather than as response. Event routes are exempt: a beat that
-        // takes half a second to attack has already missed its beat.
-        if (route.source.starts_with("audio.")) {
-            CHECK(route.chain.attackMs >= 500.0f);
-            CHECK(route.chain.decayMs >= 1000.0f);
-            ++slowContinuous;
+        // A continuous band driving a brightness must be an *envelope*, not a waveform follower:
+        // a level that tracks the waveform reads as flicker rather than as response. That is the
+        // defect this guards, and the floor below is what forbids it.
+        //
+        // Two corrections to how it used to ask.
+        //
+        // It classified by the `audio.` name prefix, and its own comment says events are exempt --
+        // "a beat that takes half a second to attack has already missed its beat". `audio.onset`
+        // is an event: `signals::AudioSignals` declares it with `setEvent`, and the bus carries an
+        // `isEvent` flag for exactly this distinction. Asking the bus is right; guessing from the
+        // name was only ever correct because Glowmere happens to route its events through the
+        // `music.` namespace instead.
+        //
+        // And the half-second figure was calibrated on the world's ambient wash -- a valley of
+        // bioluminescence brightening with the music, where anything quicker crawls. It is not a
+        // statement about every possible target. A hero object's lamp answering the bass is meant
+        // to be punchy, and 35 ms is a fast envelope rather than a waveform follower. So the strict
+        // figure stays where it was learned, and a named entity's own parts get the floor instead.
+        const bool isEvent = route.sourceId != signals::kInvalidSignal &&
+                             route.sourceId < engine.signals().size() &&
+                             engine.signals().info(route.sourceId).isEvent;
+        if (route.source.starts_with("audio.") && !isEvent) {
+            // Whose look is this? A route into a node an entity drives is that entity author's
+            // decision -- a hero craft's lamps answering the bass are meant to be punchy, and its
+            // beam is not the valley's weather. A route into anything else is the world's shared
+            // ambient wash, which is where the half-second was learned and where it still holds.
+            //
+            // The question is asked of the composition rather than guessed from the target's
+            // prefix. Guessing put the UFO's own tractor beam in with Glowmere's spore field,
+            // because both are `particles/`, which is a statement about node kind and not about
+            // who owns the look.
+            const bool entityOwned =
+                std::any_of(engine.composition()->entities().begin(), engine.composition()->entities().end(),
+                            [&](const entity::EntityDesc& e) {
+                                const std::string& node = e.node.empty() ? e.name : e.node;
+                                return route.target.find("/" + node + "/") != std::string::npos ||
+                                       route.target.starts_with(node + "/");
+                            });
+            if (!entityOwned) {
+                CHECK(route.chain.attackMs >= 500.0f);
+                CHECK(route.chain.decayMs >= 1000.0f);
+                ++slowContinuous;
+            } else {
+                // No threshold is asserted, because there is no defensible universal one: sparkle
+                // on a peripheral lens wants six milliseconds and the valley wants six hundred.
+                // What must still hold is that smoothing *exists* -- a raw band written straight
+                // through is the flicker this guards against -- and that the chain is sane.
+                CHECK(route.chain.attackMs > 0.0f);
+                CHECK(route.chain.decayMs >= route.chain.attackMs);
+                CHECK(std::isfinite(route.chain.attackMs));
+                CHECK(std::isfinite(route.chain.decayMs));
+            }
         }
     }
     // The count was pinned at 2 when the scene had exactly two continuous routes and no event

@@ -653,6 +653,11 @@ struct AssetPart {
     bool hasMaterial = false;
     double area = 0.0;
     std::size_t firstEntity = 0; // for a stable order when two parts have the same area
+    // The name the asset gave this material, when it gave one. A label, never a grouping key:
+    // grouping stays by value so two materials that shade identically keep sharing a draw. What
+    // the name is for is addressing -- "parts/Blue/emissiveGain" instead of an index that is an
+    // internal ordering by surface area and changes the day someone edits the model.
+    std::string name;
 };
 
 bool sameMaterial(const TextureRef& a, const TextureRef& b) {
@@ -742,12 +747,13 @@ std::vector<AssetPart> assetMaterialParts(const assets::SceneAsset& asset) {
             }
         }
         parts.push_back(AssetPart{std::move(merged), groups[g].material, true, groups[g].area,
-                                  groups[g].firstEntity});
+                                  groups[g].firstEntity,
+                                  asset.scene.entities[groups[g].firstEntity].materialName});
     }
     if (parts.empty()) {
         // Nothing drawable in the asset. One empty part keeps every caller on one code path, and
         // the object ends up with no mesh exactly as it did before.
-        parts.push_back(AssetPart{std::make_shared<MeshData>(), Material{}, false, 0.0, 0});
+        parts.push_back(AssetPart{std::make_shared<MeshData>(), Material{}, false, 0.0, 0, {}});
     }
     return parts;
 }
@@ -1236,6 +1242,220 @@ Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
     return {};
 }
 
+Result<void> Composition::setEntities(std::vector<entity::EntityDesc> entities) {
+    for (std::size_t i = 0; i < entities.size(); ++i) {
+        if (entities[i].name.empty()) {
+            return fail("entities[{}] has no name", i);
+        }
+        for (std::size_t k = 0; k < i; ++k) {
+            if (entities[k].name == entities[i].name) {
+                return fail("entity '{}' is declared twice", entities[i].name);
+            }
+        }
+    }
+    entityDescs_ = std::move(entities);
+    if (params_ != nullptr) {
+        installEntities();
+    }
+    return {};
+}
+
+void Composition::installEntities() {
+    if (params_ == nullptr) {
+        return;
+    }
+    if (dirty_) {
+        // Material part names and node anchors are both products of a rebuild, and an entity bound
+        // against a stale one binds to the wrong thing.
+        rebuild();
+    }
+    entityWorld_.unregisterParameters(*params_);
+    entityWorld_.setEntities(entityDescs_, worldSeed());
+
+    // What the entity layer is allowed to know about this composition: for every node, where its
+    // transform parameters live, where its material knobs live, what its material parts are called
+    // and where the scene put it.
+    std::vector<entity::NodeBinding> bindings;
+    bindings.reserve(nodes_.size());
+    std::vector<std::pair<std::string, glm::vec3>> landmarks;
+    landmarks.reserve(nodes_.size() + heroes_.size());
+    for (const auto& nodePtr : nodes_) {
+        const CompositionNode& node = *nodePtr;
+        entity::NodeBinding binding;
+        binding.node = node.name;
+        binding.exists = true;
+        binding.transformPrefix = prefix_ + "nodes/" + node.name + "/";
+        if (node.kind == NodeKind::Procedural) {
+            binding.geometryPrefix = "procedural/" + sanitise(prefix_) + node.name + "/";
+        } else if (node.kind == NodeKind::Particles) {
+            // Particle knobs are registered under the system's name rather than the node's path
+            // (registerParticleParameters takes no prefix), and the system is named for the node.
+            binding.geometryPrefix = "particles/" + sanitise(prefix_) + node.name + "/";
+        }
+        binding.partNames = node.materialPartNames;
+        binding.anchor = nodeWorldTransform(node).position;
+        landmarks.emplace_back(node.name, binding.anchor);
+        bindings.push_back(std::move(binding));
+    }
+    // Heroes are landmarks too: "look at the elder" is the natural thing for an author to write,
+    // and a hero's declared height is what makes a character look at its crown rather than its
+    // roots.
+    for (const world::HeroPoint& hero : heroes_) {
+        landmarks.emplace_back(hero.name, hero.position + glm::vec3(0.0f, hero.height * 0.5f, 0.0f));
+    }
+    entityWorld_.setBindings(std::move(bindings));
+    entityWorld_.setLandmarks(std::move(landmarks));
+
+    // The ground an entity walks on is the ground the terrain was built from -- the same WorldMap
+    // and the same ecology -- so a walker can never be above or below the surface it is standing
+    // on, and never needs a second description of it kept in step by hand.
+    entityWorld_.setNavigator(buildNavigator());
+
+    entityWorld_.registerParameters(*params_, prefix_ + "entity/");
+    entityWorld_.bind(*params_, prefix_ + "entity/");
+
+    // Hand every entity that declared clips a sink onto the node's rig. An entity that declared
+    // none gets one too and it does nothing -- which is the point: a craft, a rock and a character
+    // are the same kind of thing here, and only the data says which.
+    animationSinks_.clear();
+    for (const entity::EntityDesc& desc : entityDescs_) {
+        entity::Entity* live = entityWorld_.find(desc.name);
+        if (live == nullptr) {
+            continue;
+        }
+        animationSinks_.push_back(std::make_unique<AnimationSink>(*this, desc.driven(), *live));
+        live->setPoseSink(animationSinks_.back().get());
+    }
+
+    if (modulator_ != nullptr) {
+        auto& routes = modulator_->routes();
+        routes.erase(std::remove_if(routes.begin(), routes.end(),
+                                    [](const params::ModRoute& r) { return r.fromEntity; }),
+                     routes.end());
+        std::vector<std::string> problems;
+        std::size_t installed = 0;
+        for (params::ModRoute& route : entityWorld_.compileReactions(*params_, problems)) {
+            route.fromEntity = true;
+            modulator_->addRoute(std::move(route));
+            ++installed;
+        }
+        if (!entityWorld_.empty()) {
+            // Say what was installed, not only what failed. "No warnings" and "nothing happened"
+            // look identical in a log, and this project has shipped the second while reading it as
+            // the first.
+            log::info("composition '{}': {} entit{} installed, {} reaction{} bound, {} unresolved",
+                      name_, entityWorld_.size(), entityWorld_.size() == 1 ? "y" : "ies",
+                      installed, installed == 1 ? "" : "s", problems.size());
+        }
+        for (const std::string& problem : problems) {
+            // Loud, by name, with the candidates that were tried. A reaction that resolves to
+            // nothing is a feature that does nothing and says nothing, and this project has
+            // shipped five of those.
+            log::warn("{}", problem);
+        }
+        entityWorld_.recordProblems(problems);
+    }
+}
+
+entity::Navigator Composition::buildNavigator() const {
+    for (const auto& nodePtr : nodes_) {
+        if (nodePtr->kind != NodeKind::Terrain) {
+            continue;
+        }
+        world::ClearanceField field;
+        field.map = &nodePtr->worldMap;
+        field.ecology = &nodePtr->ecology;
+        field.heroes = heroes_;
+        // A walker is not a camera: it stands on the ground rather than clearing it, and its
+        // personal space is its own width rather than a near plane.
+        field.cameraRadius = 0.6f;
+        field.groundClearance = 0.0f;
+        return entity::Navigator(&nodePtr->worldMap, field);
+    }
+    return {};
+}
+
+std::uint32_t Composition::worldSeed() const {
+    for (const auto& nodePtr : nodes_) {
+        if (nodePtr->kind == NodeKind::Terrain) {
+            return nodePtr->worldMap.seed;
+        }
+    }
+    return 1u;
+}
+
+void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& state) {
+    const std::string& want = entity_.clipFor(state.activity);
+    if (want.empty()) {
+        return; // this entity declared no clips: it drives a craft or a prop, not a character
+    }
+    // Unconditional every frame: the player treats a request for the state it is already in as a
+    // no-op rather than a restart, so "what should be playing now" is the only thing a behaviour
+    // has to know. The timeline second rather than a wall clock is what keeps an offline render
+    // reproducible (ADR-086).
+    owner_.setNodeAnimation(node_, want, state.time);
+}
+
+void Composition::cullEntityNodes() {
+    if (entityWorld_.empty() || viewportHeight_ == 0) {
+        return;
+    }
+    const float aspect = static_cast<float>(viewportWidth_) / static_cast<float>(viewportHeight_);
+    const world::FrustumPlanes planes = world::frustumPlanes(scene_.camera.projection(aspect) * scene_.camera.view());
+    for (const auto& entityPtr : entityWorld_.entities()) {
+        const CompositionNode* node = findNode(entityPtr->desc().driven());
+        if (node == nullptr) {
+            continue;
+        }
+        const std::size_t index = static_cast<std::size_t>(node - nodes_.front().get());
+        (void)index;
+        for (std::size_t i = 0; i < nodes_.size() && i < ranges_.size(); ++i) {
+            if (nodes_[i].get() != node) {
+                continue;
+            }
+            const NodeRange& range = ranges_[i];
+            for (std::size_t k = 0; k < range.entityCount && range.firstEntity + k < scene_.entities.size(); ++k) {
+                Entity& e = scene_.entities[range.firstEntity + k];
+                if (e.mesh == kInvalidMesh || e.mesh >= scene_.meshes.size()) {
+                    e.cameraCulled = false;
+                    continue;
+                }
+                const auto [lo, hi] = scene_.meshes[e.mesh].bounds();
+                // The mesh's bounds are its bind pose; a posed skeleton can reach outside them, so
+                // pad by a quarter of the box before testing. A character culled one frame early
+                // is a character that pops.
+                const glm::vec3 pad = (hi - lo) * 0.25f + glm::vec3(0.25f);
+                const glm::mat4 m = e.transform.matrix();
+                glm::vec3 wlo(std::numeric_limits<float>::max());
+                glm::vec3 whi(std::numeric_limits<float>::lowest());
+                for (int corner = 0; corner < 8; ++corner) {
+                    const glm::vec3 p((corner & 1) ? hi.x + pad.x : lo.x - pad.x,
+                                      (corner & 2) ? hi.y + pad.y : lo.y - pad.y,
+                                      (corner & 4) ? hi.z + pad.z : lo.z - pad.z);
+                    const glm::vec3 w = glm::vec3(m * glm::vec4(p, 1.0f));
+                    wlo = glm::min(wlo, w);
+                    whi = glm::max(whi, w);
+                }
+                e.cameraCulled = !world::aabbVisible(planes, wlo, whi);
+            }
+            break;
+        }
+    }
+}
+
+void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) {
+    if (entityWorld_.empty() || params_ == nullptr) {
+        return;
+    }
+    entity::EntityUpdate update;
+    update.time = time.renderTime;
+    update.dt = time.deltaTime;
+    update.frameIndex = time.frameIndex;
+    update.bus = &bus;
+    update.viewPosition = scene_.camera.position;
+    entityWorld_.update(update, *params_);
+}
+
 Result<void> Composition::addMaterialProgram(MaterialProgram program) {
     if (auto v = program.validate(); !v) {
         return std::unexpected(v.error());
@@ -1490,6 +1710,19 @@ const CompositionNode* Composition::findNode(const std::string& name) const {
 
 void MaterialPartParameters::apply(Material& material) const {
     if (tint != nullptr) material.baseColor *= tint->value();
+    if (emissiveColor != nullptr) {
+        const glm::vec3 c = emissiveColor->value();
+        if (c.r + c.g + c.b > 0.0f) {
+            material.emissiveColor = c;
+            // A part given a colour owns its emission outright: strength 1, then emissiveGain
+            // from there. Anything else makes a part's brightness depend on the shared material's,
+            // and the point of a part is to be driven separately from its neighbours -- a lamp on
+            // the bass and a lens on the treble cannot share one intensity. The parts an author
+            // leaves black keep the shared intensity, which is what makes a single route onto
+            // `material/emissive` still read as "the whole object glowing".
+            material.emissiveIntensity = 1.0f;
+        }
+    }
     if (emissiveGain != nullptr) material.emissiveIntensity *= emissiveGain->value();
     if (roughnessScale != nullptr) material.roughness = std::clamp(material.roughness * roughnessScale->value(), 0.0f, 1.0f);
     if (opacityScale != nullptr) material.opacity = std::clamp(material.opacity * opacityScale->value(), 0.0f, 1.0f);
@@ -1645,6 +1878,9 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     } else {
         dirty_ = true; // nested particle systems were renamed for their parameter paths
     }
+    // Last, because an entity binds against the parameters every node above has just registered
+    // and against the material part names the rebuild resolved.
+    installEntities();
 }
 
 void Composition::registerNodeParameters(CompositionNode& node) {
@@ -1683,6 +1919,10 @@ void Composition::registerNodeParameters(CompositionNode& node) {
                 controls.emissiveGain = &params_->add(floatDesc(partBase + "emissiveGain", 1.0f, 0.0f, 50.0f, 0.0f, 2.0f));
                 controls.roughnessScale = &params_->add(floatDesc(partBase + "roughnessScale", 1.0f, 0.0f, 4.0f, 0.0f, 2.0f));
                 controls.opacityScale = &params_->add(floatDesc(partBase + "opacityScale", 1.0f, 0.0f, 1.0f, 0.0f, 1.0f));
+                params::ParamDesc<glm::vec3> emissive =
+                    vec3Desc(partBase + "emissiveColor", glm::vec3(0.0f), 0.0f, 64.0f, 0.0f, 4.0f);
+                emissive.isColor = true;
+                controls.emissiveColor = &params_->add(std::move(emissive));
                 node.materialPartParams.push_back(controls);
             }
         }
@@ -1800,6 +2040,9 @@ void Composition::unregisterParameters() {
 }
 
 void Composition::detach() {
+    if (params_ != nullptr) {
+        entityWorld_.unregisterParameters(*params_);
+    }
     for (auto& node : nodes_) {
         node->positionParam = nullptr;
         node->rotationParam = nullptr;
@@ -2386,6 +2629,23 @@ void Composition::rebuild() {
                     }
                     return resolved;
                 };
+                mutableNode.materialPartNames.clear();
+                for (const AssetPart& part : parts) {
+                    mutableNode.materialPartNames.push_back(part.name);
+                }
+                if (parts.size() > 1) {
+                    // Say what the parts are called. An author writing a reaction against this
+                    // asset has to know what to write, and the alternative to printing it is
+                    // reading the glTF by hand or guessing at an index.
+                    std::string named;
+                    for (std::size_t i = 0; i < parts.size(); ++i) {
+                        if (!named.empty()) {
+                            named += ", ";
+                        }
+                        named += fmt::format("{}={}", i, parts[i].name.empty() ? "<unnamed>" : parts[i].name);
+                    }
+                    log::info("procedural '{}': material parts {}", node.name, named);
+                }
                 if (!parts.empty()) {
                     pg.source.assetMesh = parts[0].mesh;
                     pg.source.meshBudget = partBudget(parts, 0, pg.source.meshBudget);
@@ -2676,6 +2936,7 @@ void Composition::update(const FrameTime& time) {
         cameraAngle_ += cameraOrbitSpeed_->value() * dt;
     }
     applyParameters();
+    cullEntityNodes();
     updateCharacters(time);
 }
 
@@ -3808,6 +4069,9 @@ nlohmann::json Composition::toJson() const {
         }
         j["heroes"] = std::move(heroes);
     }
+    if (!entityDescs_.empty()) {
+        j["entities"] = entity::entitiesToJson(entityDescs_);
+    }
     if (graph_) {
         j["graph"] = graph_->toJson();
     }
@@ -4192,6 +4456,15 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             heroes.push_back(std::move(*hero));
         }
         if (auto ok = comp->setHeroes(std::move(heroes)); !ok) {
+            return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
+        }
+    }
+    if (j.contains("entities")) {
+        auto entities = entity::entitiesFromJson(j.at("entities"), scenePath.parent_path());
+        if (!entities) {
+            return fail("scene file '{}': {}", scenePath.string(), entities.error().message);
+        }
+        if (auto ok = comp->setEntities(std::move(*entities)); !ok) {
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
     }

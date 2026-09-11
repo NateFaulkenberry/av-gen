@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-stylized.scene.json",
-        "sha256": "3780cb3c2b13c691df87a648cbdd6beafbcbd830de9ac0dbab04b9db7e44c7d8",
-        "size": 27886
+        "sha256": "7745c79b94a9b1eee922eea36244c0c58ecc1b1c6b843217d0d59f7ebd9e7e88",
+        "size": 32011
       }
     }
   },
@@ -2975,6 +2975,32 @@
     "procedural/monument-spire/variation/seed": 12345,
     "procedural/monument-spire/variation/uniformScale": 0.0,
     "procedural/monument-spire/visible": true,
+    "procedural/visitor/parts/0/roughnessScale": 1.0,
+    "procedural/visitor/parts/0/tint": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "procedural/visitor/parts/1/emissiveColor": [
+      0.45,
+      1.0,
+      1.55
+    ],
+    "procedural/visitor/parts/1/emissiveGain": 0.8,
+    "procedural/visitor/parts/1/roughnessScale": 1.25,
+    "procedural/visitor/parts/2/roughnessScale": 1.45,
+    "procedural/visitor/parts/2/tint": [
+      0.5,
+      0.52,
+      0.6
+    ],
+    "procedural/visitor/parts/3/emissiveColor": [
+      0.12,
+      0.45,
+      1.85
+    ],
+    "procedural/visitor/parts/3/emissiveGain": 0.65,
+    "procedural/visitor/parts/3/roughnessScale": 0.7,
     "root/impulse": 0.0,
     "root/rotationSpeed": 0.0,
     "root/scale": 1.0,

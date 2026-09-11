@@ -194,6 +194,13 @@ struct Entity {
     // glTF node's own transform is ignored on import, as the specification requires.
     RigId rig = kInvalidRig;
     Material material;
+    // The name the source asset gave this entity's material, when it gave one. Carried on the
+    // entity rather than on the Material because Material is compared by value to decide what can
+    // share a draw, and a name is a label rather than a property of the surface: two materials
+    // that shade identically must keep merging into one part however they were named. What the
+    // name buys is *addressing* -- it is how a scene file can say "parts/Blue/emissiveGain"
+    // instead of an index nobody can predict.
+    std::string materialName;
     MeshStyle style = MeshStyle::Lit;
     bool visible = true;
     // Whether the shadow passes draw this entity. Separate from `visible` because the camera's

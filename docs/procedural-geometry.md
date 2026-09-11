@@ -48,7 +48,17 @@ own axis); world-space deformers act on the final world position (a wave across 
 ## Material parts
 
 Multi-material mesh sources in procedural composition nodes expose additional parameter paths:
-`procedural/<node>/parts/<index>/tint`, `emissiveGain`, `roughnessScale`, and `opacityScale`.
+`procedural/<node>/parts/<index>/tint`, `emissiveGain`, `roughnessScale`, `opacityScale` and
+`emissiveColor`. `emissiveColor` is black by default, meaning "whatever the material already had" —
+an emission of zero and an emission that is black are the same picture, so black is free to mean
+something else. Setting it gives that part its own colour *and* its own unit strength, which is
+what lets a lamp answer the bass while the lens beside it answers the treble; a multiplier alone
+cannot light a part whose glTF `emissiveFactor` is `[0,0,0]`, which is most of them.
+
+The index is ordered by surface area and is not something a scene file should have to guess. The
+composition logs what an asset's parts are called (`material parts 0=Gray, 1=Light, 2=Black,
+3=Blue`), and an entity's reactions may address them by that name — see `"entities"` in
+`docs/project-format.md`.
 Nested compositions include their existing prefix before the node name. All default to one.
 These multiply each part's own material after the legacy whole-node material controls have been
 applied, and are recalculated from the rest material each frame, not compounded over time.

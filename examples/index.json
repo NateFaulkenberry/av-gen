@@ -167,6 +167,12 @@
    "category": "Lab",
    "description": "Three copies of one CC0 character, idling, walking and running from the same glTF skin: 49 joints, three clips, GPU skinning through the shared PBR shading. Each node declares its own opening state, and the pose is a pure function of the timeline, so the window and an offline render agree.",
    "project": "characters/alien.json"
+  },
+  {
+   "name": "Wanderer - Behaviour and Navigation",
+   "category": "Lab",
+   "description": "The entity layer end to end (ADR-088): a character picks navigable destinations from the same WorldMap the terrain mesh was built from, stops to look at a hovering scout, and walks faster as the track opens up -- because a behaviour's speed is an ordinary parameter and the music can reach it. The scout's four materials answer four different bands.",
+   "project": "characters/alien-wander.json"
   }
  ]
 }

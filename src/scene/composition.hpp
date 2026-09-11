@@ -25,6 +25,7 @@
 #include "scene/sdf_object.hpp"
 #include "scene/spline_params.hpp"
 #include "scene/particles.hpp"
+#include "entity/entity.hpp"
 #include "scene/scene_controller.hpp"
 #include "world/ecology.hpp"
 #include "world/hero.hpp"
@@ -54,6 +55,14 @@ struct MaterialPartParameters {
     params::Parameter<float>* emissiveGain = nullptr;
     params::Parameter<float>* roughnessScale = nullptr;
     params::Parameter<float>* opacityScale = nullptr;
+    // The colour this part emits. Black means "whatever the material already had", because an
+    // emission of zero and an emission that is black are the same picture, so black is free to
+    // mean something else. Without it a part can only be scaled: `emissiveGain` multiplies, and a
+    // multiplier cannot light a lamp whose glTF emissiveFactor is [0,0,0] -- which is every lamp
+    // in every asset exported without emission, i.e. most of them. A part that cannot be given a
+    // colour cannot be given a *different* colour from its neighbour either, and driving different
+    // parts of one object from different bands is the entire reason parts are addressable.
+    params::Parameter<glm::vec3>* emissiveColor = nullptr;
 
     void apply(Material& material) const;
 };
@@ -128,6 +137,11 @@ struct CompositionNode {
     // and their material. Built at rebuild, applied alongside it every frame.
     std::vector<ProceduralGeometry> proceduralSubRest;
     std::vector<MaterialPartParameters> materialPartParams;
+    // Part index -> the material name the asset gave it, filled at rebuild for an imported mesh
+    // source (ADR-044) and empty for everything else. This is what lets a reaction be written
+    // against a name an artist can see in the model file rather than against an area-ordered index
+    // nobody can predict: see entity::EntityWorld::resolveTarget.
+    std::vector<std::string> materialPartNames;
     FieldParameters fieldParams;
     spatial::FieldSpec fieldRest;
     SplineParameters splineParams;
@@ -152,6 +166,7 @@ public:
     // ---- SceneController ----
     [[nodiscard]] std::string name() const override { return name_; }
     void update(const FrameTime& time) override;
+    void updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) override;
     [[nodiscard]] const Scene& scene() const override { return scene_; }
     [[nodiscard]] Scene& scene() override { return scene_; }
 
@@ -210,6 +225,27 @@ public:
     // Rejects the whole set rather than dropping the bad member, and names it. A hero silently
     // dropped is a camera director that frames nothing with no explanation of why.
     Result<void> setHeroes(std::vector<world::HeroPoint> heroes);
+
+    // ---- entities (ADR-088) ------------------------------------------------------------------
+    //
+    // The `entities` array of a scene file: what in this scene moves on its own and how it answers
+    // the music. A peer of `heroes` for the same reason heroes are a peer of the composition data
+    // -- the nodes are already placed, and this says what drives them.
+    //
+    // Setting entities does not mark the composition dirty: an entity moves a node by writing its
+    // transform parameters, and nothing it can do requires geometry to be rebuilt.
+    [[nodiscard]] const std::vector<entity::EntityDesc>& entities() const { return entityDescs_; }
+    [[nodiscard]] const entity::EntityWorld& entityWorld() const { return entityWorld_; }
+    [[nodiscard]] entity::EntityWorld& entityWorld() { return entityWorld_; }
+    // Rejects the whole set and names the offender rather than dropping one, for the same reason
+    // setHeroes does: an entity silently missing is a scene that does nothing with no explanation.
+    Result<void> setEntities(std::vector<entity::EntityDesc> entities);
+    // Rebuilds the entity layer's view of this composition -- which node each entity drives, what
+    // its material parts are called, where the ground is -- and reinstalls its reaction routes on
+    // the modulator. Called from attach() and after a rebuild; safe to call again.
+    void installEntities();
+    // Everything the entity layer could not resolve. Empty when all of it resolved.
+    [[nodiscard]] const std::vector<std::string>& entityProblems() const { return entityWorld_.problems(); }
 
     // ---- procedural graph (ADR-028) ----
     // A composition is either graph-driven or flat: installing a graph replaces every node this
@@ -461,7 +497,33 @@ private:
     // Scene-level material programs (ADR-030): "materialPrograms" in the file, parameters
     // "material/<name>/…", referenced by Material::program.
     CompositionData compositionData_;
+    [[nodiscard]] entity::Navigator buildNavigator() const;
+    [[nodiscard]] std::uint32_t worldSeed() const;
+    // Marks the entities of entity-driven nodes that fall outside the camera frustum, so the rig
+    // pass can skip posing a character nobody can see (ADR-086's cullDistance handles the far ones;
+    // nothing was setting cameraCulled for anything but terrain). Deliberately only for nodes an
+    // entity drives: every other node's visibility is somebody else's decision and flipping it
+    // here would be a rendering change smuggled in as an optimisation.
+    void cullEntityNodes();
+
+    // Turns a behaviour's Activity into an animation state on the node it drives (ADR-086/087).
+    // Owned by the composition because only the composition knows which node holds which rig.
+    class AnimationSink final : public entity::IPoseSink {
+    public:
+        AnimationSink(Composition& owner, std::string node, const entity::Entity& entity)
+            : owner_(owner), node_(std::move(node)), entity_(entity) {}
+        void setLocomotion(const entity::LocomotionState& state) override;
+
+    private:
+        Composition& owner_;
+        std::string node_;
+        const entity::Entity& entity_;
+    };
+    std::vector<std::unique_ptr<AnimationSink>> animationSinks_;
+
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
+    std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
+    entity::EntityWorld entityWorld_;
     std::optional<graph::Graph> graph_;
     bool graphDirty_ = false;
     double interactiveRebuildBudgetMs_ = 0.0;

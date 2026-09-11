@@ -1,0 +1,40 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "assets": {
+    "audio": {
+      "path": "../../assets/audio/glowmere-valley.wav"
+    },
+    "scene": {
+      "kind": "composition",
+      "path": {
+        "path": "alien-wander.scene.json",
+        "sha256": "811b49a9e4493adfc168200655d716abdb034d9c033b86d0d06fd746474a8643",
+        "size": 7140
+      }
+    }
+  },
+  "parameters": {
+    "procedural/scout/parts/1/emissiveColor": [
+      0.45,
+      1.0,
+      1.55
+    ],
+    "procedural/scout/parts/1/emissiveGain": 0.8,
+    "procedural/scout/parts/1/roughnessScale": 1.25,
+    "procedural/scout/parts/2/roughnessScale": 1.45,
+    "procedural/scout/parts/2/tint": [
+      0.5,
+      0.52,
+      0.6
+    ],
+    "procedural/scout/parts/3/emissiveColor": [
+      0.12,
+      0.45,
+      1.85
+    ],
+    "procedural/scout/parts/3/emissiveGain": 0.65,
+    "procedural/scout/parts/3/roughnessScale": 0.7
+  },
+  "routes": []
+}
