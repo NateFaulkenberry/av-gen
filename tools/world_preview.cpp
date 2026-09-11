@@ -2,11 +2,21 @@
 // is turned into triangles. Hypsometric tint plus hillshade plus 10 m contours plus water, which is
 // the same set of cues a topographic map uses, for the same reason: it makes shape legible.
 //
-//   avgen_world_preview [world.json] [out.png] [pixels]
+//   avgen_world_preview [--biomes] [world.json] [out.png] [pixels] [probeX probeZ]...
+//   avgen_world_preview --terrain <style> [--seed N] [--set key=value]... [out.png] [pixels]
+//
+// The second form generates a map from `terrain_gen`'s artistic parameters instead of loading one,
+// which is the only way to look at a style before it has been committed to a recipe. It installs the
+// composer's five biomes so `--biomes` means the same thing in both forms, and it prints the water
+// courses the generator produced -- the half of the water seam that a picture cannot show.
 
 #include "assets/image.hpp"
-#include "world/world_map.hpp"
 #include "world/terrain.hpp"
+#include "world/terrain_gen.hpp"
+#include "world/terrain_water.hpp"
+#include "world/world_composer.hpp"
+#include "world/world_recipe.hpp"
+#include "world/world_map.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -14,6 +24,8 @@
 #include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <cstdlib>
+#include <string>
 #include <vector>
 
 using namespace avgen;
@@ -47,17 +59,115 @@ int main(int argc, char** argv) {
     // biome map has to answer is whether its regions sit where the geography put them.
     int arg = 1;
     bool biomeView = false;
-    if (argc > 1 && std::string(argv[1]) == "--biomes") {
-        biomeView = true;
-        ++arg;
+    bool generate = false;
+    std::string recipePath;
+    world::TerrainParams params;
+    while (arg < argc && std::string(argv[arg]).rfind("--", 0) == 0) {
+        const std::string flag = argv[arg];
+        if (flag == "--biomes") {
+            biomeView = true;
+            ++arg;
+        } else if (flag == "--terrain" && arg + 1 < argc) {
+            const auto style = world::terrainStyleFromName(argv[arg + 1]);
+            if (!style) {
+                std::fprintf(stderr, "unknown terrain style '%s'\n", argv[arg + 1]);
+                return 1;
+            }
+            params = world::terrainPreset(*style);
+            generate = true;
+            arg += 2;
+        } else if (flag == "--recipe" && arg + 1 < argc) {
+            recipePath = argv[arg + 1];
+            generate = true;
+            arg += 2;
+        } else if (flag == "--set" && arg + 1 < argc) {
+            const std::string kv = argv[arg + 1];
+            const auto eq = kv.find('=');
+            if (eq == std::string::npos) {
+                std::fprintf(stderr, "--set wants key=value, got '%s'\n", kv.c_str());
+                return 1;
+            }
+            nlohmann::json patch = params.toJson();
+            const std::string key = kv.substr(0, eq);
+            const std::string value = kv.substr(eq + 1);
+            if (key == "style") {
+                patch[key] = value;
+            } else if (key == "seed") {
+                patch[key] = static_cast<std::uint32_t>(std::strtoul(value.c_str(), nullptr, 10));
+            } else {
+                patch[key] = std::atof(value.c_str());
+            }
+            auto parsed = world::TerrainParams::fromJson(patch);
+            if (!parsed) {
+                std::fprintf(stderr, "%s\n", parsed.error().message.c_str());
+                return 1;
+            }
+            params = *parsed;
+            arg += 2;
+        } else {
+            std::fprintf(stderr, "unknown flag '%s'\n", flag.c_str());
+            return 1;
+        }
     }
-    const std::string worldPath = argc > arg ? argv[arg] : "";
-    const std::string outPath = argc > arg + 1 ? argv[arg + 1] : "world_preview.png";
-    const int size = argc > arg + 2 ? std::atoi(argv[arg + 2]) : 768;
-    const int firstProbe = arg + 3;
+    const std::string worldPath = generate ? "" : (argc > arg ? argv[arg] : "");
+    const int outArg = generate ? arg : arg + 1;
+    const std::string outPath = argc > outArg ? argv[outArg] : "world_preview.png";
+    const int size = argc > outArg + 1 ? std::atoi(argv[outArg + 1]) : 768;
+    const int firstProbe = outArg + 2;
 
     world::WorldMap map = world::defaultWorld();
-    if (!worldPath.empty()) {
+    if (generate) {
+        if (!recipePath.empty()) {
+            // The composer's own path, not a reconstruction of it: whatever `terrainFor` returns is
+            // what `--generate` will put in the scene, biomes and all.
+            auto recipe = world::WorldRecipe::loadFile(recipePath);
+            if (!recipe) {
+                std::fprintf(stderr, "%s\n", recipe.error().message.c_str());
+                return 1;
+            }
+            params = recipe->terrain;
+            params.name = recipe->world;
+            params.seed = recipe->seed;
+            params.extent = recipe->extent;
+        }
+        params.name = recipePath.empty() ? std::string("preview-") + world::terrainStyleName(params.style)
+                                         : params.name;
+        map = world::generateTerrain(params);
+        map.biomes = world::composerBiomes();
+        map.prepare();
+        std::printf("%s\n", params.toJson().dump().c_str());
+        if (auto v = map.validate(); !v) {
+            std::fprintf(stderr, "generated map is invalid: %s\n", v.error().message.c_str());
+            return 1;
+        }
+        // A cross-section through each river, because a picture from above cannot show whether the
+        // water is in a channel or lying on top of one.
+        for (const world::WaterCourse& c : world::waterCourses(map)) {
+            if (c.kind != world::WaterKind::River || c.centreline.size() < 5) {
+                continue;
+            }
+            const std::size_t mid = c.centreline.size() / 2;
+            const glm::vec2 at(c.centreline[mid].x, c.centreline[mid].z);
+            const glm::vec2 flow = c.flowAt(at);
+            const glm::vec2 across(-flow.y, flow.x);
+            std::printf("  section %-10s surface %.2f  bed %.2f |", c.name.c_str(), c.surfaceAt(at),
+                        map.height(at));
+            for (float m = -4.0f; m <= 4.01f; m += 1.0f) {
+                std::printf(" %+.1f", map.height(at + across * (c.halfWidth * m)) - c.surfaceAt(at));
+            }
+            std::printf("  (metres above the water line at -4..+4 half-widths)\n");
+        }
+        for (const world::WaterCourse& c : world::waterCourses(map)) {
+            std::printf("  water: %-10s %-5s %2zu nodes, half-width %.1f m, depth %.1f m, "
+                        "length %.0f m, descent %.1f m, flow %.2f m/s\n",
+                        c.name.c_str(), world::waterKindName(c.kind), c.centreline.size(), c.halfWidth,
+                        c.depth, c.length, c.descent, c.flowSpeed());
+            const glm::vec3& head = c.centreline.front();
+            const glm::vec3& mouth = c.centreline.back();
+            std::printf("             head (%.0f, %.0f) at %.1f m  ->  mouth (%.0f, %.0f) at %.1f m\n",
+                        head.x, head.z, head.y, mouth.x, mouth.z, mouth.y);
+        }
+    } else if (!worldPath.empty()) {
         std::ifstream in(worldPath);
         if (!in) {
             std::fprintf(stderr, "cannot open %s\n", worldPath.c_str());

@@ -55,7 +55,25 @@ struct PathHit {
     float distance = 0.0f;
     float level = 0.0f;
 };
-PathHit closestOnPath(const std::vector<glm::vec3>& path, glm::vec2 p) {
+// Segments per bounding block. Eight is enough to pay for the box test out of the segments it skips
+// and small enough that a block of a meandering curve is still a local piece of it.
+constexpr std::size_t kPathBlock = 8;
+
+// Distance from p to an axis-aligned box, or 0 inside it. Conservative by construction: every point
+// of the block's polyline is inside the box, so no segment in it can be nearer than this.
+float boxDistance(const glm::vec4& box, glm::vec2 p) {
+    const float dx = std::max({box.x - p.x, 0.0f, p.x - box.z});
+    const float dz = std::max({box.y - p.y, 0.0f, p.y - box.w});
+    return std::sqrt(dx * dx + dz * dz);
+}
+
+// `blocks` is optional and is purely an accelerator: skipping a block whose box is further away than
+// the best distance so far cannot change the answer, because the update below is a strict `<` and
+// any segment inside the box is at least the box's distance away. Passing an empty span walks every
+// segment and gives the identical result -- which is what the determinism captures require and what
+// makes this safe to add to a format that is already serialised in scenes.
+PathHit closestOnPath(const std::vector<glm::vec3>& path, glm::vec2 p,
+                      const std::vector<glm::vec4>& blocks = {}) {
     PathHit best{std::numeric_limits<float>::max(), 0.0f};
     if (path.empty()) {
         return {0.0f, 0.0f};
@@ -63,7 +81,12 @@ PathHit closestOnPath(const std::vector<glm::vec3>& path, glm::vec2 p) {
     if (path.size() == 1) {
         return {glm::distance(p, glm::vec2(path[0].x, path[0].z)), path[0].y};
     }
+    const bool blocked = blocks.size() * kPathBlock >= path.size() - 1;
     for (std::size_t i = 0; i + 1 < path.size(); ++i) {
+        if (blocked && i % kPathBlock == 0 && boxDistance(blocks[i / kPathBlock], p) >= best.distance) {
+            i += kPathBlock - 1;
+            continue;
+        }
         const glm::vec2 a(path[i].x, path[i].z);
         const glm::vec2 b(path[i + 1].x, path[i + 1].z);
         const glm::vec2 ab = b - a;
@@ -197,7 +220,7 @@ float WorldMap::height(glm::vec2 p) const {
         if (!f.reaches(p)) {
             continue; // exactly equivalent to a zero weight, and it costs one compare
         }
-        const PathHit hit = closestOnPath(f.samplePath(), p);
+        const PathHit hit = closestOnPath(f.samplePath(), p, f.blocks);
         const float w = featureWeight(hit.distance, f.width, f.falloff);
         if (w <= 0.0f) {
             continue;
@@ -258,7 +281,7 @@ float WorldMap::waterSurface(glm::vec2 p) const {
         if (!f.water || !f.reaches(p)) {
             continue;
         }
-        const PathHit hit = closestOnPath(f.samplePath(), p);
+        const PathHit hit = closestOnPath(f.samplePath(), p, f.blocks);
         // Only inside the bank, and only where the feature actually reaches: a wide, soft-shouldered
         // river should not flood the shoulder just because the shoulder is within `width`.
         if (featureWeight(hit.distance, f.width, f.falloff) > 0.0f) {
@@ -278,7 +301,7 @@ float WorldMap::moisture(glm::vec2 p, float altitude01) const {
         if (!f.water) {
             continue;
         }
-        const PathHit hit = closestOnPath(f.samplePath(), p);
+        const PathHit hit = closestOnPath(f.samplePath(), p, f.blocks);
         const float beyondBank = std::max(hit.distance - f.width, 0.0f);
         wet = std::max(wet, std::exp(-beyondBank / std::max(moistureReach, 1e-3f)));
     }
@@ -311,6 +334,17 @@ void WorldMap::prepare() {
         }
         f.boundsMin = lo - glm::vec2(f.width);
         f.boundsMax = hi + glm::vec2(f.width);
+        f.blocks.clear();
+        const std::vector<glm::vec3>& pts = f.samplePath();
+        for (std::size_t i = 0; i + 1 < pts.size(); i += kPathBlock) {
+            glm::vec2 blo(std::numeric_limits<float>::max());
+            glm::vec2 bhi(std::numeric_limits<float>::lowest());
+            for (std::size_t k = i; k < std::min(i + kPathBlock + 1, pts.size()); ++k) {
+                blo = glm::min(blo, glm::vec2(pts[k].x, pts[k].z));
+                bhi = glm::max(bhi, glm::vec2(pts[k].x, pts[k].z));
+            }
+            f.blocks.emplace_back(blo.x, blo.y, bhi.x, bhi.y);
+        }
     }
     // A coarse survey rather than the exact extremes: 97 samples a side is enough to place the
     // range within a metre or two, and what altitude blending needs is a stable reference every
