@@ -7,6 +7,7 @@
 
 #include "analysis/analysis_runner.hpp"
 #include "app/control_hub.hpp"
+#include "app/music_runtime.hpp"
 #include "app/render_settings.hpp"
 #include "app/scene_states.hpp"
 #include "app/world_director.hpp"
@@ -287,6 +288,10 @@ public:
     [[nodiscard]] params::Modulator& modulator() { return modulator_; }
     [[nodiscard]] signals::SignalBus& signals() { return bus_; }
     [[nodiscard]] const signals::AudioSignals& audioSignals() const { return audioSignals_; }
+    // The musical event signals (ADR-073): music.beat ... music.impact, and the classifier behind
+    // them. Read it to ask *when* something fired; the bus clears event values at the end of every
+    // update(), so polling the signals from outside the frame only ever sees zero.
+    [[nodiscard]] const MusicRuntime& music() const { return music_; }
     [[nodiscard]] audio::AudioPlayer* player() { return player_.get(); }
     [[nodiscard]] analysis::AnalysisRunner* runner() { return runner_.get(); }
     [[nodiscard]] const analysis::AnalysisTrack* track() const { return track_.get(); }
@@ -317,6 +322,7 @@ private:
     params::ParameterSet params_;
     signals::SignalBus bus_;
     signals::AudioSignals audioSignals_;
+    MusicRuntime music_;
     params::Modulator modulator_;
     signals::SourceRack sources_;
     params::PresetBank presets_;

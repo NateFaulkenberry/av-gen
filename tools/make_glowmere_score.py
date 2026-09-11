@@ -59,9 +59,40 @@ def envelope(t: float, span: float, attack: float, release: float) -> float:
 # Where the break sits, as a fraction of the piece. Just past the middle: late enough that the
 # arrangement has built something to take away, early enough to leave room for the arrival to land
 # and then settle.
-kBreakStart = 0.55
-kBreakEnd = 0.60
-kDropSettle = 0.66
+kBreakStart = 0.54
+kBreakEnd = 0.615
+kDropSettle = 0.70
+# The gain is back within about a second and a half of the break ending, well inside the two and a
+# half seconds the classifier allows a break to resolve in.
+kDropReturn = 0.632
+
+
+def break_gain(t: float, seconds: float) -> float:
+    """How loud *everything* is, including the drone, through the break.
+
+    The drone is the only voice `section_weight` does not gate -- it follows the swell alone -- so
+    it set the floor of the break and no amount of thinning the other voices could get under it.
+    The first two attempts at a break measured 0.042 and 0.090 mean RMS against natural troughs of
+    0.040 elsewhere in the piece; the detector correctly declined to call either a break, because
+    neither was one. A break has to be the quietest thing in the track by a margin nothing else
+    reaches, and that means the drone has to duck too.
+
+    It never reaches zero. A break of literal silence reads as a fault in the file, and the
+    classifier wants energy to collapse rather than vanish.
+    """
+    u = t / seconds
+    if u < kBreakStart or u >= kDropReturn:
+        return 1.0
+    if u < kBreakEnd:
+        hush = 1.0 - smoothstep((u - kBreakStart) / max(kBreakEnd - kBreakStart, 1e-6))
+        return 0.10 + 0.90 * hush
+    # The return is *fast*. A drop, to the classifier, is a break resolving within about two and a
+    # half seconds; recovering over the seven seconds it takes the arrangement to settle means the
+    # energy is back but never arrived, and no drop is recognised. So the gain snaps back over
+    # roughly a bar and a half and the long taper is left to `boost`, which shapes the arrival
+    # rather than gating it.
+    rise = smoothstep((u - kBreakEnd) / max(kDropReturn - kBreakEnd, 1e-6))
+    return 0.10 + 0.90 * rise
 
 
 def smoothstep(x: float) -> float:
@@ -93,15 +124,19 @@ def section_weight(t: float, seconds: float) -> tuple:
         # Not a step. A hard gate would put a click in the audio and give the onset detector a
         # transient exactly where the music is meant to be emptying out.
         hush = 1.0 - smoothstep((u - kBreakStart) / max(kBreakEnd - kBreakStart, 1e-6))
-        pad *= 0.18 + 0.82 * hush
-        pulse *= 0.05 + 0.95 * hush
-        bell *= 0.12 + 0.88 * hush
-        air *= 0.75 + 0.25 * hush
+        # Deeper than the first attempt, which measured 0.042 mean RMS against a *natural* trough of
+        # 0.040 elsewhere in the piece -- so it was not a break, it was another dip, and the detector
+        # correctly declined to call it one. A break has to be the quietest thing in the track by a
+        # margin nothing else reaches.
+        pad *= 0.05 + 0.95 * hush
+        pulse *= 0.0 + 1.0 * hush
+        bell *= 0.03 + 0.97 * hush
+        air *= 0.20 + 0.80 * hush
     elif u < kDropSettle and u >= kBreakEnd:
         # The return, over about a bar and a half: loud, and slightly louder than before it, because
         # a drop that comes back to exactly where it left is a gap rather than an arrival.
         rise = smoothstep((u - kBreakEnd) / max(kDropSettle - kBreakEnd, 1e-6))
-        boost = 1.0 + 0.22 * (1.0 - rise)
+        boost = 1.0 + 0.45 * (1.0 - rise)
         pad *= boost
         pulse *= boost
         bell *= boost
@@ -143,7 +178,7 @@ def main() -> None:
     for i in range(n):
         t = i / rate
         _, _, _, air = section_weight(t, args.seconds)
-        swell = 0.62 + 0.38 * math.sin(TWO_PI * t / 31.0)
+        swell = (0.82 + 0.18 * math.sin(TWO_PI * t / 31.0)) * break_gain(t, args.seconds)
         s = 0.20 * swell * (math.sin(TWO_PI * D1 * t) + 0.7 * math.sin(TWO_PI * (D1 + 0.2) * t))
         s += 0.12 * swell * math.sin(TWO_PI * D2 * t)
         # One-pole low-passed noise. Its cutoff opens as the piece grows, which walks the spectral

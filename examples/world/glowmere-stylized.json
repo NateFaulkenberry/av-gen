@@ -8,6 +8,9 @@
   "scene": {
    "kind": "composition",
    "path": "glowmere-stylized.scene.json"
+  },
+  "audio": {
+   "path": "../../assets/audio/glowmere-valley.wav"
   }
  },
  "parameters": {
@@ -197,6 +200,146 @@
    "chain": {
     "attackMs": 600.0,
     "decayMs": 2000.0
+   }
+  },
+  {
+   "source": "music.beat",
+   "target": "material/glowmereTissue/emissionIntensity",
+   "op": "add",
+   "amount": 0.09,
+   "chain": {
+    "attackMs": 25.0,
+    "decayMs": 240.0
+   }
+  },
+  {
+   "source": "music.impact",
+   "target": "material/glowmereTissue/emissionIntensity",
+   "op": "add",
+   "amount": 0.22,
+   "chain": {
+    "attackMs": 12.0,
+    "decayMs": 900.0
+   }
+  },
+  {
+   "source": "music.downbeat",
+   "target": "nodes/elder-filaments/emissiveBoost",
+   "op": "add",
+   "amount": 0.1,
+   "chain": {
+    "attackMs": 45.0,
+    "decayMs": 620.0
+   }
+  },
+  {
+   "source": "music.downbeat",
+   "target": "lightrig/GlowmereValley/elder-practical/intensity",
+   "op": "add",
+   "amount": 0.3,
+   "chain": {
+    "attackMs": 60.0,
+    "decayMs": 900.0
+   }
+  },
+  {
+   "source": "music.phrase",
+   "target": "particles/spores/turbulence",
+   "op": "add",
+   "amount": 0.18,
+   "chain": {
+    "attackMs": 1400.0,
+    "decayMs": 3600.0
+   }
+  },
+  {
+   "source": "music.section",
+   "target": "nodes/elder-crown/emissiveBoost",
+   "op": "add",
+   "amount": 0.06,
+   "chain": {
+    "attackMs": 2200.0,
+    "decayMs": 6000.0
+   }
+  },
+  {
+   "source": "music.build",
+   "target": "scene/windSpeed",
+   "op": "add",
+   "amount": 0.18,
+   "chain": {
+    "attackMs": 2400.0,
+    "decayMs": 2800.0
+   }
+  },
+  {
+   "source": "music.build",
+   "target": "particles/spores/spawnRate",
+   "op": "add",
+   "amount": 70.0,
+   "chain": {
+    "attackMs": 2600.0,
+    "decayMs": 2400.0
+   }
+  },
+  {
+   "source": "music.break",
+   "target": "scene/windSpeed",
+   "op": "add",
+   "amount": -0.2,
+   "chain": {
+    "attackMs": 1500.0,
+    "decayMs": 3000.0
+   }
+  },
+  {
+   "source": "music.break",
+   "target": "particles/spores/spawnRate",
+   "op": "add",
+   "amount": -80.0,
+   "chain": {
+    "attackMs": 1400.0,
+    "decayMs": 3000.0
+   }
+  },
+  {
+   "source": "music.drop",
+   "target": "nodes/elder-filaments/emissiveBoost",
+   "op": "add",
+   "amount": 0.18,
+   "chain": {
+    "attackMs": 70.0,
+    "decayMs": 2200.0
+   }
+  },
+  {
+   "source": "music.drop",
+   "target": "procedural/elder-filaments/distribution/radius",
+   "op": "add",
+   "amount": 0.3,
+   "chain": {
+    "attackMs": 320.0,
+    "decayMs": 2600.0
+   }
+  },
+  {
+   "source": "music.drop",
+   "target": "particles/spores/burst",
+   "op": "add",
+   "amount": 220.0,
+   "chain": {
+    "attackMs": 10.0,
+    "decayMs": 260.0
+   }
+  },
+  {
+   "source": "music.drop",
+   "target": "scene/volumeScattering",
+   "op": "add",
+   "amount": 0.09,
+   "chain": {
+    "attackMs": 250.0,
+    "decayMs": 1800.0
    }
   }
  ],

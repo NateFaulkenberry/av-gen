@@ -1,6 +1,7 @@
 #include "app/camera_director.hpp"
 
 #include "app/engine.hpp"
+#include "app/music_runtime.hpp"
 #include "core/log.hpp"
 #include "params/timeline.hpp"
 
@@ -78,6 +79,56 @@ Result<Sequence> directHeroes(std::span<const world::HeroPoint> heroes,
         return std::unexpected(sequence.error());
     }
     return sequence;
+}
+
+Result<signals::MusicalStructure> structureOfTrack(const analysis::AnalysisTrack& track,
+                                                   int phraseBars, int sectionPhrases) {
+    const auto& frames = track.frames();
+    if (frames.empty()) {
+        return fail("the camera director needs an analysed track: this one has no frames");
+    }
+    // A detector of its own, walked over every frame in order. Reusing the engine's would fold from
+    // whatever state playback had reached, so the same track would produce a different structure
+    // depending on when the button was pressed.
+    MusicRuntime runtime;
+    std::vector<signals::MusicalMoment> moments;
+    for (const analysis::AnalysisFrame& frame : frames) {
+        runtime.consume(frame, phraseBars, sectionPhrases);
+        const auto found = runtime.lastMoments();
+        moments.insert(moments.end(), found.begin(), found.end());
+    }
+    const double total = frames.back().timeSeconds;
+    if (!(total > 0.0)) {
+        return fail("the analysed track has no duration");
+    }
+    auto structure = signals::MusicalStructure::fromMoments(moments, total);
+    if (structure.sections.empty()) {
+        // Not an empty sequence further down the line: a track the fold found no structure in is a
+        // track the director cannot shoot, and saying so here names the cause.
+        return fail("no musical structure was found in {:.1f}s of audio ({} moment(s)); the "
+                    "director has nothing to cut to",
+                    total, moments.size());
+    }
+    return structure;
+}
+
+Result<std::size_t> directEngine(Engine& engine, std::span<const world::HeroPoint> heroes,
+                                 std::uint32_t seed) {
+    const analysis::AnalysisTrack* track = engine.track();
+    if (track == nullptr) {
+        return fail("the camera director needs analysed audio; load a track first");
+    }
+    auto structure = structureOfTrack(*track);
+    if (!structure) {
+        return std::unexpected(structure.error());
+    }
+    auto sequence = directHeroes(heroes, *structure, seed);
+    if (!sequence) {
+        return std::unexpected(sequence.error());
+    }
+    log::info("camera director: {:.0f}s of audio folded into {} section(s)",
+              structure->durationSeconds(), structure->sections.size());
+    return installSequence(engine, *sequence);
 }
 
 Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {

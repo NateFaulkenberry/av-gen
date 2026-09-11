@@ -13,6 +13,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <algorithm>
+#include <filesystem>
 
 using namespace avgen;
 
@@ -232,4 +233,48 @@ TEST_CASE("The director's camera targets are stated once", "[director][camera]")
         INFO("installed track targets " << t.target);
         CHECK(std::find(owned.begin(), owned.end(), t.target) != owned.end());
     }
+}
+
+TEST_CASE("The Glowmere score folds into a structure with a drop in it", "[director][camera][glowmere]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    // The end of the chain on the real soundtrack. This is the test that would have caught the
+    // score having no drop in it: before the break was added to make_glowmere_score.py the piece
+    // built monotonically, so Break and Drop could never fire and the camera behaviour the showcase
+    // is built around had nothing to trigger on. Everything downstream looked fine.
+    const std::filesystem::path wav =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "glowmere-valley.wav";
+    if (!std::filesystem::exists(wav)) {
+        SKIP("glowmere-valley.wav is generated, not committed: run tools/make_glowmere_score.py");
+    }
+
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    auto loaded = engine.loadAudio(wav);
+    INFO((loaded ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+    REQUIRE(engine.track() != nullptr);
+
+    auto structure = app::structureOfTrack(*engine.track());
+    INFO((structure ? std::string() : structure.error().message));
+    REQUIRE(structure.has_value());
+    CHECK(structure->sections.size() >= 3);
+    CHECK(structure->durationSeconds() > 60.0);
+
+    // The moment the showcase is built around. A score with no collapse cannot produce one.
+    INFO("sections: " << structure->sections.size()
+                      << ", drops: " << structure->count(signals::MusicalSection::Drop)
+                      << ", breakdowns: " << structure->count(signals::MusicalSection::Breakdown));
+    CHECK(structure->count(signals::MusicalSection::Drop) +
+              structure->count(signals::MusicalSection::FinalDrop) >
+          0);
+
+    // And it can actually be shot.
+    const auto heroes = threeHeroes();
+    auto sequence = app::directHeroes(heroes, *structure);
+    INFO((sequence ? std::string() : sequence.error().message));
+    REQUIRE(sequence.has_value());
+    CHECK(sequence->shots.size() >= 3);
+#endif
 }

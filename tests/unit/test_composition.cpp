@@ -1615,3 +1615,193 @@ TEST_CASE("A scatter layer's material program and the ground's glow reach the fl
         }));
     }
 }
+
+// ---- heroes (ADR-074) ---------------------------------------------------------------------------
+
+namespace {
+
+// A scene whose only interesting content is its heroes block. Nodes are left out deliberately: a
+// hero describes something already placed, and nothing here should need geometry to exist.
+std::string heroScene(const std::string& heroes) {
+    return R"({"format": "avgen-scene", "version": 1, "name": "heroic", "heroes": )" + heroes + "}";
+}
+
+} // namespace
+
+TEST_CASE("An authored scene declares heroes and they survive a file round trip",
+          "[scene][composition][json][hero]") {
+    Fixture fx;
+    const std::string text = heroScene(R"([
+      {"name": "elder", "assembly": "elder", "position": [-1, -9, -46], "yaw": 0.5, "scale": 1.0,
+       "radius": 8.2, "height": 16.5, "importance": 0.95, "focalWeight": 0.9,
+       "preferredCameraDistance": 50.0, "preferredCameraElevation": 6.0, "activationRadius": 160.0,
+       "colorAccent": [1.0, 0.47, 0.15], "reactionProfile": "organism"},
+      {"name": "cairn", "asset": "rock_big", "position": [12, 0, 4], "importance": 0.4}
+    ])");
+    auto loaded = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    REQUIRE(loaded.has_value());
+    scene::Composition& comp = **loaded;
+    REQUIRE(comp.heroes().size() == 2);
+    const world::HeroPoint& elder = comp.heroes()[0];
+    CHECK(elder.name == "elder");
+    CHECK(elder.assembly == "elder");
+    CHECK(elder.assetId.empty());
+    checkVec(elder.position, glm::vec3(-1.0f, -9.0f, -46.0f));
+    CHECK_THAT(static_cast<double>(elder.yaw), WithinAbs(0.5, 1e-6));
+    CHECK_THAT(static_cast<double>(elder.radius), WithinAbs(8.2, 1e-5));
+    CHECK_THAT(static_cast<double>(elder.height), WithinAbs(16.5, 1e-5));
+    CHECK_THAT(static_cast<double>(elder.importance), WithinAbs(0.95, 1e-6));
+    CHECK_THAT(static_cast<double>(elder.focalWeight), WithinAbs(0.9, 1e-6));
+    CHECK_THAT(static_cast<double>(elder.preferredCameraDistance), WithinAbs(50.0, 1e-5));
+    CHECK_THAT(static_cast<double>(elder.preferredCameraElevationDegrees), WithinAbs(6.0, 1e-5));
+    CHECK_THAT(static_cast<double>(elder.activationRadius), WithinAbs(160.0, 1e-5));
+    checkVec(elder.colorAccent, glm::vec3(1.0f, 0.47f, 0.15f));
+    CHECK(elder.reactionProfile == "organism");
+    CHECK(comp.heroes()[1].assetId == "rock_big");
+    CHECK(comp.heroes()[1].assembly.empty());
+
+    const nlohmann::json j = comp.toJson();
+    REQUIRE(j.contains("heroes"));
+    REQUIRE(j["heroes"].size() == 2);
+    CHECK(j["heroes"][0]["assembly"] == "elder");
+    CHECK(j["heroes"][0]["reactionProfile"] == "organism");
+    // A second pass through the format reproduces the first exactly.
+    auto again = scene::Composition::fromJson(j, fx.registry);
+    REQUIRE(again.has_value());
+    CHECK((*again)->toJson() == j);
+
+    // The part that matters, and the reason this is not just a toJson check: an offline render
+    // saves the project and reloads it from disk before drawing a single frame. ADR-067 lost a
+    // corridor that way and ADR-070 lost a light rig; a hero that lived only in memory would be a
+    // camera director that frames nothing when rendered and works fine in the editor.
+    const auto path = tempDir() / "avgen_comp_heroes.json";
+    fx.files.push_back(path);
+    REQUIRE(comp.saveFile(path).has_value());
+    auto reloaded = scene::Composition::loadFile(path.filename(), fx.registry);
+    REQUIRE(reloaded.has_value());
+    REQUIRE((*reloaded)->heroes().size() == 2);
+    const world::HeroPoint& afterFile = (*reloaded)->heroes()[0];
+    CHECK(afterFile.name == "elder");
+    CHECK(afterFile.assembly == "elder");
+    CHECK(afterFile.reactionProfile == "organism");
+    checkVec(afterFile.position, glm::vec3(-1.0f, -9.0f, -46.0f));
+    checkVec(afterFile.colorAccent, glm::vec3(1.0f, 0.47f, 0.15f));
+    CHECK_THAT(static_cast<double>(afterFile.preferredCameraDistance), WithinAbs(50.0, 1e-5));
+    CHECK_THAT(static_cast<double>(afterFile.activationRadius), WithinAbs(160.0, 1e-5));
+    CHECK_THAT(static_cast<double>(afterFile.height), WithinAbs(16.5, 1e-5));
+}
+
+TEST_CASE("A scene that declares no heroes is unchanged by the heroes block",
+          "[scene][composition][json][hero]") {
+    Fixture fx;
+    const std::string text = R"({"format": "avgen-scene", "version": 1, "name": "plain",
+      "nodes": [{"name": "orb", "kind": "orb"}]})";
+    auto loaded = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    REQUIRE(loaded.has_value());
+    CHECK((*loaded)->heroes().empty());
+    // Not "an empty array": a scene that never mentioned heroes must write back the file it had.
+    CHECK_FALSE((*loaded)->toJson().contains("heroes"));
+}
+
+TEST_CASE("An invalid hero names itself and refuses the scene rather than vanishing",
+          "[scene][composition][json][hero]") {
+    Fixture fx;
+    auto load = [&](const std::string& heroes) {
+        return scene::Composition::fromJson(nlohmann::json::parse(heroScene(heroes)), fx.registry);
+    };
+
+    // Inside the stand-off: the hero would never be active on the shot designed for it.
+    {
+        auto r = load(R"([{"name": "elder", "assembly": "elder", "preferredCameraDistance": 50.0,
+                           "activationRadius": 20.0}])");
+        REQUIRE_FALSE(r.has_value());
+        INFO(r.error().message);
+        CHECK(r.error().message.find("elder") != std::string::npos);
+        CHECK(r.error().message.find("activationRadius") != std::string::npos);
+    }
+    // A profile nobody wrote: the hero would load and then react to nothing.
+    {
+        auto r = load(R"([{"name": "elder", "assembly": "elder", "reactionProfile": "mycelial"}])");
+        REQUIRE_FALSE(r.has_value());
+        INFO(r.error().message);
+        CHECK(r.error().message.find("elder") != std::string::npos);
+        CHECK(r.error().message.find("mycelial") != std::string::npos);
+    }
+    // Nothing stands here at all.
+    {
+        auto r = load(R"([{"name": "elder"}])");
+        REQUIRE_FALSE(r.has_value());
+        INFO(r.error().message);
+        CHECK(r.error().message.find("elder") != std::string::npos);
+    }
+    // Two heroes by the same name: every downstream reference to "elder" would be ambiguous.
+    {
+        auto r = load(R"([{"name": "elder", "assembly": "elder"},
+                          {"name": "elder", "assembly": "elder-2"}])");
+        REQUIRE_FALSE(r.has_value());
+        INFO(r.error().message);
+        CHECK(r.error().message.find("elder") != std::string::npos);
+    }
+    // Shape errors.
+    CHECK_FALSE(load(R"({"name": "elder"})").has_value());
+    CHECK_FALSE(load(R"([42])").has_value());
+    CHECK_FALSE(load(R"([{"assembly": "elder"}])").has_value());
+
+    // And the same refusals reach setHeroes directly, so an in-memory scene cannot hold a hero a
+    // file would be refused for.
+    scene::Composition comp(fx.registry, "direct");
+    world::HeroPoint bad;
+    bad.name = "elder";
+    bad.assembly = "elder";
+    bad.preferredCameraDistance = 50.0f;
+    bad.activationRadius = 20.0f;
+    auto rejected = comp.setHeroes({bad});
+    REQUIRE_FALSE(rejected.has_value());
+    CHECK(rejected.error().message.find("elder") != std::string::npos);
+    CHECK(comp.heroes().empty());
+}
+
+TEST_CASE("examples/world/glowmere-stylized.scene.json declares the elder as its hero",
+          "[scene][composition][json][hero]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path path =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-stylized.scene.json";
+    REQUIRE(std::filesystem::exists(path));
+    std::ifstream in(path);
+    REQUIRE(in.good());
+    nlohmann::json j;
+    in >> j;
+    REQUIRE(j.contains("heroes"));
+    REQUIRE(j["heroes"].is_array());
+    REQUIRE(j["heroes"].size() == 1);
+    auto hero = world::HeroPoint::fromJson(j["heroes"][0]);
+    REQUIRE(hero.has_value());
+    CHECK(hero->name == "elder");
+    // An assembly, not an asset: the elder is elder-crown, elder-stem and elder-filaments, and no
+    // asset id could name three nodes.
+    CHECK(hero->assembly == "elder");
+    CHECK(hero->assetId.empty());
+    // The three nodes it names are really there, under that prefix.
+    std::vector<std::string> parts;
+    for (const nlohmann::json& n : j.at("nodes")) {
+        const std::string name = n.at("name").get<std::string>();
+        if (name.starts_with(hero->assembly)) {
+            parts.push_back(name);
+        }
+    }
+    CHECK(parts == std::vector<std::string>{"elder-crown", "elder-stem", "elder-filaments"});
+    // Its root is the stem's base and its accent is the filaments' emissive colour, so the hero
+    // describes the geometry rather than sitting next to it.
+    checkVec(hero->position, glm::vec3(-1.0f, -9.0f, -46.0f));
+    checkVec(hero->colorAccent, glm::vec3(1.0f, 0.47f, 0.15f));
+    CHECK(hero->importance > 0.9f);
+    CHECK(hero->reactionProfile == "organism");
+    // Roughly three times its height, the stand-off the composer frames a hero from, and an
+    // activation radius that covers the whole authored camera move (its furthest pose is about 78 m
+    // from the elder) so the elder is never inert while it is on screen.
+    CHECK_THAT(static_cast<double>(hero->preferredCameraDistance / hero->height), WithinAbs(3.0, 0.1));
+    CHECK(hero->activationRadius > 100.0f);
+#endif
+}

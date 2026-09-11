@@ -333,13 +333,29 @@ TEST_CASE("Glowmere's directed shot stays grounded, bounded and fully connected"
     for (const auto& track : engine.timeline().tracks()) {
         REQUIRE(track.param != nullptr);
     }
-    REQUIRE(engine.modulator().routes().size() == 2);
+    // Every route binds. This is the assertion that matters and it is deliberately made over *all*
+    // of them: a route whose source or target does not resolve is silently inert, which looks
+    // exactly like a scene that is not reacting, and the loader only warns.
+    REQUIRE(!engine.modulator().routes().empty());
+    std::size_t slowContinuous = 0;
     for (const auto& route : engine.modulator().routes()) {
+        INFO("route " << route.source << " -> " << route.target);
         CHECK(route.targetParam != nullptr);
         CHECK(route.sourceId != signals::kInvalidSignal);
-        CHECK(route.chain.attackMs >= 500.0f);
-        CHECK(route.chain.decayMs >= 1000.0f);
+        // The continuous audio-band routes are smoothed hard, because a level that follows the
+        // waveform reads as flicker rather than as response. Event routes are exempt: a beat that
+        // takes half a second to attack has already missed its beat.
+        if (route.source.starts_with("audio.")) {
+            CHECK(route.chain.attackMs >= 500.0f);
+            CHECK(route.chain.decayMs >= 1000.0f);
+            ++slowContinuous;
+        }
     }
+    // The count was pinned at 2 when the scene had exactly two continuous routes and no event
+    // routes existed. Pinning a total is pinning an authoring decision: adding a musical reaction
+    // to the scene should not fail a test about whether routes bind. What must hold is that the
+    // continuous pair is still there and still smoothed.
+    CHECK(slowContinuous >= 2);
     glm::vec3 previousPosition{};
     glm::vec3 previousDirection{};
     for (std::uint64_t frame = 0; frame <= 2700; frame += 3) {

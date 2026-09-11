@@ -23,6 +23,10 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
     # The camera director's join: heroes to a brief, a sequence onto the timeline (ADR-075).
     "${CMAKE_SOURCE_DIR}/src/app/camera_director.cpp"
+    # Musical events published as signals (ADR-073). engine.cpp holds a MusicRuntime, so this has to
+    # be on the list for the test binary to link one -- without it the implementation is forced into
+    # the header, which is a build constraint masquerading as a design decision.
+    "${CMAKE_SOURCE_DIR}/src/app/music_runtime.cpp"
     # Placement layout is geometry over a click and a surface (ADR-069).
     "${CMAKE_SOURCE_DIR}/src/app/placement.cpp"
     # Output mapping maths/JSON and the output set are GPU-free (milestone 1.2).
@@ -69,6 +73,7 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/viewport_pick.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/camera_director.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/music_runtime.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/placement.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/output_manager_gpu.cpp")

@@ -27,6 +27,7 @@
 #include "scene/particles.hpp"
 #include "scene/scene_controller.hpp"
 #include "world/ecology.hpp"
+#include "world/hero.hpp"
 #include "world/terrain.hpp"
 
 #include <nlohmann/json.hpp>
@@ -156,6 +157,23 @@ public:
         compositionData_ = std::move(data);
         dirty_ = true;
     }
+
+    // ---- heroes (ADR-072, authored in ADR-074) ----
+    // What in this scene is worth travelling towards. A peer of CompositionData rather than a part
+    // of it: focal points say where the frame should point, and a hero says what the thing there
+    // *is* -- how big, how important, what colour it owns and how it answers the music. Until now
+    // the only producer of heroes was the world composer, so a hand-authored scene had nothing that
+    // a camera director could be pointed at and no route by which a reaction profile could reach
+    // Glowmere's elder.
+    //
+    // Deliberately does not mark the composition dirty and never reaches `scene_`: heroes are a
+    // description of what has already been placed by the scene's own nodes, so declaring one must
+    // not be able to move, resize or relight anything. A rebuild triggered from here would be a
+    // rebuild that only risks changing a frame.
+    [[nodiscard]] const std::vector<world::HeroPoint>& heroes() const { return heroes_; }
+    // Rejects the whole set rather than dropping the bad member, and names it. A hero silently
+    // dropped is a camera director that frames nothing with no explanation of why.
+    Result<void> setHeroes(std::vector<world::HeroPoint> heroes);
 
     // ---- procedural graph (ADR-028) ----
     // A composition is either graph-driven or flat: installing a graph replaces every node this
@@ -362,6 +380,7 @@ private:
     // Scene-level material programs (ADR-030): "materialPrograms" in the file, parameters
     // "material/<name>/…", referenced by Material::program.
     CompositionData compositionData_;
+    std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
     std::optional<graph::Graph> graph_;
     bool graphDirty_ = false;
     std::vector<std::string> graphNodes_;      // node names installed by the last evaluation

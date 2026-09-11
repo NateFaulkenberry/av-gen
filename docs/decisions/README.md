@@ -78,3 +78,6 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [070](ADR-070-art-direction-profiles.md) | Art-direction profiles | Accepted |
 | [071](ADR-071-cinematic-camera.md) | A camera vocabulary, and a camera cut to the music | Accepted |
 | [072](ADR-072-heroes.md) | Heroes | Accepted |
+| [073](ADR-073-musical-signals.md) | Musical signals | Accepted |
+| [074](ADR-074-authored-heroes.md) | Heroes a scene can declare | Accepted |
+| [075](ADR-075-camera-director-connected.md) | The camera director, connected | Accepted |

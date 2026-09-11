@@ -49,6 +49,7 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     timeSignals_.phrasePulse = bus_.declare("beat.phrasePulse", 0.0f, 1.0f, true);
     timeSignals_.sectionPhase = bus_.declare("beat.section");
     timeSignals_.sectionCount = bus_.declare("beat.sectionCount", 0.0f, 100000.0f);
+    music_.declare(bus_); // music.beat ... music.impact (ADR-073)
     stateProgressSignal_ = bus_.declare("state.progress");
     stateIndexSignal_ = bus_.declare("state.index", 0.0f, 64.0f);
     sources_.attach(bus_, params_);
@@ -1285,6 +1286,7 @@ Result<double> Engine::loadAudio(const std::filesystem::path& path) {
     audioFile_ = shared;
     audioPath_ = path;
     modulator_.resetState();
+    music_.reset();
     hasFrame_ = false;
     return shared->durationSeconds();
 }
@@ -1315,6 +1317,7 @@ void Engine::stop() {
         player_->stop();
         modulator_.resetState();
         sources_.reset();
+        music_.reset();
         beatClockPhase_ = 0.0;
     }
 }
@@ -1327,6 +1330,9 @@ void Engine::seekSeconds(double seconds) {
     }
     modulator_.resetState();
     sources_.reset();
+    // A seek discontinuity in the energy history reads as a drop; the detector must not carry
+    // the old piece across it.
+    music_.reset();
     beatClockPhase_ = 0.0;
     lastAnalysisBeatCount_ = 0;
     cueState_ = {};   // cues re-sync from the new position on the next frame
@@ -1373,6 +1379,7 @@ Result<void> Engine::useAudioInput(const std::string& deviceName) {
     input_ = std::move(input);
     audioFile_.reset();
     audioPath_.clear();
+    music_.reset();
     hasFrame_ = false;
     beatClockPhase_ = 0.0;
     beatClockCount_ = 0;
@@ -1387,6 +1394,7 @@ void Engine::stopAudioInput() {
     }
     runner_.reset();
     input_.reset();
+    music_.reset();
     hasFrame_ = false;
     audioSignals_.publishSilence(bus_);
 }
@@ -1407,6 +1415,9 @@ void Engine::publishFrame(const analysis::AnalysisFrame& frame) {
     latest_ = frame;
     hasFrame_ = true;
     audioSignals_.publish(bus_, frame);
+    // Live, this is every analysis frame the render thread sees. Offline it is the last of the
+    // batch update() already walked, which consume() recognises by frame index and ignores.
+    music_.consume(frame, phraseBars_, sectionPhrases_);
 }
 
 void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
@@ -1602,6 +1613,11 @@ void Engine::update(const FrameTime& time) {
                 onset = true;
                 onsetStrength = std::max(onsetStrength, frames[cursor].onsetStrength);
             }
+            // The classifier is fed here rather than from publishFrame() below, which only ever
+            // sees the last frame of the batch: at 30 fps that is one analysis frame in three, and
+            // a detector that samples the music at the frame rate is a detector whose answers
+            // depend on the frame rate (ADR-073).
+            music_.consume(frames[cursor], phraseBars_, sectionPhrases_);
             ++cursor;
         }
         if (cursor > offlineFrameCursor_) {
@@ -1631,6 +1647,7 @@ void Engine::update(const FrameTime& time) {
         rebind();
     }
     updateTimeSignals(time, newFrame);
+    music_.publish(bus_); // unconditional: no audio consumed means every music.* signal is false
     updateTimelineClock(time);
     applyCues();
     {

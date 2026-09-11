@@ -1112,6 +1112,28 @@ Result<void> Composition::addGrid(spatial::GridField grid) {
     return {};
 }
 
+// ADR-074. Validated as a set, and all-or-nothing: a scene that declares a hero the director cannot
+// use should say so at load rather than silently render without it. Note the deliberate absence of
+// `dirty_ = true` -- see the header; heroes describe nodes that are already placed.
+Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
+    for (std::size_t i = 0; i < heroes.size(); ++i) {
+        if (auto ok = heroes[i].validate(); !ok) {
+            return std::unexpected(ok.error());
+        }
+        // Names are how everything downstream refers to a hero -- a focus request, a reaction
+        // profile installed against it, a director's choice of subject. Two heroes called the same
+        // thing would make every one of those ambiguous, and the ambiguity would surface as the
+        // wrong object being framed rather than as an error.
+        for (std::size_t j = 0; j < i; ++j) {
+            if (heroes[j].name == heroes[i].name) {
+                return fail("hero '{}' is declared twice", heroes[i].name);
+            }
+        }
+    }
+    heroes_ = std::move(heroes);
+    return {};
+}
+
 Result<void> Composition::addMaterialProgram(MaterialProgram program) {
     if (auto v = program.validate(); !v) {
         return std::unexpected(v.error());
@@ -3542,6 +3564,16 @@ nlohmann::json Composition::toJson() const {
             j["composition"] = composition;
         }
     }
+    // ADR-074: a top-level block, a sibling of `composition` rather than a member of it, because a
+    // hero is a thing in the world and a focal point is an instruction to the camera. Written only
+    // when there are heroes, so every scene that never declared one keeps the file it had.
+    if (!heroes_.empty()) {
+        json heroes = json::array();
+        for (const world::HeroPoint& hero : heroes_) {
+            heroes.push_back(hero.toJson());
+        }
+        j["heroes"] = std::move(heroes);
+    }
     if (graph_) {
         j["graph"] = graph_->toJson();
     }
@@ -3903,6 +3935,31 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("scene file '{}': composition: {}", scenePath.string(), data.error().message);
         }
         comp->compositionData_ = std::move(*data);
+    }
+    // ADR-074. Read through HeroPoint::fromJson, which validates, so the failure modes the type
+    // already knows about -- an activation radius inside the stand-off, an unknown reaction profile
+    // -- are refused here with the hero's own name in the message. Refusing the file rather than
+    // skipping the entry is the point: this whole block exists because an offline render reloads
+    // the project before drawing it, and a hero that quietly failed to load would look exactly like
+    // a hero nobody declared (ADR-067, ADR-070 -- twice bitten).
+    if (j.contains("heroes")) {
+        const json& heroesJson = j.at("heroes");
+        if (!heroesJson.is_array()) {
+            return fail("'heroes' must be an array");
+        }
+        std::vector<world::HeroPoint> heroes;
+        heroes.reserve(heroesJson.size());
+        for (std::size_t i = 0; i < heroesJson.size(); ++i) {
+            auto hero = world::HeroPoint::fromJson(heroesJson[i]);
+            if (!hero) {
+                return fail("scene file '{}': heroes[{}]: {}", scenePath.string(), i,
+                            hero.error().message);
+            }
+            heroes.push_back(std::move(*hero));
+        }
+        if (auto ok = comp->setHeroes(std::move(heroes)); !ok) {
+            return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
+        }
     }
     if (j.contains("graph")) {
         const json& gj = j.at("graph");
