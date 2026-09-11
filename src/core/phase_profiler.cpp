@@ -147,6 +147,11 @@ std::string PhaseProfiler::report(std::string_view title) const {
     out += fmt::format("{:<22} {:>8.3f}   (median frame minus the median of every phase)\n", "unaccounted",
                        frame.median - medianSum);
     out += fmt::format("spikes: >16.7ms {}   >33.3ms {}   >50ms {}\n", spikes(16.7), spikes(33.3), spikes(50.0));
+#ifndef AVGEN_ALLOC_COUNTERS
+    // Said plainly, because a row of zeros that means "not measured" and a row of zeros that means
+    // "allocated nothing" look identical, and one of them is a lie.
+    out += "allocation rows read zero: build with -DAVGEN_ALLOC_COUNTERS=ON to attribute them\n";
+#endif
     return out;
 }
 

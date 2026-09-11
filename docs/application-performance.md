@@ -458,11 +458,15 @@ Pacing, not FPS. From `--profile-csv`, world scene, 500 frames, `--ui-script sli
 
 | | before | after |
 |---|---|---|
-| FRAME median | 8.99 ms | 8.38 ms |
+| FRAME median | 8.99 ms | 8.37 ms |
 | FRAME mean | 89.9 ms | 13.7 ms |
-| FRAME P95 | 217.2 ms | 48.2 ms |
-| frames > 16.7 ms | 222/500 | 48/500 |
-| frames > 50 ms | **221/500 (44%)** | **24/500 (4.8%)** |
+| FRAME P95 | 217.2 ms | 51.2 ms |
+| `engine.update` mean | 82.3 ms | 6.4 ms |
+| `engine.update` P95 | 215.2 ms | 44.6 ms |
+| frames > 50 ms | **221/500 (44%)** | **27/500 (5.4%)** |
+
+(Three runs each on the shipping configuration; the spread across the three was 26–29 frames over
+50 ms and 44.6–44.9 ms at P95.)
 
 The mean being ten times the median is the signature of exactly the problem the brief describes: an
 acceptable typical frame with a catastrophic tail. The remaining tail is the deliberate refresh
