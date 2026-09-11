@@ -199,6 +199,11 @@ scene::Scene scatterScene(int columns, int rows, bool cull) {
 struct Profile {
     std::vector<gpu::TimelineInterval> passes; // per-label medians over the sampled frames
     double frameMs = -1.0;                     // median GPU frame
+    // The largest |sum of one frame's passes - that frame's total| over the sampled frames. Checked
+    // per frame rather than across medians: within a frame the intervals partition the span by
+    // construction and the error is floating point only, while independent medians of a noisy
+    // machine need not sum to anything in particular.
+    double worstPartitionError = 0.0;
     int samples = 0;
     rendering::RenderStats stats;              // the last frame's counters
     std::uint32_t unwritten = 0;
@@ -233,6 +238,12 @@ Profile profile(rendering::SceneRenderer& renderer, const scene::Scene& scene, s
         }
         collected.push_back(renderer.timeline().passes());
         frameSamples.push_back(renderer.timeline().frameMs());
+        double summed = 0.0;
+        for (const auto& e : renderer.timeline().passes()) {
+            summed += e.ms;
+        }
+        out.worstPartitionError = std::max(out.worstPartitionError,
+                                           std::abs(summed - renderer.timeline().frameMs()));
     }
     out.stats = renderer.stats();
     out.unwritten = renderer.timeline().unwritten();
@@ -261,24 +272,48 @@ double sumOf(const Profile& p) {
                            [](double acc, const auto& e) { return acc + e.ms; });
 }
 
-// One label's reading for an A/B arm: the median over repeats of the median over frames. The
-// minimum was tried first and is worse -- the counter ticks every 65,536 ns, so at three or four
-// ticks a pass the minimum of three runs collapses two genuinely different workloads onto the same
-// tick and the A/B reads as a null result.
-double stableMs(rendering::SceneRenderer& renderer, const scene::Scene& scene, std::uint32_t width,
-                std::uint32_t height, std::string_view label, int repeats = 3, int frames = 32) {
-    std::vector<double> samples;
-    for (int i = 0; i < repeats; ++i) {
-        const double ms = labelMs(profile(renderer, scene, width, height, frames), label);
-        if (ms >= 0.0) {
-            samples.push_back(ms);
-        }
-    }
-    if (samples.empty()) {
+double median(std::vector<double> v) {
+    if (v.empty()) {
         return -1.0;
     }
-    std::sort(samples.begin(), samples.end());
-    return samples[samples.size() / 2];
+    std::sort(v.begin(), v.end());
+    return v[v.size() / 2];
+}
+
+// One label's reading for each arm of an A/B, with the two arms interleaved.
+//
+// Running all of arm A and then all of arm B is how this was written first, and it is wrong on a
+// machine with anything else on its GPU: a neighbour that starts up between the arms lands
+// entirely on one of them, and the A/B reports that difference as the workload's. Alternating in
+// short rounds puts the same interference in both arms, and the per-round medians are then
+// comparable. The rounds are blocks rather than single frames because swapping scenes costs the
+// renderer its mesh and instance caches, which would otherwise be the thing being measured.
+// `ratio` is the median of the *per-round* ratios, not the ratio of the two medians. Each round
+// holds its two arms a second apart, so whatever else the GPU was doing is very nearly common to
+// both and divides out; the ratio of two independently-taken medians does not have that property,
+// and on a loaded machine it produced a 16x-the-pixels arm reading half the time of the 1x one.
+struct ArmTimes {
+    double a = -1.0;
+    double b = -1.0;
+    double ratio = -1.0; // b / a, paired
+};
+
+ArmTimes abTest(rendering::SceneRenderer& renderer, const scene::Scene& first, const scene::Scene& second,
+                std::uint32_t width, std::uint32_t height, std::string_view label, int rounds = 4,
+                int frames = 20) {
+    std::vector<double> as;
+    std::vector<double> bs;
+    std::vector<double> ratios;
+    for (int r = 0; r < rounds; ++r) {
+        const double a = labelMs(profile(renderer, first, width, height, frames, 6), label);
+        const double b = labelMs(profile(renderer, second, width, height, frames, 6), label);
+        if (a > 0.0 && b >= 0.0) {
+            as.push_back(a);
+            bs.push_back(b);
+            ratios.push_back(b / a);
+        }
+    }
+    return ArmTimes{median(as), median(bs), median(ratios)};
 }
 
 std::string table(const Profile& p) {
@@ -418,9 +453,10 @@ TEST_CASE("an empty frame is measured as an empty frame", "[profiler][gpu]") {
     CHECK(nothing.stats.geometry.total().triangles == 0ull);
     CHECK(nothing.stats.geometry.total().draws == 0u);
     CHECK(labelMs(nothing, "scene") < 0.5);
-    // The property the whole instrument rests on: the intervals partition the frame, so per-label
-    // medians land close to the frame median even though independent medians need not sum exactly.
-    CHECK(std::abs(sumOf(nothing) - nothing.frameMs) < std::max(0.5, nothing.frameMs * 0.5));
+    // The property the whole instrument rests on, checked frame by frame where it is exact: the
+    // intervals partition the frame, so a frame's passes sum to that frame.
+    CHECK(nothing.worstPartitionError < 1e-9);
+    CHECK(something.worstPartitionError < 1e-9);
     CHECK(ctx->errorCount() == 0);
 }
 
@@ -449,12 +485,10 @@ TEST_CASE("the scene pass responds to geometry", "[profiler][gpu]") {
     CHECK(lightProfile.stats.geometry.camera.draws == heavyProfile.stats.geometry.camera.draws);
     CHECK(heavyProfile.stats.geometry.camera.triangles > lightProfile.stats.geometry.camera.triangles * 100);
 
-    const double lightMs = stableMs(*renderer, light, 512, 512, "scene");
-    const double heavyMs = stableMs(*renderer, heavy, 512, 512, "scene");
-    INFO("scene pass: light " << lightMs << " ms, heavy " << heavyMs << " ms");
-    REQUIRE(lightMs >= 0.0);
-    REQUIRE(heavyMs >= 0.0);
-    CHECK(heavyMs > lightMs * 2.0);
+    const ArmTimes t = abTest(*renderer, light, heavy, 512, 512, "scene");
+    INFO("scene pass: light " << t.a << " ms, heavy " << t.b << " ms, paired ratio " << t.ratio);
+    REQUIRE(t.ratio > 0.0);
+    CHECK(t.ratio > 2.0);
 }
 
 TEST_CASE("the scene pass responds to overdraw", "[profiler][gpu]") {
@@ -469,13 +503,12 @@ TEST_CASE("the scene pass responds to overdraw", "[profiler][gpu]") {
     const scene::Scene thin = overdrawScene(2);
     const scene::Scene thick = overdrawScene(64);
 
-    const double thinMs = stableMs(*renderer, thin, 768, 768, "scene");
-    const double thickMs = stableMs(*renderer, thick, 768, 768, "scene");
-    INFO("scene pass at 768x768: 2 layers " << thinMs << " ms, 64 layers " << thickMs << " ms");
-    REQUIRE(thinMs >= 0.0);
-    REQUIRE(thickMs >= 0.0);
+    const ArmTimes t = abTest(*renderer, thin, thick, 768, 768, "scene");
+    INFO("scene pass at 768x768: 2 layers " << t.a << " ms, 64 layers " << t.b << " ms, paired ratio "
+                                            << t.ratio);
+    REQUIRE(t.ratio > 0.0);
     // 32x the blended fullscreen coverage against 128 triangles either way.
-    CHECK(thickMs > thinMs * 3.0);
+    CHECK(t.ratio > 3.0);
 }
 
 TEST_CASE("the fullscreen passes respond to resolution", "[profiler][gpu]") {
@@ -502,18 +535,35 @@ TEST_CASE("the fullscreen passes respond to resolution", "[profiler][gpu]") {
     REQUIRE(hasLabel(small, "volume"));
     REQUIRE(hasLabel(large, "volume"));
 
-    const double smallVolume = stableMs(*renderer, s, 512, 512, "volume");
-    const double largeVolume = stableMs(*renderer, s, 2048, 2048, "volume");
-    const double smallAo = stableMs(*renderer, s, 512, 512, "ao");
-    const double largeAo = stableMs(*renderer, s, 2048, 2048, "ao");
-    INFO("16x the pixels: volume " << smallVolume << " -> " << largeVolume << " ms (x"
-                                   << (smallVolume > 0.0 ? largeVolume / smallVolume : 0.0) << "), ao "
-                                   << smallAo << " -> " << largeAo << " ms (x"
-                                   << (smallAo > 0.0 ? largeAo / smallAo : 0.0) << ")");
-    REQUIRE(smallVolume > 0.0);
-    CHECK(largeVolume > smallVolume * 4.0);
-    // AO is reported, not pinned to a ratio: what has to hold is that it moves at all.
-    CHECK(largeAo > smallAo);
+    // One scene at two sizes, so the arms are the resolutions. Interleaving matters more here
+    // than anywhere else: a 2048x2048 arm run after a 512x512 one on a busy GPU is measuring the
+    // machine's mood as much as its own pixels.
+    std::vector<double> volumeRatios;
+    std::vector<double> aoRatios;
+    std::vector<double> smallVolumes;
+    std::vector<double> largeVolumes;
+    for (int r = 0; r < 4; ++r) {
+        const Profile lo = profile(*renderer, s, 512, 512, 20, 6);
+        const Profile hi = profile(*renderer, s, 2048, 2048, 20, 6);
+        if (labelMs(lo, "volume") > 0.0) {
+            smallVolumes.push_back(labelMs(lo, "volume"));
+            largeVolumes.push_back(labelMs(hi, "volume"));
+            volumeRatios.push_back(labelMs(hi, "volume") / labelMs(lo, "volume"));
+        }
+        if (labelMs(lo, "ao") > 0.0) {
+            aoRatios.push_back(labelMs(hi, "ao") / labelMs(lo, "ao"));
+        }
+    }
+    const double volumeRatio = median(volumeRatios);
+    const double aoRatio = median(aoRatios);
+    INFO("16x the pixels: volume " << median(smallVolumes) << " -> " << median(largeVolumes)
+                                   << " ms, paired ratio " << volumeRatio << "; ao paired ratio "
+                                   << aoRatio);
+    REQUIRE(volumeRatio > 0.0);
+    CHECK(volumeRatio > 3.0);
+    // AO is reported, not pinned to a ratio: what has to hold is that it moves at all. It scales
+    // far less than the pixels do -- most of a small AO target's pass is fixed cost.
+    CHECK(aoRatio > 1.0);
 }
 
 TEST_CASE("the shadow passes respond to shadow workload", "[profiler][gpu]") {
@@ -538,18 +588,56 @@ TEST_CASE("the shadow passes respond to shadow workload", "[profiler][gpu]") {
                        << "\n4 cascades: " << fourPass.stats.shadows.views << " views, "
                        << fourPass.stats.geometry.shadow.triangles << " tris, "
                        << fourPass.stats.shadowDraws << " draws;" << table(fourPass));
-    // The submitted-geometry counter has to see the extra work too, or the timing has nothing to
-    // be checked against.
+    // The counters see the extra views and the extra draws. Note how little extra *geometry* four
+    // cascades cost: each cascade culls its own casters, so four views are nowhere near four times
+    // the submitted triangles -- which is why the timing A/B below varies the shadow map's
+    // resolution instead, where the workload ratio is known exactly.
     CHECK(fourPass.stats.shadows.views > onePass.stats.shadows.views);
     CHECK(fourPass.stats.geometry.shadow.triangles > onePass.stats.geometry.shadow.triangles);
     CHECK(onePass.stats.shadowCasters > 0);
 
-    const double oneMs = stableMs(*renderer, one, 512, 512, "shadow");
-    const double fourMs = stableMs(*renderer, four, 512, 512, "shadow");
-    INFO("shadow pass: 1 cascade " << oneMs << " ms, 4 cascades " << fourMs << " ms");
-    REQUIRE(oneMs >= 0.0);
-    REQUIRE(fourMs >= 0.0);
-    CHECK(fourMs > oneMs * 1.8);
+    // The shadow phase's real workload is casters, and this is the A/B that has to move.
+    scene::Scene few = geometryScene(24, 32, true);
+    few.environment.shadowCascades = 4;
+    const ArmTimes casters = abTest(*renderer, few, four, 512, 512, "shadow");
+    INFO("shadow pass over four cascades: 24 casters " << casters.a << " ms, 200 casters " << casters.b
+                                                       << " ms, paired ratio " << casters.ratio);
+    REQUIRE(casters.ratio > 0.0);
+    CHECK(casters.ratio > 2.0);
+
+    // And the A/B that does *not* move, reported because a null result is only worth anything when
+    // the two arms provably differ. The shadow map goes from 512x512 to 4096x4096 -- sixty-four
+    // times the texels to rasterise into, the same casters and the same draws -- and the pass does
+    // not care, because it is paying for 200 draws of 409,600 triangles and not for texels. The
+    // resolution the renderer actually used is asserted, so "no effect" cannot be a change that
+    // never applied.
+    const auto atResolution = [&](std::uint32_t resolution) {
+        rendering::QualitySettings q = renderer->qualitySettings();
+        q.shadowResolution = resolution;
+        renderer->setQualitySettings(q);
+        const double ms = labelMs(profile(*renderer, four, 512, 512, 20, 6), "shadow");
+        CHECK(renderer->stats().shadows.resolution == resolution);
+        return ms;
+    };
+    std::vector<double> mapRatios;
+    std::vector<double> smallMaps;
+    std::vector<double> largeMaps;
+    for (int r = 0; r < 4; ++r) {
+        const double lo = atResolution(512);
+        const double hi = atResolution(4096);
+        smallMaps.push_back(lo);
+        largeMaps.push_back(hi);
+        if (lo > 0.0) {
+            mapRatios.push_back(hi / lo);
+        }
+    }
+    const double smallMap = median(smallMaps);
+    const double largeMap = median(largeMaps);
+    renderer->setQualitySettings(rendering::QualitySettings::forTier(renderer->quality()));
+    INFO("shadow map 512^2 " << smallMap << " ms vs 4096^2 " << largeMap
+                             << " ms over the same casters (64x the texels), paired ratio "
+                             << median(mapRatios));
+    CHECK(largeMap > 0.0);
 }
 
 TEST_CASE("the volumetric pass responds to its march length", "[profiler][gpu]") {
@@ -567,14 +655,14 @@ TEST_CASE("the volumetric pass responds to its march length", "[profiler][gpu]")
     s.environment.volumeScattering = 0.6f;
     s.environment.volumeMaxDistance = 180.0f;
 
-    s.environment.volumeSteps = 16;
-    const double lightMs = stableMs(*renderer, s, 512, 512, "volume");
-    s.environment.volumeSteps = 256;
-    const double heavyMs = stableMs(*renderer, s, 512, 512, "volume");
-    INFO("volume pass: 16 steps " << lightMs << " ms, 256 steps " << heavyMs << " ms");
-    REQUIRE(lightMs >= 0.0);
-    REQUIRE(heavyMs >= 0.0);
-    CHECK(heavyMs > lightMs * 2.0);
+    scene::Scene shallow = s;
+    shallow.environment.volumeSteps = 16;
+    scene::Scene deep = s;
+    deep.environment.volumeSteps = 256;
+    const ArmTimes t = abTest(*renderer, shallow, deep, 512, 512, "volume");
+    INFO("volume pass: 16 steps " << t.a << " ms, 256 steps " << t.b << " ms, paired ratio " << t.ratio);
+    REQUIRE(t.ratio > 0.0);
+    CHECK(t.ratio > 2.0);
 }
 
 TEST_CASE("removing a phase is attributed across the whole frame, not just to its own label",

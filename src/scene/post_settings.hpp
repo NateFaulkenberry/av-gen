@@ -79,6 +79,21 @@ struct PostSettings {
     bool dofPhysical = false;
     LensSettings lens;
 
+    // ---- tilt-shift (ADR-079): the same defocus, driven by a screen band instead of a distance --
+    // A tilt-shift lens swings its focal plane away from parallel with the sensor, so what is sharp
+    // is a *band* across the frame at an arbitrary angle rather than a shell at one distance. That
+    // is a different circle-of-confusion function, not a different filter, so it rides the depth of
+    // field pass: when both are on the pixel takes the larger of the two circles, because the wider
+    // blur is the one you can see. Off by default and costs nothing until `enabled`.
+    bool tiltShiftEnabled = false;
+    glm::vec2 tiltShiftCentre{0.5f, 0.5f}; // normalised screen position, (0,0) = top left
+    float tiltShiftRotation = 0.0f;        // degrees; 0 = a horizontal band, positive = clockwise
+    // Both distances are in fractions of the frame *height*, so the band keeps its shape and angle
+    // when the aspect ratio changes rather than shearing with it.
+    float tiltShiftBandWidth = 0.2f;  // full width of the fully sharp band
+    float tiltShiftFalloff = 0.25f;   // distance past the band's edge to reach maximum defocus
+    float tiltShiftMaxRadius = 8.0f;  // pixels at 720p (scaled by height / 720), as dofMaxRadius
+
     // ---- motion blur (ADR-040: tile-based reconstruction over the ADR-035 velocity target) -----
     // The blur length is the pixel's screen motion times `motionBlurAmount` times the shutter
     // fraction `lens.shutterAngle / 360` (ADR-037), so 1.0 with a 180 degree shutter is the
@@ -142,6 +157,12 @@ struct PostParameters {
     params::Parameter<float>* focusRange = nullptr;
     params::Parameter<float>* dofMaxRadius = nullptr;
     params::Parameter<bool>* dofPhysical = nullptr;
+    params::Parameter<bool>* tiltShiftEnabled = nullptr;
+    params::Parameter<glm::vec2>* tiltShiftCentre = nullptr;
+    params::Parameter<float>* tiltShiftRotation = nullptr;
+    params::Parameter<float>* tiltShiftBandWidth = nullptr;
+    params::Parameter<float>* tiltShiftFalloff = nullptr;
+    params::Parameter<float>* tiltShiftMaxRadius = nullptr;
     params::Parameter<float>* motionBlurAmount = nullptr;
     params::Parameter<float>* antialias = nullptr;
     params::Parameter<float>* sharpen = nullptr;
@@ -158,5 +179,16 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
 Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p);
 void applyPostParameters(const PostParameters& p, PostSettings& settings);
 const char* tonemapOperatorName(TonemapOperator op);
+
+// How defocused the tilt-shift band leaves a point, 0 (fully sharp) to 1 (the maximum radius).
+// `uv` is a normalised screen position with (0,0) at the top left, matching the post chain's own
+// convention; `aspect` is width / height, and distances are measured in fractions of the frame
+// height so that a rotation is the same angle on screen whatever shape the frame is.
+//
+// This is the twin of `tiltShiftCoverage` in shaders/post.wgsl and the two must agree: the shader
+// is what renders, this is what the unit tests can actually pin down. Keeping it here rather than
+// inside the renderer also lets a future automated focus pull ask "is this point sharp?" without a
+// device.
+[[nodiscard]] float tiltShiftCoverage(const PostSettings& settings, glm::vec2 uv, float aspect);
 
 } // namespace avgen::scene

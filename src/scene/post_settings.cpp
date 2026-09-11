@@ -28,6 +28,16 @@ params::ParamDesc<bool> b(const char* path, bool def) {
     d.hardMax = true;
     return d;
 }
+params::ParamDesc<glm::vec2> v2(const char* path, glm::vec2 def, float lo, float hi, float slo, float shi) {
+    params::ParamDesc<glm::vec2> d;
+    d.path = path;
+    d.defaultValue = def;
+    d.hardMin = glm::vec2(lo);
+    d.hardMax = glm::vec2(hi);
+    d.softMin = glm::vec2(slo);
+    d.softMax = glm::vec2(shi);
+    return d;
+}
 params::ParamDesc<glm::vec3> v3(const char* path, glm::vec3 def, float lo, float hi, bool isColor = false) {
     params::ParamDesc<glm::vec3> d;
     d.path = path;
@@ -85,6 +95,19 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     p.focusRange = &params.add(f("post/dof/focusRange", s.focusRange, 0.01f, 1000.0f, 0.1f, 20.0f));
     p.dofMaxRadius = &params.add(f("post/dof/maxRadius", s.dofMaxRadius, 0.0f, 32.0f, 0.0f, 16.0f));
     p.dofPhysical = &params.add(b("post/dof/physical", s.dofPhysical));
+    p.tiltShiftEnabled = &params.add(b("post/tiltShift/enabled", s.tiltShiftEnabled));
+    // The centre may sit outside the frame on purpose -- a band running off the top of the image is
+    // a normal framing -- so the hard range is wider than the slider's.
+    p.tiltShiftCentre = &params.add(v2("post/tiltShift/centre", s.tiltShiftCentre, -1.0f, 2.0f, 0.0f, 1.0f));
+    p.tiltShiftRotation =
+        &params.add(f("post/tiltShift/rotation", s.tiltShiftRotation, -180.0f, 180.0f, -90.0f, 90.0f));
+    p.tiltShiftBandWidth =
+        &params.add(f("post/tiltShift/bandWidth", s.tiltShiftBandWidth, 0.0f, 2.0f, 0.0f, 0.8f));
+    // Not zero at the bottom: a zero falloff is a visible hard line across the image rather than a
+    // lens, and the shader would have to guard the division anyway.
+    p.tiltShiftFalloff = &params.add(f("post/tiltShift/falloff", s.tiltShiftFalloff, 0.001f, 2.0f, 0.01f, 1.0f));
+    p.tiltShiftMaxRadius =
+        &params.add(f("post/tiltShift/maxRadius", s.tiltShiftMaxRadius, 0.0f, 32.0f, 0.0f, 16.0f));
     p.motionBlurAmount = &params.add(f("post/motionBlur/amount", s.motionBlurAmount, 0.0f, 1.0f, 0.0f, 1.0f));
     p.antialias = &params.add(f("post/output/antialias", s.antialias, 0.0f, 1.0f, 0.0f, 1.0f));
     p.sharpen = &params.add(f("post/output/sharpen", s.sharpen, 0.0f, 1.0f, 0.0f, 1.0f));
@@ -145,9 +168,14 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         {"sharpen", p.sharpen},               {"vignette", p.vignette},
         {"grain", p.grain},                   {"chromaRetention", p.chromaRetention},
         {"contrast", p.contrast},             {"saturation", p.saturation},
+        {"tiltShiftRotation", p.tiltShiftRotation},
+        {"tiltShiftBandWidth", p.tiltShiftBandWidth},
+        {"tiltShiftFalloff", p.tiltShiftFalloff},
+        {"tiltShiftMaxRadius", p.tiltShiftMaxRadius},
     };
     const std::pair<const char*, params::Parameter<bool>*> bools[] = {
         {"bloomEnabled", p.bloomEnabled}, {"halationEnabled", p.halationEnabled},
+        {"tiltShiftEnabled", p.tiltShiftEnabled},
     };
     for (const auto& [key, value] : j.items()) {
         bool handled = false;

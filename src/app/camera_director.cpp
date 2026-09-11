@@ -2,6 +2,8 @@
 
 #include "app/engine.hpp"
 #include "app/music_runtime.hpp"
+#include "scene/composition.hpp"
+#include "world/camera_clearance.hpp"
 #include "core/log.hpp"
 #include "params/timeline.hpp"
 
@@ -34,7 +36,25 @@ constexpr std::array<std::string_view, 6> kCameraTargets{
 bool isCameraTarget(std::string_view target) {
     return std::find(kCameraTargets.begin(), kCameraTargets.end(), target) != kCameraTargets.end();
 }
+
+// The scene's terrain, or nothing. The first one wins, for the same reason installWorld picks the
+// first: a scene with two terrains is ambiguous and silently choosing between them is a bug found
+// much later.
+const scene::CompositionNode* terrainNodeOf(Engine& engine) {
+    const scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        return nullptr;
+    }
+    for (const auto& node : composition->nodes()) {
+        if (node && node->kind == scene::NodeKind::Terrain) {
+            return node.get();
+        }
+    }
+    return nullptr;
+}
+
 } // namespace
+
 
 std::span<const std::string_view> directedCameraTargets() { return kCameraTargets; }
 
@@ -151,8 +171,53 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
     std::erase_if(tracks, [](const params::Track& t) { return isCameraTarget(t.target); });
     const std::size_t removed = before - tracks.size();
 
+    // Keep the path out of the scenery before any of it is installed (ADR-080).
+    //
+    // Shot geometry is orbit points at a distance in radii and knows nothing about what is in the
+    // way, so a directed camera will fly through a hillside or a canopy as readily as through open
+    // air. Glowmere's first directed pass went through the trees.
+    nlohmann::json cleared = baked;
+    std::size_t liftedKeys = 0;
+    if (const scene::CompositionNode* terrain = terrainNodeOf(engine)) {
+        world::ClearanceField field;
+        field.map = &terrain->worldMap;
+        field.ecology = &terrain->ecology;
+        const std::vector<world::HeroPoint>& heroes = engine.composition()->heroes();
+        field.heroes = heroes;
+        for (auto& track : cleared) {
+            if (track.value("target", std::string()) != "camera/position") {
+                continue;
+            }
+            auto& keys = track["keys"];
+            std::vector<glm::vec3> path;
+            path.reserve(keys.size());
+            for (const auto& key : keys) {
+                const auto& v = key.at("value");
+                path.emplace_back(v[0].get<float>(), v[1].get<float>(), v[2].get<float>());
+            }
+            liftedKeys = world::clearPath(field, path);
+            for (std::size_t i = 0; i < keys.size() && i < path.size(); ++i) {
+                keys[i]["value"] = {path[i].x, path[i].y, path[i].z};
+            }
+        }
+    }
+    if (liftedKeys > 0) {
+        log::info("camera director: lifted {} camera key(s) clear of the terrain, canopy or a hero",
+                  liftedKeys);
+    }
+
     std::size_t added = 0;
-    for (const auto& entry : baked) {
+    std::vector<std::string> unknown;
+    for (const auto& entry : cleared) {
+        // A track for a parameter this build does not have is a track that binds to nothing and is
+        // skipped in silence by the timeline. Better to leave it out and name it once: the bake
+        // emits camera/focus/emphasis for hero spotlighting, which nothing registers yet, and an
+        // unbound track sitting in a saved project is a puzzle for whoever opens it next.
+        const std::string target = entry.value("target", std::string());
+        if (!target.empty() && engine.params().find(target) == nullptr) {
+            unknown.push_back(target);
+            continue;
+        }
         // Parsed through the timeline's own reader rather than by hand, so a directed track and an
         // authored one are the same kind of object and cannot drift apart in what they support.
         nlohmann::json wrapper = nlohmann::json::object();
@@ -177,6 +242,14 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
     // project are bound when the engine rebinds after a load; these arrive afterwards and never
     // were, so the director reported six tracks installed, the keys were correct, the timeline was
     // enabled, and the camera sat perfectly still.
+    if (!unknown.empty()) {
+        std::string names;
+        for (const std::string& t : unknown) {
+            names += names.empty() ? t : ", " + t;
+        }
+        log::info("camera director: {} baked track(s) name parameters this build does not have and "
+                  "were left out: {}", unknown.size(), names);
+    }
     if (auto bound = timeline.bind(engine.params()); !bound) {
         // A target that does not resolve is worth naming rather than swallowing: it means the
         // director is shooting at a parameter this scene does not have.
