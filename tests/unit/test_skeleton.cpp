@@ -440,6 +440,10 @@ TEST_CASE("a scene file declares an animated character end to end", "[scene][com
     auto loaded = scene::Composition::loadFile(sceneFile, registry);
     REQUIRE(loaded.has_value());
     scene::Composition& composition = **loaded;
+    params::ParameterSet parameters;
+    params::Modulator modulator;
+    composition.attach(parameters, modulator);
+    composition.setViewport(640, 360);
 
     FrameTime time;
     time.renderTime = 0.0;
@@ -482,6 +486,27 @@ TEST_CASE("a scene file declares an animated character end to end", "[scene][com
     composition.update(time);
     CHECK(composition.scene().rigs[0].player.currentState() == "Run");
     CHECK(composition.scene().rigs[0].player.blendWeight(0.45) < 1.0f); // mid cross-fade, not a cut
+
+    auto* idlePosition = parameters.findAs<glm::vec3>("nodes/idle/position");
+    REQUIRE(idlePosition != nullptr);
+    idlePosition->setBase({100.0f, 0.0f, 0.0f});
+    parameters.resetFinals();
+    composition.update(time);
+    std::size_t culledIdle = 0;
+    for (const scene::Entity& entity : composition.scene().entities) {
+        if (entity.rig == 0 && entity.cameraCulled) {
+            ++culledIdle;
+        }
+    }
+    CHECK(culledIdle > 0);
+    idlePosition->setBase({-1.25f, 0.0f, 0.0f});
+    parameters.resetFinals();
+    composition.update(time);
+    for (const scene::Entity& entity : composition.scene().entities) {
+        if (entity.rig == 0) {
+            CHECK_FALSE(entity.cameraCulled);
+        }
+    }
 }
 
 TEST_CASE("the animation block survives a save and reload", "[scene][composition][skeleton]") {

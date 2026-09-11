@@ -149,6 +149,9 @@ tone mapping and composition overlay.
 - [x] Camera culling no longer freezes timeline pose evaluation.
 - [ ] Build an animated-bounds image regression at a frustum edge: bind pose outside/inside versus
   posed limb crossing the plane. Compare culling enabled/disabled and prove the visible pixels remain.
+- [x] Authored alien composition regression now moves an animated glTF node outside the frustum,
+  verifies its rig entity is culled, then restores it and verifies recovery. The broader pixel-level
+  limb-crossing case remains open.
 - [x] Choose the first architectural animated-bounds solution: pose before culling and derive
   skinned bounds from the current palette, with bind-pose fallback for invalid/partially weighted
   meshes. Do not permanently disable culling.
