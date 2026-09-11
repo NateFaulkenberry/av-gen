@@ -77,7 +77,10 @@ writes a scene file. `--help` lists every flag.
 ## Documentation
 
 - [docs/architecture.md](docs/architecture.md): modules, data flow, threading, seams for growth
-- [docs/build.md](docs/build.md), [docs/testing.md](docs/testing.md), [docs/performance.md](docs/performance.md)
+- [docs/build.md](docs/build.md), [docs/testing.md](docs/testing.md)
+- Performance is two documents, deliberately: [docs/performance.md](docs/performance.md) is the
+  GPU's frame, [docs/application-performance.md](docs/application-performance.md) is the main
+  thread -- the UI, the engine update, threading, allocation and latency
 - [docs/audio.md](docs/audio.md), [docs/rendering.md](docs/rendering.md), [docs/lighting.md](docs/lighting.md),
   [docs/shaders.md](docs/shaders.md),
   [docs/assets.md](docs/assets.md), [docs/project-format.md](docs/project-format.md)
