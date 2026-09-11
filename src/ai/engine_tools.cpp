@@ -7,6 +7,7 @@
 #include "app/engine.hpp"
 #include "app/world_builder.hpp"
 #include "analysis/analysis_track.hpp"
+#include "core/hash.hpp"
 #include "core/log.hpp"
 #include "params/serialization.hpp"
 #include "scene/composition.hpp"
@@ -19,6 +20,7 @@
 #include <cmath>
 #include <cstddef>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -36,6 +38,15 @@ std::size_t limitOf(const json& args) {
     const auto raw = args.value("limit", static_cast<double>(kDefaultLimit));
     const auto clamped = std::clamp(raw, 1.0, static_cast<double>(kMaxLimit));
     return static_cast<std::size_t>(clamped);
+}
+
+std::string importTypeFor(const std::filesystem::path& path) {
+    std::string ext = path.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (ext == ".glb" || ext == ".gltf") return "models";
+    if (ext == ".hdr" || ext == ".exr") return "environments";
+    if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".tga" || ext == ".webp") return "textures";
+    return {};
 }
 
 bool containsNoCase(std::string_view haystack, std::string_view needle) {
@@ -870,6 +881,69 @@ void registerParameterTools(ToolRegistry& registry) {
                                    {"path", asset.path.string()}, {"tags", asset.tags}});
             }
             return ToolResult::ok(json{{"assets", std::move(out)}}, fmt::format("{} matching asset(s)", found.size()));
+        });
+
+    add(registry, "asset.import", "Import an asset into the project",
+        "Copy a supported model, environment or texture into the open project's assets directory. The source must be reported by asset.list_importable or be inside an authorized content root; the original is never modified. Returns a stable project asset ID and copied dependencies.",
+        schema::object({{"file", schema::string("Path to a reachable model, environment or texture")}}),
+        sessionWrite(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string given = args.value("file", std::string{});
+            if (given.empty()) return ToolResult::failure(ToolErrorCode::InvalidArguments, "no file named");
+            const auto source = ctx.resolveContent(given);
+            if (!source) return ToolResult::failure(ToolErrorCode::NotFound, "file is outside authorized content roots");
+            app::Engine& engine = ctx.engine();
+            if (engine.projectPath().empty()) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "open or create a project before importing assets");
+            }
+            const std::string type = importTypeFor(*source);
+            if (type.empty()) return ToolResult::failure(ToolErrorCode::Unsupported, "supported asset types are glTF, GLB, HDR, EXR and common textures");
+            auto hash = sha256File(*source);
+            if (!hash) return ToolResult::failure(ToolErrorCode::Unavailable, hash.error().message);
+            const std::filesystem::path assetRoot = engine.projectPath().parent_path() / "assets" / type;
+            std::error_code ec;
+            std::filesystem::create_directories(assetRoot, ec);
+            if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot create project asset directory: " + ec.message());
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(engine.projectPath().parent_path() / "assets",
+                                                                                     std::filesystem::directory_options::skip_permission_denied, ec)) {
+                if (!entry.is_regular_file(ec)) continue;
+                auto existing = sha256File(entry.path());
+                if (existing && *existing == *hash) {
+                    return ToolResult::ok(json{{"id", "asset://project/" + type + "/" + entry.path().filename().string()},
+                                               {"path", entry.path().string()}, {"source", "project"}, {"duplicate", true}},
+                                          "asset already imported");
+                }
+            }
+            const std::filesystem::path target = assetRoot / source->filename();
+            std::filesystem::copy_file(*source, target, std::filesystem::copy_options::overwrite_existing, ec);
+            if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy asset: " + ec.message());
+            std::vector<std::string> copied;
+            copied.push_back(target.string());
+            if (source->extension() == ".gltf") {
+                std::ifstream in(*source);
+                json gltf = json::parse(in, nullptr, false);
+                if (gltf.is_discarded()) return ToolResult::failure(ToolErrorCode::Unsupported, "invalid glTF JSON");
+                std::vector<std::string> uris;
+                for (const char* key : {"buffers", "images"}) {
+                    if (!gltf.contains(key) || !gltf.at(key).is_array()) continue;
+                    for (const auto& item : gltf.at(key)) {
+                        if (item.is_object() && item.contains("uri") && item.at("uri").is_string()) uris.push_back(item.at("uri").get<std::string>());
+                    }
+                }
+                for (const std::string& uri : uris) {
+                    if (uri.find("data:") == 0 || uri.find("#") != std::string::npos) continue;
+                    const std::filesystem::path dependency = source->parent_path() / uri;
+                    if (!std::filesystem::is_regular_file(dependency, ec)) return ToolResult::failure(ToolErrorCode::NotFound, "missing glTF dependency: " + uri);
+                    const std::filesystem::path dependencyTarget = assetRoot / dependency.filename();
+                    std::filesystem::copy_file(dependency, dependencyTarget, std::filesystem::copy_options::overwrite_existing, ec);
+                    if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy glTF dependency: " + ec.message());
+                    copied.push_back(dependencyTarget.string());
+                }
+            }
+            const std::string id = "asset://project/" + type + "/" + target.stem().string();
+            return ToolResult::ok(json{{"id", id}, {"source", "project"}, {"type", type},
+                                       {"path", target.string()}, {"sha256", *hash}, {"copied", copied}},
+                                  "asset imported into project");
         });
 
     add(registry, "asset.list_importable", "List importable media",

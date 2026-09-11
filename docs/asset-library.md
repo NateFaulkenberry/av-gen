@@ -1,5 +1,52 @@
 # The asset library
 
+## Project ownership and AI awareness
+
+AV Gen now has a shared lightweight catalog for the first phase of project asset ownership. It
+does not replace the curated manifest above; it gives the application and AI tools one vocabulary
+for discovering files that are already available in the session.
+
+The catalog classifies visible files as:
+
+- `builtin`: files found under the configured content roots outside the open project's `assets/`
+  directory.
+- `project`: files under the open project's `assets/` directory (and project root for legacy
+  project-local files).
+- `external`: reserved for future legacy/path migration records; arbitrary files are never added
+  to the catalog unless the host places them in an authorized readable root.
+
+AI discovery uses the same catalog as the future Asset Library:
+
+```text
+asset.list  { query?, limit? }
+asset.search { query, limit? }
+```
+
+Each record includes a stable session identity such as `asset://builtin/models/tree.glb` or
+`asset://project/models/my-tree.glb`, source ownership, type, name, physical path and basic tags.
+The physical path is returned for tool execution, but scene authoring should prefer the stable ID.
+Search is case-insensitive over ID, name and type.
+
+Project visual import is available to the AI through:
+
+```text
+asset.import { file }
+```
+
+The source must resolve through the existing canonicalized `ToolContext::contentRoots()` boundary.
+Supported first-phase types are glTF/GLB models, HDR/EXR environments and common textures. The
+file is copied into `<project>/assets/{models,environments,textures}/`; an existing SHA-256 match
+is reported as a duplicate instead of copied again. A `.gltf` import also copies its referenced
+buffer and image sidecars, rejecting missing dependencies rather than creating a half-imported
+asset. No source file is modified, and no destination outside the project is writable by this
+tool.
+
+This is deliberately phase one. Existing scene files still use their legacy path fields and the
+catalog does not silently rewrite them. Stable `asset://` scene references, a visual Asset Library
+panel, thumbnails, replacement/delete workflows and migration of old absolute paths remain the
+next ownership phase. Built-in content is not copied into new projects merely because it appears
+in the catalog.
+
 ## The rule
 
 **One artistic language, many variations.** The library is curated by hand and listed in
