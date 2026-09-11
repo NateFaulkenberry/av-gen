@@ -97,22 +97,25 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
         return out;
     }
 
-    // Nodes first in the direction that *creates* them, so a parameter or a parent the command also
-    // carries has something to land on; nodes last in the direction that destroys them, for the
-    // same reason read backwards.
+    // Nodes are settled before the parents and the parameters, so that a parameter path or a parent
+    // name the command carries has something to land on.
     auto restore = [&](std::vector<NodeRecord>& records) {
         for (NodeRecord& record : records) {
             if (!record.held) {
                 continue; // already live: a double-apply, or a command pushed without an undo
             }
-            scene::CompositionNode node = std::move(*record.held);
-            record.held.reset();
-            const std::string wanted = node.name;
-            auto added = composition->addNode(std::move(node));
+            const std::string wanted = record.held->name;
+            // The node is handed over only on success. `addNode` takes by value, so moving out of
+            // `held` first and then failing -- a glTF that will no longer load, a nested scene file
+            // that has been deleted, a terrain that no longer validates -- destroys the node *and*
+            // leaves `held` null, which this code reads as "it is in the scene". The one thing an
+            // undo must never do is lose the thing it was asked to bring back.
+            auto added = composition->addNode(scene::CompositionNode(std::move(*record.held)));
             if (!added) {
                 out.problems.push_back("could not restore '" + wanted + "': " + added.error().message);
                 continue;
             }
+            record.held.reset();
             if ((*added)->name != wanted) {
                 // Names are unique and the history is linear, so this should not happen. If it
                 // does, the command's parameter paths now name a node that is not there, and
@@ -137,9 +140,17 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
         }
     };
 
+    // Removals first, in *both* directions, and the reason is name recycling. `Composition::uniqueName`
+    // hands out the first free name, so a Replace stroke that erases `fern_2` and paints a fern in
+    // its place gets `fern_2` back for the new one. Restore the old `fern_2` while the new one is
+    // still in the scene and it is renamed on the way in -- and then every parameter path, selection
+    // record and label in the command names a node that is not there. Freeing the names before
+    // handing them back costs nothing and makes the collision impossible.
     if (forward) {
+        take(command.removed);
         restore(command.added);
     } else {
+        take(command.added);
         restore(command.removed);
     }
 
@@ -162,12 +173,6 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
             continue;
         }
         ++out.paramsWritten;
-    }
-
-    if (forward) {
-        take(command.removed);
-    } else {
-        take(command.added);
     }
 
     // Once, at the end. A node that came back brings its parameter paths with it, and the routes

@@ -141,6 +141,13 @@ void WorldEditor::updateGhost(app::Engine& engine, const assets::AssetLibrary* l
     const bool painting = brush.mode == app::PlacementMode::Brush || eraser || replacing;
 
     if (input.leftPressed) {
+        // A press while a stroke is already open would overwrite `stroke_`, and `stroke_` owns the
+        // nodes an Eraser has taken out of the scene -- they would be destroyed with it and could
+        // not be undone. Closing the open one first is what `EditHistory::beginDrag` does with a
+        // drag that was never released, and for the same reason.
+        if (stroking_) {
+            commitStroke(engine);
+        }
         stroking_ = true;
         stroke_ = EditCommand("Paint");
         stroke_.selectionBefore = selection.nodes();
@@ -311,7 +318,20 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
                     break;
                 }
                 case GizmoMode::Rotate: {
-                    const glm::quat turned = delta.rotation * scene::quatFromEulerDegrees(start.rotation);
+                    // The delta is world space; the parameter is the node's *local* rotation. For a
+                    // node under a rotated parent those differ, and multiplying them directly turns
+                    // the object about the wrong axis -- group some rocks, turn the group, then turn
+                    // one rock inside it. The position half of this case already goes back through
+                    // the parent frame; so does this now.
+                    glm::quat parentRotation(1.0f, 0.0f, 0.0f, 0.0f);
+                    if (!node->parent.empty()) {
+                        if (const scene::CompositionNode* parent = composition->findNode(node->parent)) {
+                            parentRotation = composition->nodeWorldTransform(*parent).rotation;
+                        }
+                    }
+                    const glm::quat localDelta =
+                        glm::conjugate(parentRotation) * delta.rotation * parentRotation;
+                    const glm::quat turned = localDelta * scene::quatFromEulerDegrees(start.rotation);
                     setNodeRotation(engine, start.node, scene::eulerDegrees(turned));
                     // Several objects turn about the shared pivot, not each about its own: that is
                     // what makes rotating a group of rocks look like turning an arrangement.

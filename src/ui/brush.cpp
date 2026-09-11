@@ -1,6 +1,7 @@
 #include "ui/brush.hpp"
 
 #include "core/log.hpp"
+#include "world/terrain_query.hpp"
 
 #include <fmt/format.h>
 #include <glm/gtx/quaternion.hpp>
@@ -163,6 +164,17 @@ BrushPreview planBrush(scene::Composition& composition, const app::PlacementSett
         }
     }
 
+    // One query for the whole stroke. It is pointers and floats, but building it walks the node list
+    // to find the terrain, and a scatter has dozens of instances.
+    const world::TerrainQuery query = composition.terrainQuery();
+    float lift = 0.0f;
+    for (const auto& node : composition.nodes()) {
+        if (node && node->kind == scene::NodeKind::Terrain) {
+            lift = composition.nodeWorldTransform(*node).position.y;
+            break;
+        }
+    }
+
     const glm::vec3 upright(0.0f, 1.0f, 0.0f);
     for (const app::Placement& p : plan) {
         GhostInstance ghost;
@@ -174,7 +186,20 @@ BrushPreview planBrush(scene::Composition& composition, const app::PlacementSett
         // out on the tangent plane at the cursor, which is right for the pattern and wrong for the
         // altitude: over ten metres of hillside the far edge of the disc is metres off the ground.
         // Sampling per instance is what makes a stroke follow the terrain.
-        const GroundSample under = sampleGroundAt(composition, glm::vec2(p.position.x, p.position.z));
+        GroundSample under = sampleGroundAt(query, lift, glm::vec2(p.position.x, p.position.z));
+        // Snap to somewhere the world would accept, when asked. `nearestValidPoint` is a
+        // deterministic outward spiral, so a stroke that snaps is the same stroke twice.
+        if (settings.snapToValid && query.valid()) {
+            const bool refused = !under.insideWorld || (settings.avoidWater && under.submerged) ||
+                                 under.slopeDegrees > settings.maxSlopeDegrees;
+            if (refused) {
+                if (const auto moved = query.nearestValidPoint(glm::vec2(p.position.x, p.position.z),
+                                                               ghost.footprintRadius,
+                                                               settings.snapSearchRadius)) {
+                    under = sampleGroundAt(query, lift, *moved);
+                }
+            }
+        }
         ghost.groundNormal = under.valid ? under.normal : p.normal;
         ghost.slopeDegrees = under.slopeDegrees;
         const glm::vec3 surface = under.valid ? under.normal : glm::vec3(0.0f, 1.0f, 0.0f);
@@ -197,6 +222,13 @@ BrushPreview planBrush(scene::Composition& composition, const app::PlacementSett
             ghost.issue = PlacementIssue::InWater;
         } else if (under.slopeDegrees > settings.maxSlopeDegrees) {
             ghost.issue = PlacementIssue::TooSteep;
+        } else if (query.isOccupied(glm::vec2(position.x, position.z), ghost.footprintRadius)) {
+            // A hero, a registered obstacle, or the world's edge -- the things the world itself
+            // calls solid (ADR-090). Deliberately *not* the canopy: it is statistical and cannot say
+            // whether a particular disc contains a trunk, so folding it in here would turn "is
+            // something standing here" into "does something grow nearby".
+            ghost.issue = PlacementIssue::Collides;
+            ghost.blockedBy = query.hasObstacles() ? "something solid" : "a hero or the world's edge";
         } else {
             for (const Obstacle& obstacle : obstacles) {
                 const float gap = glm::length(glm::vec2(obstacle.centre.x - position.x,

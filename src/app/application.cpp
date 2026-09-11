@@ -1362,6 +1362,11 @@ bool Application::handleEditorShortcut(const SDL_Event& event) {
         return true;
     case SDLK_DELETE:
     case SDLK_BACKSPACE:
+        // Only ours when there is something to delete. Swallowing the key with an empty selection
+        // takes it away from whatever else might want it and gives nothing back.
+        if (editor.selection.empty()) {
+            return false;
+        }
         editor.deleteSelection(*engine_);
         return true;
     case SDLK_UP:

@@ -359,9 +359,17 @@ void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Windo
         pushButton(window, x, y, true);
         break;
     }
+    case 151:
     case 152: {
+        // A motion with every button event, press and release alike. Without one on the release
+        // frame the pointer reverts to the operating system's cursor for exactly that frame, and
+        // the click completes wherever the physical mouse is sitting -- which on one run of this
+        // opened an example project out of a panel nobody had pointed at.
         const auto [x, y] = at(0.45f, 0.78f);
-        pushButton(window, x, y, false);
+        pushMotion(window, x, y);
+        if (frame == 152) {
+            pushButton(window, x, y, false);
+        }
         break;
     }
     case 160:
@@ -412,7 +420,11 @@ void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Windo
         break;
     }
     case 212:
-        say(fmt::format("edit: a box over the frame selected {} object(s)", editor.selection.size()));
+        // Of the nodes in the scene, not of the nodes in the *frame*: most of what a paint stroke
+        // laid down at the bottom of the view projects outside the visible rectangle, and a box
+        // that caught those would be a box that was not doing its job.
+        say(fmt::format("edit: a box over the frame selected {} of {} objects",
+                        editor.selection.size(), nodes()));
         break;
     default:
         break;

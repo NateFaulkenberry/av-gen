@@ -9,17 +9,17 @@
 // is pointing is not a thing that can be made fast; it is a thing that has to be asked a different
 // way.
 //
-// So the ghost asks the world instead of the picture. The ground is `world::WorldMap::sample` --
-// a closed-form height function, not a mesh -- so a ray can be marched against it for a few dozen
-// evaluations and no device at all. That is the same query the terrain mesher, the scatter pass and
-// `entity::findPlacement` use, deliberately: spec §3 forbids a second piece of terrain logic per
-// consumer, and the fastest way to end up with one is to write a private raycast because the shared
-// one was not convenient.
+// So the ghost asks the world instead of the picture, through **`world::TerrainQuery`** (ADR-090) --
+// the one spatial-query surface §3 asks for. Every terrain fact in `GroundSample` below is one of
+// its queries: the height, the normal, the slope, the water, the canopy, whether the point is
+// walkable and, when it is not, *why*. This file decides nothing about terrain. It owns the ray
+// march and nothing else, and even that is a loop over `heightAt`.
 //
-// **When terrain lands its consolidated surface** (`heightAt`/`normalAt`/`slopeAt`/`isWalkable`/
-// `isWater`/`isOccupied`/`nearestValidPoint`), `GroundSample` is what this file should be filling
-// from it: every field below is one of those queries and nothing here decides anything about
-// terrain that terrain does not already decide. The march is the only part that would remain.
+// That matters more than it looks. §3 forbids separate terrain logic per consumer, and the way a
+// project acquires it is not by deciding to: it is by one consumer needing a slightly different
+// answer and writing three lines rather than asking for a shared one. The brush's "is this too
+// steep" and the walker's "can I stand here" are the same question, and when they are the same call
+// they cannot drift.
 //
 // The GPU picker is still the authority for a *click*, because it is exact and can see procedural
 // instances and terrain chunks that no node owns. This is for the frame-by-frame question.
@@ -28,9 +28,11 @@
 
 #include "scene/camera.hpp"
 #include "scene/composition.hpp"
+#include "world/terrain_query.hpp"
 
 #include <glm/glm.hpp>
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -46,19 +48,27 @@ struct ViewRay {
 // points" in the renderer are the same claim rather than two that agree most of the time.
 [[nodiscard]] ViewRay rayThroughNdc(const scene::Camera& camera, float aspect, glm::vec2 ndc);
 
-// Everything the world says about one point of ground. Filled by marching a ray, or by asking
-// about a position directly.
+// Everything the world says about one point of ground. Every field but `valid`, `distance` and
+// `hasTerrain` comes straight from `world::TerrainPoint`.
 struct GroundSample {
     bool valid = false;            // the ray met the ground at all
     glm::vec3 position{0.0f};      // on the surface
     glm::vec3 normal{0.0f, 1.0f, 0.0f};
+    // In degrees, from the normal. `TerrainPoint::slope` is 1 - normal.y, which is a convenient
+    // 0..1 and not an angle; every slope limit an artist sets is written in degrees, so the
+    // conversion happens once, here, rather than in each place that would have to remember.
     float slopeDegrees = 0.0f;
     float distance = 0.0f;         // along the ray
     bool insideWorld = true;       // within the terrain's extent
     bool submerged = false;        // the ground here is under water
     float waterDepth = 0.0f;       // metres of water over it, 0 when dry
-    float canopyHeight = 0.0f;     // what `ClearanceField` says grows here, metres
+    float canopyHeight = 0.0f;     // statistical (ADR-080): what grows *around* here, not at it
     bool hasTerrain = false;       // false when the scene has no terrain node and y=0 stood in
+    // What the world itself says about this point, and why it would refuse a walker. The brush has
+    // its own thresholds -- a fern and a boulder disagree about what is too steep -- but when the
+    // world has already rejected a point, its reason is the one to show.
+    world::TerrainReject reject = world::TerrainReject::None;
+    bool walkable = true;
 };
 
 // Marches `ray` against the scene's terrain (the first Terrain node), falling back to the y = 0
@@ -69,6 +79,16 @@ struct GroundSample {
 // The same answer for a point already known, e.g. every instance of a scatter brush around the
 // cursor. Does not march: it reads the column at (x, z).
 [[nodiscard]] GroundSample sampleGroundAt(scene::Composition& composition, glm::vec2 xz);
+// The same, against a query the caller already has. The brush takes one for a whole stroke rather
+// than rebuilding it per instance: a `TerrainQuery` is pointers and floats, but finding the terrain
+// node is a linear scan of the node list and a stroke has dozens of instances.
+[[nodiscard]] GroundSample sampleGroundAt(const world::TerrainQuery& query, float lift, glm::vec2 xz);
+
+// The nearest place a thing of `radius` could actually stand, searched outwards from `xz`.
+// `world::TerrainQuery::nearestValidPoint` does the searching; this wraps it back into a
+// `GroundSample` so a caller that has one can keep having one. Empty when the search found nowhere.
+[[nodiscard]] std::optional<GroundSample> nearestPlaceable(scene::Composition& composition, glm::vec2 xz,
+                                                            float radius, float searchRadius = 48.0f);
 
 // The nearest node whose world-space box the ray enters. Used for box selection and for the
 // collision term of placement validity, not for click selection -- a box is not a silhouette, and

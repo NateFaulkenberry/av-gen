@@ -87,13 +87,32 @@ failed at its one job.
 
 ### The ghost asks the world, not the picture
 
-`ui::world_probe` marches a ray against `world::WorldMap::sample` — a closed-form height function,
-not a mesh — so "what is under the cursor" costs a few dozen evaluations and no device. That is
-deliberately the *same* query the terrain mesher, the scatter pass and `entity::findPlacement` use;
-spec §3 forbids a second piece of terrain logic per consumer, and the fastest way to acquire one is
-to write a private raycast because the shared query was inconvenient. When the terrain pass lands
-its consolidated surface (`heightAt`/`slopeAt`/`isWater`/`isOccupied`/`nearestValidPoint`),
-`GroundSample` is what should be filled from it: every field in it is one of those queries.
+`ui::world_probe` marches a ray against `world::TerrainQuery` (ADR-090) — the one spatial-query
+surface §3 asks for. The ground is a closed-form height function rather than a mesh, so "what is
+under the cursor" costs a few dozen evaluations and no device at all.
+
+**Every terrain fact in `GroundSample` is one of that surface's queries**, and this editor decides
+none of them: the height, the normal, the slope, the water depth, the canopy, whether the point is
+walkable and, when it is not, which rule refused it. `TerrainPoint::at` answers all of it from one
+set of noise evaluations. The march is the only thing `world_probe` owns, and even that is a loop
+over `heightAt`.
+
+Two consequences worth stating, because they are what §3 is actually for:
+
+- The brush's *"is this too steep"* and the walker's *"can I stand here"* are the same call, so they
+  cannot drift. `tests/unit/test_world_editor.cpp` asserts the ghost's numbers **are**
+  `TerrainQuery`'s to the last decimal, which is the property that keeps them the same call.
+- `nearestValidPoint` gives the brush snap-to-valid for nothing: a refused instance can be moved to
+  the nearest place the world would accept, deterministically, and the ghost shows it there. It is
+  off by default — a brush that silently relocates what it places disagrees with where you pointed —
+  but with it on, nothing is placed anywhere the artist has not already seen it.
+
+Occupancy goes through `TerrainQuery::isOccupied`, which answers for heroes, the world's edge and
+§5's obstacle set when navigation has installed one. It deliberately does **not** consult the canopy:
+the canopy is statistical (ADR-080) and cannot say whether a particular disc contains a trunk. The
+brush's own per-instance collision test against placed nodes' bounds is the exact answer for the
+objects the editor can see, and `hasObstacles()` is how it tells "nothing is there" from "nobody
+asked".
 
 The GPU picker remains the authority for a *click*. It is exact and it can see procedural instances
 and terrain chunks that no node owns. One blocking read on a click is fine; sixty a second is not.
@@ -182,13 +201,23 @@ the mouse.
 
 ## Consequences
 
-- **Measured, on `examples/recipes/glowmere.recipe.json`.** A structural edit re-flattens in
-  **19.6–23.7 ms** where it took **114.9–134.5 ms** before; `engine.update`'s p99 across a scripted
-  paint stroke falls from **120.3 ms to 20.4 ms**. `AVGEN_NO_TERRAIN_CACHE=1` restores the old
-  behaviour so the comparison stays checkable.
-- The cold flatten is unchanged (~271 ms): there is nothing to reuse the first time.
+- **Measured, on `examples/recipes/glowmere.recipe.json` after ADR-090.** A structural edit —
+  placing an asset — re-flattens in **21.7–33.3 ms** where it took **455–478 ms**;
+  `engine.update`'s p99 across a scripted paint stroke falls from **469.6 ms to 26.3 ms**.
+  `AVGEN_NO_TERRAIN_CACHE=1` restores the old behaviour so the comparison stays checkable.
+- **That gap grew with ADR-090, which is the point.** Before terrain generation landed, the same
+  measurement was 115–134 ms against 19.6–23.7 ms. Real rivers and lakes made a world four times
+  more expensive to build; they did not make it more expensive to *edit*, because a terrain that has
+  not changed is no longer rebuilt. The 31 ms one-time world build ADR-090 records is paid once per
+  terrain, not once per flower.
+- The cold flatten is unchanged (~620 ms): there is nothing to reuse the first time.
+- Dragging `nodes/<terrain>/terrainLodDistance` or `terrainViewDistance` does **not** move the cache
+  key, because `TerrainSettings::structuralHash` deliberately excludes them — they choose meshes per
+  frame and change nothing that was built. So the LOD debug sliders do not rebuild the world.
 - The cache costs memory — a second copy of the terrain's chunk meshes, tens of megabytes on a
-  Glowmere world. It buys back a third of a second per edit.
+  Glowmere world. It buys back a tenth of a second per edit. The reuse path writes nothing back:
+  copying the cache into a fresh record only to move it straight home again would have been that
+  same deep copy on every rebuild, which is most of what the cache exists to save.
 - A brush stroke is one undo step, however many dabs it laid down, and one `rebind()` per dab rather
   than one per plant.
 - The history owns deleted nodes, so it is bounded (256 commands) and cleared when a project loads.
@@ -215,11 +244,13 @@ the mouse.
 
 ## Revisit triggers
 
-- **The terrain pass lands its consolidated spatial queries.** `ui::GroundSample` should be filled
-  from them; the march is the only part that should remain here.
+- **Navigation installs an `ObstacleField`.** `TerrainQuery::isOccupied` becomes a per-instance
+  answer at that point, and the brush's own bounds sweep — which is O(nodes) per frame — could be
+  retired in its favour.
 - **A scene grows enough nodes that the brush's per-frame `nodeBounds` sweep shows up.** It is O(nodes)
-  per frame while painting, against a node list that is hundreds today. A spatial index is the fix,
-  and `world::scatter`'s own cloud structure is the precedent.
+  per frame while painting, against a node list that is hundreds today. The per-vertex half of it is
+  already gone — `Scene::meshBounds` memoises against the mesh version — but the sweep itself is
+  linear. A spatial index is the fix, and `world::scatter`'s own cloud structure is the precedent.
 - **Somebody wants undo across a Generate World.** It is deliberately outside the history: a
   generate replaces the composer's own nodes wholesale, and the honest answer today is that the
   history is cleared.

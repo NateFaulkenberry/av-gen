@@ -69,6 +69,12 @@ struct PlacementSettings {
     bool avoidWater = true;        // do not plant in a lake
     bool avoidCollisions = true;   // do not plant inside something already there
     float collisionPadding = 0.0f; // extra metres of clearance demanded around each instance
+    // Move a refused instance to the nearest spot the world *would* accept, rather than dropping it
+    // (ADR-090's `TerrainQuery::nearestValidPoint`). Off by default, because a brush that silently
+    // relocates what it places is a brush that disagrees with where you pointed -- but the ghost
+    // shows the moved position, so with it on the artist still sees exactly what will happen.
+    bool snapToValid = false;
+    float snapSearchRadius = 24.0f; // metres to look outwards before giving up
     // 0 means "a new arrangement every stroke", which is what a brush should do. A fixed non-zero
     // seed makes a stroke reproducible, which is what a test and a bug report need.
     std::uint32_t seed = 0;

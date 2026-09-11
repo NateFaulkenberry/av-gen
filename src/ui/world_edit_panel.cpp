@@ -251,7 +251,9 @@ void WorldEditPanel::drawBrush(WorldEditor& editor) {
         ImGui::SliderFloat("Spacing", &brush.spacing, 0.1f, 12.0f, "%.2f m");
         helpMarker("The closest two placements may ever be. Density thins the stroke without "
                    "changing this.");
-        ImGui::SliderFloat("Density", &brush.density, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Density", &brush.density, 0.05f, 1.0f, "%.2f");
+        helpMarker("How much of the room the spacing allows to actually use. It stops at 0.05 rather "
+                   "than 0 because a brush that places nothing is a brush that looks broken.");
         break;
     case app::PlacementMode::Cluster:
         ImGui::SliderInt("Count", &brush.clusterCount, 1, 60);
@@ -292,6 +294,13 @@ void WorldEditPanel::drawBrush(WorldEditor& editor) {
             ImGui::Checkbox("Keep clear of other objects", &brush.avoidCollisions);
             if (brush.avoidCollisions) {
                 ImGui::SliderFloat("Clearance", &brush.collisionPadding, 0.0f, 8.0f, "%.2f m");
+            }
+            ImGui::Checkbox("Nudge to the nearest valid spot", &brush.snapToValid);
+            helpMarker("Instead of refusing, move a blocked instance to the nearest place the world "
+                       "would accept. The ghost shows where it will actually go, so nothing is "
+                       "placed anywhere you have not already seen it.");
+            if (brush.snapToValid) {
+                ImGui::SliderFloat("Look within", &brush.snapSearchRadius, 1.0f, 80.0f, "%.0f m");
             }
             ImGui::TreePop();
         }
@@ -336,7 +345,12 @@ void WorldEditPanel::drawSelection(app::Engine& engine, WorldEditor& editor) {
     }
 
     if (ImGui::BeginListBox("##selected", ImVec2(-1.0f, 74.0f))) {
-        for (const std::string& name : selection.nodes()) {
+        // Over a copy. Clicking a row calls `Selection::set`, which clears and repopulates the very
+        // vector a range-for would be walking -- and `clear()` keeps the capacity, so the loop's
+        // cached end still points past the old size and the next row dereferences a destroyed
+        // string. Two objects selected and one click is enough.
+        const std::vector<std::string> rows = selection.nodes();
+        for (const std::string& name : rows) {
             const scene::CompositionNode* node = composition->findNode(name);
             const bool active = name == selection.primary();
             ImGui::PushID(name.c_str());

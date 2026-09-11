@@ -1,7 +1,6 @@
 #include "ui/world_probe.hpp"
 
 #include "entity/placement.hpp"
-#include "world/camera_clearance.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -20,22 +19,11 @@ scene::CompositionNode* terrainOf(scene::Composition& composition) {
     return nullptr;
 }
 
-// Fills the ground terms of a sample from a world map at a horizontal position, in the terrain's
-// own frame. `lift` is the terrain node's world y offset.
-void fillFromMap(GroundSample& out, const world::WorldMap& map, glm::vec2 xz, float lift) {
-    const world::Sample s = map.sample(xz);
-    out.position = glm::vec3(xz.x, s.height + lift, xz.y);
-    out.normal = s.normal;
-    // `Sample::slope` is 1 - normal.y, which is a convenient 0..1 but not an angle. Artists reason
-    // in degrees and every slope limit in the world is written in degrees, so it is converted once,
-    // here, rather than in each of the places that would otherwise have to remember.
-    out.slopeDegrees = glm::degrees(std::acos(std::clamp(s.normal.y, -1.0f, 1.0f)));
-    out.submerged = s.submerged;
-    out.waterDepth = s.submerged ? std::max(0.0f, s.waterSurface - s.height) : 0.0f;
-    const glm::vec2 lo = map.min();
-    const glm::vec2 hi = map.max();
-    out.insideWorld = xz.x >= lo.x && xz.x <= hi.x && xz.y >= lo.y && xz.y <= hi.y;
-    out.hasTerrain = true;
+// How far the terrain node's own transform lifts the map. `TerrainQuery` answers in the map's frame
+// -- it is a join over a `WorldMap`, which knows nothing about where the node carrying it was
+// placed -- so the one thing this file has to add back is the node's world y.
+float liftOf(scene::Composition& composition, const scene::CompositionNode* terrain) {
+    return terrain != nullptr ? composition.nodeWorldTransform(*terrain).position.y : 0.0f;
 }
 
 bool rayBox(const ViewRay& ray, const glm::vec3& lo, const glm::vec3& hi, float maxDistance, float& t) {
@@ -89,22 +77,46 @@ Projected projectPoint(const scene::Camera& camera, float aspect, glm::vec3 worl
     return out;
 }
 
-GroundSample sampleGroundAt(scene::Composition& composition, glm::vec2 xz) {
+GroundSample sampleGroundAt(const world::TerrainQuery& query, float lift, glm::vec2 xz) {
     GroundSample out;
-    scene::CompositionNode* terrain = terrainOf(composition);
-    if (terrain == nullptr) {
-        out.valid = true;
-        out.position = glm::vec3(xz.x, 0.0f, xz.y);
+    out.valid = true;
+    if (!query.valid()) {
+        // No terrain. The ground is y = 0, and a brush has to work in an empty scene because an
+        // empty scene is where somebody finds out what the brush does.
+        out.position = glm::vec3(xz.x, lift, xz.y);
         return out;
     }
-    const float lift = composition.nodeWorldTransform(*terrain).position.y;
-    fillFromMap(out, terrain->worldMap, xz, lift);
-    out.valid = true;
-    world::ClearanceField field;
-    field.map = &terrain->worldMap;
-    field.ecology = &terrain->ecology;
-    out.canopyHeight = field.canopyHeight(xz);
+    // One call, one set of noise evaluations. Asking for height, then slope, then water separately
+    // costs three; `TerrainPoint` is the shape that exists so callers do not.
+    const world::TerrainPoint p = query.at(xz);
+    out.position = glm::vec3(xz.x, p.height + lift, xz.y);
+    out.normal = p.normal;
+    out.slopeDegrees = glm::degrees(std::acos(std::clamp(p.normal.y, -1.0f, 1.0f)));
+    out.submerged = p.water;
+    out.waterDepth = p.waterDepth;
+    out.canopyHeight = p.canopy;
+    out.insideWorld = query.inBounds(xz);
+    out.reject = p.reject;
+    out.walkable = p.walkable;
+    out.hasTerrain = true;
     return out;
+}
+
+GroundSample sampleGroundAt(scene::Composition& composition, glm::vec2 xz) {
+    return sampleGroundAt(composition.terrainQuery(), liftOf(composition, terrainOf(composition)), xz);
+}
+
+std::optional<GroundSample> nearestPlaceable(scene::Composition& composition, glm::vec2 xz, float radius,
+                                             float searchRadius) {
+    const world::TerrainQuery query = composition.terrainQuery();
+    if (!query.valid()) {
+        return std::nullopt;
+    }
+    const std::optional<glm::vec2> found = query.nearestValidPoint(xz, radius, searchRadius);
+    if (!found) {
+        return std::nullopt;
+    }
+    return sampleGroundAt(query, liftOf(composition, terrainOf(composition)), *found);
 }
 
 GroundSample sampleGroundAlong(scene::Composition& composition, const ViewRay& ray, float maxDistance) {
@@ -127,8 +139,9 @@ GroundSample sampleGroundAlong(scene::Composition& composition, const ViewRay& r
     }
 
     const world::WorldMap& map = terrain->worldMap;
-    const float lift = composition.nodeWorldTransform(*terrain).position.y;
-    const auto heightAt = [&](glm::vec2 xz) { return map.height(xz) + lift; };
+    const world::TerrainQuery query = composition.terrainQuery();
+    const float lift = liftOf(composition, terrain);
+    const auto heightAt = [&](glm::vec2 xz) { return query.heightAt(xz) + lift; };
 
     // A fixed-step march with a bisection at the crossing. The step is a fraction of the terrain's
     // cell size rather than a fraction of the distance: a coarse step steps over a ridge and lands
@@ -166,13 +179,8 @@ GroundSample sampleGroundAlong(scene::Composition& composition, const ViewRay& r
                 }
             }
             const glm::vec3 q = ray.origin + ray.direction * hi;
-            fillFromMap(out, map, glm::vec2(q.x, q.z), lift);
-            out.valid = true;
+            out = sampleGroundAt(query, lift, glm::vec2(q.x, q.z));
             out.distance = hi;
-            world::ClearanceField field;
-            field.map = &map;
-            field.ecology = &terrain->ecology;
-            out.canopyHeight = field.canopyHeight(glm::vec2(q.x, q.z));
             return out;
         }
         previousT = t;

@@ -1657,7 +1657,12 @@ WorldBounds Composition::nodeBounds(const std::string& name) {
         // rather than through entities. Its instances are not enumerated here; the node's own
         // world position stands in, which is enough to find and grab it.
         if (!out.valid && range.proceduralIndex >= 0) {
-            out.include(nodeWorldTransform(**it).position);
+            // A box, not a point. A zero-volume AABB is one no ray ever enters, so a single
+            // `include` would leave a procedural object visible in a box selection and impossible to
+            // click -- which is the opposite of "enough to find and grab it".
+            const glm::vec3 p = nodeWorldTransform(**it).position;
+            out.include(p - glm::vec3(0.5f));
+            out.include(p + glm::vec3(0.5f));
         }
     }
     // A group owns no geometry: it is the union of what hangs off it, recursively.
@@ -2522,6 +2527,7 @@ void Composition::rebuild() {
             const bool reuseTerrain = !cacheDisabled && mutableNode.terrainProducts.usable(terrainKey);
             CompositionNode::TerrainProducts fresh;
             fresh.hash = terrainKey;
+            bool reusedProducts = false;
             std::size_t layerIndex = 0;
             for (const world::ScatterLayer& layer : node.ecology.layers) {
                 std::span<const glm::vec3> anchors;
@@ -2694,17 +2700,19 @@ void Composition::rebuild() {
                 mutableNode.chunks = mutableNode.terrainProducts.chunks;
                 for (world::TerrainChunk& chunk : mutableNode.chunks) {
                     for (MeshId& id : chunk.meshes) {
-                        if (id != kInvalidMesh) {
+                        if (id != kInvalidMesh && id < mutableNode.terrainProducts.meshes.size()) {
                             id += meshBase;
                         }
                     }
-                    if (chunk.water != kInvalidMesh) {
+                    if (chunk.water != kInvalidMesh &&
+                        chunk.water < mutableNode.terrainProducts.meshes.size()) {
                         chunk.water += meshBase;
                     }
                 }
-                fresh.glow = mutableNode.terrainProducts.glow;
-                fresh.chunks = mutableNode.terrainProducts.chunks;
-                fresh.meshes = mutableNode.terrainProducts.meshes;
+                // And nothing is written back. Copying the cache into `fresh` only to move it
+                // straight back is a deep copy of every terrain mesh -- tens of megabytes -- on
+                // every rebuild, which is a large fraction of what the cache was built to save.
+                reusedProducts = true;
             } else {
                 mutableNode.glow = std::move(nodeGlow);
                 fresh.glow = mutableNode.glow;
@@ -2718,17 +2726,24 @@ void Composition::rebuild() {
                     });
                 fresh.chunks = mutableNode.chunks;
                 for (world::TerrainChunk& chunk : fresh.chunks) {
+                    // `TerrainChunk::meshes` is value-initialised, so the slots above `lodLevels`
+                    // hold 0 rather than kInvalidMesh. Subtracting the base from those wraps, and at
+                    // a base of exactly 1 the wrapped value *is* kInvalidMesh -- which the restore
+                    // would then decline to rebase, turning an unused slot into a poisoned one. The
+                    // guard is on being a real id rather than on not being the sentinel.
                     for (MeshId& id : chunk.meshes) {
-                        if (id != kInvalidMesh) {
+                        if (id != kInvalidMesh && id >= meshBase) {
                             id -= meshBase;
                         }
                     }
-                    if (chunk.water != kInvalidMesh) {
+                    if (chunk.water != kInvalidMesh && chunk.water >= meshBase) {
                         chunk.water -= meshBase;
                     }
                 }
             }
-            mutableNode.terrainProducts = std::move(fresh);
+            if (!reusedProducts) {
+                mutableNode.terrainProducts = std::move(fresh);
+            }
             for (std::size_t c = 0; c < mutableNode.chunks.size(); ++c) {
                 const world::TerrainChunk& chunk = mutableNode.chunks[c];
                 Entity& e = scene_.addEntity(fmt::format("{}.chunk{}", node.name, c), chunk.meshes[0]);

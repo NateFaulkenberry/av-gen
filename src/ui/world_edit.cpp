@@ -318,7 +318,13 @@ EditCommand duplicateNodes(app::Engine& engine, std::span<const std::string> nam
         // caller had happened to select alongside the group itself.
         const bool root = std::find(sources.begin(), sources.end(), source->parent) == sources.end();
         if (root) {
-            copy.transform.position += offset;
+            // `offset` is world space and `transform.position` is local to the copy's parent. For a
+            // node under a rotated or scaled parent those are different directions, so the offset is
+            // taken through the parent's frame -- the same conversion `moveNodes` does, for exactly
+            // the same reason.
+            const glm::mat4 frame = parentFrame(*composition, *source);
+            const glm::vec3 local = glm::vec3(glm::inverse(frame) * glm::vec4(offset, 0.0f));
+            copy.transform.position += local;
         }
         copies.push_back(std::move(copy));
     }

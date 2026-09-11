@@ -16,6 +16,8 @@
 #include "ui/world_editor.hpp"
 #include "ui/world_probe.hpp"
 
+#include <glm/gtx/quaternion.hpp>
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -848,4 +850,212 @@ TEST_CASE("duplicating a group and one of its members does not move the member t
                                                              *composition->findNode(b)).position.x);
         CHECK_THAT(dx, Catch::Matchers::WithinAbs(offset.x, 1e-3));
     }
+}
+
+// ---- §3: one spatial-query surface, not one per consumer ---------------------------------------------
+
+TEST_CASE("the ghost's terrain facts are the shared query's, to the last decimal") {
+    // §3 forbids separate terrain logic per consumer, and the way a project acquires it is not by
+    // deciding to -- it is by one consumer wanting a slightly different answer and writing three
+    // lines instead of asking. So this asserts the brush's ground sample *is* TerrainQuery's answer,
+    // which is the property that stops them drifting.
+    Fixture f;
+    scene::CompositionNode terrain;
+    terrain.name = "ground";
+    terrain.kind = scene::NodeKind::Terrain;
+    terrain.worldMap = world::defaultWorld();
+    terrain.worldMap.size = glm::vec2(300.0f, 300.0f);
+    terrain.worldMap.prepare();
+    REQUIRE(f.engine.composition()->addNode(std::move(terrain)).has_value());
+    auto* composition = f.engine.composition();
+    const world::TerrainQuery query = composition->terrainQuery();
+    REQUIRE(query.valid());
+
+    for (const glm::vec2 p : {glm::vec2(0.0f, 0.0f), glm::vec2(40.0f, -70.0f), glm::vec2(-120.0f, 95.0f)}) {
+        const ui::GroundSample sample = ui::sampleGroundAt(*composition, p);
+        const world::TerrainPoint point = query.at(p);
+        CHECK_THAT(sample.position.y, Catch::Matchers::WithinAbs(point.height, 1e-5));
+        CHECK_THAT(sample.waterDepth, Catch::Matchers::WithinAbs(point.waterDepth, 1e-5));
+        CHECK(sample.submerged == point.water);
+        CHECK_THAT(sample.canopyHeight, Catch::Matchers::WithinAbs(point.canopy, 1e-5));
+        CHECK(sample.reject == point.reject);
+        CHECK(sample.walkable == point.walkable);
+        // And the degrees the artist sets a limit in are the degrees of the query's own normal.
+        CHECK_THAT(sample.slopeDegrees,
+                   Catch::Matchers::WithinAbs(glm::degrees(std::acos(std::clamp(point.normal.y, -1.0f, 1.0f))),
+                                              1e-4));
+    }
+}
+
+TEST_CASE("a refused placement can be nudged to somewhere the world accepts") {
+    Fixture f;
+    scene::CompositionNode terrain;
+    terrain.name = "ground";
+    terrain.kind = scene::NodeKind::Terrain;
+    terrain.worldMap = world::defaultWorld();
+    terrain.worldMap.size = glm::vec2(300.0f, 300.0f);
+    terrain.worldMap.prepare();
+    REQUIRE(f.engine.composition()->addNode(std::move(terrain)).has_value());
+    auto* composition = f.engine.composition();
+
+    // Well outside the map: refused for being out of bounds, whatever else is true of it.
+    const glm::vec2 far(900.0f, 900.0f);
+    CHECK_FALSE(ui::sampleGroundAt(*composition, far).insideWorld);
+
+    assets::AssetDescriptor descriptor;
+    descriptor.id = "fern";
+    descriptor.naturalSize = glm::vec3(1.0f, 2.0f, 1.0f);
+    descriptor.preferredScale = 2.0f;
+    ui::BrushAsset asset{&descriptor, f.glb.generic_string()};
+
+    app::PlacementSettings settings;
+    settings.mode = app::PlacementMode::Single;
+    settings.seed = 5u;
+    settings.avoidCollisions = false;
+    const ui::GroundSample outside = ui::sampleGroundAt(*composition, far);
+
+    // Without the nudge it is refused, and the ghost says which constraint did it.
+    const ui::BrushPreview refused = ui::planBrush(*composition, settings, asset, outside, 1u);
+    REQUIRE(refused.instances.size() == 1);
+    CHECK(refused.instances[0].issue == ui::PlacementIssue::OutsideWorld);
+
+    // The nudge searches the world's own `nearestValidPoint`. From that far out there is nothing
+    // within the search radius, so it stays refused rather than being teleported across the map --
+    // which is the behaviour that matters: a snap that always succeeds is a snap that lies.
+    app::PlacementSettings snapping = settings;
+    snapping.snapToValid = true;
+    snapping.snapSearchRadius = 10.0f;
+    CHECK(ui::planBrush(*composition, snapping, asset, outside, 1u).instances[0].issue ==
+          ui::PlacementIssue::OutsideWorld);
+
+    // Just over the edge, though, it finds its way back in.
+    const glm::vec2 edge(composition->findNode("ground")->worldMap.max().x + 4.0f, 0.0f);
+    const ui::GroundSample justOut = ui::sampleGroundAt(*composition, edge);
+    CHECK_FALSE(ui::planBrush(*composition, settings, asset, justOut, 1u).instances[0].valid());
+    app::PlacementSettings reach = snapping;
+    reach.snapSearchRadius = 60.0f;
+    const ui::BrushPreview nudged = ui::planBrush(*composition, reach, asset, justOut, 1u);
+    REQUIRE(nudged.instances.size() == 1);
+    CHECK(nudged.instances[0].valid());
+    // And it moved: the ghost is where the thing will actually be, not where the cursor was.
+    CHECK(nudged.instances[0].position.x < edge.x);
+}
+
+// ---- regressions ---------------------------------------------------------------------------------
+
+TEST_CASE("undoing a command that both removed and added does not collide over a recycled name") {
+    // A Replace stroke erases `a` and paints something that is then given the name `a`, because
+    // `uniqueName` hands out the first free one. If undo restores the old `a` while the new one is
+    // still in the scene, the old one is renamed on the way in -- and every parameter path and
+    // selection record in the command then names a node that is not there. The fix is to free the
+    // names before handing them back: removals are taken first in *both* directions.
+    Fixture f;
+    ui::EditHistory history;
+    const std::string original = f.add("a", glm::vec3(0.0f, 0.0f, 7.0f));
+    REQUIRE(original == "a");
+
+    ui::EditCommand replace("Replace");
+    ui::EditCommand removal = ui::deleteNodes(f.engine, std::vector<std::string>{original});
+    REQUIRE(removal.removed.size() == 1);
+    for (ui::NodeRecord& record : removal.removed) {
+        replace.removed.push_back(std::move(record));
+    }
+    // The name is free now, so the replacement takes it.
+    scene::CompositionNode fresh;
+    fresh.name = "a";
+    fresh.kind = scene::NodeKind::Gltf;
+    fresh.asset = f.glb.generic_string();
+    fresh.transform.position = glm::vec3(0.0f, 0.0f, -7.0f);
+    std::vector<scene::CompositionNode> batch;
+    batch.push_back(std::move(fresh));
+    std::vector<std::string> created;
+    ui::EditCommand placed = ui::placeNodes(f.engine, std::move(batch), "Replace", &created);
+    REQUIRE(created.size() == 1);
+    CHECK(created.front() == "a"); // the collision this test is about
+    for (ui::NodeRecord& record : placed.added) {
+        replace.added.push_back(std::move(record));
+    }
+    history.push(std::move(replace));
+
+    auto* composition = f.engine.composition();
+    CHECK(composition->nodeCount() == 1);
+    CHECK_THAT(f.positionOf("a").z, Catch::Matchers::WithinAbs(-7.0, 1e-4));
+
+    const ui::EditApply undone = history.undo(f.engine);
+    CHECK(undone.ok()); // no "came back as" problem
+    CHECK(composition->nodeCount() == 1);
+    REQUIRE(composition->findNode("a") != nullptr);
+    // And it is the *original* that came back, at the position the original had.
+    CHECK_THAT(f.positionOf("a").z, Catch::Matchers::WithinAbs(7.0, 1e-4));
+
+    const ui::EditApply redone = history.redo(f.engine);
+    CHECK(redone.ok());
+    CHECK_THAT(f.positionOf("a").z, Catch::Matchers::WithinAbs(-7.0, 1e-4));
+}
+
+TEST_CASE("rotating an object inside a turned group turns it about the world axis, not its parent's") {
+    // The gizmo's delta is world space; the parameter it writes is the node's *local* rotation.
+    // Multiplying them directly is right only when the parent chain is unrotated, and wrong by
+    // exactly the parent's rotation when it is not.
+    Fixture f;
+    const std::string a = f.add("a", glm::vec3(-2.0f, 0.0f, 0.0f));
+    const std::string b = f.add("b", glm::vec3(2.0f, 0.0f, 0.0f));
+    auto* composition = f.engine.composition();
+    std::string group;
+    static_cast<void>(ui::groupNodes(f.engine, std::vector<std::string>{a, b}, "g", &group));
+    // Turn the group a quarter turn about X -- deliberately a different axis from the one the drag
+    // will use. A parent turned about the *same* axis commutes with the delta and the wrong formula
+    // gives the right answer, which is how this bug survives a test written without thinking about
+    // it: the first version of this one rotated the group about Y and passed either way.
+    ui::setNodeRotation(f.engine, group, glm::vec3(90.0f, 0.0f, 0.0f));
+
+    ui::WorldEditor editor;
+    editor.gizmoMode = ui::GizmoMode::Rotate;
+    editor.localSpace = false; // the world's Y, which is the axis the handle stands for
+    editor.selection.set(a);
+
+    const scene::Camera camera = lookingDown();
+    const float aspect = 16.0f / 9.0f;
+    ui::EditorInput input;
+    input.overCanvas = true;
+
+    // One frame to settle the gizmo frame, then read it back and aim at its Y ring.
+    editor.update(f.engine, nullptr, camera, aspect, input);
+    REQUIRE(editor.visuals().showGizmo);
+    const ui::GizmoFrame frame = editor.visuals().gizmo;
+    const std::vector<glm::vec3> ring = ui::rotationRing(frame, ui::GizmoHandle::AxisY, 48);
+    REQUIRE(ring.size() == 48);
+
+    const glm::quat worldBefore = composition->nodeWorldTransform(*composition->findNode(a)).rotation;
+
+    // Pressed at 45 degrees round the ring rather than at 0. The three rotation rings intersect
+    // wherever one of them crosses another's plane -- the Y ring's zero point lies on the X ring
+    // too -- and at a crossing the picker takes the first axis it tested. Anywhere between the
+    // crossings names exactly one ring.
+    REQUIRE(ui::pickHandle(camera, aspect, frame, ui::GizmoMode::Rotate,
+                           ui::projectPoint(camera, aspect, ring[6]).ndc,
+                           0.033f) == ui::GizmoHandle::AxisY);
+    input.ndc = ui::projectPoint(camera, aspect, ring[6]).ndc;
+    input.leftPressed = true;
+    input.leftDown = true;
+    editor.update(f.engine, nullptr, camera, aspect, input);
+
+    input.leftPressed = false;
+    input.ndc = ui::projectPoint(camera, aspect, ring[12]).ndc; // a further eighth: 45 degrees on
+    editor.update(f.engine, nullptr, camera, aspect, input);
+
+    const glm::quat worldAfter = composition->nodeWorldTransform(*composition->findNode(a)).rotation;
+    // The world-space change is a rotation about the world's Y and nothing else.
+    const glm::quat delta = worldAfter * glm::inverse(worldBefore);
+    const glm::vec3 axis = glm::axis(glm::normalize(delta));
+    const float degrees = glm::degrees(glm::angle(glm::normalize(delta)));
+    CHECK_THAT(degrees, Catch::Matchers::WithinAbs(45.0, 3.0));
+    CHECK_THAT(std::abs(axis.y), Catch::Matchers::WithinAbs(1.0, 0.02));
+    CHECK_THAT(axis.x, Catch::Matchers::WithinAbs(0.0, 0.02));
+    CHECK_THAT(axis.z, Catch::Matchers::WithinAbs(0.0, 0.02));
+
+    input.leftDown = false;
+    input.leftReleased = true;
+    editor.update(f.engine, nullptr, camera, aspect, input);
+    CHECK(editor.history.undoSize() == 1); // and the whole drag is one thing to undo
 }
