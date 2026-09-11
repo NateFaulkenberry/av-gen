@@ -52,8 +52,14 @@ The `snap` combo offers **Off**, **Frames**, **Beats** and **Markers**. The defa
 
 ## The strip
 
-Rows, top to bottom: a ruler, a marker row, the shot lane, one lane per actor, then the overlay
-lane if there are any overlays.
+Rows, top to bottom: a ruler, a marker row, the audio lane, the shot lane, one lane per actor, then
+the overlay lane if there are any overlays.
+
+The **audio lane** shows the loaded song's waveform, with its filename in the corner. It sits
+directly above the shots on purpose: what you are usually looking for is whether a cut lands on
+something in the music, and that is only readable when the two rows are adjacent. Where the lane
+goes dark, the audio has ended and the piece continues past it. It appears only when a song is
+loaded.
 
 | Gesture | Does |
 |---|---|

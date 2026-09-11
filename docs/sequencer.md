@@ -328,8 +328,14 @@ render time. A subject with a `preferredDistance` can refuse the match, and the 
 
 ## The Sequence panel
 
-One horizontal time axis. A ruler with the song's sections and beats on it, a lane of shots, a lane
-per actor showing its clip cues, and a lane of overlays.
+One horizontal time axis. A ruler with the song's sections and beats on it, a lane showing the
+song's waveform, a lane of shots, a lane per actor showing its clip cues, and a lane of overlays.
+
+The audio lane is drawn from an `audio::WaveformSummary` -- the minimum and maximum sample in each
+five-millisecond slice, summarised once when the file loads. It is kept in *time* rather than in
+pixels so that zooming reads more or fewer buckets per column instead of needing a rebuild, and its
+amplitude is clamped rather than normalised to whatever is on screen, so a passage keeps the same
+shape as you scroll past it.
 
 - **Click** in the strip to scrub. **Click** a block to select it.
 - **Drag** a block to move it, its right edge to resize it. Both snap.
