@@ -169,6 +169,7 @@ void Scene::clear() {
     entities.clear();
     particles.clear();
     procedurals.clear();
+    rigs.clear();
     ++meshVersion;
     ++textureVersion;
 }
