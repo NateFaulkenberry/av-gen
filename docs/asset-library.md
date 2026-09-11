@@ -64,6 +64,21 @@ The registry resolves those IDs on the next load, while old path-based scenes re
 The composition integration suite covers this round trip with a project-local glTF and verifies the
 stable ID is written instead of an absolute path.
 
+## Deferred ownership and UI work
+
+The following work is deliberately not implemented in the current phase. It is a handoff backlog
+for a future session because each item needs broader product/UI decisions or a larger asset-pipeline
+change than the current catalog and import path should absorb:
+
+- Drag/drop asset placement from the catalog.
+- A built-in **Import to Project** action.
+- Thumbnail generation and caching.
+- Full asset context actions for replace, delete and reveal.
+- Automatic migration UI for legacy external absolute paths.
+- Nested glTF URI decoding and directory-preserving dependency copying.
+- Full scene reference replacement and versioning.
+- An export/move/delete-source matrix beyond the current composition portability coverage.
+
 ## The rule
 
 **One artistic language, many variations.** The library is curated by hand and listed in
