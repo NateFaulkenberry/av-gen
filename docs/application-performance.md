@@ -498,14 +498,28 @@ anywhere in `src/`**.
 
 1. **The GPU, on a real world.** 15.6 ms of a 17.3 ms frame at 3.36 Mpx. Renderer 2.0's subject;
    §7 is this document's contribution to it.
-2. **`Composition::rebuild()` is all-or-nothing.** Ten call sites set `dirty_`, and every one
-   re-flattens the entire world: adding one material program, adding one hero node, or swapping the
-   HDR re-scatters ~260k ecology cells and rebuilds 256 terrain chunks. The redundant *second* one
-   is gone (§9.3); the ~390 ms first one is real work done synchronously on the main thread, and is
-   the largest remaining editor freeze. P1-2.
+2. **`Composition::rebuild()` is all-or-nothing** — but it no longer re-scatters and re-meshes the
+   terrain. Ten call sites still set `dirty_` and every one still re-flattens, but a terrain's
+   scatter clouds, glow clusters and chunk meshes are now memoised on the node and reused whenever
+   the rebuild was caused by something else (ADR-092). Measured on
+   `examples/recipes/glowmere.recipe.json` after ADR-090, placing an asset costs **21.7-33.3 ms**
+   where it cost **455-478 ms**, and `engine.update`'s p99 across a scripted paint stroke falls from
+   **469.6 ms to 26.3 ms**. `AVGEN_NO_TERRAIN_CACHE=1` restores the old behaviour, so the comparison
+   stays measurable rather than historical. The cold flatten is unchanged (~620 ms): the first one
+   has nothing to reuse. What remains in the ~25 ms is procedural regeneration and entity
+   rebuilding, and `dirty_` still has no granularity. P1-2, reduced.
+
+   The gap grew fourfold when ADR-090 landed, which is the point of measuring it this way: real
+   rivers and lakes made a world much more expensive to *build* and left it exactly as cheap to
+   *edit*. The LOD debug sliders do not rebuild either -- `TerrainSettings::structuralHash` excludes
+   `lodDistance` and `viewDistance` because they choose meshes per frame and change nothing that was
+   built.
 3. **`world::scatter` is single-threaded** — ~260k grid cells, ~1.3M `WorldMap::height` evaluations,
    one layer at a time, while `buildTerrain` beside it is already threaded. P1-3.
-4. **Viewport pick: up to 5 serial blocking GPU round-trips per click.** P2-1.
+4. **Viewport pick: up to 5 serial blocking GPU round-trips per click.** P2-1. Still true for a
+   click, which is the right place for it. The editor's *hover* no longer goes near it: the live
+   ghost marches a ray against `WorldMap::sample` on the CPU instead (ADR-092), because a preview
+   that follows the cursor cannot block on the GPU sixty times a second.
 5. **The audio-driven root transform** could regenerate every procedural cloud per frame in a scene
    whose root scale or rotation is audio-routed. P1-1.
 6. **482 allocations per frame** in the composition update. P3-1.
@@ -515,7 +529,9 @@ anywhere in `src/`**.
 ## 15. Future work
 
 - Give `Composition` incremental invalidation: a material program or a light rig should not rebuild
-  terrain. The information is there — `dirty_` just has no granularity.
+  terrain. The information is there — `dirty_` just has no granularity. ADR-092 took the terrain out
+  of the rebuild by memoising it, which is the same saving arrived at from the other end; the
+  granularity itself is still missing.
 - Move `world::scatter` onto the job system, or at least thread it the way `buildTerrain` is.
 - Make the terrain build asynchronous and show the previous mesh until it lands, so opening a world
   does not freeze the editor at all.

@@ -22,6 +22,8 @@
 #include "ui/editor_layout.hpp"
 #include "ui/graph_editor.hpp"
 #include "ui/world_builder_panel.hpp"
+#include "ui/world_edit_panel.hpp"
+#include "ui/world_editor.hpp"
 #include "ui/world_panel.hpp"
 
 #include <filesystem>
@@ -123,6 +125,12 @@ public:
     // ADR-066: the recipe, Generate World, and the job monitor. Given the job system
     // and builder by the host so the panel owns no scheduling of its own.
     WorldBuilderPanel worldBuilder;
+    // ADR-092: the world editor -- modes, the ghost, selection, gizmos and undo -- and the one
+    // panel that shows its controls. The editor is public because the host has to ask it whether
+    // the mouse belongs to it before starting a camera gesture, and has to hand it what the GPU
+    // picker resolved a click to.
+    WorldEditor editor;
+    WorldEditPanel editPanel;
     app::JobSystem* jobs = nullptr;
     app::WorldBuilder* builder = nullptr;
     // Procedural graph editor (ADR-028); the host re-installs the graph when it changes.
@@ -172,6 +180,9 @@ private:
     void drawWorldWindow(app::Engine& engine);
     void drawAssetsWindow();
     void drawWorldBuilderWindow(app::Engine& engine);
+    void drawEditWindow(app::Engine& engine);
+    // Runs the world editor and draws it over the world, inside the canvas window.
+    void drawViewportEditor(app::Engine& engine, const CanvasRect& rect);
     void drawGraphWindow(app::Engine& engine);
     // ---- the shell (ADR-076) ----
     void drawMenuBar(app::Engine& engine);

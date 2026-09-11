@@ -47,6 +47,13 @@ enum class UiScriptArm : std::uint32_t {
     Scrub = 1u << 4,    // move the transport every frame
     Camera = 1u << 5,   // orbit the viewport by dragging on the canvas
     Tabs = 1u << 6,     // switch the authoring layer and the World panel's tab
+    // ADR-092. The world editor, driven through the pointer: arm a brush, paint a stroke across the
+    // canvas, undo it, select what is under the cursor, group it, take that back too. It exists
+    // because the editor's *wiring* -- SDL to ImGui to the canvas's hover state to the ghost to the
+    // placement -- is the part that unit tests cannot reach and that this repository cannot
+    // screenshot, so the only honest way to know it is connected is to make the program do it and
+    // then ask the scene what happened.
+    Edit = 1u << 7,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -74,12 +81,21 @@ public:
     // pushes are read by the same frame's poll, so an arm's cost lands in the frame it belongs to.
     void step(Engine& engine, ui::ControlPanel* panel, platform::Window& window, std::uint64_t frame);
 
+    // What the Edit arm did, in the order it did it, for the host to log on the way out. The whole
+    // value of a scripted edit is the sentence it can print afterwards: "painted 23, undid to 0,
+    // selected fern_4, grouped 2". Empty unless the arm ran.
+    [[nodiscard]] const std::vector<std::string>& editLog() const { return editLog_; }
+
     // What the Sliders arm wrote this frame, as "path=value". The host logs it when a frame turns
     // out to have been slow, which is how "changing a property costs 14 ms" becomes the name of the
     // property. Empty on a frame that wrote nothing.
     [[nodiscard]] const std::vector<std::string>& lastWrites() const { return lastWrites_; }
 
 private:
+    void stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+
+    std::vector<std::string> editLog_;
+    std::size_t editNodesBefore_ = 0;
     std::vector<std::string> lastWrites_;
     UiScriptArm arms_ = UiScriptArm::None;
     std::size_t paramCursor_ = 0;

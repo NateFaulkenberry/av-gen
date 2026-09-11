@@ -32,6 +32,8 @@
 #include "world/terrain.hpp"
 #include "world/terrain_query.hpp"
 
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <nlohmann/json.hpp>
 
 #include <cstdint>
@@ -47,7 +49,44 @@ namespace avgen::scene {
 // Terrain (ADR-046): the node kind that turns a WorldMap into ground. It is a node rather than a
 // property of the scene because a composition may hold more than one world, and because everything
 // a node already has -- a transform, visibility, a material, parameters -- is what terrain needs.
-enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural, Field, Spline, Sdf, Terrain };
+// `Group` is an empty transform. It draws nothing and generates nothing; its whole purpose is to
+// be something other nodes can be parented to, so an artist's arrangement of twenty rocks is one
+// thing that moves as a unit and stays twenty rocks you can still select individually (ADR-092,
+// world-authoring-spec §26). Parenting, the world transform, the parameters and the file format
+// already did all of that work; a group is the node kind that had been missing to use it.
+// Euler angles in degrees <-> quaternion, in the convention every node's "rotation" field and
+// every "nodes/<name>/rotation" parameter uses: glm::quat(vec3) builds Rz * Ry * Rx, and the
+// recovery uses atan2 rather than glm::eulerAngles because asin loses precision near +-90 degrees.
+// Declared here because the editor has to go the other way -- a gizmo produces a rotation and has
+// to write the parameter -- and a seventh private copy of this pair would be a seventh chance for
+// one of them to disagree about the order.
+[[nodiscard]] glm::quat quatFromEulerDegrees(const glm::vec3& degrees);
+[[nodiscard]] glm::vec3 eulerDegrees(const glm::quat& q);
+
+// The world-space axis-aligned box a node occupies (ADR-092). Invalid when the node draws nothing:
+// a group, or a node whose asset failed to load. "Empty" and "at the origin" are different answers
+// and an editor that confuses them draws a selection outline around a point in space.
+struct WorldBounds {
+    glm::vec3 min{0.0f};
+    glm::vec3 max{0.0f};
+    bool valid = false;
+
+    [[nodiscard]] glm::vec3 centre() const { return (min + max) * 0.5f; }
+    [[nodiscard]] glm::vec3 size() const { return max - min; }
+    [[nodiscard]] float radius() const { return glm::length(size()) * 0.5f; }
+    void include(const glm::vec3& p) {
+        if (!valid) { min = max = p; valid = true; return; }
+        min = glm::min(min, p);
+        max = glm::max(max, p);
+    }
+    void include(const WorldBounds& other) {
+        if (!other.valid) { return; }
+        include(other.min);
+        include(other.max);
+    }
+};
+
+enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural, Field, Spline, Sdf, Terrain, Group };
 const char* nodeKindName(NodeKind kind);
 Result<NodeKind> nodeKindFromName(const std::string& name);
 
@@ -150,6 +189,30 @@ struct CompositionNode {
     spatial::Spline splineRest;
     SdfParameters sdfParams;
     SdfObject sdfRest;
+    // Terrain: what the last flatten produced, kept so the next one does not produce it again
+    // (ADR-092). A terrain's chunk meshes and its ecology scatter are pure functions of the map,
+    // the terrain settings and the ecology -- and on a Glowmere world they are ~390 ms of a
+    // rebuild, most of it `world::scatter` walking a quarter of a million grid cells. `dirty_` has
+    // no granularity: adding one flower re-flattens the world, so without this an artist painting
+    // a meadow pays for the whole terrain once per dab.
+    //
+    // Keyed on the hash of exactly those inputs, so a terrain that *has* changed rebuilds and one
+    // that has not does not. Cleared by `setEcology`/`setWorldMap`-shaped edits by virtue of the
+    // hash moving; nothing has to remember to invalidate it.
+    struct TerrainProducts {
+        std::uint64_t hash = 0; // 0 means nothing is cached
+        std::vector<std::shared_ptr<spatial::PointCloud>> clouds; // one per ecology layer, in order
+        std::vector<world::GlowCluster> glow;
+        // Chunk mesh ids are stored **relative to the first mesh this terrain contributed**, because
+        // the absolute ids depend on what else the scene flattened before it and that changes
+        // whenever a node is added. They are rebased on reuse.
+        std::vector<world::TerrainChunk> chunks;
+        std::vector<MeshData> meshes; // in the order buildTerrain emitted them
+        [[nodiscard]] bool usable(std::uint64_t want) const {
+            return hash != 0 && hash == want && !meshes.empty();
+        }
+    };
+    TerrainProducts terrainProducts;
     std::vector<world::TerrainChunk> chunks;  // Terrain: built at rebuild, indexed by entity offset
     // Terrain: the emissive scatter layers reduced to soft emitters, built at rebuild. The
     // per-frame pass picks the ones near the camera and makes them lights (ADR-053).
@@ -159,6 +222,16 @@ struct CompositionNode {
     params::Parameter<float>* terrainLodDistanceParam = nullptr;
     params::Parameter<float>* terrainViewDistanceParam = nullptr;
 };
+
+// A copy of everything *authored* about a node -- exactly the fields the scene file writes -- with
+// every piece of runtime state left behind for `addNode` to rebuild: the loaded glTF asset, the
+// nested child composition, the parameter pointers, the rest copies, a terrain's built chunks.
+//
+// This is what duplication and the clipboard copy (ADR-092). It is a named function rather than a
+// copy constructor because CompositionNode deliberately is not copyable -- it owns a nested
+// Composition -- and because the list of fields here is the list a new authored field has to be
+// added to. If a duplicate ever comes back missing something, this is the function that forgot it.
+[[nodiscard]] CompositionNode cloneNodeSpec(const CompositionNode& node);
 
 class Composition final : public SceneController {
 public:
@@ -178,6 +251,16 @@ public:
     Result<CompositionNode*> addNode(CompositionNode node);
     // Removes a node; its children are re-parented to the removed node's parent.
     bool removeNode(const std::string& name);
+    // The same removal, handing the node back instead of destroying it (ADR-092). Undo needs the
+    // node itself rather than a description of it: a CompositionNode carries a loaded scene asset,
+    // a nested child composition, a procedural rest copy and a terrain's built chunks, and a
+    // round trip through the scene-file JSON would quietly drop whatever the format does not
+    // write. Moving the node out keeps all of it, exactly, for the cost of a pointer.
+    //
+    // Returns nullptr when no node of that name exists. The returned node's parameter pointers are
+    // already cleared -- it is out of the parameter set -- so it is safe to hold across any number
+    // of frames and hand back to addNode().
+    [[nodiscard]] std::unique_ptr<CompositionNode> detachNode(const std::string& name);
     [[nodiscard]] CompositionNode* findNode(const std::string& name);
     [[nodiscard]] const CompositionNode* findNode(const std::string& name) const;
     // Which node owns scene entity `entityIndex`, or nullptr. This is what a viewport click
@@ -209,6 +292,13 @@ public:
     // World transform of a node (parent chain applied, parameters included), without the root
     // scale/rotation. Unknown parents are treated as roots.
     [[nodiscard]] Transform nodeWorldTransform(const CompositionNode& node) const;
+    // What a node actually occupies in the world, measured from the flattened scene rather than
+    // from the asset file: the box the editor outlines, sits a gizmo in the middle of, and tests a
+    // box-selection against has to be the box that is on screen. A Group has no geometry of its
+    // own, so its bounds are the union of its descendants' -- which is what makes a group possible
+    // to grab. Rebuilds the scene first when it is dirty, because bounds read from a stale
+    // flattening are bounds of the world as it was before the last edit.
+    [[nodiscard]] WorldBounds nodeBounds(const std::string& name);
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
     // ---- composition (ADR-038) ----
     // What the frame is about: focal points, depth layers and exclusion regions. Its fields are

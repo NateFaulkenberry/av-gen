@@ -29,6 +29,13 @@ enum class PlacementMode : std::uint8_t {
     Brush,      // a scatter filling the brush, spaced apart
     Cluster,    // a few, tight together, as one thing that grew there
     Landmark,   // one, deliberately enormous
+    // ADR-092. These two place nothing on their own -- they are what a click *means* rather than
+    // what it lays out -- so `planPlacements` returns an empty plan for Eraser and a Brush plan for
+    // Replace, and the editor does the removing. They live in this enum anyway because to the person
+    // holding the mouse they are brush modes, and a mode you have to leave the brush to reach is a
+    // mode you stop using.
+    Eraser,     // drag to remove what the brush covers
+    Replace,    // remove what the brush covers, then paint over it
 };
 [[nodiscard]] const char* placementModeName(PlacementMode mode);
 
@@ -36,13 +43,41 @@ struct PlacementSettings {
     PlacementMode mode = PlacementMode::Single;
     float brushRadius = 4.0f;      // metres
     float spacing = 1.2f;          // minimum metres between two placements in a brush
+    // 0..1 of what the spacing would allow. Spacing says how close two plants may be; density says
+    // how much of that room to use, which is the control an artist actually reaches for -- "the
+    // same meadow, thinner" is a density change and not a spacing change, and doing it with
+    // spacing alone also changes how evenly the plants sit.
+    float density = 1.0f;
     int clusterCount = 7;
     float clusterRadius = 1.4f;
-    float scaleJitter = 0.18f;     // +/- fraction
+    // 0 fills the disc evenly, 1 pulls everything toward a few centres. Evenly is the default
+    // because a cluster that bunches reads as a target rather than as a patch of something growing.
+    float clustering = 0.0f;
+    float scaleJitter = 0.18f;     // +/- fraction: the scale range is 1-j .. 1+j
     float yawJitter = 1.0f;        // 0..1 of a full turn
     float landmarkScale = 4.0f;    // multiplies the asset's intended height in Landmark mode
     bool alignToNormal = false;    // lie along the surface rather than standing upright
-    float sink = 0.0f;             // metres pushed into the ground
+    // Metres pushed into the ground. Negative lifts clear of it: one axis, both directions, rather
+    // than a "sink" and a "height offset" that disagree about which way is which.
+    float sink = 0.0f;
+
+    // ---- where a placement is allowed to land (ADR-092, spec §21/§22) ------------------------
+    // These do not lay anything out; they are the terms the ghost tests each planned instance
+    // against and the reason it turns red. They are settings rather than constants because what
+    // counts as too steep for a fern is not what counts as too steep for a boulder.
+    float maxSlopeDegrees = 60.0f; // above this the ground is a cliff face
+    bool avoidWater = true;        // do not plant in a lake
+    bool avoidCollisions = true;   // do not plant inside something already there
+    float collisionPadding = 0.0f; // extra metres of clearance demanded around each instance
+    // Move a refused instance to the nearest spot the world *would* accept, rather than dropping it
+    // (ADR-090's `TerrainQuery::nearestValidPoint`). Off by default, because a brush that silently
+    // relocates what it places is a brush that disagrees with where you pointed -- but the ghost
+    // shows the moved position, so with it on the artist still sees exactly what will happen.
+    bool snapToValid = false;
+    float snapSearchRadius = 24.0f; // metres to look outwards before giving up
+    // 0 means "a new arrangement every stroke", which is what a brush should do. A fixed non-zero
+    // seed makes a stroke reproducible, which is what a test and a bug report need.
+    std::uint32_t seed = 0;
 };
 
 // One object to create. `scale` is a multiplier on whatever normalising scale the asset needs to

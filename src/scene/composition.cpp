@@ -8,6 +8,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include <algorithm>
+#include <cstdlib>
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -116,34 +117,6 @@ void forEachParticleParam(ParticleParameters& p, F&& f) {
 }
 
 // ---- transforms --------------------------------------------------------------------------------
-
-glm::quat quatFromEulerDegrees(const glm::vec3& degrees) {
-    return glm::quat(glm::radians(degrees));
-}
-
-// Inverse of glm::quat(vec3): that constructor builds Rz * Ry * Rx. glm::eulerAngles recovers
-// the middle angle with asin, which loses precision near +-90 degrees; atan2 does not.
-glm::vec3 eulerDegrees(const glm::quat& q) {
-    const glm::mat3 m = glm::mat3_cast(q); // m[column][row]
-    const float m00 = m[0][0];
-    const float m10 = m[0][1];
-    const float m20 = m[0][2];
-    const float m01 = m[1][0];
-    const float m11 = m[1][1];
-    const float m21 = m[1][2];
-    const float m22 = m[2][2];
-    const float cy = std::sqrt(m00 * m00 + m10 * m10);
-    const float y = std::atan2(-m20, cy);
-    float x = 0.0f;
-    float z = 0.0f;
-    if (cy > 1e-6f) {
-        x = std::atan2(m21, m22);
-        z = std::atan2(m10, m00);
-    } else {
-        x = std::atan2(-m20 * m01, m11); // gimbal lock: fold roll into pitch
-    }
-    return glm::degrees(glm::vec3(x, y, z));
-}
 
 bool uniformScale(const glm::vec3& s) {
     return std::abs(s.x - s.y) < 1e-6f && std::abs(s.x - s.z) < 1e-6f;
@@ -886,6 +859,35 @@ std::string nestedPrefixFor(const std::string& outerPrefix, const std::string& n
 
 } // namespace
 
+glm::quat quatFromEulerDegrees(const glm::vec3& degrees) {
+    return glm::quat(glm::radians(degrees));
+}
+
+// Inverse of glm::quat(vec3): that constructor builds Rz * Ry * Rx. glm::eulerAngles recovers
+// the middle angle with asin, which loses precision near +-90 degrees; atan2 does not.
+glm::vec3 eulerDegrees(const glm::quat& q) {
+    const glm::mat3 m = glm::mat3_cast(q); // m[column][row]
+    const float m00 = m[0][0];
+    const float m10 = m[0][1];
+    const float m20 = m[0][2];
+    const float m01 = m[1][0];
+    const float m11 = m[1][1];
+    const float m21 = m[1][2];
+    const float m22 = m[2][2];
+    const float cy = std::sqrt(m00 * m00 + m10 * m10);
+    const float y = std::atan2(-m20, cy);
+    float x = 0.0f;
+    float z = 0.0f;
+    if (cy > 1e-6f) {
+        x = std::atan2(m21, m22);
+        z = std::atan2(m10, m00);
+    } else {
+        x = std::atan2(-m20 * m01, m11); // gimbal lock: fold roll into pitch
+    }
+    return glm::degrees(glm::vec3(x, y, z));
+}
+
+
 // ---- node kinds --------------------------------------------------------------------------------
 
 const char* nodeKindName(NodeKind kind) {
@@ -910,6 +912,8 @@ const char* nodeKindName(NodeKind kind) {
         return "sdf";
     case NodeKind::Terrain:
         return "terrain";
+    case NodeKind::Group:
+        return "group";
     }
     return "gltf";
 }
@@ -917,7 +921,7 @@ const char* nodeKindName(NodeKind kind) {
 Result<NodeKind> nodeKindFromName(const std::string& name) {
     for (const NodeKind kind :
          {NodeKind::Gltf, NodeKind::Orb, NodeKind::Grid, NodeKind::Particles, NodeKind::Scene, NodeKind::Procedural,
-          NodeKind::Field, NodeKind::Spline, NodeKind::Sdf, NodeKind::Terrain}) {
+          NodeKind::Field, NodeKind::Spline, NodeKind::Sdf, NodeKind::Terrain, NodeKind::Group}) {
         if (name == nodeKindName(kind)) {
             return kind;
         }
@@ -1584,6 +1588,101 @@ Transform Composition::nodeWorldTransform(const CompositionNode& node) const {
     return world;
 }
 
+CompositionNode cloneNodeSpec(const CompositionNode& node) {
+    CompositionNode copy;
+    copy.name = node.name;
+    copy.kind = node.kind;
+    copy.asset = node.asset;
+    copy.parent = node.parent;
+    copy.transform = node.transform;
+    copy.visible = node.visible;
+    copy.emissiveBoost = node.emissiveBoost;
+    copy.roughnessScale = node.roughnessScale;
+    copy.particles = node.particles;
+    copy.procedural = node.procedural;
+    copy.proceduralMaterialAuthored = node.proceduralMaterialAuthored;
+    copy.field = node.field;
+    copy.spline = node.spline;
+    copy.sdf = node.sdf;
+    copy.worldMap = node.worldMap;
+    copy.terrain = node.terrain;
+    copy.terrainMaterial = node.terrainMaterial;
+    copy.ecology = node.ecology;
+    copy.animation = node.animation;
+    // The live transform, not the one the node was born with: duplicating something you have just
+    // moved has to duplicate it where it is now. The parameter is the value the flattened scene
+    // uses, so it is the one that is true.
+    if (node.positionParam != nullptr) {
+        copy.transform.position = node.positionParam->base();
+    }
+    if (node.rotationParam != nullptr) {
+        copy.transform.rotation = quatFromEulerDegrees(node.rotationParam->base());
+    }
+    if (node.scaleParam != nullptr) {
+        copy.transform.scale = node.scaleParam->base();
+    }
+    return copy;
+}
+
+WorldBounds Composition::nodeBounds(const std::string& name) {
+    WorldBounds out;
+    const auto it = std::find_if(nodes_.begin(), nodes_.end(),
+                                 [&](const std::unique_ptr<CompositionNode>& n) { return n->name == name; });
+    if (it == nodes_.end()) {
+        return out;
+    }
+    ensureBuilt(); // ranges_ indexes scene_.entities, and a dirty scene has neither
+    const std::size_t index = static_cast<std::size_t>(std::distance(nodes_.begin(), it));
+    if (index < ranges_.size()) {
+        const NodeRange& range = ranges_[index];
+        for (std::size_t e = range.firstEntity; e < range.firstEntity + range.entityCount && e < scene_.entities.size(); ++e) {
+            const Entity& entity = scene_.entities[e];
+            if (entity.mesh >= scene_.meshes.size()) {
+                continue;
+            }
+            // The *cached* bounds, not MeshData::bounds(). That one scans every vertex, and this is
+            // called for every node on every frame the brush is showing a ghost -- which on a
+            // painted meadow is a few hundred thousand vertex reads per frame for an answer the
+            // scene already memoised against its own mesh version.
+            const auto& [lo, hi] = scene_.meshBounds(entity.mesh);
+            // Eight corners through the entity's own transform: transforming min and max alone is
+            // wrong the moment anything is rotated, and everything a brush places is rotated.
+            for (int corner = 0; corner < 8; ++corner) {
+                const glm::vec3 p((corner & 1) ? hi.x : lo.x, (corner & 2) ? hi.y : lo.y,
+                                  (corner & 4) ? hi.z : lo.z);
+                out.include(transformPoint(entity.transform, p));
+            }
+        }
+        // A procedural object (a scatter layer, a generated plant) draws through its own cloud
+        // rather than through entities. Its instances are not enumerated here; the node's own
+        // world position stands in, which is enough to find and grab it.
+        if (!out.valid && range.proceduralIndex >= 0) {
+            // A box, not a point. A zero-volume AABB is one no ray ever enters, so a single
+            // `include` would leave a procedural object visible in a box selection and impossible to
+            // click -- which is the opposite of "enough to find and grab it".
+            const glm::vec3 p = nodeWorldTransform(**it).position;
+            out.include(p - glm::vec3(0.5f));
+            out.include(p + glm::vec3(0.5f));
+        }
+    }
+    // A group owns no geometry: it is the union of what hangs off it, recursively.
+    if ((*it)->kind == NodeKind::Group) {
+        for (const auto& other : nodes_) {
+            if (other->parent == name) {
+                out.include(nodeBounds(other->name));
+            }
+        }
+        if (!out.valid) {
+            // An empty group still has to be findable, or a group whose contents were all deleted
+            // becomes an object that exists, saves, loads and cannot be selected or removed.
+            const glm::vec3 p = nodeWorldTransform(**it).position;
+            out.include(p - glm::vec3(0.5f));
+            out.include(p + glm::vec3(0.5f));
+        }
+    }
+    return out;
+}
+
 Result<CompositionNode*> Composition::addNode(CompositionNode node) {
     const std::string base = node.name.empty() ? std::string(nodeKindName(node.kind)) : sanitise(node.name);
     node.name = uniqueName(base);
@@ -1676,6 +1775,7 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
         break;
     case NodeKind::Orb:
     case NodeKind::Grid:
+    case NodeKind::Group:
         break;
     }
 
@@ -1689,13 +1789,18 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
 }
 
 bool Composition::removeNode(const std::string& name) {
+    return detachNode(name) != nullptr;
+}
+
+std::unique_ptr<CompositionNode> Composition::detachNode(const std::string& name) {
     const auto it = std::find_if(nodes_.begin(), nodes_.end(),
                                  [&](const std::unique_ptr<CompositionNode>& n) { return n->name == name; });
     if (it == nodes_.end()) {
-        return false;
+        return nullptr;
     }
     unregisterNodeParameters(**it);
     const std::string grandParent = (*it)->parent;
+    std::unique_ptr<CompositionNode> taken = std::move(*it);
     nodes_.erase(it);
     for (auto& other : nodes_) {
         if (other->parent == name) {
@@ -1703,7 +1808,7 @@ bool Composition::removeNode(const std::string& name) {
         }
     }
     dirty_ = true;
-    return true;
+    return taken;
 }
 
 CompositionNode* Composition::findNode(const std::string& name) {
@@ -2177,6 +2282,11 @@ void Composition::ensureBuilt() {
 }
 
 void Composition::rebuild() {
+    // A flatten is the single most expensive thing the editor does on the main thread, it is
+    // triggered by structural edits an artist makes constantly, and until ADR-092 nothing said what
+    // it cost. One line per rebuild, so "why did that stutter" has an answer in the log of the run
+    // it happened in rather than in a profiler nobody was running.
+    const auto rebuildStart = std::chrono::steady_clock::now();
     scene_.meshes.clear();
     scene_.textures.clear();
     scene_.entities.clear();
@@ -2374,6 +2484,13 @@ void Composition::rebuild() {
             range.restRoughness.push_back(0.35f);
             break;
         }
+        case NodeKind::Group:
+            // Nothing. A group is a transform its children read through nodeWorldTransform(), and a
+            // transform that draws is not a group -- an artist who has to hide the handle of every
+            // group they made has been given a chore rather than a tool. Its selection outline and
+            // its gizmo are drawn by the editor, over the frame, where they cannot be rendered into
+            // an offline take by accident.
+            break;
         case NodeKind::Grid: {
             const MeshId mesh = scene_.addMesh(makePlane(12.0f, 48));
             Entity& grid = scene_.addEntity(node.name, mesh);
@@ -2393,6 +2510,25 @@ void Composition::rebuild() {
             // new kind of drawable.
             std::vector<world::GlowCluster> nodeGlow;
             std::unordered_map<std::string, std::shared_ptr<spatial::PointCloud>> habitats;
+            // Everything this terrain produces is a pure function of these five. A rebuild caused by
+            // anything else -- a node placed, a material program added, an HDR swapped -- reuses
+            // what the last one made (ADR-092); a change to any of them moves the key and the
+            // terrain is built again, with nothing to remember to invalidate.
+            CompositionNode& mutableNode = *nodePtr;
+            const std::uint64_t terrainKey =
+                node.worldMap.structuralHash() ^ (node.terrain.structuralHash() * 0x9E3779B97F4A7C15ull) ^
+                (node.ecology.structuralHash() * 0xC2B2AE3D27D4EB4Full) ^
+                (static_cast<std::uint64_t>(ecologyLightGain_ * 1024.0f) * 0x165667B19E3779F9ull) ^
+                (static_cast<std::uint64_t>(ecologyGlowCell_ * 1024.0f) * 0x27D4EB2F165667C5ull);
+            // AVGEN_NO_TERRAIN_CACHE=1 turns the reuse off, so the claim "placing a node used to
+            // cost a whole terrain" can be measured rather than believed. A benchmark whose
+            // baseline has to be reconstructed by reverting a commit is a benchmark nobody re-runs.
+            static const bool cacheDisabled = std::getenv("AVGEN_NO_TERRAIN_CACHE") != nullptr;
+            const bool reuseTerrain = !cacheDisabled && mutableNode.terrainProducts.usable(terrainKey);
+            CompositionNode::TerrainProducts fresh;
+            fresh.hash = terrainKey;
+            bool reusedProducts = false;
+            std::size_t layerIndex = 0;
             for (const world::ScatterLayer& layer : node.ecology.layers) {
                 std::span<const glm::vec3> anchors;
                 if (layer.proximity) {
@@ -2401,7 +2537,18 @@ void Composition::rebuild() {
                         anchors = found->second->positions();
                     }
                 }
-                auto cloud = std::make_shared<spatial::PointCloud>(world::scatter(node.worldMap, layer, anchors, node.ecology.clearances));
+                std::shared_ptr<spatial::PointCloud> cloud;
+                if (reuseTerrain && layerIndex < mutableNode.terrainProducts.clouds.size()) {
+                    // A shared_ptr, so reuse is free rather than a copy of a quarter of a million
+                    // placements. The cloud is immutable once scattered, and the procedural object
+                    // below already holds it by the same pointer.
+                    cloud = mutableNode.terrainProducts.clouds[layerIndex];
+                } else {
+                    cloud = std::make_shared<spatial::PointCloud>(
+                        world::scatter(node.worldMap, layer, anchors, node.ecology.clearances));
+                }
+                ++layerIndex;
+                fresh.clouds.push_back(cloud);
                 habitats.emplace(layer.name, cloud);
                 if (cloud->count() == 0) {
                     log::warn("terrain '{}': scatter '{}' placed nothing", node.name, layer.name);
@@ -2497,15 +2644,17 @@ void Composition::rebuild() {
                         pg.sourceTransform.scale = glm::vec3(layer.height / authored);
                     }
                 }
-                if (layer.emissiveIntensity > 0.0f && ecologyLightGain_ > 0.0f) {
+                if (layer.emissiveIntensity > 0.0f && ecologyLightGain_ > 0.0f && !reuseTerrain) {
                     auto clusters = world::aggregateGlow(*cloud, layer, ecologyGlowCell_,
                                                          pg.variation.seed);
                     log::info("terrain '{}': scatter '{}' glow reduced to {} emitters", node.name,
                               layer.name, clusters.size());
                     nodeGlow.insert(nodeGlow.end(), clusters.begin(), clusters.end());
                 }
-                log::info("terrain '{}': scatter '{}' placed {} instances", node.name, layer.name,
-                          cloud->count());
+                if (!reuseTerrain) {
+                    log::info("terrain '{}': scatter '{}' placed {} instances", node.name, layer.name,
+                              cloud->count());
+                }
                 // The asset's other materials, each an object identical to this one but for its
                 // mesh, its material and its share of the triangle budget. The layer's tint and
                 // emission are applied to each part's *own* colour, which is the whole point: the
@@ -2534,14 +2683,67 @@ void Composition::rebuild() {
                     scene_.procedurals.push_back(std::move(sub));
                 }
             }
-            // The whole world is built here, once. Chunk meshes are static: only which of a chunk's
-            // four meshes is drawn, and whether it is drawn at all, changes per frame.
-            CompositionNode& mutableNode = *nodePtr;
-            mutableNode.glow = std::move(nodeGlow);
+            // The whole world is built here, once -- and, since ADR-092, once *ever* for a given
+            // map and settings rather than once per rebuild. Chunk meshes are static: only which of
+            // a chunk's four meshes is drawn, and whether it is drawn at all, changes per frame.
             const auto buildStart = std::chrono::steady_clock::now();
-            mutableNode.chunks = world::buildTerrain(
-                node.worldMap, node.terrain,
-                [&](std::size_t, int, MeshData&& mesh) { return scene_.addMesh(std::move(mesh)); });
+            // Where this terrain's meshes start in the scene, so cached ids can be stored relative
+            // to it and rebased on the way back in. The absolute ids move whenever anything else in
+            // the scene flattens a mesh before this node, which is exactly what placing an asset
+            // does.
+            const auto meshBase = static_cast<MeshId>(scene_.meshes.size());
+            if (reuseTerrain) {
+                mutableNode.glow = mutableNode.terrainProducts.glow;
+                for (const MeshData& mesh : mutableNode.terrainProducts.meshes) {
+                    scene_.addMesh(MeshData(mesh));
+                }
+                mutableNode.chunks = mutableNode.terrainProducts.chunks;
+                for (world::TerrainChunk& chunk : mutableNode.chunks) {
+                    for (MeshId& id : chunk.meshes) {
+                        if (id != kInvalidMesh && id < mutableNode.terrainProducts.meshes.size()) {
+                            id += meshBase;
+                        }
+                    }
+                    if (chunk.water != kInvalidMesh &&
+                        chunk.water < mutableNode.terrainProducts.meshes.size()) {
+                        chunk.water += meshBase;
+                    }
+                }
+                // And nothing is written back. Copying the cache into `fresh` only to move it
+                // straight back is a deep copy of every terrain mesh -- tens of megabytes -- on
+                // every rebuild, which is a large fraction of what the cache was built to save.
+                reusedProducts = true;
+            } else {
+                mutableNode.glow = std::move(nodeGlow);
+                fresh.glow = mutableNode.glow;
+                mutableNode.chunks = world::buildTerrain(
+                    node.worldMap, node.terrain, [&](std::size_t, int, MeshData&& mesh) {
+                        // Kept as well as installed. A copy of the terrain's meshes is tens of
+                        // megabytes and it buys back a third of a second per edit; the alternative
+                        // is re-meshing a world every time somebody places a flower.
+                        fresh.meshes.push_back(mesh);
+                        return scene_.addMesh(std::move(mesh));
+                    });
+                fresh.chunks = mutableNode.chunks;
+                for (world::TerrainChunk& chunk : fresh.chunks) {
+                    // `TerrainChunk::meshes` is value-initialised, so the slots above `lodLevels`
+                    // hold 0 rather than kInvalidMesh. Subtracting the base from those wraps, and at
+                    // a base of exactly 1 the wrapped value *is* kInvalidMesh -- which the restore
+                    // would then decline to rebase, turning an unused slot into a poisoned one. The
+                    // guard is on being a real id rather than on not being the sentinel.
+                    for (MeshId& id : chunk.meshes) {
+                        if (id != kInvalidMesh && id >= meshBase) {
+                            id -= meshBase;
+                        }
+                    }
+                    if (chunk.water != kInvalidMesh && chunk.water >= meshBase) {
+                        chunk.water -= meshBase;
+                    }
+                }
+            }
+            if (!reusedProducts) {
+                mutableNode.terrainProducts = std::move(fresh);
+            }
             for (std::size_t c = 0; c < mutableNode.chunks.size(); ++c) {
                 const world::TerrainChunk& chunk = mutableNode.chunks[c];
                 Entity& e = scene_.addEntity(fmt::format("{}.chunk{}", node.name, c), chunk.meshes[0]);
@@ -2589,8 +2791,9 @@ void Composition::rebuild() {
             const auto wet = static_cast<std::size_t>(std::count_if(
                 mutableNode.chunks.begin(), mutableNode.chunks.end(),
                 [](const world::TerrainChunk& c) { return c.water != kInvalidMesh; }));
-            log::info("terrain '{}': {} chunks ({} with water), {} triangles at LOD 0, built in {:.0f} ms",
-                      node.name, mutableNode.chunks.size(), wet, triangles, buildMs);
+            log::info("terrain '{}': {} chunks ({} with water), {} triangles at LOD 0, {} in {:.0f} ms",
+                      node.name, mutableNode.chunks.size(), wet, triangles,
+                      reuseTerrain ? "reused" : "built", buildMs);
             break;
         }
         case NodeKind::Particles: {
@@ -2906,6 +3109,11 @@ void Composition::rebuild() {
     // The procedural vector has just been rebuilt from the node list, so every index into it is
     // new. Costs measured against the old one describe objects that no longer exist.
     proceduralRebuild_.clear();
+    log::info("composition '{}': flattened {} node(s) -> {} entities, {} meshes, {} procedurals in {:.1f} ms",
+              name_, nodes_.size(), scene_.entities.size(), scene_.meshes.size(),
+              scene_.procedurals.size(),
+              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - rebuildStart)
+                  .count());
     dirty_ = false;
 }
 
@@ -4003,10 +4211,19 @@ nlohmann::json Composition::toJson() const {
         if (!node.parent.empty()) {
             n["parent"] = node.parent;
         }
-        n["position"] = vecToJson(node.transform.position);
+        // The parameter's base value when there is one, the authored transform when there is not.
+        // Rotation always did this; position and scale did not, so a node moved or resized through
+        // its parameter -- which is the only way the editor can move it, and what a preset writes --
+        // came back where it started the moment the scene was saved and reloaded. Three fields that
+        // disagreed about where a node's transform lives is exactly the class of bug where an edit
+        // silently does nothing (ADR-092).
+        n["position"] = vecToJson(node.positionParam != nullptr ? node.positionParam->base()
+                                                                : node.transform.position);
         n["rotation"] = vecToJson(node.rotationParam != nullptr ? node.rotationParam->base()
                                                                 : eulerDegrees(node.transform.rotation));
-        n["scale"] = vecToJson(node.transform.scale);
+        n["scale"] = vecToJson(node.scaleParam != nullptr ? node.scaleParam->base()
+                                                          : node.transform.scale);
+        
         n["visible"] = node.visible;
         n["emissiveBoost"] = node.emissiveBoost;
         n["roughnessScale"] = node.roughnessScale;

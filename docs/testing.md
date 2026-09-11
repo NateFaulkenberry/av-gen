@@ -103,3 +103,46 @@ raw mouse events the application received). It separates "the widgets are broken
 never arrived", which is how the event-queue regression in `OutputManager::pumpEvents` was found.
 The counter for filtered events also shows when the application's own window filter is dropping
 input meant for the UI.
+
+## Checking the world editor
+
+The editor's *decisions* are ImGui-free and are in `tests/unit/test_world_editor.cpp`: selection,
+groups, transforms, duplication, the ghost's placement validity, the gizmo's drag arithmetic,
+undo/redo, and the round trip through both a scene file and a project. `edit_history.cpp`,
+`world_edit.cpp`, `world_probe.cpp`, `brush.cpp`, `gizmo.cpp` and `world_editor.cpp` are on the unit
+test target for exactly that reason (ADR-092).
+
+The editor's *wiring* is not reachable that way, and this project cannot screenshot an ImGui frame.
+
+```sh
+./build/release/src/avgen --generate examples/recipes/glowmere-low.recipe.json \
+    --ui-script edit --frames 200 --size 1280x800
+```
+
+`--ui-script edit` restores the default layout, arms a brush, paints a stroke across the canvas,
+undoes it, redoes it, clicks to select, groups two objects and undoes that — all of it through real
+SDL events on the process queue, routed by `Window::pumpEvents`, seen by ImGui, gated by the canvas's
+hover state. It prints what the scene did on the way out:
+
+```
+edit: library has 44 assets; armed 'mushroom_red'; 8 nodes to start
+edit: ghost armed=true ... ground=(110.4, -2.5, 93.2) slope 1 deg, 12 instance(s), 12 valid, 0 blocked
+edit: first ghost at (111.6, -2.7, 87.9), 0.61 m tall, footprint 0.30 m, ok
+edit: painted 24 node(s) in one stroke; undo stack 1 deep, top 'Place 24 x mushroom_red'
+edit: after undo, 8 nodes (started at 8)
+edit: after redo, 32 nodes
+```
+
+**The press has to come before the pointer moves, and that is a property of Dear ImGui rather than
+of this arm.** `ImGui_ImplSDL3_UpdateMouseData` replaces the pointer position with the operating
+system's cursor at the top of every frame in which the window is focused and no mouse button is
+held, so a synthetic motion on its own is overwritten before the frame that would have used it.
+While a button is down it leaves the position alone. Any scripted check of the pointer therefore has
+to happen mid-drag; the first version of this arm reported "no ground under the cursor" while the
+physical mouse sat over a panel, and an earlier one opened an example project because its click
+landed in the Assets list of a layout left over from another session.
+
+`AVGEN_EDITOR_TRACE=1` prints the editor's inputs and what it made of them, once per frame: the
+mode, whether the pointer is over the canvas, where in normalised device coordinates, whether the
+button is down, and whether the ghost is armed and found ground. That is the line that separates
+"the brush is broken" from "the pointer never reached the canvas".
