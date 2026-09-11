@@ -1,5 +1,7 @@
 #include "app/engine.hpp"
 
+#include "core/phase_profiler.hpp"
+
 #include <functional>
 #include <map>
 #include <set>
@@ -1652,6 +1654,10 @@ void Engine::update(const FrameTime& time) {
         audioSignals_.publishSilence(bus_);
     }
 
+    const auto allocsNow = [] { return static_cast<std::uint32_t>(core::allocCounters().allocations); };
+    const std::uint32_t allocsAtStart = allocsNow();
+    std::uint32_t allocMark = allocsNow();
+
     // Live control first: MIDI clock messages feed this frame's beat clock, transport commands
     // move the position the time signals read, parameter writes precede modulation.
     controlHub_.update(*this, time);
@@ -1659,6 +1665,8 @@ void Engine::update(const FrameTime& time) {
         sources_.attach(bus_, params_); // new control channels: declare and rebind routes
         rebind();
     }
+    stats_.allocsControl = allocsNow() - allocMark;
+    allocMark = allocsNow();
     updateTimeSignals(time, newFrame);
     music_.publish(bus_); // unconditional: no audio consumed means every music.* signal is false
     updateTimelineClock(time);
@@ -1678,6 +1686,8 @@ void Engine::update(const FrameTime& time) {
         bus_.set(stateProgressSignal_, states_.progress());
         bus_.set(stateIndexSignal_, static_cast<float>(std::max(0, states_.currentIndex())));
     }
+    stats_.allocsSignals = allocsNow() - allocMark;
+    allocMark = allocsNow();
     if (input_ && inputGain_ != nullptr) {
         input_->setGain(inputGain_->value());
     }
@@ -1690,7 +1700,10 @@ void Engine::update(const FrameTime& time) {
             comp->setViewport(viewportWidth_, viewportHeight_);
         }
     }
+    stats_.allocsModulation = allocsNow() - allocMark;
+    allocMark = allocsNow();
     controller_->update(time);
+    stats_.allocsController = allocsNow() - allocMark;
     scene::applyPostParameters(postParams_, post_);
     // ---- physical camera (ADR-037) ---------------------------------------------------------
     // After controller_->update() has placed the camera: the lens, the focus tracker's new
@@ -1739,6 +1752,8 @@ void Engine::update(const FrameTime& time) {
     }
     bus_.clearEvents();
 
+    stats_.allocsOther = (allocsNow() - allocsAtStart) - stats_.allocsControl - stats_.allocsSignals -
+                         stats_.allocsModulation - stats_.allocsController;
     const auto end = std::chrono::steady_clock::now();
     const double micros = std::chrono::duration<double, std::micro>(end - start).count();
     stats_.modulationMicros = stats_.modulationMicros * 0.9 + micros * 0.1;

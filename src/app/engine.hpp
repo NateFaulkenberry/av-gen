@@ -58,6 +58,16 @@ struct EngineStats {
     double analysisHopMicros = 0.0;
     std::uint64_t analysisFrames = 0;
     double modulationMicros = 0.0;
+    // Where the per-frame update's heap allocations come from, counted with the interposed
+    // counters in core/phase_profiler.hpp. An idle editor that allocates hundreds of times a frame
+    // is doing work it did not have to; knowing the total without knowing the source only tells
+    // you that. Counts for the last frame, not an average -- an average of an allocation count
+    // hides the frame that allocated ten thousand times.
+    std::uint32_t allocsControl = 0;   // MIDI/OSC drain, control hub
+    std::uint32_t allocsSignals = 0;   // time signals, music, timeline clock, cues, states
+    std::uint32_t allocsModulation = 0; // parameter finals, timeline automation, routes
+    std::uint32_t allocsController = 0; // the scene controller: composition update and rebuilds
+    std::uint32_t allocsOther = 0;
 };
 
 class Engine {

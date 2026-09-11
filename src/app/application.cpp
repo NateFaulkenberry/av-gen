@@ -1005,6 +1005,26 @@ void stressStep(Engine& engine, Rng& rng, std::uint64_t frame) {
         engine.seekSeconds(engine.durationSeconds()); // jump to the very end
     }
 }
+// AVGEN_SLOW_PHASE_MS=<ms>: a phase that takes longer than this names, in the log, whatever the
+// scripted interaction wrote on that frame. Turning "changing a property costs 200 ms" into the
+// name of the property is otherwise guesswork, and guesswork is how a performance pass ends up
+// optimising something that was never the problem.
+double slowPhaseMs() {
+    static const double threshold = [] {
+        const char* env = std::getenv("AVGEN_SLOW_PHASE_MS");
+        return env != nullptr ? std::atof(env) : 0.0;
+    }();
+    return threshold;
+}
+
+std::string describeWrites(const UiScript& script) {
+    std::string out;
+    for (const std::string& w : script.lastWrites()) {
+        out += w + " ";
+    }
+    return out.empty() ? std::string("(nothing)") : out;
+}
+
 } // namespace
 
 
@@ -1442,7 +1462,12 @@ int Application::runLive() {
     const int kPhJob = prof.phase("render.job");
     const int kPhEvProc = prof.phase("gpu.processEvents");
     const int kPhResize = prof.phase("canvas.resize");
+    const int kPhLatency = prof.phase("input->present ms");
     const int kPhAllocK = prof.phase("# kallocs/frame");
+    const int kPhAllocUi = prof.phase("# allocs ui.build");
+    const int kPhAllocEngine = prof.phase("# allocs engine.upd");
+    const int kPhAllocRecord = prof.phase("# allocs render.rec");
+    const int kPhAllocImgui = prof.phase("# allocs imgui.rec");
     if (auto arms = parseUiScript(options_.uiScript)) {
         uiScript_ = UiScript(*arms);
     }
@@ -1464,12 +1489,14 @@ int Application::runLive() {
             canvas_ = panel_->canvas();
         }
         const auto eventsStart = std::chrono::steady_clock::now();
+        newestInputNs_ = 0;
         auto events = window_->pollEvents([this](const SDL_Event& event) {
             if (uiSelfTestEvents_) {
                 uiEventTypes_[event.type] += 1;
             }
             if (event.type == SDL_EVENT_MOUSE_MOTION) {
                 ++uiMotionEvents_;
+                newestInputNs_ = std::max(newestInputNs_, event.motion.timestamp);
             } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
                 ++uiButtonEvents_;
             } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
@@ -1597,8 +1624,17 @@ int Application::runLive() {
         lastTime = time;
         engine_->setViewport(renderWidth_, renderHeight_);
         {
-            core::PhaseProfiler::Scope scope(prof, kPhEngine);
+            const std::uint64_t allocsBefore = core::allocCounters().allocations;
+            const auto updateStart = std::chrono::steady_clock::now();
             engine_->update(time);
+            prof.count(kPhAllocEngine, static_cast<double>(core::allocCounters().allocations - allocsBefore));
+            const double updateMs =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - updateStart).count();
+            prof.add(kPhEngine, updateMs);
+            if (slowPhaseMs() > 0.0 && updateMs > slowPhaseMs()) {
+                log::warn("slow engine.update {:.1f} ms at frame {}: wrote {}", updateMs, framesRendered,
+                          describeWrites(uiScript_));
+            }
         }
 
         stats.width = renderWidth_;
@@ -1630,11 +1666,11 @@ int Application::runLive() {
         // to the event routing rather than the widgets.
         static const bool uiSelfTest = std::getenv("AVGEN_UI_SELFTEST") != nullptr;
         uiSelfTestEvents_ = uiSelfTest;
-        const auto uiStart = std::chrono::steady_clock::now();
-        imgui_->newFrame();
-        panel_->draw(*engine_, stats);
-        prof.add(kPhUi,
-                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - uiStart).count());
+        {
+            core::PhaseProfiler::AllocScope scope(prof, kPhUi, kPhAllocUi);
+            imgui_->newFrame();
+            panel_->draw(*engine_, stats);
+        }
         if (uiSelfTest && (time.frameIndex % 30) == 0) {
             const ImGuiIO& io = ImGui::GetIO();
             int wx = 0;
@@ -1706,6 +1742,7 @@ int Application::runLive() {
             // The CPU cost of *recording* the frame's commands. Not the GPU's cost of running them:
             // that is gpu::FrameTimeline's, is reported separately, and belongs to the renderer
             // effort rather than to this one.
+            const std::uint64_t recordAllocsBefore = core::allocCounters().allocations;
             const auto recordStart = std::chrono::steady_clock::now();
             if (auto r = renderer_->render(encoder, engine_->scene(), time, finalTarget, &shaderInputs); !r) {
                 log::error("render: {}", r.error().message);
@@ -1714,19 +1751,11 @@ int Application::runLive() {
             const double recordMs =
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - recordStart).count();
             prof.add(kPhRecord, recordMs);
-            // Attribution for a slow record: name the properties the script changed on the frame it
-            // went slow. Guessing which knob costs 14 ms from a distribution is how a performance
-            // pass ends up optimising the wrong thing.
-            static const double slowRecordMs = [] {
-                const char* env = std::getenv("AVGEN_SLOW_RECORD_MS");
-                return env != nullptr ? std::atof(env) : 0.0;
-            }();
-            if (slowRecordMs > 0.0 && recordMs > slowRecordMs && !uiScript_.lastWrites().empty()) {
-                std::string wrote;
-                for (const std::string& w : uiScript_.lastWrites()) {
-                    wrote += w + " ";
-                }
-                log::warn("slow record {:.1f} ms at frame {}: wrote {}", recordMs, framesRendered, wrote);
+            prof.count(kPhAllocRecord,
+                       static_cast<double>(core::allocCounters().allocations - recordAllocsBefore));
+            if (slowPhaseMs() > 0.0 && recordMs > slowPhaseMs()) {
+                log::warn("slow render.record {:.1f} ms at frame {}: wrote {}", recordMs, framesRendered,
+                          describeWrites(uiScript_));
             }
         }
         // Clearing the window is the whole of the main window's present now: the editor draws the
@@ -1746,7 +1775,7 @@ int Application::runLive() {
             encoder.BeginRenderPass(&pass).End();
         }
         {
-            core::PhaseProfiler::Scope scope(prof, kPhImgui);
+            core::PhaseProfiler::AllocScope scope(prof, kPhImgui, kPhAllocImgui);
             imgui_->render(encoder, target);
         }
         {
@@ -1789,6 +1818,16 @@ int Application::runLive() {
         const auto workEnd = std::chrono::steady_clock::now();
         const auto presentStart = workEnd;
         context_->present();
+        if (newestInputNs_ != 0) {
+            // How old the input is by the time the frame carrying it is handed to the compositor.
+            // Not the whole of what a person perceives -- scanout and the compositor's own queue are
+            // past this point -- but it is the part the application controls, and the part that
+            // moves when the loop is reordered.
+            const std::uint64_t nowNs = SDL_GetTicksNS();
+            if (nowNs > newestInputNs_) {
+                prof.add(kPhLatency, static_cast<double>(nowNs - newestInputNs_) / 1.0e6);
+            }
+        }
         prof.add(kPhPresent, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
                                                                        presentStart).count());
         const auto outputsStart = std::chrono::steady_clock::now();
@@ -1833,6 +1872,19 @@ int Application::runLive() {
             fpsStart = frameEnd;
         }
         ++framesRendered;
+        if (framesRendered == 60) {
+            // The one number that decides what the world costs and that nobody quotes: the canvas is
+            // a fraction of the window but at the display's backing scale, so an editor on a Retina
+            // screen renders the world at several times the pixel count of a "1440x900" benchmark.
+            // Logged once, so every run states what it actually rendered.
+            log::info("canvas: world rendered at {}x{} px ({:.2f} Mpx) inside a {}x{} px window (scale {:.2f})",
+                      renderWidth_, renderHeight_,
+                      static_cast<double>(renderWidth_) * renderHeight_ / 1.0e6, window_->pixelWidth(),
+                      window_->pixelHeight(), window_->pixelScale());
+            const EngineStats& es = engine_->stats();
+            log::info("engine.update allocations: control={} signals={} modulation={} controller={} other={}",
+                      es.allocsControl, es.allocsSignals, es.allocsModulation, es.allocsController, es.allocsOther);
+        }
         if (framesRendered % 120 == 0) {
             const auto& f = engine_->latestFrame();
             log::debug("frame {} t={:.2f}s fps={:.1f} cpu={:.2f}ms gpu={:.2f}ms bass={:.2f} mid={:.2f} treble={:.2f} scale={:.2f}",

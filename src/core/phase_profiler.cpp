@@ -42,6 +42,16 @@ int PhaseProfiler::phase(std::string_view name) {
     return static_cast<int>(count_++);
 }
 
+PhaseProfiler::AllocScope::AllocScope(PhaseProfiler& profiler, int msIndex, int allocIndex)
+    : profiler_(&profiler), msIndex_(msIndex), allocIndex_(allocIndex),
+      allocs_(allocCounters().allocations), start_(std::chrono::steady_clock::now()) {}
+
+PhaseProfiler::AllocScope::~AllocScope() {
+    profiler_->add(msIndex_,
+                   std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start_).count());
+    profiler_->count(allocIndex_, static_cast<double>(allocCounters().allocations - allocs_));
+}
+
 void PhaseProfiler::beginFrame() { current_.fill(0.0); }
 
 void PhaseProfiler::endFrame(double frameMs) {

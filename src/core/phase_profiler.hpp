@@ -76,6 +76,24 @@ public:
         std::chrono::steady_clock::time_point start_;
     };
 
+    // Times a phase and counts the heap allocations made inside it, into two separate phase
+    // slots. Where a frame's allocations come from is otherwise a question only a sampling
+    // profiler can answer, and the answer ("somewhere in ImGui") is not actionable.
+    class AllocScope {
+    public:
+        AllocScope(PhaseProfiler& profiler, int msIndex, int allocIndex);
+        ~AllocScope();
+        AllocScope(const AllocScope&) = delete;
+        AllocScope& operator=(const AllocScope&) = delete;
+
+    private:
+        PhaseProfiler* profiler_;
+        int msIndex_;
+        int allocIndex_;
+        std::uint64_t allocs_;
+        std::chrono::steady_clock::time_point start_;
+    };
+
     struct Summary {
         double min = 0.0;
         double median = 0.0;

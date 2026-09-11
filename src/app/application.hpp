@@ -137,6 +137,11 @@ private:
     std::uint64_t uiButtonEvents_ = 0;
     std::uint64_t uiFilteredEvents_ = 0;
     bool uiSelfTestEvents_ = false;
+    // The newest input event consumed this frame, on SDL's nanosecond clock. Subtracting it from
+    // the clock at present time gives input-to-present latency, which is the number "the UI feels
+    // sluggish" is actually about -- a frame rate says how often the picture changes, not how old
+    // the picture is. Zero when no input arrived this frame.
+    std::uint64_t newestInputNs_ = 0;
     std::map<std::uint32_t, std::uint64_t> uiEventTypes_;
     // Offline rendering: settings from the project + CLI overrides; a job runs to completion
     // headless, or a few frames per UI frame in the live app.
@@ -234,6 +239,7 @@ private:
     // Puts the camera in free mode, because position and target are ignored in orbit mode and a
     // gesture that silently moves nothing is indistinguishable from a dead input.
     void ensureFreeCamera();
+    void handleInputEvent(const SDL_Event& event);
     void handleViewportEvent(const SDL_Event& event);
     // Scripted mouse input for checking the viewport end to end; see the definition.
     void runViewportProbe(int frameIndex);
