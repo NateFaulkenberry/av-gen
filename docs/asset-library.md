@@ -20,12 +20,14 @@ AI discovery uses the same catalog as the future Asset Library:
 ```text
 asset.list  { query?, limit? }
 asset.search { query, limit? }
+asset.get { id }
 ```
 
 Each record includes a stable session identity such as `asset://builtin/models/tree.glb` or
 `asset://project/models/my-tree.glb`, source ownership, type, name, physical path and basic tags.
 The physical path is returned for tool execution, but scene authoring should prefer the stable ID.
-Search is case-insensitive over ID, name and type.
+Search is case-insensitive over ID, name and type. `asset.get` resolves one stable ID to the same
+authoritative record, so AI scene authoring does not rely on ambiguous filenames after import.
 
 Project visual import is available to the AI through:
 

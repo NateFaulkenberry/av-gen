@@ -883,6 +883,24 @@ void registerParameterTools(ToolRegistry& registry) {
             return ToolResult::ok(json{{"assets", std::move(out)}}, fmt::format("{} matching asset(s)", found.size()));
         });
 
+    add(registry, "asset.get", "Get asset metadata",
+        "Resolve one stable asset ID from asset.list or asset.search and return its ownership, type, path and tags.",
+        schema::object({{"id", schema::string("Stable asset ID")}}, {"id"}),
+        readOnly(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string id = args.at("id").get<std::string>();
+            const auto catalog = assets::catalogAssets(ctx.contentRoots(), ctx.engine().projectPath().parent_path());
+            if (!catalog) return ToolResult::failure(ToolErrorCode::Unavailable, catalog.error().message);
+            for (const auto& asset : *catalog) {
+                if (asset.id != id) continue;
+                return ToolResult::ok(json{{"id", asset.id}, {"name", asset.name}, {"type", asset.type},
+                                           {"source", assets::assetSourceName(asset.source)},
+                                           {"path", asset.path.string()}, {"tags", asset.tags}},
+                                      "asset metadata");
+            }
+            return ToolResult::failure(ToolErrorCode::NotFound, "asset ID is not visible in this session");
+        });
+
     add(registry, "asset.import", "Import an asset into the project",
         "Copy a supported model, environment or texture into the open project's assets directory. The source must be reported by asset.list_importable or be inside an authorized content root; the original is never modified. Returns a stable project asset ID and copied dependencies.",
         schema::object({{"file", schema::string("Path to a reachable model, environment or texture")}}),
