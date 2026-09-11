@@ -108,9 +108,9 @@
    "name": "visitor",
    "assembly": "visitor-craft",
    "position": [
-    29.0,
-    47.548846,
-    -126.8
+    -45.0,
+    30.25,
+    185.0
    ],
    "yaw": 0.0,
    "scale": 1.0,
@@ -1490,9 +1490,9 @@
    "kind": "gltf",
    "asset": "../../assets/imported/alien.gltf",
    "position": [
-    6.0,
-    -8.0,
-    -30.0
+    165.0,
+    23.08,
+    20.0
    ],
    "scale": [
     0.08,
@@ -1512,9 +1512,9 @@
    "name": "visitor",
    "kind": "procedural",
    "position": [
-    29.0,
-    49.0,
-    -126.8
+    -45.0,
+    31.7,
+    185.0
    ],
    "rotation": [
     3.5,
@@ -1798,9 +1798,9 @@
       "elder",
       "beacon-grove"
      ],
-     "observeChance": 0.26,
-     "minDwell": 2.2,
-     "maxDwell": 6.0,
+     "observeChance": 0.07,
+     "minDwell": 1.0,
+     "maxDwell": 2.8,
      "alertThreshold": 0.32,
      "reactionDecay": 1.2
     },
@@ -1812,8 +1812,8 @@
      "arrive": 2.5,
      "minRange": 6.0,
      "maxRange": 14.0,
-     "pauseMin": 2.5,
-     "pauseMax": 8.0,
+     "pauseMin": 0.5,
+     "pauseMax": 2.2,
      "homeRadius": 16.0
     },
     {

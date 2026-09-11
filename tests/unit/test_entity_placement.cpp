@@ -191,18 +191,19 @@ TEST_CASE("the craft hangs where the world says it may", "[entity][placement]") 
         }
     }
 
-    SECTION("it is in frame, and it is not on top of the subject") {
+    SECTION("it is nowhere near the opening frame") {
+        // This asked the opposite until the showcase changed: the craft had to be wholly inside the
+        // frame, reading as a second subject beside the elder. The opening shot is now the elder
+        // alone, and everything else -- the craft, the other three landmarks, the walker -- is
+        // somewhere else in the valley to be found. So the requirement inverts rather than relaxes:
+        // no part of the craft may touch the frame.
         const glm::vec3 ndc = shot.project(craft.position);
         INFO("ndc " << ndc.x << ", " << ndc.y << " at " << ndc.z << " m");
-        CHECK(ndc.z > 0.0f);
         const float r = shot.screenRadius(craft.position, craft.radius);
-        // Wholly inside the frame with a margin, so no part of it is cut by an edge.
-        CHECK(std::abs(ndc.x) + r * (1.0f / shot.aspect) < 0.92f);
-        CHECK(std::abs(ndc.y) + r < 0.92f);
-        // Big enough to read as an object rather than a speck: at least 3% of the frame height.
-        CHECK(r > 0.03f);
-        // ... and not so big it takes the frame off the elder, which is what this shot is about.
-        CHECK(r < 0.20f);
+        const bool behindCamera = ndc.z <= 0.0f;
+        const bool offFrame = std::abs(ndc.x) - r * (1.0f / shot.aspect) > 1.0f ||
+                              std::abs(ndc.y) - r > 1.0f;
+        CHECK((behindCamera || offFrame));
 
         // Clear of the elder in the frame. The elder's crown is the scene's declared focal point.
         const world::HeroPoint* elder = nullptr;
@@ -217,7 +218,13 @@ TEST_CASE("the craft hangs where the world says it may", "[entity][placement]") 
         const float elderR = shot.screenRadius(crown, elder->radius);
         const glm::vec2 separation((ndc.x - elderNdc.x) * shot.aspect, ndc.y - elderNdc.y);
         INFO("elder ndc " << elderNdc.x << ", " << elderNdc.y << " r " << elderR << "; craft r " << r);
-        CHECK(glm::length(separation) > elderR + r);
+        // Only a question worth asking while the craft is in front of the camera. Behind it,
+        // `project` returns a degenerate point and this would compare the elder against the origin
+        // -- failing for a craft that is not on screen at all, which is the case it should pass
+        // most easily.
+        if (ndc.z > 0.0f) {
+            CHECK(glm::length(separation) > elderR + r);
+        }
     }
 
     SECTION("it is silhouetted against the sky") {
