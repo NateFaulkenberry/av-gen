@@ -153,9 +153,10 @@ tone mapping and composition overlay.
 ### P1: water and terrain boundaries
 
 - [x] Correct water alpha convention: `shaders/water.wgsl` now returns non-premultiplied RGB with
-  alpha, matching `water_renderer.cpp`'s `SrcAlpha/OneMinusSrcAlpha` blend. An image-level shoreline
-  regression is still desirable.
-- [ ] Build a minimal water QA scene with flat/steep/shallow/deep/angled shore cases and camera
+  alpha, matching `water_renderer.cpp`'s `SrcAlpha/OneMinusSrcAlpha` blend.
+- [x] Minimal native water image regression covers compositing over an opaque bed, deterministic
+  repeat rendering and a distinct no-water frame. Broader shoreline angle/camera cases remain open.
+- [ ] Build a larger water QA scene with flat/steep/shallow/deep/angled shore cases and camera
   views above, below, grazing and near-parallel to the surface.
 - [ ] Visualize water geometry mask, opaque linear depth, reconstructed thickness, shoreline fade,
   foam mask and water object ID. Confirm all effects are zero outside water geometry.

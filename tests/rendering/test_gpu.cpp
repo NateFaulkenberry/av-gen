@@ -5,6 +5,7 @@
 #include "gpu/render_target.hpp"
 #include "gpu/shader_library.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -68,6 +69,42 @@ scene::Scene cubeScene() {
     key.direction = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.6f));
     key.intensity = 3.0f;
     s.addLight(key);
+    return s;
+}
+
+scene::Scene waterTestScene() {
+    scene::Scene s;
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.environment.showSkybox = false;
+    s.environment.sky.enabled = false;
+    s.environment.environmentIntensity = 0.0f;
+    s.camera.position = {0.0f, 2.5f, 4.5f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+
+    const auto ground = s.addMesh(scene::makePlane(3.0f, 8));
+    auto& bed = s.addEntity("bed", ground);
+    bed.transform.position = {0.0f, -0.35f, 0.0f};
+    bed.material.baseColor = {0.05f, 0.2f, 0.08f};
+    bed.material.roughness = 1.0f;
+
+    const auto surface = s.addMesh(scene::makePlane(3.0f, 8));
+    auto& water = s.addEntity("water", surface);
+    water.style = scene::MeshStyle::Water;
+    water.material.program = "qaWater";
+    scene::WaterSurface qa;
+    qa.program = "qaWater";
+    qa.fastestFlow = 0.4f;
+    qa.settings.shallow = 10.0f;
+    qa.settings.shallowColor = {0.15f, 0.65f, 0.9f};
+    qa.settings.deepColor = qa.settings.shallowColor;
+    qa.settings.clarity = 10.0f;
+    qa.settings.maxOpacity = 0.55f;
+    qa.settings.fresnel = 0.0f;
+    qa.settings.reflection = 0.0f;
+    qa.settings.specular = 0.0f;
+    qa.settings.ripple = 0.0f;
+    qa.settings.foam = 0.0f;
+    s.waters.push_back(qa);
     return s;
 }
 
@@ -222,6 +259,27 @@ TEST_CASE("SceneRenderer renders a lit cube deterministically", "[gpu][renderer]
         auto returned = renderer.renderToImage(scene, time, 96, 64);
         REQUIRE(returned.has_value());
         CHECK(gpu::hashImage(*returned) == gpu::hashImage(*first));
+        CHECK(ctx->errorCount() == 0);
+    }
+
+    TEST_CASE("water composites over an opaque bed and remains deterministic", "[gpu][renderer][water]") {
+        auto ctx = makeContext();
+        auto shaders = makeShaders(*ctx);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        auto scene = waterTestScene();
+        FrameTime time{};
+        auto withWater = renderer.renderToImage(scene, time, 128, 96);
+        REQUIRE(withWater.has_value());
+        auto repeated = renderer.renderToImage(scene, time, 128, 96);
+        REQUIRE(repeated.has_value());
+        CHECK(gpu::hashImage(*withWater) == gpu::hashImage(*repeated));
+        CHECK(withWater->pixel(64, 48)[2] > withWater->pixel(64, 48)[0]);
+
+        scene.entities[1].cameraCulled = true;
+        auto withoutWater = renderer.renderToImage(scene, time, 128, 96);
+        REQUIRE(withoutWater.has_value());
+        CHECK(gpu::hashImage(*withWater) != gpu::hashImage(*withoutWater));
         CHECK(ctx->errorCount() == 0);
     }
 
