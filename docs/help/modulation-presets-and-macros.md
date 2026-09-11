@@ -8,7 +8,6 @@ tags: preset, macro, morph, blend, snapshot, world macro
 keywords: how do i save a look; blend between two looks; what is a macro; one knob many parameters; preset morph
 related: modulation/parameters, modulation/sources, sequencer/timeline-automation
 features: panel.modulation, panel.world
-parameters: macros/energy
 ---
 
 # Presets and Macros

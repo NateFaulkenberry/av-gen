@@ -7,6 +7,7 @@
 // that passes its unit tests over three synthetic topics and ships an empty panel is exactly the
 // failure this project keeps repeating.
 
+#include "app/engine.hpp"
 #include "help/api.hpp"
 #include "help/app_surface.hpp"
 #include "help/database.hpp"
@@ -653,4 +654,59 @@ TEST_CASE("Every shortcut in the reference is bound, and every binding is in the
         INFO("bound at " << bound.sourceRef << ": " << bound.keys);
         CHECK(db.getShortcut(bound.keys) != nullptr);
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// §34, enforced on the one thing a source scan cannot see
+// ---------------------------------------------------------------------------------------------
+
+TEST_CASE("Every parameter path the documentation cites is one the engine registers") {
+    if (!std::filesystem::is_directory(contentDir())) {
+        SKIP("docs/help is not present in this checkout");
+    }
+    help::HelpDatabase db;
+    REQUIRE(db.loadDirectory(contentDir()).has_value());
+
+    // A scan of the source cannot know these: most parameters are registered when a scene loads,
+    // so the only honest source is a running engine. The union of what two engines register --
+    // one on the built-in orb scene, one on a composition -- is the set a topic may cite. Two
+    // rather than one because the groups are disjoint: `orb/` exists only in the first and
+    // `env/`, `scene/volume*` and the per-node groups only in the second.
+    help::AppSurface surface;
+    surface.coverage.filesRead = 1;
+    const auto collect = [&surface](app::Engine& engine) {
+        for (const params::IParameter* param : engine.params().ordered()) {
+            if (std::ranges::find(surface.parameterPaths, param->path()) == surface.parameterPaths.end()) {
+                surface.parameterPaths.push_back(param->path());
+            }
+        }
+    };
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        engine.loadOrbScene();
+        collect(engine);
+    }
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        const auto scene = sourceRoot() / "examples" / "chamber" / "chamber.scene.json";
+        if (std::filesystem::exists(scene)) {
+            const auto loaded = engine.loadComposition(scene);
+            if (!loaded) {
+                FAIL(loaded.error().message);
+            }
+            collect(engine);
+        }
+    }
+    REQUIRE(surface.parameterPaths.size() > 40);
+
+    std::string missing;
+    for (const help::HelpDocument& doc : db.documents()) {
+        for (const std::string& path : doc.parameters) {
+            if (std::ranges::find(surface.parameterPaths, path) == surface.parameterPaths.end()) {
+                missing += "\n  " + doc.id + " cites '" + path + "'";
+            }
+        }
+    }
+    INFO("paths the engine does not register:" << missing);
+    CHECK(missing.empty());
 }

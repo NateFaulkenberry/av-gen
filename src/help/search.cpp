@@ -174,17 +174,27 @@ float KeywordSearch::inverseDocumentFrequency(const std::vector<Posting>& postin
 }
 
 std::vector<const std::vector<KeywordSearch::Posting>*> KeywordSearch::prefixPostings(std::string_view prefix) const {
-    std::vector<const std::vector<Posting>*> out;
     if (prefix.size() < 3) {
-        return out;
+        return {};
     }
+    // Collected, then ordered, then capped -- not capped while iterating. The postings live in an
+    // unordered_map, so stopping at the first 24 would make *which* 24 depend on hash order, and a
+    // score that depends on hash order is a score that moves when an unrelated topic is added.
+    std::vector<std::pair<std::string_view, const std::vector<Posting>*>> matches;
     for (const auto& [term, postings] : postings_) {
         if (term.size() > prefix.size() && std::string_view(term).starts_with(prefix)) {
-            out.push_back(&postings);
-            if (out.size() >= 24) { // a prefix that matches half the vocabulary is not a search
-                break;
-            }
+            matches.emplace_back(term, &postings);
         }
+    }
+    std::ranges::sort(matches, {}, &std::pair<std::string_view, const std::vector<Posting>*>::first);
+    constexpr std::size_t kMaxExpansions = 24; // a prefix matching half the vocabulary is not a search
+    if (matches.size() > kMaxExpansions) {
+        matches.resize(kMaxExpansions);
+    }
+    std::vector<const std::vector<Posting>*> out;
+    out.reserve(matches.size());
+    for (const auto& [term, postings] : matches) {
+        out.push_back(postings);
     }
     return out;
 }
