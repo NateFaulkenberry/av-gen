@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cctype>
 #include <system_error>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace avgen::assets {
 namespace {
@@ -44,6 +46,29 @@ Result<std::vector<AssetRecord>> catalogAssets(const std::vector<std::filesystem
     std::error_code ec;
     const auto projectAssets = projectRoot.empty() ? std::filesystem::path{} :
         std::filesystem::weakly_canonical(projectRoot / "assets", ec);
+    std::map<std::string, AssetRecord> manifestRecords;
+    if (!projectRoot.empty()) {
+        std::ifstream in(projectRoot / "assets" / "manifest.json");
+        if (in) {
+            const nlohmann::json manifest = nlohmann::json::parse(in, nullptr, false);
+            if (manifest.is_object() && manifest.value("format", std::string{}) == "avgen-project-assets" &&
+                manifest["assets"].is_array()) {
+                for (const auto& item : manifest["assets"]) {
+                    if (!item.is_object() || !item.value("id", std::string{}).starts_with("asset://project/")) continue;
+                    const std::filesystem::path path = std::filesystem::weakly_canonical(projectRoot / item.value("path", std::string{}), ec);
+                    if (ec || !std::filesystem::is_regular_file(path, ec)) continue;
+                    AssetRecord record;
+                    record.id = item.value("id", std::string{});
+                    record.name = path.stem().string();
+                    record.type = item.value("type", std::string{});
+                    record.source = AssetSource::Project;
+                    record.path = path;
+                    record.tags.push_back(record.type);
+                    manifestRecords[path.string()] = std::move(record);
+                }
+            }
+        }
+    }
     for (const auto& root : contentRoots) {
         const auto canonicalRoot = std::filesystem::weakly_canonical(root, ec);
         if (ec || !std::filesystem::is_directory(canonicalRoot, ec)) continue;
@@ -51,6 +76,7 @@ Result<std::vector<AssetRecord>> catalogAssets(const std::vector<std::filesystem
                  canonicalRoot, std::filesystem::directory_options::skip_permission_denied, ec)) {
             if (records.size() >= limit) break;
             if (!entry.is_regular_file(ec)) continue;
+            if (entry.path().filename() == "manifest.json") continue;
             const std::string type = typeFor(lower(entry.path().extension().string()));
             if (type.empty()) continue;
             const auto path = std::filesystem::weakly_canonical(entry.path(), ec);
@@ -63,12 +89,15 @@ Result<std::vector<AssetRecord>> catalogAssets(const std::vector<std::filesystem
             }
             const auto relative = path.lexically_relative(canonicalRoot).generic_string();
             AssetRecord record;
+            if (const auto manifest = manifestRecords.find(path.string()); manifest != manifestRecords.end()) {
+                record = manifest->second;
+            }
             record.source = source;
-            record.type = type;
+            if (record.type.empty()) record.type = type;
             record.path = path;
-            record.name = path.stem().string();
-            record.id = "asset://" + sourcePrefix(source) + "/" + relative;
-            record.tags.push_back(type);
+            if (record.name.empty()) record.name = path.stem().string();
+            if (record.id.empty()) record.id = "asset://" + sourcePrefix(source) + "/" + relative;
+            if (record.tags.empty()) record.tags.push_back(record.type);
             records.push_back(std::move(record));
         }
     }

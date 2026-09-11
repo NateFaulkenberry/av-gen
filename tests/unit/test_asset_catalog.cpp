@@ -16,6 +16,8 @@ TEST_CASE("asset catalog distinguishes built-in and project assets", "[assets][c
     std::ofstream(root / "builtin" / "models" / "tree.glb") << "fixture";
     std::ofstream(root / "project" / "assets" / "models" / "custom.glb") << "fixture";
     std::ofstream(root / "project" / "assets" / "moon.hdr") << "fixture";
+    std::ofstream(root / "project" / "assets" / "manifest.json")
+        << R"({"format":"avgen-project-assets","version":1,"assets":[{"id":"asset://project/models/custom-identity","type":"model","path":"assets/models/custom.glb","sha256":"fixture"}]})";
 
     const auto records = assets::catalogAssets({root / "builtin", root / "project"}, root / "project");
     REQUIRE(records.has_value());
@@ -32,7 +34,7 @@ TEST_CASE("asset catalog distinguishes built-in and project assets", "[assets][c
     CHECK(find("tree")->source == assets::AssetSource::Builtin);
     CHECK(find("custom")->source == assets::AssetSource::Project);
     CHECK(find("moon")->type == "environment");
-    CHECK(find("custom")->id.rfind("asset://project/", 0) == 0);
+    CHECK(find("custom")->id == "asset://project/models/custom-identity");
     CHECK(find("tree")->id.rfind("asset://builtin/", 0) == 0);
 
     const auto matches = assets::searchAssets(*records, "custom");
