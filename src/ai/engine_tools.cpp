@@ -9,7 +9,10 @@
 #include "core/log.hpp"
 #include "params/serialization.hpp"
 #include "scene/composition.hpp"
+#include "entity/entity.hpp"
+#include "entity/field.hpp"
 #include "seq/sequence.hpp"
+#include "seq/layers.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -943,6 +946,329 @@ void registerParameterTools(ToolRegistry& registry) {
             return ToolResult::ok(std::move(out),
                                   fmt::format("imported {} ({:.1f} s)",
                                               target.filename().string(), *duration));
+        });
+
+    // ---- authoring the piece ----------------------------------------------------------------------
+    //
+    // `sequence.get_state` reads the piece; these three write it. Each edits `Engine::sequence()`
+    // and then re-installs, because a sequence is a *value* and installing is what turns it into
+    // timeline tracks and overlay layers. Re-installing is safe to do on every edit: it is
+    // idempotent by design -- every track and layer the previous install owned is replaced, never
+    // stacked -- which is what makes a per-edit bake the right shape here rather than a separate
+    // "commit" the assistant could forget.
+    //
+    // Each reports the install's `unresolved` list. A track whose target parameter does not exist
+    // evaluates and writes nothing, which looks exactly like a scene that is not reacting, and it
+    // is the one kind of problem that must never be left to the log alone.
+    add(registry, "sequence.add_marker", "Add a marker",
+        "Put a section or cue marker on the piece. Sections are the song's structure -- INTRO, "
+        "VERSE, CHORUS -- and are what a shot is placed against; cues are a point an author wants "
+        "to find again. Beat markers are not authored here: they come from the analysis.",
+        schema::object({{"time", schema::number("Seconds from the start of the piece")},
+                        {"name", schema::string("What this moment is, e.g. CHORUS")},
+                        {"kind", schema::string("section (default) or cue")}}),
+        sessionWrite(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            if (!args.contains("time") || !args.at("time").is_number()) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "a marker needs a time");
+            }
+            const std::string name = args.value("name", std::string{});
+            if (name.empty()) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "a marker needs a name");
+            }
+            const std::string kindName = args.value("kind", std::string("section"));
+            const auto kind = seq::markerKindFromName(kindName);
+            if (!kind || *kind == seq::MarkerKind::Beat) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                           fmt::format("'{}' is not a marker an author sets", kindName),
+                                           "use section or cue; beat markers come from the analysis");
+            }
+            app::Engine& engine = ctx.engine();
+            seq::Marker marker;
+            marker.timeSeconds = std::max(args.at("time").get<double>(), 0.0);
+            marker.name = name;
+            marker.kind = *kind;
+            engine.sequence().markers.push_back(marker);
+            std::stable_sort(engine.sequence().markers.begin(), engine.sequence().markers.end(),
+                             [](const seq::Marker& a, const seq::Marker& b) {
+                                 return a.timeSeconds < b.timeSeconds;
+                             });
+            const auto report = engine.installSequence();
+            if (!report) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, report.error().message);
+            }
+            return ToolResult::ok(json{{"name", marker.name},
+                                       {"timeSeconds", marker.timeSeconds},
+                                       {"kind", seq::markerKindName(marker.kind)},
+                                       {"markers", engine.sequence().markers.size()}},
+                                  fmt::format("marker '{}' at {:.2f}s", marker.name, marker.timeSeconds));
+        });
+
+    add(registry, "sequence.add_shot", "Add a shot",
+        "Add a shot to the piece: a span of time with one visual setup. `scene` names a scene slot "
+        "the sequence already has; leaving it empty inherits the previous shot's. The camera is "
+        "left to inherit unless a preset is named, because a shot with no camera holds the last "
+        "one, which is what a cut between two angles of the same setup means.",
+        schema::object({{"name", schema::string("Shot name")},
+                        {"start", schema::number("Seconds from the start of the piece")},
+                        {"duration", schema::number("Seconds (default 8)")},
+                        {"scene", schema::string("Scene slot id; empty inherits the previous shot's")}}),
+        sessionWrite(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string name = args.value("name", std::string{});
+            if (name.empty()) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "a shot needs a name");
+            }
+            app::Engine& engine = ctx.engine();
+            seq::Sequence& piece = engine.sequence();
+            if (std::ranges::any_of(piece.shots, [&name](const seq::Shot& s) { return s.name == name; })) {
+                return ToolResult::failure(ToolErrorCode::Conflict,
+                                           fmt::format("a shot called '{}' already exists", name));
+            }
+            const std::string slot = args.value("scene", std::string{});
+            if (!slot.empty() &&
+                !std::ranges::any_of(piece.scenes,
+                                     [&slot](const seq::SceneSlot& s) { return s.id == slot; })) {
+                return ToolResult::failure(ToolErrorCode::NotFound,
+                                           fmt::format("no scene slot called '{}'", slot),
+                                           "sequence.get_state lists the slots this piece has");
+            }
+            seq::Shot shot;
+            shot.name = name;
+            shot.startSeconds = std::max(args.value("start", 0.0), 0.0);
+            shot.durationSeconds = std::max(args.value("duration", 8.0), 0.05);
+            shot.scene = slot;
+            piece.shots.push_back(shot);
+            std::stable_sort(piece.shots.begin(), piece.shots.end(),
+                             [](const seq::Shot& a, const seq::Shot& b) {
+                                 return a.startSeconds < b.startSeconds;
+                             });
+            const auto report = engine.installSequence();
+            if (!report) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, report.error().message);
+            }
+            json out{{"name", shot.name},
+                     {"startSeconds", shot.startSeconds},
+                     {"endSeconds", shot.endSeconds()},
+                     {"scene", shot.scene},
+                     {"shots", piece.shots.size()},
+                     {"durationSeconds", piece.duration()}};
+            if (!report->unresolved.empty()) {
+                out["unresolved"] = report->unresolved;
+                out["unresolvedNote"] = "these tracks name parameters this scene does not have; "
+                                        "they animate nothing";
+            }
+            if (!report->warnings.empty()) {
+                out["warnings"] = report->warnings;
+            }
+            return ToolResult::ok(std::move(out),
+                                  fmt::format("shot '{}' at {:.2f}s", shot.name, shot.startSeconds));
+        });
+
+    add(registry, "sequence.add_overlay", "Add a text overlay",
+        "Put timed text over the frame -- a title, a lyric line, a placeholder to fill in later. "
+        "This is the 2D composition layer system (ADR-083) reached through the sequence, so the "
+        "text is an overlay cue that becomes a real layer on install, editable afterwards like any "
+        "other.",
+        schema::object({{"text", schema::string("The line to show")},
+                        {"start", schema::number("Seconds from the start of the piece")},
+                        {"end", schema::number("Seconds; must be after start")},
+                        {"id", schema::string("Stable id; derived from the text when omitted")},
+                        {"style", schema::string("A named style the composition owns")}}),
+        sessionWrite(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string text = args.value("text", std::string{});
+            if (text.empty()) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "an overlay needs text");
+            }
+            const double start = std::max(args.value("start", 0.0), 0.0);
+            const double end = args.value("end", start + 3.0);
+            if (!(end > start)) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                           "an overlay must end after it starts");
+            }
+            app::Engine& engine = ctx.engine();
+            seq::Sequence& piece = engine.sequence();
+            seq::OverlayCue cue;
+            cue.id = args.value("id", std::string{});
+            if (cue.id.empty()) {
+                cue.id = fmt::format("overlay-{}", piece.overlays.size() + 1);
+            }
+            if (std::ranges::any_of(piece.overlays,
+                                    [&cue](const seq::OverlayCue& o) { return o.id == cue.id; })) {
+                return ToolResult::failure(ToolErrorCode::Conflict,
+                                           fmt::format("an overlay with id '{}' already exists", cue.id));
+            }
+            cue.kind = seq::OverlayKind::Text;
+            cue.content = text;
+            cue.style = args.value("style", std::string{});
+            cue.startSeconds = start;
+            cue.endSeconds = end;
+            piece.overlays.push_back(cue);
+            const auto report = engine.installSequence();
+            if (!report) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, report.error().message);
+            }
+            json out{{"id", cue.id},
+                     {"text", cue.content},
+                     {"startSeconds", cue.startSeconds},
+                     {"endSeconds", cue.endSeconds},
+                     {"overlays", piece.overlays.size()},
+                     {"layersRealised", report->overlays.size()}};
+            if (report->overlays.empty()) {
+                out["warning"] = "the cue was added but became no layer: this session has no "
+                                 "composition for it to live in";
+            }
+            return ToolResult::ok(std::move(out),
+                                  fmt::format("overlay '{}' {:.2f}-{:.2f}s", cue.id, start, end));
+        });
+
+    // ---- entities and the fields that govern them -------------------------------------------------
+    //
+    // The engine has had all of this since ADR-088 and ADR-097 and none of it was reachable from a
+    // prompt. §18 of the bootstrap brief asks for a "proximity influence prototype"; what exists is
+    // the finished thing -- a field is a position, a radius, a falloff and a strength, and it scales
+    // the depth of the reactions an entity already has, so a character walking past a lamp makes
+    // the lamp answer the music more strongly without a second reactivity system.
+    add(registry, "entity.list", "List entities",
+        "The entities in the scene: what each one drives, the behaviours it runs, how many reactions "
+        "it carries, and the profile it was built from. Reactions are what a music field scales, so "
+        "an entity with none is one a field cannot affect.",
+        noArgs(), readOnly(),
+        [](const json&, ToolContext& ctx) -> ToolResult {
+            const scene::Composition* comp = ctx.engine().composition();
+            if (comp == nullptr) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "this session has no composition");
+            }
+            json list = json::array();
+            for (const entity::EntityDesc& e : comp->entities()) {
+                json behaviours = json::array();
+                for (const auto& b : e.behaviors) {
+                    behaviours.push_back(b.kind);
+                }
+                list.push_back(json{{"name", e.name},
+                                    {"node", e.driven()},
+                                    {"profile", e.profile},
+                                    {"behaviours", std::move(behaviours)},
+                                    {"reactions", e.reactions.size()},
+                                    {"sockets", e.sockets.size()}});
+            }
+            const auto count = list.size();
+            return ToolResult::ok(json{{"entities", std::move(list)}},
+                                  fmt::format("{} entit{}", count, count == 1 ? "y" : "ies"));
+        });
+
+    add(registry, "field.list", "List music influence fields",
+        "The fields in the scene and what each resolved to: where it is, how far it reaches, which "
+        "entities it governs, and -- the part worth reading -- whether it follows something baked or "
+        "something live. A field on a baked actor is a pure function of time and survives a scrub "
+        "exactly; one on a live entity does not (ADR-091).",
+        noArgs(), readOnly(),
+        [](const json&, ToolContext& ctx) -> ToolResult {
+            const scene::Composition* comp = ctx.engine().composition();
+            if (comp == nullptr) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "this session has no composition");
+            }
+            json list = json::array();
+            for (const entity::FieldDesc& f : comp->fields()) {
+                list.push_back(json{{"name", f.name},
+                                    {"source", f.source},
+                                    {"strength", f.strength},
+                                    {"floorGain", f.floorGain},
+                                    {"reach", f.volume.reach()},
+                                    {"scaleReactions", f.scaleReactions},
+                                    {"enabled", f.enabled},
+                                    {"tags", f.tags}});
+            }
+            json report = json::array();
+            for (const std::string& line : comp->entityWorld().fieldReport()) {
+                report.push_back(line);
+            }
+            const auto count = list.size();
+            return ToolResult::ok(json{{"fields", std::move(list)}, {"resolution", std::move(report)}},
+                                  fmt::format("{} field(s)", count));
+        });
+
+    add(registry, "field.create", "Create a music influence field",
+        "Put a music influence field in the scene. It scales the depth of the reactions its governed "
+        "entities already have, so the same `audio.bass -> emissiveGain` an author wrote becomes "
+        "spatial: full strength at the centre, nothing at the edge, smooth between. Give it a "
+        "`source` to make it follow a node or entity -- a character carrying the music with them -- "
+        "and `tags` to say which entities it governs.",
+        schema::object({{"name", schema::string("Field name")},
+                        {"radius", schema::number("Reach in metres (default 12)")},
+                        {"source", schema::string("Node or entity whose position it follows; omit to "
+                                                  "pin it at `center`")},
+                        {"center", schema::array(schema::number("metres"), "World position when it follows nothing")},
+                        {"strength", schema::number("Gain at full influence (default 1)")},
+                        {"floorGain", schema::number("Gain outside the volume (default 0)")},
+                        {"falloff", schema::string("constant, linear, smooth (default) or inverseSquare")},
+                        {"tags", schema::array(schema::string("tag"),
+                                               "Entity tags or profile names it governs; empty means all")}}),
+        sessionWrite(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            scene::Composition* comp = ctx.engine().composition();
+            if (comp == nullptr) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "this session has no composition to put a field in");
+            }
+            const std::string name = args.value("name", std::string{});
+            if (name.empty()) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "a field needs a name");
+            }
+            std::vector<entity::FieldDesc> fields = comp->fields();
+            if (std::ranges::any_of(fields, [&name](const entity::FieldDesc& f) { return f.name == name; })) {
+                return ToolResult::failure(ToolErrorCode::Conflict,
+                                           fmt::format("a field called '{}' already exists", name));
+            }
+            entity::FieldDesc desc;
+            desc.name = name;
+            desc.source = args.value("source", std::string{});
+            desc.strength = static_cast<float>(args.value("strength", 1.0));
+            desc.floorGain = static_cast<float>(args.value("floorGain", 0.0));
+            desc.volume.shape = entity::VolumeShape::Sphere;
+            desc.volume.radius = static_cast<float>(std::max(args.value("radius", 12.0), 0.01));
+            if (args.contains("center") && args.at("center").is_array() && args.at("center").size() == 3) {
+                desc.volume.center = glm::vec3(args.at("center")[0].get<float>(),
+                                               args.at("center")[1].get<float>(),
+                                               args.at("center")[2].get<float>());
+            }
+            if (args.contains("falloff")) {
+                if (!entity::falloffFromName(args.at("falloff").get<std::string>(), desc.volume.falloff)) {
+                    return ToolResult::failure(
+                        ToolErrorCode::InvalidArguments,
+                        fmt::format("'{}' is not a falloff", args.at("falloff").get<std::string>()),
+                        "use constant, linear, smooth or inverseSquare");
+                }
+            }
+            if (args.contains("tags") && args.at("tags").is_array()) {
+                for (const auto& t : args.at("tags")) {
+                    if (t.is_string()) {
+                        desc.tags.push_back(t.get<std::string>());
+                    }
+                }
+            }
+            fields.push_back(desc);
+            if (auto r = comp->setFields(std::move(fields)); !r) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, r.error().message);
+            }
+            json out{{"name", desc.name},
+                     {"reach", desc.volume.reach()},
+                     {"source", desc.source},
+                     {"strength", desc.strength},
+                     {"fields", comp->fields().size()}};
+            json report = json::array();
+            for (const std::string& line : comp->entityWorld().fieldReport()) {
+                report.push_back(line);
+            }
+            out["resolution"] = std::move(report);
+            if (desc.source.empty()) {
+                out["note"] = "this field does not follow anything, so it stays where `center` put it";
+            }
+            return ToolResult::ok(std::move(out),
+                                  fmt::format("field '{}', reach {:.1f} m", desc.name, desc.volume.reach()));
         });
 
     add(registry, "parameter.list_groups", "Parameter groups",

@@ -1,6 +1,8 @@
 # The AI control plane's missing verbs
 
-A handoff. Item 1 of the list below is **done and on `main`**; items 2–8 are the work.
+A handoff. **Items 1, 2, 4, 5, 6 and 7 are done and on `main`** — the plane went from 35 tools
+to 50, and from *no verb that creates anything* to one for each of project, world, media,
+shot, overlay and field. **Items 3 and 8 are the work.**
 
 ## Why this exists
 
@@ -20,10 +22,36 @@ to express *create*, because a parameter set describes what exists, not what mig
 So the gap is not "a few more tools". It is a category of verb that was missing, and each item
 below adds one.
 
-## What is already done (item 1)
+## What is already done
 
-**`project.list` · `project.create` · `project.save` · `project.save_as` · `project.open`** —
-`src/ai/engine_tools.cpp`. The plane is now 40 tools across 14 domains.
+**Item 1 — `project.list · create · save · save_as · open`.** The round trip the whole brief rests
+on: a project that only exists in the process that made it is not a project.
+
+**Item 2 — `asset.list_importable · asset.import_audio`.** Copies media into the open project and
+makes it the session's track. Copied rather than referenced, because a project pointing at a file on
+somebody's desktop stops working the day it moves. A file that will not decode has its copy removed
+again rather than left for a save to record.
+
+**Item 4 — `world.list_recipes · world.generate`.** Wraps the path `--generate` and the Generate
+World button already take. `composeFromRecipeFile` was *extracted* from `Application` rather than
+copied, so "which library does this recipe mean" keeps one answer. It reports **layers, not
+instances**: composing produces the rule for each scatter and the instances only exist once terrain
+is built from it.
+
+**Items 5 and 6 — `sequence.add_marker · add_shot · add_overlay`.** The bake turned out not to be
+the obstacle the first draft of this document expected: `Engine::installSequence()` is idempotent —
+every track and layer the previous install owned is replaced, never stacked — so each edit can
+re-install and there is no separate "commit" for an assistant to forget. A test pins that property,
+because if it regressed every assistant edit would double the timeline. Overlays are how §5's lyric
+placeholder and §19's cursor both get made, so item 6 folded into item 5 exactly as this document
+guessed it might.
+
+**Item 7 — `entity.list · field.list · field.create`.** §18 asks for a "proximity influence
+prototype" and the engine has the finished thing; this is the ask. `field.list` reports what each
+field *resolved to*, which is how an author learns whether it is scrub-exact (ADR-091) without
+rendering the same frame twice.
+
+All in `src/ai/engine_tools.cpp`. **50 tools across 18 domains.**
 
 Three decisions in there that the rest of the list should follow:
 
@@ -44,19 +72,10 @@ Three decisions in there that the rest of the list should follow:
   on disk were empty — and it is negative-controlled: make `project.save` report success without
   writing, and the reopen fails.
 
-Tests: `tests/unit/test_ai_tools.cpp`, tag `[ai][tools][project]`. Full suite 1527, green.
+Tests: `tests/unit/test_ai_tools.cpp`, tags `[project]`, `[import]`, `[world]`, `[authoring]`,
+`[field]`. Full suite **1536, green**.
 
-## The remaining eight, in the order to do them
-
-### 2. `asset.import` and a bounded filesystem resolve
-
-Unlocks the prompt's §2 — "import `~/Desktop/test.mp3`". Today the agent cannot resolve a path or
-load media; it can only read `hasAudio`.
-
-Mostly a safety decision rather than much code: **which roots may an agent read**, and does import
-copy into the project or reference in place. The project format already stores relative paths with
-size and sha256 (see `Engine::saveProject`), so copying-in is the behaviour the format expects.
-`Engine::loadAudio` does the actual work.
+## The two that remain
 
 ### 3. `scene.create_node` · `delete_node` · `set_parent`
 
@@ -72,50 +91,6 @@ a test. That was designed as the seam and this is the thing it was designed for.
 
 Do not add node creation until that sink exists. A create tool with a snapshot-backed transaction
 would report a rollback it cannot perform.
-
-### 4. `world.generate(recipe)`
-
-The cheapest large win, and the reason to do it before the sequence work: **it already functions.**
-`assets/city.manifest.json` and the 1,071 imported meshes are on disk, and a generated world was
-verified this week — 47 scatter layers installed, trees and pedestrians placed, and the navigation
-layer picked the pedestrians up as obstacles without being asked.
-
-One tool wrapping `world::composeWorld` + `Application::generateWorldFromRecipe` turns §6–§7 from
-impossible into mostly automatic. Take a recipe by name from `examples/recipes/`, or a small inline
-recipe object; the validation already exists in `world::WorldRecipe::fromJson`.
-
-**Know the limit before you promise it**: the composer places by *density* and caps a world at 64
-scatter layers, which is why the shipped Glowmere manifest is 13 entries and why the city manifest
-is 47. Streets and blocks are a grid problem, not a scatter problem. This tool dresses a world; it
-does not lay out a city block.
-
-### 5. `sequence.create_shot` · `set_camera` · `add_marker` · `add_actor`
-
-§3, §4, §13 and §20. The read side landed this week as `sequence.get_state` (shots, scenes, actors,
-overlays, sections, and the song's beats around a named second); this is its mirror.
-
-**The catch worth designing around first**: editing a sequence means re-baking it, and a bake
-replaces every track it owns — `sequencer.get_state` already reports those under
-`ownedBySequence`. So a mutating sequence tool is not a setter; it is an edit followed by a bake
-followed by a track replacement, and the transaction boundary has to cover all three or a rollback
-leaves half a piece behind.
-
-### 6. `layer.*` over `comp::LayerStack`
-
-§5 and §19 — the lyric placeholder and the fourth-wall cursor are the same system (ADR-083). Text,
-timing, position, style. `seq::OverlayCue` already describes a timed overlay and
-`seq::CompositionLayerSink` already turns one into a layer, so this may be better expressed as part
-of item 5 than as its own domain. Decide that before writing it.
-
-### 7. `entity.spawn` · `set_profile` · `attach_field`
-
-§10 (population), §17 (world reactivity) and §18 (proximity influence). The engine side exists and
-none of it is reachable from a prompt: ADR-088 entities and behaviours, ADR-096 actions and
-schedules, ADR-097 music-influence fields.
-
-§18 in particular is *already built* — a field is a position, a radius, a falloff and a strength,
-and it scales the depth of reactions an entity already has. The prompt asks for it as a prototype;
-the engine has the finished thing and no way to ask for it.
 
 ### 8. `render.capture`
 
@@ -149,9 +124,14 @@ and Kenney's mini-characters arrive rigged with 64 clips each.
 
 ## How to run the prompt
 
-Do not run it whole yet. Its §15 — the audio-reactive foundation — is the one section that works
-today, end to end, through the canonical pipeline: `signal.list` → `parameter.search` →
-`modulation.create`. Run that as a genuine acceptance test of the plane.
+Much more of it will now run than when this document was written. What an assistant can do today,
+in the prompt's own order: create and save a project (§1), import the track and analyse it (§2),
+add markers for the story beats (§20), add shots (§13), put a lyric placeholder on the frame (§5),
+generate a world (§6 in part), wire audio reactivity (§15), and put a music influence field in it
+(§18). Then save, close, reopen, and check it all survived (§26).
 
-Re-run the whole prompt once items 2–5 land. That is the point at which the answer changes from
-*no* to *probably*.
+What it still cannot do is **make an object**: no building, no bed, no stage, no protagonist. That
+is item 3, and it is why the city sections remain out of reach.
+
+So run it, but read §30 knowing which boxes cannot tick yet. The honest next acceptance test is the
+prompt with §7–§12 struck out — everything else in it now has a verb.

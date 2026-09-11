@@ -1116,3 +1116,128 @@ TEST_CASE("Importing refuses a file outside the readable folders", "[ai][tools][
 
     std::filesystem::remove_all(root);
 }
+
+// ---- authoring the piece ------------------------------------------------------------------------
+
+TEST_CASE("The assistant can author shots, markers and a lyric placeholder", "[ai][tools][authoring]") {
+    // §3, §5, §13 and §20 of the bootstrap prompt: the structure of a music video, made by the
+    // assistant rather than read by it.
+    Fixture f;
+    const auto marker = f.call("sequence.add_marker",
+                               json{{"time", 40.0}, {"name", "CHORUS"}, {"kind", "section"}});
+    INFO((marker.error ? marker.error->message : std::string{}));
+    REQUIRE(marker.success);
+    CHECK(marker.value["markers"].get<std::size_t>() == 1);
+
+    REQUIRE(f.call("sequence.add_shot", json{{"name", "Establish"}, {"start", 0.0}, {"duration", 12.0}}).success);
+    const auto second = f.call("sequence.add_shot",
+                               json{{"name", "The Walk"}, {"start", 12.0}, {"duration", 20.0}});
+    REQUIRE(second.success);
+    CHECK(second.value["shots"].get<std::size_t>() == 2);
+    // The piece's duration follows its shots rather than being set by hand.
+    CHECK(second.value["durationSeconds"].get<double>() >= 32.0);
+
+    // A shot name is unique, and a second one says so rather than quietly making a duplicate that
+    // is impossible to address afterwards.
+    const auto dup = f.call("sequence.add_shot", json{{"name", "The Walk"}, {"start", 40.0}});
+    CHECK_FALSE(dup.success);
+    REQUIRE(dup.error.has_value());
+    CHECK(dup.error->code == ai::ToolErrorCode::Conflict);
+
+    // A scene slot that does not exist is caught here rather than becoming a shot that cuts to
+    // nothing.
+    const auto ghost = f.call("sequence.add_shot", json{{"name", "Nowhere"}, {"scene", "atlantis"}});
+    CHECK_FALSE(ghost.success);
+    REQUIRE(ghost.error.has_value());
+    CHECK(ghost.error->code == ai::ToolErrorCode::NotFound);
+
+    const auto lyric = f.call("sequence.add_overlay",
+                              json{{"text", "[LYRICS PLACEHOLDER]"}, {"start", 4.0}, {"end", 8.0}});
+    INFO((lyric.error ? lyric.error->message : std::string{}));
+    REQUIRE(lyric.success);
+    CHECK(lyric.value["overlays"].get<std::size_t>() == 1);
+    // An overlay that ends before it starts is refused, not silently swapped.
+    CHECK_FALSE(f.call("sequence.add_overlay",
+                       json{{"text", "backwards"}, {"start", 9.0}, {"end", 2.0}}).success);
+
+    // Everything lands in the piece the read tool reports, which is the check that these two halves
+    // are talking about the same object.
+    const auto state = f.call("sequence.get_state");
+    REQUIRE(state.success);
+    CHECK(state.value["shotCount"].get<std::size_t>() == 2);
+    CHECK(state.value["overlayCount"].get<std::size_t>() == 1);
+    REQUIRE(state.value["sections"].size() == 1);
+    CHECK(state.value["sections"][0]["name"].get<std::string>() == "CHORUS");
+}
+
+TEST_CASE("Re-installing a sequence replaces its tracks instead of stacking them", "[ai][tools][authoring]") {
+    // The property that makes a bake-per-edit the right shape: five edits must not leave five
+    // copies of the same track behind. If this ever regressed, every assistant edit would double
+    // the timeline.
+    Fixture f;
+    REQUIRE(f.call("sequence.add_shot", json{{"name", "One"}, {"start", 0.0}, {"duration", 5.0}}).success);
+    const std::size_t afterFirst = f.engine.timeline().tracks().size();
+    for (int i = 0; i < 4; ++i) {
+        REQUIRE(f.call("sequence.add_marker",
+                       json{{"time", static_cast<double>(i)}, {"name", "M" + std::to_string(i)}})
+                    .success);
+    }
+    CHECK(f.engine.timeline().tracks().size() == afterFirst);
+    CHECK(f.engine.sequence().markers.size() == 4);
+}
+
+// ---- entities and the fields that govern them ---------------------------------------------------
+
+TEST_CASE("The assistant can put a music field into a scene", "[ai][tools][field]") {
+    // §18 of the bootstrap brief -- "proximity influence prototype" -- against an engine that has
+    // the finished version of it (ADR-097) and, until now, no way to be asked for one.
+    Fixture f;
+    REQUIRE(f.engine.loadFile(helixScene()).has_value());
+    REQUIRE(f.engine.composition() != nullptr);
+
+    const auto before = f.call("field.list");
+    REQUIRE(before.success);
+    CHECK(before.value["fields"].empty());
+
+    const auto made = f.call("field.create", json{{"name", "headphones"},
+                                                  {"radius", 14.0},
+                                                  {"strength", 1.5},
+                                                  {"falloff", "smooth"}});
+    INFO((made.error ? made.error->message : std::string{}));
+    REQUIRE(made.success);
+    CHECK_THAT(made.value["reach"].get<double>(), WithinAbs(14.0, 1e-3));
+    // A field that follows nothing says so, rather than leaving an author to wonder why it never
+    // moves.
+    CHECK(made.value.contains("note"));
+
+    const auto after = f.call("field.list");
+    REQUIRE(after.success);
+    REQUIRE(after.value["fields"].size() == 1);
+    CHECK(after.value["fields"][0]["name"].get<std::string>() == "headphones");
+    // The install reports what each field resolved to, which is how an author learns whether it is
+    // scrub-exact (ADR-091) without rendering the same frame twice.
+    CHECK(!after.value["resolution"].empty());
+
+    // A second field of the same name is a conflict, not a silent duplicate.
+    const auto dup = f.call("field.create", json{{"name", "headphones"}});
+    CHECK_FALSE(dup.success);
+    REQUIRE(dup.error.has_value());
+    CHECK(dup.error->code == ai::ToolErrorCode::Conflict);
+
+    // A falloff that is not one is refused with the list of the ones that are.
+    const auto bad = f.call("field.create", json{{"name", "other"}, {"falloff", "exponential"}});
+    CHECK_FALSE(bad.success);
+    REQUIRE(bad.error.has_value());
+    CHECK(bad.error->recovery.find("smooth") != std::string::npos);
+}
+
+TEST_CASE("Entity and field tools say so when there is no composition", "[ai][tools][field]") {
+    Fixture f; // the built-in orb, no composition
+    for (const char* tool : {"entity.list", "field.list"}) {
+        INFO(tool);
+        const auto r = f.call(tool);
+        CHECK_FALSE(r.success);
+        REQUIRE(r.error.has_value());
+        CHECK(r.error->code == ai::ToolErrorCode::Unavailable);
+    }
+}
