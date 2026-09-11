@@ -23932,6 +23932,9 @@
   },
   {
    "uri": "Textures/Green/Green_Normal.png"
+  },
+  {
+   "uri": "Textures/Green/Green_ORM.png"
   }
  ],
  "materials": [
@@ -23942,7 +23945,7 @@
      "index": 0
     },
     "metallicRoughnessTexture": {
-     "index": 1
+     "index": 3
     },
     "baseColorFactor": [
      0.2600959241390228,
@@ -23950,7 +23953,8 @@
      0.04155454784631729,
      1.0
     ],
-    "metallicFactor": 0.0
+    "metallicFactor": 1.0,
+    "roughnessFactor": 1.0
    },
    "normalTexture": {
     "index": 2
@@ -25417,6 +25421,10 @@
   {
    "source": 2,
    "sampler": 2
+  },
+  {
+   "source": 3,
+   "sampler": 0
   }
  ],
  "scene": 0

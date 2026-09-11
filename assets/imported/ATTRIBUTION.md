@@ -50,10 +50,14 @@ fail silently:
 - assimp wrote the texture URIs with the FBX's Windows separators -- `Textures\Green\Green_BaseColor.png`
   -- and glTF URIs are forward-slashed. The loader could never have resolved them, so the character
   would have rendered untextured with no error naming the cause.
-- `metallicRoughnessTexture` points at `Green_Metallic.png`, which is a metallic-only map, where
-  glTF expects roughness in green and metallic in blue. `Green_Roughness.png` is kept beside it so
-  the two can be combined properly if the stylized material ever wants them; Glowmere's night
-  lighting may not need either.
+- `metallicRoughnessTexture` pointed at `Green_Metallic.png`, a metallic-only map, where glTF
+  expects roughness in green and metallic in blue. The shader therefore read roughness out of a
+  metal mask's green channel -- near zero everywhere -- so the character rendered as a mirror.
+  `Green_ORM.png` now packs the authored maps the way glTF expects (R = 1, G = roughness,
+  B = metallic) and the material points at it with both factors at 1.0.
+
+  The authored values are uniform: roughness 1.0, metallic 0.0. A fully matte dielectric, which is
+  what a stylized character wants and the opposite of what it was rendering.
 
 ## What is in them
 
