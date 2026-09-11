@@ -502,12 +502,18 @@ anywhere in `src/`**.
    terrain. Ten call sites still set `dirty_` and every one still re-flattens, but a terrain's
    scatter clouds, glow clusters and chunk meshes are now memoised on the node and reused whenever
    the rebuild was caused by something else (ADR-092). Measured on
-   `examples/recipes/glowmere.recipe.json`, placing an asset costs **19.6-23.7 ms** where it cost
-   **114.9-134.5 ms**, and `engine.update`'s p99 across a scripted paint stroke falls from **120.3 ms
-   to 20.4 ms**. `AVGEN_NO_TERRAIN_CACHE=1` restores the old behaviour, so the comparison stays
-   measurable rather than historical. The cold flatten is unchanged (~271 ms): the first one has
-   nothing to reuse. What remains in the ~20 ms is procedural regeneration and entity rebuilding, and
-   `dirty_` still has no granularity. P1-2, reduced.
+   `examples/recipes/glowmere.recipe.json` after ADR-090, placing an asset costs **21.7-33.3 ms**
+   where it cost **455-478 ms**, and `engine.update`'s p99 across a scripted paint stroke falls from
+   **469.6 ms to 26.3 ms**. `AVGEN_NO_TERRAIN_CACHE=1` restores the old behaviour, so the comparison
+   stays measurable rather than historical. The cold flatten is unchanged (~620 ms): the first one
+   has nothing to reuse. What remains in the ~25 ms is procedural regeneration and entity
+   rebuilding, and `dirty_` still has no granularity. P1-2, reduced.
+
+   The gap grew fourfold when ADR-090 landed, which is the point of measuring it this way: real
+   rivers and lakes made a world much more expensive to *build* and left it exactly as cheap to
+   *edit*. The LOD debug sliders do not rebuild either -- `TerrainSettings::structuralHash` excludes
+   `lodDistance` and `viewDistance` because they choose meshes per frame and change nothing that was
+   built.
 3. **`world::scatter` is single-threaded** — ~260k grid cells, ~1.3M `WorldMap::height` evaluations,
    one layer at a time, while `buildTerrain` beside it is already threaded. P1-3.
 4. **Viewport pick: up to 5 serial blocking GPU round-trips per click.** P2-1. Still true for a
