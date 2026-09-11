@@ -38,10 +38,11 @@ asset.import { file }
 The source must resolve through the existing canonicalized `ToolContext::contentRoots()` boundary.
 Supported first-phase types are glTF/GLB models, HDR/EXR environments and common textures. The
 file is copied into `<project>/assets/{models,environments,textures}/`; an existing SHA-256 match
-is reported as a duplicate instead of copied again. A `.gltf` import also copies its referenced
-buffer and image sidecars, rejecting missing dependencies rather than creating a half-imported
-asset. No source file is modified, and no destination outside the project is writable by this
-tool.
+is reported as a duplicate instead of copied again. A `.gltf` import preflights and copies its
+referenced buffer and image sidecars, rejecting missing dependencies before any project file is
+written rather than creating a half-imported asset. No source file is modified, and no destination
+outside the project is writable by this tool. Filesystem I/O failures are returned as hard tool
+errors; a future phase should add a full rollback journal for mid-copy failures as well.
 
 Every successful visual import also updates `<project>/assets/manifest.json` atomically. The
 manifest stores the stable project ID, asset type, project-relative path and SHA-256 source hash.

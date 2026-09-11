@@ -922,6 +922,25 @@ void registerParameterTools(ToolRegistry& registry) {
             std::error_code ec;
             std::filesystem::create_directories(assetRoot, ec);
             if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot create project asset directory: " + ec.message());
+            std::vector<std::filesystem::path> dependencies;
+            if (source->extension() == ".gltf") {
+                std::ifstream in(*source);
+                json gltf = json::parse(in, nullptr, false);
+                if (gltf.is_discarded()) return ToolResult::failure(ToolErrorCode::Unsupported, "invalid glTF JSON");
+                for (const char* key : {"buffers", "images"}) {
+                    if (!gltf.contains(key) || !gltf.at(key).is_array()) continue;
+                    for (const auto& item : gltf.at(key)) {
+                        if (!item.is_object() || !item.contains("uri") || !item.at("uri").is_string()) continue;
+                        const std::string uri = item.at("uri").get<std::string>();
+                        if (uri.rfind("data:", 0) == 0 || uri.find("#") != std::string::npos) continue;
+                        const auto dependency = source->parent_path() / uri;
+                        if (!std::filesystem::is_regular_file(dependency, ec)) {
+                            return ToolResult::failure(ToolErrorCode::NotFound, "missing glTF dependency: " + uri);
+                        }
+                        dependencies.push_back(dependency);
+                    }
+                }
+            }
             for (const auto& entry : std::filesystem::recursive_directory_iterator(engine.projectPath().parent_path() / "assets",
                                                                                      std::filesystem::directory_options::skip_permission_denied, ec)) {
                 if (!entry.is_regular_file(ec)) continue;
@@ -937,26 +956,11 @@ void registerParameterTools(ToolRegistry& registry) {
             if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy asset: " + ec.message());
             std::vector<std::string> copied;
             copied.push_back(target.string());
-            if (source->extension() == ".gltf") {
-                std::ifstream in(*source);
-                json gltf = json::parse(in, nullptr, false);
-                if (gltf.is_discarded()) return ToolResult::failure(ToolErrorCode::Unsupported, "invalid glTF JSON");
-                std::vector<std::string> uris;
-                for (const char* key : {"buffers", "images"}) {
-                    if (!gltf.contains(key) || !gltf.at(key).is_array()) continue;
-                    for (const auto& item : gltf.at(key)) {
-                        if (item.is_object() && item.contains("uri") && item.at("uri").is_string()) uris.push_back(item.at("uri").get<std::string>());
-                    }
-                }
-                for (const std::string& uri : uris) {
-                    if (uri.find("data:") == 0 || uri.find("#") != std::string::npos) continue;
-                    const std::filesystem::path dependency = source->parent_path() / uri;
-                    if (!std::filesystem::is_regular_file(dependency, ec)) return ToolResult::failure(ToolErrorCode::NotFound, "missing glTF dependency: " + uri);
+            for (const auto& dependency : dependencies) {
                     const std::filesystem::path dependencyTarget = assetRoot / dependency.filename();
                     std::filesystem::copy_file(dependency, dependencyTarget, std::filesystem::copy_options::overwrite_existing, ec);
                     if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy glTF dependency: " + ec.message());
                     copied.push_back(dependencyTarget.string());
-                }
             }
             const std::string id = "asset://project/" + type + "/" + target.stem().string();
             const std::filesystem::path manifestPath = engine.projectPath().parent_path() / "assets" / "manifest.json";
