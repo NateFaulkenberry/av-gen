@@ -1487,6 +1487,32 @@ void Application::handleViewportEvent(const SDL_Event& event) {
 // than a lambda in the loop because the loop now pumps the queue twice: once before the
 // swapchain wait for window-level events, and once after it so the frame is built on the
 // freshest input there is. See runLive().
+namespace {
+
+// Where an event happened, when it happened anywhere. Wheel events carry no position of their own,
+// so they fall back to the pointer's current place rather than to the origin -- which is inside the
+// canvas on most layouts and would have routed every scroll to the world.
+[[nodiscard]] bool eventPointer(const SDL_Event& event, float& x, float& y) {
+    switch (event.type) {
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+        x = event.button.x;
+        y = event.button.y;
+        return true;
+    case SDL_EVENT_MOUSE_MOTION:
+        x = event.motion.x;
+        y = event.motion.y;
+        return true;
+    case SDL_EVENT_MOUSE_WHEEL:
+        SDL_GetMouseState(&x, &y);
+        return true;
+    default:
+        return false; // keys and everything else: not a pointer event, so not the canvas's to claim
+    }
+}
+
+} // namespace
+
 void Application::handleInputEvent(const SDL_Event& event) {
             if (uiSelfTestEvents_) {
                 uiEventTypes_[event.type] += 1;
@@ -1513,7 +1539,15 @@ void Application::handleInputEvent(const SDL_Event& event) {
             // A drag that began on the canvas keeps the mouse until the button is released:
             // letting a panel steal a gesture halfway through because the cursor passed over it is
             // how an orbit ends up jumping to a stop mid-swing.
-            if (canvas_.hovered || viewportGesture_ != ViewportGesture::None) {
+            // `canvas_.hovered` is last frame's answer and can be stale by a whole frame -- see
+            // `ui::viewportOwnsPointer`, which explains why that let a click on the sequencer
+            // select something in the world, and why the pointer's actual position settles it.
+            float pointerX = 0.0f;
+            float pointerY = 0.0f;
+            const bool positional = eventPointer(event, pointerX, pointerY);
+            const bool inside = !positional || canvas_.contains(pointerX, pointerY);
+            if (ui::viewportOwnsPointer(canvas_.hovered, inside,
+                                        viewportGesture_ != ViewportGesture::None)) {
                 handleViewportEvent(event);
             }
             if (event.type == SDL_EVENT_KEY_DOWN && !imgui_->wantsKeyboard() &&

@@ -116,3 +116,31 @@ TEST_CASE("Every camera gesture stays reachable, and only those are the camera's
     CHECK(sawPan);
     CHECK(sawLook);
 }
+
+TEST_CASE("A click on a panel is not a click on the world", "[ui][viewport]") {
+    // The bug this encodes: clicking the sequencer's timeline selected something in the world.
+    //
+    // The routing gate asked one question -- was the canvas hovered -- and that answer is
+    // necessarily a frame old, because SDL events are read before the frame is laid out. At 60 Hz a
+    // frame is 16 ms and nobody outruns it. In a heavy scene a frame is 80 ms or more, which is
+    // ample time to move off the canvas onto the timeline and click while the stale answer still
+    // says "the world". The heavier the scene, the more reliably it happened, which is exactly the
+    // wrong way round for anyone trying to reproduce it.
+    SECTION("a stale hover does not survive the pointer being somewhere else") {
+        CHECK_FALSE(ui::viewportOwnsPointer(true, false, false));
+    }
+    SECTION("the ordinary case still works") {
+        CHECK(ui::viewportOwnsPointer(true, true, false));
+    }
+    SECTION("inside the rectangle is not enough on its own") {
+        // A panel floating over the canvas is inside the rectangle too. There the hover state is the
+        // only thing that knows better, so it still has to agree.
+        CHECK_FALSE(ui::viewportOwnsPointer(false, true, false));
+    }
+    SECTION("a gesture keeps the mouse wherever it travels") {
+        // Releasing a drag over a panel must still reach the viewport, or the orbit never ends and
+        // the next click anywhere is treated as part of it.
+        CHECK(ui::viewportOwnsPointer(false, false, true));
+        CHECK(ui::viewportOwnsPointer(true, false, true));
+    }
+}

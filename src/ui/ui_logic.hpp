@@ -118,6 +118,31 @@ enum class ViewportIntent : std::uint8_t {
     return ViewportIntent::EditorPointer;
 }
 
+// Whether a mouse event belongs to the world rather than to a panel.
+//
+// `hovered` is necessarily *last frame's* answer: SDL events are read before the frame is laid out,
+// so the newest hover state there is comes from the previous layout. On a still window that is the
+// current answer and the test is exact. On a moving pointer it is stale by one frame -- which is
+// 16 ms at 60 Hz and nobody notices, and 80 ms or more in a heavy scene, which is long enough to
+// move off the canvas onto the timeline and click. That is how a click on the sequencer ended up
+// selecting something in the world.
+//
+// So the stale answer is confirmed against a fact that is *not* stale: where the pointer actually
+// is, against the canvas rectangle. A click outside that rectangle is never the world's, whatever
+// last frame believed. It does not help against a panel floating *over* the canvas -- there the
+// rectangle test says yes and only the hover state knows better -- but that is the narrow case, and
+// the stale hover is usually right about it.
+//
+// A drag that began on the canvas keeps the mouse until the button is released, wherever it travels:
+// letting a panel steal a gesture halfway through is how an orbit jumps to a stop mid-swing.
+[[nodiscard]] inline bool viewportOwnsPointer(bool hoveredLastFrame, bool pointerInsideCanvas,
+                                              bool gestureInProgress) {
+    if (gestureInProgress) {
+        return true;
+    }
+    return hoveredLastFrame && pointerInsideCanvas;
+}
+
 [[nodiscard]] inline bool intentIsCamera(ViewportIntent intent) {
     return intent == ViewportIntent::CameraOrbit || intent == ViewportIntent::CameraPan ||
            intent == ViewportIntent::CameraLook;
