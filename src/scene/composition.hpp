@@ -24,6 +24,7 @@
 #include "scene/material_params.hpp"
 #include "scene/sdf_object.hpp"
 #include "scene/spline_params.hpp"
+#include "scene/floaters.hpp"
 #include "scene/particles.hpp"
 #include "entity/entity.hpp"
 #include "scene/scene_controller.hpp"
@@ -109,6 +110,7 @@ struct CompositionNode {
     SdfObject sdf;                 // settings for kind Sdf (ADR-027; node transform folded into sdf.transform)
     world::WorldMap worldMap;      // settings for kind Terrain (ADR-046): the geography
     world::TerrainSettings terrain;// settings for kind Terrain: how it is chopped up and coarsened
+    world::WaterFlowSettings waterFlow; // settings for kind Terrain (ADR-091): how fast the water runs
     Material terrainMaterial;      // settings for kind Terrain: shared by every chunk
     world::Ecology ecology;        // settings for kind Terrain (ADR-048): what grows on it
 
@@ -132,6 +134,12 @@ struct CompositionNode {
     ParticleSystem particleRest;
     ProceduralParameters proceduralParams;
     ProceduralGeometry proceduralRest;
+    // ADR-091 §13: when set, this Procedural node's instances are not scattered on the ground --
+    // they float on the named terrain node's water and drift with it, recomputed every frame from
+    // the timeline clock. Everything else about the node is unchanged: the same imported mesh, the
+    // same material, the same GPU culling and LOD.
+    std::optional<FloatSpec> floats;
+    bool floatWarned = false;      // the "nothing will float" warning is said once, not per frame
     // ADR-044: a multi-material asset is one procedural object per material. `proceduralRest` is
     // part 0 -- the one carrying the most surface area, and the one the node's parameters were
     // registered from; these are the rest copies of the others, identical to it but for their mesh
@@ -150,6 +158,12 @@ struct CompositionNode {
     SdfParameters sdfParams;
     SdfObject sdfRest;
     std::vector<world::TerrainChunk> chunks;  // Terrain: built at rebuild, indexed by entity offset
+    // Terrain (ADR-091): the water bodies derived from this node's map, built at rebuild. The
+    // surface mesh's flow lanes come from it, and so does every floating thing on it.
+    world::WaterBodySet waterBodies;
+    // Terrain (ADR-091): this node's slot in Scene::waters, or -1 when it has no water. Set at
+    // rebuild; the per-frame parameter pass writes through it.
+    int waterSurfaceIndex = -1;
     // Terrain: the emissive scatter layers reduced to soft emitters, built at rebuild. The
     // per-frame pass picks the ones near the camera and makes them lights (ADR-053).
     std::vector<world::GlowCluster> glow;
@@ -157,6 +171,16 @@ struct CompositionNode {
     params::Parameter<bool>* terrainCullParam = nullptr;  // Terrain: frustum culling on/off (debug)
     params::Parameter<float>* terrainLodDistanceParam = nullptr;
     params::Parameter<float>* terrainViewDistanceParam = nullptr;
+    // Terrain (ADR-091): the water's own modulation surface. These are the properties §15 asks a
+    // signal to reach, and they are ordinary parameters so they reach it through the ModRoute
+    // chain every other reactive property in this engine uses, not a second one.
+    params::Parameter<float>* waterGlowParam = nullptr;
+    params::Parameter<float>* waterSparkleParam = nullptr;
+    params::Parameter<float>* waterRippleParam = nullptr;
+    params::Parameter<float>* waterFlowSpeedParam = nullptr;
+    params::Parameter<float>* waterSwellParam = nullptr;
+    params::Parameter<float>* waterFoamParam = nullptr;
+    params::Parameter<glm::vec3>* waterGlowColorParam = nullptr;
 };
 
 class Composition final : public SceneController {
@@ -390,6 +414,9 @@ private:
     // outside the frustum or beyond the view distance. Changes no geometry, only which mesh each
     // chunk entity points at, which is why a camera can fly across a world for free.
     void updateTerrainLod();
+    void updateWaterSurfaces(); // ADR-091: the water parameters into Scene::waters, once a frame
+    void updateFloaters(double time); // ADR-091 §13: drifting instances, once a frame
+    std::vector<Floater> floaterScratch_; // reused by updateFloaters so a drifting layer allocates once
     void updateEcologyLights();
     void registerNodeParameters(CompositionNode& node);
     void unregisterNodeParameters(CompositionNode& node);

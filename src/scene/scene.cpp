@@ -170,6 +170,7 @@ void Scene::clear() {
     particles.clear();
     procedurals.clear();
     rigs.clear();
+    waters.clear();
     ++meshVersion;
     ++textureVersion;
 }

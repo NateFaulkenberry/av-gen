@@ -11,6 +11,7 @@
 #include "scene/procedural.hpp"
 #include "scene/material_program.hpp"
 #include "scene/sdf_object.hpp"
+#include "scene/water_surface.hpp"
 #include "spatial/field.hpp"
 #include "spatial/spline.hpp"
 #include "scene/scene_types.hpp"
@@ -39,6 +40,10 @@ struct Scene {
     spatial::SplineSet splines;                  // ADR-026; distributions, path deformers, camera, emitters
     std::vector<SdfObject> sdfs;                 // ADR-027; rendering::SdfRenderer / meshed entities
     std::vector<MaterialProgram> materialPrograms; // ADR-030; referenced by Material::program
+    // ADR-091: the water surfaces of this scene, one per distinct look. An entity drawn with
+    // MeshStyle::Water finds its settings by the material-program name it carries, which is how a
+    // water surface reaches rendering::WaterRenderer without an index on every Entity in a world.
+    std::vector<WaterSurface> waters;
     // ADR-086: the skinned characters. An Entity names one through Entity::rig; scene::updateRigs
     // advances them from the controller's update, never from the renderer.
     std::vector<SkinnedRig> rigs;

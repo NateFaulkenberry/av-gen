@@ -1947,6 +1947,23 @@ void Composition::registerNodeParameters(CompositionNode& node) {
             floatDesc(base + "terrainLodDistance", node.terrain.lodDistance, 4.0f, 4000.0f, 20.0f, 400.0f));
         node.terrainViewDistanceParam = &params_->add(
             floatDesc(base + "terrainViewDistance", node.terrain.viewDistance, 8.0f, 20000.0f, 50.0f, 2000.0f));
+        // ADR-091 §15: the water's modulation surface. Ordinary parameters, so `routes` in a
+        // project reaches them through the ProcessorChain every other reactive property uses --
+        // attack, decay, curve, threshold, depth -- rather than through a second mapping layer, and
+        // so the editor gets sliders for them for nothing. Tasteful is the artist's business: what
+        // this decides is only that these six things are the ones worth moving.
+        const world::WaterSettings& w = node.terrain.water;
+        node.waterGlowParam = &params_->add(floatDesc(base + "water/glow", w.glow, 0.0f, 100.0f, 0.0f, 4.0f));
+        node.waterSparkleParam =
+            &params_->add(floatDesc(base + "water/sparkle", w.sparkle, 0.0f, 100.0f, 0.0f, 4.0f));
+        node.waterRippleParam =
+            &params_->add(floatDesc(base + "water/ripple", w.ripple, 0.0f, 20.0f, 0.0f, 3.0f));
+        node.waterFlowSpeedParam =
+            &params_->add(floatDesc(base + "water/flowSpeed", w.rippleSpeed, 0.0f, 100.0f, 0.0f, 4.0f));
+        node.waterSwellParam = &params_->add(floatDesc(base + "water/swell", w.swell, 0.0f, 100.0f, 0.0f, 1.5f));
+        node.waterFoamParam = &params_->add(floatDesc(base + "water/foam", w.foam, 0.0f, 10.0f, 0.0f, 2.0f));
+        node.waterGlowColorParam =
+            &params_->add(vec3Desc(base + "water/glowColor", w.glowColor, 0.0f, 20.0f, 0.0f, 1.0f));
     }
     if (node.kind == NodeKind::Scene && node.child) {
         node.child->attach(*params_, *modulator_, base);
@@ -1962,13 +1979,22 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
         }
         if (node.kind == NodeKind::Terrain) {
             for (const char* suffix :
-                 {"terrainLod", "terrainCull", "terrainLodDistance", "terrainViewDistance"}) {
+                 {"terrainLod", "terrainCull", "terrainLodDistance", "terrainViewDistance",
+                  "water/glow", "water/sparkle", "water/ripple", "water/flowSpeed", "water/swell",
+                  "water/foam", "water/glowColor"}) {
                 params_->remove(base + suffix);
             }
             node.terrainLodParam = nullptr;
             node.terrainCullParam = nullptr;
             node.terrainLodDistanceParam = nullptr;
             node.terrainViewDistanceParam = nullptr;
+            node.waterGlowParam = nullptr;
+            node.waterSparkleParam = nullptr;
+            node.waterRippleParam = nullptr;
+            node.waterFlowSpeedParam = nullptr;
+            node.waterSwellParam = nullptr;
+            node.waterFoamParam = nullptr;
+            node.waterGlowColorParam = nullptr;
         }
         forEachParticleParam(node.particleParams, [&](auto* p) {
             if (p != nullptr) {
@@ -2215,12 +2241,13 @@ void Composition::rebuild() {
                                               node.terrain.groundMottle, node.terrain.groundGlow,
                                               node.terrain.groundGlowScale, node.terrain.groundGlowCoverage,
                                               node.terrain.groundGlowColor));
-        if (node.terrain.water.enabled) {
-            install(terrainWaterProgramName(node.name),
-                    world::waterMaterialProgram(node.terrain.water, terrainWaterProgramName(node.name)));
-        }
+        // ADR-091: water no longer runs a material program -- it has its own pipeline, and the
+        // program it used to run could not reach the scene depth its shoreline is made of. The
+        // name survives as the key `Scene::waters` is addressed by; installing a program under it
+        // would spend one of the eight material-program slots on something nothing evaluates.
     }
     scene_.materialPrograms.clear();
+    scene_.waters.clear();
     ownMaterialCount_ = materialPrograms_.size();
     for (const MaterialProgram& src : materialPrograms_) {
         MaterialProgram mp = src;
@@ -2527,9 +2554,15 @@ void Composition::rebuild() {
             CompositionNode& mutableNode = *nodePtr;
             mutableNode.glow = std::move(nodeGlow);
             const auto buildStart = std::chrono::steady_clock::now();
+            // ADR-091: the water bodies first -- the surface mesh's flow lanes are baked from
+            // them, so they have to exist before a triangle does. Derived from the same map the
+            // ground is, so there is one description of where the river goes and one of which way
+            // it runs, and terrain is not asked to know the second.
+            mutableNode.waterBodies = world::waterBodies(node.worldMap, node.waterFlow);
             mutableNode.chunks = world::buildTerrain(
                 node.worldMap, node.terrain,
-                [&](std::size_t, int, MeshData&& mesh) { return scene_.addMesh(std::move(mesh)); });
+                [&](std::size_t, int, MeshData&& mesh) { return scene_.addMesh(std::move(mesh)); },
+                &mutableNode.waterBodies);
             for (std::size_t c = 0; c < mutableNode.chunks.size(); ++c) {
                 const world::TerrainChunk& chunk = mutableNode.chunks[c];
                 Entity& e = scene_.addEntity(fmt::format("{}.chunk{}", node.name, c), chunk.meshes[0]);
@@ -2552,17 +2585,55 @@ void Composition::rebuild() {
                     continue;
                 }
                 Entity& e = scene_.addEntity(fmt::format("{}.water{}", node.name, c), chunk.water);
-                e.style = MeshStyle::Lit;
+                // ADR-091: its own style, so the renderer draws it through the water pipeline
+                // rather than through the shared metallic-roughness path with an alpha on it.
+                // `material.program` is no longer a program to run: it is the *name* the draw
+                // finds this surface's settings by in Scene::waters.
+                e.style = MeshStyle::Water;
                 e.material.baseColor = node.terrain.water.shallowColor;
                 e.material.roughness = node.terrain.water.roughness;
                 e.material.metallic = 0.0f;
                 e.material.doubleSided = true; // a surface seen from under it is still a surface
                 e.material.program = prefixed(sanitise(prefix_), terrainWaterProgramName(node.name));
+                e.castsShadow = false; // a translucent sheet casting a hard shadow on its own bed
                 e.transform = nodeT;
                 e.visible = visible;
                 range.restTransforms.emplace_back();
                 range.restEmissive.push_back(0.0f);
                 range.restRoughness.push_back(node.terrain.water.roughness);
+            }
+            // ADR-091: every water body's centreline, published as a scene spline named
+            // "<node>.<body>". A river is a curve through the world and the engine already has a
+            // curve type that particle emitters, path deformers, instance distributions and the
+            // camera all read -- so publishing it costs one conversion and means a mist emitter
+            // that runs down the river is a scene file away, with no new emitter kind.
+            for (const world::WaterBody& body : mutableNode.waterBodies.bodies) {
+                if (body.centre.size() < 2) {
+                    continue;
+                }
+                spatial::Spline sp;
+                sp.name = prefixed(sanitise(prefix_), fmt::format("{}.{}", node.name, body.name));
+                sp.kind = spatial::SplineKind::Polyline;
+                sp.generator = spatial::SplineGenerator::Points;
+                sp.points.reserve(body.centre.size());
+                for (const glm::vec3& c : body.centre) {
+                    spatial::SplinePoint sp0;
+                    sp0.position = transformPoint(nodeT, c);
+                    sp.points.push_back(sp0);
+                }
+                scene_.splines.splines.push_back(std::move(sp));
+            }
+            if (node.terrain.water.enabled) {
+                float fastest = 0.0f;
+                for (const world::WaterBody& body : mutableNode.waterBodies.bodies) {
+                    fastest = std::max(fastest, body.speed);
+                }
+                WaterSurface surface;
+                surface.program = prefixed(sanitise(prefix_), terrainWaterProgramName(node.name));
+                surface.settings = node.terrain.water;
+                surface.fastestFlow = std::max(fastest, 0.05f);
+                mutableNode.waterSurfaceIndex = static_cast<int>(scene_.waters.size());
+                scene_.waters.push_back(std::move(surface));
             }
             const auto triangles = [&] {
                 std::size_t t = 0;
@@ -2936,6 +3007,10 @@ void Composition::update(const FrameTime& time) {
         cameraAngle_ += cameraOrbitSpeed_->value() * dt;
     }
     applyParameters();
+    // ADR-091 §13. After the parameters, because a floating layer's node transform is one of them,
+    // and before the culling, so a drifting layer's bounds are this frame's rather than last
+    // frame's -- a raft that has moved out of frame must be culled on where it is now.
+    updateFloaters(time.renderTime);
     cullEntityNodes();
     updateCharacters(time);
 }
@@ -3330,6 +3405,7 @@ void Composition::applyParameters() {
     scene_.camera.farPlane = std::max(radius_ * 50.0f, 2000.0f); // free cameras look across whole worlds
     applyFraming();
     updateTerrainLod();
+    updateWaterSurfaces();
     // Last frame's ecology lights come off before the rig block, which removes its own lights by
     // resizing from the back and would otherwise take these with them.
     if (ecologyLightCount_ > 0) {
@@ -3563,6 +3639,118 @@ void Composition::updateEcologyLights() {
 void Composition::setViewport(std::uint32_t width, std::uint32_t height) {
     viewportWidth_ = std::max(width, 1u);
     viewportHeight_ = std::max(height, 1u);
+}
+
+// ADR-091 §15. The water's reactive properties are ordinary parameters, so by the time this runs
+// the modulator has already put the frame's signal through each route's gain, curve, threshold,
+// attack/decay and depth. All that is left is to copy the finals into the surface the renderer
+// reads -- which is the whole of "water music reactivity": no second modulation system, and a
+// project can point `audio.bass` at `nodes/valley/water/glow` with no C++ written for it.
+void Composition::updateWaterSurfaces() {
+    for (const auto& nodePtr : nodes_) {
+        const CompositionNode& node = *nodePtr;
+        if (node.kind != NodeKind::Terrain || node.waterSurfaceIndex < 0) {
+            continue;
+        }
+        const auto slot = static_cast<std::size_t>(node.waterSurfaceIndex);
+        if (slot >= scene_.waters.size()) {
+            continue;
+        }
+        WaterSettings& w = scene_.waters[slot].settings;
+        w = node.terrain.water; // the authored rest, then whatever the routes moved
+        if (node.waterGlowParam != nullptr) w.glow = node.waterGlowParam->value();
+        if (node.waterSparkleParam != nullptr) w.sparkle = node.waterSparkleParam->value();
+        if (node.waterRippleParam != nullptr) w.ripple = node.waterRippleParam->value();
+        if (node.waterFlowSpeedParam != nullptr) w.rippleSpeed = node.waterFlowSpeedParam->value();
+        if (node.waterSwellParam != nullptr) w.swell = node.waterSwellParam->value();
+        if (node.waterFoamParam != nullptr) w.foam = node.waterFoamParam->value();
+        if (node.waterGlowColorParam != nullptr) w.glowColor = node.waterGlowColorParam->value();
+    }
+}
+
+// ADR-091 §13. Every floating layer's instances, recomputed from the timeline second.
+//
+// The cost is the layer's instance count times a nearest-point query on a polyline, which for
+// Glowmere's two hundred pads on a hundred-segment river is tens of microseconds -- and it buys
+// the property that matters more than the microseconds: there is no state. A seek to t = 40 s puts
+// every pad where a continuous playback would have had it, so a scrub, a re-render and a live
+// preview of the same second agree exactly.
+//
+// Instances are written into the node's ProceduralGeometry and `structureVersion` is bumped, which
+// is the renderer's upload key. That is a per-frame upload of count * 96 bytes -- 19 KB for two
+// hundred pads -- and the bounds recompute that goes with it is a pass over the same array.
+void Composition::updateFloaters(double time) {
+    for (std::size_t i = 0; i < nodes_.size(); ++i) {
+        CompositionNode& node = *nodes_[i];
+        if (node.kind != NodeKind::Procedural || !node.floats.has_value()) {
+            continue;
+        }
+        if (i >= ranges_.size() || ranges_[i].proceduralIndex < 0) {
+            continue;
+        }
+        const auto slot = static_cast<std::size_t>(ranges_[i].proceduralIndex);
+        if (slot >= scene_.procedurals.size()) {
+            continue;
+        }
+        const CompositionNode* source = findNode(node.floats->water);
+        if (source == nullptr || source->kind != NodeKind::Terrain) {
+            // Named a node that is not a terrain, or nothing at all. Said once, loudly: a floating
+            // layer that silently places nothing is precisely the failure this codebase keeps
+            // repeating, and an empty river is not obviously a bug when you are looking at it.
+            if (!node.floatWarned) {
+                log::warn("node '{}': float/water names '{}', which is not a terrain node in this "
+                          "composition; nothing will float",
+                          node.name, node.floats->water);
+                node.floatWarned = true;
+            }
+            continue;
+        }
+        if (source->waterBodies.empty()) {
+            if (!node.floatWarned) {
+                log::warn("node '{}': terrain '{}' has no water bodies; nothing will float", node.name,
+                          node.floats->water);
+                node.floatWarned = true;
+            }
+            continue;
+        }
+        evaluateFloaters(source->waterBodies, *node.floats, static_cast<float>(time), floaterScratch_);
+
+        ProceduralGeometry& pg = scene_.procedurals[slot];
+        // The node's own transform moves the world the water is in, so it moves what floats on it.
+        const glm::mat4 model = nodeWorldTransform(node).matrix();
+        pg.instances.resize(floaterScratch_.size());
+        glm::vec3 lo(std::numeric_limits<float>::max());
+        glm::vec3 hi(std::numeric_limits<float>::lowest());
+        for (std::size_t k = 0; k < floaterScratch_.size(); ++k) {
+            const Floater& f = floaterScratch_[k];
+            const glm::vec3 world = glm::vec3(model * glm::vec4(f.position, 1.0f));
+            spatial::InstanceRecord& rec = pg.instances[k];
+            rec.position = glm::vec4(world, 1.0f);
+            const glm::quat q = f.rotation;
+            rec.rotation = glm::vec4(q.x, q.y, q.z, q.w);
+            const float normalised =
+                floaterScratch_.size() > 1
+                    ? static_cast<float>(k) / static_cast<float>(floaterScratch_.size() - 1)
+                    : 0.0f;
+            rec.scale = glm::vec4(glm::vec3(f.scale), normalised);
+            rec.random = glm::vec4(f.random, std::fmod(f.random * 7.13f, 1.0f),
+                                   std::fmod(f.random * 3.77f, 1.0f), f.speed);
+            rec.color = glm::vec4(1.0f, 1.0f, 1.0f, static_cast<float>(k));
+            rec.emissive = glm::vec4(1.0f, 1.0f, 1.0f, f.random);
+            lo = glm::min(lo, world);
+            hi = glm::max(hi, world);
+        }
+        if (pg.instances.empty()) {
+            lo = glm::vec3(0.0f);
+            hi = glm::vec3(0.0f);
+        }
+        pg.boundsMin = lo;
+        pg.boundsMax = hi;
+        // The renderer uploads instances when this changes, which for a drifting layer is every
+        // frame. Deliberately the same key rather than a second one: "the records are different"
+        // is exactly what `structureVersion` means, and a layer that moves has different records.
+        ++pg.structureVersion;
+    }
 }
 
 void Composition::updateTerrainLod() {
@@ -4022,6 +4210,9 @@ nlohmann::json Composition::toJson() const {
         }
         if (node.kind == NodeKind::Procedural) {
             n["procedural"] = node.procedural.toJson();
+            if (node.floats.has_value()) {
+                n["float"] = node.floats->toJson();
+            }
         }
         if (node.kind == NodeKind::Field) {
             n["field"] = node.field.toJson();
@@ -4045,6 +4236,7 @@ nlohmann::json Composition::toJson() const {
                                 {"lodLevels", ts.lodLevels},   {"lodDistance", ts.lodDistance},
                                 {"viewDistance", ts.viewDistance}, {"shadowDistance", ts.shadowDistance},
                                 {"skirtDepth", ts.skirtDepth},
+                                {"flow", world::waterFlowToJson(node.waterFlow)},
                                 {"water",
                                  json{{"enabled", ts.water.enabled},
                                       {"shallow", ts.water.shallow},
@@ -4053,7 +4245,30 @@ nlohmann::json Composition::toJson() const {
                                       {"shallowColor", vecToJson(ts.water.shallowColor)},
                                       {"deepColor", vecToJson(ts.water.deepColor)},
                                       {"emissiveColor", vecToJson(ts.water.emissiveColor)},
-                                      {"emissiveIntensity", ts.water.emissiveIntensity}}}};
+                                      {"emissiveIntensity", ts.water.emissiveIntensity},
+                                      {"clarity", ts.water.clarity},
+                                      {"maxOpacity", ts.water.maxOpacity},
+                                      {"edgeFade", ts.water.edgeFade},
+                                      {"fresnel", ts.water.fresnel},
+                                      {"reflection", ts.water.reflection},
+                                      {"reflectionTint", vecToJson(ts.water.reflectionTint)},
+                                      {"specular", ts.water.specular},
+                                      {"ripple", ts.water.ripple},
+                                      {"rippleScale", ts.water.rippleScale},
+                                      {"rippleSpeed", ts.water.rippleSpeed},
+                                      {"chop", ts.water.chop},
+                                      {"foam", ts.water.foam},
+                                      {"foamWidth", ts.water.foamWidth},
+                                      {"foamColor", vecToJson(ts.water.foamColor)},
+                                      {"refraction", ts.water.refraction},
+                                      {"glow", ts.water.glow},
+                                      {"glowColor", vecToJson(ts.water.glowColor)},
+                                      {"glowScale", ts.water.glowScale},
+                                      {"glowCoverage", ts.water.glowCoverage},
+                                      {"glowDepth", ts.water.glowDepth},
+                                      {"sparkle", ts.water.sparkle},
+                                      {"sparkleColor", vecToJson(ts.water.sparkleColor)},
+                                      {"swell", ts.water.swell}}}};
             const Material& m = node.terrainMaterial;
             json mat{{"baseColor", vecToJson(m.baseColor)},
                      {"opacity", m.opacity},
@@ -4639,6 +4854,16 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 node.procedural = std::move(*pg);
                 node.proceduralMaterialAuthored = item.at("procedural").contains("material");
             }
+            // ADR-091 §13: a procedural node that floats. Read after "procedural" so a scene can
+            // say "these are lily pads" and "they drift on the valley's river" in the same node.
+            if (item.contains("float")) {
+                auto spec = FloatSpec::fromJson(item.at("float"));
+                if (!spec) {
+                    return fail("scene file '{}': node '{}': {}", scenePath.string(), node.name,
+                                spec.error().message);
+                }
+                node.floats = std::move(*spec);
+            }
             if (node.kind == NodeKind::Terrain) {
                 // "world" is the geography and "terrain" is how it is turned into meshes; both are
                 // optional, so `{"kind": "terrain"}` alone gives the shipped world at shipped
@@ -4703,7 +4928,19 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         for (const TerrainFloat& f :
                              {TerrainFloat{"shallow", &w.shallow}, TerrainFloat{"roughness", &w.roughness},
                               TerrainFloat{"shoreFade", &w.shoreFade},
-                              TerrainFloat{"emissiveIntensity", &w.emissiveIntensity}}) {
+                              TerrainFloat{"emissiveIntensity", &w.emissiveIntensity},
+                              TerrainFloat{"clarity", &w.clarity}, TerrainFloat{"maxOpacity", &w.maxOpacity},
+                              TerrainFloat{"edgeFade", &w.edgeFade}, TerrainFloat{"fresnel", &w.fresnel},
+                              TerrainFloat{"reflection", &w.reflection},
+                              TerrainFloat{"specular", &w.specular}, TerrainFloat{"ripple", &w.ripple},
+                              TerrainFloat{"rippleScale", &w.rippleScale},
+                              TerrainFloat{"rippleSpeed", &w.rippleSpeed}, TerrainFloat{"chop", &w.chop},
+                              TerrainFloat{"foam", &w.foam}, TerrainFloat{"foamWidth", &w.foamWidth},
+                              TerrainFloat{"refraction", &w.refraction}, TerrainFloat{"glow", &w.glow},
+                              TerrainFloat{"glowScale", &w.glowScale},
+                              TerrainFloat{"glowCoverage", &w.glowCoverage},
+                              TerrainFloat{"glowDepth", &w.glowDepth},
+                              TerrainFloat{"sparkle", &w.sparkle}, TerrainFloat{"swell", &w.swell}}) {
                             auto v = readFloat(wj, f.key, *f.target);
                             if (!v) {
                                 return fail("node '{}': water: {}", node.name, v.error().message);
@@ -4712,13 +4949,27 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         }
                         for (const auto& [key, target] : {std::pair{"shallowColor", &w.shallowColor},
                                                           std::pair{"deepColor", &w.deepColor},
-                                                          std::pair{"emissiveColor", &w.emissiveColor}}) {
+                                                          std::pair{"emissiveColor", &w.emissiveColor},
+                                                          std::pair{"reflectionTint", &w.reflectionTint},
+                                                          std::pair{"foamColor", &w.foamColor},
+                                                          std::pair{"glowColor", &w.glowColor},
+                                                          std::pair{"sparkleColor", &w.sparkleColor}}) {
                             auto v = readVec<3>(wj, key, *target);
                             if (!v) {
                                 return fail("node '{}': water: {}", node.name, v.error().message);
                             }
                             *target = *v;
                         }
+                        if (auto vr = w.validate(); !vr) {
+                            return fail("node '{}': {}", node.name, vr.error().message);
+                        }
+                    }
+                    if (t.contains("flow")) {
+                        auto flow = world::waterFlowFromJson(t.at("flow"));
+                        if (!flow) {
+                            return fail("node '{}': terrain: {}", node.name, flow.error().message);
+                        }
+                        node.waterFlow = *flow;
                     }
                     struct TerrainInt { const char* key; int* target; };
                     for (const TerrainInt& f :

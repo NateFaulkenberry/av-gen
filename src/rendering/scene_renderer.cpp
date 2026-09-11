@@ -74,6 +74,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       skinning_(std::make_unique<SkinningRenderer>(context, shaders)),
       ao_(std::make_unique<AoRenderer>(context, shaders)),
       shadowMask_(std::make_unique<ShadowMaskRenderer>(context, shaders)),
+      water_(std::make_unique<WaterRenderer>()),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
     objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
 }
@@ -353,6 +354,13 @@ Result<void> SceneRenderer::init() {
     // read. Same frame, material and IBL groups; only group 1 differs.
     if (auto r = skinning_->init(frameLayout_, materialLayout_, iblLayout_, objectUniforms_,
                                  sizeof(ObjectUniforms), kHdrFormat, kDepthFormat);
+        !r) {
+        return r;
+    }
+    // ADR-091: water draws inside the scene pass with the scene's own frame, object and IBL
+    // groups, and one of its own for the surface settings.
+    if (auto r = water_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_, objectLayout_,
+                              iblLayout_);
         !r) {
         return r;
     }
@@ -1203,6 +1211,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     if (auto r = shadowMask_->reload(); !r) {
         keep("shadow_mask.wgsl", r);
     }
+    if (auto r = water_->reload(shaders_); !r) {
+        keep("water.wgsl", r);
+    }
     ++engineReloads_;
     if (first) {
         log::info("engine shaders reloaded");
@@ -1680,6 +1691,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     rebuildFrameBindGroups();
     stage(cpu.lightsMs);
 
+    const auto waterSlotFor = [&scene](const std::string& program) -> std::uint32_t {
+        for (std::size_t i = 0; i < scene.waters.size() && i < kMaxWaterMaterials; ++i) {
+            if (scene.waters[i].program == program) {
+                return static_cast<std::uint32_t>(i);
+            }
+        }
+        return 0; // a water entity whose surface was not registered draws with the first one
+    };
+
     // ---- object uniforms (one 256-byte slot per visible entity) ----
     struct DrawItem {
         std::uint32_t offset;
@@ -1688,11 +1708,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-086: where this entity's joint palette sits in the joint buffer. A zero slice means
         // a static mesh, which is every entity in a scene with no character in it.
         SkinningRenderer::Slice skin;
+        // ADR-091: which of the scene's water surfaces this entity draws with, resolved once here
+        // from the material-program name rather than looked up per draw.
+        std::uint32_t water = 0;
         [[nodiscard]] bool skinned() const { return skin.valid(); }
     };
     std::vector<DrawItem> opaque;
     std::vector<DrawItem> grid;
     std::vector<DrawItem> blended;
+    std::vector<DrawItem> water;
     // ADR-086. Everything a skinned entity does differently at a draw site: the skinned pipeline, a
     // second dynamic offset naming its slice of the joint buffer, and the influence stream in
     // vertex slot 1. A frame with no skinned entity in it never reaches this, and records exactly
@@ -1800,6 +1824,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // True when the shadow passes would draw this entity: they take the opaque list only.
     const auto shadowEligible = [](const scene::Entity& entity) {
         return entity.castsShadow && entity.style != scene::MeshStyle::Grid &&
+               entity.style != scene::MeshStyle::Water &&
                entity.material.alphaMode != scene::AlphaMode::Blend;
     };
     const auto drawable = [&](const scene::Entity& entity) {
@@ -1818,6 +1843,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
         if (entity.style == scene::MeshStyle::Grid) {
             grid.push_back(*item);
+        } else if (entity.style == scene::MeshStyle::Water) {
+            DrawItem w = *item;
+            w.water = waterSlotFor(entity.material.program);
+            water.push_back(w);
         } else if (entity.material.alphaMode == scene::AlphaMode::Blend) {
             blended.push_back(*item);
         } else {
@@ -1889,7 +1918,30 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // Ambient occlusion and the contact-shadow march both need the depth of the whole opaque
     // scene while it is being shaded (ADR-034/035); the particle fog coupling reads the linear
     // depth the same prepass resolves, so the flag is decided before either uses it.
-    const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows || shadowMask_->active();
+    // ADR-091: water reads the prepass's linear depth to know how thick it is, which is what its
+    // shoreline and its depth colour are made of. A scene with water in it therefore asks for the
+    // prepass whatever else is on -- 0.20 ms of depth-only geometry, against a surface that
+    // otherwise falls back to the vertex depth and to the mesh's own edge for its waterline.
+    const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows ||
+                                   shadowMask_->active() || !scene.waters.empty();
+    // ---- water surfaces (ADR-091) ----
+    // One uniform slot per authored surface, uploaded once a frame. `flowTime` is the timeline
+    // second, never a wall clock and never an accumulated delta: a river at t = 12.0 has to be in
+    // the same place in an offline render as it is live, and the project verifies that by hashing
+    // captured frames.
+    {
+        waterUniforms_.clear();
+        const float flowTime = static_cast<float>(time.renderTime);
+        for (const scene::WaterSurface& surface : scene.waters) {
+            if (waterUniforms_.size() >= kMaxWaterMaterials) {
+                break;
+            }
+            waterUniforms_.push_back(
+                waterUniformsFrom(surface.settings, flowTime, surface.fastestFlow, needsDepthPrepass));
+        }
+        water_->upload(queue, waterUniforms_);
+    }
+
 
     // ---- particle simulation (compute) ----
     // ADR-040 frame context: the previous view-projection for the velocity target (ADR-035), the
@@ -2247,6 +2299,29 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             ++stats_.triangles;
             ++stats_.state.pipelineBinds;
             stats_.state.bindGroupBinds += 2;
+        }
+        // ---- water (ADR-091) ----
+        // After the sky and before the particles: the surface has to composite over the bed and
+        // the bank, which are opaque and already drawn, and the motes and spores above it have to
+        // composite over the surface. Its own pipeline, so the branch it needs is not in the
+        // shader every other entity in the world runs.
+        if (!water.empty() && water_->ready()) {
+            rp.SetPipeline(water_->pipeline());
+            ++stats_.state.pipelineBinds;
+            for (const auto& item : water) {
+                const GpuMesh& mesh = meshes_[item.entity->mesh];
+                const std::uint32_t waterOffset = water_->offset(item.water);
+                rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
+                rp.SetBindGroup(2, water_->bindGroup(), 1, &waterOffset);
+                rp.SetVertexBuffer(0, mesh.vertices);
+                rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
+                rp.DrawIndexed(mesh.indexCount);
+                stats_.geometry.camera.record(mesh.indexCount, 1, false);
+                stats_.state.bindGroupBinds += 2;
+                ++stats_.state.vertexBufferBinds;
+                ++stats_.state.indexBufferBinds;
+                ++stats_.drawCalls;
+            }
         }
         drawItems(grid, false);
         particles_->draw(rp, scene);

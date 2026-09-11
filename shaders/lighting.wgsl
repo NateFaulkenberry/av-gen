@@ -16,6 +16,19 @@
 @group(0) @binding(10) var ltcSampler: sampler;
 
 
+// Normalises, or returns the fallback when the vector is too short to have a direction. This used
+// to call material.wgsl's matSafeNormalize, which meant this file could only be included by a
+// module that had already included the material interpreter -- an undeclared dependency that
+// water.wgsl (ADR-091), which wants the lighting and has no material program in it, tripped over
+// immediately. One copy of four lines is cheaper than that coupling.
+fn lightSafeNormalize(v: vec3<f32>, fallback: vec3<f32>) -> vec3<f32> {
+    let len2 = dot(v, v);
+    if (len2 > 1e-12) {
+        return v * inverseSqrt(len2);
+    }
+    return fallback;
+}
+
 // ---- linearly transformed cones (area lights) ---------------------------------------------------
 
 // The clamped-cosine integral of one polygon edge (Heitz et al. 2016).
@@ -134,7 +147,7 @@ fn shadePainterly(ctx: ShadeContext, direction: vec3<f32>, radiance: vec3<f32>) 
     var result: LightSample;
     let incidence = dot(ctx.normal, direction);
     let diffuse = painterlyRamp(incidence * 0.7 + 0.15);
-    let halfway = matSafeNormalize(direction + ctx.view, ctx.normal);
+    let halfway = lightSafeNormalize(direction + ctx.view, ctx.normal);
     let highlight = smoothstep(mix(0.92, 0.72, ctx.roughness), 0.99,
                                max(dot(ctx.normal, halfway), 0.0));
     result.diffuse = ctx.diffuseColor * radiance * (diffuse / PI);

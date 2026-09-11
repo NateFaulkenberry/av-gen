@@ -18,6 +18,8 @@
 #include "core/error.hpp"
 #include "scene/material_program.hpp"
 #include "scene/scene_types.hpp"
+#include "scene/water_surface.hpp"
+#include "world/water.hpp"
 #include "world/world_map.hpp"
 
 #include <array>
@@ -32,21 +34,11 @@ constexpr int kMaxTerrainLods = 4;
 // level, so a caller that switches on the level cannot mistake water for a coarser ground.
 constexpr int kWaterLevel = kMaxTerrainLods;
 
-// How water looks. It lives with the terrain settings rather than with the world map because it is
-// a rendering decision: the map decides where water *is*, this decides what it looks like.
-struct WaterSettings {
-    bool enabled = true;
-    float shallow = 2.2f;                       // metres of depth over which the colour reaches deep
-    glm::vec3 shallowColor{0.045f, 0.16f, 0.15f}; // linear; the edge, where the bed shows through
-    glm::vec3 deepColor{0.004f, 0.020f, 0.043f};  // linear; the channel
-    float roughness = 0.06f;                    // low: water is a mirror before it is a colour
-    float shoreFade = 1.6f;                     // metres over which the surface fades into the bank
-    float emissiveIntensity = 0.0f;             // for a world whose water carries light
-    glm::vec3 emissiveColor{0.0f};
-
-    [[nodiscard]] Result<void> validate() const;
-    [[nodiscard]] std::uint64_t structuralHash() const;
-};
+// `WaterSettings` moved to scene/water_surface.hpp in ADR-091 and is aliased here: the settings
+// have to reach `scene::Scene`, which the renderer is handed, and pulling the whole world map into
+// scene.hpp to get them would invert the dependency for twenty-five floats. The name a terrain
+// authors with does not change.
+using WaterSettings = scene::WaterSettings;
 
 struct TerrainSettings {
     float chunkSize = 40.0f;    // metres per chunk edge
@@ -137,8 +129,11 @@ struct TerrainChunk {
 // The pixels-per-unit factor `chunkLod` wants, from a vertical field of view and a viewport height.
 [[nodiscard]] float lodProjectionScale(float fovYRadians, float viewportHeight);
 
-// The water material, generated like the ground's so the palette has one home.
-[[nodiscard]] scene::MaterialProgram waterMaterialProgram(const WaterSettings& water, std::string name);
+// ADR-091: `waterMaterialProgram` is gone. Water is drawn by rendering::WaterRenderer through its
+// own pipeline now, because the shoreline and the depth colour are made from the scene's own depth
+// buffer and a material program cannot reach it. What the generated program did -- colour by depth,
+// fade at the edge -- the surface shader does from the same `WaterSettings`, per pixel rather than
+// per vertex, and it frees one of the eight material-program slots.
 
 // The ground material for a biome set, generated rather than authored (ADR-047). A biome's colours
 // live in the world JSON, and a scene that also wrote them into a material program would have two
@@ -181,15 +176,23 @@ struct ChunkField {
 // down the valley for free.
 //
 // Vertex uv carries (depth, shore) rather than a texture coordinate, the same trade the ground makes
-// -- depth is how far the bed is below the surface, normalised over `waterShallow` metres, and shore
-// is how close this point is to dry land. Between them a material can be clear at the edge and dark
-// in the channel without knowing anything about the world.
+// -- depth is how far the bed is below the surface in metres, and shore is how close this point is
+// to dry land, normalised over `shoreFade`. Between them a material can be clear at the edge and
+// dark in the channel without knowing anything about the world.
+//
+// The vertex *normal* carries the flow (ADR-091): xz is the downstream direction at this point and
+// y is the speed as a fraction of the body's own, so the surface knows which way it runs without a
+// second vertex stream and without the shader knowing what a river is. A water sheet's real normal
+// is +Y everywhere and is the one thing already known, which is what makes the slot free. Pass a
+// `WaterBodySet` derived from the same map (world/water.hpp) to fill it; without one the flow is
+// zero and the surface is still, which is what every world did before ADR-091.
 //
 // A quad is emitted wherever any of its corners is under water, and the terrain occludes the rest by
 // depth test, so the shoreline is where the two surfaces actually cross rather than where a mesh
 // boundary happened to fall.
 [[nodiscard]] scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& settings,
-                                              glm::ivec2 coord, const ChunkField* field = nullptr);
+                                              glm::ivec2 coord, const ChunkField* field = nullptr,
+                                              const WaterBodySet* bodies = nullptr);
 
 // Builds every chunk at every level. `emit(chunkIndex, lod, mesh)` receives each mesh in build
 // order; the caller decides where meshes live. Returns the chunks with bounds filled in.
@@ -200,6 +203,7 @@ struct ChunkField {
 // which is not thread safe and does not need to be.
 [[nodiscard]] std::vector<TerrainChunk> buildTerrain(
     const WorldMap& map, const TerrainSettings& settings,
-    const std::function<scene::MeshId(std::size_t chunkIndex, int lod, scene::MeshData&& mesh)>& emit);
+    const std::function<scene::MeshId(std::size_t chunkIndex, int lod, scene::MeshData&& mesh)>& emit,
+    const WaterBodySet* bodies = nullptr);
 
 } // namespace avgen::world
