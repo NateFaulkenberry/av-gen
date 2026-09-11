@@ -19,6 +19,7 @@
 // can speak.
 
 #include "core/error.hpp"
+#include "world/terrain_gen.hpp"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -121,6 +122,11 @@ struct WorldRecipe {
     float extent = 400.0f;             // metres across, so weights can mean densities
 
     CompositionWeights composition;
+    // The ground this world grows on (§30). Optional in the JSON: a recipe that says nothing about
+    // terrain gets the rolling-hills preset scaled to its own extent, which is what every recipe
+    // written before this block existed gets. `seed`, `extent` and `name` are overwritten from the
+    // recipe's own, so a world cannot have two seeds or two sizes.
+    TerrainParams terrain = terrainPreset(TerrainStyle::RollingHills);
     EcologyWeights ecology;
     AtmosphereWeights atmosphere;
     LightingWeights lighting;

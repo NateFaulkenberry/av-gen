@@ -80,6 +80,9 @@ Result<void> WorldRecipe::validate() const {
     if (!(art.saturation >= 0.0f) || !std::isfinite(art.saturation)) {
         return fail("world '{}': art.saturation must be a finite value >= 0", world);
     }
+    if (auto t = terrain.validate(); !t) {
+        return fail("world '{}': {}", world, t.error().message);
+    }
     return {};
 }
 
@@ -206,6 +209,21 @@ Result<WorldRecipe> WorldRecipe::fromJson(const json& j) {
             return std::unexpected(e.error());
         }
     }
+    // The terrain block last, so the recipe's own seed and extent are already known: they win over
+    // anything the block says, because a world with two seeds or two sizes is a world whose terrain
+    // and whose ecology were composed for different places.
+    if (j.contains("terrain")) {
+        auto t = TerrainParams::fromJson(j.at("terrain"), r.extent);
+        if (!t) {
+            return std::unexpected(t.error());
+        }
+        r.terrain = *t;
+    } else {
+        r.terrain = terrainPreset(TerrainStyle::RollingHills, r.extent);
+    }
+    r.terrain.name = r.world;
+    r.terrain.seed = r.seed;
+    r.terrain.extent = r.extent;
     if (auto ok = r.validate(); !ok) {
         return std::unexpected(ok.error());
     }
@@ -276,6 +294,13 @@ json WorldRecipe::toJson() const {
     a["organicMotion"] = art.organicMotion;
     a["chaos"] = art.chaos;
     j["art"] = std::move(a);
+    // Written out with the name, seed and extent stripped: they live at the top level and a second
+    // copy of them here is a second copy to disagree with.
+    json t = terrain.toJson();
+    t.erase("name");
+    t.erase("seed");
+    t.erase("extent");
+    j["terrain"] = std::move(t);
     return j;
 }
 
