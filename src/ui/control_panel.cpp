@@ -309,7 +309,28 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
         }
         ImGui::SetNextWindowSize(floatingSize, ImGuiCond_FirstUseEver);
         if (ImGui::Begin(id.data(), open)) {
+            // Reserve a column for labels. ImGui draws a widget's label to its *right*, and these
+            // panels are full of sliders at the default item width -- which is most of the window --
+            // so every label ran off the edge and was clipped: "Foreground" read as "Foregroun",
+            // "material/baseColor" as "material/b". From inside a narrow docked panel that looks
+            // like the panel is underlapping whatever is beside it.
+            //
+            // A negative item width means "stop this far short of the right edge", so this is the
+            // label column. Proportional with a floor, because a fixed pixel column is either
+            // wasteful in a wide panel or useless in a narrow one, and a proportional one alone
+            // collapses to nothing when somebody drags a splitter in.
+            // Sized from a real label rather than a guessed fraction. The first attempt reserved
+            // 42% of the panel and "Foreground" still lost its last character: the column has to
+            // hold the widest label these panels actually use, not a proportion that looks about
+            // right. Measured against the font in use, so it follows the DPI scale.
+            const float avail = ImGui::GetContentRegionAvail().x;
+            const float labelColumn =
+                ImGui::CalcTextSize("Bioluminescence").x + ImGui::GetStyle().ItemInnerSpacing.x * 2.0f;
+            // Never more than half the panel: past that the slider becomes unusable, and a label
+            // that cannot fit is better truncated than a control that cannot be dragged.
+            ImGui::PushItemWidth(-std::min(labelColumn, avail * 0.5f));
             body();
+            ImGui::PopItemWidth();
         }
         ImGui::End();
     };
@@ -788,8 +809,20 @@ void ControlPanel::drawResponse(app::Engine& engine) {
 
 void ControlPanel::drawParameters(app::Engine& engine) {
     using namespace params;
-    std::string currentGroup;
-    bool groupOpen = false;
+    // Gathered by group before anything is drawn, rather than emitting a header whenever the group
+    // changes from one parameter to the next.
+    //
+    // Parameter order is registration order, and a group's members are not contiguous in it: every
+    // node registers its own handful under "nodes", interleaved with whatever registered between
+    // them. Comparing against only the *previous* group therefore emitted the "nodes" header once
+    // per node -- eight times on Glowmere -- each an ImGui tree node with the same id, which is
+    // what ImGui was reporting as two visible items with conflicting IDs. It was also simply wrong
+    // as a list: one group, shown eight times, each holding a fraction of its parameters.
+    //
+    // Groups keep first-appearance order so the panel does not reshuffle itself when a node is
+    // added.
+    std::vector<std::string> order;
+    std::unordered_map<std::string, std::vector<IParameter*>> grouped;
     for (IParameter* param : engine.params().ordered()) {
         if (!param->flags().exposed) {
             continue;
@@ -797,16 +830,19 @@ void ControlPanel::drawParameters(app::Engine& engine) {
         if (!world.shows(param->path())) {
             continue; // hidden by the authoring layer (World window)
         }
-        if (param->group() != currentGroup) {
-            if (groupOpen) {
-                ImGui::TreePop();
-            }
-            currentGroup = param->group();
-            groupOpen = ImGui::TreeNodeEx(currentGroup.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+        auto [it, inserted] = grouped.try_emplace(param->group());
+        if (inserted) {
+            order.push_back(param->group());
         }
-        if (!groupOpen) {
-            continue;
-        }
+        it->second.push_back(param);
+    }
+
+    for (const std::string& group : order) {
+      const bool groupOpen = ImGui::TreeNodeEx(group.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+      if (!groupOpen) {
+          continue;
+      }
+      for (IParameter* param : grouped[group]) {
         ImGui::PushID(param->path().c_str());
         const std::size_t n = param->componentCount();
         float values[4] = {};
@@ -871,9 +907,8 @@ void ControlPanel::drawParameters(app::Engine& engine) {
             ImGui::EndPopup();
         }
         ImGui::PopID();
-    }
-    if (groupOpen) {
-        ImGui::TreePop();
+      }
+      ImGui::TreePop();
     }
 }
 
