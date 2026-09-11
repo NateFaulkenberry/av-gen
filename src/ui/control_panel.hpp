@@ -213,6 +213,8 @@ private:
     bool rebuildLayout_ = false;
     bool firstFrame_ = true;
     int assetKind_ = 0;
+    int catalogSource_ = 0;
+    int catalogType_ = 0;
     char assetSearch_[96] = "";
     int newRouteSource_ = 0;
     int newRouteTarget_ = 0;

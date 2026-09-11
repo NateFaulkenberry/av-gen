@@ -558,9 +558,26 @@ void ControlPanel::drawAssetsWindow() {
         ImGui::EndTable();
     }
     if (!catalogAssets.empty() && ImGui::TreeNodeEx("Ownership catalog", ImGuiTreeNodeFlags_DefaultOpen)) {
+        const char* sources[] = {"all sources", "project", "built-in"};
+        const char* types[] = {"all types", "model", "environment", "texture", "audio", "scene"};
+        ImGui::SetNextItemWidth(130.0f);
+        ImGui::Combo("##catalog-source", &catalogSource_, sources, IM_ARRAYSIZE(sources));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(130.0f);
+        ImGui::Combo("##catalog-type", &catalogType_, types, IM_ARRAYSIZE(types));
+        ImGui::SameLine();
+        ImGui::TextDisabled("stable IDs");
         for (const auto& asset : catalogAssets) {
             const bool project = asset.source == assets::AssetSource::Project;
-            ImGui::BulletText("[%s] %s  %s", project ? "PROJECT" : "BUILT-IN", asset.name.c_str(), asset.type.c_str());
+            const char* sourceName = assets::assetSourceName(asset.source);
+            if (catalogSource_ == 1 && !project) continue;
+            if (catalogSource_ == 2 && project) continue;
+            if (catalogType_ > 0 && asset.type != types[catalogType_]) continue;
+            if (assetSearch_[0] != '\0') {
+                const std::string haystack = asset.name + " " + asset.id + " " + asset.type;
+                if (haystack.find(assetSearch_) == std::string::npos) continue;
+            }
+            ImGui::BulletText("[%s] %s  %s", sourceName, asset.name.c_str(), asset.type.c_str());
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s\n%s", asset.id.c_str(), asset.path.string().c_str());
             }
