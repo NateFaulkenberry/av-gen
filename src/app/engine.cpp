@@ -92,6 +92,19 @@ void Engine::setTempoSource(TempoSource source) {
 
 void Engine::installController(std::unique_ptr<scene::SceneController> controller) {
     controller_ = std::move(controller);
+    // Live only. An expensive procedural regeneration is allowed to wait for the slider driving it
+    // to stop moving, rather than taking the frame away from the editor on every frame of a drag
+    // (see Composition::setInteractiveRebuildBudget). Offline never sets it, because the deferral
+    // reads a wall clock and a wall clock must not decide what a deterministic render contains.
+    //
+    // The budget is the cost above which an object is treated as expensive. Two milliseconds:
+    // comfortably below a 60 Hz frame's share, comfortably above the cost of a procedural small
+    // enough that deferring it would only add latency.
+    if (mode_ == EngineMode::Live) {
+        if (auto* comp = composition()) {
+            comp->setInteractiveRebuildBudget(2.0);
+        }
+    }
     // Scene swaps clear the parameter set, so sources, post settings and shader layers must
     // re-register. Post parameters keep their current base values (post_ holds them).
     ensureControlSource();
