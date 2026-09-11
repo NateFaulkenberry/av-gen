@@ -225,3 +225,67 @@ performance with the method stated; tests added and their results; and — the s
 most — **what remains unfinished or hardcoded, honestly.** A crude city that is genuinely laid out
 beats a beautiful one built on a one-off script, and an honest list of what is missing is worth more
 than a claim that nothing is.
+
+---
+
+# PROGRESS — update this section as you go
+
+**This brief is live.** It is written to be picked up mid-way, so whoever is working on it keeps this
+section current: what is done, what is half-done, and what the next step is. A handoff that says
+"see the commits" is not a handoff.
+
+## Done
+
+**ADR-100 — what a layout emits.** The question the brief said to answer first, answered:
+`docs/decisions/ADR-100-city-layout.md`. The repeated fabric of the city (roads, pavements, ordinary
+buildings, props) is emitted as `spatial::PointCloud`s and installed exactly as a scatter layer,
+because `ProceduralGeometry::distribution.scatterCloud` already takes explicit positions and
+everything past that point is the instanced path Glowmere's 150,000 instances already travel — GPU
+culling, the LOD ladder, wind. The handful of pieces a director names — the protagonist's building,
+the stage — are ordinary composition nodes. The ADR records why neither alone works.
+
+**The plan — `src/world/city.hpp` / `city.cpp`.** A lattice of cells, each with a kind (road,
+junction, crossing, pavement, plot, plaza) and a quarter turn, as a pure function of `CitySettings`.
+The street network is laid first and blocks fill what is left, because roads carved out of a field of
+plots end up with plots hanging over them wherever the arithmetic is off by one. Planning knows
+nothing about assets on purpose: the structural properties can then be checked exhaustively with no
+library, device or mesh.
+
+Tests: `tests/unit/test_city.cpp`, tag `[city]`. Ten cases, 1,157 assertions. Full suite **1550,
+green**.
+
+Two things the tests caught, worth knowing because both would have rendered as a plausible-looking
+grid:
+
+- **A block two cells across is all edge.** Every cell touches a road, so the pavement ring consumes
+  the whole block and the city has roads, footways and *no buildings*. It counted fine and rendered
+  as an empty grid. `blockCells` now has a floor of 3 and the refusal says why.
+- The road-continuity test's own first version inferred road columns from row 0, which is itself a
+  road — so it called every column a road and passed vacuously. It reads from a line crossing the
+  blocks now. Worth remembering when writing the next structural test.
+
+## Next — the placer
+
+Turn a `CityPlan` plus an `assets::AssetLibrary` into placements. This is where assets, scale and the
+terrain enter, and where the two halves of ADR-100 are actually produced.
+
+Shape it like `world::composeWorld`: a pure function from (plan, settings, library, `TerrainQuery*`)
+to something `app::installWorld` can install, so the editor's Generate button, `--generate` and the
+assistant's `world.generate` all reach it without three code paths. Start with roads and pavements
+alone — one asset each, correctly rotated and adjoining — and render it before adding buildings.
+A street that tiles is the thing to see working first; everything else is dressing on top of it.
+
+Specifics already known:
+
+- `assets/city.manifest.json` is a *scatter* library of 47 entries. The city pieces — road tiles,
+  the 153 downtown modules, the modular buildings — are on disk and **not** in it, because the
+  composer builds one scatter layer per entry and caps at 64. The placer needs its own way to name a
+  piece; consider a second manifest or a category convention, and write down which.
+- Kenney road pieces are 1×1 *unit* tiles. `CitySettings::moduleSize` is metres. The scale factor is
+  art direction and belongs in the manifest, never in the geometry.
+- `TerrainQuery::heightAt` decides where the ground is. Do not write height or slope logic.
+
+## Not started
+
+The road graph (§2 of this brief) and interiors (§3). Neither has been designed beyond what is
+written above; both are still exactly as the brief describes them.
