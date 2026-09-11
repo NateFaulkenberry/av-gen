@@ -29,6 +29,7 @@
 #include "entity/entity.hpp"
 #include "entity/obstacles.hpp"
 #include "scene/scene_controller.hpp"
+#include "world/city.hpp"
 #include "world/ecology.hpp"
 #include "world/hero.hpp"
 #include "world/terrain.hpp"
@@ -88,7 +89,7 @@ struct WorldBounds {
     }
 };
 
-enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural, Field, Spline, Sdf, Terrain, Group };
+enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedural, Field, Spline, Sdf, Terrain, Group, City };
 const char* nodeKindName(NodeKind kind);
 Result<NodeKind> nodeKindFromName(const std::string& name);
 
@@ -154,6 +155,13 @@ struct CompositionNode {
     world::WaterFlowSettings waterFlow; // settings for kind Terrain (ADR-099): how fast the water runs
     Material terrainMaterial;      // settings for kind Terrain: shared by every chunk
     world::Ecology ecology;        // settings for kind Terrain (ADR-048): what grows on it
+    // Settings for kind City (ADR-100). The node carries the *description*, never the placements:
+    // a scatter cloud is a runtime shared_ptr and is not serialised, exactly as a terrain's ecology
+    // scatter is not, so a city is re-planned and re-placed on every rebuild from these few numbers.
+    // That is what makes it survive a save and a reload.
+    world::CitySettings city;
+    std::filesystem::path cityLibrary; // the tiling manifest, as written; resolved via the registry
+    std::size_t cityCells = 0;         // what the last rebuild planned, for the editor to show
 
     NodeAnimation animation;       // ADR-086; Gltf nodes whose asset carries a skin
 

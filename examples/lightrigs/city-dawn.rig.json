@@ -1,0 +1,34 @@
+{
+ "format": "avgen-lightrig",
+ "version": 1,
+ "name": "CityDawn",
+ "keyIntensity": 3.2,
+ "ambientIntensity": 0.75,
+ "ambientColor": [0.46, 0.52, 0.62],
+ "ambientTemperature": 7600,
+ "lights": [
+  {
+   "name": "sun",
+   "type": "directional",
+   "role": "key",
+   "azimuth": 108.0,
+   "elevation": 9.0,
+   "intensity": 1.0,
+   "color": [1.0, 0.82, 0.66],
+   "temperature": 3600,
+   "castsShadow": true,
+   "shadowStrength": 0.8
+  },
+  {
+   "name": "skyfill",
+   "type": "directional",
+   "role": "fill",
+   "azimuth": 285.0,
+   "elevation": 46.0,
+   "intensity": 0.35,
+   "color": [0.55, 0.66, 0.85],
+   "temperature": 9000,
+   "castsShadow": false
+  }
+ ]
+}

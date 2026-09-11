@@ -3,6 +3,10 @@
 // exhaustively here, with no library, no device and no mesh.
 
 #include "world/city.hpp"
+#include "core/time.hpp"
+#include <unistd.h>
+#include <fstream>
+#include "scene/composition.hpp"
 #include <cmath>
 #include <filesystem>
 #include <algorithm>
@@ -499,4 +503,107 @@ TEST_CASE("A library with nothing in it is refused rather than placing nothing",
     const auto r = world::placeCity(plan, empty, *library);
     REQUIRE_FALSE(r.has_value());
     CHECK(r.error().message.find("tagged") != std::string::npos);
+}
+
+// ---- the node that installs one ------------------------------------------------------------------
+
+TEST_CASE("A city node turns into instanced geometry", "[world][city][node]") {
+    // The seam to the engine. A `city` node carries settings only -- a scatter cloud is runtime
+    // state and is never serialised -- so the plan and the placements are made again on every
+    // rebuild, exactly as a terrain's ecology scatter is. This is what makes a city survive a save.
+    const std::filesystem::path scene =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "city" / "first-block.scene.json";
+    if (!std::filesystem::exists(scene) || !std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("the first-block example is not present in this checkout");
+    }
+    assets::AssetRegistry registry;
+    // The base the scene's relative paths resolve against, which `Engine::loadComposition` sets
+    // before loading. Without it the city's tiling manifest is looked for in the wrong place, the
+    // rebuild warns, and the scene comes back with no city in it -- which looks exactly like the
+    // city not working.
+    registry.setBaseDirectory(scene.parent_path());
+    auto composition = scene::Composition::loadFile(scene, registry);
+    INFO((composition ? std::string{} : composition.error().message));
+    REQUIRE(composition.has_value());
+
+    // A composition is built lazily: loading parses the file and `update` is what flattens the
+    // nodes into a scene. Reading `procedurals` before one would find an empty list and say nothing
+    // about whether the city works.
+    (*composition)->update(FrameTime{});
+
+    const scene::CompositionNode* node = (*composition)->findNode("city");
+    REQUIRE(node != nullptr);
+    CHECK(node->kind == scene::NodeKind::City);
+    CHECK(node->city.blockCells == 3);
+    CHECK(node->cityCells > 0); // the rebuild planned it
+
+    // One instanced object per distinct piece, each carrying a cloud rather than a single transform.
+    const auto& procedurals = (*composition)->scene().procedurals;
+    std::size_t cityObjects = 0;
+    std::size_t instances = 0;
+    for (const scene::ProceduralGeometry& pg : procedurals) {
+        if (pg.name.find("city_") == std::string::npos) {
+            continue;
+        }
+        ++cityObjects;
+        REQUIRE(pg.distribution.kind == scene::DistributionKind::Scatter);
+        REQUIRE(pg.distribution.scatterCloud != nullptr);
+        instances += pg.distribution.scatterCloud->count();
+        // The mesh is resolved, not merely named. Setting `source.asset` alone generates nothing --
+        // the first version of this did exactly that and rendered an empty frame while reporting
+        // 152 instances placed.
+        CHECK(pg.source.kind == scene::PrimitiveKind::Mesh);
+        CHECK(pg.source.assetMesh != nullptr);
+        CHECK(pg.lod.cull);
+    }
+    CHECK(cityObjects > 0);
+    CHECK(instances > 0);
+}
+
+TEST_CASE("A city node round-trips through a scene file", "[world][city][node]") {
+    const std::filesystem::path scene =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "city" / "first-block.scene.json";
+    if (!std::filesystem::exists(scene)) {
+        SKIP("the first-block example is not present in this checkout");
+    }
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(scene.parent_path());
+    auto first = scene::Composition::loadFile(scene, registry);
+    REQUIRE(first.has_value());
+    (*first)->update(FrameTime{});
+    const nlohmann::json doc = (*first)->toJson();
+
+    auto second = scene::Composition::fromJson(doc, registry);
+    INFO((second ? std::string{} : second.error().message));
+    REQUIRE(second.has_value());
+    (*second)->update(FrameTime{});
+    const scene::CompositionNode* a = (*first)->findNode("city");
+    const scene::CompositionNode* b = (*second)->findNode("city");
+    REQUIRE(a != nullptr);
+    REQUIRE(b != nullptr);
+    CHECK(b->kind == scene::NodeKind::City);
+    CHECK(b->city.seed == a->city.seed);
+    CHECK(b->city.blocksX == a->city.blocksX);
+    CHECK(b->city.blockCells == a->city.blockCells);
+    CHECK_THAT(b->city.moduleSize, WithinAbs(a->city.moduleSize, 1e-5f));
+    CHECK_THAT(b->city.tileUnits, WithinAbs(a->city.tileUnits, 1e-5f));
+    // And it planned the same city on the way back in, which is the point of carrying settings
+    // rather than placements.
+    CHECK(b->cityCells == a->cityCells);
+}
+
+TEST_CASE("A city whose settings cannot be planned is refused at load", "[world][city][node]") {
+    // Refused when the file is read, not when the frame is drawn: a scene that cannot make a city
+    // is a file somebody has to fix, and a warning during rebuild is a thing nobody sees.
+    const auto dir = std::filesystem::temp_directory_path() /
+                     ("avgen_city_bad_" + std::to_string(static_cast<long long>(getpid())));
+    std::filesystem::create_directories(dir);
+    const auto file = dir / "bad.scene.json";
+    std::ofstream(file) << R"({"format":"avgen-scene","version":1,"name":"bad","nodes":[
+        {"name":"city","kind":"city","city":{"blockCells":1}}]})";
+    assets::AssetRegistry registry;
+    const auto loaded = scene::Composition::loadFile(file, registry);
+    REQUIRE_FALSE(loaded.has_value());
+    CHECK(loaded.error().message.find("footway") != std::string::npos);
+    std::filesystem::remove_all(dir);
 }

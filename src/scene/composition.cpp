@@ -914,6 +914,8 @@ const char* nodeKindName(NodeKind kind) {
         return "sdf";
     case NodeKind::Terrain:
         return "terrain";
+    case NodeKind::City:
+        return "city";
     case NodeKind::Group:
         return "group";
     }
@@ -923,7 +925,8 @@ const char* nodeKindName(NodeKind kind) {
 Result<NodeKind> nodeKindFromName(const std::string& name) {
     for (const NodeKind kind :
          {NodeKind::Gltf, NodeKind::Orb, NodeKind::Grid, NodeKind::Particles, NodeKind::Scene, NodeKind::Procedural,
-          NodeKind::Field, NodeKind::Spline, NodeKind::Sdf, NodeKind::Terrain, NodeKind::Group}) {
+          NodeKind::Field, NodeKind::Spline, NodeKind::Sdf, NodeKind::Terrain, NodeKind::Group,
+          NodeKind::City}) {
         if (name == nodeKindName(kind)) {
             return kind;
         }
@@ -2755,6 +2758,111 @@ void Composition::rebuild() {
             range.restTransforms.emplace_back();
             range.restEmissive.push_back(0.0f);
             range.restRoughness.push_back(0.5f);
+            break;
+        }
+        case NodeKind::City: {
+            // ADR-100. The node carries `CitySettings`; the plan and the placements are derived
+            // here on every rebuild, because a scatter cloud is runtime state and is not serialised.
+            // Exactly the arrangement the terrain node uses for its ecology, and for the same
+            // reason: the description survives a save, the placements are made again from it.
+            CompositionNode& mutableNode = *nodePtr;
+            auto plan = world::planCity(node.city);
+            if (!plan) {
+                log::warn("city '{}': {}", node.name, plan.error().message);
+                break;
+            }
+            const std::filesystem::path manifest =
+                node.cityLibrary.empty() ? std::filesystem::path{} : registry_.resolve(node.cityLibrary);
+            if (manifest.empty()) {
+                log::warn("city '{}': no tiling library named; nothing to place with", node.name);
+                break;
+            }
+            auto library = assets::AssetLibrary::loadFile(manifest);
+            if (!library) {
+                log::warn("city '{}': {}", node.name, library.error().message);
+                break;
+            }
+            const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+            // The ground, when this scene has one. A city on a terrain sits on it; a city on its own
+            // sits at y = 0, which is what an empty project gets and is a usable first frame.
+            std::optional<world::TerrainQuery> ground;
+            for (const auto& other : nodes_) {
+                if (other->kind == NodeKind::Terrain) {
+                    ground = world::terrainQuery(other->worldMap, &other->ecology, heroes_);
+                    break;
+                }
+            }
+            auto placed = world::placeCity(*plan, roles, *library, ground ? &*ground : nullptr);
+            if (!placed) {
+                log::warn("city '{}': {}", node.name, placed.error().message);
+                break;
+            }
+            for (const world::CityPlacement& placement : placed->placements) {
+                const assets::AssetDescriptor* asset = library->find(placement.asset);
+                if (asset == nullptr || placement.cloud == nullptr) {
+                    continue;
+                }
+                // The mesh itself, resolved the way an ecology layer's is. Setting `source.asset`
+                // alone names a file and generates nothing: the registry has to load it and the
+                // parts have to be attached, which is what this shares with the terrain path.
+                const std::string assetPath =
+                    (manifest.parent_path() / asset->file).lexically_normal().string();
+                const std::vector<AssetPart> parts =
+                    resolveMeshParts(assetPath, "city '" + node.name + "'");
+                if (parts.empty() || parts[0].mesh == nullptr) {
+                    continue;
+                }
+                ProceduralGeometry pg;
+                pg.name = sanitise(prefix_) + node.name + "_" + placement.asset;
+                pg.source.kind = PrimitiveKind::Mesh;
+                pg.source.asset = assetPath;
+                pg.source.assetMesh = parts[0].mesh;
+                if (parts[0].hasMaterial) {
+                    pg.material = parts[0].material;
+                }
+                pg.distribution.kind = DistributionKind::Scatter;
+                pg.distribution.scatterCloud = placement.cloud;
+                pg.distribution.scatterHash =
+                    static_cast<std::uint64_t>(node.city.seed) * 0x9E3779B97F4A7C15ull ^
+                    std::hash<std::string>{}(placement.asset);
+                pg.visible = visible;
+                pg.sourceTransform = nodeT;
+                // Culling and the LOD ladder on, for the same reason a scatter layer has them: a
+                // city is thousands of instances and every one of them off screen is free only if
+                // something is asked to check.
+                pg.lod.cull = true;
+                // An asset with more than one material becomes one object per material over the
+                // *same* cloud, which is the arrangement the scatter path already uses. Without it
+                // a two-material kerb draws only half of itself.
+                std::vector<ProceduralGeometry> subs;
+                for (std::size_t part = 1; part < parts.size(); ++part) {
+                    if (parts[part].mesh == nullptr) {
+                        continue;
+                    }
+                    ProceduralGeometry sub = pg;
+                    sub.name = pg.name + fmt::format("_m{}", part);
+                    sub.source.assetPart = static_cast<int>(part);
+                    sub.source.assetMesh = parts[part].mesh;
+                    if (parts[part].hasMaterial) {
+                        sub.material = parts[part].material;
+                    }
+                    subs.push_back(std::move(sub));
+                }
+                scene_.procedurals.push_back(std::move(pg));
+                for (ProceduralGeometry& sub : subs) {
+                    scene_.procedurals.push_back(std::move(sub));
+                }
+            }
+            mutableNode.cityCells = plan->cells.size();
+            log::info("city '{}': {} x {} cells, {} piece(s), {} instance(s){}", node.name,
+                      plan->width, plan->depth, placed->placements.size(), placed->instanceCount(),
+                      placed->undressed.empty() ? std::string{} : [&placed] {
+                          std::string list;
+                          for (const std::string& kind : placed->undressed) {
+                              list += (list.empty() ? "" : ", ") + kind;
+                          }
+                          return " -- nothing tagged for: " + list;
+                      }());
             break;
         }
         case NodeKind::Terrain: {
@@ -4736,6 +4844,23 @@ nlohmann::json Composition::toJson() const {
                 n["float"] = node.floats->toJson();
             }
         }
+        if (node.kind == NodeKind::City) {
+            // The description, never the placements (ADR-100). A city is re-planned and re-placed
+            // from these numbers on every rebuild, exactly as a terrain's scatter is.
+            const world::CitySettings& cs = node.city;
+            n["city"] = json{{"moduleSize", cs.moduleSize},
+                             {"tileUnits", cs.tileUnits},
+                             {"blocksX", cs.blocksX},
+                             {"blocksZ", cs.blocksZ},
+                             {"blockCells", cs.blockCells},
+                             {"roadCells", cs.roadCells},
+                             {"seed", cs.seed},
+                             {"plazaFraction", cs.plazaFraction},
+                             {"crossingFraction", cs.crossingFraction}};
+            if (!node.cityLibrary.empty()) {
+                n["cityLibrary"] = node.cityLibrary.generic_string();
+            }
+        }
         if (node.kind == NodeKind::Field) {
             n["field"] = node.field.toJson();
         }
@@ -5422,6 +5547,34 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                 spec.error().message);
                 }
                 node.floats = std::move(*spec);
+            }
+            if (node.kind == NodeKind::City) {
+                // Everything optional, so `{"kind": "city"}` alone is a city at the shipped
+                // settings rather than nothing -- the same courtesy the terrain node extends.
+                if (item.contains("city")) {
+                    const json& c = item.at("city");
+                    if (!c.is_object()) {
+                        return fail("node '{}': 'city' must be an object", node.name);
+                    }
+                    world::CitySettings& cs = node.city;
+                    cs.moduleSize = c.value("moduleSize", cs.moduleSize);
+                    cs.tileUnits = c.value("tileUnits", cs.tileUnits);
+                    cs.blocksX = c.value("blocksX", cs.blocksX);
+                    cs.blocksZ = c.value("blocksZ", cs.blocksZ);
+                    cs.blockCells = c.value("blockCells", cs.blockCells);
+                    cs.roadCells = c.value("roadCells", cs.roadCells);
+                    cs.seed = c.value("seed", cs.seed);
+                    cs.plazaFraction = c.value("plazaFraction", cs.plazaFraction);
+                    cs.crossingFraction = c.value("crossingFraction", cs.crossingFraction);
+                    // Refused at load rather than at rebuild: a city that cannot be planned is a
+                    // scene file somebody has to fix, and the error names the field.
+                    if (auto r = cs.validate(); !r) {
+                        return fail("node '{}': {}", node.name, r.error().message);
+                    }
+                }
+                if (item.contains("cityLibrary")) {
+                    node.cityLibrary = item.at("cityLibrary").get<std::string>();
+                }
             }
             if (node.kind == NodeKind::Terrain) {
                 // "world" is the geography and "terrain" is how it is turned into meshes; both are

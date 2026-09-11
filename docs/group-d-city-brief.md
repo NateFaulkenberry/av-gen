@@ -286,20 +286,42 @@ its tile size — it cannot be recovered from the mesh**, because decoration tha
 is the artist's intent. `CitySettings::tileUnits` states it (1.0 for Kenney) and the whole pack scales
 uniformly.
 
-## Next — install it, then look at it
+**The node that installs one — `NodeKind::City`.** A `city` node carries `CitySettings` and a path
+to the tiling manifest, and `Composition::rebuild` plans, places and emits one instanced
+`ProceduralGeometry` per piece. The node carries the *description*, never the placements, because a
+scatter cloud is a runtime `shared_ptr` and is not serialised — exactly the arrangement the terrain
+node uses for its ecology, and for the same reason: the settings survive a save and the placements
+are made again from them. Round-trip tested.
 
-`PlacedCity` is a value nothing consumes yet. The next step is the seam to the engine, and then a
-frame:
+**`examples/city/first-block.scene.json`** is the first one, with `examples/lightrigs/city-dawn.rig.json`.
+It renders: **13x13 cells, 7 pieces, 152 instances, 8,734 triangles, 0 GPU errors.**
 
-1. Turn placements into `scene::ProceduralGeometry` with `distribution.scatterCloud` set, the way
-   `Composition::rebuild` already does for scatter layers (`src/scene/composition.cpp`, the block
-   around the `subs` loop). Follow `app::installWorld` / `app::GeneratedWorld` for the install shape
-   so the editor, `--generate` and `world.generate` all reach it without three code paths.
-2. **Render it and look at the frame before adding anything.** A street that tiles is the thing to
-   see working; buildings, props and trees are dressing on top of it. `render.probe` will say the
-   camera sees something; only a frame says the tiles meet.
-3. Then buildings: the plot cells are already planned and already reported as `undressed`, so the
-   work is choosing a building per plot and tagging pieces in the manifest.
+Tests: tags `[city]`, `[city][place]`, `[city][node]`. Full suite **1558, green**.
+
+Three things that cost time and would cost it again:
+
+- **Naming the asset is not resolving it.** Setting `source.asset` and nothing else produced a
+  composition that reported 152 instances placed and rendered an empty frame. The registry has to
+  load the scene and the parts have to be attached — `resolveMeshParts` then `source.assetMesh`, the
+  way the ecology path does. A test now asserts `assetMesh != nullptr` for exactly this.
+- **A scene with no light renders the city at (10,18,41) against a (37,37,51) background** — present,
+  correct and invisible. The first frame needs a rig; the example carries a dawn one.
+- **`Composition::loadFile` does not build anything.** `update()` is what flattens nodes into a
+  scene, and `AssetRegistry::setBaseDirectory` has to be set first or relative paths resolve
+  somewhere else and the rebuild warns into a log nobody reads. Both bit this work's own tests.
+
+## Next — buildings, and then a frame worth looking at
+
+The street is flat, which is correct and is also why the render is a 100-pixel band: there is nothing
+vertical in the city yet. The measured brightness profile shows sky, then that band with real
+per-pixel variation in it (road markings, kerbs), then ground.
+
+1. **Tag building pieces in `assets/city-pieces.manifest.json`.** The plot cells are already planned
+   and already reported as `undressed`, so the work is choosing a piece per plot and giving it the
+   `building` tag. The Kenney commercial, industrial, suburban and modular kits are on disk; the
+   Quaternius downtown modules are the taller option.
+2. **Vary height by block**, or every street is the same. `CityCell::block` is carried for this.
+3. Then look at a frame properly, and only then add props, trees and the plaza ground.
 
 ## Not started
 
