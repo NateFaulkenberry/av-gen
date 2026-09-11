@@ -599,6 +599,7 @@ Result<void> Timeline::bind(ParameterSet& params) {
             unknown.push_back(track.target);
         }
     }
+    unbound_ = unknown;
     if (unknown.empty()) {
         return {};
     }
@@ -617,6 +618,7 @@ void Timeline::unbind() {
     for (Track& track : tracks_) {
         track.param = nullptr;
     }
+    unbound_.clear();
 }
 
 void Timeline::apply(const TimelineClock& clock) const {

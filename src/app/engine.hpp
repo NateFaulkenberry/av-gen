@@ -16,6 +16,7 @@
 #include "analysis/analyzer.hpp"
 #include "audio/audio_file.hpp"
 #include "audio/audio_player.hpp"
+#include "comp/layer_stack.hpp"
 #include "core/error.hpp"
 #include "core/time.hpp"
 #include "params/modulation.hpp"
@@ -119,6 +120,22 @@ public:
     // Copies every referenced file into <dir>/assets (scene files rewritten with relative
     // references) and writes <dir>/project.json pointing at the copies.
     [[nodiscard]] Result<void> exportBundle(const std::filesystem::path& dir);
+
+    // ---- the 2D composition (ADR-081) ----
+    // The layer stack drawn over the finished 3D frame. Every layer property is a parameter in
+    // params(), registered before the timeline binds, so layers keyframe on the *same* timeline as
+    // the scene and the camera and modulate from the *same* signal routes. Saved with the project
+    // under "composition"; a project written before this existed simply has none.
+    [[nodiscard]] comp::LayerStack& layers() { return layers_; }
+    [[nodiscard]] const comp::LayerStack& layers() const { return layers_; }
+    // Adding and removing go through the engine rather than the stack because a layer's parameters
+    // have to enter and leave the parameter set with it, and the timeline has to re-bind.
+    comp::TextLayer& addTextLayer(std::string text, double startSeconds = 0.0, double endSeconds = 0.0);
+    comp::ShapeLayer& addShapeLayer(comp::ShapeKind shape);
+    bool removeLayer(std::uint32_t id);
+    comp::Layer* duplicateLayer(std::uint32_t id);
+    // Re-registers every layer's parameters (after an edit that changed which exist) and re-binds.
+    void refreshLayerParameters();
 
     // ---- built-in post-processing ----
     [[nodiscard]] scene::PostSettings& post() { return post_; }
@@ -350,6 +367,8 @@ private:
     void applyWorldMacros();      // regenerates every world macro's routes (after load)
     void ensureMacroKnob(const std::string& knob, float defaultValue);
     shaders::ShaderLayerSet shaderLayers_;
+    comp::LayerStack layers_;
+    void removeLayerParameters(); // drops "layers/*" from params_ (before a reload or a delete)
     scene::PostSettings post_;
     scene::PostParameters postParams_;
     scene::LensSettings lens_;

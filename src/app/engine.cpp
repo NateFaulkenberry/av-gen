@@ -114,9 +114,68 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
     }
     resetCameraState();
     shaderLayers_.reattach();
+    // The composition's layer parameters (ADR-081), with everything else that has to survive a
+    // scene swap -- and before rebind(), because a timeline track naming a parameter that does not
+    // exist yet binds to nothing and then does nothing, quietly (ADR-075, ADR-080).
+    layers_.detach();
+    layers_.attach(params_);
     addDefaultPostRoutes();
     rebind();
     modulator_.resetState();
+}
+
+void Engine::removeLayerParameters() {
+    timeline_.unbind(); // the tracks hold pointers into the set these are about to leave
+    for (const auto& layer : layers_.layers()) {
+        layers_.removeParameters(params_, *layer);
+    }
+    layers_.detach();
+}
+
+void Engine::refreshLayerParameters() {
+    layers_.attach(params_);
+    rebind();
+}
+
+comp::TextLayer& Engine::addTextLayer(std::string text, double startSeconds, double endSeconds) {
+    comp::TextLayer& layer = layers_.addText(std::move(text), startSeconds, endSeconds);
+    layer.attach(params_);
+    rebind();
+    return layer;
+}
+
+comp::ShapeLayer& Engine::addShapeLayer(comp::ShapeKind shape) {
+    comp::ShapeLayer& layer = layers_.addShape(shape);
+    layer.attach(params_);
+    rebind();
+    return layer;
+}
+
+bool Engine::removeLayer(std::uint32_t id) {
+    const comp::Layer* layer = layers_.find(id);
+    if (layer == nullptr) {
+        return false;
+    }
+    timeline_.unbind();
+    layers_.removeParameters(params_, *layer);
+    // Tracks that were driving the layer that just left would sit unbound for ever. Dropping them
+    // with the layer is the honest thing: the alternative is a saved project full of tracks aimed
+    // at nothing, which is exactly the failure this system was built to stop having.
+    auto& tracks = timeline_.tracks();
+    const std::string prefix = fmt::format("layers/{}/", id);
+    std::erase_if(tracks, [&](const params::Track& t) { return t.target.rfind(prefix, 0) == 0; });
+    const bool removed = layers_.remove(id);
+    rebind();
+    return removed;
+}
+
+comp::Layer* Engine::duplicateLayer(std::uint32_t id) {
+    comp::Layer* copy = layers_.duplicate(id);
+    if (copy != nullptr) {
+        copy->attach(params_);
+        rebind();
+    }
+    return copy;
 }
 
 void Engine::resetCameraState() {
@@ -165,6 +224,7 @@ void Engine::detachSceneParameters() {
         comp->detach();
     }
     shaderLayers_.detach();
+    layers_.detach();
     timeline_.unbind();
 }
 
@@ -544,6 +604,13 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
         }
         doc["worldMacros"] = std::move(macros);
     }
+    // The 2D composition (ADR-081). Pulled back from the parameters first: the inspector and the
+    // timeline write through the parameter set, and a project saved from the authored fields alone
+    // would lose every edit made with a slider.
+    layers_.pullAuthored();
+    if (!layers_.empty()) {
+        doc["composition"] = layers_.toJson();
+    }
     doc["render"] = render_.toJson();
     doc["control"] = controlHub_.map().toJson();
     if (outputs_.is_array() && !outputs_.empty()) {
@@ -722,6 +789,20 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         }
     }
 
+    // ---- the 2D composition (ADR-081) ----
+    // Here, and not later: the parameter block below carries "layers/<id>/..." values, and the
+    // timeline below carries tracks aimed at them. Both need the parameters to exist first, and a
+    // project written before this feature existed simply has no "composition" key.
+    removeLayerParameters();
+    if (const auto composition = doc.find("composition"); composition != doc.end()) {
+        if (auto r = layers_.fromJson(*composition); !r) {
+            return r;
+        }
+    } else {
+        layers_.clear();
+    }
+    layers_.attach(params_);
+
     if (auto r = params::loadProject(doc, params_, modulator_, &sources_, &presets_); !r) {
         return r;
     }
@@ -820,6 +901,8 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
 }
 
 void Engine::newProject() {
+    removeLayerParameters();
+    layers_.clear();
     timeline_.clear();
     cueState_ = {};
     cueApplied_ = false;

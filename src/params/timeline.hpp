@@ -142,6 +142,11 @@ public:
     // Resolves every track's target in `params`; unknown targets leave `param` null (the track
     // is kept so a later scene can bind it). Returns an error naming the unresolved targets.
     [[nodiscard]] Result<void> bind(ParameterSet& params);
+    // The targets the last bind() could not resolve, deduplicated and in track order. A track that
+    // names a parameter this build does not have is a feature that does nothing and says nothing,
+    // and that has cost this project two features already (ADR-075, ADR-080). bind() logs it; this
+    // is so the editor can *show* it, next to the tracks, for as long as it is still true.
+    [[nodiscard]] const std::vector<std::string>& unboundTargets() const { return unbound_; }
     void unbind();
     // Writes the finals of every enabled, bound track. Call after ParameterSet::resetFinals()
     // and before the modulator's routes. Does nothing when `enabled` is false.
@@ -160,6 +165,7 @@ public:
 private:
     std::vector<Track> tracks_;
     std::vector<Cue> cues_;
+    std::vector<std::string> unbound_;
 };
 
 } // namespace avgen::params
