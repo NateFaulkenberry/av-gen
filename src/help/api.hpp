@@ -14,14 +14,22 @@
 // Wrapping this in a registry is meant to be about ten lines:
 //
 //     for (const help::ToolDescriptor& tool : help::tools()) {
-//         registry.add({.name = tool.name,
-//                       .description = tool.description,
+//         // `name` is a view of a string literal with static lifetime, so copying it into the
+//         // closure is safe -- and it has to be copied, or the lambda outlives the loop variable.
+//         const std::string_view name = tool.name;
+//         registry.add({.name = std::string(tool.name),
+//                       .description = std::string(tool.description),
 //                       .schema = nlohmann::json::parse(tool.parametersSchema),
 //                       .readOnly = tool.readOnly,
-//                       .run = [&db](const nlohmann::json& args) {
-//                           return help::dispatch(db, tool.name, args);
+//                       .run = [&db, name](const nlohmann::json& args) {
+//                           return help::dispatch(db, name, args);
 //                       }});
 //     }
+//
+// `db` is one `help::HelpDatabase` loaded once at startup. Every call here takes it by const
+// reference and none of them mutates it; the search index is built during the load rather than on
+// the first query, so one loaded instance can serve the panel and the orchestrator concurrently.
+// Loading it, however, is setup and must finish before either consumer starts.
 //
 // `dispatch` never throws: a bad argument comes back as `{"error": "..."}` with the same shape as a
 // success, because a tool that throws into an orchestrator's loop is a tool that ends a task.

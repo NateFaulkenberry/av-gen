@@ -135,7 +135,11 @@ Result<HelpLoadReport> HelpDatabase::loadDirectory(const std::filesystem::path& 
     report.shortcuts = impl_->features.shortcuts().size();
 
     impl_->report = report;
-    impl_->indexDirty = true;
+    // Built here rather than on the first query. The lazy rebuild mutates through a const method,
+    // which is fine for one thread and a data race for two -- and two is the whole point of §25:
+    // the panel and the control plane share one database. Building it while loading, on the thread
+    // that loaded, means every const call afterwards really is const.
+    impl_->rebuild();
     return report;
 }
 

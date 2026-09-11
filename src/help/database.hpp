@@ -44,6 +44,11 @@ struct HelpLoadReport {
     std::vector<std::string> errors; // one per file that failed to parse; loading continues
 };
 
+// Threading: once a load has finished, every const method here is safe to call from several
+// threads at once -- the search index is built during the load rather than on the first query, so
+// nothing is mutated behind a const call. The mutating methods (`loadDirectory`, `addDocument`,
+// `addFeature`, `addShortcut`, `setSearchBackend`) are setup, and are not safe against a concurrent
+// reader.
 class HelpDatabase {
 public:
     HelpDatabase();
