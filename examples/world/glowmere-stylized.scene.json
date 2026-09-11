@@ -1486,6 +1486,29 @@
    }
   },
   {
+   "name": "wanderer",
+   "kind": "gltf",
+   "asset": "../../assets/imported/alien.gltf",
+   "position": [
+    6.0,
+    -8.0,
+    -30.0
+   ],
+   "scale": [
+    0.08,
+    0.08,
+    0.08
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.35,
+    "speed": 1.0,
+    "updateHz": 30,
+    "cullDistance": 220.0
+   },
+   "visible": true
+  },
+  {
    "name": "visitor",
    "kind": "procedural",
    "position": [
@@ -1749,6 +1772,74 @@
      "chain": {
       "attackMs": 140.0,
       "decayMs": 700.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "wanderer",
+   "node": "wanderer",
+   "seed": 11235813,
+   "cullDistance": 240.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walk",
+    "run": "Run",
+    "turn": "Walk",
+    "observe": "Idle",
+    "react": "Idle"
+   },
+   "behaviors": [
+    {
+     "kind": "interest",
+     "signal": "music.impact",
+     "subjects": [
+      "visitor",
+      "elder",
+      "beacon-grove"
+     ],
+     "observeChance": 0.26,
+     "minDwell": 2.2,
+     "maxDwell": 6.0,
+     "alertThreshold": 0.32,
+     "reactionDecay": 1.2
+    },
+    {
+     "kind": "wander",
+     "speed": 0.85,
+     "runSpeed": 2.3,
+     "turnRate": 140.0,
+     "arrive": 1.0,
+     "minRange": 4.0,
+     "maxRange": 11.0,
+     "pauseMin": 2.0,
+     "pauseMax": 7.0,
+     "homeRadius": 14.0
+    },
+    {
+     "kind": "lookAt",
+     "turnRate": 90.0,
+     "weight": 1.0
+    }
+   ],
+   "reactions": [
+    {
+     "signal": "audio.rms",
+     "target": "wander/speed",
+     "depth": 1.4,
+     "chain": {
+      "attackMs": 520.0,
+      "decayMs": 1800.0
+     }
+    },
+    {
+     "signal": "music.drop",
+     "target": "interest/observeChance",
+     "depth": 0.3,
+     "chain": {
+      "envelope": "peakhold",
+      "envelopeFallPerSecond": 0.3,
+      "envelopeHoldMs": 1100.0
      }
     }
    ]
