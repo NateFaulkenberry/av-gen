@@ -188,12 +188,17 @@ Result<CityPlan> planCity(const CitySettings& settings) {
                     // back of the building in front of it. A test found exactly that.
                     const bool coreEdge = dx == 1 || dz == 1 || dx == settings.blockCells - 2 ||
                                           dz == settings.blockCells - 2;
+                    // Both axes at the core's edge: the corner of the block, where two streets meet.
+                    const bool coreCorner =
+                        (dx == 1 || dx == settings.blockCells - 2) &&
+                        (dz == 1 || dz == settings.blockCells - 2);
                     if (plaza) {
                         cell.kind = CellKind::Plaza;
                     } else if (edge) {
                         cell.kind = CellKind::Pavement;
                     } else if (coreEdge) {
                         cell.kind = CellKind::Plot;
+                        cell.corner = coreCorner;
                     } else {
                         cell.kind = CellKind::Courtyard;
                     }

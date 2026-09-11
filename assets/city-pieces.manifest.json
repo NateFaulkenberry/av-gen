@@ -1136,6 +1136,163 @@
     "material": {
      "roughness": 0.9
     }
+   },
+   {
+    "name": "street-lamp",
+    "file": "kenney/city/city-kit-roads/light-square.glb",
+    "category": "architectural",
+    "archetype": "lamp",
+    "triangles": 60,
+    "naturalSize": [
+     0.05,
+     0.6,
+     0.2375
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.0,
+    "tags": [
+     "streetprop",
+     "city"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "naturalCentre": [
+     0.0,
+     0.0,
+     -0.0938
+    ]
+   },
+   {
+    "name": "street-lamp-curved",
+    "file": "kenney/city/city-kit-roads/light-curved.glb",
+    "category": "architectural",
+    "archetype": "lamp",
+    "triangles": 92,
+    "naturalSize": [
+     0.05,
+     0.675,
+     0.225
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.0,
+    "tags": [
+     "streetprop",
+     "city"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "naturalCentre": [
+     0.0,
+     0.0,
+     -0.0875
+    ]
+   },
+   {
+    "name": "street-lamp-double",
+    "file": "kenney/city/city-kit-roads/light-square-double.glb",
+    "category": "architectural",
+    "archetype": "lamp",
+    "triangles": 88,
+    "naturalSize": [
+     0.05,
+     0.6,
+     0.425
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.0,
+    "tags": [
+     "streetprop",
+     "city"
+    ],
+    "material": {
+     "roughness": 0.8
+    }
+   },
+   {
+    "name": "street-signal",
+    "file": "kenney/city/city-kit-roads/traffic-light.glb",
+    "category": "architectural",
+    "archetype": "signal",
+    "triangles": 212,
+    "naturalSize": [
+     0.1176,
+     0.515,
+     0.09
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.0,
+    "tags": [
+     "streetprop",
+     "city"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "naturalCentre": [
+     -0.0138,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "name": "street-sign-stop",
+    "file": "kenney/city/city-kit-roads/road-sign-stop.glb",
+    "category": "architectural",
+    "archetype": "sign",
+    "triangles": 104,
+    "naturalSize": [
+     0.0775,
+     0.4941,
+     0.1382
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.0,
+    "tags": [
+     "streetprop",
+     "city"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "naturalCentre": [
+     -0.0127,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "name": "street-sign-street",
+    "file": "kenney/city/city-kit-roads/road-sign-street.glb",
+    "category": "architectural",
+    "archetype": "sign",
+    "triangles": 154,
+    "naturalSize": [
+     0.1963,
+     0.475,
+     0.1962
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.35,
+    "preferredDensity": 0.0,
+    "tags": [
+     "streetprop",
+     "city"
+    ],
+    "material": {
+     "roughness": 0.8
+    },
+    "naturalCentre": [
+     -0.0731,
+     0.0,
+     0.0731
+    ]
    }
   ]
  }

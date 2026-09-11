@@ -355,7 +355,15 @@ TEST_CASE("The placer dresses every cell the library has a piece for", "[world][
         plan.countOf(world::CellKind::Road) + plan.countOf(world::CellKind::Junction) +
         plan.countOf(world::CellKind::Crossing) + plan.countOf(world::CellKind::Pavement) +
         plan.countOf(world::CellKind::Courtyard) + plan.countOf(world::CellKind::Plot) * 2;
-    CHECK(placed->instanceCount() == dressable);
+    // Tiles only. Props stand on cells and are counted by their own tests; a lamp post is not a
+    // second pavement.
+    std::size_t tiles = 0;
+    for (const world::CityPlacement& p : placed->placements) {
+        if (!p.prop) {
+            tiles += p.cloud->count();
+        }
+    }
+    CHECK(tiles == dressable);
 
     // Including the buildings, which is what distinguishes a city from a road layout. A plot left
     // undressed is not an error and still renders -- as an empty block -- so the report is the only
@@ -401,10 +409,10 @@ TEST_CASE("A placed tile is one module across and square to the lattice", "[worl
 
     std::set<std::pair<int, int>> occupied;
     for (const world::CityPlacement& p : placed->placements) {
-        // Ground pieces only. A building is not a tile: it has no neighbour to meet across its
-        // edges, and it is scaled to its plot rather than to the pack (see "A building fits its
-        // plot whatever size it was drawn").
-        if (p.kind == world::CellKind::Plot) {
+        // Ground pieces only. A building is not a tile -- it has no neighbour to meet across its
+        // edges, and is scaled to its plot rather than to the pack -- and neither is a lamp post or
+        // a tree, which stand *on* a cell rather than being it.
+        if (p.kind == world::CellKind::Plot || p.prop) {
             continue;
         }
         const assets::AssetDescriptor* asset = library->find(p.asset);
@@ -786,16 +794,22 @@ TEST_CASE("A block builds from one family", "[world][city][place]") {
                 (pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
             const int cz = static_cast<int>(std::floor(
                 (pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
-            const glm::ivec2 block = plan.at({cx, cz}).block;
-            REQUIRE(block.x >= 0);
-            familiesPerBlock[{block.x, block.y}].insert(it->second);
+            const world::CityCell at = plan.at({cx, cz});
+            REQUIRE(at.block.x >= 0);
+            if (at.corner) {
+                continue; // the corner shop: deliberately not the block's family
+            }
+            familiesPerBlock[{at.block.x, at.block.y}].insert(it->second);
         }
     }
     REQUIRE(familiesPerBlock.size() > 1);
     std::set<std::string> distinct;
     for (const auto& [block, families] : familiesPerBlock) {
+        // The block's own family, and nothing else -- corners excluded above, since a corner is
+        // allowed to trade. Everything between the corners is one family, which is what makes a
+        // street read as a street.
         INFO("block " << block.first << "," << block.second << " has " << families.size()
-                      << " families");
+                      << " families away from its corners");
         CHECK(families.size() == 1);
         distinct.insert(*families.begin());
     }
@@ -1008,11 +1022,16 @@ TEST_CASE("A block's ground belongs to its family", "[world][city][place]") {
                 std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
             const int cz = static_cast<int>(
                 std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
-            const glm::ivec2 block = plan.at({cx, cz}).block;
-            REQUIRE(block.x >= 0);
-            INFO(p.asset << " is " << it->second << " ground on block " << block.x << ","
-                         << block.y);
-            CHECK(it->second == roles.familyFor(block, s.seed));
+            const world::CityCell at = plan.at({cx, cz});
+            REQUIRE(at.block.x >= 0);
+            if (at.corner) {
+                // A corner plot may trade in another family, and its forecourt goes with it: a shop
+                // on a grass lawn would be the odder result.
+                continue;
+            }
+            INFO(p.asset << " is " << it->second << " ground on block " << at.block.x << ","
+                         << at.block.y);
+            CHECK(it->second == roles.familyFor(at.block, s.seed));
             ++checked;
         }
     }
@@ -1062,10 +1081,13 @@ TEST_CASE("A street steps rather than jumps", "[world][city][place]") {
                 std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
             const int cz = static_cast<int>(
                 std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
-            const glm::ivec2 block = plan.at({cx, cz}).block;
-            REQUIRE(block.x >= 0);
-            perBlock[{block.x, block.y}].push_back(aspect);
-            familyOfBlock[{block.x, block.y}] = roles.familyFor(block, s.seed);
+            const world::CityCell at = plan.at({cx, cz});
+            REQUIRE(at.block.x >= 0);
+            if (at.corner) {
+                continue; // a corner may be another family entirely; the band governs the terrace
+            }
+            perBlock[{at.block.x, at.block.y}].push_back(aspect);
+            familyOfBlock[{at.block.x, at.block.y}] = roles.familyFor(at.block, s.seed);
         }
     }
     REQUIRE(perBlock.size() > 4);
@@ -1181,4 +1203,130 @@ TEST_CASE("A piece that dresses the ground actually covers its tile", "[world][c
         ++checked;
     }
     CHECK(checked > 0);
+}
+
+TEST_CASE("A corner may trade in another family, and nowhere else may", "[world][city][place]") {
+    // Three other tests exclude corner plots, so this is what keeps that exclusion honest: without
+    // it, a corner rule that never fired would leave every one of them passing.
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+    REQUIRE(roles.plotFamilies.size() > 1);
+
+    world::CitySettings s;
+    s.blocksX = 4;
+    s.blocksZ = 4;
+    s.blockCells = 6;
+    s.plazaFraction = 0.0f;
+    s.seed = 5150u;
+    const world::CityPlan plan = planOrFail(s);
+
+    std::map<std::string, std::string> familyOf;
+    for (const auto& [family, names] : roles.plotFamilies) {
+        for (const std::string& n : names) {
+            familyOf[n] = family;
+        }
+    }
+    auto placed = world::placeCity(plan, roles, *library);
+    REQUIRE(placed.has_value());
+
+    std::size_t corners = 0;
+    std::size_t cornersTrading = 0;
+    std::size_t interior = 0;
+    for (const world::CityPlacement& p : placed->placements) {
+        if (p.kind != world::CellKind::Plot || p.prop) {
+            continue;
+        }
+        const auto it = familyOf.find(p.asset);
+        REQUIRE(it != familyOf.end());
+        for (const glm::vec3& pos : p.cloud->positions()) {
+            const float m = s.moduleSize;
+            const int cx = static_cast<int>(
+                std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
+            const int cz = static_cast<int>(
+                std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
+            const world::CityCell at = plan.at({cx, cz});
+            REQUIRE(at.block.x >= 0);
+            const std::string block = roles.familyFor(at.block, s.seed);
+            if (at.corner) {
+                ++corners;
+                cornersTrading += (it->second != block) ? 1 : 0;
+            } else {
+                ++interior;
+                // The rule the other tests lean on: away from a corner, a block is one family.
+                INFO(p.asset << " is " << it->second << " on a " << block << " block, not a corner");
+                CHECK(it->second == block);
+            }
+        }
+    }
+    REQUIRE(corners > 0);
+    REQUIRE(interior > 0);
+    // Some corners trade and some do not -- `cornerMix` is a chance, not a rule that every corner is
+    // a shop, which would be its own kind of pattern.
+    INFO(cornersTrading << " of " << corners << " corners trade in another family");
+    CHECK(cornersTrading > 0);
+    CHECK(cornersTrading < corners);
+}
+
+TEST_CASE("Street furniture stands at the kerb and faces the road", "[world][city][place]") {
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+    REQUIRE_FALSE(roles.streetProp.empty());
+
+    world::CitySettings s;
+    s.blocksX = 3;
+    s.blocksZ = 3;
+    s.blockCells = 5;
+    s.plazaFraction = 0.0f;
+    s.seed = 616u;
+    const world::CityPlan plan = planOrFail(s);
+    auto placed = world::placeCity(plan, roles, *library);
+    REQUIRE(placed.has_value());
+
+    std::set<std::string> street(roles.streetProp.begin(), roles.streetProp.end());
+    std::size_t placedCount = 0;
+    for (const world::CityPlacement& p : placed->placements) {
+        if (!street.contains(p.asset)) {
+            continue;
+        }
+        CHECK(p.prop); // it stands on a footway; it is not the footway
+        for (const glm::vec3& pos : p.cloud->positions()) {
+            const float m = s.moduleSize;
+            const int cx = static_cast<int>(
+                std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
+            const int cz = static_cast<int>(
+                std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
+            INFO(p.asset << " at " << pos.x << "," << pos.z << " stands on "
+                         << world::cellKindName(plan.kindAt({cx, cz})));
+            CHECK(plan.kindAt({cx, cz}) == world::CellKind::Pavement);
+
+            // At the kerb: pushed well off the cell's centre, towards a carriageway. A lamp post in
+            // the middle of a footway is in the way, and one at the back of it is in a garden.
+            const glm::vec3 centre = plan.centreOf({cx, cz});
+            const glm::vec2 offset(pos.x - centre.x, pos.z - centre.z);
+            CHECK(std::max(std::abs(offset.x), std::abs(offset.y)) > m * 0.2f);
+
+            // And the cell it was pushed towards carries traffic.
+            const glm::ivec2 toward =
+                std::abs(offset.x) > std::abs(offset.y)
+                    ? glm::ivec2(offset.x > 0.0f ? 1 : -1, 0)
+                    : glm::ivec2(0, offset.y > 0.0f ? 1 : -1);
+            INFO("pushed towards " << toward.x << "," << toward.y << " which is "
+                                   << world::cellKindName(plan.kindAt({cx + toward.x, cz + toward.y})));
+            CHECK(plan.isCarriageway({cx + toward.x, cz + toward.y}));
+            ++placedCount;
+        }
+    }
+    REQUIRE(placedCount > 0);
+    // Sparse, not on every footway cell: at one module per cell, furnishing them all is a lamp post
+    // every 8 m, about three times the real spacing.
+    INFO(placedCount << " pieces over " << plan.countOf(world::CellKind::Pavement) << " pavements");
+    CHECK(placedCount < plan.countOf(world::CellKind::Pavement) / 2);
 }

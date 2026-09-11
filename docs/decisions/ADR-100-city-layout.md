@@ -214,3 +214,49 @@ alongside the window. A call to `imgui_->applyTheme(...)` in the headless branch
 method call on a null `unique_ptr`, and it took down every `--headless` render, the `--render` batch
 path and `tools/review_frames.py` with it — while the full test suite stayed green, because nothing
 in it launches the binary headless. That is the coverage gap worth closing, not just the null.
+
+## A piece tagged for the ground must have ground on it
+
+A role tag says what a piece *dresses*. Nothing until now said it had to be *coverable ground*, and
+the gap was not theoretical: `road-straight-barrier` — two rails with no carriageway between them —
+was tagged `road`, drawn for half the road cells, and each one rendered as a hole through to the
+background.
+
+Every count said the city was complete, because it was: a piece was placed on every cell. `placeCity`
+counts pieces; it cannot know whether a piece has a surface. A bounding box cannot tell either, since
+the rails span the full tile and so the box is exactly a road's box. Only the triangles know, which
+is why the test that now guards this asks whether any triangle lies under five points spread across
+the tile — and not the corners, where a piece is allowed to stop short so a neighbour's kerb may
+overhang into it.
+
+The general rule: **a role tag is a claim about geometry, and claims about geometry get checked
+against geometry.** Anything that becomes the floor under a cell is subject to it.
+
+## What stands on a cell is not the cell
+
+`CityPlacement::prop` separates the two. A tile is one module across and square to the lattice; a
+lamp post and a tree are neither, and three tests were only distinguishing them by matching asset
+names against a role list — which works until a piece is tagged for two things.
+
+## Street furniture belongs to the road, so the road places it
+
+Yard props are jittered across their cell because a yard has no preferred spot. Street furniture is
+the opposite: it takes its position *from the carriageway beside it* — pushed out to the kerb, jogged
+along it so a run of lamps is not a ruled line, and turned to face the traffic. A lamp in the middle
+of a footway is in the way; one at the back is in a garden; a signal facing the pavement is pointless.
+
+A pavement cell with no carriageway beside it is interior to a block and is furnished with nothing.
+
+## The exception that makes the rule readable
+
+A block is one family, which is what makes a street read as a street — and a whole city of such
+blocks is a diagram. `cornerMix` lets a plot on a block's corner build from another family.
+
+Corners specifically, because that is where two streets meet and where a shop stands. Scattering the
+exception through the terrace would not read as variety; it would read as the family rule failing.
+
+Which family a corner trades in comes from the seed, never from a name in code. `city_place.cpp`
+does not know that "commercial" exists — it is a word an artist wrote in a manifest, and the rule is
+"a family other than this block's".
+
+The corner's *ground* follows its trade, since a shop standing on a lawn is the stranger result.

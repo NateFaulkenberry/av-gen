@@ -390,15 +390,60 @@ block against **its own family's** range, and fails the broken placer at 0.86 wh
 scores under 0.6. Every new check here was negative-controlled by breaking the code it tests; two of
 them needed rewriting when the control passed.
 
-## Next — the road graph, and what dressing is still thin
+**A road tile has to have a road on it.** The correction that mattered most here, and a correction
+of this document. The previous note blamed "commercial and industrial ground is dark". That was
+wrong. `road-straight-barrier` was tagged `road`: 48 vertices, every one at |x| >= 0.45 — two rails
+meant to run *along* a carriageway, with no carriageway of its own. Tagged as a road it was drawn for
+about half the road cells, and each rendered as a hole straight through to the background.
 
-1. **Commercial and industrial ground is dark** (`tile-low`, plain asphalt) and reads as a hole from a
-   low angle, where the suburban grass reads correctly. This is art direction, not a defect: the kit
-   has no light forecourt tile. A recoloured variant or a different piece would fix it.
-2. **Pavements have nothing on them** — no lamp posts, bins, benches, bus stops. `city-kit-roads` has
-   95 pieces, most untagged, and the prop scatter that yards use would work on a footway unchanged.
-3. **Blocks are one family throughout.** Real cities have a corner shop in a residential street. The
-   family could be a weighting rather than a hard pick.
+Nothing in the system could see it. `bare = 0`: a piece was placed on all 361 cells. `placeCity`
+counts pieces and cannot know whether a piece has a surface — and neither can a bounding box, since
+the rails span the full 1x1 tile, so the box is exactly the box of a road.
+
+What found it was measuring instead of guessing, in three steps worth repeating:
+
+1. **Sample the albedo.** Reading each piece's UVs against its palette put `tile-low` at luma 168.7 —
+   the *lightest* ground in the pack. The "dark ground" theory died there.
+2. **Raise the sun.** The dark rectangles survived a 55-degree sun, so they were not shadows.
+3. **Render one asset at a time.** `road-straight` alone covers the map completely;
+   `road-straight-barrier` alone leaves the entire road grid black. No ambiguity left.
+
+A test now asserts the invariant that was only ever implied: a piece tagged for a ground role must
+have triangles under five points spread across its tile — not the corners, where a piece may stop
+short to let a neighbour's kerb overhang. The piece is retagged `roadside` rather than dropped:
+rails alongside a carriageway are real, and need the layered placement that plots already use.
+
+**Street furniture.** Lamps, a traffic signal and signs stand on footways. Placed at the **kerb**,
+not jittered like a yard prop — a lamp post in the middle of a footway is in the way, one at the back
+of it is in a garden — and facing the carriageway, which is the point of a signal and the right way
+round for a lamp's arm. `streetPropChance` (0.22) keeps them sparse: at one module per cell,
+furnishing every pavement is a lamp every 8 m, about three times the real spacing. A pavement cell
+with no carriageway beside it is inside a block and gets nothing.
+
+**The corner shop.** `cornerMix` (0.5) lets a plot on a block's corner build from a family other than
+its block's. Corners only: that is where two streets meet and where a shop would actually stand, and
+a bungalow dropped mid-terrace is not variety but a mistake. Which other family comes from the seed,
+so no family is named in code — "commercial" is a word in a manifest, not a concept `city_place.cpp`
+knows. A corner's ground goes with its trade, since a shop on a lawn is the odder result.
+
+`CityPlacement::prop` now distinguishes a thing standing *on* a cell from the cell itself. Three
+tests were conflating them, and a lamp post is not a second pavement.
+
+**Three tests had to exclude corners, so a fourth now proves corners trade** — otherwise those
+exclusions would quietly remove the coverage they look like they preserve. Both new rules were
+negative-controlled: disabling the corner draw fails at "0 of 64 corners trade", and placing
+furniture at the cell centre instead of the kerb fails its offset check.
+
+## Next
+
+1. **Layered decoration on roads.** `road-straight-barrier` is waiting on it, and so are the ~80
+   still-untagged pieces in `city-kit-roads` (bends, roundabouts, driveways, highway signs). A road
+   cell that can carry a decoration as well as a surface is the same two-piece arrangement a plot
+   already uses.
+2. **The pavement ring is 8 m wide.** A block's edge cells are all footway, so at one module per cell
+   the footways read as plazas. Either the ring should be a fraction of a cell, or blocks want a
+   finer module than roads do.
+3. **The road graph** (§2) and **interiors** (§3), still as the brief describes them.
 
 ## Not started
 

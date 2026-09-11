@@ -42,6 +42,9 @@ constexpr const char* kFamilyPrefix = "family:";
 // Props are tagged by what they are, not by a cell kind, because a prop is not what a cell *is* --
 // it is what stands on it, and several of them stand on one.
 constexpr const char* kPropTag = "prop";
+// Street furniture: what stands on a footway rather than in a yard. A separate vocabulary because
+// pavements do not split by family -- a street is the same street whichever block it runs past.
+constexpr const char* kStreetPropTag = "streetprop";
 
 // The family an asset declares, or empty. One definition, used by every role that splits by family.
 [[nodiscard]] std::string familyOf(const assets::AssetDescriptor& asset) {
@@ -124,6 +127,7 @@ CityLibrary CityLibrary::fromTags(const assets::AssetLibrary& library) {
 
     // Props, which have no cell kind of their own.
     collect(kPropTag, out.prop);
+    collect(kStreetPropTag, out.streetProp);
 
     // Families, from a `family:<name>` tag. A prefix rather than a bare tag because the code has to
     // be able to tell a family from any other word an artist writes: every one of these buildings is
@@ -162,6 +166,15 @@ const std::vector<std::string>& CityLibrary::forFamily(CellKind role,
         }
     }
     return forKind(role);
+}
+
+std::vector<std::string> CityLibrary::families() const {
+    std::vector<std::string> out;
+    out.reserve(plotFamilies.size());
+    for (const auto& [family, names] : plotFamilies) {
+        out.push_back(family);
+    }
+    return out;
 }
 
 const std::vector<std::string>& CityLibrary::propsFor(const std::string& family) const {
@@ -204,9 +217,11 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
         std::vector<glm::vec4> rotations;
         std::vector<glm::vec3> scales;
         CellKind kind = CellKind::Empty;
+        bool prop = false;
     };
     std::vector<std::pair<std::string, Gather>> gathered;
-    const auto gatherFor = [&gathered](const std::string& asset, CellKind kind) -> Gather& {
+    const auto gatherFor = [&gathered](const std::string& asset, CellKind kind,
+                                       bool prop) -> Gather& {
         for (auto& [name, g] : gathered) {
             if (name == asset) {
                 return g;
@@ -214,6 +229,7 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
         }
         gathered.emplace_back(asset, Gather{});
         gathered.back().second.kind = kind;
+        gathered.back().second.prop = prop;
         return gathered.back().second;
     };
 
@@ -325,7 +341,7 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
             position.x -= offset.x;
             position.z -= offset.z;
         }
-        Gather& g = gatherFor(name, role);
+        Gather& g = gatherFor(name, role, false);
         g.positions.push_back(position);
         g.rotations.emplace_back(rotation.x, rotation.y, rotation.z, rotation.w);
         g.scales.emplace_back(scale);
@@ -364,11 +380,63 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
             // plot rule -- a tree has no plot to fill, and stretching one to an 8 m footprint is how
             // a garden ends up with a single enormous shrub in it.
             const float scale = plan.settings.moduleSize / plan.settings.tileUnits;
-            Gather& g = gatherFor(name, CellKind::Courtyard);
+            Gather& g = gatherFor(name, CellKind::Courtyard, true);
             g.positions.push_back(position);
             g.rotations.emplace_back(rotation.x, rotation.y, rotation.z, rotation.w);
             g.scales.emplace_back(scale);
         }
+    };
+
+    // Street furniture stands at the kerb and faces the road. Not jittered across the cell like a
+    // yard prop: a lamp post in the middle of a footway is in the way, and one that has wandered to
+    // the back of it is in somebody's garden. The road is what it belongs to, so the road is what
+    // positions it.
+    const auto placeStreetProp = [&](glm::ivec2 coord) {
+        if (roles.streetProp.empty() || plan.settings.streetPropChance <= 0.0f) {
+            return;
+        }
+        Rng rng = cellRng(plan.settings.seed ^ 0x1B873593u, coord);
+        if (rng.nextFloat() >= plan.settings.streetPropChance) {
+            return;
+        }
+        // Which way the road is. A pavement cell with no carriageway beside it is inside a block,
+        // and furnishing it would put a traffic light in a back yard.
+        static constexpr glm::ivec2 kDirs[4] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
+        const glm::ivec2* toward = nullptr;
+        for (const glm::ivec2& dir : kDirs) {
+            if (plan.isCarriageway({coord.x + dir.x, coord.y + dir.y})) {
+                toward = &dir;
+                break;
+            }
+        }
+        if (toward == nullptr) {
+            return;
+        }
+        const std::string& name = roles.streetProp[rng.nextU32() % roles.streetProp.size()];
+        const assets::AssetDescriptor* asset = library.find(name);
+        if (asset == nullptr) {
+            noteUndressed(CellKind::Pavement);
+            return;
+        }
+        const float m = plan.settings.moduleSize;
+        glm::vec3 position = plan.centreOf(coord);
+        // Out towards the kerb, and along it by a little so a run of lamps is not a ruled line.
+        position.x += static_cast<float>(toward->x) * m * 0.34f +
+                      static_cast<float>(toward->y) * (rng.nextFloat() - 0.5f) * m * 0.4f;
+        position.z += static_cast<float>(toward->y) * m * 0.34f +
+                      static_cast<float>(toward->x) * (rng.nextFloat() - 0.5f) * m * 0.4f;
+        if (terrain != nullptr) {
+            position.y = terrain->heightAt(glm::vec2(position.x, position.z));
+        }
+        // Facing the carriageway, which is the whole point of a signal and the right way round for
+        // a lamp's arm. A quarter turn, because the street is on an axis.
+        const glm::quat rotation =
+            glm::angleAxis(quarterRadians(quarterTowards(*toward)), glm::vec3(0.0f, 1.0f, 0.0f));
+        const float scale = plan.settings.moduleSize / plan.settings.tileUnits;
+        Gather& g = gatherFor(name, CellKind::Pavement, true);
+        g.positions.push_back(position);
+        g.rotations.emplace_back(rotation.x, rotation.y, rotation.z, rotation.w);
+        g.scales.emplace_back(scale);
     };
 
     for (int z = 0; z < plan.depth; ++z) {
@@ -380,9 +448,30 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
             }
             // One family per block, chosen once. Its buildings, the ground under them and the things
             // standing in its yards all come from it, which is what makes a block read as one place.
-            const std::string family = cell.block.x >= 0
-                                           ? roles.familyFor(cell.block, plan.settings.seed)
-                                           : std::string{};
+            std::string family = cell.block.x >= 0
+                                     ? roles.familyFor(cell.block, plan.settings.seed)
+                                     : std::string{};
+            if (cell.kind == CellKind::Plot && cell.corner && !family.empty() &&
+                plan.settings.cornerMix > 0.0f) {
+                // The corner shop. A block of one family throughout is a suburb with nothing in it
+                // but houses; the corner is where the exception belongs, because that is where two
+                // streets meet and where a shop would actually stand. Which other family it draws
+                // from comes from the seed, so no family is named in code -- "commercial" is a word
+                // in a manifest, not a concept this file knows.
+                const std::vector<std::string> all = roles.families();
+                if (all.size() > 1) {
+                    Rng rng = cellRng(plan.settings.seed ^ 0xCC9E2D51u, coord);
+                    if (rng.nextFloat() < plan.settings.cornerMix) {
+                        std::vector<std::string> others;
+                        for (const std::string& f : all) {
+                            if (f != family) {
+                                others.push_back(f);
+                            }
+                        }
+                        family = others[rng.nextU32() % others.size()];
+                    }
+                }
+            }
             if (cell.kind == CellKind::Plot) {
                 // The ground first, then the building on it. Salted so the floor's choice is its own
                 // and not the building's -- without that, every plot that drew building number two
@@ -400,6 +489,9 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
                 continue;
             }
             placeOne(coord, cell, cell.kind, roles.forKind(cell.kind), 0u, family);
+            if (cell.kind == CellKind::Pavement) {
+                placeStreetProp(coord);
+            }
         }
     }
 
@@ -421,6 +513,7 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
         placement.name = "city-" + name;
         placement.asset = name;
         placement.kind = g.kind;
+        placement.prop = g.prop;
         placement.cloud = std::move(cloud);
         out.placements.push_back(std::move(placement));
     }

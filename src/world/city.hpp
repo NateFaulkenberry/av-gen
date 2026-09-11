@@ -65,6 +65,9 @@ struct CityCell {
     // For a road, the axis it runs along. For a plot, the way the building faces: towards the
     // nearest carriageway, so a building presents its front to a street rather than its back.
     Quarter rotation = Quarter::Zero;
+    // A plot on a corner of its block's buildable core, where two streets meet. Marked by the plan
+    // because the plan is what knows the shape of a block; a placer would have to re-derive it.
+    bool corner = false;
     // Which block this cell belongs to, or (-1,-1) for the street network between them. Carried so a
     // placer can vary a block's character without re-deriving which cells are in it.
     glm::ivec2 block{-1, -1};
@@ -115,6 +118,15 @@ struct CitySettings {
     // so a prop cannot cross into the cell beside it, which for a tree beside a road means standing
     // in the carriageway.
     float propSpread = 0.34f;
+    // How often a footway carries something -- a lamp, a traffic light, a sign. A fraction rather
+    // than a count, because street furniture is sparse: at one module per cell, furnishing every
+    // pavement cell puts a lamp post every 8 m, which is about three times the real spacing.
+    float streetPropChance = 0.22f;
+    // How often a corner plot builds from a family other than its block's. A block of one family
+    // throughout is a suburb with no corner shop in it; this is the exception that makes the rule
+    // read as a rule. Corners only, because a shop on the corner is where a shop goes -- a bungalow
+    // dropped in the middle of a terrace is not variety, it is a mistake.
+    float cornerMix = 0.5f;
 
     [[nodiscard]] Result<void> validate() const;
     // Cells across the whole plan, in each direction.
@@ -168,6 +180,7 @@ struct CityLibrary {
     std::vector<std::string> plot;     // buildings, all of them, whatever family
     std::vector<std::string> courtyard; // what fills the inside of a block
     std::vector<std::string> prop;      // things that stand *on* a cell rather than being it
+    std::vector<std::string> streetProp; // lamps, signals and signs, for the footway
     std::vector<std::string> plaza;    // ground for an open block
 
     // Buildings grouped by the family they belong to, from a `family:<name>` tag. A block picks one
@@ -206,6 +219,8 @@ struct CityLibrary {
                                                             const std::string& family) const;
     // Props for a family. Not a CellKind: a prop is not what a cell *is*, it is what stands on it.
     [[nodiscard]] const std::vector<std::string>& propsFor(const std::string& family) const;
+    // Every family that declares buildings, in a fixed order. The corner rule picks from this.
+    [[nodiscard]] std::vector<std::string> families() const;
     // Builds a library by reading the tags of an asset library: an entry tagged "road" dresses road
     // cells, and so on. Keeps the role vocabulary in the manifest, where an artist can change it,
     // rather than in this header.
@@ -216,7 +231,12 @@ struct CityLibrary {
 struct CityPlacement {
     std::string name;    // layer name, unique within a city: "city-road-straight"
     std::string asset;   // the library entry this came from
+    // The cell kind this dresses. For a prop, the kind of cell it stands on.
     CellKind kind = CellKind::Empty;
+    // True when this is a thing standing *on* a cell rather than the cell itself: a tree in a yard,
+    // a lamp on a footway. The distinction matters to anything that reasons about the ground -- a
+    // tile is one module across and square to the lattice, and a lamp post is neither.
+    bool prop = false;
     std::shared_ptr<spatial::PointCloud> cloud;
 };
 
