@@ -882,9 +882,25 @@ const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureLodM
     mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.lod.impostorSize)));
     auto it = meshes.find(key);
     if (it == meshes.end()) {
-        it = meshes.emplace(key, uploadMesh(scene::makeLodMesh(object.source, level, object.lod.impostorSize),
-                                            object.name))
-                 .first;
+        // What the level actually comes back as, against the level above it. A LOD level is only
+        // worth selecting if it is smaller than its predecessor, and the decimator that builds
+        // these is a vertex clustering with no way to guarantee its target: on the Quaternius trees
+        // it returns most of the source (ADR-078 predicted exactly this of the preserving
+        // simplifier, and it holds for this one too). A ladder whose rungs are all the same height
+        // is invisible in every counter the frame prints -- `lod=2/30/124/0` reads like a working
+        // LOD system either way -- so the achieved size is logged where a reader can see it. Taken
+        // before the emplace: ensureMesh() inserts into the same map.
+        const CachedMesh* base = ensureMesh(object);
+        const std::uint32_t sourceTris = base != nullptr ? base->indexCount / 3 : 0;
+        const CachedMesh uploaded =
+            uploadMesh(scene::makeLodMesh(object.source, level, object.lod.impostorSize), object.name);
+        log::debug("procedural '{}': lod {} = {} triangles, {:.0f}% of the source mesh's {}",
+                   object.name, level, uploaded.indexCount / 3,
+                   sourceTris > 0 ? 100.0 * static_cast<double>(uploaded.indexCount / 3) /
+                                        static_cast<double>(sourceTris)
+                                  : 0.0,
+                   sourceTris);
+        it = meshes.emplace(key, uploaded).first;
     }
     it->second.lastUsed = frame;
     return it->second.indexCount > 0 ? &it->second : nullptr;

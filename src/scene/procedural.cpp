@@ -99,6 +99,8 @@
 
 #include "scene/procedural.hpp"
 
+#include "assets/mesh_lod.hpp"
+
 #include "core/log.hpp"
 #include "core/color.hpp"
 #include "core/noise.hpp"
@@ -1478,14 +1480,49 @@ MeshData decimateMesh(const MeshData& mesh, int targetTriangles) {
 }
 
 Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize) {
-    // An imported mesh has no generator parameters to halve, so its levels are decimations of
+    // An imported mesh has no generator parameters to halve, so its levels are simplifications of
     // whatever the budget already left.
+    //
+    // They go through meshoptimizer (ADR-078), not through `decimateMesh`. The difference is not a
+    // refinement: `decimateMesh` is a vertex clustering on a uniform grid, and a grid has no way to
+    // *reach* a triangle count -- it snaps vertices into cells and keeps whatever triangles survive.
+    // On the two assets Glowmere leans on hardest that is close to nothing. Measured, before this:
+    //
+    //     valley_canopy  lod1 = 97% of the source, lod2 = 72%, lod3 = 72%   (asked 35 / 12 / 4)
+    //     valley_bushes  lod1 = 96%,               lod2 = 78%, lod3 = 78%
+    //
+    // -- a ladder whose rungs are all the same height, which every counter in the frame reports as
+    // a working LOD system because `lod=2/30/124/0` says how many instances chose each level and
+    // nothing said how big the levels were. The scene pass is fragment-bound and its fragment
+    // invocations are set by triangle count rather than by pixels (sub-pixel triangles still cost a
+    // quad each), so those percentages are very nearly the whole cost of those two layers.
+    //
+    // `vegetationLodSettings()` is the calibration ADR-078 measured for exactly this geometry and
+    // then left unused: the same ratios this function already asked for, lower attribute weights,
+    // and the sloppy fallback armed, which is what gets past a Quaternius tree's non-manifold
+    // branch junctions. It is used for every mesh source, not only for scatter: the fallback fires
+    // only on a level that stalled, so geometry that simplifies cleanly is unaffected by arming it.
+    //
+    // LOD0 is deliberately not routed through here -- it stays exactly the mesh `makeSourceMesh`
+    // builds -- so the near field is unchanged and only levels a viewer sees at a distance move.
     if (spec.kind == PrimitiveKind::Mesh && level > 0 && level <= 3 && spec.assetMesh) {
-        const auto full = static_cast<int>(spec.assetMesh->indices.size() / 3);
-        const int budget = spec.meshBudget > 0 ? std::min(spec.meshBudget, full) : full;
+        Result<MeshData> base = makeSourceMesh(spec);
+        if (!base) {
+            return base;
+        }
+        auto chain = assets::buildLodChain(*base, assets::vegetationLodSettings());
+        if (chain && static_cast<std::size_t>(level) < chain->levels.size()) {
+            MeshData out = std::move(chain->levels[static_cast<std::size_t>(level)].mesh);
+            if (!out.indices.empty() && out.valid()) {
+                return out;
+            }
+        }
+        // A mesh the simplifier refuses is still better served by the old clustering than by the
+        // source at every distance.
+        const auto full = static_cast<int>(base->indices.size() / 3);
         static constexpr std::array<float, 4> kLevelShare{1.0f, 0.35f, 0.12f, 0.04f};
-        return decimateMesh(*spec.assetMesh,
-                            std::max(static_cast<int>(static_cast<float>(budget) * kLevelShare[level]), 24));
+        return decimateMesh(*base,
+                            std::max(static_cast<int>(static_cast<float>(full) * kLevelShare[level]), 24));
     }
     if (level <= 0) {
         return makeSourceMesh(spec);

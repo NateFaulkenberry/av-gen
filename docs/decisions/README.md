@@ -81,4 +81,13 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [073](ADR-073-musical-signals.md) | Musical signals | Accepted |
 | [074](ADR-074-authored-heroes.md) | Heroes a scene can declare | Accepted |
 | [075](ADR-075-camera-director-connected.md) | The camera director, connected | Accepted |
-| [083](ADR-084-the-editors-frame.md) | The editor's frame: where the swapchain wait stands, and what a drag may cost | Accepted |
+| [076](ADR-076-editor-shell.md) | The editor shell | Accepted |
+| [077](ADR-077-frame-profiler.md) | The frame profiler | Accepted |
+| [078](ADR-078-mesh-lod.md) | Mesh LODs from meshoptimizer, and what the existing decimator is still for | Accepted |
+| [079](ADR-079-tilt-shift.md) | Tilt-shift | Accepted |
+| [080](ADR-080-camera-clearance.md) | Camera clearance | Accepted |
+| [081](ADR-081-shadow-stability.md) | Shadow stability | Accepted |
+| [082](ADR-082-lod-stability.md) | LOD stability | Accepted |
+| [083](ADR-083-composition-and-layers.md) | Composition and layers | Accepted |
+| [084](ADR-084-the-editors-frame.md) | The editor's frame: where the swapchain wait stands, and what a drag may cost | Accepted |
+| [085](ADR-085-lod-chain-wired.md) | The LOD ladder is built by meshoptimizer, and it has to descend | Accepted |

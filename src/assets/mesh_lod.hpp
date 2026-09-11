@@ -27,11 +27,15 @@ struct MeshOptimiseSettings {
     // and per hard edge, and some split more than that; without the weld the vertex cache and the
     // simplifier both see a mesh with more corners than it has.
     bool weld = true;
-    // Reorder triangles front-to-back within cache clusters. Off by default: it buys fewer shaded
-    // fragments at a measured cost to vertex-cache efficiency, and this engine's scene pass is
-    // vertex- and draw-bound rather than fragment-bound at editor resolution
-    // (docs/renderer-2-architecture.md §2), so the trade currently runs the wrong way. The number
-    // is meshoptimizer's threshold: 1.05 permits a 5% ACMR regression.
+    // Reorder triangles front-to-back within cache clusters. Off by default, but no longer for the
+    // reason first written here: that read "the scene pass is vertex- and draw-bound rather than
+    // fragment-bound", which was the conclusion §2 of docs/renderer-2-architecture.md drew from a
+    // confounded resolution sweep, and it is the opposite of the truth. The pass is fragment-bound.
+    // It stays off because the *overdraw* it removes is small -- a software early-Z arm, discarding
+    // every fragment behind the prepass depth, took 1.24 ms of a 21.36 ms pass on Glowmere, so the
+    // depth prepass is already doing this job -- and the ACMR regression is not. Revisit it on a
+    // scene with no prepass. The number is meshoptimizer's threshold: 1.05 permits a 5% ACMR
+    // regression.
     float overdrawThreshold = 0.0f; // 0 = skip the overdraw pass
 };
 
