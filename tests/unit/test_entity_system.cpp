@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -519,4 +520,49 @@ TEST_CASE("ticking a crowd of entities costs microseconds, not milliseconds", "[
     // A budget, not a benchmark: 64 entities is more than any shot here carries, and if a frame's
     // worth of behaviour ever costs a tenth of a 60 fps frame something has gone badly wrong.
     CHECK(perFrame < 1600.0);
+}
+
+TEST_CASE("two scenes share one behaviour profile", "[entity][serialisation]") {
+    // "A saucer that answers a mix" is a thing more than one scene wants. The profile carries the
+    // mapping and nothing about size or place, which is what lets a 16 m craft over Glowmere and a
+    // 2.6 m scout in a field be configured by the same file.
+    const std::filesystem::path dir = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "entities";
+    const auto profile = entity::loadProfile(dir / "craft-lights.profile.json");
+    REQUIRE(profile);
+    CHECK(profile->reactions.size() >= 8);
+    CHECK(profile->behaviors.empty()); // a mapping, not a motion
+
+    nlohmann::json j = nlohmann::json::array();
+    j.push_back({{"name", "visitor"},
+                 {"node", "visitor"},
+                 {"profile", "craft-lights.profile.json"},
+                 {"reactions",
+                  nlohmann::json::array({{{"signal", "audio.bass"}, {"target", "position"}, {"depth", -0.9}}})}});
+    const auto read = entity::entitiesFromJson(j, dir);
+    REQUIRE(read);
+    const entity::EntityDesc& e = (*read)[0];
+    // The profile's reactions come first and the scene's own are appended, so a local route lands
+    // on top of a shared one on the same property rather than instead of it.
+    CHECK(e.reactions.size() == profile->reactions.size() + 1);
+    CHECK(e.reactions.front().target == profile->reactions.front().target);
+    CHECK(e.reactions.back().target == "position");
+    CHECK(e.profile == "craft-lights.profile.json");
+
+    // Saving names the profile and writes only what this entity added, so the shared file stays
+    // shared instead of being inlined into every scene that used it.
+    const nlohmann::json written = entity::entityToJson(e);
+    CHECK(written["profile"] == "craft-lights.profile.json");
+    REQUIRE(written.contains("reactions"));
+    CHECK(written["reactions"].size() == 1);
+    const auto again = entity::entitiesFromJson(nlohmann::json::array({written}), dir);
+    REQUIRE(again);
+    CHECK((*again)[0].reactions.size() == e.reactions.size()); // and it round-trips without growing
+}
+
+TEST_CASE("a profile that is not there is an error naming the file", "[entity][diagnostics]") {
+    nlohmann::json j = nlohmann::json::array();
+    j.push_back({{"name", "visitor"}, {"profile", "no-such-profile.json"}});
+    const auto read = entity::entitiesFromJson(j, std::filesystem::path(AVGEN_SOURCE_DIR) / "examples");
+    REQUIRE_FALSE(read);
+    CHECK_THAT(read.error().message, ContainsSubstring("no-such-profile.json"));
 }

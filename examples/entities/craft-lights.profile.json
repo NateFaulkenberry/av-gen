@@ -1,0 +1,106 @@
+{
+ "format": "avgen-entity-profile",
+ "version": 1,
+ "name": "craft-lights",
+ "description": "How a saucer answers a mix, for any asset whose materials are named Light (the underside emitter) and Blue (the peripheral lenses). Bands rather than levels: the low end is heavy and slow, the top is fast and small, and the kick is an envelope rather than a gate, so the craft reads as answering the music rather than blinking along with it. Nothing here knows how big the craft is or where it is, which is why two scenes can share it.",
+ "reactions": [
+  {
+   "signal": "audio.bass",
+   "target": "parts/Light/emissiveGain",
+   "depth": 2.6,
+   "chain": {
+    "attackMs": 35.0,
+    "curve": "power",
+    "curveAmount": 1.6,
+    "decayMs": 260.0
+   }
+  },
+  {
+   "signal": "audio.onset",
+   "target": "parts/Light/emissiveGain",
+   "depth": 4.2,
+   "chain": {
+    "attackMs": 3.0,
+    "decayMs": 95.0,
+    "envelope": "peakhold",
+    "envelopeFallPerSecond": 7.0,
+    "envelopeHoldMs": 18.0
+   }
+  },
+  {
+   "signal": "audio.treble",
+   "target": "parts/Blue/emissiveGain",
+   "depth": 2.1,
+   "chain": {
+    "attackMs": 12.0,
+    "curve": "power",
+    "curveAmount": 1.8,
+    "decayMs": 150.0
+   }
+  },
+  {
+   "signal": "audio.highMid",
+   "target": "parts/Blue/emissiveGain",
+   "depth": 0.9,
+   "chain": {
+    "attackMs": 6.0,
+    "decayMs": 70.0
+   }
+  },
+  {
+   "signal": "audio.mid",
+   "target": "parts/Blue/emissiveColor",
+   "depth": 0.55,
+   "component": 1,
+   "chain": {
+    "attackMs": 170.0,
+    "curve": "scurve",
+    "curveAmount": 1.5,
+    "decayMs": 760.0
+   }
+  },
+  {
+   "signal": "audio.mid",
+   "target": "parts/Blue/emissiveColor",
+   "depth": -0.3,
+   "component": 2,
+   "chain": {
+    "attackMs": 170.0,
+    "curve": "scurve",
+    "curveAmount": 1.5,
+    "decayMs": 760.0
+   }
+  },
+  {
+   "signal": "beat.phase",
+   "target": "parts/Blue/emissiveGain",
+   "depth": 0.55,
+   "polarity": "bipolar",
+   "chain": {
+    "curve": "scurve",
+    "curveAmount": 2.0
+   }
+  },
+  {
+   "signal": "audio.rms",
+   "target": "material/emissive",
+   "depth": 0.55,
+   "chain": {
+    "attackMs": 110.0,
+    "decayMs": 620.0
+   }
+  },
+  {
+   "signal": "audio.onset",
+   "target": "scale",
+   "depth": 0.032,
+   "chain": {
+    "attackMs": 4.0,
+    "decayMs": 130.0,
+    "envelope": "peakhold",
+    "envelopeFallPerSecond": 9.0,
+    "envelopeHoldMs": 12.0
+   }
+  }
+ ]
+}

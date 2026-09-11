@@ -4460,7 +4460,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         }
     }
     if (j.contains("entities")) {
-        auto entities = entity::entitiesFromJson(j.at("entities"));
+        auto entities = entity::entitiesFromJson(j.at("entities"), scenePath.parent_path());
         if (!entities) {
             return fail("scene file '{}': {}", scenePath.string(), entities.error().message);
         }

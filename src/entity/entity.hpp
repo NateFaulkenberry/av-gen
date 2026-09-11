@@ -39,6 +39,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -90,6 +91,14 @@ struct EntityDesc {
     // name belongs to an asset: a behaviour that named one would break the day a character shipped
     // with a different set, and the same `wander` has to drive an alien, a deer and a robot.
     std::vector<std::pair<std::string, std::string>> clips;
+    // The profile this entity was built from, as written. Round-tripped so saving a scene does not
+    // inline what the author deliberately shared -- `profileCount` records how many of each list
+    // came from it, so the writer emits only what this entity added. Runtime, never serialised.
+    std::string profile;
+    std::size_t profileBehaviors = 0;
+    std::size_t profileReactions = 0;
+    std::size_t profileClips = 0;
+    std::size_t profileSockets = 0;
 
     // Behaviour level of detail. Beyond `fullDetailDistance` metres from the view, the entity is
     // updated every `coarseInterval` seconds instead of every frame, with the accumulated dt; past
@@ -270,9 +279,25 @@ private:
 // The `entities` array of an avgen-scene document. Sibling of `nodes` and `heroes`, because an
 // entity describes a node that the scene has already placed.
 
-[[nodiscard]] Result<std::vector<EntityDesc>> entitiesFromJson(const nlohmann::json& j);
+// `baseDir` is the folder a `"profile"` reference is resolved against -- the scene file's own, the
+// same rule every other asset path in a scene file follows.
+[[nodiscard]] Result<std::vector<EntityDesc>> entitiesFromJson(const nlohmann::json& j,
+                                                               const std::filesystem::path& baseDir = {});
 [[nodiscard]] nlohmann::json entitiesToJson(const std::vector<EntityDesc>& entities);
-[[nodiscard]] Result<EntityDesc> entityFromJson(const nlohmann::json& j);
+[[nodiscard]] Result<EntityDesc> entityFromJson(const nlohmann::json& j,
+                                                const std::filesystem::path& baseDir = {});
 [[nodiscard]] nlohmann::json entityToJson(const EntityDesc& entity);
+
+// A behaviour profile: the reusable half of an entity, in its own file.
+//
+//     { "format": "avgen-entity-profile", "version": 1,
+//       "behaviors": [...], "reactions": [...], "clips": {...} }
+//
+// "A hovering craft that answers the music" is a thing two scenes want, and copying twenty lines of
+// JSON between them is how they stop being the same thing. An entity naming a profile takes its
+// behaviours, reactions and clips, and may then add its own: the profile's come first, so a local
+// reaction lands on top of a profile's on the same property rather than instead of it.
+[[nodiscard]] Result<EntityDesc> profileFromJson(const nlohmann::json& j);
+[[nodiscard]] Result<EntityDesc> loadProfile(const std::filesystem::path& path);
 
 } // namespace avgen::entity

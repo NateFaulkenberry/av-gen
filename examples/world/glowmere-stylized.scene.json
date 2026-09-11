@@ -1633,6 +1633,7 @@
  "entities": [
   {
    "name": "visitor",
+   "profile": "../entities/craft-lights.profile.json",
    "node": "visitor",
    "seed": 20260911,
    "fullDetailDistance": 420.0,
@@ -1667,17 +1668,6 @@
    "reactions": [
     {
      "signal": "audio.bass",
-     "target": "parts/Light/emissiveGain",
-     "depth": 2.6,
-     "chain": {
-      "attackMs": 35.0,
-      "curve": "power",
-      "curveAmount": 1.6,
-      "decayMs": 260.0
-     }
-    },
-    {
-     "signal": "audio.bass",
      "target": "position",
      "depth": -0.95,
      "component": 1,
@@ -1686,30 +1676,6 @@
       "curve": "power",
       "curveAmount": 1.4,
       "decayMs": 340.0
-     }
-    },
-    {
-     "signal": "audio.onset",
-     "target": "parts/Light/emissiveGain",
-     "depth": 4.6,
-     "chain": {
-      "attackMs": 3.0,
-      "decayMs": 95.0,
-      "envelope": "peakhold",
-      "envelopeFallPerSecond": 7.0,
-      "envelopeHoldMs": 18.0
-     }
-    },
-    {
-     "signal": "audio.onset",
-     "target": "scale",
-     "depth": 0.032,
-     "chain": {
-      "attackMs": 4.0,
-      "decayMs": 130.0,
-      "envelope": "peakhold",
-      "envelopeFallPerSecond": 9.0,
-      "envelopeHoldMs": 12.0
      }
     },
     {
@@ -1723,69 +1689,6 @@
       "envelope": "peakhold",
       "envelopeFallPerSecond": 6.0,
       "envelopeHoldMs": 8.0
-     }
-    },
-    {
-     "signal": "audio.mid",
-     "target": "parts/Blue/emissiveColor",
-     "depth": 0.55,
-     "component": 1,
-     "chain": {
-      "attackMs": 170.0,
-      "curve": "scurve",
-      "curveAmount": 1.5,
-      "decayMs": 760.0
-     }
-    },
-    {
-     "signal": "audio.mid",
-     "target": "parts/Blue/emissiveColor",
-     "depth": -0.3,
-     "component": 2,
-     "chain": {
-      "attackMs": 170.0,
-      "curve": "scurve",
-      "curveAmount": 1.5,
-      "decayMs": 760.0
-     }
-    },
-    {
-     "signal": "audio.treble",
-     "target": "parts/Blue/emissiveGain",
-     "depth": 2.1,
-     "chain": {
-      "attackMs": 12.0,
-      "curve": "power",
-      "curveAmount": 1.8,
-      "decayMs": 150.0
-     }
-    },
-    {
-     "signal": "audio.highMid",
-     "target": "parts/Blue/emissiveGain",
-     "depth": 0.9,
-     "chain": {
-      "attackMs": 6.0,
-      "decayMs": 70.0
-     }
-    },
-    {
-     "signal": "beat.phase",
-     "target": "parts/Blue/emissiveGain",
-     "depth": 0.55,
-     "polarity": "bipolar",
-     "chain": {
-      "curve": "scurve",
-      "curveAmount": 2.0
-     }
-    },
-    {
-     "signal": "audio.rms",
-     "target": "material/emissive",
-     "depth": 0.55,
-     "chain": {
-      "attackMs": 110.0,
-      "decayMs": 620.0
      }
     }
    ]

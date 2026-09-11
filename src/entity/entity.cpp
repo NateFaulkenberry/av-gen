@@ -10,6 +10,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <span>
 
 namespace avgen::entity {
 namespace {
@@ -502,7 +504,7 @@ void EntityWorld::applyAttachments(const Entity& entity, params::ParameterSet& p
 
 // ---- serialisation ---------------------------------------------------------------------------
 
-Result<EntityDesc> entityFromJson(const nlohmann::json& j) {
+Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem::path& baseDir) {
     if (!j.is_object()) {
         return fail("entity must be an object");
     }
@@ -511,6 +513,26 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j) {
     }
     EntityDesc desc;
     desc.name = j["name"].get<std::string>();
+    // A profile first, so the entity's own blocks append to it rather than replacing it: a scene
+    // takes "a hovering craft that answers the music" and then adds the one reaction that is about
+    // this craft in this shot.
+    if (j.contains("profile") && j["profile"].is_string()) {
+        desc.profile = j["profile"].get<std::string>();
+        const std::filesystem::path path =
+            baseDir.empty() ? std::filesystem::path(desc.profile) : baseDir / desc.profile;
+        auto loaded = loadProfile(path);
+        if (!loaded) {
+            return fail("entity '{}': {}", desc.name, loaded.error().message);
+        }
+        desc.behaviors = std::move(loaded->behaviors);
+        desc.reactions = std::move(loaded->reactions);
+        desc.clips = std::move(loaded->clips);
+        desc.sockets = std::move(loaded->sockets);
+        desc.profileBehaviors = desc.behaviors.size();
+        desc.profileReactions = desc.reactions.size();
+        desc.profileClips = desc.clips.size();
+        desc.profileSockets = desc.sockets.size();
+    }
     if (j.contains("node") && j["node"].is_string()) {
         desc.node = j["node"].get<std::string>();
     }
@@ -623,14 +645,47 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j) {
     return desc;
 }
 
-Result<std::vector<EntityDesc>> entitiesFromJson(const nlohmann::json& j) {
+Result<EntityDesc> profileFromJson(const nlohmann::json& j) {
+    if (!j.is_object()) {
+        return fail("an entity profile must be an object");
+    }
+    if (j.contains("format") && j["format"].is_string() &&
+        j["format"].get<std::string>() != "avgen-entity-profile") {
+        return fail("not an entity profile: format '{}'", j["format"].get<std::string>());
+    }
+    nlohmann::json copy = j;
+    copy["name"] = "profile";
+    copy.erase("profile"); // profiles do not chain: one level of indirection is a library, two is a maze
+    return entityFromJson(copy);
+}
+
+Result<EntityDesc> loadProfile(const std::filesystem::path& path) {
+    std::ifstream file(path);
+    if (!file) {
+        return fail("cannot open entity profile '{}'", path.string());
+    }
+    nlohmann::json j;
+    try {
+        file >> j;
+    } catch (const std::exception& e) {
+        return fail("entity profile '{}': {}", path.string(), e.what());
+    }
+    auto desc = profileFromJson(j);
+    if (!desc) {
+        return fail("entity profile '{}': {}", path.string(), desc.error().message);
+    }
+    return desc;
+}
+
+Result<std::vector<EntityDesc>> entitiesFromJson(const nlohmann::json& j,
+                                                 const std::filesystem::path& baseDir) {
     if (!j.is_array()) {
         return fail("'entities' must be an array");
     }
     std::vector<EntityDesc> out;
     out.reserve(j.size());
     for (const auto& item : j) {
-        auto entity = entityFromJson(item);
+        auto entity = entityFromJson(item, baseDir);
         if (!entity) {
             return fail("{}", entity.error().message);
         }
@@ -646,6 +701,9 @@ Result<std::vector<EntityDesc>> entitiesFromJson(const nlohmann::json& j) {
 nlohmann::json entityToJson(const EntityDesc& entity) {
     nlohmann::json j = nlohmann::json::object();
     j["name"] = entity.name;
+    if (!entity.profile.empty()) {
+        j["profile"] = entity.profile;
+    }
     if (!entity.node.empty()) {
         j["node"] = entity.node;
     }
@@ -659,18 +717,20 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
     if (entity.cullDistance > 0.0f) {
         j["cullDistance"] = entity.cullDistance;
     }
-    if (!entity.behaviors.empty()) {
+    if (entity.behaviors.size() > entity.profileBehaviors) {
         nlohmann::json behaviors = nlohmann::json::array();
-        for (const BehaviorDesc& behavior : entity.behaviors) {
+        for (const BehaviorDesc& behavior :
+             std::span(entity.behaviors).subspan(entity.profileBehaviors)) {
             // The settings object is the authored form and already carries `kind` and `name`.
             behaviors.push_back(behavior.settings.is_object() ? behavior.settings
                                                               : nlohmann::json{{"kind", behavior.kind}});
         }
         j["behaviors"] = std::move(behaviors);
     }
-    if (!entity.reactions.empty()) {
+    if (entity.reactions.size() > entity.profileReactions) {
         nlohmann::json reactions = nlohmann::json::array();
-        for (const ReactionDesc& reaction : entity.reactions) {
+        for (const ReactionDesc& reaction :
+             std::span(entity.reactions).subspan(entity.profileReactions)) {
             nlohmann::json r = nlohmann::json::object();
             r["signal"] = reaction.signal;
             r["target"] = reaction.target;
@@ -688,16 +748,16 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
         }
         j["reactions"] = std::move(reactions);
     }
-    if (!entity.clips.empty()) {
+    if (entity.clips.size() > entity.profileClips) {
         nlohmann::json clips = nlohmann::json::object();
-        for (const auto& [activity, state] : entity.clips) {
+        for (const auto& [activity, state] : std::span(entity.clips).subspan(entity.profileClips)) {
             clips[activity] = state;
         }
         j["clips"] = std::move(clips);
     }
-    if (!entity.sockets.empty()) {
+    if (entity.sockets.size() > entity.profileSockets) {
         nlohmann::json sockets = nlohmann::json::array();
-        for (const SocketDesc& socket : entity.sockets) {
+        for (const SocketDesc& socket : std::span(entity.sockets).subspan(entity.profileSockets)) {
             nlohmann::json s = nlohmann::json::object();
             s["name"] = socket.name;
             if (!socket.joint.empty()) {
