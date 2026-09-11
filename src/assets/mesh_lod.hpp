@@ -85,6 +85,13 @@ struct LodChainSettings {
     // is the right setting when stopping short and saying so is preferable to a mesh whose triangles no
     // longer correspond to the source's.
     float sloppyFallback = 0.0f;
+    // How many times the sloppy simplifier may be asked again with a larger request when it
+    // undershoots. It quantises the mesh onto a grid and the triangle count it lands on is a step
+    // function of that grid's size, so a single call overshoots its target badly and without
+    // warning: asked for 35% of CommonTree_1 it returned 7.6%, which made LOD0 -> LOD1 a
+    // thirteen-fold drop at 28 px of screen radius rather than the threefold one the ladder asks
+    // for (ADR-085). Asking for more, repeatedly, climbs the steps. 1 is the single call.
+    std::uint32_t sloppyIterations = 6;
     // Run `optimiseMesh` on the source before simplifying and on every level afterwards.
     bool optimise = true;
     // Fill `LodChain::shadowIndices`.

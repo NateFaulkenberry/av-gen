@@ -902,3 +902,20 @@ Phase 3 measured 2.42 ms for the same removal at 720x450 as a shader-only A/B be
 existed; 1.18 is the same removal after it, which is the number that matters now. It changes the
 image, ADR-034 gave the march to every light deliberately, and the control is therefore a rig's to
 use and not the renderer's to apply.
+
+### The LOD ladder was cheaper than it claimed (2026-09-11, ADR-086)
+
+`meshopt_simplifySloppy` quantises onto a grid, so the triangle count it returns is a step function
+of the grid it picked and one call lands wherever the steps fall: asked for 35% of `CommonTree_1` it
+returned 7.6%. `LodChainSettings::sloppyIterations` now bisects the request. Glowmere's canopy ladder
+goes from 8% / 8% / 2% of the source to 34% / 13% / 2% against a 35 / 12 / 4 target.
+
+| canvas | submitted tris | scene pass | GPU frame |
+|---|---:|---:|---:|
+| 720x450 | 201,174 -> 235,761 (+17.2%) | 11.21 -> 11.34 (+0.13) | 12.98 -> 13.17 (+0.19) |
+| 2880x1166 | 694,977 -> 767,961 (+10.5%) | 29.23 -> **31.06** (+1.83) | 35.59 -> 37.62 (+2.03) |
+
+Min of 4 interleaved runs, two binaries, identical shaders. **A deliberate regression**: the
+millisecond was being bought by drawing a thinner world than the ladder specified while every
+counter reported the ladder working, which is §72 with the numbers on its side. 2.8% of pixels
+change, all in the mid-ground band, and the change is canopies with their authored foliage mass.

@@ -73,6 +73,10 @@ std::string levelName(const std::string& base, std::size_t level) {
 // when the first stalled far short of the target or returned nothing at all. `indices` is empty
 // when neither produced a triangle -- an empty level is not a small level, it is an object that
 // vanishes at a distance, and the caller must be able to tell the two apart.
+// How near the target a sloppy level has to land before the search stops asking for more. A level
+// between here and the target is doing its job; below it, the ladder has a hole in it.
+constexpr float kSloppyClose = 0.7f;
+
 struct SimplifyAttempt {
     std::vector<std::uint32_t> indices;
     float relativeError = 0.0f;
@@ -108,16 +112,63 @@ SimplifyAttempt simplifyTo(const scene::MeshData& src, std::size_t targetIndices
         (settings.sloppyFallback > 0.0f && stalled &&
          static_cast<float>(produced) > static_cast<float>(targetIndices) * settings.sloppyFallback);
     if (trySloppy) {
+        // The sloppy simplifier quantises onto a grid, so the triangle count it returns is a step
+        // function of the grid size it chose and a single call lands wherever the steps fall:
+        // asked for 35% of CommonTree_1 it returns 7.6%. That is not a small level, it is the
+        // wrong level -- the ladder asks for a threefold drop and gets a thirteenfold one, at the
+        // distance band where a moving camera crosses it. So the request is raised by however far
+        // short the last answer fell and asked again, and the candidate nearest the target from
+        // below is kept.
         std::vector<std::uint32_t> alternative(src.indices.size());
-        float sloppyError = 0.0f;
-        const std::size_t sloppyProduced =
-            meshopt_simplifySloppy(alternative.data(), src.indices.data(), src.indices.size(),
-                                   positionData(src), src.vertices.size(), sizeof(scene::Vertex), nullptr,
-                                   targetIndices, settings.maxError, &sloppyError);
-        if (sloppyProduced >= 3 && (produced < 3 || sloppyProduced < produced)) {
-            primary.swap(alternative);
-            produced = sloppyProduced;
-            relativeError = sloppyError;
+        std::vector<std::uint32_t> best;
+        float bestError = 0.0f;
+        std::size_t bestProduced = 0;
+        // Under the target is the whole point of a budget; over it is a miss, and counted four
+        // times as badly so a candidate is never traded down across the line.
+        const auto score = [targetIndices](std::size_t n) {
+            return n <= targetIndices ? targetIndices - n : (n - targetIndices) * 4;
+        };
+        const auto attempt = [&](std::size_t request) {
+            float sloppyError = 0.0f;
+            const std::size_t got =
+                meshopt_simplifySloppy(alternative.data(), src.indices.data(), src.indices.size(),
+                                       positionData(src), src.vertices.size(), sizeof(scene::Vertex),
+                                       nullptr, request, settings.maxError, &sloppyError);
+            if (got >= 3 && (bestProduced == 0 || score(got) < score(bestProduced))) {
+                best.assign(alternative.begin(), alternative.begin() + static_cast<std::ptrdiff_t>(got));
+                bestProduced = got;
+                bestError = sloppyError;
+            }
+            return got;
+        };
+        // Bisect the *request*, not the result. The grid the sloppy simplifier picks is a function
+        // of what it is asked for, and the triangle count it lands on is a step function of that
+        // grid, so the answer is monotonic in the request but nowhere near proportional to it.
+        // Asking once, at the target, is what returned 7.6% of CommonTree_1 for a 35% request.
+        // `lo` is a request known to come back at or under the target, `hi` one known to come back
+        // over it, and each step halves the gap.
+        std::size_t lo = targetIndices;
+        std::size_t hi = src.indices.size();
+        const auto attempts = std::max<std::uint32_t>(settings.sloppyIterations, 1u);
+        std::size_t got = attempt(lo);
+        for (std::uint32_t i = 1; i < attempts && hi > lo + 2; ++i) {
+            // Close enough from below: the level is doing its job and more calls buy nothing.
+            if (bestProduced >= 3 && bestProduced <= targetIndices &&
+                static_cast<float>(bestProduced) >= static_cast<float>(targetIndices) * kSloppyClose) {
+                break;
+            }
+            const std::size_t mid = lo + (hi - lo) / 2;
+            got = attempt(mid);
+            if (got >= 3 && got <= targetIndices) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        if (bestProduced >= 3 && (produced < 3 || bestProduced < produced)) {
+            primary.swap(best);
+            produced = bestProduced;
+            relativeError = bestError;
             sloppy = true;
         }
     }
