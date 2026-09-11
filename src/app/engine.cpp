@@ -1,5 +1,7 @@
 #include "app/engine.hpp"
 
+#include "core/phase_profiler.hpp"
+
 #include <functional>
 #include <map>
 #include <set>
@@ -90,6 +92,19 @@ void Engine::setTempoSource(TempoSource source) {
 
 void Engine::installController(std::unique_ptr<scene::SceneController> controller) {
     controller_ = std::move(controller);
+    // Live only. An expensive procedural regeneration is allowed to wait for the slider driving it
+    // to stop moving, rather than taking the frame away from the editor on every frame of a drag
+    // (see Composition::setInteractiveRebuildBudget). Offline never sets it, because the deferral
+    // reads a wall clock and a wall clock must not decide what a deterministic render contains.
+    //
+    // The budget is the cost above which an object is treated as expensive. Two milliseconds:
+    // comfortably below a 60 Hz frame's share, comfortably above the cost of a procedural small
+    // enough that deferring it would only add latency.
+    if (mode_ == EngineMode::Live) {
+        if (auto* comp = composition()) {
+            comp->setInteractiveRebuildBudget(2.0);
+        }
+    }
     // Scene swaps clear the parameter set, so sources, post settings and shader layers must
     // re-register. Post parameters keep their current base values (post_ holds them).
     ensureControlSource();
@@ -1735,6 +1750,10 @@ void Engine::update(const FrameTime& time) {
         audioSignals_.publishSilence(bus_);
     }
 
+    const auto allocsNow = [] { return static_cast<std::uint32_t>(core::allocCounters().allocations); };
+    const std::uint32_t allocsAtStart = allocsNow();
+    std::uint32_t allocMark = allocsNow();
+
     // Live control first: MIDI clock messages feed this frame's beat clock, transport commands
     // move the position the time signals read, parameter writes precede modulation.
     controlHub_.update(*this, time);
@@ -1742,6 +1761,8 @@ void Engine::update(const FrameTime& time) {
         sources_.attach(bus_, params_); // new control channels: declare and rebind routes
         rebind();
     }
+    stats_.allocsControl = allocsNow() - allocMark;
+    allocMark = allocsNow();
     updateTimeSignals(time, newFrame);
     music_.publish(bus_); // unconditional: no audio consumed means every music.* signal is false
     updateTimelineClock(time);
@@ -1761,6 +1782,8 @@ void Engine::update(const FrameTime& time) {
         bus_.set(stateProgressSignal_, states_.progress());
         bus_.set(stateIndexSignal_, static_cast<float>(std::max(0, states_.currentIndex())));
     }
+    stats_.allocsSignals = allocsNow() - allocMark;
+    allocMark = allocsNow();
     if (input_ && inputGain_ != nullptr) {
         input_->setGain(inputGain_->value());
     }
@@ -1773,7 +1796,10 @@ void Engine::update(const FrameTime& time) {
             comp->setViewport(viewportWidth_, viewportHeight_);
         }
     }
+    stats_.allocsModulation = allocsNow() - allocMark;
+    allocMark = allocsNow();
     controller_->update(time);
+    stats_.allocsController = allocsNow() - allocMark;
     scene::applyPostParameters(postParams_, post_);
     // ---- physical camera (ADR-037) ---------------------------------------------------------
     // After controller_->update() has placed the camera: the lens, the focus tracker's new
@@ -1822,6 +1848,8 @@ void Engine::update(const FrameTime& time) {
     }
     bus_.clearEvents();
 
+    stats_.allocsOther = (allocsNow() - allocsAtStart) - stats_.allocsControl - stats_.allocsSignals -
+                         stats_.allocsModulation - stats_.allocsController;
     const auto end = std::chrono::steady_clock::now();
     const double micros = std::chrono::duration<double, std::micro>(end - start).count();
     stats_.modulationMicros = stats_.modulationMicros * 0.9 + micros * 0.1;

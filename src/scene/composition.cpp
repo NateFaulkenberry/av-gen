@@ -936,14 +936,116 @@ std::string Composition::nestedPrefix(const CompositionNode& node) const {
     return nestedPrefixFor(prefix_, node.name, node.child != nullptr && node.child->attached());
 }
 
+// ---- interactive rebuild policy (docs/application-performance.md) -------------------------------
+//
+// Pure, so it can be reasoned about and tested without a scene, a clock or a GPU. `state` is the
+// object's record, `wanted` the hash its inputs currently ask for, `built` the hash it is actually
+// at, `elapsedMs` the wall time since the last poll. Returns true when the caller should regenerate
+// now.
+//
+// The shape of it: an object whose inputs just moved restarts a settle timer, so a drag -- which
+// moves them every frame -- never reaches the regeneration until it stops. Once they hold still for
+// kSettleMs it regenerates. And because a drag can go on for seconds, there is a ceiling on how
+// long it may be held back, scaled by what the object costs: something costing 150 ms refreshes at
+// most every 600 ms while the drag continues, something costing 5 ms every 90, so no object spends
+// more than about a fifth of the time regenerating. A fixed ceiling would either starve the cheap
+// objects or hand the expensive ones the frame back again.
+bool advanceRebuildDeferral(Composition::ProceduralRebuildState& state, std::uint64_t wanted,
+                            std::uint64_t built, double elapsedMs) {
+    // About five frames at 60 Hz: short enough that letting go of a slider feels immediate, long
+    // enough that a drag cannot sneak a regeneration in between two of its own frames.
+    constexpr double kSettleMs = 90.0;
+    constexpr double kCostMultiple = 4.0;
+
+    if (wanted == built) {
+        state.deferring = false;
+        state.settledForMs = 0.0;
+        state.heldForMs = 0.0;
+        return false;
+    }
+    if (!state.deferring) {
+        state.deferring = true;
+        state.deferredHash = wanted;
+        state.settledForMs = 0.0;
+        state.heldForMs = 0.0;
+        return false;
+    }
+    state.heldForMs += elapsedMs;
+    if (wanted != state.deferredHash) {
+        state.deferredHash = wanted; // the inputs moved again: still wrong, but not yet still
+        state.settledForMs = 0.0;
+    } else {
+        state.settledForMs += elapsedMs;
+    }
+    const double ceilingMs = std::max(kSettleMs, state.lastMs * kCostMultiple);
+    if (state.settledForMs < kSettleMs && state.heldForMs < ceilingMs) {
+        return false;
+    }
+    state.deferring = false;
+    state.settledForMs = 0.0;
+    state.heldForMs = 0.0;
+    return true;
+}
+
 void Composition::rebuildProcedurals() {
     // Every object sees the complete list (Procedural sources reference siblings by name, spline
     // distributions read scene_.splines); generateCloud resolves references recursively so the
     // order of the vector does not matter.
     const GenerationContext ctx{&scene_.procedurals, &scene_.splines, 0};
-    for (ProceduralGeometry& pg : scene_.procedurals) {
-        pg.rebuild(ctx);
+    if (interactiveRebuildBudgetMs_ <= 0.0) {
+        // Offline, and every non-editor caller: regenerate whatever wants to. No clock is read, so
+        // the result depends only on the scene and the time, which is what determinism means.
+        for (ProceduralGeometry& pg : scene_.procedurals) {
+            pg.rebuild(ctx);
+        }
+        return;
     }
+
+    proceduralRebuild_.resize(scene_.procedurals.size());
+    const auto now = std::chrono::steady_clock::now();
+    const double sinceLastFrameMs =
+        lastRebuildPollTime_.time_since_epoch().count() == 0
+            ? 0.0
+            : std::chrono::duration<double, std::milli>(now - lastRebuildPollTime_).count();
+    lastRebuildPollTime_ = now;
+
+    for (std::size_t i = 0; i < scene_.procedurals.size(); ++i) {
+        ProceduralGeometry& pg = scene_.procedurals[i];
+        ProceduralRebuildState& state = proceduralRebuild_[i];
+
+        // Cheap objects never defer: the machinery would cost more than the work.
+        if (state.lastMs <= interactiveRebuildBudgetMs_) {
+            const auto started = std::chrono::steady_clock::now();
+            if (pg.rebuild(ctx)) {
+                state.lastMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
+                                                                        started)
+                                   .count();
+            }
+            state.deferring = false;
+            state.settledForMs = 0.0;
+            state.heldForMs = 0.0;
+            continue;
+        }
+
+        const std::uint64_t wanted = pg.contextualHash(ctx);
+        if (!advanceRebuildDeferral(state, wanted, pg.builtHash, sinceLastFrameMs)) {
+            continue;
+        }
+        const auto started = std::chrono::steady_clock::now();
+        if (pg.rebuild(ctx)) {
+            state.lastMs =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+        }
+        state.deferring = false;
+        state.settledForMs = 0.0;
+        state.heldForMs = 0.0;
+    }
+}
+
+std::size_t Composition::proceduralsAwaitingRebuild() const {
+    return static_cast<std::size_t>(
+        std::count_if(proceduralRebuild_.begin(), proceduralRebuild_.end(),
+                      [](const ProceduralRebuildState& s) { return s.deferring; }));
 }
 
 void Composition::rebuildSdfs() {
@@ -2503,6 +2605,9 @@ void Composition::rebuild() {
 
     ++scene_.meshVersion;
     ++scene_.textureVersion;
+    // The procedural vector has just been rebuilt from the node list, so every index into it is
+    // new. Costs measured against the old one describe objects that no longer exist.
+    proceduralRebuild_.clear();
     dirty_ = false;
 }
 
@@ -3302,6 +3407,27 @@ Result<void> Composition::installLightRig(LightRig rig, const std::filesystem::p
 }
 
 void Composition::setEnvironmentMap(const std::filesystem::path& path) {
+    // Setting the same map twice changes nothing about the flattened scene, and `dirty_` is not a
+    // request to re-read the file -- the registry caches images by path, so a second rebuild would
+    // resolve to the identical texture. It is a request to rebuild everything: 256 terrain chunks,
+    // 260k scatter cells, every procedural cloud.
+    //
+    // Which is what the load path was asking for. `attach()` rebuilds (it fits the camera to the
+    // flattened bounds), and `loadComposition` then calls `reapplyEnvironment()`, which called this
+    // unconditionally with the path the scene had just been loaded with -- so every scene carrying
+    // an environment map built its world twice on open. Measured on
+    // examples/world/terrain.scene.json: 775 ms in the first frame's engine update, 397 ms after.
+    //
+    // Compared as resolved paths, because the two sides genuinely differ in form: the scene file
+    // stores a relative path and the engine hands back the absolute one it resolved in order to
+    // load the image. Comparing the raw strings would never match and the guard would never fire.
+    const bool same = environmentPath_.empty() && path.empty()
+                          ? true
+                          : (!environmentPath_.empty() && !path.empty() &&
+                             registry_.resolve(environmentPath_) == registry_.resolve(path));
+    if (same) {
+        return;
+    }
     environmentPath_ = path;
     dirty_ = true;
 }

@@ -1,5 +1,18 @@
 # Performance
 
+> **This document is the GPU's frame.** The main thread -- the UI, the event loop, the engine
+> update, threading, allocation behaviour and input latency -- is
+> [docs/application-performance.md](application-performance.md) (ADR-084). Keeping them apart is
+> deliberate: "why is the editor slow" has two very different answers and they should not be
+> searched for in the same place.
+>
+> One number from there belongs here, because every benchmark below is affected by it: **the editor
+> does not render the world at the window size.** It renders it into the dock tree's centre region
+> at the display's backing scale, which on this machine is 3.36 Mpx in a 1440x900-point window and
+> 4.36 Mpx in a 1920x1200 one -- 2.6x and 3.4x the 1.30 Mpx that "1440x900" means below. A pass
+> costing 25.7 ms here costs considerably more in the editor as actually used. Every run now logs
+> the canvas's real size once; `--canvas-scale` sets it.
+
 ## The ecology is drawn instances, not submitted draws (2026-09-10, P1/P2)
 
 **The optimisation spec's P1 and P2 were aimed at the wrong thing, and this section is the

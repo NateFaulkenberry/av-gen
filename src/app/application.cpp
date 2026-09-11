@@ -8,6 +8,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cstdio>
 #include <fstream>
 
 #include "assets/image.hpp"
@@ -74,6 +75,11 @@ std::string usageText() {
            "  --play              start playback immediately\n"
            "  --frames <n>        exit after n frames\n"
            "  --stress <seed>     apply random slider-like actions every frame (seek, params, routes, volume)\n"
+           "  --ui-script <arms>  drive the editor with a repeatable interaction: comma-separated from\n"
+           "                      hover,sliders,panels,select,scrub,camera,tabs -- or idle, or all\n"
+           "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
+           "  --profile-cpu       print the main thread's per-phase frame distribution on exit\n"
+           "  --profile-csv <f>   write one row per frame (every phase) to <f> on exit\n"
            "  --capture <file>    write the last frame as a PPM image\n"
            "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
            "                      emission|ids|occlusion|depth\n"
@@ -260,6 +266,30 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             options.stressSeed = static_cast<std::uint64_t>(std::atoll(v->c_str()));
             if (options.stressSeed == 0) return fail("--stress seed must be > 0");
             ++i;
+        } else if (arg == "--ui-script") {
+            auto v = need(i, "--ui-script");
+            if (!v) return std::unexpected(v.error());
+            if (!parseUiScript(*v)) {
+                return fail("--ui-script '{}' is not an arm; expected some of {}", *v, uiScriptNames());
+            }
+            options.uiScript = *v;
+            ++i;
+        } else if (arg == "--canvas-scale") {
+            auto v = need(i, "--canvas-scale");
+            if (!v) return std::unexpected(v.error());
+            options.canvasScale = std::strtof(v->c_str(), nullptr);
+            if (options.canvasScale < 0.25f || options.canvasScale > 1.0f) {
+                return fail("--canvas-scale must be between 0.25 and 1.0");
+            }
+            ++i;
+        } else if (arg == "--profile-cpu") {
+            options.profileCpu = true;
+        } else if (arg == "--profile-csv") {
+            auto v = need(i, "--profile-csv");
+            if (!v) return std::unexpected(v.error());
+            options.profileCsv = std::filesystem::path(*v);
+            options.profileCpu = true;
+            ++i;
         } else if (arg == "--frames") {
             auto v = need(i, "--frames");
             if (!v) return std::unexpected(v.error());
@@ -441,6 +471,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         jobs_ = std::make_unique<JobSystem>(2);
         worldBuilder_ = std::make_unique<WorldBuilder>(*jobs_);
         panel_ = std::make_unique<ui::ControlPanel>();
+        panel_->canvasRenderScale = options_.canvasScale;
         panel_->setLayoutStore(prefs.empty() ? std::filesystem::path{} : prefs / "editor-layout.json",
                                imgui_->hadSavedLayout());
         panel_->jobs = jobs_.get();
@@ -997,6 +1028,26 @@ void stressStep(Engine& engine, Rng& rng, std::uint64_t frame) {
         engine.seekSeconds(engine.durationSeconds()); // jump to the very end
     }
 }
+// AVGEN_SLOW_PHASE_MS=<ms>: a phase that takes longer than this names, in the log, whatever the
+// scripted interaction wrote on that frame. Turning "changing a property costs 200 ms" into the
+// name of the property is otherwise guesswork, and guesswork is how a performance pass ends up
+// optimising something that was never the problem.
+double slowPhaseMs() {
+    static const double threshold = [] {
+        const char* env = std::getenv("AVGEN_SLOW_PHASE_MS");
+        return env != nullptr ? std::atof(env) : 0.0;
+    }();
+    return threshold;
+}
+
+std::string describeWrites(const UiScript& script) {
+    std::string out;
+    for (const std::string& w : script.lastWrites()) {
+        out += w + " ";
+    }
+    return out.empty() ? std::string("(nothing)") : out;
+}
+
 } // namespace
 
 
@@ -1144,6 +1195,56 @@ void Application::handleViewportEvent(const SDL_Event& event) {
 //     does not if the canvas origin is not subtracted from the click.
 //   - A drag that ends outside the canvas must keep moving the camera after it leaves, or a panel
 //     has stolen a gesture halfway through (ADR-068).
+// One raw SDL event on its way to ImGui, the viewport and the shortcut table. A member rather
+// than a lambda in the loop because the loop now pumps the queue twice: once before the
+// swapchain wait for window-level events, and once after it so the frame is built on the
+// freshest input there is. See runLive().
+void Application::handleInputEvent(const SDL_Event& event) {
+            if (uiSelfTestEvents_) {
+                uiEventTypes_[event.type] += 1;
+            }
+            if (event.type == SDL_EVENT_MOUSE_MOTION) {
+                ++uiMotionEvents_;
+                newestInputNs_ = std::max(newestInputNs_, event.motion.timestamp);
+            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                ++uiButtonEvents_;
+            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                ++uiButtonEvents_;
+            }
+            // Output windows share the SDL queue; only the main window's input reaches ImGui.
+            if (SDL_Window* from = SDL_GetWindowFromEvent(&event); from != nullptr && from != window_->handle()) {
+                ++uiFilteredEvents_;
+                return;
+            }
+            imgui_->processEvent(event);
+            // The viewport gets the mouse when the pointer is over the canvas. Since the canvas is
+            // an ImGui window of its own (ADR-076), ImGui's WantCaptureMouse is true whenever the
+            // pointer is on the world, so it can no longer be the test -- the canvas's own hover
+            // state is, and it is false when a panel, a popup or a menu is over it.
+            //
+            // A drag that began on the canvas keeps the mouse until the button is released:
+            // letting a panel steal a gesture halfway through because the cursor passed over it is
+            // how an orbit ends up jumping to a stop mid-swing.
+            if (canvas_.hovered || viewportGesture_ != ViewportGesture::None) {
+                handleViewportEvent(event);
+            }
+            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && !imgui_->wantsKeyboard()) {
+                if (event.key.key == SDLK_SPACE) {
+                    engine_->togglePlay();
+                } else if (event.key.key == SDLK_O && panel_ && panel_->onOpenAudio) {
+                    panel_->onOpenAudio();
+                } else if (event.key.key == SDLK_S && panel_ && panel_->onOpenScene) {
+                    panel_->onOpenScene();
+                } else if (event.key.key == SDLK_E && panel_ && panel_->onOpenEnvironment) {
+                    panel_->onOpenEnvironment();
+                } else if (event.key.key == SDLK_LEFT) {
+                    engine_->seekSeconds(engine_->positionSeconds() - 5.0);
+                } else if (event.key.key == SDLK_RIGHT) {
+                    engine_->seekSeconds(engine_->positionSeconds() + 5.0);
+                }
+            }
+}
+
 void Application::runViewportProbe(int frameIndex) {
     static const char* const clickSpec = std::getenv("AVGEN_VIEWPORT_PROBE");
     static const char* const dragSpec = std::getenv("AVGEN_VIEWPORT_DRAG");
@@ -1415,57 +1516,52 @@ int Application::runLive() {
     FrameTime lastTime{};
     Rng stressRng(options_.stressSeed);
 
+    // The main thread's frame, phase by phase. Resolved once: `phase()` is a linear scan over the
+    // names and is not for the hot path, and a function-local static would be a guarded load per
+    // frame for no reason when the loop can simply hold them.
+    core::PhaseProfiler& prof = cpuProfile_;
+    const int kPhScript = prof.phase("ui.script");
+    const int kPhEvents = prof.phase("events.poll");
+    const int kPhEngine = prof.phase("engine.update");
+    const int kPhUi = prof.phase("ui.build");
+    const int kPhAcquire = prof.phase("gpu.acquire WAIT");
+    const int kPhDebug = prof.phase("debug.geometry");
+    const int kPhRecord = prof.phase("render.record");
+    const int kPhImgui = prof.phase("imgui.record");
+    const int kPhSubmit = prof.phase("gpu.submit");
+    const int kPhPresent = prof.phase("gpu.present WAIT");
+    const int kPhPick = prof.phase("viewport.pick");
+    const int kPhOutputs = prof.phase("outputs+share");
+    const int kPhJob = prof.phase("render.job");
+    const int kPhEvProc = prof.phase("gpu.processEvents");
+    const int kPhResize = prof.phase("canvas.resize");
+    const int kPhLatency = prof.phase("input->present ms");
+    const int kPhAllocK = prof.phase("# kallocs/frame");
+    const int kPhAllocUi = prof.phase("# allocs ui.build");
+    const int kPhAllocEngine = prof.phase("# allocs engine.upd");
+    const int kPhAllocRecord = prof.phase("# allocs render.rec");
+    const int kPhAllocImgui = prof.phase("# allocs imgui.rec");
+    if (auto arms = parseUiScript(options_.uiScript)) {
+        uiScript_ = UiScript(*arms);
+    }
+    if (uiScript_.active()) {
+        log::info("ui-script: '{}' driving the editor", options_.uiScript);
+    }
+
     for (;;) {
         const auto frameStart = std::chrono::steady_clock::now();
+        prof.beginFrame();
+        const std::uint64_t allocsAtFrameStart = core::allocCounters().allocations;
         // Last frame's canvas. Events are read before this frame is laid out, so this is the most
         // recent answer there is; on a still window it is the current one.
         if (panel_ != nullptr) {
             canvas_ = panel_->canvas();
         }
-        auto events = window_->pollEvents([this](const SDL_Event& event) {
-            if (uiSelfTestEvents_) {
-                uiEventTypes_[event.type] += 1;
-            }
-            if (event.type == SDL_EVENT_MOUSE_MOTION) {
-                ++uiMotionEvents_;
-            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-                ++uiButtonEvents_;
-            } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
-                ++uiButtonEvents_;
-            }
-            // Output windows share the SDL queue; only the main window's input reaches ImGui.
-            if (SDL_Window* from = SDL_GetWindowFromEvent(&event); from != nullptr && from != window_->handle()) {
-                ++uiFilteredEvents_;
-                return;
-            }
-            imgui_->processEvent(event);
-            // The viewport gets the mouse when the pointer is over the canvas. Since the canvas is
-            // an ImGui window of its own (ADR-076), ImGui's WantCaptureMouse is true whenever the
-            // pointer is on the world, so it can no longer be the test -- the canvas's own hover
-            // state is, and it is false when a panel, a popup or a menu is over it.
-            //
-            // A drag that began on the canvas keeps the mouse until the button is released:
-            // letting a panel steal a gesture halfway through because the cursor passed over it is
-            // how an orbit ends up jumping to a stop mid-swing.
-            if (canvas_.hovered || viewportGesture_ != ViewportGesture::None) {
-                handleViewportEvent(event);
-            }
-            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && !imgui_->wantsKeyboard()) {
-                if (event.key.key == SDLK_SPACE) {
-                    engine_->togglePlay();
-                } else if (event.key.key == SDLK_O && panel_ && panel_->onOpenAudio) {
-                    panel_->onOpenAudio();
-                } else if (event.key.key == SDLK_S && panel_ && panel_->onOpenScene) {
-                    panel_->onOpenScene();
-                } else if (event.key.key == SDLK_E && panel_ && panel_->onOpenEnvironment) {
-                    panel_->onOpenEnvironment();
-                } else if (event.key.key == SDLK_LEFT) {
-                    engine_->seekSeconds(engine_->positionSeconds() - 5.0);
-                } else if (event.key.key == SDLK_RIGHT) {
-                    engine_->seekSeconds(engine_->positionSeconds() + 5.0);
-                }
-            }
-        });
+        const auto eventsStart = std::chrono::steady_clock::now();
+        newestInputNs_ = 0;
+        auto events = window_->pollEvents([this](const SDL_Event& e) { handleInputEvent(e); });
+        prof.add(kPhEvents, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
+                                                                        eventsStart).count());
         if (events.quit) {
             break;
         }
@@ -1476,7 +1572,8 @@ int Application::runLive() {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
             continue;
         }
-        if (events.resized) {
+        if (events.resized || pendingResize_) {
+            pendingResize_ = false;
             context_->configureSurface(window_->pixelWidth(), window_->pixelHeight());
             if (auto r = renderer_->resize(window_->pixelWidth(), window_->pixelHeight()); !r) {
                 log::error("resize: {}", r.error().message);
@@ -1502,9 +1599,16 @@ int Application::runLive() {
         const float pixelScale = std::max(window_->pixelScale(), 1e-3f);
         std::uint32_t cw = window_->pixelWidth();
         std::uint32_t ch = window_->pixelHeight();
+        // The canvas's pixels, times the editor's render scale. The scale is the editor's one
+        // lever on what the world costs: the canvas is the display's backing scale times its own
+        // size, so on a Retina screen it is several times the pixel count the renderer's benchmarks
+        // quote, and the person at the keyboard had no way to say "softer, but keep up". The
+        // default is 1.0, which is every canvas pixel and exactly what this did before.
+        const float renderScale =
+            panel_ != nullptr ? std::clamp(panel_->canvasRenderScale, 0.25f, 1.0f) : 1.0f;
         if (canvas_.valid()) {
-            cw = std::max(1u, static_cast<std::uint32_t>(std::lround(canvas_.width * pixelScale)));
-            ch = std::max(1u, static_cast<std::uint32_t>(std::lround(canvas_.height * pixelScale)));
+            cw = std::max(1u, static_cast<std::uint32_t>(std::lround(canvas_.width * pixelScale * renderScale)));
+            ch = std::max(1u, static_cast<std::uint32_t>(std::lround(canvas_.height * pixelScale * renderScale)));
         }
         // A new size only takes effect once it has held still for a few frames. Following every
         // frame of a splitter drag would be more correct and much worse: each size is a new render
@@ -1531,6 +1635,7 @@ int Application::runLive() {
         // The final texture has to exist before the panel draws, because the canvas window shows it
         // and ImGui records the texture id while it lays the frame out -- the drawing into it
         // happens later in the same encoder, so the image is this frame's, not the last one's.
+        const auto resizeStart = std::chrono::steady_clock::now();
         const bool retiringView = finalTexture_ != nullptr &&
                                   (finalWidth_ != renderWidth_ || finalHeight_ != renderHeight_);
         if (auto r = ensureFinalTexture(renderWidth_, renderHeight_); !r) {
@@ -1545,11 +1650,87 @@ int Application::runLive() {
         if (panel_ != nullptr) {
             panel_->canvasTexture = reinterpret_cast<std::uint64_t>(finalView_.Get());
         }
+        prof.add(kPhResize, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
+                                                                      resizeStart).count());
+
+        // ---- the swapchain wait, and then the frame ------------------------------------------
+        //
+        // The wait comes *before* the input is sampled and the frame is built, which is the reverse
+        // of the obvious order and the point of it.
+        //
+        // Under Fifo this wait is however long the CPU must stand still before a swapchain image is
+        // free: the vsync pace when the frame is cheap, the GPU's backlog when it is not -- 15.6 ms
+        // of a 17.2 ms frame on the world scene. Building the UI before it meant the picture that
+        // reached the screen was built from input sampled a whole wait earlier, so every millisecond
+        // the GPU fell behind was also a millisecond of staleness in the pointer. The frame rate did
+        // not show it; input-to-present latency did, at 17.2 ms median where the work is 1.6.
+        //
+        // So: wait first, then read whatever the device produced during the wait, then build the
+        // frame from it. The queue is pumped twice per frame -- the first pass takes the
+        // window-level events (resize, close, dropped files) that have to be acted on before a
+        // surface image is asked for at all, and this pass takes the input. Nothing is dropped:
+        // both passes go through the same handler and the same ImGui backend, and the second pass's
+        // window events are merged into the first's.
+        const auto workBeforeAcquire = std::chrono::steady_clock::now();
+        auto view = context_->acquireSurfaceView();
+        const auto workAfterAcquire = std::chrono::steady_clock::now();
+        // A WAIT, not work, and not GPU time either: this is how long the CPU stood still because
+        // no swapchain image was free. Under Fifo it is the vsync pace when the frame is cheap and
+        // the GPU's backlog when it is not. Naming it as a wait is the whole point -- a number that
+        // grows when the GPU is the bottleneck must not be read as the CPU getting slower.
+        prof.add(kPhAcquire,
+                 std::chrono::duration<double, std::milli>(workAfterAcquire - workBeforeAcquire).count());
+        if (!view) {
+            // Nothing has been submitted to ImGui yet this frame -- the UI is built below, after
+            // the wait -- so there is no frame to end here.
+            log::warn("frame skipped: {}", view.error().message);
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+            continue;
+        }
+        // Late input. Anything the pointer or keyboard produced while the CPU was waiting above is
+        // in the queue now, and this frame uses it rather than showing it one frame later.
+        {
+            const auto lateStart = std::chrono::steady_clock::now();
+            if (uiScript_.active()) {
+                // The script stands in for the device, so it produces its events where a device's
+                // would be: just before the poll that consumes them. Pushing them at the top of the
+                // frame instead would date every synthetic event by a whole wait and quietly make
+                // the measurement insensitive to the very thing being measured.
+                core::PhaseProfiler::Scope scope(prof, kPhScript);
+                uiScript_.step(*engine_, panel_.get(), *window_, static_cast<std::uint64_t>(framesRendered));
+            }
+            const platform::FrameEvents late =
+                window_->pollEvents([this](const SDL_Event& e) { handleInputEvent(e); });
+            events.quit = events.quit || late.quit;
+            // This frame's surface is already configured and its image already acquired, so a
+            // resize that arrives now is next frame's business.
+            pendingResize_ = pendingResize_ || late.resized;
+            for (const std::string& dropped : late.droppedFiles) {
+                loadAny(dropped);
+            }
+            prof.add(kPhEvents,
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - lateStart).count());
+            if (events.quit) {
+                break;
+            }
+        }
 
         const FrameTime time = engine_->tick(clock);
         lastTime = time;
         engine_->setViewport(renderWidth_, renderHeight_);
-        engine_->update(time);
+        {
+            const std::uint64_t allocsBefore = core::allocCounters().allocations;
+            const auto updateStart = std::chrono::steady_clock::now();
+            engine_->update(time);
+            prof.count(kPhAllocEngine, static_cast<double>(core::allocCounters().allocations - allocsBefore));
+            const double updateMs =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - updateStart).count();
+            prof.add(kPhEngine, updateMs);
+            if (slowPhaseMs() > 0.0 && updateMs > slowPhaseMs()) {
+                log::warn("slow engine.update {:.1f} ms at frame {}: wrote {}", updateMs, framesRendered,
+                          describeWrites(uiScript_));
+            }
+        }
 
         stats.width = renderWidth_;
         stats.height = renderHeight_;
@@ -1562,6 +1743,7 @@ int Application::runLive() {
 
         // Background render: a few frames per UI frame, then the next queued job.
         if (job_) {
+            core::PhaseProfiler::Scope scope(prof, kPhJob);
             if (job_->step(4, 0.010)) {
                 const auto p = job_->progress();
                 lastRender_ = p;
@@ -1579,8 +1761,11 @@ int Application::runLive() {
         // to the event routing rather than the widgets.
         static const bool uiSelfTest = std::getenv("AVGEN_UI_SELFTEST") != nullptr;
         uiSelfTestEvents_ = uiSelfTest;
-        imgui_->newFrame();
-        panel_->draw(*engine_, stats);
+        {
+            core::PhaseProfiler::AllocScope scope(prof, kPhUi, kPhAllocUi);
+            imgui_->newFrame();
+            panel_->draw(*engine_, stats);
+        }
         if (uiSelfTest && (time.frameIndex % 30) == 0) {
             const ImGuiIO& io = ImGui::GetIO();
             int wx = 0;
@@ -1614,15 +1799,6 @@ int Application::runLive() {
                       ImGui::IsAnyItemHovered(), io.DeltaTime);
         }
 
-        const auto workBeforeAcquire = std::chrono::steady_clock::now();
-        auto view = context_->acquireSurfaceView();
-        const auto workAfterAcquire = std::chrono::steady_clock::now();
-        if (!view) {
-            log::warn("frame skipped: {}", view.error().message);
-            ImGui::EndFrame();
-            std::this_thread::sleep_for(std::chrono::milliseconds(16));
-            continue;
-        }
         const std::uint32_t pw = window_->pixelWidth();
         const std::uint32_t ph = window_->pixelHeight();
         // The frame renders into the offscreen final texture; every projection output still
@@ -1635,6 +1811,7 @@ int Application::runLive() {
         // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
         // options; an empty set costs nothing.
         if (panel_) {
+            core::PhaseProfiler::Scope scope(prof, kPhDebug);
             panel_->composition.stats = &compositor_->stats();
             const rendering::DebugViewOptions& options = panel_->world.debug;
             renderer_->setDebugDepthTest(options.depthTest);
@@ -1642,9 +1819,25 @@ int Application::runLive() {
         }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
-        if (auto r = renderer_->render(encoder, engine_->scene(), time, finalTarget, &shaderInputs); !r) {
-            log::error("render: {}", r.error().message);
-            return 2;
+        {
+            // The CPU cost of *recording* the frame's commands. Not the GPU's cost of running them:
+            // that is gpu::FrameTimeline's, is reported separately, and belongs to the renderer
+            // effort rather than to this one.
+            const std::uint64_t recordAllocsBefore = core::allocCounters().allocations;
+            const auto recordStart = std::chrono::steady_clock::now();
+            if (auto r = renderer_->render(encoder, engine_->scene(), time, finalTarget, &shaderInputs); !r) {
+                log::error("render: {}", r.error().message);
+                return 2;
+            }
+            const double recordMs =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - recordStart).count();
+            prof.add(kPhRecord, recordMs);
+            prof.count(kPhAllocRecord,
+                       static_cast<double>(core::allocCounters().allocations - recordAllocsBefore));
+            if (slowPhaseMs() > 0.0 && recordMs > slowPhaseMs()) {
+                log::warn("slow render.record {:.1f} ms at frame {}: wrote {}", recordMs, framesRendered,
+                          describeWrites(uiScript_));
+            }
         }
         // Clearing the window is the whole of the main window's present now: the editor draws the
         // frame into its canvas, and the world no longer covers the surface for the panels to be
@@ -1662,9 +1855,15 @@ int Application::runLive() {
             pass.colorAttachments = &ground;
             encoder.BeginRenderPass(&pass).End();
         }
-        imgui_->render(encoder, target);
-        wgpu::CommandBuffer commands = encoder.Finish();
-        context_->queue().Submit(1, &commands);
+        {
+            core::PhaseProfiler::AllocScope scope(prof, kPhImgui, kPhAllocImgui);
+            imgui_->render(encoder, target);
+        }
+        {
+            core::PhaseProfiler::Scope scope(prof, kPhSubmit);
+            wgpu::CommandBuffer commands = encoder.Finish();
+            context_->queue().Submit(1, &commands);
+        }
         renderer_->collectFrameTimings();
         compositor_->collectTimings();
         // What the panel armed this frame. Copied rather than read through the panel at click time
@@ -1694,9 +1893,26 @@ int Application::runLive() {
         runViewportProbe(framesRendered);
         // After the frame is submitted, so the identifier and depth targets hold what the user
         // actually clicked on rather than the frame before it.
-        serviceViewportPick();
+        {
+            core::PhaseProfiler::Scope scope(prof, kPhPick);
+            serviceViewportPick();
+        }
         const auto workEnd = std::chrono::steady_clock::now();
+        const auto presentStart = workEnd;
         context_->present();
+        if (newestInputNs_ != 0) {
+            // How old the input is by the time the frame carrying it is handed to the compositor.
+            // Not the whole of what a person perceives -- scanout and the compositor's own queue are
+            // past this point -- but it is the part the application controls, and the part that
+            // moves when the loop is reordered.
+            const std::uint64_t nowNs = SDL_GetTicksNS();
+            if (nowNs > newestInputNs_) {
+                prof.add(kPhLatency, static_cast<double>(nowNs - newestInputNs_) / 1.0e6);
+            }
+        }
+        prof.add(kPhPresent, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
+                                                                       presentStart).count());
+        const auto outputsStart = std::chrono::steady_clock::now();
         if (outputs_.openCount() > 0) {
             if (auto r = outputs_.presentAll(*context_, finalTexture_, renderWidth_, renderHeight_); !r) {
                 log::warn("outputs: {}", r.error().message);
@@ -1715,13 +1931,21 @@ int Application::runLive() {
             }
         }
         outputs_.pumpEvents(/*pumpQueue*/ false); // the primary window already pumped this frame
-        context_->processEvents();
+        prof.add(kPhOutputs, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
+                                                                       outputsStart).count());
+        {
+            core::PhaseProfiler::Scope scope(prof, kPhEvProc);
+            context_->processEvents();
+        }
 
         const auto frameEnd = std::chrono::steady_clock::now();
         // CPU work excludes the swapchain wait inside acquire and the present call.
         stats.cpuFrameMs = std::chrono::duration<double, std::milli>((workBeforeAcquire - frameStart) +
                                                                      (workEnd - workAfterAcquire)).count();
         stats.frameIntervalMs = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
+        prof.count(kPhAllocK,
+                   static_cast<double>(core::allocCounters().allocations - allocsAtFrameStart) / 1000.0);
+        prof.endFrame(stats.frameIntervalMs);
         ++fpsFrames;
         fpsAccum = std::chrono::duration<double>(frameEnd - fpsStart).count();
         if (fpsAccum >= 0.5) {
@@ -1730,6 +1954,19 @@ int Application::runLive() {
             fpsStart = frameEnd;
         }
         ++framesRendered;
+        if (framesRendered == 60) {
+            // The one number that decides what the world costs and that nobody quotes: the canvas is
+            // a fraction of the window but at the display's backing scale, so an editor on a Retina
+            // screen renders the world at several times the pixel count of a "1440x900" benchmark.
+            // Logged once, so every run states what it actually rendered.
+            log::info("canvas: world rendered at {}x{} px ({:.2f} Mpx) inside a {}x{} px window (scale {:.2f})",
+                      renderWidth_, renderHeight_,
+                      static_cast<double>(renderWidth_) * renderHeight_ / 1.0e6, window_->pixelWidth(),
+                      window_->pixelHeight(), window_->pixelScale());
+            const EngineStats& es = engine_->stats();
+            log::info("engine.update allocations: control={} signals={} modulation={} controller={} other={}",
+                      es.allocsControl, es.allocsSignals, es.allocsModulation, es.allocsController, es.allocsOther);
+        }
         if (framesRendered % 120 == 0) {
             const auto& f = engine_->latestFrame();
             log::debug("frame {} t={:.2f}s fps={:.1f} cpu={:.2f}ms gpu={:.2f}ms bass={:.2f} mid={:.2f} treble={:.2f} scale={:.2f}",
@@ -1756,6 +1993,20 @@ int Application::runLive() {
     // ImGui saves its own ini from DestroyContext, so the two halves of the layout land together.
     if (panel_) {
         panel_->saveLayout();
+    }
+    if (options_.profileCpu) {
+        // stderr rather than the log, so the table is not interleaved with timestamps and levels
+        // and can be pasted into a document as it stands.
+        std::fputs(cpuProfile_
+                       .report(fmt::format("main-thread CPU, live editor, ui-script '{}'",
+                                           options_.uiScript.empty() ? "idle" : options_.uiScript))
+                       .c_str(),
+                   stderr);
+    }
+    if (options_.profileCsv) {
+        std::ofstream out(*options_.profileCsv);
+        out << cpuProfile_.csv();
+        log::info("frame phases written to {}", options_.profileCsv->string());
     }
     log::info("rendered {} frames; GPU errors: {}", framesRendered, context_->errorCount());
     return context_->errorCount() == 0 ? 0 : 5;

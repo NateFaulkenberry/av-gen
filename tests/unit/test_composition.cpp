@@ -19,6 +19,7 @@
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace avgen;
@@ -1826,4 +1827,222 @@ TEST_CASE("examples/world/glowmere-stylized.scene.json declares the elder as its
     CHECK_THAT(static_cast<double>(hero->preferredCameraDistance / hero->height), WithinAbs(3.0, 0.1));
     CHECK(hero->activationRadius > 100.0f);
 #endif
+}
+
+// ---- rebuild invalidation (docs/application-performance.md) -------------------------------------
+//
+// `dirty_` is not a request to re-read a file. It is a request to flatten the whole world again --
+// every terrain chunk, every scatter layer, every procedural cloud -- and on
+// examples/world/terrain.scene.json that is about 390 ms of frozen main thread. So anything that
+// sets it has to have actually changed something.
+//
+// The load path set it for nothing. `attach()` flattens once (it fits the camera to the resulting
+// bounds), and `Engine::loadComposition` then called `setEnvironmentMap()` with the path the scene
+// had just been loaded with, which dirtied it again -- so every scene carrying an environment map
+// built its world twice on open, and the second build landed inside the editor's first frame.
+//
+// The observable here is `scene().meshVersion`, which `rebuild()` increments. Deliberately not a
+// getter for the flag: what matters is whether the world is flattened again, and the version is
+// what the renderer watches to decide whether to re-upload every buffer.
+TEST_CASE("Setting the same environment map again does not re-flatten the world",
+          "[scene][composition][performance]") {
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(tempDir());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "composition");
+    comp.attach(params, modulator);
+
+    const FrameTime time{};
+    comp.update(time);
+    const std::uint64_t settled = comp.scene().meshVersion;
+
+    comp.setEnvironmentMap("env/studio.hdr");
+    comp.update(time);
+    const std::uint64_t afterFirstSet = comp.scene().meshVersion;
+    CHECK(afterFirstSet > settled); // a new map is a real change
+
+    // The same map again, by the same name: nothing about the flattened scene depends on it.
+    comp.setEnvironmentMap("env/studio.hdr");
+    comp.update(time);
+    CHECK(comp.scene().meshVersion == afterFirstSet);
+
+    // And the same map by its absolute name, which is the form the engine hands back after
+    // resolving it in order to load the image. This is the case the load path actually hits; a
+    // guard that only compared the raw strings would never fire here, which is why it is pinned
+    // separately from the one above.
+    comp.setEnvironmentMap(registry.resolve("env/studio.hdr"));
+    comp.update(time);
+    CHECK(comp.scene().meshVersion == afterFirstSet);
+    CHECK(!comp.environmentMap().empty());
+
+    // A different map is still a change.
+    comp.setEnvironmentMap("env/sunset.hdr");
+    comp.update(time);
+    CHECK(comp.scene().meshVersion > afterFirstSet);
+
+    // So is clearing it.
+    const std::uint64_t afterSunset = comp.scene().meshVersion;
+    comp.setEnvironmentMap({});
+    comp.update(time);
+    CHECK(comp.scene().meshVersion > afterSunset);
+}
+
+// ---- interactive regeneration (docs/application-performance.md) ---------------------------------
+//
+// Procedural regeneration is real work and must happen; the question is when. Done inside the frame
+// on every frame of a drag, the editor's frame rate becomes the regeneration rate -- measured at
+// 145-216 ms per frame on Glowmere with `hierarchy/depth` under the pointer.
+//
+// Two properties matter and both are pinned here. Offline must be untouched, because the deferral
+// reads a wall clock; and the live editor must still converge, because geometry that is quietly and
+// permanently wrong is worse than geometry that is briefly late.
+TEST_CASE("Procedural regeneration is deferred only when a budget is set", "[scene][composition][performance]") {
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(tempDir());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "composition");
+    comp.attach(params, modulator);
+
+    scene::CompositionNode node;
+    node.name = "grid";
+    node.kind = scene::NodeKind::Procedural;
+    node.procedural.name = "grid";
+    node.procedural.source.kind = scene::PrimitiveKind::Box;
+    node.procedural.distribution.kind = scene::DistributionKind::Grid;
+    node.procedural.distribution.gridCount = glm::ivec3(6, 1, 6);
+    REQUIRE(comp.addNode(std::move(node)));
+
+    FrameTime time{};
+    params.resetFinals();
+    comp.update(time);
+    REQUIRE(comp.scene().procedurals.size() == 1);
+    const std::uint32_t settled = comp.scene().procedurals[0].structureVersion;
+
+    // Driven through the parameter, which is what a slider drags. Writing the flattened copy
+    // directly would prove nothing: applyParameters() rebuilds that copy from the node's rest state
+    // every frame, so the write would be gone before rebuildProcedurals() ever saw it.
+    auto* gridX = params.find("procedural/grid/distribution/gridCountX");
+    REQUIRE(gridX != nullptr);
+
+    SECTION("no budget: a changed input regenerates on the very next update") {
+        CHECK(comp.interactiveRebuildBudget() == 0.0);
+        gridX->setBaseComponent(0, 7.0f);
+        params.resetFinals(); // the engine does this each frame; a bare composition has no engine
+        comp.update(time);
+        CHECK(comp.scene().procedurals[0].structureVersion > settled);
+        CHECK(comp.proceduralsAwaitingRebuild() == 0);
+    }
+
+    SECTION("with a budget, an object cheaper than it is never deferred") {
+        // This grid costs microseconds, so the budget leaves it alone. The deferral is for objects
+        // whose regeneration takes the frame away; it must not add latency to the ones it was never
+        // meant for.
+        comp.setInteractiveRebuildBudget(2.0);
+        gridX->setBaseComponent(0, 8.0f);
+        params.resetFinals(); // the engine does this each frame; a bare composition has no engine
+        comp.update(time);
+        CHECK(comp.scene().procedurals[0].structureVersion > settled);
+        CHECK(comp.proceduralsAwaitingRebuild() == 0);
+    }
+
+    SECTION("a structural rebuild forgets the per-object state rather than misapplying it") {
+        comp.setInteractiveRebuildBudget(2.0);
+        params.resetFinals(); // the engine does this each frame; a bare composition has no engine
+        comp.update(time);
+        scene::CompositionNode second;
+        second.name = "grid2";
+        second.kind = scene::NodeKind::Procedural;
+        second.procedural.name = "grid2";
+        second.procedural.source.kind = scene::PrimitiveKind::Sphere;
+        REQUIRE(comp.addNode(std::move(second))); // sets dirty_, so the next update re-flattens
+        params.resetFinals(); // the engine does this each frame; a bare composition has no engine
+        comp.update(time);
+        CHECK(comp.scene().procedurals.size() == 2);
+        CHECK(comp.proceduralsAwaitingRebuild() == 0);
+    }
+}
+
+// The deferral policy itself, as arithmetic. Pinned here rather than through a composition because
+// the two properties that matter are properties of the policy and not of any scene: a drag must
+// never reach a regeneration, and a released slider must always reach one. Driving it through a
+// real scene would additionally depend on a wall clock and on which of several code paths happened
+// to have flattened the object first, neither of which this is about.
+TEST_CASE("The interactive rebuild policy defers a drag and always converges",
+          "[scene][composition][performance]") {
+    using State = scene::Composition::ProceduralRebuildState;
+
+    SECTION("nothing to do when the object is already at the wanted hash") {
+        State s;
+        s.lastMs = 500.0;
+        s.deferring = true;
+        CHECK_FALSE(scene::advanceRebuildDeferral(s, 42, 42, 1000.0));
+        CHECK_FALSE(s.deferring);
+        CHECK(s.heldForMs == 0.0);
+    }
+
+    SECTION("a drag does not regenerate per frame, only at the ceiling") {
+        State s;
+        s.lastMs = 150.0; // expensive: the ceiling is 4 x 150 = 600 ms
+        std::uint64_t wanted = 1;
+        // Sixty frames of a drag at 60 Hz -- a second of dragging, with a different wanted hash
+        // every frame, which is what dragging a slider does. The failing behaviour this replaces
+        // regenerated on all sixty, at 145-216 ms each.
+        int regenerations = 0;
+        int firstAt = -1;
+        for (int frame = 0; frame < 60; ++frame) {
+            if (scene::advanceRebuildDeferral(s, ++wanted, 0, 16.7)) {
+                ++regenerations;
+                if (firstAt < 0) {
+                    firstAt = frame;
+                }
+            }
+        }
+        // Once, at the ceiling: 601 ms in, which at 16.7 ms a frame is frame 36.
+        CHECK(regenerations == 1);
+        CHECK(firstAt == 36);
+    }
+
+    SECTION("letting go regenerates within the settle window") {
+        State s;
+        s.lastMs = 150.0;
+        CHECK_FALSE(scene::advanceRebuildDeferral(s, 7, 0, 16.7)); // the drag's last frame
+        // Now still. It must not fire immediately (that would defeat the settling)...
+        CHECK_FALSE(scene::advanceRebuildDeferral(s, 7, 0, 16.7));
+        // ...and it must fire soon. 90 ms is the window; give it a couple of frames of slack and
+        // require that it has happened, rather than pinning the exact frame.
+        bool fired = false;
+        for (int frame = 0; frame < 8 && !fired; ++frame) {
+            fired = scene::advanceRebuildDeferral(s, 7, 0, 16.7);
+        }
+        CHECK(fired);
+        CHECK_FALSE(s.deferring);
+    }
+
+    SECTION("a long continuous drag still refreshes, at a rate that scales with the cost") {
+        // The ceiling: an object may not be held back forever, or a slow drag would show nothing
+        // moving at all. Cheap objects get the floor (90 ms), expensive ones four times their own
+        // cost, so neither starves and neither takes the frame back.
+        const auto framesUntilRefresh = [](double lastMs) {
+            State s;
+            s.lastMs = lastMs;
+            std::uint64_t wanted = 1;
+            for (int frame = 1; frame <= 2000; ++frame) {
+                if (scene::advanceRebuildDeferral(s, ++wanted, 0, 1.0)) { // 1 ms per step
+                    return frame;
+                }
+            }
+            return 0;
+        };
+        // A moving target never settles, so only the ceiling can fire. Note both do fire: a drag is
+        // deferred, not ignored.
+        const int cheap = framesUntilRefresh(5.0);
+        const int expensive = framesUntilRefresh(150.0);
+        CHECK(cheap > 0);
+        CHECK(expensive > 0);
+        CHECK(cheap == 91);       // the 90 ms floor
+        CHECK(expensive == 601);  // 4 x 150 ms, so under a fifth of the time spent regenerating
+        CHECK(expensive > cheap);
+    }
 }

@@ -14,6 +14,8 @@
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
 #include "rendering/composition_renderer.hpp"
+#include "app/ui_script.hpp"
+#include "core/phase_profiler.hpp"
 #include "rendering/output_mapper.hpp"
 #include "ui/editor_layout.hpp"
 #include "share/texture_share.hpp"
@@ -70,6 +72,14 @@ struct AppOptions {
     bool autoplay = false;
     int frames = -1; // exit after this many frames (-1 = run until closed)
     std::uint64_t stressSeed = 0; // > 0: apply random UI-like actions every frame (crash reproduction)
+    // Performance work (docs/application-performance.md). --ui-script drives the editor with a
+    // repeatable interaction so "it feels sluggish" can be measured rather than described;
+    // --profile-cpu prints the main thread's per-phase distribution on the way out.
+    std::string uiScript;
+    float canvasScale = 1.0f; // --canvas-scale: the world's share of the canvas's pixels
+
+    bool profileCpu = false;
+    std::optional<std::filesystem::path> profileCsv; // --profile-csv <file>: one row per frame
     bool headless = false;
     double offlineFps = 60.0;
     bool fpsGiven = false;
@@ -130,6 +140,16 @@ private:
     std::uint64_t uiButtonEvents_ = 0;
     std::uint64_t uiFilteredEvents_ = 0;
     bool uiSelfTestEvents_ = false;
+    // The newest input event consumed this frame, on SDL's nanosecond clock. Subtracting it from
+    // the clock at present time gives input-to-present latency, which is the number "the UI feels
+    // sluggish" is actually about -- a frame rate says how often the picture changes, not how old
+    // the picture is. Zero when no input arrived this frame.
+    std::uint64_t newestInputNs_ = 0;
+    // A resize that arrived during the late input pump, i.e. after this frame's surface was
+    // already configured and its image already acquired. It has to be carried to the next
+    // frame rather than acted on here, and carried explicitly: the FrameEvents that held it
+    // is a per-frame local, so without this the resize would simply be dropped.
+    bool pendingResize_ = false;
     std::map<std::uint32_t, std::uint64_t> uiEventTypes_;
     // Offline rendering: settings from the project + CLI overrides; a job runs to completion
     // headless, or a few frames per UI frame in the live app.
@@ -187,6 +207,13 @@ private:
     // and the scene reads it: how big to render, what aspect the camera has, and where a click
     // landed. Copied from the panel once per frame rather than read through it per event, so the
     // event handler does not reach into UI state and a scripted caller can run without a panel.
+    // The main thread's own cost, phase by phase. Not GPU time and never reported as such: see
+    // core/phase_profiler.hpp. Always collected -- a scope is two steady_clock reads and an add,
+    // which measured below the clock's own resolution against an uninstrumented build -- so the
+    // editor can show the distribution live and any run can be asked what it spent its frames on.
+    core::PhaseProfiler cpuProfile_;
+    UiScript uiScript_;
+
     ui::CanvasRect canvas_;
     std::uint32_t renderWidth_ = 0;   // canvas size in framebuffer pixels; what the renderer is sized to
     std::uint32_t renderHeight_ = 0;
@@ -223,6 +250,8 @@ private:
     // Puts the camera in free mode, because position and target are ignored in orbit mode and a
     // gesture that silently moves nothing is indistinguishable from a dead input.
     void ensureFreeCamera();
+    // One raw SDL event on its way to ImGui, the viewport and the shortcut table.
+    void handleInputEvent(const SDL_Event& event);
     void handleViewportEvent(const SDL_Event& event);
     // Scripted mouse input for checking the viewport end to end; see the definition.
     void runViewportProbe(int frameIndex);

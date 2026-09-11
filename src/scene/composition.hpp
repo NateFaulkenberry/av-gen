@@ -33,6 +33,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cstdint>
+#include <chrono>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -184,6 +185,47 @@ public:
     [[nodiscard]] const graph::Graph* graph() const { return graph_ ? &*graph_ : nullptr; }
     [[nodiscard]] graph::Graph* graph() { return graph_ ? &*graph_ : nullptr; }
     void markGraphDirty() { graphDirty_ = true; }
+
+    // ---- interactive regeneration (docs/application-performance.md) ---------------------------
+    //
+    // Procedural regeneration is legitimate work -- change the knob, the geometry changes -- but it
+    // is done inside the frame, so while a slider is being dragged the editor's frame rate becomes
+    // the regeneration rate. Measured on examples/world/glowmere-stylized.json: dragging
+    // `procedural/elder-stem/hierarchy/depth` to 4 put every following frame at 145-216 ms, i.e.
+    // 5-7 fps, for as long as the drag continued.
+    //
+    // With a budget set, an object whose last regeneration cost more than `budgetMs` waits for its
+    // inputs to stop moving before regenerating again, rather than chasing every frame of a drag.
+    // It still regenerates periodically during a long continuous drag, at a rate that scales with
+    // what it costs, so the picture keeps up without the editor stopping.
+    //
+    // Zero -- the default -- means regenerate whenever the inputs change, which is the behaviour
+    // offline rendering requires and gets: the deferral reads a wall clock, and a wall clock has no
+    // business deciding what a deterministic render contains. Only the live editor sets it.
+    void setInteractiveRebuildBudget(double budgetMs) { interactiveRebuildBudgetMs_ = budgetMs; }
+    [[nodiscard]] double interactiveRebuildBudget() const { return interactiveRebuildBudgetMs_; }
+    // Objects currently holding a regeneration back, for the editor to show. Never a silent state:
+    // geometry that is deliberately a few frames behind the slider has to say so.
+    [[nodiscard]] std::size_t proceduralsAwaitingRebuild() const;
+
+    // Per-object regeneration cost and deferral state, indexed into the flattened procedural list.
+    // Cleared by rebuild(), which is also what rebuilds that list, so the indices cannot go stale.
+    // Public because the policy that reads it is a free function -- see advanceRebuildDeferral in
+    // composition.cpp, which is pure and is where the behaviour is pinned.
+    //
+    // Two timers, not one, and they answer different questions. `settledForMs` asks "have the
+    // inputs stopped moving?" and restarts whenever they move again -- a drag restarts it every
+    // frame, which is what keeps the drag out of the regeneration. `heldForMs` asks "how long has
+    // this object been wrong?" and only resets when it is actually regenerated, so a drag that goes
+    // on for seconds still gets a refresh. With one timer the second question cannot be asked at
+    // all: the first thing a moving target does is reset it.
+    struct ProceduralRebuildState {
+        double lastMs = 0.0;            // what this object's last regeneration actually cost
+        double settledForMs = 0.0;      // since its inputs last moved
+        double heldForMs = 0.0;         // since it first wanted to regenerate and was not let
+        bool deferring = false;
+        std::uint64_t deferredHash = 0; // the hash it is waiting to reach
+    };
     void clearGraph();
     [[nodiscard]] const std::vector<std::string>& graphWarnings() const { return graphWarnings_; }
     // Re-evaluates the graph when dirty and installs the result (called by update()).
@@ -275,6 +317,8 @@ private:
     std::string uniqueName(const std::string& base) const;
     [[nodiscard]] std::string nestedPrefix(const CompositionNode& node) const;
     void rebuildProcedurals();  // (re)generates every procedural object against the flattened scene
+    std::vector<ProceduralRebuildState> proceduralRebuild_;
+    std::chrono::steady_clock::time_point lastRebuildPollTime_{};
     void rebuildSdfs();
     [[nodiscard]] Transform nodeTransform(const CompositionNode& node) const; // params or authored values (local)
     // True when making `parent` the parent of `node` would close a cycle (node and parent by name).
@@ -383,6 +427,7 @@ private:
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
     std::optional<graph::Graph> graph_;
     bool graphDirty_ = false;
+    double interactiveRebuildBudgetMs_ = 0.0;
     std::vector<std::string> graphNodes_;      // node names installed by the last evaluation
     std::vector<std::string> graphMaterials_;  // material program names installed by it
     std::vector<std::string> graphWarnings_;
@@ -453,5 +498,14 @@ private:
     params::Parameter<float>* rootImpulse_ = nullptr;
     float rootAngle_ = 0.0f;
 };
+
+
+// The interactive-rebuild policy, as a pure function: state in, decision out, no clock read inside.
+// True means regenerate this object now. Defined in composition.cpp beside its only caller and
+// pinned in tests/unit/test_composition.cpp, because the behaviour that matters -- a drag never
+// reaching a regeneration, and a released slider always reaching one -- is a property of this
+// arithmetic and not of any scene.
+[[nodiscard]] bool advanceRebuildDeferral(Composition::ProceduralRebuildState& state, std::uint64_t wanted,
+                                          std::uint64_t built, double elapsedMs);
 
 } // namespace avgen::scene
