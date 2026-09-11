@@ -550,3 +550,40 @@ TEST_CASE("focalStrength zero means no emphasis, not no subject", "[world][compo
     CHECK(composed->plan.focal.front().strength == 0.0f);
     CHECK(composed->plan.focal.front().radius > 0.0f);
 }
+
+TEST_CASE("A knee-high accent does not outrank a tree as the composition's subject",
+          "[world][composer]") {
+    // Two candidates: a small thing with the library's highest artistic importance, and a tall
+    // thing with slightly less. This is Glowmere's real shape -- its manifest scores a 1.5 m beacon
+    // mushroom 0.90 against a 15 m tree's 0.80.
+    const auto doc = nlohmann::json::parse(R"({
+      "source": "test", "license": "CC0",
+      "assets": [
+        {"name": "beacon", "category": "fungi", "file": "a.glb",
+         "visualImportance": 0.9, "preferredScale": 1.5, "preferredDensity": 0.02,
+         "naturalSize": [0.4, 0.46, 0.4]},
+        {"name": "tall_tree", "category": "flora", "file": "b.glb",
+         "visualImportance": 0.8, "preferredScale": 15.0, "preferredDensity": 0.002,
+         "naturalSize": [6.0, 7.3, 6.0]}
+      ]})");
+    auto lib = assets::AssetLibrary::fromJson(doc, "/tmp/lib");
+    REQUIRE(lib.has_value());
+
+    world::WorldRecipe r = testRecipe();
+    auto composed = world::composeWorld(r, *lib);
+    REQUIRE(composed.has_value());
+    REQUIRE(composed->plan.heroes.size() >= 2);
+
+    // Hero 0 is what the viewpoint is framed on, at about three times its own height, so it has to
+    // be something that can carry a shot from across the valley. Ranking on `visualImportance`
+    // alone made the subject of a valley of fifteen-metre trees a mushroom, with the camera parked
+    // eighteen metres from it and every other hero behind it.
+    CHECK(composed->plan.heroes.front().assetId == "tall_tree");
+    // The accent is still a hero. It stops being *the* hero; it does not stop existing.
+    const bool beaconPresent =
+        std::any_of(composed->plan.heroes.begin(), composed->plan.heroes.end(),
+                    [](const world::HeroPoint& h) { return h.assetId == "beacon"; });
+    CHECK(beaconPresent);
+    // And the stand-off follows the subject's real size rather than an accent's.
+    CHECK(composed->plan.heroes.front().preferredCameraDistance > 40.0f);
+}

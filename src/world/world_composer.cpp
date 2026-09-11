@@ -477,9 +477,32 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
                 candidates.push_back(&a);
             }
         }
+        // Ranked by *presence*: the artistic role weighted by how much of the world the thing
+        // occupies.
+        //
+        // `visualImportance` alone cannot choose a landmark. It is a statement about role -- "0
+        // texture, 1 the thing the shot is about" -- and it knows nothing about size, so Glowmere's
+        // library scores a 1.5 m beacon mushroom 0.90 against a 15 m tree's 0.80. Hero 0 is what
+        // the viewpoint is framed on, at about three times its own height, so the subject of a
+        // valley of fifteen-metre trees was a mushroom with the camera parked eighteen metres from
+        // it, and every other hero ninety metres away behind it.
+        //
+        // The weighting is deliberately gentle, and square-rooted so it discriminates hardest at
+        // the small end: a merely tall asset with nothing to say still does not become the subject,
+        // but a knee-high accent no longer outranks a tree. The mushroom stays a hero -- it simply
+        // stops being *the* hero.
+        float tallest = 0.0f;
+        for (const assets::AssetDescriptor* a : candidates) {
+            tallest = std::max(tallest, a->effectiveHeight());
+        }
+        const auto presence = [tallest](const assets::AssetDescriptor* a) {
+            const float relative =
+                tallest > 1e-3f ? std::clamp(a->effectiveHeight() / tallest, 0.0f, 1.0f) : 1.0f;
+            return a->visualImportance * (0.35f + 0.65f * std::sqrt(relative));
+        };
         std::stable_sort(candidates.begin(), candidates.end(),
-                         [](const assets::AssetDescriptor* a, const assets::AssetDescriptor* b) {
-                             return a->visualImportance > b->visualImportance;
+                         [&presence](const assets::AssetDescriptor* a, const assets::AssetDescriptor* b) {
+                             return presence(a) > presence(b);
                          });
         const float span = std::max(recipe.extent, 1.0f);
         for (int i = 0; i < wanted && !candidates.empty(); ++i) {
