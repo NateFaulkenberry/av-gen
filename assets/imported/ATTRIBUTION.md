@@ -12,6 +12,7 @@ who needs to re-verify it later.
 |---|---|---|---|
 | `alien.gltf`, `alien.bin` | https://duendeds.itch.io/stylized-alien-low-poly-character | duendeds | CC0 1.0 |
 | `ufo.gltf`, `ufo.bin` | https://flexunit.itch.io/3d-game-ready-ufo-spaceship | flexunit | CC0 1.0 |
+| `camera_01.glb` | https://polyhaven.com/a/Camera_01 | Rajil Jose Macatangay (Poly Haven) | CC0 |
 
 ## Also vendored, and not committed
 
