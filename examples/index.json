@@ -148,25 +148,25 @@
    "name": "Glowmere Density - Low",
    "category": "Performance",
    "description": "Glowmere thinned to 40% of its density weights over the same 420 m of ground: 1,665 instances placed, 94 visible, 10.7 ms at 1440x900. The lightest rung of the renderer's density ladder.",
-   "project": "recipes/glowmere-low.recipe.json"
+   "recipe": "recipes/glowmere-low.recipe.json"
   },
   {
    "name": "Glowmere Density - Medium",
    "category": "Performance",
    "description": "Glowmere at its shipped density over 420 m: 10,123 placed, 595 visible, 14.1 ms. The reference rung -- every other rung is this one scaled.",
-   "project": "recipes/glowmere-medium.recipe.json"
+   "recipe": "recipes/glowmere-medium.recipe.json"
   },
   {
    "name": "Glowmere Density - Dense",
    "category": "Performance",
    "description": "The same valley spread over 840 m: 99,515 placed, 1,352 visible, 27.6 ms. Identical art direction, four times the ground.",
-   "project": "recipes/glowmere-dense.recipe.json"
+   "recipe": "recipes/glowmere-dense.recipe.json"
   },
   {
    "name": "Glowmere Density - Extreme",
    "category": "Performance",
    "description": "1,100 m of the same valley: 160,766 placed, 3,111 visible, 33.6 ms -- heavier than the authored showcase scene. The renderer's stress rung.",
-   "project": "recipes/glowmere-extreme.recipe.json"
+   "recipe": "recipes/glowmere-extreme.recipe.json"
   },
   {
    "name": "Alien - Skinned Character",

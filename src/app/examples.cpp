@@ -42,12 +42,18 @@ Result<std::vector<ExampleInfo>> loadExampleIndex(const std::filesystem::path& i
         info.name = e["name"].get<std::string>();
         info.description = e.value("description", std::string());
         info.category = e.value("category", std::string("Examples"));
+        // Three kinds of entry, opened the same way: `Application::openAny` sniffs a recipe from a
+        // project by content, so the key is documentation rather than routing. A recipe says so
+        // rather than calling itself a project, since what it opens is a world that gets generated.
         std::string file = e.value("project", std::string());
         if (file.empty()) {
             file = e.value("scene", std::string());
         }
         if (file.empty()) {
-            return fail("examples index: '{}' needs a 'project' or 'scene'", info.name);
+            file = e.value("recipe", std::string());
+        }
+        if (file.empty()) {
+            return fail("examples index: '{}' needs a 'project', 'scene' or 'recipe'", info.name);
         }
         info.file = (dir / file).lexically_normal();
         out.push_back(std::move(info));

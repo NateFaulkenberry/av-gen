@@ -12,6 +12,9 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/profile_capture.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
+    # The example index is JSON and paths. It is here so the menu the application builds is the one
+    # the test reads: checking the raw JSON instead passed on an index the application then refused.
+    "${CMAKE_SOURCE_DIR}/src/app/examples.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"
     # The job system is threads and state; no device needed (ADR-064).
     "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"

@@ -2,6 +2,7 @@
 // whole session; bundles copy everything referenced; new project resets.
 
 #include "app/engine.hpp"
+#include "app/examples.hpp"
 #include "entity/entity.hpp"
 #include "world/world_recipe.hpp"
 #include "assets/image.hpp"
@@ -612,28 +613,35 @@ TEST_CASE("Every example in the index exists and loads", "[integration][project]
     REQUIRE(index["examples"].is_array());
     REQUIRE(!index["examples"].empty());
 
-    std::set<std::string> names;
     for (const auto& entry : index["examples"]) {
-        REQUIRE(entry.contains("name"));
-        REQUIRE(entry.contains("project"));
         REQUIRE(entry.contains("category"));
         REQUIRE(entry.contains("description"));
-        const auto name = entry["name"].get<std::string>();
-        INFO("example: " << name);
-        CHECK(names.insert(name).second);          // the list is a menu; two identical rows is a bug
-        CHECK(!entry["description"].get<std::string>().empty());
-        const auto project = examples / entry["project"].get<std::string>();
-        REQUIRE(std::filesystem::exists(project));
+    }
+
+    // Read the menu with the application's own parser rather than a second copy of the key rules.
+    // Checking the raw JSON for a 'project' key passed happily on an index the application then
+    // refused to open -- the test agreed with itself while the example list came up empty.
+    const auto listed = app::loadExampleIndex(indexPath);
+    INFO((listed ? std::string() : listed.error().message));
+    REQUIRE(listed.has_value());
+    CHECK(listed->size() == index["examples"].size());
+
+    std::set<std::string> names;
+    for (const app::ExampleInfo& info : *listed) {
+        INFO("example: " << info.name);
+        CHECK(names.insert(info.name).second);     // the list is a menu; two identical rows is a bug
+        CHECK(!info.description.empty());
+        REQUIRE(std::filesystem::exists(info.file));
         // An index entry is a project or a recipe, and they open by different verbs: a project is
         // loaded, a recipe is composed. The routing rule is shared with the application rather
         // than restated here, so the menu and the test cannot disagree about what a file is.
-        if (world::isRecipeFile(project)) {
-            const auto recipe = world::WorldRecipe::loadFile(project);
+        if (world::isRecipeFile(info.file)) {
+            const auto recipe = world::WorldRecipe::loadFile(info.file);
             INFO((recipe ? std::string() : recipe.error().message));
             CHECK(recipe.has_value());
         } else {
             app::Engine engine(app::EngineMode::Offline);
-            const auto loaded = engine.loadProject(project);
+            const auto loaded = engine.loadProject(info.file);
             INFO((loaded ? std::string() : loaded.error().message));
             CHECK(loaded.has_value());
         }
