@@ -50,6 +50,11 @@ struct EditorInput {
     bool leftReleased = false;
     bool shift = false;
     bool alt = false;     // bypass group selection: pick the object inside, not the group
+    // The camera modifier is held, so this drag belongs to the camera and not to the editor
+    // (`ui::viewportIntent`). Separate from `alt` even though the same key sets both, because they
+    // are different questions: `alt` is about which object a *click* means, this is about who owns
+    // a *drag*. Collapsing them would make Option-clicking inside a group start an orbit.
+    bool cameraDrag = false;
     bool escape = false;  // cancel the drag in progress
 };
 

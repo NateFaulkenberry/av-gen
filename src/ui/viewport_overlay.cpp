@@ -1,5 +1,7 @@
 #include "ui/viewport_overlay.hpp"
 
+#include "ui/ui_logic.hpp"
+
 #include "ui/brush.hpp"
 #include "ui/gizmo.hpp"
 #include "ui/world_probe.hpp"
@@ -161,6 +163,9 @@ EditorInput editorInputFromImGui(const CanvasRect& canvas) {
     input.leftReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
     input.shift = io.KeyShift;
     input.alt = io.KeyAlt;
+    // Asked of the same rule the camera asks, so the two cannot disagree about whose drag this is.
+    input.cameraDrag = ui::intentIsCamera(ui::viewportIntent(input.leftDown, false, false, io.KeyAlt,
+                                                             io.KeyShift));
     input.escape = ImGui::IsKeyPressed(ImGuiKey_Escape, false);
     return input;
 }

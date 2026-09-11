@@ -29,6 +29,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "ui/imgui_layer.hpp"
+#include "ui/ui_logic.hpp"
 
 #include <SDL3/SDL.h>
 #include <glm/gtx/quaternion.hpp>
@@ -1326,13 +1327,31 @@ void Application::handleViewportEvent(const SDL_Event& event) {
         viewportLastMouse_ = glm::vec2(event.button.x, event.button.y);
         viewportDragTotal_ = glm::vec2(0.0f);
         const SDL_Keymod mods = SDL_GetModState();
-        if (event.button.button == SDL_BUTTON_MIDDLE ||
-            (event.button.button == SDL_BUTTON_LEFT && (mods & SDL_KMOD_SHIFT) != 0)) {
+        // One rule, shared with the editor, decided from the button and the modifiers rather than
+        // from who asked first (`ui::viewportIntent`). The left button belongs to the editor unless
+        // the camera modifier is held; the other buttons are always the camera's.
+        //
+        // `editorOwnsLeft` above is still read elsewhere, but it can no longer be the only thing
+        // standing between a press and an orbit -- which is what made box selection unreachable,
+        // because the editor does not know a press is a drag until the pointer travels and by then
+        // the camera had taken the gesture.
+        const ui::ViewportIntent intent = ui::viewportIntent(
+            event.button.button == SDL_BUTTON_LEFT, event.button.button == SDL_BUTTON_MIDDLE,
+            event.button.button == SDL_BUTTON_RIGHT, (mods & SDL_KMOD_ALT) != 0,
+            (mods & SDL_KMOD_SHIFT) != 0);
+        switch (intent) {
+        case ui::ViewportIntent::CameraPan:
             viewportGesture_ = ViewportGesture::Pan;
-        } else if (event.button.button == SDL_BUTTON_RIGHT) {
+            break;
+        case ui::ViewportIntent::CameraLook:
             viewportGesture_ = ViewportGesture::Look;
-        } else if (event.button.button == SDL_BUTTON_LEFT && !editorOwnsLeft) {
+            break;
+        case ui::ViewportIntent::CameraOrbit:
             viewportGesture_ = ViewportGesture::Orbit;
+            break;
+        case ui::ViewportIntent::EditorPointer:
+        case ui::ViewportIntent::None:
+            break; // the editor's, or nothing's
         }
         break;
     }

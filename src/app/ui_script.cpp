@@ -403,6 +403,11 @@ void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Windo
         // A drag box over most of the frame. Press and move together for the same reason as the
         // paint stroke: a synthetic pointer only survives while a button is held.
         editor.selection.clear();
+        // Where the camera was before the drag. A bare left drag is the *editor's* gesture now
+        // (ui::viewportIntent), and this records the defect it fixed: the box selected and the
+        // camera orbited under it at the same time, so the box could not be aimed. A camera that
+        // has moved by the end of a box drag is that regression, in one line.
+        boxCamera_ = engine.scene().camera.position;
         const auto [x, y] = at(0.06f, 0.10f);
         pushMotion(window, x, y);
         pushButton(window, x, y, true);
@@ -423,6 +428,9 @@ void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Windo
         // Of the nodes in the scene, not of the nodes in the *frame*: most of what a paint stroke
         // laid down at the bottom of the view projects outside the visible rectangle, and a box
         // that caught those would be a box that was not doing its job.
+        say(fmt::format("edit: the camera moved {:.3f} m during the box drag (0 means the box had "
+                        "the pointer to itself)",
+                        glm::length(engine.scene().camera.position - boxCamera_)));
         say(fmt::format("edit: a box over the frame selected {} of {} objects",
                         editor.selection.size(), nodes()));
         break;

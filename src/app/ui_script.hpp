@@ -21,6 +21,8 @@
 //
 // Both are honest about what they are; neither claims to be the other.
 
+#include <glm/glm.hpp>
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -99,6 +101,7 @@ private:
     std::vector<std::string> lastWrites_;
     UiScriptArm arms_ = UiScriptArm::None;
     std::size_t paramCursor_ = 0;
+    glm::vec3 boxCamera_{0.0f}; // camera pose at the start of the box drag, for the report
     float phase_ = 0.0f;
 };
 

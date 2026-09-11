@@ -51,3 +51,68 @@ TEST_CASE("A loaded shader's inputs are visible on the layer the editor opens on
     // "shader" is not the shader group.
     CHECK_FALSE(layerShowsPath(AuthoringLayer::Beginner, "shaders_legacy/x"));
 }
+
+// ---- who the viewport's pointer belongs to ------------------------------------------------------
+
+TEST_CASE("The left button belongs to the editor, and the camera is on a modifier", "[ui][viewport]") {
+    using ui::ViewportIntent;
+    // The gesture this whole rule exists for. A bare left drag over the world used to start a camera
+    // orbit, because the camera decided at the button-down and the editor's box selection could not
+    // claim the pointer until the drag had travelled. Measured on the scripted editor run before
+    // the fix: the camera moved 71.9 m during the box drag and the box caught 0 objects.
+    CHECK(ui::viewportIntent(true, false, false, false, false) == ViewportIntent::EditorPointer);
+
+    // Shift still means "add to the selection", so a shift-drag is still the editor's: it extends a
+    // box. It must not have stayed a camera pan, which is what it used to be.
+    CHECK(ui::viewportIntent(true, false, false, false, true) == ViewportIntent::EditorPointer);
+
+    // The camera lives behind the one modifier, with pan on the same modifier plus shift so that a
+    // laptop trackpad -- which has no middle button -- can still pan.
+    CHECK(ui::viewportIntent(true, false, false, true, false) == ViewportIntent::CameraOrbit);
+    CHECK(ui::viewportIntent(true, false, false, true, true) == ViewportIntent::CameraPan);
+
+    // The other buttons are unconditionally the camera's, whatever the editor is doing, so looking
+    // around never stops being possible.
+    CHECK(ui::viewportIntent(false, true, false, false, false) == ViewportIntent::CameraPan);
+    CHECK(ui::viewportIntent(false, false, true, false, false) == ViewportIntent::CameraLook);
+    CHECK(ui::viewportIntent(false, true, false, true, true) == ViewportIntent::CameraPan);
+    CHECK(ui::viewportIntent(false, false, true, true, true) == ViewportIntent::CameraLook);
+
+    // No button is no gesture.
+    CHECK(ui::viewportIntent(false, false, false, false, false) == ViewportIntent::None);
+    CHECK(ui::viewportIntent(false, false, false, true, true) == ViewportIntent::None);
+}
+
+TEST_CASE("Every camera gesture stays reachable, and only those are the camera's", "[ui][viewport]") {
+    using ui::ViewportIntent;
+    // Exhaustive over the five inputs, asserting two properties rather than enumerating outcomes:
+    // the editor never loses the bare left button, and the camera is never reached without either a
+    // modifier or a different button. A future binding that violates either fails here.
+    bool sawOrbit = false;
+    bool sawPan = false;
+    bool sawLook = false;
+    for (int bits = 0; bits < 32; ++bits) {
+        const bool left = (bits & 1) != 0;
+        const bool middle = (bits & 2) != 0;
+        const bool right = (bits & 4) != 0;
+        const bool alt = (bits & 8) != 0;
+        const bool shift = (bits & 16) != 0;
+        const ViewportIntent intent = ui::viewportIntent(left, middle, right, alt, shift);
+        INFO("left " << left << " middle " << middle << " right " << right << " alt " << alt
+                     << " shift " << shift);
+        if (left && !middle && !right && !alt) {
+            CHECK(intent == ViewportIntent::EditorPointer); // with or without shift
+        }
+        if (ui::intentIsCamera(intent)) {
+            CHECK((middle || right || alt)); // never the bare left button
+        }
+        sawOrbit = sawOrbit || intent == ViewportIntent::CameraOrbit;
+        sawPan = sawPan || intent == ViewportIntent::CameraPan;
+        sawLook = sawLook || intent == ViewportIntent::CameraLook;
+    }
+    // All three camera moves still have a binding. A rule that made selection work by making the
+    // camera unreachable would pass every check above and be useless.
+    CHECK(sawOrbit);
+    CHECK(sawPan);
+    CHECK(sawLook);
+}

@@ -48,6 +48,25 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
     }
     selection.retainOnly(*composition);
 
+    // The camera modifier is down, so this drag is the camera's and the editor takes no part in it
+    // (`ui::viewportIntent`). Without this the one gesture would do both: Option-dragging would spin
+    // the world *and* drag a selection box across it.
+    //
+    // Anything already in progress is abandoned rather than left half-open -- a gizmo drag that was
+    // interrupted by a camera move must not resume against a different view when the modifier is
+    // released, because the handle it was following is no longer under the pointer.
+    if (input.cameraDrag) {
+        if (drag_.active) {
+            history.cancelDrag(engine);
+            drag_ = GizmoDrag{};
+            startTransforms_.clear();
+        }
+        boxing_ = false;
+        status_ = "moving the view";
+        preview_ = BrushPreview{};
+        return;
+    }
+
     if (input.escape) {
         if (drag_.active) {
             history.cancelDrag(engine);
