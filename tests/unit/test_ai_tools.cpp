@@ -19,6 +19,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <filesystem>
+#include <unistd.h>
 
 using namespace avgen;
 using Catch::Matchers::WithinAbs;
@@ -859,4 +860,110 @@ TEST_CASE("sequence.get_state hands back beats only where they were asked for", 
         CHECK(beat.get<double>() >= 38.0);
         CHECK(beat.get<double>() <= 42.0);
     }
+}
+
+// ---- the project's own life cycle ---------------------------------------------------------------
+
+TEST_CASE("An assistant can create a project, save it and open it again", "[ai][tools][project]") {
+    // The round trip the bootstrap prompt calls its success criterion: a project that only exists
+    // in the process that made it is not a project. Everything else the assistant can do edits a
+    // session; this is the pair of verbs that makes one persist.
+    const auto root = std::filesystem::temp_directory_path() /
+                      ("avgen_ai_projects_" + std::to_string(static_cast<long long>(getpid())));
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+
+    Fixture f;
+    f.ctx.setProjectsRoot(root);
+
+    // Nothing there yet, and the tool says so rather than inventing a listing.
+    auto listed = f.call("project.list");
+    REQUIRE(listed.success);
+    CHECK(listed.value["projects"].empty());
+
+    const auto created = f.call("project.create", json{{"name", "All You Got"}});
+    INFO((created.error ? created.error->message : std::string{}));
+    REQUIRE(created.success);
+    CHECK(created.value["exists"].get<bool>());
+    const auto file = std::filesystem::path(created.value["file"].get<std::string>());
+    CHECK(std::filesystem::exists(file));           // on disk, not merely reported
+    CHECK(f.engine.projectPath() == file);          // and the session is now that project
+
+    // A value set after creation has to survive the save, or "saved" means nothing. `orb/scale`
+    // rather than anything scene-shaped: a brand new project has the built-in orb and no
+    // composition, which is exactly the state `project.create` leaves behind.
+    REQUIRE(f.engine.params().find("orb/scale") != nullptr);
+    f.engine.params().find("orb/scale")->setBaseComponent(0, 0.42f);
+    const auto saved = f.call("project.save");
+    REQUIRE(saved.success);
+    CHECK(saved.value["exists"].get<bool>());
+    CHECK(saved.value["bytes"].get<std::uint64_t>() > 0);
+
+    listed = f.call("project.list");
+    REQUIRE(listed.success);
+    REQUIRE(listed.value["projects"].size() == 1);
+    CHECK(listed.value["projects"][0].get<std::string>() == "All You Got");
+
+    // Open it into a *different* engine, which is the only version of this test worth running: the
+    // same engine would pass even if the file on disk were empty.
+    Fixture other;
+    other.ctx.setProjectsRoot(root);
+    const auto opened = other.call("project.open", json{{"name", "All You Got"}});
+    INFO((opened.error ? opened.error->message : std::string{}));
+    REQUIRE(opened.success);
+    CHECK(opened.value["parameters"].get<std::size_t>() > 0);
+    const auto* scale = other.engine.params().find("orb/scale");
+    REQUIRE(scale != nullptr);
+    CHECK_THAT(scale->baseComponent(0), WithinAbs(0.42f, 1e-4));
+
+    std::filesystem::remove_all(root);
+}
+
+TEST_CASE("The project tools refuse a name that would escape the projects folder", "[ai][tools][project]") {
+    // A tool that took a path would let one bad argument write anywhere. These take a name, and a
+    // name that is not a name is reported rather than quietly rewritten into something safe --
+    // sanitising it would hide the mistake from the thing that made it.
+    const auto root = std::filesystem::temp_directory_path() /
+                      ("avgen_ai_projects_guard_" + std::to_string(static_cast<long long>(getpid())));
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root);
+    Fixture f;
+    f.ctx.setProjectsRoot(root);
+
+    for (const char* bad : {"../escape", "..", ".hidden", "a/b", "", "with\\backslash"}) {
+        INFO("name: " << bad);
+        const auto r = f.call("project.create", json{{"name", bad}});
+        CHECK_FALSE(r.success);
+        REQUIRE(r.error.has_value());
+        CHECK(r.error->code == ai::ToolErrorCode::InvalidArguments);
+    }
+    // Nothing was created by any of them.
+    std::size_t entries = 0;
+    for (const auto& e : std::filesystem::directory_iterator(root)) { (void)e; ++entries; }
+    CHECK(entries == 0);
+
+    // And a real name still works, so the guard is a guard and not a wall.
+    CHECK(f.call("project.create", json{{"name", "Night Shift"}}).success);
+    // Creating it twice is a conflict, not a silent overwrite of somebody's work.
+    const auto again = f.call("project.create", json{{"name", "Night Shift"}});
+    CHECK_FALSE(again.success);
+    REQUIRE(again.error.has_value());
+    CHECK(again.error->code == ai::ToolErrorCode::Conflict);
+
+    std::filesystem::remove_all(root);
+}
+
+TEST_CASE("Saving without a project says which tool to use instead", "[ai][tools][project]") {
+    Fixture f; // no projects root, no project path
+    const auto r = f.call("project.save");
+    CHECK_FALSE(r.success);
+    REQUIRE(r.error.has_value());
+    CHECK(r.error->code == ai::ToolErrorCode::InvalidArguments);
+    CHECK(r.error->recovery.find("project.create") != std::string::npos);
+
+    // And without a root configured, the name-based tools refuse rather than guessing a location.
+    const auto created = f.call("project.create", json{{"name", "Somewhere"}});
+    CHECK_FALSE(created.success);
+    REQUIRE(created.error.has_value());
+    CHECK(created.error->code == ai::ToolErrorCode::Unavailable);
 }

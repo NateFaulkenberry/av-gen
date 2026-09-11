@@ -118,6 +118,9 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
         [&] {
             ToolContext ctx(*engine_);
             ctx.setCancelToken(task.cancel());
+            if (!projectsRoot_.empty()) {
+                ctx.setProjectsRoot(projectsRoot_);
+            }
             if (performance_) {
                 ctx.setPerformanceSource(performance_);
             }

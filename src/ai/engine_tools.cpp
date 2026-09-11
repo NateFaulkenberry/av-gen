@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -305,6 +306,36 @@ ToolAnnotations mutating() {
     return a;
 }
 
+
+// Writing a project to disk, or opening one. Deliberately *not* `mutatesProject`: the snapshot
+// domain is parameter state, and a snapshot cannot un-write a file or put back the session that
+// opening another project replaced. Claiming otherwise would promise a rollback nothing keeps, so
+// these say `mutatesSession` and `undoable = false`, which is the truth.
+ToolAnnotations sessionWrite(bool destructive = false) {
+    ToolAnnotations a;
+    a.mutatesSession = true;
+    a.destructive = destructive;
+    a.idempotent = !destructive;
+    a.undoable = false;
+    a.requiresMainThread = true;
+    return a;
+}
+
+// A project name, used as a directory name. Refused rather than sanitised when it would escape the
+// projects root: an agent that asked for "../../etc" has made a mistake worth reporting, and
+// quietly rewriting it to something safe teaches it nothing and hides the bug.
+[[nodiscard]] bool safeProjectName(std::string_view name) {
+    if (name.empty() || name.size() > 120 || name.front() == '.') {
+        return false;
+    }
+    if (name.find("..") != std::string_view::npos) {
+        return false;
+    }
+    return name.find('/') == std::string_view::npos &&
+           name.find('\\') == std::string_view::npos &&
+           name.find('\0') == std::string_view::npos;
+}
+
 void add(ToolRegistry& r, std::string name, std::string title, std::string description,
          json inputSchema, ToolAnnotations annotations, ToolFn fn) {
     Tool tool;
@@ -485,6 +516,183 @@ void registerProjectTools(ToolRegistry& registry, SnapshotStore& snapshots) {
 // ================================================================================================
 
 void registerParameterTools(ToolRegistry& registry) {
+    // ---- the project's own life cycle ---------------------------------------------------------
+    //
+    // These exist because everything else in this file edits a project somebody else created. An
+    // assistant asked to *start* a piece had no verb for it: `project.get_state` could describe the
+    // session and the snapshot tools could roll one back, and nothing could make one or keep it.
+    //
+    // Every one takes a **name**, never a path. A tool that took a path would let one bad argument
+    // write anywhere on the machine; a name resolves under `ToolContext::projectsRoot()`, so the
+    // worst a wrong answer does is make a directory in a folder the user already owns.
+    add(registry, "project.list", "List projects",
+        "Every project in the projects folder, by name. Use this before opening one rather than "
+        "guessing a name.",
+        noArgs(), readOnly(),
+        [](const json&, ToolContext& ctx) -> ToolResult {
+            if (!ctx.hasProjectsRoot()) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "no projects folder is configured in this session",
+                                           "projects cannot be listed, created or opened by name "
+                                           "until the host sets one");
+            }
+            json names = json::array();
+            std::error_code ec;
+            for (const auto& entry : std::filesystem::directory_iterator(ctx.projectsRoot(), ec)) {
+                if (!entry.is_directory(ec)) {
+                    continue;
+                }
+                const std::string name = entry.path().filename().string();
+                if (!std::filesystem::exists(entry.path() / (name + ".json"), ec)) {
+                    continue;
+                }
+                names.push_back(name);
+            }
+            const auto count = names.size();
+            return ToolResult::ok(json{{"root", ctx.projectsRoot().string()},
+                                       {"projects", std::move(names)}},
+                                  fmt::format("{} project(s)", count));
+        });
+
+    add(registry, "project.create", "Create a project",
+        "Start a new empty project under this name and save it, so it exists on disk before "
+        "anything is built in it. The session is replaced: anything unsaved is lost.",
+        schema::object({{"name", schema::string("Project name, used as its folder and file name")}}),
+        sessionWrite(true),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string name = args.value("name", std::string{});
+            if (!safeProjectName(name)) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                           fmt::format("'{}' is not a usable project name", name),
+                                           "use a plain name with no slashes or leading dots");
+            }
+            if (!ctx.hasProjectsRoot()) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "no projects folder is configured in this session");
+            }
+            const std::filesystem::path dir = ctx.projectsRoot() / name;
+            const std::filesystem::path file = dir / (name + ".json");
+            std::error_code ec;
+            if (std::filesystem::exists(file, ec)) {
+                return ToolResult::failure(ToolErrorCode::Conflict,
+                                           fmt::format("a project called '{}' already exists", name),
+                                           "open it with project.open, or choose another name");
+            }
+            std::filesystem::create_directories(dir, ec);
+            if (ec) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           fmt::format("cannot create '{}': {}", dir.string(),
+                                                       ec.message()));
+            }
+            app::Engine& engine = ctx.engine();
+            engine.newProject();
+            if (auto r = engine.saveProject(file); !r) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, r.error().message);
+            }
+            return ToolResult::ok(json{{"name", name},
+                                       {"file", file.string()},
+                                       {"exists", std::filesystem::exists(file, ec)}},
+                                  fmt::format("created '{}'", name));
+        });
+
+    add(registry, "project.save", "Save the project",
+        "Write the open project back to its own file. Fails when the session has never been saved, "
+        "which is when project.create or project.save_as is the tool you want. Reports the path and "
+        "confirms it exists afterwards, because a save that silently wrote nothing is the failure "
+        "worth catching.",
+        noArgs(), sessionWrite(),
+        [](const json&, ToolContext& ctx) -> ToolResult {
+            app::Engine& engine = ctx.engine();
+            if (engine.projectPath().empty()) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                           "this session has no project file yet",
+                                           "use project.create to start one, or project.save_as to "
+                                           "name this session");
+            }
+            const std::filesystem::path file = engine.projectPath();
+            if (auto r = engine.saveProject(file); !r) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, r.error().message);
+            }
+            std::error_code ec;
+            return ToolResult::ok(
+                json{{"file", file.string()},
+                     {"exists", std::filesystem::exists(file, ec)},
+                     {"bytes", static_cast<std::uint64_t>(std::filesystem::file_size(file, ec))}},
+                fmt::format("saved {}", file.filename().string()));
+        });
+
+    add(registry, "project.save_as", "Save the project under a name",
+        "Write the open session to a project of this name and carry on working in it. Use it to "
+        "name a session that was never saved, or to fork one.",
+        schema::object({{"name", schema::string("Project name, used as its folder and file name")}}),
+        sessionWrite(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string name = args.value("name", std::string{});
+            if (!safeProjectName(name)) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                           fmt::format("'{}' is not a usable project name", name));
+            }
+            if (!ctx.hasProjectsRoot()) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "no projects folder is configured in this session");
+            }
+            const std::filesystem::path dir = ctx.projectsRoot() / name;
+            const std::filesystem::path file = dir / (name + ".json");
+            std::error_code ec;
+            std::filesystem::create_directories(dir, ec);
+            app::Engine& engine = ctx.engine();
+            if (auto r = engine.saveProject(file); !r) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, r.error().message);
+            }
+            return ToolResult::ok(json{{"name", name},
+                                       {"file", file.string()},
+                                       {"exists", std::filesystem::exists(file, ec)}},
+                                  fmt::format("saved as '{}'", name));
+        });
+
+    add(registry, "project.open", "Open a project",
+        "Load a project by name, replacing the session. Anything unsaved is lost. Reports what came "
+        "back -- parameters, routes, tracks, whether audio and a scene resolved -- and any load "
+        "warnings, because a project whose scene is missing still 'opens' and the warnings are how "
+        "you find out.",
+        schema::object({{"name", schema::string("Project name, as reported by project.list")}}),
+        sessionWrite(true),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string name = args.value("name", std::string{});
+            if (!safeProjectName(name)) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                           fmt::format("'{}' is not a usable project name", name));
+            }
+            if (!ctx.hasProjectsRoot()) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "no projects folder is configured in this session");
+            }
+            const std::filesystem::path file = ctx.projectsRoot() / name / (name + ".json");
+            std::error_code ec;
+            if (!std::filesystem::exists(file, ec)) {
+                return ToolResult::failure(ToolErrorCode::NotFound,
+                                           fmt::format("no project called '{}'", name),
+                                           "project.list reports what is there");
+            }
+            app::Engine& engine = ctx.engine();
+            if (auto r = engine.loadProject(file); !r) {
+                return ToolResult::failure(ToolErrorCode::Unavailable, r.error().message);
+            }
+            json out;
+            out["name"] = name;
+            out["file"] = file.string();
+            out["parameters"] = engine.params().size();
+            out["routes"] = engine.modulator().routes().size();
+            out["timelineTracks"] = engine.timeline().tracks().size();
+            out["hasAudio"] = engine.hasAudio();
+            out["hasComposition"] = engine.composition() != nullptr;
+            if (!engine.projectWarnings().empty()) {
+                out["warnings"] = engine.projectWarnings();
+                out["warningNote"] = "the project opened, but these assets did not resolve";
+            }
+            return ToolResult::ok(std::move(out), fmt::format("opened '{}'", name));
+        });
+
     add(registry, "parameter.list_groups", "Parameter groups",
         "The top-level parameter groups in this scene and how many parameters each holds. The "
         "cheapest way to orient yourself before searching: groups are things like 'camera', 'env', "

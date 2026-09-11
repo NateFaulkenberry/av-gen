@@ -609,6 +609,23 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // operation when idle.
         settingsPath_ = AppSettings::pathIn(prefs);
         initControlPlane();
+        // Where an assistant may make a project. The preferences directory rather than anywhere the
+        // model names: the project tools take a *name* and resolve it under this root, so one bad
+        // argument makes a folder here instead of writing across the machine. A session with no
+        // preferences directory installs nothing and those tools refuse, which is the honest
+        // failure -- better than defaulting to the working directory and surprising somebody.
+        if (!prefs.empty()) {
+            const std::filesystem::path projects = prefs / "projects";
+            std::error_code projectsEc;
+            std::filesystem::create_directories(projects, projectsEc);
+            if (!projectsEc) {
+                ai_->setProjectsRoot(projects);
+                log::info("ai: projects folder {}", projects.string());
+            } else {
+                log::warn("ai: cannot use a projects folder at {}: {}", projects.string(),
+                          projectsEc.message());
+            }
+        }
         // Performance is renderer state, and `src/ai/` lives in avgen_core which cannot see the
         // renderer. So the application -- which owns both -- fills in a plain snapshot, and a
         // session without a renderer simply installs nothing and the tool says so honestly.

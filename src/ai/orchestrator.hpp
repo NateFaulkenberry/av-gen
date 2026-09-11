@@ -174,6 +174,10 @@ public:
     [[nodiscard]] const std::shared_ptr<Provider>& provider() const { return provider_; }
     void setTransactionSink(TransactionSink* sink) { sink_ = sink; }
     void setPerformanceSource(PerformanceSource source) { performance_ = std::move(source); }
+    // Where `project.create` / `open` / `save_as` resolve a name. Empty means those tools refuse,
+    // which is the right default: a session that never says where projects live should not have
+    // one guessed for it.
+    void setProjectsRoot(std::filesystem::path root) { projectsRoot_ = std::move(root); }
     void setLimits(TaskLimits limits) { limits_ = limits; }
     [[nodiscard]] const TaskLimits& limits() const { return limits_; }
     void setModel(std::string model) { model_ = std::move(model); }
@@ -193,6 +197,7 @@ private:
     std::shared_ptr<Provider> provider_;
     TransactionSink* sink_ = nullptr;
     PerformanceSource performance_;
+    std::filesystem::path projectsRoot_;
     TaskLimits limits_;
     std::string model_;
     double temperature_ = 0.4;

@@ -112,6 +112,10 @@ void ControlPlane::setTransactionSink(TransactionSink* sink) {
     orchestrator_.setTransactionSink(activeSink_);
 }
 
+void ControlPlane::setProjectsRoot(std::filesystem::path root) {
+    orchestrator_.setProjectsRoot(std::move(root));
+}
+
 void ControlPlane::setPerformanceSource(PerformanceSource source) {
     orchestrator_.setPerformanceSource(std::move(source));
 }

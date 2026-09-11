@@ -114,6 +114,8 @@ public:
     [[nodiscard]] TransactionSink& transactionSink() const { return *activeSink_; }
 
     void setPerformanceSource(PerformanceSource source);
+    // Where projects live, for the project life-cycle tools.
+    void setProjectsRoot(std::filesystem::path root);
 
     // ---- running a task -------------------------------------------------------------------------
     // Submits to the job system and returns immediately. Null when a task is already running or

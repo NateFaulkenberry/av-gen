@@ -21,6 +21,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <string>
@@ -116,6 +117,17 @@ public:
     void setCancelToken(CancelToken token) { cancel_ = std::move(token); }
     [[nodiscard]] bool cancelled() const { return cancel_.cancelled(); }
 
+    // Where projects live. Supplied by the host rather than derived here, for two reasons: this
+    // file is in `avgen_core` and the real answer comes from SDL's preferences directory, which is
+    // in the platform layer; and a test needs to point it at a temporary directory.
+    //
+    // It exists at all because a tool that took a path would let an agent write anywhere on the
+    // machine. The project tools take a *name* and resolve it under this root, so the blast radius
+    // of a bad argument is one directory the user already owns.
+    void setProjectsRoot(std::filesystem::path root) { projectsRoot_ = std::move(root); }
+    [[nodiscard]] const std::filesystem::path& projectsRoot() const { return projectsRoot_; }
+    [[nodiscard]] bool hasProjectsRoot() const { return !projectsRoot_.empty(); }
+
     void setPerformanceSource(PerformanceSource source) { performance_ = std::move(source); }
     [[nodiscard]] PerformanceSnapshot performance() const {
         return performance_ ? performance_() : PerformanceSnapshot{};
@@ -137,6 +149,7 @@ public:
 private:
     app::Engine* engine_ = nullptr;
     CancelToken cancel_;
+    std::filesystem::path projectsRoot_;
     PerformanceSource performance_;
     ChangeLog changes_;
 };
