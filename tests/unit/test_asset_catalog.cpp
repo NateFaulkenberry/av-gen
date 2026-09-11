@@ -67,4 +67,7 @@ TEST_CASE("asset registry resolves stable project and builtin IDs", "[assets][re
         std::filesystem::path("/tmp/avgen-registry-root/models/tree.glb"));
     CHECK(registry.resolve("models/tree.glb") ==
         std::filesystem::path("/tmp/avgen-registry-root/models/tree.glb"));
+        CHECK(registry.assetId("/tmp/avgen-registry-root/assets/models/tree.glb") ==
+            "asset://project/models/tree.glb");
+        CHECK(registry.assetId("/tmp/avgen-registry-root/models/tree.glb").empty());
 }

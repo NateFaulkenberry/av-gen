@@ -1415,7 +1415,8 @@ Result<void> Engine::saveComposition(const std::filesystem::path& path) {
     registry_.setBaseDirectory(path.parent_path());
     for (auto& node : comp->nodes()) {
         if (!node->asset.empty()) {
-            node->asset = registry_.relativise(node->asset);
+            const std::string id = registry_.assetId(node->asset);
+            node->asset = id.empty() ? registry_.relativise(node->asset) : std::filesystem::path(id);
         }
     }
     comp->setEnvironmentMap(environmentPath_.empty() ? std::filesystem::path()

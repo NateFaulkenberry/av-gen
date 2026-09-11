@@ -55,6 +55,11 @@ panel, thumbnails, replacement/delete workflows and migration of old absolute pa
 next ownership phase. Built-in content is not copied into new projects merely because it appears
 in the catalog.
 
+Composition saves now take the first migration step: when a referenced file resolves under the
+composition's project `assets/` directory, the saved node uses `asset://project/...`; built-in and
+external files retain relative/legacy paths rather than being relabeled without ownership proof.
+The registry resolves those IDs on the next load, while old path-based scenes remain readable.
+
 ## The rule
 
 **One artistic language, many variations.** The library is curated by hand and listed in

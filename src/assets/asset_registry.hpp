@@ -45,6 +45,9 @@ public:
     [[nodiscard]] std::filesystem::path resolve(const std::filesystem::path& path) const;
     // Inverse of resolve() for saving: relative to the base directory when possible.
     [[nodiscard]] std::filesystem::path relativise(const std::filesystem::path& path) const;
+    // Returns a stable project ID when the resolved file lives under <base>/assets; legacy and
+    // external files return an empty string so save/migration never relabels arbitrary content.
+    [[nodiscard]] std::string assetId(const std::filesystem::path& path) const;
 
     // Cached loads. Errors are not cached (a failing path is retried on the next call).
     [[nodiscard]] Result<std::shared_ptr<const SceneAsset>> loadScene(const std::filesystem::path& path);

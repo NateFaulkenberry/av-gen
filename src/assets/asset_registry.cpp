@@ -86,6 +86,16 @@ std::filesystem::path AssetRegistry::relativise(const std::filesystem::path& pat
     return relative;
 }
 
+std::string AssetRegistry::assetId(const std::filesystem::path& path) const {
+    const auto resolved = resolve(path);
+    const auto assetsRoot = canonicalise(absoluteBase() / "assets");
+    const auto relative = resolved.lexically_relative(assetsRoot);
+    if (relative.empty() || relative.native().starts_with("..")) {
+        return {};
+    }
+    return "asset://project/" + relative.generic_string();
+}
+
 Result<std::shared_ptr<const SceneAsset>> AssetRegistry::loadScene(const std::filesystem::path& path) {
     const std::filesystem::path resolved = resolve(path);
     const std::string key = resolved.string();
