@@ -8,13 +8,17 @@ file(GLOB_RECURSE AVGEN_CORE_SOURCES CONFIGURE_DEPENDS
 list(APPEND AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app/cinematic.cpp")
 if(APPLE)
     # Native video export (AVFoundation) is Objective-C++; the portable stub is for other platforms.
-    file(GLOB_RECURSE AVGEN_CORE_OBJCXX_SOURCES CONFIGURE_DEPENDS assets/*.mm comp/*.mm)
+    # The AI control plane's HTTP transport (ADR-094) is the same shape: NSURLSession has no C
+    # interface, so the system client is Objective-C++ and the portable half reports "unavailable".
+    file(GLOB_RECURSE AVGEN_CORE_OBJCXX_SOURCES CONFIGURE_DEPENDS assets/*.mm comp/*.mm ai/*.mm)
     list(APPEND AVGEN_CORE_SOURCES ${AVGEN_CORE_OBJCXX_SOURCES})
     list(REMOVE_ITEM AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/assets/video_writer_native_stub.cpp")
     # Fonts: CoreText on macOS (ADR-083); the stub is for platforms with no type engine.
     list(REMOVE_ITEM AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/comp/font_stub.cpp")
     # MIDI: CoreMIDI on macOS; the stub is for other platforms.
     list(REMOVE_ITEM AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/control/midi_stub.cpp")
+    # HTTP: NSURLSession on macOS (ADR-094).
+    list(REMOVE_ITEM AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/ai/http_portable.cpp")
 else()
     list(REMOVE_ITEM AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/control/midi_coremidi.cpp")
     list(REMOVE_ITEM AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/comp/font_coretext.mm")
@@ -30,9 +34,13 @@ if(NOT MSVC)
 endif()
 if(APPLE)
     set_source_files_properties(${AVGEN_CORE_OBJCXX_SOURCES} PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    # Security is the Keychain (ADR-094). CoreFoundation is listed explicitly rather than relied on
+    # through Foundation: Security does not re-export CF's symbols, and linking one without the
+    # other fails at link time on _CFRelease and friends.
     target_link_libraries(avgen_core PUBLIC
         "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo" "-framework Foundation"
-        "-framework CoreMIDI" "-framework CoreText" "-framework CoreGraphics")
+        "-framework CoreMIDI" "-framework CoreText" "-framework CoreGraphics"
+        "-framework Security" "-framework CoreFoundation")
 endif()
 target_compile_definitions(avgen_core PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FORCE_RADIANS GLM_ENABLE_EXPERIMENTAL)
 avgen_set_warnings(avgen_core)

@@ -18,7 +18,9 @@
 #include "rendering/scene_renderer.hpp"
 #include "rendering/sdf_renderer.hpp"
 #include "ui/composition_panel.hpp"
+#include "ui/ai_panel.hpp"
 #include "ui/sequence_panel.hpp"
+#include "ui/settings_panel.hpp"
 #include "ui/editor_layout.hpp"
 #include "ui/graph_editor.hpp"
 #include "ui/help_panel.hpp"
@@ -142,6 +144,10 @@ public:
     // The documentation (help-system spec). Owns its own content database and loads it lazily on
     // the first frame it is drawn, so a session that never opens Help pays nothing for it.
     HelpPanel help;
+    // The AI control plane's two panels (ADR-094). Both are inert until the host installs a
+    // control plane, which is what makes AI optional rather than load-bearing.
+    AiPanel ai;
+    SettingsPanel settings;
 
     // How much of the canvas's pixel count the world is actually rendered at, before being shown
     // stretched to fill it (ADR-084). One means every canvas pixel, which is what the editor has

@@ -1,5 +1,7 @@
 #include "app/application.hpp"
 
+#include "ai/scripted_provider.hpp"
+
 #include "app/asset_browser.hpp"
 #include "app/camera_director.hpp"
 #include "app/world_director.hpp"
@@ -75,6 +77,9 @@ std::string usageText() {
            "  --play              start playback immediately\n"
            "  --frames <n>        exit after n frames\n"
            "  --stress <seed>     apply random slider-like actions every frame (seek, params, routes, volume)\n"
+           "  --ai-prompt <text>  run one AI task at start-up against the configured provider\n"
+           "  --ai-script <file>  run the AI control plane against a scripted provider (JSON with a\n"
+           "                      'turns' array). Deterministic: no key, no network, real tools\n"
            "  --ui-script <arms>  drive the editor with a repeatable interaction: comma-separated from\n"
            "                      hover,sliders,panels,select,scrub,camera,tabs -- or idle, or all\n"
            "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
@@ -267,6 +272,16 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             options.stressSeed = static_cast<std::uint64_t>(std::atoll(v->c_str()));
             if (options.stressSeed == 0) return fail("--stress seed must be > 0");
             ++i;
+        } else if (arg == "--ai-prompt") {
+            auto v = need(i, "--ai-prompt");
+            if (!v) return std::unexpected(v.error());
+            options.aiPrompt = *v;
+            ++i;
+        } else if (arg == "--ai-script") {
+            auto v = need(i, "--ai-script");
+            if (!v) return std::unexpected(v.error());
+            options.aiScript = std::filesystem::path(*v);
+            ++i;
         } else if (arg == "--ui-script") {
             auto v = need(i, "--ui-script");
             if (!v) return std::unexpected(v.error());
@@ -338,6 +353,9 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
 Application::Application() = default;
 Application::~Application() {
     // Destruction order matters: UI before GPU context, renderer before context, window last.
+    // The control plane goes first of all: it cancels the running task and waits for it, and both
+    // the panel (a raw pointer) and the engine (a reference) outlive it only if it goes now.
+    ai_.reset();
     panel_.reset();
     worldBuilder_.reset();
     jobs_.reset();
@@ -349,6 +367,104 @@ Application::~Application() {
     window_.reset();
 }
 
+void Application::initControlPlane() {
+    if (auto loaded = AppSettings::load(settingsPath_); !loaded) {
+        log::warn("settings: {}", loaded.error().message);
+    } else {
+        settings_ = std::move(*loaded);
+    }
+    ai_ = std::make_unique<ai::ControlPlane>(*engine_, jobs_.get());
+    ai_->settings() = settings_.ai;
+    if (auto r = ai_->applySettings(); !r) {
+        // Not an error: "no provider configured" is the ordinary state (ADR-065), and saying so at
+        // info level is the difference between a feature that is off and a feature that is broken.
+        log::info("ai: {}", r.error().message);
+    }
+}
+
+int Application::runAiTask() {
+    if (ai_ == nullptr) {
+        log::error("ai: no control plane in this session");
+        return 7;
+    }
+    if (options_.aiScript) {
+        // The scripted provider (§52's one permitted mock). Every tool it calls is the real tool
+        // against the real engine; only the model's judgement is replaced, which is what makes a
+        // run of this repeatable and diffable.
+        auto turns = ai::ScriptedProvider::loadScript(*options_.aiScript);
+        if (!turns) {
+            log::error("ai script: {}", turns.error().message);
+            return 7;
+        }
+        ai_->setProvider(std::make_shared<ai::ScriptedProvider>(std::move(*turns)));
+        log::info("ai: scripted provider from {}", options_.aiScript->string());
+    }
+    const std::string prompt =
+        options_.aiPrompt.empty() ? std::string("follow the script") : options_.aiPrompt;
+    auto task = ai_->submit(prompt);
+    if (!task) {
+        log::error("ai: could not start a task");
+        return 7;
+    }
+    log::info("ai: \"{}\"", prompt);
+    // This thread is the main thread, so it is the one that must service the queue -- exactly as
+    // the frame loop does. Blocking here is correct for a batch flag and is why the flag exists.
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::duration<double>(ai_->settings().limits.maxSeconds + 30.0);
+    std::size_t reported = 0;
+    while (!task->finished()) {
+        ai_->pump();
+        const std::vector<ai::Activity> activities = task->activities();
+        for (std::size_t i = reported; i < activities.size(); ++i) {
+            const ai::Activity& a = activities[i];
+            if (a.kind == ai::ActivityKind::StateChanged) {
+                continue;
+            }
+            log::info("ai: [{}] {}{}{}", ai::activityKindName(a.kind), a.title,
+                      a.detail.empty() ? "" : " -- ", a.detail);
+        }
+        reported = activities.size();
+        if (std::chrono::steady_clock::now() > deadline) {
+            log::error("ai: task did not finish in time");
+            task->requestCancel();
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds{2});
+    }
+    ai_->pump();
+    const ai::TaskOutcome outcome = task->outcome();
+    for (const std::string& target : outcome.changedTargets) {
+        log::info("ai: changed {}", target);
+    }
+    log::info("ai: {} -- {} tool call(s), {} value(s) changed{}",
+              outcome.success ? "completed" : (outcome.cancelled ? "cancelled" : "failed"),
+              outcome.toolCalls, outcome.changedTargets.size(),
+              outcome.rolledBack ? ", rolled back" : "");
+    if (!outcome.summary.empty()) {
+        log::info("ai: {}", outcome.summary);
+    }
+    if (!outcome.success) {
+        log::error("ai: {}", outcome.error);
+        return 7;
+    }
+    return 0;
+}
+
+void Application::saveSettings() {
+    if (settingsPath_.empty()) {
+        return;
+    }
+    if (ai_) {
+        settings_.ai = ai_->settings();
+    }
+    if (panel_) {
+        settings_.canvasRenderScale = panel_->canvasRenderScale;
+    }
+    if (auto r = settings_.save(settingsPath_); !r) {
+        log::warn("settings: {}", r.error().message);
+    }
+}
+
 Result<void> Application::init(const AppOptions& options, const std::filesystem::path& executablePath) {
     if (!options.headless) {
         recent_ = RecentFiles(platform::preferencesDirectory() / "recent.json");
@@ -358,6 +474,17 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     }
     options_ = options;
     engine_ = std::make_unique<Engine>(options.headless ? EngineMode::Offline : EngineMode::Live);
+    if (options.headless) {
+        // A headless run gets a control plane too, so `--ai-script` and `--ai-prompt` work without
+        // a window. It *reads* the settings file -- an operator who configured a provider in the
+        // app expects a batch run to use it -- and never writes one, because a render has no
+        // business changing the user's configuration. The credential still comes from the keychain
+        // or, on a machine where that cannot be read, from AVGEN_AI_<PROVIDER>_KEY.
+        settingsPath_ = AppSettings::pathIn(platform::preferencesDirectory());
+        jobs_ = std::make_unique<JobSystem>(2);
+        initControlPlane();
+        settingsPath_.clear(); // read-only from here: saveSettings() is now a no-op
+    }
 
     if (!options.headless) {
         platform::WindowDesc wdesc;
@@ -473,8 +600,66 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         imgui_ = std::move(*imgui);
         jobs_ = std::make_unique<JobSystem>(2);
         worldBuilder_ = std::make_unique<WorldBuilder>(*jobs_);
+
+        // ---- the AI control plane (ADR-094) ----
+        // Built unconditionally, configured only if the user has done so. With nothing configured
+        // this costs one object holding a tool table and does nothing at all per frame beyond an
+        // empty queue check -- ADR-065's rule that an optional subsystem must not degrade normal
+        // operation when idle.
+        settingsPath_ = AppSettings::pathIn(prefs);
+        initControlPlane();
+        // Performance is renderer state, and `src/ai/` lives in avgen_core which cannot see the
+        // renderer. So the application -- which owns both -- fills in a plain snapshot, and a
+        // session without a renderer simply installs nothing and the tool says so honestly.
+        ai_->setPerformanceSource([this] {
+            ai::PerformanceSnapshot snapshot;
+            if (renderer_ == nullptr) {
+                return snapshot;
+            }
+            const rendering::RenderStats& stats = renderer_->stats();
+            snapshot.available = true;
+            snapshot.cpuFrameMs = lastCpuFrameMs_;
+            snapshot.frameIntervalMs = lastFrameIntervalMs_;
+            snapshot.fps = lastFps_;
+            snapshot.gpuFrameMs = lastGpuFrameMs_;
+            snapshot.drawCalls = stats.drawCalls;
+            snapshot.triangles = stats.triangles;
+            snapshot.width = stats.width;
+            snapshot.height = stats.height;
+            snapshot.visibleInstances = stats.visibleInstances;
+            snapshot.culledInstances = stats.culledInstances;
+            snapshot.lights = stats.lights;
+            snapshot.entities = stats.entities;
+            snapshot.shadowDraws = stats.shadowDraws;
+            snapshot.particleSystems = stats.particles.systems;
+            snapshot.proceduralObjects = stats.procedural.objects;
+            for (const gpu::TimelineInterval& pass : renderer_->timeline().passes()) {
+                snapshot.gpuPasses.push_back(ai::PassTime{pass.label, pass.ms});
+            }
+            std::sort(snapshot.gpuPasses.begin(), snapshot.gpuPasses.end(),
+                      [](const ai::PassTime& a, const ai::PassTime& b) {
+                          return a.milliseconds > b.milliseconds;
+                      });
+            return snapshot;
+        });
+
         panel_ = std::make_unique<ui::ControlPanel>();
-        panel_->canvasRenderScale = options_.canvasScale;
+        panel_->canvasRenderScale =
+            options_.canvasScale != 1.0f ? options_.canvasScale : settings_.canvasRenderScale;
+        panel_->ai.plane = ai_.get();
+        panel_->settings.plane = ai_.get();
+        panel_->settings.settings = &settings_;
+        panel_->settings.canvasRenderScale = &panel_->canvasRenderScale;
+        panel_->settings.settingsFile = settingsPath_.generic_string();
+        panel_->settings.onChanged = [this] { saveSettings(); };
+        panel_->ai.onOpenSettings = [this] {
+            // Open the Settings panel on the AI section, which is the navigation §46 asks for when
+            // nothing is configured.
+            panel_->settings.show(ui::SettingsPanel::Section::Ai);
+            if (bool* slot = panel_->layout().slot("Settings"); slot != nullptr) {
+                *slot = true;
+            }
+        };
         panel_->setLayoutStore(prefs.empty() ? std::filesystem::path{} : prefs / "editor-layout.json",
                                imgui_->hadSavedLayout());
         panel_->jobs = jobs_.get();
@@ -1632,6 +1817,11 @@ Result<void> Application::directCameraFromTrack() {
 }
 
 int Application::run() {
+    if (!options_.aiPrompt.empty() || options_.aiScript) {
+        if (const int aiCode = runAiTask(); aiCode != 0) {
+            return aiCode;
+        }
+    }
     const int code = options_.headless ? runHeadless() : runLive();
     if (options_.saveProject) {
         storeOutputsToProject();
@@ -1667,6 +1857,10 @@ int Application::runLive() {
     // frame for no reason when the loop can simply hold them.
     core::PhaseProfiler& prof = cpuProfile_;
     const int kPhScript = prof.phase("ui.script");
+    // The AI control plane's per-frame cost, named so it appears in --profile-cpu like everything
+    // else. An idle plane must measure as nothing, and a phase is how that is checked rather than
+    // asserted.
+    const int kPhAi = prof.phase("ai.pump");
     const int kPhEvents = prof.phase("events.poll");
     const int kPhEngine = prof.phase("engine.update");
     const int kPhUi = prof.phase("ui.build");
@@ -1886,6 +2080,19 @@ int Application::runLive() {
         stats.sdf = renderer_->stats().sdf;
         stats.particles = renderer_->stats().particles;
         stats.gpuFrameMs = renderer_->timeline().frameMs();
+        lastCpuFrameMs_ = stats.cpuFrameMs;
+        lastFrameIntervalMs_ = stats.frameIntervalMs;
+        lastFps_ = stats.fps;
+        lastGpuFrameMs_ = stats.gpuFrameMs;
+
+        // The AI control plane's only claim on the frame (ADR-094, spec §38). Queued tool bodies
+        // run here, on this thread, under a time budget -- the agent loop itself and every network
+        // call are on a job worker and cannot reach the engine except through this queue. With no
+        // task running this is one mutex and an empty-deque check.
+        if (ai_) {
+            core::PhaseProfiler::Scope scope(prof, kPhAi);
+            ai_->pump();
+        }
 
         // Background render: a few frames per UI frame, then the next queued job.
         if (job_) {
@@ -2400,6 +2607,15 @@ int Application::runHeadless() {
         engine_->update(time);
         lastEngineUpdateMs_ =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - updateStart).count();
+        // The AI control plane's queue, drained here for the same reason the live loop drains it
+        // (ADR-094): this is the thread that owns engine state, so it is the thread tool bodies
+        // run on. A headless run that never pumped would leave a task submitted during the loop
+        // waiting for a service that never came -- which is the exact shape of the bug this
+        // repository keeps shipping, so it is drained even though nothing in the offline path
+        // submits one today.
+        if (ai_) {
+            ai_->pump();
+        }
         // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
         // options; an empty set costs nothing.
         if (panel_) {
