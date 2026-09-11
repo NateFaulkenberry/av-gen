@@ -664,8 +664,23 @@ Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) c
     }
 
     // ---- camera (spec 8-11) -------------------------------------------------------------------
-    for (const auto& s : shots) {
+    //
+    // A cut is two shots meeting at one second, and a track holds one key per time: `Track::addKey`
+    // replaces a key within a microsecond of an existing one, so an outgoing shot's final pose and
+    // an incoming shot's opening pose written at the same second would be one key, and the outgoing
+    // shot would spend its whole length gliding towards the *next* shot's opening frame. The last
+    // key of a shot that is cut away from therefore lands a millisecond early: short enough that no
+    // frame rate this engine renders at can see the ramp, long enough that both poses survive.
+    constexpr double kCutSeconds = 1e-3;
+    for (std::size_t si = 0; si < shots.size(); ++si) {
+        const Shot& s = shots[si];
         const ShotCamera& cam = s.camera;
+        // Only when something actually cuts here. A following shot that inherits its camera is an
+        // author saying "keep going", and nudging the key would put a stutter in a continuous move.
+        const bool cutAfter = si + 1 < shots.size() &&
+                              shots[si + 1].camera.kind != CameraKind::Inherit &&
+                              shots[si + 1].startSeconds <= s.endSeconds() + 1e-9;
+        const double cameraEnd = cutAfter ? s.endSeconds() - kCutSeconds : s.endSeconds();
         const Actor* lookAt = cam.lookAtActor.empty() ? nullptr : actorNamed(cam.lookAtActor);
         const float weight = std::clamp(cam.lookAtWeight, 0.0f, 1.0f);
         const auto aim = [&](double time, glm::vec3 derived) {
@@ -680,7 +695,7 @@ Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) c
             samples = std::clamp(samples, 2, 256);
             for (int i = 0; i < samples; ++i) {
                 const float t = static_cast<float>(i) / static_cast<float>(samples - 1);
-                const double time = s.startSeconds + s.durationSeconds * static_cast<double>(t);
+                const double time = std::lerp(s.startSeconds, cameraEnd, static_cast<double>(t));
                 // The keys carry eased values, so the interpolation between them is linear and the
                 // shape of the move is entirely the shot's own -- handing eased values to a smooth
                 // interpolator eases them twice (the same reasoning as cinematic.cpp).
@@ -695,7 +710,7 @@ Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) c
             }
         } else if (cam.kind == CameraKind::Keys) {
             for (const auto& k : cam.keys) {
-                const double time = s.startSeconds + k.timeSeconds;
+                const double time = std::min(s.startSeconds + k.timeSeconds, cameraEnd);
                 builder.key3("camera/position", time, k.position, k.interp);
                 builder.key3("camera/target", time, aim(time, k.target), k.interp);
                 if (k.focalLength > 0.0f) {

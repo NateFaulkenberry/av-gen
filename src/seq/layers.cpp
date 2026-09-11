@@ -248,11 +248,15 @@ Result<OverlayCue> OverlayCue::fromJson(const json& j) {
         }
         cue.preset = *parsed;
     }
-    auto presetSeconds = readFloat(j, "presetSeconds", static_cast<float>(cue.presetSeconds));
-    if (!presetSeconds) {
-        return std::unexpected(presetSeconds.error());
+    // Read as a double, not a float: a round trip through a float turns 0.45 into
+    // 0.44999998807907104, and a re-serialised project that differs from the one just loaded makes
+    // every "did this change?" check in the editor and in a test useless.
+    if (const auto ps = j.find("presetSeconds"); ps != j.end()) {
+        if (!ps->is_number()) {
+            return fail("overlay '{}' presetSeconds must be a number", cue.id);
+        }
+        cue.presetSeconds = ps->get<double>();
     }
-    cue.presetSeconds = static_cast<double>(*presetSeconds);
     if (const auto e = j.find("extra"); e != j.end()) {
         cue.extra = *e;
     }

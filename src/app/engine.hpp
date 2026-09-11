@@ -30,6 +30,8 @@
 #include "scene/camera.hpp"
 #include "scene/post_settings.hpp"
 #include "scene/scene_controller.hpp"
+#include "seq/director.hpp"
+#include "seq/sequence.hpp"
 #include "shaders/shader_layers.hpp"
 #include "signals/audio_signals.hpp"
 #include "signals/signal_bus.hpp"
@@ -146,6 +148,31 @@ public:
     comp::Layer* duplicateLayer(std::uint32_t id);
     // Re-registers every layer's parameters (after an edit that changed which exist) and re-binds.
     void refreshLayerParameters();
+
+    // ---- the cinematic sequence (ADR-089) ----
+    // The timed performance: shots, scene slots, actors, overlay cues, markers. Held by value
+    // because it is a value; installing it is what turns it into timeline tracks and layers.
+    //
+    // Nothing here runs per frame except `applyAnimation` inside `update()`, which is a handful of
+    // string compares per actor. A sequence that is installed costs what its tracks cost.
+    [[nodiscard]] const seq::Sequence& sequence() const { return sequence_; }
+    // Non-const for editing. Edit, then call `installSequence()`; the two are separate because a
+    // bake is a moment and an editor drags a shot handle sixty times a second.
+    [[nodiscard]] seq::Sequence& sequence() { return sequence_; }
+    [[nodiscard]] bool hasSequence() const {
+        return !sequence_.shots.empty() || !sequence_.actors.empty() || !sequence_.overlays.empty();
+    }
+    // Replaces the sequence and installs it.
+    [[nodiscard]] Result<seq::InstallReport> setSequence(seq::Sequence sequence);
+    // Bakes the current sequence onto the timeline, realises its overlay cues as layers and binds.
+    // Idempotent: every track and layer the previous install owned is replaced, never stacked.
+    [[nodiscard]] Result<seq::InstallReport> installSequence();
+    // Removes every track and layer the sequence owns, and forgets the sequence.
+    void clearSequence();
+    // What the last install did, for the editor to show.
+    [[nodiscard]] const seq::InstallReport& sequenceReport() const { return sequenceReport_; }
+    // Parameter paths the installed sequence owns. Anything else on the timeline is the author's.
+    [[nodiscard]] const std::vector<std::string>& sequenceTargets() const { return sequenceTargets_; }
 
     // ---- built-in post-processing ----
     [[nodiscard]] scene::PostSettings& post() { return post_; }
@@ -378,6 +405,9 @@ private:
     void ensureMacroKnob(const std::string& knob, float defaultValue);
     shaders::ShaderLayerSet shaderLayers_;
     comp::LayerStack layers_;
+    seq::Sequence sequence_;
+    std::vector<std::string> sequenceTargets_;
+    seq::InstallReport sequenceReport_;
     void removeLayerParameters(); // drops "layers/*" from params_ (before a reload or a delete)
     scene::PostSettings post_;
     scene::PostParameters postParams_;

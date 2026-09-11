@@ -1,5 +1,7 @@
 #include "app/engine.hpp"
 
+#include "seq/layer_sink.hpp"
+
 #include "core/phase_profiler.hpp"
 
 #include <functional>
@@ -137,6 +139,58 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
     addDefaultPostRoutes();
     rebind();
     modulator_.resetState();
+    // A scene swap cleared the parameter set, so every track the sequence baked is now bound to
+    // nothing -- including the ones naming nodes the new scene does have. Re-installing is the only
+    // thing that fixes that, and it is what makes "open a project, then swap its scene" behave.
+    if (hasSequence()) {
+        if (auto r = installSequence(); !r) {
+            log::warn("sequence: {}", r.error().message);
+            noteBindingProblem(r.error().message);
+        }
+    }
+}
+
+// ---- the cinematic sequence (ADR-089) --------------------------------------------------------
+
+Result<seq::InstallReport> Engine::setSequence(seq::Sequence sequence) {
+    sequence_ = std::move(sequence);
+    return installSequence();
+}
+
+Result<seq::InstallReport> Engine::installSequence() {
+    // The sink is built fresh each time and owns nothing between calls: what identifies a
+    // sequencer layer is its name, which survives in the stack, not a handle held here.
+    seq::CompositionLayerSink sink(layers_, &params_);
+    auto report = seq::install(sequence_, timeline_, params_, sink, sequenceTargets_);
+    if (!report) {
+        // The install left the timeline consistent (old tracks gone) even when the bake failed, so
+        // forget the targets: there is nothing left for the next install to erase.
+        sequenceTargets_.clear();
+        sequenceReport_ = seq::InstallReport{};
+        return report;
+    }
+    sequenceTargets_ = report->targets;
+    sequenceReport_ = *report;
+    for (const std::string& warning : report->warnings) {
+        noteBindingProblem(warning);
+    }
+    log::info("sequence '{}': {} shot(s), {} actor(s), {} overlay cue(s) -> {} track(s), {} key(s), "
+              "{} layer(s){}",
+              sequence_.name, sequence_.shots.size(), sequence_.actors.size(),
+              sequence_.overlays.size(), report->trackCount, report->keyCount,
+              report->layersRealised,
+              report->unresolved.empty()
+                  ? std::string{}
+                  : fmt::format(", {} unresolved target(s)", report->unresolved.size()));
+    return report;
+}
+
+void Engine::clearSequence() {
+    seq::CompositionLayerSink sink(layers_, &params_);
+    seq::uninstall(timeline_, params_, sink, sequenceTargets_);
+    sequenceTargets_.clear();
+    sequenceReport_ = seq::InstallReport{};
+    sequence_ = seq::Sequence{};
 }
 
 void Engine::removeLayerParameters() {
@@ -621,7 +675,27 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
     }
     doc["shaders"] = std::move(shaders);
     if (!timeline_.empty()) {
-        doc["timeline"] = timeline_.toJson();
+        nlohmann::json timeline = timeline_.toJson();
+        // Tracks the sequence baked are derived from it, exactly as its layers are, and the
+        // sequence is saved below. Saving both means the next load reads them *and* re-bakes them,
+        // and two tracks writing camera/position is not a blend -- it is whichever one the timeline
+        // happens to apply second. So the file holds what the author wrote by hand; the bake is
+        // recreated from the shots it came from.
+        if (!sequenceTargets_.empty() && timeline.contains("tracks") && timeline["tracks"].is_array()) {
+            nlohmann::json authored = nlohmann::json::array();
+            for (const auto& track : timeline["tracks"]) {
+                const std::string target = track.value("target", std::string{});
+                if (std::find(sequenceTargets_.begin(), sequenceTargets_.end(), target) ==
+                    sequenceTargets_.end()) {
+                    authored.push_back(track);
+                }
+            }
+            timeline["tracks"] = std::move(authored);
+        }
+        if (!timeline.value("tracks", nlohmann::json::array()).empty() ||
+            !timeline.value("cues", nlohmann::json::array()).empty()) {
+            doc["timeline"] = std::move(timeline);
+        }
     }
     if (!states_.empty()) {
         doc["states"] = states_.toJson();
@@ -641,7 +715,44 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
     // would lose every edit made with a slider.
     layers_.pullAuthored();
     if (!layers_.empty()) {
-        doc["composition"] = layers_.toJson();
+        nlohmann::json composition = layers_.toJson();
+        // Layers the sequence made are derived from its overlay cues, and the cues are saved just
+        // below. Writing both would save the same lyric twice and, worse, restore it with a layer
+        // id the next install will not reuse -- so the saved parameter values would attach to a
+        // layer that no longer exists. The sequence owns them; "composition" holds what the author
+        // made by hand.
+        if (composition.contains("layers") && composition["layers"].is_array()) {
+            nlohmann::json authored = nlohmann::json::array();
+            for (const auto& layer : composition["layers"]) {
+                const std::string name = layer.value("name", std::string{});
+                if (!seq::CompositionLayerSink::ownedName(name)) {
+                    authored.push_back(layer);
+                }
+            }
+            composition["layers"] = std::move(authored);
+        }
+        if (!composition.value("layers", nlohmann::json::array()).empty()) {
+            doc["composition"] = std::move(composition);
+        }
+        // Their parameters are derived too. Left in, a reload would try to apply "layers/7/anchor"
+        // before the install has made layer 7, and warn about a parameter the author never wrote.
+        if (doc.contains("parameters") && doc["parameters"].is_object()) {
+            std::vector<std::string> doomed;
+            for (const auto& layer : layers_.layers()) {
+                if (!seq::CompositionLayerSink::ownedName(layer->name)) {
+                    continue;
+                }
+                for (const std::string& path : layer->parameterPaths()) {
+                    doomed.push_back(path);
+                }
+            }
+            for (const std::string& path : doomed) {
+                doc["parameters"].erase(path);
+            }
+        }
+    }
+    if (hasSequence()) {
+        doc["sequence"] = sequence_.toJson();
     }
     doc["render"] = render_.toJson();
     doc["control"] = controlHub_.map().toJson();
@@ -924,6 +1035,26 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     }
     rebind();
     modulator_.resetState();
+    // The sequence goes on last, after every parameter a bake could possibly name exists: the
+    // scene's nodes, the camera, the post chain, the sources and the shader inputs. Installing it
+    // earlier would bind its tracks to a parameter set that was still being built, which is how a
+    // feature ends up correct in every respect except that it does nothing (ADR-075).
+    sequence_ = seq::Sequence{};
+    sequenceTargets_.clear();
+    sequenceReport_ = seq::InstallReport{};
+    if (doc.contains("sequence")) {
+        auto parsed = seq::Sequence::fromJson(doc["sequence"]);
+        if (!parsed) {
+            return fail("project sequence: {}", parsed.error().message);
+        }
+        sequence_ = std::move(*parsed);
+        if (auto r = installSequence(); !r) {
+            // A sequence that will not install is a load warning, not a load failure: the rest of
+            // the project is perfectly good and the author needs to see the piece to fix it.
+            log::warn("project sequence: {}", r.error().message);
+            noteBindingProblem(fmt::format("sequence: {}", r.error().message));
+        }
+    }
     projectPath_ = path;
     reportCuePresetOverrides();
     log::info("project '{}' loaded: {} parameters, {} routes, {} sources, {} presets, {} timeline tracks, {} cues, {} warning(s)",
@@ -933,6 +1064,9 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
 }
 
 void Engine::newProject() {
+    sequence_ = seq::Sequence{};
+    sequenceTargets_.clear();
+    sequenceReport_ = seq::InstallReport{};
     removeLayerParameters();
     layers_.clear();
     timeline_.clear();
@@ -1816,6 +1950,13 @@ void Engine::update(const FrameTime& time) {
         if (auto* comp = composition()) {
             comp->setViewport(viewportWidth_, viewportHeight_);
         }
+    }
+    // The one part of a sequence a track cannot carry: which clip each actor is in, and the second
+    // its phase started from (ADR-089). After updateBehaviour, so a sequence that says what a
+    // character is doing wins over a behaviour that guessed; before controller_->update(), which is
+    // what poses the rigs. Pure in the clock, so a scrub lands the same pose as a play-through.
+    if (auto* comp = composition(); comp != nullptr && !sequence_.actors.empty()) {
+        seq::applyAnimation(sequence_, *comp, timelineClock_.seconds);
     }
     stats_.allocsModulation = allocsNow() - allocMark;
     allocMark = allocsNow();
