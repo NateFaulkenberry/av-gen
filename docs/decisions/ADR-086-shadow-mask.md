@@ -207,6 +207,22 @@ threshold and this run was headless too. What has changed is that the ladder's r
 control: 35% means 35%, so re-calibrating them is a decision that can be made and measured, which
 it could not be while the simplifier silently returned a fifth of what it was asked for.
 
+
+## Where the phase leaves the frame
+
+Both changes together against the Phase 3 renderer, min of 4 interleaved runs, same shaders on
+disk in both arms so this isolates the two changes rather than the whole diff:
+
+| canvas | submitted tris | scene pass | GPU frame | wall clock |
+|---|---:|---:|---:|---:|
+| 720x450 | 201,174 -> 235,761 | 13.11 -> **11.53** (-12.1%) | 14.61 -> 13.37 (-8.5%) | 17.09 -> 16.07 |
+| 1440x900 | 396,495 -> 448,038 | 18.55 -> **15.47** (-16.6%) | 21.36 -> 19.01 (-11.0%) | 24.13 -> 21.77 |
+| 2880x1166 | 694,977 -> 767,961 | 38.01 -> **31.00** (-18.4%) | 43.25 -> 37.49 (-13.3%) | 46.04 -> 40.42 |
+
+13% off the editor canvas's GPU frame while submitting 10.5% *more* geometry than before, because
+one change bought a per-pixel term and the other spent part of it on the geometry the ladder had
+been quietly withholding.
+
 ## Revisit triggers
 
 - A world whose key light is a spot rather than a directional light gets nothing from this; the
