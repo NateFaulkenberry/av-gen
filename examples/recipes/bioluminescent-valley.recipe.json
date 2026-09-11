@@ -4,6 +4,15 @@
  "seed": 20260910,
  "extent": 420.0,
  "assetLibrary": "../../assets/manifest.json",
+ "terrain": {
+  "style": "valley",
+  "roughness": 0.42,
+  "valleyStrength": 0.85,
+  "ridgeStrength": 0.6,
+  "waterAmount": 0.6,
+  "riverFrequency": 0.5,
+  "pondFrequency": 0.35
+ },
  "composition": {
   "foreground": 0.9,
   "midground": 0.8,

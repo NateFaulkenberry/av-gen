@@ -83,6 +83,13 @@ struct Feature {
     // every sample and every segment of every feature, most of which are nowhere near the point.
     glm::vec2 boundsMin{0.0f};
     glm::vec2 boundsMax{0.0f};
+    // Runtime: the same box again for each run of 8 consecutive segments of `samplePath()`, as
+    // (minX, minZ, maxX, maxZ). The whole-feature box says whether to look at a feature at all; this
+    // says which *part* of it to look at, which is the difference between paying for a river's
+    // hundred and twenty segments at every sample inside its bounds and paying for the handful that
+    // could possibly be the nearest. A generated world has a dozen features that each span it, so
+    // without this a height sample is the product of every feature and every segment of it.
+    std::vector<glm::vec4> blocks;
     [[nodiscard]] bool reaches(glm::vec2 p) const {
         return p.x >= boundsMin.x && p.x <= boundsMax.x && p.y >= boundsMin.y && p.y <= boundsMax.y;
     }

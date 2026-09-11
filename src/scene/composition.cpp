@@ -1431,6 +1431,18 @@ entity::Navigator Composition::buildNavigator() const {
     return {};
 }
 
+world::TerrainQuery Composition::terrainQuery() const {
+    for (const auto& nodePtr : nodes_) {
+        if (nodePtr->kind != NodeKind::Terrain) {
+            continue;
+        }
+        return world::terrainQuery(nodePtr->worldMap, &nodePtr->ecology, heroes_);
+    }
+    // A scene with no terrain is a legitimate scene: the query answers the y = 0 plane and says it
+    // is not valid, which is what lets a caller run against it rather than special-casing it.
+    return {};
+}
+
 std::uint32_t Composition::worldSeed() const {
     for (const auto& nodePtr : nodes_) {
         if (nodePtr->kind == NodeKind::Terrain) {
