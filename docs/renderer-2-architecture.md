@@ -4,7 +4,9 @@
 conclusions they support. It does not yet cover every subsystem the brief lists; the sections marked
 *not yet audited* are honest gaps, not omissions of bad news.
 
-Nothing in the renderer has been modified to produce this document.
+Nothing in the renderer had been modified when the document was first written. Sections 2 and 3 have
+since been superseded by later phases and say so where they stand; the superseded text is kept
+because a wrong conclusion that set a phase order is worth being able to read.
 
 ## How these numbers were taken
 
@@ -41,9 +43,13 @@ reproduce, and the spread is p10 24.5 to p90 28.4. The earlier figure included s
 The problem is the *absolute* frame time — 25.7 ms is 39 FPS against the brief's 16.67 ms target —
 not variance.
 
-## 2. The scene pass is geometry-bound, not fragment-bound
+## 2. The scene pass is fragment-bound, and its fragments are counted by triangles
 
-This is the single most important measured result, because it decides which phases matter.
+**Superseded by Phase 3. The section as written said the opposite, and the measurement it rested on
+was confounded.** Kept in the same form as section 3: the reasoning is what the phase order was
+built on, and it has to be readable to see where it went wrong.
+
+### What it used to say
 
 | Resolution | pixels | GPU frame | scene pass |
 |---|---:|---:|---:|
@@ -51,19 +57,108 @@ This is the single most important measured result, because it decides which phas
 | 1440×900 | 1.30 MP | 24.25 ms | 20.71 ms |
 | 2880×1800 | 5.18 MP | 47.97 ms | 40.96 ms |
 
-**Quadrupling the pixels from 720×450 to 1440×900 moves the scene pass by 4%** (19.92 → 20.71 ms).
-A fragment-bound pass would have moved by something close to 4×. From 1440×900 to 2880×1800 it
-doubles, so fragment cost does become significant at that resolution — but at the resolution the
-editor actually runs, the scene pass is paying for vertices, draws and state, not pixels.
+Quadrupling the pixels moves the scene pass by 4%, so — the argument ran — the pass is paying for
+vertices, draws and state rather than for pixels, and the phases that matter are visibility, LOD,
+HLOD and instancing.
 
-Two consequences:
+### The confound
 
-- **Dynamic resolution (§33) will not help at 1440×900.** It is a real feature and worth having for
-  high-resolution output, but it cannot be the answer to the current frame time. Reducing render
-  scale from 1440×900 to 720×450 would buy roughly 2 ms of a 24 ms frame.
-- The phases that matter here are **visibility, LOD, HLOD and instancing** (§9–§16, brief phases
-  2–4). That is what the brief predicted, and the measurement supports it rather than merely being
-  consistent with it.
+`projScale` is `viewportHeight / (2 tan(fovY/2))`, and screen-space LOD selects against it, so a
+taller render target selects *more* geometry. The sweep varied pixels and triangles together:
+
+| resolution | pixels | submitted camera triangles | scene pass |
+|---|---:|---:|---:|
+| 720×450 | 0.32 MP | 436,176 | 21.50 ms |
+| 1440×900 | 1.30 MP | 635,754 | 23.53 ms |
+| 2880×1800 | 5.18 MP | 809,459 | 48.04 ms |
+
+Neither a "slope in ms per megapixel" nor a "resolution-independent intercept" fitted to those
+points means what its name says: the three rows are three different workloads.
+
+### What is actually true
+
+**The pass is fragment-bound.** The depth prepass submits *the same geometry* — the counters say so:
+`camera 436176 tris / 2353 inst / 145 draws; depth 436176 / 2353 / 145` — through the same vertex
+stage, and costs **0.20 ms**. The lit pass costs **21.30 ms** at 720×450. Vertices, draws and state
+are the 0.20; everything else is the fragment stage. Cutting the fragment shader's work confirms it
+and says where it goes (720×450, Glowmere, shader-only A/B through `AVGEN_SHADER_DIR`, min of 3
+interleaved runs):
+
+| fragment shader arm | scene | delta |
+|---|---:|---:|
+| baseline | 21.43 | — |
+| `directLighting` returns zero | 4.98 | **−16.45** |
+| `shadowFactor` returns 1 (keeps the contact march) | 11.14 | −10.29 |
+| contact march skipped (keeps the shadow maps) | 14.81 | −6.62 |
+| the clustered local lights skipped | 18.02 | −3.41 |
+| the screen-space AO fetch skipped | 20.51 | −0.92 |
+
+Three quarters of the pass is `directLighting`: two directional lights and a practical, each doing a
+12-step screen-space contact march, plus the key light's PCSS cascade lookup, plus up to 32
+bioluminescent cluster lights.
+
+**But the number of fragments is set by the triangle count, not by the pixel count.** That is what
+made the pass look geometry-bound, and it is why both readings of the old table were half right. The
+ecology submits more triangles than the frame has pixels — 436,176 against 324,000 at 720×450 — and
+a triangle smaller than a quad still costs a quad. So below roughly 1.3 MP the invocation count is a
+floor set by geometry and barely moves with resolution, and above it screen coverage takes over:
+
+| Glowmere, `directLighting`'s own cost | 360×225 | 720×450 | 1440×900 | 2880×1800 |
+|---|---:|---:|---:|---:|
+| ms | 12.00 | 16.06 | 14.28 | 32.83 |
+| pixels | 0.081 MP | 0.324 MP | 1.30 MP | 5.18 MP |
+
+Sixteen times the pixels between the first and third column, and the lighting costs 19% more.
+
+**The marginal cost per pixel does not have a cliff in it.** Measured on the scene pass's own
+geometry-free arms: terrain alone runs 8.30 → 3.39 → 2.88 ns/pixel from 0.32 to 5.18 MP (falling, as
+a fixed floor is amortised), and a fixed-geometry scene — the authored procedural nodes only, single
+instances with no ladder, so `projScale` cannot change what is submitted — is flat within the
+timestamp's own quantisation across the same range. The scene pass writes five colour attachments
+plus depth, and it was worth asking whether the tiler splits past some resolution and re-bins; these
+two say it does not. The steepening in the old table is the geometry growing with the viewport.
+
+### What it should have concluded
+
+- **The phases that matter are still LOD and instancing** — but for a different reason, and with a
+  different success criterion. The lever is *triangles*, because triangles buy fragment invocations,
+  not because the vertex stage is expensive. A LOD change that halves submitted triangles and leaves
+  the mesh count alone is a win; a draw-call merge that leaves the triangles alone is not.
+- **Fragment-side work is not "not the lever".** It is three quarters of the pass, and it is the
+  whole of it at the resolution the editor actually runs — see the canvas note below.
+- **Dynamic resolution was dismissed on a bad number.** At 0.32–1.3 MP it buys little because the
+  invocation count is geometry-floored. Above that the pass is genuinely per-pixel at roughly
+  2–3 ms/MP, and the editor canvas is 3.4–4.4 MP.
+
+### The resolution this is all quoted at is not the one the editor uses
+
+The world is rendered into the dock centre at the display's backing scale: a 1440×900-point window
+is a **2880×1166 = 3.36 MP** canvas, and 1920×1200 points is **2466×1766 = 4.36 MP**, against the
+1.30 MP that "1440×900" has meant in every benchmark in this document. `--canvas-scale` and a
+once-per-run log of the canvas's true size exist now; `docs/performance.md` carries it. Both
+operating points are measured in section 2a.
+
+## 2a. Where Glowmere's scene pass goes, by resolution
+
+Min of 3 interleaved runs per cell, `--tier realtime`, headless, machine shared with other agents.
+"before" is `df06bb8`; "after" is the LOD chain of ADR-084.
+
+| canvas | pixels | submitted tris before → after | scene before → after |
+|---|---:|---:|---:|
+| 720×450 | 0.32 MP | 436,176 → 201,172 | 21.36 → **12.65** |
+| 1440×900 | 1.30 MP | 635,754 → 396,493 | 20.97 → **18.15** |
+| 2880×1166 (editor, 1440×900 pt) | 3.36 MP | 1,014,963 → 694,975 | 40.57 → **37.62** |
+| 2466×1766 (editor, 1920×1200 pt) | 4.36 MP | 711,065 → 621,121 | 36.37 → **35.39** |
+| 2880×1800 | 5.18 MP | 809,459 → 707,017 | 43.58 → **42.80** |
+
+The shape of that table *is* the finding: cutting triangles takes 41% off the pass at the benchmark
+resolution and 7% off it at the resolution the editor renders, because the two ends of the range are
+bound by different things. The editor canvas is past the crossover, and what it is short of is
+fragment throughput.
+
+Note also that the 3.36 MP canvas is *slower* than the 4.36 MP one. It is wider (2.47:1 against
+1.40:1), so its frustum holds more of the world — 1.01 M triangles against 0.71 M. Aspect ratio
+moves this budget as much as pixel count does.
 
 ## 3. The geometry statistics do not measure what they appear to
 
@@ -224,9 +319,13 @@ Stated rather than quietly skipped:
    measures pre-cull geometry, submitted primitives are unmeasured, and pass timings under-report by
    ~40% on a removal basis. Nothing downstream can be evaluated until this is fixed.
 2. **Phases 2–4 (visibility, LOD/HLOD, instancing) are where the frame time is.** 85% of the GPU
-   frame is one geometry-bound pass.
-3. **Dynamic resolution and fragment-side work are not the lever at editor resolution.** Worth
-   building for high-resolution output; not an answer to 25.7 ms.
+   frame is one pass. *(Phase 3: still true, but read section 2 for why — the pass is fragment-bound
+   and the geometry is what buys the fragments.)*
+3. ~~**Dynamic resolution and fragment-side work are not the lever at editor resolution.** Worth
+   building for high-resolution output; not an answer to 25.7 ms.~~ **Wrong on both counts, and
+   wrong because the editor does not render at 1440×900.** It renders at 3.4–4.4 MP, which is past
+   the point where the pass becomes per-pixel. Fragment-side work is three quarters of the pass, and
+   render scale is a real lever there. Section 2.
 4. **GPU-driven submission is already partly present** and the CPU is not the bottleneck, so §17's
    later stages stay parked until measurement justifies them.
 5. **Volumetrics are 4% of the frame.** Whatever their measurement error, they are not the problem.
