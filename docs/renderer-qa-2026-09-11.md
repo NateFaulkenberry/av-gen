@@ -129,6 +129,9 @@ tone mapping and composition overlay.
 - [x] Renderer boundary validation rejects non-finite camera view/projection and entity model
   matrices before GPU submission. Focused NaN/Inf regression passes; broader joint/bounds validation
   remains open.
+- [x] Camera view construction now chooses a fallback up axis when forward and authored up are
+  parallel. This prevents `lookAtRH` from generating NaN matrices for top-down/edge-on shots. The
+  camera unit suite and disc-emitter GPU regression both pass.
 - [ ] Audit object uniform ring/dynamic offsets and per-frame writes under rapid scene changes.
   Use object IDs and a two-frame alternating transform test to detect stale object data.
 - [x] Fix stale model history across camera culling. `prevModelsNext_` was previously populated
@@ -275,6 +278,19 @@ scene entity's frame state.
 still read the prior frame from `prevModels_`.
 
 **Regression:** `[gpu][motion][blur]` compares the re-entry image with a fresh renderer and passes.
+
+### Camera forward/up singularity
+
+**Symptom:** a top-down camera could make `renderToImage()` fail because the view matrix became
+non-finite; the particle disc edge-on regression exposed it.
+
+**Root cause:** `glm::lookAtRH` was given a forward direction parallel to the authored world-up
+vector, leaving its lateral basis undefined.
+
+**Fix:** `Camera::view()` selects a stable world-axis fallback up vector when the two directions are
+near parallel.
+
+**Regression:** camera tests pass 140 assertions and the disc-emitter test passes 42 assertions.
 
 ### Water alpha-squared compositing
 

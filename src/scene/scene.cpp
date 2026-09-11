@@ -27,7 +27,16 @@ Transform Transform::fromMatrix(const glm::mat4& m) {
 }
 
 glm::mat4 Camera::view() const {
-    return glm::lookAtRH(position, target, up);
+    const glm::vec3 forward = target - position;
+    glm::vec3 viewUp = up;
+    if (glm::dot(forward, forward) > 1e-12f && glm::dot(viewUp, viewUp) > 1e-12f) {
+        const glm::vec3 direction = glm::normalize(forward);
+        if (std::abs(glm::dot(direction, glm::normalize(viewUp))) > 0.999f) {
+            viewUp = std::abs(direction.y) < 0.999f ? glm::vec3(0.0f, 1.0f, 0.0f)
+                                                    : glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+    }
+    return glm::lookAtRH(position, target, viewUp);
 }
 
 glm::mat4 Camera::projection(float aspect) const {
