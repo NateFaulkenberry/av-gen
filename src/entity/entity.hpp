@@ -41,6 +41,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -124,6 +125,29 @@ struct NodeBinding {
     glm::vec3 anchor{0.0f};      // the node's authored world position
 };
 
+// A place worth walking to (ADR-093, §6). §6 lists what a character should find interesting --
+// glowing plants, water, the UFO, terrain features, scenic locations -- and this is that list, as
+// data, so a behaviour can choose among them without knowing where any of them came from.
+//
+// The kinds exist so a character can have *taste*: one drawn to water and one drawn to high ground
+// are the same behaviour with different weights, and the difference is what stops two characters in
+// the same world walking the same route.
+enum class InterestKind : std::uint8_t {
+    Landmark,  // a hero or an authored node: the elder, the monument, the arch
+    Character, // another entity, which moves
+    Glow,      // a patch of luminous ecology
+    Water,     // a point on a shoreline
+    Vista,     // a walkable local high point
+};
+[[nodiscard]] const char* interestKindName(InterestKind kind);
+
+struct InterestPoint {
+    glm::vec3 position{0.0f};
+    std::string name;   // empty for a derived point; a landmark or entity name otherwise
+    InterestKind kind = InterestKind::Landmark;
+    float weight = 1.0f;
+};
+
 // ---- runtime ---------------------------------------------------------------------------------
 
 struct EntityUpdate {
@@ -175,6 +199,11 @@ private:
 
     double coarseAccum_ = 0.0;
     bool active_ = true;
+    // Whether this entity has ever been ticked. Behaviour level of detail may not suppress the
+    // *first* update: an entity that has never run has never published a LocomotionState, so
+    // skipping it hands the animation layer a position of (0,0,0) and a character pops in from the
+    // world origin on whichever frame it first comes close enough to matter.
+    bool everUpdated_ = false;
 
     IPoseSink* pose_ = nullptr;
     const ISkeletonQuery* skeleton_ = nullptr;
@@ -198,16 +227,45 @@ public:
     void setBindings(std::vector<NodeBinding> bindings);
     [[nodiscard]] const NodeBinding* binding(const std::string& node) const;
 
-    void setNavigator(Navigator nav) { nav_ = std::move(nav); }
+    void setNavigator(Navigator nav) {
+        nav_ = std::move(nav);
+        refreshInterestPoints();
+    }
     [[nodiscard]] const Navigator& navigator() const { return nav_; }
 
     // Named places a behaviour may attend to: the scene's heroes, and any node an entity drives.
     // Set by the host, because only the host knows what the scene contains.
     void setLandmarks(std::vector<std::pair<std::string, glm::vec3>> landmarks) {
         landmarks_ = std::move(landmarks);
+        refreshInterestPoints();
     }
     // Where `name` is, looking first at entities (which move) and then at landmarks (which do not).
     [[nodiscard]] bool pointOfInterest(std::string_view name, glm::vec3& out) const;
+
+    // Places worth going to (§6). Assembled from three sources, which is why it is derived rather
+    // than set: the host's landmarks, the entities that move, and whatever the navigation grid
+    // noticed about the terrain while it was being built. `extras` is for what only the host knows
+    // -- a patch of glowing ecology is a point of interest and nothing else in here can see one.
+    void setExtraInterestPoints(std::vector<InterestPoint> extras);
+    [[nodiscard]] std::span<const InterestPoint> interestPoints() const { return interests_; }
+    // Recomputes the list. Called by setLandmarks and setNavigator, so a host that uses those gets
+    // interests without asking; call it directly after moving something that is one.
+    void refreshInterestPoints();
+
+    // Characters not walking through each other (§11 of the world-authoring brief).
+    //
+    // Rebuilt once per update from every entity that declared a radius, into the same uniform grid
+    // the static obstacles use -- so separation costs a disc query per character rather than a pass
+    // over every other character. With three entities that distinction is academic; with a crowd it
+    // is the whole thing, and building it on N^2 now would mean rewriting it later.
+    //
+    // It is deliberately *not* part of the navigator's obstacle set. A route is planned over a world
+    // that is not moving; who is standing where is a fact about this frame, and folding it into the
+    // graph would have every character replanning every time anyone walked past.
+    [[nodiscard]] const spatial::ObstacleField& crowd() const { return crowd_; }
+    // The push that takes entity `self` out of the other bodies it is overlapping, in world XZ.
+    // Zero when it is clear, which is the usual answer.
+    [[nodiscard]] glm::vec2 crowdSeparation(std::size_t self, glm::vec2 p, float radius) const;
 
     // Registers every behaviour's knobs. Must run before any route or track is bound: a route
     // bound before its target exists is a route that does nothing, silently, forever.
@@ -233,8 +291,44 @@ public:
     // after modulation, so a route and a behaviour compose rather than overwrite.
     void update(const EntityUpdate& ctx, params::ParameterSet& params);
 
-    // Puts every entity back to its start. Called on a seek.
+    // Puts every entity back to its start.
     void reset();
+
+    // Puts every entity where it would have been at `time` had the timeline been played from zero
+    // (ADR-093). Resets, then re-simulates the behaviour layer at a fixed step.
+    //
+    // Why re-simulation rather than evaluation. A character that plans a route, steers round a
+    // trunk and is pushed out of a rock has a position that depends on its history: there is no
+    // closed form for "where would it be at t = 94 s", and pretending otherwise would mean throwing
+    // away the obstacle avoidance that makes it worth watching. Re-simulation is the honest answer,
+    // and at a fixed step it is *reproducible*, which is the property that was actually missing --
+    // before this, seeking to the same second twice could leave a character in two different
+    // places, and nothing called `reset` at all.
+    //
+    // Two things it deliberately does not do. It does not write to the parameter set: the next
+    // ordinary update folds the offsets on, and writing them here would accumulate onto finals that
+    // only a real frame clears. And it does not replay the audio analysis -- the default `bus` is
+    // null, so a re-simulated character walks its autonomous walk without the music.
+    //
+    // That second one is a choice, and it is the one that makes the guarantee statable. Handing the
+    // *current* bus to eighteen hundred re-simulated steps is not a replay of anything: it applies
+    // one instant of the music uniformly across half a minute, and it makes the answer depend on
+    // where the playhead happened to be when the seek was requested -- so seeking twice to the same
+    // second would still give two different frames, which is the defect. What is promised here is
+    // that the same seek time always produces the same state. Matching a played-through timeline
+    // exactly would need the analysis replayed too; an offline render plays from zero and never
+    // seeks, so it is exact either way.
+    //
+    // `maxSeconds` bounds the work: seeking an hour into a piece must not stall for a minute.
+    // Beyond it the simulation starts from `time - maxSeconds`, which costs a character its
+    // accumulated history and keeps the editor responsive.
+    // `params`, when given, is put back to its authored values first: behaviours read parameter
+    // *finals*, and a final still holding the last played frame's modulation would make the answer
+    // depend on where the playhead came from -- which is the whole thing being fixed. The next
+    // ordinary frame recomputes them.
+    void seek(double time, params::ParameterSet* params = nullptr,
+              const signals::SignalBus* bus = nullptr, glm::vec3 viewPosition = {},
+              double step = 1.0 / 60.0, double maxSeconds = 90.0);
 
     // Everything that could not be resolved, for the editor and the log. Never silently empty
     // because a problem was swallowed.
@@ -263,6 +357,12 @@ private:
     // from compileReactions, which has one; refreshed by bind() and update().
     mutable const params::ParameterSet* params_ = nullptr;
     std::vector<std::pair<std::string, glm::vec3>> landmarks_;
+    std::vector<InterestPoint> interests_;
+    std::vector<InterestPoint> extraInterests_;
+    // One obstacle per entity with a body, in entity order, so an index into `entities()` is an
+    // index into this. Rebuilt every update: bodies move.
+    spatial::ObstacleField crowd_;
+    std::vector<std::size_t> crowdOwner_; // crowd obstacle index -> entity index
     std::vector<std::string> problems_;
     std::vector<std::string> registered_;
     std::string prefix_ = "entity/";

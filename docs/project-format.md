@@ -222,9 +222,20 @@ at something without either knowing about the other.
 | `bank` | leans into the direction of travel | `degrees`, `responseMs` |
 | `spin` | a yaw *rate* that events push and damping pulls back | `signal`, `baseRate`, `impulse`, `damping`, `maxRate` |
 | `orbit` | slow travel around a named point | `around`, `radius`, `rate`, `phase` |
-| `wander` | navigable destination, walk, pause, repeat | `speed`, `runSpeed`, `turnRate`, `arrive`, `minRange`, `maxRange`, `pauseMin`, `pauseMax`, `homeRadius` |
+| `wander` | navigable destination, walk, pause, repeat — local milling about | `speed`, `runSpeed`, `turnRate`, `arrive`, `minRange`, `maxRange`, `pauseMin`, `pauseMax`, `homeRadius` |
+| `explore` | the full loop: idle, choose somewhere worth going, plan a route, walk it, arrive facing it, observe (ADR-093) | `speed`, `runSpeed`, `turnRate`, `arrive`, `idleMin`, `idleMax`, `observeChance`, `observeMin`, `observeMax`, `minRange`, `maxRange`, `homeRadius`, `runChance`, `slopeAlign`, `bodyRadius`, `headroom`, `footprint` |
+| `ground` | follows the terrain and leans into it, for a character whose motion comes from elsewhere | `slopeAlign`, `smoothingMs`, `maxFloat`, `maxTilt` |
 | `lookAt` | turns the body towards a subject when not travelling | `target`, `turnRate`, `weight` |
 | `interest` | probabilistic stop-and-look, plus a decaying reaction to a strong audio event | `signal`, `subjects`, `observeChance`, `minDwell`, `maxDwell`, `alertThreshold`, `reactionDecay`, `reactionCooldown` |
+
+`explore` also reads settings that are taste rather than automation, so they are authored on the
+behaviour and are not registered parameters: `landmarkAffinity`, `characterAffinity`, `glowAffinity`,
+`waterAffinity` and `vistaAffinity` say what a character is drawn to; `strollChance` is how often it
+goes for a walk instead of somewhere; `waypointRadius`, `repathSeconds`, `stuckSeconds` and
+`noveltyRadius` tune the route following. Its destinations come from the world's interest registry —
+heroes, entities, luminous patches of ecology, shoreline and high ground — assembled by the
+composition; `bodyRadius`, `headroom` and `footprint` are the character's own size, and 0 on any of
+them takes the world's default.
 
 **Reactions** are `property <- signal`, declared in data. Each compiles to an ordinary modulation
 route with an ordinary `chain` (every field of `docs/control.md`'s route chain applies). What the

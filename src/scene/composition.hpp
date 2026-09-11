@@ -26,6 +26,7 @@
 #include "scene/spline_params.hpp"
 #include "scene/particles.hpp"
 #include "entity/entity.hpp"
+#include "entity/obstacles.hpp"
 #include "scene/scene_controller.hpp"
 #include "world/ecology.hpp"
 #include "world/hero.hpp"
@@ -614,6 +615,8 @@ private:
     // "material/<name>/…", referenced by Material::program.
     CompositionData compositionData_;
     [[nodiscard]] entity::Navigator buildNavigator() const;
+    // The luminous patches of ecology, as places worth walking to (ADR-093, §6).
+    [[nodiscard]] std::vector<entity::InterestPoint> glowInterestPoints() const;
     [[nodiscard]] std::uint32_t worldSeed() const;
     // Marks the entities of entity-driven nodes that fall outside the camera frustum, so the rig
     // pass can skip posing a character nobody can see (ADR-086's cullDistance handles the far ones;
@@ -640,6 +643,17 @@ private:
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
     entity::EntityWorld entityWorld_;
+    // Every solid a walker has to go round, built once per rebuild from the scatter clouds and the
+    // heroes (ADR-093, §5). Shared rather than owned outright: the navigator every entity reads is
+    // a copy, and they all have to be looking at the same set. Null until the first rebuild.
+    std::shared_ptr<spatial::ObstacleField> obstacles_;
+    // The same set presented through §3's one-method interface (ADR-090), so a caller holding only
+    // a `TerrainQuery` gets the per-instance answer too. A stable member rather than a temporary
+    // because `terrainQuery()` hands out a pointer to it.
+    entity::NavigationObstacles obstacleBridge_;
+    // How coarse the navigation graph is, in metres. 0 disables pathfinding, which leaves the
+    // straight-line steering that was here before ADR-093 -- correct, and unable to route.
+    float navCellSize_ = 4.0f;
     std::optional<graph::Graph> graph_;
     bool graphDirty_ = false;
     double interactiveRebuildBudgetMs_ = 0.0;

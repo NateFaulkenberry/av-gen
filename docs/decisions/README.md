@@ -98,3 +98,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [090](ADR-090-terrain-generation-and-queries.md) | Terrain with geography in it, and one place to ask where the ground is | Accepted |
 | [091](ADR-091-simulation-authority.md) | Two-tier simulation authority: what bakes, what lives, and what a scrub may do | Accepted |
 | [092](ADR-092-the-world-editor.md) | The world editor: a ghost under the cursor, a record of every edit | Accepted |
+| [093](ADR-093-world-navigation.md) | World navigation: a hybrid graph, per-instance obstacles, and a character with somewhere to go | Accepted |

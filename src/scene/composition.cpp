@@ -1,6 +1,7 @@
 #include "scene/composition.hpp"
 
 #include "core/log.hpp"
+#include "entity/obstacles.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/sky.hpp"
 
@@ -1314,6 +1315,7 @@ void Composition::installEntities() {
     // and the same ecology -- so a walker can never be above or below the surface it is standing
     // on, and never needs a second description of it kept in step by hand.
     entityWorld_.setNavigator(buildNavigator());
+    entityWorld_.setExtraInterestPoints(glowInterestPoints());
 
     entityWorld_.registerParameters(*params_, prefix_ + "entity/");
     entityWorld_.bind(*params_, prefix_ + "entity/");
@@ -1361,6 +1363,53 @@ void Composition::installEntities() {
     }
 }
 
+std::vector<entity::InterestPoint> Composition::glowInterestPoints() const {
+    // §6 lists glowing plants first among the things a character should find interesting, and this
+    // world has tens of thousands of them. The lighting pass already reduced each patch to one soft
+    // emitter (ADR-053), and a patch is exactly the right granularity: a character walks to a
+    // glowing hollow, not to an individual mushroom.
+    std::vector<entity::InterestPoint> out;
+    for (const auto& nodePtr : nodes_) {
+        if (nodePtr->kind != NodeKind::Terrain || nodePtr->glow.empty()) {
+            continue;
+        }
+        for (const world::GlowCluster& cluster : nodePtr->glow) {
+            entity::InterestPoint point;
+            point.position = cluster.position;
+            point.kind = entity::InterestKind::Glow;
+            point.weight = cluster.power;
+            out.push_back(point);
+        }
+    }
+    if (out.empty()) {
+        return out;
+    }
+    // The brightest, and only a handful of them. A weighted pick over nine thousand near-identical
+    // candidates is a uniform pick with extra steps, and it would drown every other kind of
+    // interest in the registry.
+    constexpr std::size_t kMaxGlow = 96;
+    std::sort(out.begin(), out.end(), [](const entity::InterestPoint& a, const entity::InterestPoint& b) {
+        if (a.weight != b.weight) {
+            return a.weight > b.weight;
+        }
+        // A deterministic tie-break, so two builds of the same world offer the same places.
+        if (a.position.x != b.position.x) {
+            return a.position.x < b.position.x;
+        }
+        return a.position.z < b.position.z;
+    });
+    if (out.size() > kMaxGlow) {
+        out.resize(kMaxGlow);
+    }
+    // Normalised, so "how bright" stays a preference between glowing places and does not make one
+    // patch a thousand times likelier than every landmark in the world.
+    const float peak = std::max(out.front().weight, 1e-6f);
+    for (entity::InterestPoint& point : out) {
+        point.weight = 0.35f + 0.65f * (point.weight / peak);
+    }
+    return out;
+}
+
 entity::Navigator Composition::buildNavigator() const {
     for (const auto& nodePtr : nodes_) {
         if (nodePtr->kind != NodeKind::Terrain) {
@@ -1374,7 +1423,14 @@ entity::Navigator Composition::buildNavigator() const {
         // personal space is its own width rather than a near plane.
         field.cameraRadius = 0.6f;
         field.groundClearance = 0.0f;
-        return entity::Navigator(&nodePtr->worldMap, field);
+        entity::Navigator nav(&nodePtr->worldMap, field);
+        nav.setObstacles(obstacles_, obstacles_ != nullptr ? &obstacleBridge_ : nullptr);
+        // The navigation graph (ADR-093, §2). Built here rather than lazily, so its cost lands at
+        // scene load where it can be seen and measured, and every walker in the world shares one.
+        if (navCellSize_ > 0.0f) {
+            nav.buildGrid(navCellSize_);
+        }
+        return nav;
     }
     return {};
 }
@@ -1384,7 +1440,11 @@ world::TerrainQuery Composition::terrainQuery() const {
         if (nodePtr->kind != NodeKind::Terrain) {
             continue;
         }
-        return world::terrainQuery(nodePtr->worldMap, &nodePtr->ecology, heroes_);
+        world::TerrainQuery query = world::terrainQuery(nodePtr->worldMap, &nodePtr->ecology, heroes_);
+        if (obstacles_ != nullptr) {
+            query.obstacles = &obstacleBridge_;
+        }
+        return query;
     }
     // A scene with no terrain is a legitimate scene: the query answers the y = 0 plane and says it
     // is not valid, which is what lets a caller run against it rather than special-casing it.
@@ -2287,6 +2347,10 @@ void Composition::rebuild() {
     // it cost. One line per rebuild, so "why did that stutter" has an answer in the log of the run
     // it happened in rather than in a profiler nobody was running.
     const auto rebuildStart = std::chrono::steady_clock::now();
+    // The obstacle set describes the world this rebuild is about to produce, so it starts empty
+    // here rather than being patched: a stale solid is a character walking round nothing, and a
+    // missing one is a character walking through a tree.
+    obstacles_ = std::make_shared<spatial::ObstacleField>();
     scene_.meshes.clear();
     scene_.textures.clear();
     scene_.entities.clear();
@@ -2559,6 +2623,26 @@ void Composition::rebuild() {
                 // registered with each other and each is drawn with its own material.
                 const std::vector<AssetPart> parts = resolveMeshParts(layer.asset, node.name);
                 const auto [assetLo, assetHi] = partsBounds(parts);
+                // Per-instance obstacles (ADR-093, §5). Built here, and only here, because this is
+                // the one place that holds the layer, its placements and the asset's own bounds at
+                // the same time -- `ClearanceField` can say "trees about fourteen metres tall grow
+                // around here" and never "there is a trunk at this spot", which is why a character
+                // could walk through one. The policy decides what is scenery: 120,000 grass
+                // instances cost one comparison and produce nothing.
+                {
+                    const glm::vec3 extent = assetHi - assetLo;
+                    const float assetHeight = std::max(extent.y, 1e-3f);
+                    // Horizontal radius over height, unit-free, so the layer's own normalisation
+                    // does not have to be unpicked here.
+                    const float aspect = std::max(extent.x, extent.z) * 0.5f / assetHeight;
+                    const std::size_t added = entity::obstaclesFromScatter(
+                        layer, *cloud, aspect, assetHeight, entity::ObstaclePolicy{}, *obstacles_);
+                    if (added > 0) {
+                        log::info("terrain '{}': scatter '{}' contributed {} navigation obstacles ({})",
+                                  node.name, layer.name, added,
+                                  spatial::obstacleTypeName(entity::classifyScatterLayer(layer)));
+                    }
+                }
                 ProceduralGeometry pg;
                 pg.name = sanitise(prefix_) + node.name + "_" + layer.name;
                 pg.source.kind = PrimitiveKind::Mesh;
@@ -2683,9 +2767,24 @@ void Composition::rebuild() {
                     scene_.procedurals.push_back(std::move(sub));
                 }
             }
+            // Heroes are the large authored solids -- the elder, the monument, the arch -- and the
+            // only things in this world that already carry a volume worth colliding with.
+            entity::obstaclesFromHeroes(heroes_, *obstacles_);
+            obstacles_->build();
+            // Publish it through §3's seam. Until this happens `TerrainQuery::isOccupied` answers a
+            // narrower question than its name suggests -- heroes and the world's edge -- and
+            // `hasObstacles()` is what tells a caller the difference between "nothing is there" and
+            // "nobody asked".
+            obstacleBridge_.setField(obstacles_);
+            log::info("terrain '{}': {} navigation obstacles ({} blocking) indexed at {:.1f} m cells",
+                      node.name, obstacles_->size(), obstacles_->blockingCount(),
+                      obstacles_->cellSize());
             // The whole world is built here, once -- and, since ADR-092, once *ever* for a given
             // map and settings rather than once per rebuild. Chunk meshes are static: only which of
             // a chunk's four meshes is drawn, and whether it is drawn at all, changes per frame.
+            // The glow is assigned inside the cache-miss branch below, not here: on a cache hit it
+            // comes from the memo instead, and moving `nodeGlow` in both places would empty it.
+
             const auto buildStart = std::chrono::steady_clock::now();
             // Where this terrain's meshes start in the scene, so cached ids can be stored relative
             // to it and rebased on the way back in. The absolute ids move whenever anything else in

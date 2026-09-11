@@ -315,3 +315,54 @@ seen with the key light off to the side.
 - The sky's stars are the photograph's. A camera that looks mostly at the ground, as this one does,
   sees only the few degrees above the ridge, which on this HDRI is where the moon's haze is
   brightest -- so the frame gets a moon and a horizon glow rather than a field of stars.
+
+## Navigation (ADR-093)
+
+Three layers, and which one to reach for depends on the question.
+
+**"Where is the ground, and may I stand there?"** — `world::TerrainQuery` (ADR-090). Analytic,
+allocation-free, thread-safe for reads, and the only place the walkability rules live.
+`entity::Navigator::sample` is a translation of it, not a second copy.
+
+**"Is anything solid at this spot?"** — `spatial::ObstacleField`: vertical cylinders in a uniform
+grid, built once per world from the scatter clouds and the heroes. The height recorded is the height
+of the *solid*, so a fourteen-metre tree contributes a half-metre trunk rather than a five-metre
+bounding disc. Reachable as `composition.entityWorld().navigator().obstacles()`, and published
+through §3's one-method seam by `entity::NavigationObstacles`, so `TerrainQuery::isOccupied` answers
+truthfully wherever a query object has been handed one. `hasObstacles()` distinguishes "nothing is
+there" from "nobody asked".
+
+**"How do I get from here to there?"** — `entity::NavGrid`, a coarse terrain-aware grid over the
+walkable world, flood-filled into connected regions and searched with A*. Obstacles are a per-cell
+*cost* rather than a wall, so a route prefers open ground and the fine steering threads the trunks.
+
+```cpp
+entity::PathRequest request{.from = here, .to = there, .goalTolerance = 2.0f};
+const entity::PathResult route = navigator.requestPath(request);
+if (route.ok()) {
+    follow(route.waypoints);                 // excludes `from`, ends at route.goal
+} else {
+    giveUpGracefully(route.status);          // Unreachable, NoGoal, SearchExhausted, ...
+}
+```
+
+`route.goal` is not always `request.to`: a destination inside a rock or under water is answered with
+the nearest place a body could stand. A caller that assumed otherwise walks a character into the
+thing it was heading for.
+
+Replanning is `navigator.pathValid(from, waypoints, nextLeg)` — it re-checks the remaining legs
+rather than repeating the search, so it is cheap enough to run on a cadence.
+
+Determinism: every one of these is a pure function of the world and the arguments. No seed, no clock,
+no iteration-order dependence; A* breaks ties on cell index. The same request always returns the same
+waypoints, which is what ADR-091 needs for a baked actor's route to survive a re-bake.
+
+**Characters against each other** is separate and deliberately weaker: `EntityWorld` rebuilds a
+`Creature` obstacle field once per update from every entity that declared a `radius`, and
+`crowdSeparation` pushes a body out of the ones it overlaps. It is not part of the navigator's
+obstacle set — a route is planned over a world that is not moving.
+
+**For a debug overlay**: `NavGrid::cells()` carries walkability, slope, water and obstruction per
+cell; `stats()` carries the region count and the largest region; `shorePoints()` and `vistaPoints()`
+are what the grid noticed about the terrain. The `explore` behaviour exposes `route()`, `routeLeg()`,
+`destination()`, `phaseName()` and `lastPathStatus()`.

@@ -319,6 +319,12 @@ which in a meadow of grass and ferns meant everywhere, and separately the `inter
 it in `observe` for thirteen seconds at a stretch. It now moves on 52% of frames and covers ~195 m a
 minute (`ADR-088`, and the commits around it).
 
+**§1–§7 were then completed in `ADR-093`**, which added the per-instance obstacle set, a navigation
+graph with A* and string pulling, the `explore` behaviour loop with an interest registry, footprint
+grounding, and fixed-step re-simulation on a seek. It also folded `Navigator::sample` onto ADR-090's
+`TerrainQuery`, so §3's "one set of rules" is now literally one. The paragraph below is what was
+outstanding when this was filed, kept for the record.
+
 What remains genuinely missing is the rest of §1–§5: **obstacle avoidance is statistical, not
 per-instance.** `ClearanceField::canopyHeight` answers "trees about nine metres tall grow around
 here", never "there is a trunk at this spot", so a character can walk through a tree. There is no
