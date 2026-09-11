@@ -13,6 +13,20 @@ who needs to re-verify it later.
 | `alien.gltf`, `alien.bin` | https://duendeds.itch.io/stylized-alien-low-poly-character | duendeds | CC0 1.0 |
 | `ufo.gltf`, `ufo.bin` | https://flexunit.itch.io/3d-game-ready-ufo-spaceship | flexunit | CC0 1.0 |
 
+## Also vendored, and not committed
+
+| Asset | Source | Author | Licence |
+|---|---|---|---|
+| `assets/quaternius/` | https://quaternius.com (Stylized Nature MegaKit, free tier, 68 models) | Quaternius | CC0 1.0 |
+
+Declared by the kit's own `License_Standard.txt`, which travels with it.
+
+It is **gitignored for size, not for licence**: 85 MB, of which about 37 MB is the texture set
+duplicated between `glTF/` and `Textures/`. The consequence is worth knowing because it bites
+every time: a fresh git worktree has no `assets/quaternius`, so every world loads as bare terrain
+behind a wall of "glTF file not found" warnings until the directory is symlinked in from the main
+checkout.
+
 ## What was changed
 
 Both arrived as binary FBX (version 7400), which this engine does not read — it loads `.gltf` and
