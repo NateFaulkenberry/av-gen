@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 
 namespace avgen::scene {
@@ -205,6 +206,13 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         if (handled) {
             continue;
         }
+        if (key == "tiltShiftCentre" && p.tiltShiftCentre != nullptr) {
+            if (!value.is_array() || value.size() != 2 || !value[0].is_number() || !value[1].is_number()) {
+                return fail("post.tiltShiftCentre must be an array of two numbers");
+            }
+            p.tiltShiftCentre->setBase(glm::vec2(value[0].get<float>(), value[1].get<float>()));
+            continue;
+        }
         if (key == "tonemap" && p.tonemap != nullptr) {
             if (!value.is_number_unsigned()) {
                 return fail("post.tonemap must be an unsigned integer (0 aces, 1 agx, 2 reinhard, "
@@ -259,6 +267,12 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
     s.focusRange = p.focusRange->value();
     s.dofMaxRadius = p.dofMaxRadius->value();
     s.dofPhysical = p.dofPhysical->value();
+    s.tiltShiftEnabled = p.tiltShiftEnabled->value();
+    s.tiltShiftCentre = p.tiltShiftCentre->value();
+    s.tiltShiftRotation = p.tiltShiftRotation->value();
+    s.tiltShiftBandWidth = p.tiltShiftBandWidth->value();
+    s.tiltShiftFalloff = p.tiltShiftFalloff->value();
+    s.tiltShiftMaxRadius = p.tiltShiftMaxRadius->value();
     s.motionBlurAmount = p.motionBlurAmount->value();
     s.antialias = p.antialias->value();
     s.sharpen = p.sharpen->value();
@@ -267,6 +281,22 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
     s.vignette = p.vignette->value();
     s.grain = p.grain->value();
     s.chromaRetention = p.chromaRetention->value();
+}
+
+float tiltShiftCoverage(const PostSettings& s, glm::vec2 uv, float aspect) {
+    // Scaling x by the aspect ratio puts both axes in units of frame height, which is what makes
+    // the rotation an angle on *screen*. Measured in raw uv, a 45 degree band on a 16:9 frame comes
+    // out at 28 degrees, and its width changes as it turns.
+    const glm::vec2 p = (uv - s.tiltShiftCentre) * glm::vec2(std::max(aspect, 1e-4f), 1.0f);
+    const float theta = glm::radians(s.tiltShiftRotation);
+    // The normal to the band's axis. uv.y runs downwards, so a positive rotation reads clockwise.
+    const glm::vec2 normal{-std::sin(theta), std::cos(theta)};
+    const float distance = std::abs(p.x * normal.x + p.y * normal.y);
+    const float halfWidth = std::max(s.tiltShiftBandWidth, 0.0f) * 0.5f;
+    const float t = std::clamp((distance - halfWidth) / std::max(s.tiltShiftFalloff, 1e-4f), 0.0f, 1.0f);
+    // Smoothstep rather than a linear ramp: the band's edge is where the eye looks for a seam, and
+    // a linear ramp leaves a visible crease there because its slope jumps.
+    return t * t * (3.0f - 2.0f * t);
 }
 
 } // namespace avgen::scene

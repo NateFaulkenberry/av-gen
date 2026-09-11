@@ -83,19 +83,22 @@ struct RenderStats {
     std::uint64_t visibleInstances = 0; // procedural instances that survived culling
     std::uint64_t culledInstances = 0;
     std::uint64_t lodCounts[4] = {0, 0, 0, 0};
-    // Triangles the lit scene pass submitted: entity meshes, procedural instances at the LOD
-    // levels the cull pass chose, and meshed SDFs. It used to fold in
+    // Triangles the frame submitted: `geometry.camera.triangles` -- entity meshes, procedural
+    // instances at the LOD levels the cull pass chose, and meshed SDFs -- plus the one-triangle
+    // fullscreen draws (the skybox and the tone map) this field has always counted. It used to
+    // fold in
     // `ProceduralStats::logicalTriangles` -- source triangles times every instance record, before
     // LOD and before culling -- which made Glowmere report 15.1 M triangles for a frame that
     // submitted a fraction of that, and made every LOD or culling change invisible to the one
     // geometry number anybody reads (ADR-077). The pre-cull figure is still there, under a name
     // that says what it is: `geometry.logicalTriangles`.
     //
-    // Four things are deliberately not in it. Particles and raymarched SDFs are billboards and
-    // fullscreen boxes whose cost is fragments, not vertices, and "two triangles per raymarched
-    // object" says nothing true about either. The skybox, the tone map and the other fullscreen
-    // passes are one triangle each for the same reason -- a geometry budget that moves when the
-    // resolution changes is not a geometry budget. Their draws are still in `drawCalls`.
+    // Particles and raymarched SDFs are not in it: they are billboards and fullscreen boxes whose
+    // cost is fragments, not vertices, and "two triangles per raymarched object" says nothing true
+    // about either. Their draws are still in `drawCalls`. `geometry` below excludes the fullscreen
+    // triangles as well, for the same reason -- a geometry budget that moves when the resolution
+    // changes is not a geometry budget -- so the two differ by however many fullscreen draws the
+    // frame made, which is one or two.
     std::uint32_t triangles = 0;
     // ADR-077. The full geometry split -- what the world contains against what each class of pass
     // was handed -- and the CPU and state counters that go with it. `triangles` above is

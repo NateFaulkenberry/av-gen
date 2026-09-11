@@ -3,12 +3,16 @@
 // Built-in image formation chain (ADR-016, ADR-039) over the transient pool. The order is fixed
 // and documented in docs/image-formation.md:
 //
-//   scene HDR -> [metering of the pre-exposure image] -> [exposure] -> [DoF] -> [motion blur]
+//   scene HDR -> [metering of the pre-exposure image] -> [exposure] -> [defocus] -> [motion blur]
 //             -> [lens distortion + chromatic aberration]
 //             -> [bloom: prefilter, downsample chain, energy-conserving upsample chain]
 //             -> [halation pyramid + anamorphic streaks: the "wide" tier]
 //             -> composite (bloom + wide tier + colour grade) -> [fxaa] -> [sharpen]
 //             -> HDR result for tone mapping.
+//
+// The defocus pass is one circle-of-confusion gather driven either by distance from the focus
+// plane (depth of field, ADR-037) or by distance from a band across the frame (the tilt-shift,
+// ADR-079), or by both at once, whichever circle is larger.
 //
 // Passes run only when their settings are active; with everything off and a unit exposure the
 // input is returned unchanged. Selective post (bloom weighted by emission, sharpening masked by

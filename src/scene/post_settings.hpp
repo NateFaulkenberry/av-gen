@@ -6,7 +6,8 @@
 // that drives depth of field), which come from "camera/*" (ADR-037).
 //
 // The chain's order is fixed (ADR-039) and documented in docs/image-formation.md:
-//   scene HDR -> volumetrics -> exposure -> depth of field -> motion blur -> lens distortion and
+//   scene HDR -> volumetrics -> exposure -> defocus (depth of field and the ADR-079 tilt-shift
+//   band, which share one gather) -> motion blur -> lens distortion and
 //   chromatic aberration -> bloom, halation, anamorphic -> colour grade -> sharpen -> tone map,
 //   vignette, grain.
 

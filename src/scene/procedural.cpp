@@ -2413,6 +2413,8 @@ json ProceduralGeometry::toJson() const {
         s2["distance2"] = lod.lodDistances[1];
         s2["distance3"] = lod.lodDistances[2];
         s2["byScreenSize"] = lod.lodByScreenSize;
+        s2["spread"] = lod.lodSpread;
+        s2["hysteresis"] = lod.lodHysteresis;
         s2["impostorSize"] = lod.impostorSize;
         j["lod"] = std::move(s2);
     }
@@ -2653,6 +2655,8 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(l.lodDistances[1], "distance2", readFloat);
         AVGEN_PROC_READ(l.lodDistances[2], "distance3", readFloat);
         AVGEN_PROC_READ(l.lodByScreenSize, "byScreenSize", readBool);
+        AVGEN_PROC_READ(l.lodSpread, "spread", readFloat);
+        AVGEN_PROC_READ(l.lodHysteresis, "hysteresis", readFloat);
         AVGEN_PROC_READ(l.impostorSize, "impostorSize", readFloat);
     }
     if (root.contains("material")) {
@@ -3012,6 +3016,10 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     p.lodDistance[0] = r.f("lod/distance1", lodRest.lodDistances[0], 0.0f, 100000.0f, 0.0f, 500.0f);
     p.lodDistance[1] = r.f("lod/distance2", lodRest.lodDistances[1], 0.0f, 100000.0f, 0.0f, 500.0f);
     p.lodDistance[2] = r.f("lod/distance3", lodRest.lodDistances[2], 0.0f, 100000.0f, 0.0f, 500.0f);
+    // Both capped at 0.5: beyond that the band is wider than the gap between adjacent thresholds
+    // and a level could never be reached at all.
+    p.lodSpread = r.f("lod/spread", lodRest.lodSpread, 0.0f, 0.5f, 0.0f, 0.3f);
+    p.lodHysteresis = r.f("lod/hysteresis", lodRest.lodHysteresis, 0.0f, 0.5f, 0.0f, 0.3f);
 
     // Material
     const Material& m = rest.material;
@@ -3160,6 +3168,8 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
     copyValue(p, "lod/enabled", live.lod.cull);
     copyValue(p, "lod/maxDistance", live.lod.maxDistance);
     copyValue(p, "lod/minScreenRadius", live.lod.minScreenRadius);
+    copyValue(p, "lod/spread", live.lod.lodSpread);
+    copyValue(p, "lod/hysteresis", live.lod.lodHysteresis);
     copyValue(p, "lod/distance1", live.lod.lodDistances[0]);
     copyValue(p, "lod/distance2", live.lod.lodDistances[1]);
     copyValue(p, "lod/distance3", live.lod.lodDistances[2]);

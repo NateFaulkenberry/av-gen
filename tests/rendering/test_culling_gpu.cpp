@@ -243,6 +243,10 @@ TEST_CASE("Instances behind the camera are culled", "[gpu][culling]") {
     CHECK(ctx->errorCount() == 0);
 }
 
+// The two cases below compare GPU classification against a hard-threshold CPU reference, so they
+// pin the per-instance spread off (ADR-082). The spread deliberately gives every instance its own
+// slightly offset threshold -- that is the whole point of it -- while what these cases test is the
+// threshold semantics underneath, which are unchanged. Spread's own behaviour has its own case.
 TEST_CASE("maxDistance and minScreenRadius reduce the visible count monotonically", "[gpu][culling]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);
@@ -255,6 +259,7 @@ TEST_CASE("maxDistance and minScreenRadius reduce the visible count monotonicall
     s.camera.position = {0.0f, 40.0f, 0.001f};
     s.camera.target = {0.0f, 0.0f, 0.0f};
     s.procedurals[0].lod.cull = true;
+    s.procedurals[0].lod.lodSpread = 0.0f;
 
     const auto visibleCount = [&](const scene::Scene& scene) {
         (void)renderWith(renderer, scene);
@@ -306,6 +311,7 @@ TEST_CASE("LOD assignment matches the CPU reference by distance and by screen si
         g.instances.push_back(recordAt({0.0f, 0.0f, -static_cast<float>(i)}, 1.0f, static_cast<std::uint32_t>(i)));
     }
     g.lod.lodCount = 4;
+    g.lod.lodSpread = 0.0f;
     g.lod.lodByScreenSize = false;
     g.lod.lodDistances[0] = 20.0f;
     g.lod.lodDistances[1] = 60.0f;
@@ -815,5 +821,132 @@ TEST_CASE("A whole-object rejection encodes no draws and changes no pixel", "[gp
     const gpu::Image8 seen = renderWith(renderer, facing);
     CHECK(renderer.procedurals().stats().culledObjects == 0);
     CHECK(litPixels(seen) > 500);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- ADR-082: stability of the LOD decision ----------------------------------------------------
+
+namespace {
+
+// A wall of instances at one distance, so every one of them meets its LOD threshold at the same
+// camera position. That is the worst case for popping and the clearest case to measure: without
+// help, all of them change level on the same frame.
+scene::Scene coincidentWall(std::size_t count, float threshold) {
+    scene::ProceduralGeometry g = boxGrid(1, 1, 1.0f);
+    g.instances.clear();
+    for (std::size_t i = 0; i < count; ++i) {
+        g.instances.push_back(recordAt({0.0f, 0.0f, 0.0f}, 1.0f, static_cast<std::uint32_t>(i)));
+    }
+    g.lod.lodCount = 2;
+    g.lod.lodByScreenSize = false;
+    g.lod.lodDistances[0] = threshold;
+    g.lod.lodDistances[1] = 0.0f;
+    g.lod.lodDistances[2] = 0.0f;
+    scene::Scene s = sceneWith(std::move(g));
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("Per-instance spread turns a mass LOD switch into a migration", "[gpu][culling][lod]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    constexpr std::size_t kCount = 400;
+    constexpr float kThreshold = 50.0f;
+
+    // Walks the camera through the threshold and returns the biggest number of instances that
+    // changed level between two adjacent steps. That number *is* the pop: it is how much of the
+    // world changes mesh on one frame.
+    const auto worstStep = [&](float spread) {
+        scene::Scene s = coincidentWall(kCount, kThreshold);
+        s.procedurals[0].lod.lodSpread = spread;
+        s.procedurals[0].lod.lodHysteresis = 0.0f;
+        std::uint32_t worst = 0;
+        std::uint32_t previous = 0;
+        bool first = true;
+        for (int step = 0; step <= 40; ++step) {
+            // 44 m out to 56 m, which spans the widest spread band this test uses.
+            const float distance = 44.0f + 0.3f * static_cast<float>(step);
+            s.camera.position = {0.0f, 0.0f, distance};
+            (void)renderWith(renderer, s);
+            auto counts = renderer.procedurals().readCullCounts("grid");
+            REQUIRE(counts.has_value());
+            const std::uint32_t atLevel1 = counts->lod[1];
+            if (!first) {
+                worst = std::max(worst, static_cast<std::uint32_t>(
+                                            std::abs(static_cast<int>(atLevel1) - static_cast<int>(previous))));
+            }
+            previous = atLevel1;
+            first = false;
+        }
+        return worst;
+    };
+
+    const std::uint32_t hard = worstStep(0.0f);
+    const std::uint32_t spread = worstStep(0.12f);
+    INFO("worst single-frame change: hard " << hard << ", spread " << spread << " of " << kCount);
+
+    // With one shared threshold the entire wall changes on a single frame.
+    CHECK(hard == kCount);
+    // With each instance on its own threshold, no single frame may move more than a fraction of
+    // it. A quarter is a generous bound -- it measures in the low tens -- and it is the property
+    // that matters rather than an exact figure that would pin the hash.
+    CHECK(spread < kCount / 4);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Hysteresis holds a level through camera jitter that would otherwise strobe",
+          "[gpu][culling][lod]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    constexpr std::size_t kCount = 200;
+    constexpr float kThreshold = 50.0f;
+
+    // Sits the camera exactly on the threshold and breathes by a few centimetres -- far inside the
+    // dead zone, far outside floating-point noise. Returns how many times the population changed
+    // level. Spread is off so that the dead zone is the only thing under test.
+    const auto changes = [&](float hysteresis) {
+        scene::Scene s = coincidentWall(kCount, kThreshold);
+        s.procedurals[0].lod.lodSpread = 0.0f;
+        s.procedurals[0].lod.lodHysteresis = hysteresis;
+        // One settling frame, so what follows measures jitter and not start-up.
+        s.camera.position = {0.0f, 0.0f, kThreshold + 0.2f};
+        (void)renderWith(renderer, s);
+
+        int flips = 0;
+        std::uint32_t previous = 0;
+        bool first = true;
+        for (int step = 0; step < 12; ++step) {
+            const float distance = kThreshold + (step % 2 == 0 ? 0.2f : -0.2f);
+            s.camera.position = {0.0f, 0.0f, distance};
+            (void)renderWith(renderer, s);
+            auto counts = renderer.procedurals().readCullCounts("grid");
+            REQUIRE(counts.has_value());
+            if (!first && counts->lod[1] != previous) {
+                ++flips;
+            }
+            previous = counts->lod[1];
+            first = false;
+        }
+        return flips;
+    };
+
+    // Without a dead zone, a 40 cm breath either side of a 50 m threshold flips the whole
+    // population every frame. This is the artefact, reproduced.
+    const int bare = changes(0.0f);
+    INFO("level changes without hysteresis: " << bare);
+    CHECK(bare >= 10);
+
+    // With one, the level is decided once and then held.
+    const int held = changes(0.12f);
+    INFO("level changes with hysteresis: " << held);
+    CHECK(held == 0);
     CHECK(ctx->errorCount() == 0);
 }

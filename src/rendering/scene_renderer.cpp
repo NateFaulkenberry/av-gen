@@ -15,6 +15,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <optional>
@@ -2119,6 +2120,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             rp.SetBindGroup(2, materialBindGroup(scene::Material{}));
             rp.Draw(3);
             ++stats_.drawCalls;
+            // Counted in the legacy total but not in `geometry`: it is one triangle of sky-sized
+            // fragment work, and a geometry budget that a resolution change moves is not one.
+            ++stats_.triangles;
             ++stats_.state.pipelineBinds;
             stats_.state.bindGroupBinds += 2;
         }
@@ -2308,6 +2312,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         rp.Draw(3);
         rp.End();
         ++stats_.drawCalls;
+        ++stats_.triangles; // as the skybox above: a fullscreen triangle, not scene geometry
         ++stats_.state.pipelineBinds;
         ++stats_.state.bindGroupBinds;
     }
@@ -2333,11 +2338,46 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         stats_.state.renderPasses = timeline_->renderPasses();
         stats_.state.computePasses = timeline_->computePasses();
         stats_.unclassifiedPasses = timeline_->unclassifiedPasses();
-        stats_.triangles = static_cast<std::uint32_t>(
-            std::min<std::uint64_t>(stats_.geometry.camera.triangles, 0xFFFFFFFFull));
+        // Added to, not assigned: the fullscreen triangles counted during the pass above stay in
+        // the legacy total, which is what `tests/rendering/test_gpu.cpp` pins and what the editor
+        // status line has always shown.
+        stats_.triangles += static_cast<std::uint32_t>(
+            std::min<std::uint64_t>(stats_.geometry.camera.triangles, 0xFFFFFFFFull - stats_.triangles));
     }
     stage(cpu.tonemapEncodeMs);
     cpu.totalMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - renderStart).count();
+    // AVGEN_FRAME_COUNTERS=1 prints the submission split. The headline `tris=` and `draws=` reach
+    // the log through src/app, but the per-pass split, the staleness flags and the pass
+    // classification do not, and a counter nobody can get at from a command line does not get read.
+    static const bool dumpCounters = std::getenv("AVGEN_FRAME_COUNTERS") != nullptr;
+    if (dumpCounters && time.frameIndex % 30 == 0) {
+        const GeometryCounters& g = stats_.geometry;
+        log::info("submitted: camera {} tris / {} inst / {} draws ({} estimated, {} unmeasured); "
+                  "depth {} / {} / {}; shadow {} / {} / {} over {} casters; logical {} tris / {} inst; "
+                  "binds {}pipe {}group {}vb {}ib ({} redundant avoided); passes {}render {}compute "
+                  "{}unclassified",
+                  g.camera.triangles, g.camera.instances, g.camera.draws, g.camera.estimatedDraws,
+                  g.camera.unmeasuredDraws, g.depth.triangles, g.depth.instances, g.depth.draws,
+                  g.shadow.triangles, g.shadow.instances, g.shadow.draws, stats_.shadowCasters,
+                  g.logicalTriangles, g.logicalInstances, stats_.state.pipelineBinds,
+                  stats_.state.bindGroupBinds, stats_.state.vertexBufferBinds,
+                  stats_.state.indexBufferBinds, stats_.state.redundantBindsAvoided,
+                  stats_.state.renderPasses, stats_.state.computePasses, stats_.unclassifiedPasses);
+    }
+    // AVGEN_CPU_STAGES=1 prints the breakdown. It is reachable from the API as stats().cpu, but the
+    // headless benchmark's own log line is in src/app and a measurement nobody can get at from a
+    // command line does not get taken. Read once, like AVGEN_TIMELINE_RAW.
+    static const bool dumpStages = std::getenv("AVGEN_CPU_STAGES") != nullptr;
+    if (dumpStages && time.frameIndex % 30 == 0) {
+        log::info("cpu stages (ms): total {:.3f} = uploads {:.3f} lights {:.3f} objects {:.3f} "
+                  "fields {:.3f} sim {:.3f} particles {:.3f} procedural {:.3f} sdf {:.3f} "
+                  "shadow {:.3f} background {:.3f} depth {:.3f} scene {:.3f} volume {:.3f} "
+                  "post {:.3f} tonemap {:.3f} | unattributed {:.4f}",
+                  cpu.totalMs, cpu.uploadsMs, cpu.lightsMs, cpu.objectsMs, cpu.fieldsMs,
+                  cpu.simulationMs, cpu.particlesMs, cpu.proceduralMs, cpu.sdfMs, cpu.shadowEncodeMs,
+                  cpu.backgroundEncodeMs, cpu.depthEncodeMs, cpu.sceneEncodeMs, cpu.volumeEncodeMs,
+                  cpu.postEncodeMs, cpu.tonemapEncodeMs, cpu.unattributedMs());
+    }
     return {};
 }
 

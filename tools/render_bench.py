@@ -9,6 +9,7 @@ can be shown to help or hurt rather than argued about.
     tools/render_bench.py                               # the four-rung ladder, 3 repeats
     tools/render_bench.py low medium --repeats 5
     tools/render_bench.py --frames 300 --size 2880x1800
+    tools/render_bench.py --wait-idle 600               # let another agent's build finish first
     tools/render_bench.py examples/world/glowmere-stylized.json   # a project, for comparison
     tools/render_bench.py --json out.json               # everything, machine-readable
 
@@ -25,9 +26,10 @@ the last one. It cannot remove the drift; it stops the drift from having a prefe
 bar, and the reader has no way to tell a 5% regression from a noisy machine. The per-run table is
 printed by default for exactly that reason, and the summary carries the spread.
 
-**It checks the things that silently invalidate a pass**: a non-zero GPU error count, a competing
-`avgen` process on the same GPU, and the benchmarked binary changing mid-pass. All three have
-happened; all three produce numbers that look perfectly plausible.
+**It checks the things that silently invalidate a pass**: a non-zero GPU error count, another
+`avgen` or a build competing for the machine before *or* after each run, and the benchmarked binary
+changing mid-pass. All three have happened; all three produce numbers that look perfectly
+plausible. Contended runs are excluded from the medians and kept in the per-run table.
 
 Pure standard library.
 """
@@ -171,7 +173,7 @@ def run_once(binary, path, flag, frames, fps, size, tier, extra):
         d, ind, empty, skipped, shadow, tris, vis, culled, lod = hits[-1]
         result.update(draws=int(d), indirect=int(ind), empty_draws=int(empty),
                       skipped_draws=int(skipped), shadow_draws=int(shadow),
-                      logical_tris=int(tris), visible=int(vis), culled=int(culled), lod=lod)
+                      tris=int(tris), visible=int(vis), culled=int(culled), lod=lod)
     if m := ERRORS.search(log):
         result["gpu_errors"] = int(m.group(3))
     # How much of the GPU frame the passes account for. The timeline's intervals partition the
@@ -241,10 +243,10 @@ def main():
     targets = [resolve(n) for n in (args.presets or LADDER)]
 
     if competing := competing_processes(args.binary):
-        print("WARNING: %d other avgen process(es) are running and share this GPU:" % len(competing))
+        print("WARNING: %d competing process(es) are running (renderer or build):" % len(competing))
         for pid, cmdline in competing:
             print("  pid %s  %s" % (pid, cmdline))
-        print("  Every number below is contended. Stop them before believing any of it.\n")
+        print("  Every number below is contended. Stop them, or pass --wait-idle.\n")
 
     before = digest(args.binary)
     order = []
@@ -301,15 +303,20 @@ def main():
 
     rows = []
     dropped = 0
+    all_contended = []
     for label, _, _ in targets:
         recs = [r for r in runs[label] if "wall_median" in r]
         # Contended runs are excluded from the medians rather than averaged in. Including them
         # does not make the answer more robust -- it makes it a median of two different machines.
         # They stay in the per-run table and in the JSON, so nothing is hidden.
         clean = [r for r in recs if not r.get("contended")]
-        dropped += len(recs) - len(clean)
         if clean:
+            dropped += len(recs) - len(clean)
             recs = clean
+        elif recs:
+            # Nothing clean to fall back to. Reporting an empty row would hide the run entirely,
+            # so the numbers stand and the preset is named as contended throughout.
+            all_contended.append(label)
         if not recs:
             rows.append([label] + ["-"] * 11)
             continue
@@ -330,11 +337,14 @@ def main():
             str(last.get("draws", "-")),
             str(last.get("shadow_draws", "-")),
             "%d" % last.get("visible", 0),
-            "%.2fM" % (last.get("logical_tris", 0) / 1e6),
+            "%.2fM" % (last.get("tris", 0) / 1e6),
         ])
     print("Summary: median over %d interleaved run(s), %d frames at %s, tier %s%s"
           % (args.repeats, args.frames, args.size, args.tier,
              "; %d contended run(s) excluded" % dropped if dropped else ""))
+    if all_contended:
+        print("EVERY run of %s was contended. Those rows are not a measurement of anything."
+              % ", ".join(all_contended))
     print(table(rows, ["preset", "runs", "wall", "p10", "p90", "spread", "gpu", "scene",
                        "draws", "shadowDr", "visible", "tris"], "lrrrrrrrrrrr"))
     print()
@@ -347,7 +357,7 @@ def main():
         print("\nWARNING: %s changed during the pass (%s -> %s). The runs are not comparable."
               % (os.path.basename(args.binary), before, after))
     if competing := competing_processes(args.binary):
-        print("\nWARNING: %d other avgen process(es) were still running at the end of the pass."
+        print("\nWARNING: %d competing process(es) were still running at the end of the pass."
               % len(competing))
 
     if args.json:

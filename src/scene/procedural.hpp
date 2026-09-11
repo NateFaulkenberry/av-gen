@@ -415,6 +415,19 @@ struct LodSettings {
     int lodCount = 1;              // 1..kMaxLodLevels
     float lodDistances[3] = {0.0f, 0.0f, 0.0f}; // LOD0->1, 1->2, 2->3
     bool lodByScreenSize = true;   // thresholds are projected radii in pixels, not distances
+    // How wide a band the population migrates a LOD change across, as a fraction of the threshold
+    // (ADR-082). Each instance gets its own offset threshold from a hash of its index, so a band
+    // of the world stops changing mesh on one frame together. Deterministic -- a pure function of
+    // the instance index -- so it is on by default. 0 restores the old hard-edged behaviour.
+    float lodSpread = 0.12f;
+    // Dead zone around every threshold, as a fraction of it. An instance keeps its current level
+    // until the metric crosses by this much, which is what stops one sitting on a threshold from
+    // strobing as the camera breathes.
+    //
+    // Off by default, because it is the one thing here that reads the previous frame: with it on,
+    // what you see depends on how the camera got here and not only on where it is. That is a real
+    // trade against this engine's frame-independence, so it is offered rather than assumed.
+    float lodHysteresis = 0.0f;
     float impostorSize = 1.0f;     // multiplies the LOD2/LOD3 billboard size
     [[nodiscard]] std::uint64_t structuralHash() const; // lodCount only (the rest are uniforms)
 };
@@ -550,6 +563,8 @@ struct ProceduralParameters {
     params::Parameter<bool>* lodEnabled = nullptr;        // lod/enabled -> LodSettings::cull
     params::Parameter<float>* lodMaxDistance = nullptr;   // lod/maxDistance
     params::Parameter<float>* lodMinScreenRadius = nullptr; // lod/minScreenRadius
+    params::Parameter<float>* lodSpread = nullptr;          // lod/spread
+    params::Parameter<float>* lodHysteresis = nullptr;      // lod/hysteresis
     std::array<params::Parameter<float>*, 3> lodDistance{}; // lod/distance1..3
 };
 
