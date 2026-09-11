@@ -1,4 +1,4 @@
-# ADR-086: The key light's shadow map is looked up once per four pixels; its contact march is not
+# ADR-087: The key light's shadow map is looked up once per four pixels; its contact march is not
 
 Status: accepted
 Date: 2026-09-11

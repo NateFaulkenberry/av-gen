@@ -1,5 +1,5 @@
 // Shadow maps, screen-space contact shadows and the ambient-occlusion fetch (ADR-033/034).
-// Split out of lighting.wgsl in ADR-086 so that the half-resolution shadow-mask pass
+// Split out of lighting.wgsl in ADR-087 so that the half-resolution shadow-mask pass
 // (shaders/shadow_mask.wgsl) can compute exactly the terms the lit pass would have computed,
 // instead of a second implementation that drifts from it.
 //
@@ -15,7 +15,7 @@
 //   6  aoTexture         texture   rg = octahedral bent normal, b = visibility, a = view depth
 //   7  sceneLinearDepth  texture   R32F view-space depth of the prepass (contact shadows)
 //   11 shadowMaskTexture texture   rgb = up to three directional lights' shadow-map visibility,
-//                                    a = the view depth each was computed at (ADR-086)
+//                                    a = the view depth each was computed at (ADR-087)
 
 const LIGHT_DIRECTIONAL: f32 = 0.0;
 const LIGHT_POINT: f32 = 1.0;
@@ -60,7 +60,7 @@ struct ShadowUniforms {
 @group(0) @binding(5) var shadowSampler: sampler_comparison;
 @group(0) @binding(6) var aoTexture: texture_2d<f32>;
 @group(0) @binding(7) var sceneLinearDepth: texture_2d<f32>;
-// ADR-086: the half-resolution screen-space shadow mask. rgb = the combined visibility (cascade
+// ADR-087: the half-resolution screen-space shadow mask. rgb = the combined visibility (cascade
 // lookup and contact march, already minned) of directional lights 0, 1 and 2; a = the view depth
 // the mask texel was computed at, which is what the bilateral upsample weighs against. Bound to a
 // 1x1 white stand-in when the mask is off, so the binding is always valid.
@@ -184,7 +184,7 @@ fn shadowLookup(view: u32, worldPos: vec3<f32>) -> ShadowLookup {
 // The disc has sixteen points, so a seventeenth tap would land on the first one again. Past
 // sixteen the disc is rotated a further half of its own angular spacing per revolution, which puts
 // the second sixteen between the first sixteen instead of on top of them. That matters only to the
-// shadow-mask pass (ADR-086), which runs at a quarter of the pixels and spends the difference on
+// shadow-mask pass (ADR-087), which runs at a quarter of the pixels and spends the difference on
 // taps: a twelve-tap estimate quantises visibility to twelve levels, and at full resolution the
 // per-pixel rotation dithers those levels into invisibility while at half resolution it does not,
 // which reads as soft parallel bands across an open penumbra.
@@ -361,7 +361,7 @@ fn contactShadow(worldPos: vec3<f32>, normal: vec3<f32>, toLight: vec3<f32>, scr
     return 1.0 - occlusion;
 }
 
-// ---- the half-resolution shadow mask (ADR-086) --------------------------------------------------
+// ---- the half-resolution shadow mask (ADR-087) --------------------------------------------------
 
 // Which mask channel a directional light's index reads. Written as nested selects rather than a
 // dynamic vector index because the slot is small, known to be 0..2, and this compiles to two

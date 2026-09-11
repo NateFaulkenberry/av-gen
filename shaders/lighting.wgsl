@@ -3,7 +3,7 @@
 //
 // The shadow half of what used to live here -- shadow maps, PCSS, the screen-space contact march
 // and the ambient-occlusion fetch -- is in shadows.wgsl, which this file includes. It was split
-// out so shaders/shadow_mask.wgsl can compute the same terms in its own pass (ADR-086).
+// out so shaders/shadow_mask.wgsl can compute the same terms in its own pass (ADR-087).
 //
 // Group 0 (the frame group) carries everything a shading pass needs beyond its own material:
 // bindings 1-7 and 11 are declared by shadows.wgsl; this file adds
@@ -101,7 +101,7 @@ struct ShadeContext {
     viewDepth: f32,
     rotation: f32,         // per-pixel PCF rotation
     jitter: f32,           // per-pixel contact-shadow offset
-    // ADR-086: whether this fragment may read the half-resolution shadow mask. False for a
+    // ADR-087: whether this fragment may read the half-resolution shadow mask. False for a
     // blended surface, which the depth prepass never drew, so the mask under it describes
     // whatever is behind rather than the surface itself.
     maskable: bool,
@@ -292,7 +292,7 @@ fn evaluateLight(index: u32, ctx: ShadeContext) -> LightSample {
         return sample;
     }
 
-    // ADR-086: the leading directional lights have had their *shadow map* term computed for them at
+    // ADR-087: the leading directional lights have had their *shadow map* term computed for them at
     // half resolution, in shaders/shadow_mask.wgsl, before this pass started. Reading it back costs
     // four texel loads; computing it costs a PCSS blocker search and a filtered cascade lookup. The
     // mask is consulted only where it has something to say about *this* surface -- everywhere else

@@ -47,7 +47,7 @@ struct QualitySettings {
     bool ambientOcclusion = true;
     float aoResolutionScale = 0.5f;        // half resolution + bilateral upsample
     std::uint32_t aoHistoryFrames = 8;     // temporal accumulation length
-    // ADR-086: the fraction of the scene's resolution the directional lights' combined shadow term
+    // ADR-087: the fraction of the scene's resolution the directional lights' combined shadow term
     // (cascade lookup + contact march) is computed at, before a bilateral upsample in the lit
     // pass. 1.0 means "no mask pass": the lit pass computes the term per pixel, exactly as it did
     // before the mask existed, which is what keeps offline renders unchanged.

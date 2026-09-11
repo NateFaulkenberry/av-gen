@@ -99,7 +99,7 @@ Result<void> SceneRenderer::init() {
         // Group 0 of every scene pass. 0 = FrameUniforms and 15 = the simulated-grid table declared
         // by shaders/fields.wgsl (ADR-032; read-only storage, inert when the scene has no grids).
         // 1..10 are the lighting bindings shaders/shadows.wgsl and shaders/lighting.wgsl declare
-        // (ADR-033/034), and 11 is the shadow mask shaders/shadows.wgsl reads (ADR-086); a pass
+        // (ADR-033/034), and 11 is the shadow mask shaders/shadows.wgsl reads (ADR-087); a pass
         // whose shader does not mention them simply never reads them.
         std::array<wgpu::BindGroupLayoutEntry, 13> entries{};
         entries[0].binding = 0;
@@ -139,7 +139,7 @@ Result<void> SceneRenderer::init() {
         entries[10].visibility = wgpu::ShaderStage::Fragment;
         entries[10].sampler.type = wgpu::SamplerBindingType::Filtering;
         entries[11] = entries[6];
-        entries[11].binding = 11; // ADR-086: the half-resolution directional shadow mask
+        entries[11].binding = 11; // ADR-087: the half-resolution directional shadow mask
         entries[12].binding = 15;
         entries[12].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[12].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
@@ -642,7 +642,7 @@ void SceneRenderer::rebuildFrameBindGroups() {
     // reads the linear depth through its own group instead.
     frameBindGroupAux_ = make(frameUniforms_, shadows_->dummyAtlasView(), ao_->placeholder(),
                               linearDepthDefault_.view, shadowMask_->placeholder(), "frame-bind-group-aux");
-    // ADR-086: the mask pass is the one caller that needs the real atlas and the real linear depth
+    // ADR-087: the mask pass is the one caller that needs the real atlas and the real linear depth
     // while still being forbidden the mask -- it is computing the shading pass's own shadow terms,
     // through the shading pass's own bindings, into the target it must not sample.
     frameBindGroupMask_ = make(frameUniforms_, shadows_->atlasView(), ao_->placeholder(), sceneDepth,
@@ -1634,7 +1634,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                    static_cast<float>(std::max(stats_.ao.width, 1u)),
                                    static_cast<float>(std::max(stats_.ao.height, 1u)));
     }
-    // ---- the half-resolution directional shadow mask (ADR-086): sized here for the same reason ----
+    // ---- the half-resolution directional shadow mask (ADR-087): sized here for the same reason ----
     // It reads the linear depth the prepass resolves, so it can only run when there is a prepass;
     // and the prepass only runs when something needs it, which now includes this.
     {
@@ -2045,7 +2045,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ---- ground-truth ambient occlusion (ADR-034) ----
         ao_->encode(encoder, frameBindGroupAux_);
 
-        // ---- the directional shadow mask (ADR-086) ----
+        // ---- the directional shadow mask (ADR-087) ----
         // Last of the prepass group: it wants the shadow atlas (drawn above) and the linear depth
         // (resolved just now), and the lit pass that follows wants it.
         shadowMask_->encode(encoder, frameBindGroupMask_);

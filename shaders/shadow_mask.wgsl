@@ -1,4 +1,4 @@
-// The half-resolution screen-space shadow mask (ADR-086).
+// The half-resolution screen-space shadow mask (ADR-087).
 //
 // One fullscreen pass over the linear depth target that the depth prepass already resolved. For
 // each of the leading directional lights (at most three) it computes the *shadow map* term the lit

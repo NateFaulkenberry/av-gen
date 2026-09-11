@@ -41,7 +41,7 @@ struct RigLight {
     // march twelve steps per fragment and only the moon has a map, which costs 2.42 ms at
     // 720x450, and until now no rig could say otherwise -- `PunctualLight::contactShadow` defaults
     // to true and nothing set it. It stays true by default, because turning it off changes the
-    // image and that is a decision for a rig to make, not for the renderer (ADR-086).
+    // image and that is a decision for a rig to make, not for the renderer (ADR-087).
     bool contactShadow = true;
     float shadowStrength = 1.0f;
     float softness = 1.0f;

@@ -69,7 +69,7 @@ fn viewToWorldPoint(v: vec3<f32>) -> vec3<f32> {
 // not smear a normal across them.
 //
 // The orientation comes from the winding of the two differences and never from a test against the
-// view direction (ADR-086). `dx` runs along +x in view space and `dy` along -y, so `cross(dy, dx)`
+// view direction (ADR-087). `dx` runs along +x in view space and `dy` along -y, so `cross(dy, dx)`
 // is the side facing the camera whatever the surface's angle; the `normal.z < 0` test this used to
 // do is a coin flip on a surface seen nearly edge-on, which is most of the ground in a landscape.
 // It shows up here as almost nothing -- 5.4% of Glowmere's pixels move and 99.5% of those by one or

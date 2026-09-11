@@ -51,7 +51,7 @@ encoder = device.CreateCommandEncoder()
   pass "gtao-pass"          : half-resolution horizon occlusion + bent normal          (ADR-034)
   pass "gtao-temporal-pass" : reprojected, neighbourhood-clamped accumulation
   pass "shadow-mask-pass"   : half-resolution shadow-map term of up to three directional
-                              lights, bilaterally upsampled in the scene pass         (ADR-086)
+                              lights, bilaterally upsampled in the scene pass         (ADR-087)
   pass "scene-pass"         : HDR RGBA16Float + 4 auxiliary targets + Depth24Plus      (ADR-035)
                               opaque PBR entities (pbr.wgsl; back-face cull, or none for doubleSided)
                               procedural geometry (procedural.wgsl; one DrawIndexed(indexCount,
@@ -77,7 +77,7 @@ scene pass; it is skipped entirely when occlusion, contact shadows and the shado
 Note what the prepass draws, because the shadow mask depends on it: opaque and alpha-masked
 geometry, never blended. A blended surface therefore has no mask texel of its own -- the depth
 under it belongs to whatever is behind -- and shades its directional shadows at full resolution
-instead (ADR-086).
+instead (ADR-087).
 
 ### Colour targets of the scene pass (ADR-035)
 

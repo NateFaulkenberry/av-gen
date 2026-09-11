@@ -819,7 +819,7 @@ through vertex pulling. Submissions here are worth about a millisecond in total;
 six. **There is no per-layer submission cost left to remove.** The lever on the remaining 6 ms is
 the LOD ladder and the mesh budgets.
 
-## The shadow-map lookup is the editor canvas's largest single term (2026-09-11, ADR-086)
+## The shadow-map lookup is the editor canvas's largest single term (2026-09-11, ADR-087)
 
 Phase 3 left the scene pass fragment-bound and named the fragments: at the editor's 2880x1166
 canvas, `directLighting` is 81% of the pass, the key light's cascaded PCSS lookup is 34% of it and
@@ -903,7 +903,7 @@ existed; 1.18 is the same removal after it, which is the number that matters now
 image, ADR-034 gave the march to every light deliberately, and the control is therefore a rig's to
 use and not the renderer's to apply.
 
-### The LOD ladder was cheaper than it claimed (2026-09-11, ADR-086)
+### The LOD ladder was cheaper than it claimed (2026-09-11, ADR-087)
 
 `meshopt_simplifySloppy` quantises onto a grid, so the triangle count it returns is a step function
 of the grid it picked and one call lands wherever the steps fall: asked for 35% of `CommonTree_1` it

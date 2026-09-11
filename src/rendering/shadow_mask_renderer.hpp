@@ -1,6 +1,6 @@
 #pragma once
 
-// The half-resolution screen-space shadow mask (ADR-086). `shaders/shadow_mask.wgsl` runs one
+// The half-resolution screen-space shadow mask (ADR-087). `shaders/shadow_mask.wgsl` runs one
 // fullscreen pass over the linear depth target the prepass resolved and writes, per leading
 // directional light, exactly the combined visibility the lit pass would otherwise compute per
 // pixel: the cascaded PCSS lookup minned with the twelve-step screen-space contact march. The

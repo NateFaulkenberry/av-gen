@@ -467,7 +467,7 @@ TEST_CASE("the froxel grid the compute pass builds matches the CPU reference", "
     CHECK(mismatches == 0);
 }
 
-// ---- the half-resolution shadow mask (ADR-086) ---------------------------------------------------
+// ---- the half-resolution shadow mask (ADR-087) ---------------------------------------------------
 
 namespace {
 
@@ -569,7 +569,7 @@ float meanLuminance(const gpu::Image8& image, std::uint32_t x0, std::uint32_t y0
 
 TEST_CASE("the shadow mask leaves open lit ground alone", "[gpu][shadows][mask]") {
     // The class of failure this guards: a mask that shadows ground nothing is standing on. It is
-    // what the flipped reconstruction normal of ADR-086 did, over a whole valley, smoothly enough
+    // what the flipped reconstruction normal of ADR-087 did, over a whole valley, smoothly enough
     // to read as art rather than as a bug.
     //
     // **It does not reproduce that particular defect, and that was checked rather than assumed.**
