@@ -3,10 +3,12 @@
 #include "core/log.hpp"
 #include "core/noise.hpp"
 #include "entity/entity.hpp"
+#include "entity/grounding.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 
 namespace avgen::entity {
 namespace {
@@ -674,6 +676,691 @@ private:
     std::uint32_t subject_ = 0;
 };
 
+// ---- explore ---------------------------------------------------------------------------------
+//
+// The loop §6 asks for: IDLE -> SELECT INTEREST -> NAVIGATE -> WALK -> ARRIVE -> OBSERVE -> IDLE.
+//
+// `wander` is kept and is still the right behaviour for a background creature that should mill
+// about near where it was placed. This is the other thing: a character that crosses a world on
+// purpose, because something over there is worth looking at.
+//
+// What separates it from a waypoint debugger, which §6 is explicit about not wanting:
+//
+//   * It goes somewhere *for a reason*. Destinations are drawn from the interest registry -- the
+//     heroes, the craft, a shoreline, a high point -- weighted by the character's own taste, with
+//     recently visited places suppressed so it does not pace between two favourites.
+//   * It plans. A route comes from the navigation graph, so a lake or a ridge is walked around
+//     rather than discovered, refused and re-rolled. That is the difference between travelling and
+//     the rejection-sampling twitch that was here before.
+//   * Every duration is sampled, every branch is a roll. Two characters with the same behaviour and
+//     different seeds do not do the same thing at the same time, and neither does the same
+//     character twice around the loop.
+//   * It arrives rather than stopping: it slows over the last few metres and turns to face what it
+//     came for before it stands still.
+//
+// Seeded throughout, through `ctx.rng`. No wall clock anywhere.
+class Explore final : public IBehavior {
+public:
+    explicit Explore(const nlohmann::json* s)
+        : speedDefault_(readFloat(s, "speed", 1.7f)),
+          runSpeedDefault_(readFloat(s, "runSpeed", 4.2f)),
+          turnDefault_(readFloat(s, "turnRate", 150.0f)),
+          arriveDefault_(readFloat(s, "arrive", 1.6f)),
+          idleMinDefault_(readFloat(s, "idleMin", 0.6f)),
+          idleMaxDefault_(readFloat(s, "idleMax", 3.0f)),
+          observeDefault_(readFloat(s, "observeChance", 0.55f)),
+          observeMinDefault_(readFloat(s, "observeMin", 2.0f)),
+          observeMaxDefault_(readFloat(s, "observeMax", 6.5f)),
+          minRangeDefault_(readFloat(s, "minRange", 12.0f)),
+          maxRangeDefault_(readFloat(s, "maxRange", 160.0f)),
+          homeDefault_(readFloat(s, "homeRadius", 0.0f)),
+          runChanceDefault_(readFloat(s, "runChance", 0.18f)),
+          slopeAlignDefault_(readFloat(s, "slopeAlign", 0.55f)),
+          bodyRadiusDefault_(readFloat(s, "bodyRadius", 0.0f)),
+          headroomDefault_(readFloat(s, "headroom", 0.0f)),
+          footprintDefault_(readFloat(s, "footprint", 0.55f)),
+          // Taste. Read once and held, rather than registered: an author sets what a character
+          // cares about when they build it, and "how much does it like water" is not a thing
+          // anybody automates on a timeline.
+          landmarkAffinity_(readFloat(s, "landmarkAffinity", 1.0f)),
+          characterAffinity_(readFloat(s, "characterAffinity", 1.3f)),
+          glowAffinity_(readFloat(s, "glowAffinity", 1.2f)),
+          waterAffinity_(readFloat(s, "waterAffinity", 0.9f)),
+          vistaAffinity_(readFloat(s, "vistaAffinity", 0.7f)),
+          strollChance_(readFloat(s, "strollChance", 0.3f)),
+          waypointRadius_(readFloat(s, "waypointRadius", 2.2f)),
+          repathSeconds_(readFloat(s, "repathSeconds", 6.0f)),
+          stuckSeconds_(readFloat(s, "stuckSeconds", 2.5f)),
+          noveltyRadius_(readFloat(s, "noveltyRadius", 22.0f)) {}
+
+    [[nodiscard]] std::string_view kind() const override { return "explore"; }
+
+    void registerParameters(params::ParameterSet& params, const std::string& prefix) override {
+        speed_ = &params.add(floatDesc(prefix + "speed", speedDefault_, 0.0f, 40.0f));
+        runSpeed_ = &params.add(floatDesc(prefix + "runSpeed", runSpeedDefault_, 0.0f, 60.0f));
+        turn_ = &params.add(floatDesc(prefix + "turnRate", turnDefault_, 1.0f, 1440.0f));
+        arrive_ = &params.add(floatDesc(prefix + "arrive", arriveDefault_, 0.05f, 20.0f));
+        idleMin_ = &params.add(floatDesc(prefix + "idleMin", idleMinDefault_, 0.0f, 300.0f));
+        idleMax_ = &params.add(floatDesc(prefix + "idleMax", idleMaxDefault_, 0.0f, 600.0f));
+        observe_ = &params.add(floatDesc(prefix + "observeChance", observeDefault_, 0.0f, 1.0f));
+        observeMin_ = &params.add(floatDesc(prefix + "observeMin", observeMinDefault_, 0.0f, 300.0f));
+        observeMax_ = &params.add(floatDesc(prefix + "observeMax", observeMaxDefault_, 0.0f, 600.0f));
+        minRange_ = &params.add(floatDesc(prefix + "minRange", minRangeDefault_, 0.0f, 1000.0f));
+        maxRange_ = &params.add(floatDesc(prefix + "maxRange", maxRangeDefault_, 0.5f, 4000.0f));
+        home_ = &params.add(floatDesc(prefix + "homeRadius", homeDefault_, 0.0f, 4000.0f));
+        runChance_ = &params.add(floatDesc(prefix + "runChance", runChanceDefault_, 0.0f, 1.0f));
+        slopeAlign_ = &params.add(floatDesc(prefix + "slopeAlign", slopeAlignDefault_, 0.0f, 1.0f));
+        // How big this character is. A world's navigator carries defaults for a person-sized
+        // walker, and Glowmere's is nearly ten metres tall: it has to keep further from a trunk
+        // than a person does, and it does not duck under anything. 0 keeps the world's own number,
+        // so a scene that says nothing behaves exactly as it did.
+        bodyRadius_ = &params.add(floatDesc(prefix + "bodyRadius", bodyRadiusDefault_, 0.0f, 40.0f));
+        headroom_ = &params.add(floatDesc(prefix + "headroom", headroomDefault_, 0.0f, 60.0f));
+        footprint_ = &params.add(floatDesc(prefix + "footprint", footprintDefault_, 0.0f, 20.0f));
+        paths_ = {prefix + "speed",         prefix + "runSpeed",   prefix + "turnRate",
+                  prefix + "arrive",        prefix + "idleMin",    prefix + "idleMax",
+                  prefix + "observeChance", prefix + "observeMin", prefix + "observeMax",
+                  prefix + "minRange",      prefix + "maxRange",   prefix + "homeRadius",
+                  prefix + "runChance",     prefix + "slopeAlign",  prefix + "bodyRadius",
+                  prefix + "headroom",      prefix + "footprint"};
+    }
+    void collectParameterPaths(std::vector<std::string>& out) const override {
+        out.insert(out.end(), paths_.begin(), paths_.end());
+    }
+
+    void reset(Rng& rng) override {
+        phase_ = Phase::Idle;
+        timer_ = rng.range(0.0f, 1.5f);
+        path_.clear();
+        leg_ = 0;
+        hasGoal_ = false;
+        goalName_.clear();
+        goalKind_ = InterestKind::Vista;
+        sinceRepath_ = 0.0f;
+        stuckFor_ = 0.0f;
+        bestProgress_ = std::numeric_limits<float>::max();
+        failures_ = 0;
+        running_ = false;
+        recent_.clear();
+        ground_.reset();
+    }
+
+    void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
+        refreshWalker(ctx);
+        // Another behaviour has stopped the feet -- `interest` looking at something, a scripted
+        // beat. Travel yields rather than competing: the route and the phase are kept, and the walk
+        // resumes from where it stopped rather than being re-rolled.
+        if (state.activity == Activity::Observe) {
+            state.speed = 0.0f;
+            applyGrounding(ctx, state, motion, 0.0f);
+            return;
+        }
+        // The phases are a chain, not a list: selecting a goal should plan a route in the same
+        // frame, and planning one should start walking in it. The guard is what keeps a bug in a
+        // transition from becoming an infinite loop inside one frame.
+        for (int guard = 0; guard < 5; ++guard) {
+            if (!step(ctx, state, motion)) {
+                break;
+            }
+        }
+        applyGrounding(ctx, state, motion, state.speed);
+    }
+
+private:
+    enum class Phase : std::uint8_t { Idle, Select, Navigate, Walk, Arrive, Observe };
+
+    // The navigator this character should be using: the world's, resized to its own body. Rebuilt
+    // only when something it depends on changed, because both of those are keyframeable and a
+    // per-frame copy would be a per-frame copy for nothing.
+    void refreshWalker(const BehaviorContext& ctx) {
+        if (ctx.nav == nullptr) {
+            return;
+        }
+        const float radius = param(bodyRadius_, bodyRadiusDefault_);
+        const float headroom = param(headroom_, headroomDefault_);
+        if (radius <= 0.0f && headroom <= 0.0f) {
+            walkerSource_ = nullptr; // this character takes the world's defaults
+            return;
+        }
+        if (walkerSource_ == ctx.nav && walkerRadius_ == radius && walkerHeadroom_ == headroom) {
+            return;
+        }
+        walker_ = *ctx.nav;
+        NavSettings settings = walker_.settings();
+        if (radius > 0.0f) {
+            settings.bodyRadius = radius;
+            // Something this wide steps over more than a person does, and its stride is longer.
+            settings.stepOver = std::max(settings.stepOver, radius * 0.75f);
+            settings.stepHeight = std::max(settings.stepHeight, radius * 1.6f);
+        }
+        if (headroom > 0.0f) {
+            settings.headroom = headroom;
+            // The thicket band is "too tall to wade through, too low to walk under". Raising the
+            // ceiling without raising the floor would turn every shrub into a wall, which is
+            // precisely the bug that kept the old walker standing still in a meadow.
+            settings.walkableVegetation = std::max(settings.walkableVegetation, headroom * 0.36f);
+        }
+        walker_.setSettings(settings);
+        walkerSource_ = ctx.nav;
+        walkerRadius_ = radius;
+        walkerHeadroom_ = headroom;
+    }
+    [[nodiscard]] const Navigator* nav(const BehaviorContext& ctx) const {
+        return walkerSource_ != nullptr ? &walker_ : ctx.nav;
+    }
+
+    [[nodiscard]] float param(const params::Parameter<float>* p, float fallback) const {
+        return p != nullptr ? p->value() : fallback;
+    }
+    [[nodiscard]] float sample(const BehaviorContext& ctx, float lo, float hi) const {
+        if (ctx.rng == nullptr) {
+            return lo;
+        }
+        return ctx.rng->range(std::min(lo, hi), std::max(lo, hi));
+    }
+
+    // Runs one phase. Returns true when the phase changed and the new one should run immediately.
+    bool step(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) {
+        switch (phase_) {
+        case Phase::Idle: return stepIdle(ctx, state);
+        case Phase::Select: return stepSelect(ctx, state);
+        case Phase::Navigate: return stepNavigate(ctx, state);
+        case Phase::Walk: return stepWalk(ctx, state, motion);
+        case Phase::Arrive: return stepArrive(ctx, state);
+        case Phase::Observe: return stepObserve(ctx, state);
+        }
+        return false;
+    }
+
+    bool stepIdle(const BehaviorContext& ctx, EntityState& state) {
+        state.speed = 0.0f;
+        state.activity = Activity::Idle;
+        timer_ -= static_cast<float>(ctx.dt);
+        if (timer_ > 0.0f) {
+            return false;
+        }
+        phase_ = Phase::Select;
+        return true;
+    }
+
+    bool stepSelect(const BehaviorContext& ctx, EntityState& state) {
+        state.speed = 0.0f;
+        if (!pickGoal(ctx, state)) {
+            // Nowhere to go. Stand a moment and ask again rather than burning the frame on
+            // rejection sampling, which is what the previous navigation did and why it never moved.
+            timer_ = sample(ctx, 0.8f, 2.0f);
+            phase_ = Phase::Idle;
+            return false;
+        }
+        // Whether this trip is a walk or a run is decided once, on departure, rather than per
+        // frame -- a character that re-rolled its gait every frame would flicker between them.
+        running_ = ctx.rng != nullptr && ctx.rng->nextFloat() < param(runChance_, runChanceDefault_);
+        phase_ = Phase::Navigate;
+        return true;
+    }
+
+    bool stepNavigate(const BehaviorContext& ctx, EntityState& state) {
+        state.speed = 0.0f;
+        const glm::vec3 here = state.position();
+        const glm::vec2 flat(here.x, here.z);
+        const glm::vec2 target(goal_.x, goal_.z);
+        const Navigator* navigator = nav(ctx);
+        if (navigator != nullptr && navigator->findPath(flat, target, path_) && !path_.empty()) {
+            leg_ = 0;
+            sinceRepath_ = 0.0f;
+            stuckFor_ = 0.0f;
+            bestProgress_ = glm::length(target - flat);
+            failures_ = 0;
+            phase_ = Phase::Walk;
+            return true;
+        }
+        // No route. Two more goals, then stand down for a moment: a character that re-planned every
+        // frame from a spot with nowhere to go would spend the whole render planning.
+        ++failures_;
+        if (failures_ >= 3) {
+            failures_ = 0;
+            hasGoal_ = false;
+            timer_ = sample(ctx, 0.6f, 1.8f);
+            phase_ = Phase::Idle;
+            return false;
+        }
+        phase_ = Phase::Select;
+        return true;
+    }
+
+    bool stepWalk(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) {
+        (void)motion;
+        const auto dt = static_cast<float>(ctx.dt);
+        sinceRepath_ += dt;
+        const glm::vec3 here = state.position();
+        const glm::vec2 flat(here.x, here.z);
+
+        // A goal that moves. The craft drifts and hovers, and a character walking to where it was
+        // a minute ago is a character walking to nothing.
+        if (goalKind_ == InterestKind::Character && !goalName_.empty() && ctx.world != nullptr) {
+            glm::vec3 now{0.0f};
+            if (ctx.world->pointOfInterest(goalName_, now) &&
+                glm::length(glm::vec2(now.x - goal_.x, now.z - goal_.z)) > 6.0f) {
+                goal_ = now;
+                phase_ = Phase::Navigate;
+                return true;
+            }
+        }
+        if (leg_ >= path_.size()) {
+            phase_ = Phase::Arrive;
+            return true;
+        }
+
+        const bool finalLeg = leg_ + 1 >= path_.size();
+        const float arrive = param(arrive_, arriveDefault_);
+        const glm::vec2 waypoint = path_[leg_];
+        const float toWaypoint = glm::length(waypoint - flat);
+        const float reached = finalLeg ? arrive : std::max(waypointRadius_, 0.5f);
+        if (toWaypoint <= reached) {
+            if (finalLeg) {
+                phase_ = Phase::Arrive;
+                return true;
+            }
+            ++leg_;
+            return true; // take the next leg in this same frame rather than idling a step
+        }
+
+        const Navigator* navigator = nav(ctx);
+        const float speed = running_ ? param(runSpeed_, runSpeedDefault_) : param(speed_, speedDefault_);
+        const float turnRate = param(turn_, turnDefault_) / kDegrees;
+        glm::vec2 direction = (waypoint - flat) / std::max(toWaypoint, 1e-4f);
+        if (navigator != nullptr && navigator->valid()) {
+            // Local steering on top of the plan. The route says which way the world is open; this
+            // says which way the next four metres are, and the two together are what lets a
+            // character walk a straight line between two trunks the grid called one open cell.
+            const glm::vec2 steered = navigator->steer(flat, waypoint, std::max(speed * 1.6f, 3.0f));
+            if (glm::length(steered) > 0.5f) {
+                direction = steered;
+            } else {
+                // Every local way out is blocked. Re-plan rather than grinding, and count it: a
+                // character that cannot make progress must eventually choose somewhere else.
+                stuckFor_ += dt;
+                if (stuckFor_ > stuckSeconds_) {
+                    stuckFor_ = 0.0f;
+                    phase_ = Phase::Navigate;
+                    return true;
+                }
+                state.speed = 0.0f;
+                state.activity = Activity::Idle;
+                return false;
+            }
+        }
+
+        // Turn towards the heading before travelling along it, and travel at the fraction of full
+        // speed the facing error allows, so a character pivots rather than strafing.
+        const float wanted = std::atan2(direction.x, direction.y);
+        const float delta = angleDelta(state.yaw, wanted);
+        const float step = turnRate * dt;
+        const float turned = std::clamp(delta, -step, step);
+        state.yaw += turned;
+        state.turnRate = turned / std::max(dt, 1e-4f);
+
+        const float alignment = std::max(0.0f, std::cos(angleDelta(state.yaw, wanted)));
+        float travelSpeed = speed * alignment;
+        // Slow into the last couple of metres instead of stopping dead on the waypoint.
+        if (finalLeg) {
+            travelSpeed *= std::clamp(toWaypoint / std::max(arrive * 2.5f, 0.5f), 0.25f, 1.0f);
+        }
+        travelSpeed = std::min(travelSpeed, toWaypoint / std::max(dt, 1e-4f));
+        const glm::vec2 heading(std::sin(state.yaw), std::cos(state.yaw));
+        const glm::vec2 move = heading * travelSpeed * dt;
+        state.travel.x += move.x;
+        state.travel.z += move.y;
+
+        // Whatever the steering did not prevent, the field corrects. This is the guarantee rather
+        // than the effort: a body may not end a frame inside a solid, however it got there --
+        // terrain regenerated under it, an author dropped a rock on it, a seek put it somewhere.
+        if (navigator != nullptr) {
+            const glm::vec3 after = state.position();
+            const glm::vec2 push =
+                navigator->resolvePenetration(glm::vec2(after.x, after.z), after.y);
+            const float pushLength = glm::length(push);
+            if (pushLength > 1e-4f) {
+                // Clamped, so a body that somehow ends up deep inside something walks out over a
+                // few frames rather than being flung across the valley in one.
+                const float limit = std::min(pushLength, std::max(speed, 1.0f) * dt * 2.0f);
+                state.travel.x += push.x / pushLength * limit;
+                state.travel.z += push.y / pushLength * limit;
+            }
+        }
+
+        state.speed = travelSpeed;
+        const float runSpeed = param(runSpeed_, runSpeedDefault_);
+        state.activity = travelSpeed > runSpeed * 0.7f  ? Activity::Run
+                         : travelSpeed > 0.05f          ? Activity::Walk
+                                                        : Activity::Turn;
+
+        // Progress, and the watchdog on it. Measured against the goal rather than the waypoint, so
+        // a character shuffling back and forth between two legs is still recognised as stuck.
+        const glm::vec3 nowAt = state.position();
+        const float remaining = glm::length(glm::vec2(goal_.x - nowAt.x, goal_.z - nowAt.z));
+        if (remaining < bestProgress_ - 0.25f) {
+            bestProgress_ = remaining;
+            stuckFor_ = 0.0f;
+        } else {
+            stuckFor_ += dt;
+        }
+        if (stuckFor_ > stuckSeconds_) {
+            stuckFor_ = 0.0f;
+            phase_ = Phase::Navigate;
+            return false;
+        }
+        // A periodic re-plan, because the world is not static: the craft moves, and an editor may
+        // have put something across the route since it was chosen.
+        if (sinceRepath_ > std::max(repathSeconds_, 1.0f)) {
+            phase_ = Phase::Navigate;
+            return false;
+        }
+        return false;
+    }
+
+    bool stepArrive(const BehaviorContext& ctx, EntityState& state) {
+        const auto dt = static_cast<float>(ctx.dt);
+        state.speed = 0.0f;
+        const glm::vec3 here = state.position();
+        // Turn to face what it came for. An arrival that ends facing whichever way the last leg
+        // happened to point is the single clearest tell of a waypoint system.
+        const glm::vec2 toGoal(goal_.x - here.x, goal_.z - here.z);
+        const float distance = glm::length(toGoal);
+        bool facing = true;
+        if (distance > 0.3f) {
+            const float wanted = std::atan2(toGoal.x, toGoal.y);
+            const float delta = angleDelta(state.yaw, wanted);
+            const float step = (param(turn_, turnDefault_) / kDegrees) * dt;
+            const float turned = std::clamp(delta, -step, step);
+            state.yaw += turned;
+            state.turnRate = turned / std::max(dt, 1e-4f);
+            state.activity = std::abs(delta) > 0.12f ? Activity::Turn : Activity::Idle;
+            facing = std::abs(angleDelta(state.yaw, wanted)) <= 0.2f;
+        } else {
+            state.activity = Activity::Idle;
+        }
+        timer_ -= dt;
+        if (!facing && timer_ > -1.5f) {
+            return false; // still turning, and not yet out of patience
+        }
+        remember(goal_);
+        if (ctx.rng != nullptr && ctx.rng->nextFloat() < param(observe_, observeDefault_)) {
+            timer_ = sample(ctx, param(observeMin_, observeMinDefault_), param(observeMax_, observeMaxDefault_));
+            phase_ = Phase::Observe;
+            return true;
+        }
+        timer_ = sample(ctx, param(idleMin_, idleMinDefault_), param(idleMax_, idleMaxDefault_));
+        phase_ = Phase::Idle;
+        hasGoal_ = false;
+        return false;
+    }
+
+    bool stepObserve(const BehaviorContext& ctx, EntityState& state) {
+        state.speed = 0.0f;
+        state.activity = Activity::Observe;
+        // Name the subject; `lookAt` does the turning. The same division `interest` uses, so either
+        // can be replaced without touching the other.
+        state.lookTarget = goal_;
+        state.hasLookTarget = true;
+        if (goalKind_ == InterestKind::Character && !goalName_.empty() && ctx.world != nullptr) {
+            glm::vec3 now{0.0f};
+            if (ctx.world->pointOfInterest(goalName_, now)) {
+                state.lookTarget = now; // it is watching the craft, and the craft is moving
+            }
+        }
+        timer_ -= static_cast<float>(ctx.dt);
+        if (timer_ > 0.0f) {
+            return false;
+        }
+        hasGoal_ = false;
+        timer_ = sample(ctx, param(idleMin_, idleMinDefault_), param(idleMax_, idleMaxDefault_));
+        phase_ = Phase::Idle;
+        return false;
+    }
+
+    void applyGrounding(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion,
+                        float speed) {
+        if (ctx.nav == nullptr) {
+            return;
+        }
+        GroundSettings settings;
+        settings.slopeAlign = param(slopeAlign_, slopeAlignDefault_);
+        // A body reads the ground over its own width. A ten-metre creature bridges what a person
+        // trips on, and grounding it on a half-metre disc makes it follow detail it would not feel.
+        settings.footprint = std::max(param(footprint_, footprintDefault_), 0.0f);
+        const glm::vec3 here = state.position();
+        const GroundResult ground = ground_.update(*nav(ctx), glm::vec2(here.x, here.z), state.yaw,
+                                                   speed, ctx.dt, settings);
+        state.travel.y = ground.height - state.anchor.y;
+        // Pitch and roll ride on the motion offset rather than on the state's yaw, because the
+        // entity composes the two differently: yaw is the body's facing and these are a lean on top
+        // of it, and an author's authored rotation has to survive both.
+        motion.rotation.x += ground.pitch;
+        motion.rotation.z += ground.roll;
+    }
+
+    void remember(const glm::vec3& place) {
+        recent_.push_back(place);
+        if (recent_.size() > kRecent) {
+            recent_.erase(recent_.begin());
+        }
+    }
+
+    [[nodiscard]] float affinity(InterestKind kind) const {
+        switch (kind) {
+        case InterestKind::Landmark: return landmarkAffinity_;
+        case InterestKind::Character: return characterAffinity_;
+        case InterestKind::Glow: return glowAffinity_;
+        case InterestKind::Water: return waterAffinity_;
+        case InterestKind::Vista: return vistaAffinity_;
+        }
+        return 1.0f;
+    }
+
+    // Choose somewhere to go. Weighted over the interest registry, with a chance of simply going
+    // for a walk instead -- a character that only ever moved between named places would visit the
+    // same five spots forever, which is §6's "looks like a debugging waypoint system" in another
+    // costume.
+    bool pickGoal(const BehaviorContext& ctx, const EntityState& state) {
+        const glm::vec3 here = state.position();
+        const glm::vec2 flat(here.x, here.z);
+        const float lo = param(minRange_, minRangeDefault_);
+        const float hi = std::max(param(maxRange_, maxRangeDefault_), lo + 1.0f);
+        const float home = param(home_, homeDefault_);
+        const glm::vec2 anchor(state.anchor.x, state.anchor.z);
+
+        const bool stroll = ctx.rng != nullptr && ctx.rng->nextFloat() < strollChance_;
+        if (!stroll && ctx.world != nullptr) {
+            candidates_.clear();
+            weights_.clear();
+            float total = 0.0f;
+            for (const InterestPoint& point : ctx.world->interestPoints()) {
+                // Never pick the entity's own node as somewhere to walk to.
+                if (!selfName_.empty() && point.name == selfName_) {
+                    continue;
+                }
+                const glm::vec2 at(point.position.x, point.position.z);
+                const float distance = glm::length(at - flat);
+                if (distance < lo || distance > hi) {
+                    continue;
+                }
+                if (home > 0.0f && glm::length(at - anchor) > home) {
+                    continue;
+                }
+                float weight = affinity(point.kind) * std::max(point.weight, 0.0f);
+                // Nearer is likelier, but only mildly: a falloff steep enough to matter is a
+                // character that never crosses its own world.
+                weight *= 1.0f / (1.0f + distance / std::max(hi * 0.5f, 1.0f));
+                for (const glm::vec3& seen : recent_) {
+                    if (glm::length(glm::vec2(seen.x - at.x, seen.z - at.y)) < noveltyRadius_) {
+                        weight *= 0.12f; // been there
+                        break;
+                    }
+                }
+                if (weight <= 0.0f) {
+                    continue;
+                }
+                candidates_.push_back(&point);
+                weights_.push_back(weight);
+                total += weight;
+            }
+            if (total > 0.0f && ctx.rng != nullptr) {
+                float roll = ctx.rng->nextFloat() * total;
+                for (std::size_t i = 0; i < candidates_.size(); ++i) {
+                    roll -= weights_[i];
+                    if (roll <= 0.0f) {
+                        goal_ = candidates_[i]->position;
+                        goalName_ = candidates_[i]->name;
+                        goalKind_ = candidates_[i]->kind;
+                        hasGoal_ = true;
+                        return true;
+                    }
+                }
+                // Floating point ran out before the list did. Take the last one rather than
+                // reporting failure, which would make a rounding error look like an empty world.
+                goal_ = candidates_.back()->position;
+                goalName_ = candidates_.back()->name;
+                goalKind_ = candidates_.back()->kind;
+                hasGoal_ = true;
+                return true;
+            }
+        }
+
+        // A walk for its own sake, and the fallback when nothing in the registry is reachable.
+        const Navigator* navigator = nav(ctx);
+        if (navigator == nullptr || ctx.rng == nullptr) {
+            return false;
+        }
+        const glm::vec2 from = (home > 0.0f && glm::length(flat - anchor) > home) ? anchor : flat;
+        // Strolls are shorter than pilgrimages: a random point a hundred metres away is not a
+        // stroll, and choosing one is how a character ends up crossing the world for nothing.
+        const float strollHi = std::min(hi, std::max(lo + 8.0f, 45.0f));
+        glm::vec2 destination{0.0f};
+        if (!navigator->pickDestination(*ctx.rng, from, lo, home > 0.0f ? std::min(strollHi, home) : strollHi,
+                                        destination)) {
+            return false;
+        }
+        goal_ = glm::vec3(destination.x, navigator->groundHeight(destination), destination.y);
+        goalName_.clear();
+        goalKind_ = InterestKind::Vista;
+        hasGoal_ = true;
+        return true;
+    }
+
+    static constexpr std::size_t kRecent = 5;
+
+    float speedDefault_, runSpeedDefault_, turnDefault_, arriveDefault_;
+    float idleMinDefault_, idleMaxDefault_, observeDefault_, observeMinDefault_, observeMaxDefault_;
+    float minRangeDefault_, maxRangeDefault_, homeDefault_, runChanceDefault_, slopeAlignDefault_;
+    float bodyRadiusDefault_, headroomDefault_, footprintDefault_;
+    float landmarkAffinity_, characterAffinity_, glowAffinity_, waterAffinity_, vistaAffinity_;
+    float strollChance_, waypointRadius_, repathSeconds_, stuckSeconds_, noveltyRadius_;
+
+    params::Parameter<float>* speed_ = nullptr;
+    params::Parameter<float>* runSpeed_ = nullptr;
+    params::Parameter<float>* turn_ = nullptr;
+    params::Parameter<float>* arrive_ = nullptr;
+    params::Parameter<float>* idleMin_ = nullptr;
+    params::Parameter<float>* idleMax_ = nullptr;
+    params::Parameter<float>* observe_ = nullptr;
+    params::Parameter<float>* observeMin_ = nullptr;
+    params::Parameter<float>* observeMax_ = nullptr;
+    params::Parameter<float>* minRange_ = nullptr;
+    params::Parameter<float>* maxRange_ = nullptr;
+    params::Parameter<float>* home_ = nullptr;
+    params::Parameter<float>* runChance_ = nullptr;
+    params::Parameter<float>* slopeAlign_ = nullptr;
+    params::Parameter<float>* bodyRadius_ = nullptr;
+    params::Parameter<float>* headroom_ = nullptr;
+    params::Parameter<float>* footprint_ = nullptr;
+    std::vector<std::string> paths_;
+    std::string selfName_;
+    // This character's own view of the world: the host's navigator with its own size written onto
+    // it. A copy is cheap -- the map, the obstacle field and the graph are all shared -- and it is
+    // what makes "how big am I" a property of the character rather than of the world, which is the
+    // difference between one walker and a cast of them.
+    Navigator walker_;
+    const Navigator* walkerSource_ = nullptr;
+    float walkerRadius_ = -1.0f;
+    float walkerHeadroom_ = -1.0f;
+
+    Phase phase_ = Phase::Idle;
+    float timer_ = 0.0f;
+    std::vector<glm::vec2> path_;
+    std::size_t leg_ = 0;
+    glm::vec3 goal_{0.0f};
+    std::string goalName_;
+    InterestKind goalKind_ = InterestKind::Vista;
+    bool hasGoal_ = false;
+    bool running_ = false;
+    float sinceRepath_ = 0.0f;
+    float stuckFor_ = 0.0f;
+    float bestProgress_ = 0.0f;
+    int failures_ = 0;
+    std::vector<glm::vec3> recent_;
+    GroundFollower ground_;
+    // Scratch for the weighted pick, kept so a selection every few seconds does not allocate.
+    std::vector<const InterestPoint*> candidates_;
+    std::vector<float> weights_;
+};
+
+// ---- ground ----------------------------------------------------------------------------------
+//
+// Grounding on its own, for a character whose horizontal motion comes from somewhere else: a
+// keyframed walk, a spline, a future scripted sequence. `explore` already grounds itself, so this
+// is not needed alongside it -- it is the same component (ADR-093, §4, §7) exposed as a behaviour
+// so that "follow the terrain" is available without also taking a mind.
+class Ground final : public IBehavior {
+public:
+    explicit Ground(const nlohmann::json* s)
+        : alignDefault_(readFloat(s, "slopeAlign", 0.55f)),
+          smoothDefault_(readFloat(s, "smoothingMs", 85.0f)),
+          floatDefault_(readFloat(s, "maxFloat", 0.22f)),
+          tiltDefault_(readFloat(s, "maxTilt", 34.0f)) {}
+
+    [[nodiscard]] std::string_view kind() const override { return "ground"; }
+
+    void registerParameters(params::ParameterSet& params, const std::string& prefix) override {
+        align_ = &params.add(floatDesc(prefix + "slopeAlign", alignDefault_, 0.0f, 1.0f));
+        smooth_ = &params.add(floatDesc(prefix + "smoothingMs", smoothDefault_, 0.0f, 4000.0f));
+        float_ = &params.add(floatDesc(prefix + "maxFloat", floatDefault_, 0.0f, 20.0f));
+        tilt_ = &params.add(floatDesc(prefix + "maxTilt", tiltDefault_, 0.0f, 90.0f));
+        paths_ = {prefix + "slopeAlign", prefix + "smoothingMs", prefix + "maxFloat",
+                  prefix + "maxTilt"};
+    }
+    void collectParameterPaths(std::vector<std::string>& out) const override {
+        out.insert(out.end(), paths_.begin(), paths_.end());
+    }
+    void reset(Rng&) override { follower_.reset(); }
+
+    void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
+        if (ctx.nav == nullptr) {
+            return;
+        }
+        GroundSettings settings;
+        settings.slopeAlign = align_ != nullptr ? align_->value() : alignDefault_;
+        settings.heightSmoothingMs = smooth_ != nullptr ? smooth_->value() : smoothDefault_;
+        settings.maxFloat = float_ != nullptr ? float_->value() : floatDefault_;
+        settings.maxTilt = tilt_ != nullptr ? tilt_->value() : tiltDefault_;
+        const glm::vec3 here = state.position();
+        const GroundResult ground = follower_.update(*ctx.nav, glm::vec2(here.x, here.z), state.yaw,
+                                                     state.speed, ctx.dt, settings);
+        state.travel.y = ground.height - state.anchor.y;
+        motion.rotation.x += ground.pitch;
+        motion.rotation.z += ground.roll;
+    }
+
+private:
+    float alignDefault_, smoothDefault_, floatDefault_, tiltDefault_;
+    params::Parameter<float>* align_ = nullptr;
+    params::Parameter<float>* smooth_ = nullptr;
+    params::Parameter<float>* float_ = nullptr;
+    params::Parameter<float>* tilt_ = nullptr;
+    std::vector<std::string> paths_;
+    GroundFollower follower_;
+};
+
 // ---- orbit -----------------------------------------------------------------------------------
 //
 // Travel slowly around a named point. Separate from `drift` because a craft holding station over
@@ -745,7 +1432,7 @@ bool BehaviorContext::event(std::string_view name) const {
 }
 
 std::vector<std::string_view> behaviorKinds() {
-    return {"hover", "drift", "bank", "spin", "wander", "lookAt", "interest", "orbit"};
+    return {"hover", "drift", "bank", "spin", "wander", "explore", "ground", "lookAt", "interest", "orbit"};
 }
 
 std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::json* settings) {
@@ -763,6 +1450,12 @@ std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::j
     }
     if (kind == "wander") {
         return std::make_unique<Wander>(settings);
+    }
+    if (kind == "explore") {
+        return std::make_unique<Explore>(settings);
+    }
+    if (kind == "ground") {
+        return std::make_unique<Ground>(settings);
     }
     if (kind == "lookAt") {
         return std::make_unique<LookAt>(settings);

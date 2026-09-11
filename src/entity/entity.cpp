@@ -1,5 +1,7 @@
 #include "entity/entity.hpp"
 
+#include "entity/nav_grid.hpp"
+
 #include "core/hash.hpp"
 #include "core/log.hpp"
 #include "params/serialization.hpp"
@@ -201,6 +203,50 @@ bool EntityWorld::pointOfInterest(std::string_view name, glm::vec3& out) const {
     return false;
 }
 
+const char* interestKindName(InterestKind kind) {
+    switch (kind) {
+    case InterestKind::Landmark: return "landmark";
+    case InterestKind::Character: return "character";
+    case InterestKind::Glow: return "glow";
+    case InterestKind::Water: return "water";
+    case InterestKind::Vista: return "vista";
+    }
+    return "unknown";
+}
+
+void EntityWorld::setExtraInterestPoints(std::vector<InterestPoint> extras) {
+    extraInterests_ = std::move(extras);
+    refreshInterestPoints();
+}
+
+void EntityWorld::refreshInterestPoints() {
+    interests_.clear();
+    // Order matters only for reproducibility, not for preference -- a behaviour weights by kind,
+    // not by position in the list -- but it has to be *an* order, and this one is the order the
+    // host declared things in, followed by what the terrain offered.
+    for (const auto& [name, position] : landmarks_) {
+        InterestPoint point;
+        point.position = position;
+        point.name = name;
+        // A landmark that is also an entity moves, and a behaviour that cached its position would
+        // walk to where the craft used to be. Naming the kind here lets the behaviour re-resolve.
+        point.kind = find(name) != nullptr ? InterestKind::Character : InterestKind::Landmark;
+        point.weight = 1.0f;
+        interests_.push_back(std::move(point));
+    }
+    for (const InterestPoint& extra : extraInterests_) {
+        interests_.push_back(extra);
+    }
+    if (const NavGrid* grid = nav_.grid()) {
+        for (const glm::vec3& p : grid->shorePoints()) {
+            interests_.push_back(InterestPoint{p, {}, InterestKind::Water, 1.0f});
+        }
+        for (const glm::vec3& p : grid->vistaPoints()) {
+            interests_.push_back(InterestPoint{p, {}, InterestKind::Vista, 1.0f});
+        }
+    }
+}
+
 void EntityWorld::registerParameters(params::ParameterSet& params, const std::string& prefix) {
     prefix_ = prefix;
     registered_.clear();
@@ -366,12 +412,69 @@ void EntityWorld::reset() {
         entity->state_ = EntityState{};
         entity->motion_ = MotionOffset{};
         entity->coarseAccum_ = 0.0;
+        entity->everUpdated_ = false;
         if (const NodeBinding* b = binding(entity->desc_.driven())) {
             entity->state_.anchor = b->anchor;
         }
         for (auto& behavior : entity->behaviors_) {
             behavior->reset(entity->rng_);
         }
+    }
+}
+
+void EntityWorld::seek(double time, params::ParameterSet* params, const signals::SignalBus* bus,
+                       glm::vec3 viewPosition, double step, double maxSeconds) {
+    if (params != nullptr) {
+        params->resetFinals();
+    }
+    reset();
+    const double target = std::max(time, 0.0);
+    const double dt = std::max(step, 1e-3);
+    const double span = std::min(target, std::max(maxSeconds, 0.0));
+    const auto steps = static_cast<std::uint64_t>(span / dt);
+    // A fixed step, not the frame's. That is what makes the answer a function of `time` alone: a
+    // seek that integrated whatever dt the last frame happened to take would land somewhere that
+    // depended on the machine it ran on.
+    for (std::uint64_t i = 0; i < steps; ++i) {
+        const double now = target - span + static_cast<double>(i) * dt;
+        for (auto& entityPtr : entities_) {
+            Entity& entity = *entityPtr;
+            const float distance = glm::length(entity.state_.position() - viewPosition);
+            if (entity.desc_.cullDistance > 0.0f && distance > entity.desc_.cullDistance &&
+                entity.everUpdated_) {
+                continue;
+            }
+            entity.motion_ = MotionOffset{};
+            entity.state_.hasLookTarget = false;
+            entity.state_.reaction = 0.0f;
+            entity.state_.activity = Activity::Idle;
+            entity.state_.detail = 1.0f;
+            entity.everUpdated_ = true;
+
+            BehaviorContext bc;
+            bc.time = now;
+            bc.dt = dt;
+            bc.bus = bus;
+            bc.nav = &nav_;
+            bc.world = this;
+            bc.rng = &entity.rng_;
+            for (auto& behavior : entity.behaviors_) {
+                behavior->update(bc, entity.state_, entity.motion_);
+            }
+        }
+    }
+    // Publish the state the next frame will build on, without touching the parameter set.
+    for (auto& entityPtr : entities_) {
+        Entity& entity = *entityPtr;
+        entity.locomotion_.activity = entity.state_.activity;
+        entity.locomotion_.time = target;
+        entity.locomotion_.position = entity.state_.position() + entity.motion_.position;
+        entity.locomotion_.yaw = entity.state_.yaw;
+        entity.locomotion_.speed = entity.state_.speed;
+        entity.locomotion_.turnRate = entity.state_.turnRate;
+        entity.locomotion_.reaction = entity.state_.reaction;
+        entity.locomotion_.lookTarget = entity.state_.lookTarget;
+        entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;
     }
 }
 
@@ -385,8 +488,12 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         Entity& entity = *entityPtr;
         const glm::vec3 here = entity.state_.position();
         const float distance = glm::length(here - ctx.viewPosition);
+        // The one update level of detail may never skip. Everything below reasons about an entity
+        // that has state worth keeping; on the first frame there is none, and skipping leaves the
+        // pose sink reading a default-constructed LocomotionState at the origin.
+        const bool first = !entity.everUpdated_;
 
-        if (entity.desc_.cullDistance > 0.0f && distance > entity.desc_.cullDistance) {
+        if (!first && entity.desc_.cullDistance > 0.0f && distance > entity.desc_.cullDistance) {
             // Far enough away that nothing it could do would be visible. Not merely a cheaper
             // update: no update, and no parameter write either, so the node stays exactly where
             // the scene put it.
@@ -396,7 +503,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         }
 
         double dt = ctx.dt;
-        if (entity.desc_.fullDetailDistance > 0.0f && distance > entity.desc_.fullDetailDistance) {
+        if (!first && entity.desc_.fullDetailDistance > 0.0f && distance > entity.desc_.fullDetailDistance) {
             entity.coarseAccum_ += ctx.dt;
             if (entity.coarseAccum_ < static_cast<double>(entity.desc_.coarseInterval)) {
                 ++counts_.skipped;
@@ -412,6 +519,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
             ++counts_.full;
         }
         entity.active_ = true;
+        entity.everUpdated_ = true;
 
         entity.motion_ = MotionOffset{};
         entity.state_.hasLookTarget = false;

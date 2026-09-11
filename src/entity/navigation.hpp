@@ -20,10 +20,14 @@
 // the same world, the same generator state and the same request always produce the same answer.
 
 #include "core/rng.hpp"
+#include "spatial/obstacle_field.hpp"
 #include "world/camera_clearance.hpp"
 #include "world/world_map.hpp"
 
 #include <glm/glm.hpp>
+
+#include <memory>
+#include <vector>
 
 namespace avgen::entity {
 
@@ -44,11 +48,16 @@ struct NavSettings {
     float heroMargin = 1.0f;        // metres to stay outside a hero's sphere
     float boundaryMargin = 12.0f;   // metres to stay inside the world's edge
     float stepHeight = 1.4f;        // metres of rise tolerated between two samples of a step
+    // The walker's own width. The statistical canopy above cannot say "there is a trunk here", so
+    // this is what the per-instance obstacle field (ADR-093, §5) is tested against: a body radius
+    // and a step-over height turn a set of cylinders into "may I stand here".
+    float bodyRadius = 0.45f;
+    float stepOver = 0.4f;          // solids shorter than this are stepped over, not avoided
 };
 
 // Why a point was rejected. A string rather than an enum because its only consumer is a diagnostic
 // and a reason nobody can read is a reason nobody acts on.
-enum class NavReject : std::uint8_t { None, OutOfBounds, TooSteep, Submerged, NoHeadroom, InsideHero, Step };
+enum class NavReject : std::uint8_t { None, OutOfBounds, TooSteep, Submerged, NoHeadroom, InsideHero, Step, Obstructed };
 [[nodiscard]] const char* navRejectName(NavReject reason);
 
 struct NavSample {
@@ -56,8 +65,15 @@ struct NavSample {
     float ground = 0.0f;   // world y of the surface
     float slope = 0.0f;
     float canopy = 0.0f;   // metres of growth above the ground here
+    glm::vec3 normal{0.0f, 1.0f, 0.0f};
+    // The water surface above this point, or -infinity where the ground is dry. Carried rather
+    // than reduced to a boolean because "how far above the water am I" is what tells a shoreline
+    // from a hilltop, and the navigation grid uses it to find the places worth walking to.
+    float waterSurface = 0.0f;
     NavReject reject = NavReject::None;
 };
+
+class NavGrid;
 
 class Navigator {
 public:
@@ -65,12 +81,38 @@ public:
     Navigator(const world::WorldMap* map, world::ClearanceField field, NavSettings settings = {});
 
     [[nodiscard]] bool valid() const { return map_ != nullptr; }
+    // The walkable extent: the map's own bounds pulled in by the boundary margin, which is the
+    // rectangle `sample` will actually accept. Falls back to a small square when there is no map,
+    // so a caller sizing a structure to the world never has to special-case not having one.
+    [[nodiscard]] glm::vec2 worldMin() const;
+    [[nodiscard]] glm::vec2 worldMax() const;
     [[nodiscard]] const NavSettings& settings() const { return settings_; }
+    void setSettings(const NavSettings& settings) { settings_ = settings; }
     [[nodiscard]] const world::ClearanceField& clearance() const { return field_; }
+
+    // The per-instance solids this world contains (ADR-093, §5). Shared rather than owned: the
+    // host builds one set for the world and every walker in it reads the same one, and a copy of a
+    // Navigator -- which is how it reaches EntityWorld -- keeps pointing at it.
+    void setObstacles(std::shared_ptr<const spatial::ObstacleField> obstacles) {
+        obstacles_ = std::move(obstacles);
+    }
+    [[nodiscard]] const spatial::ObstacleField* obstacles() const { return obstacles_.get(); }
+    // The filter this walker queries the obstacle field with, standing on ground at `footY`.
+    [[nodiscard]] spatial::ObstacleFilter filter(float footY = 0.0f) const;
+
+    // The navigation graph (ADR-093, §2). Built explicitly by the host, once, because it costs one
+    // world sample per cell; absent is a legal state and every query below degrades to the
+    // straight-line behaviour that was here before rather than failing.
+    void buildGrid(float cellSize = 4.0f);
+    void setGrid(std::shared_ptr<const NavGrid> grid) { grid_ = std::move(grid); }
+    [[nodiscard]] const NavGrid* grid() const { return grid_.get(); }
 
     // The surface height at p. Zero when there is no map, so a scene with no terrain still runs
     // its entities on the y = 0 plane rather than refusing to run them at all.
     [[nodiscard]] float groundHeight(glm::vec2 p) const;
+    // The surface normal at p, from central differences `epsilon` metres apart. Sampling wider than
+    // a body is wide is what turns a noise function into a slope a body can lean on.
+    [[nodiscard]] glm::vec3 groundNormal(glm::vec2 p, float epsilon = 0.5f) const;
     // The tallest thing that grows at p, in metres above the ground.
     [[nodiscard]] float canopyHeight(glm::vec2 p) const;
     [[nodiscard]] NavSample sample(glm::vec2 p) const;
@@ -89,15 +131,34 @@ public:
 
     // The direction to move in to get from `from` towards `to` without walking into anything: the
     // straight line when `lookahead` metres of it are clear, otherwise the clearest of a fan of
-    // deviations either side. Local steering rather than a planner, because this world is open
-    // ground with scattered obstacles and A* over it would be a great deal of machinery to walk
-    // around a tree. Returns a unit vector, or (0,0) when every direction is blocked.
+    // deviations either side. Local steering, and only local: it gets a walker round a trunk and a
+    // boulder, and it cannot get one round a lake. That is what `findPath` is for, and the two are
+    // meant to be used together -- a planner for the route, a steerer for the metre in front.
+    // Returns a unit vector, or (0,0) when every direction is blocked.
     [[nodiscard]] glm::vec2 steer(glm::vec2 from, glm::vec2 to, float lookahead) const;
+
+    // A route from `from` to `to` as a polyline of world XZ waypoints, excluding `from`. Uses the
+    // grid when there is one; without a grid it answers with the single point `to` when the
+    // straight line is clear, which keeps every caller written against this working in a scene
+    // that never built a graph.
+    [[nodiscard]] bool findPath(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out) const;
+
+    // Whether a walker of this size may stand at `p` without being inside a solid. Separate from
+    // `sample` so a caller that already has the ground height does not pay for it twice.
+    [[nodiscard]] bool obstructed(glm::vec2 p, float ground) const;
+    // Metres of open ground around `p`, clamped to `maxRange`; `maxRange` when there is no
+    // obstacle field at all, because a world with no recorded solids is a world with no solids.
+    [[nodiscard]] float clearanceAt(glm::vec2 p, float ground, float maxRange = 12.0f) const;
+    // The push that takes a walker at `p` out of anything it has ended up inside. Zero normally;
+    // non-zero after terrain moved under it, after a seek, or after an author dropped a rock on it.
+    [[nodiscard]] glm::vec2 resolvePenetration(glm::vec2 p, float ground) const;
 
 private:
     const world::WorldMap* map_ = nullptr;
     world::ClearanceField field_{};
     NavSettings settings_{};
+    std::shared_ptr<const spatial::ObstacleField> obstacles_;
+    std::shared_ptr<const NavGrid> grid_;
 };
 
 } // namespace avgen::entity

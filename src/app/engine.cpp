@@ -1599,6 +1599,15 @@ void Engine::seekSeconds(double seconds) {
     lastAnalysisBeatCount_ = 0;
     cueState_ = {};   // cues re-sync from the new position on the next frame
     cueApplied_ = false;
+    // Entities, too (ADR-093). Until this existed a seek left every character exactly where the
+    // playhead had walked it to, so scrubbing back to the same second twice gave two different
+    // frames -- `EntityWorld::reset` was written for this and nothing ever called it. `seek` is
+    // the version that belongs here: `reset` alone would put every character back at its t = 0
+    // pose, which is a different frame from the one the seeked second actually has.
+    if (scene::Composition* composition = this->composition()) {
+        composition->entityWorld().seek(seconds, &params_, nullptr,
+                                        composition->scene().camera.position);
+    }
 }
 
 bool Engine::isPlaying() const { return player_ && player_->isPlaying(); }

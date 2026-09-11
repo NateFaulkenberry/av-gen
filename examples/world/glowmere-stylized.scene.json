@@ -1780,7 +1780,9 @@
    "name": "wanderer",
    "node": "wanderer",
    "seed": 11235813,
-   "cullDistance": 240.0,
+   "fullDetailDistance": 90.0,
+   "coarseInterval": 0.1,
+   "cullDistance": 320.0,
    "clips": {
     "idle": "Idle",
     "walk": "Walk",
@@ -1798,23 +1800,40 @@
       "elder",
       "beacon-grove"
      ],
-     "observeChance": 0.07,
+     "observeChance": 0.0,
      "minDwell": 1.0,
      "maxDwell": 2.8,
      "alertThreshold": 0.32,
      "reactionDecay": 1.2
     },
     {
-     "kind": "wander",
-     "speed": 5.5,
-     "runSpeed": 13.0,
-     "turnRate": 140.0,
-     "arrive": 2.5,
-     "minRange": 6.0,
-     "maxRange": 14.0,
-     "pauseMin": 0.5,
-     "pauseMax": 2.2,
-     "homeRadius": 16.0
+     "kind": "explore",
+     "speed": 5.0,
+     "runSpeed": 11.0,
+     "turnRate": 150.0,
+     "arrive": 3.0,
+     "bodyRadius": 1.6,
+     "headroom": 11.0,
+     "footprint": 2.2,
+     "idleMin": 0.8,
+     "idleMax": 3.2,
+     "observeChance": 0.5,
+     "observeMin": 2.5,
+     "observeMax": 7.0,
+     "minRange": 18.0,
+     "maxRange": 220.0,
+     "homeRadius": 0.0,
+     "runChance": 0.22,
+     "slopeAlign": 0.5,
+     "strollChance": 0.3,
+     "landmarkAffinity": 1.0,
+     "characterAffinity": 1.25,
+     "glowAffinity": 1.35,
+     "waterAffinity": 1.0,
+     "vistaAffinity": 0.8,
+     "waypointRadius": 3.5,
+     "repathSeconds": 7.0,
+     "noveltyRadius": 28.0
     },
     {
      "kind": "lookAt",
@@ -1825,8 +1844,8 @@
    "reactions": [
     {
      "signal": "audio.rms",
-     "target": "wander/speed",
-     "depth": 11.2,
+     "target": "explore/speed",
+     "depth": 3.4,
      "chain": {
       "attackMs": 520.0,
       "decayMs": 1800.0
@@ -1834,7 +1853,7 @@
     },
     {
      "signal": "music.drop",
-     "target": "interest/observeChance",
+     "target": "explore/observeChance",
      "depth": 0.3,
      "chain": {
       "envelope": "peakhold",
