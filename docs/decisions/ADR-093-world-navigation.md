@@ -3,8 +3,9 @@
 Status: accepted
 Date: 2026-09-11
 
-Supersedes nothing. Extends ADR-088 (entities), builds on ADR-080 (camera clearance) and ADR-048
-(ecology). Answers §1–§7 of `docs/world-authoring-spec.md`.
+Supersedes nothing. Extends ADR-088 (entities), builds on ADR-080 (camera clearance), ADR-048
+(ecology) and ADR-090 (terrain generation and the §3 query surface). Answers §1–§7 of
+`docs/world-authoring-spec.md`.
 
 ## Context
 
@@ -79,10 +80,26 @@ handed the same obstacle once per cell, and `resolve` *sums* its overlaps — a 
 was pushed out of it four times and shot across the valley. Single-cell binning makes every query
 duplicate-free by construction rather than by each caller remembering to dedupe.
 
-It lives in `spatial/` rather than in `entity/` or `world/` because both need it — the walker asks
+**Where it lives, and how §3 reaches it.** `spatial::ObstacleField` sits in `spatial/` rather than in
+`entity/` or `world/` because both need it — the walker asks
 whether it may stand somewhere, and §3's consolidated terrain query surface has to answer
 `isOccupied(x, z, radius)` with the same facts — and neither may include the other's headers without
 a cycle. `spatial/obstacle_field.hpp` includes glm and the standard library and nothing else.
+
+ADR-090's `TerrainQuery` names a one-method interface, `world::ObstacleField::occupied(p, radius)`,
+and says the per-object answer belongs to navigation. `entity::NavigationObstacles` is that answer:
+an adapter presenting the container through the interface, held by the composition and attached to
+both the navigator and `Composition::terrainQuery()`. It is in `entity/` rather than on the container
+because `world` already includes `spatial` (an ecology emits a point cloud), so making the container
+implement a `world` interface would close a cycle between the two directories. It also overrides the
+optional `penetration`, because the interface's default can only say "blocked" and a steering
+behaviour needs a distance to steer by.
+
+The walker does *not* go through that interface for its own queries. `occupied` takes a radius and
+nothing else, so it cannot know how tall the mover is or what it can step over; `Navigator` asks
+`spatial::ObstacleField` directly with a filter carrying its body radius, its step-over height and
+its headroom. The shared interface is the conservative plan-view answer that everything else — the
+editor's placement, the water placer, the composer — needs and did not have.
 
 **What becomes an obstacle** is policy, and it lives separately in `entity/obstacles.hpp`. The
 judgement §5 asks for — "vegetation and small decorative objects should not necessarily block; large
@@ -97,6 +114,24 @@ walked around.
 A whole layer of ground cover costs one comparison to reject: the tallest instance a layer can grow
 is its authored height at its largest scale, so 97,000 grass instances are dismissed without being
 iterated. Glowmere's thirteen layers produce **2,355 obstacles** from about 115,000 instances.
+
+### §3 — One set of rules, asked once
+
+ADR-090's `WalkRules` and `TerrainQuery::at()` deliberately reproduced `NavSettings` and
+`Navigator::sample` — the same names, the same defaults, the same ladder of bounds, slope, water,
+thicket and hero, fired in the same order — and the terrain agent deliberately did not touch
+`src/entity/`. That left two copies of the walkability logic with nothing keeping them in step, which
+is precisely what §3 exists to prevent.
+
+Resolved in navigation's favour, as §3 asks: `Navigator::sample` is now a *translation* of
+`TerrainQuery::at()` rather than a second implementation of it. `NavSettings::walkRules()` hands the
+six shared rules to the query, `sample` maps `TerrainPoint` onto `NavSample` and `TerrainReject` onto
+`NavReject`, and the only thing navigation still decides for itself is the per-instance obstacle test
+— which it must, because that is the one question `TerrainQuery` deliberately does not answer from a
+point and a radius.
+
+`NavSettings` keeps three fields `WalkRules` does not have — `stepHeight`, `bodyRadius`, `stepOver`.
+Those are properties of a thing that *moves*, and a query about a point has no business knowing them.
 
 ### §4 — Grounding: a footprint, not a point
 
@@ -127,7 +162,8 @@ it from reading as a waypoint system is:
 - Destinations come from an **interest registry** on `EntityWorld`, assembled from the host's
   landmarks and entities, the luminous patches the lighting pass already reduced each glowing
   population to (ADR-053), and the shoreline and high ground the navigation grid noticed for free
-  while it was being built. Glowmere offers **287** of them. Choice is weighted by the character's
+  while it was being built. Glowmere offers **352** of them — 17 landmarks and entities, 96 luminous
+  patches, 172 shoreline points and 67 vistas. Choice is weighted by the character's
   own taste per kind, mildly by distance, and suppressed for places recently visited.
 - It **plans**, so a lake is walked around rather than discovered, refused and re-rolled.
 - Every duration is sampled and every branch is a roll, through the entity's own seeded stream.
@@ -186,16 +222,23 @@ Measured on `examples/world/glowmere-stylized.json`, over 60 s of its timeline, 
 | ground covered (bounding span) | ~32 m (leashed to a 16 m home radius) | **244 m** |
 | frames under way | 52% | **76%** |
 | frames inside a solid | not measured; walked through trees | **0 of 3,601** |
-| float above the surface | unbounded (snapped) | **≤ 0.15 m** |
+| frames in water, or outside the world | not measured | **0 of 3,601** |
+| float above the surface | unbounded (snapped) | **≤ 0.32 m** |
 | below its own footprint | — | **0** |
+
+(Measured before ADR-090 merged. On the regenerated terrain that came with it — which now actually
+has rivers and lakes — the same minute gives 248 m travelled, 175 m of ground covered and 72% of
+frames under way. The floors in the test are set well below all of these.)
 
 Costs, stated as numbers:
 
-- `isOccupied` over 2,355 obstacles: **42 ns**.
-- A corner-to-corner route across the 640 m valley: **1.4 ms**, about 9,500 cells expanded. A
+- `isOccupied` over 2,355 obstacles: **24 ns**.
+- A corner-to-corner route across the 640 m valley: **1.3 ms**, about 9,500 cells expanded. A
   character asks for one every few seconds.
-- Navigation grid build: **~210 ms**, once, at scene load, beside a 50 ms terrain build and about a
-  second of glTF decoding. 23,716 cells at 190 KB.
+- Navigation grid build: **~165 ms**, once, at scene load, beside a 50 ms terrain build and about a
+  second of glTF decoding. 23,716 cells at 190 KB. Dominated by two full `WorldMap` evaluations per
+  cell — one for the ground and one inside `canopyHeightAt` — which is where to look if it ever
+  needs to be cheaper.
 - Behaviour level of detail: the walker runs at a tenth of the frame rate beyond 90 m and covers the
   same ground; over the minute it ticked on about a quarter of the frames.
 
@@ -221,10 +264,11 @@ watching. Fixed-step re-simulation buys the property that was actually missing.
 
 ## Revisit triggers
 
-- **The terrain agent's consolidated query surface (§3) lands.** `ObstacleField::isOccupied` is the
-  seam it should forward to; the field is reachable as
-  `composition.entityWorld().navigator().obstacles()`, or by holding the same
-  `std::shared_ptr<const spatial::ObstacleField>` the composition builds.
+- **Water as an interest.** ADR-090 brought `world::WaterCourse` with a centreline, a downstream
+  `flowAt` and `contains`. The interest registry currently derives its shoreline points from the
+  navigation grid — a walkable cell next to a wet one — which is cheap and correct but knows nothing
+  about which body of water it is on. A character that should follow a river downstream, or walk to
+  a named lake, wants the water courses themselves.
 - **A second character joins the scene.** Per-character nav settings exist on `explore`; the
   navigator's own `NavSettings` are still world-level and used by `pickDestination` and the grid
   build. If characters of very different sizes need different *graphs*, the grid needs a size key.

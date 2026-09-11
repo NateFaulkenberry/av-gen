@@ -95,3 +95,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [087](ADR-087-shadow-mask.md) | A half-resolution screen-space shadow mask | Accepted |
 | [088](ADR-088-entities.md) | Entities and behaviour: driving nodes from signals | Accepted |
 | [089](ADR-089-the-cinematic-sequence.md) | The cinematic sequence: choreography through time | Accepted |
+| [093](ADR-093-world-navigation.md) | World navigation: a hybrid graph, per-instance obstacles, and a character with somewhere to go | Accepted |

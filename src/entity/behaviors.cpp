@@ -1176,12 +1176,12 @@ private:
             weights_.clear();
             float total = 0.0f;
             for (const InterestPoint& point : ctx.world->interestPoints()) {
-                // Never pick the entity's own node as somewhere to walk to.
-                if (!selfName_.empty() && point.name == selfName_) {
-                    continue;
-                }
                 const glm::vec2 at(point.position.x, point.position.z);
                 const float distance = glm::length(at - flat);
+                // The near bound is also what keeps a character from choosing *itself*: the host
+                // lists every node an entity drives as a landmark, and this one is standing on its
+                // own. Nothing else is needed for that, and a name comparison would only be a
+                // second rule that could disagree with this one.
                 if (distance < lo || distance > hi) {
                     continue;
                 }
@@ -1275,7 +1275,6 @@ private:
     params::Parameter<float>* headroom_ = nullptr;
     params::Parameter<float>* footprint_ = nullptr;
     std::vector<std::string> paths_;
-    std::string selfName_;
     // This character's own view of the world: the host's navigator with its own size written onto
     // it. A copy is cheap -- the map, the obstacle field and the graph are all shared -- and it is
     // what makes "how big am I" a property of the character rather than of the world, which is the

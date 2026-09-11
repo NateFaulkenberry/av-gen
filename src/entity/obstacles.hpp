@@ -25,14 +25,49 @@
 #include "spatial/point_cloud.hpp"
 #include "world/ecology.hpp"
 #include "world/hero.hpp"
+#include "world/terrain_query.hpp"
 
 #include <glm/glm.hpp>
 
 #include <cstddef>
+#include <memory>
 #include <span>
 #include <string_view>
+#include <utility>
 
 namespace avgen::entity {
+
+// §3's seam, from this side (ADR-090, ADR-093).
+//
+// The terrain query surface names one interface -- `occupied(p, radius)`, plus an optional
+// `penetration` -- and says the per-object answer belongs to navigation. This is that answer: a
+// `spatial::ObstacleField` presented through it, so `TerrainQuery::isOccupied` stops reporting only
+// heroes and the world's edge and starts reporting the trunks.
+//
+// The adapter lives here rather than on `spatial::ObstacleField` itself for a dependency reason.
+// `world` already includes `spatial` (an ecology emits a point cloud), so making the container
+// implement a `world` interface would close a cycle between the two directories. `entity` depends on
+// both and is where the two halves of navigation already meet, so the join belongs here and the
+// container stays a plain spatial structure that includes nothing but glm.
+//
+// Both methods are const, allocate nothing and touch no mutable state, which is the contract the
+// interface asks for: a query object is used from a worker, from the editor and from a determinism
+// test without any of them agreeing on a lifetime beyond the world's.
+class NavigationObstacles final : public world::ObstacleField {
+public:
+    NavigationObstacles() = default;
+    explicit NavigationObstacles(std::shared_ptr<const spatial::ObstacleField> field)
+        : field_(std::move(field)) {}
+
+    void setField(std::shared_ptr<const spatial::ObstacleField> field) { field_ = std::move(field); }
+    [[nodiscard]] const spatial::ObstacleField* field() const { return field_.get(); }
+
+    [[nodiscard]] bool occupied(glm::vec2 p, float radius) const override;
+    [[nodiscard]] float penetration(glm::vec2 p, float radius) const override;
+
+private:
+    std::shared_ptr<const spatial::ObstacleField> field_;
+};
 
 // The thresholds that separate scenery from an obstacle. Defaults describe a person-sized walker
 // in a temperate valley; they are a struct rather than constants so a world with different

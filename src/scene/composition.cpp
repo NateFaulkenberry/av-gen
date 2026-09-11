@@ -1420,7 +1420,7 @@ entity::Navigator Composition::buildNavigator() const {
         field.cameraRadius = 0.6f;
         field.groundClearance = 0.0f;
         entity::Navigator nav(&nodePtr->worldMap, field);
-        nav.setObstacles(obstacles_);
+        nav.setObstacles(obstacles_, obstacles_ != nullptr ? &obstacleBridge_ : nullptr);
         // The navigation graph (ADR-093, §2). Built here rather than lazily, so its cost lands at
         // scene load where it can be seen and measured, and every walker in the world shares one.
         if (navCellSize_ > 0.0f) {
@@ -1436,7 +1436,11 @@ world::TerrainQuery Composition::terrainQuery() const {
         if (nodePtr->kind != NodeKind::Terrain) {
             continue;
         }
-        return world::terrainQuery(nodePtr->worldMap, &nodePtr->ecology, heroes_);
+        world::TerrainQuery query = world::terrainQuery(nodePtr->worldMap, &nodePtr->ecology, heroes_);
+        if (obstacles_ != nullptr) {
+            query.obstacles = &obstacleBridge_;
+        }
+        return query;
     }
     // A scene with no terrain is a legitimate scene: the query answers the y = 0 plane and says it
     // is not valid, which is what lets a caller run against it rather than special-casing it.
@@ -2622,6 +2626,11 @@ void Composition::rebuild() {
             // only things in this world that already carry a volume worth colliding with.
             entity::obstaclesFromHeroes(heroes_, *obstacles_);
             obstacles_->build();
+            // Publish it through §3's seam. Until this happens `TerrainQuery::isOccupied` answers a
+            // narrower question than its name suggests -- heroes and the world's edge -- and
+            // `hasObstacles()` is what tells a caller the difference between "nothing is there" and
+            // "nobody asked".
+            obstacleBridge_.setField(obstacles_);
             log::info("terrain '{}': {} navigation obstacles ({} blocking) indexed at {:.1f} m cells",
                       node.name, obstacles_->size(), obstacles_->blockingCount(),
                       obstacles_->cellSize());

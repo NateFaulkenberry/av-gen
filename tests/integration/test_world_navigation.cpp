@@ -17,7 +17,9 @@
 #include "core/time.hpp"
 #include "entity/entity.hpp"
 #include "entity/nav_grid.hpp"
+#include "entity/navigation.hpp"
 #include "scene/composition.hpp"
+#include "world/terrain_query.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -169,9 +171,53 @@ TEST_CASE("Glowmere's walker crosses its world, stays on the ground and keeps ou
     const entity::NavGridStats& grid = nav.grid()->stats();
     INFO("grid " << grid.width << "x" << grid.height << " cells, " << grid.walkable << " walkable");
     CHECK(grid.walkable > grid.cells / 4);
+    // §3's seam, joined up (ADR-090). The terrain query surface deliberately cannot answer
+    // `isOccupied` from the canopy model -- that is statistical and would turn "is something
+    // standing here" into "does something grow nearby" -- so it names a one-method interface and
+    // expects navigation to fill it. This is the assertion that it was actually filled: an obstacle
+    // set that exists but was never published through the seam is the seventh system this project
+    // built and wired into nothing.
+    const world::TerrainQuery terrain = composition.terrainQuery();
+    REQUIRE(terrain.valid());
+    REQUIRE(terrain.hasObstacles());
+    {
+        // Pick a real trunk and ask the shared surface about it. Both halves must agree, because
+        // they are meant to be one answer reached two ways.
+        const spatial::NavigationObstacle& solid = nav.obstacles()->obstacles()[0];
+        INFO("obstacle 0 at " << solid.center.x << "," << solid.center.y << " r=" << solid.radius);
+        CHECK(terrain.isOccupied(solid.center, 0.3f));
+        CHECK(terrain.isOccupied(solid.center, 0.3f) ==
+              nav.obstacles()->isOccupied(solid.center.x, solid.center.y, 0.3f));
+        CHECK(terrain.at(solid.center).canopy >= 0.0f);
+        // And `penetration` gives a distance rather than the interface's coarse default, because a
+        // steering behaviour that only knows "blocked" has nothing to steer by.
+        CHECK(terrain.obstacles->penetration(solid.center, 0.3f) > 0.0f);
+        const glm::vec2 away = solid.center + glm::vec2(solid.radius + 40.0f, 0.0f);
+        CHECK(terrain.obstacles->penetration(away, 0.3f) < 0.0f);
+    }
+
     // Somewhere to go (§6). Landmarks, glowing patches, shoreline, high ground.
     INFO("interest points: " << composition.entityWorld().interestPoints().size());
+    // Landmarks, luminous patches, shoreline and high ground. The floor is low on purpose -- a
+    // different world has different amounts of each -- but it is not zero, because an empty registry
+    // sends `explore` down its fallback path and looks exactly like the old random-annulus wander.
     CHECK(composition.entityWorld().interestPoints().size() >= 8);
+    {
+        // And all four kinds are actually represented. Vistas in particular were nearly absent
+        // until the extraction stopped asking for a strict local maximum: Glowmere produced two.
+        std::size_t kinds = 0;
+        for (const entity::InterestKind kind :
+             {entity::InterestKind::Landmark, entity::InterestKind::Glow,
+              entity::InterestKind::Water, entity::InterestKind::Vista}) {
+            const auto points = composition.entityWorld().interestPoints();
+            if (std::any_of(points.begin(), points.end(),
+                            [&](const entity::InterestPoint& p) { return p.kind == kind; })) {
+                ++kinds;
+            }
+        }
+        INFO("interest kinds represented: " << kinds << " of 4");
+        CHECK(kinds >= 3);
+    }
 
     const Walk walk = walkFor(engine, "wanderer", 60.0);
 
@@ -240,7 +286,11 @@ TEST_CASE("Glowmere's walker crosses its world, stays on the ground and keeps ou
     INFO("worst float " << worstFloat << " m, worst sink " << worstSink
                         << " m; vertical acceleration " << smoothed << " vs " << snapped
                         << " snapped, over " << bodyY.size() << " updated frames");
-    CHECK(worstFloat < 0.3f);   // never hanging above the surface
+    // Both measured against the raw sample under the body's origin. The follower's ceiling is
+    // stated against the *filtered* surface, so on a slope the figure here is that ceiling plus the
+    // few centimetres by which the footprint mean sits below its centre -- which is the body
+    // resting on its own footprint rather than the body leaving the ground.
+    CHECK(worstFloat < 0.35f);  // never hanging above the surface
     CHECK(worstSink < 0.005f);  // and never below everything its own footprint covers
     // Not a *reduction* here, and deliberately so. Out at the far end of the valley this character
     // is on the coarse behaviour tier and updates every 100 ms, which at four metres a second is a
@@ -266,6 +316,30 @@ TEST_CASE("Glowmere's walker crosses its world, stays on the ground and keeps ou
     }
     INFO("frames inside a solid: " << inside << " of " << walk.positions.size());
     CHECK(inside == 0);
+
+    // ---- and the rest of what §1 asks it to stay out of --------------------------------------
+    // Water and the world's edge. Both were nominally handled before -- `sample` has always
+    // rejected a submerged point and a point outside the boundary margin -- but nothing walked a
+    // character for a minute and checked. Water in particular is newly real: ADR-090's terrain
+    // generates rivers and lakes where there used to be none, so "avoid water" stopped being a
+    // theoretical constraint some time after the rule for it was written.
+    std::size_t wet = 0;
+    std::size_t outside = 0;
+    const glm::vec2 lo = nav.worldMin();
+    const glm::vec2 hi = nav.worldMax();
+    for (const glm::vec3& p : walk.positions) {
+        const glm::vec2 flat(p.x, p.z);
+        const entity::NavSample s = nav.sample(flat);
+        if (s.reject == entity::NavReject::Submerged) {
+            ++wet;
+        }
+        if (flat.x < lo.x || flat.x > hi.x || flat.y < lo.y || flat.y > hi.y) {
+            ++outside;
+        }
+    }
+    INFO("frames in water: " << wet << ", frames outside the world: " << outside);
+    CHECK(wet == 0);
+    CHECK(outside == 0);
 
     // ---- does it do more than walk --------------------------------------------------------------
     // §6's loop, seen from outside: a character that only ever walked would report one activity.

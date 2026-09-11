@@ -47,6 +47,29 @@ spatial::ObstacleType fromCategory(assets::AssetCategory category) {
 
 } // namespace
 
+bool NavigationObstacles::occupied(glm::vec2 p, float radius) const {
+    return field_ != nullptr && field_->isOccupied(p.x, p.y, radius);
+}
+
+float NavigationObstacles::penetration(glm::vec2 p, float radius) const {
+    if (field_ == nullptr) {
+        return -std::max(radius, 0.0f);
+    }
+    // The real answer rather than the interface's coarse default, which can only say "blocked" and
+    // leaves a steering behaviour with nothing to steer by. `clearance` is a signed distance from
+    // the disc's rim to the nearest solid; penetration is its negation.
+    //
+    // The filter is the plan-view one on purpose: `occupied` and `penetration` take a radius and
+    // nothing else, so they cannot know how tall the mover is or what it can step over. A walker
+    // that has an opinion about those asks `spatial::ObstacleField` directly with its own filter --
+    // which `entity::Navigator` does. This is the shared, conservative answer.
+    spatial::ObstacleFilter filter;
+    filter.bodyRadius = std::max(radius, 0.0f);
+    filter.stepOver = 0.0f;
+    filter.headHeight = 0.0f;
+    return -field_->clearance(p, filter, std::max(radius, 1.0f) * 4.0f);
+}
+
 spatial::ObstacleType classifyAsset(std::string_view category, std::string_view assetPath) {
     // The composer's own word first. It came from the asset library, which read the manifest, and
     // second-guessing it from a filename would make two classifications of the same thing that can

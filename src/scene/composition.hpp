@@ -26,6 +26,7 @@
 #include "scene/spline_params.hpp"
 #include "scene/particles.hpp"
 #include "entity/entity.hpp"
+#include "entity/obstacles.hpp"
 #include "scene/scene_controller.hpp"
 #include "world/ecology.hpp"
 #include "world/hero.hpp"
@@ -556,6 +557,10 @@ private:
     // heroes (ADR-093, §5). Shared rather than owned outright: the navigator every entity reads is
     // a copy, and they all have to be looking at the same set. Null until the first rebuild.
     std::shared_ptr<spatial::ObstacleField> obstacles_;
+    // The same set presented through §3's one-method interface (ADR-090), so a caller holding only
+    // a `TerrainQuery` gets the per-instance answer too. A stable member rather than a temporary
+    // because `terrainQuery()` hands out a pointer to it.
+    entity::NavigationObstacles obstacleBridge_;
     // How coarse the navigation graph is, in metres. 0 disables pathfinding, which leaves the
     // straight-line steering that was here before ADR-093 -- correct, and unable to route.
     float navCellSize_ = 4.0f;

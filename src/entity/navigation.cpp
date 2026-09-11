@@ -29,7 +29,11 @@ const char* navRejectName(NavReject reason) {
 }
 
 Navigator::Navigator(const world::WorldMap* map, world::ClearanceField field, NavSettings settings)
-    : map_(map), field_(field), settings_(settings) {}
+    : map_(map), field_(field), settings_(settings) {
+    query_.map = map;
+    query_.clearance = field;
+    query_.rules = settings_.walkRules();
+}
 
 glm::vec2 Navigator::worldMin() const {
     return map_ != nullptr ? map_->min() + settings_.boundaryMargin : glm::vec2(-64.0f);
@@ -52,57 +56,32 @@ float Navigator::canopyHeight(glm::vec2 p) const {
 }
 
 NavSample Navigator::sample(glm::vec2 p) const {
+    // One set of rules, asked once (§3, ADR-090). This used to be a second copy of the walkability
+    // ladder -- bounds, slope, water, thicket, hero -- sitting beside `TerrainQuery::at` with the
+    // same numbers and no mechanism keeping them in step. Now it is a translation: terrain answers
+    // the ground, and navigation adds the one thing terrain deliberately cannot answer.
+    const world::TerrainPoint t = query_.at(p);
     NavSample out;
-    out.waterSurface = -std::numeric_limits<float>::infinity();
-    if (map_ == nullptr) {
-        // No terrain: the y = 0 plane. Still obstacle-tested, because a scene may place solids on a
-        // flat world and a walker that ignored them there would be a walker that only avoids things
-        // when a hill is present.
-        if (obstructed(p, 0.0f)) {
-            out.reject = NavReject::Obstructed;
-            return out;
-        }
-        out.navigable = true;
-        return out;
+    out.ground = t.height;
+    out.slope = t.slope;
+    out.normal = t.normal;
+    out.waterSurface = t.waterSurface;
+    out.canopy = t.canopy;
+    switch (t.reject) {
+    case world::TerrainReject::None: break;
+    case world::TerrainReject::OutOfBounds: out.reject = NavReject::OutOfBounds; return out;
+    case world::TerrainReject::TooSteep: out.reject = NavReject::TooSteep; return out;
+    case world::TerrainReject::Submerged: out.reject = NavReject::Submerged; return out;
+    case world::TerrainReject::NoHeadroom: out.reject = NavReject::NoHeadroom; return out;
+    case world::TerrainReject::InsideHero: out.reject = NavReject::InsideHero; return out;
+    case world::TerrainReject::Obstructed: out.reject = NavReject::Obstructed; return out;
     }
-    const glm::vec2 lo = map_->min() + settings_.boundaryMargin;
-    const glm::vec2 hi = map_->max() - settings_.boundaryMargin;
-    if (p.x < lo.x || p.x > hi.x || p.y < lo.y || p.y > hi.y) {
-        out.reject = NavReject::OutOfBounds;
-        return out;
-    }
-    const world::Sample s = map_->sample(p, 0.5f);
-    out.ground = s.height;
-    out.slope = s.slope;
-    out.normal = s.normal;
-    out.waterSurface = s.waterSurface;
-    out.canopy = field_.canopyHeight(p);
-    if (s.slope > settings_.maxSlope) {
-        out.reject = NavReject::TooSteep;
-        return out;
-    }
-    // `waterSurface` is -infinity on dry ground, so this comparison is a no-op there. A walker
-    // needs dry land, not merely a bed above the water table: the margin is the difference
-    // between standing on a bank and standing ankle-deep in the river.
-    if (std::isfinite(s.waterSurface) && s.height < s.waterSurface + settings_.waterMargin) {
-        out.reject = NavReject::Submerged;
-        return out;
-    }
-    if (out.canopy > settings_.walkableVegetation && out.canopy < settings_.headroom) {
-        // Tall enough to stop a walker and too low to duck under: a thicket. Either side of that
-        // band is passable -- grass and ferns are waded through, and a forest floor beneath a
-        // fourteen-metre canopy is the most walkable ground there is.
-        out.reject = NavReject::NoHeadroom;
-        return out;
-    }
-    const glm::vec3 stand(p.x, s.height + settings_.heroMargin, p.y);
-    if (field_.heroPenetration(stand) > 0.0f) {
-        out.reject = NavReject::InsideHero;
-        return out;
-    }
-    // The per-instance test the canopy model cannot make. `canopy` above says "trees about
-    // fourteen metres tall grow around here"; this says "and one of them is at this spot".
-    if (obstructed(p, s.height)) {
+    // The per-instance test the canopy model cannot make. `canopy` above says "trees about fourteen
+    // metres tall grow around here"; this says "and one of them is at this spot". Asked here rather
+    // than through `TerrainQuery::isOccupied` because a walker has a body: it knows its own radius,
+    // what it can step over and how much headroom it needs, and the shared query takes a radius and
+    // nothing else.
+    if (obstructed(p, t.height)) {
         out.reject = NavReject::Obstructed;
         return out;
     }

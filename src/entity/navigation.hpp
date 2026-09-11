@@ -22,6 +22,7 @@
 #include "core/rng.hpp"
 #include "spatial/obstacle_field.hpp"
 #include "world/camera_clearance.hpp"
+#include "world/terrain_query.hpp"
 #include "world/world_map.hpp"
 
 #include <glm/glm.hpp>
@@ -31,8 +32,13 @@
 
 namespace avgen::entity {
 
-// What makes ground unwalkable. Defaults describe a person-sized walker on Glowmere's valley
-// floor; a heavier or smaller thing changes the numbers, not the rules.
+// What makes ground unwalkable, plus what a *walker* needs that a point does not have.
+//
+// The first six are `world::WalkRules` under other ownership, and they are deliberately the same
+// names with the same defaults: §3 says there is one set of rules, and this struct now hands them
+// to `world::TerrainQuery` rather than re-implementing them. The rest -- the step height, the body
+// radius, the step-over -- are properties of a thing that *moves*, which a query about a point has
+// no business knowing.
 struct NavSettings {
     float maxSlope = 0.55f;         // 0 flat .. 1 vertical (1 - normal.y); above this it is a cliff
     float waterMargin = 0.35f;      // metres of dry land required above any water surface
@@ -53,6 +59,16 @@ struct NavSettings {
     // and a step-over height turn a set of cylinders into "may I stand here".
     float bodyRadius = 0.45f;
     float stepOver = 0.4f;          // solids shorter than this are stepped over, not avoided
+
+    // The six shared rules, as the terrain query surface wants them.
+    [[nodiscard]] world::WalkRules walkRules() const {
+        return world::WalkRules{.maxSlope = maxSlope,
+                                .waterMargin = waterMargin,
+                                .headroom = headroom,
+                                .walkableVegetation = walkableVegetation,
+                                .heroMargin = heroMargin,
+                                .boundaryMargin = boundaryMargin};
+    }
 };
 
 // Why a point was rejected. A string rather than an enum because its only consumer is a diagnostic
@@ -87,14 +103,26 @@ public:
     [[nodiscard]] glm::vec2 worldMin() const;
     [[nodiscard]] glm::vec2 worldMax() const;
     [[nodiscard]] const NavSettings& settings() const { return settings_; }
-    void setSettings(const NavSettings& settings) { settings_ = settings; }
+    void setSettings(const NavSettings& settings) {
+        settings_ = settings;
+        query_.rules = settings_.walkRules();
+    }
     [[nodiscard]] const world::ClearanceField& clearance() const { return field_; }
+    // The world's own query surface (ADR-090), carrying this walker's rules. `sample` is a
+    // translation of `TerrainQuery::at` rather than a second implementation of it.
+    [[nodiscard]] const world::TerrainQuery& terrain() const { return query_; }
 
     // The per-instance solids this world contains (ADR-093, §5). Shared rather than owned: the
     // host builds one set for the world and every walker in it reads the same one, and a copy of a
     // Navigator -- which is how it reaches EntityWorld -- keeps pointing at it.
-    void setObstacles(std::shared_ptr<const spatial::ObstacleField> obstacles) {
+    // `bridge` is the adapter that presents the same set through §3's interface, so a caller
+    // holding only a `TerrainQuery` gets the same answers. Optional: without it the navigator still
+    // avoids obstacles and `TerrainQuery::isOccupied` still reports only heroes and the world edge,
+    // which is exactly the "nobody asked" state `hasObstacles()` exists to distinguish.
+    void setObstacles(std::shared_ptr<const spatial::ObstacleField> obstacles,
+                      const world::ObstacleField* bridge = nullptr) {
         obstacles_ = std::move(obstacles);
+        query_.obstacles = bridge;
     }
     [[nodiscard]] const spatial::ObstacleField* obstacles() const { return obstacles_.get(); }
     // The filter this walker queries the obstacle field with, standing on ground at `footY`.
@@ -157,6 +185,7 @@ private:
     const world::WorldMap* map_ = nullptr;
     world::ClearanceField field_{};
     NavSettings settings_{};
+    world::TerrainQuery query_{};
     std::shared_ptr<const spatial::ObstacleField> obstacles_;
     std::shared_ptr<const NavGrid> grid_;
 };

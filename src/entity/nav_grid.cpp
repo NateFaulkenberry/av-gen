@@ -446,14 +446,22 @@ void NavGrid::extractInterestPoints() {
         shore_.emplace_back(p.x, at(shoreCells[i]).ground, p.y);
     }
 
-    // A vista is a walkable cell higher than everything within `reach` of it. Sampled on a stride
-    // over the grid rather than tested everywhere, because a local maximum is a property of a
-    // neighbourhood and testing every cell finds the same handful of hills many times over.
-    const int reach = std::max(3, static_cast<int>(std::lround(24.0f / stats_.cellSize)));
-    const int stride = std::max(2, reach / 2);
+    // A vista is high ground with a view, and the obvious test for one -- a cell strictly higher
+    // than every cell within twenty-odd metres -- turns out to find almost nothing. On terrain this
+    // smooth there is one summit per hill and a hill is far wider than the test window, so Glowmere
+    // produced *two* vistas for a whole valley and "terrain features" was effectively absent from
+    // the interest registry.
+    //
+    // Prominence and separation instead: how far a point stands above the ground around it, and
+    // then a greedy spread so the list is a set of different hills rather than one hill sampled
+    // repeatedly. Both are cheap, both are deterministic, and the result is the thing an author
+    // means by "somewhere with a view".
+    const int reach = std::max(3, static_cast<int>(std::lround(26.0f / stats_.cellSize)));
+    const int stride = std::max(1, reach / 3);
+    const float minSeparation = 42.0f;
     struct Candidate {
         glm::vec3 position;
-        float height;
+        float prominence;
     };
     std::vector<Candidate> candidates;
     for (int y = reach; y + reach < stats_.height; y += stride) {
@@ -463,34 +471,52 @@ void NavGrid::extractInterestPoints() {
                 continue;
             }
             const float h = at(c).ground;
-            bool highest = true;
-            for (int dy = -reach; dy <= reach && highest; ++dy) {
-                for (int dx = -reach; dx <= reach; ++dx) {
-                    if (at(glm::ivec2(x + dx, y + dy)).ground > h) {
-                        highest = false;
-                        break;
-                    }
+            // Eight probes on the ring rather than every cell in the box: a summit is a summit in
+            // every direction, and this is 8 lookups where the box was 169.
+            float around = 0.0f;
+            int taken = 0;
+            for (int k = 0; k < 8; ++k) {
+                const float angle = static_cast<float>(k) * 0.7853982f;
+                const glm::ivec2 probe(x + static_cast<int>(std::lround(std::cos(angle) * reach)),
+                                       y + static_cast<int>(std::lround(std::sin(angle) * reach)));
+                if (!inside(probe)) {
+                    continue;
                 }
+                around += at(probe).ground;
+                ++taken;
             }
-            if (highest) {
-                const glm::vec2 p = centerOf(c);
-                candidates.push_back({glm::vec3(p.x, h, p.y), h});
+            if (taken < 6) {
+                continue; // too near the edge to judge
             }
+            const float prominence = h - around / static_cast<float>(taken);
+            if (prominence < 2.5f) {
+                continue;
+            }
+            const glm::vec2 p = centerOf(c);
+            candidates.push_back({glm::vec3(p.x, h, p.y), prominence});
         }
     }
-    // The highest ones first, so a world with more prominences than the cap keeps the ones worth
-    // standing on. Ties broken by position, so the list does not depend on scan order.
+    // Most prominent first, ties broken by position so the list does not depend on scan order.
     std::sort(candidates.begin(), candidates.end(), [](const Candidate& a, const Candidate& b) {
-        if (a.height != b.height) {
-            return a.height > b.height;
+        if (a.prominence != b.prominence) {
+            return a.prominence > b.prominence;
         }
         if (a.position.x != b.position.x) {
             return a.position.x < b.position.x;
         }
         return a.position.z < b.position.z;
     });
-    for (std::size_t i = 0; i < candidates.size() && i < kMaxVistas; ++i) {
-        vistas_.push_back(candidates[i].position);
+    for (const Candidate& candidate : candidates) {
+        if (vistas_.size() >= kMaxVistas) {
+            break;
+        }
+        const bool tooClose = std::any_of(vistas_.begin(), vistas_.end(), [&](const glm::vec3& taken) {
+            return glm::length(glm::vec2(taken.x - candidate.position.x,
+                                         taken.z - candidate.position.z)) < minSeparation;
+        });
+        if (!tooClose) {
+            vistas_.push_back(candidate.position);
+        }
     }
 }
 
