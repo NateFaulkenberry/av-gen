@@ -1,5 +1,7 @@
 #include "params/serialization.hpp"
 
+#include <algorithm>
+
 #include "core/log.hpp"
 
 #include <array>
@@ -328,6 +330,14 @@ json saveProject(const ParameterSet& params, const Modulator& modulator, const s
     doc["parameters"] = std::move(parameters);
     json routes = json::array();
     for (const ModRoute& route : modulator.routes()) {
+        // Routes a subsystem installed are that subsystem's to re-create: a procedural graph
+        // rebuilds its own on evaluation (ADR-028) and an entity compiles its own from the scene
+        // file's `reactions` (ADR-087). Writing them here would mean a project that grows a
+        // duplicate of every one of them each time it is saved, and a route the author cannot
+        // delete because the thing that owns it puts it straight back.
+        if (route.fromGraph || route.fromEntity) {
+            continue;
+        }
         routes.push_back(routeToJson(route));
     }
     doc["routes"] = std::move(routes);
@@ -529,7 +539,17 @@ Result<void> loadProject(const json& original, ParameterSet& params, Modulator& 
             return applied;
         }
     }
-    modulator.clearRoutes();
+    // Replace the authored routes and keep the ones a subsystem installed. clearRoutes() here
+    // used to take everything, which meant a scene's graph routes (ADR-028) and an entity's
+    // reactions (ADR-087) were installed when the composition attached and deleted a few hundred
+    // lines later by the project's own second parameter pass -- bound, counted in the log, and
+    // then gone, which is exactly the shape of failure this codebase keeps shipping.
+    {
+        std::vector<ModRoute>& live = modulator.routes();
+        live.erase(std::remove_if(live.begin(), live.end(),
+                                  [](const ModRoute& r) { return !r.fromGraph && !r.fromEntity; }),
+                   live.end());
+    }
     for (auto& route : routes) {
         modulator.addRoute(std::move(route));
     }

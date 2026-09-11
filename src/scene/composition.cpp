@@ -1287,6 +1287,10 @@ void Composition::installEntities() {
         binding.transformPrefix = prefix_ + "nodes/" + node.name + "/";
         if (node.kind == NodeKind::Procedural) {
             binding.geometryPrefix = "procedural/" + sanitise(prefix_) + node.name + "/";
+        } else if (node.kind == NodeKind::Particles) {
+            // Particle knobs are registered under the system's name rather than the node's path
+            // (registerParticleParameters takes no prefix), and the system is named for the node.
+            binding.geometryPrefix = "particles/" + sanitise(prefix_) + node.name + "/";
         }
         binding.partNames = node.materialPartNames;
         binding.anchor = nodeWorldTransform(node).position;
@@ -1316,9 +1320,19 @@ void Composition::installEntities() {
                                     [](const params::ModRoute& r) { return r.fromEntity; }),
                      routes.end());
         std::vector<std::string> problems;
+        std::size_t installed = 0;
         for (params::ModRoute& route : entityWorld_.compileReactions(*params_, problems)) {
             route.fromEntity = true;
             modulator_->addRoute(std::move(route));
+            ++installed;
+        }
+        if (!entityWorld_.empty()) {
+            // Say what was installed, not only what failed. "No warnings" and "nothing happened"
+            // look identical in a log, and this project has shipped the second while reading it as
+            // the first.
+            log::info("composition '{}': {} entit{} installed, {} reaction{} bound, {} unresolved",
+                      name_, entityWorld_.size(), entityWorld_.size() == 1 ? "y" : "ies",
+                      installed, installed == 1 ? "" : "s", problems.size());
         }
         for (const std::string& problem : problems) {
             // Loud, by name, with the candidates that were tried. A reaction that resolves to
@@ -1624,6 +1638,19 @@ const CompositionNode* Composition::findNode(const std::string& name) const {
 
 void MaterialPartParameters::apply(Material& material) const {
     if (tint != nullptr) material.baseColor *= tint->value();
+    if (emissiveColor != nullptr) {
+        const glm::vec3 c = emissiveColor->value();
+        if (c.r + c.g + c.b > 0.0f) {
+            material.emissiveColor = c;
+            // A part given a colour owns its emission outright: strength 1, then emissiveGain
+            // from there. Anything else makes a part's brightness depend on the shared material's,
+            // and the point of a part is to be driven separately from its neighbours -- a lamp on
+            // the bass and a lens on the treble cannot share one intensity. The parts an author
+            // leaves black keep the shared intensity, which is what makes a single route onto
+            // `material/emissive` still read as "the whole object glowing".
+            material.emissiveIntensity = 1.0f;
+        }
+    }
     if (emissiveGain != nullptr) material.emissiveIntensity *= emissiveGain->value();
     if (roughnessScale != nullptr) material.roughness = std::clamp(material.roughness * roughnessScale->value(), 0.0f, 1.0f);
     if (opacityScale != nullptr) material.opacity = std::clamp(material.opacity * opacityScale->value(), 0.0f, 1.0f);
@@ -1820,6 +1847,10 @@ void Composition::registerNodeParameters(CompositionNode& node) {
                 controls.emissiveGain = &params_->add(floatDesc(partBase + "emissiveGain", 1.0f, 0.0f, 50.0f, 0.0f, 2.0f));
                 controls.roughnessScale = &params_->add(floatDesc(partBase + "roughnessScale", 1.0f, 0.0f, 4.0f, 0.0f, 2.0f));
                 controls.opacityScale = &params_->add(floatDesc(partBase + "opacityScale", 1.0f, 0.0f, 1.0f, 0.0f, 1.0f));
+                params::ParamDesc<glm::vec3> emissive =
+                    vec3Desc(partBase + "emissiveColor", glm::vec3(0.0f), 0.0f, 64.0f, 0.0f, 4.0f);
+                emissive.isColor = true;
+                controls.emissiveColor = &params_->add(std::move(emissive));
                 node.materialPartParams.push_back(controls);
             }
         }

@@ -55,6 +55,14 @@ struct MaterialPartParameters {
     params::Parameter<float>* emissiveGain = nullptr;
     params::Parameter<float>* roughnessScale = nullptr;
     params::Parameter<float>* opacityScale = nullptr;
+    // The colour this part emits. Black means "whatever the material already had", because an
+    // emission of zero and an emission that is black are the same picture, so black is free to
+    // mean something else. Without it a part can only be scaled: `emissiveGain` multiplies, and a
+    // multiplier cannot light a lamp whose glTF emissiveFactor is [0,0,0] -- which is every lamp
+    // in every asset exported without emission, i.e. most of them. A part that cannot be given a
+    // colour cannot be given a *different* colour from its neighbour either, and driving different
+    // parts of one object from different bands is the entire reason parts are addressable.
+    params::Parameter<glm::vec3>* emissiveColor = nullptr;
 
     void apply(Material& material) const;
 };
