@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <algorithm>
 #include "assets/asset_library.hpp"
+#include "assets/gltf_loader.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -1110,4 +1111,74 @@ TEST_CASE("A street steps rather than jumps", "[world][city][place]") {
     // independently puts this near 1 on a block with a dozen plots and ten pieces to choose from.
     INFO(counted << " blocks, mean spread " << ratio << " of the family's own range");
     CHECK(ratio < 0.6f);
+}
+
+TEST_CASE("A piece that dresses the ground actually covers its tile", "[world][city][place]") {
+    // The invariant a whole afternoon went into discovering the hard way.
+    //
+    // `road-straight-barrier` was tagged `road`. It is 48 vertices, every one of them at |x| >= 0.45:
+    // two rails meant to run *along* a carriageway, with no carriageway of its own. Tagged as a road
+    // it was chosen for half the road cells, and each one rendered as a hole straight through to the
+    // background -- while every count in the system said the city was complete, because a piece had
+    // indeed been placed on every cell. `placeCity` counts pieces; it cannot know whether a piece
+    // has a surface.
+    //
+    // Bounding boxes cannot catch this either: the rails span the full 1x1 tile, so the box is
+    // exactly the box of a road. Only the triangles know.
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+
+    // Seen from above, is any triangle under this point?
+    const auto coversPoint = [](const scene::Scene& s, float px, float pz) {
+        for (const scene::MeshData& mesh : s.meshes) {
+            for (std::size_t i = 0; i + 2 < mesh.indices.size(); i += 3) {
+                const glm::vec3 a = mesh.vertices[mesh.indices[i + 0]].position;
+                const glm::vec3 b = mesh.vertices[mesh.indices[i + 1]].position;
+                const glm::vec3 c = mesh.vertices[mesh.indices[i + 2]].position;
+                const float d = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
+                if (std::abs(d) < 1e-12f) {
+                    continue; // edge-on from above; it covers nothing
+                }
+                const float l1 = ((b.z - c.z) * (px - c.x) + (c.x - b.x) * (pz - c.z)) / d;
+                const float l2 = ((c.z - a.z) * (px - c.x) + (a.x - c.x) * (pz - c.z)) / d;
+                const float l3 = 1.0f - l1 - l2;
+                if (l1 >= -1e-5f && l2 >= -1e-5f && l3 >= -1e-5f) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    // The roles whose piece *is* the ground under your feet. A prop or a building stands on a cell;
+    // these are the cell.
+    static const std::vector<std::string> kGroundRoles = {"road",      "junction", "crossing",
+                                                          "pavement",  "courtyard", "plaza"};
+    std::size_t checked = 0;
+    for (const assets::AssetDescriptor& asset : library->assets()) {
+        const bool ground = std::ranges::any_of(
+            kGroundRoles, [&asset](const std::string& r) { return asset.hasTag(r); });
+        if (!ground) {
+            continue;
+        }
+        scene::Scene s;
+        auto loaded = assets::loadGltf(library->resolve(asset), s, {});
+        INFO(asset.name << ": " << (loaded ? std::string{} : loaded.error().message));
+        REQUIRE(loaded.has_value());
+        // The middle and four points well inside the tile. Not the corners: a piece is allowed to
+        // stop short of its own edge where a neighbour's kerb overhangs into it.
+        for (const auto [px, pz] : {std::pair{0.0f, 0.0f}, std::pair{0.3f, 0.3f},
+                                    std::pair{-0.3f, 0.3f}, std::pair{0.3f, -0.3f},
+                                    std::pair{-0.3f, -0.3f}}) {
+            INFO(asset.name << " has no surface at (" << px << ", " << pz
+                            << "); it is tagged for a ground role but a cell dressed with it is a "
+                               "hole through to the background");
+            CHECK(coversPoint(s, px, pz));
+        }
+        ++checked;
+    }
+    CHECK(checked > 0);
 }

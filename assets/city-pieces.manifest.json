@@ -42,9 +42,9 @@
     "visualImportance": 0.3,
     "preferredDensity": 0.0,
     "tags": [
-     "road",
      "city",
-     "module"
+     "module",
+     "roadside"
     ],
     "material": {
      "roughness": 0.9
