@@ -74,12 +74,6 @@ struct FloatSpec {
     float bobRate = 0.32f;     // cycles per second of the bob
     float tilt = 0.10f;        // radians of static lean off level, per instance
     float sink = 0.01f;        // metres below the surface the origin sits
-    // Metres of standing water an instance needs under it. Checked against
-    // `world::TerrainQuery::waterDepthAt` (ADR-090 §3) rather than against a shape this file
-    // invents: the course's banks are a planar test and the bed wanders inside them, so a pad
-    // placed by the planar test alone ends up sitting on a shoal. An instance that lands too
-    // shallow is pulled toward the centreline and, failing that, dropped.
-    float minDepth = 0.15f;
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const; // everything except the clock
@@ -98,9 +92,11 @@ struct Floater {
 
 // Places `spec.count` floaters on `bodies` at timeline second `time`. Pure and deterministic: the
 // same arguments always give the same vector, and `time` is the only one that moves.
-// `terrain` may be null, in which case the course's banks are the only test available and an
-// instance may end up over a shoal; pass one whenever there is one.
+// How far across the channel an instance may sit comes from `WaterBody::wettedHalfWidth`, which is
+// the measured wetted width of the reach rather than the course's nominal banks -- so a layer keeps
+// off the shoals without touching the height field here (ADR-090 §3 answered that once, at
+// derivation). A body derived without a terrain query falls back to the nominal banks.
 void evaluateFloaters(const world::WaterBodySet& bodies, const FloatSpec& spec, float time,
-                      std::vector<Floater>& out, const world::TerrainQuery* terrain = nullptr);
+                      std::vector<Floater>& out);
 
 } // namespace avgen::scene

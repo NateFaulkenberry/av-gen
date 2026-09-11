@@ -218,8 +218,14 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // is not in the depth prepass. Reading the depth at a point the ripple normal displaces is the
     // whole of the refraction here: it wobbles the shoreline and the depth colour by a few
     // centimetres of world space, which is what water does to the things under it.
-    let offset = n.xz * water.shore.z;
-    let distorted = screenUv + offset * (0.35 / max(viewDistance * 0.1, 1.0));
+    // The displacement is authored in metres, so it is applied in metres: the surface point is
+    // pushed along the ripple normal's horizontal part and re-projected, which is what makes
+    // `refraction` mean the same thing at two metres and at fifty. Adding a world offset straight
+    // to a screen uv, which is the obvious shortcut, makes it mean neither.
+    let refracted = in.worldPos + vec3<f32>(n.x, 0.0, n.z) * water.shore.z;
+    let refractedClip = frame.viewProj * vec4<f32>(refracted, 1.0);
+    let ndc = refractedClip.xy / max(refractedClip.w, 1e-4);
+    let distorted = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
     let bed = bedDepthAt(distorted);
     // Thickness along the ray, floored at zero: where the bed is nearer than the surface the water
     // is behind something and contributes nothing, which the depth test has already handled.
@@ -232,8 +238,9 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // A surface seen from a very grazing angle over a shallow bed reports a long thickness and goes
     // opaque a metre from the bank, which is right for a lake and wrong for a stream you can see the
     // stones in. Capping the ray's thickness at a few times the vertical depth keeps the shallows
-    // shallow whatever angle they are seen from.
-    thickness = min(thickness, vertical * 6.0 + water.shore.x);
+    // shallow whatever angle they are seen from. The constant is a shaping number, not a knob:
+    // there is no shot where the right answer is "six times, but for this river eleven".
+    thickness = min(thickness, vertical * 6.0 + 0.25);
 
     // ---- colour by depth ----------------------------------------------------------------------
     let depthMix = 1.0 - exp(-vertical / max(water.shallowColor.w, 1e-3));
@@ -317,8 +324,8 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // of a smooth field is glitter paint, and what a real surface does is catch the light on a
     // handful of facets that happen to be turned the right way at that instant.
     //
-    // The field is faded against the pixel footprint like the ripple layers are: sub-pixel sparkle
-    // has nothing to resolve and crawls, and a river at fifty metres would otherwise be static.
+    // Band-passed in screen space (see `sparkleBandFade`): sub-pixel sparkle crawls, and sparkle
+    // whose cells are eighty pixels across is a row of white ovals lying on the water.
     var sparkle = vec3<f32>(0.0);
     if (water.sparkleColor.w > 0.0) {
         let frequency = water.ripples.y * 26.0;

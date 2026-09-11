@@ -106,8 +106,10 @@ direction into `normal.xz` and the speed, as a fraction of the fastest body in t
 "river".
 
 `uv.x` changed from a 0..1 ratio of `shallow` to depth in **metres**, because the shader curves it
-itself now and the foam width is authored in metres. `uv.y` keeps the old normalised shore term: it
-is the one cue a fragment has when there is no depth prepass to read.
+itself now and the foam width is authored in metres. `uv.y` was a second copy of the same number and
+now carries the cross-channel coordinate — 1 on the centreline, 0 at the bank — which the bed's depth
+cannot say: a wide shallow reach is shallow all the way across and its middle is still its middle.
+The bioluminescence keeps to the channel because of it.
 
 A world that passes no bodies gets exactly the vertex it always got. That is tested.
 
@@ -123,7 +125,9 @@ surface whose slope is dominated by its finest layer reads as crazed glass. Fall
 puts the broad swell in charge of the shape and leaves the fine layers as detail on it, which is
 also what nature does: capillary waves are millimetres tall on top of metre-long swell.
 
-Each layer, and the sparkle, fades against the world-space size of one pixel. Sub-pixel water detail
+Each layer fades against the world-space size of one pixel. The sparkle is band-passed instead, at
+both ends: a glint field whose cells are eighty pixels across is a row of white ovals lying on the
+water, which is what a world-space frequency gives in the near field. Sub-pixel water detail
 does not shimmer, it *crawls*, because the pattern is travelling; this is the level of detail that
 keeps the far reach of a river smooth.
 
@@ -199,10 +203,23 @@ river is a curve through the world and the engine already has a curve type that 
 path deformers, instance distributions and the camera all read. Glowmere's mote emitter runs down the
 river because it names `valley.glowmere-run`, with no new emitter kind.
 
-**Cost.** Measured at Glowmere's channel shot, medians over 240 frames, minimum of three runs on an
-idle machine (`docs/world-performance.md` records the table). The water surface is a narrow ribbon in
-most shots and fullscreen-adjacent in none of them, which is the honest reason it is cheap here: a
-world with a lake filling the frame would pay more, and the per-pixel cost is what to budget with.
+**Cost**, from `docs/world-performance.md`: **+1.44 ms** of the scene pass at the editor's
+2880×1166 canvas, at a camera where the water is 15.3% of the frame — **≈2.8 ns per water pixel**,
+so a surface filling that canvas would be about 9.4 ms. Glowmere's river never comes close, because
+it is a seven-metre channel: at the shot this work was judged on it is 7.6% of the frame and the
+difference is under what this machine could resolve under the load it was carrying, which is stated
+as "not resolvable" there rather than rounded to a number that happened to come out.
+
+The floating layers cost **0.019 ms** on the CPU for 320 instances. They cost 0.70 ms first, and both
+fixes were the same mistake twice: asking a question per frame that had a per-*world* answer. The
+expensive one was `TerrainQuery::waterDepthAt` per pad per frame to keep pads off the shoals — a
+six-octave noise evaluation for a fact about the riverbed, which does not move. `WaterBody::wetted`
+measures it once.
+
+**Determinism**, which the drifting is written for: two headless runs of 150 frames are byte
+identical, and the same timeline second rendered at 30 fps and at 60 fps leaves the water region
+96.9% identical -- the residue being the particles over it and the temporal AO history, both of
+which `renderer-2-backlog.md` already records as cadence-dependent and neither of which is water.
 
 **What is not here.** No planar reflection and no screen-space reflection: the sky comes from the
 environment cube and the scene does not reflect. No copy of the frame for refraction. No underwater

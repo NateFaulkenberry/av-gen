@@ -10,7 +10,9 @@ WORLD -> TERRAIN -> BIOMES -> ECOLOGY -> BIOLUMINESCENCE -> ATMOSPHERE -> CINEMA
 -- because each stage is a function of the one above it. Vegetation belongs on a slope, not
 scattered on a plane and then given a slope later.
 
-This document covers the world map, terrain, biomes and ecology. The directed Glowmere
+This document covers the world map, terrain, biomes and ecology. Water -- what the map's water
+features become once they are shaded, made to flow and inhabited -- is in [water.md](water.md)
+(ADR-090's `WaterCourse` and ADR-091's surface, flow and floating layers). The directed Glowmere
 candidate and its measured limitations are documented in [shot-glowmere.md](shot-glowmere.md).
 
 ## The world map

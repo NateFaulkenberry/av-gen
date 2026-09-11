@@ -2570,7 +2570,12 @@ void Composition::rebuild() {
             // them, so they have to exist before a triangle does. Derived from the same map the
             // ground is, so there is one description of where the river goes and one of which way
             // it runs, and terrain is not asked to know the second.
-            mutableNode.waterBodies = world::waterBodies(node.worldMap, node.waterFlow);
+            // ADR-090 §3: the query is what answers "how much water is over the bed here", and the
+            // body uses it once -- to measure how far across each reach there actually is water --
+            // rather than every floating leaf asking the height field again on every frame.
+            const world::TerrainQuery waterQuery =
+                world::terrainQuery(node.worldMap, &node.ecology, heroes_);
+            mutableNode.waterBodies = world::waterBodies(node.worldMap, node.waterFlow, &waterQuery);
             mutableNode.chunks = world::buildTerrain(
                 node.worldMap, node.terrain,
                 [&](std::size_t, int, MeshData&& mesh) { return scene_.addMesh(std::move(mesh)); },
@@ -3732,13 +3737,7 @@ void Composition::updateFloaters(double time) {
             }
             continue;
         }
-        // ADR-090 §3: the terrain query answers "how much water is over the bed here", which is
-        // what decides whether a pad can actually sit at a point. The course's banks say where the
-        // channel is; only this says where it holds water.
-        const world::TerrainQuery query =
-            world::terrainQuery(source->worldMap, &source->ecology, heroes_);
-        evaluateFloaters(source->waterBodies, *node.floats, static_cast<float>(time), floaterScratch_,
-                         &query);
+        evaluateFloaters(source->waterBodies, *node.floats, static_cast<float>(time), floaterScratch_);
 
         ProceduralGeometry& pg = scene_.procedurals[slot];
         // The node's own transform moves the world the water is in, so it moves what floats on it.
@@ -3822,11 +3821,6 @@ void Composition::updateTerrainLod() {
             const world::TerrainChunk& chunk = node.chunks[c];
             Entity& e = scene_.entities[range.firstEntity + c];
             const std::size_t water = chunk.water != kInvalidMesh ? waterEntity++ : scene_.entities.size();
-            const auto setWaterShadow = [&](bool on) {
-                if (water < scene_.entities.size()) {
-                    scene_.entities[water].castsShadow = on;
-                }
-            };
             const auto setWater = [&](bool on) {
                 if (water < scene_.entities.size()) {
                     scene_.entities[water].visible = scene_.entities[water].visible && on;
@@ -3874,7 +3868,10 @@ void Composition::updateTerrainLod() {
                 continue;
             }
             e.castsShadow = distance <= shadowReach;
-            setWaterShadow(e.castsShadow);
+            // The water's own flag is left where it was set at build: false. ADR-091 made the
+            // surface translucent, and a translucent sheet throwing a hard shadow onto its own bed
+            // was a bug nobody had looked at. The renderer excludes MeshStyle::Water from the
+            // shadow passes anyway; keeping the flag honest means the two agree about why.
             if (planes && !world::aabbVisible(*planes, lo, hi)) {
                 // Off screen, not absent. The camera passes skip it; the shadow passes still get
                 // it as a candidate and test it against each cascade's own frustum, because a hill

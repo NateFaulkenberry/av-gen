@@ -1846,6 +1846,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         } else if (entity.style == scene::MeshStyle::Water) {
             DrawItem w = *item;
             w.water = waterSlotFor(entity.material.program);
+            // Every water chunk of a terrain shares the node's transform, so `makeItem`'s depth --
+            // the origin's -- is the same number for all of them and sorts nothing. The chunk's own
+            // centre is the key that means anything here. Chunks tile a plane and rarely overlap on
+            // screen, but a river seen across a pond at a grazing angle does, and two blended
+            // surfaces composited in the wrong order is a seam that only appears from one place.
+            const auto& [lo, hi] = scene.meshBounds(entity.mesh);
+            const glm::vec3 centre = glm::vec3(entity.transform.matrix() * glm::vec4((lo + hi) * 0.5f, 1.0f));
+            w.viewDepth = -(view * glm::vec4(centre, 1.0f)).z;
             water.push_back(w);
         } else if (entity.material.alphaMode == scene::AlphaMode::Blend) {
             blended.push_back(*item);
@@ -1881,6 +1889,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                           static_cast<std::size_t>(objectIndex) * kObjectStride);
     }
     std::stable_sort(blended.begin(), blended.end(),
+                     [](const DrawItem& a, const DrawItem& b) { return a.viewDepth > b.viewDepth; });
+    std::stable_sort(water.begin(), water.end(),
                      [](const DrawItem& a, const DrawItem& b) { return a.viewDepth > b.viewDepth; });
     prevModels_.swap(prevModelsNext_);
     prevModelsNext_.clear();

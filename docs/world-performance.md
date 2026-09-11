@@ -82,11 +82,74 @@ Three consequences of these numbers are load-bearing elsewhere and worth stating
   culled for being small leaves a hole in the horizon, whereas a fern that vanishes at sixty metres
   is a fern nobody was looking at.
 
+## Water (ADR-091)
+
+Measured on the same machine, release build, headless, the Glowmere project with the camera pinned
+by `camera/position` / `camera/target`, 120 frames, GPU pass medians. **Four repeats per
+configuration, interleaved and with the order alternated, and the minimum of the four kept**: other
+agents' builds and GPU tests were running throughout, and contention can only ever make a pass look
+slower, so the minimum is the honest floor. The blocked (non-interleaved) form of this measurement
+was thrown away: it put whole busy stretches on one configuration and produced a "no water" scene
+pass 1.2 ms *slower* than one with water in it, which cannot be true.
+
+Two cameras, because water's cost is per water pixel and nothing else:
+
+| camera | water's share of the frame |
+|---|---:|
+| `channel` — standing 4 m over the river looking along it | 7.6% |
+| `surface` — a metre over the water, looking down the reach | 15.3% |
+
+(Share measured by diffing captures with the water enabled and disabled, counting pixels that move
+by more than 1/255.)
+
+| camera | resolution | full | water, no floating layers | no water | **the surface** | **the floating layers** |
+|---|---|---:|---:|---:|---:|---:|
+| channel | 1440×900 (1.30 Mpx) | 16.45 | 16.38 | 17.63 | *not resolvable* | *not resolvable* |
+| channel | 2880×1166 (3.36 Mpx) | 31.65 | 30.74 | 26.28 | +4.46 | +0.91 |
+| surface | 1440×900 | 9.76 | 9.70 | 8.65 | **+1.05** | +0.06 |
+| surface | 2880×1166 | 15.01 | 14.42 | 12.98 | **+1.44** | +0.59 |
+
+All figures are the scene pass in milliseconds. The `surface` rows reproduced across two independent
+sessions (+0.92 / +1.05 and +1.50 / +1.44), so those are the numbers to trust. The `channel` rows did
+not: at 1440×900 the difference came out *negative*, and at 2880×1166 it came out three times the
+per-pixel rate the `surface` rows imply. A river that is 7.6% of the frame costs something under a
+millisecond, and this machine could not resolve it under the load it was carrying — which is the
+honest statement, rather than picking whichever of the two runs agreed with expectation.
+
+From the `surface` rows: **≈2.8 ns per water pixel at 3.36 Mpx** (1.44 ms over 514 k pixels), and
+5.3 ns/px at 1.30 Mpx. The per-pixel rate falling as the target grows is the same slope this
+renderer shows everywhere else (`renderer-2-backlog.md` records terrain at 8.30 → 2.88 ns/px over
+0.32 → 5.18 Mpx), and it is why a small-window measurement over-states a fullscreen one.
+
+**What to budget with**: a water surface filling the frame at the editor's canvas would be about
+**9.4 ms**, extrapolating the per-pixel rate. Glowmere's river never comes close because it is a
+seven-metre channel; a world whose shot is mostly lake would, and that is the case to measure before
+authoring one rather than after.
+
+Two costs that do *not* appear in the table:
+
+- **The depth prepass.** A scene with water asks for it whatever else is on, because the surface's
+  thickness — and so its shoreline, its transparency and its depth colour — is made from it. On
+  Glowmere it is free: ambient occlusion and the shadow mask already required it, and `depth` is
+  0.26 / 0.52 ms in every configuration above, water or no water. A scene with neither would pay
+  that once.
+- **The floating layers on the CPU.** `evaluateFloaters` for 320 instances over two bodies:
+  **0.019 ms per frame** (`avgen_tests "[.water-cost]"`, which is a measurement, not an assertion).
+  It was 0.70 ms before two fixes worth recording, because both are the same mistake. The first was
+  `WaterBody::flowAt` calling `WaterCourse::flowAt`, `surfaceAt`, `alongAt` and `contains` in turn —
+  four walks of the same polyline for four answers about one point. The second, and 98% of the cost,
+  was asking `TerrainQuery::waterDepthAt` per instance per frame to keep pads off the shoals: that is
+  a six-octave noise evaluation, and *how far across a reach there is water* is a property of the
+  world, not of the frame. It is measured once now, into `WaterBody::wetted`.
+
 ## Not measured, and therefore not claimed
 
 - Base-M2 behaviour, sustained thermal behaviour, and whole-shot interactive timing.
 - Dedicated GPU memory. RSS is process high-water, not GPU allocation.
-- Any figure at the target output resolution rather than 1440×900.
+- Any figure at the target output resolution rather than 1440×900 (water is measured at both
+  1440×900 and the editor's 2880×1166 canvas; nothing else here is).
+- Water's cost at a camera where it is a thin ribbon. See the note in the water section: the machine
+  could not resolve it under load, and no number is claimed.
 - Temporal quality. Rendering every frame verifies execution, not the absence of shimmer, popping or
   LOD transitions in motion.
 - Quality tiers remain manual. There is no adaptive performance controller.

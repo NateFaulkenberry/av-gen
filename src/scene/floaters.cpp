@@ -55,9 +55,6 @@ Result<void> FloatSpec::validate() const {
     if (clusters < 1 || clusters > 4096) {
         return fail("float: clusters must be in [1, 4096]");
     }
-    if (minDepth < 0.0f || minDepth > 100.0f) {
-        return fail("float: minDepth must be in [0, 100] metres");
-    }
     if (bob < 0.0f || bob > 100.0f) {
         return fail("float: bob must be in [0, 100] metres");
     }
@@ -87,7 +84,6 @@ std::uint64_t FloatSpec::structuralHash() const {
     h.f32(bobRate);
     h.f32(tilt);
     h.f32(sink);
-    h.f32(minDepth);
     return h.value();
 }
 
@@ -98,7 +94,7 @@ json FloatSpec::toJson() const {
                 {"driftSpread", driftSpread},                   {"lateral", lateral},
                 {"margin", margin},   {"clustering", clustering}, {"clusters", clusters},
                 {"spin", spin},       {"bob", bob},             {"bobRate", bobRate},
-                {"tilt", tilt},       {"sink", sink},         {"minDepth", minDepth}};
+                {"tilt", tilt},       {"sink", sink}};
 }
 
 Result<FloatSpec> FloatSpec::fromJson(const json& j) {
@@ -139,7 +135,7 @@ Result<FloatSpec> FloatSpec::fromJson(const json& j) {
           std::pair{"lateral", &s.lateral}, std::pair{"margin", &s.margin},
           std::pair{"clustering", &s.clustering}, std::pair{"spin", &s.spin},
           std::pair{"bob", &s.bob}, std::pair{"bobRate", &s.bobRate}, std::pair{"tilt", &s.tilt},
-          std::pair{"sink", &s.sink}, std::pair{"minDepth", &s.minDepth}}) {
+          std::pair{"sink", &s.sink}}) {
         if (auto r = readFloat(key, *target); !r) {
             return std::unexpected(r.error());
         }
@@ -151,7 +147,7 @@ Result<FloatSpec> FloatSpec::fromJson(const json& j) {
 }
 
 void evaluateFloaters(const world::WaterBodySet& bodies, const FloatSpec& spec, float time,
-                      std::vector<Floater>& out, const world::TerrainQuery* terrain) {
+                      std::vector<Floater>& out) {
     out.clear();
     if (!spec.enabled || spec.count <= 0 || bodies.empty()) {
         return;
@@ -199,31 +195,29 @@ void evaluateFloaters(const world::WaterBodySet& bodies, const FloatSpec& spec, 
         const glm::vec2 normal(-tangent.y, tangent.x);
         // Across the channel, pulled off the bank by `margin`. The offset is fixed per instance: a
         // leaf does not wander across a river inside one shot, and one that does reads as a fish.
+        // The banks are a planar test; the bed is not planar. `WaterBody::wettedHalfWidth` is how
+        // far across this reach there *is* water, measured once when the body was derived rather
+        // than per leaf per frame, and the offset is expressed as a fraction of it -- so a pad in a
+        // narrow reach sits in the narrow reach instead of on the shoal beside it, and as it drifts
+        // into one it slides in rather than teleporting.
         const float usable = std::max(spec.lateral - spec.margin, 0.0f);
-        float across = (r.w * 2.0f - 1.0f) * usable * body.halfWidth();
-        glm::vec2 p = glm::vec2(centre.x, centre.z) + normal * across;
-        // The banks are a planar test; the bed is not planar. Where there is a terrain query to
-        // ask, an instance that landed on a shoal walks in toward the centreline -- halving its
-        // offset, which converges in a handful of steps because the channel is deepest in the
-        // middle -- and is dropped if even the centreline is dry there. Dropping is the honest
-        // outcome: a river's head is genuinely too shallow to hold a lily pad.
-        if (terrain != nullptr && terrain->valid() && spec.minDepth > 0.0f) {
-            bool wet = terrain->waterDepthAt(p) >= spec.minDepth;
-            for (int attempt = 0; attempt < 5 && !wet; ++attempt) {
-                across *= 0.5f;
-                p = glm::vec2(centre.x, centre.z) + normal * across;
-                wet = terrain->waterDepthAt(p) >= spec.minDepth;
-            }
-            if (!wet) {
-                continue;
-            }
+        const float reach = body.wettedHalfWidth(along);
+        const float across = (r.w * 2.0f - 1.0f) * usable * reach;
+        const glm::vec2 p = glm::vec2(centre.x, centre.z) + normal * across;
+        // A reach with no water in it at all holds nothing. Faded rather than cut, because a pad
+        // drifts from the head to the mouth and wraps, and a hard test would blink it out at the
+        // shallow head and blink it back a second later.
+        const float wetness = glm::clamp(reach / std::max(body.halfWidth() * 0.25f, 1e-3f), 0.0f, 1.0f);
+        if (wetness <= 0.001f) {
+            continue;
         }
 
-        // The surface it actually sits on, asked of the body rather than assumed from the
-        // centreline: a wide channel's surface is the same level across it, but the shear profile
-        // is not, and the same query answers both.
-        const world::FlowSample flow = body.flowAt(p);
-        const float surface = std::isfinite(flow.surface) ? flow.surface : centre.y;
+        // The surface it sits on is the centreline's at this arc position -- a body's surface is
+        // flat across its width, which is what makes it a water surface -- and `centre` already is
+        // that point. Asking the body for a flow sample here would re-project the point that was
+        // just computed *from* the arc position, which is the same walk again for an answer already
+        // in hand: the shear profile takes the offset directly.
+        const float surface = centre.y;
         const float phase = r.x * 6.28318531f;
         const float bob = std::sin(time * spec.bobRate * 6.28318531f + phase) * spec.bob;
         f.position = glm::vec3(p.x, surface + bob - spec.sink, p.y);
@@ -238,9 +232,13 @@ void evaluateFloaters(const world::WaterBodySet& bodies, const FloatSpec& spec, 
         f.rotation = glm::angleAxis(yaw, glm::vec3(0.0f, 1.0f, 0.0f)) *
                      glm::angleAxis(lean, glm::normalize(glm::vec3(std::cos(leanAxis), 0.0f,
                                                                    std::sin(leanAxis))));
-        f.scale = glm::mix(spec.sizeMin, spec.sizeMax, r.z);
+        f.scale = glm::mix(spec.sizeMin, spec.sizeMax, r.z) * wetness;
         f.random = r.w;
-        f.speed = flow.speed * spec.driftScale * spread;
+        const float shear = body.halfWidth() > 1e-4f
+                                ? body.shearProfile(glm::clamp(std::fabs(across) / body.halfWidth(),
+                                                               0.0f, 1.0f))
+                                : 0.0f;
+        f.speed = body.speed * (1.0f - shear) * spec.driftScale * spread;
         out.push_back(f);
     }
 }

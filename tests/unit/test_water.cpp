@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include <numeric>
 #include <vector>
 
@@ -55,26 +56,39 @@ world::WorldMap descendingRiver(bool reversed = false) {
 
 } // namespace
 
-TEST_CASE("downstream is the direction the bed falls, whichever end it was drawn from", "[unit][water]") {
-    // The one thing a river's flow direction must not depend on is which end an artist started
-    // drawing from. Both of these are the same watercourse; both must run the same way.
-    for (const bool reversed : {false, true}) {
-        const world::WorldMap map = descendingRiver(reversed);
-        const world::WaterBodySet set = world::waterBodies(map);
-        REQUIRE(set.bodies.size() == 1);
-        const world::WaterBody& body = set.bodies.front();
-        CHECK(body.flowing);
-        CHECK(body.course.kind == world::WaterKind::River);
-        CHECK(body.course.descent > 4.0f); // five metres of fall, whichever way it was authored
-        // Mid-channel, the flow points toward +Z, which is downhill.
-        const world::FlowSample s = body.flowAt(glm::vec2(0.0f, 0.0f));
-        INFO("reversed=" << reversed << " direction (" << s.direction.x << ", " << s.direction.y << ")");
-        CHECK(s.direction.y > 0.9f);
-        CHECK(s.inside);
-        CHECK(s.speed > 0.0f);
-        // And the head is upstream of the mouth.
-        CHECK(body.centre().front().y > body.centre().back().y);
-    }
+TEST_CASE("downstream is the direction the bed falls", "[unit][water]") {
+    const world::WorldMap map = descendingRiver();
+    const world::WaterBodySet set = world::waterBodies(map);
+    REQUIRE(set.bodies.size() == 1);
+    const world::WaterBody& body = set.bodies.front();
+    CHECK(body.flowing);
+    CHECK(body.course.kind == world::WaterKind::River);
+    CHECK(body.course.descent > 4.0f);   // it descends five metres
+    CHECK(body.centre().front().y > body.centre().back().y); // head above mouth
+    // Mid-channel, the flow points toward +Z, which is downhill.
+    const world::FlowSample s = body.flowAt(glm::vec2(0.0f, 0.0f));
+    INFO("direction (" << s.direction.x << ", " << s.direction.y << ")");
+    CHECK(s.direction.y > 0.9f);
+    CHECK(s.inside);
+    CHECK(s.speed > 0.0f);
+    // And the speed is the course's own, from its gradient, not a number anybody typed.
+    CHECK(s.speed == Approx(body.course.flowSpeed()).epsilon(0.01));
+}
+
+TEST_CASE("a course authored uphill goes still rather than running backwards", "[unit][water]") {
+    // ADR-090 decided this and this pins it from the water side: a path whose nodes rise downstream
+    // is an authoring mistake, and `waterCourses` clamps its descent to zero rather than reversing
+    // it. What matters here is that the mistake is *loud* -- the body reports no flow at all, which
+    // shows up as "0.00 m/s" in the terrain node's own log line, rather than quietly running the
+    // ripples and every floating leaf the wrong way up the valley.
+    const world::WorldMap map = descendingRiver(/*reversed=*/true);
+    const world::WaterBodySet set = world::waterBodies(map);
+    REQUIRE(set.bodies.size() == 1);
+    const world::WaterBody& body = set.bodies.front();
+    CHECK(body.course.kind == world::WaterKind::River);
+    CHECK(body.course.descent == Approx(0.0f).margin(1e-4f));
+    CHECK(!body.flowing);
+    CHECK(body.flowAt(glm::vec2(0.0f, 0.0f)).speed < set.settings.stillSpeed * 0.5f);
 }
 
 TEST_CASE("a body with no fall in it is still water, not a river at zero", "[unit][water]") {
@@ -121,6 +135,56 @@ TEST_CASE("the water is fastest in the channel and slowest at the bank", "[unit]
     CHECK(body.flowAt(glm::vec2(-3.0f, 0.0f)).across > 0.0f);
     CHECK(body.flowAt(glm::vec2(3.0f, 0.0f)).across < 0.0f);
     CHECK(body.flowAt(glm::vec2(0.0f, 0.0f)).across == Approx(0.0f).margin(1e-4f));
+}
+
+TEST_CASE("a body's flow agrees with the course it was built from", "[unit][water]") {
+    // `WaterBody::flowAt` projects onto the centreline itself rather than calling
+    // `WaterCourse::flowAt`, `surfaceAt`, `alongAt` and `contains` in turn -- four walks of the same
+    // polyline for four answers about the same point, where this asks all four and is called once
+    // per water vertex of a world. That is a second copy of terrain's arithmetic, which is worth
+    // being nervous about, so this is the assertion that keeps the two honest: if terrain changes
+    // how a course is projected onto, this fails rather than the river quietly running elsewhere.
+    const world::WorldMap map = world::defaultWorld();
+    const std::vector<world::WaterCourse> courses = world::waterCourses(map);
+    const world::WaterBodySet bodies = world::waterBodies(courses);
+    REQUIRE(bodies.bodies.size() == courses.size());
+    REQUIRE(!courses.empty());
+
+    int compared = 0;
+    for (std::size_t b = 0; b < bodies.bodies.size(); ++b) {
+        const world::WaterBody& body = bodies.bodies[b];
+        const world::WaterCourse& course = courses[b];
+        if (course.kind == world::WaterKind::Sea) {
+            continue;
+        }
+        // A grid over the course's own bounds, so the samples include midstream, both banks, the
+        // ends and a good deal of dry ground beyond them.
+        for (int i = 0; i < 17; ++i) {
+            for (int j = 0; j < 17; ++j) {
+                const float u = static_cast<float>(i) / 16.0f;
+                const float v = static_cast<float>(j) / 16.0f;
+                const glm::vec3 head = course.centreline.front();
+                const glm::vec3 mouth = course.centreline.back();
+                const glm::vec2 p(glm::mix(head.x, mouth.x, u) + (v - 0.5f) * 4.0f * course.halfWidth,
+                                  glm::mix(head.z, mouth.z, u) + (u - 0.5f) * 3.0f * course.halfWidth);
+                const world::FlowSample s = body.flowAt(p);
+                INFO("body '" << body.name() << "' at (" << p.x << ", " << p.y << ")");
+                CHECK(s.surface == Approx(course.surfaceAt(p)).margin(1e-3f));
+                CHECK(s.inside == course.contains(p));
+                if (course.centreline.size() >= 2) {
+                    CHECK(s.along == Approx(course.alongAt(p)).margin(1e-3f));
+                }
+                if (body.flowing) {
+                    const glm::vec2 d = course.flowAt(p);
+                    CHECK(s.direction.x == Approx(d.x).margin(1e-3f));
+                    CHECK(s.direction.y == Approx(d.y).margin(1e-3f));
+                }
+                ++compared;
+            }
+        }
+    }
+    INFO("compared " << compared << " points");
+    CHECK(compared > 200);
 }
 
 TEST_CASE("a water vertex carries the flow of the body under it", "[unit][water]") {
@@ -312,6 +376,49 @@ TEST_CASE("floating objects stay inside the water they float on", "[unit][water]
     }
 }
 
+TEST_CASE("a floating layer keeps off the shoals", "[unit][water][floaters]") {
+    // The shipped world's river runs out at its head, where the channel is a few centimetres deep.
+    // The course's nominal half-width says nothing about that; `wettedHalfWidth` does, and this is
+    // the assertion that a layer respects it -- every instance must sit in standing water, not just
+    // between the banks.
+    const world::WorldMap map = world::defaultWorld();
+    const world::TerrainQuery query = world::terrainQuery(map);
+    const world::WaterBodySet dry = world::waterBodies(map);              // no query: nominal banks
+    const world::WaterBodySet measured = world::waterBodies(map, {}, &query);
+    REQUIRE(!measured.empty());
+    const world::WaterBody* river = measured.find("glowmere-run");
+    REQUIRE(river != nullptr);
+    REQUIRE(river->wetted.size() == static_cast<std::size_t>(world::kWettedSamples));
+    CHECK(dry.find("glowmere-run")->wetted.empty());
+    // The table is not all ones, or it would be saying nothing: a real river narrows.
+    const float widest = *std::max_element(river->wetted.begin(), river->wetted.end());
+    const float narrowest = *std::min_element(river->wetted.begin(), river->wetted.end());
+    INFO("wetted fraction " << narrowest << " .. " << widest);
+    CHECK(widest > 0.3f);
+    CHECK(narrowest < widest);
+
+    scene::FloatSpec spec;
+    spec.water = "valley";
+    spec.body = "glowmere-run";
+    spec.count = 400;
+    spec.seed = 31337;
+    spec.lateral = 1.0f;
+    spec.margin = 0.1f;
+    for (const float t : {0.0f, 9.0f, 55.0f, 300.0f}) {
+        std::vector<scene::Floater> f;
+        scene::evaluateFloaters(measured, spec, t, f);
+        REQUIRE(!f.empty());
+        int dryPlacements = 0;
+        for (const scene::Floater& one : f) {
+            if (query.waterDepthAt(glm::vec2(one.position.x, one.position.z)) <= 0.0f) {
+                ++dryPlacements;
+            }
+        }
+        INFO("t=" << t << ": " << dryPlacements << " of " << f.size() << " on dry ground");
+        CHECK(dryPlacements == 0);
+    }
+}
+
 TEST_CASE("a floating layer with no water places nothing and says why", "[unit][water][floaters]") {
     // The failure this codebase keeps repeating is a system that runs, places nothing and reports
     // success. A spec with no water named is rejected at load rather than at the first empty frame.
@@ -357,4 +464,30 @@ TEST_CASE("a float spec round-trips through JSON", "[unit][water][floaters]") {
     auto parsed = scene::FloatSpec::fromJson(spec.toJson());
     REQUIRE(parsed);
     CHECK(parsed->structuralHash() == spec.structuralHash());
+}
+
+// Hidden (the leading dot): a measurement, not an assertion. A floating layer is recomputed every
+// frame on the CPU, and the number that matters is what that costs for a Glowmere-sized layer, so
+// it is recorded here rather than guessed at in a doc. Run with
+// `avgen_tests "[.water-cost]"`.
+TEST_CASE("the CPU cost of a floating layer", "[.water-cost][unit][water]") {
+    const world::WorldMap map = world::defaultWorld();
+    const world::TerrainQuery query = world::terrainQuery(map);
+    const world::WaterBodySet bodies = world::waterBodies(map, {}, &query);
+    scene::FloatSpec spec;
+    spec.water = "valley";
+    spec.count = 320; // Glowmere's three layers together
+    std::vector<scene::Floater> out;
+    // One pass to warm the caches, then a hundred timed ones.
+    scene::evaluateFloaters(bodies, spec, 0.0f, out);
+    const auto start = std::chrono::steady_clock::now();
+    constexpr int kRuns = 100;
+    for (int i = 0; i < kRuns; ++i) {
+        scene::evaluateFloaters(bodies, spec, static_cast<float>(i) * 0.05f, out);
+    }
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+                          .count() / kRuns;
+    WARN("evaluateFloaters: " << spec.count << " instances over " << bodies.bodies.size()
+                              << " bodies in " << ms << " ms per frame (" << out.size() << " placed)");
+    CHECK(ms < 5.0); // a floating layer that costs more than this is not a floating layer any more
 }

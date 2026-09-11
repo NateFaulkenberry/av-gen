@@ -19,6 +19,7 @@
 // and whichever run. Nothing in this file knows about meshes, the GPU or a frame.
 
 #include "core/error.hpp"
+#include "world/terrain_query.hpp"
 #include "world/terrain_water.hpp"
 #include "world/world_map.hpp"
 
@@ -51,6 +52,12 @@ struct WaterFlowSettings {
     // Radians the flow direction wanders off the centreline tangent, as a slow function of
     // position. Small: this is the difference between a current and an arrow.
     float meander = 0.18f;
+    // How much the *speed* varies from reach to reach, 0..1, from the same slow spatial field: at
+    // 0.3 some stretches run a third faster than the course's average and some a third slower.
+    // This is §11's "occasional local variation", and it is spatial rather than temporal on purpose
+    // -- a river does not speed up and slow down in place, it has fast reaches and slow pools, and
+    // the pattern moves through them.
+    float turbulence = 0.25f;
     // Still water: the fraction of `stillSpeed` a pond's surface carries, and the direction the
     // wind pushes it. A pond that is a perfect mirror reads as glass rather than as water.
     float stillFactor = 0.12f;
@@ -83,6 +90,16 @@ struct WaterBody {
     float speed = 0.0f;             // metres per second at the centreline
     float bankShear = 0.7f;         // how much of that is lost at the bank
     glm::vec2 stillDirection{0.0f}; // the direction a still body's surface carries its pattern
+    // How far across the channel there is actually water, as a fraction of `halfWidth`, sampled at
+    // `kWettedSamples` points along the course. A course's banks are a planar test and a bed is
+    // not planar: the channel narrows, shoals and runs out at the head, and the nominal half-width
+    // says none of that. This does, and it is a property of the world rather than of the frame, so
+    // it is measured once here instead of by every floating leaf on every frame -- which is the
+    // difference between 0.02 ms and 0.43 ms for a layer of three hundred.
+    //
+    // Empty when `waterBodies` was called without a terrain query, in which case the nominal
+    // half-width is all anyone has.
+    std::vector<float> wetted;
 
     [[nodiscard]] const std::string& name() const { return course.name; }
     [[nodiscard]] float halfWidth() const { return course.halfWidth; }
@@ -103,7 +120,14 @@ struct WaterBody {
     // drifting-object system needs the same profile the surface uses, and two copies of it would be
     // two answers to "how fast is the water here".
     [[nodiscard]] float shearProfile(float r) const;
+    // The usable half-width at a normalised arc position, in metres: `halfWidth()` where the table
+    // is empty, and the measured wetted width where it is not. 0 means there is no water here.
+    [[nodiscard]] float wettedHalfWidth(float along01) const;
 };
+
+// How finely `WaterBody::wetted` samples a course. 128 over Glowmere's 516 m river is a probe every
+// four metres, which is finer than the channel's own width and far finer than anything that floats.
+inline constexpr int kWettedSamples = 128;
 
 // Every body a world holds, in the order `waterCourses` reports them.
 struct WaterBodySet {
@@ -122,11 +146,15 @@ struct WaterBodySet {
 // Builds a body for every course terrain reports on this map. Pure: same map + same settings = same
 // bodies. The map must be prepared (`WorldMap::prepare()`), which every parser and `defaultWorld`
 // already do.
-[[nodiscard]] WaterBodySet waterBodies(const WorldMap& map, const WaterFlowSettings& settings = {});
+// `terrain` (optional) is used once, here, to measure how far across each reach there is actually
+// water; see `WaterBody::wetted`. Pass one whenever there is one.
+[[nodiscard]] WaterBodySet waterBodies(const WorldMap& map, const WaterFlowSettings& settings = {},
+                                       const TerrainQuery* terrain = nullptr);
 // The same, from courses already in hand -- the form to use when a caller has them, because
 // `waterCourses` is a walk over the features and there is no reason to do it twice.
 [[nodiscard]] WaterBodySet waterBodies(const std::vector<WaterCourse>& courses,
-                                       const WaterFlowSettings& settings = {});
+                                       const WaterFlowSettings& settings = {},
+                                       const TerrainQuery* terrain = nullptr);
 
 [[nodiscard]] Result<WaterFlowSettings> waterFlowFromJson(const nlohmann::json& j);
 [[nodiscard]] nlohmann::json waterFlowToJson(const WaterFlowSettings& flow);

@@ -9,7 +9,7 @@ Three things own three different parts of it, and the split is worth holding on 
 |---|---|---|
 | `world::WorldMap` | *where* water is: `waterSurface(p)`, `Sample::submerged` | `world/world_map.hpp` |
 | `world::WaterCourse` | *which way it runs*: a downstream-ordered centreline, width, depth, descent | `world/terrain_water.hpp` (ADR-090) |
-| `world::WaterBody` | *how its surface moves*: speed, shear, meander, arc length | `world/water.hpp` |
+| `world::WaterBody` | *how its surface moves*: speed, shear, meander, turbulence, arc length | `world/water.hpp` |
 | `scene::WaterSettings` | *what it looks like* | `scene/water_surface.hpp` |
 
 Nothing authors a river twice. A `WaterCourse` is derived from the map's own features, a `WaterBody`
@@ -24,14 +24,14 @@ Water settings live on a terrain node, beside the terrain that holds them:
 { "name": "valley", "kind": "terrain",
   "terrain": {
     "chunkSize": 40.0, "resolution": 32,
-    "flow":  { "speedScale": 1.0, "bankShear": 0.7, "meander": 0.18, "stillFactor": 0.12 },
+    "flow":  { "speedScale": 1.0, "bankShear": 0.7, "meander": 0.18, "turbulence": 0.25 },
     "water": { "enabled": true,
                "shallowColor": [0.05, 0.22, 0.24], "deepColor": [0.006, 0.035, 0.075],
                "shallow": 2.0, "clarity": 1.25, "edgeFade": 0.8, "maxOpacity": 0.93,
                "fresnel": 0.30, "reflection": 8.0, "reflectionTint": [0.55, 0.74, 0.98],
                "specular": 3.0, "roughness": 0.17,
                "ripple": 1.0, "rippleScale": 0.42, "rippleSpeed": 1.0, "chop": 0.35,
-               "foam": 0.6, "foamWidth": 0.42, "refraction": 0.25,
+               "foam": 0.6, "foamWidth": 0.22, "refraction": 0.25,
                "glow": 1.2, "glowColor": [0.15, 1.0, 0.75], "glowCoverage": 0.22,
                "glowScale": 0.16, "glowDepth": 0.55,
                "sparkle": 0.6 } } }
@@ -85,9 +85,16 @@ green". 0.2 is about right for the brief's "occasionally notice"; past 0.5 the c
 
 ```json
 "flow": { "speedScale": 1.0, "speedOverride": 0.0, "bankShear": 0.7,
-          "meander": 0.18, "stillFactor": 0.12, "stillSpeed": 0.55,
-          "windDirection": [0.7, 0.7] }
+          "meander": 0.18, "turbulence": 0.25,
+          "stillFactor": 0.12, "stillSpeed": 0.55, "windDirection": [0.7, 0.7] }
 ```
+
+§11 asks for `flowDirection`, `flowSpeed`, `flowStrength` and `turbulence`. They are here, spelled
+for where the answers actually come from: direction and speed are the course's, `speedScale` and
+`bankShear` are the strength, and the variation is split between `meander` (the direction wanders)
+and `turbulence` (the speed does, so a river has fast reaches and slow pools). Both are *spatial*
+and not temporal, because a river does not speed up and slow down in place -- it has fast stretches,
+and the pattern moves through them.
 
 There is **no `flowDirection` and no `flowSpeed`**, on purpose. Direction is the direction the bed
 falls, read from the course. Speed comes from the course's own gradient — a steep short river runs, a

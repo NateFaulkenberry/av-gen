@@ -331,7 +331,8 @@
      "windDirection": [
       0.7,
       0.7
-     ]
+     ],
+     "turbulence": 0.25
     }
    },
    "material": {
