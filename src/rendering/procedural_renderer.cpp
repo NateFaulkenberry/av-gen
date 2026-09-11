@@ -15,6 +15,7 @@
 #include <glm/gtc/matrix_inverse.hpp>
 
 #include <algorithm>
+#include <vector>
 #include <limits>
 #include <array>
 #include <bit>
@@ -1099,6 +1100,15 @@ bool ProceduralRenderer::Impl::ensureCullBuffers(ObjectState& state, std::uint32
         desc.label = "procedural-lod-index";
         desc.size = static_cast<std::uint64_t>(stride) * sizeof(std::uint32_t);
         state.lodIndex = device.CreateBuffer(&desc);
+        // Zeroed, because classification now reads last frame's level out of this buffer before
+        // overwriting it (ADR-082) and a fresh allocation otherwise holds whatever the driver left
+        // there -- which would be read as "this instance was already at level 4 billion" and drop
+        // the whole object to its coarsest mesh for one frame after every grow.
+        {
+            const std::vector<std::uint32_t> zeros(stride, 0u);
+            context.queue().WriteBuffer(state.lodIndex, 0, zeros.data(),
+                                        static_cast<std::size_t>(stride) * sizeof(std::uint32_t));
+        }
         desc.label = "procedural-cull-blocksums";
         desc.size = static_cast<std::uint64_t>(blocks) * lodCount * sizeof(std::uint32_t);
         state.blockSums = device.CreateBuffer(&desc);
@@ -1538,6 +1548,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                                     std::max(objectScale, 1e-6f));
             cull.thresholds = glm::vec4(lodSettings.lodDistances[0], lodSettings.lodDistances[1],
                                         lodSettings.lodDistances[2], 0.0f);
+            cull.stability = glm::vec4(std::clamp(lodSettings.lodSpread, 0.0f, 0.5f),
+                                       std::clamp(lodSettings.lodHysteresis, 0.0f, 0.5f), 0.0f, 0.0f);
             const std::uint32_t blocks = std::max((instanceCount + kCullScanBlock - 1) / kCullScanBlock, 1u);
             cull.counts = glm::uvec4(instanceCount, lodCount, state.visibleStride, blocks);
             // ADR-038: the composition's depth bands thin instances and move the LOD ladder.

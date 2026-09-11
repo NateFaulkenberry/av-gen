@@ -234,11 +234,15 @@ struct CullPassUniforms {
     glm::uvec4 counts;        // x = record count, y = lod count, z = visible stride, w = scan blocks
     glm::uvec4 flags;         // x = cull enabled, y = thresholds are screen radii, z = stats slot, w = 0
     glm::uvec4 indexCounts;   // index count of each level's mesh
+    // ADR-082. x = per-instance threshold spread, y = hysteresis dead zone, both as fractions of
+    // the threshold. Kept apart because they differ in kind: the spread is a pure function of the
+    // instance index and so is deterministic, while hysteresis reads the previous frame.
+    glm::vec4 stability;
     // ADR-038 depth layers, as (start, end, density, detail). `flags.w` holds the count, so a
     // scene with no layers classifies exactly as it did before they existed.
     glm::vec4 depthLayers[kMaxCullDepthLayers];
 };
-static_assert(sizeof(CullPassUniforms) == 256 + 16 * kMaxCullDepthLayers);
+static_assert(sizeof(CullPassUniforms) == 272 + 16 * kMaxCullDepthLayers);
 
 class ProceduralRenderer {
 public:

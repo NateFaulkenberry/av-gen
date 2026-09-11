@@ -48,6 +48,7 @@ struct CullParams {
     counts: vec4<u32>,           // x = record count, y = lod count, z = visible stride, w = scan blocks
     flags: vec4<u32>,            // x = cull enabled, y = thresholds are screen radii, z = stats slot, w = 0
     indexCounts: vec4<u32>,      // index count of each level's mesh (for the indirect args)
+    stability: vec4<f32>,        // x = per-instance spread, y = hysteresis dead zone (ADR-082)
     // ADR-038 depth layers, as (start, end, density, detail); the count is flags.w.
     depthLayers: array<vec4<f32>, 6>,
 };
@@ -115,6 +116,15 @@ fn instanceHash(i: u32) -> f32 {
     return f32(h >> 8u) / 16777216.0;
 }
 
+// A second stable per-instance number, decorrelated from the one density thinning uses.
+//
+// It has to be decorrelated: if the same hash decided both which instances survive thinning and
+// which ones change LOD early, the two would agree, and the instances that swap first would be
+// exactly the ones thinning already removed -- so the spread would do nothing where it is needed.
+fn ladderHash(i: u32) -> f32 {
+    return instanceHash(i * 0x9E3779B9u + 0x85EBCA6Bu);
+}
+
 // ---- classification -----------------------------------------------------------------------------
 
 @compute @workgroup_size(64)
@@ -129,6 +139,41 @@ fn cs_cull_classify(@builtin(global_invocation_id) gid: vec3<u32>) {
     // Projected radius in pixels: radius / distance * (height / (2 tan(fovY / 2))).
     let screenRadius = radius / max(dist, 1e-4) * cullParams.cameraPos.w;
 
+    // Hysteresis and per-instance spread (ADR-082).
+    //
+    // Every threshold below used to be a hard binary comparison, evaluated fresh from the current
+    // camera with no memory of what this instance decided last frame. Two artefacts follow, and
+    // together they are what the brief calls popping:
+    //
+    //   * An instance whose projected radius sits near a threshold flips state every time the
+    //     camera breathes, because the comparison has no dead zone.
+    //   * Every instance at a given radius crosses its threshold on the *same frame*, so a whole
+    //     band of the world changes mesh at once.
+    //
+    // The first wants memory; the second wants the instances to disagree with each other. Both are
+    // available without allocating anything. `lodIndex` is grow-only and is written by this pass
+    // and no other, so last frame's level is still sitting in it when this frame starts -- and
+    // `ladderHash` gives each instance a stable offset of its own.
+    //
+    // Zero hysteresis reproduces the old behaviour exactly, which is what the tests rely on.
+    // The two are deliberately separate settings, because they differ in kind.
+    //
+    // `spread` gives every instance its own slightly offset threshold. It is a pure function of
+    // the instance index, so it is exactly as deterministic as the old hard comparison, and it is
+    // what stops a whole band of the world changing mesh on the same frame: no instance is ever
+    // half-way between two meshes, but the *population* is. This is the crossfade, and it is on by
+    // default.
+    //
+    // `hysteresis` is the dead zone, and it is the one that reads `previous`. That makes the
+    // image depend on the camera's history rather than only on where the camera is now, so it is
+    // off by default and opt-in -- the divergence is bounded to instances within the dead zone of
+    // a threshold, which are by definition at a size where the two levels are near
+    // indistinguishable, but it is a divergence and this engine promises frame-independence.
+    let previous = lodIndex[i];
+    let spreadAmount = clamp(cullParams.stability.x, 0.0, 0.5);
+    let hysteresis = clamp(cullParams.stability.y, 0.0, 0.5);
+    let spread = 1.0 + (ladderHash(i) - 0.5) * spreadAmount;
+
     var culled = false;
     if (cullParams.flags.x != 0u) {
         for (var k = 0u; k < 6u; k = k + 1u) {
@@ -138,7 +183,14 @@ fn cs_cull_classify(@builtin(global_invocation_id) gid: vec3<u32>) {
         let maxDist = cullParams.limits.x;
         if (maxDist > 0.0 && dist - radius > maxDist) { culled = true; }
         let minRadius = cullParams.limits.y;
-        if (minRadius > 0.0 && screenRadius < minRadius) { culled = true; }
+        if (minRadius > 0.0) {
+            // It takes a larger radius to come back than it does to disappear, so an instance
+            // sitting on the bar stays where it is instead of strobing.
+            let bar = minRadius * spread;
+            let wasCulled = previous == kCulled;
+            let limit = select(bar * (1.0 - hysteresis), bar * (1.0 + hysteresis), wasCulled);
+            if (screenRadius < limit) { culled = true; }
+        }
     }
 
     // The composition's depth bands: `density` thins this band, `detail` moves the LOD ladder.
@@ -150,14 +202,24 @@ fn cs_cull_classify(@builtin(global_invocation_id) gid: vec3<u32>) {
     var level = 0u;
     let lodCount = max(cullParams.counts.y, 1u);
     let byScreen = cullParams.flags.y != 0u;
+    // A culled instance has no level to remember, so it re-enters at whatever this frame says.
+    let hadLevel = select(previous, 0u, previous == kCulled);
     for (var k = 0u; k < 3u; k = k + 1u) {
         if (k + 1u >= lodCount) { break; }
-        let t = thresholdAt(k);
-        if (t <= 0.0) { break; }
+        let t0 = thresholdAt(k);
+        if (t0 <= 0.0) { break; }
         // Higher detail pushes the ladder further out (distance) or accepts a smaller sliver
         // before dropping a level (screen radius).
-        var take = dist >= t * detail;
-        if (byScreen) { take = screenRadius <= t / detail; }
+        let alreadyTaken = hadLevel > k;
+        var take: bool;
+        if (byScreen) {
+            let t = t0 / detail * spread;
+            // Already down a level: keep it until the radius grows back past the upper edge.
+            take = screenRadius <= select(t * (1.0 - hysteresis), t * (1.0 + hysteresis), alreadyTaken);
+        } else {
+            let t = t0 * detail * spread;
+            take = dist >= select(t * (1.0 + hysteresis), t * (1.0 - hysteresis), alreadyTaken);
+        }
         if (!take) { break; }
         level = k + 1u;
     }
