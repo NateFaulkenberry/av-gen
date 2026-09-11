@@ -91,3 +91,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [083](ADR-083-composition-and-layers.md) | Composition and layers | Accepted |
 | [084](ADR-084-the-editors-frame.md) | The editor's frame: where the swapchain wait stands, and what a drag may cost | Accepted |
 | [085](ADR-085-lod-chain-wired.md) | The LOD ladder is built by meshoptimizer, and it has to descend | Accepted |
+| [086](ADR-086-shadow-mask.md) | The key light's shadow map is looked up once per four pixels; its contact march is not | Accepted |

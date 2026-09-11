@@ -67,6 +67,15 @@ fn viewToWorldPoint(v: vec3<f32>) -> vec3<f32> {
 
 // Best-fit normal from the depth buffer: pick the closer neighbour on each axis so silhouettes do
 // not smear a normal across them.
+//
+// The orientation comes from the winding of the two differences and never from a test against the
+// view direction (ADR-086). `dx` runs along +x in view space and `dy` along -y, so `cross(dy, dx)`
+// is the side facing the camera whatever the surface's angle; the `normal.z < 0` test this used to
+// do is a coin flip on a surface seen nearly edge-on, which is most of the ground in a landscape.
+// It shows up here as almost nothing -- 5.4% of Glowmere's pixels move and 99.5% of those by one or
+// two of 255, because the horizon integral weights each slice by how much of the normal lies in it
+// and a flipped grazing normal barely lies in any -- but the identical code in the shadow mask put
+// bands of acne across the whole frame, so it is not left standing in either place.
 fn depthNormal(uv: vec2<f32>, p: vec3<f32>) -> vec3<f32> {
     let step = ao.fullSize.zw;
     let left = viewPosition(uv - vec2<f32>(step.x, 0.0), depthAt(uv - vec2<f32>(step.x, 0.0)));
@@ -75,13 +84,11 @@ fn depthNormal(uv: vec2<f32>, p: vec3<f32>) -> vec3<f32> {
     let up = viewPosition(uv + vec2<f32>(0.0, step.y), depthAt(uv + vec2<f32>(0.0, step.y)));
     let dx = select(right - p, p - left, abs(left.z - p.z) < abs(right.z - p.z));
     let dy = select(up - p, p - down, abs(down.z - p.z) < abs(up.z - p.z));
-    let n = cross(dx, dy);
+    let n = cross(dy, dx);
     if (dot(n, n) < 1e-12) {
         return vec3<f32>(0.0, 0.0, 1.0);
     }
-    let unit = normalize(n);
-    // Face the camera.
-    return select(unit, -unit, unit.z < 0.0);
+    return normalize(n);
 }
 
 @fragment

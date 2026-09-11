@@ -35,6 +35,14 @@ struct RigLight {
     float sizeRadii = 0.5f;       // area emitters: size in subject radii
     float aspect = 1.0f;          // Rect: width / height
     bool castsShadow = false;
+    // Whether this light runs the screen-space contact march (ADR-034). Separate from
+    // `castsShadow`, which allocates a shadow map: the march is the only shadow a light without a
+    // map has, and ADR-034 gives it to every light deliberately. But three of Glowmere's lights
+    // march twelve steps per fragment and only the moon has a map, which costs 2.42 ms at
+    // 720x450, and until now no rig could say otherwise -- `PunctualLight::contactShadow` defaults
+    // to true and nothing set it. It stays true by default, because turning it off changes the
+    // image and that is a decision for a rig to make, not for the renderer (ADR-086).
+    bool contactShadow = true;
     float shadowStrength = 1.0f;
     float softness = 1.0f;
     float volumetricStrength = 0.0f;

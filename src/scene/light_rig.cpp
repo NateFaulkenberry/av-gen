@@ -313,6 +313,7 @@ std::vector<PunctualLight> LightRig::expand(const glm::vec3& subjectCenter, floa
         light.innerConeAngle = r.coneDegrees * kDegToRad * 0.5f * 0.75f;
         light.outerConeAngle = r.coneDegrees * kDegToRad * 0.5f;
         light.castsShadow = r.castsShadow;
+        light.contactShadow = r.contactShadow;
         light.shadowStrength = std::clamp(r.shadowStrength, 0.0f, 1.0f);
         light.softness = std::max(r.softness, 0.0f);
         light.volumetricStrength = std::max(r.volumetricStrength, 0.0f);
@@ -344,6 +345,7 @@ std::uint64_t LightRig::structuralHash() const {
         h.f32(l.sizeRadii);
         h.f32(l.aspect);
         h.boolean(l.castsShadow);
+        h.boolean(l.contactShadow);
         h.f32(l.shadowStrength);
         h.f32(l.softness);
         h.f32(l.volumetricStrength);
@@ -383,6 +385,7 @@ nlohmann::json LightRig::toJson() const {
         e["size"] = l.sizeRadii;
         e["aspect"] = l.aspect;
         e["castsShadow"] = l.castsShadow;
+        e["contactShadow"] = l.contactShadow;
         e["shadowStrength"] = l.shadowStrength;
         e["softness"] = l.softness;
         e["volumetric"] = l.volumetricStrength;
@@ -501,6 +504,11 @@ Result<LightRig> LightRig::fromJson(const nlohmann::json& j) {
             return std::unexpected(casts.error());
         }
         l.castsShadow = *casts;
+        auto contact = readBool(e, "contactShadow", l.contactShadow);
+        if (!contact) {
+            return std::unexpected(contact.error());
+        }
+        l.contactShadow = *contact;
         auto follow = readBool(e, "followCamera", l.followCamera);
         if (!follow) {
             return std::unexpected(follow.error());

@@ -50,6 +50,8 @@ encoder = device.CreateCommandEncoder()
   pass "linear-depth-pass"  : Depth24Plus -> R32Float view distance
   pass "gtao-pass"          : half-resolution horizon occlusion + bent normal          (ADR-034)
   pass "gtao-temporal-pass" : reprojected, neighbourhood-clamped accumulation
+  pass "shadow-mask-pass"   : half-resolution shadow-map term of up to three directional
+                              lights, bilaterally upsampled in the scene pass         (ADR-086)
   pass "scene-pass"         : HDR RGBA16Float + 4 auxiliary targets + Depth24Plus      (ADR-035)
                               opaque PBR entities (pbr.wgsl; back-face cull, or none for doubleSided)
                               procedural geometry (procedural.wgsl; one DrawIndexed(indexCount,
@@ -67,10 +69,15 @@ encoder = device.CreateCommandEncoder()
 timer.resolve(encoder); queue.Submit; timer.collect(); surface.Present()
 ```
 
-The depth prepass exists because ambient occlusion and the contact-shadow march need the depth of
-the whole opaque scene *while it is being shaded*, which a forward pass cannot give them. It costs
-one fragment-free geometry pass and pays part of itself back as early-Z in the scene pass; it is
-skipped entirely when both occlusion and contact shadows are off.
+The depth prepass exists because ambient occlusion, the contact-shadow march and the shadow mask
+need the depth of the whole opaque scene *while it is being shaded*, which a forward pass cannot
+give them. It costs one fragment-free geometry pass and pays part of itself back as early-Z in the
+scene pass; it is skipped entirely when occlusion, contact shadows and the shadow mask are all off.
+
+Note what the prepass draws, because the shadow mask depends on it: opaque and alpha-masked
+geometry, never blended. A blended surface therefore has no mask texel of its own -- the depth
+under it belongs to whatever is behind -- and shades its directional shadows at full resolution
+instead (ADR-086).
 
 ### Colour targets of the scene pass (ADR-035)
 

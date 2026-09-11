@@ -818,3 +818,87 @@ and the meshes must be padded to a common size (1,400 triangles against a mean o
 through vertex pulling. Submissions here are worth about a millisecond in total; geometry is worth
 six. **There is no per-layer submission cost left to remove.** The lever on the remaining 6 ms is
 the LOD ladder and the mesh budgets.
+
+## The shadow-map lookup is the editor canvas's largest single term (2026-09-11, ADR-086)
+
+Phase 3 left the scene pass fragment-bound and named the fragments: at the editor's 2880x1166
+canvas, `directLighting` is 81% of the pass, the key light's cascaded PCSS lookup is 34% of it and
+the screen-space contact marches 19%. Phase 4 moved the lookup into a half-resolution pass
+(`shaders/shadow_mask.wgsl`) and upsamples it bilaterally in the lit pass.
+
+Min of 5 interleaved runs, `--tier realtime`, headless, Glowmere, machine shared with other agents.
+The arms are `--disable shadowmask` against the default, round-robin, never all of one then all of
+the other.
+
+| canvas | pixels | scene pass off -> on | mask pass | GPU frame off -> on |
+|---|---:|---:|---:|---:|
+| 720x450 | 0.32 MP | 13.04 -> **11.27** (-13.6%) | 0.20 | 14.75 -> 13.17 (-10.7%) |
+| 1440x900 | 1.30 MP | 19.40 -> **14.94** (-23.0%) | 0.59 | 22.35 -> 18.48 (-17.3%) |
+| 2880x1166 (editor, 1440x900 pt) | 3.36 MP | 42.80 -> **31.39** (-26.7%) | 1.25 | 47.91 -> 37.68 (-21.4%) |
+| 2466x1766 (editor, 1920x1200 pt) | 4.36 MP | 39.58 -> **28.44** (-28.1%) | 1.44 | 45.42 -> 35.72 (-21.4%) |
+
+That is the mirror image of ADR-085's table, which bought 41% at 720x450 and 7% at the editor's
+canvas. Below the crossover the invocation count is geometry-floored and a per-pixel saving has
+little to work on; above it, it is the whole story.
+
+The absolute level drifted about 10% between measurement sessions on this machine (the 2880x1166
+"off" arm read 38.27 in one session and 42.80 in another); the ratios moved by two points. Trust the
+ratios.
+
+### The contact march does not survive half resolution, and that is measured
+
+Masking the contact march as well was the plan and is rejected on the image, not on the clock. At
+2880x1166, against the unmasked frame:
+
+| what the mask carries | pixels differing |
+|---|---:|
+| the shadow-map term only | **8.4%** |
+| the shadow-map term and the contact march | 30.2% |
+
+Glowmere's ground is a field of grass and reed cards; a march evaluated once per 2x2 applies what
+it hit to all four pixels, so every contact shadow doubles in width and dense ground cover goes
+black. A penumbra survives half resolution; a contact shadow is exactly the signal that does not.
+
+### Render scale: a real lever that saturates
+
+The editor canvas at a fixed aspect, scaled down. Min of 3 interleaved runs. Submitted triangles
+fall too, because screen-space LOD selects against `projScale` and `projScale` follows the viewport
+height -- which is what a user of a render-scale slider actually gets, so it is reported together.
+
+| scale | size | Mpx | submitted tris | scene | GPU frame | vs full |
+|---:|---|---:|---:|---:|---:|---:|
+| 1.00 | 2880x1166 | 3.36 | 694,977 | 29.23 | 35.52 | — |
+| 0.90 | 2592x1048 | 2.72 | 635,963 | 25.76 | 31.26 | -12.0% |
+| 0.80 | 2304x932 | 2.15 | 594,261 | 22.35 | 27.13 | -23.6% |
+| 0.71 | 2036x824 | 1.68 | 533,217 | 20.12 | 24.25 | -31.7% |
+| 0.60 | 1728x700 | 1.21 | 472,276 | 17.37 | 20.91 | -41.1% |
+| 0.50 | 1440x582 | 0.84 | 396,524 | 16.19 | 19.20 | -45.9% |
+
+**It saturates, and it saturates above the target.** Halving the linear scale -- a quarter of the
+pixels, and a visibly softer picture -- leaves the frame at 19.20 ms, still short of 16.67. Between
+0.60 and 0.50 the frame moves 1.71 ms for another 0.37 MP, because by then the invocation count is
+geometry-floored again (section 2 of `renderer-2-architecture.md`).
+
+**So dynamic resolution is not worth building yet.** A scaler targeting 16.67 ms on this world would
+sit at its floor permanently and still miss, which is a static setting plus machinery plus a softer
+picture the user did not ask for. The static `--canvas-scale` stays the right shape of control, and
+0.9 is 12% for a difference that is hard to see on a still frame. Revisit when the frame is close
+enough to the target that a scaler would spend most of its time at 1.0 -- that is the only regime
+where it buys headroom rather than quietly spending quality.
+
+### Two directional lights march without a map, and a rig can now say not to
+
+`skyfill` and `elder-practical` are `castsShadow: false` and still run a twelve-step contact march
+per fragment, because `PunctualLight::contactShadow` defaults to true and no rig field set it.
+`RigLight::contactShadow` now exists (default true, so nothing changes on its own). Turning both off
+in Glowmere's rig, min of 4 interleaved runs with the shadow mask already in place:
+
+| canvas | scene | GPU frame |
+|---|---:|---:|
+| 720x450 | 11.21 -> 10.03 (-1.18) | 12.98 -> 11.80 (-1.18) |
+| 2880x1166 | 29.23 -> **25.95** (-3.28) | 35.52 -> 32.31 (-3.21) |
+
+Phase 3 measured 2.42 ms for the same removal at 720x450 as a shader-only A/B before the mask
+existed; 1.18 is the same removal after it, which is the number that matters now. It changes the
+image, ADR-034 gave the march to every light deliberately, and the control is therefore a rig's to
+use and not the renderer's to apply.

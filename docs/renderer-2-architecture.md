@@ -256,7 +256,10 @@ Per §2 and §80, these are working systems to extend rather than replace:
   taken at each pass *end*, so intervals partition rather than nest.
 - **Aux targets already exist**: normal+roughness, velocity, emission, object+material IDs, linear
   depth. Motion vectors (§53) therefore have somewhere to come from already.
-- **`--disable shadows,ao,volume,post`** for cost attribution by removal.
+- **`--disable shadows,ao,volume,post,shadowmask`** for cost attribution by removal.
+- **A half-resolution shadow mask** (ADR-086) already exists for the directional lights'
+  shadow-map term, with a bilateral upsample and a full-resolution fallback for anything it
+  cannot describe.
 
 ## 7a. The popping has a specific cause, and it is not the one the brief assumes
 
@@ -326,6 +329,11 @@ Stated rather than quietly skipped:
    wrong because the editor does not render at 1440×900.** It renders at 3.4–4.4 MP, which is past
    the point where the pass becomes per-pixel. Fragment-side work is three quarters of the pass, and
    render scale is a real lever there. Section 2.
+   *(Phase 4, ADR-086: fragment-side work confirmed -- moving the key light's cascade lookup to half
+   resolution takes 27% off the scene pass at the editor's canvas and 14% at 720x450, the mirror
+   image of Phase 3's ladder. Render scale measured too: 12% for a 0.9 linear scale, 46% for 0.5,
+   and it saturates above the 16.67 ms target, so a **dynamic** form is not worth building yet. See
+   `docs/performance.md`.)*
 4. **GPU-driven submission is already partly present** and the CPU is not the bottleneck, so §17's
    later stages stay parked until measurement justifies them.
 5. **Volumetrics are 4% of the frame.** Whatever their measurement error, they are not the problem.

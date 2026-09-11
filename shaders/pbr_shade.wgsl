@@ -379,6 +379,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         context.viewDepth = viewDepth;
         context.rotation = gradientNoise(screenUv * frame.targetSize.xy) * 6.28318531;
         context.jitter = 0.5;
+        context.maskable = alphaMode < 1.5; // ADR-086: blended surfaces are not in the depth prepass
         let lighting = directLighting(context);
         if (!sampledOcclusion) {
             occlusion = sampleAmbientOcclusion(screenUv, viewDepth, n);
@@ -459,6 +460,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     let noise = gradientNoise(screenUv * frame.targetSize.xy);
     ctx.rotation = noise * 6.28318531;
     ctx.jitter = noise;
+    ctx.maskable = alphaMode < 1.5; // ADR-086: blended surfaces are not in the depth prepass
     let lit = directLighting(ctx);
     let direct = lit.diffuse + lit.specular;
 

@@ -71,6 +71,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       debug_(std::make_unique<DebugDraw>(context, shaders)),
       simulation_(std::make_unique<Simulation>(context, shaders)),
       shadows_(std::make_unique<ShadowRenderer>(context)), ao_(std::make_unique<AoRenderer>(context, shaders)),
+      shadowMask_(std::make_unique<ShadowMaskRenderer>(context, shaders)),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
     objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
 }
@@ -97,9 +98,10 @@ Result<void> SceneRenderer::init() {
     {
         // Group 0 of every scene pass. 0 = FrameUniforms and 15 = the simulated-grid table declared
         // by shaders/fields.wgsl (ADR-032; read-only storage, inert when the scene has no grids).
-        // 1..10 are the lighting bindings shaders/lighting.wgsl declares (ADR-033/034); a pass whose
-        // shader does not mention them simply never reads them.
-        std::array<wgpu::BindGroupLayoutEntry, 12> entries{};
+        // 1..10 are the lighting bindings shaders/shadows.wgsl and shaders/lighting.wgsl declare
+        // (ADR-033/034), and 11 is the shadow mask shaders/shadows.wgsl reads (ADR-086); a pass
+        // whose shader does not mention them simply never reads them.
+        std::array<wgpu::BindGroupLayoutEntry, 13> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -136,9 +138,11 @@ Result<void> SceneRenderer::init() {
         entries[10].binding = 10;
         entries[10].visibility = wgpu::ShaderStage::Fragment;
         entries[10].sampler.type = wgpu::SamplerBindingType::Filtering;
-        entries[11].binding = 15;
-        entries[11].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
-        entries[11].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[11] = entries[6];
+        entries[11].binding = 11; // ADR-086: the half-resolution directional shadow mask
+        entries[12].binding = 15;
+        entries[12].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
+        entries[12].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "frame-layout";
         desc.entryCount = entries.size();
@@ -315,6 +319,9 @@ Result<void> SceneRenderer::init() {
     if (auto r = shadows_->init(sizeof(FrameUniforms)); !r) {
         return r;
     }
+    if (auto r = shadowMask_->init(frameLayout_); !r) {
+        return r;
+    }
     if (auto r = ao_->init(frameLayout_); !r) {
         return r;
     }
@@ -367,6 +374,7 @@ Result<void> SceneRenderer::init() {
     volumes_->setTimeline(timeline_.get());
     simulation_->setTimeline(timeline_.get());
     ao_->setTimeline(timeline_.get());
+    shadowMask_->setTimeline(timeline_.get());
     postProcessor_->setTimeline(timeline_.get());
     initialised_ = true;
     return {};
@@ -585,8 +593,9 @@ Result<void> SceneRenderer::createLightResources() {
 void SceneRenderer::rebuildFrameBindGroups() {
     const auto& device = context_.device();
     auto make = [&](const wgpu::Buffer& frameBuffer, const wgpu::TextureView& shadowAtlas,
-                    const wgpu::TextureView& aoView, const wgpu::TextureView& depthView, const char* label) {
-        std::array<wgpu::BindGroupEntry, 12> entries{};
+                    const wgpu::TextureView& aoView, const wgpu::TextureView& depthView,
+                    const wgpu::TextureView& maskView, const char* label) {
+        std::array<wgpu::BindGroupEntry, 13> entries{};
         entries[0].binding = 0;
         entries[0].buffer = frameBuffer;
         entries[0].size = sizeof(FrameUniforms);
@@ -613,9 +622,11 @@ void SceneRenderer::rebuildFrameBindGroups() {
         entries[9].textureView = ltc2_.view;
         entries[10].binding = 10;
         entries[10].sampler = ltcSampler_;
-        entries[11].binding = 15;
-        entries[11].buffer = fields_->gridBuffer();
-        entries[11].size = FieldUniforms::kGridBufferSize;
+        entries[11].binding = 11;
+        entries[11].textureView = maskView;
+        entries[12].binding = 15;
+        entries[12].buffer = fields_->gridBuffer();
+        entries[12].size = FieldUniforms::kGridBufferSize;
         wgpu::BindGroupDescriptor desc{};
         desc.label = label;
         desc.layout = frameLayout_;
@@ -624,15 +635,21 @@ void SceneRenderer::rebuildFrameBindGroups() {
         return device.CreateBindGroup(&desc);
     };
     const wgpu::TextureView sceneDepth = linearDepth_.valid() ? linearDepth_.view : linearDepthDefault_.view;
-    frameBindGroup_ = make(frameUniforms_, shadows_->atlasView(), ao_->output(), sceneDepth, "frame-bind-group");
+    frameBindGroup_ = make(frameUniforms_, shadows_->atlasView(), ao_->output(), sceneDepth,
+                           shadowMask_->output(), "frame-bind-group");
     // The prepass, the shadow passes, the linear-depth pass and the AO passes all write something
-    // the shading pass reads, so their copy binds placeholders in those three slots. Ambient
-    // occlusion reads the linear depth through its own group instead.
+    // the shading pass reads, so their copy binds placeholders in those slots. Ambient occlusion
+    // reads the linear depth through its own group instead.
     frameBindGroupAux_ = make(frameUniforms_, shadows_->dummyAtlasView(), ao_->placeholder(),
-                              linearDepthDefault_.view, "frame-bind-group-aux");
+                              linearDepthDefault_.view, shadowMask_->placeholder(), "frame-bind-group-aux");
+    // ADR-086: the mask pass is the one caller that needs the real atlas and the real linear depth
+    // while still being forbidden the mask -- it is computing the shading pass's own shadow terms,
+    // through the shading pass's own bindings, into the target it must not sample.
+    frameBindGroupMask_ = make(frameUniforms_, shadows_->atlasView(), ao_->placeholder(), sceneDepth,
+                               shadowMask_->placeholder(), "frame-bind-group-mask");
     for (std::uint32_t v = 0; v < kMaxShadowViews; ++v) {
         shadowFrameGroups_[v] = make(shadows_->viewUniforms(v), shadows_->dummyAtlasView(), ao_->placeholder(),
-                                     linearDepthDefault_.view, "shadow-frame-group");
+                                     linearDepthDefault_.view, shadowMask_->placeholder(), "shadow-frame-group");
     }
 }
 
@@ -1173,6 +1190,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     if (auto r = postProcessor_->reload(); !r) {
         keep("post.wgsl", r);
     }
+    if (auto r = shadowMask_->reload(); !r) {
+        keep("shadow_mask.wgsl", r);
+    }
     ++engineReloads_;
     if (first) {
         log::info("engine shaders reloaded");
@@ -1614,6 +1634,21 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                    static_cast<float>(std::max(stats_.ao.width, 1u)),
                                    static_cast<float>(std::max(stats_.ao.height, 1u)));
     }
+    // ---- the half-resolution directional shadow mask (ADR-086): sized here for the same reason ----
+    // It reads the linear depth the prepass resolves, so it can only run when there is a prepass;
+    // and the prepass only runs when something needs it, which now includes this.
+    {
+        shadowMask_->update(hdr_.width(), hdr_.height(), qualitySettings_, toggles_.shadowMask,
+                            static_cast<std::uint32_t>(frame.lightCounts.x + 0.5f),
+                            scene.camera.effectiveFovY(), aspect, scene.camera.nearPlane,
+                            scene.camera.farPlane);
+        stats_.shadowMask = shadowMask_->stats();
+        const bool on = shadowMask_->active();
+        frame.shadowMaskParams = glm::vec4(on ? 1.0f : 0.0f,
+                                           on ? static_cast<float>(stats_.shadowMask.lights) : 0.0f,
+                                           static_cast<float>(std::max(stats_.shadowMask.width, 1u)),
+                                           static_cast<float>(std::max(stats_.shadowMask.height, 1u)));
+    }
     queue.WriteBuffer(frameUniforms_, 0, &frame, sizeof(frame));
     // Each shadow view is the same block with its own light-space matrix, so the depth-only passes
     // reuse the ordinary vertex shaders (ADR-034).
@@ -1805,7 +1840,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // Ambient occlusion and the contact-shadow march both need the depth of the whole opaque
     // scene while it is being shaded (ADR-034/035); the particle fog coupling reads the linear
     // depth the same prepass resolves, so the flag is decided before either uses it.
-    const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows;
+    const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows || shadowMask_->active();
 
     // ---- particle simulation (compute) ----
     // ADR-040 frame context: the previous view-projection for the velocity target (ADR-035), the
@@ -2009,6 +2044,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
 
         // ---- ground-truth ambient occlusion (ADR-034) ----
         ao_->encode(encoder, frameBindGroupAux_);
+
+        // ---- the directional shadow mask (ADR-086) ----
+        // Last of the prepass group: it wants the shadow atlas (drawn above) and the linear depth
+        // (resolved just now), and the lit pass that follows wants it.
+        shadowMask_->encode(encoder, frameBindGroupMask_);
     }
     stage(cpu.depthEncodeMs);
 
@@ -2465,6 +2505,7 @@ void SceneRenderer::collectFrameTimings() {
     volumes_->collectTimings();
     simulation_->collectTimings();
     ao_->collectTimings();
+    shadowMask_->collectTimings();
 
     stats_.gpuFrameMs = timeline_->frameMs();
     stats_.gpuPasses = static_cast<std::uint32_t>(timeline_->passes().size());
@@ -2477,6 +2518,7 @@ void SceneRenderer::collectFrameTimings() {
     stats_.volume = volumes_->stats();
     stats_.simulation = simulation_->stats();
     stats_.ao = ao_->stats();
+    stats_.shadowMask = shadowMask_->stats();
     stats_.shadows.shadowMs = stats_.shadows.views > 0 ? timeline_->msFor("shadow") : -1.0;
     stats_.post.postMs = timeline_->msForPrefix("post/");
 
