@@ -1959,7 +1959,7 @@ void Composition::registerNodeParameters(CompositionNode& node) {
             floatDesc(base + "terrainLodDistance", node.terrain.lodDistance, 4.0f, 4000.0f, 20.0f, 400.0f));
         node.terrainViewDistanceParam = &params_->add(
             floatDesc(base + "terrainViewDistance", node.terrain.viewDistance, 8.0f, 20000.0f, 50.0f, 2000.0f));
-        // ADR-091 §15: the water's modulation surface. Ordinary parameters, so `routes` in a
+        // ADR-099 §15: the water's modulation surface. Ordinary parameters, so `routes` in a
         // project reaches them through the ProcessorChain every other reactive property uses --
         // attack, decay, curve, threshold, depth -- rather than through a second mapping layer, and
         // so the editor gets sliders for them for nothing. Tasteful is the artist's business: what
@@ -2253,7 +2253,7 @@ void Composition::rebuild() {
                                               node.terrain.groundMottle, node.terrain.groundGlow,
                                               node.terrain.groundGlowScale, node.terrain.groundGlowCoverage,
                                               node.terrain.groundGlowColor));
-        // ADR-091: water no longer runs a material program -- it has its own pipeline, and the
+        // ADR-099: water no longer runs a material program -- it has its own pipeline, and the
         // program it used to run could not reach the scene depth its shoreline is made of. The
         // name survives as the key `Scene::waters` is addressed by; installing a program under it
         // would spend one of the eight material-program slots on something nothing evaluates.
@@ -2566,7 +2566,7 @@ void Composition::rebuild() {
             CompositionNode& mutableNode = *nodePtr;
             mutableNode.glow = std::move(nodeGlow);
             const auto buildStart = std::chrono::steady_clock::now();
-            // ADR-091: the water bodies first -- the surface mesh's flow lanes are baked from
+            // ADR-099: the water bodies first -- the surface mesh's flow lanes are baked from
             // them, so they have to exist before a triangle does. Derived from the same map the
             // ground is, so there is one description of where the river goes and one of which way
             // it runs, and terrain is not asked to know the second.
@@ -2602,7 +2602,7 @@ void Composition::rebuild() {
                     continue;
                 }
                 Entity& e = scene_.addEntity(fmt::format("{}.water{}", node.name, c), chunk.water);
-                // ADR-091: its own style, so the renderer draws it through the water pipeline
+                // ADR-099: its own style, so the renderer draws it through the water pipeline
                 // rather than through the shared metallic-roughness path with an alpha on it.
                 // `material.program` is no longer a program to run: it is the *name* the draw
                 // finds this surface's settings by in Scene::waters.
@@ -2619,7 +2619,7 @@ void Composition::rebuild() {
                 range.restEmissive.push_back(0.0f);
                 range.restRoughness.push_back(node.terrain.water.roughness);
             }
-            // ADR-091: every water body's centreline, published as a scene spline named
+            // ADR-099: every water body's centreline, published as a scene spline named
             // "<node>.<body>". A river is a curve through the world and the engine already has a
             // curve type that particle emitters, path deformers, instance distributions and the
             // camera all read -- so publishing it costs one conversion and means a mist emitter
@@ -3031,7 +3031,7 @@ void Composition::update(const FrameTime& time) {
         cameraAngle_ += cameraOrbitSpeed_->value() * dt;
     }
     applyParameters();
-    // ADR-091 §13. After the parameters, because a floating layer's node transform is one of them,
+    // ADR-099 §13. After the parameters, because a floating layer's node transform is one of them,
     // and before the culling, so a drifting layer's bounds are this frame's rather than last
     // frame's -- a raft that has moved out of frame must be culled on where it is now.
     updateFloaters(time.renderTime);
@@ -3665,7 +3665,7 @@ void Composition::setViewport(std::uint32_t width, std::uint32_t height) {
     viewportHeight_ = std::max(height, 1u);
 }
 
-// ADR-091 §15. The water's reactive properties are ordinary parameters, so by the time this runs
+// ADR-099 §15. The water's reactive properties are ordinary parameters, so by the time this runs
 // the modulator has already put the frame's signal through each route's gain, curve, threshold,
 // attack/decay and depth. All that is left is to copy the finals into the surface the renderer
 // reads -- which is the whole of "water music reactivity": no second modulation system, and a
@@ -3692,7 +3692,7 @@ void Composition::updateWaterSurfaces() {
     }
 }
 
-// ADR-091 §13. Every floating layer's instances, recomputed from the timeline second.
+// ADR-099 §13. Every floating layer's instances, recomputed from the timeline second.
 //
 // The cost is the layer's instance count times a nearest-point query on a polyline, which for
 // Glowmere's two hundred pads on a hundred-segment river is tens of microseconds -- and it buys
@@ -3868,7 +3868,7 @@ void Composition::updateTerrainLod() {
                 continue;
             }
             e.castsShadow = distance <= shadowReach;
-            // The water's own flag is left where it was set at build: false. ADR-091 made the
+            // The water's own flag is left where it was set at build: false. ADR-099 made the
             // surface translucent, and a translucent sheet throwing a hard shadow onto its own bed
             // was a bug nobody had looked at. The renderer excludes MeshStyle::Water from the
             // shadow passes anyway; keeping the flag honest means the two agree about why.
@@ -4875,7 +4875,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 node.procedural = std::move(*pg);
                 node.proceduralMaterialAuthored = item.at("procedural").contains("material");
             }
-            // ADR-091 §13: a procedural node that floats. Read after "procedural" so a scene can
+            // ADR-099 §13: a procedural node that floats. Read after "procedural" so a scene can
             // say "these are lily pads" and "they drift on the valley's river" in the same node.
             if (item.contains("float")) {
                 auto spec = FloatSpec::fromJson(item.at("float"));

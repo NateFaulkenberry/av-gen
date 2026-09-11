@@ -357,7 +357,7 @@ Result<void> SceneRenderer::init() {
         !r) {
         return r;
     }
-    // ADR-091: water draws inside the scene pass with the scene's own frame, object and IBL
+    // ADR-099: water draws inside the scene pass with the scene's own frame, object and IBL
     // groups, and one of its own for the surface settings.
     if (auto r = water_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_, objectLayout_,
                               iblLayout_);
@@ -1708,7 +1708,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-086: where this entity's joint palette sits in the joint buffer. A zero slice means
         // a static mesh, which is every entity in a scene with no character in it.
         SkinningRenderer::Slice skin;
-        // ADR-091: which of the scene's water surfaces this entity draws with, resolved once here
+        // ADR-099: which of the scene's water surfaces this entity draws with, resolved once here
         // from the material-program name rather than looked up per draw.
         std::uint32_t water = 0;
         [[nodiscard]] bool skinned() const { return skin.valid(); }
@@ -1928,13 +1928,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // Ambient occlusion and the contact-shadow march both need the depth of the whole opaque
     // scene while it is being shaded (ADR-034/035); the particle fog coupling reads the linear
     // depth the same prepass resolves, so the flag is decided before either uses it.
-    // ADR-091: water reads the prepass's linear depth to know how thick it is, which is what its
+    // ADR-099: water reads the prepass's linear depth to know how thick it is, which is what its
     // shoreline and its depth colour are made of. A scene with water in it therefore asks for the
     // prepass whatever else is on -- 0.20 ms of depth-only geometry, against a surface that
     // otherwise falls back to the vertex depth and to the mesh's own edge for its waterline.
     const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows ||
                                    shadowMask_->active() || !scene.waters.empty();
-    // ---- water surfaces (ADR-091) ----
+    // ---- water surfaces (ADR-099) ----
     // One uniform slot per authored surface, uploaded once a frame. `flowTime` is the timeline
     // second, never a wall clock and never an accumulated delta: a river at t = 12.0 has to be in
     // the same place in an offline render as it is live, and the project verifies that by hashing
@@ -2310,7 +2310,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             ++stats_.state.pipelineBinds;
             stats_.state.bindGroupBinds += 2;
         }
-        // ---- water (ADR-091) ----
+        // ---- water (ADR-099) ----
         // After the sky and before the particles: the surface has to composite over the bed and
         // the bank, which are opaque and already drawn, and the motes and spores above it have to
         // composite over the surface. Its own pipeline, so the branch it needs is not in the

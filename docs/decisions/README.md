@@ -96,4 +96,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [088](ADR-088-entities.md) | Entities and behaviour: driving nodes from signals | Accepted |
 | [089](ADR-089-the-cinematic-sequence.md) | The cinematic sequence: choreography through time | Accepted |
 | [090](ADR-090-terrain-generation-and-queries.md) | Terrain generation and spatial queries | Accepted |
-| [091](ADR-091-water.md) | Water occupies a channel | Accepted |
+| [091](ADR-099-water.md) | Water occupies a channel | Accepted |

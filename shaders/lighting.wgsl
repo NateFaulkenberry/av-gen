@@ -19,7 +19,7 @@
 // Normalises, or returns the fallback when the vector is too short to have a direction. This used
 // to call material.wgsl's matSafeNormalize, which meant this file could only be included by a
 // module that had already included the material interpreter -- an undeclared dependency that
-// water.wgsl (ADR-091), which wants the lighting and has no material program in it, tripped over
+// water.wgsl (ADR-099), which wants the lighting and has no material program in it, tripped over
 // immediately. One copy of four lines is cheaper than that coupling.
 fn lightSafeNormalize(v: vec3<f32>, fallback: vec3<f32>) -> vec3<f32> {
     let len2 = dot(v, v);

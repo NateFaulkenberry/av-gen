@@ -183,7 +183,7 @@ constexpr MeshId kInvalidMesh = 0xFFFFFFFFu;
 using RigId = std::uint32_t;
 constexpr RigId kInvalidRig = 0xFFFFFFFFu;
 
-// How an entity is drawn. `Water` (ADR-091) is a surface the scene pass draws through its own
+// How an entity is drawn. `Water` (ADR-099) is a surface the scene pass draws through its own
 // pipeline: it needs the scene's depth to know how thick it is, the environment to reflect, and a
 // normal it computes itself, none of which the shared metallic-roughness path can give it. It is a
 // style rather than a material flag because it decides which pipeline draws the entity, which is

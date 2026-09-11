@@ -1,4 +1,4 @@
-// Water (ADR-091, spec §46): the claims the surface, the flow and the floating layers are built on.
+// Water (ADR-099, spec §46): the claims the surface, the flow and the floating layers are built on.
 //
 // What is worth testing here is not "does it compile" but the four properties the rest of the
 // system depends on and that are easy to break silently:
@@ -224,7 +224,7 @@ TEST_CASE("a water vertex carries the flow of the body under it", "[unit][water]
 }
 
 TEST_CASE("without a body set the water vertex is the one it always was", "[unit][water]") {
-    // Every world that predates ADR-091 passes no bodies, and its water must come out exactly as
+    // Every world that predates ADR-099 passes no bodies, and its water must come out exactly as
     // it did: normal +Y, and no flow to carry a pattern along.
     const world::WorldMap map = world::defaultWorld();
     world::TerrainSettings settings;

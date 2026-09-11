@@ -111,7 +111,7 @@ struct CompositionNode {
     SdfObject sdf;                 // settings for kind Sdf (ADR-027; node transform folded into sdf.transform)
     world::WorldMap worldMap;      // settings for kind Terrain (ADR-046): the geography
     world::TerrainSettings terrain;// settings for kind Terrain: how it is chopped up and coarsened
-    world::WaterFlowSettings waterFlow; // settings for kind Terrain (ADR-091): how fast the water runs
+    world::WaterFlowSettings waterFlow; // settings for kind Terrain (ADR-099): how fast the water runs
     Material terrainMaterial;      // settings for kind Terrain: shared by every chunk
     world::Ecology ecology;        // settings for kind Terrain (ADR-048): what grows on it
 
@@ -135,7 +135,7 @@ struct CompositionNode {
     ParticleSystem particleRest;
     ProceduralParameters proceduralParams;
     ProceduralGeometry proceduralRest;
-    // ADR-091 §13: when set, this Procedural node's instances are not scattered on the ground --
+    // ADR-099 §13: when set, this Procedural node's instances are not scattered on the ground --
     // they float on the named terrain node's water and drift with it, recomputed every frame from
     // the timeline clock. Everything else about the node is unchanged: the same imported mesh, the
     // same material, the same GPU culling and LOD.
@@ -159,10 +159,10 @@ struct CompositionNode {
     SdfParameters sdfParams;
     SdfObject sdfRest;
     std::vector<world::TerrainChunk> chunks;  // Terrain: built at rebuild, indexed by entity offset
-    // Terrain (ADR-091): the water bodies derived from this node's map, built at rebuild. The
+    // Terrain (ADR-099): the water bodies derived from this node's map, built at rebuild. The
     // surface mesh's flow lanes come from it, and so does every floating thing on it.
     world::WaterBodySet waterBodies;
-    // Terrain (ADR-091): this node's slot in Scene::waters, or -1 when it has no water. Set at
+    // Terrain (ADR-099): this node's slot in Scene::waters, or -1 when it has no water. Set at
     // rebuild; the per-frame parameter pass writes through it.
     int waterSurfaceIndex = -1;
     // Terrain: the emissive scatter layers reduced to soft emitters, built at rebuild. The
@@ -172,7 +172,7 @@ struct CompositionNode {
     params::Parameter<bool>* terrainCullParam = nullptr;  // Terrain: frustum culling on/off (debug)
     params::Parameter<float>* terrainLodDistanceParam = nullptr;
     params::Parameter<float>* terrainViewDistanceParam = nullptr;
-    // Terrain (ADR-091): the water's own modulation surface. These are the properties §15 asks a
+    // Terrain (ADR-099): the water's own modulation surface. These are the properties §15 asks a
     // signal to reach, and they are ordinary parameters so they reach it through the ModRoute
     // chain every other reactive property in this engine uses, not a second one.
     params::Parameter<float>* waterGlowParam = nullptr;
@@ -431,8 +431,8 @@ private:
     // outside the frustum or beyond the view distance. Changes no geometry, only which mesh each
     // chunk entity points at, which is why a camera can fly across a world for free.
     void updateTerrainLod();
-    void updateWaterSurfaces(); // ADR-091: the water parameters into Scene::waters, once a frame
-    void updateFloaters(double time); // ADR-091 §13: drifting instances, once a frame
+    void updateWaterSurfaces(); // ADR-099: the water parameters into Scene::waters, once a frame
+    void updateFloaters(double time); // ADR-099 §13: drifting instances, once a frame
     std::vector<Floater> floaterScratch_; // reused by updateFloaters so a drifting layer allocates once
     void updateEcologyLights();
     void registerNodeParameters(CompositionNode& node);

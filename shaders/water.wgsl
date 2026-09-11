@@ -1,4 +1,4 @@
-// Stylized water (ADR-091). Its own pipeline inside the scene pass, drawn after the opaque
+// Stylized water (ADR-099). Its own pipeline inside the scene pass, drawn after the opaque
 // geometry and blended over it.
 //
 // Why not pbr_shade.wgsl. Water is not a metallic-roughness surface with an alpha on it; it is a
@@ -170,7 +170,7 @@ fn rippleGradient(p: vec2<f32>, flowDir: vec2<f32>, speed: f32, t: f32, footprin
 
 // The view-space distance the opaque scene was drawn at under this pixel, or a very large number
 // where there was no depth prepass this frame (in which case the shader falls back to the vertex
-// depth and the surface degrades to what it was before ADR-091 rather than to garbage).
+// depth and the surface degrades to what it was before ADR-099 rather than to garbage).
 fn bedDepthAt(uv: vec2<f32>) -> f32 {
     if (water.params.z < 0.5) {
         return 1.0e7;

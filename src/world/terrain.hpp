@@ -34,7 +34,7 @@ constexpr int kMaxTerrainLods = 4;
 // level, so a caller that switches on the level cannot mistake water for a coarser ground.
 constexpr int kWaterLevel = kMaxTerrainLods;
 
-// `WaterSettings` moved to scene/water_surface.hpp in ADR-091 and is aliased here: the settings
+// `WaterSettings` moved to scene/water_surface.hpp in ADR-099 and is aliased here: the settings
 // have to reach `scene::Scene`, which the renderer is handed, and pulling the whole world map into
 // scene.hpp to get them would invert the dependency for twenty-five floats. The name a terrain
 // authors with does not change.
@@ -129,7 +129,7 @@ struct TerrainChunk {
 // The pixels-per-unit factor `chunkLod` wants, from a vertical field of view and a viewport height.
 [[nodiscard]] float lodProjectionScale(float fovYRadians, float viewportHeight);
 
-// ADR-091: `waterMaterialProgram` is gone. Water is drawn by rendering::WaterRenderer through its
+// ADR-099: `waterMaterialProgram` is gone. Water is drawn by rendering::WaterRenderer through its
 // own pipeline now, because the shoreline and the depth colour are made from the scene's own depth
 // buffer and a material program cannot reach it. What the generated program did -- colour by depth,
 // fade at the edge -- the surface shader does from the same `WaterSettings`, per pixel rather than
@@ -180,12 +180,12 @@ struct ChunkField {
 // body this point is: 1 on the centreline and 0 at the bank, which the bed's depth cannot say --
 // a wide shallow reach is shallow all the way across and its middle is still its middle.
 //
-// The vertex *normal* carries the flow (ADR-091): xz is the downstream direction at this point and
+// The vertex *normal* carries the flow (ADR-099): xz is the downstream direction at this point and
 // y is the speed as a fraction of the body's own, so the surface knows which way it runs without a
 // second vertex stream and without the shader knowing what a river is. A water sheet's real normal
 // is +Y everywhere and is the one thing already known, which is what makes the slot free. Pass a
 // `WaterBodySet` derived from the same map (world/water.hpp) to fill it; without one the flow is
-// zero and the surface is still, which is what every world did before ADR-091.
+// zero and the surface is still, which is what every world did before ADR-099.
 //
 // A quad is emitted wherever any of its corners is under water, and the terrain occludes the rest by
 // depth test, so the shoreline is where the two surfaces actually cross rather than where a mesh

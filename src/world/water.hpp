@@ -1,6 +1,6 @@
 #pragma once
 
-// Water bodies (ADR-091): a renderable, inhabitable body of water, built *from* the `WaterCourse`
+// Water bodies (ADR-099): a renderable, inhabitable body of water, built *from* the `WaterCourse`
 // terrain hands over (ADR-090, world/terrain_water.hpp).
 //
 // The division of labour is terrain_water.hpp's and this file honours it. A `WaterCourse` is

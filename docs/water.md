@@ -1,7 +1,7 @@
 # Water
 
 How a world's water is described, shaded, inhabited and made to answer the music. The decisions and
-the reasons are in [ADR-091](decisions/ADR-091-water.md); this is the authoring reference.
+the reasons are in [ADR-099](decisions/ADR-099-water.md); this is the authoring reference.
 
 Three things own three different parts of it, and the split is worth holding on to:
 

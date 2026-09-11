@@ -21,7 +21,7 @@
 #include "material.wgsl"
 #include "lighting.wgsl"
 
-// applyFog / fogHeightIntegral moved to common.wgsl in ADR-091: water.wgsl needs the same fog and
+// applyFog / fogHeightIntegral moved to common.wgsl in ADR-099: water.wgsl needs the same fog and
 // does not include this file, and two copies of a fog curve is how two surfaces end up in
 // different weather.
 

@@ -301,7 +301,7 @@ scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& sett
             const float depth = std::max(surface - q.bed, 0.0f);
             scene::Vertex v;
             v.position = glm::vec3(p.x, surface, p.y);
-            // ADR-091: the normal slot carries the flow, because a flat sheet's normal is the one
+            // ADR-099: the normal slot carries the flow, because a flat sheet's normal is the one
             // thing already known. xz is the downstream direction, y is the speed as a fraction of
             // the fastest body in the world, so the water surface shader can scroll its layers
             // along the real course without the GPU ever hearing of a river. A world with no

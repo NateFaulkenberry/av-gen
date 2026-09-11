@@ -1,4 +1,4 @@
-# ADR-091: Water occupies a channel
+# ADR-099: Water occupies a channel
 
 ## Status
 Accepted, 2026-09-11.

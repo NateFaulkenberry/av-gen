@@ -1,6 +1,6 @@
 #pragma once
 
-// How a water surface looks (ADR-091). Its own header, and in `scene` rather than in `world`,
+// How a water surface looks (ADR-099). Its own header, and in `scene` rather than in `world`,
 // because two things need it that are on opposite sides of that line: a `world::TerrainSettings`
 // authors it, and a `scene::Scene` carries it to the renderer. `world::WaterSettings` is an alias
 // of this, so terrain still reads the way it always did.
@@ -8,7 +8,7 @@
 // The map decides where water *is* (world/world_map.hpp) and `world::WaterFlowSettings` decides
 // which way it runs (world/water.hpp); this decides what it looks like.
 //
-// Only the first block existed before ADR-091, when water was a depth-coloured opaque sheet drawn
+// Only the first block existed before ADR-099, when water was a depth-coloured opaque sheet drawn
 // through the general material interpreter. Everything below it is what a *surface* needs and a
 // material program cannot reach: the scene's own depth (for thickness, and so for a shoreline that
 // is not the mesh's silhouette), the environment cube (for a reflection), and a normal that moves.

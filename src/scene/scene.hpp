@@ -40,7 +40,7 @@ struct Scene {
     spatial::SplineSet splines;                  // ADR-026; distributions, path deformers, camera, emitters
     std::vector<SdfObject> sdfs;                 // ADR-027; rendering::SdfRenderer / meshed entities
     std::vector<MaterialProgram> materialPrograms; // ADR-030; referenced by Material::program
-    // ADR-091: the water surfaces of this scene, one per distinct look. An entity drawn with
+    // ADR-099: the water surfaces of this scene, one per distinct look. An entity drawn with
     // MeshStyle::Water finds its settings by the material-program name it carries, which is how a
     // water surface reaches rendering::WaterRenderer without an index on every Entity in a world.
     std::vector<WaterSurface> waters;

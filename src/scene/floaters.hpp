@@ -1,6 +1,6 @@
 #pragma once
 
-// Things that float and drift (ADR-091 §13). Lily pads, leaves, petals, blossoms, glowing
+// Things that float and drift (ADR-099 §13). Lily pads, leaves, petals, blossoms, glowing
 // organisms, debris -- anything that sits on a water surface, is carried by the current, and is not
 // a particle. Particles are the wrong tool for these: they are billboards with a lifetime, and a
 // lily pad is a mesh with an orientation that has to be there the whole shot.

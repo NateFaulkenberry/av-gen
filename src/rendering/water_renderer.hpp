@@ -1,6 +1,6 @@
 #pragma once
 
-// Water surfaces (ADR-091). A pipeline inside the scene pass, not a pass of its own: water is
+// Water surfaces (ADR-099). A pipeline inside the scene pass, not a pass of its own: water is
 // geometry, it is depth-tested against the world it sits in, and it wants to be composited over
 // the bank behind it while the bank's depth is still bound.
 //
