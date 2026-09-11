@@ -39,6 +39,45 @@ namespace {
 
 // The tag prefix that declares which family a building belongs to.
 constexpr const char* kFamilyPrefix = "family:";
+// Props are tagged by what they are, not by a cell kind, because a prop is not what a cell *is* --
+// it is what stands on it, and several of them stand on one.
+constexpr const char* kPropTag = "prop";
+
+// The family an asset declares, or empty. One definition, used by every role that splits by family.
+[[nodiscard]] std::string familyOf(const assets::AssetDescriptor& asset) {
+    for (const std::string& tag : asset.tags) {
+        if (tag.starts_with(kFamilyPrefix)) {
+            return tag.substr(std::string_view(kFamilyPrefix).size());
+        }
+    }
+    return {};
+}
+
+// Groups a role's assets by the family each declares, dropping those that declare none -- they are
+// already in the role's flat list, which is what `forFamily` falls back to.
+void groupByFamily(const std::vector<std::string>& names, const assets::AssetLibrary& library,
+                   CityLibrary::Families& into) {
+    for (const std::string& name : names) {
+        const assets::AssetDescriptor* asset = library.find(name);
+        if (asset == nullptr) {
+            continue;
+        }
+        const std::string family = familyOf(*asset);
+        if (family.empty()) {
+            continue;
+        }
+        auto it = std::ranges::find_if(into, [&family](const auto& e) { return e.first == family; });
+        if (it == into.end()) {
+            into.emplace_back(family, std::vector<std::string>{});
+            it = into.end() - 1;
+        }
+        it->second.push_back(name);
+    }
+    std::ranges::sort(into, {}, &std::pair<std::string, std::vector<std::string>>::first);
+    for (auto& [family, list] : into) {
+        std::ranges::sort(list);
+    }
+}
 
 } // namespace
 
@@ -59,7 +98,7 @@ const std::vector<std::string>& CityLibrary::forKind(CellKind kind) const {
 
 bool CityLibrary::empty() const {
     return road.empty() && junction.empty() && crossing.empty() && pavement.empty() &&
-           plot.empty() && courtyard.empty() && plaza.empty();
+           plot.empty() && courtyard.empty() && plaza.empty() && prop.empty();
 }
 
 CityLibrary CityLibrary::fromTags(const assets::AssetLibrary& library) {
@@ -83,45 +122,61 @@ CityLibrary CityLibrary::fromTags(const assets::AssetLibrary& library) {
     collect(roleTag(CellKind::Courtyard), out.courtyard);
     collect(roleTag(CellKind::Plaza), out.plaza);
 
-    // Families, from a `family:<name>` tag on a building. A prefix rather than a bare tag because
-    // the code has to be able to tell a family from any other word an artist writes: every one of
-    // these buildings is also tagged "city" and "building", and "a tag that only some of them carry"
-    // is a rule that silently reclassifies the vocabulary the moment somebody tags one of them
-    // "damaged". The prefix says which tag is meant to be a family, in the manifest, explicitly.
-    for (const std::string& name : out.plot) {
-        const assets::AssetDescriptor* asset = library.find(name);
-        if (asset == nullptr) {
-            continue;
-        }
-        for (const std::string& tag : asset->tags) {
-            if (!tag.starts_with(kFamilyPrefix)) {
-                continue;
-            }
-            const std::string family = tag.substr(std::string_view(kFamilyPrefix).size());
-            auto it = std::ranges::find_if(out.plotFamilies,
-                                           [&family](const auto& e) { return e.first == family; });
-            if (it == out.plotFamilies.end()) {
-                out.plotFamilies.emplace_back(family, std::vector<std::string>{});
-                it = out.plotFamilies.end() - 1;
-            }
-            it->second.push_back(name);
-        }
-    }
-    std::ranges::sort(out.plotFamilies, {}, &std::pair<std::string, std::vector<std::string>>::first);
-    for (auto& [family, names] : out.plotFamilies) {
-        std::ranges::sort(names);
-    }
+    // Props, which have no cell kind of their own.
+    collect(kPropTag, out.prop);
+
+    // Families, from a `family:<name>` tag. A prefix rather than a bare tag because the code has to
+    // be able to tell a family from any other word an artist writes: every one of these buildings is
+    // also tagged "city" and "building", and "a tag that only some of them carry" is a rule that
+    // silently reclassifies the vocabulary the moment somebody tags one of them "damaged". The
+    // prefix says which tag is meant to be a family, in the manifest, explicitly.
+    groupByFamily(out.plot, library, out.plotFamilies);
+    groupByFamily(out.courtyard, library, out.courtyardFamilies);
+    groupByFamily(out.prop, library, out.propFamilies);
     return out;
 }
 
-const std::vector<std::string>& CityLibrary::forBlock(glm::ivec2 block, std::uint32_t seed) const {
+std::string CityLibrary::familyFor(glm::ivec2 block, std::uint32_t seed) const {
     if (plotFamilies.empty()) {
-        return plot;
+        return {};
     }
     // From the block's coordinates, not from a running stream, for the reason `cellRng` exists: a
     // block's character must not change because a block somewhere else did.
     Rng rng = cellRng(seed ^ 0x51ED270Bu, block);
-    return plotFamilies[rng.nextU32() % plotFamilies.size()].second;
+    return plotFamilies[rng.nextU32() % plotFamilies.size()].first;
+}
+
+const std::vector<std::string>& CityLibrary::forFamily(CellKind role,
+                                                       const std::string& family) const {
+    const Families* families = nullptr;
+    switch (role) {
+    case CellKind::Plot:      families = &plotFamilies; break;
+    case CellKind::Courtyard: families = &courtyardFamilies; break;
+    default:                  families = nullptr; break;
+    }
+    if (families != nullptr && !family.empty()) {
+        const auto it = std::ranges::find_if(*families,
+                                             [&family](const auto& e) { return e.first == family; });
+        if (it != families->end() && !it->second.empty()) {
+            return it->second;
+        }
+    }
+    return forKind(role);
+}
+
+const std::vector<std::string>& CityLibrary::propsFor(const std::string& family) const {
+    if (!family.empty()) {
+        const auto it = std::ranges::find_if(propFamilies,
+                                             [&family](const auto& e) { return e.first == family; });
+        if (it != propFamilies.end() && !it->second.empty()) {
+            return it->second;
+        }
+    }
+    return prop;
+}
+
+const std::vector<std::string>& CityLibrary::forBlock(glm::ivec2 block, std::uint32_t seed) const {
+    return forFamily(CellKind::Plot, familyFor(block, seed));
 }
 
 std::size_t PlacedCity::instanceCount() const {
@@ -175,13 +230,50 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
     // -- but a building is a solid thing on top of something, and a plot given only a building has
     // nothing under it but the void, which is exactly what it looks like.
     const auto placeOne = [&](glm::ivec2 coord, const CityCell& cell, CellKind role,
-                              const std::vector<std::string>& candidates, std::uint32_t salt) {
+                              const std::vector<std::string>& candidates, std::uint32_t salt,
+                              const std::string& family) {
         if (candidates.empty()) {
             noteUndressed(role);
             return;
         }
         Rng rng = cellRng(plan.settings.seed ^ salt, coord);
-        const std::string& name = candidates[rng.nextU32() % candidates.size()];
+        const std::string* chosen = &candidates[rng.nextU32() % candidates.size()];
+        if (role == CellKind::Plot && candidates.size() > 1) {
+            // Buildings step along a street rather than jumping. Drawing each plot independently
+            // from the family gives a two-storey house between two six-storey ones and back again,
+            // which is uniform in *character* -- the family did its job -- and random in height,
+            // which no built street is.
+            //
+            // So a block gets a height *band* of its own, and each plot picks near it: the family's
+            // pieces are sorted by height, the band names a place in that order, and a plot lands
+            // within a piece or two of it. Neighbouring plots in the same block therefore differ by
+            // a storey rather than by a tower, and two blocks of the same family still differ from
+            // each other. The drift is deliberately small; the whole effect is lost if it is not.
+            std::vector<const assets::AssetDescriptor*> byHeight;
+            byHeight.reserve(candidates.size());
+            for (const std::string& n : candidates) {
+                if (const assets::AssetDescriptor* a = library.find(n); a != nullptr) {
+                    byHeight.push_back(a);
+                }
+            }
+            if (byHeight.size() > 1) {
+                std::ranges::sort(byHeight, {}, [](const assets::AssetDescriptor* a) {
+                    // By proportion, not by raw height: every building is scaled to the same plot,
+                    // so what decides how tall one *stands* is its height over its footprint.
+                    const float foot = std::max(a->naturalSize.x, a->naturalSize.z);
+                    return foot > 0.0f ? a->naturalSize.y / foot : a->naturalSize.y;
+                });
+                Rng blockRng = cellRng(plan.settings.seed ^ 0x6C078965u, cell.block);
+                const auto span = static_cast<std::uint32_t>(byHeight.size());
+                const std::uint32_t band = blockRng.nextU32() % span;
+                // +/- one piece either side of the band, clamped at the ends.
+                const int drift = static_cast<int>(rng.nextU32() % 3u) - 1;
+                const auto index = static_cast<std::uint32_t>(
+                    std::clamp(static_cast<int>(band) + drift, 0, static_cast<int>(span) - 1));
+                chosen = &byHeight[index]->name;
+            }
+        }
+        const std::string& name = *chosen;
         const assets::AssetDescriptor* asset = library.find(name);
         if (asset == nullptr) {
             noteUndressed(role);
@@ -195,6 +287,7 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
         // degrees "for variation" is a road that no longer meets the one beside it, which is the
         // single most visible way a tiled city goes wrong. A plot's ground is laid square, since the
         // quarter turn on a plot cell is the *building's* facing and means nothing to the floor.
+        (void)family;
         const bool building = role == CellKind::Plot;
         const float yaw = building ? quarterRadians(cell.rotation) : 0.0f;
         const glm::quat rotation = glm::angleAxis(yaw, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -238,6 +331,46 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
         g.scales.emplace_back(scale);
     };
 
+    // Props: several on one cell, jittered, and free to face any way. A prop is not a tile -- it
+    // adjoins nothing -- so the quarter-turn rule that keeps roads meeting does not apply to it, and
+    // a row of trees all facing the same way is the giveaway that they were placed by a program.
+    const auto scatterProps = [&](glm::ivec2 coord, const std::vector<std::string>& candidates) {
+        if (candidates.empty() || plan.settings.propsPerCell <= 0) {
+            return;
+        }
+        Rng rng = cellRng(plan.settings.seed ^ 0x27D4EB2Fu, coord);
+        // How many, not always the maximum: a yard with exactly three things in it, on every yard,
+        // is a pattern rather than a yard.
+        const int count = static_cast<int>(rng.nextU32() % (static_cast<std::uint32_t>(
+                                                                plan.settings.propsPerCell) + 1u));
+        const glm::vec3 centre = plan.centreOf(coord);
+        const float spread = plan.settings.moduleSize * plan.settings.propSpread;
+        for (int i = 0; i < count; ++i) {
+            const std::string& name = candidates[rng.nextU32() % candidates.size()];
+            const assets::AssetDescriptor* asset = library.find(name);
+            if (asset == nullptr) {
+                continue;
+            }
+            glm::vec3 position = centre;
+            position.x += (rng.nextFloat() * 2.0f - 1.0f) * spread;
+            position.z += (rng.nextFloat() * 2.0f - 1.0f) * spread;
+            if (terrain != nullptr) {
+                position.y = terrain->heightAt(glm::vec2(position.x, position.z));
+            }
+            const glm::quat rotation = glm::angleAxis(rng.nextFloat() * 6.2831853f,
+                                                      glm::vec3(0.0f, 1.0f, 0.0f));
+            // Pack scale, like the ground: a prop is sized against the kit it was drawn with, and
+            // Kenney's trees, planters and tanks are already in proportion to its buildings. Not the
+            // plot rule -- a tree has no plot to fill, and stretching one to an 8 m footprint is how
+            // a garden ends up with a single enormous shrub in it.
+            const float scale = plan.settings.moduleSize / plan.settings.tileUnits;
+            Gather& g = gatherFor(name, CellKind::Courtyard);
+            g.positions.push_back(position);
+            g.rotations.emplace_back(rotation.x, rotation.y, rotation.z, rotation.w);
+            g.scales.emplace_back(scale);
+        }
+    };
+
     for (int z = 0; z < plan.depth; ++z) {
         for (int x = 0; x < plan.width; ++x) {
             const glm::ivec2 coord{x, z};
@@ -245,18 +378,28 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
             if (cell.kind == CellKind::Empty) {
                 continue;
             }
+            // One family per block, chosen once. Its buildings, the ground under them and the things
+            // standing in its yards all come from it, which is what makes a block read as one place.
+            const std::string family = cell.block.x >= 0
+                                           ? roles.familyFor(cell.block, plan.settings.seed)
+                                           : std::string{};
             if (cell.kind == CellKind::Plot) {
                 // The ground first, then the building on it. Salted so the floor's choice is its own
                 // and not the building's -- without that, every plot that drew building number two
                 // would also draw ground number two, and the two would move together for no reason
                 // anybody could see.
-                placeOne(coord, cell, CellKind::Courtyard, roles.forKind(CellKind::Courtyard),
-                         0x5BD1E995u);
-                placeOne(coord, cell, CellKind::Plot,
-                         roles.forBlock(cell.block, plan.settings.seed), 0u);
+                placeOne(coord, cell, CellKind::Courtyard,
+                         roles.forFamily(CellKind::Courtyard, family), 0x5BD1E995u, family);
+                placeOne(coord, cell, CellKind::Plot, roles.forFamily(CellKind::Plot, family), 0u,
+                         family);
                 continue;
             }
-            placeOne(coord, cell, cell.kind, roles.forKind(cell.kind), 0u);
+            if (cell.kind == CellKind::Courtyard || cell.kind == CellKind::Plaza) {
+                placeOne(coord, cell, cell.kind, roles.forFamily(cell.kind, family), 0u, family);
+                scatterProps(coord, roles.propsFor(family));
+                continue;
+            }
+            placeOne(coord, cell, cell.kind, roles.forKind(cell.kind), 0u, family);
         }
     }
 

@@ -798,6 +798,344 @@
      0.0,
      0.62
     ]
+   },
+   {
+    "name": "ground-grass",
+    "file": "kenney/city/nature-kit/ground_grass.glb",
+    "category": "architectural",
+    "archetype": "ground",
+    "triangles": 2,
+    "naturalSize": [
+     1.0,
+     0,
+     1.0
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "courtyard",
+     "plaza",
+     "city",
+     "family:suburban"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "ground-paved",
+    "file": "kenney/city/city-kit-roads/tile-low.glb",
+    "category": "architectural",
+    "archetype": "ground",
+    "triangles": 12,
+    "naturalSize": [
+     1.0,
+     0.02,
+     1.0
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "courtyard",
+     "city",
+     "family:commercial"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "ground-yard",
+    "file": "kenney/city/city-kit-roads/tile-low.glb",
+    "category": "architectural",
+    "archetype": "ground",
+    "triangles": 12,
+    "naturalSize": [
+     1.0,
+     0.02,
+     1.0
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "courtyard",
+     "city",
+     "family:industrial"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "prop-tree-large",
+    "file": "kenney/city/city-kit-suburban/tree-large.glb",
+    "category": "architectural",
+    "archetype": "tree",
+    "triangles": 42,
+    "naturalSize": [
+     0.2104,
+     0.767,
+     0.243
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "prop",
+     "city",
+     "family:suburban"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "prop-tree-small",
+    "file": "kenney/city/city-kit-suburban/tree-small.glb",
+    "category": "architectural",
+    "archetype": "tree",
+    "triangles": 42,
+    "naturalSize": [
+     0.2104,
+     0.567,
+     0.243
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "prop",
+     "city",
+     "family:suburban"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "prop-planter",
+    "file": "kenney/city/city-kit-suburban/planter.glb",
+    "category": "architectural",
+    "archetype": "planter",
+    "triangles": 204,
+    "naturalSize": [
+     0.4,
+     0.1771,
+     0.3
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "prop",
+     "city",
+     "family:suburban"
+    ],
+    "material": {
+     "roughness": 0.9
+    },
+    "naturalCentre": [
+     0.0,
+     0.0,
+     -0.0006
+    ]
+   },
+   {
+    "name": "prop-bush",
+    "file": "kenney/city/nature-kit/plant_bush.glb",
+    "category": "architectural",
+    "archetype": "bush",
+    "triangles": 32,
+    "naturalSize": [
+     0.396,
+     0.2444,
+     0.396
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "prop",
+     "city",
+     "family:suburban"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "prop-bush-large",
+    "file": "kenney/city/nature-kit/plant_bushLarge.glb",
+    "category": "architectural",
+    "archetype": "bush",
+    "triangles": 60,
+    "naturalSize": [
+     0.3743,
+     0.2429,
+     0.3357
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "prop",
+     "city",
+     "family:suburban"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "prop-tree-oak",
+    "file": "kenney/city/nature-kit/tree_oak.glb",
+    "category": "architectural",
+    "archetype": "tree",
+    "triangles": 196,
+    "naturalSize": [
+     0.6406,
+     1.2262,
+     0.7396
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "prop",
+     "city",
+     "family:suburban"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "prop-tank",
+    "file": "kenney/city/city-kit-industrial/detail-tank.glb",
+    "category": "architectural",
+    "archetype": "tank",
+    "triangles": 310,
+    "naturalSize": [
+     0.848,
+     0.4153,
+     0.5153
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "prop",
+     "city",
+     "family:industrial"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "prop-tank-large",
+    "file": "kenney/city/city-kit-industrial/detail-tank-large.glb",
+    "category": "architectural",
+    "archetype": "tank",
+    "triangles": 566,
+    "naturalSize": [
+     1.5084,
+     0.9616,
+     1.6484
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "prop",
+     "city",
+     "family:industrial"
+    ],
+    "material": {
+     "roughness": 0.9
+    },
+    "naturalCentre": [
+     0.0,
+     0.0,
+     -0.07
+    ]
+   },
+   {
+    "name": "prop-solar-flat",
+    "file": "kenney/city/city-kit-industrial/solar-panel-flat.glb",
+    "category": "architectural",
+    "archetype": "solar",
+    "triangles": 164,
+    "naturalSize": [
+     0.4182,
+     0.0615,
+     0.7134
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "prop",
+     "city",
+     "family:industrial"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "prop-solar",
+    "file": "kenney/city/city-kit-industrial/solar-panel-landscape.glb",
+    "category": "architectural",
+    "archetype": "solar",
+    "triangles": 244,
+    "naturalSize": [
+     0.7134,
+     0.2624,
+     0.3951
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "prop",
+     "city",
+     "family:industrial"
+    ],
+    "material": {
+     "roughness": 0.9
+    },
+    "naturalCentre": [
+     -0.1476,
+     0.0,
+     -0.1268
+    ]
+   },
+   {
+    "name": "prop-tree-cone",
+    "file": "kenney/city/nature-kit/tree_cone.glb",
+    "category": "architectural",
+    "archetype": "tree",
+    "triangles": 132,
+    "naturalSize": [
+     0.5297,
+     1.4303,
+     0.5297
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.4,
+    "preferredDensity": 0.0,
+    "tags": [
+     "prop",
+     "city",
+     "family:commercial"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
    }
   ]
  }

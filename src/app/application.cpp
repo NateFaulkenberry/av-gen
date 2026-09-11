@@ -484,7 +484,10 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         settingsPath_ = AppSettings::pathIn(platform::preferencesDirectory());
         jobs_ = std::make_unique<JobSystem>(2);
         initControlPlane();
-        imgui_->applyTheme(settings_.appearance);
+        // No theme here. `imgui_` is only constructed alongside the window, further down, so in a
+        // headless run this called a method on a null unique_ptr and took down every `--headless`
+        // render, the `--render` batch path and `tools/review_frames.py` with it. There is also
+        // nothing to theme: a run with no window draws no UI.
         settingsPath_.clear(); // read-only from here: saveSettings() is now a no-op
     }
 

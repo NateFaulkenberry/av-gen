@@ -357,18 +357,48 @@ teaches people to edit the test rather than read it.
 
 Tests: 22 cases under `[city]`, 2,540 assertions.
 
-## Next — dressing, then the road graph
+**Dressing — family ground, yards and a street that steps.** The three items the previous PROGRESS
+named, done. The example renders **19x19 cells, 32 pieces, 481 instances, 0 GPU errors**.
 
-The city reads as a city. What is missing is everything *between* the buildings:
+- **Ground belongs to a family.** A suburban block stands on grass (`ground_grass`, a 1x1 two-triangle
+  tile from the nature kit), commercial and industrial on paving. `CityLibrary` now groups three
+  roles by family — buildings, ground and props — because all three are things a block's character
+  governs. Roads and pavements deliberately are not: a street is the same street whichever block it
+  runs past, and giving each family its own kerb is how a city stops joining up.
+- **A yard has several things in it.** Props are the first thing in this lattice that is not one
+  piece per cell: `propsPerCell` (default 3) scatters trees, planters, bushes, tanks and solar panels
+  across courtyards and plazas, jittered within `propSpread` of the centre so nothing strays into the
+  road, and turned freely — a prop adjoins nothing, so the quarter-turn rule that keeps roads meeting
+  does not apply, and a row of trees all facing one way is the giveaway that a program placed them.
+  The count varies per cell too; exactly three things in every yard is a pattern rather than a yard.
+- **A street steps rather than jumps.** A block now gets a height *band* as well as a family: the
+  family's pieces are sorted by height-over-footprint, the band names a place in that order, and each
+  plot lands within one piece of it. Neighbouring buildings differ by a storey instead of by a tower,
+  and two blocks of the same family still differ from each other.
 
-1. **A plot's ground is currently `road-square`** — plain asphalt, shared with courtyards and plazas.
-   It reads as a hole from a low angle. A grass or forecourt tile per family would fix it; the
-   suburban kit has `path-*` and `driveway-*` pieces on disk.
-2. **Props, trees and fences.** `planter`, `tree-large`, `tree-small`, `fence-*` are in the suburban
-   kit and untagged. These want a *sub-cell* scatter — several per cell — which the placer does not
-   do yet: it places one piece per role per cell. That is the next structural change.
-3. **Height variation within a family.** A block picks a family; every building in it is then equally
-   likely, so a block is uniform in *character* but random in height. Real streets step.
+Props take **pack scale**, like the ground, not the plot rule — a tree has no plot to fill, and
+stretching one to an 8 m footprint is how a garden ends up with a single enormous shrub. Curated
+rather than swept: shipping containers measure 24 m long at pack scale, and parasols are shopfront
+details that read as a 6 m umbrella when free-standing.
+
+**A test that passed against a deliberately broken placer.** Worth reading before writing the next
+one. "A street steps rather than jumps" first compared a block's height spread against the *whole
+city's*, and passed with the height band disabled — because the city spans three families (0.57 to
+3.15 aspect) and any one block draws from one of them, so the ratio held on the strength of the
+family rule alone, which was already working. It measured the wrong baseline. It now compares each
+block against **its own family's** range, and fails the broken placer at 0.86 where the real one
+scores under 0.6. Every new check here was negative-controlled by breaking the code it tests; two of
+them needed rewriting when the control passed.
+
+## Next — the road graph, and what dressing is still thin
+
+1. **Commercial and industrial ground is dark** (`tile-low`, plain asphalt) and reads as a hole from a
+   low angle, where the suburban grass reads correctly. This is art direction, not a defect: the kit
+   has no light forecourt tile. A recoloured variant or a different piece would fix it.
+2. **Pavements have nothing on them** — no lamp posts, bins, benches, bus stops. `city-kit-roads` has
+   95 pieces, most untagged, and the prop scatter that yards use would work on a footway unchanged.
+3. **Blocks are one family throughout.** Real cities have a corner shop in a residential street. The
+   family could be a weighting rather than a hard pick.
 
 ## Not started
 

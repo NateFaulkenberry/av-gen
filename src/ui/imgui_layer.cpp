@@ -63,7 +63,17 @@ Result<std::unique_ptr<ImGuiLayer>> ImGuiLayer::create(platform::Window& window,
     return layer;
 }
 
-void ImGuiLayer::applyTheme(app::AppearanceTheme theme) { ui::applyTheme(theme); }
+void ImGuiLayer::applyTheme(app::AppearanceTheme theme) {
+    // A theme is written into `ImGui::GetStyle()`, which needs a context, and a headless run never
+    // makes one -- `init` is only called when there is a window. Applying one anyway dereferenced a
+    // null `GImGui` and took down every `--headless` render, the `--render` batch path and
+    // `tools/review_frames.py` with it. Guarded here rather than at the call site so the layer is
+    // safe for any caller: "style a UI that does not exist" is this class's business to refuse.
+    if (!initialised_) {
+        return;
+    }
+    ui::applyTheme(theme);
+}
 
 ImGuiLayer::~ImGuiLayer() {
     if (initialised_) {

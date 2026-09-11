@@ -110,3 +110,21 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
         DISCOVERY_MODE PRE_TEST)
 endif()
+
+# The binary, launched the way a batch render launches it.
+#
+# Everything above tests libraries. Nothing tested the application itself, and that gap had a cost:
+# a theme call in the headless branch dereferenced a null `imgui_` -- which is only constructed
+# alongside the window -- and took down every `--headless` render, the `--render` batch path and
+# tools/review_frames.py, while the whole suite stayed green. No unit test can catch that, because
+# the fault is in how `Application` wires itself together when there is no window.
+#
+# So this runs the real binary and asks it for one frame. It needs a GPU, like the gpu-labelled
+# tests, and it takes the same lock for the same reason.
+if(TARGET avgen)
+    add_test(NAME gpu.the-binary-renders-a-frame-headless
+             COMMAND avgen --headless --example Hyperspace --frames 1 --fps 30 --size 320x180
+                     --capture "${CMAKE_CURRENT_BINARY_DIR}/headless-smoke.png")
+    set_tests_properties(gpu.the-binary-renders-a-frame-headless PROPERTIES
+        LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 180)
+endif()

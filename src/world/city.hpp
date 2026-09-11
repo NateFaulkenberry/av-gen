@@ -106,6 +106,15 @@ struct CitySettings {
     // uniformly, keeping the proportions it was drawn with. Below 1 so neighbouring buildings on
     // adjacent plots do not touch.
     float plotFill = 0.9f;
+    // How many props -- trees, planters, tanks, bins -- may stand on one open cell. Props are the
+    // first thing in this lattice that is not one-piece-per-cell: a courtyard with a single tree
+    // dead in its middle reads as a placed object, and a courtyard with three reads as a yard. 0
+    // leaves them out.
+    int propsPerCell = 3;
+    // How far into the cell a prop may sit, as a fraction of the module from the centre. Below 0.5
+    // so a prop cannot cross into the cell beside it, which for a tree beside a road means standing
+    // in the carriageway.
+    float propSpread = 0.34f;
 
     [[nodiscard]] Result<void> validate() const;
     // Cells across the whole plan, in each direction.
@@ -158,6 +167,7 @@ struct CityLibrary {
     std::vector<std::string> pavement;
     std::vector<std::string> plot;     // buildings, all of them, whatever family
     std::vector<std::string> courtyard; // what fills the inside of a block
+    std::vector<std::string> prop;      // things that stand *on* a cell rather than being it
     std::vector<std::string> plaza;    // ground for an open block
 
     // Buildings grouped by the family they belong to, from a `family:<name>` tag. A block picks one
@@ -168,7 +178,15 @@ struct CityLibrary {
     //
     // Sorted by family name, and every family's assets sorted, for the same reason the flat lists
     // are: the choice must be a function of the seed, not of manifest order.
-    std::vector<std::pair<std::string, std::vector<std::string>>> plotFamilies;
+    //
+    // Three roles are split this way, because all three are things a block's character governs: a
+    // suburban block wants houses on grass with trees on it, and an industrial one wants sheds on
+    // asphalt with tanks. Roads and pavements are not: a street is the same street whichever block
+    // it runs past, and giving each family its own kerb is how a city stops joining up.
+    using Families = std::vector<std::pair<std::string, std::vector<std::string>>>;
+    Families plotFamilies;
+    Families courtyardFamilies;
+    Families propFamilies;
 
     [[nodiscard]] const std::vector<std::string>& forKind(CellKind kind) const;
     [[nodiscard]] bool empty() const;
@@ -177,6 +195,17 @@ struct CityLibrary {
     // that never adopted the convention still builds a city.
     [[nodiscard]] const std::vector<std::string>& forBlock(glm::ivec2 block,
                                                            std::uint32_t seed) const;
+    // The family a block belongs to, or empty when nothing declares one. Chosen once and reused for
+    // everything the block places, which is what makes a block read as one place rather than as a
+    // sample of the library.
+    [[nodiscard]] std::string familyFor(glm::ivec2 block, std::uint32_t seed) const;
+    // A role's assets within one family, falling back to the role's unfamilied list when that family
+    // declares none -- so tagging a family's ground is an improvement a manifest can make later
+    // without every other family losing its floor in the meantime.
+    [[nodiscard]] const std::vector<std::string>& forFamily(CellKind role,
+                                                            const std::string& family) const;
+    // Props for a family. Not a CellKind: a prop is not what a cell *is*, it is what stands on it.
+    [[nodiscard]] const std::vector<std::string>& propsFor(const std::string& family) const;
     // Builds a library by reading the tags of an asset library: an entry tagged "road" dresses road
     // cells, and so on. Keeps the role vocabulary in the manifest, where an artist can change it,
     // rather than in this header.

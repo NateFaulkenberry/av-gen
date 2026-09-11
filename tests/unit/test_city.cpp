@@ -849,3 +849,265 @@ TEST_CASE("A building fits its plot whatever size it was drawn", "[world][city][
     CHECK(sawBuilding);
     CHECK(footprints.size() > 1);
 }
+
+TEST_CASE("A yard has several things in it, inside the yard", "[world][city][place]") {
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+    REQUIRE_FALSE(roles.prop.empty());
+
+    world::CitySettings s;
+    s.blocksX = 3;
+    s.blocksZ = 3;
+    s.blockCells = 5; // a core of 3x3, so the middle cell is a courtyard
+    s.plazaFraction = 0.0f;
+    s.seed = 31u;
+    const world::CityPlan plan = planOrFail(s);
+    const std::size_t courtyards = plan.countOf(world::CellKind::Courtyard);
+    REQUIRE(courtyards > 0);
+
+    auto placed = world::placeCity(plan, roles, *library);
+    REQUIRE(placed.has_value());
+
+    // Which assets are props, so prop instances can be told from the ground under them.
+    std::set<std::string> propNames(roles.prop.begin(), roles.prop.end());
+
+    std::size_t propInstances = 0;
+    for (const world::CityPlacement& p : placed->placements) {
+        if (!propNames.contains(p.asset)) {
+            continue;
+        }
+        for (const glm::vec3& pos : p.cloud->positions()) {
+            ++propInstances;
+            // Inside the cell it belongs to. A prop that strays into the next cell is a tree in the
+            // road, which is the whole reason `propSpread` is below half a module.
+            const float m = s.moduleSize;
+            const int cx = static_cast<int>(
+                std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
+            const int cz = static_cast<int>(
+                std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
+            const world::CellKind kind = plan.kindAt({cx, cz});
+            INFO(p.asset << " at " << pos.x << "," << pos.z << " landed on "
+                         << world::cellKindName(kind));
+            CHECK((kind == world::CellKind::Courtyard || kind == world::CellKind::Plaza));
+
+            const glm::vec3 centre = plan.centreOf({cx, cz});
+            CHECK(std::abs(pos.x - centre.x) <= m * s.propSpread + 1e-3f);
+            CHECK(std::abs(pos.z - centre.z) <= m * s.propSpread + 1e-3f);
+        }
+    }
+    // Several per yard on average, not one: a courtyard with a single tree dead in its middle reads
+    // as a placed object rather than as a yard.
+    INFO(propInstances << " props over " << courtyards << " courtyards");
+    CHECK(propInstances > courtyards);
+
+    // And not always the same number, or it is a pattern rather than a yard. Counted per cell.
+    std::map<std::pair<int, int>, int> perCell;
+    for (const world::CityPlacement& p : placed->placements) {
+        if (!propNames.contains(p.asset)) {
+            continue;
+        }
+        for (const glm::vec3& pos : p.cloud->positions()) {
+            const float m = s.moduleSize;
+            perCell[{static_cast<int>(
+                         std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m)),
+                     static_cast<int>(
+                         std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m))}]++;
+        }
+    }
+    std::set<int> counts;
+    for (const auto& [cell, n] : perCell) {
+        counts.insert(n);
+    }
+    CHECK(counts.size() > 1);
+}
+
+TEST_CASE("Props are turned every which way, and tiles are not", "[world][city][place]") {
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+
+    world::CitySettings s;
+    s.blocksX = 3;
+    s.blocksZ = 3;
+    s.blockCells = 5;
+    s.seed = 8u;
+    const world::CityPlan plan = planOrFail(s);
+    auto placed = world::placeCity(plan, roles, *library);
+    REQUIRE(placed.has_value());
+
+    std::set<std::string> propNames(roles.prop.begin(), roles.prop.end());
+    bool sawOffAxisProp = false;
+    for (const world::CityPlacement& p : placed->placements) {
+        const bool isProp = propNames.contains(p.asset);
+        for (const glm::vec4& r : p.cloud->rotations()) {
+            // Yaw only, whatever the piece: nothing here should ever tilt.
+            CHECK_THAT(r.x, WithinAbs(0.0f, 1e-5f));
+            CHECK_THAT(r.z, WithinAbs(0.0f, 1e-5f));
+            // A quarter turn has y in {0, +/-sin45, +/-1}. A prop is free of that, and at least one
+            // must actually land off it -- a rule that is written but never fires is not a rule.
+            const float y = std::abs(r.y);
+            const bool quarter = y < 1e-4f || std::abs(y - 0.70710678f) < 1e-4f ||
+                                 std::abs(y - 1.0f) < 1e-4f;
+            if (isProp) {
+                sawOffAxisProp = sawOffAxisProp || !quarter;
+            } else {
+                INFO(p.asset << " is a tile and must be square to the lattice");
+                CHECK(quarter);
+            }
+        }
+    }
+    CHECK(sawOffAxisProp);
+}
+
+TEST_CASE("A block's ground belongs to its family", "[world][city][place]") {
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+    // More than one family declares ground, or the property below holds for free.
+    REQUIRE(roles.courtyardFamilies.size() > 1);
+
+    world::CitySettings s;
+    s.blocksX = 4;
+    s.blocksZ = 4;
+    s.blockCells = 5;
+    s.plazaFraction = 0.0f;
+    s.seed = 4242u;
+    const world::CityPlan plan = planOrFail(s);
+
+    // Ground assets, and which family each belongs to.
+    std::map<std::string, std::string> familyOfGround;
+    for (const auto& [family, names] : roles.courtyardFamilies) {
+        for (const std::string& n : names) {
+            familyOfGround[n] = family;
+        }
+    }
+
+    auto placed = world::placeCity(plan, roles, *library);
+    REQUIRE(placed.has_value());
+
+    std::size_t checked = 0;
+    for (const world::CityPlacement& p : placed->placements) {
+        const auto it = familyOfGround.find(p.asset);
+        if (it == familyOfGround.end()) {
+            continue; // a prop, a building, or the unfamilied fallback ground
+        }
+        for (const glm::vec3& pos : p.cloud->positions()) {
+            const float m = s.moduleSize;
+            const int cx = static_cast<int>(
+                std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
+            const int cz = static_cast<int>(
+                std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
+            const glm::ivec2 block = plan.at({cx, cz}).block;
+            REQUIRE(block.x >= 0);
+            INFO(p.asset << " is " << it->second << " ground on block " << block.x << ","
+                         << block.y);
+            CHECK(it->second == roles.familyFor(block, s.seed));
+            ++checked;
+        }
+    }
+    CHECK(checked > 0);
+}
+
+TEST_CASE("A street steps rather than jumps", "[world][city][place]") {
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+
+    world::CitySettings s;
+    s.blocksX = 4;
+    s.blocksZ = 4;
+    s.blockCells = 6; // a 4x4 core: enough plots in a block to have a spread at all
+    s.plazaFraction = 0.0f;
+    s.seed = 77u;
+    const world::CityPlan plan = planOrFail(s);
+    auto placed = world::placeCity(plan, roles, *library);
+    REQUIRE(placed.has_value());
+
+    // How tall a building stands, as height over footprint: every building is scaled to the same
+    // plot, so proportion is what decides it.
+    const auto aspectOf = [&library](const std::string& name) -> float {
+        const assets::AssetDescriptor* a = library->find(name);
+        if (a == nullptr) {
+            return 0.0f;
+        }
+        const float foot = std::max(a->naturalSize.x, a->naturalSize.z);
+        return foot > 0.0f ? a->naturalSize.y / foot : a->naturalSize.y;
+    };
+
+    std::set<std::string> buildings(roles.plot.begin(), roles.plot.end());
+    std::map<std::pair<int, int>, std::vector<float>> perBlock;
+    std::map<std::pair<int, int>, std::string> familyOfBlock;
+    for (const world::CityPlacement& p : placed->placements) {
+        if (!buildings.contains(p.asset)) {
+            continue;
+        }
+        const float aspect = aspectOf(p.asset);
+        for (const glm::vec3& pos : p.cloud->positions()) {
+            const float m = s.moduleSize;
+            const int cx = static_cast<int>(
+                std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
+            const int cz = static_cast<int>(
+                std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
+            const glm::ivec2 block = plan.at({cx, cz}).block;
+            REQUIRE(block.x >= 0);
+            perBlock[{block.x, block.y}].push_back(aspect);
+            familyOfBlock[{block.x, block.y}] = roles.familyFor(block, s.seed);
+        }
+    }
+    REQUIRE(perBlock.size() > 4);
+
+    const auto spread = [](std::vector<float> v) {
+        const auto [lo, hi] = std::ranges::minmax_element(v);
+        return *hi - *lo;
+    };
+
+    // Against the block's *own family*, which is the comparison that isolates what is being tested.
+    //
+    // The first version of this test compared a block's spread against the whole city's and passed
+    // against a deliberately broken placer, because the city spans three families (0.57 to 3.15) and
+    // any one block draws from one of them -- so the ratio held on the strength of the family rule
+    // alone, which was already working. It measured the wrong thing and would have gone on passing
+    // if the height band were deleted.
+    std::map<std::string, std::vector<float>> familyAspects;
+    for (const auto& [family, names] : roles.plotFamilies) {
+        for (const std::string& n : names) {
+            familyAspects[family].push_back(aspectOf(n));
+        }
+    }
+
+    float ratioTotal = 0.0f;
+    std::size_t counted = 0;
+    for (const auto& [block, aspects] : perBlock) {
+        const std::string& family = familyOfBlock[block];
+        const auto it = familyAspects.find(family);
+        if (it == familyAspects.end() || aspects.size() < 4) {
+            continue;
+        }
+        const float familySpread = spread(it->second);
+        if (familySpread <= 0.0f) {
+            continue; // a family whose pieces are all the same height says nothing either way
+        }
+        ratioTotal += spread(aspects) / familySpread;
+        ++counted;
+    }
+    REQUIRE(counted > 3);
+    const float ratio = ratioTotal / static_cast<float>(counted);
+
+    // A block occupies a band of its family's range, not the whole of it. Drawing each plot
+    // independently puts this near 1 on a block with a dozen plots and ten pieces to choose from.
+    INFO(counted << " blocks, mean spread " << ratio << " of the family's own range");
+    CHECK(ratio < 0.6f);
+}

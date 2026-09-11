@@ -161,3 +161,56 @@ samples the base-colour texture's RGB only when `frame.lightCounts.z` is 0 — t
 `scene::Environment::stylized`. Under stylized shading a palette-textured import renders bone white,
 correctly lit and completely colourless. Every Kenney kit is palette-textured, so a city scene sets
 `"stylized": false`.
+
+## A block's character governs three roles, not one
+
+Buildings, the ground under them, and the props standing in their yards all come from the block's
+one family. A suburban block is houses on grass with trees; an industrial one is sheds on paving with
+tanks. The family is chosen once per block, from the seed and the block's coordinates, and every role
+derives from that single name.
+
+Roads, pavements, junctions and crossings deliberately do **not** split by family. A street is the
+same street whichever block it runs past, and giving each family its own kerb is how a city stops
+joining up — the exact failure `tileUnits` exists to prevent, arriving by a different route.
+
+A family that declares no assets for a role falls back to the role's unfamilied list. So tagging a
+family's ground is an improvement a manifest can make later, without every other family losing its
+floor in the meantime.
+
+## Props are not cells
+
+A prop — a tree, a planter, a tank — is the first thing in this lattice that is not one piece per
+cell. It is not what a cell *is*; it is what stands on it, and several stand on one. So:
+
+- `propsPerCell` is a count, and the count varies per cell. A yard with exactly three things in it,
+  on every yard, is a pattern rather than a yard.
+- Props are jittered within `propSpread` of the cell centre, which is below half a module so a prop
+  cannot cross into the cell beside it. For a tree beside a road, that crossing means standing in the
+  carriageway.
+- Props are turned **freely**, not by quarter turns. The rule that keeps road tiles square to the
+  lattice exists because they have to meet their neighbours; a prop adjoins nothing. A row of trees
+  all facing the same way is the clearest sign that a program placed them.
+- Props take **pack scale**, like the ground, not the plot rule. A tree has no plot to fill, and
+  stretching one to an 8 m footprint is how a garden ends up with a single enormous shrub.
+
+Which pieces become props is curation, not a sweep. At this module a shipping container measures 24 m
+long and a shopfront parasol reads as a 6 m umbrella standing on its own in a yard.
+
+## A street steps
+
+A block picks a family, which makes it uniform in character — and, on its own, random in height,
+which no built street is. So a block also gets a height *band*: the family's pieces are sorted by
+height over footprint (proportion, not raw height, because every building is scaled to the same
+plot), the band names a place in that order, and each plot lands within one piece of it.
+
+Neighbouring buildings then differ by a storey rather than by a tower, while two blocks of the same
+family still differ from each other. The drift is deliberately small — the effect is lost entirely if
+it is not.
+
+## Headless has no UI to theme
+
+Recorded here because it cost an afternoon and will again. `Application` constructs `imgui_` only
+alongside the window. A call to `imgui_->applyTheme(...)` in the headless branch is therefore a
+method call on a null `unique_ptr`, and it took down every `--headless` render, the `--render` batch
+path and `tools/review_frames.py` with it — while the full test suite stayed green, because nothing
+in it launches the binary headless. That is the coverage gap worth closing, not just the null.
