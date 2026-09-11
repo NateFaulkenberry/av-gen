@@ -118,11 +118,9 @@ tone mapping and composition overlay.
   `visible = visible && on` and set distant terrain `visible=false`; neither state was restored
   when the camera returned. Runtime camera state now uses `cameraCulled`, and distant chunks also
   clear `castsShadow` for that frame. Regression: `[composition][terrain][shadows]`.
-- [ ] Reproduce a static-object transform test across camera translate/rotate/orbit/dolly, resolution
-  changes and timeline seek. Assert the authoritative `Entity::transform.position` and submitted
-  `ObjectUniforms::model` translation remain constant. Include a far-from-origin object.
-- [x] Basic GPU static-object camera-motion invariant is covered. Extend it with far-origin,
-  resize, seek and object-ID/readback cases before final sign-off.
+- [x] Static-object transform regression covers camera motion, a far-from-origin object, resize and
+  timeline seek. It preserves authored TRS and restores the image after returning to the original
+  camera/resolution. Object-slot/readback identity remains a separate diagnostics task.
 - [ ] Add targeted transform diagnostics for selected entity name/ID: world transform, model
   translation, camera position, camera/view-projection terms, culling state and object slot index.
   Log only changes or invalid values, not every frame.
