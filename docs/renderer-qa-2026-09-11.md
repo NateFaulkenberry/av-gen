@@ -183,8 +183,10 @@ tone mapping and composition overlay.
   Check readback ring, uniform staging, joint palettes, water uniforms and bind groups for stale data.
 - [x] Direct renderer reverse-time regression passes 42 assertions. Broader Engine-level seek,
   reload, resize and rapid-cut stress remains open.
-- [ ] Run ASan/UBSan and TSan-compatible CPU tests after each resource-lifetime change. Add a stable
-  two-renderer same-frame hash test around every confirmed state bug.
+- [x] TSan sequence seek/determinism coverage passes 148 assertions across 8 cases; TSan animation
+  coverage passes 57 assertions across 9 cases.
+- [x] ASan/UBSan focused animation and terrain checks pass; TSan sequence and animation checks pass.
+  Broader resource-lifetime and full TSan suite coverage remains open.
 - [x] Syphon burst synchronization is covered with a deadline-bounded retry; the in-process client
   no longer treats a transient nil texture after a frame notification as a permanent failure.
 
