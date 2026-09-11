@@ -1,8 +1,8 @@
 # The AI control plane's missing verbs
 
-A handoff. **Items 1, 2, 4, 5, 6 and 7 are done and on `main`** — the plane went from 35 tools
-to 50, and from *no verb that creates anything* to one for each of project, world, media,
-shot, overlay and field. **Items 3 and 8 are the work.**
+A handoff. **Seven of the eight items are done and on `main`** — the plane went from 35 tools to
+51, and from *no verb that creates anything* to one for each of project, world, media, shot,
+overlay and field, plus a way for the assistant to check its own framing. **Item 3 is the work.**
 
 ## Why this exists
 
@@ -51,6 +51,14 @@ prototype" and the engine has the finished thing; this is the ask. `field.list` 
 field *resolved to*, which is how an author learns whether it is scrub-exact (ADR-091) without
 rendering the same frame twice.
 
+**Item 8 — `render.probe`.** The assistant has no eyes: every provider declares `vision: false`, so
+an image would be a file it cannot read. This is the frame as *numbers* — which nodes fall inside
+the frustum, where each sits, how much of the height it fills — by projecting each node's bounds
+through the camera. It uses all eight corners of the box rather than the centre, because a building
+whose centre is behind the camera can still fill the frame, and a centre test would call it
+invisible. Pure arithmetic, so it needs no renderer and works headless. A camera framing nothing
+says so instead of looking fine.
+
 All in `src/ai/engine_tools.cpp`. **50 tools across 18 domains.**
 
 Three decisions in there that the rest of the list should follow:
@@ -73,9 +81,9 @@ Three decisions in there that the rest of the list should follow:
   writing, and the reopen fails.
 
 Tests: `tests/unit/test_ai_tools.cpp`, tags `[project]`, `[import]`, `[world]`, `[authoring]`,
-`[field]`. Full suite **1536, green**.
+`[field]`, `[probe]`. Full suite **1538, green**.
 
-## The two that remain
+## The one that remains
 
 ### 3. `scene.create_node` · `delete_node` · `set_parent`
 
@@ -92,7 +100,25 @@ a test. That was designed as the seam and this is the thing it was designed for.
 Do not add node creation until that sink exists. A create tool with a snapshot-backed transaction
 would report a rollback it cannot perform.
 
-### 8. `render.capture`
+**What I found looking at it, so the next person does not have to.** `ui::EditHistory` has no
+compound-group API — no `beginGroup`/`endGroup`. It has `push(EditCommand)`, `undo`, `redo` and
+`undoSize()`, plus `beginDrag`/`commitDrag` for coalescing a drag. A sink can be written over that:
+record `undoSize()` at `begin`, and on `abort` undo until it is back to that mark.
+
+The harder half is not the sink. **The AI tools do not push `EditCommand`s at all** — `parameter.set`
+writes the parameter directly, and the snapshot sink is what makes that undoable. So a session with
+the editor sink installed would have node creation on the undo stack and parameter edits in a
+snapshot, two mechanisms for one transaction. Decide which of these before writing code:
+
+1. Route every mutating tool through `EditHistory` and drop the snapshot sink when an editor exists.
+   Cleanest end state; touches every existing tool.
+2. Give the editor sink both: an undo mark *and* a snapshot, aborting both. Smaller change, two
+   things to keep in step.
+3. Let node CRUD refuse unless the editor sink is installed (`TransactionSink::kind()` already
+   reports what is backing it), and leave parameter tools on snapshots. Smallest, and honest, but
+   node creation then does not work headless.
+
+## 8. `render.capture`
 
 So the agent can verify instead of assert. Everything above is worth less without it: the prompt's
 §26 and §30 ask the assistant to confirm its own work, and it currently has no eyes. The control

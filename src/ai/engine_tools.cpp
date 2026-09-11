@@ -1271,6 +1271,140 @@ void registerParameterTools(ToolRegistry& registry) {
                                   fmt::format("field '{}', reach {:.1f} m", desc.name, desc.volume.reach()));
         });
 
+    // ---- looking at the frame ----------------------------------------------------------------------
+    //
+    // The assistant has no eyes. Every provider in the registry declares `vision: false`, so an
+    // image would be a file it cannot read; what it can use is the frame described as *numbers*.
+    //
+    // This answers the question a shot is actually judged on -- is the thing I framed in the frame,
+    // and how big is it -- by projecting each node's bounds through the camera the scene has. Pure
+    // arithmetic over `scene::Camera` and `Composition::nodeBounds`, so it needs no renderer and
+    // works headless, which is also what makes it testable.
+    add(registry, "render.probe", "Look at the frame",
+        "What the camera can currently see, as numbers: which nodes fall inside the frustum, where "
+        "each sits in the frame, and how much of the height it fills. Use it to check a shot frames "
+        "its subject before trusting that it does -- a camera pointed at nothing reports nothing "
+        "rather than looking fine. It reads the camera the last frame used, the same as camera.get, "
+        "so after moving the camera let a frame happen before asking what it sees.",
+        schema::object({{"node", schema::string("Ask about one node; omit for everything visible")},
+                        {"aspect", schema::number("Frame aspect ratio (default 16:9)")},
+                        {"limit", schema::integer("Maximum nodes reported (default 40)", 1, kMaxLimit)}}),
+        readOnly(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            app::Engine& engine = ctx.engine();
+            scene::Composition* comp = engine.composition();
+            if (comp == nullptr) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "this session has no composition to look at");
+            }
+            const scene::Camera& camera = engine.scene().camera;
+            const auto aspect = static_cast<float>(std::max(args.value("aspect", 16.0 / 9.0), 0.01));
+            const glm::mat4 viewProjection = camera.projection(aspect) * camera.view();
+            const std::string only = args.value("node", std::string{});
+            const std::size_t limit = limitOf(args);
+
+            // One node, projected. Returns nothing when its bounds are unknown, which is a different
+            // answer from "off screen" and is reported as such.
+            const auto look = [&](const std::string& name) -> std::optional<json> {
+                const scene::WorldBounds bounds = comp->nodeBounds(name);
+                if (!bounds.valid) {
+                    return std::nullopt;
+                }
+                // The eight corners, not the centre: a building whose centre is behind the camera
+                // can still fill the frame, and a centre-only test would call it invisible.
+                float minX = 1e30f, maxX = -1e30f, minY = 1e30f, maxY = -1e30f;
+                float nearestZ = 1e30f;
+                int inFront = 0;
+                for (int corner = 0; corner < 8; ++corner) {
+                    const glm::vec3 p((corner & 1) ? bounds.max.x : bounds.min.x,
+                                      (corner & 2) ? bounds.max.y : bounds.min.y,
+                                      (corner & 4) ? bounds.max.z : bounds.min.z);
+                    const glm::vec4 clip = viewProjection * glm::vec4(p, 1.0f);
+                    if (clip.w <= 1e-4f) {
+                        continue; // behind the eye; contributes no screen position
+                    }
+                    ++inFront;
+                    const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+                    minX = std::min(minX, ndc.x); maxX = std::max(maxX, ndc.x);
+                    minY = std::min(minY, ndc.y); maxY = std::max(maxY, ndc.y);
+                    nearestZ = std::min(nearestZ, clip.w);
+                }
+                json j;
+                j["node"] = name;
+                j["distance"] = glm::length(bounds.centre() - camera.position);
+                j["radius"] = bounds.radius();
+                if (inFront == 0) {
+                    j["onScreen"] = false;
+                    j["why"] = "entirely behind the camera";
+                    return j;
+                }
+                const bool overlaps = maxX >= -1.0f && minX <= 1.0f && maxY >= -1.0f && minY <= 1.0f;
+                j["onScreen"] = overlaps;
+                j["partlyBehind"] = inFront < 8;
+                // Normalised screen rectangle, 0..1 from the top-left, which is how a person would
+                // describe where something sits in a frame.
+                j["frame"] = json{{"left", (minX + 1.0f) * 0.5f},
+                                  {"right", (maxX + 1.0f) * 0.5f},
+                                  {"top", 1.0f - (maxY + 1.0f) * 0.5f},
+                                  {"bottom", 1.0f - (minY + 1.0f) * 0.5f}};
+                j["heightFraction"] = std::clamp((maxY - minY) * 0.5f, 0.0f, 4.0f);
+                j["nearestDistance"] = nearestZ;
+                if (!overlaps) {
+                    j["why"] = "outside the frame";
+                }
+                return j;
+            };
+
+            json out;
+            out["camera"] = json{{"position", {camera.position.x, camera.position.y, camera.position.z}},
+                                 {"target", {camera.target.x, camera.target.y, camera.target.z}},
+                                 {"fovYDegrees", camera.effectiveFovY() * 57.2957795f},
+                                 {"aspect", aspect}};
+            if (!only.empty()) {
+                if (comp->findNode(only) == nullptr) {
+                    return ToolResult::failure(ToolErrorCode::NotFound,
+                                               fmt::format("no node called '{}'", only),
+                                               "scene.find_nodes reports what the scene has");
+                }
+                const auto seen = look(only);
+                if (!seen) {
+                    return ToolResult::failure(ToolErrorCode::Unavailable,
+                                               fmt::format("'{}' has no bounds to project", only),
+                                               "a node with no geometry cannot be framed");
+                }
+                out["node"] = *seen;
+                const bool on = (*seen)["onScreen"].get<bool>();
+                return ToolResult::ok(std::move(out),
+                                      fmt::format("'{}' is {}", only, on ? "in frame" : "not in frame"));
+            }
+            json visible = json::array();
+            std::size_t offScreen = 0;
+            std::size_t unbounded = 0;
+            for (const auto& node : comp->nodes()) {
+                const auto seen = look(node->name);
+                if (!seen) {
+                    ++unbounded;
+                    continue;
+                }
+                if (!(*seen)["onScreen"].get<bool>()) {
+                    ++offScreen;
+                    continue;
+                }
+                if (visible.size() < limit) {
+                    visible.push_back(*seen);
+                }
+            }
+            const auto shown = visible.size();
+            out["visible"] = std::move(visible);
+            out["offScreen"] = offScreen;
+            out["withoutBounds"] = unbounded;
+            if (shown == 0) {
+                out["warning"] = "the camera is framing nothing: every node with bounds is outside "
+                                 "the frustum";
+            }
+            return ToolResult::ok(std::move(out), fmt::format("{} node(s) in frame", shown));
+        });
+
     add(registry, "parameter.list_groups", "Parameter groups",
         "The top-level parameter groups in this scene and how many parameters each holds. The "
         "cheapest way to orient yourself before searching: groups are things like 'camera', 'env', "

@@ -1241,3 +1241,83 @@ TEST_CASE("Entity and field tools say so when there is no composition", "[ai][to
         CHECK(r.error->code == ai::ToolErrorCode::Unavailable);
     }
 }
+
+// ---- looking at the frame -----------------------------------------------------------------------
+
+TEST_CASE("The assistant can check whether a shot frames its subject", "[ai][tools][probe]") {
+    // The prompt asks the assistant to verify its own work and it has no eyes: every provider
+    // declares vision false. This is the frame described as numbers instead.
+    Fixture f;
+    REQUIRE(f.engine.loadFile(helixScene()).has_value());
+    REQUIRE(f.engine.composition() != nullptr);
+    // The first node that actually has geometry: a composition may open with lights or empties,
+    // and "frame that" is not a meaningful request about a node with no bounds.
+    std::string node;
+    for (const auto& n : f.engine.composition()->nodes()) {
+        if (f.engine.composition()->nodeBounds(n->name).valid) {
+            node = n->name;
+            break;
+        }
+    }
+    REQUIRE(!node.empty());
+
+    // Frame it deliberately, then ask. `camera.frame_node` is the tool an assistant would have used.
+    REQUIRE(f.call("camera.frame_node", json{{"name", node}}).success);
+    const auto framed = f.call("render.probe", json{{"node", node}});
+    INFO((framed.error ? framed.error->message : std::string{}));
+    REQUIRE(framed.success);
+    CHECK(framed.value["node"]["onScreen"].get<bool>());
+    // It fills a sensible part of the height rather than being a speck or overflowing entirely.
+    const double height = framed.value["node"]["heightFraction"].get<double>();
+    CHECK(height > 0.05);
+    CHECK(framed.value["node"]["frame"]["left"].get<double>() < 1.0);
+
+    // Now point the camera away from everything and ask again. This is the case worth having: a
+    // camera aimed at nothing must report nothing, not look fine.
+    REQUIRE(f.call("camera.set", json{{"position", {0.0, 5000.0, 0.0}},
+                                      {"target", {0.0, 6000.0, 0.0}}}).success);
+    // The probe reads the camera a frame produced, the same as camera.get, so let one happen. In a
+    // live session frames run between tool calls; in a test nothing does unless it is asked for.
+    f.engine.update(FrameTime{0.0, 1.0 / 60.0, 0});
+    const auto empty = f.call("render.probe");
+    REQUIRE(empty.success);
+    CHECK(empty.value["visible"].empty());
+    CHECK(empty.value["offScreen"].get<std::size_t>() > 0);
+    CHECK(empty.value.contains("warning"));
+
+    // A node that does not exist is a named error, not an empty answer that reads as "not visible".
+    const auto ghost = f.call("render.probe", json{{"node", "no-such-node"}});
+    CHECK_FALSE(ghost.success);
+    REQUIRE(ghost.error.has_value());
+    CHECK(ghost.error->code == ai::ToolErrorCode::NotFound);
+}
+
+TEST_CASE("The frame probe uses the whole bounding box, not the centre", "[ai][tools][probe]") {
+    // A building whose centre is behind the camera can still fill the frame. Testing the centre
+    // alone would call it invisible, which is the bug this guards -- so the camera is put *inside*
+    // the scene's own bounds and something must still be in frame.
+    Fixture f;
+    REQUIRE(f.engine.loadFile(helixScene()).has_value());
+    scene::WorldBounds all;
+    for (const auto& n : f.engine.composition()->nodes()) {
+        const scene::WorldBounds b = f.engine.composition()->nodeBounds(n->name);
+        if (b.valid) {
+            all = b;
+            break;
+        }
+    }
+    REQUIRE(all.valid);
+
+    REQUIRE(f.call("camera.set", json{{"position", {all.centre().x, all.centre().y, all.centre().z}},
+                                      {"target", {all.max.x + 10.0, all.centre().y, all.centre().z}}})
+                .success);
+    f.engine.update(FrameTime{0.0, 1.0 / 60.0, 0});
+    const auto probe = f.call("render.probe");
+    REQUIRE(probe.success);
+    // Something is either in frame or explicitly partly behind; what must not happen is a silent
+    // "nothing here" for a camera standing in the middle of the scene.
+    const bool anythingSeen = !probe.value["visible"].empty();
+    INFO("visible " << probe.value["visible"].size() << ", offScreen "
+                    << probe.value["offScreen"].get<std::size_t>());
+    CHECK(anythingSeen);
+}
