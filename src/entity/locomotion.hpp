@@ -19,6 +19,7 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace avgen::entity {
@@ -55,6 +56,22 @@ struct LocomotionState {
     // this for head/eye look-at on top of whatever clip is playing.
     glm::vec3 lookTarget{0.0f};
     bool hasLookTarget = false;
+
+    // ---- what an action asked for (ADR-096) ----
+    // The activity an action named -- "sit", "sleep", "pickUp" -- or empty when the gait is in
+    // charge and `activity` above is the whole story. Still an activity *name* and never a clip
+    // name: EntityDesc::clips turns it into whatever the asset shipped, which is the rule that
+    // lets one action drive an alien, a deer and a robot.
+    //
+    // A std::string rather than a view because this struct outlives the call it was built in: an
+    // entity keeps its last locomotion for anything that asks. Assigned from the action's own
+    // string, so in steady state it reuses its capacity and allocates nothing per frame.
+    std::string action;
+    // Clip seconds per timeline second. The gait's answer to a walk clip authored at 1.6 m/s being
+    // played by a body moving at 2.0.
+    float playbackRate = 1.0f;
+    // Cross-fade seconds into this state; negative leaves it to the animation state's own blendIn.
+    float blend = -1.0f;
 };
 
 // Implemented by the animation layer. An entity holds a pointer that stays null until something

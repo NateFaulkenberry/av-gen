@@ -76,7 +76,128 @@ glm::vec3 eulerDegrees(const glm::quat& q) {
 Entity::Entity(EntityDesc desc, std::uint32_t sceneSeed)
     : desc_(std::move(desc)),
       seed_(desc_.seed != 0 ? desc_.seed : nameSeed(desc_.name, sceneSeed)),
-      rng_(seed_) {}
+      rng_(seed_) {
+    // The runtime copies of everything an action may change. Keeping them beside the description
+    // rather than in it is what lets a reset put the entity back exactly as the scene file wrote
+    // it: `equip` adds to `attachments_`, and a seek throws that away without touching the author's
+    // own attachments.
+    propertyValues_.reserve(desc_.properties.size());
+    for (const PropertyDesc& property : desc_.properties) {
+        propertyValues_.emplace_back(property.name, std::clamp(property.value, property.min, property.max));
+    }
+    attachments_ = desc_.attachments;
+    schedule_.setDesc(desc_.schedule);
+    if (!desc_.actions.empty()) {
+        actions_.push(desc_.actions, Authority::Routine);
+    }
+}
+
+const std::string& Entity::clipFor(std::string_view activity) const {
+    static const std::string kNone;
+    const auto find = [&](std::string_view name) -> const std::string* {
+        const auto it = std::find_if(desc_.clips.begin(), desc_.clips.end(),
+                                     [&](const std::pair<std::string, std::string>& c) {
+                                         return c.first == name;
+                                     });
+        return it == desc_.clips.end() ? nullptr : &it->second;
+    };
+    if (const std::string* exact = find(activity)) {
+        return *exact;
+    }
+    // No clip for the activity an action named. Falling back to `idle` rather than to nothing is
+    // deliberate: a character told to sit whose asset has no sit clip should stand there, not
+    // freeze in its bind pose.
+    if (const std::string* idle = find("idle")) {
+        return *idle;
+    }
+    return kNone;
+}
+
+bool Entity::hasProperty(std::string_view property) const {
+    return std::any_of(propertyValues_.begin(), propertyValues_.end(),
+                       [&](const std::pair<std::string, float>& p) { return p.first == property; });
+}
+
+float Entity::property(std::string_view property) const {
+    const auto it = std::find_if(propertyValues_.begin(), propertyValues_.end(),
+                                 [&](const std::pair<std::string, float>& p) { return p.first == property; });
+    return it == propertyValues_.end() ? 0.0f : it->second;
+}
+
+bool Entity::setProperty(std::string_view property, float value) {
+    for (std::size_t i = 0; i < propertyValues_.size(); ++i) {
+        if (propertyValues_[i].first != property) {
+            continue;
+        }
+        const PropertyDesc& declared = desc_.properties[i];
+        propertyValues_[i].second = std::clamp(value, declared.min, declared.max);
+        if (i < propertyParams_.size() && propertyParams_[i] != nullptr) {
+            // The base, not the final: the modulation pass resets finals to bases every frame, so a
+            // state written to a final would be forgotten by the next one. Writing the base is also
+            // what makes an equipped prop survive a save.
+            propertyParams_[i]->setBase(propertyValues_[i].second);
+        }
+        return true;
+    }
+    return false;
+}
+
+const InteractionDesc* Entity::interaction(std::string_view verb) const {
+    const auto it = std::find_if(desc_.interactions.begin(), desc_.interactions.end(),
+                                 [&](const InteractionDesc& i) { return i.name == verb; });
+    return it == desc_.interactions.end() ? nullptr : &*it;
+}
+
+std::string_view Entity::occupant(std::string_view verb) const {
+    const auto it = std::find_if(claims_.begin(), claims_.end(),
+                                 [&](const std::pair<std::string, std::string>& c) { return c.first == verb; });
+    return it == claims_.end() ? std::string_view{} : std::string_view(it->second);
+}
+
+bool Entity::claim(std::string_view verb, std::string_view who) {
+    for (auto& claim : claims_) {
+        if (claim.first == verb) {
+            return claim.second == who;
+        }
+    }
+    claims_.emplace_back(std::string(verb), std::string(who));
+    return true;
+}
+
+void Entity::release(std::string_view verb, std::string_view who) {
+    claims_.erase(std::remove_if(claims_.begin(), claims_.end(),
+                                 [&](const std::pair<std::string, std::string>& c) {
+                                     return c.first == verb && c.second == who;
+                                 }),
+                  claims_.end());
+}
+
+bool Entity::attach(const std::string& node, const std::string& socket) {
+    if (std::find_if(desc_.sockets.begin(), desc_.sockets.end(),
+                     [&](const SocketDesc& s) { return s.name == socket; }) == desc_.sockets.end()) {
+        // An attachment to a socket that does not exist is the silent-nothing failure this layer
+        // exists to prevent. Refuse it and let the action report it by name.
+        return false;
+    }
+    for (AttachmentDesc& attachment : attachments_) {
+        if (attachment.node == node) {
+            attachment.socket = socket;
+            return true;
+        }
+    }
+    attachments_.push_back(AttachmentDesc{node, socket});
+    return true;
+}
+
+bool Entity::detach(const std::string& node) {
+    const auto it = std::find_if(attachments_.begin(), attachments_.end(),
+                                 [&](const AttachmentDesc& a) { return a.node == node; });
+    if (it == attachments_.end()) {
+        return false;
+    }
+    attachments_.erase(it);
+    return true;
+}
 
 const std::string& Entity::clipFor(Activity activity) const {
     static const std::string kNone;
@@ -144,6 +265,7 @@ void EntityWorld::setEntities(std::vector<EntityDesc> descs, std::uint32_t scene
             made->reset(entity->rng_);
             entity->behaviors_.push_back(std::move(made));
         }
+        entity->actions_.setSink(&pendingEvents_, entity->name());
         entities_.push_back(std::move(entity));
     }
     for (const std::string& problem : problems_) {
@@ -157,6 +279,8 @@ void EntityWorld::clear() {
     landmarks_.clear();
     problems_.clear();
     registered_.clear();
+    actionEvents_.clear();
+    pendingEvents_.clear();
     counts_ = {};
 }
 
@@ -212,6 +336,21 @@ void EntityWorld::registerParameters(params::ParameterSet& params, const std::st
             entity->behaviors_[i]->registerParameters(params, base);
             entity->behaviors_[i]->collectParameterPaths(registered_);
         }
+        // Declared state, as ordinary parameters. This is the whole of what makes "the headphones
+        // are on" readable by anything else: a reaction targets "state/headphones", a track
+        // keyframes it, a preset saves it, and none of them has to know an action wrote it.
+        entity->propertyParams_.assign(entity->desc_.properties.size(), nullptr);
+        for (std::size_t i = 0; i < entity->desc_.properties.size(); ++i) {
+            const PropertyDesc& property = entity->desc_.properties[i];
+            const std::string path = prefix + entity->name() + "/state/" + property.name;
+            auto& param = params.add(params::ParamDesc<float>{.path = path,
+                                                              .defaultValue = property.value,
+                                                              .hardMin = property.min,
+                                                              .hardMax = property.max});
+            param.setBase(entity->propertyValues_[i].second);
+            entity->propertyParams_[i] = &param;
+            registered_.push_back(path);
+        }
     }
     parametersLive_ = true;
 }
@@ -226,6 +365,9 @@ void EntityWorld::unregisterParameters(params::ParameterSet& params) {
         entity->positionParam_ = nullptr;
         entity->rotationParam_ = nullptr;
         entity->scaleParam_ = nullptr;
+        // Stale pointers into a set that has just been emptied. The state itself lives on in
+        // propertyValues_, which is why it survives a scene swap and a rebind.
+        std::fill(entity->propertyParams_.begin(), entity->propertyParams_.end(), nullptr);
     }
 }
 
@@ -357,14 +499,27 @@ void EntityWorld::bind(params::ParameterSet& params, const std::string& prefix) 
         entity->rotationParam_ = params.findAs<glm::vec3>(b->transformPrefix + "rotation");
         entity->scaleParam_ = params.findAs<glm::vec3>(b->transformPrefix + "scale");
         entity->state_.anchor = b->anchor;
+        entity->actions_.setSink(&pendingEvents_, entity->name());
+        entity->propertyParams_.assign(entity->desc_.properties.size(), nullptr);
+        for (std::size_t i = 0; i < entity->desc_.properties.size(); ++i) {
+            const std::string path = prefix + entity->name() + "/state/" + entity->desc_.properties[i].name;
+            entity->propertyParams_[i] = params.findAs<float>(path);
+            if (entity->propertyParams_[i] != nullptr) {
+                entity->propertyParams_[i]->setBase(entity->propertyValues_[i].second);
+            }
+        }
     }
+    navPath_.setNavigator(&nav_);
 }
 
 void EntityWorld::reset() {
+    actionEvents_.clear();
+    pendingEvents_.clear();
     for (auto& entity : entities_) {
         entity->rng_ = Rng(entity->seed_);
         entity->state_ = EntityState{};
         entity->motion_ = MotionOffset{};
+        entity->locomotion_ = LocomotionState{};
         entity->coarseAccum_ = 0.0;
         if (const NodeBinding* b = binding(entity->desc_.driven())) {
             entity->state_.anchor = b->anchor;
@@ -372,7 +527,71 @@ void EntityWorld::reset() {
         for (auto& behavior : entity->behaviors_) {
             behavior->reset(entity->rng_);
         }
+        // Intent goes back to what the scene file said, not to nothing: a seek must reproduce the
+        // entity the author described, including the routine it was given and the props it was
+        // placed holding. Everything an action added since -- an equipped prop, a set property, a
+        // claimed chair -- is exactly what a seek should discard.
+        entity->actions_.reset();
+        entity->schedule_.reset();
+        entity->gait_.reset();
+        entity->attachments_ = entity->desc_.attachments;
+        entity->claims_.clear();
+        for (std::size_t i = 0; i < entity->desc_.properties.size() && i < entity->propertyValues_.size(); ++i) {
+            const PropertyDesc& property = entity->desc_.properties[i];
+            entity->propertyValues_[i].second = std::clamp(property.value, property.min, property.max);
+            if (i < entity->propertyParams_.size() && entity->propertyParams_[i] != nullptr) {
+                entity->propertyParams_[i]->setBase(entity->propertyValues_[i].second);
+            }
+        }
+        if (!entity->desc_.actions.empty()) {
+            entity->actions_.push(entity->desc_.actions, Authority::Routine);
+        }
     }
+}
+
+float EntityWorld::property(std::string_view entity, std::string_view property, float fallback) const {
+    const Entity* found = find(entity);
+    return found != nullptr && found->hasProperty(property) ? found->property(property) : fallback;
+}
+
+bool EntityWorld::startRoutine(std::string_view entity, double now) {
+    Entity* found = find(entity);
+    if (found == nullptr || found->schedule().desc().entries.empty()) {
+        return false;
+    }
+    found->schedule().start(now);
+    found->actions().hold(Authority::Routine, false);
+    return true;
+}
+
+bool EntityWorld::pauseRoutine(std::string_view entity, double now) {
+    Entity* found = find(entity);
+    if (found == nullptr || !found->schedule().running()) {
+        return false;
+    }
+    found->schedule().pause(now, found->actions());
+    return true;
+}
+
+bool EntityWorld::resumeRoutine(std::string_view entity, double now) {
+    Entity* found = find(entity);
+    if (found == nullptr || !found->schedule().paused()) {
+        return false;
+    }
+    found->schedule().resume(now, found->actions());
+    return true;
+}
+
+bool EntityWorld::direct(std::string_view entity, std::vector<ActionDesc> actions, double now) {
+    Entity* found = find(entity);
+    if (found == nullptr) {
+        return false;
+    }
+    // The Director tier, so whatever the entity was doing keeps its place and its elapsed seconds
+    // and carries on when this drains. That is ADR-091's "resumes rather than resets", and it is a
+    // property of *which tier* the override goes on rather than of anything the caller must do.
+    found->actions().override(std::move(actions), Authority::Director, now);
+    return true;
 }
 
 void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) {
@@ -381,12 +600,27 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
     }
     params_ = &params;
     counts_ = {};
+    navPath_.setNavigator(&nav_);
+    // Cleared, not freed: the capacity is kept, so a frame in which twelve actions complete costs
+    // no allocation after the first one that did (§47). Anything raised since the last update --
+    // a director's cancellation -- is folded in rather than lost.
+    actionEvents_.clear();
+    if (!pendingEvents_.empty()) {
+        actionEvents_.swap(pendingEvents_);
+        pendingEvents_.clear();
+    }
     for (auto& entityPtr : entities_) {
         Entity& entity = *entityPtr;
         const glm::vec3 here = entity.state_.position();
         const float distance = glm::length(here - ctx.viewPosition);
 
-        if (entity.desc_.cullDistance > 0.0f && distance > entity.desc_.cullDistance) {
+        // An entity under orders is never culled. A behaviour is ambient and losing it off camera
+        // costs nothing; an *action* is something a director said, and a character that stopped
+        // walking to the nightstand because the camera looked away would be a bug nobody could
+        // reproduce. The coarse stage below still applies, so the cost stays bounded -- what is
+        // refused here is only the "do not update at all" band.
+        const bool underOrders = entity.actions_.pending() > 0 || entity.schedule_.running();
+        if (!underOrders && entity.desc_.cullDistance > 0.0f && distance > entity.desc_.cullDistance) {
             // Far enough away that nothing it could do would be visible. Not merely a cheaper
             // update: no update, and no parameter write either, so the node stays exactly where
             // the scene put it.
@@ -417,6 +651,26 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         entity.state_.hasLookTarget = false;
         entity.state_.reaction = 0.0f;
         entity.state_.activity = Activity::Idle;
+        entity.state_.driven = false;
+
+        // ---- intent, before behaviour (ADR-091) ----
+        // The hierarchy is read top-down, so the action tier gets its say first and the behaviours
+        // below it see `driven` and yield. Yielding is not stopping: a wanderer keeps its
+        // destination and its pause timer, which is what makes the fall-back a resume.
+        entity.schedule_.update(ctx.time, entity.actions_);
+        ActionOutput intent;
+        if (entity.actions_.pending() > 0) {
+            ActionContext ac;
+            ac.time = ctx.time;
+            ac.dt = dt;
+            ac.rng = &entity.rng_;
+            ac.self = &entity;
+            ac.world = this;
+            ac.path = &pathProvider();
+            ac.gait = &entity.desc_.gait;
+            ac.events = &actionEvents_;
+            intent = entity.actions_.update(ac, entity.state_);
+        }
 
         BehaviorContext bc;
         bc.time = ctx.time;
@@ -461,7 +715,23 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         if (entity.state_.activity == Activity::Idle && entity.state_.reaction > 0.4f) {
             entity.state_.activity = Activity::React;
         }
-        entity.locomotion_.activity = entity.state_.activity;
+        // ---- the gait (§7) ----
+        // The behaviour said how fast it is going; the gait says what that looks like. Separated
+        // because the two answers have different requirements: the speed must be exactly what the
+        // navigation produced, and the *clip* must not change four times a second because the
+        // speed is sitting on a threshold. Hysteresis lives here and nowhere else, so every
+        // behaviour and every action gets it without asking.
+        const Activity gait =
+            entity.gait_.select(entity.desc_.gait, entity.state_.activity, entity.state_.speed,
+                                entity.state_.turnRate, dt);
+        entity.locomotion_.activity = gait;
+        entity.locomotion_.playbackRate = Gait::playbackRate(entity.desc_.gait, gait, entity.state_.speed);
+        entity.locomotion_.blend = entity.desc_.gait.blend;
+        // What an action asked to be played, if it asked for anything. Assigned rather than
+        // rebuilt so a steady state reuses the string's capacity.
+        if (entity.locomotion_.action != intent.activity) {
+            entity.locomotion_.action.assign(intent.activity);
+        }
         entity.locomotion_.time = ctx.time;
         entity.locomotion_.position = entity.state_.position() + entity.motion_.position;
         entity.locomotion_.yaw = entity.state_.yaw;
@@ -476,10 +746,15 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
 
         applyAttachments(entity, params);
     }
+    if (actionListener_) {
+        for (const ActionEvent& event : actionEvents_) {
+            actionListener_(event);
+        }
+    }
 }
 
 void EntityWorld::applyAttachments(const Entity& entity, params::ParameterSet& params) const {
-    for (const AttachmentDesc& attachment : entity.desc_.attachments) {
+    for (const AttachmentDesc& attachment : entity.attachments()) {
         scene::Transform t;
         if (!entity.socketTransform(attachment.socket, t)) {
             continue;
@@ -642,6 +917,70 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
                 AttachmentDesc{item["node"].get<std::string>(), item["socket"].get<std::string>()});
         }
     }
+    // ---- intent (ADR-096) ----
+    if (j.contains("properties")) {
+        const nlohmann::json& properties = j["properties"];
+        if (properties.is_object()) {
+            // The readable spelling: { "headphones": 0, "awake": 1 }. A 0..1 flag is what almost
+            // every state property is, so it is the shape that needs no ceremony.
+            for (const auto& [name, value] : properties.items()) {
+                if (!value.is_number()) {
+                    return fail("entity '{}': property '{}' must be a number", desc.name, name);
+                }
+                desc.properties.push_back(PropertyDesc{name, value.get<float>(), 0.0f, 1.0f});
+            }
+        } else if (properties.is_array()) {
+            for (const auto& item : properties) {
+                if (!item.is_object() || !item.contains("name") || !item["name"].is_string()) {
+                    return fail("entity '{}': every property needs a string 'name'", desc.name);
+                }
+                PropertyDesc property;
+                property.name = item["name"].get<std::string>();
+                property.value = item.contains("value") && item["value"].is_number()
+                                     ? item["value"].get<float>() : 0.0f;
+                property.min = item.contains("min") && item["min"].is_number()
+                                   ? item["min"].get<float>() : 0.0f;
+                property.max = item.contains("max") && item["max"].is_number()
+                                   ? item["max"].get<float>() : 1.0f;
+                desc.properties.push_back(std::move(property));
+            }
+        } else {
+            return fail("entity '{}': 'properties' must be an object or an array", desc.name);
+        }
+    }
+    if (j.contains("interactions")) {
+        if (!j["interactions"].is_array()) {
+            return fail("entity '{}': 'interactions' must be an array", desc.name);
+        }
+        for (const auto& item : j["interactions"]) {
+            auto interaction = interactionFromJson(item);
+            if (!interaction) {
+                return fail("entity '{}': {}", desc.name, interaction.error().message);
+            }
+            desc.interactions.push_back(std::move(*interaction));
+        }
+    }
+    if (j.contains("actions")) {
+        auto actions = actionsFromJson(j["actions"]);
+        if (!actions) {
+            return fail("entity '{}': {}", desc.name, actions.error().message);
+        }
+        desc.actions = std::move(*actions);
+    }
+    if (j.contains("schedule")) {
+        auto schedule = scheduleFromJson(j["schedule"]);
+        if (!schedule) {
+            return fail("entity '{}': {}", desc.name, schedule.error().message);
+        }
+        desc.schedule = std::move(*schedule);
+    }
+    if (j.contains("gait")) {
+        auto gait = gaitFromJson(j["gait"]);
+        if (!gait) {
+            return fail("entity '{}': {}", desc.name, gait.error().message);
+        }
+        desc.gait = *gait;
+    }
     return desc;
 }
 
@@ -777,6 +1116,42 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
             attachments.push_back(nlohmann::json{{"node", attachment.node}, {"socket", attachment.socket}});
         }
         j["attachments"] = std::move(attachments);
+    }
+    if (!entity.properties.empty()) {
+        const bool simple = std::all_of(entity.properties.begin(), entity.properties.end(),
+                                        [](const PropertyDesc& p) { return p.min == 0.0f && p.max == 1.0f; });
+        if (simple) {
+            nlohmann::json properties = nlohmann::json::object();
+            for (const PropertyDesc& property : entity.properties) {
+                properties[property.name] = property.value;
+            }
+            j["properties"] = std::move(properties);
+        } else {
+            nlohmann::json properties = nlohmann::json::array();
+            for (const PropertyDesc& property : entity.properties) {
+                properties.push_back(nlohmann::json{{"name", property.name},
+                                                    {"value", property.value},
+                                                    {"min", property.min},
+                                                    {"max", property.max}});
+            }
+            j["properties"] = std::move(properties);
+        }
+    }
+    if (!entity.interactions.empty()) {
+        nlohmann::json interactions = nlohmann::json::array();
+        for (const InteractionDesc& interaction : entity.interactions) {
+            interactions.push_back(interactionToJson(interaction));
+        }
+        j["interactions"] = std::move(interactions);
+    }
+    if (!entity.actions.empty()) {
+        j["actions"] = actionsToJson(entity.actions);
+    }
+    if (!entity.schedule.entries.empty()) {
+        j["schedule"] = scheduleToJson(entity.schedule);
+    }
+    if (!(entity.gait == GaitSettings{})) {
+        j["gait"] = gaitToJson(entity.gait);
     }
     return j;
 }

@@ -27,7 +27,9 @@
 //     "reactions": [ { "signal": "audio.bass", "target": "parts/Lamp/emissiveGain", "depth": 3 } ]
 
 #include "core/rng.hpp"
+#include "entity/action.hpp"
 #include "entity/behavior.hpp"
+#include "entity/gait.hpp"
 #include "entity/locomotion.hpp"
 #include "entity/navigation.hpp"
 #include "params/modulation.hpp"
@@ -91,6 +93,23 @@ struct EntityDesc {
     // name belongs to an asset: a behaviour that named one would break the day a character shipped
     // with a different set, and the same `wander` has to drive an alien, a deer and a robot.
     std::vector<std::pair<std::string, std::string>> clips;
+
+    // ---- intent (ADR-096) ----
+    // Named numbers other systems can read: registered as ordinary parameters under
+    // "entity/<name>/state/<property>", so a reaction, a keyframe or a modulation route may
+    // address one without any of them knowing an action wrote it.
+    std::vector<PropertyDesc> properties;
+    // The verbs this node offers anyone who asks -- "sit", "open", "pickUp". Declared on the prop,
+    // never on the character, so the set dressing can grow without the character layer changing.
+    std::vector<InteractionDesc> interactions;
+    // What this entity does at load: the opening action list, drained in order.
+    std::vector<ActionDesc> actions;
+    // The routine it runs, if it has one. Started by the director, not by the load.
+    ScheduleDesc schedule;
+    // How this body's speed becomes a gait. Per entity because a deer, a robot and a person cross
+    // from walking to running at different speeds.
+    GaitSettings gait;
+
     // The profile this entity was built from, as written. Round-tripped so saving a scene does not
     // inline what the author deliberately shared -- `profileCount` records how many of each list
     // came from it, so the writer emits only what this entity added. Runtime, never serialised.
@@ -142,6 +161,10 @@ public:
     // The animation state for `activity`, or empty when the entity declared none. Falls back to
     // "idle" so a character with one clip still plays it rather than standing in its bind pose.
     [[nodiscard]] const std::string& clipFor(Activity activity) const;
+    // The same lookup for an activity an action named ("sit", "sleep", "pickUp"). Still an
+    // activity name and never a clip name: this is the indirection that lets one prop's "sit"
+    // drive an alien, a deer and a robot.
+    [[nodiscard]] const std::string& clipFor(std::string_view activity) const;
     [[nodiscard]] const std::string& name() const { return desc_.name; }
     [[nodiscard]] const EntityState& state() const { return state_; }
     [[nodiscard]] const LocomotionState& locomotion() const { return locomotion_; }
@@ -156,6 +179,37 @@ public:
 
     // The entity's behaviours, in declaration order.
     [[nodiscard]] const std::vector<std::unique_ptr<IBehavior>>& behaviors() const { return behaviors_; }
+
+    // ---- intent (ADR-096) ------------------------------------------------------------------
+
+    [[nodiscard]] ActionQueue& actions() { return actions_; }
+    [[nodiscard]] const ActionQueue& actions() const { return actions_; }
+    [[nodiscard]] Schedule& schedule() { return schedule_; }
+    [[nodiscard]] const Schedule& schedule() const { return schedule_; }
+    [[nodiscard]] const Gait& gait() const { return gait_; }
+
+    // A named number this entity declared. `setProperty` refuses a name the entity did not
+    // declare rather than inventing one, because a property invented at runtime is a property no
+    // reaction could have been bound to -- which is this project's recurring failure, in miniature.
+    [[nodiscard]] bool hasProperty(std::string_view property) const;
+    [[nodiscard]] float property(std::string_view property) const;
+    bool setProperty(std::string_view property, float value);
+    [[nodiscard]] const std::vector<std::pair<std::string, float>>& properties() const {
+        return propertyValues_;
+    }
+
+    // The verb this node offers under that name, or null.
+    [[nodiscard]] const InteractionDesc* interaction(std::string_view verb) const;
+    // Who is using an exclusive interaction right now, or "".
+    [[nodiscard]] std::string_view occupant(std::string_view verb) const;
+    // Takes an exclusive interaction, if it is free or already this claimant's.
+    bool claim(std::string_view verb, std::string_view who);
+    void release(std::string_view verb, std::string_view who);
+
+    // What the entity is carrying: what the scene attached, plus whatever `equip` added since.
+    [[nodiscard]] const std::vector<AttachmentDesc>& attachments() const { return attachments_; }
+    bool attach(const std::string& node, const std::string& socket);
+    bool detach(const std::string& node);
 
 private:
     friend class EntityWorld;
@@ -175,6 +229,19 @@ private:
 
     double coarseAccum_ = 0.0;
     bool active_ = true;
+
+    // ---- intent ----
+    ActionQueue actions_;
+    Schedule schedule_;
+    Gait gait_;
+    // Authoritative here rather than in the parameter set: an entity may be ticked before anything
+    // registers a parameter, and a state that only existed as a parameter would vanish on a scene
+    // swap. The parameter mirrors this, not the other way round.
+    std::vector<std::pair<std::string, float>> propertyValues_;
+    std::vector<params::Parameter<float>*> propertyParams_;
+    std::vector<AttachmentDesc> attachments_;
+    // verb -> the entity currently using it. A vector because a prop offers two or three verbs.
+    std::vector<std::pair<std::string, std::string>> claims_;
 
     IPoseSink* pose_ = nullptr;
     const ISkeletonQuery* skeleton_ = nullptr;
@@ -198,8 +265,41 @@ public:
     void setBindings(std::vector<NodeBinding> bindings);
     [[nodiscard]] const NodeBinding* binding(const std::string& node) const;
 
-    void setNavigator(Navigator nav) { nav_ = std::move(nav); }
+    void setNavigator(Navigator nav) {
+        nav_ = std::move(nav);
+        navPath_.setNavigator(&nav_);
+    }
     [[nodiscard]] const Navigator& navigator() const { return nav_; }
+
+    // ---- intent (ADR-096) ------------------------------------------------------------------
+
+    // How a `move` action finds its way. Defaults to the straight-line provider over the
+    // navigator set above, which is everything that exists today; §5/§6's planner installs itself
+    // here and nothing else changes. The pointer is borrowed: the caller keeps it alive.
+    void setPathProvider(const IPathProvider* path) { path_ = path; }
+    [[nodiscard]] const IPathProvider& pathProvider() const { return path_ != nullptr ? *path_ : navPath_; }
+
+    // Every completion, failure, skip and cancellation from the last update(), in the order they
+    // happened. Cleared at the top of each update rather than freed, so reading them costs nothing
+    // and producing them allocates nothing in steady state. This is the seam §17's event system
+    // consumes; it is a list rather than a callback so a reader may run at its own cadence.
+    [[nodiscard]] const std::vector<ActionEvent>& actionEvents() const { return actionEvents_; }
+    // And a callback, for a caller that wants one the instant it happens.
+    void setActionListener(ActionQueue::Listener listener) { actionListener_ = std::move(listener); }
+
+    // Reads a property off another entity. Returns `fallback` when there is no such entity or it
+    // declared no such property -- the caller that cares asks `Entity::hasProperty` first.
+    [[nodiscard]] float property(std::string_view entity, std::string_view property,
+                                 float fallback = 0.0f) const;
+
+    // Starts / pauses / resumes an entity's routine. Named here because a director talks to the
+    // world, not to an entity it had to find first.
+    bool startRoutine(std::string_view entity, double now);
+    bool pauseRoutine(std::string_view entity, double now);
+    bool resumeRoutine(std::string_view entity, double now);
+    // A director override: it preempts whatever the entity was doing and, when it drains, the
+    // entity resumes rather than resets (ADR-091).
+    bool direct(std::string_view entity, std::vector<ActionDesc> actions, double now);
 
     // Named places a behaviour may attend to: the scene's heroes, and any node an entity drives.
     // Set by the host, because only the host knows what the scene contains.
@@ -259,6 +359,15 @@ private:
     std::vector<std::unique_ptr<Entity>> entities_;
     std::vector<NodeBinding> bindings_;
     Navigator nav_{};
+    NavigatorPath navPath_{&nav_};
+    const IPathProvider* path_ = nullptr;
+    std::vector<ActionEvent> actionEvents_;
+    // Events raised between updates -- a director cancelling an override, a routine stopped --
+    // held until the next update folds them in. Clearing at the top of an update without this
+    // would throw away everything that happened while the engine was not ticking, which is
+    // precisely when a director does its work.
+    std::vector<ActionEvent> pendingEvents_;
+    ActionQueue::Listener actionListener_;
     // The set the paths are resolved against. Cached because resolveTarget is const and is called
     // from compileReactions, which has one; refreshed by bind() and update().
     mutable const params::ParameterSet* params_ = nullptr;

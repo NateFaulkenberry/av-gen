@@ -1397,7 +1397,11 @@ std::uint32_t Composition::worldSeed() const {
 }
 
 void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& state) {
-    const std::string& want = entity_.clipFor(state.activity);
+    // An action's activity first, the gait's second (ADR-096). Both are *activity names* that the
+    // entity's own `clips` map turns into whatever the asset shipped -- neither the action nor the
+    // gait ever names a clip, which is what lets one routine drive an alien, a deer and a robot.
+    const std::string& want =
+        state.action.empty() ? entity_.clipFor(state.activity) : entity_.clipFor(state.action);
     if (want.empty()) {
         return; // this entity declared no clips: it drives a craft or a prop, not a character
     }
@@ -1405,7 +1409,7 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
     // no-op rather than a restart, so "what should be playing now" is the only thing a behaviour
     // has to know. The timeline second rather than a wall clock is what keeps an offline render
     // reproducible (ADR-086).
-    owner_.setNodeAnimation(node_, want, state.time);
+    owner_.setNodeAnimation(node_, want, state.time, state.blend, state.playbackRate);
 }
 
 void Composition::cullEntityNodes() {
