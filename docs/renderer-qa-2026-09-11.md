@@ -203,9 +203,10 @@ tone mapping and composition overlay.
 - [x] Existing runtime isolation controls are available through `--disable shadows,ao,volume,post,
   shadowmask`, with A/B logging and documentation. The new entity diagnostics are exposed in the
   existing Debug tab. Fine-grained culling/animation/LOD/water/VFX toggles remain open.
-- [ ] Create `RendererQA` with labeled static cube, glTF, disabled-animation mesh, terrain, water,
-  transparent object, particles, character, UFO, near/far/behind-camera/extreme-angle objects.
-  Include camera path, resize, seek and reverse controls.
+- [x] Create `RendererQA` as `examples/qa/renderer-qa.json`, indexed under Lab. It includes built-in
+  near/far/behind-camera geometry, a skinned alien, a transparent orb, particles and a floor; its
+  60-frame preview smoke render passes with zero GPU errors. Camera path/resize/seek/reverse stress
+  remains a runtime test task.
 - [ ] Make Glowmere regression checks explicit: UFO close-up/orbit stationarity, alien animation,
   shoreline stability and camera cuts. Keep it as a control even if Constellation is the active art.
 

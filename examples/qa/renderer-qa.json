@@ -1,0 +1,16 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {"name": "Renderer QA"},
+ "assets": {"scene": {"kind": "composition", "path": "renderer-qa.scene.json"}},
+ "parameters": {
+  "post/bloom/enabled": false,
+  "post/output/vignette": 0.0,
+  "post/output/grain": 0.0
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {"enabled": false, "tracks": [], "cues": []},
+ "render": {"width": 1280, "height": 720, "fps": 30, "output": "sequence"}
+}

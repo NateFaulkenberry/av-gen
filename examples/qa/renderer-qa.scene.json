@@ -1,0 +1,23 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Renderer QA",
+ "camera": {"mode": 1, "position": [0, 5, 16], "target": [0, 1, -8], "fov": 42, "orbitSpeed": 0},
+ "environment": {
+  "background": [0.004, 0.006, 0.012],
+  "intensity": 0.18,
+  "fogColor": [0.015, 0.025, 0.05],
+  "fogDensity": 0.002,
+  "volumeDensity": 0.0,
+  "sky": {"enabled": false, "background": false}
+ },
+ "nodes": [
+  {"name": "floor", "kind": "grid", "position": [0, 0, -8], "scale": [10, 1, 10], "material": {"baseColor": [0.06, 0.08, 0.12], "roughness": 0.9}},
+  {"name": "near-cube", "kind": "procedural", "position": [-5, 1, -4], "procedural": {"source": {"kind": "box", "size": [1, 1, 1], "subdivisions": 2}, "distribution": {"kind": "single"}, "material": {"baseColor": [0.8, 0.2, 0.12], "roughness": 0.45}}},
+  {"name": "far-cube", "kind": "procedural", "position": [5, 1, -90], "procedural": {"source": {"kind": "box", "size": [2, 2, 2], "subdivisions": 2}, "distribution": {"kind": "single"}, "material": {"baseColor": [0.12, 0.3, 0.9], "roughness": 0.65}}},
+  {"name": "behind-camera", "kind": "procedural", "position": [0, 1, 24], "procedural": {"source": {"kind": "sphere", "radius": 1.0, "segments": 24, "rings": 12}, "distribution": {"kind": "single"}, "material": {"baseColor": [0.2, 0.8, 0.35], "roughness": 0.4}}},
+  {"name": "alien", "kind": "gltf", "asset": "../../assets/imported/alien.gltf", "position": [0, 0, -5], "scale": [0.01, 0.01, 0.01], "animation": {"state": "Walk", "blend": 0.2}},
+  {"name": "transparent-orb", "kind": "orb", "position": [3, 1.2, -5], "material": {"baseColor": [0.1, 0.5, 0.95], "opacity": 0.45, "alphaMode": "blend", "roughness": 0.15}},
+  {"name": "particles", "kind": "particles", "position": [-3, 1, -6], "particles": {"capacity": 512, "spawnRate": 80, "lifetimeMin": 1.0, "lifetimeMax": 2.0, "speedMin": 0.0, "speedMax": 0.3, "sizeStart": 0.06, "sizeEnd": 0.01, "emissive": 2.0, "colorStart": [0.2, 0.8, 1.0, 1.0], "colorEnd": [0.1, 0.2, 1.0, 0.0]}}
+ ]
+}
