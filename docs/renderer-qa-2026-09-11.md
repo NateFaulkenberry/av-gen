@@ -42,6 +42,9 @@ imported UFO asset. The attached stabilization brief is the acceptance contract 
 - [x] Previous-model history now advances for every entity, including camera-culled entities.
   This prevents false motion-vector streaks when an object moves while hidden and re-enters without
   moving. The new GPU regression compares that re-entry frame with a fresh renderer.
+- [x] Renderer temporal history resets on backward timeline time. Previous camera/model matrices
+  are cleared on reverse/seek discontinuities so the first reversed frame does not inherit false
+  motion. Regression compares reused and fresh renderers at the same timestamp.
 - [x] Water color output now matches the conventional `SrcAlpha` blend state. The shader was
   returning RGB already multiplied by alpha, so the fixed-function blend multiplied alpha twice;
   shallow water and shoreline colors were darkened. Shader compilation and Glowmere rendering pass
@@ -178,6 +181,8 @@ tone mapping and composition overlay.
   Dawn does not make state implicit.
 - [ ] Stress resize, scene reload, timeline seek/reverse, rapid camera cuts and frame-index reuse.
   Check readback ring, uniform staging, joint palettes, water uniforms and bind groups for stale data.
+- [x] Direct renderer reverse-time regression passes 42 assertions. Broader Engine-level seek,
+  reload, resize and rapid-cut stress remains open.
 - [ ] Run ASan/UBSan and TSan-compatible CPU tests after each resource-lifetime change. Add a stable
   two-renderer same-frame hash test around every confirmed state bug.
 - [x] Syphon burst synchronization is covered with a deadline-bounded retry; the in-process client
@@ -278,6 +283,18 @@ scene entity's frame state.
 still read the prior frame from `prevModels_`.
 
 **Regression:** `[gpu][motion][blur]` compares the re-entry image with a fresh renderer and passes.
+
+### False motion after reverse seek
+
+**Symptom:** reusing a renderer after moving timeline time backward produced a different frame than
+a fresh renderer at the same scene state.
+
+**Root cause:** previous view-projection and model histories described the forward frame, so the
+first reverse frame was treated as motion instead of a temporal discontinuity.
+
+**Fix:** clear temporal camera/model history whenever `renderTime` decreases.
+
+**Regression:** `[gpu][motion][determinism]` reverse-timeline case passes 42 assertions.
 
 ### Camera forward/up singularity
 

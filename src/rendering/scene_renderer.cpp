@@ -1524,6 +1524,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // itself also writes the frame origin, and every later pass's cost is the interval from the
     // previous pass's end to its own.
     timeline_->beginFrame();
+    if (time.renderTime < previousRenderTime_) {
+        // A seek/reverse is a discontinuity, not motion. Reusing forward temporal history would
+        // create false object/camera velocities and make the first reversed frame differ from a
+        // fresh renderer at the same timeline second.
+        havePrevViewProj_ = false;
+        prevModels_.clear();
+        prevModelsNext_.clear();
+    }
+    previousRenderTime_ = time.renderTime;
     clusterDispatches_ = 0;
     // The CPU side of the frame, stage by stage (ADR-077). The boundary rolls: every interval
     // between two marks is charged to the stage the mark names, so the stages partition render()

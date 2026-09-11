@@ -227,6 +227,41 @@ TEST_CASE("camera-culling history does not create a false re-entry velocity", "[
     CHECK(gpu::hashImage(*reentered) == gpu::hashImage(*expected));
 }
 
+TEST_CASE("reverse timeline reuse matches a fresh renderer", "[gpu][motion][determinism]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    scene::Scene sequence = movingBox();
+    sequence.post.motionBlurAmount = 1.0f;
+    sequence.post.motionBlurSamples = 12;
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    FrameTime time;
+    time.deltaTime = 1.0 / 30.0;
+    time.frameIndex = 0;
+    time.renderTime = 0.0;
+    sequence.entities[0].transform.position = {-0.8f, 0.0f, 0.0f};
+    REQUIRE(renderer.renderToImage(sequence, time, 256, 256).has_value());
+    time.frameIndex = 1;
+    time.renderTime = 1.0 / 30.0;
+    sequence.entities[0].transform.position = {0.0f, 0.0f, 0.0f};
+    REQUIRE(renderer.renderToImage(sequence, time, 256, 256).has_value());
+
+    // Seek backward and render a state already visited by this renderer. Temporal buffers must not
+    // leak the forward path into the reversed frame.
+    time.frameIndex = 2;
+    time.renderTime = 0.0;
+    sequence.entities[0].transform.position = {-0.8f, 0.0f, 0.0f};
+    const auto reversed = renderer.renderToImage(sequence, time, 256, 256);
+    REQUIRE(reversed.has_value());
+
+    rendering::SceneRenderer fresh(*ctx, shaders);
+    REQUIRE(fresh.init().has_value());
+    const auto expected = fresh.renderToImage(sequence, time, 256, 256);
+    REQUIRE(expected.has_value());
+    CHECK(gpu::hashImage(*reversed) == gpu::hashImage(*expected));
+}
+
 namespace {
 
 // A hero emitter: few particles, a long life, no randomness in the forces, trails on.

@@ -56,6 +56,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -438,6 +439,7 @@ private:
     std::unique_ptr<gpu::TransientPool> pool_;
     glm::mat4 prevViewProj_{1.0f};
     bool havePrevViewProj_ = false;
+    double previousRenderTime_ = -std::numeric_limits<double>::infinity();
     QualityTier tier_ = QualityTier::Realtime;
     QualitySettings qualitySettings_ = QualitySettings::forTier(QualityTier::Realtime);
     PassToggles toggles_;
