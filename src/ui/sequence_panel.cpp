@@ -524,9 +524,11 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     const double mouseTime = toTime(mouse.x);
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        // Which lane was hit decides what the click means. Above the lanes -- the ruler and the
-        // marker row -- is always a scrub, so there is one place on the strip that is guaranteed
-        // not to grab a block.
+        // Which lane was hit decides what the click means. Above the shot lane -- the ruler, the
+        // marker row and the waveform -- is always a scrub, so there is one place on the strip that
+        // is guaranteed not to grab a block. The waveform holds no blocks and is deliberately left
+        // that way: clicking a moment in the music to hear it is worth more than anything a block
+        // there could offer.
         dragKind_ = 0;
         dragIndex_ = -1;
         bool hitBlock = false;
