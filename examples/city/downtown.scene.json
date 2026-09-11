@@ -1,0 +1,5938 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "downtown",
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    -0.6,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      260,
+      1.2,
+      260
+     ],
+     "subdivisions": 1,
+     "bevel": 0.0,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.03,
+      0.034,
+      0.042
+     ],
+     "roughness": 0.95,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "plaza-floor",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    0.06,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      58,
+      0.2,
+      44
+     ],
+     "subdivisions": 1,
+     "bevel": 0.4,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.03,
+      0.033,
+      0.04
+     ],
+     "roughness": 0.88,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "avenue",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    0.02,
+    -40
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      240,
+      0.16,
+      14
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.022,
+      0.022,
+      0.026
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "tower0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      14.040000000000001,
+      34.0,
+      13.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 7,
+     "start": [
+      -63.0,
+      0,
+      34.0
+     ],
+     "end": [
+      63.0,
+      0,
+      34.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.26,
+      0.3,
+      0.34
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      17.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 541992510,
+     "randomScale": [
+      0.1,
+      0.45,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "tower0-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      15.12,
+      1.53,
+      13.780000000000001
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 7,
+     "start": [
+      -63.0,
+      0,
+      34.0
+     ],
+     "end": [
+      63.0,
+      0,
+      34.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      34.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 541992510,
+     "randomScale": [
+      0.1,
+      0.45,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "tower0-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      7.48,
+      27.45
+     ],
+     "end": [
+      63.0,
+      7.48,
+      27.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.125
+    },
+    "variation": {
+     "seed": 541992527
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      7.48,
+      40.55
+     ],
+     "end": [
+      63.0,
+      7.48,
+      40.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.8874999999999997
+    },
+    "variation": {
+     "seed": 541993438
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      11.333333333333334,
+      27.45
+     ],
+     "end": [
+      63.0,
+      11.333333333333334,
+      27.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.125
+    },
+    "variation": {
+     "seed": 541992528
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      11.333333333333334,
+      40.55
+     ],
+     "end": [
+      63.0,
+      11.333333333333334,
+      40.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.8874999999999997
+    },
+    "variation": {
+     "seed": 541993439
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      15.186666666666666,
+      27.45
+     ],
+     "end": [
+      63.0,
+      15.186666666666666,
+      27.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.125
+    },
+    "variation": {
+     "seed": 541992529
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      15.186666666666666,
+      40.55
+     ],
+     "end": [
+      63.0,
+      15.186666666666666,
+      40.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.8874999999999997
+    },
+    "variation": {
+     "seed": 541993440
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-win3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      19.040000000000003,
+      27.45
+     ],
+     "end": [
+      63.0,
+      19.040000000000003,
+      27.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.125
+    },
+    "variation": {
+     "seed": 541992530
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-winb3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      19.040000000000003,
+      40.55
+     ],
+     "end": [
+      63.0,
+      19.040000000000003,
+      40.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.8874999999999997
+    },
+    "variation": {
+     "seed": 541993441
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-win4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      22.893333333333334,
+      27.45
+     ],
+     "end": [
+      63.0,
+      22.893333333333334,
+      27.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.125
+    },
+    "variation": {
+     "seed": 541992531
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-winb4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      22.893333333333334,
+      40.55
+     ],
+     "end": [
+      63.0,
+      22.893333333333334,
+      40.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.8874999999999997
+    },
+    "variation": {
+     "seed": 541993442
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-win5",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      26.74666666666667,
+      27.45
+     ],
+     "end": [
+      63.0,
+      26.74666666666667,
+      27.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.125
+    },
+    "variation": {
+     "seed": 541992532
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-winb5",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      26.74666666666667,
+      40.55
+     ],
+     "end": [
+      63.0,
+      26.74666666666667,
+      40.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.8874999999999997
+    },
+    "variation": {
+     "seed": 541993443
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-win6",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      30.6,
+      27.45
+     ],
+     "end": [
+      63.0,
+      30.6,
+      27.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.125
+    },
+    "variation": {
+     "seed": 541992533
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower0-winb6",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      2.55,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -63.0,
+      30.6,
+      40.55
+     ],
+     "end": [
+      63.0,
+      30.6,
+      40.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.8874999999999997
+    },
+    "variation": {
+     "seed": 541993444
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      14.040000000000001,
+      52.0,
+      15.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 6,
+     "start": [
+      -54.0,
+      0,
+      56.0
+     ],
+     "end": [
+      54.0,
+      0,
+      56.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.33,
+      0.27,
+      0.32
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      26.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 878707004,
+     "randomScale": [
+      0.1,
+      0.45,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "tower1-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      15.12,
+      2.34,
+      15.9
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 6,
+     "start": [
+      -54.0,
+      0,
+      56.0
+     ],
+     "end": [
+      54.0,
+      0,
+      56.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      52.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 878707004,
+     "randomScale": [
+      0.1,
+      0.45,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "tower1-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      11.44,
+      48.45
+     ],
+     "end": [
+      54.0,
+      11.44,
+      48.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.375
+    },
+    "variation": {
+     "seed": 878707021
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      11.44,
+      63.55
+     ],
+     "end": [
+      54.0,
+      11.44,
+      63.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.3625
+    },
+    "variation": {
+     "seed": 878707932
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      15.86,
+      48.45
+     ],
+     "end": [
+      54.0,
+      15.86,
+      48.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.375
+    },
+    "variation": {
+     "seed": 878707022
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      15.86,
+      63.55
+     ],
+     "end": [
+      54.0,
+      15.86,
+      63.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.3625
+    },
+    "variation": {
+     "seed": 878707933
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      20.28,
+      48.45
+     ],
+     "end": [
+      54.0,
+      20.28,
+      48.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.375
+    },
+    "variation": {
+     "seed": 878707023
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      20.28,
+      63.55
+     ],
+     "end": [
+      54.0,
+      20.28,
+      63.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.3625
+    },
+    "variation": {
+     "seed": 878707934
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-win3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      24.7,
+      48.45
+     ],
+     "end": [
+      54.0,
+      24.7,
+      48.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.375
+    },
+    "variation": {
+     "seed": 878707024
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-winb3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      24.7,
+      63.55
+     ],
+     "end": [
+      54.0,
+      24.7,
+      63.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.3625
+    },
+    "variation": {
+     "seed": 878707935
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-win4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      29.120000000000005,
+      48.45
+     ],
+     "end": [
+      54.0,
+      29.120000000000005,
+      48.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.375
+    },
+    "variation": {
+     "seed": 878707025
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-winb4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      29.120000000000005,
+      63.55
+     ],
+     "end": [
+      54.0,
+      29.120000000000005,
+      63.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.3625
+    },
+    "variation": {
+     "seed": 878707936
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-win5",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      33.54,
+      48.45
+     ],
+     "end": [
+      54.0,
+      33.54,
+      48.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.375
+    },
+    "variation": {
+     "seed": 878707026
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-winb5",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      33.54,
+      63.55
+     ],
+     "end": [
+      54.0,
+      33.54,
+      63.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.3625
+    },
+    "variation": {
+     "seed": 878707937
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-win6",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      37.96,
+      48.45
+     ],
+     "end": [
+      54.0,
+      37.96,
+      48.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.375
+    },
+    "variation": {
+     "seed": 878707027
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-winb6",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      37.96,
+      63.55
+     ],
+     "end": [
+      54.0,
+      37.96,
+      63.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.3625
+    },
+    "variation": {
+     "seed": 878707938
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-win7",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      42.38,
+      48.45
+     ],
+     "end": [
+      54.0,
+      42.38,
+      48.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.375
+    },
+    "variation": {
+     "seed": 878707028
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-winb7",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      42.38,
+      63.55
+     ],
+     "end": [
+      54.0,
+      42.38,
+      63.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.3625
+    },
+    "variation": {
+     "seed": 878707939
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-win8",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      46.800000000000004,
+      48.45
+     ],
+     "end": [
+      54.0,
+      46.800000000000004,
+      48.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.375
+    },
+    "variation": {
+     "seed": 878707029
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower1-winb8",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.9,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      46.800000000000004,
+      63.55
+     ],
+     "end": [
+      54.0,
+      46.800000000000004,
+      63.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.3625
+    },
+    "variation": {
+     "seed": 878707940
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      14.040000000000001,
+      72.0,
+      17.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      -45.0,
+      0,
+      80.0
+     ],
+     "end": [
+      45.0,
+      0,
+      80.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.09,
+      0.12,
+      0.16
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      36.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 439921187,
+     "randomScale": [
+      0.1,
+      0.45,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "tower2-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      15.12,
+      3.2399999999999998,
+      18.02
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      -45.0,
+      0,
+      80.0
+     ],
+     "end": [
+      45.0,
+      0,
+      80.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      72.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 439921187,
+     "randomScale": [
+      0.1,
+      0.45,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "tower2-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      15.84,
+      71.45
+     ],
+     "end": [
+      45.0,
+      15.84,
+      71.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 439921204
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      15.84,
+      88.55
+     ],
+     "end": [
+      45.0,
+      15.84,
+      88.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 439922115
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      20.736000000000004,
+      71.45
+     ],
+     "end": [
+      45.0,
+      20.736000000000004,
+      71.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 439921205
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      20.736000000000004,
+      88.55
+     ],
+     "end": [
+      45.0,
+      20.736000000000004,
+      88.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 439922116
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      25.631999999999998,
+      71.45
+     ],
+     "end": [
+      45.0,
+      25.631999999999998,
+      71.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 439921206
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      25.631999999999998,
+      88.55
+     ],
+     "end": [
+      45.0,
+      25.631999999999998,
+      88.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 439922117
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-win3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      30.528000000000002,
+      71.45
+     ],
+     "end": [
+      45.0,
+      30.528000000000002,
+      71.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 439921207
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-winb3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      30.528000000000002,
+      88.55
+     ],
+     "end": [
+      45.0,
+      30.528000000000002,
+      88.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 439922118
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-win4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      35.424,
+      71.45
+     ],
+     "end": [
+      45.0,
+      35.424,
+      71.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 439921208
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-winb4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      35.424,
+      88.55
+     ],
+     "end": [
+      45.0,
+      35.424,
+      88.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 439922119
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-win5",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      40.32000000000001,
+      71.45
+     ],
+     "end": [
+      45.0,
+      40.32000000000001,
+      71.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 439921209
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-winb5",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      40.32000000000001,
+      88.55
+     ],
+     "end": [
+      45.0,
+      40.32000000000001,
+      88.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 439922120
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-win6",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      45.216,
+      71.45
+     ],
+     "end": [
+      45.0,
+      45.216,
+      71.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 439921210
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-winb6",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      45.216,
+      88.55
+     ],
+     "end": [
+      45.0,
+      45.216,
+      88.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 439922121
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-win7",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      50.111999999999995,
+      71.45
+     ],
+     "end": [
+      45.0,
+      50.111999999999995,
+      71.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 439921211
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-winb7",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      50.111999999999995,
+      88.55
+     ],
+     "end": [
+      45.0,
+      50.111999999999995,
+      88.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 439922122
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-win8",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      55.008,
+      71.45
+     ],
+     "end": [
+      45.0,
+      55.008,
+      71.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 439921212
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-winb8",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      55.008,
+      88.55
+     ],
+     "end": [
+      45.0,
+      55.008,
+      88.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 439922123
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-win9",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      59.904,
+      71.45
+     ],
+     "end": [
+      45.0,
+      59.904,
+      71.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 439921213
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-winb9",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      59.904,
+      88.55
+     ],
+     "end": [
+      45.0,
+      59.904,
+      88.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 439922124
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-win10",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      64.8,
+      71.45
+     ],
+     "end": [
+      45.0,
+      64.8,
+      71.45
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 439921214
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower2-winb10",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      5.3999999999999995,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -45.0,
+      64.8,
+      88.55
+     ],
+     "end": [
+      45.0,
+      64.8,
+      88.55
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.42,
+      0.72,
+      1.0
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 439922125
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      14.040000000000001,
+      40.0,
+      14.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 6,
+     "start": [
+      -54.0,
+      0,
+      -62.0
+     ],
+     "end": [
+      54.0,
+      0,
+      -62.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.54,
+      0.47,
+      0.4
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      20.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 346626812,
+     "randomScale": [
+      0.1,
+      0.45,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "tower3-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      15.12,
+      1.7999999999999998,
+      14.84
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 6,
+     "start": [
+      -54.0,
+      0,
+      -62.0
+     ],
+     "end": [
+      54.0,
+      0,
+      -62.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      40.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 346626812,
+     "randomScale": [
+      0.1,
+      0.45,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "tower3-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      8.8,
+      -54.95
+     ],
+     "end": [
+      54.0,
+      8.8,
+      -54.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 346626829
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      8.8,
+      -69.05
+     ],
+     "end": [
+      54.0,
+      8.8,
+      -69.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 346627740
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      12.685714285714287,
+      -54.95
+     ],
+     "end": [
+      54.0,
+      12.685714285714287,
+      -54.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 346626830
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      12.685714285714287,
+      -69.05
+     ],
+     "end": [
+      54.0,
+      12.685714285714287,
+      -69.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 346627741
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      16.57142857142857,
+      -54.95
+     ],
+     "end": [
+      54.0,
+      16.57142857142857,
+      -54.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 346626831
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      16.57142857142857,
+      -69.05
+     ],
+     "end": [
+      54.0,
+      16.57142857142857,
+      -69.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 346627742
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-win3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      20.45714285714286,
+      -54.95
+     ],
+     "end": [
+      54.0,
+      20.45714285714286,
+      -54.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 346626832
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-winb3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      20.45714285714286,
+      -69.05
+     ],
+     "end": [
+      54.0,
+      20.45714285714286,
+      -69.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 346627743
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-win4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      24.34285714285714,
+      -54.95
+     ],
+     "end": [
+      54.0,
+      24.34285714285714,
+      -54.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 346626833
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-winb4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      24.34285714285714,
+      -69.05
+     ],
+     "end": [
+      54.0,
+      24.34285714285714,
+      -69.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 346627744
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-win5",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      28.228571428571428,
+      -54.95
+     ],
+     "end": [
+      54.0,
+      28.228571428571428,
+      -54.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 346626834
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-winb5",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      28.228571428571428,
+      -69.05
+     ],
+     "end": [
+      54.0,
+      28.228571428571428,
+      -69.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 346627745
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-win6",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      32.114285714285714,
+      -54.95
+     ],
+     "end": [
+      54.0,
+      32.114285714285714,
+      -54.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 346626835
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-winb6",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      32.114285714285714,
+      -69.05
+     ],
+     "end": [
+      54.0,
+      32.114285714285714,
+      -69.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 346627746
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-win7",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      36.0,
+      -54.95
+     ],
+     "end": [
+      54.0,
+      36.0,
+      -54.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 346626836
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "tower3-winb7",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.52,
+      3.0,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -54.0,
+      36.0,
+      -69.05
+     ],
+     "end": [
+      54.0,
+      36.0,
+      -69.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 346627747
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "neon-tall",
+   "kind": "procedural",
+   "position": [
+    -26.0,
+    15.0,
+    26.0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.9,
+      11.0,
+      0.35
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.3,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.16,
+      0.46
+     ],
+     "emissiveIntensity": 20.0
+    }
+   }
+  },
+  {
+   "name": "neon-band",
+   "kind": "procedural",
+   "position": [
+    20.0,
+    9.5,
+    26.5
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      16.0,
+      0.8,
+      0.3
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.3,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.16,
+      0.82,
+      1.0
+     ],
+     "emissiveIntensity": 16.0
+    }
+   }
+  },
+  {
+   "name": "neon-ring",
+   "kind": "procedural",
+   "position": [
+    2.0,
+    12.0,
+    25.5
+   ],
+   "rotation": [
+    90,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 3.1,
+     "minorRadius": 0.22,
+     "majorSegments": 40,
+     "minorSegments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.3,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.16,
+      0.46
+     ],
+     "emissiveIntensity": 14.0
+    }
+   }
+  },
+  {
+   "name": "dt-lamps-post",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.075,
+     "height": 4.2,
+     "radialSegments": 8,
+     "caps": true,
+     "bevel": 0.02,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 9,
+     "start": [
+      -30.0,
+      0.3,
+      18.0
+     ],
+     "end": [
+      30.0,
+      0.3,
+      18.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.06,
+      0.065,
+      0.07
+     ],
+     "roughness": 0.45,
+     "metallic": 0.6
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      2.1,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "dt-lamps-head",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.42,
+      0.1,
+      0.22
+     ],
+     "subdivisions": 1,
+     "bevel": 0.04,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 9,
+     "start": [
+      -30.0,
+      4.2,
+      18.0
+     ],
+     "end": [
+      30.0,
+      4.2,
+      18.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.07,
+      0.075,
+      0.08
+     ],
+     "roughness": 0.4,
+     "metallic": 0.6
+    }
+   }
+  },
+  {
+   "name": "dt-lamps-bulb",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.11,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 9,
+     "start": [
+      -30.0,
+      4.1000000000000005,
+      18.0
+     ],
+     "end": [
+      30.0,
+      4.1000000000000005,
+      18.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.3,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.55,
+      0.18
+     ],
+     "emissiveIntensity": 7.0
+    }
+   }
+  },
+  {
+   "name": "dt-lamps-w-post",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.075,
+     "height": 4.2,
+     "radialSegments": 8,
+     "caps": true,
+     "bevel": 0.02,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 9,
+     "start": [
+      -30.0,
+      0.3,
+      -20.0
+     ],
+     "end": [
+      30.0,
+      0.3,
+      -20.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.06,
+      0.065,
+      0.07
+     ],
+     "roughness": 0.45,
+     "metallic": 0.6
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      2.1,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "dt-lamps-w-head",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.42,
+      0.1,
+      0.22
+     ],
+     "subdivisions": 1,
+     "bevel": 0.04,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 9,
+     "start": [
+      -30.0,
+      4.2,
+      -20.0
+     ],
+     "end": [
+      30.0,
+      4.2,
+      -20.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.07,
+      0.075,
+      0.08
+     ],
+     "roughness": 0.4,
+     "metallic": 0.6
+    }
+   }
+  },
+  {
+   "name": "dt-lamps-w-bulb",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.11,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 9,
+     "start": [
+      -30.0,
+      4.1000000000000005,
+      -20.0
+     ],
+     "end": [
+      30.0,
+      4.1000000000000005,
+      -20.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.3,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.55,
+      0.18
+     ],
+     "emissiveIntensity": 7.0
+    }
+   }
+  },
+  {
+   "name": "dt-trees-0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/CommonTree_2.gltf",
+     "assetPart": 0
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 7,
+     "start": [
+      -26.0,
+      0.2,
+      8.0
+     ],
+     "end": [
+      26.0,
+      0.2,
+      8.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.24,
+      0.17,
+      0.11
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "scale": [
+      0.62,
+      0.62,
+      0.62
+     ]
+    },
+    "variation": {
+     "seed": 515,
+     "randomUniformScale": 0.22,
+     "randomRotation": [
+      0.0,
+      3.14,
+      0.0
+     ],
+     "randomPosition": [
+      0.4,
+      0.0,
+      0.4
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.02,
+     "valueRandom": 0.18
+    }
+   }
+  },
+  {
+   "name": "dt-trees-1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/CommonTree_2.gltf",
+     "assetPart": 1
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 7,
+     "start": [
+      -26.0,
+      0.2,
+      8.0
+     ],
+     "end": [
+      26.0,
+      0.2,
+      8.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.14,
+      0.26,
+      0.14
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "scale": [
+      0.62,
+      0.62,
+      0.62
+     ]
+    },
+    "variation": {
+     "seed": 522,
+     "randomUniformScale": 0.22,
+     "randomRotation": [
+      0.0,
+      3.14,
+      0.0
+     ],
+     "randomPosition": [
+      0.4,
+      0.0,
+      0.4
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.02,
+     "valueRandom": 0.18
+    }
+   }
+  },
+  {
+   "name": "basin",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    0.4,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 4.2,
+     "height": 0.7,
+     "radialSegments": 28,
+     "caps": true,
+     "bevel": 0.18,
+     "bevelSegments": 3
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.22,
+      0.23,
+      0.26
+     ],
+     "roughness": 0.7,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "basin-water",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    0.72,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 3.7,
+     "height": 0.12,
+     "radialSegments": 28,
+     "caps": true
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.01,
+      0.018,
+      0.03
+     ],
+     "roughness": 0.1,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.08,
+      0.22,
+      0.4
+     ],
+     "emissiveIntensity": 0.45
+    }
+   }
+  },
+  {
+   "name": "basin-column",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    2.4,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.42,
+     "height": 3.6,
+     "radialSegments": 16,
+     "caps": true,
+     "bevel": 0.08,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.24,
+      0.25,
+      0.28
+     ],
+     "roughness": 0.6,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.9,
+      0.62,
+      0.3
+     ],
+     "emissiveIntensity": 1.8
+    }
+   }
+  }
+ ]
+}

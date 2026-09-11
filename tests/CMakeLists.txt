@@ -13,8 +13,6 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/profile_capture.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"
-    # The cinematic director is pure geometry and JSON (ADR-062); it needs no device.
-    "${CMAKE_SOURCE_DIR}/src/app/cinematic.cpp"
     # The job system is threads and state; no device needed (ADR-064).
     "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"
     # Generate World: composition on a worker, install on the main thread (ADR-066).
@@ -68,8 +66,6 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         "${CMAKE_SOURCE_DIR}/src/app/profile_capture.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"
-        # The cinematic director is pure geometry and JSON (ADR-062); it needs no device.
-        "${CMAKE_SOURCE_DIR}/src/app/cinematic.cpp"
         # The job system is threads and state; no device needed (ADR-064).
         "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"
         # Generate World: composition on a worker, install on the main thread (ADR-066).

@@ -1,0 +1,2071 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "audio": {
+   "path": "../../assets/audio/night-shift.wav"
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "night-shift.scene.json"
+  }
+ },
+ "parameters": {
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": -2.1,
+  "post/tonemap/operator": 1,
+  "post/tonemap/chroma-retention": 0.35,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.34,
+  "post/bloom/threshold": 0.85,
+  "post/bloom/knee": 0.55,
+  "post/bloom/radius": 1.15,
+  "post/bloom/emissionWeight": 0.55,
+  "post/grade/contrast": 1.1,
+  "post/grade/saturation": 0.96,
+  "post/grade/lift": [
+   0.004,
+   0.006,
+   0.012
+  ],
+  "post/grade/temperature": -0.06,
+  "post/output/vignette": 0.3,
+  "post/output/grain": 0.012,
+  "post/tiltShift/enabled": true,
+  "post/tiltShift/centre": [
+   0.5,
+   0.56
+  ],
+  "post/tiltShift/bandWidth": 0.16,
+  "post/tiltShift/falloff": 0.34,
+  "post/tiltShift/maxRadius": 5.5,
+  "post/halation/enabled": true,
+  "post/halation/intensity": 0.22,
+  "post/halation/threshold": 2.4,
+  "scene/fogDensity": 0.0016,
+  "scene/fogColor": [
+   0.075,
+   0.07,
+   0.09
+  ]
+ },
+ "routes": [
+  {
+   "source": "audio.beat",
+   "target": "nodes/plaza/nodes/lamps-n-bulb/emissiveBoost",
+   "component": -1,
+   "amount": 0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "enabled": true,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "clampEnabled": false,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5,
+    "attackMs": 6.0,
+    "decayMs": 340.0,
+    "envelope": "peakhold",
+    "envelopeHoldMs": 0.0,
+    "envelopeFallPerSecond": 3.0,
+    "remapEnabled": false,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 0.0,
+    "remapOutMax": 1.0
+   }
+  },
+  {
+   "source": "audio.beat",
+   "target": "nodes/plaza/nodes/lamps-s-bulb/emissiveBoost",
+   "component": -1,
+   "amount": 0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "enabled": true,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "clampEnabled": false,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5,
+    "attackMs": 6.0,
+    "decayMs": 340.0,
+    "envelope": "peakhold",
+    "envelopeHoldMs": 0.0,
+    "envelopeFallPerSecond": 3.0,
+    "remapEnabled": false,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 0.0,
+    "remapOutMax": 1.0
+   }
+  },
+  {
+   "source": "audio.beat",
+   "target": "nodes/downtown/nodes/dt-lamps-bulb/emissiveBoost",
+   "component": -1,
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "enabled": true,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "clampEnabled": false,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5,
+    "attackMs": 6.0,
+    "decayMs": 320.0,
+    "envelope": "peakhold",
+    "envelopeHoldMs": 0.0,
+    "envelopeFallPerSecond": 3.0,
+    "remapEnabled": false,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 0.0,
+    "remapOutMax": 1.0
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "nodes/downtown/nodes/neon-tall/emissiveBoost",
+   "component": -1,
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "enabled": true,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "clampEnabled": false,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5,
+    "attackMs": 25.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeHoldMs": 0.0,
+    "envelopeFallPerSecond": 4.0,
+    "remapEnabled": false,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 0.0,
+    "remapOutMax": 1.0
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "nodes/downtown/nodes/neon-band/emissiveBoost",
+   "component": -1,
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "enabled": true,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "clampEnabled": false,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5,
+    "attackMs": 18.0,
+    "decayMs": 300.0,
+    "envelope": "none",
+    "envelopeHoldMs": 0.0,
+    "envelopeFallPerSecond": 4.0,
+    "remapEnabled": false,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 0.0,
+    "remapOutMax": 1.0
+   }
+  },
+  {
+   "source": "audio.rms",
+   "target": "scene/keyLight",
+   "component": -1,
+   "amount": 0.18,
+   "op": "add",
+   "polarity": "unipolar",
+   "enabled": true,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "clampEnabled": false,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5,
+    "attackMs": 300.0,
+    "decayMs": 900.0,
+    "envelope": "none",
+    "envelopeHoldMs": 0.0,
+    "envelopeFallPerSecond": 4.0,
+    "remapEnabled": false,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 0.0,
+    "remapOutMax": 1.0
+   }
+  },
+  {
+   "source": "music.drop",
+   "target": "post/bloom/intensity",
+   "component": -1,
+   "amount": 0.18,
+   "op": "add",
+   "polarity": "unipolar",
+   "enabled": true,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "clampEnabled": false,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5,
+    "attackMs": 10.0,
+    "decayMs": 220.0,
+    "envelope": "peakhold",
+    "envelopeHoldMs": 400.0,
+    "envelopeFallPerSecond": 0.6,
+    "remapEnabled": false,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 0.0,
+    "remapOutMax": 1.0
+   }
+  }
+ ],
+ "sources": [],
+ "presets": [],
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "startSeconds": 0.0,
+  "endSeconds": 105.0
+ },
+ "sequence": {
+  "name": "night-shift",
+  "duration": 105.0,
+  "scenes": [
+   {
+    "id": "plaza",
+    "node": "plaza",
+    "file": "plaza.scene.json"
+   },
+   {
+    "id": "downtown",
+    "node": "downtown",
+    "file": "downtown.scene.json"
+   }
+  ],
+  "shots": [
+   {
+    "name": "First Light",
+    "start": 0.0,
+    "duration": 20.0,
+    "scene": "plaza",
+    "in": {
+     "kind": "fadeIn",
+     "seconds": 2.6
+    },
+    "camera": {
+     "kind": "keys",
+     "lookAtWeight": 0.0,
+     "samples": 24,
+     "keys": [
+      {
+       "time": 0.0,
+       "position": [
+        81.622,
+        71.467,
+        33.874
+       ],
+       "target": [
+        -40.0,
+        7.0,
+        -1.0
+       ],
+       "interp": "easeOut",
+       "focalLength": 46.0
+      },
+      {
+       "time": 20.0,
+       "position": [
+        62.134,
+        49.928,
+        20.194
+       ],
+       "target": [
+        -34.0,
+        6.0,
+        -2.0
+       ],
+       "interp": "smooth"
+      }
+     ]
+    }
+   },
+   {
+    "name": "The Walk",
+    "start": 20.0,
+    "duration": 20.0,
+    "scene": "plaza",
+    "camera": {
+     "kind": "keys",
+     "lookAtActor": "hero",
+     "lookAtHeight": 1.15,
+     "lookAtWeight": 1.0,
+     "samples": 24,
+     "keys": [
+      {
+       "time": 0.0,
+       "position": [
+        -88.0,
+        21.0,
+        3.1
+       ],
+       "target": [
+        -50.0,
+        1.2,
+        -3.4
+       ],
+       "interp": "linear",
+       "focalLength": 42.0
+      },
+      {
+       "time": 5.0,
+       "position": [
+        -81.438,
+        21.0,
+        3.1
+       ],
+       "target": [
+        -43.438,
+        1.2,
+        -3.4
+       ],
+       "interp": "linear"
+      },
+      {
+       "time": 10.0,
+       "position": [
+        -67.0,
+        21.0,
+        3.1
+       ],
+       "target": [
+        -29.0,
+        1.2,
+        -3.4
+       ],
+       "interp": "linear"
+      },
+      {
+       "time": 15.0,
+       "position": [
+        -52.562,
+        21.0,
+        3.1
+       ],
+       "target": [
+        -14.562,
+        1.2,
+        -3.4
+       ],
+       "interp": "linear"
+      },
+      {
+       "time": 20.0,
+       "position": [
+        -46.0,
+        21.0,
+        3.1
+       ],
+       "target": [
+        -8.0,
+        1.2,
+        -3.4
+       ],
+       "interp": "linear"
+      }
+     ]
+    }
+   },
+   {
+    "name": "Reveal",
+    "start": 40.0,
+    "duration": 20.0,
+    "scene": "plaza",
+    "out": {
+     "kind": "fadeOut",
+     "seconds": 1.4
+    },
+    "camera": {
+     "kind": "keys",
+     "lookAtWeight": 0.0,
+     "samples": 32,
+     "keys": [
+      {
+       "time": 0.0,
+       "position": [
+        -46.0,
+        21.0,
+        3.1
+       ],
+       "target": [
+        -8.0,
+        1.2,
+        -3.4
+       ],
+       "interp": "easeIn",
+       "focalLength": 35.0
+      },
+      {
+       "time": 8.0,
+       "position": [
+        98.812,
+        56.0,
+        25.035
+       ],
+       "target": [
+        20.688,
+        5.0,
+        -3.4
+       ],
+       "interp": "smooth"
+      },
+      {
+       "time": 20.0,
+       "position": [
+        138.634,
+        108.536,
+        62.69
+       ],
+       "target": [
+        6.0,
+        9.0,
+        -2.0
+       ],
+       "interp": "easeOut"
+      }
+     ]
+    }
+   },
+   {
+    "name": "Crosstown",
+    "start": 60.0,
+    "duration": 20.0,
+    "scene": "downtown",
+    "in": {
+     "kind": "fadeIn",
+     "seconds": 1.2
+    },
+    "camera": {
+     "kind": "keys",
+     "lookAtActor": "hero",
+     "lookAtHeight": 1.3,
+     "lookAtWeight": 0.22,
+     "samples": 28,
+     "keys": [
+      {
+       "time": 0.0,
+       "position": [
+        -46.0,
+        11.0,
+        -54.0
+       ],
+       "target": [
+        -20.0,
+        2.0,
+        14.0
+       ],
+       "interp": "linear",
+       "focalLength": 34.0
+      },
+      {
+       "time": 6.667,
+       "position": [
+        -40.579,
+        11.0,
+        -52.749
+       ],
+       "target": [
+        -14.579,
+        2.0,
+        15.251
+       ],
+       "interp": "linear"
+      },
+      {
+       "time": 13.333,
+       "position": [
+        -33.446,
+        11.0,
+        -51.103
+       ],
+       "target": [
+        -7.446,
+        2.0,
+        16.897
+       ],
+       "interp": "linear"
+      },
+      {
+       "time": 20.0,
+       "position": [
+        -29.37,
+        11.0,
+        -49.68
+       ],
+       "target": [
+        -3.37,
+        2.0,
+        18.32
+       ],
+       "interp": "linear"
+      }
+     ]
+    }
+   },
+   {
+    "name": "Arrival",
+    "start": 80.0,
+    "duration": 25.0,
+    "scene": "downtown",
+    "out": {
+     "kind": "fadeOut",
+     "seconds": 4.5
+    },
+    "camera": {
+     "kind": "keys",
+     "lookAtActor": "hero",
+     "lookAtHeight": 1.25,
+     "lookAtWeight": 0.55,
+     "samples": 32,
+     "keys": [
+      {
+       "time": 0.0,
+       "position": [
+        -63.535,
+        23.902,
+        -29.476
+       ],
+       "target": [
+        1.0,
+        6.0,
+        2.0
+       ],
+       "interp": "easeIn",
+       "focalLength": 40.0
+      },
+      {
+       "time": 13.75,
+       "position": [
+        -19.035,
+        18.986,
+        -53.045
+       ],
+       "target": [
+        1.0,
+        6.0,
+        2.0
+       ],
+       "interp": "smooth"
+      },
+      {
+       "time": 25.0,
+       "position": [
+        19.386,
+        15.54,
+        -43.507
+       ],
+       "target": [
+        1.0,
+        6.0,
+        2.0
+       ],
+       "interp": "easeOut"
+      }
+     ]
+    }
+   }
+  ],
+  "actors": [
+   {
+    "id": "hero",
+    "node": "walker",
+    "visible": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "position": [
+       -62.0,
+       0.0,
+       -3.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "position": [
+       -62.0,
+       0.0,
+       -3.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "position": [
+       -50.0,
+       0.0,
+       -3.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "position": [
+       -8.0,
+       0.0,
+       -3.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 52.0,
+      "position": [
+       26.0,
+       0.0,
+       -3.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 59.9,
+      "position": [
+       64.0,
+       0.0,
+       -5.6
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 60.0,
+      "position": [
+       -30.0,
+       0.0,
+       -16.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 75.0,
+      "position": [
+       -17.0,
+       0.0,
+       -13.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 88.0,
+      "position": [
+       -6.0,
+       0.0,
+       -9.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.0,
+      "position": [
+       5.0,
+       0.0,
+       -7.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 105.0,
+      "position": [
+       5.0,
+       0.0,
+       -7.0
+      ],
+      "interp": "smooth"
+     }
+    ],
+    "clips": [
+     {
+      "time": 0.0,
+      "clip": "Idle",
+      "speed": 1.0
+     },
+     {
+      "time": 12.0,
+      "clip": "Walk",
+      "speed": 1.0
+     },
+     {
+      "time": 44.0,
+      "clip": "Run",
+      "speed": 1.05
+     },
+     {
+      "time": 56.0,
+      "clip": "Walk",
+      "speed": 1.0
+     },
+     {
+      "time": 94.5,
+      "clip": "Idle",
+      "speed": 1.0
+     }
+    ]
+   }
+  ],
+  "overlays": [
+   {
+    "id": "lyric001",
+    "kind": "text",
+    "content": "SODIUM LIGHT",
+    "style": "lyric",
+    "start": 22.0,
+    "end": 25.65,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric002",
+    "kind": "text",
+    "content": "ON EVERY STREET",
+    "style": "lyric",
+    "start": 26.0,
+    "end": 29.65,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric003",
+    "kind": "text",
+    "content": "A LITTLE GREEN",
+    "style": "lyric",
+    "start": 30.0,
+    "end": 33.15,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric004",
+    "kind": "text",
+    "content": "BENEATH MY FEET",
+    "style": "lyric",
+    "start": 33.5,
+    "end": 40.65,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric005",
+    "kind": "text",
+    "content": "AND THE CITY",
+    "style": "lyric",
+    "start": 41.0,
+    "end": 44.65,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric006",
+    "kind": "text",
+    "content": "KEEPS ITS OWN TIME",
+    "style": "lyric",
+    "start": 45.0,
+    "end": 48.65,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric007",
+    "kind": "text",
+    "content": "EVERY WINDOW",
+    "style": "lyric",
+    "start": 49.0,
+    "end": 52.15,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric008",
+    "kind": "text",
+    "content": "A DIFFERENT LINE",
+    "style": "lyric",
+    "start": 52.5,
+    "end": 61.65,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric009",
+    "kind": "text",
+    "content": "NOBODY ASKS",
+    "style": "lyric",
+    "start": 62.0,
+    "end": 65.65,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric010",
+    "kind": "text",
+    "content": "WHERE I'M FROM",
+    "style": "lyric",
+    "start": 66.0,
+    "end": 69.65,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric011",
+    "kind": "text",
+    "content": "THE LAMPS COME ON",
+    "style": "lyric",
+    "start": 70.0,
+    "end": 72.65,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric012",
+    "kind": "text",
+    "content": "ONE BY ONE",
+    "style": "lyric",
+    "start": 73.0,
+    "end": 80.65,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric013",
+    "kind": "text",
+    "content": "AND THE CITY",
+    "style": "lyric",
+    "start": 81.0,
+    "end": 84.65,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric014",
+    "kind": "text",
+    "content": "KEEPS ITS OWN TIME",
+    "style": "lyric",
+    "start": 85.0,
+    "end": 88.65,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric015",
+    "kind": "text",
+    "content": "EVERY WINDOW",
+    "style": "lyric",
+    "start": 89.0,
+    "end": 92.15,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "lyric016",
+    "kind": "text",
+    "content": "A DIFFERENT LINE",
+    "style": "lyric",
+    "start": 92.5,
+    "end": 95.5,
+    "order": 10,
+    "anchor": [
+     0.5,
+     0.135
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.97,
+     0.95,
+     0.92,
+     1.0
+    ],
+    "preset": "fadeInOut",
+    "presetSeconds": 0.32
+   },
+   {
+    "id": "title",
+    "kind": "text",
+    "content": "NIGHT SHIFT",
+    "style": "title",
+    "start": 96.0,
+    "end": 104.0,
+    "order": 20,
+    "anchor": [
+     0.5,
+     0.7
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.98,
+     0.94,
+     0.88,
+     1.0
+    ],
+    "preset": "scalePop",
+    "presetSeconds": 0.6
+   },
+   {
+    "id": "border",
+    "kind": "shape",
+    "content": "rectangle",
+    "start": 0.0,
+    "end": 105.0,
+    "order": -10,
+    "anchor": [
+     0.5,
+     0.5
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "size": 1.0,
+    "rotation": 0.0,
+    "color": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "preset": "none",
+    "presetSeconds": 0.45,
+    "extra": {
+     "size": [
+      1.7,
+      0.93
+     ],
+     "strokeWidth": 0.0035,
+     "strokeColor": [
+      0.92,
+      0.88,
+      0.82,
+      0.42
+     ]
+    }
+   }
+  ],
+  "markers": [
+   {
+    "time": 0.0,
+    "name": "INTRO",
+    "kind": "section"
+   },
+   {
+    "time": 20.0,
+    "name": "VERSE",
+    "kind": "section"
+   },
+   {
+    "time": 40.0,
+    "name": "CHORUS",
+    "kind": "section"
+   },
+   {
+    "time": 60.0,
+    "name": "VERSE 2",
+    "kind": "section"
+   },
+   {
+    "time": 75.0,
+    "name": "BREAK",
+    "kind": "section"
+   },
+   {
+    "time": 80.0,
+    "name": "CHORUS 2",
+    "kind": "section"
+   },
+   {
+    "time": 100.0,
+    "name": "OUTRO",
+    "kind": "section"
+   }
+  ],
+  "tracks": [
+   {
+    "target": "env/sky/sunIntensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       4.0
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       3.2
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       2.2
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       0.7
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 75.0,
+      "value": [
+       0.35
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.15
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 100.0,
+      "value": [
+       0.1
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "env/sky/zenithColor",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.055,
+       0.08,
+       0.17
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.045,
+       0.064,
+       0.14
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.034,
+       0.048,
+       0.108
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       0.022,
+       0.03,
+       0.07
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.01,
+       0.014,
+       0.036
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "env/sky/horizonColor",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.42,
+       0.26,
+       0.22
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.36,
+       0.22,
+       0.21
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.27,
+       0.18,
+       0.2
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       0.16,
+       0.12,
+       0.17
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.055,
+       0.05,
+       0.09
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "env/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.55
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       0.24
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.13
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "scene/keyLight",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       0.42
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.16
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "scene/fogColor",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.075,
+       0.07,
+       0.09
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       0.035,
+       0.042,
+       0.075
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.02,
+       0.028,
+       0.058
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "scene/fogDensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0016
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       0.0024
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.003
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "scene/styledSkyAmbient",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.013,
+       0.019,
+       0.04
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       0.007,
+       0.01,
+       0.024
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.005,
+       0.007,
+       0.018
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "scene/styledGroundAmbient",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.006,
+       0.0055,
+       0.005
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.003,
+       0.0027,
+       0.0025
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "env/sky/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.22
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.19
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.16
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       0.13
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.08
+      ],
+      "interp": "step"
+     }
+    ]
+   },
+   {
+    "target": "nodes/plaza/nodes/north-win0/emissiveBoost",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.35
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.8
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       1.25
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "nodes/plaza/nodes/north-win1/emissiveBoost",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.3
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.9
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       1.35
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "nodes/plaza/nodes/north-win2/emissiveBoost",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.25
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.7
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       1.2
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "nodes/plaza/nodes/south-win0/emissiveBoost",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.95
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       1.3
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "nodes/plaza/nodes/south-win1/emissiveBoost",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.3
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.85
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       1.25
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "nodes/plaza/nodes/south-win2/emissiveBoost",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.25
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.75
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       1.15
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "nodes/plaza/nodes/lamps-n-bulb/emissiveBoost",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       1.35
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "nodes/plaza/nodes/lamps-s-bulb/emissiveBoost",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       1.35
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "post/tiltShift/bandWidth",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.16
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.55
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       0.55
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 59.0,
+      "value": [
+       0.2
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.34
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 105.0,
+      "value": [
+       0.34
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "post/bloom/intensity",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.22
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.3
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       0.4
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "post/grade/saturation",
+    "component": -1,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "enabled": true,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.96
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       1.02
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       1.1
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ }
+}

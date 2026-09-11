@@ -376,6 +376,7 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     panel("Parameters", ImVec2(420, 360), [&] { drawParameters(engine); });
     panel("Composition", ImVec2(460, 640), [&] { composition.draw(engine); });
     panel("Render", ImVec2(460, 420), [&] { drawRender(engine); });
+    panel("Sequence", ImVec2(900, 420), [&] { sequence.draw(engine); });
     panel("Control", ImVec2(420, 300), [&] {
         drawTransport(engine);
         ImGui::Separator();

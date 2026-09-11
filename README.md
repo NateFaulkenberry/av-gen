@@ -85,6 +85,9 @@ writes a scene file. `--help` lists every flag.
   [docs/shaders.md](docs/shaders.md),
   [docs/assets.md](docs/assets.md), [docs/project-format.md](docs/project-format.md)
 - [docs/authoring.md](docs/authoring.md): how to build a world, window by window
+- [docs/sequencer.md](docs/sequencer.md): choreography through time -- shots, scene cuts,
+  characters, lyrics and markers, and how a piece becomes ordinary timeline tracks
+- [docs/composition.md](docs/composition.md): the 2D layers over the frame
 - [docs/art-direction.md](docs/art-direction.md): the World Director, looks, composition and phrasing
 - The procedural world: [docs/procedural-geometry.md](docs/procedural-geometry.md),
   [docs/spatial-data.md](docs/spatial-data.md), [docs/gpu-fields.md](docs/gpu-fields.md),

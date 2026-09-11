@@ -1,7 +1,11 @@
 # ---- avgen_core: GPU-free engine logic (core, audio, analysis, signals, params, scene, entity, assets)
 file(GLOB_RECURSE AVGEN_CORE_SOURCES CONFIGURE_DEPENDS
     core/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp spatial/*.cpp world/*.cpp graph/*.cpp shaders/*.cpp assets/*.cpp ai/*.cpp entity/*.cpp
-    control/*.cpp comp/*.cpp)
+    control/*.cpp comp/*.cpp seq/*.cpp)
+# The cinematic shot vocabulary (ADR-062) is pure geometry and JSON, and the sequencer (ADR-089)
+# holds an app::Shot by value in every shot it bakes. It lives in app/ for history's sake; it
+# belongs to the library, or seq/ could not be tested without linking the editor.
+list(APPEND AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app/cinematic.cpp")
 if(APPLE)
     # Native video export (AVFoundation) is Objective-C++; the portable stub is for other platforms.
     file(GLOB_RECURSE AVGEN_CORE_OBJCXX_SOURCES CONFIGURE_DEPENDS assets/*.mm comp/*.mm)
@@ -67,6 +71,8 @@ endif()
 
 # ---- avgen: the application -------------------------------------------------------------------
 file(GLOB_RECURSE AVGEN_APP_SOURCES CONFIGURE_DEPENDS app/*.cpp)
+# cinematic.cpp is compiled into avgen_core (above); leaving it here too would define it twice.
+list(REMOVE_ITEM AVGEN_APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app/cinematic.cpp")
 add_executable(avgen ${AVGEN_APP_SOURCES})
 target_link_libraries(avgen PRIVATE avgen_core)
 if(TARGET avgen_platform)

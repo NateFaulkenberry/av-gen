@@ -14,6 +14,27 @@
    "seed": 20260910,
    "key": "D Dorian",
    "sha256": "3e059aba0e6a3c4b99e1ad6fcaafaff9c8044451b2e6e394599552ac7ae9863f"
+  },
+  {
+   "name": "night-shift",
+   "file": "audio/night-shift.wav",
+   "command": "python3 tools/make_city_score.py assets/audio/night-shift.wav",
+   "seconds": 105.0,
+   "rate": 48000,
+   "channels": 2,
+   "bpm": 96.0,
+   "seed": 20260911,
+   "key": "E minor",
+   "sections": {
+    "intro": 0.0,
+    "verse": 20.0,
+    "chorus": 40.0,
+    "verse2": 60.0,
+    "break": 75.0,
+    "chorus2": 80.0,
+    "outro": 100.0
+   },
+   "sha256": "66092f806f1b4b05a17565a5436797cbc9fb49d9b4bbe18ed288054d7f47c3c6"
   }
  ]
 }

@@ -8,10 +8,10 @@ Version 2 (milestone 0.3) adds modulation sources, presets and per-route polarit
 (milestone 0.9) adds `"assets"` (audio / scene / environment references) and `"app"`
 (`{ "name", "version" }` of the writer); both are filled in by the engine.
 
-Version 4 also carries two blocks that are *optional and unversioned by the envelope*, because
+Version 4 also carries three blocks that are *optional and unversioned by the envelope*, because
 their absence is meaningful and needs no migration: `"composition"` (ADR-083, the 2D layer stack,
-with a `version` of its own) and `"timeline"`. A project written before either existed simply has
-no such key, and loads with none.
+with a `version` of its own), `"timeline"`, and `"sequence"` (ADR-089, the cinematic sequence). A
+project written before any of them existed simply has no such key, and loads with none.
 
 Older documents are upgraded in memory by `params::migrateProject`, one version at a time,
 before loading (the file on disk is only rewritten on save, at the current version); every step
@@ -343,6 +343,55 @@ duplicate or empty name are errors.
 
 Run with `avgen --queue jobs.json`. Each job's settings are the project's `render` block with
 the job's `render` fields merged over it; paths in the queue file are relative to it.
+
+## `"sequence"` — the cinematic sequence (ADR-089)
+
+Optional, and read **last**, after every parameter a bake could name exists. The full user guide is
+[docs/sequencer.md](sequencer.md); this is the shape on disk.
+
+```json
+"sequence": {
+  "name": "night-shift",
+  "duration": 105.0,
+  "scenes": [ { "id": "plaza", "node": "plaza", "file": "plaza.scene.json" } ],
+  "shots": [
+    { "name": "The Walk", "start": 20.0, "duration": 20.0, "scene": "plaza",
+      "in":  { "kind": "cut", "seconds": 0.0 },
+      "out": { "kind": "fadeOut", "seconds": 1.4 },
+      "camera": { "kind": "keys", "samples": 24, "lookAtActor": "hero",
+                  "lookAtHeight": 1.15, "lookAtWeight": 1.0,
+                  "keys": [ { "time": 0.0, "position": [-77, 15, 1.1],
+                              "target": [-50, 1.2, -3.4], "interp": "linear",
+                              "focalLength": 42.0 } ] },
+      "tracks": [] } ],
+  "actors": [
+    { "id": "hero", "node": "walker", "visible": true,
+      "keys":  [ { "time": 0.0, "position": [-62, 0, -3.4], "interp": "smooth" } ],
+      "clips": [ { "time": 12.0, "clip": "Walk", "speed": 1.0 } ] } ],
+  "overlays": [
+    { "id": "lyric007", "kind": "text", "content": "EVERY WINDOW", "style": "lyric",
+      "start": 49.0, "end": 52.15, "order": 10, "anchor": [0.5, 0.135],
+      "pivot": [0.5, 0.5], "size": 1.0, "rotation": 0.0,
+      "color": [0.97, 0.95, 0.92, 1.0], "preset": "fadeInOut", "presetSeconds": 0.32,
+      "extra": {} } ],
+  "markers": [ { "time": 40.0, "name": "CHORUS", "kind": "section" } ],
+  "tracks": [ ]
+}
+```
+
+`shots[].camera.kind` is `inherit`, `move` or `keys`; a `move` carries an `app::Shot` in the
+ADR-062 vocabulary. Camera and shot-local track times are **relative to the shot's start**, so
+moving a shot moves its automation with it; actor, overlay, marker and sequence-level track times
+are absolute. `transitions` are `cut`, `fadeIn` and `fadeOut`. `overlays[].extra` is carried
+verbatim and handed to the layer system untouched, which is where anything the four built-in styles
+(`lyric`, `title`, `caption`, `credit`) do not cover goes.
+
+**What is deliberately not written.** The tracks the bake produced, the layers it realised and those
+layers' parameter values are all derived from the sequence and are re-created on load. Writing them
+as well would mean a load that reads them *and* re-bakes them, and two tracks writing
+`camera/position` is not a blend — it is whichever one the timeline applies second. So `"timeline"`
+holds what the author keyed by hand, `"composition"` holds the layers the author made by hand, and
+`"sequence"` holds the piece.
 
 ## `"composition"` — the 2D layer stack (ADR-083)
 
