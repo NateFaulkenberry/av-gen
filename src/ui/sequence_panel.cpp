@@ -40,9 +40,15 @@ constexpr float kEdgeGrab = 5.0f; // points either side of a block's right edge 
 ImU32 shotColour(int index, bool selected) {
     // Alternating so a cut is visible even between two shots on the same scene, and warmer when
     // selected rather than merely brighter -- a brighter blue next to a blue reads as "nearer".
-    const float base = index % 2 == 0 ? 0.30f : 0.24f;
-    return selected ? IM_COL32(196, 140, 72, 235)
-                    : ImGui::GetColorU32(ImVec4(base, base + 0.10f, base + 0.22f, 0.92f));
+    const ImVec4 surface = ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
+    const ImVec4 active = ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive);
+    if (selected) {
+        return ImGui::GetColorU32(ImVec4(active.x, active.y, active.z, 0.95f));
+    }
+    const float lift = index % 2 == 0 ? 0.08f : 0.03f;
+    return ImGui::GetColorU32(ImVec4(std::min(surface.x + lift, 1.0f),
+                                     std::min(surface.y + lift, 1.0f),
+                                     std::min(surface.z + lift * 1.4f, 1.0f), 0.92f));
 }
 
 const char* kSnapNames[] = {"Off", "Frames", "Beats", "Markers"};
@@ -63,6 +69,7 @@ void SequencePanel::draw(app::Engine& engine) {
 void SequencePanel::drawToolbar(app::Engine& engine) {
     seq::Sequence& piece = engine.sequence();
 
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 4.0f));
     ImGui::PushItemWidth(160);
     std::strncpy(nameBuffer_, piece.name.c_str(), sizeof(nameBuffer_) - 1);
     nameBuffer_[sizeof(nameBuffer_) - 1] = '\0';
@@ -219,6 +226,7 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
             ImGui::OpenPopup("import-lyrics");
         }
     }
+    ImGui::PopStyleVar();
     if (ImGui::BeginPopup("import-lyrics")) {
         ImGui::TextUnformatted("LRC, SRT or WebVTT");
         char buffer[512];
