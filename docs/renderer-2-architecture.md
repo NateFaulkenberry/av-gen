@@ -141,7 +141,7 @@ operating points are measured in section 2a.
 ## 2a. Where Glowmere's scene pass goes, by resolution
 
 Min of 3 interleaved runs per cell, `--tier realtime`, headless, machine shared with other agents.
-"before" is `df06bb8`; "after" is the LOD chain of ADR-084.
+"before" is `df06bb8`; "after" is the LOD chain of ADR-085.
 
 | canvas | pixels | submitted tris before → after | scene before → after |
 |---|---:|---:|---:|

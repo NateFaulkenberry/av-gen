@@ -89,4 +89,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [081](ADR-081-shadow-stability.md) | Shadow stability | Accepted |
 | [082](ADR-082-lod-stability.md) | LOD stability | Accepted |
 | [083](ADR-083-composition-and-layers.md) | Composition and layers | Accepted |
-| [084](ADR-084-lod-chain-wired.md) | The LOD ladder is built by meshoptimizer, and it has to descend | Accepted |
+| [084](ADR-085-lod-chain-wired.md) | The LOD ladder is built by meshoptimizer, and it has to descend | Accepted |

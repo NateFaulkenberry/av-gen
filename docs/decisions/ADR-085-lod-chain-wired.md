@@ -1,4 +1,4 @@
-# ADR-084: The LOD ladder is built by meshoptimizer, and it has to descend
+# ADR-085: The LOD ladder is built by meshoptimizer, and it has to descend
 
 Status: accepted
 Date: 2026-09-11
