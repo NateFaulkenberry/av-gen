@@ -1,0 +1,105 @@
+#include "entity/gait.hpp"
+
+#include <algorithm>
+#include <cmath>
+
+namespace avgen::entity {
+
+bool gaitLocomotor(Activity activity) {
+    switch (activity) {
+    case Activity::Idle:
+    case Activity::Walk:
+    case Activity::Run:
+    case Activity::Turn:
+        return true;
+    case Activity::Observe:
+    case Activity::React:
+        return false;
+    }
+    return false;
+}
+
+void Gait::reset() {
+    gait_ = Activity::Idle;
+    dwell_ = 0.0;
+    changes_ = 0;
+    moving_ = false;
+    running_ = false;
+}
+
+Activity Gait::select(const GaitSettings& settings, Activity proposed, float speed, float turnRate,
+                      double dt) {
+    dwell_ += dt;
+
+    // The bands, read in the direction the body is actually going. `moving_` and `running_` are
+    // the memory that makes them bands rather than thresholds.
+    const float moveThreshold = moving_ ? settings.moveExit : settings.moveEnter;
+    moving_ = speed > moveThreshold;
+    if (moving_) {
+        const float runThreshold = running_ ? settings.runExit : settings.runEnter;
+        running_ = speed > runThreshold;
+    } else {
+        running_ = false;
+    }
+
+    // Something else has the character's attention. Pass it through untouched and leave the
+    // remembered gait alone, so `Walking -> React -> Walking` is what comes back rather than
+    // `Walking -> React -> Idle` (ADR-091).
+    if (!gaitLocomotor(proposed)) {
+        return proposed;
+    }
+
+    Activity wanted = Activity::Idle;
+    if (moving_) {
+        wanted = running_ ? Activity::Run : Activity::Walk;
+    } else if (std::abs(turnRate) > settings.turnEnter) {
+        wanted = Activity::Turn;
+    }
+
+    if (wanted == gait_) {
+        return gait_;
+    }
+    // The dwell. A change is refused while the current gait is younger than `minDwell`, which is
+    // what stops a body accelerating across the band from switching twice in three frames. Not
+    // applied to the first decision after a reset (dwell_ starts at 0 and the gait starts Idle,
+    // so a character that begins walking begins walking).
+    if (changes_ > 0 && dwell_ < static_cast<double>(settings.minDwell)) {
+        return gait_;
+    }
+    gait_ = wanted;
+    dwell_ = 0.0;
+    ++changes_;
+    return gait_;
+}
+
+float Gait::playbackRate(const GaitSettings& settings, Activity activity, float speed) {
+    if (!settings.matchRate) {
+        return 1.0f;
+    }
+    float authored = 0.0f;
+    if (activity == Activity::Walk) {
+        authored = settings.walkSpeed;
+    } else if (activity == Activity::Run) {
+        authored = settings.runSpeed;
+    }
+    if (authored <= 1e-4f) {
+        return 1.0f;
+    }
+    return std::clamp(speed / authored, settings.rateMin, settings.rateMax);
+}
+
+float Gait::approach(float current, float desired, float accel, float decel, double dt) {
+    const auto step = static_cast<float>(dt);
+    if (step <= 0.0f) {
+        return current;
+    }
+    if (desired > current) {
+        return std::min(desired, current + std::max(0.0f, accel) * step);
+    }
+    if (desired < current) {
+        return std::max(desired, current - std::max(0.0f, decel) * step);
+    }
+    return current;
+}
+
+} // namespace avgen::entity

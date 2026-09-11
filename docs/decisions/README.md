@@ -101,3 +101,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [093](ADR-093-world-navigation.md) | World navigation: a hybrid graph, per-instance obstacles, and a character with somewhere to go | Accepted |
 | [094](ADR-094-ai-control-plane.md) | The AI control plane: a tool API the engine owns, and one client of it | Accepted |
 | [095](ADR-095-the-help-system.md) | The Help system, staged around "Help should never lie" | Accepted |
+| [096](ADR-096-actions-and-intent.md) | Actions, schedules and interactions: the intent layer | Accepted |

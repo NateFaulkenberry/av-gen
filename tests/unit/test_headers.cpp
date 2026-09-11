@@ -15,6 +15,8 @@
 #include "core/rng.hpp"
 #include "core/time.hpp"
 #include "core/triple_buffer.hpp"
+#include "entity/action.hpp"
+#include "entity/gait.hpp"
 #include "params/modulation.hpp"
 #include "params/parameter.hpp"
 #include "params/parameter_set.hpp"

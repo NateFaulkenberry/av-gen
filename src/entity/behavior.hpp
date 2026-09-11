@@ -61,6 +61,14 @@ struct EntityState {
     // must scale by the real dt, which the context carries; this is for behaviours that want to
     // know they are being run coarsely and simplify.
     float detail = 1.0f;
+    // A higher authority is driving this entity's body this frame -- an action, a schedule or a
+    // director override (ADR-091, ADR-096). Behaviours that own *travel and facing* must yield
+    // while it is set, and must yield by **keeping their state**: the rule is that the tier below
+    // resumes rather than resets, so a wanderer preempted mid-walk carries on to the same
+    // destination afterwards rather than picking a new one. Behaviours that only add an offset --
+    // hover, drift, spin, bank -- are unaffected: a craft can hover while it is being told where
+    // to go.
+    bool driven = false;
     [[nodiscard]] glm::vec3 position() const { return anchor + travel; }
 };
 

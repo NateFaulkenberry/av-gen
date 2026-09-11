@@ -355,6 +355,14 @@ public:
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
         (void)motion;
+        // A higher authority is driving this body: an action, a schedule or a director override
+        // (ADR-091, ADR-096). Yield by *keeping everything*: the destination and the pause timer
+        // are untouched, so when the order ends the walk carries on to the same place rather than
+        // picking a new one. Speed is deliberately not zeroed here -- whoever is driving has
+        // already written it, and overwriting it would make a directed walk stand still.
+        if (state.driven) {
+            return;
+        }
         // Something with the character's attention has it. Travel is what a character does when
         // nothing else is happening, so it yields rather than competing: the destination and the
         // pause timer are kept, and the walk resumes from where it stopped.
@@ -520,6 +528,11 @@ public:
         if (state.activity == Activity::Walk || state.activity == Activity::Run) {
             return;
         }
+        // And the same again when an action owns the body. A character told to walk to the
+        // nightstand may look at the window on the way; it may not turn to face it.
+        if (state.driven) {
+            return;
+        }
         const float weight = weight_ != nullptr ? weight_->value() : weightDefault_;
         if (weight <= 0.0f) {
             return;
@@ -633,7 +646,11 @@ public:
         if (!observing_ && !startled_) {
             return;
         }
-        if (observing_) {
+        // Under orders, interest still names a subject and still raises a reaction -- a directed
+        // character can flinch at a drum hit and glance at a window -- but it does not stop the
+        // feet. Stopping is a decision, and the decision is not this behaviour's to make while
+        // something above it is driving.
+        if (observing_ && !state.driven) {
             state.speed = 0.0f;
             state.activity = Activity::Observe;
         }
