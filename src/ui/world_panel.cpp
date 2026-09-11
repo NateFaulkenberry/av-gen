@@ -209,8 +209,8 @@ void WorldPanel::drawInspector(app::Engine& engine) {
             break;
         }
     }
-    ImGui::Separator();
-    ImGui::TextDisabled("Why is this moving?");
+    ImGui::SeparatorText("Influences");
+    ImGui::TextDisabled("Why is this moving? Timeline, routes and state changes are listed here.");
     bool any = false;
     for (params::IParameter* param : engine.params().ordered()) {
         if (!detail::pathStartsWith(param->path(), prefix)) {
@@ -252,6 +252,7 @@ void WorldPanel::drawInspector(app::Engine& engine) {
 
 void WorldPanel::drawStates(app::Engine& engine) {
     app::StateMachine& machine = engine.states();
+    ImGui::SeparatorText("Scene state");
     ImGui::Text("current: %s", machine.current().empty() ? "(none)" : machine.current().c_str());
     if (machine.transitioning()) {
         ImGui::SameLine();
