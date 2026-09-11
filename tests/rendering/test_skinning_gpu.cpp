@@ -26,6 +26,7 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -249,6 +250,21 @@ TEST_CASE("posing a rig moves the pixels, and the same second gives the same pix
     auto again = renderer.renderToImage(s, frameAt(2), 512, 384);
     REQUIRE(again.has_value());
     CHECK(differingPixels(*bent, *again) == 0);
+}
+
+TEST_CASE("non-finite joint palettes are rejected before GPU upload", "[gpu][skinning][validation]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    auto scene = barScene(true);
+    scene.rigs[0].palette[0][0][0] = std::numeric_limits<float>::quiet_NaN();
+    scene.rigs[0].previousPalette[0][0][0] = std::numeric_limits<float>::infinity();
+    auto image = renderer.renderToImage(scene, frameAt(0), 256, 256);
+    REQUIRE(image.has_value());
+    CHECK(renderer.stats().skinning.rigs == 0);
+    CHECK(renderer.stats().skinning.uploadBytes == 0);
+    CHECK(ctx->errorCount() == 0);
 }
 
 TEST_CASE("the alien renders posed, and the pose comes only from the timeline", "[gpu][skinning]") {

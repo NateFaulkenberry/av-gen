@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 
 namespace avgen::rendering {
@@ -23,6 +24,19 @@ constexpr std::uint32_t kMaxRigs = 64;
 
 std::uint32_t alignUp(std::uint32_t value, std::uint32_t alignment) {
     return (value + alignment - 1) / alignment * alignment;
+}
+
+bool finitePalette(const std::vector<glm::mat4>& palette) {
+    for (const glm::mat4& matrix : palette) {
+        for (int column = 0; column < 4; ++column) {
+            for (int row = 0; row < 4; ++row) {
+                if (!std::isfinite(matrix[column][row])) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
 }
 
 // The skinned vertex layout: the scene's own Vertex in slot 0, exactly as the static pipelines
@@ -260,7 +274,9 @@ void SkinningRenderer::update(const scene::Scene& scene) {
     const auto rigCount = static_cast<std::uint32_t>(std::min<std::size_t>(scene.rigs.size(), kMaxRigs));
     std::uint32_t maxJoints = 0;
     for (std::uint32_t i = 0; i < rigCount; ++i) {
-        maxJoints = std::max(maxJoints, static_cast<std::uint32_t>(scene.rigs[i].palette.size()));
+        if (finitePalette(scene.rigs[i].palette) && finitePalette(scene.rigs[i].previousPalette)) {
+            maxJoints = std::max(maxJoints, static_cast<std::uint32_t>(scene.rigs[i].palette.size()));
+        }
     }
     if (maxJoints == 0) {
         return;
@@ -279,7 +295,10 @@ void SkinningRenderer::update(const scene::Scene& scene) {
     for (std::uint32_t i = 0; i < rigCount; ++i) {
         const scene::SkinnedRig& rig = scene.rigs[i];
         const auto joints = static_cast<std::uint32_t>(rig.palette.size());
-        if (joints == 0) {
+        if (joints == 0 || !finitePalette(rig.palette) || !finitePalette(rig.previousPalette)) {
+            if (joints > 0 && (!finitePalette(rig.palette) || !finitePalette(rig.previousPalette))) {
+                log::warn("skinned rig '{}' has a non-finite joint palette; skipping GPU upload", rig.name);
+            }
             continue;
         }
         slices_[i] = Slice{sliceBytes * i, joints};

@@ -132,6 +132,9 @@ tone mapping and composition overlay.
 - [x] Renderer boundary validation rejects non-finite camera view/projection and entity model
   matrices before GPU submission. Focused NaN/Inf regression passes; broader joint/bounds validation
   remains open.
+- [x] Skinning upload validation rejects non-finite current/previous joint palettes before GPU
+  staging. Invalid rigs are skipped for that frame with a targeted warning; the malformed-palette
+  GPU regression passes without WebGPU errors.
 - [x] Camera view construction now chooses a fallback up axis when forward and authored up are
   parallel. This prevents `lookAtRH` from generating NaN matrices for top-down/edge-on shots. The
   camera unit suite and disc-emitter GPU regression both pass.
