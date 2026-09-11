@@ -768,3 +768,95 @@ TEST_CASE("Tool results are compact and carry the error shape the spec asks for"
     CHECK(badJson.at("error").contains("message"));
     CHECK(badJson.at("error").contains("recovery"));
 }
+
+// ---- the piece, as opposed to the tracks it bakes into -------------------------------------------
+
+TEST_CASE("sequence.get_state reports the music video, not the timeline", "[ai][tools][sequence]") {
+    // Night Shift is the repository's worked music video, so this asserts against a real piece
+    // rather than a fixture: five shots cutting between two scenes, a character with animation
+    // cues, lyric overlays, and the song's own sections.
+    const std::filesystem::path project =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "city" / "night-shift.json";
+    if (!std::filesystem::exists(project)) {
+        SKIP("night-shift.json is not present in this checkout");
+    }
+    Fixture f;
+    const auto loaded = f.engine.loadProject(project);
+    INFO((loaded ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+
+    const auto result = f.call("sequence.get_state");
+    REQUIRE(result.success);
+    const json& out = result.value;
+
+    // The thing the assistant could not previously answer at all: what shots are in this video.
+    REQUIRE(out.contains("shots"));
+    CHECK(out["shotCount"].get<std::size_t>() == 5);
+    REQUIRE(out["shots"].size() == 5);
+    CHECK(out["shots"][0]["name"].get<std::string>() == "First Light");
+    CHECK(out["shots"][1]["name"].get<std::string>() == "The Walk");
+    // A shot has to say when it cuts, or it cannot be placed against anything.
+    CHECK(out["shots"][1]["startSeconds"].get<double>() > 0.0);
+    CHECK(out["shots"][1]["endSeconds"].get<double>() >
+          out["shots"][1]["startSeconds"].get<double>());
+    // And which scene it is in, which is what makes "Crosstown" a different place from "The Walk".
+    CHECK(out["shots"][1]["scene"].get<std::string>() == "plaza");
+    CHECK(out["shots"][3]["scene"].get<std::string>() == "downtown");
+    CHECK(out["scenes"].size() == 2);
+
+    // The character, and the clips it plays. A shot that wants the hero running has to be able to
+    // find out that it runs at all.
+    CHECK(out["actorCount"].get<std::size_t>() == 1);
+    REQUIRE(out["actors"].size() == 1);
+    CHECK(out["actors"][0]["id"].get<std::string>() == "hero");
+    CHECK(out["actors"][0]["clips"].size() >= 3);
+
+    CHECK(out["overlayCount"].get<std::size_t>() > 0); // the lyrics
+
+    // The song's landmarks. These are what "cut on the chorus" means, and they were invisible.
+    REQUIRE(out.contains("sections"));
+    CHECK(out["sections"].size() == 7);
+    bool sawChorus = false;
+    for (const json& section : out["sections"]) {
+        sawChorus = sawChorus || section["name"].get<std::string>() == "CHORUS";
+    }
+    CHECK(sawChorus);
+
+    // The audio it is cut to, by name and length rather than only as whatever the analyser hears at
+    // this instant -- which is all `audio.get_analysis` can say.
+    REQUIRE(out.contains("audio"));
+    CHECK(out["audio"]["hasAudio"].get<bool>());
+    CHECK(out["audio"]["file"].get<std::string>() == "night-shift.wav");
+    CHECK(out["audio"]["durationSeconds"].get<double>() > 100.0);
+}
+
+TEST_CASE("sequence.get_state hands back beats only where they were asked for", "[ai][tools][sequence]") {
+    const std::filesystem::path project =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "city" / "night-shift.json";
+    if (!std::filesystem::exists(project)) {
+        SKIP("night-shift.json is not present in this checkout");
+    }
+    Fixture f;
+    REQUIRE(f.engine.loadProject(project).has_value());
+
+    // Without the argument, the summary and nothing more. A three-minute song has hundreds of
+    // beats and sending them on every call would crowd out the rest of the answer.
+    const auto plain = f.call("sequence.get_state");
+    REQUIRE(plain.success);
+    REQUIRE(plain.value.contains("audio"));
+    CHECK_FALSE(plain.value["audio"].contains("beatsNear"));
+    const auto beatCount = plain.value["audio"].value("beatCount", std::size_t{0});
+    CHECK(beatCount > 0);
+
+    // With it, the beats around one moment -- which is what "the downbeat before the chorus" needs.
+    const auto near = f.call("sequence.get_state", json{{"beatsAround", 40.0}, {"beatWindow", 2.0}});
+    REQUIRE(near.success);
+    REQUIRE(near.value["audio"].contains("beatsNear"));
+    const json& beats = near.value["audio"]["beatsNear"];
+    CHECK(!beats.empty());
+    CHECK(beats.size() < beatCount); // a window, not the whole song
+    for (const json& beat : beats) {
+        CHECK(beat.get<double>() >= 38.0);
+        CHECK(beat.get<double>() <= 42.0);
+    }
+}

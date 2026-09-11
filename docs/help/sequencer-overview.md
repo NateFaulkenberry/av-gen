@@ -4,16 +4,16 @@ title: The Sequencer
 category: Sequencer
 summary: What the Sequence panel holds, how time works in it, and what a bake actually produces.
 order: 40
-tags: sequencer, timeline, shots, bake, snapping, zoom
-keywords: how do i make a music video; what is the sequence panel; how do i cut between scenes; timeline; shots
+tags: sequencer, timeline, shots, bake, snapping, zoom, audio, waveform, beats
+keywords: how do i make a music video; what is the sequence panel; how do i cut between scenes; timeline; shots; where is the waveform; why can i not see the audio on the timeline; how do i cut on the beat; audio lane; see the song
 related: sequencer/shots, sequencer/actors, sequencer/overlays, sequencer/timeline-automation, sequencer/camera-direction
 features: panel.sequence
 ---
 
 # The Sequencer
 
-The **Sequence** panel holds the piece in time: shots, scene cuts, character cues, lyrics and
-markers.
+The **Sequence** panel holds the piece in time: the song's waveform, shots, scene cuts, character
+cues, lyrics and markers.
 
 A sequence is a **value**. Editing it produces new keyframes on the ordinary parameter timeline —
 that step is called the **bake** — and between bakes a sequence costs nothing at all per frame,

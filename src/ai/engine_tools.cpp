@@ -4,9 +4,11 @@
 #include "ai/tool_context.hpp"
 #include "ai/transaction.hpp"
 #include "app/engine.hpp"
+#include "analysis/analysis_track.hpp"
 #include "core/log.hpp"
 #include "params/serialization.hpp"
 #include "scene/composition.hpp"
+#include "seq/sequence.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1475,6 +1477,158 @@ void registerSequencerTools(ToolRegistry& registry) {
 // ================================================================================================
 
 void registerAudioTools(ToolRegistry& registry) {
+    // The piece, as opposed to the tracks it bakes into. `sequencer.get_state` above reports
+    // `params::Timeline` -- the baked result -- which is the right thing to keyframe against and the
+    // wrong thing to reason about: it cannot say what a shot is, when it cuts, or what the song does
+    // underneath it. Until this existed the assistant could add a keyframe to a music video and not
+    // be able to answer "what shots are in it".
+    //
+    // Read-only, and deliberately so for now: editing a sequence means re-baking it, and a bake
+    // replaces every track it owns (`ownedBySequence` in `sequencer.get_state`), so a mutating
+    // version needs the transaction story worked out first.
+    add(registry, "sequence.get_state", "Cinematic sequence",
+        "The music video itself: its shots and when each one cuts, the scenes they cut between, the "
+        "actors and the animation clips they play, the text overlays, and the section markers of "
+        "the song. Also the music's own shape -- tempo, how many beats were detected, and the beats "
+        "themselves around a moment you name. This is what to read before placing or judging a "
+        "shot; `sequencer.get_state` reports the baked tracks, not the piece.",
+        schema::object(
+            {{"beatsAround", schema::number("Return the individual beat times near this second. "
+                                            "Omit for the summary alone, which is usually enough.")},
+             {"beatWindow", schema::number("Half-width in seconds around `beatsAround` (default 4)")},
+             {"limit", schema::integer("Maximum shots, actors and overlays each (default 40)", 1,
+                                       kMaxLimit)}}),
+        readOnly(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            app::Engine& engine = ctx.engine();
+            const seq::Sequence& piece = engine.sequence();
+            const std::size_t limit = limitOf(args);
+            json out;
+            out["name"] = piece.name;
+            out["durationSeconds"] = piece.duration();
+
+            // The song. `audio.get_analysis` answers "what does it sound like at the playhead"; this
+            // answers "what shape is it", which is the question a cut is made against.
+            json audio;
+            audio["hasAudio"] = engine.hasAudio();
+            if (engine.hasAudio()) {
+                audio["file"] = engine.audioPath().filename().generic_string();
+                audio["durationSeconds"] = engine.durationSeconds();
+            }
+            if (const analysis::AnalysisTrack* track = engine.track(); track != nullptr) {
+                const std::vector<double>& beats = track->beats().beatTimes;
+                audio["beatCount"] = beats.size();
+                if (!beats.empty()) {
+                    audio["firstBeatSeconds"] = beats.front();
+                    audio["lastBeatSeconds"] = beats.back();
+                }
+                if (args.contains("beatsAround") && !beats.empty()) {
+                    const double centre = args.value("beatsAround", 0.0);
+                    const double half = std::max(args.value("beatWindow", 4.0), 0.0);
+                    json near = json::array();
+                    for (const double beat : beats) {
+                        if (beat >= centre - half && beat <= centre + half) {
+                            near.push_back(beat);
+                        }
+                    }
+                    audio["beatsNear"] = std::move(near);
+                    audio["beatsNearWindow"] = json{{"centre", centre}, {"halfWidth", half}};
+                }
+            }
+            audio["tempoBpm"] = engine.latestFrame().tempoBpm;
+            out["audio"] = std::move(audio);
+
+            json scenes = json::array();
+            for (const seq::SceneSlot& slot : piece.scenes) {
+                scenes.push_back(json{{"id", slot.id}, {"node", slot.node}, {"file", slot.file}});
+            }
+            out["scenes"] = std::move(scenes);
+
+            json shots = json::array();
+            for (std::size_t i = 0; i < piece.shots.size() && i < limit; ++i) {
+                const seq::Shot& shot = piece.shots[i];
+                json j;
+                j["index"] = i;
+                j["name"] = shot.name;
+                j["startSeconds"] = shot.startSeconds;
+                j["durationSeconds"] = shot.durationSeconds;
+                j["endSeconds"] = shot.endSeconds();
+                j["scene"] = shot.scene;
+                j["camera"] = json{{"kind", seq::cameraKindName(shot.camera.kind)},
+                                   {"lookAtActor", shot.camera.lookAtActor},
+                                   {"keys", shot.camera.keys.size()}};
+                j["transitionIn"] = json{{"kind", seq::transitionKindName(shot.in.kind)},
+                                         {"seconds", shot.in.seconds}};
+                j["transitionOut"] = json{{"kind", seq::transitionKindName(shot.out.kind)},
+                                          {"seconds", shot.out.seconds}};
+                j["tracks"] = shot.tracks.size();
+                shots.push_back(std::move(j));
+            }
+            out["shots"] = std::move(shots);
+            out["shotCount"] = piece.shots.size();
+
+            json actors = json::array();
+            for (std::size_t i = 0; i < piece.actors.size() && i < limit; ++i) {
+                const seq::Actor& actor = piece.actors[i];
+                json clips = json::array();
+                for (const seq::ClipCue& cue : actor.clips) {
+                    clips.push_back(json{{"timeSeconds", cue.timeSeconds},
+                                         {"clip", cue.clip},
+                                         {"speed", cue.speed}});
+                }
+                actors.push_back(json{{"id", actor.id},
+                                      {"node", actor.nodeName()},
+                                      {"visible", actor.visible},
+                                      {"positionKeys", actor.keys.size()},
+                                      {"pathActive", actor.path.active},
+                                      {"clips", std::move(clips)}});
+            }
+            out["actors"] = std::move(actors);
+            out["actorCount"] = piece.actors.size();
+
+            json overlays = json::array();
+            for (std::size_t i = 0; i < piece.overlays.size() && i < limit; ++i) {
+                const seq::OverlayCue& cue = piece.overlays[i];
+                overlays.push_back(json{{"id", cue.id},
+                                        {"content", cue.content},
+                                        {"style", cue.style},
+                                        {"startSeconds", cue.startSeconds},
+                                        {"endSeconds", cue.endSeconds}});
+            }
+            out["overlays"] = std::move(overlays);
+            out["overlayCount"] = piece.overlays.size();
+
+            // Sections and cues in full -- there are a handful and they are the landmarks a shot is
+            // placed against. Beat markers are counted rather than listed: a three-minute song has
+            // hundreds, and `audio.beatsNear` is the bounded way to ask for the ones that matter.
+            json sections = json::array();
+            json cues = json::array();
+            std::size_t beatMarkers = 0;
+            for (const seq::Marker& marker : piece.markers) {
+                switch (marker.kind) {
+                case seq::MarkerKind::Section:
+                    sections.push_back(json{{"timeSeconds", marker.timeSeconds}, {"name", marker.name}});
+                    break;
+                case seq::MarkerKind::Cue:
+                    cues.push_back(json{{"timeSeconds", marker.timeSeconds}, {"name", marker.name}});
+                    break;
+                case seq::MarkerKind::Beat:
+                    ++beatMarkers;
+                    break;
+                }
+            }
+            out["sections"] = std::move(sections);
+            out["cues"] = std::move(cues);
+            out["beatMarkers"] = beatMarkers;
+            out["events"] = piece.events.size();
+
+            const auto summary =
+                fmt::format("{} shot(s), {} actor(s), {} overlay(s) over {:.1f} s",
+                            piece.shots.size(), piece.actors.size(), piece.overlays.size(),
+                            piece.duration());
+            return ToolResult::ok(std::move(out), summary);
+        });
+
     add(registry, "audio.get_analysis", "Audio analysis",
         "What the analyser currently hears: loudness, the five frequency bands, spectral centroid, "
         "onset, tempo and beat position, plus when each musical event (beat, downbeat, build, "

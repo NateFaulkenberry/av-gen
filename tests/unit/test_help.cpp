@@ -609,6 +609,11 @@ TEST_CASE("The shipped content answers the questions the acceptance criteria nam
         {"what does a rendering setting do", "rendering/overview"},
         {"shader uniforms", "shaders/uniforms"},
         {"midi controller", "modulation/external-control"},
+        // The audio lane. Somebody who has just loaded a song and cannot see it on the strip will
+        // type one of these, and the answer is the topic that now describes the lane.
+        {"where is the waveform", "sequencer/overview"},
+        {"why can i not see the audio on the timeline", "sequencer/overview"},
+        {"how do i cut on the beat", "sequencer/overview"},
     };
     for (const auto& [query, expected] : cases) {
         INFO("query: " << query << " -- expected " << expected);
