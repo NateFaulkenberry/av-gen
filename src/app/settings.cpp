@@ -5,16 +5,36 @@
 #include <algorithm>
 #include <fstream>
 #include <system_error>
+#include <cstdint>
 
 namespace avgen::app {
 
 using nlohmann::json;
 
+const char* appearanceThemeName(AppearanceTheme theme) {
+    switch (theme) {
+    case AppearanceTheme::System: return "System";
+    case AppearanceTheme::Dark: return "Dark";
+    case AppearanceTheme::Light: return "Light";
+    }
+    return "System";
+}
+
+bool appearanceThemeFromName(const std::string& name, AppearanceTheme& out) {
+    for (const auto theme : {AppearanceTheme::System, AppearanceTheme::Dark, AppearanceTheme::Light}) {
+        if (name == appearanceThemeName(theme)) {
+            out = theme;
+            return true;
+        }
+    }
+    return false;
+}
+
 json AppSettings::toJson() const {
     json doc;
     doc["format"] = kFormatName;
     doc["version"] = kFormatVersion;
-    doc["general"] = json{{"canvasRenderScale", canvasRenderScale}};
+    doc["general"] = json{{"canvasRenderScale", canvasRenderScale}, {"appearance", appearanceThemeName(appearance)}};
     doc["ai"] = ai.toJson();
     return doc;
 }
@@ -34,6 +54,11 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
     AppSettings out;
     if (const auto general = doc.find("general"); general != doc.end() && general->is_object()) {
         out.canvasRenderScale = std::clamp(general->value("canvasRenderScale", 1.0f), 0.25f, 2.0f);
+        if (const auto appearance = general->find("appearance"); appearance != general->end()) {
+            if (!appearance->is_string() || !appearanceThemeFromName(appearance->get<std::string>(), out.appearance)) {
+                return fail("general.appearance must be System, Dark or Light");
+            }
+        }
     }
     if (const auto ai = doc.find("ai"); ai != doc.end()) {
         auto parsed = ai::AiSettings::fromJson(*ai);

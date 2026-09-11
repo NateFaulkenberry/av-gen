@@ -4,6 +4,7 @@
 
 #include "core/error.hpp"
 #include "gpu/render_target.hpp"
+#include "app/settings.hpp"
 
 #include <webgpu/webgpu_cpp.h>
 
@@ -35,6 +36,7 @@ public:
 
     void processEvent(const SDL_Event& event);
     void newFrame();
+    void applyTheme(app::AppearanceTheme theme);
     // Appends a render pass (LoadOp::Load) that draws the UI over `target`.
     void render(wgpu::CommandEncoder& encoder, const gpu::TargetView& target);
 

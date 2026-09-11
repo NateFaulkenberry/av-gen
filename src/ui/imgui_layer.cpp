@@ -1,4 +1,5 @@
 #include "ui/imgui_layer.hpp"
+#include "ui/theme.hpp"
 
 #include "core/log.hpp"
 #include "gpu/context.hpp"
@@ -41,16 +42,7 @@ Result<std::unique_ptr<ImGuiLayer>> ImGuiLayer::create(platform::Window& window,
     // SDL3 reports logical points on macOS; ImGui 1.92's dynamic fonts rasterise at the
     // framebuffer scale automatically, so styles and font sizes stay in points.
     const float scale = window.pixelScale();
-    ImGui::StyleColorsDark();
-    ImGuiStyle& style = ImGui::GetStyle();
-    // A docked panel is part of the frame, not a card lying on it, so it has square corners; and
-    // the dark theme's 94%-opaque window background goes fully opaque. Translucency was worth
-    // something while every panel floated over a full-window render (ADR-076); now that the world
-    // is beside the panels rather than behind them it shows the editor's own grey through the
-    // editor's own grey, and on the canvas's neighbours it showed the world bleeding through.
-    style.WindowRounding = 0.0f;
-    style.FrameRounding = 4.0f;
-    style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    ui::applyTheme(app::AppearanceTheme::System);
     ImFontConfig fontConfig;
     fontConfig.SizePixels = 15.0f;
     io.Fonts->AddFontDefault(&fontConfig);
@@ -70,6 +62,8 @@ Result<std::unique_ptr<ImGuiLayer>> ImGuiLayer::create(platform::Window& window,
     log::info("ImGui {} + ImPlot ready (scale {:.2f})", IMGUI_VERSION, scale);
     return layer;
 }
+
+void ImGuiLayer::applyTheme(app::AppearanceTheme theme) { ui::applyTheme(theme); }
 
 ImGuiLayer::~ImGuiLayer() {
     if (initialised_) {

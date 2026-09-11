@@ -30,6 +30,8 @@
 #include <functional>
 #include <string>
 
+#include "app/settings.hpp"
+
 namespace avgen::app {
 class Engine;
 struct AppSettings;
@@ -48,6 +50,7 @@ public:
     // Installed by the host.
     avgen::ai::ControlPlane* plane = nullptr;
     app::AppSettings* settings = nullptr;
+    std::function<void(app::AppearanceTheme)> onAppearanceChanged;
     float* canvasRenderScale = nullptr;
     std::string settingsFile; // shown in Advanced so a person can find it
     // Persists the settings file. Called after any change, so there is no Save button to forget.

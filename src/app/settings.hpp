@@ -31,9 +31,15 @@
 #include <nlohmann/json.hpp>
 
 #include <filesystem>
+#include <cstdint>
 #include <string>
 
 namespace avgen::app {
+
+enum class AppearanceTheme : std::uint8_t { System, Dark, Light };
+
+[[nodiscard]] const char* appearanceThemeName(AppearanceTheme theme);
+[[nodiscard]] bool appearanceThemeFromName(const std::string& name, AppearanceTheme& out);
 
 struct AppSettings {
     static constexpr const char* kFormatName = "avgen-settings";
@@ -44,6 +50,7 @@ struct AppSettings {
     // (ADR-084). It lives here because it is a property of this machine and this display, not of
     // the project: the same project on a laptop and on a workstation wants different answers.
     float canvasRenderScale = 1.0f;
+    AppearanceTheme appearance = AppearanceTheme::System;
 
     // ---- ai ----
     ai::AiSettings ai;

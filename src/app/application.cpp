@@ -484,6 +484,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         settingsPath_ = AppSettings::pathIn(platform::preferencesDirectory());
         jobs_ = std::make_unique<JobSystem>(2);
         initControlPlane();
+        imgui_->applyTheme(settings_.appearance);
         settingsPath_.clear(); // read-only from here: saveSettings() is now a no-op
     }
 
@@ -696,6 +697,11 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->ai.plane = ai_.get();
         panel_->settings.plane = ai_.get();
         panel_->settings.settings = &settings_;
+        panel_->settings.onAppearanceChanged = [this](app::AppearanceTheme theme) {
+            if (imgui_) {
+                imgui_->applyTheme(theme);
+            }
+        };
         panel_->settings.canvasRenderScale = &panel_->canvasRenderScale;
         panel_->settings.settingsFile = settingsPath_.generic_string();
         panel_->settings.onChanged = [this] { saveSettings(); };

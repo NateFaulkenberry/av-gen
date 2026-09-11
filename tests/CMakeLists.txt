@@ -5,6 +5,7 @@ add_executable(avgen_tests ${AVGEN_UNIT_TEST_SOURCES})
 target_include_directories(avgen_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 # Integration tests drive app::Engine, which lives in the app sources; compile the GPU-free part in.
 target_sources(avgen_tests PRIVATE
+    "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"

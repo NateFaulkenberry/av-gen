@@ -3,6 +3,7 @@
 #include "ai/control_plane.hpp"
 #include "app/engine.hpp"
 #include "app/settings.hpp"
+#include "ui/theme.hpp"
 
 #include <imgui.h>
 
@@ -57,6 +58,20 @@ void SettingsPanel::draw(app::Engine& engine) {
 
 void SettingsPanel::drawGeneral() {
     ImGui::TextDisabled("Settings that belong to this installation rather than to a project.");
+    ImGui::Separator();
+    if (settings != nullptr) {
+        int appearance = static_cast<int>(settings->appearance);
+        ImGui::TextDisabled("Appearance");
+        if (ImGui::Combo("Theme", &appearance, "System\0Dark\0Light\0")) {
+            settings->appearance = static_cast<app::AppearanceTheme>(std::clamp(appearance, 0, 2));
+            if (onAppearanceChanged) {
+                onAppearanceChanged(settings->appearance);
+            }
+            if (onChanged) {
+                onChanged();
+            }
+        }
+    }
     ImGui::Separator();
     ImGui::TextWrapped(
         "Panel layout is stored separately and restored automatically. Use View > Restore Default "
