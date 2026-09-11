@@ -18,9 +18,11 @@ imported UFO asset. The attached stabilization brief is the acceptance contract 
 - Glowmere painterly at 1280x800, realtime, 120 frames: zero GPU errors, 152 draws, 428,633
   triangles, 2,329 visible / 114,283 culled instances, 23.79 ms median GPU and 28.27 ms median
   wall time over the warmed sample. This is the current broad renderer baseline, not a 60 FPS sign-off.
-- The final full release suite discovers 1,510 tests: all 1,510 passed, with four optional tests
-  skipped. The Syphon burst test passes after the notification-to-texture retry hardening. The
-  skipped tests are two Khronos sample imports, external ffmpeg encoding and NDI runtime support.
+- The latest full release suite discovers 1,515 tests: 1,514 passed, four optional tests skipped,
+  and the EXR render determinism test failed in the full-suite run. Its isolated rerun passed, so
+  this is currently classified as a suite-order/resource interaction rather than a reproduced
+  standalone defect. The Syphon burst test passes after notification-to-texture retry hardening.
+  The skipped tests are two Khronos sample imports, external ffmpeg encoding and NDI runtime support.
 
 ## Implemented in this pass
 
@@ -33,7 +35,9 @@ imported UFO asset. The attached stabilization brief is the acceptance contract 
 - [x] Focused unit suite passes: 57 assertions across 9 animation tests.
 - [x] Existing GPU skinning suite passes: 47 assertions across 3 cases.
 - [x] Constellation and Glowmere 120-frame headless baselines render with zero GPU errors.
-- [x] Full release suite completed green: 1,510 passed, four optional skips, zero failures.
+- [x] Historical full release suite completed green at 1,510 tests, then 1,513 tests after the
+  RendererQA additions. Latest suite: 1,515 discovered, 1,514 passed, four skips and one EXR
+  determinism failure; isolated rerun passed.
 - [x] The shadow-workload timing threshold also passes in the final suite; its earlier isolated
   miss was timing variance, not a reproduced renderer correctness failure.
 - [x] Terrain runtime visibility regression fixed: view-distance culling no longer writes
@@ -221,8 +225,9 @@ tone mapping and composition overlay.
   near/far/behind-camera geometry, a skinned alien, a transparent orb, particles and a floor; its
   60-frame preview smoke render passes with zero GPU errors. Camera path/resize/seek/reverse stress
   remains a runtime test task.
-- [x] RendererQA remains valid in the full release suite: the post-scene-index run passes all 1,513
-  tests with four optional skips and zero failures.
+- [x] RendererQA remains valid in the full release suite: the post-scene-index run reached 1,515
+  tests; the new RendererQA and water tests pass. One unrelated EXR determinism case failed only
+  in the full run and passed isolated.
 - [ ] Make Glowmere regression checks explicit: UFO close-up/orbit stationarity, alien animation,
   shoreline stability and camera cuts. Keep it as a control even if Constellation is the active art.
 
