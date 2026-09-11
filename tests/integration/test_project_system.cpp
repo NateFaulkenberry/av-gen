@@ -2,6 +2,7 @@
 // whole session; bundles copy everything referenced; new project resets.
 
 #include "app/engine.hpp"
+#include "world/world_recipe.hpp"
 #include "assets/image.hpp"
 #include "audio/audio_file.hpp"
 #include "core/time.hpp"
@@ -576,10 +577,19 @@ TEST_CASE("Every example in the index exists and loads", "[integration][project]
         CHECK(!entry["description"].get<std::string>().empty());
         const auto project = examples / entry["project"].get<std::string>();
         REQUIRE(std::filesystem::exists(project));
-        app::Engine engine(app::EngineMode::Offline);
-        const auto loaded = engine.loadProject(project);
-        INFO((loaded ? std::string() : loaded.error().message));
-        CHECK(loaded.has_value());
+        // An index entry is a project or a recipe, and they open by different verbs: a project is
+        // loaded, a recipe is composed. The routing rule is shared with the application rather
+        // than restated here, so the menu and the test cannot disagree about what a file is.
+        if (world::isRecipeFile(project)) {
+            const auto recipe = world::WorldRecipe::loadFile(project);
+            INFO((recipe ? std::string() : recipe.error().message));
+            CHECK(recipe.has_value());
+        } else {
+            app::Engine engine(app::EngineMode::Offline);
+            const auto loaded = engine.loadProject(project);
+            INFO((loaded ? std::string() : loaded.error().message));
+            CHECK(loaded.has_value());
+        }
     }
 #endif
 }

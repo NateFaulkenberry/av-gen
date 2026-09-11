@@ -398,4 +398,23 @@ glm::vec3 tintTowards(glm::vec3 base, glm::vec3 target, float amount) {
     return base * (glm::vec3(1.0f) * (1.0f - t) + hue * t);
 }
 
+
+bool isRecipeFile(const std::filesystem::path& path) {
+    std::string name = path.filename().string();
+    std::transform(name.begin(), name.end(), name.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (name.ends_with(".recipe.json")) {
+        return true;
+    }
+    if (!name.ends_with(".json")) {
+        return false;
+    }
+    // Content, so a renamed recipe still opens: a recipe names the world it grows and the ground it
+    // covers, and carries no composition format marker.
+    std::ifstream in(path);
+    const nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
+    return doc.is_object() && !doc.contains("format") && doc.contains("world") &&
+           doc["world"].is_string() && (doc.contains("extent") || doc.contains("ecology"));
+}
+
 } // namespace avgen::world

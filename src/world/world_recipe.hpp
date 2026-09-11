@@ -139,4 +139,16 @@ struct WorldRecipe {
     [[nodiscard]] std::vector<std::pair<std::string, float>> weights() const;
 };
 
+// Does this path hold a world recipe rather than a project or a composition?
+//
+// A recipe is *generated*, not loaded -- `composeWorld` turns one into a composition -- so whoever
+// opens a file has to know which verb applies before the path reaches `Engine::loadFile`, which has
+// no branch for a recipe and sends every other `.json` to `loadProject`, where it is rejected. That
+// is why the example browser could not open the shipped recipes at all.
+//
+// The rule lives next to the type it identifies because three callers need it -- the application's
+// open path, the example browser, and the test that walks the example index -- and three copies of
+// it would drift apart.
+[[nodiscard]] bool isRecipeFile(const std::filesystem::path& path);
+
 } // namespace avgen::world

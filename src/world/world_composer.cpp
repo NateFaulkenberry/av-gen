@@ -562,7 +562,12 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
     // best asset" run beside the one that placed the heroes. Two independent answers to the same
     // question is how a world ends up framed on something that is not the thing it put in the
     // clearing.
-    if (!out.plan.heroes.empty() && recipe.composition.focalStrength > 0.0f) {
+    // Not gated on `focalStrength`: zero means "do not emphasise the subject", not "have no
+    // subject". The focal region is also what the viewpoint is chosen from (below), so gating it
+    // meant a recipe with `focalStrength: 0.0` composed a world that nothing ever looked at. The
+    // strength rides along on the region and reaches the density emphasis as a weight, where zero
+    // already means no emphasis.
+    if (!out.plan.heroes.empty()) {
         const HeroPoint& subject = out.plan.heroes.front();
         FocalRegion f;
         f.center = glm::vec2(subject.position.x, subject.position.z);
@@ -631,8 +636,19 @@ Result<ComposedWorld> composeWorld(const WorldRecipe& recipe, const assets::Asse
             zone.name = kind.name;
             zone.center = glm::vec2(anchor.position.x, anchor.position.z);
             // Large enough to be a place rather than a patch: a zone the camera crosses in a second
-            // reads as an inconsistency in the scatter, not as somewhere it has arrived.
-            zone.radius = std::max(recipe.extent * 0.13f, anchor.activationRadius * 0.8f);
+            // reads as an inconsistency in the scatter, not as somewhere it has arrived. But it is
+            // a *share of the world*, not a fixed number of metres.
+            //
+            // `activationRadius` descends from the hero's own height and knows nothing about how
+            // much ground there is, so letting it set the size (it was the larger term below about
+            // 800 m of extent) made four zones blanket a 420 m world and merely dapple an 1100 m
+            // one. Overlapping zones multiply, so a blanketed world had every emphasis compounded
+            // -- flora fell to 0.33 of baseline -- and the same recipe therefore had a different
+            // effective density at every extent. Measured: four times the ground gave ten to twelve
+            // times the flora instead of four. The hero's scale still leans on the size; it no
+            // longer sets it.
+            const float share = recipe.extent * 0.13f;
+            zone.radius = std::clamp(anchor.activationRadius * 0.8f, share * 0.7f, share * 1.3f);
             zone.softness = zone.radius * 0.55f;
             zone.emphasis = {{"flora", kind.flora}, {"fungi", kind.fungi}, {"rock", kind.rock}};
             out.plan.zones.push_back(std::move(zone));

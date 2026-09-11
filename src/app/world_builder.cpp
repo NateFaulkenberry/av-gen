@@ -5,6 +5,7 @@
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <utility>
 
@@ -292,6 +293,102 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
                       "{} reaction(s)",
                       world.recipe.world, hero.name, hero.importance,
                       asset->naturalSize.y * hero.scale, hero.preferredCameraDistance, routes);
+        }
+    }
+
+    // ---- the air ----------------------------------------------------------------------------
+    //
+    // `atmosphere.spores` and `atmosphere.floating` were parsed from every recipe and read by
+    // nothing: the composer emitted no particle system, so two knobs that a person can see and
+    // edit did exactly nothing. A dead knob is worse than a missing one, because it invites
+    // somebody to spend an afternoon deciding what value it should have.
+    //
+    // Two systems rather than one, because the weights describe two different things -- fine
+    // particulate at human scale, and larger elements suspended much higher -- and a single
+    // emitter cannot be both without looking like neither.
+    {
+        const world::AtmosphereWeights& air = world.recipe.atmosphere;
+        const world::PaletteRoles& palette = world.composed.profile.palette;
+
+        // Centred on what the world is about, since that is where the camera will be.
+        glm::vec2 centre(0.0f);
+        if (!world.composed.plan.focal.empty()) {
+            centre = world.composed.plan.focal.front().center;
+        }
+        float ground = 0.0f;
+        if (terrainNode != nullptr) {
+            ground = terrainNode->worldMap.height(centre);
+        }
+
+        struct AirLayer {
+            const char* name;
+            float weight;
+            glm::vec3 color;
+            float height;       // metres of air the system fills, above the ground
+            float lift;         // where the bottom of that volume sits
+            float sizeStart;
+            float speed;
+            float lifetime;
+            float emissive;
+            float capacityPerUnit;
+        };
+        const AirLayer layers[] = {
+            // Drifting particulate, near enough to read as being in the room with you.
+            {"spores", air.spores, palette.primary, 16.0f, 1.0f, 0.075f, 0.14f, 22.0f, 1.8f, 41000.0f},
+            // Larger suspended elements, higher, slower, and fewer -- they read as scale rather
+            // than as texture, so they must not be dense enough to become texture.
+            {"motes", air.floating, palette.secondary, 46.0f, 8.0f, 0.26f, 0.07f, 40.0f, 1.1f, 9000.0f},
+        };
+
+        for (const AirLayer& layer : layers) {
+            if (composition->findNode(layer.name) != nullptr) {
+                composition->removeNode(layer.name);   // regenerating replaces rather than stacks
+            }
+            if (layer.weight <= 0.0f) {
+                continue;   // a weight of zero is an instruction, not an omission
+            }
+            // The volume covers a fixed share of the world, so a recipe's weight means the same
+            // density of air at any extent -- the same property the zones above now have.
+            const float half = std::max(world.recipe.extent * 0.26f, 20.0f);
+
+            scene::CompositionNode node;
+            node.name = layer.name;
+            node.kind = scene::NodeKind::Particles;
+            scene::ParticleSystem& ps = node.particles;
+            ps.name = layer.name;
+            ps.shape = scene::EmitterShape::Box;
+            ps.position = glm::vec3(centre.x, ground + layer.lift + layer.height * 0.5f, centre.y);
+            ps.extent = glm::vec3(half, layer.height * 0.5f, half);
+            ps.capacity = static_cast<std::uint32_t>(
+                std::clamp(layer.capacityPerUnit * layer.weight, 256.0f, 65536.0f));
+            // Spawn to fill the pool over about one lifetime, so the volume reaches a steady state
+            // rather than arriving all at once and then thinning as the first cohort expires.
+            ps.spawnRate = static_cast<float>(ps.capacity) / layer.lifetime;
+            ps.lifetimeMin = layer.lifetime * 0.65f;
+            ps.lifetimeMax = layer.lifetime * 1.35f;
+            ps.speedMin = layer.speed * 0.1f;
+            ps.speedMax = layer.speed;
+            ps.spread = 1.0f;                       // no preferred direction; this is drift
+            ps.gravity = glm::vec3(0.02f, 0.012f, 0.0f);   // a barely-there upward drift
+            ps.drag = 0.1f;
+            ps.turbulence = 0.35f;
+            ps.turbulenceScale = 0.05f;
+            ps.turbulenceSpeed = 0.12f;
+            ps.sizeStart = layer.sizeStart;
+            ps.sizeEnd = 0.0f;
+            ps.blend = scene::ParticleBlend::Additive;
+            ps.emissive = layer.emissive;
+            ps.colorStart = glm::vec4(layer.color, 0.55f);
+            ps.colorEnd = glm::vec4(layer.color, 0.0f);
+            ps.softness = 0.5f;
+
+            if (auto added = engine.addNode(std::move(node)); !added) {
+                log::warn("world '{}': air layer '{}': {}", world.recipe.world, layer.name,
+                          added.error().message);
+            } else {
+                log::info("world '{}': air layer '{}' weight {:.2f}, {} particles over {:.0f} m",
+                          world.recipe.world, layer.name, layer.weight, ps.capacity, half * 2.0f);
+            }
         }
     }
 

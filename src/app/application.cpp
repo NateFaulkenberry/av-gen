@@ -643,7 +643,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         if (examples) {
             for (const auto& ex : *examples) {
                 if (ex.name == *options.example) {
-                    if (auto r = engine_->loadFile(ex.file); !r) {
+                    if (auto r = openAny(ex.file); !r) {
                         log::error("example '{}': {}", ex.name, r.error().message);
                         if (options.headless) return std::unexpected(r.error());
                     }
@@ -828,7 +828,7 @@ void Application::applyShare(const std::string& kind, const std::string& name) {
 }
 
 void Application::loadAny(const std::filesystem::path& path) {
-    auto r = engine_->loadFile(path);
+    auto r = openAny(path);
     if (!r) {
         log::error("open '{}': {}", path.string(), r.error().message);
         if (panel_) {
@@ -1764,6 +1764,13 @@ RenderSettings Application::renderSettingsFromOptions() const {
     if (options_.codec) s.codec = *options_.codec;
     if (options_.quality) s.quality = *options_.quality;
     return s;
+}
+
+Result<void> Application::openAny(const std::filesystem::path& path) {
+    if (world::isRecipeFile(path)) {
+        return generateWorldFromRecipe(path);
+    }
+    return engine_->loadFile(path);
 }
 
 Result<void> Application::generateWorldFromRecipe(const std::filesystem::path& path) {
