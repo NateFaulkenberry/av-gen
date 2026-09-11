@@ -54,6 +54,17 @@ std::uint64_t materialKey(const scene::Material& m) {
     return h;
 }
 
+bool finiteMatrix(const glm::mat4& matrix) {
+    for (int column = 0; column < 4; ++column) {
+        for (int row = 0; row < 4; ++row) {
+            if (!std::isfinite(matrix[column][row])) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 } // namespace
 
 SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
@@ -1567,6 +1578,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     const float aspect = static_cast<float>(hdr_.width()) / static_cast<float>(hdr_.height());
     const glm::mat4 view = scene.camera.view();
     const glm::mat4 proj = scene.camera.projection(aspect);
+    if (!finiteMatrix(view) || !finiteMatrix(proj)) {
+        return fail("scene render: camera produced a non-finite view or projection matrix");
+    }
+    for (const scene::Entity& entity : scene.entities) {
+        const glm::mat4 model = entity.transform.matrix();
+        if (!finiteMatrix(model)) {
+            return fail("scene render: entity '{}' produced a non-finite model matrix", entity.name);
+        }
+    }
 
     // ---- frame uniforms ----
     FrameUniforms frame{};

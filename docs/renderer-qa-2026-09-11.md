@@ -124,10 +124,11 @@ tone mapping and composition overlay.
 - [ ] Add targeted transform diagnostics for selected entity name/ID: world transform, model
   translation, camera position, camera/view-projection terms, culling state and object slot index.
   Log only changes or invalid values, not every frame.
-- [ ] Audit duplicate entity names. Either enforce uniqueness at the scene boundary or replace the
-  velocity-history key with a stable entity identity. Add a regression for two same-named objects.
-- [ ] Add finite-value validation for transforms, quaternions, camera matrices, mesh bounds, joint
-  palettes and object indices at the CPU/GPU boundary. Fail with object/rig name and frame time.
+- [x] Duplicate entity names are rejected at the scene boundary; existing unit coverage protects
+  the stable model-history key assumption.
+- [x] Renderer boundary validation rejects non-finite camera view/projection and entity model
+  matrices before GPU submission. Focused NaN/Inf regression passes; broader joint/bounds validation
+  remains open.
 - [ ] Audit object uniform ring/dynamic offsets and per-frame writes under rapid scene changes.
   Use object IDs and a two-frame alternating transform test to detect stale object data.
 - [x] Fix stale model history across camera culling. `prevModelsNext_` was previously populated

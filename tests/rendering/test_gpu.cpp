@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
+#include <limits>
 #include <memory>
 
 using namespace avgen;
@@ -259,6 +260,23 @@ TEST_CASE("SceneRenderer renders a lit cube deterministically", "[gpu][renderer]
         auto returned = renderer.renderToImage(scene, time, 96, 64);
         REQUIRE(returned.has_value());
         CHECK(gpu::hashImage(*returned) == gpu::hashImage(*first));
+        CHECK(ctx->errorCount() == 0);
+    }
+
+    TEST_CASE("renderer rejects non-finite camera and entity transforms", "[gpu][renderer][validation]") {
+        auto ctx = makeContext();
+        auto shaders = makeShaders(*ctx);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        FrameTime time{};
+
+        auto badEntity = cubeScene();
+        badEntity.entities[0].transform.position.x = std::numeric_limits<float>::quiet_NaN();
+        CHECK_FALSE(renderer.renderToImage(badEntity, time, 64, 64).has_value());
+
+        auto badCamera = cubeScene();
+        badCamera.camera.position.y = std::numeric_limits<float>::infinity();
+        CHECK_FALSE(renderer.renderToImage(badCamera, time, 64, 64).has_value());
         CHECK(ctx->errorCount() == 0);
     }
 
