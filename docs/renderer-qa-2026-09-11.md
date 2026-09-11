@@ -18,7 +18,7 @@ imported UFO asset. The attached stabilization brief is the acceptance contract 
 - Glowmere painterly at 1280x800, realtime, 120 frames: zero GPU errors, 152 draws, 428,633
   triangles, 2,329 visible / 114,283 culled instances, 23.79 ms median GPU and 28.27 ms median
   wall time over the warmed sample. This is the current broad renderer baseline, not a 60 FPS sign-off.
-- The final full release suite discovers 1,507 tests: all 1,507 passed, with four optional tests
+- The final full release suite discovers 1,510 tests: all 1,510 passed, with four optional tests
   skipped. The Syphon burst test passes after the notification-to-texture retry hardening. The
   skipped tests are two Khronos sample imports, external ffmpeg encoding and NDI runtime support.
 
@@ -33,7 +33,7 @@ imported UFO asset. The attached stabilization brief is the acceptance contract 
 - [x] Focused unit suite passes: 57 assertions across 9 animation tests.
 - [x] Existing GPU skinning suite passes: 47 assertions across 3 cases.
 - [x] Constellation and Glowmere 120-frame headless baselines render with zero GPU errors.
-- [x] Full release suite completed green: 1,507 passed, four optional skips, zero failures.
+- [x] Full release suite completed green: 1,510 passed, four optional skips, zero failures.
 - [x] The shadow-workload timing threshold also passes in the final suite; its earlier isolated
   miss was timing variance, not a reproduced renderer correctness failure.
 - [x] Terrain runtime visibility regression fixed: view-distance culling no longer writes
