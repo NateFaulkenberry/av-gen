@@ -94,6 +94,32 @@ hashes are bit-identical with particles on; the render job's sequence hash is th
 The parity tests are the backbone: any change to a field, effector, SDF node or material op has to
 produce the same number on the CPU and the GPU, which is what keeps offline renders honest.
 
+## AI control plane (ADR-094)
+
+| Tag | Binary | Covers |
+|---|---|---|
+| `[ai][tools]` | unit | the tool registry against a real `app::Engine`: schema validation, structured errors, every tool's behaviour, annotation invariants |
+| `[ai][tools][regression]` | unit | the three silent-failure guards — an unbound timeline target, a `Replace` track or route overriding a set, a camera pose written in orbit mode — plus the summary-versus-result check |
+| `[ai][provider]` | unit | each vendor adapter against recorded wire payloads, in both directions, with the credential asserted to be in a header and never in the body or the URL |
+| `[ai][credentials]` | unit | that a `ProviderConfig` cannot carry a secret, that a file carrying one is refused, and that status text never contains a value |
+| `[ai][transaction]` | unit | snapshot round-trips, rebinding after a restore, rollback and commit |
+| `[integration][ai]` | unit | the whole path: `submit` → job worker → agent loop → main-thread queue → real tools → real engine, with transactions, rollback, cancellation, budgets and the acceptance scenarios |
+| `[integration][ai][threading]` | unit | that tools only ever run on the pumping thread, and that a task the frame loop never services times out rather than deadlocking |
+
+**The only permitted mock is the provider** (spec §52): every tool runs against the real engine, so
+a suite that passed against a stand-in would prove only that the stand-in works (§54). Tests use
+`ai::MemoryCredentialStore` so nothing ever writes to a developer's real keychain.
+
+The end-to-end path is also runnable outside the test binary:
+
+```
+avgen --headless --frames 2 --composition examples/helix/helix.scene.json \
+      --ai-script examples/ai/atmosphere.ai.json --save-project /tmp/after.json
+```
+
+Everything but the model's judgement is real, so the resulting project and the captured frame can
+be diffed against a run without the pass.
+
 ## Diagnosing input
 
 `AVGEN_UI_SELFTEST=1 ./build/debug/src/avgen --play` logs two lines every thirty frames: what ImGui
