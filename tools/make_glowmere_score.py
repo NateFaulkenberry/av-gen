@@ -56,6 +56,19 @@ def envelope(t: float, span: float, attack: float, release: float) -> float:
     return 1.0
 
 
+# Where the break sits, as a fraction of the piece. Just past the middle: late enough that the
+# arrangement has built something to take away, early enough to leave room for the arrival to land
+# and then settle.
+kBreakStart = 0.55
+kBreakEnd = 0.60
+kDropSettle = 0.66
+
+
+def smoothstep(x: float) -> float:
+    x = min(1.0, max(0.0, x))
+    return x * x * (3.0 - 2.0 * x)
+
+
 def section_weight(t: float, seconds: float) -> tuple:
     """How loud each voice is at time `t`, following the camera: the shot opens beside the hero,
     travels the valley from about a quarter in, climbs to a vista at two thirds and arrives near
@@ -65,6 +78,35 @@ def section_weight(t: float, seconds: float) -> tuple:
     pulse = min(1.0, max(0.0, (u - 0.22) / 0.20))
     bell = 0.35 + 0.65 * min(1.0, max(0.0, (u - 0.05) / 0.55))
     air = 0.25 + 0.75 * min(1.0, max(0.0, (u - 0.30) / 0.45))
+    # The break and the drop.
+    #
+    # Added because the piece had neither, and the visual system reads musical *structure*, not only
+    # level. A drop, to the detector, is a break resolving into a loud downbeat -- so a score that
+    # only ever rises can never produce one, and the whole family of behaviours that hang off a drop
+    # (the camera landing a reveal on it, the world answering it) has nothing to fire on. The
+    # arrangement was monotonic: pad in at 10%, pulse at 22%, bell and air ramping, fade at 93%.
+    #
+    # So: everything but the air drops out for about four seconds, then returns at full. The air bed
+    # stays because a break with literal silence in it reads as a fault in the file rather than as a
+    # held breath, and because the detector wants energy to *collapse*, not to vanish.
+    if kBreakStart <= u < kBreakEnd:
+        # Not a step. A hard gate would put a click in the audio and give the onset detector a
+        # transient exactly where the music is meant to be emptying out.
+        hush = 1.0 - smoothstep((u - kBreakStart) / max(kBreakEnd - kBreakStart, 1e-6))
+        pad *= 0.18 + 0.82 * hush
+        pulse *= 0.05 + 0.95 * hush
+        bell *= 0.12 + 0.88 * hush
+        air *= 0.75 + 0.25 * hush
+    elif u < kDropSettle and u >= kBreakEnd:
+        # The return, over about a bar and a half: loud, and slightly louder than before it, because
+        # a drop that comes back to exactly where it left is a gap rather than an arrival.
+        rise = smoothstep((u - kBreakEnd) / max(kDropSettle - kBreakEnd, 1e-6))
+        boost = 1.0 + 0.22 * (1.0 - rise)
+        pad *= boost
+        pulse *= boost
+        bell *= boost
+        air *= boost
+
     # The arrival, and then the settle: everything but the drone recedes over the last six seconds
     # so the picture is left alone at the end of its own journey.
     if u > 0.93:
