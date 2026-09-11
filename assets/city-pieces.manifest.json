@@ -1,0 +1,170 @@
+{
+ "source": "Kenney City Kit Roads (kenney.nl/assets), CC0 1.0",
+ "license": "CC0 1.0 Universal. Kenney's License.txt travels with the meshes.",
+ "note": "The city's *tiling* library (ADR-100), and deliberately separate from assets/city.manifest.json, which is the scatter library the ecology composer reads and which is capped at 64 layers. Nothing here is scattered: `world::placeCity` reads the `tags` to learn which piece dresses which cell kind, so adding a road variant is a line in this file. Only pieces that tile edge to edge on a square cell belong here -- a curve or a bend does not, because the lattice knows straights and crossroads and nothing else. preferredScale is 0 on purpose: the placer scales each piece by its own footprint so that one cell is exactly `moduleSize` metres, which is what makes two tiles meet.",
+ "categories": {
+  "cityModules": [
+   {
+    "name": "road-straight",
+    "file": "kenney/city/city-kit-roads/road-straight.glb",
+    "category": "architectural",
+    "archetype": "road",
+    "triangles": 44,
+    "naturalSize": [
+     1.0,
+     0.02,
+     1.0
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.3,
+    "preferredDensity": 0.0,
+    "tags": [
+     "road",
+     "city",
+     "module"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "road-straight-barrier",
+    "file": "kenney/city/city-kit-roads/road-straight-barrier.glb",
+    "category": "architectural",
+    "archetype": "road",
+    "triangles": 24,
+    "naturalSize": [
+     1.0,
+     0.08,
+     1.0
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.3,
+    "preferredDensity": 0.0,
+    "tags": [
+     "road",
+     "city",
+     "module"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "road-crossroad",
+    "file": "kenney/city/city-kit-roads/road-crossroad.glb",
+    "category": "architectural",
+    "archetype": "junction",
+    "triangles": 116,
+    "naturalSize": [
+     1.0,
+     0.02,
+     1.0
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.3,
+    "preferredDensity": 0.0,
+    "tags": [
+     "junction",
+     "city",
+     "module"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "road-crossroad-line",
+    "file": "kenney/city/city-kit-roads/road-crossroad-line.glb",
+    "category": "architectural",
+    "archetype": "junction",
+    "triangles": 108,
+    "naturalSize": [
+     1.0,
+     0.02,
+     1.0
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.3,
+    "preferredDensity": 0.0,
+    "tags": [
+     "junction",
+     "city",
+     "module"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "road-crossing",
+    "file": "kenney/city/city-kit-roads/road-crossing.glb",
+    "category": "architectural",
+    "archetype": "crossing",
+    "triangles": 104,
+    "naturalSize": [
+     1.0,
+     0.02,
+     1.0
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.3,
+    "preferredDensity": 0.0,
+    "tags": [
+     "crossing",
+     "city",
+     "module"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "road-square",
+    "file": "kenney/city/city-kit-roads/road-square.glb",
+    "category": "architectural",
+    "archetype": "pavement",
+    "triangles": 36,
+    "naturalSize": [
+     1.0,
+     0.02,
+     1.0
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.3,
+    "preferredDensity": 0.0,
+    "tags": [
+     "pavement",
+     "city",
+     "module"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   },
+   {
+    "name": "road-side",
+    "file": "kenney/city/city-kit-roads/road-side.glb",
+    "category": "architectural",
+    "archetype": "pavement",
+    "triangles": 44,
+    "naturalSize": [
+     1.0,
+     0.02,
+     1.31
+    ],
+    "preferredScale": 0.0,
+    "visualImportance": 0.3,
+    "preferredDensity": 0.0,
+    "tags": [
+     "pavement",
+     "city",
+     "module"
+    ],
+    "material": {
+     "roughness": 0.9
+    }
+   }
+  ]
+ }
+}

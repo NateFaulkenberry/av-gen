@@ -22,11 +22,15 @@
 // for the same reason `world::composeWorld` is: a world that is not reproducible cannot be rendered
 // offline.
 
+#include "assets/asset_library.hpp"
 #include "core/error.hpp"
+#include "spatial/point_cloud.hpp"
+#include "world/terrain_query.hpp"
 
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -63,6 +67,15 @@ struct CitySettings {
     // Metres per cell. The lattice pitch, and the single number every asset pack is scaled against
     // (ADR-100): Kenney's kit is 1x1 *units* with a 0.79-unit person, which is not metres.
     float moduleSize = 8.0f;
+    // The tile size the pack was authored on, in its own units. Kenney's road pieces are drawn on a
+    // 1x1 tile, so this is 1.
+    //
+    // It is stated rather than measured, and that is the point. `road-side` *bounds* 1.0 x 1.31
+    // because its kerb is meant to overhang the tile; scaling that piece by its bounding box shrinks
+    // the tile it is supposed to fill to 6.1 m of an 8 m cell and leaves a gap between it and its
+    // neighbour. Decoration that reaches past the tile is the artist's intent, so the tile has to be
+    // declared by whoever curated the pack -- it cannot be recovered from the mesh.
+    float tileUnits = 1.0f;
     // Blocks in each direction, and how many plot cells a block is across. The street network runs
     // between blocks, so a 3x3 city of 4-cell blocks is 3*4 + 4 = 16 cells across: a road on each
     // side of every block, sharing the roads between neighbours.
@@ -111,5 +124,56 @@ struct CityPlan {
 
 // The plan. Pure, and a pure function of `settings`.
 [[nodiscard]] Result<CityPlan> planCity(const CitySettings& settings);
+
+// ---- placing ------------------------------------------------------------------------------------
+//
+// The second half of ADR-100, and where assets, scale and the ground enter. A plan is a grid of enum
+// values; a placement is a cloud of instances of one asset. One cloud per asset, because that is what
+// `ProceduralGeometry::distribution.scatterCloud` takes and therefore what gets GPU culling, the LOD
+// ladder and instanced draws without any of it being written again.
+
+// Which assets dress which cell kind. Names are `assets::AssetLibrary` entry names, not file paths:
+// the library already carries the file, the measured bounds and `preferredScale`, which is where the
+// Kenney-units-to-metres reconciliation lives (ADR-100). A role with no assets leaves those cells
+// undressed, and `placeCity` says so rather than placing nothing quietly.
+struct CityLibrary {
+    std::vector<std::string> road;
+    std::vector<std::string> junction;
+    std::vector<std::string> crossing;
+    std::vector<std::string> pavement;
+    std::vector<std::string> plot;     // buildings
+    std::vector<std::string> plaza;    // ground for an open block
+
+    [[nodiscard]] const std::vector<std::string>& forKind(CellKind kind) const;
+    [[nodiscard]] bool empty() const;
+    // Builds a library by reading the tags of an asset library: an entry tagged "road" dresses road
+    // cells, and so on. Keeps the role vocabulary in the manifest, where an artist can change it,
+    // rather than in this header.
+    [[nodiscard]] static CityLibrary fromTags(const assets::AssetLibrary& library);
+};
+
+// One asset, and every instance of it the plan asked for.
+struct CityPlacement {
+    std::string name;    // layer name, unique within a city: "city-road-straight"
+    std::string asset;   // the library entry this came from
+    CellKind kind = CellKind::Empty;
+    std::shared_ptr<spatial::PointCloud> cloud;
+};
+
+struct PlacedCity {
+    std::vector<CityPlacement> placements;
+    // Cells the plan asked to dress and the library had nothing for. Reported rather than logged,
+    // because a city missing its roads still renders -- as an empty grid -- and the count is the
+    // only thing that says why.
+    std::vector<std::string> undressed;
+    [[nodiscard]] std::size_t instanceCount() const;
+};
+
+// Turns a plan into placements. `terrain` may be null, in which case every piece sits at y = 0;
+// given one, each piece is dropped onto the ground under itself. Pure apart from that query, and a
+// pure function of (plan, library, terrain) -- same inputs, same city (ADR-091).
+[[nodiscard]] Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
+                                           const assets::AssetLibrary& library,
+                                           const TerrainQuery* terrain = nullptr);
 
 } // namespace avgen::world

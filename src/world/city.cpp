@@ -53,6 +53,10 @@ Result<void> CitySettings::validate() const {
     if (roadCells < 1) {
         return fail("city: a road must be at least one cell wide");
     }
+    if (!(tileUnits > 0.0f) || !std::isfinite(tileUnits)) {
+        return fail("city: tileUnits must be a finite value above zero; it is the size the pack's "
+                    "tiles were drawn at, in the pack's own units");
+    }
     // A ceiling rather than a limit somebody discovers: the lattice is materialised as a vector of
     // cells, and the placer walks it once per asset. Ten thousand cells is a city; a million is a
     // mistake in a recipe that would otherwise show up as a hang.

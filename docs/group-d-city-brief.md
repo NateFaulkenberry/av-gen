@@ -264,28 +264,48 @@ grid:
   road — so it called every column a road and passed vacuously. It reads from a line crossing the
   blocks now. Worth remembering when writing the next structural test.
 
-## Next — the placer
+**The placer — `src/world/city_place.cpp`, `assets/city-pieces.manifest.json`.** A plan plus an
+asset library becomes `PlacedCity`: one `spatial::PointCloud` per asset, which is the second half of
+ADR-100 and the thing `distribution.scatterCloud` takes. Roles come from manifest **tags** — an entry
+tagged `road` dresses road cells — so adding a road variant is a line of JSON, not a code change.
 
-Turn a `CityPlan` plus an `assets::AssetLibrary` into placements. This is where assets, scale and the
-terrain enter, and where the two halves of ADR-100 are actually produced.
+`assets/city-pieces.manifest.json` is deliberately a *second* manifest, separate from
+`assets/city.manifest.json`. That one is the **scatter** library the ecology composer reads and is
+capped at 64 layers; this one is the **tiling** library the city placer reads and has no such cap,
+because `AssetLibrary` never had one — the cap is `src/world/ecology.cpp:221` and belongs to the
+ecology alone. Only pieces that tile edge to edge belong here: a curve or a bend does not, because
+the lattice knows straights and crossroads and nothing else.
 
-Shape it like `world::composeWorld`: a pure function from (plan, settings, library, `TerrainQuery*`)
-to something `app::installWorld` can install, so the editor's Generate button, `--generate` and the
-assistant's `world.generate` all reach it without three code paths. Start with roads and pavements
-alone — one asset each, correctly rotated and adjoining — and render it before adding buildings.
-A street that tiles is the thing to see working first; everything else is dressing on top of it.
+Tests: tag `[city][place]`. Full suite **1555, green**.
 
-Specifics already known:
+**The design finding worth keeping.** The placer first scaled each piece by its own bounding box,
+which sounds like the thing that would make everything fit and does the opposite. `road-side` bounds
+1.0 x 1.31 because its kerb is *meant* to overhang the tile; scaling by that box shrank the tile it
+fills to 6.1 m of an 8 m cell and left a gap beside every one of them. **A tiling pack has to declare
+its tile size — it cannot be recovered from the mesh**, because decoration that reaches past the tile
+is the artist's intent. `CitySettings::tileUnits` states it (1.0 for Kenney) and the whole pack scales
+uniformly.
 
-- `assets/city.manifest.json` is a *scatter* library of 47 entries. The city pieces — road tiles,
-  the 153 downtown modules, the modular buildings — are on disk and **not** in it, because the
-  composer builds one scatter layer per entry and caps at 64. The placer needs its own way to name a
-  piece; consider a second manifest or a category convention, and write down which.
-- Kenney road pieces are 1×1 *unit* tiles. `CitySettings::moduleSize` is metres. The scale factor is
-  art direction and belongs in the manifest, never in the geometry.
-- `TerrainQuery::heightAt` decides where the ground is. Do not write height or slope logic.
+## Next — install it, then look at it
+
+`PlacedCity` is a value nothing consumes yet. The next step is the seam to the engine, and then a
+frame:
+
+1. Turn placements into `scene::ProceduralGeometry` with `distribution.scatterCloud` set, the way
+   `Composition::rebuild` already does for scatter layers (`src/scene/composition.cpp`, the block
+   around the `subs` loop). Follow `app::installWorld` / `app::GeneratedWorld` for the install shape
+   so the editor, `--generate` and `world.generate` all reach it without three code paths.
+2. **Render it and look at the frame before adding anything.** A street that tiles is the thing to
+   see working; buildings, props and trees are dressing on top of it. `render.probe` will say the
+   camera sees something; only a frame says the tiles meet.
+3. Then buildings: the plot cells are already planned and already reported as `undressed`, so the
+   work is choosing a building per plot and tagging pieces in the manifest.
 
 ## Not started
 
 The road graph (§2 of this brief) and interiors (§3). Neither has been designed beyond what is
 written above; both are still exactly as the brief describes them.
+
+One thing §2 gets for free when it starts: the plan already distinguishes `Road`, `Junction`,
+`Crossing` and `Pavement`, and `CityPlan::isCarriageway` exists. A lane graph is derivable from the
+lattice rather than authored a second time, which is what the brief asks for.

@@ -3,6 +3,10 @@
 // exhaustively here, with no library, no device and no mesh.
 
 #include "world/city.hpp"
+#include <cmath>
+#include <filesystem>
+#include <algorithm>
+#include "assets/asset_library.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -301,4 +305,198 @@ TEST_CASE("Settings that cannot make a city are refused by name", "[world][city]
     world::CitySettings badFraction;
     badFraction.plazaFraction = 2.0f;
     CHECK(refused(badFraction).find("plazaFraction") != std::string::npos);
+}
+
+// ---- placing (ADR-100, second half) -------------------------------------------------------------
+
+namespace {
+
+std::filesystem::path cityPiecesManifest() {
+    return std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "city-pieces.manifest.json";
+}
+
+} // namespace
+
+TEST_CASE("The placer dresses every cell the library has a piece for", "[world][city][place]") {
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    INFO((library ? std::string{} : library.error().message));
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+    CHECK_FALSE(roles.road.empty());
+    CHECK_FALSE(roles.junction.empty());
+
+    world::CitySettings s;
+    s.blocksX = 2;
+    s.blocksZ = 2;
+    s.blockCells = 3;
+    s.plazaFraction = 0.0f;
+    const world::CityPlan plan = planOrFail(s);
+
+    auto placed = world::placeCity(plan, roles, *library);
+    INFO((placed ? std::string{} : placed.error().message));
+    REQUIRE(placed.has_value());
+    CHECK(placed->instanceCount() > 0);
+
+    // One instance per dressable cell, no more and no fewer. A tile placed twice is z-fighting and a
+    // tile missed is a hole in the road, and both read as "the city looks a bit wrong".
+    const std::size_t dressable =
+        plan.countOf(world::CellKind::Road) + plan.countOf(world::CellKind::Junction) +
+        plan.countOf(world::CellKind::Crossing) + plan.countOf(world::CellKind::Pavement);
+    CHECK(placed->instanceCount() == dressable);
+
+    // Buildings have no piece in this manifest yet, so the plots are reported as undressed rather
+    // than quietly skipped -- a city missing its buildings still renders, as an empty grid.
+    CHECK(std::ranges::find(placed->undressed, std::string("plot")) != placed->undressed.end());
+}
+
+TEST_CASE("A placed tile is one module across and square to the lattice", "[world][city][place]") {
+    // The two properties that make tiles *meet*. A piece scaled by its height instead of its
+    // footprint leaves a seam; a piece given a few degrees of yaw "for variation" no longer adjoins
+    // the one beside it, which is the most visible way a tiled city goes wrong.
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+
+    world::CitySettings s;
+    s.moduleSize = 8.0f;
+    s.blocksX = 1;
+    s.blocksZ = 1;
+    s.blockCells = 3;
+    const world::CityPlan plan = planOrFail(s);
+    auto placed = world::placeCity(plan, roles, *library);
+    REQUIRE(placed.has_value());
+
+    std::set<std::pair<int, int>> occupied;
+    for (const world::CityPlacement& p : placed->placements) {
+        const assets::AssetDescriptor* asset = library->find(p.asset);
+        REQUIRE(asset != nullptr);
+        REQUIRE(p.cloud != nullptr);
+        const auto scales = p.cloud->scales();
+        const auto rotations = p.cloud->rotations();
+        const auto positions = p.cloud->positions();
+        for (std::size_t i = 0; i < p.cloud->count(); ++i) {
+            // The *tile* is one module across -- not the bounding box, which includes decoration
+            // the artist meant to overhang. `road-side` bounds 1.0 x 1.31 because of its kerb, and
+            // an earlier version of the placer scaled by that box and shrank the tile to 6.1 m of
+            // an 8 m cell, leaving a gap beside every one of them.
+            const float tileAfter = s.tileUnits * scales[i].x;
+            INFO(p.asset << " instance " << i << " (bounds " << asset->naturalSize.x << " x "
+                         << asset->naturalSize.z << ")");
+            CHECK_THAT(tileAfter, WithinAbs(s.moduleSize, 1e-3f));
+            // Yaw is a quarter turn and nothing else: the quaternion's x and z stay zero.
+            CHECK_THAT(rotations[i].x, WithinAbs(0.0f, 1e-5f));
+            CHECK_THAT(rotations[i].z, WithinAbs(0.0f, 1e-5f));
+            // Every instance sits on a distinct cell centre.
+            const int cx = static_cast<int>(std::lround(positions[i].x / s.moduleSize));
+            const int cz = static_cast<int>(std::lround(positions[i].z / s.moduleSize));
+            CHECK(occupied.insert({cx, cz}).second);
+        }
+    }
+}
+
+TEST_CASE("The same plan places the same city", "[world][city][place]") {
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+    world::CitySettings s;
+    s.seed = 77;
+    const world::CityPlan plan = planOrFail(s);
+
+    auto a = world::placeCity(plan, roles, *library);
+    auto b = world::placeCity(plan, roles, *library);
+    REQUIRE(a.has_value());
+    REQUIRE(b.has_value());
+    REQUIRE(a->placements.size() == b->placements.size());
+    for (std::size_t i = 0; i < a->placements.size(); ++i) {
+        INFO("placement " << i);
+        CHECK(a->placements[i].asset == b->placements[i].asset);
+        REQUIRE(a->placements[i].cloud->count() == b->placements[i].cloud->count());
+        const auto pa = a->placements[i].cloud->positions();
+        const auto pb = b->placements[i].cloud->positions();
+        for (std::size_t k = 0; k < pa.size(); ++k) {
+            CHECK_THAT(pa[k].x, WithinAbs(pb[k].x, 1e-5f));
+            CHECK_THAT(pa[k].z, WithinAbs(pb[k].z, 1e-5f));
+        }
+    }
+}
+
+TEST_CASE("Which piece a cell gets does not depend on the cells before it", "[world][city][place]") {
+    // Drawn per cell from its own coordinates rather than from one running stream, so growing the
+    // city by a block does not reshuffle the part that was already there. A placer that used a
+    // single stream would repaint the whole city every time a setting changed.
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+
+    world::CitySettings small;
+    small.blocksX = 1;
+    small.blocksZ = 1;
+    small.blockCells = 3;
+    small.seed = 5;
+    world::CitySettings big = small;
+    big.blocksX = 2;
+
+    const auto placedSmall = world::placeCity(planOrFail(small), roles, *library);
+    const auto placedBig = world::placeCity(planOrFail(big), roles, *library);
+    REQUIRE(placedSmall.has_value());
+    REQUIRE(placedBig.has_value());
+
+    // Both cities are centred on the origin, so compare by cell *kind* at matching plan coordinates
+    // instead: the piece chosen for a given coordinate must be the same in both.
+    const world::CityPlan planSmall = planOrFail(small);
+    const world::CityPlan planBig = planOrFail(big);
+    const auto assetAt = [&](const world::PlacedCity& city, const world::CityPlan& plan,
+                             glm::ivec2 c) -> std::string {
+        const glm::vec3 want = plan.centreOf(c);
+        for (const world::CityPlacement& p : city.placements) {
+            const auto positions = p.cloud->positions();
+            for (const glm::vec3& pos : positions) {
+                if (std::abs(pos.x - want.x) < 1e-3f && std::abs(pos.z - want.z) < 1e-3f) {
+                    return p.asset;
+                }
+            }
+        }
+        return {};
+    };
+    int compared = 0;
+    for (int z = 0; z < planSmall.depth; ++z) {
+        for (int x = 0; x < planSmall.width; ++x) {
+            if (planSmall.kindAt({x, z}) != planBig.kindAt({x, z})) {
+                continue; // the bigger plan is a different shape here; nothing to compare
+            }
+            const std::string sa = assetAt(*placedSmall, planSmall, {x, z});
+            const std::string ba = assetAt(*placedBig, planBig, {x, z});
+            if (sa.empty() || ba.empty()) {
+                continue;
+            }
+            INFO("cell " << x << "," << z);
+            CHECK(sa == ba);
+            ++compared;
+        }
+    }
+    CHECK(compared > 0);
+}
+
+TEST_CASE("A library with nothing in it is refused rather than placing nothing", "[world][city][place]") {
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    if (!library) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    const world::CityPlan plan = planOrFail(world::CitySettings{});
+    const world::CityLibrary empty;
+    const auto r = world::placeCity(plan, empty, *library);
+    REQUIRE_FALSE(r.has_value());
+    CHECK(r.error().message.find("tagged") != std::string::npos);
 }
