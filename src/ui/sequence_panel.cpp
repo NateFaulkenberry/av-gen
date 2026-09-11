@@ -120,6 +120,59 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
         touch();
     }
     ImGui::SameLine();
+    if (ImGui::Button("Add Actor")) {
+        ImGui::OpenPopup("add-actor");
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Take over a node in the scene: its transform becomes keyframes and, if it\n"
+                          "carries a rig, its animation states become cues.");
+    }
+    if (ImGui::BeginPopup("add-actor")) {
+        // Every node the scene has, so the one thing an actor needs -- a node that exists -- cannot
+        // be got wrong by typing.
+        scene::Composition* composition = engine.composition();
+        if (composition == nullptr) {
+            ImGui::TextDisabled("The current scene is not a composition.");
+        } else {
+            ImGui::TextUnformatted("Drive which node?");
+            for (const auto& nodePtr : composition->nodes()) {
+                const scene::CompositionNode* n = nodePtr.get();
+                if (n == nullptr) {
+                    continue;
+                }
+                const bool taken = std::any_of(piece.actors.begin(), piece.actors.end(),
+                                               [&](const seq::Actor& a) { return a.nodeName() == n->name; });
+                ImGui::BeginDisabled(taken);
+                const std::string label =
+                    n->rigs.empty() ? n->name : fmt::format("{}  (rig)", n->name);
+                if (ImGui::Selectable(label.c_str())) {
+                    seq::Actor actor;
+                    actor.id = n->name;
+                    actor.node = n->name;
+                    // One key where the node already stands, so the actor starts by changing
+                    // nothing -- an actor that teleported its node to the origin on creation would
+                    // be a feature nobody used twice.
+                    actor.keys.push_back(seq::ActorKey{.timeSeconds = 0.0,
+                                                       .position = n->transform.position});
+                    if (!n->rigs.empty() && n->rigs.front() < engine.scene().rigs.size()) {
+                        const auto& states = engine.scene().rigs[n->rigs.front()].player.states();
+                        if (!states.empty()) {
+                            actor.clips.push_back(seq::ClipCue{.timeSeconds = 0.0,
+                                                               .clip = states.front().name});
+                        }
+                    }
+                    piece.actors.push_back(std::move(actor));
+                    selection_ = Selection::Actor;
+                    selected_ = static_cast<int>(piece.actors.size()) - 1;
+                    touch();
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndDisabled();
+            }
+        }
+        ImGui::EndPopup();
+    }
+    ImGui::SameLine();
     if (ImGui::Button("Add Border")) {
         seq::OverlayCue cue;
         cue.id = "border";
@@ -788,6 +841,7 @@ void SequencePanel::drawShotInspector(app::Engine& engine, seq::Shot& shot) {
 }
 
 void SequencePanel::drawActorInspector(app::Engine& engine, seq::Actor& actor) {
+    seq::Sequence& piece = engine.sequence();
     ImGui::SeparatorText("Actor");
     char node[96];
     std::strncpy(node, actor.node.c_str(), sizeof(node) - 1);
@@ -902,6 +956,14 @@ void SequencePanel::drawActorInspector(app::Engine& engine, seq::Actor& actor) {
         }
         ImGui::PopID();
     }
+    if (ImGui::Button("Delete actor")) {
+        piece.actors.erase(piece.actors.begin() + selected_);
+        selection_ = Selection::None;
+        selected_ = -1;
+        touch();
+        return;
+    }
+    ImGui::SameLine();
     if (ImGui::Button("Cue here")) {
         seq::ClipCue cue;
         cue.timeSeconds = snap(engine, engine.timelineClock().seconds);

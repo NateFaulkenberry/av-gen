@@ -63,6 +63,23 @@ def track(target, keys, interp="smooth", component=-1):
                       "interp": interp} for t, v in keys]}
 
 
+def sky_track(target, keys):
+    """A sky parameter, keyed with Step on purpose.
+
+    `SkyRuntime::hash()` covers the zenith and horizon colours, the sun's colour, intensity, size
+    and direction, and the sky's own intensity -- and a changed hash rebuilds the whole procedural
+    sky: a 256-pixel cube with nine mips, a 32-pixel irradiance probe and a six-mip prefiltered
+    radiance chain. That is 93-146 ms of CPU. Animated smoothly, it happens on *every frame*, and
+    at 1280x720 this piece rendered at 8.6 fps with the sky rebuild as its single largest cost.
+
+    Stepped at the section boundaries it happens five times in a hundred and five seconds. The
+    dusk then arrives at a cut, which is where a cutter would have put it anyway, and everything
+    that should move continuously -- the key light, the fog, the ambient, the practicals -- still
+    does, because none of those are in the sky's hash.
+    """
+    return track(target, keys, interp="step")
+
+
 # ---- the character's walk ----------------------------------------------------------------------
 # Plaza: the street runs along X at z = 0 and the character walks the south lane at z = -3.4.
 # Downtown: the avenue is at z = -40 and the fountain is at the origin of that district.
@@ -133,8 +150,10 @@ def lyric_cues():
     of the committed .lrc produce the same timings."""
     cues = []
     for i, (start, text) in enumerate(LYRICS):
-        nxt = LYRICS[i + 1][0] if i + 1 < len(LYRICS) else start + LYRIC_HOLD
-        end = max(nxt - LYRIC_GAP, start + 0.4)
+        # The last line holds for LYRIC_HOLD exactly; every other runs up to the next one less the
+        # gap that keeps two lyrics off the same frame.
+        end = max(LYRICS[i + 1][0] - LYRIC_GAP if i + 1 < len(LYRICS) else start + LYRIC_HOLD,
+                  start + 0.4)
         cues.append({
             "id": f"lyric{i + 1:03d}",
             "kind": "text",
@@ -266,11 +285,17 @@ def look_tracks():
     """
     return [
         # The sun goes down through the first reveal and is gone by the time we reach downtown.
-        track("env/sky/sunIntensity", [(0.0, 9.0), (CHORUS, 6.0), (VERSE2, 1.1), (CHORUS2, 0.25)]),
-        track("env/sky/zenithColor", [(0.0, [0.055, 0.080, 0.170]), (VERSE2, [0.022, 0.030, 0.070]),
-                                      (CHORUS2, [0.010, 0.014, 0.036])]),
-        track("env/sky/horizonColor", [(0.0, [0.42, 0.26, 0.22]), (VERSE2, [0.16, 0.12, 0.17]),
-                                       (CHORUS2, [0.055, 0.050, 0.090])]),
+        sky_track("env/sky/sunIntensity",
+                  [(0.0, 4.0), (VERSE, 3.2), (CHORUS, 2.2), (VERSE2, 0.7), (BREAK, 0.35),
+                   (CHORUS2, 0.15), (OUTRO, 0.10)]),
+        sky_track("env/sky/zenithColor",
+                  [(0.0, [0.055, 0.080, 0.170]), (VERSE, [0.045, 0.064, 0.140]),
+                   (CHORUS, [0.034, 0.048, 0.108]), (VERSE2, [0.022, 0.030, 0.070]),
+                   (CHORUS2, [0.010, 0.014, 0.036])]),
+        sky_track("env/sky/horizonColor",
+                  [(0.0, [0.42, 0.26, 0.22]), (VERSE, [0.36, 0.22, 0.21]),
+                   (CHORUS, [0.27, 0.18, 0.20]), (VERSE2, [0.16, 0.12, 0.17]),
+                   (CHORUS2, [0.055, 0.050, 0.090])]),
         track("env/intensity", [(0.0, 0.55), (VERSE2, 0.24), (CHORUS2, 0.13)]),
         track("scene/keyLight", [(0.0, 1.0), (VERSE2, 0.42), (CHORUS2, 0.16)]),
         # Fog cools and thickens: the far towers should read as far even after the sun has gone.
@@ -280,7 +305,8 @@ def look_tracks():
         track("scene/styledSkyAmbient", [(0.0, [0.013, 0.019, 0.040]), (VERSE2, [0.007, 0.010, 0.024]),
                                          (CHORUS2, [0.005, 0.007, 0.018])]),
         track("scene/styledGroundAmbient", [(0.0, [0.006, 0.0055, 0.005]), (CHORUS2, [0.003, 0.0027, 0.0025])]),
-        track("env/sky/intensity", [(0.0, 0.22), (VERSE2, 0.13), (CHORUS2, 0.08)]),
+        sky_track("env/sky/intensity",
+                  [(0.0, 0.22), (VERSE, 0.19), (CHORUS, 0.16), (VERSE2, 0.13), (CHORUS2, 0.08)]),
         # The practicals come up as the light goes down. One track for the whole plaza's windows
         # would be nicer still; this is the two nodes that carry the most of them.
         track("nodes/plaza/nodes/north-win0/emissiveBoost", [(0.0, 0.35), (CHORUS, 0.8), (VERSE2, 1.25)]),
@@ -339,7 +365,9 @@ def routes():
               attackMs=18.0, decayMs=300.0),
         # Energy, on the sky's own brightness: the section changes are already keyed, so this only
         # has to carry the difference between a loud bar and a quiet one.
-        route("audio.rms", "env/sky/intensity", 0.22, attackMs=300.0, decayMs=900.0),
+        # Deliberately NOT env/sky/*: a route writing a sky parameter rebuilds the procedural sky
+        # every frame (see sky_track). scene/keyLight is the same idea and costs nothing.
+        route("audio.rms", "scene/keyLight", 0.18, attackMs=300.0, decayMs=900.0),
         # The drop, on the bloom. One accent, once, where the arrangement asks for it.
         route("music.drop", "post/bloom/intensity", 0.18,
               envelope="peakhold", envelopeHoldMs=400.0, envelopeFallPerSecond=0.6),

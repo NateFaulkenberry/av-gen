@@ -183,5 +183,7 @@ pulling the parameter bases back into the authored fields before every save.
   overlay runs. Replacing it with a video, a still or a nested composition needs nothing here.
 * **HDR / bloom for layers.** Add a second `FrameOverlay` call before the post chain and an
   emissive route per layer. The hook is shaped for it; v1 does not have it.
-* **Timed text import.** A phrase with a start and an end is already the unit of the model, which
-  is what LRC / SRT / WebVTT / CSV want. Not written.
+* **Timed text import.** Written, in the sequencer rather than here: a phrase with a start and an
+  end is already the unit of the model, and `seq::loadLyrics` (ADR-089, `src/seq/lyrics.hpp`) reads
+  LRC, SRT and WebVTT into `seq::OverlayCue`s that become these layers. The format is decided by
+  what is in the file rather than by its extension. See [docs/sequencer.md](sequencer.md).

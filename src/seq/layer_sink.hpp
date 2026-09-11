@@ -63,12 +63,9 @@ public:
     // Removes every `seq:` layer in the stack and records the parameter paths they owned.
     void clear() override;
 
-    // Parameter paths that belonged to layers this sink removed. The installer erases the timeline
-    // tracks naming them; without that, a re-bake leaves tracks bound to nothing behind.
-    [[nodiscard]] const std::vector<std::string>& retiredPaths() const { return retired_; }
-    // Cues the sink could not realise, with the reason. Not errors: an image cue in a project
-    // opened by a build with no image layer kind is a thing to say out loud, not to refuse.
-    [[nodiscard]] const std::vector<std::string>& warnings() const { return warnings_; }
+    [[nodiscard]] std::span<const std::string> retiredPaths() const override { return retired_; }
+    [[nodiscard]] std::span<const std::string> sinkWarnings() const override { return warnings_; }
+    [[nodiscard]] int realisedCount() const override { return static_cast<int>(created_.size()); }
     // Layer ids this sink created, in creation order.
     [[nodiscard]] const std::vector<std::uint32_t>& created() const { return created_; }
 

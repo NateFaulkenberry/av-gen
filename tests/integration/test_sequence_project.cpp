@@ -7,6 +7,7 @@
 // by. Every check here goes through `app::Engine::update`, not through the model, so it is testing
 // the path a render actually takes.
 
+#include "app/camera_director.hpp"
 #include "app/engine.hpp"
 #include "core/time.hpp"
 #include "scene/composition.hpp"
@@ -372,4 +373,40 @@ TEST_CASE("editing a sequence and re-installing does not accumulate tracks or la
     CHECK(engine.layers().empty());
     CHECK(engine.sequenceTargets().empty());
     CHECK_FALSE(engine.hasSequence());
+}
+
+// Hidden (`[.]`): it needs `assets/audio/night-shift.wav`, which is generated rather than committed
+// (`python3 tools/make_city_score.py assets/audio/night-shift.wav`). Run it with
+// `avgen_tests "[poc]"` after regenerating the score.
+//
+// What it pins is that the proof-of-concept's *song* is analysable: the sequencer's "Sections"
+// button folds a track into labelled sections, and a score with no energy contrast folds into one
+// section and gives an author nothing to cut to. The score was written to be sequenced, and this is
+// where that claim is checked rather than asserted.
+TEST_CASE("the proof-of-concept score folds into sections the editor can cut to", "[.][poc]") {
+    const fs::path wav = fs::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "night-shift.wav";
+    if (!fs::exists(wav)) {
+        WARN("assets/audio/night-shift.wav is absent; run tools/make_city_score.py");
+        return;
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadAudio(wav).has_value());
+    REQUIRE(engine.track() != nullptr);
+    CHECK(engine.durationSeconds() == Approx(105.0).margin(0.1));
+
+    const auto& beats = engine.track()->beats();
+    WARN(fmt::format("tempo {:.1f} bpm (confidence {:.2f}), {} beat(s)", beats.tempoBpm,
+                     beats.confidence, beats.beatTimes.size()));
+    // 96 BPM over 105 s is 168 beats; the tracker may find the half- or double-time grid, which is
+    // still a grid an author can snap to.
+    CHECK(beats.beatTimes.size() > 60);
+
+    auto structure = app::structureOfTrack(*engine.track(), engine.phraseBars(), engine.sectionPhrases());
+    REQUIRE(structure.has_value());
+    for (const signals::StructureSection& s : structure->sections) {
+        WARN(fmt::format("{:7.2f}s {:7.2f}s  {:<12} intensity {:.2f}", s.startSeconds,
+                         s.durationSeconds, signals::musicalSectionName(s.kind), s.intensity));
+    }
+    // More than one section, or the fold has told the author nothing.
+    CHECK(structure->sections.size() >= 3);
 }

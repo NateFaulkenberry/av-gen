@@ -230,6 +230,21 @@ engines, one played forward and one seeked in an order no playback would produce
 
 ---
 
+## One performance trap worth knowing
+
+**Do not animate a procedural sky's own parameters smoothly.** `SkyRuntime::hash()` covers the
+zenith and horizon colours, the sun's colour, intensity, size and direction, and the sky's own
+intensity; a changed hash rebuilds a 256-pixel cube with nine mips, a 32-pixel irradiance probe and
+a six-mip prefiltered radiance chain, which is 93-146 ms of CPU. A smooth `env/sky/*` track rebuilds
+it *every frame*, and a modulation route pointed at one does the same however the track is keyed.
+
+Key those parameters with `Step` at the section boundaries instead. The dusk then arrives at a cut,
+which is where a cutter would have put it anyway, and everything that should move continuously --
+`scene/keyLight`, `scene/fogColor`, `scene/fogDensity`, `scene/styledSkyAmbient`, the practicals'
+`emissiveBoost` -- still does, because none of those are in the sky's hash. On the Night Shift project this is the
+difference between 8.7 and 63.3 frames per second over the whole piece at 1280x720 (364.0 s to
+49.7 s for 3,150 frames), and 8 sky rebuilds instead of 3,150.
+
 ## Known limitations
 
 - No crossfade between two 3D scenes; a dip to black is what exists.

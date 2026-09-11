@@ -2,8 +2,6 @@
 
 #include "core/log.hpp"
 #include "scene/composition.hpp"
-#include "seq/layer_sink.hpp"
-
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -33,10 +31,8 @@ Result<InstallReport> install(const Sequence& sequence, params::Timeline& timeli
     //    creates the new ones and a cue removed from the sequence has to take its layer with it.
     sink.clear();
     std::unordered_set<std::string> doomed(owned.begin(), owned.end());
-    if (const auto* comp = dynamic_cast<const CompositionLayerSink*>(&sink); comp != nullptr) {
-        for (const std::string& path : comp->retiredPaths()) {
-            doomed.insert(path);
-        }
+    for (const std::string& path : sink.retiredPaths()) {
+        doomed.insert(path);
     }
 
     // 2. Bake. Pure, and the only thing that can fail on the content of the sequence itself.
@@ -54,11 +50,9 @@ Result<InstallReport> install(const Sequence& sequence, params::Timeline& timeli
     report.targets = baked->targets;
     report.trackCount = baked->trackCount;
     report.keyCount = baked->keyCount;
-    if (const auto* comp = dynamic_cast<const CompositionLayerSink*>(&sink); comp != nullptr) {
-        report.layersRealised = static_cast<int>(comp->created().size());
-        for (const std::string& w : comp->warnings()) {
-            report.warnings.push_back(w);
-        }
+    report.layersRealised = sink.realisedCount();
+    for (const std::string& w : sink.sinkWarnings()) {
+        report.warnings.push_back(w);
     }
 
     // 3. Out with the old. A target the new bake also writes is in both sets; erasing first and
@@ -108,10 +102,8 @@ void uninstall(params::Timeline& timeline, params::ParameterSet& params, LayerSi
                std::span<const std::string> owned) {
     sink.clear();
     std::unordered_set<std::string> doomed(owned.begin(), owned.end());
-    if (const auto* comp = dynamic_cast<const CompositionLayerSink*>(&sink); comp != nullptr) {
-        for (const std::string& path : comp->retiredPaths()) {
-            doomed.insert(path);
-        }
+    for (const std::string& path : sink.retiredPaths()) {
+        doomed.insert(path);
     }
     (void)eraseTracks(timeline, doomed);
     (void)timeline.bind(params);

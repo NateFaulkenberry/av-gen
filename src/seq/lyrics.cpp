@@ -127,9 +127,12 @@ void closeEnds(std::vector<LyricLine>& lines, double defaultHold, double gap, do
         if (line.endSeconds > line.startSeconds + minimum) {
             continue;
         }
-        const double next = i + 1 < lines.size() ? lines[i + 1].startSeconds
-                                                 : line.startSeconds + defaultHold;
-        line.endSeconds = std::max(next - gap, line.startSeconds + minimum);
+        // A line runs up to the next one, less the gap that keeps two lyrics off the same frame.
+        // The last line has nothing to make room for, so it holds for exactly `defaultHold`:
+        // subtracting a gap there would be making space beside a line that does not exist.
+        const double end = i + 1 < lines.size() ? lines[i + 1].startSeconds - gap
+                                                : line.startSeconds + defaultHold;
+        line.endSeconds = std::max(end, line.startSeconds + minimum);
     }
 }
 

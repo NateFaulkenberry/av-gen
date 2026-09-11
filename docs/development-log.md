@@ -1269,3 +1269,97 @@ time somebody moved a hill.
 - Sockets resolve against the entity's own frame until something implements `ISkeletonQuery`.
 - A behaviour profile is take-it-or-extend-it. There is no override-by-name, because an override
   that could not survive a save would be worse than not having one.
+
+## 2026-09-11 — The cinematic sequence: choreography through time (ADR-089)
+
+The engine could render a world, analyse a song, animate a camera, pose a character, draw type over
+the frame and export a video. It could not say **when**. Every one of those systems had its own idea
+of time and there was no object that could be handed a second and answer *what does the piece look
+like now*.
+
+There was also, in the working tree, an uncommitted `src/seq/` from an earlier attempt: 2,615 lines,
+in no build file, referenced by nothing. Its design was right — a sequence *bakes* into ordinary
+timeline tracks — and two of its seams described a repository that no longer existed. `seq/rig.*`
+built a stand-in articulated character out of composition nodes on the stated grounds that "there is
+no skeletal animation in av-gen"; there is (ADR-086). `seq/layers.hpp` described the composition
+system as "being built separately"; it landed as ADR-083. The first was deleted, the second was
+connected, and the rest was kept.
+
+### What a sequence is
+
+Shots, scene slots, actors, overlay cues, markers and piece-level tracks — a value. `bake()` is a
+pure function from that value to the JSON `params::Timeline::fromJson` reads. After the bake there
+is no sequencer left to run, which is what buys determinism, scrubbing and cost at once.
+
+The one thing that is not baked is which animation clip an actor is in. A track carries numbers; a
+clip's phase needs a *time origin*. So `animationAt(t)` returns the active cue per actor and
+`applyAnimation` pushes it — the clip and the cue's own absolute second — into the composition every
+frame.
+
+### Found by writing the tests
+
+- **A cut was eating a shot.** Two shots meet at one second, and `Track::addKey` replaces a key
+  within a microsecond of an existing one — so the outgoing shot's final camera pose and the
+  incoming shot's opening pose became *one* key, and the first shot spent its whole twenty seconds
+  gliding toward the second shot's opening frame. The last key of a shot that is cut away from now
+  lands a millisecond early.
+- **A saved project held both the sequence and the tracks baked from it**, so a load read them *and*
+  re-baked them. Two tracks writing `camera/position` is not a blend; it is whichever one the
+  timeline applies second. Derived tracks, derived layers and their parameter values are no longer
+  written.
+- **A scene swap left every baked track correct and bound to nothing** — ADR-075's failure again,
+  found by a test that swaps the scene and then asks whether the cut still happens.
+- `OverlayCue::fromJson` read `presetSeconds` through a `float`, so `0.45` came back as
+  `0.44999998807907104` and a project re-saved immediately after loading differed from itself.
+
+### Found by writing the proof-of-concept
+
+- **Animating a procedural sky's own parameters rebuilds it every frame.** `SkyRuntime::hash()`
+  covers the zenith and horizon colours, the sun's colour, intensity, size and direction, and the
+  sky's own intensity; a changed hash rebuilds a 256-pixel cube with nine mips, a 32-pixel
+  irradiance probe and a six-mip prefiltered chain — 93 to 146 ms of CPU, per frame. Keying those
+  four parameters with `Step` at the section boundaries instead took the same six hundred frames
+  from **66.5 s to 30.7 s** (minimum of two interleaved runs each, 1280×720), and the whole
+  hundred-and-five-second piece from **364.0 s to 49.7 s** — 8.7 fps to 63.3, with 8 sky rebuilds
+  instead of 3,150. The dusk now arrives at a cut, which is where a cutter would have put it anyway,
+  and everything that should move continuously still does: none of the key light, the fog, the
+  ambient or the practicals is in the sky's hash.
+- **A wide scene of small objects gets almost no cast shadows.** 220 nodes over 260 metres reports
+  `draws=95 shadowDraws=2`. Not the rig, not the sun's elevation, not instancing — a `single`-
+  distribution probe box in the middle of frame is culled too. `shadowFar` is `sceneRadius * 3`, so
+  a large ground plane pushes the cascade splits past the geometry. Recorded in
+  `docs/renderer-2-backlog.md` rather than fixed: it is renderer work.
+- **Two districts must share the same ground.** Putting them side by side tripled the scene radius
+  for no gain — they are never both visible.
+
+### Numbers
+
+- **Determinism.** The same project rendered twice produces the same sequence hash:
+  `1a31c825fdc049aa` twice before the sky change, `32dbb3a940c95aa2` twice after. The integration
+  test makes the stronger claim — two engines, one played forward and one seeked in an order no
+  playback would produce, agree on every parameter the sequence writes and on the composition frame.
+- **The sequencer's own cost**, minimum of many runs, `avgen_tests "[seqcost]"`:
+  bake 213 µs, install (bake + sixteen layers realised + bind) 433 µs, `animationAt` **26 ns per
+  frame**, and the 25 tracks a five-shot piece bakes evaluate in **0.45 µs per frame** above the
+  `resetFinals` every frame pays anyway.
+- **The proof-of-concept**: 48 tracks, 230 keys, 18 layers, 0 unresolved targets; 9,279 parameters;
+  227 composition nodes; ~430,000 triangles. 105 seconds at 1280×720 ProRes 422 with the audio
+  muxed renders in **49.7 s** (63.3 fps), sequence hash `059c6e621acdbfe6`.
+- **The score analyses.** `tools/make_city_score.py` was written to be sequenced rather than merely
+  heard, and the engine agrees: 96.0 BPM at 0.92 confidence over 165 beats (the true count is 168),
+  and the musical fold puts section boundaries at 23.55, 40.00, 46.12, 56.12, 66.07, **80.00**,
+  86.15 and 96.14 seconds — 40.00 and 80.00 being exactly the two chorus starts the arrangement
+  was blocked out to. Pinned by `avgen_tests "[poc]"`, which is hidden because the score is
+  generated rather than committed.
+
+### Known limitations
+
+- Entity behaviours (ADR-088) integrate `dt` and are not scrub-deterministic. A sequence's actors are
+  the deterministic alternative and the piece uses them; `EntityWorld::reset()` exists and nothing
+  calls it, and even if something did it would return entities to *t = 0* rather than to the seeked
+  time.
+- No crossfade between two 3D scenes; a dip to black is what exists, and it is two keys on
+  `scene/brightness` rather than a renderer change.
+- `lookAtWeight` is per shot, not animated, so a shot whose subject *changes* has to author its
+  targets. The proof-of-concept's reveal does exactly that.
+- Every scene slot is resident.

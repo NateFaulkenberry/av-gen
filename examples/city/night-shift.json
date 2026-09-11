@@ -206,9 +206,9 @@
   },
   {
    "source": "audio.rms",
-   "target": "env/sky/intensity",
+   "target": "scene/keyLight",
    "component": -1,
-   "amount": 0.22,
+   "amount": 0.18,
    "op": "add",
    "polarity": "unipolar",
    "enabled": true,
@@ -1169,7 +1169,7 @@
     "content": "A DIFFERENT LINE",
     "style": "lyric",
     "start": 92.5,
-    "end": 95.15,
+    "end": 95.5,
     "order": 10,
     "anchor": [
      0.5,
@@ -1306,30 +1306,51 @@
      {
       "time": 0.0,
       "value": [
-       9.0
+       4.0
       ],
-      "interp": "smooth"
+      "interp": "step"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       3.2
+      ],
+      "interp": "step"
      },
      {
       "time": 40.0,
       "value": [
-       6.0
+       2.2
       ],
-      "interp": "smooth"
+      "interp": "step"
      },
      {
       "time": 60.0,
       "value": [
-       1.1
+       0.7
       ],
-      "interp": "smooth"
+      "interp": "step"
+     },
+     {
+      "time": 75.0,
+      "value": [
+       0.35
+      ],
+      "interp": "step"
      },
      {
       "time": 80.0,
       "value": [
-       0.25
+       0.15
       ],
-      "interp": "smooth"
+      "interp": "step"
+     },
+     {
+      "time": 100.0,
+      "value": [
+       0.1
+      ],
+      "interp": "step"
      }
     ]
    },
@@ -1348,7 +1369,25 @@
        0.08,
        0.17
       ],
-      "interp": "smooth"
+      "interp": "step"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.045,
+       0.064,
+       0.14
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.034,
+       0.048,
+       0.108
+      ],
+      "interp": "step"
      },
      {
       "time": 60.0,
@@ -1357,7 +1396,7 @@
        0.03,
        0.07
       ],
-      "interp": "smooth"
+      "interp": "step"
      },
      {
       "time": 80.0,
@@ -1366,7 +1405,7 @@
        0.014,
        0.036
       ],
-      "interp": "smooth"
+      "interp": "step"
      }
     ]
    },
@@ -1385,7 +1424,25 @@
        0.26,
        0.22
       ],
-      "interp": "smooth"
+      "interp": "step"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.36,
+       0.22,
+       0.21
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.27,
+       0.18,
+       0.2
+      ],
+      "interp": "step"
      },
      {
       "time": 60.0,
@@ -1394,7 +1451,7 @@
        0.12,
        0.17
       ],
-      "interp": "smooth"
+      "interp": "step"
      },
      {
       "time": 80.0,
@@ -1403,7 +1460,7 @@
        0.05,
        0.09
       ],
-      "interp": "smooth"
+      "interp": "step"
      }
     ]
    },
@@ -1615,21 +1672,35 @@
       "value": [
        0.22
       ],
-      "interp": "smooth"
+      "interp": "step"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       0.19
+      ],
+      "interp": "step"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       0.16
+      ],
+      "interp": "step"
      },
      {
       "time": 60.0,
       "value": [
        0.13
       ],
-      "interp": "smooth"
+      "interp": "step"
      },
      {
       "time": 80.0,
       "value": [
        0.08
       ],
-      "interp": "smooth"
+      "interp": "step"
      }
     ]
    },

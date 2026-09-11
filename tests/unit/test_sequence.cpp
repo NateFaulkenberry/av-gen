@@ -27,6 +27,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -696,4 +697,117 @@ TEST_CASE("camera presets fill a shot with a move a subject's size makes sense o
         REQUIRE(parsed.has_value());
         CHECK(*parsed == preset);
     }
+}
+
+// ---- cost (spec 58) ---------------------------------------------------------------------------
+
+// Hidden by default (`[.]`): it measures rather than checks, and a timing assertion in the ordinary
+// suite is a test that fails on a busy machine. Run it with `avgen_tests "[seqcost]"`.
+//
+// The claim under measurement is the one the whole design rests on: **nothing in seq/ runs per
+// frame**. A bake is a moment, and what a sequence costs while it plays is what its tracks cost.
+TEST_CASE("what a sequence costs", "[.][seqcost]") {
+    // A piece the size of the proof-of-concept: five shots, one actor, eighteen overlay cues,
+    // twenty-one piece-level tracks.
+    seq::Sequence piece;
+    piece.name = "cost";
+    piece.scenes.push_back(seq::SceneSlot{.id = "a", .node = "city-day"});
+    piece.scenes.push_back(seq::SceneSlot{.id = "b", .node = "city-night"});
+    for (int i = 0; i < 5; ++i) {
+        seq::Shot shot = keyedShot(fmt::format("shot{}", i), i * 21.0, 21.0,
+                                   glm::vec3(0.0f, 12.0f, 30.0f), glm::vec3(0.0f, 6.0f, 14.0f));
+        shot.scene = i % 2 == 0 ? "a" : "b";
+        shot.camera.kind = seq::CameraKind::Move;
+        shot.camera.samples = 28;
+        shot.camera.lookAtActor = "hero";
+        piece.shots.push_back(std::move(shot));
+    }
+    seq::Actor hero;
+    hero.id = "hero";
+    hero.node = "walker";
+    for (int i = 0; i < 11; ++i) {
+        hero.keys.push_back(seq::ActorKey{.timeSeconds = i * 10.5,
+                                          .position = glm::vec3(static_cast<float>(i) * 6.0f, 0.0f, 0.0f)});
+    }
+    for (int i = 0; i < 5; ++i) {
+        hero.clips.push_back(seq::ClipCue{.timeSeconds = i * 21.0,
+                                          .clip = i % 2 == 0 ? "Walk" : "Idle"});
+    }
+    piece.actors.push_back(std::move(hero));
+    for (int i = 0; i < 16; ++i) {
+        piece.overlays.push_back(lyric(fmt::format("l{:03}", i), "A LINE OF WORDS", 4.0 + i * 6.0,
+                                       7.5 + i * 6.0, seq::OverlayPreset::FadeInOut, 10));
+    }
+    for (int i = 0; i < 21; ++i) {
+        params::Track t;
+        t.target = "scene/fogDensity";
+        for (int k = 0; k < 6; ++k) {
+            t.addKey(params::Key{.time = k * 20.0, .value = {0.002f, 0.0f, 0.0f, 0.0f}});
+        }
+        piece.tracks.push_back(std::move(t));
+    }
+    REQUIRE(piece.validate().has_value());
+
+    const auto measure = [](const char* what, int runs, auto&& body) {
+        // Minimum, not median: under contention the minimum is the only statistic that means
+        // anything about the code rather than about the machine.
+        double best = 1e30;
+        for (int i = 0; i < runs; ++i) {
+            const auto t0 = std::chrono::steady_clock::now();
+            body();
+            const auto t1 = std::chrono::steady_clock::now();
+            best = std::min(best, std::chrono::duration<double, std::micro>(t1 - t0).count());
+        }
+        WARN(fmt::format("{}: {:.1f} us (min of {})", what, best, runs));
+        return best;
+    };
+
+    comp::LayerStack stack;
+    params::ParameterSet params;
+    stack.attach(params);
+    registerSceneParameters(params);
+    params::Timeline timeline;
+    std::vector<std::string> owned;
+
+    int trackCount = 0;
+    int keyCount = 0;
+    measure("bake (18 cues, no layers)", 20, [&] {
+        seq::NullLayerSink sink;
+        const auto baked = piece.bake(sink);
+        trackCount = baked->trackCount;
+        keyCount = baked->keyCount;
+    });
+    WARN(fmt::format("bake produced {} track(s), {} key(s)", trackCount, keyCount));
+
+    measure("install (bake + realise + bind)", 10, [&] {
+        seq::CompositionLayerSink sink(stack, &params);
+        auto report = seq::install(piece, timeline, params, sink, owned);
+        owned = report->targets;
+    });
+
+    // The only thing that runs per frame.
+    measure("animationAt x 1000", 5, [&] {
+        for (int i = 0; i < 1000; ++i) {
+            const auto cues = piece.animationAt(static_cast<double>(i) * 0.105);
+            (void)cues;
+        }
+    });
+
+    // And what the tracks it produced cost to evaluate, which is the real per-frame number.
+    // Measured apart from resetFinals, which every frame pays whether or not a sequence exists.
+    (void)timeline.bind(params);
+    const double resetOnly = measure("resetFinals x 1000 (baseline)", 5, [&] {
+        for (int i = 0; i < 1000; ++i) {
+            params.resetFinals();
+        }
+    });
+    const double both = measure("resetFinals + timeline.apply x 1000", 5, [&] {
+        for (int i = 0; i < 1000; ++i) {
+            params.resetFinals();
+            timeline.apply(params::TimelineClock{.seconds = static_cast<double>(i) * 0.105});
+        }
+    });
+    WARN(fmt::format("the sequence's {} baked track(s) evaluate in {:.3f} us per frame",
+                     timeline.tracks().size(), (both - resetOnly) / 1000.0));
+    CHECK(trackCount > 0);
 }

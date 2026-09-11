@@ -42,6 +42,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -122,6 +123,16 @@ public:
 
     // Forget every layer this sink made. Called before a re-bake so a removed cue's layer goes.
     virtual void clear() = 0;
+
+    // Parameter paths that belonged to layers `clear()` removed. The installer erases the timeline
+    // tracks naming them, because a track bound to a deleted layer is the silent no-op ADR-075
+    // exists to record. A sink that owns no parameters returns nothing, which is the default.
+    [[nodiscard]] virtual std::span<const std::string> retiredPaths() const { return {}; }
+    // Cues the sink could not realise, with the reason. Not errors: an image cue in a build with no
+    // image layer kind is a thing to say out loud, not to refuse.
+    [[nodiscard]] virtual std::span<const std::string> sinkWarnings() const { return {}; }
+    // How many layers the last bake actually produced, for the editor to show.
+    [[nodiscard]] virtual int realisedCount() const { return 0; }
 };
 
 // Accepts nothing, remembers what it was asked for, and says so. Used by tests that care about

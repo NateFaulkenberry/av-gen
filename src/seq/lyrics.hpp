@@ -55,8 +55,9 @@ struct LyricImport {
     OverlayPreset preset = OverlayPreset::FadeInOut;
     double presetSeconds = 0.35;
     int order = 10;
-    // Only used where the source carries no end time (LRC): how long the last line holds, and how
-    // much silence to leave between one line and the next.
+    // Only used where the source carries no end time (LRC): exactly how long the last line holds,
+    // and how much silence to leave between one line and the next. The gap is not applied to the
+    // last line -- there is nothing after it to make room for.
     double defaultHold = 3.0;
     double gap = 0.08;
     // Lines shorter than this are given `defaultHold` instead: a lyric flashed for a tenth of a
