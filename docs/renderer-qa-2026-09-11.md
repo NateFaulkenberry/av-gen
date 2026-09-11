@@ -152,6 +152,9 @@ tone mapping and composition overlay.
 - [x] Authored alien composition regression now moves an animated glTF node outside the frustum,
   verifies its rig entity is culled, then restores it and verifies recovery. The broader pixel-level
   limb-crossing case remains open.
+- [x] GPU composition regression now verifies the authored alien's culling changes the rendered
+  image and restoring its node position reproduces the original image exactly. The remaining gap
+  is specifically a limb crossing the frustum edge while the bind pose and posed bounds differ.
 - [x] Choose the first architectural animated-bounds solution: pose before culling and derive
   skinned bounds from the current palette, with bind-pose fallback for invalid/partially weighted
   meshes. Do not permanently disable culling.
