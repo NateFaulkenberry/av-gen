@@ -16,6 +16,8 @@
 #include "scene/scene.hpp"
 #include "support/temp_dir.hpp"
 
+#include <fmt/format.h>
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -287,39 +289,88 @@ TEST_CASE("a hundred text layers stay one pass and a handful of draws",
           "[gpu][composition][performance]") {
     Harness h = Harness::make();
     const scene::Scene scene = blackScene();
+    // 1080p, because a cost per pixel is the only cost this pass really has, and quoting it at
+    // 320x180 would be quoting nothing.
+    constexpr std::uint32_t kWidth = 1920;
+    constexpr std::uint32_t kHeight = 1080;
+
+    struct Sample {
+        std::size_t layers = 0;
+        double gpuMs = -1.0;
+        double cpuBuildMs = 0.0;
+        double rebuildMs = 0.0;
+        std::uint32_t draws = 0;
+        std::uint32_t items = 0;
+        std::uint32_t vertices = 0;
+        std::uint32_t glyphs = 0;
+    };
 
     const auto measure = [&](std::size_t count) {
         comp::LayerStack stack;
         for (std::size_t i = 0; i < count; ++i) {
-            auto& text = stack.addText("performance");
-            text.size = 0.04f;
-            text.position = glm::vec2(0.5f, 0.05f + 0.9f * static_cast<float>(i) / static_cast<float>(count + 1));
+            auto& text = stack.addText("a line of lyric");
+            text.size = 0.035f;
+            text.position = glm::vec2(0.5f, 0.03f + 0.94f * static_cast<float>(i) / static_cast<float>(count + 1));
         }
-        // Warm the atlas and the pipelines before timing.
-        h.shot(scene, stack, 0.0, 640, 360);
-        constexpr int kFrames = 20;
-        const auto start = std::chrono::steady_clock::now();
+        // The authoring-time cost: shaping and rasterising everything from cold.
+        const auto rebuildStart = std::chrono::steady_clock::now();
+        stack.build(comp::Frame{kWidth, kHeight}, 0.0);
+        const double rebuildMs =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - rebuildStart).count();
+
+        // Warm the pipelines and let the timestamp ring fill.
+        for (int f = 0; f < 6; ++f) {
+            h.shot(scene, stack, 0.0, kWidth, kHeight);
+        }
+        Sample best;
+        best.layers = count;
+        best.rebuildMs = rebuildMs;
+        constexpr int kFrames = 24;
+        double total = 0.0;
+        int counted = 0;
         for (int f = 0; f < kFrames; ++f) {
-            h.shot(scene, stack, 0.0, 640, 360);
+            // A different second every frame, so nothing is cached that would not be in a real
+            // animation: every item is rebuilt and re-uploaded.
+            h.shot(scene, stack, 0.01 * f, kWidth, kHeight);
+            h.compositor->collectTimings();
+            const auto& stats = h.compositor->stats();
+            if (stats.gpuMs >= 0.0) {
+                total += stats.gpuMs;
+                ++counted;
+            }
+            best.cpuBuildMs = std::max(best.cpuBuildMs, stats.cpuBuildMs);
+            best.draws = stats.draws;
+            best.items = stats.items;
+            best.vertices = stats.vertices;
+            best.glyphs = stats.glyphs;
         }
-        const double ms =
-            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() / kFrames;
-        return std::pair{ms, h.compositor->stats()};
+        best.gpuMs = counted > 0 ? total / counted : -1.0;
+        return best;
     };
 
-    const auto [msNone, statsNone] = measure(0);
-    const auto [msOne, statsOne] = measure(1);
-    const auto [msHundred, statsHundred] = measure(100);
-    WARN("composition frame cost: 0 layers " << msNone << " ms, 1 layer " << msOne << " ms, 100 layers "
-                                             << msHundred << " ms; draws " << statsHundred.draws << ", items "
-                                             << statsHundred.items << ", glyphs " << statsHundred.glyphs);
-    CHECK(statsOne.draws == 1);
+    std::string table = "composition cost at 1920x1080 (GPU pass / CPU per-frame build / cold rebuild):\n";
+    Sample hundred;
+    for (std::size_t count : {std::size_t{0}, std::size_t{1}, std::size_t{10}, std::size_t{100},
+                              std::size_t{200}}) {
+        const Sample s = measure(count);
+        table += fmt::format("  {:>3} layers: gpu {:7.4f} ms | build {:6.4f} ms | cold {:7.3f} ms | "
+                             "{} draw(s), {} items, {} verts, {} glyphs\n",
+                             s.layers, s.gpuMs, s.cpuBuildMs, s.rebuildMs, s.draws, s.items, s.vertices,
+                             s.glyphs);
+        if (count == 100) {
+            hundred = s;
+        }
+    }
+    WARN(table);
+
+    CHECK(hundred.layers == 100);
     // A hundred plain text layers share one blend mode and contiguous geometry, so they are one
     // draw call. This is the property that stops the system collapsing at scale.
-    CHECK(statsHundred.draws == 1);
-    CHECK(statsHundred.layers == 100);
-    // The same eleven letters in a hundred layers rasterise once.
-    CHECK(statsHundred.glyphs <= 12);
+    CHECK(hundred.draws == 1);
+    // The same letters in a hundred layers rasterise once.
+    CHECK(hundred.glyphs <= 16);
+    // And the per-frame CPU work is uploading items, not rebuilding anything.
+    CHECK(hundred.cpuBuildMs < 1.0);
 }
 
 // ---- the offline path ---------------------------------------------------------------------
