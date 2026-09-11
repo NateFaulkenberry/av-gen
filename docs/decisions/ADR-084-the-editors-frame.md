@@ -1,4 +1,4 @@
-# ADR-083: The editor's frame
+# ADR-084: The editor's frame
 
 **Status:** accepted (2026-09-10)
 **Context:** `docs/application-performance.md`

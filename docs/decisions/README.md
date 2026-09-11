@@ -81,4 +81,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [073](ADR-073-musical-signals.md) | Musical signals | Accepted |
 | [074](ADR-074-authored-heroes.md) | Heroes a scene can declare | Accepted |
 | [075](ADR-075-camera-director-connected.md) | The camera director, connected | Accepted |
-| [083](ADR-083-the-editors-frame.md) | The editor's frame: where the swapchain wait stands, and what a drag may cost | Accepted |
+| [083](ADR-084-the-editors-frame.md) | The editor's frame: where the swapchain wait stands, and what a drag may cost | Accepted |

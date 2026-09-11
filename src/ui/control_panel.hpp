@@ -127,7 +127,7 @@ public:
     GraphEditor graphEditor;
 
     // How much of the canvas's pixel count the world is actually rendered at, before being shown
-    // stretched to fill it (ADR-083). One means every canvas pixel, which is what the editor has
+    // stretched to fill it (ADR-084). One means every canvas pixel, which is what the editor has
     // always done and remains the default.
     //
     // Worth a control because of what the canvas actually is. The editor renders the world at the

@@ -2,7 +2,7 @@
 
 > **This document is the GPU's frame.** The main thread -- the UI, the event loop, the engine
 > update, threading, allocation behaviour and input latency -- is
-> [docs/application-performance.md](application-performance.md) (ADR-083). Keeping them apart is
+> [docs/application-performance.md](application-performance.md) (ADR-084). Keeping them apart is
 > deliberate: "why is the editor slow" has two very different answers and they should not be
 > searched for in the same place.
 >
