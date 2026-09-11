@@ -430,12 +430,13 @@ RigStats updateRigs(Scene& scene, const FrameTime& time) {
         return stats;
     }
     const auto begin = std::chrono::steady_clock::now();
-    // Nearest visible entity per rig. A rig with no entity drawing it is not posed at all: there is
-    // nothing on screen for the pose to reach.
+    // Nearest authored-visible entity per rig. Camera culling only suppresses drawing; it must not
+    // suppress timeline evaluation or a character freezes at the frustum boundary and pops when it
+    // comes back. The explicit rig cullDistance remains the policy for skipping distant animation.
     std::vector<float> nearest(scene.rigs.size(), std::numeric_limits<float>::max());
     const glm::vec3 eye = scene.camera.position;
     for (const Entity& entity : scene.entities) {
-        if (entity.rig >= scene.rigs.size() || !entity.visible || entity.cameraCulled) {
+        if (entity.rig >= scene.rigs.size() || !entity.visible) {
             continue;
         }
         const float distance = glm::distance(eye, entity.transform.position);

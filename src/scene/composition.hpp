@@ -665,11 +665,11 @@ private:
     // The luminous patches of ecology, as places worth walking to (ADR-093, §6).
     [[nodiscard]] std::vector<entity::InterestPoint> glowInterestPoints() const;
     [[nodiscard]] std::uint32_t worldSeed() const;
-    // Marks the entities of entity-driven nodes that fall outside the camera frustum, so the rig
-    // pass can skip posing a character nobody can see (ADR-086's cullDistance handles the far ones;
-    // nothing was setting cameraCulled for anything but terrain). Deliberately only for nodes an
-    // entity drives: every other node's visibility is somebody else's decision and flipping it
-    // here would be a rendering change smuggled in as an optimisation.
+    // Marks the entities of entity-driven nodes that fall outside the camera frustum. This only
+    // suppresses drawing; rig evaluation remains timeline-driven so a character cannot freeze at
+    // the frustum edge. ADR-086's cullDistance remains the animation distance policy. Deliberately
+    // only for nodes an entity drives: every other node's visibility is somebody else's decision
+    // and flipping it here would be a rendering change smuggled in as an optimisation.
     void cullEntityNodes();
 
     // Turns a behaviour's Activity into an animation state on the node it drives (ADR-086/087).

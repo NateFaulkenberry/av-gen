@@ -302,6 +302,36 @@ TEST_CASE("updateRigs skips rigs nothing visible refers to", "[scene][animation]
     CHECK(stats.culled == 1);
 }
 
+TEST_CASE("camera culling does not freeze an authored-visible rig", "[scene][animation]") {
+    scene::Scene s;
+    s.camera.position = glm::vec3(0.0f, 0.0f, 5.0f);
+    s.rigs.push_back(twoStateRig());
+    const scene::MeshId mesh = s.addMesh([] {
+        scene::MeshData m;
+        m.vertices = {{{0, 0, 0}, {0, 0, 1}, {0, 0}},
+                      {{1, 0, 0}, {0, 0, 1}, {1, 0}},
+                      {{0, 1, 0}, {0, 0, 1}, {0, 1}}};
+        m.indices = {0, 1, 2};
+        return m;
+    }());
+    scene::Entity& e = s.addEntity("alien", mesh);
+    e.rig = 0;
+    e.cameraCulled = true;
+
+    FrameTime time;
+    time.renderTime = 1.0;
+    auto stats = scene::updateRigs(s, time);
+    CHECK(stats.posed == 1);
+    CHECK(stats.culled == 0);
+    const std::uint64_t posedVersion = s.rigs[0].paletteVersion;
+
+    e.cameraCulled = false;
+    time.renderTime = 1.1;
+    stats = scene::updateRigs(s, time);
+    CHECK(stats.posed == 1);
+    CHECK(s.rigs[0].paletteVersion > posedVersion);
+}
+
 // ---- the imported asset --------------------------------------------------------------------
 
 TEST_CASE("the alien imports as a rig with its three clips", "[assets][gltf][skeleton]") {

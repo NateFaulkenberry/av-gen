@@ -1497,6 +1497,41 @@ void Composition::cullEntityNodes() {
     }
     const float aspect = static_cast<float>(viewportWidth_) / static_cast<float>(viewportHeight_);
     const world::FrustumPlanes planes = world::frustumPlanes(scene_.camera.projection(aspect) * scene_.camera.view());
+    const auto posedBounds = [&](const Entity& entity, const glm::vec3& lo, const glm::vec3& hi) {
+        if (entity.rig == kInvalidRig || entity.rig >= scene_.rigs.size() || entity.mesh >= scene_.meshes.size() ||
+            !scene_.meshes[entity.mesh].skinned()) {
+            return std::pair{lo, hi};
+        }
+        const SkinnedRig& rig = scene_.rigs[entity.rig];
+        const MeshData& mesh = scene_.meshes[entity.mesh];
+        if (rig.palette.empty() || rig.skeleton.palette.empty()) {
+            return std::pair{lo, hi};
+        }
+        glm::vec3 posedLo(std::numeric_limits<float>::max());
+        glm::vec3 posedHi(std::numeric_limits<float>::lowest());
+        bool any = false;
+        for (std::size_t i = 0; i < mesh.vertices.size() && i < mesh.skin.size(); ++i) {
+            glm::vec3 position(0.0f);
+            float weightSum = 0.0f;
+            const SkinInfluence& influence = mesh.skin[i];
+            for (std::size_t j = 0; j < kJointInfluences; ++j) {
+                const float weight = influence.weights[j];
+                if (weight <= 0.0f || influence.joints[j] >= rig.palette.size()) {
+                    continue;
+                }
+                position += glm::vec3(rig.palette[influence.joints[j]] * glm::vec4(mesh.vertices[i].position, 1.0f)) * weight;
+                weightSum += weight;
+            }
+            if (weightSum <= 1e-6f) {
+                continue;
+            }
+            position /= weightSum;
+            posedLo = glm::min(posedLo, position);
+            posedHi = glm::max(posedHi, position);
+            any = true;
+        }
+        return any ? std::pair{posedLo, posedHi} : std::pair{lo, hi};
+    };
     for (const auto& entityPtr : entityWorld_.entities()) {
         const CompositionNode* node = findNode(entityPtr->desc().driven());
         if (node == nullptr) {
@@ -1515,10 +1550,11 @@ void Composition::cullEntityNodes() {
                     e.cameraCulled = false;
                     continue;
                 }
-                const auto [lo, hi] = scene_.meshes[e.mesh].bounds();
-                // The mesh's bounds are its bind pose; a posed skeleton can reach outside them, so
-                // pad by a quarter of the box before testing. A character culled one frame early
-                // is a character that pops.
+                const auto [meshLo, meshHi] = scene_.meshes[e.mesh].bounds();
+                const auto [lo, hi] = posedBounds(e, meshLo, meshHi);
+                // A posed skeleton can reach outside its bind-pose bounds. Skinned meshes use the
+                // current palette above; the small residual pad covers interpolation and numerical
+                // edge cases without disabling culling for the whole character.
                 const glm::vec3 pad = (hi - lo) * 0.25f + glm::vec3(0.25f);
                 const glm::mat4 m = e.transform.matrix();
                 glm::vec3 wlo(std::numeric_limits<float>::max());
@@ -3451,8 +3487,8 @@ void Composition::update(const FrameTime& time) {
     // and before the culling, so a drifting layer's bounds are this frame's rather than last
     // frame's -- a raft that has moved out of frame must be culled on where it is now.
     updateFloaters(time.renderTime);
-    cullEntityNodes();
     updateCharacters(time);
+    cullEntityNodes();
 }
 
 // ADR-086. Two things, in order: push each node's authored animation request into its rigs (only

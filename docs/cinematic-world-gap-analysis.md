@@ -139,7 +139,7 @@ built naively.
 | §22 | Music propagation | — | Secondary emitters | Architect only: a field's source is an entity property, so an influenced entity can own a field | S | — | §19 |
 | §23 | Audio signal access | **Exists** | None | — | — | — | — |
 | §24 | Musical sections | Markers exist; `music.*` signals exist | Sections do not *drive* anything | Section becomes an event source in §17 | S | — | §17 |
-| §25 | Multi-audio | Exists | Verify field/event timing uses timeline time, not source time | Audit | S | — | — |
+| §25 | Multi-audio | **Does not exist** — `Engine` holds one `audioFile_`; `seq::Sequence` has no audio at all | No audio clip, no second source, no waveform on the sequence | An `AudioClip` on the sequence (file, start, in/out, gain), the analysis keyed per clip, a waveform lane | M | Analysis is precomputed, so cost is load-time | — |
 | §26 | Clock separation | `renderTime`, `FixedStepClock`, seek | Simulation time is not separable from render time | See §3 | M | — | — |
 | §27 | Deterministic simulation | Entity seeds derive from scene seed + name | Behaviours accumulate; seek resets them | See §3 | M | — | — |
 | §28 | Population management | — | **Nothing** | Spawn regions + an active set chosen by camera distance, with hysteresis bands | M | This is the one that protects frame time | §29 |
@@ -247,6 +247,12 @@ Recorded so the plan is not built on it:
 - **§36 retargeting** — the brief allows architecting toward it. The `clips` indirection is that
   architecture; actual cross-skeleton retargeting is a genuine multi-week feature and should not be
   started in this pass.
+- **"The recently added multiple-audio-file sequencing capability"** (§25) — **there is no such
+  capability.** `app::Engine` holds a single `audioFile_` and a single `audioPath_`, and `seq::`
+  contains no audio type whatsoever. The sequence sees audio only as `Marker`s of kind `Beat` and
+  `Section`, whose times are *copied* from the analysis so the editor can draw and snap to them.
+  This row of the matrix said "Exists" in the first version of this document, which was wrong: the
+  brief asserted the capability and it was recorded without being checked. Corrected 2026-09-11.
 
 ## 6. What is genuinely missing, in one list
 
