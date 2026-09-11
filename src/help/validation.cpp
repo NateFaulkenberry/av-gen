@@ -9,33 +9,49 @@
 namespace avgen::help {
 namespace {
 
-// Does any topic actually talk about this thing? Deliberately generous -- a mention in the prose
-// counts, not just a `features:` declaration -- because the question the coverage checks ask is
-// "would a reader find out about this from Help", not "did somebody fill in the metadata".
-bool anyTopicMentions(const HelpDatabase& db, std::string_view phrase) {
-    if (phrase.empty()) {
-        return true;
-    }
-    const std::vector<std::string> wanted = tokenize(phrase);
-    if (wanted.empty()) {
-        return true;
-    }
+// The folded word sequence of every topic a reader would actually learn something from. Built once
+// per validation run: the coverage checks ask this question a few dozen times, and re-tokenising
+// the whole corpus for each of them was most of the tool's running time.
+//
+// Placeholders are excluded. A topic that names a feature in order to say it is not documented is
+// not coverage of it, and counting it would make the gap register hide the gaps.
+std::vector<std::vector<std::string>> corpusOf(const HelpDatabase& db) {
+    std::vector<std::vector<std::string>> corpus;
     for (const HelpDocument& doc : db.documents()) {
         if (doc.status == HelpStatus::NotYetDocumented) {
-            continue; // a placeholder naming a feature is not coverage of it
+            continue;
         }
-        std::string haystack = doc.title;
-        haystack += ' ';
-        haystack += doc.summary;
-        haystack += ' ';
-        haystack += doc.markdown;
+        std::string text = doc.title;
+        text += ' ';
+        text += doc.summary;
+        text += ' ';
+        text += doc.markdown;
         for (const std::string& keyword : doc.keywords) {
-            haystack += ' ';
-            haystack += keyword;
+            text += ' ';
+            text += keyword;
         }
-        const std::vector<std::string> have = tokenize(haystack);
-        const std::unordered_set<std::string> set(have.begin(), have.end());
-        if (std::ranges::all_of(wanted, [&set](const std::string& t) { return set.contains(t); })) {
+        corpus.push_back(tokenize(text));
+    }
+    return corpus;
+}
+
+// Does any topic actually talk about this thing? A mention in the prose counts, not just a
+// `features:` declaration, because the question the coverage checks ask is "would a reader find out
+// about this from Help" rather than "did somebody fill in the metadata".
+//
+// Matched as a **phrase**, contiguously. An unordered bag of words is close to vacuous over a corpus
+// this size -- "Save Project" would be satisfied by any topic that happens to contain "save" and
+// "project" in unrelated sentences, which quietly turns the coverage half of the validator off.
+bool corpusMentions(const std::vector<std::vector<std::string>>& corpus, std::string_view phrase) {
+    const std::vector<std::string> wanted = tokenize(phrase);
+    if (wanted.empty()) {
+        return true; // a label with no words in it is not something coverage can be claimed about
+    }
+    for (const std::vector<std::string>& topic : corpus) {
+        if (topic.size() < wanted.size()) {
+            continue;
+        }
+        if (std::ranges::search(topic, wanted).begin() != topic.end()) {
             return true;
         }
     }
@@ -176,9 +192,12 @@ std::vector<Finding> validate(const HelpDatabase& db, const AppSurface& surface)
 
     // ---- 2. Does the application have things the documentation does not cover? ------------------
 
+    const std::vector<std::vector<std::string>> corpus = corpusOf(db);
+
     for (const AppPanel& panel : surface.panels) {
         const std::string featureId = "panel." + slugify(panel.id);
-        const bool documented = !db.documentsForFeature(featureId).empty() || anyTopicMentions(db, panel.label);
+        const bool documented =
+            !db.documentsForFeature(featureId).empty() || corpusMentions(corpus, panel.label);
         if (!documented) {
             add(Severity::Warning, "undocumented-panel", panel.id,
                 fmt::format("the '{}' panel ({}, {}) is registered but no topic documents it", panel.label,
@@ -187,7 +206,7 @@ std::vector<Finding> validate(const HelpDatabase& db, const AppSurface& surface)
     }
 
     for (const AppCommand& command : surface.commands) {
-        if (!anyTopicMentions(db, command.label)) {
+        if (!corpusMentions(corpus, command.label)) {
             add(Severity::Warning, "undocumented-command", command.menuPath,
                 fmt::format("no topic mentions this command ({})", command.sourceRef));
         }

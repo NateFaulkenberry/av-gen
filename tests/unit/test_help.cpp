@@ -133,6 +133,44 @@ let x = 1.0;
     CHECK(code->text == "let x = 1.0;");
 }
 
+TEST_CASE("A table cell may contain an escaped pipe") {
+    // A reference table of command-line syntax contains `a\\|b`, and splitting the row on every raw
+    // `|` grew the row an extra cell. ImGui then starts a new row on the cell the header has no
+    // column for, so the whole table draws ragged -- which is what the shipped command-line
+    // reference did before this.
+    const auto blocks = help::parseHelpBody("| Flag | Does |\n|---|---|\n"
+                                            "| `--output <d>[:full\\|:WxH]` | an output window |\n");
+    REQUIRE(blocks.size() == 1);
+    REQUIRE(blocks[0].kind == help::BlockKind::Table);
+    REQUIRE(blocks[0].rows.size() == 2);
+    CHECK(blocks[0].rows[0].cells.size() == 2);
+    REQUIRE(blocks[0].rows[1].cells.size() == 2);
+    // ...and the escape is resolved by the inline parser, not left as a stray backslash.
+    CHECK(help::flattenSpans(blocks[0].rows[1].cells[0]) == "--output <d>[:full|:WxH]");
+    CHECK(help::flattenSpans(blocks[0].rows[1].cells[1]) == "an output window");
+}
+
+TEST_CASE("Every shipped table row has the columns its header declared") {
+    if (!std::filesystem::is_directory(contentDir())) {
+        SKIP("docs/help is not present in this checkout");
+    }
+    help::HelpDatabase db;
+    REQUIRE(db.loadDirectory(contentDir()).has_value());
+    for (const help::HelpDocument& doc : db.documents()) {
+        for (const help::HelpBlock& block : doc.body) {
+            if (block.kind != help::BlockKind::Table || block.rows.empty()) {
+                continue;
+            }
+            const std::size_t columns = block.rows.front().cells.size();
+            for (std::size_t r = 0; r < block.rows.size(); ++r) {
+                INFO(doc.id << " table row " << r << " has " << block.rows[r].cells.size()
+                     << " cells, header declared " << columns);
+                CHECK(block.rows[r].cells.size() == columns);
+            }
+        }
+    }
+}
+
 TEST_CASE("Inline styles and links parse, and a link resolves to a topic id") {
     const auto spans = help::parseInline("plain `code` **strong** *em* [label](help://a/b#anchor) "
                                          "[out](https://example.com)");

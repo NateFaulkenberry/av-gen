@@ -89,11 +89,23 @@ Result<HelpLoadReport> HelpDatabase::loadDirectory(const std::filesystem::path& 
     HelpLoadReport report;
     report.loadedFrom = dir;
 
+    // The error_code overload only makes *construction* non-throwing; incrementing the iterator
+    // still throws on a directory it cannot descend into. This runs inside an ImGui frame, between
+    // Begin and End, so an exception here would unwind past End and leave the window stack
+    // unbalanced -- the editor would assert on the next frame over a permissions problem.
     std::vector<std::filesystem::path> files;
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(dir, ec)) {
-        if (entry.is_regular_file(ec) && entry.path().extension() == ".md") {
-            files.push_back(entry.path());
+    try {
+        auto it = std::filesystem::recursive_directory_iterator(
+            dir, std::filesystem::directory_options::skip_permission_denied, ec);
+        const std::filesystem::recursive_directory_iterator end;
+        for (; !ec && it != end; it.increment(ec)) {
+            std::error_code fileEc;
+            if (it->is_regular_file(fileEc) && it->path().extension() == ".md") {
+                files.push_back(it->path());
+            }
         }
+    } catch (const std::exception& e) {
+        return fail("cannot walk '{}': {}", dir.string(), e.what());
     }
     if (ec) {
         return fail("cannot walk '{}': {}", dir.string(), ec.message());
@@ -243,8 +255,13 @@ const HelpShortcut* HelpDatabase::getShortcut(std::string_view command) const {
     if (const HelpShortcut* direct = impl_->features.findShortcut(command); direct != nullptr) {
         return direct;
     }
-    // §38: searching "duplicate" should give the key straight away, so a lookup by the words a
-    // person would use -- the description or the keys themselves -- also resolves.
+    // §38: searching "duplicate" should give the key straight away, so a lookup by the keys
+    // themselves resolves too. Guarded against an empty argument, because `keys` is optional in
+    // features.json and "" == "" would hand back an unrelated row to a feature that has no
+    // shortcut at all.
+    if (command.empty()) {
+        return nullptr;
+    }
     for (const HelpShortcut& shortcut : impl_->features.shortcuts()) {
         if (shortcut.keys == command) {
             return &shortcut;

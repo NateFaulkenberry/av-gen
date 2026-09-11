@@ -119,25 +119,50 @@ bool isTableDivider(std::string_view line) {
     return sawDash;
 }
 
-std::vector<std::string_view> tableCells(std::string_view line) {
+// A tab counts as four columns for indent purposes, but a byte count is what a prefix strip needs.
+std::size_t leadingWhitespaceBytes(std::string_view line) {
+    std::size_t n = 0;
+    while (n < line.size() && (line[n] == ' ' || line[n] == '\t')) {
+        ++n;
+    }
+    return n;
+}
+
+// Cells are split on unescaped `|` only. `parseInline` honours a backslash escape, so a cell
+// containing `\|` -- which a reference table of command-line syntax will -- has to survive the
+// split, or the row silently grows a column and the table it belongs to is drawn ragged.
+std::vector<std::string> tableCells(std::string_view line) {
     std::string_view t = trim(line);
     if (!t.empty() && t.front() == '|') {
         t.remove_prefix(1);
     }
-    if (!t.empty() && t.back() == '|') {
+    // A trailing `|` closes the row -- unless it is itself escaped.
+    if (t.size() >= 2 && t.back() == '|' && t[t.size() - 2] != '\\') {
+        t.remove_suffix(1);
+    } else if (t.size() == 1 && t.back() == '|') {
         t.remove_suffix(1);
     }
-    std::vector<std::string_view> cells;
-    std::size_t start = 0;
-    while (start <= t.size()) {
-        const auto bar = t.find('|', start);
-        const auto end = bar == std::string_view::npos ? t.size() : bar;
-        cells.push_back(trim(t.substr(start, end - start)));
-        if (bar == std::string_view::npos) {
-            break;
+
+    std::vector<std::string> cells;
+    std::string cell;
+    for (std::size_t i = 0; i < t.size(); ++i) {
+        if (t[i] == '\\' && i + 1 < t.size() && t[i + 1] == '|') {
+            // Resolved here, not left for parseInline. `\|` is a *table* escape -- it exists to
+            // stop the pipe ending the cell -- and the cell it most often appears in is a code
+            // span, where parseInline takes the text verbatim and would leave the backslash on
+            // screen. This is also what GitHub does with a pipe escape inside a table.
+            cell.push_back('|');
+            ++i;
+            continue;
         }
-        start = bar + 1;
+        if (t[i] == '|') {
+            cells.emplace_back(trim(cell));
+            cell.clear();
+            continue;
+        }
+        cell.push_back(t[i]);
     }
+    cells.emplace_back(trim(cell));
     return cells;
 }
 
@@ -145,8 +170,7 @@ std::vector<std::string_view> tableCells(std::string_view line) {
 // marker, and reports which it was.
 bool listMarker(std::string_view line, bool& numbered, std::string_view& content) {
     std::string_view t = line;
-    const std::size_t indent = indentOf(t);
-    t.remove_prefix(std::min(indent, t.size()));
+    t.remove_prefix(leadingWhitespaceBytes(t)); // bytes, not display columns: a tab is one byte
     if (t.size() >= 2 && (t[0] == '-' || t[0] == '*' || t[0] == '+') && t[1] == ' ') {
         numbered = false;
         content = trim(t.substr(2));

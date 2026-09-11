@@ -164,7 +164,11 @@ void helpTooltip(const char* oneLine, std::string_view documentId) {
     if (!ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         return;
     }
-    ImGui::BeginTooltip();
+    // ImGui's contract is that EndTooltip is only called when BeginTooltip returned true. It is
+    // hard-coded true in this version, which is exactly the kind of thing that changes under you.
+    if (!ImGui::BeginTooltip()) {
+        return;
+    }
     ImGui::TextUnformatted(oneLine);
     ImGui::PushStyleColor(ImGuiCol_Text, kLinkColor);
     ImGui::Text("Learn more: %.*s", static_cast<int>(documentId.size()), documentId.data());
@@ -203,13 +207,18 @@ void HelpPanel::ensureLoaded() {
     }
     loaded_ = true;
 
+    // Derived rows first, authored rows second. features.hpp documents that order and the merge
+    // rule depends on it: the authored file is what adds a documentId to a panel row, and the
+    // derived row is what supplies the name, the description and the region. Loading the file
+    // first made the derived row the later one and silently discarded anything authored.
+    registerPanelFeatures();
+
     std::filesystem::path exe;
     if (const char* base = SDL_GetBasePath(); base != nullptr) {
         exe = std::filesystem::path(base) / "avgen";
     }
     const auto dirs = help::HelpDatabase::searchDirs(exe);
     const help::HelpLoadReport report = db_.loadFirstAvailable(dirs);
-    registerPanelFeatures();
 
     if (report.documents == 0) {
         // Loud, because this is the failure that looks exactly like "nobody wrote any Help". The
@@ -243,7 +252,9 @@ void HelpPanel::open(std::string_view documentId) {
     // and search for it, so a stale contextual link degrades into a useful result list.
     status_ = "No topic '" + std::string(documentId) + "'. Showing the closest matches.";
     const std::size_t n = std::min(documentId.size(), sizeof(search_) - 1);
-    std::copy_n(documentId.data(), n, search_);
+    if (n > 0) { // data() of a default-constructed string_view is null, and copy_n would still read it
+        std::copy_n(documentId.data(), n, search_);
+    }
     search_[n] = '\0';
     runSearch();
     navigate({});
@@ -254,6 +265,14 @@ void HelpPanel::navigate(std::string_view documentId, bool recordHistory) {
     if (recordHistory) {
         history_.resize(historyPos_);
         history_.push_back(current_);
+        // Capped: a long session -- or the self-test, which visits every topic -- would otherwise
+        // grow this for ever. Dropping from the front keeps Back working for the recent past, which
+        // is the only part of it anybody uses.
+        constexpr std::size_t kMaxHistory = 64;
+        if (history_.size() > kMaxHistory) {
+            history_.erase(history_.begin(), history_.begin() + static_cast<std::ptrdiff_t>(
+                                                                    history_.size() - kMaxHistory));
+        }
         historyPos_ = history_.size();
     }
     if (!current_.empty()) {
@@ -305,7 +324,12 @@ void HelpPanel::runSearch() {
 void HelpPanel::stepSelfTest() {
     const auto ids = db_.documents();
     const int total = static_cast<int>(ids.size());
-    const int step = selfTestStep_++;
+    const int step = selfTestStep_;
+    if (step > total + 6) {
+        selfTestStep_ = -1; // done; stop counting rather than incrementing until it overflows
+        return;
+    }
+    ++selfTestStep_;
 
     const auto expect = [this](bool condition, const char* what) {
         if (!condition) {
@@ -460,9 +484,11 @@ void HelpPanel::drawSidebar() {
                 if (doc == nullptr) {
                     continue;
                 }
+                ImGui::PushID(doc->id.c_str());
                 if (ImGui::Selectable(doc->title.c_str(), doc->id == current_)) {
                     navigate(doc->id);
                 }
+                ImGui::PopID();
             }
         }
         ImGui::Separator();
@@ -554,10 +580,12 @@ void HelpPanel::drawArticle() {
         for (const char* id : {"start/welcome", "start/how-it-works", "start/interface",
                                "modulation/recipes", "troubleshooting/index"}) {
             if (const help::HelpDocument* doc = db_.get(id); doc != nullptr) {
+                ImGui::PushID(doc->id.c_str());
                 if (ImGui::Selectable(doc->title.c_str())) {
                     navigate(doc->id);
                 }
                 ImGui::TextColored(kMutedColor, "  %s", doc->summary.c_str());
+                ImGui::PopID();
             }
         }
         ImGui::Spacing();
@@ -654,7 +682,7 @@ void HelpPanel::drawDocument(const help::HelpDocument& doc) {
             ImGui::Indent(indent);
             ImGui::Bullet();
             ImGui::SameLine(0.0f, 0.0f);
-            const std::string clicked = drawSpans(block.spans, wrap - indent - 20.0f);
+            const std::string clicked = drawSpans(block.spans, std::max(wrap - indent - 20.0f, 80.0f));
             if (!clicked.empty()) {
                 followed = clicked;
             }
@@ -682,7 +710,10 @@ void HelpPanel::drawDocument(const help::HelpDocument& doc) {
             if (block.rows.empty()) {
                 break;
             }
-            const int columns = static_cast<int>(block.rows.front().cells.size());
+            // Bounded at both ends. ImGui asserts above 511 columns and, in a release build where
+            // the assert is compiled out, indexes past its own column array -- and content can come
+            // from any directory AVGEN_HELP_DIR points at.
+            const int columns = static_cast<int>(std::min<std::size_t>(block.rows.front().cells.size(), 32));
             if (columns <= 0) {
                 break;
             }

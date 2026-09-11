@@ -94,9 +94,16 @@ int main(int argc, char** argv) {
     if (printTools) {
         nlohmann::json out = nlohmann::json::array();
         for (const help::ToolDescriptor& tool : help::tools()) {
+            // The non-throwing overload: a typo in a schema literal should be a message, not a
+            // terminate, and this is the one place those literals are parsed.
+            auto schema = nlohmann::json::parse(tool.parametersSchema, nullptr, false);
+            if (schema.is_discarded()) {
+                std::cerr << "tool '" << tool.name << "' has an unparseable parameter schema\n";
+                return 2;
+            }
             out.push_back({{"name", tool.name},
                            {"description", tool.description},
-                           {"parameters", nlohmann::json::parse(tool.parametersSchema)},
+                           {"parameters", std::move(schema)},
                            {"readOnly", tool.readOnly}});
         }
         std::cout << out.dump(2, ' ', false, nlohmann::json::error_handler_t::replace) << "\n";

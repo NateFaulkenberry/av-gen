@@ -7,6 +7,19 @@
 namespace avgen::help {
 namespace {
 
+// `json::value()` throws when the key is present with the wrong type, which would undo the whole
+// point of parsing with the non-throwing overload: a hand-edited features.json must produce a
+// message, not an exception out of an ImGui frame.
+std::string stringOr(const nlohmann::json& object, std::string_view key, std::string fallback = {}) {
+    const auto it = object.find(key);
+    return it != object.end() && it->is_string() ? it->get<std::string>() : fallback;
+}
+
+bool boolOr(const nlohmann::json& object, std::string_view key, bool fallback) {
+    const auto it = object.find(key);
+    return it != object.end() && it->is_boolean() ? it->get<bool>() : fallback;
+}
+
 std::vector<std::string> stringArray(const nlohmann::json& value) {
     std::vector<std::string> out;
     if (value.is_array()) {
@@ -77,7 +90,11 @@ void HelpFeatureTable::add(HelpFeature feature) {
     keep(existing.shortcut, std::move(feature.shortcut));
     keep(existing.menuPath, std::move(feature.menuPath));
     keep(existing.availability, std::move(feature.availability));
-    existing.kind = feature.kind;
+    // Subsystem is the parser's default for a row that named no kind, so it never overrides one
+    // that was stated -- the same "non-empty wins" rule the strings above follow.
+    if (feature.kind != FeatureKind::Subsystem) {
+        existing.kind = feature.kind;
+    }
     if (!feature.related.empty()) {
         existing.related = std::move(feature.related);
     }
@@ -137,15 +154,17 @@ Result<void> HelpFeatureTable::loadFile(const std::filesystem::path& file) {
             }
             HelpFeature feature;
             feature.id = entry["id"].get<std::string>();
-            feature.name = entry.value("name", std::string());
-            feature.category = entry.value("category", std::string());
-            feature.summary = entry.value("summary", std::string());
-            feature.documentId = entry.value("document", std::string());
-            feature.shortcut = entry.value("shortcut", std::string());
-            feature.menuPath = entry.value("menu", std::string());
-            feature.availability = entry.value("availability", std::string());
-            feature.related = stringArray(entry.value("related", nlohmann::json::array()));
-            const std::string kind = entry.value("kind", std::string("subsystem"));
+            feature.name = stringOr(entry, "name");
+            feature.category = stringOr(entry, "category");
+            feature.summary = stringOr(entry, "summary");
+            feature.documentId = stringOr(entry, "document");
+            feature.shortcut = stringOr(entry, "shortcut");
+            feature.menuPath = stringOr(entry, "menu");
+            feature.availability = stringOr(entry, "availability");
+            if (const auto related = entry.find("related"); related != entry.end()) {
+                feature.related = stringArray(*related);
+            }
+            const std::string kind = stringOr(entry, "kind", "subsystem");
             if (!parseFeatureKind(kind, feature.kind)) {
                 return fail("'{}': feature '{}' has unknown kind '{}'", file.string(), feature.id, kind);
             }
@@ -163,12 +182,15 @@ Result<void> HelpFeatureTable::loadFile(const std::filesystem::path& file) {
             }
             HelpShortcut shortcut;
             shortcut.command = entry["command"].get<std::string>();
-            shortcut.keys = entry.value("keys", std::string());
-            shortcut.description = entry.value("description", std::string());
-            shortcut.context = entry.value("context", std::string("General"));
-            shortcut.documentId = entry.value("document", std::string());
-            shortcut.configurable = entry.value("configurable", false);
-            shortcut.callSite = entry.value("callSite", std::string());
+            shortcut.keys = stringOr(entry, "keys");
+            shortcut.description = stringOr(entry, "description");
+            shortcut.context = stringOr(entry, "context", "General");
+            shortcut.documentId = stringOr(entry, "document");
+            shortcut.configurable = boolOr(entry, "configurable", false);
+            shortcut.callSite = stringOr(entry, "callSite");
+            if (shortcut.keys.empty()) {
+                return fail("'{}': shortcut '{}' has no 'keys'", file.string(), shortcut.command);
+            }
             addShortcut(std::move(shortcut));
         }
     }
