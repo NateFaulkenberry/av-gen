@@ -132,11 +132,11 @@ nlohmann::json setsToJson(const std::vector<PropertySet>& sets) {
 
 // ---- names -----------------------------------------------------------------------------------
 
-const char* pathStatusName(PathStatus status) {
+const char* routeStatusName(RouteStatus status) {
     switch (status) {
-    case PathStatus::Ready: return "ready";
-    case PathStatus::Pending: return "pending";
-    case PathStatus::Unreachable: return "unreachable";
+    case RouteStatus::Ready: return "ready";
+    case RouteStatus::Pending: return "pending";
+    case RouteStatus::Unreachable: return "unreachable";
     }
     return "?";
 }
@@ -221,20 +221,20 @@ const char* authorityName(Authority authority) {
 
 // ---- the navigator-backed path provider ---------------------------------------------------------
 
-PathStatus NavigatorPath::route(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out) const {
+RouteStatus NavigatorPath::route(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out) const {
     out.clear();
     if (nav_ == nullptr || !nav_->valid()) {
         // No terrain: the world is the y = 0 plane and every straight line across it is a route.
         // The same answer `Navigator::groundHeight` gives, for the same reason.
         out.push_back(to);
-        return PathStatus::Ready;
+        return RouteStatus::Ready;
     }
     if (!nav_->navigable(to)) {
-        return PathStatus::Unreachable;
+        return RouteStatus::Unreachable;
     }
     (void)from;
     out.push_back(to);
-    return PathStatus::Ready;
+    return RouteStatus::Ready;
 }
 
 glm::vec2 NavigatorPath::steer(glm::vec2 from, glm::vec2 to, float lookahead) const {
@@ -654,13 +654,13 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
                     layer.progress.waypoints.assign(1, goal);
                     layer.progress.routed = true;
                 } else {
-                    const PathStatus status = path->route(here, goal, layer.progress.waypoints);
-                    if (status == PathStatus::Unreachable) {
+                    const RouteStatus status = path->route(here, goal, layer.progress.waypoints);
+                    if (status == RouteStatus::Unreachable) {
                         failed = true;
                         reason = "unreachable";
                         break;
                     }
-                    if (status == PathStatus::Pending) {
+                    if (status == RouteStatus::Pending) {
                         state.speed = 0.0f;
                         movement = true;
                         break; // ask again next tick; a planner is allowed to take its time

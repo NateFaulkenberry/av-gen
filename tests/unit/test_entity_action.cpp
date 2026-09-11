@@ -162,18 +162,18 @@ entity::EntityDesc heroDesc(const char* name = "hero") {
 // can be a stub, a straight line or a search, and the action layer does not change.
 class StubPath final : public entity::IPathProvider {
 public:
-    entity::PathStatus status = entity::PathStatus::Ready;
+    entity::RouteStatus status = entity::RouteStatus::Ready;
     mutable int routeCalls = 0;
-    [[nodiscard]] entity::PathStatus route(glm::vec2 from, glm::vec2 to,
+    [[nodiscard]] entity::RouteStatus route(glm::vec2 from, glm::vec2 to,
                                            std::vector<glm::vec2>& out) const override {
         ++routeCalls;
         (void)from;
-        if (status != entity::PathStatus::Ready) {
+        if (status != entity::RouteStatus::Ready) {
             return status;
         }
         out.clear();
         out.push_back(to);
-        return entity::PathStatus::Ready;
+        return entity::RouteStatus::Ready;
     }
     [[nodiscard]] glm::vec2 steer(glm::vec2 from, glm::vec2 to, float) const override {
         const glm::vec2 d = to - from;
@@ -702,7 +702,7 @@ TEST_CASE("a walk with no route fails with a reason instead of walking at a wall
     hero.actions = {walk, wait(0.1, "next")};
     World w({hero}, {{"hero", glm::vec3(0.0f)}});
     StubPath path;
-    path.status = entity::PathStatus::Unreachable;
+    path.status = entity::RouteStatus::Unreachable;
     w.world.setPathProvider(&path);
     w.tick(0.5);
     REQUIRE(w.log.size() >= 1);
@@ -723,12 +723,12 @@ TEST_CASE("a planner that needs a moment gets one", "[entity][action][navigation
     hero.actions = {walk};
     World w({hero}, {{"hero", glm::vec3(0.0f)}});
     StubPath path;
-    path.status = entity::PathStatus::Pending;
+    path.status = entity::RouteStatus::Pending;
     w.world.setPathProvider(&path);
     w.tick(0.5);
     CHECK(w.log.empty());
     CHECK(glm::length(w.actor().state().position()) < 1e-4f); // waited, did not set off
-    path.status = entity::PathStatus::Ready;
+    path.status = entity::RouteStatus::Ready;
     w.tick(6.0);
     CHECK(w.completed() == std::vector<std::string>{"walkTo"});
 }
@@ -738,11 +738,11 @@ TEST_CASE("a walk that makes no progress gives up and says why", "[entity][actio
     // walking on the spot for the rest of the render with nothing in the log.
     class Treadmill final : public entity::IPathProvider {
     public:
-        [[nodiscard]] entity::PathStatus route(glm::vec2, glm::vec2 to,
+        [[nodiscard]] entity::RouteStatus route(glm::vec2, glm::vec2 to,
                                                std::vector<glm::vec2>& out) const override {
             out.clear();
             out.push_back(to);
-            return entity::PathStatus::Ready;
+            return entity::RouteStatus::Ready;
         }
         [[nodiscard]] glm::vec2 steer(glm::vec2, glm::vec2, float) const override {
             return glm::vec2(0.0f, 1.0f); // always north, whatever was asked

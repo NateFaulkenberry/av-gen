@@ -70,19 +70,24 @@ class EntityWorld;
 // What is deliberately *not* here: anything about how a route is found, whether it is cached,
 // whether it is asynchronous (that is what `Pending` is for), or what a waypoint costs.
 
-enum class PathStatus : std::uint8_t {
+// Distinct from `entity::PathStatus` (ADR-093), which is the *planner's* verdict and has seven
+// cases for the several different ways a route can fail to exist. This is the narrower question a
+// caller asks each update -- "do you have one for me yet" -- and its `Pending` is about timing
+// rather than reachability, which is why the two are not one enum. A provider backed by the planner
+// collapses that enum's failures into `Unreachable`.
+enum class RouteStatus : std::uint8_t {
     Ready,       // `out` holds the route
     Pending,     // a planner is working on it; ask again next update
     Unreachable, // there is no route, and the caller should give up rather than walk at a wall
 };
-[[nodiscard]] const char* pathStatusName(PathStatus status);
+[[nodiscard]] const char* routeStatusName(RouteStatus status);
 
 class IPathProvider {
 public:
     virtual ~IPathProvider() = default;
     // Waypoints from `from` to `to`: `from` excluded, `to` included, so a straight-line provider
     // returns exactly one. `out` is cleared on Ready and left alone otherwise.
-    [[nodiscard]] virtual PathStatus route(glm::vec2 from, glm::vec2 to,
+    [[nodiscard]] virtual RouteStatus route(glm::vec2 from, glm::vec2 to,
                                            std::vector<glm::vec2>& out) const = 0;
     // A unit heading that makes progress from `from` towards `to` without walking into anything,
     // or (0,0) when every direction is blocked.
@@ -101,7 +106,7 @@ class NavigatorPath final : public IPathProvider {
 public:
     explicit NavigatorPath(const Navigator* nav = nullptr) : nav_(nav) {}
     void setNavigator(const Navigator* nav) { nav_ = nav; }
-    [[nodiscard]] PathStatus route(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out) const override;
+    [[nodiscard]] RouteStatus route(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out) const override;
     [[nodiscard]] glm::vec2 steer(glm::vec2 from, glm::vec2 to, float lookahead) const override;
     [[nodiscard]] float groundHeight(glm::vec2 p) const override;
 
