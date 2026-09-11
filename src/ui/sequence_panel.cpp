@@ -1,5 +1,7 @@
 #include "ui/sequence_panel.hpp"
 
+#include <chrono>
+
 #include "analysis/analysis_track.hpp"
 #include "app/camera_director.hpp"
 #include "core/log.hpp"
@@ -280,7 +282,9 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     const double duration = std::max({piece.duration(), engine.durationSeconds(), 1.0});
 
     const float width = std::max(ImGui::GetContentRegionAvail().x, 80.0f);
-    const int lanes = 1 + static_cast<int>(piece.actors.size()) + (piece.overlays.empty() ? 0 : 1);
+    const bool hasAudio = engine.audioFile() != nullptr;
+    const int lanes = (hasAudio ? 1 : 0) + 1 + static_cast<int>(piece.actors.size()) +
+                      (piece.overlays.empty() ? 0 : 1);
     const float height = kRulerHeight + kMarkerHeight +
                          static_cast<float>(lanes) * (kLaneHeight + kLaneGap) + kLaneGap;
 
@@ -363,6 +367,61 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         return std::pair<ImVec2, ImVec2>{ImVec2(toX(from), laneY),
                                          ImVec2(toX(to), laneY + kLaneHeight)};
     };
+
+    // ---- the audio lane ----
+    //
+    // First, above the shots, because the song is what everything below it is cut to: a shot
+    // boundary that does not land on anything in the waveform is the thing an author most needs to
+    // be able to see, and it is only visible when the two are adjacent.
+    //
+    // Drawn from a summary keyed on the file (see `waveform`), so this loop reads two floats per
+    // column rather than a slice of a twenty-megabyte file per column per frame.
+    if (hasAudio) {
+        const audio::WaveformSummary& wave = waveform(engine);
+        const auto [laneA, laneB] = laneRect(view_, view_ + span);
+        draw->AddRectFilled(laneA, laneB, IM_COL32(26, 30, 40, 210), 3.0f);
+        const float mid = laneY + kLaneHeight * 0.5f;
+        const float halfHeight = kLaneHeight * 0.5f - 2.0f;
+
+        // Where the audio actually stops. Past it the lane is empty rather than flat-lined, so a
+        // piece longer than its song reads as "the music has ended" instead of as silence that
+        // might be a bug.
+        const float audioEndX = toX(wave.durationSeconds);
+        if (audioEndX < laneB.x) {
+            draw->AddRectFilled(ImVec2(std::max(audioEndX, laneA.x), laneA.y), laneB,
+                                IM_COL32(0, 0, 0, 90), 3.0f);
+        }
+        const auto first = static_cast<int>(std::max(laneA.x, origin.x));
+        const auto last = static_cast<int>(std::min(laneB.x, origin.x + width));
+        const double perPixel = span / static_cast<double>(width);
+        for (int px = first; px <= last; ++px) {
+            const double from = toTime(static_cast<float>(px));
+            const auto [lo, hi] = wave.peak(from, from + perPixel);
+            if (lo == 0.0f && hi == 0.0f) {
+                continue;
+            }
+            const float x = static_cast<float>(px) + 0.5f;
+            // Clamped rather than scaled by the peak: a waveform whose height depends on the
+            // loudest moment in view changes shape as you scroll, which makes it useless for
+            // finding a moment again.
+            const float top = mid - std::min(hi, 1.0f) * halfHeight;
+            const float bottom = mid - std::max(lo, -1.0f) * halfHeight;
+            draw->AddLine(ImVec2(x, top), ImVec2(x, std::max(bottom, top + 1.0f)),
+                          IM_COL32(108, 156, 214, 200));
+        }
+        draw->AddLine(ImVec2(laneA.x, mid), ImVec2(laneB.x, mid), IM_COL32(120, 150, 200, 40));
+        draw->AddRect(laneA, laneB, IM_COL32(0, 0, 0, 120), 3.0f);
+        // The file's own name, because "which song is this" is a question the strip should answer
+        // without opening anything.
+        const std::string label = engine.audioPath().filename().string();
+        if (!label.empty()) {
+            draw->PushClipRect(laneA, laneB, true);
+            draw->AddText(ImVec2(laneA.x + 5.0f, laneA.y + 3.0f), IM_COL32(190, 215, 245, 150),
+                          label.c_str());
+            draw->PopClipRect();
+        }
+        laneY += kLaneHeight + kLaneGap;
+    }
 
     // Shots (spec 29).
     for (std::size_t i = 0; i < piece.shots.size(); ++i) {
@@ -1100,6 +1159,31 @@ const std::vector<double>& SequencePanel::beats(const app::Engine& engine) {
         beatSource_ = track;
     }
     return beatCache_;
+}
+
+const audio::WaveformSummary& SequencePanel::waveform(const app::Engine& engine) {
+    const std::shared_ptr<const audio::AudioFile> file = engine.audioFile();
+    if (file == nullptr) {
+        waveCache_ = {};
+        waveSource_ = nullptr;
+        return waveCache_;
+    }
+    // Keyed on the file, so loading a different song rebuilds and scrubbing does not. The summary
+    // is the one expensive thing on this panel and it must happen exactly as often as the audio
+    // changes, which is approximately never.
+    if (waveSource_ != file.get()) {
+        const auto started = std::chrono::steady_clock::now();
+        waveCache_ = audio::summarise(*file);
+        waveSource_ = file.get();
+        // Logged because it is the one pass over the whole file this panel makes, and because a
+        // line that appears once per load rather than once per frame is the cheapest possible proof
+        // that the cache is a cache.
+        log::info("sequence: waveform for '{}' summarised in {:.1f} ms ({} buckets over {:.1f} s)",
+                  engine.audioPath().filename().string(),
+                  std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count(),
+                  waveCache_.bucketCount(), waveCache_.durationSeconds);
+    }
+    return waveCache_;
 }
 
 void SequencePanel::importLyrics(app::Engine& engine, const std::filesystem::path& path) {

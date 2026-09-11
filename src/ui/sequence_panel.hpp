@@ -22,6 +22,7 @@
 // would make the drag feel like the thing it is not.
 
 #include "app/engine.hpp"
+#include "audio/waveform.hpp"
 #include "seq/sequence.hpp"
 
 #include <cstdint>
@@ -63,6 +64,10 @@ private:
     // Beat times from the analysed track, cached: the vector is thousands of doubles and the strip
     // asks for it every frame.
     [[nodiscard]] const std::vector<double>& beats(const app::Engine& engine);
+    // The audio's drawable shape, cached on the file it came from. Summarising is a pass over every
+    // sample -- five million of them for a three-minute song -- so it happens when the file changes
+    // and never while drawing.
+    [[nodiscard]] const audio::WaveformSummary& waveform(const app::Engine& engine);
 
     Selection selection_ = Selection::None;
     int selected_ = -1;
@@ -79,6 +84,8 @@ private:
     char textBuffer_[512] = "";
     std::vector<double> beatCache_;
     const void* beatSource_ = nullptr;
+    audio::WaveformSummary waveCache_;
+    const void* waveSource_ = nullptr;
 };
 
 } // namespace avgen::ui
