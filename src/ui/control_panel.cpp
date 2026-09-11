@@ -124,6 +124,12 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
         buildDefaultDockLayout(dockspace, layout_);
     }
 
+    // The centre is the canvas's alone, and that has to be reasserted every run rather than
+    // trusted to the saved layout: ImGui writes `NoTabBar` into the .ini but not
+    // `NoDockingOverMe`, so a panel dropped into the centre once stays there for ever, sharing one
+    // rectangle with the world and with no tab bar to show that it is doing so.
+    enforceCanvasCentre(dockspace, layout_);
+
     // The canvas before the panels, so the world is submitted whatever a panel does afterwards.
     canvas_ = drawCanvasWindow(canvasTexture, layout_.regionNode(DockRegion::Centre));
     drawPanels(engine, stats);

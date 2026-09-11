@@ -7,6 +7,7 @@
 
 #include "app/engine.hpp"
 #include "rendering/debug_draw.hpp"
+#include "ui/ui_logic.hpp"
 
 #include <string>
 #include <vector>
@@ -16,9 +17,6 @@ namespace avgen::ui {
 // Which parameters a layer shows. Beginner: world macros, atmosphere, camera, post. Intermediate:
 // + generators (procedural/*), fields, materials, deformers, particles, splines, sdf. Advanced:
 // everything (graph, attributes, GPU, simulation).
-enum class AuthoringLayer : int { Beginner = 0, Intermediate = 1, Advanced = 2 };
-// True when `path` (a parameter path) belongs to the layer.
-[[nodiscard]] bool layerShowsPath(AuthoringLayer layer, const std::string& path);
 
 // One reason a parameter is not simply its base value.
 struct Influence {

@@ -93,6 +93,108 @@ void buildDefaultDockLayout(ImGuiID dockspace, EditorLayout& layout) {
               static_cast<double>(ratios.bottom) * 100.0);
 }
 
+namespace {
+
+// Where a panel that has strayed into the centre should go back to.
+//
+// `EditorLayout`'s region nodes are only filled in when the default layout is *built*, so on a run
+// that loaded a saved layout they are all zero and cannot be used. The saved layout does know the
+// answer, though, indirectly: whichever node this panel's registered neighbours are sitting in is
+// the region, whatever id it happens to have this run. Falling back to that is what makes the
+// repair work on exactly the layouts that need repairing.
+ImGuiID homeNodeFor(DockRegion region, const EditorLayout& layout, const ImGuiDockNode* centre) {
+    if (const std::uint32_t known = layout.regionNode(region); known != 0) {
+        return static_cast<ImGuiID>(known);
+    }
+    for (const EditorPanel& sibling : editorPanels()) {
+        if (sibling.region != region) {
+            continue;
+        }
+        const ImGuiWindow* window = ImGui::FindWindowByName(sibling.id.data());
+        if (window == nullptr || window->DockId == 0) {
+            continue;
+        }
+        if (centre != nullptr && window->DockId == centre->ID) {
+            continue;   // also stranded; it is not evidence of where the region is
+        }
+        return window->DockId;
+    }
+    return 0;
+}
+
+} // namespace
+
+std::size_t enforceCanvasCentre(ImGuiID dockspace, const EditorLayout& layout) {
+    ImGuiDockNode* centre = ImGui::DockBuilderGetCentralNode(dockspace);
+    if (centre == nullptr) {
+        return 0;
+    }
+    // Reapplied every run rather than once at build: `NoDockingOverMe` is not written to the .ini,
+    // so without this the rule exists only until the first restart.
+    centre->SetLocalFlags(centre->LocalFlags | ImGuiDockNodeFlags_NoTabBar |
+                          ImGuiDockNodeFlags_NoDockingOverMe);
+
+    std::size_t evicted = 0;
+    // Backwards, because docking a window elsewhere removes it from this node's list.
+    for (int i = centre->Windows.Size - 1; i >= 0; --i) {
+        const ImGuiWindow* window = centre->Windows[i];
+        if (window == nullptr || window->Name == nullptr) {
+            continue;
+        }
+        const std::string_view name(window->Name);
+        if (name == kCanvasWindow) {
+            continue;
+        }
+        DockRegion region = DockRegion::Floating;
+        if (const EditorPanel* panel = findEditorPanel(name); panel != nullptr) {
+            region = panel->region;
+        }
+        // A panel with no registered home, or one whose region cannot be located, is floated --
+        // visible and recoverable, where leaving it in the centre is neither.
+        const ImGuiID home = homeNodeFor(region, layout, centre);
+        ImGui::DockBuilderDockWindow(window->Name, home);
+        log::warn("editor: '{}' was sharing the canvas's centre node and has been moved {}", name,
+                  home != 0 ? "back beside its neighbours" : "out to a floating window");
+        ++evicted;
+    }
+    // A panel that has not been shown yet has no window, so it is not in the node's list above --
+    // it exists only as the settings the .ini was parsed into. Left alone, it would appear in the
+    // centre for the one frame between being opened and being evicted, which is a flash of a panel
+    // over the world every time a hidden panel is first shown.
+    if (ImGuiContext* g = ImGui::GetCurrentContext(); g != nullptr) {
+        for (ImGuiWindowSettings* settings = g->SettingsWindows.begin(); settings != nullptr;
+             settings = g->SettingsWindows.next_chunk(settings)) {
+            if (settings->DockId != centre->ID) {
+                continue;
+            }
+            const char* name = settings->GetName();
+            if (name == nullptr || std::string_view(name) == kCanvasWindow) {
+                continue;
+            }
+            if (ImGui::FindWindowByName(name) != nullptr) {
+                continue;   // live, and already handled above
+            }
+            DockRegion region = DockRegion::Floating;
+            if (const EditorPanel* panel = findEditorPanel(name); panel != nullptr) {
+                region = panel->region;
+            }
+            settings->DockId = homeNodeFor(region, layout, centre);
+            log::warn("editor: '{}' was recorded in the canvas's centre node and has been moved {}",
+                      name, settings->DockId != 0 ? "back beside its neighbours" : "out to float");
+            ++evicted;
+        }
+    }
+
+    if (evicted > 0) {
+        // Dock positions live in ImGui's own .ini rather than in `EditorLayout`, so the repair is
+        // persisted by marking that dirty. Without it the broken layout stays on disk and the fix
+        // is redone on every launch -- which would work, but would also mean the warning above is
+        // printed for ever.
+        ImGui::MarkIniSettingsDirty();
+    }
+    return evicted;
+}
+
 CanvasRect drawCanvasWindow(std::uint64_t texture, std::uint32_t centreNode) {
     CanvasRect rect;
     if (centreNode != 0) {

@@ -21,6 +21,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <limits>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -210,9 +211,19 @@ TEST_CASE("a pass's timeline number responds to that pass's own workload", "[tim
     // reported number by under 2 ms out of a claimed 39.4.
     const auto marchMs = [&](std::uint32_t steps) {
         s.environment.volumeSteps = steps;
-        double best = 0.0;
+        // One run discarded before measuring. The first encode of a given configuration pays
+        // pipeline compilation, and that lands inside the measured interval: the 16-step arm, which
+        // runs first, reported 40.6 ms for a pass whose real cost is under one.
+        (void)msFor(run(*renderer, s, 20), "volume");
+        // The *least* of several, not the greatest. Taking the maximum keeps whichever sample was
+        // most disturbed -- by compilation, by another process on the GPU, by anything -- which is
+        // the opposite of what a cost measurement wants, and it fails in both directions: a spike
+        // in the light arm fails the test, and a spike in the heavy arm passes it for the wrong
+        // reason. The minimum is the closest observation to an undisturbed one, which is the
+        // estimator the rest of this project's benchmarking uses on a shared machine.
+        double best = std::numeric_limits<double>::max();
         for (int attempt = 0; attempt < 3; ++attempt) {
-            best = std::max(best, msFor(run(*renderer, s, 20), "volume"));
+            best = std::min(best, msFor(run(*renderer, s, 20), "volume"));
         }
         return best;
     };

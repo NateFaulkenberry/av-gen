@@ -10,38 +10,6 @@
 
 namespace avgen::ui {
 
-namespace {
-
-bool startsWith(const std::string& s, std::string_view prefix) {
-    return s.size() >= prefix.size() && s.compare(0, prefix.size(), prefix) == 0;
-}
-
-// The group prefixes each layer adds to the one below it.
-const char* const kBeginnerPrefixes[] = {"macros/", "scene/", "env/", "post/", "camera/", "root/"};
-const char* const kIntermediatePrefixes[] = {"procedural/", "field/", "spline/", "sdf/", "material/", "particles/"};
-
-} // namespace
-
-bool layerShowsPath(AuthoringLayer layer, const std::string& path) {
-    if (layer == AuthoringLayer::Advanced) {
-        return true;
-    }
-    for (const char* prefix : kBeginnerPrefixes) {
-        if (startsWith(path, prefix)) {
-            return true;
-        }
-    }
-    if (layer == AuthoringLayer::Beginner) {
-        return false;
-    }
-    for (const char* prefix : kIntermediatePrefixes) {
-        if (startsWith(path, prefix)) {
-            return true;
-        }
-    }
-    return startsWith(path, "nodes/");
-}
-
 std::string WorldSelection::parameterPrefix() const {
     switch (kind) {
     case Kind::Node: return "nodes/" + name + "/";
@@ -244,7 +212,7 @@ void WorldPanel::drawInspector(app::Engine& engine) {
     ImGui::TextDisabled("Why is this moving?");
     bool any = false;
     for (params::IParameter* param : engine.params().ordered()) {
-        if (!startsWith(param->path(), prefix)) {
+        if (!detail::pathStartsWith(param->path(), prefix)) {
             continue;
         }
         const auto influences = influencesOf(engine, param->path());

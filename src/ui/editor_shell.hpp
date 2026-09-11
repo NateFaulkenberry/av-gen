@@ -19,6 +19,20 @@ namespace avgen::ui {
 // `centreNode` is the dock node to claim if the canvas has never been placed: without it a saved
 // layout from a build that had no canvas window would open with the world floating over the
 // panels. Returns where it ended up, for the host to size the next frame's render target from.
+// Keeps the centre the canvas's alone, every run.
+//
+// `buildDefaultDockLayout` sets `NoTabBar | NoDockingOverMe` on the central node and the old
+// comment claimed both survive a restart. Only one does: ImGui's .ini serialiser writes
+// `CentralNode` and `NoTabBar` and **not** `NoDockingOverMe`, so the half that actually keeps
+// panels out of the centre is the half that is lost on load. A layout saved once with a panel in
+// the centre then keeps it there for ever, and because the node also carries `NoTabBar` there is
+// no tab bar to reveal that two windows are sharing one rectangle -- so a panel paints over the
+// world instead of beside it.
+//
+// Reapplies the flags and moves any stranger back to the region it is registered for. Returns how
+// many it evicted, which is zero on every run after the first.
+std::size_t enforceCanvasCentre(ImGuiID dockspace, const EditorLayout& layout);
+
 [[nodiscard]] CanvasRect drawCanvasWindow(std::uint64_t texture, std::uint32_t centreNode);
 
 // Rebuilds the default dock tree under `dockspace`, discarding whatever is there: a column each
