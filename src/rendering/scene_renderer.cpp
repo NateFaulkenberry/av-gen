@@ -1648,6 +1648,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         QualitySettings aoQuality = qualitySettings_;
         aoQuality.ambientOcclusion = aoQuality.ambientOcclusion && toggles_.ao;
         ao_->update(hdr_.width(), hdr_.height(), linearDepth_.view, aoQuality, time.frameIndex,
+                    time.frameNonce(),
                     scene.camera.effectiveFovY(), aspect, scene.camera.nearPlane, scene.camera.farPlane,
                     aoRadius, 1.0f);
         stats_.ao = ao_->stats();
@@ -1863,7 +1864,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     tonemap.grain = scene.post.grain;
     tonemap.size[0] = static_cast<float>(hdr_.width());
     tonemap.size[1] = static_cast<float>(hdr_.height());
-    tonemap.seed = static_cast<float>(time.frameIndex % 1024);
+    tonemap.seed = static_cast<float>(time.frameNonce() % 1024);
     tonemap.chromaRetention = scene.post.chromaRetention;
     queue.WriteBuffer(tonemapUniforms_, 0, &tonemap, sizeof(tonemap));
 

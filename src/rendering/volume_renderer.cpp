@@ -337,7 +337,7 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     u.noiseParams = glm::vec4(env.volumeNoiseAmount, env.volumeNoiseScale, env.volumeNoiseSpeed,
                               static_cast<float>(time.renderTime));
     u.info = glm::vec4(static_cast<float>(steps), static_cast<float>(densitySlot), static_cast<float>(colorSlot),
-                       static_cast<float>(time.frameIndex % 4096u));
+                       static_cast<float>(time.frameNonce() % 4096u));
     u.sizes = glm::vec4(static_cast<float>(im.half.width()), static_cast<float>(im.half.height()),
                         static_cast<float>(width), static_cast<float>(height));
     u.depthParams = glm::vec4(scene.camera.nearPlane, scene.camera.farPlane, 0.0f, 0.0f);

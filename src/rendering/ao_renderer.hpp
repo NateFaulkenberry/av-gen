@@ -61,7 +61,8 @@ public:
     // Sizes the targets and writes the uniforms. `linearDepth` is the R32Float scene depth.
     // Does nothing (and reports zero) when the tier has AO off or the size is degenerate.
     void update(std::uint32_t width, std::uint32_t height, const wgpu::TextureView& linearDepth,
-                const QualitySettings& quality, std::uint64_t frameIndex, float fovYRadians, float aspect,
+                const QualitySettings& quality, std::uint64_t frameIndex, std::uint32_t frameNonce,
+                float fovYRadians, float aspect,
                 float nearPlane, float farPlane, float worldRadius, float strength);
     // Encodes the occlusion pass and the temporal pass. `frameBindGroup` must be the variant whose
     // AO binding is a placeholder.

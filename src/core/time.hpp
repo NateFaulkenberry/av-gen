@@ -13,6 +13,27 @@ struct FrameTime {
     double renderTime = 0.0; // seconds on the engine timeline
     double deltaTime = 0.0;  // seconds since the previous frame (0 on the first frame)
     std::uint64_t frameIndex = 0;
+
+    // A per-frame number for anything that wants to *decorrelate* successive frames -- a dither
+    // seed, a ray-march offset -- as opposed to anything that *accumulates* across them.
+    //
+    // It is derived from the time on the timeline, not from how many frames have been drawn, and
+    // that distinction is the whole point. `frameIndex` counts from wherever the render started, so
+    // a given second is frame 104 in a full render and frame 4 in a render of the last five
+    // seconds, and a jitter keyed to it draws that second two different ways. Measured on
+    // night-shift before this existed: three renders covering t=104s agreed on nothing, differing
+    // over 83% of the frame by about one value in 255 -- small, and exactly large enough to make a
+    // re-rendered section not splice cleanly into a full render.
+    //
+    // Quantised to 1/240 s so it still changes every frame at any sane frame rate, and wraps at
+    // 2^24 to stay exactly representable as a float on the way to a shader.
+    [[nodiscard]] std::uint32_t frameNonce() const {
+        const double ticks = renderTime * 240.0;
+        // A long double round would be exact but the domain here is bounded: a timeline is seconds,
+        // not centuries, and the wrap makes the far end harmless anyway.
+        const auto whole = static_cast<std::int64_t>(ticks < 0.0 ? ticks - 0.5 : ticks + 0.5);
+        return static_cast<std::uint32_t>(static_cast<std::uint64_t>(whole) & 0xFFFFFFu);
+    }
 };
 
 class FrameClock {

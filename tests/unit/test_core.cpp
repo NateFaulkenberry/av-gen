@@ -151,3 +151,44 @@ TEST_CASE("TripleBuffer delivers the latest published value", "[core][triple]") 
     CHECK_FALSE(tb.acquire());
     CHECK(tb.front() == 3);
 }
+
+// A per-frame nonce that is a function of the time on the timeline, not of how many frames this
+// particular render has drawn. The bug this guards was measured on examples/city/night-shift.json:
+// rendering 0:105, 50:105 and 100:105 produced three different pictures of t=104s, disagreeing over
+// 83% of the frame, because the volumetric ray-march offset, the tonemap dither and the AO sample
+// rotation were all keyed to `frameIndex` -- which is 104, 54 and 4 for that same second.
+TEST_CASE("frameNonce depends on the timeline, not on where the render started", "[core][time]") {
+    // The same second is the same nonce whether it is the hundredth frame of a full render or the
+    // fourth frame of a render of the last five seconds. This is the whole property.
+    FrameTime full{104.0, 1.0, 104};
+    FrameTime section{104.0, 1.0, 4};
+    CHECK(full.frameNonce() == section.frameNonce());
+
+    // ...and it still advances frame to frame, or it would not decorrelate anything. 240 Hz is
+    // finer than any frame rate the engine renders at, so consecutive frames always differ.
+    FrameTime a{10.0, 0.0, 0};
+    FrameTime b{10.0 + 1.0 / 60.0, 0.0, 1};
+    FrameTime c{10.0 + 2.0 / 60.0, 0.0, 2};
+    CHECK(a.frameNonce() != b.frameNonce());
+    CHECK(b.frameNonce() != c.frameNonce());
+
+    // A clock that reaches a time by seeking agrees with one that ticked there, which is the
+    // offline-render case that made this visible.
+    FixedStepClock played(60.0);
+    FrameTime last{};
+    for (int i = 0; i < 120; ++i) {
+        last = played.tick();
+    }
+    FixedStepClock jumped(60.0);
+    jumped.restartAt(last.renderTime);
+    const FrameTime arrived = jumped.tick();
+    REQUIRE_THAT(arrived.renderTime, Catch::Matchers::WithinAbs(last.renderTime, 1e-9));
+    CHECK(arrived.frameIndex != last.frameIndex); // the counters disagree...
+    CHECK(arrived.frameNonce() == last.frameNonce()); // ...and the nonce does not care
+
+    // Negative times are a legal timeline position (a pre-roll) and must not alias onto a positive
+    // one, which a truncating cast would do by folding -0.4 and +0.4 both onto zero.
+    FrameTime behind{-1.0, 0.0, 0};
+    FrameTime ahead{1.0, 0.0, 0};
+    CHECK(behind.frameNonce() != ahead.frameNonce());
+}

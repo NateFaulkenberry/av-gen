@@ -105,9 +105,10 @@ float luminanceAt(const gpu::ImageF& image, std::uint32_t x, std::uint32_t y) {
     return 0.2126f * p[0] + 0.7152f * p[1] + 0.0722f * p[2];
 }
 
-gpu::ImageF renderFloat(rendering::SceneRenderer& renderer, const scene::Scene& s, std::uint64_t frameIndex = 0) {
+gpu::ImageF renderFloat(rendering::SceneRenderer& renderer, const scene::Scene& s,
+                        std::uint64_t frameIndex = 0, double renderTime = 1.0) {
     FrameTime time{};
-    time.renderTime = 1.0;
+    time.renderTime = renderTime;
     time.deltaTime = 1.0 / 60.0;
     time.frameIndex = frameIndex;
     auto image = renderer.renderToImageFloat(s, time, kSize, kSize);
@@ -327,10 +328,19 @@ TEST_CASE("Two fresh renderers produce identical volumetric frames", "[volume][g
         INFO("frame " << frame);
         CHECK(gpu::hashImage(ia) == gpu::hashImage(ib));
     }
-    // The jitter is a function of the frame index, so a different frame is a different image.
-    const gpu::ImageF first = renderFloat(*a, s, 0);
-    const gpu::ImageF second = renderFloat(*a, s, 1);
+    // The jitter varies from frame to frame, or it would not be decorrelating anything -- and what
+    // makes one frame different from the next is the time on the timeline.
+    const gpu::ImageF first = renderFloat(*a, s, 0, 1.0);
+    const gpu::ImageF second = renderFloat(*a, s, 1, 1.0 + 1.0 / 60.0);
     CHECK(gpu::hashImage(first) != gpu::hashImage(second));
+
+    // ...and the same moment is the same image however many frames this renderer has drawn to reach
+    // it. Keying the jitter to the render's own frame counter instead made a given second look one
+    // way in a full render and another in a render of the last few seconds: measured on
+    // night-shift, three renders covering t=104s agreed on nothing (see FrameTime::frameNonce).
+    const gpu::ImageF early = renderFloat(*a, s, 4, 2.0);
+    const gpu::ImageF late = renderFloat(*a, s, 104, 2.0);
+    CHECK(gpu::hashImage(early) == gpu::hashImage(late));
     CHECK(ctx->errorCount() == 0);
 }
 

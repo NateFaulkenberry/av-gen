@@ -246,7 +246,8 @@ Result<void> AoRenderer::reload() {
 }
 
 void AoRenderer::update(std::uint32_t width, std::uint32_t height, const wgpu::TextureView& linearDepth,
-                        const QualitySettings& quality, std::uint64_t frameIndex, float fovYRadians,
+                        const QualitySettings& quality, std::uint64_t frameIndex, std::uint32_t frameNonce,
+                        float fovYRadians,
                         float aspect, float nearPlane, float farPlane, float worldRadius, float strength) {
     Impl& im = *impl_;
     collectTimings();
@@ -283,7 +284,12 @@ void AoRenderer::update(std::uint32_t width, std::uint32_t height, const wgpu::T
                          static_cast<float>(std::max(quality.aoSlices, 1u)),
                          static_cast<float>(std::max(quality.aoStepsPerSlice, 1u)));
     const float blend = 1.0f / static_cast<float>(std::max(quality.aoHistoryFrames, 1u));
-    u.temporal = glm::vec4(static_cast<float>(frameIndex % 64u), blend, im.hasHistory ? 1.0f : 0.0f,
+    // The rotating sample pattern decorrelates neighbouring frames, so it is keyed to the time on
+    // the timeline rather than to the render's own frame counter -- otherwise a given second gets a
+    // different pattern depending on where the render started, and never converges to agreement.
+    // The history validity check above is the opposite case and rightly stays on `frameIndex`:
+    // accumulation really does care whether this frame follows the last one.
+    u.temporal = glm::vec4(static_cast<float>(frameNonce % 64u), blend, im.hasHistory ? 1.0f : 0.0f,
                            std::max(worldRadius * 0.5f, 0.05f));
     u.projection = glm::vec4(tanHalf * aspect, tanHalf, nearPlane, farPlane);
     im.context.queue().WriteBuffer(im.uniforms, 0, &u, sizeof(u));
