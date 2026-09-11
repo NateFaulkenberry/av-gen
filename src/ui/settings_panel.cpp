@@ -21,6 +21,27 @@ void resizableBuffer(std::string& buffer, std::size_t capacity) {
     }
 }
 
+void sectionHeading(const char* title, const char* detail = nullptr) {
+    ImGui::Spacing();
+    ImGui::TextUnformatted(title);
+    if (detail != nullptr) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", detail);
+    }
+    ImGui::Separator();
+    ImGui::Spacing();
+}
+
+void propertyLabel(const char* label, const char* detail = nullptr) {
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(label);
+    if (detail != nullptr) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", detail);
+    }
+    ImGui::SameLine(190.0f);
+}
+
 } // namespace
 
 void SettingsPanel::draw(app::Engine& engine) {
@@ -32,7 +53,8 @@ void SettingsPanel::draw(app::Engine& engine) {
     if (ImGui::BeginChild("settings-sections", ImVec2(listWidth, 0), ImGuiChildFlags_Borders)) {
         for (int i = 0; i < static_cast<int>(Section::Count); ++i) {
             const bool selected = static_cast<int>(section_) == i;
-            if (ImGui::Selectable(kSectionNames[static_cast<std::size_t>(i)], selected)) {
+            if (ImGui::Selectable(kSectionNames[static_cast<std::size_t>(i)], selected,
+                                  ImGuiSelectableFlags_AllowOverlap, ImVec2(0.0f, 30.0f))) {
                 section_ = static_cast<Section>(i);
             }
         }
@@ -57,12 +79,12 @@ void SettingsPanel::draw(app::Engine& engine) {
 }
 
 void SettingsPanel::drawGeneral() {
-    ImGui::TextDisabled("Settings that belong to this installation rather than to a project.");
-    ImGui::Separator();
+    sectionHeading("Appearance", "Application-wide");
+    ImGui::TextDisabled("Installation preferences apply across projects and follow this machine.");
     if (settings != nullptr) {
         int appearance = static_cast<int>(settings->appearance);
-        ImGui::TextDisabled("Appearance");
-        if (ImGui::Combo("Theme", &appearance, "System\0Dark\0Light\0")) {
+        propertyLabel("Theme", "System follows macOS");
+        if (ImGui::Combo("##appearance-theme", &appearance, "System\0Dark\0Light\0")) {
             settings->appearance = static_cast<app::AppearanceTheme>(std::clamp(appearance, 0, 2));
             if (onAppearanceChanged) {
                 onAppearanceChanged(settings->appearance);
@@ -72,7 +94,7 @@ void SettingsPanel::drawGeneral() {
             }
         }
     }
-    ImGui::Separator();
+    sectionHeading("Workspace", "Editor layout");
     ImGui::TextWrapped(
         "Panel layout is stored separately and restored automatically. Use View > Restore Default "
         "Layout to put the panels back.");
@@ -83,11 +105,11 @@ void SettingsPanel::drawRendering() {
         ImGui::TextDisabled("No renderer is attached to this session.");
         return;
     }
-    ImGui::TextDisabled("How the editor's viewport is rendered. Offline render settings are per "
-                        "project and live in the Render panel.");
-    ImGui::Separator();
+    sectionHeading("Viewport", "Editor rendering");
+    ImGui::TextDisabled("Offline render settings remain per-project in the Render panel.");
+    propertyLabel("Render scale", "Performance / sharpness");
     float scale = *canvasRenderScale;
-    if (ImGui::SliderFloat("Canvas render scale", &scale, 0.25f, 1.0f, "%.2f")) {
+    if (ImGui::SliderFloat("##canvas-render-scale", &scale, 0.25f, 1.0f, "%.2f")) {
         *canvasRenderScale = scale;
         if (settings != nullptr) {
             settings->canvasRenderScale = scale;
