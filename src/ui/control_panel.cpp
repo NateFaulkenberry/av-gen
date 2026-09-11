@@ -460,16 +460,19 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
 }
 
 void ControlPanel::drawGraphWindow(app::Engine& engine) {
-    scene::Composition* composition = engine.composition();
-    if (composition == nullptr) {
+    // `comp`, not `composition`: this class has a `composition` member (the CompositionPanel), and a
+    // local of the same name shadows it. Harmless here, and exactly the kind of thing that is not
+    // harmless the day somebody adds a line to this function meaning the panel.
+    scene::Composition* comp = engine.composition();
+    if (comp == nullptr) {
         ImGui::TextDisabled("The current scene is not a composition, so it cannot hold a graph.");
         return;
     }
-    graphEditor.onChanged = [composition] { composition->markGraphDirty(); };
-    graphEditor.draw(composition->graph());
-    if (!composition->graphWarnings().empty()) {
+    graphEditor.onChanged = [comp] { comp->markGraphDirty(); };
+    graphEditor.draw(comp->graph());
+    if (!comp->graphWarnings().empty()) {
         ImGui::Separator();
-        for (const std::string& warning : composition->graphWarnings()) {
+        for (const std::string& warning : comp->graphWarnings()) {
             ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", warning.c_str());
         }
     }
