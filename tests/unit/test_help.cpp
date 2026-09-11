@@ -546,7 +546,12 @@ TEST_CASE("The shipped Help content loads, and is not a shell") {
 
     CHECK(report->documents >= 40);
     CHECK(report->features >= 25);
-    CHECK(report->shortcuts == 6);
+    // A floor, like every other count in this test. It was an equality when six was the whole set
+    // AV Gen bound; the world editor then landed seventeen more, and an exact count here would make
+    // documenting them a failure in the smoke test that only asks whether content loaded. That the
+    // table matches the binaries exactly, in *both* directions, is checked properly by "Every
+    // shortcut in the reference is bound, and every binding is in the reference".
+    CHECK(report->shortcuts >= 6);
     CHECK(db.categories().size() >= 8);
 
     // Every category a user is told to expect actually exists.
