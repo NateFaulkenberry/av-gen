@@ -120,6 +120,13 @@ instance buffer, so instanced geometry casts without a second data path), meshed
 Raymarched SDFs march their bounding box at a quarter of the steps with a looser epsilon, which is
 all a caster silhouette needs.
 
+**At the realtime and preview tiers the map term is looked up at half resolution** for up to three
+directional lights and bilaterally upsampled in the lit pass (ADR-087): the cascade lookup is the
+largest single term in the scene pass at the resolution the editor renders, and a penumbra is
+low-frequency enough to survive it. The High and Offline tiers look it up per pixel, so an offline
+render is the frame this optimisation did not touch. Blended surfaces, local lights and any
+directional light past the third take the per-pixel path either way.
+
 Known limits: one cascaded directional light per frame; instanced geometry culled against the
 camera frustum does not cast from off-screen; there are no point-light cube maps.
 
@@ -135,10 +142,24 @@ This is what makes small parts sit against each other: an object resting on a fl
 a wall, the base of a column. It runs per light for any light with `contactShadow` set, which is how
 a point or area light gets a shadow at all.
 
+`contactShadow` defaults to true, so a light that casts no map still marches -- deliberately, per
+ADR-034, because otherwise most lights would cast nothing. It is not free: Glowmere runs three
+marches per fragment and only the moon has a map, and turning off the two that do not is worth
+3.3 ms at the editor's 2880x1166 canvas. A light rig can now say so per light
+(`"contactShadow": false` in a `.rig.json` light), and the default stays true because switching it
+off changes the image (ADR-087).
+
+**It is not masked.** The half-resolution shadow mask carries the map term only; a march evaluated
+once per 2x2 doubles the width of every contact shadow it finds, which is exactly the detail the
+march exists to produce. See ADR-087.
+
 ## Ambient occlusion
 
 GTAO (Jimenez et al. 2016) at half resolution from the linear depth target, with normals
-reconstructed from depth by a best-fit of the closer neighbour on each axis. Each of 2 to 6
+reconstructed from depth by a best-fit of the closer neighbour on each axis, oriented by the winding
+of the two screen-space differences rather than by the sign of the normal's own view-space z -- that
+sign is a coin flip on a surface seen nearly edge-on, which is most of the ground in a landscape
+(ADR-087). Each of 2 to 6
 direction slices searches the horizon both ways over 4 to 12 steps within a world radius, and the
 ground-truth visibility integral is accumulated along with a **bent normal**. A temporal pass then
 reprojects the previous frame with the camera motion, rejects history from a different surface by

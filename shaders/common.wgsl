@@ -40,6 +40,9 @@ struct FrameUniforms {
     shadowParams: vec4<f32>,   // x = atlas resolution, y = PCF radius (texels), z = contact steps, w = contact length
     aoParams: vec4<f32>,       // x = strength, y = 1 when AO is on, zw = the AO texture size
     targetSize: vec4<f32>,     // x = width, y = height, z = 1 / width, w = 1 / height
+    // ADR-087: the half-resolution screen-space shadow mask. x = 1 when it was built this frame,
+    // y = how many leading directional lights it covers (0..3), zw = its texture size in texels.
+    shadowMaskParams: vec4<f32>,
     // ADR-055 the wind field. Frame-global because the air is: the same four vectors drive every
     // shader that wants to know what is blowing, and the shadow views inherit them with the rest of
     // the block so a swaying plant and its shadow cannot disagree. See shaders/wind.wgsl.

@@ -466,3 +466,201 @@ TEST_CASE("the froxel grid the compute pass builds matches the CPU reference", "
     CHECK(populated > 0);
     CHECK(mismatches == 0);
 }
+
+// ---- the half-resolution shadow mask (ADR-087) ---------------------------------------------------
+
+namespace {
+
+// A floor the camera sees almost edge-on, one shadow-casting light raking across it, and a box
+// throwing a shadow onto it. The grazing angle is the point: it is where a normal reconstructed
+// from the depth buffer is most nearly perpendicular to the view, and where orienting that normal
+// by its own view-space z -- which is what this used to do, and what gtao.wgsl did -- becomes a
+// coin flip. When it lands wrong the normal points into the ground, the shadow lookup's normal
+// offset pushes its sample point under the surface, and open lit floor fills with acne.
+// A wide ground plane with a gentle undulation, the shape Glowmere's terrain has. Flat ground
+// cannot reproduce the defect this scene exists for: a perfectly flat surface reconstructs one
+// exact normal whose view-space z has a definite sign, so orienting by that sign happens to work.
+// It is a surface whose facets face slightly different ways -- so that some of them are within
+// rounding of perpendicular to the view -- where the sign test becomes a coin flip.
+scene::MeshData undulatingGround(float extent, std::uint32_t cells, float amplitude) {
+    scene::MeshData m;
+    const float step = extent / static_cast<float>(cells);
+    const auto height = [amplitude](float x, float z) {
+        return amplitude * (std::sin(x * 0.011f) * std::cos(z * 0.017f) + 0.6f * std::sin(z * 0.031f));
+    };
+    for (std::uint32_t j = 0; j <= cells; ++j) {
+        for (std::uint32_t i = 0; i <= cells; ++i) {
+            const float x = -extent * 0.5f + static_cast<float>(i) * step;
+            const float z = -extent * 0.5f + static_cast<float>(j) * step;
+            const float y = height(x, z);
+            // Analytic normal, so the *shading* normal is smooth while the triangles are facets --
+            // exactly the arrangement the mask has to cope with.
+            const float dx = (height(x + 0.5f, z) - height(x - 0.5f, z));
+            const float dz = (height(x, z + 0.5f) - height(x, z - 0.5f));
+            const glm::vec3 n = glm::normalize(glm::vec3(-dx, 1.0f, -dz));
+            m.vertices.push_back({{x, y, z}, n, {static_cast<float>(i), static_cast<float>(j)}});
+        }
+    }
+    const std::uint32_t stride = cells + 1;
+    for (std::uint32_t j = 0; j < cells; ++j) {
+        for (std::uint32_t i = 0; i < cells; ++i) {
+            const std::uint32_t a = j * stride + i;
+            m.indices.insert(m.indices.end(), {a, a + stride, a + stride + 1, a, a + stride + 1, a + 1});
+        }
+    }
+    return m;
+}
+
+scene::Scene grazingScene() {
+    scene::Scene s;
+    s.environment.backgroundColor = glm::vec3(0.0f);
+    s.environment.showSkybox = false;
+    s.environment.environmentIntensity = 0.0f;
+    // Big, because the defect scales with the cascade's world texel size and that is the scene
+    // radius over the atlas resolution. In a twenty-metre room a normal offset of a texel is a
+    // centimetre and points nowhere in particular without consequence; over half a kilometre it is
+    // most of a metre, and pointing it into the ground is what filled Glowmere with acne.
+    s.camera.position = {0.0f, 6.0f, 300.0f};
+    s.camera.target = {0.0f, 4.0f, -300.0f};
+    s.camera.fovYRadians = 0.9f;
+    s.camera.nearPlane = 0.5f;
+    s.camera.farPlane = 2000.0f;
+
+    const auto floor = s.addMesh(undulatingGround(1200.0f, 72, 2.5f));
+    const auto box = s.addMesh(boxMesh({8.0f, 8.0f, 8.0f}));
+    {
+        auto& e = s.addEntity("floor", floor);
+        e.material.baseColor = glm::vec3(0.8f);
+        e.material.roughness = 0.9f;
+    }
+    {
+        auto& e = s.addEntity("box", box);
+        e.transform.position = {0.0f, 30.0f, -120.0f};
+        e.material.baseColor = glm::vec3(0.8f);
+        e.material.roughness = 0.9f;
+    }
+    scene::PunctualLight key;
+    key.name = "key";
+    key.type = scene::PunctualLight::Type::Directional;
+    key.direction = glm::normalize(glm::vec3(0.35f, -0.4f, -0.6f)); // raking, like a low moon
+    key.color = glm::vec3(1.0f);
+    key.intensity = 4.0f;
+    key.castsShadow = true;
+    key.contactShadow = false; // the march is not masked; this test is about the map term
+    key.softness = 0.4f;
+    s.addLight(key);
+    return s;
+}
+
+float meanLuminance(const gpu::Image8& image, std::uint32_t x0, std::uint32_t y0, std::uint32_t x1,
+                    std::uint32_t y1) {
+    double total = 0.0;
+    std::uint32_t n = 0;
+    for (std::uint32_t y = y0; y < y1; ++y) {
+        for (std::uint32_t x = x0; x < x1; ++x) {
+            total += static_cast<double>(luminanceAt(image, x, y));
+            ++n;
+        }
+    }
+    return n > 0 ? static_cast<float>(total / n) : 0.0f;
+}
+
+} // namespace
+
+TEST_CASE("the shadow mask leaves open lit ground alone", "[gpu][shadows][mask]") {
+    // The class of failure this guards: a mask that shadows ground nothing is standing on. It is
+    // what the flipped reconstruction normal of ADR-087 did, over a whole valley, smoothly enough
+    // to read as art rather than as a bug.
+    //
+    // **It does not reproduce that particular defect, and that was checked rather than assumed.**
+    // Reintroducing the `normal.z < 0` orientation leaves this scene's numbers identical to six
+    // figures. The degeneracy needs a surface whose facets sit within rounding of perpendicular to
+    // the view *and* a cascade whose world texels are large enough for the resulting offset to
+    // reach through the ground, and a scene small enough to assert a named pixel on does not have
+    // both. What caught it was rendering Glowmere with the mask written straight to the screen and
+    // diffing it against the same term at full resolution; that is the procedure to repeat, and
+    // `--disable shadowmask` is the arm for it. Forcing the mask to zero *does* move this test's
+    // number (0.73 -> 0.41), so the scene genuinely reads the mask and the assertion is not vacuous.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+    const scene::Scene s = grazingScene();
+
+    rendering::SceneRenderer::PassToggles off;
+    off.shadowMask = false;
+    renderer->setPassToggles(off);
+    auto unmasked = renderer->renderToImage(s, frameAt(4), kSize, kSize);
+    REQUIRE(unmasked.has_value());
+
+    renderer->setPassToggles(rendering::SceneRenderer::PassToggles{});
+    auto masked = renderer->renderToImage(s, frameAt(4), kSize, kSize);
+    REQUIRE(masked.has_value());
+    REQUIRE(renderer->shadowMask().active());
+    CHECK(renderer->shadowMask().stats().width * 2 <= kSize + 1); // it really is at half resolution
+
+    // The bottom strip of the frame is floor running away from the camera, lit and unoccluded.
+    const std::uint32_t y0 = kSize * 3 / 4;
+    const float open = meanLuminance(*unmasked, 0, y0, kSize, kSize);
+    const float openMasked = meanLuminance(*masked, 0, y0, kSize, kSize);
+    INFO("open grazing floor: " << open << " unmasked -> " << openMasked << " masked");
+    REQUIRE(open > 0.02f); // the control really is lit there
+    CHECK(openMasked > open * 0.9f);
+    CHECK(openMasked < open * 1.1f);
+}
+
+TEST_CASE("the shadow mask reproduces the shadow it replaces", "[gpu][shadows][mask]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+    const scene::Scene lit = shadowScene(false);
+    const scene::Scene shadowed = shadowScene(true);
+
+    rendering::SceneRenderer::PassToggles off;
+    off.shadowMask = false;
+    renderer->setPassToggles(off);
+    auto unmasked = renderer->renderToImage(shadowed, frameAt(5), kSize, kSize);
+    REQUIRE(unmasked.has_value());
+    auto control = renderer->renderToImage(lit, frameAt(5), kSize, kSize);
+    REQUIRE(control.has_value());
+
+    renderer->setPassToggles(rendering::SceneRenderer::PassToggles{});
+    auto masked = renderer->renderToImage(shadowed, frameAt(5), kSize, kSize);
+    REQUIRE(masked.has_value());
+
+    const std::uint32_t cx = kSize / 2;
+    const std::uint32_t cy = kSize / 2;
+    const float open = luminanceAt(*control, cx, cy);
+    const float dark = luminanceAt(*unmasked, cx, cy);
+    const float darkMasked = luminanceAt(*masked, cx, cy);
+    INFO("under the box: " << open << " unshadowed, " << dark << " unmasked, " << darkMasked << " masked");
+    REQUIRE(dark < open * 0.75f);                       // there is a shadow to reproduce
+    CHECK(std::abs(darkMasked - dark) < open * 0.15f);  // and the mask reproduces it
+}
+
+TEST_CASE("an offline render builds no shadow mask", "[gpu][shadows][mask]") {
+    // Determinism: the offline tier computes the term per pixel, so an offline frame is the frame
+    // this optimisation did not touch, whatever the preview did. Asserted here rather than trusted,
+    // because the difference is a quality setting one edit away from being lost.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+    const scene::Scene s = shadowScene(true);
+
+    renderer->setQuality(rendering::QualityTier::Offline);
+    auto offline = renderer->renderToImage(s, frameAt(6), kSize, kSize);
+    REQUIRE(offline.has_value());
+    CHECK_FALSE(renderer->shadowMask().active());
+
+    rendering::SceneRenderer::PassToggles off;
+    off.shadowMask = false;
+    renderer->setPassToggles(off);
+    auto again = renderer->renderToImage(s, frameAt(6), kSize, kSize);
+    REQUIRE(again.has_value());
+    CHECK(gpu::hashImage(*offline) == gpu::hashImage(*again));
+
+    renderer->setQuality(rendering::QualityTier::Realtime);
+    renderer->setPassToggles(rendering::SceneRenderer::PassToggles{});
+    auto realtime = renderer->renderToImage(s, frameAt(6), kSize, kSize);
+    REQUIRE(realtime.has_value());
+    CHECK(renderer->shadowMask().active());
+}

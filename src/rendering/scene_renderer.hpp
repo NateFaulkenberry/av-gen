@@ -26,6 +26,7 @@
 #include "gpu/texture.hpp"
 #include "gpu/transient_pool.hpp"
 #include "rendering/ao_renderer.hpp"
+#include "rendering/shadow_mask_renderer.hpp"
 #include "rendering/field_uniforms.hpp"
 #include "rendering/frame_overlay.hpp"
 #include "rendering/light_data.hpp"
@@ -127,6 +128,7 @@ struct RenderStats {
     VolumeStats volume;         // ADR-032; the raymarched atmosphere (steps 0 = off)
     ShadowStats shadows;        // ADR-034; cascades and spot maps rendered this frame
     AoStats ao;                 // ADR-034; ground-truth ambient occlusion
+    ShadowMaskStats shadowMask; // ADR-087; the half-resolution directional shadow mask
     std::uint32_t clusteredLights = 0; // lights that went through the froxel grid (0 = fallback path)
     SimulationStats simulation; // ADR-032; the simulated grid fields stepped this frame
     SkinningStats skinning;     // ADR-086; the skinned rigs whose palettes reached the GPU
@@ -177,12 +179,15 @@ struct FrameUniforms {
     glm::vec4 shadowParams;   // x = atlas resolution, y = PCF radius (texels), z = contact steps, w = contact length
     glm::vec4 aoParams;       // x = strength, y = 1 when AO is on, zw = the AO texture size
     glm::vec4 targetSize;     // x = width, y = height, z = 1 / width, w = 1 / height
+    // ADR-087: x = 1 when the half-resolution shadow mask was built this frame, y = how many
+    // leading directional lights it covers (0..3), zw = its size in texels.
+    glm::vec4 shadowMaskParams;
     // ADR-055: the wind field, packed by wind::packWind. Frame-global because the air is; the
     // shadow views copy the whole block, so a swaying plant and its shadow cannot disagree.
     wind::WindUniforms wind;
     LightUniform lights[kMaxLights];
 };
-static_assert(sizeof(FrameUniforms) == 192 + 336 + 64 + 512);
+static_assert(sizeof(FrameUniforms) == 192 + 352 + 64 + 512);
 
 struct ObjectUniforms {
     glm::mat4 model;
@@ -297,12 +302,16 @@ public:
         bool ao = true;      // GTAO + its temporal resolve
         bool volume = true;  // the volumetric march + composite
         bool post = true;    // the built-in post chain (bloom, DoF, grading)
+        // ADR-087. Off means the lit pass computes the directional shadow term per pixel, which
+        // is what it did before the mask pass existed, so this is the A/B arm for it.
+        bool shadowMask = true;
     };
     void setPassToggles(const PassToggles& toggles) { toggles_ = toggles; }
     [[nodiscard]] const PassToggles& passToggles() const { return toggles_; }
     [[nodiscard]] ShadowRenderer& shadows() { return *shadows_; }     // ADR-034
     [[nodiscard]] SkinningRenderer& skinning() { return *skinning_; } // ADR-086
     [[nodiscard]] AoRenderer& ambientOcclusion() { return *ao_; }     // ADR-034
+    [[nodiscard]] ShadowMaskRenderer& shadowMask() { return *shadowMask_; } // ADR-087
     // Displays one auxiliary target full-screen instead of the shaded frame (ADR-035).
     void setAuxDebugView(AuxDebugView view) { auxDebugView_ = view; }
     [[nodiscard]] AuxDebugView auxDebugView() const { return auxDebugView_; }
@@ -422,6 +431,7 @@ private:
     std::unique_ptr<ShadowRenderer> shadows_; // ADR-034
     std::unique_ptr<SkinningRenderer> skinning_; // ADR-086
     std::unique_ptr<AoRenderer> ao_;          // ADR-034
+    std::unique_ptr<ShadowMaskRenderer> shadowMask_; // ADR-087
     std::unique_ptr<PostProcessor> postProcessor_;
     std::unique_ptr<gpu::TransientPool> pool_;
     glm::mat4 prevViewProj_{1.0f};
@@ -495,6 +505,10 @@ private:
     // The same group with the shadow atlas and the AO target replaced by placeholders, for the
     // passes that write them (a pass may not sample what it renders into).
     wgpu::BindGroup frameBindGroupAux_;
+    // And once more for the shadow-mask pass (ADR-087), which needs the real atlas and the real
+    // linear depth -- it computes the shading pass's own shadow terms -- but must not bind the
+    // mask it is writing.
+    wgpu::BindGroup frameBindGroupMask_;
     std::array<wgpu::BindGroup, kMaxShadowViews> shadowFrameGroups_{};
     wgpu::BindGroupLayout linearDepthLayout_;
     wgpu::BindGroup linearDepthGroup_;

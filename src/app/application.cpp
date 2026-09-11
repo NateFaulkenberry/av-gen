@@ -84,7 +84,8 @@ std::string usageText() {
            "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
            "                      emission|ids|occlusion|depth\n"
            "  --tier <t>          quality tier: preview|realtime|high|offline\n"
-           "  --disable <list>    switch phases off for cost attribution: shadows,ao,volume,post\n"
+           "  --disable <list>    switch phases off for cost attribution:\n"
+           "                      shadows,ao,volume,post,shadowmask\n"
            "  --headless          no window: offline mode, fixed-step clock, precomputed analysis\n"
            "  --fps <n>           offline frame rate (default 60)\n"
            "  --size <w>x<h>      window size in points (default: open maximised)\n"
@@ -424,8 +425,10 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                 toggles.volume = false;
             } else if (token == "post") {
                 toggles.post = false;
+            } else if (token == "shadowmask") {
+                toggles.shadowMask = false;
             } else if (!token.empty()) {
-                return fail("--disable: unknown phase '{}' (shadows,ao,volume,post)", token);
+                return fail("--disable: unknown phase '{}' (shadows,ao,volume,post,shadowmask)", token);
             }
             if (!token.empty()) {
                 off += off.empty() ? token : ", " + token;
@@ -2363,10 +2366,12 @@ int Application::runHeadless() {
             // a scene cannot prove its two arms differ, and "no effect" reads exactly like a run
             // whose edit never applied.
             log::info("             workload: volumeSteps={} cascades={} shadowRes={} aoTarget={}x{} "
-                      "aoSlices={}x{} postPasses={} bloomLevels={} sdf={}ray/{}mesh simGrids={} "
+                      "aoSlices={}x{} shadowMask={}x{}/{}L postPasses={} bloomLevels={} "
+                      "sdf={}ray/{}mesh simGrids={} "
                       "transient={} wind={}obj plants={}/{}awake ({} examined, {} slot writes)",
                       st.volume.steps, st.shadows.cascades, st.shadows.resolution, st.ao.width,
-                      st.ao.height, st.ao.slices, st.ao.steps, st.post.passes, st.post.bloomLevels,
+                      st.ao.height, st.ao.slices, st.ao.steps, st.shadowMask.width, st.shadowMask.height,
+                      st.shadowMask.lights, st.post.passes, st.post.bloomLevels,
                       st.sdf.raymarchObjects, st.sdf.meshObjects, st.simulation.grids,
                       st.transientTextures, st.procedural.windObjects, st.procedural.simActive,
                       st.procedural.simAwake, st.procedural.simExamined, st.procedural.simSlotWrites);

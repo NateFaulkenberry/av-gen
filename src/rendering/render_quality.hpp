@@ -47,6 +47,12 @@ struct QualitySettings {
     bool ambientOcclusion = true;
     float aoResolutionScale = 0.5f;        // half resolution + bilateral upsample
     std::uint32_t aoHistoryFrames = 8;     // temporal accumulation length
+    // ADR-087: the fraction of the scene's resolution the directional lights' combined shadow term
+    // (cascade lookup + contact march) is computed at, before a bilateral upsample in the lit
+    // pass. 1.0 means "no mask pass": the lit pass computes the term per pixel, exactly as it did
+    // before the mask existed, which is what keeps offline renders unchanged.
+    float shadowMaskScale = 0.5f;
+
     bool clusteredLighting = true;         // false = the 8-light uniform fallback path
     std::uint32_t sdfShadowSteps = 24;     // raymarched SDFs in the depth-only passes
 
@@ -68,6 +74,7 @@ struct QualitySettings {
         case QualityTier::Realtime:
             break;
         case QualityTier::High:
+            q.shadowMaskScale = 1.0f; // the reference live picture: the term at full resolution
             q.shadowResolution = 2048;
             q.cascadeCount = 4;
             q.shadowPcfTaps = 20;
@@ -87,6 +94,7 @@ struct QualitySettings {
             q.aoSlices = 6;
             q.aoStepsPerSlice = 12;
             q.aoResolutionScale = 1.0f;
+            q.shadowMaskScale = 1.0f;
             q.aoHistoryFrames = 16;
             q.sdfShadowSteps = 48;
             break;
