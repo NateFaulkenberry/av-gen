@@ -67,6 +67,26 @@ struct MaterialPartParameters {
     void apply(Material& material) const;
 };
 
+// What a scene file says about a skinned character on a Gltf node (ADR-086). Everything here is
+// declarative and optional: a glTF with a skin in it animates on its first clip without any of it.
+//
+// This is the *authored* half of the seam. The other half is direct: a behaviour reaches
+// `composition.scene().rigs[entity.rig].player` and calls play() with the timeline second it
+// decided at. The two do not fight -- the node re-applies its `state` only when the request
+// changes or a rebuild has just replaced the rig -- so a behaviour may take a character over and
+// keep it.
+struct NodeAnimation {
+    std::string state;        // the state to enter ("" = leave the rig on its default)
+    float blend = -1.0f;      // cross-fade seconds; < 0 = the state's own blendIn
+    float speed = 1.0f;       // clip seconds per timeline second
+    float updateHz = 0.0f;    // pose rate ceiling; 0 = every frame when near the camera
+    float cullDistance = 120.0f; // metres beyond which the rig is not posed at all (0 = never cull)
+    [[nodiscard]] bool authored() const {
+        return !state.empty() || blend >= 0.0f || speed != 1.0f || updateHz != 0.0f ||
+               cullDistance != 120.0f;
+    }
+};
+
 struct CompositionNode {
     std::string name;
     NodeKind kind = NodeKind::Gltf;
@@ -92,8 +112,14 @@ struct CompositionNode {
     Material terrainMaterial;      // settings for kind Terrain: shared by every chunk
     world::Ecology ecology;        // settings for kind Terrain (ADR-048): what grows on it
 
+    NodeAnimation animation;       // ADR-086; Gltf nodes whose asset carries a skin
+
     // Runtime (not serialised)
     std::shared_ptr<const assets::SceneAsset> sceneAsset; // Gltf
+    std::vector<RigId> rigs;       // ADR-086: this node's rigs in the flattened scene
+    std::string animationApplied;  // the state `animationAppliedAt` refers to
+    double animationAppliedAt = 0.0; // the timeline second the request was made (kept across rebuilds)
+    bool animationPushed = false;  // cleared by a rebuild: push the same request at the same second
     std::unique_ptr<class Composition> child;              // Scene (nested)
     params::Parameter<glm::vec3>* positionParam = nullptr;
     params::Parameter<glm::vec3>* rotationParam = nullptr; // Euler degrees
@@ -158,6 +184,15 @@ public:
     // flattens nodes into entity ranges -- and exposing the lookup is better than a second table
     // built beside it that would drift the first time a node stopped emitting geometry.
     [[nodiscard]] const CompositionNode* nodeForEntity(std::size_t entityIndex) const;
+
+    // ---- skinned characters (ADR-086) ----
+    // Asks every rig `nodeName` owns to enter `state` at timeline second `now`, cross-fading over
+    // `blend` seconds (< 0 = the state's own). False when there is no such node. The declarative
+    // route; a behaviour wanting frame-by-frame control drives scene().rigs[...].player itself.
+    bool setNodeAnimation(const std::string& nodeName, const std::string& state, double now,
+                          float blend = -1.0f);
+    // What the last update() spent on posing, and how many rigs it skipped.
+    [[nodiscard]] const RigStats& rigStats() const { return rigStats_; }
 
     // Re-parents `name` under `parent` ("" = root). Errors: unknown node, a cycle.
     Result<void> setParent(const std::string& name, const std::string& parent);
@@ -457,6 +492,8 @@ private:
     params::Parameter<float>* cameraLookAhead_ = nullptr;
     params::Parameter<glm::vec3>* cameraSplineOffset_ = nullptr;
     double currentTime_ = 0.0;
+    void updateCharacters(const FrameTime& time); // ADR-086
+    RigStats rigStats_;   // ADR-086: what the last update() spent posing skinned characters
     // Scene-level material programs (ADR-030): "materialPrograms" in the file, parameters
     // "material/<name>/…", referenced by Material::program.
     CompositionData compositionData_;
@@ -503,6 +540,8 @@ private:
         std::size_t proceduralCount = 0;
         std::size_t firstParticle = 0;               // particle range (Particles and Scene kinds)
         std::size_t particleCount = 0;
+        std::size_t firstRig = 0;                    // ADR-086: this node's rigs in scene_.rigs
+        std::size_t rigCount = 0;
         std::uint64_t childMeshVersion = 0;          // Scene kind: what was flattened
         std::size_t childEntityCount = 0;
         std::size_t childParticleCount = 0;

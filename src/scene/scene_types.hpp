@@ -154,11 +154,23 @@ struct Vertex {
     glm::vec2 uv;
 };
 
+// One vertex's skin influences (ADR-086): four joint indices into a Skeleton's palette and the
+// weights they carry. Kept in a second array beside the vertices rather than inside Vertex so a
+// static mesh costs nothing for skinning it will never do -- a terrain chunk's vertex stays 32
+// bytes, and the skinned pipeline reads this as a second vertex buffer.
+struct SkinInfluence {
+    std::uint16_t joints[4] = {0, 0, 0, 0};
+    glm::vec4 weights{0.0f}; // normalised on import; sums to 1
+};
+
 struct MeshData {
     std::string name;
     std::vector<Vertex> vertices;
     std::vector<std::uint32_t> indices;
+    // Empty for a static mesh; otherwise exactly as long as `vertices`.
+    std::vector<SkinInfluence> skin;
     [[nodiscard]] bool valid() const;
+    [[nodiscard]] bool skinned() const { return !skin.empty() && skin.size() == vertices.size(); }
     [[nodiscard]] std::pair<glm::vec3, glm::vec3> bounds() const; // min, max (zeros when empty)
     void computeNormals(); // smooth normals from triangle geometry (used when a file has none)
 };
@@ -166,12 +178,21 @@ struct MeshData {
 using MeshId = std::uint32_t;
 constexpr MeshId kInvalidMesh = 0xFFFFFFFFu;
 
+// A skinned rig in the scene (ADR-086; scene/animation.hpp holds the type). Lives here because
+// Entity names one and Entity is defined in this header.
+using RigId = std::uint32_t;
+constexpr RigId kInvalidRig = 0xFFFFFFFFu;
+
 enum class MeshStyle : std::uint8_t { Lit, Grid };
 
 struct Entity {
     std::string name;
     Transform transform; // world space (hierarchies are flattened on import in 0.2)
     MeshId mesh = kInvalidMesh;
+    // The rig that poses this entity's mesh (ADR-086), or kInvalidRig for a static one. When set,
+    // `transform` places the character in the world and the joint matrices do the rest: a skinned
+    // glTF node's own transform is ignored on import, as the specification requires.
+    RigId rig = kInvalidRig;
     Material material;
     // The name the source asset gave this entity's material, when it gave one. Carried on the
     // entity rather than on the Material because Material is compared by value to decide what can

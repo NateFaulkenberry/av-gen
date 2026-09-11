@@ -38,6 +38,7 @@
 #include "rendering/sdf_renderer.hpp"
 #include "rendering/shader_layer.hpp"
 #include "rendering/shadow_renderer.hpp"
+#include "rendering/skinning.hpp"
 #include "rendering/simulation.hpp"
 #include "rendering/spline_buffers.hpp"
 #include "rendering/volume_renderer.hpp"
@@ -128,6 +129,7 @@ struct RenderStats {
     AoStats ao;                 // ADR-034; ground-truth ambient occlusion
     std::uint32_t clusteredLights = 0; // lights that went through the froxel grid (0 = fallback path)
     SimulationStats simulation; // ADR-032; the simulated grid fields stepped this frame
+    SkinningStats skinning;     // ADR-086; the skinned rigs whose palettes reached the GPU
     PostStats post;
     std::uint32_t transientTextures = 0;
 };
@@ -299,6 +301,7 @@ public:
     void setPassToggles(const PassToggles& toggles) { toggles_ = toggles; }
     [[nodiscard]] const PassToggles& passToggles() const { return toggles_; }
     [[nodiscard]] ShadowRenderer& shadows() { return *shadows_; }     // ADR-034
+    [[nodiscard]] SkinningRenderer& skinning() { return *skinning_; } // ADR-086
     [[nodiscard]] AoRenderer& ambientOcclusion() { return *ao_; }     // ADR-034
     // Displays one auxiliary target full-screen instead of the shaded frame (ADR-035).
     void setAuxDebugView(AuxDebugView view) { auxDebugView_ = view; }
@@ -357,6 +360,9 @@ private:
     struct GpuMesh {
         wgpu::Buffer vertices;
         wgpu::Buffer indices;
+        // ADR-086: the joint indices and weights, in a second vertex buffer. Null for a static
+        // mesh, which is every mesh in every scene that has no character in it.
+        wgpu::Buffer skin;
         std::uint32_t indexCount = 0;
     };
     enum class LitVariant : std::uint8_t { OpaqueCull, OpaqueNoCull, Blend };
@@ -414,6 +420,7 @@ private:
     bool debugDepthTest_ = true;
     std::unique_ptr<Simulation> simulation_;
     std::unique_ptr<ShadowRenderer> shadows_; // ADR-034
+    std::unique_ptr<SkinningRenderer> skinning_; // ADR-086
     std::unique_ptr<AoRenderer> ao_;          // ADR-034
     std::unique_ptr<PostProcessor> postProcessor_;
     std::unique_ptr<gpu::TransientPool> pool_;

@@ -3,6 +3,7 @@
 // The scene data model (ADR-004): value types in scene_types.hpp; this header adds the
 // particle, post and procedural components and the Scene container.
 
+#include "scene/animation.hpp"
 #include "scene/particles.hpp"
 #include "scene/post_settings.hpp"
 #include "scene/composition_data.hpp"
@@ -38,6 +39,9 @@ struct Scene {
     spatial::SplineSet splines;                  // ADR-026; distributions, path deformers, camera, emitters
     std::vector<SdfObject> sdfs;                 // ADR-027; rendering::SdfRenderer / meshed entities
     std::vector<MaterialProgram> materialPrograms; // ADR-030; referenced by Material::program
+    // ADR-086: the skinned characters. An Entity names one through Entity::rig; scene::updateRigs
+    // advances them from the controller's update, never from the renderer.
+    std::vector<SkinnedRig> rigs;
     PostSettings post;                // built-in post-processing (copied in by the Engine)
     std::uint64_t meshVersion = 0;    // incremented when meshes change (renderer re-uploads)
     std::uint64_t textureVersion = 0; // incremented when textures change

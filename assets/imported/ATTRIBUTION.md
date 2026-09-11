@@ -38,9 +38,22 @@ assimp export UFO_Low_Poly.fbx        ufo.gltf
 assimp export Alien_Low_Green.fbx     alien.gltf
 ```
 
-The originals (`UFO_Low_Poly.fbx`, `Stylized_Alien.zip`) are kept at the repository root. The
-archive also holds a smooth-shaded variant, a grey colourway and T-pose meshes, plus PBR texture
-sets for both colourways, none of which are used here.
+The originals (`UFO_Low_Poly.fbx`, `Stylized_Alien.zip`) have been removed from the repository
+root now that the conversion is committed; both are CC0 and re-downloadable from the links above.
+The archive also held a smooth-shaded variant, a grey colourway, T-pose meshes, and PBR texture
+sets for both colourways. Only the green set is kept, under `Textures/Green/`, because it is what
+`alien.gltf` references.
+
+**Two things the conversion got wrong and that were fixed by hand**, worth recording because both
+fail silently:
+
+- assimp wrote the texture URIs with the FBX's Windows separators -- `Textures\Green\Green_BaseColor.png`
+  -- and glTF URIs are forward-slashed. The loader could never have resolved them, so the character
+  would have rendered untextured with no error naming the cause.
+- `metallicRoughnessTexture` points at `Green_Metallic.png`, which is a metallic-only map, where
+  glTF expects roughness in green and metallic in blue. `Green_Roughness.png` is kept beside it so
+  the two can be combined properly if the stylized material ever wants them; Glowmere's night
+  lighting may not need either.
 
 ## What is in them
 
