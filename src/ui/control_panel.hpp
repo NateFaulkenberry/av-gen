@@ -127,6 +127,10 @@ public:
     GraphEditor graphEditor;
 
     [[nodiscard]] const EditorLayout& layout() const { return layout_; }
+    // Writable for the host: the scripted-interaction driver (app/ui_script.hpp) toggles
+    // panels through the same flags the View menu writes, so a benchmark opens and closes a
+    // panel exactly as a person does rather than through a side door of its own.
+    [[nodiscard]] EditorLayout& layout() { return layout_; }
     [[nodiscard]] const std::string& statusMessage() const { return status_; }
     void setStatus(std::string message) { status_ = std::move(message); }
 

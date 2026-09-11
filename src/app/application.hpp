@@ -13,6 +13,8 @@
 #include "app/render_job.hpp"
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
+#include "app/ui_script.hpp"
+#include "core/phase_profiler.hpp"
 #include "rendering/output_mapper.hpp"
 #include "ui/editor_layout.hpp"
 #include "share/texture_share.hpp"
@@ -69,6 +71,12 @@ struct AppOptions {
     bool autoplay = false;
     int frames = -1; // exit after this many frames (-1 = run until closed)
     std::uint64_t stressSeed = 0; // > 0: apply random UI-like actions every frame (crash reproduction)
+    // Performance work (docs/application-performance.md). --ui-script drives the editor with a
+    // repeatable interaction so "it feels sluggish" can be measured rather than described;
+    // --profile-cpu prints the main thread's per-phase distribution on the way out.
+    std::string uiScript;
+    bool profileCpu = false;
+    std::optional<std::filesystem::path> profileCsv; // --profile-csv <file>: one row per frame
     bool headless = false;
     double offlineFps = 60.0;
     bool fpsGiven = false;
@@ -183,6 +191,13 @@ private:
     // and the scene reads it: how big to render, what aspect the camera has, and where a click
     // landed. Copied from the panel once per frame rather than read through it per event, so the
     // event handler does not reach into UI state and a scripted caller can run without a panel.
+    // The main thread's own cost, phase by phase. Not GPU time and never reported as such: see
+    // core/phase_profiler.hpp. Always collected -- a scope is two steady_clock reads and an add,
+    // which measured below the clock's own resolution against an uninstrumented build -- so the
+    // editor can show the distribution live and any run can be asked what it spent its frames on.
+    core::PhaseProfiler cpuProfile_;
+    UiScript uiScript_;
+
     ui::CanvasRect canvas_;
     std::uint32_t renderWidth_ = 0;   // canvas size in framebuffer pixels; what the renderer is sized to
     std::uint32_t renderHeight_ = 0;
