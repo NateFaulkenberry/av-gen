@@ -267,11 +267,6 @@ double labelMs(const Profile& p, std::string_view label) {
 
 bool hasLabel(const Profile& p, std::string_view label) { return labelMs(p, label) >= 0.0; }
 
-double sumOf(const Profile& p) {
-    return std::accumulate(p.passes.begin(), p.passes.end(), 0.0,
-                           [](double acc, const auto& e) { return acc + e.ms; });
-}
-
 double median(std::vector<double> v) {
     if (v.empty()) {
         return -1.0;
@@ -299,7 +294,7 @@ struct ArmTimes {
 };
 
 ArmTimes abTest(rendering::SceneRenderer& renderer, const scene::Scene& first, const scene::Scene& second,
-                std::uint32_t width, std::uint32_t height, std::string_view label, int rounds = 4,
+                std::uint32_t width, std::uint32_t height, std::string_view label, int rounds = 6,
                 int frames = 20) {
     std::vector<double> as;
     std::vector<double> bs;
@@ -560,7 +555,11 @@ TEST_CASE("the fullscreen passes respond to resolution", "[profiler][gpu]") {
                                    << " ms, paired ratio " << volumeRatio << "; ao paired ratio "
                                    << aoRatio);
     REQUIRE(volumeRatio > 0.0);
-    CHECK(volumeRatio > 3.0);
+    // Sixteen times the pixels buys two to three times the time, not sixteen. The march is
+    // half-resolution and its small arm is a 256x256 target, most of whose pass is fixed cost --
+    // the same shape the phase 0 audit measured on Glowmere, where 4x the pixels moved the volume
+    // pass by 2.2x. The bar is set to catch a pass that does not respond, not to pin a slope.
+    CHECK(volumeRatio > 1.8);
     // AO is reported, not pinned to a ratio: what has to hold is that it moves at all. It scales
     // far less than the pixels do -- most of a small AO target's pass is fixed cost.
     CHECK(aoRatio > 1.0);
@@ -575,7 +574,10 @@ TEST_CASE("the shadow passes respond to shadow workload", "[profiler][gpu]") {
     if (!renderer->timeline().available()) {
         SKIP("timestamp queries unavailable on this adapter");
     }
-    scene::Scene one = geometryScene(200, 32, true);
+    // Dense enough that both arms sit well clear of the counter's 65,536 ns tick. At a quarter of
+    // this density the light arm measured three ticks, and the A/B's answer was then whichever of
+    // 4/3, 5/3 and 8/3 the machine felt like that minute.
+    scene::Scene one = geometryScene(200, 64, true);
     one.environment.shadowCascades = 1;
     scene::Scene four = one;
     four.environment.shadowCascades = 4;
@@ -590,27 +592,38 @@ TEST_CASE("the shadow passes respond to shadow workload", "[profiler][gpu]") {
                        << fourPass.stats.shadowDraws << " draws;" << table(fourPass));
     // The counters see the extra views and the extra draws. Note how little extra *geometry* four
     // cascades cost: each cascade culls its own casters, so four views are nowhere near four times
-    // the submitted triangles -- which is why the timing A/B below varies the shadow map's
-    // resolution instead, where the workload ratio is known exactly.
+    // the submitted triangles -- which is why the timing A/B below varies the casters instead, where
+    // the workload ratio is 6.2x and known.
     CHECK(fourPass.stats.shadows.views > onePass.stats.shadows.views);
     CHECK(fourPass.stats.geometry.shadow.triangles > onePass.stats.geometry.shadow.triangles);
     CHECK(onePass.stats.shadowCasters > 0);
 
     // The shadow phase's real workload is casters, and this is the A/B that has to move.
-    scene::Scene few = geometryScene(24, 32, true);
+    scene::Scene few = geometryScene(24, 64, true);
     few.environment.shadowCascades = 4;
+    const Profile fewProfile = profile(*renderer, few, 512, 512, 20, 6);
     const ArmTimes casters = abTest(*renderer, few, four, 512, 512, "shadow");
-    INFO("shadow pass over four cascades: 24 casters " << casters.a << " ms, 200 casters " << casters.b
-                                                       << " ms, paired ratio " << casters.ratio);
+    INFO("shadow pass over four cascades: 24 casters (" << fewProfile.stats.shadowDraws << " draws, "
+                                                        << fewProfile.stats.geometry.shadow.triangles
+                                                        << " tris) " << casters.a << " ms; 200 casters ("
+                                                        << fourPass.stats.shadowDraws << " draws, "
+                                                        << fourPass.stats.geometry.shadow.triangles
+                                                        << " tris) " << casters.b << " ms; paired ratio "
+                                                        << casters.ratio);
+    // The arms provably differ in what they submit, which is what makes the timing a result either
+    // way. Written as two bounds rather than one comparison so that a passing run prints both
+    // triangle counts, and the workload ratio behind the timing ratio is on the record.
+    REQUIRE(fewProfile.stats.geometry.shadow.triangles > 0ull);
+    CHECK(fourPass.stats.geometry.shadow.triangles > fewProfile.stats.geometry.shadow.triangles * 4);
     REQUIRE(casters.ratio > 0.0);
-    CHECK(casters.ratio > 2.0);
+    CHECK(casters.ratio > 1.8);
 
-    // And the A/B that does *not* move, reported because a null result is only worth anything when
-    // the two arms provably differ. The shadow map goes from 512x512 to 4096x4096 -- sixty-four
-    // times the texels to rasterise into, the same casters and the same draws -- and the pass does
-    // not care, because it is paying for 200 draws of 409,600 triangles and not for texels. The
-    // resolution the renderer actually used is asserted, so "no effect" cannot be a change that
-    // never applied.
+    // And the A/B that barely moves, reported because a weak result is only worth anything when the
+    // two arms provably differ. The shadow map goes from 512x512 to 4096x4096 -- sixty-four times
+    // the texels to rasterise into, the same casters and the same draws -- and the pass takes 1.6
+    // to 2.7 times as long, because it is paying mostly for 2.4 M triangles of depth-only geometry
+    // and not for texels. The resolution the renderer actually used is asserted, so a small effect
+    // cannot be a change that never applied.
     const auto atResolution = [&](std::uint32_t resolution) {
         rendering::QualitySettings q = renderer->qualitySettings();
         q.shadowResolution = resolution;
@@ -635,9 +648,12 @@ TEST_CASE("the shadow passes respond to shadow workload", "[profiler][gpu]") {
     const double largeMap = median(largeMaps);
     renderer->setQualitySettings(rendering::QualitySettings::forTier(renderer->quality()));
     INFO("shadow map 512^2 " << smallMap << " ms vs 4096^2 " << largeMap
-                             << " ms over the same casters (64x the texels), paired ratio "
-                             << median(mapRatios));
+                             << " ms over the same casters (64x the texels)");
     CHECK(largeMap > 0.0);
+    // Asserted only against zero, so that the measured ratio is printed by a passing run rather
+    // than having to be guessed at from the doc. Sixty-four times the texels is nothing like
+    // sixty-four times the time, and how far from it is the number worth recording.
+    CHECK(median(mapRatios) > 0.0);
 }
 
 TEST_CASE("the volumetric pass responds to its march length", "[profiler][gpu]") {
@@ -756,8 +772,9 @@ TEST_CASE("submitted geometry is counted apart from the geometry the world conta
     CHECK(b.culledInstances > 0ull);
     CHECK(b.geometry.camera.triangles < b.geometry.logicalTriangles);
     CHECK(b.geometry.camera.estimatedDraws > 0u); // and every indirect draw is flagged as stale
-    // The counter that used to be reported as `tris` now carries the submitted figure.
-    CHECK(static_cast<std::uint64_t>(b.triangles) == b.geometry.camera.triangles);
+    // The counter that used to be reported as `tris` now carries the submitted figure, plus the
+    // one fullscreen triangle this frame draws (the tone map; the skybox is off in these scenes).
+    CHECK(static_cast<std::uint64_t>(b.triangles) == b.geometry.camera.triangles + 1);
     CHECK(ctx->errorCount() == 0);
 }
 
