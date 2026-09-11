@@ -691,7 +691,13 @@ void HelpPanel::drawDocument(const help::HelpDocument& doc) {
                                       ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Resizable)) {
                 for (std::size_t r = 0; r < block.rows.size(); ++r) {
                     ImGui::TableNextRow(r == 0 ? ImGuiTableRowFlags_Headers : 0);
-                    for (const std::vector<help::InlineSpan>& cell : block.rows[r].cells) {
+                    // Clamped to the column count the header declared. A row with more cells than
+                    // the header is a typo in a markdown table, and ImGui asserts on the extra
+                    // TableNextColumn -- a content edit must not be able to abort the editor.
+                    const std::size_t cells = std::min(block.rows[r].cells.size(),
+                                                       static_cast<std::size_t>(columns));
+                    for (std::size_t c = 0; c < cells; ++c) {
+                        const std::vector<help::InlineSpan>& cell = block.rows[r].cells[c];
                         ImGui::TableNextColumn();
                         const float cellWrap = std::max(ImGui::GetContentRegionAvail().x, 40.0f);
                         const std::string clicked = drawSpans(cell, cellWrap);
