@@ -157,6 +157,44 @@ Per §2 and §80, these are working systems to extend rather than replace:
   depth. Motion vectors (§53) therefore have somewhere to come from already.
 - **`--disable shadows,ao,volume,post`** for cost attribution by removal.
 
+## 7a. The popping has a specific cause, and it is not the one the brief assumes
+
+The brief's §11 asks to "move from distance LOD to screen-space LOD" and calls it mandatory.
+**Screen-space LOD already exists**, on both sides:
+
+- CPU, `procedural_renderer.cpp`: `screenRadius = radius / distance * camera.projScale`, and
+  `lodByScreenSize` selects by `screenRadius <= threshold`.
+- GPU, `shaders/cull.wgsl`: the same projected radius, the same comparison, plus frustum planes,
+  a max distance and a minimum screen radius.
+
+So §11 is largely done. What is missing is narrower and is the actual cause of what the user sees:
+
+```wgsl
+let minRadius = cullParams.limits.y;
+if (minRadius > 0.0 && screenRadius < minRadius) { culled = true; }
+...
+if (byScreen) { take = screenRadius <= t / detail; }
+```
+
+**Every one of these is a hard binary threshold, and there is no hysteresis anywhere in the
+renderer.** Searched: no `hysteresis`, no enter/leave radii, no fade-in or fade-out, in
+`src/rendering/` or in any shader. Nor is there any LOD crossfade — no dither, no stochastic
+transition, no temporal blend. An instance whose projected radius sits near `minScreenRadius`
+flickers in and out as the camera breathes; an instance crossing an LOD threshold swaps mesh
+between one frame and the next.
+
+That is exactly the brief's §10 and §13, and it means Phase 2's work is smaller and more targeted
+than "build screen-space LOD": it is **hysteresis on thresholds that already exist**, plus a
+transition so a swap is not instantaneous.
+
+Two things already present that Phase 2 should build on rather than replace:
+
+- The composition's depth bands already thin density and shift the LOD ladder per band
+  (`depthBand(dist)` returning a density and a detail multiplier), which is a ready-made place to
+  put per-band hysteresis margins.
+- Instances are already hashed for stable stochastic thinning (`instanceHash(i) >= band.x`), which
+  is the same mechanism a stochastic LOD crossfade needs.
+
 ## 8. Not yet audited
 
 Stated rather than quietly skipped:
@@ -169,6 +207,8 @@ Stated rather than quietly skipped:
 - Whether shadow cascade splits are stable, and the cause of the reported shadow popping (§21).
 - Terrain chunk culling behaviour (§48).
 - Occlusion culling — there appears to be none (§47).
+- Whether the *terrain* participates in the same screen-space LOD path as procedural instances, or
+  has its own chunk LOD with its own thresholds (§48).
 - Colour management audit (§56).
 - The offline render path's divergence from the realtime path.
 
