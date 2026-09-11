@@ -162,6 +162,10 @@ int main(int argc, char** argv) {
                         "length %.0f m, descent %.1f m, flow %.2f m/s\n",
                         c.name.c_str(), world::waterKindName(c.kind), c.centreline.size(), c.halfWidth,
                         c.depth, c.length, c.descent, c.flowSpeed());
+            const glm::vec3& head = c.centreline.front();
+            const glm::vec3& mouth = c.centreline.back();
+            std::printf("             head (%.0f, %.0f) at %.1f m  ->  mouth (%.0f, %.0f) at %.1f m\n",
+                        head.x, head.z, head.y, mouth.x, mouth.z, mouth.y);
         }
     } else if (!worldPath.empty()) {
         std::ifstream in(worldPath);
