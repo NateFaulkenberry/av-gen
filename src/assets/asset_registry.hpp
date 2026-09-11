@@ -36,6 +36,9 @@ public:
     explicit AssetRegistry(std::filesystem::path baseDirectory = {});
 
     void setBaseDirectory(std::filesystem::path baseDirectory);
+    // Stable asset IDs resolve within the registry base: asset://project/<path> maps to
+    // <base>/assets/<path>, while asset://builtin/<path> maps to <base>/<path>. Legacy filesystem
+    // paths continue to resolve unchanged.
     [[nodiscard]] const std::filesystem::path& baseDirectory() const { return base_; }
     // Absolute paths pass through; relative ones are joined with the base directory (or the
     // current directory when no base is set). Normalised (lexically) but not required to exist.

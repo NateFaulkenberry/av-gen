@@ -64,6 +64,13 @@ std::filesystem::path AssetRegistry::absoluteBase() const {
 }
 
 std::filesystem::path AssetRegistry::resolve(const std::filesystem::path& path) const {
+    const std::string text = path.generic_string();
+    if (text.rfind("asset://project/", 0) == 0) {
+        return canonicalise(absoluteBase() / "assets" / text.substr(std::string("asset://project/").size()));
+    }
+    if (text.rfind("asset://builtin/", 0) == 0) {
+        return canonicalise(absoluteBase() / text.substr(std::string("asset://builtin/").size()));
+    }
     if (path.is_absolute()) {
         return canonicalise(path);
     }

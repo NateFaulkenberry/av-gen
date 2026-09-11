@@ -1,4 +1,5 @@
 #include "assets/asset_catalog.hpp"
+#include "assets/asset_registry.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -56,4 +57,14 @@ TEST_CASE("asset catalog search is case-insensitive and bounded", "[assets][cata
     const auto matches = assets::searchAssets(*records, "FERN", 1);
     CHECK(matches.size() <= 1);
     fs::remove_all(root);
+}
+
+TEST_CASE("asset registry resolves stable project and builtin IDs", "[assets][registry]") {
+    assets::AssetRegistry registry("/tmp/avgen-registry-root");
+    CHECK(registry.resolve("asset://project/models/tree.glb") ==
+        std::filesystem::path("/tmp/avgen-registry-root/assets/models/tree.glb"));
+    CHECK(registry.resolve("asset://builtin/models/tree.glb") ==
+        std::filesystem::path("/tmp/avgen-registry-root/models/tree.glb"));
+    CHECK(registry.resolve("models/tree.glb") ==
+        std::filesystem::path("/tmp/avgen-registry-root/models/tree.glb"));
 }
