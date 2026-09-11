@@ -959,6 +959,35 @@ void registerParameterTools(ToolRegistry& registry) {
                 }
             }
             const std::string id = "asset://project/" + type + "/" + target.stem().string();
+            const std::filesystem::path manifestPath = engine.projectPath().parent_path() / "assets" / "manifest.json";
+            json manifest = json::object();
+            manifest["format"] = "avgen-project-assets";
+            manifest["version"] = 1;
+            manifest["assets"] = json::array();
+            std::ifstream manifestIn(manifestPath);
+            if (manifestIn) {
+                json existing = json::parse(manifestIn, nullptr, false);
+                if (!existing.is_discarded() && existing.is_object() && existing["assets"].is_array()) {
+                    manifest = std::move(existing);
+                }
+            }
+            bool replaced = false;
+            for (auto& entry : manifest["assets"]) {
+                if (entry.is_object() && entry.value("id", std::string{}) == id) {
+                    entry = json{{"id", id}, {"type", type}, {"path", std::filesystem::relative(target, engine.projectPath().parent_path()).generic_string()},
+                                 {"sha256", *hash}};
+                    replaced = true;
+                }
+            }
+            if (!replaced) {
+                manifest["assets"].push_back(json{{"id", id}, {"type", type},
+                                                    {"path", std::filesystem::relative(target, engine.projectPath().parent_path()).generic_string()},
+                                                    {"sha256", *hash}});
+            }
+            const std::filesystem::path manifestTemp = manifestPath.string() + ".tmp";
+            { std::ofstream out(manifestTemp, std::ios::trunc); out << manifest.dump(2) << '\n'; }
+            std::filesystem::rename(manifestTemp, manifestPath, ec);
+            if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot update project asset manifest: " + ec.message());
             return ToolResult::ok(json{{"id", id}, {"source", "project"}, {"type", type},
                                        {"path", target.string()}, {"sha256", *hash}, {"copied", copied}},
                                   "asset imported into project");

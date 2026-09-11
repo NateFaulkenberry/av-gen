@@ -43,6 +43,12 @@ buffer and image sidecars, rejecting missing dependencies rather than creating a
 asset. No source file is modified, and no destination outside the project is writable by this
 tool.
 
+Every successful visual import also updates `<project>/assets/manifest.json` atomically. The
+manifest stores the stable project ID, asset type, project-relative path and SHA-256 source hash.
+It is intentionally small and deterministic: it is an ownership/index record, not a copy of the
+bundled library and not a second scene format. Re-importing the same content reports a duplicate;
+replacing an asset and migrating legacy scene references are later phases that can retain this ID.
+
 This is deliberately phase one. Existing scene files still use their legacy path fields and the
 catalog does not silently rewrite them. Stable `asset://` scene references, a visual Asset Library
 panel, thumbnails, replacement/delete workflows and migration of old absolute paths remain the
