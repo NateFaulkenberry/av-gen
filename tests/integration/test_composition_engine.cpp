@@ -32,12 +32,13 @@ TEST_CASE("Engine opens scene files by format, drives them with audio and saves 
     const auto dir = std::filesystem::temp_directory_path() / "avgen_composition_engine";
     std::filesystem::create_directories(dir);
     const auto glb = testsupport::writeTriangleGlb("composition_engine");
-    std::filesystem::copy_file(glb, dir / "tri.glb", std::filesystem::copy_options::overwrite_existing);
+    std::filesystem::create_directories(dir / "assets" / "models");
+    std::filesystem::copy_file(glb, dir / "assets" / "models" / "tri.glb", std::filesystem::copy_options::overwrite_existing);
     const auto sceneFile = writeSceneFile(dir, "stage.json", R"({
         "format": "avgen-scene", "version": 1, "name": "stage",
         "nodes": [
-            { "name": "a", "kind": "gltf", "asset": "tri.glb" },
-            { "name": "b", "kind": "gltf", "asset": "tri.glb", "position": [3, 0, 0] },
+            { "name": "a", "kind": "gltf", "asset": "assets/models/tri.glb" },
+            { "name": "b", "kind": "gltf", "asset": "assets/models/tri.glb", "position": [3, 0, 0] },
             { "name": "orb", "kind": "orb" },
             { "name": "dust", "kind": "particles", "particles": { "maxParticles": 100, "spawnRate": 10 } }
         ]})");
@@ -96,7 +97,7 @@ TEST_CASE("Engine opens scene files by format, drives them with audio and saves 
         CHECK(text.find("avgen-scene") != std::string::npos);
         CHECK(text.find("\"floor\"") != std::string::npos);
         CHECK(text.find("\"b\"") == std::string::npos);
-        CHECK(text.find("\"asset\": \"tri.glb\"") != std::string::npos); // relative, not absolute
+        CHECK(text.find("\"asset\": \"asset://project/models/tri.glb\"") != std::string::npos);
     }
     REQUIRE(engine.loadFile(saved).has_value());
     REQUIRE(engine.composition() != nullptr);

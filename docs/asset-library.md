@@ -59,6 +59,8 @@ Composition saves now take the first migration step: when a referenced file reso
 composition's project `assets/` directory, the saved node uses `asset://project/...`; built-in and
 external files retain relative/legacy paths rather than being relabeled without ownership proof.
 The registry resolves those IDs on the next load, while old path-based scenes remain readable.
+The composition integration suite covers this round trip with a project-local glTF and verifies the
+stable ID is written instead of an absolute path.
 
 ## The rule
 
