@@ -271,3 +271,33 @@ discovered by a user.
 **A useful seed already exists.** The panel registry in `src/ui/editor_layout.cpp` already carries an
 id, a label, a dock region and a one-line description per panel — §5's feature metadata in embryo,
 and the right thing to extend rather than duplicate.
+
+---
+
+## What landed in the first pass (2026-09-11)
+
+The framework, the validation, and content for the stable half. See **ADR-095** for the reasoning
+and the rejected alternatives.
+
+- **Content**: `docs/help/*.md`, one topic per file, front matter plus a markdown subset;
+  `docs/help/features.json` for the metadata a registry cannot supply. Editing a topic never
+  touches C++.
+- **Engine**: `src/help/` — `document`, `markdown`, `search`, `database`, `features`, `app_surface`,
+  `validation`, `api`. GPU-free, in `avgen_core`, so the tests and the lint tool reach it without a
+  device.
+- **Panel**: `src/ui/help_panel.cpp`, registered in the panel registry like every other panel, with
+  a **Help** menu and `ui::helpLink()` / `ui::helpTooltip()` for contextual links from a control to
+  a topic.
+- **Retrieval**: `help::HelpDatabase` is §26's five calls; `help::tools()` and `help::dispatch()`
+  wrap the same five as read-only JSON tool descriptors for the AI control plane.
+- **Validation**: `tools/avgen_help_lint` and the tests in `tests/unit/test_help.cpp`. It scans the
+  implementation rather than a copy of it, asserts its own scan coverage first, and reports the gap
+  register on every run.
+
+**Measured against this build on the day it landed**: 46 topics in 10 categories, 33 features, 6
+shortcuts, 0 validation errors, 1 warning and 4 notes. The warning is a real defect the scan found:
+the File menu advertises `Cmd+S` for Save Project and nothing binds it.
+
+**Still to write**, and reported as known gaps by the validator on every run: the world editor
+(§9, §10, §44), the command inventory (§43), water, terrain and navigation, and the AI Director
+(§22–§24, §46).
