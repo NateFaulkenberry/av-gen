@@ -368,6 +368,10 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         return std::unexpected(r.error());
     }
     compositor_->setTimeline(&renderer_->timeline());
+    compositor_->setInputProvider([this] {
+        return rendering::CompositionRenderer::Input{&engine_->layers(),
+                                                     engine_->timelineClock().seconds};
+    });
     renderer_->setOverlay(compositor_.get());
     if (!options_.qualityTier.empty()) {
         rendering::QualityTier tier = rendering::QualityTier::Realtime;
@@ -1638,10 +1642,6 @@ int Application::runLive() {
         }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
-        // The composition follows the engine's timeline clock, not the render clock: a lyric has
-        // to land at the same second of the music whether the frame arrived from live playback or
-        // from an offline render stepping a fixed clock (ADR-012).
-        compositor_->setInput(&engine_->layers(), engine_->timelineClock().seconds);
         if (auto r = renderer_->render(encoder, engine_->scene(), time, finalTarget, &shaderInputs); !r) {
             log::error("render: {}", r.error().message);
             return 2;

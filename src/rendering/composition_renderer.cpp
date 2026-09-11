@@ -287,6 +287,12 @@ void CompositionRenderer::encodeOverlay(wgpu::CommandEncoder& encoder, const gpu
     stats_.draws = 0;
     stats_.items = 0;
     stats_.vertices = 0;
+    // Ask, if somebody set a provider. A render loop then cannot forget to push.
+    if (provider_) {
+        const Input input = provider_();
+        stack_ = input.stack;
+        seconds_ = input.seconds;
+    }
     if (!initialised_ || stack_ == nullptr || target.view == nullptr || target.width == 0 || target.height == 0) {
         return;
     }

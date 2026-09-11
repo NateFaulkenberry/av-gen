@@ -102,6 +102,10 @@ Result<void> RenderJob::start() {
         return r;
     }
     compositor_->setTimeline(&renderer_->timeline());
+    compositor_->setInputProvider([this] {
+        return rendering::CompositionRenderer::Input{&engine_->layers(),
+                                                     engine_->timelineClock().seconds};
+    });
     renderer_->setOverlay(compositor_.get());
     if (!engine_->layers().empty() && settings_.output == RenderOutput::ExrSequence) {
         // Worth saying out loud rather than shipping a sequence somebody discovers is missing its
@@ -216,7 +220,6 @@ Result<void> RenderJob::renderOne() {
     const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                     engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
     // The same clock the live path uses, so frame f lands in the same place either way.
-    compositor_->setInput(&engine_->layers(), engine_->timelineClock().seconds);
     // The frame's passes and its readback copy go into one command buffer; the ring submits it
     // and starts the map, and only blocks when all its slots are still on the GPU.
     wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();

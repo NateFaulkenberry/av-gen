@@ -14,6 +14,8 @@
 //   * a layer outside its time range, or keyframed to nothing, is not drawn at all.
 
 #include "comp/layer_stack.hpp"
+
+#include <functional>
 #include "core/error.hpp"
 #include "gpu/render_target.hpp"
 #include "rendering/frame_overlay.hpp"
@@ -53,14 +55,34 @@ public:
     [[nodiscard]] Result<void> init();
     [[nodiscard]] Result<void> reload(); // hot reload of composite.wgsl
 
-    // What to draw next frame, and the second to evaluate it at. That second is the engine's
-    // timeline clock, not a wall clock and not a frame counter, which is what makes a lyric land
-    // in the same place in an offline render as it does in live playback.
+    // What to draw, and the second to evaluate it at. That second is the engine's timeline clock,
+    // not a wall clock and not a frame counter, which is what makes a lyric land in the same place
+    // in an offline render as it does in live playback.
+    struct Input {
+        comp::LayerStack* stack = nullptr;
+        double seconds = 0.0;
+    };
+
+    // Set once, and the compositor asks each frame.
+    //
+    // This is a pull rather than a push because the push had to be repeated at every place that
+    // renders a frame, and one of them forgot. The overlay hook lives inside
+    // `SceneRenderer::render`, so every path *reached* it -- but reaching it with no layer stack
+    // draws nothing and reports nothing, so the headless path, which is what captures stills and
+    // runs every benchmark, rendered its world perfectly and its text not at all. A provider set
+    // beside the renderer cannot be forgotten by a render loop that does not know it exists.
+    void setInputProvider(std::function<Input()> provider) { provider_ = std::move(provider); }
+
+    // The per-frame form, kept for tests that drive the compositor directly without an engine.
     void setInput(comp::LayerStack* stack, double seconds) {
         stack_ = stack;
         seconds_ = seconds;
     }
     void setTimeline(gpu::FrameTimeline* timeline) { timeline_ = timeline; }
+
+  private:
+    std::function<Input()> provider_;
+  public:
 
     void encodeOverlay(wgpu::CommandEncoder& encoder, const gpu::TargetView& target) override;
     // Reads this frame's GPU time off the shared timeline. Call after Submit(), like the rest.
