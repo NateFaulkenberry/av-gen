@@ -29,6 +29,17 @@ struct ModRoute {
     // Runtime (not serialised)
     bool fromGraph = false;        // installed by a procedural graph evaluation (ADR-028)
     bool fromEntity = false;       // compiled from an entity's `reactions` block (ADR-088)
+    // Spatial depth (ADR-097). A music influence field scales the depth of the reactions an entity
+    // already has rather than adding a second reactivity system beside them, and *this* is where
+    // that lands: the field pass writes a gain here once a frame, and it multiplies `amount`
+    // exactly as `amount` multiplies the chain. 1 means "no field reaches this route", which is
+    // every route in every scene that has no fields in it.
+    float spatialGain = 1.0f;
+    // Which entity's `reactions` block produced this route, as an index into EntityWorld. The
+    // field pass needs to find its own routes, and a route erased and re-added by a rebuild cannot
+    // be found by position.
+    static constexpr std::uint32_t kNoOwner = 0xFFFFFFFFu;
+    std::uint32_t ownerEntity = kNoOwner;
     ProcessorChain::State state{};
     signals::SignalId sourceId = signals::kInvalidSignal;
     IParameter* targetParam = nullptr;

@@ -30,6 +30,22 @@ public:
     //
     // A no-op by default. Controllers with nothing autonomous in them need not care.
     virtual void updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) {}
+    // Spatial reactivity, run *before* modulation (ADR-097).
+    //
+    // The third slot, and it is on the other side of the routes from updateBehaviour for exactly
+    // the reason updateBehaviour is where it is. A music influence field's whole output is a gain
+    // on a modulation route's depth, so it has to be settled before those routes run; a field
+    // evaluated afterwards would put every reaction in the scene one frame behind its field, which
+    // is invisible while something drifts slowly past and is a different picture the instant
+    // anybody scrubs to a frame instead of playing to it.
+    //
+    // The bus is not const: a field publishes `field.<name>.occupancy` and its enter/exit edges as
+    // ordinary named signals, which is how a light, a material or a particle system reacts to a
+    // volume without any of them learning that volumes exist.
+    //
+    // A no-op by default. Controllers with nothing spatial in them need not care.
+    virtual void updateFields(const FrameTime& time, signals::SignalBus& bus,
+                              params::Modulator& modulator) {}
     [[nodiscard]] virtual const Scene& scene() const = 0;
     [[nodiscard]] virtual Scene& scene() = 0;
 };

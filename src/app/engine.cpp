@@ -1941,6 +1941,12 @@ void Engine::update(const FrameTime& time) {
     sources_.update(bus_, sourceContext_);
     params_.resetFinals();
     timeline_.apply(timelineClock_); // automation: the first modulation layer (ADR-018)
+    // Spatial reactivity, between automation and the routes (ADR-097). After timeline_.apply so a
+    // field that follows a baked actor reads the position that actor has *at this instant* --
+    // which is what makes such a field a pure function of time, and so scrub-safe and
+    // offline-exact (ADR-091). Before applyRoutes because a field's entire output is a gain on a
+    // route's depth: run it after and every reaction in the scene is one frame behind its field.
+    controller_->updateFields(time, bus_, modulator_);
     modulator_.applyRoutes(bus_, params_, time.deltaTime);
     // Autonomous behaviour, after the routes and before the scene reads the finals (ADR-088): a
     // behaviour's own knobs have been modulated by now, and the offsets it writes land on top of

@@ -119,7 +119,8 @@ void Modulator::applyRoutes(const signals::SignalBus& bus, ParameterSet& params,
                 x = x * 2.0f - 1.0f; // 0..1 -> -1..1 before the chain
             }
             const bool event = bus.event(route.sourceId);
-            const float y = route.chain.process(x, event, dt, route.state) * route.amount * masterGain;
+            const float y =
+                route.chain.process(x, event, dt, route.state) * route.amount * route.spatialGain * masterGain;
             route.lastOutput = y;
 
             IParameter& target = *route.targetParam;

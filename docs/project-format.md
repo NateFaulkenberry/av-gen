@@ -250,9 +250,113 @@ the animation state name the asset carries (ADR-086), so a behaviour never names
 with no `clips` drives no rig. `sockets` name a place on the entity — a skeleton joint when there
 is one, its own origin until then — and `attachments` make another node follow one.
 
+**Tags** (`"tags": ["dancer"]`) say what an entity *is*, for a field or a trigger volume to filter
+on. The profile an entity was built from counts as a tag it did not have to be given.
+
 Determinism: every behaviour draws from a per-entity PCG32 seeded from `seed` (or from the world
 seed and the entity's name), and nothing reads a clock other than the timeline second. The same
 scene, seed, audio and timeline produce the same frame.
+
+### `"entityProfiles"` — a profile library (ADR-097)
+
+A scene-level path to one file holding many named profiles, so a crowd shares a bundle instead of
+carrying a copy of it each:
+
+```json
+"entityProfiles": "profiles/night-shift.json",
+"entities": [
+  { "name": "dancer-01", "node": "dancer-01", "profile": "dancer" },
+  { "name": "dancer-02", "node": "dancer-02", "profile": "dancer" }
+]
+```
+
+```json
+{ "format": "avgen-entity-profile-library", "version": 1,
+  "profiles": {
+    "dancer": { "tags": ["crowd"],
+                "behaviors": [ { "kind": "wander", "speed": 1.2 } ],
+                "reactions": [ { "signal": "audio.bass", "target": "parts/Lamp/emissiveGain", "depth": 2.5 } ],
+                "clips": { "idle": "Idle", "walk": "Walk", "react": "Dance" } },
+    "barfly":  { "tags": ["crowd"], "reactions": [ … ] } } }
+```
+
+An entity's `"profile"` is looked up in the library first and treated as a path if the library does
+not have it, so a single-profile file (`"profile": "craft-lights.profile.json"`, resolved against
+the scene's folder) still works exactly as before. A profile's behaviours, reactions, clips, sockets
+and tags come first and the entity's own are appended, so a local reaction lands *on top of* a
+shared one on the same property rather than instead of it; saving names the profile and writes back
+only what the entity added. Profiles do not chain: one level of indirection is a library, two is a
+maze. A name the library does not have is an error that lists every name it does.
+
+### `"fields"` — trigger volumes and music influence fields (ADR-097)
+
+A sibling of `"entities"`. A field is a place in the world that **scales the depth of the reactions
+the entities inside it already have** — it never adds a reaction of its own, which is what keeps
+there being one reactivity system rather than two.
+
+```json
+"fields": [
+  { "name": "stage", "shape": "sphere", "center": [0, 0, -12], "radius": 14,
+    "falloff": "smooth", "inner": 0.25, "strength": 1.4, "floorGain": 0.05,
+    "tags": ["dancer"], "source": "singer",
+    "arc": { "holdSeconds": 6, "holdJitter": 1.5, "delaySeconds": 0.4, "delayJitter": 0.8,
+             "intensityJitter": 0.35, "releaseSeconds": 0.6, "refractorySeconds": 20,
+             "activity": "react" } },
+  { "name": "doorway", "shape": "box", "center": [4, 0, 0], "halfExtents": [1.2, 2.2, 0.4],
+    "rotation": [0, 45, 0], "falloff": "constant", "scaleReactions": false },
+  { "name": "column", "shape": "capsule", "center": [0, 2, 0], "radius": 2, "height": 8 }
+]
+```
+
+| Key | Meaning |
+|---|---|
+| `shape` | `sphere` (`radius`), `box` (`halfExtents`, `rotation`), `capsule` (`radius`, `height`, `rotation`) |
+| `center` | where the volume is — an **offset from `source`** when one is named |
+| `falloff` | `smooth` (default), `linear`, `inverseSquare`, or `constant` for a hard-edged trigger |
+| `inner` | fraction of the way out that is still full strength: a plateau, not a scale |
+| `strength` | the gain at full influence. Above 1 boosts the reactions it governs |
+| `floorGain` | the gain *outside* the volume. 0 (default) means a governed entity outside is silent |
+| `tags` | which entities it governs. Empty governs everything. Matches an entity's `tags` **or** its profile name |
+| `source` | an entity, node or hero the volume follows. Empty: it stays at `center` |
+| `scaleReactions` | `false` makes it a pure trigger: edges and signals, no modulation |
+| `requireScrubExact` | `true` makes a live source a reported problem rather than a surprise |
+| `arc` | the reaction arc, below. A block that is present is enabled unless it says otherwise |
+
+**Influence** is 1 at the centre, 0 at the surface, smooth between, and **a point exactly on the
+surface is outside**. Two overlapping fields combine by *max*, not sum. An entity no field's filter
+matches keeps a gain of exactly 1 and is never queried, so a scene with no fields — or with fields
+that do not name it — is exactly the scene it was.
+
+Set `"spatial": false` on a reaction to exempt it. The case that needs it is a `Multiply` route
+whose chain rests at 1: scaling its depth to zero *mutes* the property rather than making the
+reaction quiet.
+
+**The arc** (`delaySeconds`, `holdSeconds`, `releaseSeconds`, their `*Jitter` siblings,
+`intensity`, `intensityJitter`, `refractorySeconds`, `activity`, `holdStill`) is what an entity does
+when it crosses in: it holds `activity` for the duration and then stops holding it, so what comes
+back is whatever its behaviours are doing then — `Walking → Dance → Walking`, never
+`Walking → Dance → Idle`. The jitters are drawn from the entity's own seed, the field's name and how
+many times it has entered, so a crowd does not move as one and a replay redraws identically.
+
+**Knobs.** `strength`, `scale` (one multiplier for a sphere's radius, a box's half-extents and a
+capsule's length), `inner`, `floorGain` and `center` are registered as ordinary parameters at
+`entity/fields/<name>/…`, so they are keyframeable on the timeline and presettable like any other.
+They are **not** modulatable: the field pass runs before the routes, deliberately, so a route
+pointed at one is written and wiped without ever being read — a scene that does it is told so by
+name at load, and the answer is a timeline key.
+
+**Signals.** Every field publishes `field.<name>.occupancy` (0..1, entities inside over entities
+governed), `field.<name>.enter` and `field.<name>.exit` (events). A light, a material or a particle
+system reacts to a volume by routing from those, with no new mechanism — an entity with `reactions`
+and no `behaviors` driving any node, or an `@` absolute path for something that is not a node at
+all (`"@lightrig/key/fill/intensity"`).
+
+**Determinism (ADR-091).** A field with no source, or one following a node or a behaviour-less
+entity, is a pure function of time and is scrub-safe and offline-exact. A field following an entity
+with behaviours is not. Which one a scene has is logged by name at every load — `field 'stage'
+(sphere reach 14.0, falloff smooth, strength 1.40) follows 'singer' -> live: this field's influence
+is NOT scrub-exact (ADR-091)` — and `requireScrubExact` turns it into a warning that names the
+field and the source.
 
 
 ## Assets and app blocks (milestone 0.9, ADR-019)
