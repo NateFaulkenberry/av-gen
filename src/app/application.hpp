@@ -14,6 +14,7 @@
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
 #include "rendering/output_mapper.hpp"
+#include "ui/editor_layout.hpp"
 #include "share/texture_share.hpp"
 
 #include <webgpu/webgpu_cpp.h>
@@ -61,6 +62,9 @@ struct AppOptions {
     // ADR-066: compose a world from a recipe at start-up. The same path the World Builder
     // panel takes, reachable without a window so it can be rendered and diffed like anything else.
     std::optional<std::filesystem::path> generateRecipe;
+    // Direct the camera from the loaded track's musical structure and the world's heroes, replacing
+    // whatever camera automation the project carries (ADR-075).
+    bool directCamera = false;
     std::optional<std::filesystem::path> saveProject;  // write on exit
     bool autoplay = false;
     int frames = -1; // exit after this many frames (-1 = run until closed)
@@ -95,6 +99,10 @@ struct AppOptions {
     std::optional<std::string> ndi;    // --ndi <name>
     std::uint32_t width = 1440;
     std::uint32_t height = 900;
+    // Whether --size was given. Without it the editor opens maximised (ADR-076); with it the size
+    // asked for is the size you get, because --size is how a screenshot or a bug report is made
+    // reproducible and a window that silently ignored it would not be.
+    bool sizeGiven = false;
     log::Level logLevel = log::Level::Info;
     bool showHelp = false;
 };
@@ -168,6 +176,17 @@ private:
     // *not* stored here: it lives in the `camera/position` and `camera/target` parameters, which
     // already save, load, automate and route, and a copy beside them would be a second source of
     // truth for the same two vectors.
+    // Where the editor put the world this frame (ADR-076). Everything that maps between the screen
+    // and the scene reads it: how big to render, what aspect the camera has, and where a click
+    // landed. Copied from the panel once per frame rather than read through it per event, so the
+    // event handler does not reach into UI state and a scripted caller can run without a panel.
+    ui::CanvasRect canvas_;
+    std::uint32_t renderWidth_ = 0;   // canvas size in framebuffer pixels; what the renderer is sized to
+    std::uint32_t renderHeight_ = 0;
+    std::uint32_t pendingWidth_ = 0;  // a canvas size waiting to settle before it is acted on
+    std::uint32_t pendingHeight_ = 0;
+    int pendingFrames_ = 0;
+
     ViewportGesture viewportGesture_ = ViewportGesture::None;
     glm::vec2 viewportLastMouse_{0.0f};
     glm::vec2 viewportDragTotal_{0.0f};   // how far this drag has travelled, to tell a click from a drag
@@ -198,7 +217,11 @@ private:
     // gesture that silently moves nothing is indistinguishable from a dead input.
     void ensureFreeCamera();
     void handleViewportEvent(const SDL_Event& event);
+    // Scripted mouse input for checking the viewport end to end; see the definition.
+    void runViewportProbe(int frameIndex);
     void serviceViewportPick();
+    // Cuts the camera to the loaded track. Main thread; mutates the timeline.
+    Result<void> directCameraFromTrack();
     // ADR-064/066: one job system for the application, and the world builder that submits to it.
     // Declared after the panel so they outlive it during teardown -- the panel holds raw pointers
     // to both, and a job finishing while the panel is being destroyed would otherwise be a race.

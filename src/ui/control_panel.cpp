@@ -1,9 +1,11 @@
 #include "ui/control_panel.hpp"
 
+#include "ui/editor_shell.hpp"
 #include "ui/ui_logic.hpp"
 
 #include "audio/audio_input.hpp"
 #include "control/midi.hpp"
+#include "core/log.hpp"
 #include "platform/window.hpp"
 
 #include <imgui.h>
@@ -12,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <utility>
 #include <vector>
 
 namespace avgen::ui {
@@ -19,6 +22,13 @@ namespace avgen::ui {
 namespace {
 
 constexpr std::size_t kBandHistory = 240;
+
+// Nameless so it never appears in a window list; ImGui still needs a key for it.
+constexpr const char* kStatusBarName = "##avgen-status";
+// How long a change to the open-panel set waits before it reaches the disk. ImGui throttles its
+// own ini the same way, and for the same reason: dragging down the View menu with the mouse held
+// toggles items on the way past, and each of those should not be a file write.
+constexpr double kLayoutSaveIntervalSeconds = 2.0;
 
 std::string formatTime(double seconds) {
     if (seconds < 0.0) {
@@ -38,170 +48,289 @@ const char* bandName(std::size_t i) {
 
 } // namespace
 
-void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
-    ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
-    // Default window placement is in ImGui coordinates (logical points), which are not the
-    // framebuffer pixels in `stats` on a scaled display: using the latter puts panels off-screen.
-    const float uiWidth = ImGui::GetMainViewport()->Size.x;
+void ControlPanel::setLayoutStore(std::filesystem::path file, bool imguiHasSavedLayout) {
+    layoutFile_ = std::move(file);
+    if (auto r = layout_.load(layoutFile_); !r) {
+        // A layout that will not parse is worth one line and nothing more: the defaults are
+        // already in place, and refusing to start the editor over a preferences file would be a
+        // worse answer than opening it arranged the way it ships.
+        log::warn("editor layout: {}", r.error().message);
+    }
+    bool degenerateLayout = false;
+    // A saved layout may have every panel in a region closed, and an empty dock node is collapsed
+    // by ImGui so the centre expands into the space -- which is how a canvas ends up spanning to
+    // the window edge with nothing beside it. Restoring one panel per side region keeps the world a
+    // canvas rather than a backdrop, which is the whole point of the shell.
+    if (const std::size_t reopened = layout_.ensureRegionsOccupied(); reopened > 0) {
+        // Reopening the panel is not enough on its own. The dock *tree* is ImGui's and lives in its
+        // own ini; a region whose panels were all closed has already been collapsed there, and a
+        // window reopened into a collapsed node does not give the node its width back. The saved
+        // arrangement was degenerate rather than merely unusual, so it is rebuilt.
+        degenerateLayout = true;
+        log::info("editor layout: a saved region was empty, so the canvas had taken its space; "
+                  "rebuilding the default arrangement ({} panel(s) reopened)", reopened);
+    }
+    storedLayoutSignature_ = layout_.signature();
+    // A dock tree restored from ImGui's own ini is somebody's arrangement and is left alone.
+    // Without one there is nothing to keep, and the default has to exist before the first panel is
+    // submitted or every panel spends its first frames floating over the world.
+    // Rebuilt on a first run, and also when the saved arrangement was degenerate: reopening a
+    // panel does not give a collapsed dock node its width back, and ImGui's own ini is the
+    // authority on the tree.
+    rebuildLayout_ = !imguiHasSavedLayout || degenerateLayout;
+}
 
-    if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Open Audio...", "O") && onOpenAudio) {
-                onOpenAudio();
-            }
-            if (ImGui::MenuItem("Open Scene (glTF)...", "S") && onOpenScene) {
-                onOpenScene();
-            }
-            if (ImGui::MenuItem("Open Environment (HDR)...", "E") && onOpenEnvironment) {
-                onOpenEnvironment();
-            }
-            if (ImGui::MenuItem("Add Background Shader...") && onOpenShader) {
-                onOpenShader();
-            }
-            if (ImGui::MenuItem("Add Post Shader...") && onOpenPostShader) {
-                onOpenPostShader();
-            }
-            if (ImGui::MenuItem("Built-in Orb Scene") && onOrbScene) {
-                onOrbScene();
-            }
-            if (ImGui::MenuItem("Save Scene As...") && onSaveScene) {
-                onSaveScene();
-            }
-            ImGui::Separator();
-            ImGui::Separator();
-            if (ImGui::MenuItem("New Project") && onNewProject) {
-                onNewProject();
-            }
-            if (ImGui::MenuItem("Open Project...") && onOpenProject) {
-                onOpenProject();
-            }
-            if (ImGui::BeginMenu("Examples", !examples.empty())) {
-                std::string category;
-                for (const auto& ex : examples) {
-                    if (ex.category != category) {
-                        if (!category.empty()) {
-                            ImGui::Separator();
-                        }
-                        ImGui::TextDisabled("%s", ex.category.c_str());
-                        category = ex.category;
-                    }
-                    if (ImGui::MenuItem(ex.name.c_str()) && onOpenExample) {
-                        onOpenExample(ex);
-                    }
-                    if (ImGui::IsItemHovered() && !ex.description.empty()) {
-                        ImGui::SetTooltip("%s", ex.description.c_str());
-                    }
-                }
-                ImGui::EndMenu();
-            }
-            if (ImGui::BeginMenu("Open Recent", !recentProjects.empty())) {
-                for (const auto& recent : recentProjects) {
-                    if (ImGui::MenuItem(recent.filename().string().c_str()) && onOpenRecent) {
-                        onOpenRecent(recent);
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        ImGui::SetTooltip("%s", recent.string().c_str());
-                    }
-                }
-                ImGui::EndMenu();
-            }
-            if (ImGui::MenuItem("Save Project", "Cmd+S", false, !engine.projectPath().empty()) && onSaveProjectHere) {
-                onSaveProjectHere();
-            }
-            if (ImGui::MenuItem("Save Project As...") && onSaveProject) {
-                onSaveProject();
-            }
-            if (ImGui::MenuItem("Export Bundle...") && onExportBundle) {
-                onExportBundle();
-            }
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("View")) {
-            ImGui::MenuItem("Parameters", nullptr, &showParameters_);
-            ImGui::MenuItem("Analysis", nullptr, &showAnalysis_);
-            ImGui::MenuItem("Modulation", nullptr, &showModulation_);
-            ImGui::MenuItem("World", nullptr, &showWorld_);
-            ImGui::MenuItem("World Builder", nullptr, &showWorldBuilder_);
-            ImGui::MenuItem("Assets", nullptr, &showAssets_);
-            ImGui::MenuItem("Graph", nullptr, &showGraph_);
-            ImGui::MenuItem("ImGui Demo", nullptr, &showDemo_);
-            ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
+void ControlPanel::saveLayout() {
+    if (layoutFile_.empty()) {
+        return;
+    }
+    if (auto r = layout_.save(layoutFile_); !r) {
+        log::warn("editor layout: {}", r.error().message);
+        return;
+    }
+    storedLayoutSignature_ = layout_.signature();
+    lastLayoutSave_ = ImGui::GetTime();
+}
+
+void ControlPanel::serviceLayoutStore() {
+    if (layoutFile_.empty() || layout_.signature() == storedLayoutSignature_) {
+        return;
+    }
+    if (ImGui::GetTime() - lastLayoutSave_ < kLayoutSaveIntervalSeconds) {
+        return;
+    }
+    saveLayout();
+}
+
+void ControlPanel::restoreDefaultLayout() {
+    layout_.restoreDefaults();
+    rebuildLayout_ = true;
+}
+
+void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
+    // Menu bar and status bar first: both take their height out of the viewport's work area, and
+    // the dockspace is sized from what is left.
+    drawMenuBar(engine);
+    drawStatusBar(engine, stats);
+
+    const ImGuiID dockspace = beginEditorDockspace();
+    // The emptiness check is asked once, on the first frame. Asking it every frame would rebuild
+    // the default the moment a user dragged the last panel out of the tree, which is fighting them
+    // over their own layout rather than restoring anything.
+    const bool nothingToRestore = firstFrame_ && dockspaceIsEmpty(dockspace);
+    firstFrame_ = false;
+    if (rebuildLayout_ || nothingToRestore) {
+        rebuildLayout_ = false;
+        buildDefaultDockLayout(dockspace, layout_);
     }
 
-    ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(16, 40), ImGuiCond_FirstUseEver);
-    if (ImGui::Begin("Control")) {
+    // The canvas before the panels, so the world is submitted whatever a panel does afterwards.
+    canvas_ = drawCanvasWindow(canvasTexture, layout_.regionNode(DockRegion::Centre));
+    drawPanels(engine, stats);
+    serviceLayoutStore();
+}
+
+void ControlPanel::drawMenuBar(app::Engine& engine) {
+    if (!ImGui::BeginMainMenuBar()) {
+        return;
+    }
+    if (ImGui::BeginMenu("File")) {
+        if (ImGui::MenuItem("Open Audio...", "O") && onOpenAudio) {
+            onOpenAudio();
+        }
+        if (ImGui::MenuItem("Open Scene (glTF)...", "S") && onOpenScene) {
+            onOpenScene();
+        }
+        if (ImGui::MenuItem("Open Environment (HDR)...", "E") && onOpenEnvironment) {
+            onOpenEnvironment();
+        }
+        if (ImGui::MenuItem("Add Background Shader...") && onOpenShader) {
+            onOpenShader();
+        }
+        if (ImGui::MenuItem("Add Post Shader...") && onOpenPostShader) {
+            onOpenPostShader();
+        }
+        if (ImGui::MenuItem("Built-in Orb Scene") && onOrbScene) {
+            onOrbScene();
+        }
+        if (ImGui::MenuItem("Save Scene As...") && onSaveScene) {
+            onSaveScene();
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("New Project") && onNewProject) {
+            onNewProject();
+        }
+        if (ImGui::MenuItem("Open Project...") && onOpenProject) {
+            onOpenProject();
+        }
+        if (ImGui::BeginMenu("Examples", !examples.empty())) {
+            std::string category;
+            for (const auto& ex : examples) {
+                if (ex.category != category) {
+                    if (!category.empty()) {
+                        ImGui::Separator();
+                    }
+                    ImGui::TextDisabled("%s", ex.category.c_str());
+                    category = ex.category;
+                }
+                if (ImGui::MenuItem(ex.name.c_str()) && onOpenExample) {
+                    onOpenExample(ex);
+                }
+                if (ImGui::IsItemHovered() && !ex.description.empty()) {
+                    ImGui::SetTooltip("%s", ex.description.c_str());
+                }
+            }
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Open Recent", !recentProjects.empty())) {
+            for (const auto& recent : recentProjects) {
+                if (ImGui::MenuItem(recent.filename().string().c_str()) && onOpenRecent) {
+                    onOpenRecent(recent);
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s", recent.string().c_str());
+                }
+            }
+            ImGui::EndMenu();
+        }
+        if (ImGui::MenuItem("Save Project", "Cmd+S", false, !engine.projectPath().empty()) && onSaveProjectHere) {
+            onSaveProjectHere();
+        }
+        if (ImGui::MenuItem("Save Project As...") && onSaveProject) {
+            onSaveProject();
+        }
+        if (ImGui::MenuItem("Export Bundle...") && onExportBundle) {
+            onExportBundle();
+        }
+        ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("View")) {
+        drawViewMenu();
+        ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+}
+
+void ControlPanel::drawViewMenu() {
+    // Straight off the panel registry, so a panel added there is reachable from the menu without a
+    // second edit here -- the way panels used to go missing.
+    DockRegion previous = DockRegion::Left;
+    bool first = true;
+    for (const EditorPanel& panel : editorPanels()) {
+        if (!first && panel.region != previous) {
+            ImGui::Separator();
+        }
+        previous = panel.region;
+        first = false;
+        ImGui::MenuItem(panel.label.data(), nullptr, layout_.slot(panel.id));
+        if (ImGui::IsItemHovered() && !panel.hint.empty()) {
+            ImGui::SetTooltip("%s\n(%s)", panel.hint.data(), dockRegionName(panel.region));
+        }
+    }
+    ImGui::Separator();
+    if (ImGui::MenuItem("Restore Default Layout")) {
+        restoreDefaultLayout();
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("rebuilds the dock tree and reopens the panels this editor ships with");
+    }
+    if (ImGui::MenuItem("Save Layout Now")) {
+        if (const char* ini = ImGui::GetIO().IniFilename; ini != nullptr) {
+            ImGui::SaveIniSettingsToDisk(ini);
+        }
+        saveLayout();
+    }
+}
+
+void ControlPanel::drawStatusBar(app::Engine& engine, const FrameStats& stats) {
+    if (!beginStatusBar(kStatusBarName)) {
+        return;
+    }
+    // Every number here is measured, not estimated. An unmeasured one says so.
+    ImGui::Text("%.0f fps", stats.fps);
+    ImGui::Separator();
+    ImGui::Text("%.1f ms frame", stats.frameIntervalMs);
+    ImGui::Separator();
+    ImGui::Text("%.1f ms cpu", stats.cpuFrameMs);
+    ImGui::Separator();
+    if (stats.gpuFrameMs >= 0.0) {
+        ImGui::Text("%.2f ms gpu", stats.gpuFrameMs);
+    } else {
+        ImGui::TextDisabled("gpu n/a");
+    }
+    ImGui::Separator();
+    ImGui::Text("%u x %u", stats.width, stats.height);
+    ImGui::Separator();
+    ImGui::Text("%u draws / %u tris", stats.drawCalls, stats.triangles);
+    ImGui::Separator();
+    if (world.selection.kind == WorldSelection::Kind::Node && !world.selection.name.empty()) {
+        ImGui::Text("selected %s", world.selection.name.c_str());
+    } else {
+        ImGui::TextDisabled("no selection");
+    }
+    if (!worldBuilder.placementAssetId.empty()) {
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "placing %s", worldBuilder.placementAssetId.c_str());
+    }
+    if (!engine.projectPath().empty()) {
+        ImGui::Separator();
+        ImGui::TextDisabled("%s", engine.projectPath().filename().string().c_str());
+    }
+    if (!status_.empty()) {
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "%s", status_.c_str());
+    }
+    // The adapter is the one thing here that never changes, so it goes where it will be clipped
+    // first when the window is narrow.
+    const std::string adapter = stats.adapter + " (" + stats.backend + ")";
+    const float width = ImGui::CalcTextSize(adapter.c_str()).x;
+    if (const float room = ImGui::GetContentRegionAvail().x; room > width + ImGui::GetStyle().ItemSpacing.x) {
+        ImGui::SameLine(0.0f, room - width);
+        ImGui::TextDisabled("%s", adapter.c_str());
+    }
+    endStatusBar();
+}
+
+void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
+    // A panel is its registry entry plus its body. The size is only ever used when the panel is
+    // floating; docked, the node decides. The dock hint applies to a window ImGui has no settings
+    // for -- a brand-new panel lands in its own region instead of over the world, and one the user
+    // deliberately tore off stays torn off.
+    const auto panel = [this](std::string_view id, ImVec2 floatingSize, auto&& body) {
+        bool* open = layout_.slot(id);
+        if (open == nullptr || !*open) {
+            return;
+        }
+        const EditorPanel* entry = findEditorPanel(id);
+        if (entry != nullptr) {
+            if (const std::uint32_t node = layout_.regionNode(entry->region); node != 0) {
+                ImGui::SetNextWindowDockID(node, ImGuiCond_FirstUseEver);
+            }
+        }
+        ImGui::SetNextWindowSize(floatingSize, ImGuiCond_FirstUseEver);
+        if (ImGui::Begin(id.data(), open)) {
+            body();
+        }
+        ImGui::End();
+    };
+
+    panel("World Builder", ImVec2(400, 620), [&] { drawWorldBuilderWindow(engine); });
+    panel("Assets", ImVec2(520, 420), [&] { drawAssetsWindow(); });
+    panel("World", ImVec2(460, 520), [&] { drawWorldWindow(engine); });
+    panel("Parameters", ImVec2(420, 360), [&] { drawParameters(engine); });
+    panel("Render", ImVec2(460, 420), [&] { drawRender(engine); });
+    panel("Control", ImVec2(420, 300), [&] {
         drawTransport(engine);
         ImGui::Separator();
         drawResponse(engine);
         ImGui::Separator();
         drawPerformance(engine, stats);
-    }
-    ImGui::End();
-
-    if (showParameters_) {
-        ImGui::SetNextWindowSize(ImVec2(420, 360), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowPos(ImVec2(16, 520), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Parameters", &showParameters_)) {
-            drawParameters(engine);
-        }
-        ImGui::End();
-    }
-    if (showAnalysis_) {
-        ImGui::SetNextWindowSize(ImVec2(520, 620), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowPos(ImVec2(std::max(16.0f, uiWidth * 0.5f - 540.0f), 40),
-                                ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Analysis", &showAnalysis_)) {
-            drawAnalysis(engine);
-        }
-        ImGui::End();
-    }
-    if (showModulation_) {
-        ImGui::SetNextWindowSize(ImVec2(560, 420), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowPos(ImVec2(std::max(16.0f, uiWidth * 0.5f + 20.0f), 40),
-                                ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Modulation", &showModulation_)) {
-            drawModulation(engine);
-        }
-        ImGui::End();
-    }
-    if (showWorld_) {
-        ImGui::SetNextWindowSize(ImVec2(460, 520), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowPos(ImVec2(std::max(16.0f, uiWidth - 480.0f), 40),
-                                ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("World", &showWorld_)) {
-            drawWorldWindow(engine);
-        }
-        ImGui::End();
-    }
-    if (showWorldBuilder_) {
-        ImGui::SetNextWindowSize(ImVec2(400, 620), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowPos(ImVec2(20, 60), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("World Builder", &showWorldBuilder_)) {
-            drawWorldBuilderWindow(engine);
-        }
-        ImGui::End();
-    }
-    if (showAssets_) {
-        ImGui::SetNextWindowSize(ImVec2(520, 420), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowPos(ImVec2(120, 120), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Assets", &showAssets_)) {
-            drawAssetsWindow();
-        }
-        ImGui::End();
-    }
-    if (showGraph_) {
-        ImGui::SetNextWindowSize(ImVec2(900, 560), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowPos(ImVec2(80, 80), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Graph", &showGraph_)) {
-            drawGraphWindow(engine);
-        }
-        ImGui::End();
-    }
-    if (showDemo_) {
-        ImGui::ShowDemoWindow(&showDemo_);
+    });
+    panel("Analysis", ImVec2(520, 620), [&] { drawAnalysis(engine); });
+    panel("Modulation", ImVec2(560, 420), [&] { drawModulation(engine); });
+    panel("Graph", ImVec2(900, 560), [&] { drawGraphWindow(engine); });
+    if (bool* demo = layout_.slot("Dear ImGui Demo"); demo != nullptr && *demo) {
+        ImGui::ShowDemoWindow(demo);
     }
 }
 
@@ -1214,14 +1343,8 @@ void ControlPanel::drawTimelineTab(app::Engine& engine) {
 
 
 void ControlPanel::drawRender(app::Engine& engine) {
-    ImGui::SetNextWindowSize(ImVec2(460, 420), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Render", &showRender_)) {
-        ImGui::End();
-        return;
-    }
     if (renderSettings == nullptr) {
         ImGui::TextDisabled("render settings unavailable");
-        ImGui::End();
         return;
     }
     auto& s = *renderSettings;
@@ -1343,7 +1466,6 @@ void ControlPanel::drawRender(app::Engine& engine) {
         }
     }
     ImGui::TextDisabled("renders load the saved project; the live view keeps playing");
-    ImGui::End();
 }
 
 

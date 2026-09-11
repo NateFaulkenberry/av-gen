@@ -3,6 +3,11 @@
 // Milestone 0.1 control interface (ADR-007): transport, response gains, generated parameter
 // panel, analysis debug plots, and performance readout. Reads and writes the engine only
 // through its public API and the parameter system.
+//
+// Since the editor shell (ADR-076) this also owns the workspace around the world: the menu bar,
+// the dockspace the world shows through, the status bar, and which panels are open. The panels
+// themselves are unchanged -- they are docked instead of floating, and nothing else about them
+// moved.
 
 #include "app/engine.hpp"
 #include "app/asset_browser.hpp"
@@ -12,6 +17,7 @@
 #include "app/render_settings.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "rendering/sdf_renderer.hpp"
+#include "ui/editor_layout.hpp"
 #include "ui/graph_editor.hpp"
 #include "ui/world_builder_panel.hpp"
 #include "ui/world_panel.hpp"
@@ -84,7 +90,25 @@ public:
     std::size_t queuedRenders = 0;
     std::string videoBackends; // describeVideoBackends()
 
+    // The frame to show in the canvas, as the ImGui texture id for the render target the host just
+    // drew into (a WGPUTextureView, in this backend). Zero before the first frame exists.
+    std::uint64_t canvasTexture = 0;
+
     void draw(app::Engine& engine, const FrameStats& stats);
+
+    // Where the canvas ended up this frame. The host sizes the next frame's render target, the
+    // camera's aspect and every click's coordinates from this, so it is the shell's one output.
+    [[nodiscard]] const CanvasRect& canvas() const { return canvas_; }
+
+    // Where the open-panel set is kept, and whether ImGui found a dock tree of its own. Without a
+    // dock tree the shell has to build the default one before the first panel is submitted, or
+    // every panel spends its first frame floating in the middle of the world.
+    void setLayoutStore(std::filesystem::path file, bool imguiHasSavedLayout);
+    // Writes the open-panel set now, whether or not the throttle is due. The host calls this on
+    // the way out; ImGui saves its own ini from DestroyContext.
+    void saveLayout();
+    // Default panels open, default dock tree rebuilt on the next frame.
+    void restoreDefaultLayout();
 
     // World authoring (ADR-031): layers, overview, inspector, states, macros, debug options.
     // The host reads `world.debug` to build the debug-draw geometry each frame.
@@ -97,7 +121,7 @@ public:
     // Procedural graph editor (ADR-028); the host re-installs the graph when it changes.
     GraphEditor graphEditor;
 
-    [[nodiscard]] bool showDemo() const { return showDemo_; }
+    [[nodiscard]] const EditorLayout& layout() const { return layout_; }
     [[nodiscard]] const std::string& statusMessage() const { return status_; }
     void setStatus(std::string message) { status_ = std::move(message); }
 
@@ -121,16 +145,21 @@ private:
     void drawAssetsWindow();
     void drawWorldBuilderWindow(app::Engine& engine);
     void drawGraphWindow(app::Engine& engine);
+    // ---- the shell (ADR-076) ----
+    void drawMenuBar(app::Engine& engine);
+    void drawViewMenu();
+    void drawStatusBar(app::Engine& engine, const FrameStats& stats);
+    void drawPanels(app::Engine& engine, const FrameStats& stats);
+    // Writes the open-panel set when it has moved and the throttle is due.
+    void serviceLayoutStore();
 
-    bool showDemo_ = false;
-    bool showParameters_ = true;
-    bool showAnalysis_ = true;
-    bool showModulation_ = true;
-    bool showRender_ = false;
-    bool showWorld_ = true;
-    bool showAssets_ = false;
-    bool showWorldBuilder_ = true;
-    bool showGraph_ = false;
+    EditorLayout layout_;
+    CanvasRect canvas_;
+    std::filesystem::path layoutFile_;
+    std::uint64_t storedLayoutSignature_ = 0;
+    double lastLayoutSave_ = 0.0;
+    bool rebuildLayout_ = false;
+    bool firstFrame_ = true;
     int assetKind_ = 0;
     char assetSearch_[96] = "";
     int newRouteSource_ = 0;

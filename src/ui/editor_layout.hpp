@@ -17,10 +17,55 @@
 
 namespace avgen::ui {
 
-// Where the default layout docks a panel. Centre is the world itself: nothing is ever docked there,
-// and the enumerator exists so that a panel wanting to cover the canvas would have to say so in the
-// registry where it can be seen -- and where a test will catch it.
+// Where the default layout docks a panel. Centre is the world itself: the canvas window is the only
+// thing that ever goes there, and the enumerator exists so that a panel wanting to share it would
+// have to say so in the registry where it can be seen -- and where a test will catch it.
 enum class DockRegion { Left, Right, Bottom, Centre, Floating };
+
+// The canvas is a window like any other as far as ImGui is concerned, but it is not a panel: it
+// cannot be closed, it has no menu entry, and it is docked into the central node.
+inline constexpr std::string_view kCanvasWindow = "Viewport";
+
+// The rectangle the world is drawn into, in ImGui points relative to the main viewport -- which is
+// the window's client area, because multi-viewport is off, so these are directly comparable with
+// the positions SDL reports for a mouse event.
+//
+// Reported by the canvas window as it is laid out, and read by the host at the top of the *next*
+// frame: how big the canvas is can only be known once ImGui has placed it, and the renderer needs
+// the size before anything is drawn. One frame of lag on a resize; nothing on a still window.
+struct CanvasRect {
+    float x = 0.0f;
+    float y = 0.0f;
+    float width = 0.0f;
+    float height = 0.0f;
+    // The pointer is over the canvas and no panel, popup or menu is above it. This, and not
+    // ImGui's WantCaptureMouse, is what decides whether a mouse event belongs to the scene: the
+    // canvas is an ImGui window now, so WantCaptureMouse is true whenever the pointer is on the
+    // world.
+    bool hovered = false;
+
+    [[nodiscard]] bool valid() const { return width >= 1.0f && height >= 1.0f; }
+    // Where a point in window coordinates falls inside the canvas, in canvas points.
+    [[nodiscard]] float localX(float windowX) const { return windowX - x; }
+    [[nodiscard]] float localY(float windowY) const { return windowY - y; }
+    [[nodiscard]] bool contains(float windowX, float windowY) const {
+        return windowX >= x && windowY >= y && windowX < x + width && windowY < y + height;
+    }
+};
+
+// Where a mouse position in window points lands in the render target, in pixels. Two conversions
+// in one place because they are always both needed and one of them is always the one forgotten:
+// the canvas origin is subtracted first, then points are scaled to framebuffer pixels. Clamped to
+// the target, so a drag released outside the canvas still names a pixel inside it.
+//
+// An invalid canvas means the world is still being drawn to the whole window (the first frame of a
+// run), and the position is taken as-is.
+struct CanvasPixel {
+    std::uint32_t x = 0;
+    std::uint32_t y = 0;
+};
+[[nodiscard]] CanvasPixel canvasPixelFor(const CanvasRect& canvas, float windowX, float windowY, float scale,
+                                         std::uint32_t pixelWidth, std::uint32_t pixelHeight);
 
 [[nodiscard]] const char* dockRegionName(DockRegion region);
 
@@ -90,6 +135,19 @@ public:
     [[nodiscard]] std::uint64_t signature() const;
 
     [[nodiscard]] std::size_t size() const { return flags_.size(); }
+
+    // Reopens one panel in any side region that has none, and returns how many it had to reopen.
+    //
+    // This is the invariant that makes the world a canvas rather than a backdrop: an empty dock
+    // node is collapsed by ImGui and the centre expands into the space, so closing the last panel
+    // on the right makes the world span to the window edge. That is correct docking behaviour and
+    // wrong product behaviour -- the brief asks for space on both sides and under the canvas, full
+    // stop, not "unless you closed something".
+    //
+    // Enforced on load rather than continuously, so a region can still be emptied during a session
+    // by someone who wants that; it comes back next launch. The panel chosen is the first the
+    // registry lists for the region, which is the one the default layout would have opened.
+    std::size_t ensureRegionsOccupied();
 
 private:
     struct Flag {

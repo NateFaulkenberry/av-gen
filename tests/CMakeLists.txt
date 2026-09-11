@@ -21,6 +21,9 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/world_builder.cpp"
     # Viewport camera gestures are vector arithmetic over an eye and a target (ADR-068).
     "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
+    # The editor shell's panel registry and layout file (ADR-076). Deliberately ImGui-free so it
+    # can be checked here; the dock builder that reads it lives in avgen_platform.
+    "${CMAKE_SOURCE_DIR}/src/ui/editor_layout.cpp"
     # The camera director's join: heroes to a brief, a sequence onto the timeline (ADR-075).
     "${CMAKE_SOURCE_DIR}/src/app/camera_director.cpp"
     # Musical events published as signals (ADR-073). engine.cpp holds a MusicRuntime, so this has to

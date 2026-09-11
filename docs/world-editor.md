@@ -264,3 +264,96 @@ All of it is ordinary scene data. Save the project and it round-trips.
 - **There is no undo.** Save before generating over something you want.
 - The generated world is roughly four times sparser per square metre than the authored Glowmere
   scene, for reasons partly diagnosed and recorded in [world-performance.md](world-performance.md).
+
+---
+
+## 9. The workspace: menu bar, dockspace, panels, status bar
+
+Everything above is unchanged. What changed is the room it all happens in (ADR-076).
+
+### What you see on launch
+
+The window opens **maximised** on the display you last used, and the world fills the middle of it.
+Around the world:
+
+| Where | What | Open at first launch |
+|---|---|---|
+| Top | Menu bar — **File** and **View** | always |
+| Left | **World Builder**, **Assets** | World Builder |
+| Right | **World**, **Parameters**, **Render** | World, Parameters |
+| Bottom | **Control**, **Analysis**, **Modulation**, **Graph** | Control, Analysis, Modulation |
+| Foot | Status bar | always |
+| Centre | **the canvas** — the world | — |
+
+Panels sharing a region share a dock node, so they arrive as tabs. Build on the left, inspect on the
+right, run underneath, and the world in the middle takes about 60% of the width and 74% of the
+height.
+
+**The canvas is its own rectangle, not the window with panels laid over it.** The frame is rendered
+at the canvas's size and shown inside it; the rest of the window is opaque editor chrome with no
+world behind it. Nothing else can be docked into the centre — no tab bar, no drop target — because a
+panel there would cover the thing you came to look at.
+
+`--size <w>x<h>` still does exactly what it says and suppresses the maximising, because that flag is
+how a screenshot or a bug report is made reproducible. True fullscreen and the multi-display output
+windows are unaffected.
+
+### Showing and hiding panels
+
+**View** lists every panel, grouped by the region it belongs to, with a line of description on
+hover. A tick is a panel that is open; a panel's own close box does the same thing.
+
+A panel you open for the first time drops into its own region rather than floating over the world.
+One you deliberately drag out to float stays floating — it has a saved position of its own by then,
+and the shell does not overrule it.
+
+### The layout is remembered
+
+Two files, in avgen's preferences directory beside `recent.json`:
+
+- `editor-layout.ini` — ImGui's own: the dock tree, the split ratios, the tab order and every
+  window's size and position.
+- `editor-layout.json` — avgen's own: which panels are open, and the dock nodes the default layout
+  built.
+
+Both are written as you go and again on exit. Move a splitter, tear a panel off, close three of
+them — it comes back that way.
+
+**View → Restore Default Layout** puts it back: the dock tree is rebuilt on the spot and the
+panels this editor ships with are reopened. No restart. Use it after a layout gets away from you, or
+after an update adds a panel your saved tree has never seen.
+
+**View → Save Layout Now** writes both files immediately, for when you are about to do something to
+the machine that the ordinary two-second write might not survive.
+
+### The status bar
+
+One line across the foot. Every number on it is measured:
+
+`fps · frame interval · CPU frame time · GPU frame time · resolution · draw calls · triangles ·
+selection · armed placement · status message`, with the GPU adapter on the right.
+
+The GPU time reads `gpu n/a` when the timer has not reported yet, rather than showing a zero.
+
+### The viewport
+
+Every gesture in section 4 works exactly as it did, including the rule that a drag begun on the
+canvas keeps the mouse until you release even if the cursor crosses a panel.
+
+Three things now follow the canvas rather than the window, and the status bar's resolution is the
+quickest way to see it:
+
+- **What is rendered.** The frame is exactly the canvas's size in pixels. Widen a panel and the
+  render gets smaller and cheaper; the status bar's `w x h` changes with it.
+- **The camera's aspect.** It comes from the canvas, so the picture is never stretched by the panels
+  around it. What you frame is what the canvas shows.
+- **Where a click lands.** Picking and placement are measured from the canvas's own top-left corner,
+  not the window's.
+
+Resizing a panel stretches the picture for a single frame — the canvas's new size is only known once
+the frame it appears in has been laid out. You will see it while dragging a splitter and never
+otherwise.
+
+An offline render is still framed by the project's own render settings, not by the canvas. A canvas
+at an unusual shape and a 16:9 render will not frame identically; check against a render when it
+matters.

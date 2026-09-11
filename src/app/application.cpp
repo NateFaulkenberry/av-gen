@@ -1,6 +1,7 @@
 #include "app/application.hpp"
 
 #include "app/asset_browser.hpp"
+#include "app/camera_director.hpp"
 #include "app/world_director.hpp"
 #include "app/examples.hpp"
 #include "assets/video_writer.hpp"
@@ -67,6 +68,8 @@ std::string usageText() {
            "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
            "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
            "  --generate <file>   compose a world from a recipe (see examples/recipes/) at start-up\n"
+           "  --direct            cut the camera to the loaded track: folds the audio into\n"
+           "                      musical sections and shoots the world's heroes\n"
            "  --save-project <f>  write the project on exit\n"
            "  --play              start playback immediately\n"
            "  --frames <n>        exit after n frames\n"
@@ -78,7 +81,7 @@ std::string usageText() {
            "  --disable <list>    switch phases off for cost attribution: shadows,ao,volume,post\n"
            "  --headless          no window: offline mode, fixed-step clock, precomputed analysis\n"
            "  --fps <n>           offline frame rate (default 60)\n"
-           "  --size <w>x<h>      window size in points (default 1440x900)\n"
+           "  --size <w>x<h>      window size in points (default: open maximised)\n"
            "  --log <level>       trace|debug|info|warn|error\n"
            "  --help\n";
 }
@@ -219,6 +222,8 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             options.project = *v;
             ++i;
+        } else if (arg == "--direct") {
+            options.directCamera = true;
         } else if (arg == "--generate") {
             auto v = need(i, "--generate");
             if (!v) return std::unexpected(v.error());
@@ -277,6 +282,7 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             }
             options.width = w;
             options.height = h;
+            options.sizeGiven = true;
             options.renderWidth = w;
             options.renderHeight = h;
             ++i;
@@ -327,6 +333,9 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         wdesc.title = "avgen 0.2";
         wdesc.width = options.width;
         wdesc.height = options.height;
+        // The world is the canvas, and a canvas the size of a dialogue box is not one. An explicit
+        // --size still wins: that flag exists so a run can be reproduced at a stated size.
+        wdesc.maximised = !options.sizeGiven;
         auto window = platform::Window::create(wdesc);
         if (!window) {
             return std::unexpected(window.error());
@@ -406,7 +415,12 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         if (auto r = renderer_->resize(window_->pixelWidth(), window_->pixelHeight()); !r) {
             return std::unexpected(r.error());
         }
-        auto imgui = ui::ImGuiLayer::create(*window_, *context_);
+        // ImGui keeps the dock tree and the window geometry in its own ini beside the recent-files
+        // list; which panels are open is avgen's and lives next to it (ADR-076).
+        const std::filesystem::path prefs = platform::preferencesDirectory();
+        auto imgui = ui::ImGuiLayer::create(*window_, *context_,
+                                            prefs.empty() ? std::filesystem::path{}
+                                                          : prefs / "editor-layout.ini");
         if (!imgui) {
             return std::unexpected(imgui.error());
         }
@@ -414,6 +428,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         jobs_ = std::make_unique<JobSystem>(2);
         worldBuilder_ = std::make_unique<WorldBuilder>(*jobs_);
         panel_ = std::make_unique<ui::ControlPanel>();
+        panel_->setLayoutStore(prefs.empty() ? std::filesystem::path{} : prefs / "editor-layout.json",
+                               imgui_->hadSavedLayout());
         panel_->jobs = jobs_.get();
         panel_->builder = worldBuilder_.get();
         auto dialog = [this](platform::Window::DialogKind kind) {
@@ -635,6 +651,17 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     if (options.generateRecipe) {
         if (auto r = generateWorldFromRecipe(*options.generateRecipe); !r) {
             log::error("generate: {}", r.error().message);
+            if (options.headless) {
+                return std::unexpected(r.error());
+            }
+            if (panel_) panel_->setStatus(r.error().message);
+        }
+    }
+    if (options.directCamera) {
+        // After the world exists, because the director shoots the world's heroes and a generated
+        // world has none until it is installed.
+        if (auto r = directCameraFromTrack(); !r) {
+            log::error("direct: {}", r.error().message);
             if (options.headless) {
                 return std::unexpected(r.error());
             }
@@ -1002,9 +1029,16 @@ void Application::handleViewportEvent(const SDL_Event& event) {
     if (engine_ == nullptr) {
         return;
     }
-    // SDL reports mouse positions in points and the render targets are in pixels. On a retina
-    // display those differ by two, and picking without the conversion lands in the top-left quarter
-    // of the frame -- which looks like an offset bug rather than a units bug.
+    // SDL reports mouse positions in points, relative to the window's client area. The render
+    // target is in pixels and covers the *canvas*, not the window. Two conversions, and both are
+    // silent when they are wrong:
+    //
+    //  - points to pixels. On a retina display those differ by two, and picking without the
+    //    conversion lands in the top-left quarter of the frame.
+    //  - window to canvas. The canvas is inset by the left column and the menu bar, so a click
+    //    converted without subtracting the canvas origin lands short by exactly that inset. The
+    //    picture still moves, the click still picks *something*, and the error grows with the
+    //    width of the left-hand panel -- which is the kind of wrong that survives a demo.
     const auto scale = [this]() { return std::max(window_->pixelScale(), 1e-3f); };
 
     switch (event.type) {
@@ -1041,9 +1075,9 @@ void Application::handleViewportEvent(const SDL_Event& event) {
         const SDL_Keymod mods = SDL_GetModState();
         // A left button that went down and up without travelling is a click, not a tiny orbit.
         if (wasLeft && !moved && (mods & SDL_KMOD_SHIFT) == 0) {
-            const float s = scale();
-            viewportPickPixel_ = glm::uvec2(static_cast<std::uint32_t>(std::max(event.button.x * s, 0.0f)),
-                                            static_cast<std::uint32_t>(std::max(event.button.y * s, 0.0f)));
+            const ui::CanvasPixel pixel = ui::canvasPixelFor(canvas_, event.button.x, event.button.y,
+                                                             scale(), renderWidth_, renderHeight_);
+            viewportPickPixel_ = glm::uvec2(pixel.x, pixel.y);
             viewportPickPending_ = true;
         }
         viewportGesture_ = ViewportGesture::None;
@@ -1059,6 +1093,101 @@ void Application::handleViewportEvent(const SDL_Event& event) {
     }
 }
 
+
+// Viewport probes. Real SDL events, pushed through SDL's own queue, at points expressed as
+// fractions of the canvas:
+//
+//   AVGEN_VIEWPORT_PROBE=<u>,<v>                one left click
+//   AVGEN_VIEWPORT_DRAG=<u0>,<v0>,<u1>,<v1>     one left drag; the end may be outside the canvas
+//
+// Nothing about the path is bypassed: the events are routed by Window::pumpEvents, seen by ImGui,
+// gated by the canvas's hover state, converted by canvasPixelFor and answered by the real picker.
+// They exist because an editor's interaction cannot be checked by reading it, and a machine that
+// is not allowed to post synthetic input to the window server cannot check it by hand either.
+//
+// Two invariants they are good for:
+//   - A click at the canvas centre travels along the camera's forward axis whatever shape the
+//     canvas is, so the same probe under two panel widths must report the same world position. It
+//     does not if the canvas origin is not subtracted from the click.
+//   - A drag that ends outside the canvas must keep moving the camera after it leaves, or a panel
+//     has stolen a gesture halfway through (ADR-068).
+void Application::runViewportProbe(int frameIndex) {
+    static const char* const clickSpec = std::getenv("AVGEN_VIEWPORT_PROBE");
+    static const char* const dragSpec = std::getenv("AVGEN_VIEWPORT_DRAG");
+    if ((clickSpec == nullptr && dragSpec == nullptr) || !canvas_.valid() || window_ == nullptr) {
+        return;
+    }
+    const auto pointAt = [this](float u, float v) {
+        return glm::vec2(canvas_.x + canvas_.width * u, canvas_.y + canvas_.height * v);
+    };
+    const auto push = [this](std::uint32_t type, glm::vec2 at) {
+        SDL_Event e{};
+        e.type = type;
+        if (type == SDL_EVENT_MOUSE_MOTION) {
+            e.motion.windowID = window_->id();
+            e.motion.x = at.x;
+            e.motion.y = at.y;
+        } else {
+            e.button.windowID = window_->id();
+            e.button.button = SDL_BUTTON_LEFT;
+            e.button.down = type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+            e.button.clicks = 1;
+            e.button.x = at.x;
+            e.button.y = at.y;
+        }
+        SDL_PushEvent(&e);
+    };
+
+    if (clickSpec != nullptr) {
+        float u = 0.5f;
+        float v = 0.5f;
+        if (std::sscanf(clickSpec, "%f,%f", &u, &v) == 2) {
+            const glm::vec2 at = pointAt(u, v);
+            // The move goes first and early: the canvas's hover state, which is what lets the click
+            // reach the scene at all, is settled by ImGui on the frame after the pointer arrives.
+            if (frameIndex == 120) {
+                log::info("probe: canvas ({:.0f},{:.0f}) {:.0f}x{:.0f} points, render {}x{} px; clicking ({:.1f},{:.1f})",
+                          canvas_.x, canvas_.y, canvas_.width, canvas_.height, renderWidth_, renderHeight_, at.x, at.y);
+                push(SDL_EVENT_MOUSE_MOTION, at);
+            } else if (frameIndex == 150) {
+                push(SDL_EVENT_MOUSE_BUTTON_DOWN, at);
+            } else if (frameIndex == 152) {
+                push(SDL_EVENT_MOUSE_BUTTON_UP, at);
+            }
+        }
+        return;
+    }
+
+    float u0 = 0.5f;
+    float v0 = 0.5f;
+    float u1 = 0.0f;
+    float v1 = 0.5f;
+    if (std::sscanf(dragSpec, "%f,%f,%f,%f", &u0, &v0, &u1, &v1) != 4) {
+        return;
+    }
+    constexpr int kStart = 120;
+    constexpr int kSteps = 16;
+    const auto say = [this](const char* what, glm::vec2 at) {
+        const CameraPose pose = viewportPose();
+        log::info("probe-drag: {} at ({:.1f},{:.1f}) {} canvas; eye ({:.3f}, {:.3f}, {:.3f})", what, at.x, at.y,
+                  canvas_.contains(at.x, at.y) ? "inside" : "OUTSIDE", pose.eye.x, pose.eye.y, pose.eye.z);
+    };
+    if (frameIndex == kStart) {
+        push(SDL_EVENT_MOUSE_MOTION, pointAt(u0, v0));
+        say("start", pointAt(u0, v0));
+    } else if (frameIndex == kStart + 30) {
+        push(SDL_EVENT_MOUSE_BUTTON_DOWN, pointAt(u0, v0));
+    } else if (frameIndex > kStart + 30 && frameIndex <= kStart + 30 + kSteps * 2 && (frameIndex & 1) == 0) {
+        const float t = static_cast<float>(frameIndex - kStart - 30) / static_cast<float>(kSteps * 2);
+        const glm::vec2 at = pointAt(u0 + (u1 - u0) * t, v0 + (v1 - v0) * t);
+        push(SDL_EVENT_MOUSE_MOTION, at);
+        say("moved", at);
+    } else if (frameIndex == kStart + 30 + kSteps * 2 + 4) {
+        const glm::vec2 at = pointAt(u1, v1);
+        push(SDL_EVENT_MOUSE_BUTTON_UP, at);
+        say("released", at);
+    }
+}
 
 std::size_t Application::placeAt(glm::vec3 position, glm::vec3 normal) {
     if (placementAssetId_.empty() || engine_ == nullptr || panel_ == nullptr) {
@@ -1136,8 +1265,13 @@ void Application::serviceViewportPick() {
     viewportPickPending_ = false;
 
     PickView view;
-    const std::uint32_t pw = window_->pixelWidth();
-    const std::uint32_t ph = window_->pixelHeight();
+    // The canvas, not the window: the identifier and depth targets are the size the world was
+    // rendered at, and the ray a pixel stands for is built from the same aspect the camera used.
+    const std::uint32_t pw = renderWidth_;
+    const std::uint32_t ph = renderHeight_;
+    if (pw == 0 || ph == 0) {
+        return;
+    }
     view.size = glm::uvec2(pw, ph);
     const scene::Camera& camera = engine_->scene().camera;
     const float aspect = static_cast<float>(pw) / static_cast<float>(std::max(ph, 1u));
@@ -1193,6 +1327,30 @@ void Application::serviceViewportPick() {
               result->position.y, result->position.z);
 }
 
+
+Result<void> Application::directCameraFromTrack() {
+    if (engine_ == nullptr || engine_->composition() == nullptr) {
+        return fail("--direct needs a scene; load a project or generate a world first");
+    }
+    // Heroes come from whichever source the world has one. An authored scene declares them
+    // (ADR-074); a generated world's composer places them (ADR-072). Preferring the scene's own is
+    // deliberate: if somebody wrote them down, those are the ones they meant.
+    std::vector<world::HeroPoint> heroes = engine_->composition()->heroes();
+    if (heroes.empty() && panel_ != nullptr && panel_->worldBuilder.lastWorld) {
+        heroes = panel_->worldBuilder.lastWorld->composed.plan.heroes;
+    }
+    if (heroes.empty()) {
+        return fail("--direct found no heroes to shoot: declare some in the scene's \"heroes\" "
+                    "block, or generate a world");
+    }
+    auto installed = directEngine(*engine_, heroes);
+    if (!installed) {
+        return std::unexpected(installed.error());
+    }
+    log::info("direct: {} camera track(s) from {} hero(es)", *installed, heroes.size());
+    return {};
+}
+
 int Application::run() {
     const int code = options_.headless ? runHeadless() : runLive();
     if (options_.saveProject) {
@@ -1226,6 +1384,11 @@ int Application::runLive() {
 
     for (;;) {
         const auto frameStart = std::chrono::steady_clock::now();
+        // Last frame's canvas. Events are read before this frame is laid out, so this is the most
+        // recent answer there is; on a still window it is the current one.
+        if (panel_ != nullptr) {
+            canvas_ = panel_->canvas();
+        }
         auto events = window_->pollEvents([this](const SDL_Event& event) {
             if (uiSelfTestEvents_) {
                 uiEventTypes_[event.type] += 1;
@@ -1243,11 +1406,15 @@ int Application::runLive() {
                 return;
             }
             imgui_->processEvent(event);
-            // The viewport gets the mouse only when no ImGui window wants it. A drag that began on
-            // the scene keeps it until the button is released, though: letting a panel steal a
-            // gesture halfway through because the cursor passed over it is how an orbit ends up
-            // jumping to a stop mid-swing.
-            if (!imgui_->wantsMouse() || viewportGesture_ != ViewportGesture::None) {
+            // The viewport gets the mouse when the pointer is over the canvas. Since the canvas is
+            // an ImGui window of its own (ADR-076), ImGui's WantCaptureMouse is true whenever the
+            // pointer is on the world, so it can no longer be the test -- the canvas's own hover
+            // state is, and it is false when a panel, a popup or a menu is over it.
+            //
+            // A drag that began on the canvas keeps the mouse until the button is released:
+            // letting a panel steal a gesture halfway through because the cursor passed over it is
+            // how an orbit ends up jumping to a stop mid-swing.
+            if (canvas_.hovered || viewportGesture_ != ViewportGesture::None) {
                 handleViewportEvent(event);
             }
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && !imgui_->wantsKeyboard()) {
@@ -1295,13 +1462,64 @@ int Application::runLive() {
                 panel_->setStatus("engine shaders reloaded");
             }
         }
+        // The world is rendered at the size of the canvas, not of the window. Everything downstream
+        // follows from this one pair of numbers: the renderer's targets, the camera's aspect (the
+        // scene renderer takes it from its own HDR target) and the pixel a click resolves to.
+        // Before the first frame is laid out there is no canvas, and the window is the best guess.
+        const float pixelScale = std::max(window_->pixelScale(), 1e-3f);
+        std::uint32_t cw = window_->pixelWidth();
+        std::uint32_t ch = window_->pixelHeight();
+        if (canvas_.valid()) {
+            cw = std::max(1u, static_cast<std::uint32_t>(std::lround(canvas_.width * pixelScale)));
+            ch = std::max(1u, static_cast<std::uint32_t>(std::lround(canvas_.height * pixelScale)));
+        }
+        // A new size only takes effect once it has held still for a few frames. Following every
+        // frame of a splitter drag would be more correct and much worse: each size is a new render
+        // target and a new texture view, and ImGui's WebGPU backend caches a bind group per view
+        // for the life of the context. The picture stretches slightly for those few frames and is
+        // exact the moment the splitter is let go.
+        if (cw != pendingWidth_ || ch != pendingHeight_) {
+            pendingWidth_ = cw;
+            pendingHeight_ = ch;
+            pendingFrames_ = 0;
+        } else {
+            ++pendingFrames_;
+        }
+        constexpr int kResizeSettleFrames = 6;
+        if ((cw != renderWidth_ || ch != renderHeight_) &&
+            (renderWidth_ == 0 || pendingFrames_ >= kResizeSettleFrames)) {
+            if (auto r = renderer_->resize(cw, ch); !r) {
+                log::error("canvas resize: {}", r.error().message);
+            } else {
+                renderWidth_ = cw;
+                renderHeight_ = ch;
+            }
+        }
+        // The final texture has to exist before the panel draws, because the canvas window shows it
+        // and ImGui records the texture id while it lays the frame out -- the drawing into it
+        // happens later in the same encoder, so the image is this frame's, not the last one's.
+        const bool retiringView = finalTexture_ != nullptr &&
+                                  (finalWidth_ != renderWidth_ || finalHeight_ != renderHeight_);
+        if (auto r = ensureFinalTexture(renderWidth_, renderHeight_); !r) {
+            log::error("final texture: {}", r.error().message);
+            return 2;
+        }
+        if (retiringView) {
+            // The view the canvas was showing is gone. Nothing else releases the bind group ImGui
+            // built for it, and that bind group is the last reference to a whole render target.
+            imgui_->forgetCachedTextures();
+        }
+        if (panel_ != nullptr) {
+            panel_->canvasTexture = reinterpret_cast<std::uint64_t>(finalView_.Get());
+        }
+
         const FrameTime time = engine_->tick(clock);
         lastTime = time;
-        engine_->setViewport(window_->pixelWidth(), window_->pixelHeight());
+        engine_->setViewport(renderWidth_, renderHeight_);
         engine_->update(time);
 
-        stats.width = window_->pixelWidth();
-        stats.height = window_->pixelHeight();
+        stats.width = renderWidth_;
+        stats.height = renderHeight_;
         stats.drawCalls = renderer_->stats().drawCalls;
         stats.triangles = renderer_->stats().triangles;
         stats.procedural = renderer_->stats().procedural;
@@ -1374,13 +1592,11 @@ int Application::runLive() {
         }
         const std::uint32_t pw = window_->pixelWidth();
         const std::uint32_t ph = window_->pixelHeight();
-        if (auto r = ensureFinalTexture(pw, ph); !r) {
-            log::error("final texture: {}", r.error().message);
-            return 2;
-        }
-        // The frame renders into the offscreen final texture; the main window and every output
-        // present it through the output mapper (ADR-022).
-        gpu::TargetView finalTarget{finalView_, wgpu::TextureFormat::BGRA8Unorm, pw, ph};
+        // The frame renders into the offscreen final texture; every projection output still
+        // presents it through the output mapper (ADR-022), and the main window shows it inside the
+        // editor's canvas (ADR-076).
+        gpu::TargetView finalTarget{finalView_, wgpu::TextureFormat::BGRA8Unorm, renderWidth_,
+                                    renderHeight_};
         gpu::TargetView target{*view, context_->surfaceFormat(), pw, ph};
         wgpu::CommandEncoder encoder = context_->device().CreateCommandEncoder();
         // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
@@ -1396,10 +1612,21 @@ int Application::runLive() {
             log::error("render: {}", r.error().message);
             return 2;
         }
-        if (auto r = mapper_->draw(encoder, finalView_, *view, pw, ph, rendering::OutputMapping::identity(),
-                                   context_->surfaceFormat()); !r) {
-            log::error("present: {}", r.error().message);
-            return 2;
+        // Clearing the window is the whole of the main window's present now: the editor draws the
+        // frame into its canvas, and the world no longer covers the surface for the panels to be
+        // painted over. The clear still has to happen, because ImGui's pass loads rather than
+        // clears and the swapchain image it gets is whatever was last in it.
+        {
+            wgpu::RenderPassColorAttachment ground{};
+            ground.view = *view;
+            ground.loadOp = wgpu::LoadOp::Clear;
+            ground.storeOp = wgpu::StoreOp::Store;
+            ground.clearValue = {0.04, 0.04, 0.05, 1.0};
+            wgpu::RenderPassDescriptor pass{};
+            pass.label = "editor-ground";
+            pass.colorAttachmentCount = 1;
+            pass.colorAttachments = &ground;
+            encoder.BeginRenderPass(&pass).End();
         }
         imgui_->render(encoder, target);
         wgpu::CommandBuffer commands = encoder.Finish();
@@ -1429,18 +1656,19 @@ int Application::runLive() {
                 panel_->worldBuilder.focusRequest.reset();
             }
         }
+        runViewportProbe(framesRendered);
         // After the frame is submitted, so the identifier and depth targets hold what the user
         // actually clicked on rather than the frame before it.
         serviceViewportPick();
         const auto workEnd = std::chrono::steady_clock::now();
         context_->present();
         if (outputs_.openCount() > 0) {
-            if (auto r = outputs_.presentAll(*context_, finalTexture_, pw, ph); !r) {
+            if (auto r = outputs_.presentAll(*context_, finalTexture_, renderWidth_, renderHeight_); !r) {
                 log::warn("outputs: {}", r.error().message);
             }
         }
         if (share_.isOpen()) {
-            if (auto r = share_.publish(finalTexture_, pw, ph); !r) {
+            if (auto r = share_.publish(finalTexture_, renderWidth_, renderHeight_); !r) {
                 log::warn("share: {}", r.error().message);
             }
             if (fpsFrames % 30 == 0) {
@@ -1488,6 +1716,11 @@ int Application::runLive() {
             log::error("capture: {}", r.error().message);
             return 4;
         }
+    }
+    // The throttle means the last few seconds of toggling may not have reached the disk yet.
+    // ImGui saves its own ini from DestroyContext, so the two halves of the layout land together.
+    if (panel_) {
+        panel_->saveLayout();
     }
     log::info("rendered {} frames; GPU errors: {}", framesRendered, context_->errorCount());
     return context_->errorCount() == 0 ? 0 : 5;

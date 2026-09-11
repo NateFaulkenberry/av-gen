@@ -125,6 +125,7 @@ Result<std::unique_ptr<Window>> Window::create(const WindowDesc& desc) {
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_METAL_BOOLEAN, true);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, desc.resizable);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, desc.highDpi);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_MAXIMIZED_BOOLEAN, desc.maximised && !desc.fullscreen);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, desc.borderless);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_ALWAYS_ON_TOP_BOOLEAN, desc.alwaysOnTop);
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_FULLSCREEN_BOOLEAN, desc.fullscreen);
@@ -155,9 +156,14 @@ Result<std::unique_ptr<Window>> Window::create(const WindowDesc& desc) {
     }
     window->updateSize();
     window->focused_ = (SDL_GetWindowFlags(window->window_) & SDL_WINDOW_INPUT_FOCUS) != 0;
-    log::info("window '{}' {}x{} points, {}x{} pixels (scale {:.2f}) on display {}{}", desc.title, desc.width,
-              desc.height, window->pixelWidth_, window->pixelHeight_, window->pixelScale_, window->displayIndex(),
-              desc.fullscreen ? ", fullscreen" : "");
+    // The size logged is the one SDL gave, not the one asked for: maximised and fullscreen windows
+    // ignore the request, and a log that repeated it back would say 1440x900 for a full screen.
+    int pointWidth = 0;
+    int pointHeight = 0;
+    SDL_GetWindowSize(window->window_, &pointWidth, &pointHeight);
+    log::info("window '{}' {}x{} points, {}x{} pixels (scale {:.2f}) on display {}{}", desc.title, pointWidth,
+              pointHeight, window->pixelWidth_, window->pixelHeight_, window->pixelScale_, window->displayIndex(),
+              desc.fullscreen ? ", fullscreen" : (desc.maximised ? ", maximised" : ""));
     return window;
 }
 

@@ -329,10 +329,19 @@ TEST_CASE("Glowmere's directed shot stays grounded, bounded and fully connected"
     } else {
         REQUIRE(engine.environmentPath().empty());
     }
-    REQUIRE(engine.timeline().tracks().size() == 2);
+    // Whatever the project automates, it must bind. An unbound track is silently inert and looks
+    // exactly like automation that does nothing.
     for (const auto& track : engine.timeline().tracks()) {
+        INFO("track on " << track.target);
         REQUIRE(track.param != nullptr);
     }
+    // An *authored* camera path is now optional, and the stylized showcase deliberately has none:
+    // its camera is driven by the editor and by the camera director instead, and a timeline that
+    // replaces camera/position every frame silently overrides both (a viewport drag writes the base
+    // value and the timeline puts it back). So the walk below runs only where a path exists.
+    const bool authoredCameraPath =
+        std::any_of(engine.timeline().tracks().begin(), engine.timeline().tracks().end(),
+                    [](const params::Track& t) { return t.target.starts_with("camera/"); });
     // Every route binds. This is the assertion that matters and it is deliberately made over *all*
     // of them: a route whose source or target does not resolve is silently inert, which looks
     // exactly like a scene that is not reacting, and the loader only warns.
@@ -356,6 +365,17 @@ TEST_CASE("Glowmere's directed shot stays grounded, bounded and fully connected"
     // to the scene should not fail a test about whether routes bind. What must hold is that the
     // continuous pair is still there and still smoothed.
     CHECK(slowContinuous >= 2);
+    if (!authoredCameraPath) {
+        // No path to walk. What must still hold is that the scene is loadable and its camera is
+        // somewhere sane, since the editor starts from wherever the scene left it.
+        engine.update(FrameTime{0.0, 0.1, 0});
+        const auto& camera = engine.scene().camera;
+        const float ground = valley->worldMap.height({camera.position.x, camera.position.z});
+        INFO("camera at " << camera.position.x << ", " << camera.position.y << ", " << camera.position.z);
+        CHECK(camera.position.y - ground >= 1.2f);
+        CHECK(glm::length(camera.target - camera.position) > 5.0f);
+        return;
+    }
     glm::vec3 previousPosition{};
     glm::vec3 previousDirection{};
     for (std::uint64_t frame = 0; frame <= 2700; frame += 3) {

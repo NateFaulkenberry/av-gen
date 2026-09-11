@@ -1775,10 +1775,32 @@ TEST_CASE("examples/world/glowmere-stylized.scene.json declares the elder as its
     in >> j;
     REQUIRE(j.contains("heroes"));
     REQUIRE(j["heroes"].is_array());
-    REQUIRE(j["heroes"].size() == 1);
-    auto hero = world::HeroPoint::fromJson(j["heroes"][0]);
+    // The elder specifically, found by name rather than by position. Pinning a count of one was
+    // pinning an authoring decision: Glowmere gained three more heroes so a camera director would
+    // have somewhere to travel, and adding a hero to a scene should not fail a test about whether
+    // the elder is declared correctly.
+    REQUIRE(!j["heroes"].empty());
+    const auto entry = std::find_if(j["heroes"].begin(), j["heroes"].end(),
+                                    [](const nlohmann::json& h) {
+                                        return h.value("name", std::string()) == "elder";
+                                    });
+    REQUIRE(entry != j["heroes"].end());
+    auto hero = world::HeroPoint::fromJson(*entry);
     REQUIRE(hero.has_value());
     CHECK(hero->name == "elder");
+    // Every hero in the file has to load, or one of them is silently broken.
+    for (const nlohmann::json& h : j["heroes"]) {
+        INFO("hero '" << h.value("name", std::string("?")) << "'");
+        CHECK(world::HeroPoint::fromJson(h).has_value());
+    }
+    // The warm accent is the elder's alone. A second hero wearing it is the cheapest possible way
+    // to lose the one warm light in a cool world.
+    const auto warm = std::count_if(j["heroes"].begin(), j["heroes"].end(),
+                                    [](const nlohmann::json& h) {
+                                        const auto c = h.value("colorAccent", std::vector<float>{});
+                                        return c.size() == 3 && c[0] > 0.9f && c[1] < 0.6f && c[2] < 0.3f;
+                                    });
+    CHECK(warm == 1);
     // An assembly, not an asset: the elder is elder-crown, elder-stem and elder-filaments, and no
     // asset id could name three nodes.
     CHECK(hero->assembly == "elder");

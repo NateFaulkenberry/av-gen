@@ -7,7 +7,9 @@
 
 #include <webgpu/webgpu_cpp.h>
 
+#include <filesystem>
 #include <memory>
+#include <string>
 
 union SDL_Event;
 
@@ -22,7 +24,11 @@ namespace avgen::ui {
 
 class ImGuiLayer {
 public:
-    static Result<std::unique_ptr<ImGuiLayer>> create(platform::Window& window, gpu::Context& context);
+    // `iniFile` is where ImGui keeps the dock tree and the window geometry (ADR-076). Empty
+    // disables it entirely, which is what the offline paths want: a render should not rearrange
+    // somebody's editor.
+    static Result<std::unique_ptr<ImGuiLayer>> create(platform::Window& window, gpu::Context& context,
+                                                      const std::filesystem::path& iniFile = {});
     ~ImGuiLayer();
     ImGuiLayer(const ImGuiLayer&) = delete;
     ImGuiLayer& operator=(const ImGuiLayer&) = delete;
@@ -32,12 +38,24 @@ public:
     // Appends a render pass (LoadOp::Load) that draws the UI over `target`.
     void render(wgpu::CommandEncoder& encoder, const gpu::TargetView& target);
 
+    // Drops every cached image bind group. The WebGPU backend keeps one per texture view it has
+    // ever been shown and has no way to forget a single one, so a host that recreates its canvas
+    // render target on every resize would otherwise retain every size it has ever been. Costs a
+    // pipeline and font rebuild on the next frame; call it only when a view is actually retired.
+    void forgetCachedTextures();
+
     [[nodiscard]] bool wantsKeyboard() const;
     [[nodiscard]] bool wantsMouse() const;
+    // Whether the ini file already existed when the context was made. False means a first run, and
+    // the shell has to build its default dock tree rather than trust an empty one.
+    [[nodiscard]] bool hadSavedLayout() const { return hadSavedLayout_; }
 
 private:
     ImGuiLayer() = default;
     bool initialised_ = false;
+    bool hadSavedLayout_ = false;
+    // ImGui stores the pointer, not the characters, so this has to outlive the context.
+    std::string iniPath_;
 };
 
 } // namespace avgen::ui

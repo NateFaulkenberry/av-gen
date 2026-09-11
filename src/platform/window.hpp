@@ -32,6 +32,10 @@ struct WindowDesc {
     bool highDpi = true;
     int displayIndex = -1;       // index into Window::displays(); -1 = the default display
     bool fullscreen = false;     // borderless desktop fullscreen on that display
+    // Open zoomed to the display's work area (ADR-076). Asked for at creation rather than by
+    // zooming afterwards, because a window that appears at one size and jumps to another has
+    // already configured its surface at the first size and has to do it twice.
+    bool maximised = false;
     bool borderless = false;
     std::optional<int> x;        // position in points (global desktop space); unset = centred on the display
     std::optional<int> y;
