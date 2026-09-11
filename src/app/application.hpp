@@ -137,6 +137,9 @@ private:
     // through the job system because at start-up there is no frame to keep responsive, and blocking
     // for the tens of milliseconds this takes is simpler than deferring it a frame.
     [[nodiscard]] Result<void> generateWorldFromRecipe(const std::filesystem::path& path);
+    // Opens anything: a project, a composition, a mesh, a shader -- or a world recipe, which is
+    // generated rather than loaded and so cannot go through `Engine::loadFile`.
+    [[nodiscard]] Result<void> openAny(const std::filesystem::path& path);
 
     [[nodiscard]] Result<std::unique_ptr<RenderJob>> makeRenderJob(const std::filesystem::path& projectFile,
                                                                    RenderSettings settings);

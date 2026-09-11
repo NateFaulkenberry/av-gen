@@ -8,6 +8,7 @@
 #include "world/world_composer.hpp"
 #include "world/world_recipe.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <nlohmann/json.hpp>
@@ -490,4 +491,62 @@ TEST_CASE("A region with no density scale is still a clearing", "[world][compose
     dense.densityScale = 2.5f;
     const std::array<world::ScatterClearance, 1> thick{dense};
     CHECK(world::clearanceWeight(thick, glm::vec2(0.0f)) > 2.0f);
+}
+
+TEST_CASE("A zone is a share of the world, so extent scales density and nothing else",
+          "[world][composer]") {
+    auto lib = testLibrary();
+
+    const auto composeAt = [&](float extent) {
+        world::WorldRecipe r = testRecipe();
+        r.extent = extent;
+        auto w = world::composeWorld(r, lib);
+        REQUIRE(w.has_value());
+        return std::move(*w);
+    };
+
+    const world::ComposedWorld small = composeAt(400.0f);
+    const world::ComposedWorld large = composeAt(1200.0f);
+
+    // Zones are anchored on heroes and sized off the world, so tripling the extent triples them.
+    // They used to be sized off `activationRadius`, which descends from the hero's own height and
+    // is the same handful of metres at any extent -- so four zones blanketed a small world and
+    // dappled a large one. Because overlapping zones multiply their emphasis, that made the *same
+    // recipe* mean a different density at every extent: measured on the shipped Glowmere presets,
+    // four times the ground produced ten to twelve times the flora instead of four.
+    REQUIRE(!small.plan.zones.empty());
+    REQUIRE(small.plan.zones.size() == large.plan.zones.size());
+    for (std::size_t i = 0; i < small.plan.zones.size(); ++i) {
+        const float ratio = large.plan.zones[i].radius / small.plan.zones[i].radius;
+        CHECK(ratio == Catch::Approx(3.0f).epsilon(0.35));
+    }
+
+    // The consequence that actually matters: whatever the extent, a zone covers a bounded share of
+    // the world. The share is not identical for every zone -- the hero's own scale still leans on
+    // the size, which is deliberate -- but it can no longer run away, and that is what stops four
+    // zones blanketing one world and dappling another.
+    //
+    // Bounds are the clamp in the composer: 0.7 to 1.3 of a 0.13 share, with a little slack.
+    for (const world::ComposedWorld* w : {&small, &large}) {
+        const float extent = w == &small ? 400.0f : 1200.0f;
+        for (const world::EcologicalZone& z : w->plan.zones) {
+            const float share = z.radius / extent;
+            CHECK(share >= 0.085f);
+            CHECK(share <= 0.175f);
+        }
+    }
+}
+
+TEST_CASE("focalStrength zero means no emphasis, not no subject", "[world][composer]") {
+    auto lib = testLibrary();
+    world::WorldRecipe r = testRecipe();
+    r.composition.focalStrength = 0.0f;
+    auto composed = world::composeWorld(r, lib);
+    REQUIRE(composed.has_value());
+
+    // The focal region is what the viewpoint is framed on, so gating its existence on the strength
+    // meant `focalStrength: 0.0` composed a world that nothing ever looked at.
+    REQUIRE(!composed->plan.focal.empty());
+    CHECK(composed->plan.focal.front().strength == 0.0f);
+    CHECK(composed->plan.focal.front().radius > 0.0f);
 }
