@@ -192,9 +192,10 @@ tone mapping and composition overlay.
 
 ### P2: diagnostics and permanent torture scenes
 
-- [ ] Extend existing `DebugViewOptions`/`DebugDraw` facilities rather than creating a second debug
-  system. Add bounds, object origins/axes, culling state, object ID, world position, normals, raw/
-  linear depth, motion and water masks where the current debug targets can support them.
+- [x] Extend the existing `DebugViewOptions`/`DebugDraw` facilities with opt-in ordinary-entity
+  bounds, origins/axes and selected-entity filtering. Camera-culled entities are highlighted red.
+  Procedural bounds/IDs remain available through the original options; depth/motion/water masks
+  still use auxiliary-target work below.
 - [ ] Add runtime toggles for culling, animation, LOD, water, transparency, post, bloom, shadows,
   particles, terrain and VFX. These are isolation switches only, never production fixes.
 - [ ] Create `RendererQA` with labeled static cube, glTF, disabled-animation mesh, terrain, water,

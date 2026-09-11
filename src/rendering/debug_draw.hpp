@@ -87,6 +87,9 @@ struct DebugViewOptions {
     bool sdfSlice = false;        // SDF distance iso-lines on a horizontal slice at sliceHeight
     float sliceHeight = 0.0f;
     bool instanceIds = false;     // colour points by id hash
+    bool entityBounds = false;    // world-space bounds of ordinary mesh entities
+    bool entityOrigins = false;   // world-space origins and axes of ordinary mesh entities
+    std::string selectedEntity;   // restrict entity diagnostics when non-empty
     bool lod = false;             // colour by LOD level (ADR-029)
     bool culling = false;         // draw culled instances in red
     bool depthTest = true;
