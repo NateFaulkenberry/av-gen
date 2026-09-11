@@ -1,4 +1,5 @@
 #include "ai/engine_tools.hpp"
+#include "assets/asset_catalog.hpp"
 
 #include "ai/capabilities.hpp"
 #include "ai/tool_context.hpp"
@@ -832,6 +833,45 @@ void registerParameterTools(ToolRegistry& registry) {
     // different answer: `ToolContext::resolveContent` bounds it to the directories the host listed,
     // with `..` and symlinks resolved *before* the containment test. Without that an import tool is
     // an arbitrary-file-read primitive handed to a language model.
+    add(registry, "asset.list", "List available assets",
+        "List stable asset IDs visible to this session, including built-in and project-owned assets.",
+        schema::object({{"query", schema::string("Optional name, ID or type search")},
+                        {"limit", schema::integer("Maximum results (default 100)", 1, kMaxLimit)}}),
+        readOnly(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            const auto catalog = assets::catalogAssets(ctx.contentRoots(), ctx.engine().projectPath().parent_path());
+            if (!catalog) return ToolResult::failure(ToolErrorCode::Unavailable, catalog.error().message);
+            const auto found = assets::searchAssets(*catalog, args.value("query", std::string{}), limitOf(args));
+            json out = json::array();
+            for (const auto& asset : found) {
+                out.push_back(json{{"id", asset.id}, {"name", asset.name}, {"type", asset.type},
+                                   {"source", assets::assetSourceName(asset.source)},
+                                   {"path", asset.path.string()}, {"tags", asset.tags}});
+            }
+            return ToolResult::ok(json{{"assets", std::move(out)}, {"totalVisible", catalog->size()}},
+                                  fmt::format("{} asset(s) visible", found.size()));
+        });
+
+    add(registry, "asset.search", "Search available assets",
+        "Search built-in and project asset metadata by stable ID, name or type.",
+        schema::object({{"query", schema::string("Name, ID or type search")},
+                        {"limit", schema::integer("Maximum results (default 100)", 1, kMaxLimit)}}),
+        readOnly(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string query = args.value("query", std::string{});
+            if (query.empty()) return ToolResult::failure(ToolErrorCode::InvalidArguments, "query must not be empty");
+            const auto catalog = assets::catalogAssets(ctx.contentRoots(), ctx.engine().projectPath().parent_path());
+            if (!catalog) return ToolResult::failure(ToolErrorCode::Unavailable, catalog.error().message);
+            const auto found = assets::searchAssets(*catalog, query, limitOf(args));
+            json out = json::array();
+            for (const auto& asset : found) {
+                out.push_back(json{{"id", asset.id}, {"name", asset.name}, {"type", asset.type},
+                                   {"source", assets::assetSourceName(asset.source)},
+                                   {"path", asset.path.string()}, {"tags", asset.tags}});
+            }
+            return ToolResult::ok(json{{"assets", std::move(out)}}, fmt::format("{} matching asset(s)", found.size()));
+        });
+
     add(registry, "asset.list_importable", "List importable media",
         "Audio, glTF scenes and HDR environments the session can reach, by path. Use this to find a "
         "file rather than guessing where it lives -- a path outside the folders this session was "
