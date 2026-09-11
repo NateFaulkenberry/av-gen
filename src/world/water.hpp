@@ -68,7 +68,10 @@ struct FlowSample {
     glm::vec2 direction{0.0f};  // unit XZ, or (0,0) where there is no flow
     float speed = 0.0f;         // metres per second
     float distance = 0.0f;      // metres from the centreline
-    float across = 0.0f;        // -1 at the left bank, 0 at the centreline, +1 at the right
+    // -1 at one bank, 0 at the centreline, +1 at the other. Positive is to the *right* of the
+    // downstream direction, where right is downstream x up -- so a course running toward +Z has its
+    // positive side at negative x. Only the consistency matters; this is where it is written down.
+    float across = 0.0f;
     float along = 0.0f;         // 0 at the head, 1 at the mouth (arc length, normalised)
     float surface = 0.0f;       // metres; the body's surface level here
     bool inside = false;        // within the body's channel
