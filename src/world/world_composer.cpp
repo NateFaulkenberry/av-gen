@@ -1,5 +1,7 @@
 #include "world/world_composer.hpp"
 
+#include "world/terrain_gen.hpp"
+
 #include "core/log.hpp"
 
 #include "core/noise.hpp"
@@ -300,37 +302,19 @@ EnvironmentPlan planEnvironment(const WorldRecipe& recipe, const PaletteRoles& r
 } // namespace
 
 WorldMap terrainFor(const WorldRecipe& recipe) {
-    WorldMap map;
-    map.name = recipe.world;
-    map.seed = recipe.seed;
-    map.size = glm::vec2(recipe.extent, recipe.extent);
-    map.erosion = 0.55f;
-    // One NoiseLayer is one octave, so the stack is written out: a broad landform, a ridged mid
-    // scale that gives slopes something to be, and a fine layer for texture underfoot. A perfectly
-    // flat plane makes every slope and altitude rule in the placer a no-op, which looks exactly
-    // like the rules being ignored.
-    const float span = std::max(recipe.extent, 1.0f);
-    NoiseLayer broad;
-    broad.frequency = 1.0f / (span * 0.55f);
-    broad.amplitude = span * 0.055f;
-    broad.warp = span * 0.04f;
-    NoiseLayer ridges;
-    ridges.frequency = 1.0f / (span * 0.16f);
-    ridges.amplitude = span * 0.022f;
-    ridges.ridged = 0.65f;
-    NoiseLayer detail;
-    detail.frequency = 1.0f / (span * 0.045f);
-    detail.amplitude = span * 0.006f;
-    map.layers = {broad, ridges, detail};
-    // Damp in the basins. The default 0.35 never reaches the 0.55 that `composerBiomes`'s marsh
-    // requires, and with no water features on a generated map the lowland term is the *only* source
-    // of moisture -- so marsh covered exactly 0% of every generated world while the composer went on
-    // assigning ferns, fungi, shelf fungi and beacons to it. Those layers were placed and then had
-    // nowhere to grow, which is most of why a generated valley came out about thirteen times
-    // sparser than the authored scene it was modelled on.
-    map.lowlandMoisture = 0.78f;
+    // Everything about the shape of the ground now lives in `terrain_gen` (ADR-090), written in the
+    // artistic parameters §30 asks for. What was here before was three octaves of noise and no
+    // features at all: a rolling dune field at every seed, with no ridge, no valley, no basin and no
+    // water anywhere, which is why every slope and altitude rule in the placer had almost nothing to
+    // bite on and why a generated world could not have a river in it.
+    TerrainParams params = recipe.terrain;
+    params.name = recipe.world;
+    params.seed = recipe.seed;
+    params.extent = recipe.extent;
+    WorldMap map = generateTerrain(params);
     // Without these, every layer the composer emits names a biome the terrain has never heard of
-    // and the ecology refuses all of them.
+    // and the ecology refuses all of them. The generator deliberately leaves `biomes` empty: the
+    // vocabulary belongs to whoever writes the scatter layers against it.
     map.biomes = composerBiomes();
     map.prepare();
     return map;
