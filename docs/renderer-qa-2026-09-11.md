@@ -207,6 +207,8 @@ tone mapping and composition overlay.
   near/far/behind-camera geometry, a skinned alien, a transparent orb, particles and a floor; its
   60-frame preview smoke render passes with zero GPU errors. Camera path/resize/seek/reverse stress
   remains a runtime test task.
+- [x] RendererQA remains valid in the full release suite: the post-scene-index run passes all 1,513
+  tests with four optional skips and zero failures.
 - [ ] Make Glowmere regression checks explicit: UFO close-up/orbit stationarity, alien animation,
   shoreline stability and camera cuts. Keep it as a control even if Constellation is the active art.
 
