@@ -302,3 +302,47 @@ ring is unnecessary — those cells go back to buildings.
 Not done here, because it changes what `CellKind::Pavement` means and restates "a building is never
 flush against a carriageway" — under this arrangement a building *is* flush against the kerb, which
 is what a street is. It is written down so it is chosen rather than drifted into.
+
+## The footway shares its cell
+
+A block used to spend a whole cell on its pavement ring: 8 m at the default module, where a footway
+wants about 2.5. A uniform lattice cannot express 2.5 m as a cell, so the earlier note here proposed
+widening roads to `roadCells` 2 and letting `road-side` carry the footway in its kerb overhang.
+
+Measuring the piece settled it differently. `road-side` is `road-straight` with its kerb pushed out
+0.31 units on **one** side — 2.48 m at an 8 m module, at road height, bounded by a lip. With
+`roadCells` 1 a road cell has blocks on both sides, so one overhang cannot serve both; and the
+overhang lands *inside* the neighbouring cell, so a building there has to be set back from it
+regardless.
+
+Which is the actual answer, and it needs no wider roads: **a street-facing cell is shared.** Its
+ground is the footway tile, exactly as before; the building on it is scaled to the module *less the
+footway* and set back by half of it, so the pavement is in front and the building behind. The kerb
+overhang's own measurement, 2.48 m, is the default width, so the geometry and the setting agree.
+
+`footwayMetres = 0` restores the ring, which is what an alley wants and what every scene written
+before this expects. Both arrangements are planned, placed and tested.
+
+### What it cost
+
+This inverts "a building is never flush against a carriageway", which was a real invariant and is now
+false by design — a frontage plot touches the road, because it carries the footway. The claim that
+survives is "no building ever stands *in* a road", and it gains a companion: a plot beside a
+carriageway must be marked `frontage`, because that flag is what sets the building back. An unmarked
+plot there is a house in the traffic. The superseded rule is kept as a negative control under
+`footwayMetres = 0` rather than deleted.
+
+Anything that walked outward from a plot looking for a `Pavement` cell had to be restated too. A
+footway is no longer always a cell of its own, so the question "is there somewhere to walk beside
+this road" is asked about walkable ground, not about a cell kind.
+
+## A placement remembers its cell
+
+`CityPlacement::cells` records the cell each instance came from, parallel to the cloud.
+
+It exists because attributing a piece back to its cell by rounding its position is right until it
+quietly is not. A building is shifted by its own off-centre pivot (`naturalCentre`) and again by its
+set-back from the kerb; for the widest pieces those two together exceed half a module, and the piece
+lands in the arithmetic of the next cell along. That surfaced as a test reporting "block 1,1 has 2
+families" — a corner building attributed to its neighbour — and the fix is not a tolerance, it is to
+stop deriving what the placer already knew.

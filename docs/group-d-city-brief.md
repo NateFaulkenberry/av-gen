@@ -479,11 +479,43 @@ edge ring, and "A building never stands in the road, and never flush against one
 — a building would be flush against the kerb, which is what a street is. Worth doing deliberately
 rather than as a side effect, so it is written down here rather than half-started.
 
+**The road-carried footway, built.** A block used to spend a whole cell on its pavement ring — 8 m
+at the default module, where a footway wants about 2.5 — so footways read as plazas. The fix is not
+a finer lattice: a street-facing cell is **shared**. Its ground is the footway tile as before, and a
+building stands on the part the footway does not need, set back from the kerb. That is what a street
+is. `footwayMetres` defaults to 2.48, which is `road-side`'s own measurement: that piece is
+`road-straight` with its kerb pushed out 0.31 units on one side, and 0.31 of an 8 m module is 2.48.
+
+Setting it to 0 restores the ring, which an alley wants and which every scene written before this
+expects. Both arrangements are tested.
+
+The example goes from **589 to 752 instances** on the same lattice, and reads as a dense city rather
+than buildings scattered in a grey field.
+
+**It inverted an invariant, exactly as predicted, and six tests had to be restated.** The old one —
+"A building never stands in the road, and never flush against one" — was correct while a block spent
+a ring on pavement and is wrong now: a frontage plot *does* touch the carriageway, because it carries
+the footway and the building on it is set back behind that. What survives is the half that matters
+(no building ever stands *in* a road) plus a new half (a plot beside a carriageway must be marked
+frontage, since that flag is what sets the building back; an unmarked one would be a house in the
+traffic). The old rule is kept as a negative control under `footwayMetres = 0`.
+
+"Every carriageway has a pavement beside it" became "…somewhere to walk beside it", because a footway
+is no longer always a cell of its own. The property was about walkable ground; it asks for that now
+instead of a cell kind, and runs under both arrangements.
+
+**And a whole class of test fragility is gone.** `CityPlacement::cells` records the cell each instance
+came from. Tests had been inferring it by rounding the position — which was already wrong for the
+widest buildings once they were shifted by their own off-centre pivot *and* set back from the kerb,
+and showed up as "block 1,1 has 2 families" when the real cause was a corner building attributed to
+its neighbour. Anything reasoning per cell — the lane graph, next — should read this rather than
+re-derive it.
+
 ## Next
 
-1. **The road-carried footway** (option 2 above). The measurement is done; what remains is the plan
-   change and restating the frontage test.
-2. **The road graph** (§2) and **interiors** (§3), still as the brief describes them.
+1. **The road graph** (§2) and **interiors** (§3), still as the brief describes them. §2 now gets two
+   things free: the plan distinguishes `Road`, `Junction`, `Crossing` and `Pavement` with
+   `isCarriageway`, and `CityPlacement::cells` maps every placed piece back to its cell.
 
 ## Not started
 

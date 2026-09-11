@@ -68,6 +68,9 @@ struct CityCell {
     // A plot on a corner of its block's buildable core, where two streets meet. Marked by the plan
     // because the plan is what knows the shape of a block; a placer would have to re-derive it.
     bool corner = false;
+    // A plot whose cell also carries the footway: it faces a street directly, so the building on it
+    // is set back behind the pavement rather than centred on its cell.
+    bool frontage = false;
     // Which block this cell belongs to, or (-1,-1) for the street network between them. Carried so a
     // placer can vary a block's character without re-deriving which cells are in it.
     glm::ivec2 block{-1, -1};
@@ -102,6 +105,21 @@ struct CitySettings {
     // field. Clamped to what the core can hold, so it can be set larger than any block and simply
     // fill it.
     int buildDepth = 1;
+    // How wide the footway is, in metres, when a block's edge cells are built on.
+    //
+    // A block used to spend a whole cell on its pavement ring -- 8 m at the default module, where a
+    // footway wants about 2.5 -- so the footways read as plazas. The fix is not a finer lattice: it
+    // is that a street-facing cell is *shared*. Its ground is the footway tile, as before, and a
+    // building stands on the part of it the footway does not need, set back from the kerb. That is
+    // what a street actually is.
+    //
+    // 2.48 m is `road-side`'s own measurement: that piece is `road-straight` with its kerb pushed
+    // out 0.31 units on one side, and 0.31 of an 8 m module is 2.48. So the default matches the
+    // paved strip the art already draws.
+    //
+    // 0 restores the old arrangement -- the whole edge ring is footway and nothing is built on it --
+    // which is what an alley wants, and what every scene written before this expects.
+    float footwayMetres = 2.48f;
     std::uint32_t seed = 0;
     // Blocks left open instead of built on, as a fraction. A city with no plazas has nowhere to put
     // a stage, a crowd or a shot that needs air.
@@ -260,6 +278,12 @@ struct CityPlacement {
     // a lamp on a footway. The distinction matters to anything that reasons about the ground -- a
     // tile is one module across and square to the lattice, and a lamp post is neither.
     bool prop = false;
+    // The cell each instance came from, in plan coordinates, parallel to the cloud. Recorded because
+    // a placed piece cannot be attributed back to its cell from its position: a building is shifted
+    // by its own off-centre pivot and again by its set-back from the kerb, so "which cell is this
+    // in" answered by rounding the position is right until it quietly is not. Anything reasoning
+    // about the city per cell -- a lane graph, a test -- should read this instead.
+    std::vector<glm::ivec2> cells;
     std::shared_ptr<spatial::PointCloud> cloud;
 };
 

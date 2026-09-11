@@ -100,9 +100,16 @@ TEST_CASE("Every road runs unbroken from one edge of the city to the other", "[w
     CHECK(rows == static_cast<std::size_t>(s.blocksZ + 1));
 }
 
-TEST_CASE("A building never stands in the road, and never flush against one", "[world][city]") {
-    // Two separate claims, and the second is the one that makes a street readable: a plot touching a
-    // carriageway is a building with its front door in the traffic.
+TEST_CASE("A building never stands in the road, and fronts it across a footway", "[world][city]") {
+    // This test used to say "never flush against one", and a plot touching a carriageway failed it.
+    // That was right while a block spent a whole cell on its pavement ring. It is wrong now: a
+    // frontage plot *does* touch the carriageway, because it shares its cell with the footway and
+    // the building on it is set back behind that. A building fronting a street across a pavement is
+    // what a street is.
+    //
+    // What survives is the claim that actually matters: no building ever stands *in* the road. And
+    // it gains one -- a plot beside a carriageway must be marked as frontage, since that flag is
+    // what sets the building back. An unmarked plot there would be a house in the traffic.
     world::CitySettings s;
     s.blocksX = 3;
     s.blocksZ = 3;
@@ -111,6 +118,7 @@ TEST_CASE("A building never stands in the road, and never flush against one", "[
     const world::CityPlan plan = planOrFail(s);
 
     std::size_t plots = 0;
+    std::size_t fronting = 0;
     for (int z = 0; z < plan.depth; ++z) {
         for (int x = 0; x < plan.width; ++x) {
             if (plan.kindAt({x, z}) != world::CellKind::Plot) {
@@ -118,50 +126,116 @@ TEST_CASE("A building never stands in the road, and never flush against one", "[
             }
             ++plots;
             INFO("plot at " << x << "," << z);
+            // Never in the road.
             CHECK_FALSE(plan.isCarriageway({x, z}));
-            CHECK_FALSE(plan.isCarriageway({x - 1, z}));
-            CHECK_FALSE(plan.isCarriageway({x + 1, z}));
-            CHECK_FALSE(plan.isCarriageway({x, z - 1}));
-            CHECK_FALSE(plan.isCarriageway({x, z + 1}));
+            // And if it is beside one, it is frontage and therefore set back.
+            const bool besideRoad =
+                plan.isCarriageway({x - 1, z}) || plan.isCarriageway({x + 1, z}) ||
+                plan.isCarriageway({x, z - 1}) || plan.isCarriageway({x, z + 1});
+            if (besideRoad) {
+                INFO("a plot beside a carriageway must carry the footway");
+                CHECK(plan.at({x, z}).frontage);
+                ++fronting;
+            }
         }
     }
-    CHECK(plots > 0); // a city with no buildings would pass every check above
-}
+    CHECK(plots > 0);   // a city with no buildings would pass every check above
+    CHECK(fronting > 0); // and one with no street frontage would pass the new half of it
 
-TEST_CASE("Every carriageway cell has a pavement beside it somewhere", "[world][city]") {
-    // Where people walk. A road with no footway anywhere along it is a road nobody can use, and the
-    // navigation work downstream has nothing to prefer.
-    world::CitySettings s;
-    s.plazaFraction = 0.0f;
-    const world::CityPlan plan = planOrFail(s);
-    CHECK(plan.countOf(world::CellKind::Pavement) > 0);
-
-    // Every block that was built on has a ring of pavement round it.
-    for (int z = 1; z < plan.depth - 1; ++z) {
-        for (int x = 1; x < plan.width - 1; ++x) {
-            if (plan.kindAt({x, z}) != world::CellKind::Plot) {
+    // The negative control for the whole arrangement: with the footway given a cell of its own, no
+    // plot touches a carriageway at all, which is what this test asserted before.
+    world::CitySettings ringed = s;
+    ringed.footwayMetres = 0.0f;
+    const world::CityPlan withRing = planOrFail(ringed);
+    for (int z = 0; z < withRing.depth; ++z) {
+        for (int x = 0; x < withRing.width; ++x) {
+            if (withRing.kindAt({x, z}) != world::CellKind::Plot) {
                 continue;
             }
-            // Walking outward from a plot in any direction must meet pavement before carriageway.
-            for (const glm::ivec2 step : {glm::ivec2{1, 0}, glm::ivec2{-1, 0}, glm::ivec2{0, 1},
-                                          glm::ivec2{0, -1}}) {
-                glm::ivec2 c{x, z};
-                bool sawPavement = false;
-                for (int i = 0; i < plan.width + plan.depth; ++i) {
-                    c += step;
-                    const world::CellKind kind = plan.kindAt(c);
-                    if (kind == world::CellKind::Pavement) {
-                        sawPavement = true;
-                        break;
-                    }
-                    if (plan.isCarriageway(c) || kind == world::CellKind::Empty) {
-                        break;
-                    }
+            INFO("plot at " << x << "," << z << " with a pavement ring");
+            CHECK_FALSE(withRing.isCarriageway({x - 1, z}));
+            CHECK_FALSE(withRing.isCarriageway({x + 1, z}));
+            CHECK_FALSE(withRing.isCarriageway({x, z - 1}));
+            CHECK_FALSE(withRing.isCarriageway({x, z + 1}));
+        }
+    }
+    CHECK(withRing.countOf(world::CellKind::Pavement) > 0);
+}
+
+TEST_CASE("Every carriageway has somewhere to walk beside it", "[world][city]") {
+    // Where people walk. A road with no footway anywhere along it is a road nobody can use, and the
+    // navigation work downstream has nothing to prefer.
+    //
+    // A footway is no longer always a cell of its own. It is either a `Pavement` cell -- a block that
+    // spends a ring on it -- or a frontage plot, which carries the footway in front of its building.
+    // The property is about walkable ground beside a road, so it asks for that, not for a cell kind.
+    const auto walkable = [](const world::CityPlan& plan, glm::ivec2 c) {
+        const world::CityCell cell = plan.at(c);
+        return cell.kind == world::CellKind::Pavement ||
+               (cell.kind == world::CellKind::Plot && cell.frontage) ||
+               cell.kind == world::CellKind::Plaza;
+    };
+
+    for (const float footway : {2.48f, 0.0f}) {
+        world::CitySettings s;
+        s.plazaFraction = 0.0f;
+        s.footwayMetres = footway;
+        const world::CityPlan plan = planOrFail(s);
+        INFO("footwayMetres = " << footway);
+
+        // Every carriageway cell has walkable ground orthogonally beside it, or is a junction
+        // hemmed in by other carriageway -- the middle of a crossroads has no kerb and wants none.
+        std::size_t checked = 0;
+        for (int z = 0; z < plan.depth; ++z) {
+            for (int x = 0; x < plan.width; ++x) {
+                if (!plan.isCarriageway({x, z})) {
+                    continue;
                 }
-                INFO("from plot " << x << "," << z << " stepping " << step.x << "," << step.y);
-                CHECK(sawPavement);
+                bool beside = false;
+                bool allRoad = true;
+                for (const glm::ivec2 step : {glm::ivec2{1, 0}, glm::ivec2{-1, 0}, glm::ivec2{0, 1},
+                                              glm::ivec2{0, -1}}) {
+                    const glm::ivec2 c{x + step.x, z + step.y};
+                    beside = beside || walkable(plan, c);
+                    allRoad = allRoad && (plan.isCarriageway(c) || !plan.inBounds(c));
+                }
+                INFO("carriageway at " << x << "," << z);
+                CHECK((beside || allRoad));
+                ++checked;
             }
         }
+        CHECK(checked > 0);
+
+        // And walking out of a block reaches somewhere walkable before it reaches traffic, in every
+        // direction. This is the property that made the pavement ring worth having, and it has to
+        // survive the ring going away.
+        std::size_t fromPlots = 0;
+        for (int z = 0; z < plan.depth; ++z) {
+            for (int x = 0; x < plan.width; ++x) {
+                if (plan.kindAt({x, z}) != world::CellKind::Plot) {
+                    continue;
+                }
+                for (const glm::ivec2 step : {glm::ivec2{1, 0}, glm::ivec2{-1, 0}, glm::ivec2{0, 1},
+                                              glm::ivec2{0, -1}}) {
+                    glm::ivec2 c{x, z};
+                    bool sawWalkable = walkable(plan, c); // a frontage plot is its own footway
+                    for (int i = 0; i < plan.width + plan.depth && !sawWalkable; ++i) {
+                        c += step;
+                        if (walkable(plan, c)) {
+                            sawWalkable = true;
+                            break;
+                        }
+                        if (plan.isCarriageway(c) || plan.kindAt(c) == world::CellKind::Empty) {
+                            break;
+                        }
+                    }
+                    INFO("from plot " << x << "," << z << " stepping " << step.x << "," << step.y);
+                    CHECK(sawWalkable);
+                }
+                ++fromPlots;
+            }
+        }
+        CHECK(fromPlots > 0);
     }
 }
 
@@ -267,6 +341,8 @@ TEST_CASE("A plaza is a whole block, not a block with holes in it", "[world][cit
 }
 
 TEST_CASE("A block too small to hold a building is refused", "[world][city]") {
+    // The floor moved with the footway. A block spending a whole ring on pavement needs three cells
+    // across or it is all ring; a block whose footway shares a cell with its frontage needs one.
     // A block is a ring of pavement round a core of plots. Two cells across is all ring: every cell
     // touches a road, so there is nowhere a building can stand that is not also the footway. The
     // first version of this planner accepted it and produced a city of roads and pavements with no
@@ -274,18 +350,35 @@ TEST_CASE("A block too small to hold a building is refused", "[world][city]") {
     for (int cells : {1, 2}) {
         world::CitySettings s;
         s.blockCells = cells;
+        s.footwayMetres = 0.0f; // a ring of its own, so the block must be wide enough to hold one
         const auto r = world::planCity(s);
-        INFO("blockCells " << cells);
+        INFO("blockCells " << cells << " with a pavement ring");
         REQUIRE_FALSE(r.has_value());
         CHECK(r.error().message.find("footway") != std::string::npos);
     }
-    // Three is the smallest that works, and it must actually have both.
+    // Three is the smallest that works with a ring, and it must actually have both.
     world::CitySettings smallest;
     smallest.blockCells = 3;
+    smallest.footwayMetres = 0.0f;
     smallest.plazaFraction = 0.0f;
     const world::CityPlan plan = planOrFail(smallest);
     CHECK(plan.countOf(world::CellKind::Plot) > 0);
     CHECK(plan.countOf(world::CellKind::Pavement) > 0);
+
+    // A shared footway costs no cell, so one is enough -- and the refusal above must not fire, or
+    // the floor is being applied to an arrangement it was never about.
+    world::CitySettings shared;
+    shared.blockCells = 1;
+    shared.plazaFraction = 0.0f;
+    const world::CityPlan tiny = planOrFail(shared);
+    CHECK(tiny.countOf(world::CellKind::Plot) > 0);
+    CHECK(tiny.countOf(world::CellKind::Pavement) == 0);
+    // And a footway wider than half its cell leaves nothing to build on, which is refused by name.
+    world::CitySettings fat;
+    fat.footwayMetres = fat.moduleSize * 0.75f;
+    const auto tooWide = world::planCity(fat);
+    REQUIRE_FALSE(tooWide.has_value());
+    CHECK(tooWide.error().message.find("footway") != std::string::npos);
 }
 
 TEST_CASE("Settings that cannot make a city are refused by name", "[world][city]") {
@@ -642,7 +735,7 @@ TEST_CASE("A city whose settings cannot be planned is refused at load", "[world]
     std::filesystem::create_directories(dir);
     const auto file = dir / "bad.scene.json";
     std::ofstream(file) << R"({"format":"avgen-scene","version":1,"name":"bad","nodes":[
-        {"name":"city","kind":"city","city":{"blockCells":1}}]})";
+        {"name":"city","kind":"city","city":{"footwayMetres":900.0}}]})";
     assets::AssetRegistry registry;
     const auto loaded = scene::Composition::loadFile(file, registry);
     REQUIRE_FALSE(loaded.has_value());
@@ -787,14 +880,12 @@ TEST_CASE("A block builds from one family", "[world][city][place]") {
         }
         const auto it = familyOf.find(p.asset);
         REQUIRE(it != familyOf.end());
-        for (const glm::vec3& pos : p.cloud->positions()) {
-            // Back to cell coordinates, then to the block that cell belongs to.
-            const float m = s.moduleSize;
-            const int cx = static_cast<int>(std::floor(
-                (pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
-            const int cz = static_cast<int>(std::floor(
-                (pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
-            const world::CityCell at = plan.at({cx, cz});
+        REQUIRE(p.cells.size() == p.cloud->count());
+        for (const glm::ivec2 cell : p.cells) {
+            // The cell the placer recorded, not one inferred from the position: a building is
+            // shifted by its own off-centre pivot and again by its set-back from the kerb, and an
+            // inferred cell was already landing next door for the widest of them.
+            const world::CityCell at = plan.at(cell);
             REQUIRE(at.block.x >= 0);
             if (at.corner) {
                 continue; // the corner shop: deliberately not the block's family
@@ -925,12 +1016,8 @@ TEST_CASE("A yard has several things in it, inside the yard", "[world][city][pla
         if (!propNames.contains(p.asset)) {
             continue;
         }
-        for (const glm::vec3& pos : p.cloud->positions()) {
-            const float m = s.moduleSize;
-            perCell[{static_cast<int>(
-                         std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m)),
-                     static_cast<int>(
-                         std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m))}]++;
+        for (const glm::ivec2 cell : p.cells) {
+            perCell[{cell.x, cell.y}]++;
         }
     }
     std::set<int> counts;
@@ -1016,12 +1103,11 @@ TEST_CASE("A block's ground belongs to its family", "[world][city][place]") {
         if (it == familyOfGround.end()) {
             continue; // a prop, a building, or the unfamilied fallback ground
         }
-        for (const glm::vec3& pos : p.cloud->positions()) {
-            const float m = s.moduleSize;
-            const int cx = static_cast<int>(
-                std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
-            const int cz = static_cast<int>(
-                std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
+        REQUIRE(p.cells.size() == p.cloud->count());
+        for (std::size_t inst = 0; inst < p.cells.size(); ++inst) {
+            const glm::vec3 pos = p.cloud->positions()[inst];
+            const int cx = p.cells[inst].x;
+            const int cz = p.cells[inst].y;
             const world::CityCell at = plan.at({cx, cz});
             REQUIRE(at.block.x >= 0);
             if (at.corner) {
@@ -1075,12 +1161,11 @@ TEST_CASE("A street steps rather than jumps", "[world][city][place]") {
             continue;
         }
         const float aspect = aspectOf(p.asset);
-        for (const glm::vec3& pos : p.cloud->positions()) {
-            const float m = s.moduleSize;
-            const int cx = static_cast<int>(
-                std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
-            const int cz = static_cast<int>(
-                std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
+        REQUIRE(p.cells.size() == p.cloud->count());
+        for (std::size_t inst = 0; inst < p.cells.size(); ++inst) {
+            const glm::vec3 pos = p.cloud->positions()[inst];
+            const int cx = p.cells[inst].x;
+            const int cz = p.cells[inst].y;
             const world::CityCell at = plan.at({cx, cz});
             REQUIRE(at.block.x >= 0);
             if (at.corner) {
@@ -1242,12 +1327,11 @@ TEST_CASE("A corner may trade in another family, and nowhere else may", "[world]
         }
         const auto it = familyOf.find(p.asset);
         REQUIRE(it != familyOf.end());
-        for (const glm::vec3& pos : p.cloud->positions()) {
-            const float m = s.moduleSize;
-            const int cx = static_cast<int>(
-                std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
-            const int cz = static_cast<int>(
-                std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
+        REQUIRE(p.cells.size() == p.cloud->count());
+        for (std::size_t inst = 0; inst < p.cells.size(); ++inst) {
+            const glm::vec3 pos = p.cloud->positions()[inst];
+            const int cx = p.cells[inst].x;
+            const int cz = p.cells[inst].y;
             const world::CityCell at = plan.at({cx, cz});
             REQUIRE(at.block.x >= 0);
             const std::string block = roles.familyFor(at.block, s.seed);
@@ -1297,21 +1381,26 @@ TEST_CASE("Street furniture stands at the kerb and faces the road", "[world][cit
             continue;
         }
         CHECK(p.prop); // it stands on a footway; it is not the footway
-        for (const glm::vec3& pos : p.cloud->positions()) {
-            const float m = s.moduleSize;
-            const int cx = static_cast<int>(
-                std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
-            const int cz = static_cast<int>(
-                std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
+        REQUIRE(p.cells.size() == p.cloud->count());
+        for (std::size_t inst = 0; inst < p.cells.size(); ++inst) {
+            const glm::vec3 pos = p.cloud->positions()[inst];
+            const int cx = p.cells[inst].x;
+            const int cz = p.cells[inst].y;
+            // On a cell that carries a footway: a pavement cell, or a frontage plot where the
+            // block's edge is built on and the footway shares the cell with the building.
+            const world::CityCell at = plan.at({cx, cz});
+            const bool carriesFootway =
+                at.kind == world::CellKind::Pavement ||
+                (at.kind == world::CellKind::Plot && at.frontage);
             INFO(p.asset << " at " << pos.x << "," << pos.z << " stands on "
-                         << world::cellKindName(plan.kindAt({cx, cz})));
-            CHECK(plan.kindAt({cx, cz}) == world::CellKind::Pavement);
+                         << world::cellKindName(at.kind) << (at.frontage ? " (frontage)" : ""));
+            CHECK(carriesFootway);
 
             // At the kerb: pushed well off the cell's centre, towards a carriageway. A lamp post in
             // the middle of a footway is in the way, and one at the back of it is in a garden.
             const glm::vec3 centre = plan.centreOf({cx, cz});
             const glm::vec2 offset(pos.x - centre.x, pos.z - centre.z);
-            CHECK(std::max(std::abs(offset.x), std::abs(offset.y)) > m * 0.2f);
+            CHECK(std::max(std::abs(offset.x), std::abs(offset.y)) > s.moduleSize * 0.2f);
 
             // And the cell it was pushed towards carries traffic.
             const glm::ivec2 toward =
@@ -1327,8 +1416,15 @@ TEST_CASE("Street furniture stands at the kerb and faces the road", "[world][cit
     REQUIRE(placedCount > 0);
     // Sparse, not on every footway cell: at one module per cell, furnishing them all is a lamp post
     // every 8 m, about three times the real spacing.
-    INFO(placedCount << " pieces over " << plan.countOf(world::CellKind::Pavement) << " pavements");
-    CHECK(placedCount < plan.countOf(world::CellKind::Pavement) / 2);
+    std::size_t footways = plan.countOf(world::CellKind::Pavement);
+    for (int z = 0; z < plan.depth; ++z) {
+        for (int x = 0; x < plan.width; ++x) {
+            const world::CityCell at = plan.at({x, z});
+            footways += (at.kind == world::CellKind::Plot && at.frontage) ? 1 : 0;
+        }
+    }
+    INFO(placedCount << " pieces over " << footways << " cells carrying a footway");
+    CHECK(placedCount < footways / 2);
 }
 
 TEST_CASE("An overlay sits exactly on the surface it names", "[world][city][place]") {
@@ -1416,19 +1512,13 @@ TEST_CASE("An overlay sits exactly on the surface it names", "[world][city][plac
     // the first time a group comes out mixed.
     std::map<std::pair<int, int>, std::string> surfaceAt;
     std::set<std::pair<int, int>> overlaidAt;
-    const auto cellOf = [&](const glm::vec3& pos) {
-        const float m = s.moduleSize;
-        return std::pair{
-            static_cast<int>(std::floor((pos.x + static_cast<float>(plan.width) * m * 0.5f) / m)),
-            static_cast<int>(std::floor((pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m))};
-    };
     for (const world::CityPlacement& p : placed->placements) {
         const bool isOverlay = surfaceOf.contains(p.asset);
-        for (const glm::vec3& pos : p.cloud->positions()) {
+        for (const glm::ivec2 cell : p.cells) {
             if (isOverlay) {
-                overlaidAt.insert(cellOf(pos));
+                overlaidAt.insert({cell.x, cell.y});
             } else {
-                surfaceAt[cellOf(pos)] = p.asset;
+                surfaceAt[{cell.x, cell.y}] = p.asset;
             }
         }
     }
@@ -1460,11 +1550,10 @@ TEST_CASE("A deeper band of building fills a block, and says what it costs", "[w
     // of the block: a nine-cell block came out a ring of houses round a field.
     //
     // It also trades something away, and this records the trade rather than hiding it. One cell deep
-    // is a perimeter block and every plot has clear frontage -- "Every building faces a street"
-    // proves it can reach a road without passing through another building. Deeper than that and the
-    // inner rows cannot: they still face the nearest street, but through their neighbours, the way
-    // a mews does. That is a real arrangement, not a defect, but it is not the guarantee depth one
-    // gives, so nothing should be written that quietly assumes it.
+    // is a perimeter block and every plot fronts a street. Deeper than that and the inner rows do
+    // not: they still face the nearest street, but through their neighbours, the way a mews does.
+    // That is a real arrangement, not a defect, but it is not the guarantee depth one gives, so
+    // nothing should be written that quietly assumes it.
     const auto plotsAndYards = [](int depth) {
         world::CitySettings s;
         s.blocksX = 1;
@@ -1478,30 +1567,42 @@ TEST_CASE("A deeper band of building fills a block, and says what it costs", "[w
                          plan->countOf(world::CellKind::Courtyard)};
     };
 
+    // With the footway sharing its cell, a 9-cell block is a 9x9 core: depth one is its outer ring,
+    // 81 - 49 = 32 plots round 49 of yard.
     const auto [plots1, yards1] = plotsAndYards(1);
     const auto [plots2, yards2] = plotsAndYards(2);
     const auto [plots3, yards3] = plotsAndYards(3);
-
-    // A 9-cell block has a 7x7 core. One deep is its perimeter: 24 plots round 25 of yard.
-    CHECK(plots1 == 24);
-    CHECK(yards1 == 25);
-    // Deeper builds more and leaves less, and the two always account for the whole core.
-    CHECK(plots2 > plots1);
-    CHECK(plots3 > plots2);
+    CHECK(plots1 == 32);
+    CHECK(yards1 == 49);
+    CHECK(plots2 == 56); // 81 - 25
+    CHECK(plots3 == 72); // 81 - 9
     CHECK(yards2 < yards1);
     CHECK(yards3 < yards2);
-    CHECK(plots1 + yards1 == 49);
-    CHECK(plots2 + yards2 == 49);
-    CHECK(plots3 + yards3 == 49);
+    for (const auto& [p, y] : {std::pair{plots1, yards1}, std::pair{plots2, yards2},
+                               std::pair{plots3, yards3}}) {
+        CHECK(p + y == 81); // the two always account for the whole block
+    }
 
-    // Clamped rather than refused: a depth past what the core can hold fills it, and asking for ten
+    // Clamped rather than refused: a depth past what the block can hold fills it, and asking for ten
     // on a 9-cell block is a recipe being generous, not a mistake worth stopping a render for.
     const auto [plotsMax, yardsMax] = plotsAndYards(10);
-    CHECK(plotsMax == 49);
+    CHECK(plotsMax == 81);
     CHECK(yardsMax == 0);
 
-    // At depth one -- the default, and what the frontage guarantee rests on -- every plot touches
-    // the core's edge, so the ring is genuinely a ring.
+    // The same arithmetic one cell in, when the block spends a ring on its footway: a 7x7 core.
+    world::CitySettings ringed;
+    ringed.blocksX = 1;
+    ringed.blocksZ = 1;
+    ringed.blockCells = 9;
+    ringed.plazaFraction = 0.0f;
+    ringed.footwayMetres = 0.0f;
+    const world::CityPlan withRing = planOrFail(ringed);
+    CHECK(withRing.countOf(world::CellKind::Plot) == 24);      // 49 - 25
+    CHECK(withRing.countOf(world::CellKind::Courtyard) == 25);
+    CHECK(withRing.countOf(world::CellKind::Pavement) == 32);  // 81 - 49, the ring
+
+    // At depth one -- the default, and what the frontage guarantee rests on -- every plot fronts a
+    // street: it is marked frontage, or it has a footway cell orthogonally beside it.
     world::CitySettings s;
     s.blocksX = 1;
     s.blocksZ = 1;
@@ -1510,11 +1611,12 @@ TEST_CASE("A deeper band of building fills a block, and says what it costs", "[w
     const world::CityPlan plan = planOrFail(s);
     for (int z = 0; z < plan.depth; ++z) {
         for (int x = 0; x < plan.width; ++x) {
-            if (plan.kindAt({x, z}) != world::CellKind::Plot) {
+            const world::CityCell cell = plan.at({x, z});
+            if (cell.kind != world::CellKind::Plot) {
                 continue;
             }
-            // A plot one deep always has a pavement cell orthogonally beside it.
-            const bool touchesFootway = plan.kindAt({x + 1, z}) == world::CellKind::Pavement ||
+            const bool touchesFootway = cell.frontage ||
+                                        plan.kindAt({x + 1, z}) == world::CellKind::Pavement ||
                                         plan.kindAt({x - 1, z}) == world::CellKind::Pavement ||
                                         plan.kindAt({x, z + 1}) == world::CellKind::Pavement ||
                                         plan.kindAt({x, z - 1}) == world::CellKind::Pavement;
@@ -1522,4 +1624,18 @@ TEST_CASE("A deeper band of building fills a block, and says what it costs", "[w
             CHECK(touchesFootway);
         }
     }
+
+    // And deeper, some plot does not -- or the trade this test documents is not actually being made.
+    world::CitySettings deep = s;
+    deep.buildDepth = 3;
+    const world::CityPlan deepPlan = planOrFail(deep);
+    std::size_t landlocked = 0;
+    for (int z = 0; z < deepPlan.depth; ++z) {
+        for (int x = 0; x < deepPlan.width; ++x) {
+            const world::CityCell cell = deepPlan.at({x, z});
+            landlocked += (cell.kind == world::CellKind::Plot && !cell.frontage) ? 1 : 0;
+        }
+    }
+    CHECK(landlocked > 0);
 }
+

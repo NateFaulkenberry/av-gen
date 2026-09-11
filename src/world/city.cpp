@@ -59,9 +59,18 @@ Result<void> CitySettings::validate() const {
     // across is *all* ring -- every cell touches a road, so there is nowhere a building can stand
     // that is not also the footway. That produced a city with roads, pavements and no buildings at
     // all, which counts as a plan and renders as an empty grid. Refused by name instead.
-    if (blockCells < 3) {
-        return fail("city: a block must be at least 3 cells across to hold both a footway and a "
-                    "building; {} is all pavement", blockCells);
+    // Three when the block spends a ring of cells on its footway -- a block two across is *all*
+    // ring, so every cell is footway and there is nowhere a building can stand. That produced a city
+    // with roads, pavements and no buildings at all, which counts as a plan and renders as an empty
+    // grid, so it is refused by name instead.
+    //
+    // One is enough once the footway shares a cell with the building in front of it, because then no
+    // cell is spent on pavement alone.
+    const int smallest = footwayMetres > 0.0f ? 1 : 3;
+    if (blockCells < smallest) {
+        return fail("city: a block of {} cell(s) cannot hold both a footway and a building; it needs "
+                    "at least {}, or a footway that shares its cell (footwayMetres above zero)",
+                    blockCells, smallest);
     }
     if (roadCells < 1) {
         return fail("city: a road must be at least one cell wide");
@@ -81,6 +90,15 @@ Result<void> CitySettings::validate() const {
     }
     if (crossingFraction < 0.0f || crossingFraction > 1.0f) {
         return fail("city: crossingFraction must be between 0 and 1");
+    }
+    if (footwayMetres < 0.0f || !std::isfinite(footwayMetres)) {
+        return fail("city: footwayMetres cannot be negative");
+    }
+    // A footway wider than half the module leaves less room for the building than for the pavement
+    // in front of it, which is a footway with a shed on it rather than a street.
+    if (footwayMetres > moduleSize * 0.5f) {
+        return fail("city: a footway of {} m is more than half a {} m cell; there would be no room "
+                    "left to build on", footwayMetres, moduleSize);
     }
     if (!(plotFill > 0.0f) || plotFill > 1.0f) {
         return fail("city: plotFill must be above 0 and at most 1; it is the fraction of its plot a "
@@ -180,6 +198,7 @@ Result<CityPlan> planCity(const CitySettings& settings) {
                     cell.block = glm::ivec2(bx, bz);
                     const bool edge = dx == 0 || dz == 0 || dx == settings.blockCells - 1 ||
                                       dz == settings.blockCells - 1;
+                    (void)edge;
                     // Inside the pavement ring is the block's core, and inside *that* is the part
                     // of a block no street reaches. Buildings take a band round the core's edge and
                     // what is left becomes a courtyard -- the back of the block, where the bins and
@@ -191,10 +210,14 @@ Result<CityPlan> planCity(const CitySettings& settings) {
                     // cell is a perimeter block and is right up to about six cells across; past that
                     // the band stays one cell while the yard grows with the square of the block, and
                     // a nine-cell block becomes a ring of houses round a field.
-                    const int core = settings.blockCells - 2; // the core, inside the pavement ring
+                    // How many cells of the block are footway and nothing else. One, historically.
+                    // None once the footway shares its cell with the building in front of it, which
+                    // is what `footwayMetres` turns on -- the block's own edge becomes its frontage.
+                    const int ring = settings.footwayMetres > 0.0f ? 0 : 1;
+                    const int core = settings.blockCells - 2 * ring;
                     const int depth = std::clamp(settings.buildDepth, 1, (core + 1) / 2);
-                    const int inX = std::min(dx - 1, core - dx);   // cells in from the core's edge
-                    const int inZ = std::min(dz - 1, core - dz);
+                    const int inX = std::min(dx - ring, core - 1 - (dx - ring));
+                    const int inZ = std::min(dz - ring, core - 1 - (dz - ring));
                     const bool coreEdge = std::min(inX, inZ) < depth;
                     // Both axes at the core's own edge: the corner of the block, where two streets
                     // meet. Still the outermost ring however deep the band is -- a shop two rows
@@ -202,7 +225,7 @@ Result<CityPlan> planCity(const CitySettings& settings) {
                     const bool coreCorner = inX == 0 && inZ == 0;
                     if (plaza) {
                         cell.kind = CellKind::Plaza;
-                    } else if (edge) {
+                    } else if (ring > 0 && edge) {
                         cell.kind = CellKind::Pavement;
                     } else if (coreEdge) {
                         cell.kind = CellKind::Plot;
@@ -252,6 +275,10 @@ Result<CityPlan> planCity(const CitySettings& settings) {
                 }
             }
             cell.rotation = quarterTowards(bestDir);
+            // A plot whose cell touches a carriageway carries the footway as well as the building.
+            // Only the immediate neighbour counts: a plot one row back has the frontage row between
+            // it and the street, and sets back behind nothing.
+            cell.frontage = bestSteps == 1;
         }
     }
 

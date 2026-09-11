@@ -249,6 +249,7 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
         std::vector<glm::vec3> positions;
         std::vector<glm::vec4> rotations;
         std::vector<glm::vec3> scales;
+        std::vector<glm::ivec2> cells;
         CellKind kind = CellKind::Empty;
         bool prop = false;
     };
@@ -356,8 +357,16 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
         float scale = plan.settings.moduleSize / plan.settings.tileUnits;
         if (building) {
             const float footprint = std::max(asset->naturalSize.x, asset->naturalSize.z);
+            // A frontage building shares its cell with the footway in front of it, so it has the
+            // module *less the footway* to stand in rather than the whole of it. Uniformly, like
+            // every other building here: a house squashed along one axis to fit a pavement is a
+            // worse answer than a slightly smaller house.
+            const float room = cell.frontage
+                                   ? std::min(plan.settings.moduleSize * plan.settings.plotFill,
+                                              plan.settings.moduleSize - plan.settings.footwayMetres)
+                                   : plan.settings.moduleSize * plan.settings.plotFill;
             if (footprint > 0.0f && std::isfinite(footprint)) {
-                scale = plan.settings.moduleSize * plan.settings.plotFill / footprint;
+                scale = room / footprint;
             }
             // Onto the middle of the plot, not onto its own origin. Six of the buildings in this
             // pack are modelled about a corner rather than their middle -- `industrial-building-h`
@@ -373,11 +382,21 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
                                                           asset->naturalCentre.z * scale);
             position.x -= offset.x;
             position.z -= offset.z;
+            if (cell.frontage && plan.settings.footwayMetres > 0.0f) {
+                // Back from the kerb by half the footway, which centres the building in what is left
+                // of the cell. The building already faces the street, so the direction it faces is
+                // the direction to retreat from.
+                static constexpr glm::ivec2 kFacing[4] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
+                const glm::ivec2 towardStreet = kFacing[static_cast<int>(cell.rotation)];
+                position.x -= static_cast<float>(towardStreet.x) * plan.settings.footwayMetres * 0.5f;
+                position.z -= static_cast<float>(towardStreet.y) * plan.settings.footwayMetres * 0.5f;
+            }
         }
         Gather& g = gatherFor(name, role, false);
         g.positions.push_back(position);
         g.rotations.emplace_back(rotation.x, rotation.y, rotation.z, rotation.w);
         g.scales.emplace_back(scale);
+        g.cells.push_back(coord);
 
         // The overlay that belongs to this piece, if it drew one. Exactly the surface's transform:
         // an overlay is drawn to sit on one specific tile, so anything else -- a jitter, a turn of
@@ -403,6 +422,7 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
         og.positions.push_back(position);
         og.rotations.emplace_back(rotation.x, rotation.y, rotation.z, rotation.w);
         og.scales.emplace_back(scale);
+        og.cells.push_back(coord);
     };
 
     // Props: several on one cell, jittered, and free to face any way. A prop is not a tile -- it
@@ -442,6 +462,7 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
             g.positions.push_back(position);
             g.rotations.emplace_back(rotation.x, rotation.y, rotation.z, rotation.w);
             g.scales.emplace_back(scale);
+            g.cells.push_back(coord);
         }
     };
 
@@ -495,6 +516,7 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
         g.positions.push_back(position);
         g.rotations.emplace_back(rotation.x, rotation.y, rotation.z, rotation.w);
         g.scales.emplace_back(scale);
+        g.cells.push_back(coord);
     };
 
     for (int z = 0; z < plan.depth; ++z) {
@@ -535,10 +557,22 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
                 // and not the building's -- without that, every plot that drew building number two
                 // would also draw ground number two, and the two would move together for no reason
                 // anybody could see.
-                placeOne(coord, cell, CellKind::Courtyard,
-                         roles.forFamily(CellKind::Courtyard, family), 0x5BD1E995u, family);
+                // A frontage cell's ground is the footway it shares; anywhere else it is the
+                // family's own forecourt.
+                const CellKind groundRole =
+                    cell.frontage ? CellKind::Pavement : CellKind::Courtyard;
+                placeOne(coord, cell, groundRole,
+                         cell.frontage ? roles.forKind(CellKind::Pavement)
+                                       : roles.forFamily(CellKind::Courtyard, family),
+                         0x5BD1E995u, family);
                 placeOne(coord, cell, CellKind::Plot, roles.forFamily(CellKind::Plot, family), 0u,
                          family);
+                // A frontage cell carries the footway, so it carries what stands on a footway. When
+                // the block still has a pavement ring the lamps go there instead; either way they
+                // follow the pavement rather than a cell kind.
+                if (cell.frontage) {
+                    placeStreetProp(coord);
+                }
                 continue;
             }
             if (cell.kind == CellKind::Courtyard || cell.kind == CellKind::Plaza) {
@@ -572,6 +606,7 @@ Result<PlacedCity> placeCity(const CityPlan& plan, const CityLibrary& roles,
         placement.asset = name;
         placement.kind = g.kind;
         placement.prop = g.prop;
+        placement.cells = g.cells;
         placement.cloud = std::move(cloud);
         out.placements.push_back(std::move(placement));
     }
