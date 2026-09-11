@@ -65,8 +65,12 @@ asset:
 - **filaments** — 38 tubes on a radial distribution at radius 6.8, radius 0.045, warm emissive at
   1.2 with `emissiveRandom: 0.7`, light and floppy (mass 0.12, stiffness 0.6, tip amplitude 0.12).
 
-The silhouette reads because the three parts have completely different scales — 8 m cap, 14.5 m
-curved stem, 3.4 m hanging threads — and because the filaments move while the cap does not.
+The silhouette reads because the three parts have completely different scales — a **16.4 m** cap, a
+14.5 m curved stem and 3.4 m hanging threads — and because the filaments move while the cap does not.
+
+(An earlier revision of this line said "8 m cap". That was the *scale factor* read as a size: the
+source is a unit sphere, so a scale of 8.2 is a half-extent of 8.2 m and a width of 16.4 m. The elder
+measures 16.5 m from stem base to crown top, not the "roughly 20 m" this document first implied.)
 
 ### 1.4 Deliberate framing, held for 90 seconds
 
