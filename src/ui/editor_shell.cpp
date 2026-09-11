@@ -135,6 +135,29 @@ std::size_t enforceCanvasCentre(ImGuiID dockspace, const EditorLayout& layout) {
                           ImGuiDockNodeFlags_NoDockingOverMe);
 
     std::size_t evicted = 0;
+
+    // The other half of the rule, and the one that was missing: the canvas has to be *in* the
+    // central node, not merely alone in it.
+    //
+    // `drawCanvasWindow` docks it with `ImGuiCond_FirstUseEver`, which fires once in the life of an
+    // .ini and never again. Undocking a panel and docking it back rebuilds the dock tree, and a
+    // rebuilt tree has new node ids -- so the canvas is left holding a `DockId` for a node that no
+    // longer exists. Dear ImGui then floats it, and a borderless full-bleed window floating over the
+    // dockspace is exactly the reported symptom: the world drawn under the panels.
+    //
+    // Repaired rather than prevented, because the tree can be rebuilt by any number of gestures and
+    // the only reliable moment to check is every frame, which this already is.
+    if (ImGuiWindow* canvas = ImGui::FindWindowByName(kCanvasWindow.data()); canvas != nullptr) {
+        const ImGuiID actual = canvas->DockNode != nullptr ? canvas->DockNode->ID : canvas->DockId;
+        if (actual != centre->ID) {
+            ImGui::DockBuilderDockWindow(kCanvasWindow.data(), centre->ID);
+            log::warn("editor: the canvas had come adrift of the centre node ({} rather than {}) "
+                      "and has been docked back",
+                      actual, centre->ID);
+            ++evicted;
+        }
+    }
+
     // Backwards, because docking a window elsewhere removes it from this node's list.
     for (int i = centre->Windows.Size - 1; i >= 0; --i) {
         const ImGuiWindow* window = centre->Windows[i];
