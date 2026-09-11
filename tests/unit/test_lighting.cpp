@@ -9,6 +9,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <cmath>
@@ -287,15 +289,49 @@ TEST_CASE("cascades are stabilised against camera motion", "[lighting][shadows]"
         return rendering::fitDirectionalCascade(glm::inverse(vp), kNear, kFar, kNear, 40.0f, lightDir, 1024,
                                                 30.0f);
     };
+    // Where a fixed patch of ground lands in the shadow map, in texels. This -- not the texel
+    // *size* -- is what crawling is: the size is `2 * radius / resolution` and is constant by
+    // construction whether or not snapping works, so asserting on it passes against a snap that
+    // does nothing. It did, for as long as the snap was a no-op.
+    const glm::vec3 receiver(1.5f, 0.0f, 6.0f);
+    const auto texelOf = [&](const rendering::ShadowView& v) {
+        const glm::vec4 h = v.viewProj * glm::vec4(receiver, 1.0f);
+        const glm::vec3 ndc = glm::vec3(h) / h.w;
+        return glm::vec2((ndc.x * 0.5f + 0.5f) * 1024.0f, (ndc.y * -0.5f + 0.5f) * 1024.0f);
+    };
+
     const rendering::ShadowView base = fit({0.0f, 5.0f, 20.0f}, {0.0f, 0.0f, 0.0f});
     // A pure rotation about the camera keeps the sub-frustum's bounding sphere the same size, so
     // the map's texel size must not change: that is what stops the shadow edges crawling.
     const rendering::ShadowView rotated = fit({14.14f, 5.0f, 14.14f}, {0.0f, 0.0f, 0.0f});
     CHECK(rotated.texelWorldSize == Approx(base.texelWorldSize).epsilon(0.02));
+
     // Translating by less than a texel must not move the projection at all.
-    const rendering::ShadowView nudged =
-        fit({base.texelWorldSize * 0.1f, 5.0f, 20.0f}, {base.texelWorldSize * 0.1f, 0.0f, 0.0f});
+    const float nudge = base.texelWorldSize * 0.1f;
+    const rendering::ShadowView nudged = fit({nudge, 5.0f, 20.0f}, {nudge, 0.0f, 0.0f});
     CHECK(nudged.texelWorldSize == Approx(base.texelWorldSize).epsilon(1e-4));
+    CHECK(glm::length(texelOf(nudged) - texelOf(base)) < 0.05f);
+
+    // And over a slow dolly the receiver must sit still and then step by whole texels, rather than
+    // sliding continuously. Before the snap was anchored to a world-fixed light basis this drifted
+    // by about 0.7 texels per millimetre of camera travel, which is visible as crawling edges.
+    float worstStep = 0.0f;
+    int stationary = 0;
+    glm::vec2 previous = texelOf(base);
+    constexpr int kSteps = 120;
+    for (int i = 1; i <= kSteps; ++i) {
+        const float x = 0.001f * static_cast<float>(i);
+        const glm::vec2 here = texelOf(fit({x, 5.0f, 20.0f}, {x, 0.0f, 0.0f}));
+        const float step = glm::length(here - previous);
+        if (step < 0.01f) {
+            ++stationary;
+        }
+        worstStep = std::max(worstStep, step);
+        previous = here;
+    }
+    // Most frames land on the very same texel, and no frame moves by more than one.
+    CHECK(stationary > kSteps * 3 / 4);
+    CHECK(worstStep < 1.05f);
 }
 
 TEST_CASE("a spot shadow map covers the light's cone", "[lighting][shadows]") {

@@ -215,17 +215,23 @@ fn pcss(view: u32, uv: vec2<f32>, depth: f32, softness: f32, taps: u32, rotation
 
 // The shadow term of one light. `bias` is applied along the surface normal (normal-offset) before
 // the projection, plus a slope-scaled constant in normalised depth.
-fn shadowFactor(light: GpuLight, worldPos: vec3<f32>, normal: vec3<f32>, toLight: vec3<f32>,
-                viewDepth: f32, rotation: f32) -> f32 {
-    let flags = u32(light.cone.w + 0.5);
-    if ((flags & FLAG_CASTS_SHADOW) == 0u) {
-        return 1.0;
-    }
-    var view = u32(max(light.cone.z, 0.0));
-    let cascaded = (flags & FLAG_CASCADED) != 0u;
-    if (cascaded) {
-        view = view + cascadeFor(viewDepth, u32(max(shadowBlock.info.y, 1.0)));
-    }
+// How much of a cascade's depth extent is spent fading into the next one.
+const CASCADE_BLEND: f32 = 0.12;
+
+// The near edge of cascade `index`, in view depth. Cascade 0 starts at the camera.
+//
+// The index is stepped down through a guarded `select` rather than indexed as `index - 1u`,
+// because WGSL evaluates both arms of a `select` and `0u - 1u` would index a vec4 at four
+// billion.
+fn cascadeNear(index: u32) -> f32 {
+    let previous = select(0u, index - 1u, index > 0u);
+    return select(0.0, shadowBlock.splits[previous], index > 0u);
+}
+
+// The visibility one shadow view reports for a point. Split out of `shadowFactor` so that a
+// cascade transition can be crossfaded by evaluating two of them.
+fn shadowVisibility(view: u32, light: GpuLight, worldPos: vec3<f32>, normal: vec3<f32>,
+                    toLight: vec3<f32>, cascaded: bool, rotation: f32) -> f32 {
     if (view >= 8u) {
         return 1.0;
     }
@@ -242,11 +248,42 @@ fn shadowFactor(light: GpuLight, worldPos: vec3<f32>, normal: vec3<f32>, toLight
     let slope = clamp(tan(acos(clamp(nDotL, 0.02, 1.0))), 0.0, 4.0);
     let depth = lookup.depth - shadowBlock.views[view].params.y * (1.0 + slope);
     let taps = u32(clamp(shadowBlock.info.z, 1.0, 24.0));
-    var visibility: f32;
     if (shadowBlock.info.w > 0.5 && cascaded) {
-        visibility = pcss(view, lookup.uv, depth, max(light.sizeSoft.w, 0.05), taps, rotation);
+        return pcss(view, lookup.uv, depth, max(light.sizeSoft.w, 0.05), taps, rotation);
+    }
+    return pcf(view, lookup.uv, depth, max(light.sizeSoft.w, 0.2) * 1.5, taps, rotation);
+}
+
+fn shadowFactor(light: GpuLight, worldPos: vec3<f32>, normal: vec3<f32>, toLight: vec3<f32>,
+                viewDepth: f32, rotation: f32) -> f32 {
+    let flags = u32(light.cone.w + 0.5);
+    if ((flags & FLAG_CASTS_SHADOW) == 0u) {
+        return 1.0;
+    }
+    let base = u32(max(light.cone.z, 0.0));
+    let cascaded = (flags & FLAG_CASCADED) != 0u;
+    var visibility: f32;
+    if (cascaded) {
+        let count = u32(max(shadowBlock.info.y, 1.0));
+        let index = cascadeFor(viewDepth, count);
+        visibility = shadowVisibility(base + index, light, worldPos, normal, toLight, true, rotation);
+
+        // Crossfade the last slice of a cascade into the one behind it. Two cascades differ in
+        // texel size, in normal offset (which is derived from that texel size) and in bias, so a
+        // hard switch puts a discontinuity in the shadow exactly at the split plane -- a seam that
+        // sweeps across the ground as the camera dollies, which is what reads as shadow popping.
+        //
+        // The second lookup is only taken inside the band, so the common pixel pays nothing.
+        let far = shadowBlock.splits[index];
+        let band = (far - cascadeNear(index)) * CASCADE_BLEND;
+        if (index + 1u < count && band > 1e-4 && viewDepth > far - band) {
+            let t = clamp((viewDepth - (far - band)) / band, 0.0, 1.0);
+            let next = shadowVisibility(base + index + 1u, light, worldPos, normal, toLight, true,
+                                        rotation);
+            visibility = mix(visibility, next, t);
+        }
     } else {
-        visibility = pcf(view, lookup.uv, depth, max(light.sizeSoft.w, 0.2) * 1.5, taps, rotation);
+        visibility = shadowVisibility(base, light, worldPos, normal, toLight, false, rotation);
     }
     return mix(1.0, visibility, clamp(light.up.w, 0.0, 1.0));
 }
