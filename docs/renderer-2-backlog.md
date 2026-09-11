@@ -92,3 +92,28 @@ to the image, which is an art decision and not a default.
 - **Tile-splitting from attachment count** as the explanation for the per-pixel slope steepening:
   tested, not supported. Terrain alone runs 8.30 → 3.39 → 2.88 ns/pixel over 0.32 → 5.18 Mpx, and a
   fixed-geometry scene is flat across the same range with the same five attachments.
+
+## Multi-material scatter assets cull and count their instances once per material
+
+An asset with two materials becomes two `ProceduralGeometry` objects
+(`src/scene/composition.cpp`, the `subs` loop) -- a full copy of the first, **instance cloud
+included**, differing only in mesh, material and triangle budget. Each copy then gets its own cull
+pass over the same instances.
+
+Two consequences, one cosmetic and one real:
+
+- **The instance counters double-count.** Measured exactly on `glowmere-dense`: the composer places
+  153,776 instances and the renderer reports 161,084. The excess is 7,308, which is
+  `CommonTree_1 (725) + TwistedTree_2 (348) + Flower_3_Group (6235)` -- precisely the three layers
+  logged as "carries 2 materials; one instanced draw each". On `glowmere-low` the same sum is 301
+  against an excess of 300. This is the counter the benchmark world flagged as not meaning what its
+  name says, and this is why: `visible + culled` is a sum over *draw* objects, not over the world's
+  population. A fix can gate the population totals on `source.assetPart == 0` (part 0 is the
+  original; sub-parts are numbered from 1) while leaving `draws` per part, where it belongs.
+- **The cull work is duplicated.** The instances are identical across parts, so the visible set is
+  identical too, and the GPU computes it once per material. On `glowmere-dense` that is 7,308
+  redundant instance tests per frame, ~4.8%. Sharing one cull result across an asset's parts is the
+  optimisation; it needs the parts to share a visible-list buffer, which they currently do not.
+
+Neither is urgent -- the frame cost is small and the counter misleads rather than misrenders -- but
+the measurement is exact and reproducible, so the next person should not have to rediscover it.
