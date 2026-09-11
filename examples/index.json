@@ -13,6 +13,12 @@
    "project": "world/glowmere-stylized.json"
   },
   {
+   "name": "Glowmere Valley - Lyrics",
+   "category": "Showcase",
+   "description": "The bioluminescent valley with a finished 2D composition over it: a tracked-out title card, four lyric lines with staggered entrances and exits, and a thin border that fades up over the first two and a half seconds. The beat reaches the type through an ordinary modulation route, the same way it reaches the world.",
+   "project": "composition/glowmere-lyrics.json"
+  },
+  {
    "name": "Glowmere Valley - Matched PBR",
    "category": "Look development",
    "description": "The same painterly scene and camera using the PBR surface mode, for controlled style comparisons.",

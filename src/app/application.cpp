@@ -360,6 +360,15 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     if (auto r = renderer_->init(); !r) {
         return std::unexpected(r.error());
     }
+    // The 2D composition (ADR-083): installed as the renderer's overlay, so it draws over the
+    // tone-mapped frame in every path the renderer already has -- window, offline render,
+    // screenshot, projection output -- rather than in one of them.
+    compositor_ = std::make_unique<rendering::CompositionRenderer>(*context_, *shaders_);
+    if (auto r = compositor_->init(); !r) {
+        return std::unexpected(r.error());
+    }
+    compositor_->setTimeline(&renderer_->timeline());
+    renderer_->setOverlay(compositor_.get());
     if (!options_.qualityTier.empty()) {
         rendering::QualityTier tier = rendering::QualityTier::Realtime;
         if (!rendering::qualityTierFromName(options_.qualityTier, tier)) {
@@ -1622,12 +1631,17 @@ int Application::runLive() {
         // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
         // options; an empty set costs nothing.
         if (panel_) {
+            panel_->composition.stats = &compositor_->stats();
             const rendering::DebugViewOptions& options = panel_->world.debug;
             renderer_->setDebugDepthTest(options.depthTest);
             rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime);
         }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+        // The composition follows the engine's timeline clock, not the render clock: a lyric has
+        // to land at the same second of the music whether the frame arrived from live playback or
+        // from an offline render stepping a fixed clock (ADR-012).
+        compositor_->setInput(&engine_->layers(), engine_->timelineClock().seconds);
         if (auto r = renderer_->render(encoder, engine_->scene(), time, finalTarget, &shaderInputs); !r) {
             log::error("render: {}", r.error().message);
             return 2;
@@ -1652,6 +1666,7 @@ int Application::runLive() {
         wgpu::CommandBuffer commands = encoder.Finish();
         context_->queue().Submit(1, &commands);
         renderer_->collectFrameTimings();
+        compositor_->collectTimings();
         // What the panel armed this frame. Copied rather than read through the panel at click time
         // so the application does not reach into UI state from the event handler, and so a headless
         // or scripted caller can arm a placement without a panel existing at all.

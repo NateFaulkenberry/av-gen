@@ -16,6 +16,7 @@
 #include "core/error.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/readback_ring.hpp"
+#include "rendering/composition_renderer.hpp"
 #include "rendering/scene_renderer.hpp"
 
 #include <atomic>
@@ -97,6 +98,10 @@ private:
     std::filesystem::path baseDir_;
     std::filesystem::path output_;
     std::unique_ptr<rendering::SceneRenderer> renderer_;
+    // The 2D composition (ADR-083), installed as the renderer's overlay exactly as the live path
+    // installs it. The offline frame is the live frame plus a fixed clock; the composition must
+    // not be one of the differences.
+    std::unique_ptr<rendering::CompositionRenderer> compositor_;
     std::unique_ptr<gpu::ReadbackRing> ring_; // after renderer_: destroyed (and flushed) first
     wgpu::Texture ldr_;                       // tone-mapped RGBA8 target (CopySrc)
     wgpu::TextureView ldrView_;

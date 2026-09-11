@@ -8,6 +8,11 @@ Version 2 (milestone 0.3) adds modulation sources, presets and per-route polarit
 (milestone 0.9) adds `"assets"` (audio / scene / environment references) and `"app"`
 (`{ "name", "version" }` of the writer); both are filled in by the engine.
 
+Version 4 also carries two blocks that are *optional and unversioned by the envelope*, because
+their absence is meaningful and needs no migration: `"composition"` (ADR-083, the 2D layer stack,
+with a `version` of its own) and `"timeline"`. A project written before either existed simply has
+no such key, and loads with none.
+
 Older documents are upgraded in memory by `params::migrateProject`, one version at a time,
 before loading (the file on disk is only rewritten on save, at the current version); every step
 is logged at info level. 1 -> 2: routes without `polarity` get `"unipolar"`, empty `sources` /
@@ -263,3 +268,51 @@ duplicate or empty name are errors.
 
 Run with `avgen --queue jobs.json`. Each job's settings are the project's `render` block with
 the job's `render` fields merged over it; paths in the queue file are relative to it.
+
+## `"composition"` — the 2D layer stack (ADR-083)
+
+Optional, versioned separately from the envelope, and read *before* `"parameters"` so that the
+`layers/<id>/...` paths exist when their saved values arrive.
+
+```json
+"composition": {
+  "version": 1,
+  "reference": { "width": 1920, "height": 1080 },
+  "layers": [
+    {
+      "id": 3, "kind": "text", "name": "line 1", "enabled": true,
+      "blend": "normal", "start": 10.0, "end": 19.0,
+      "position": [0.5, 0.185], "scale": [1.0, 1.0], "rotation": 0.0,
+      "anchor": [0.5, 0.5], "opacity": 1.0, "color": [0.95, 0.99, 1.0, 1.0],
+      "text": "the valley keeps its own light",
+      "font": { "family": "Avenir Next", "weight": -0.4, "fallback": "Helvetica Neue" },
+      "size": 0.052, "align": "center", "tracking": 0.045, "lineSpacing": 1.15,
+      "glow": 0.028, "glowColor": [0.35, 0.8, 1.0, 0.45],
+      "shadowOpacity": 0.35, "shadowOffset": [0.008, -0.01]
+    },
+    {
+      "id": 1, "kind": "shape", "name": "frame", "enabled": true,
+      "blend": "normal", "start": 0.0, "end": 0.0,
+      "position": [0.5, 0.5], "scale": [1.0, 1.0], "rotation": 0.0,
+      "anchor": [0.5, 0.5], "opacity": 1.0, "color": [1.0, 1.0, 1.0, 0.0],
+      "shape": "rectangle", "size": [1.66, 0.9], "cornerRadius": 0.006,
+      "strokeWidth": 0.0022, "strokeColor": [0.72, 0.93, 1.0, 0.5]
+    }
+  ]
+}
+```
+
+`layers` is in compositing order: index 0 is drawn first, nearest the 3D render. `id` is unique
+within the composition and is what the parameter paths and the timeline tracks use, so renaming a
+layer never orphans a track. `end` at or before `start` means "until the end". `reference` is the
+frame the composition was authored against; nothing about layout depends on it, because positions
+are normalised and sizes are relative to the frame height (ADR-083).
+
+Every animatable layer property is also an ordinary parameter and therefore also appears in
+`"parameters"`. The two are kept in agreement by pulling the parameter bases back into the
+authored fields before every save. A `version` newer than the reader's is rejected and nothing is
+mutated; an unknown `kind` is an error for the same reason.
+
+Fonts are referenced, never bundled: a project carries a family and a PostScript name, and the
+machine that opens it supplies the face. An absent face is reported loudly (log at error level,
+and in red in the inspector) rather than silently substituted.

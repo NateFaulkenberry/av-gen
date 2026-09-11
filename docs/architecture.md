@@ -19,8 +19,9 @@ grows. Decisions are recorded in `docs/decisions/`; the research behind them in 
   │  ImGuiLayer/ControlPanel (reads Scene, params, routes, frames)
   │  SceneRenderer::render(encoder, Scene, FrameTime, target)
   │   ├ pass 1: lit meshes + grid → HDR RGBA16F + depth
-  │   └ pass 2: ACES tone map → swapchain (or RGBA8 texture for capture)
-  │  ImGuiLayer::render(encoder, target)  (pass 3)
+  │   ├ pass 2: ACES tone map → swapchain (or RGBA8 texture for capture)
+  │   └ pass 3: FrameOverlay → the 2D composition over the tone-mapped frame (ADR-083)
+  │  ImGuiLayer::render(encoder, target)  (pass 4)
   │  Queue::Submit, FrameTimeline::collect, Surface::Present
   └──────────────────────────────────────┘
 ```
@@ -42,11 +43,12 @@ with `FixedStepClock`. Everything from `SignalBus` downwards is identical.
 | `shaders` | avgen_core | user shader contract: ISF-style header parsing, WGSL module generation, inputs layout/packing, `ShaderLayerSet` (layers, parameters, hot-reload watching, project JSON) | params, core |
 | `spatial` | avgen_core | procedural world data (ADR-024..027): typed `AttributeSet`/`PointCloud`, point operators, `FieldSpec`/`FieldSet` sampling + GPU packing, `GridField` (simulated 3D grids + the CPU reference step; ADR-032), `Effector`, `Spline`, `SdfTree` (+ surface nets meshing); `core/noise` is the CPU twin of the WGSL noise | glm, core |
 | `scene` | avgen_core | `Scene` data model (cameras, punctual lights, materials with textures, meshes, entities, environment, particle systems), mesh generators, particle parameter registration, `SceneController` interface with `OrbScene` (built-in preset + sparks), `GltfScene` (imported file + curated parameters + dust) and `Composition` (nodes of any kind incl. `procedural`, nested scene files, flattened into one `Scene`; ADR-017), `ProceduralGeometry` (primitives, distributions, seeded variation, deformer stack, instance records; ADR-023) | glm, params, assets |
+| `comp` | avgen_core | the 2D composition above the render (ADR-083): `LayerStack` (ordered layers, cached geometry, per-frame items), `Layer` with `TextLayer`/`ShapeLayer`, `FontBackend` (CoreText shaping and outline rasterisation), `GlyphAtlas` (one shared signed-distance atlas keyed by face and glyph, not by size) | glm, params, CoreText (macOS) |
 | `control` | avgen_core | OSC 1.0 (messages, bundles, patterns, UDP receiver/sender), MIDI input (CoreMIDI on macOS, byte parser, virtual source), `ControlMap` (bindings + direct OSC scheme; ADR-021) | POSIX sockets, CoreMIDI |
 | `gpu` | avgen_gpu | `Context` (Dawn instance/adapter/device/surface), `ShaderLibrary` (WGSL files + includes + diagnostics), `RenderTarget`, `FrameTimeline` (per-pass GPU timing), readback (synchronous helpers and `ReadbackRing`) | Dawn |
-| `rendering` | avgen_gpu | `SceneRenderer` (pass list, PBR/grid/skybox/tonemap pipelines, material bind groups, lights, background/post user layers, engine shader reload), `EnvironmentProcessor` (IBL), `ShaderStack`/`ShaderLayerGpu` (user layers), `ParticleRenderer` (compute pools, indirect draw), `ProceduralRenderer` (one instanced draw per procedural object, deformer stack in the vertex shader; ADR-023), `VolumeRenderer` (half-res raymarched atmosphere + depth-aware composite; ADR-032), `Simulation` (grid-field compute passes into the shared grid table; ADR-032), `PostProcessor` (built-in effect chain over `gpu::TransientPool`) | gpu, scene, shaders |
+| `rendering` | avgen_gpu | `SceneRenderer` (pass list, PBR/grid/skybox/tonemap pipelines, material bind groups, lights, background/post user layers, engine shader reload), `EnvironmentProcessor` (IBL), `ShaderStack`/`ShaderLayerGpu` (user layers), `ParticleRenderer` (compute pools, indirect draw), `ProceduralRenderer` (one instanced draw per procedural object, deformer stack in the vertex shader; ADR-023), `VolumeRenderer` (half-res raymarched atmosphere + depth-aware composite; ADR-032), `Simulation` (grid-field compute passes into the shared grid table; ADR-032), `PostProcessor` (built-in effect chain over `gpu::TransientPool`), `CompositionRenderer` (the one `FrameOverlay`: 2D layers over the tone-mapped frame in a single pass; ADR-083) | gpu, scene, shaders, comp |
 | `platform` | avgen_platform | `Window` (SDL3, Metal layer, events, file dialog) | SDL3 |
-| `ui` | avgen_platform | `ImGuiLayer` (SDL3 + WebGPU backends), `ControlPanel` (transport, response, generated parameter panel, analysis plots, performance) | ImGui, ImPlot |
+| `ui` | avgen_platform | `ImGuiLayer` (SDL3 + WebGPU backends), `ControlPanel` (transport, response, generated parameter panel, analysis plots, performance), `CompositionPanel` (the layer stack, the text/shape inspector and the key dots; ADR-083) | ImGui, ImPlot |
 | `app` | avgen | `Engine` (the pipeline; also compiled into the test binary), `Application` (live/headless loops, CLI), `RecentFiles`, `RenderSettings`/`RenderJob` (offline renders; ADR-020), `ControlHub` (applies the control map every frame, learn state) | everything |
 
 Rules enforced by the target graph: `avgen_core` has no GPU or windowing dependency and is what
