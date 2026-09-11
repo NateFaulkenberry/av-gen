@@ -1317,6 +1317,12 @@ void Composition::installEntities() {
     entityWorld_.setNavigator(buildNavigator());
     entityWorld_.setExtraInterestPoints(glowInterestPoints());
 
+    // Fields go in here rather than in a pass of their own, because they bind against the same node
+    // table, the same landmarks and the same entity set -- a field that resolved its source against
+    // a stale anchor is the same bug as an entity bound to a stale material part. Before
+    // registerParameters, because a field's knobs are parameters too and a scene swap has just
+    // cleared the ones it had; bind() is what matches fields to entities once the anchors are set.
+    entityWorld_.setFields(fieldDescs_);
     entityWorld_.registerParameters(*params_, prefix_ + "entity/");
     entityWorld_.bind(*params_, prefix_ + "entity/");
 
@@ -1331,6 +1337,14 @@ void Composition::installEntities() {
         }
         animationSinks_.push_back(std::make_unique<AnimationSink>(*this, desc.driven(), *live));
         live->setPoseSink(animationSinks_.back().get());
+    }
+
+    fieldRoutesChecked_ = false; // the "a route cannot drive a field knob" scan runs again
+    for (const std::string& line : entityWorld_.fieldReport()) {
+        // Unconditional, at info. Which determinism guarantee a field has (ADR-091) is a thing an
+        // author has to be able to read rather than infer, and a line that is only printed when
+        // something is wrong is a line nobody learns to look for.
+        log::info("composition '{}': {}", name_, line);
     }
 
     if (modulator_ != nullptr) {
@@ -1521,6 +1535,71 @@ void Composition::cullEntityNodes() {
             break;
         }
     }
+}
+
+Result<void> Composition::setFields(std::vector<entity::FieldDesc> fields) {
+    for (std::size_t i = 0; i < fields.size(); ++i) {
+        if (fields[i].name.empty()) {
+            return fail("fields[{}] has no name", i);
+        }
+        for (std::size_t k = 0; k < i; ++k) {
+            if (fields[k].name == fields[i].name) {
+                return fail("field '{}' is declared twice", fields[i].name);
+            }
+        }
+    }
+    fieldDescs_ = std::move(fields);
+    if (params_ != nullptr) {
+        installEntities(); // a field binds against the same node table an entity does
+    }
+    return {};
+}
+
+void Composition::updateFields(const FrameTime& time, signals::SignalBus& bus,
+                               params::Modulator& modulator) {
+    if (params_ == nullptr || entityWorld_.empty()) {
+        return;
+    }
+    entity::FieldUpdate update;
+    update.time = time.renderTime;
+    update.dt = time.deltaTime;
+    update.bus = &bus;
+    update.viewPosition = scene_.camera.position;
+    const std::size_t signalsBefore = bus.size();
+    entityWorld_.updateFields(update, *params_);
+    if (!fieldRoutesChecked_) {
+        fieldRoutesChecked_ = true;
+        // A field knob is read before the routes run, deliberately (ADR-097), so a route pointed at
+        // one is written and then wiped by the next frame's resetFinals() without ever having been
+        // read. That is a reaction that does nothing and says nothing, which is the failure this
+        // project has shipped five times -- so it says something.
+        const std::string fieldPrefix = entityWorld_.fieldParameterPrefix();
+        for (const params::ModRoute& route : modulator.routes()) {
+            if (route.target.rfind(fieldPrefix, 0) != 0) {
+                continue;
+            }
+            const std::string message = fmt::format(
+                "composition '{}': modulation route '{}' -> '{}' cannot drive a field knob: the "
+                "field pass runs before the routes so a field stays a pure function of time "
+                "(ADR-097). Keyframe it on the timeline instead.",
+                name_, route.source, route.target);
+            log::warn("{}", message);
+            entityWorld_.recordProblems({message});
+        }
+    }
+    if (bus.size() != signalsBefore) {
+        // A field published itself for the first time. Anything routed from `field.<name>.*` was
+        // bound at load, when that signal did not exist yet, so it resolved to nothing -- and a
+        // route that resolves to nothing and says nothing is the failure this project has shipped
+        // five times. One re-bind, here, the same way a new control channel is handled.
+        if (auto ok = modulator.bind(bus, *params_); !ok) {
+            log::warn("composition '{}': after installing fields: {}", name_, ok.error().message);
+        }
+    }
+    // §19's seam. A field does not add a reaction; it scales the depth of the ones the entity
+    // already declared, so the same `audio.bass -> emissiveGain` an author wrote for a static prop
+    // becomes spatial without a second reactivity system beside the first one.
+    entityWorld_.applySpatialGain(modulator.routes());
 }
 
 void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) {
@@ -4417,8 +4496,14 @@ nlohmann::json Composition::toJson() const {
         }
         j["heroes"] = std::move(heroes);
     }
+    if (!profileLibraryPath_.empty()) {
+        j["entityProfiles"] = profileLibraryPath_;
+    }
     if (!entityDescs_.empty()) {
         j["entities"] = entity::entitiesToJson(entityDescs_);
+    }
+    if (!fieldDescs_.empty()) {
+        j["fields"] = entity::fieldsToJson(fieldDescs_);
     }
     if (graph_) {
         j["graph"] = graph_->toJson();
@@ -4807,12 +4892,44 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
     }
+    // ADR-097: the profile library the scene names, read once before the entities that reference
+    // it by name. A scene with none behaves exactly as it did -- a `"profile"` is then a path.
+    entity::ProfileLibrary profileLibrary;
+    if (j.contains("entityProfiles")) {
+        if (!j.at("entityProfiles").is_string()) {
+            return fail("scene file '{}': 'entityProfiles' must be a path to a profile library",
+                        scenePath.string());
+        }
+        const std::string relative = j.at("entityProfiles").get<std::string>();
+        std::filesystem::path path = relative;
+        if (path.is_relative() && !scenePath.empty()) {
+            path = scenePath.parent_path() / path;
+        }
+        auto loaded = entity::loadProfileLibrary(path);
+        if (!loaded) {
+            return fail("scene file '{}': {}", scenePath.string(), loaded.error().message);
+        }
+        profileLibrary = std::move(*loaded);
+        comp->setEntityProfileLibraryPath(relative);
+        log::info("scene '{}': entity profile library '{}': {} profile(s)", scenePath.string(),
+                  relative, profileLibrary.size());
+    }
     if (j.contains("entities")) {
-        auto entities = entity::entitiesFromJson(j.at("entities"), scenePath.parent_path());
+        auto entities =
+            entity::entitiesFromJson(j.at("entities"), scenePath.parent_path(), &profileLibrary);
         if (!entities) {
             return fail("scene file '{}': {}", scenePath.string(), entities.error().message);
         }
         if (auto ok = comp->setEntities(std::move(*entities)); !ok) {
+            return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
+        }
+    }
+    if (j.contains("fields")) {
+        auto fields = entity::fieldsFromJson(j.at("fields"));
+        if (!fields) {
+            return fail("scene file '{}': {}", scenePath.string(), fields.error().message);
+        }
+        if (auto ok = comp->setFields(std::move(*fields)); !ok) {
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
     }

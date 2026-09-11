@@ -1,0 +1,42 @@
+{
+  "format": "avgen-entity-profile-library",
+  "version": 1,
+  "description": "Three ways for a crowd to answer a mix, shared by name rather than copied per entity (ADR-097). Nothing here names an asset, a size or a place: every target is a node property every node has, so the same library dresses a city square, a club and a field of standing stones. A scene says \"entityProfiles\": \"crowd.profiles.json\" once and each entity says \"profile\": \"dancer\".",
+  "profiles": {
+    "dancer": {
+      "description": "Answers the low end hard and the top lightly, and walks between whatever a field pulls it towards. The bass is slow to let go, which is what stops a crowd reading as a strobe.",
+      "tags": ["crowd", "dancer"],
+      "behaviors": [
+        { "kind": "wander", "speed": 1.15, "runSpeed": 3.2, "minRange": 4.0, "maxRange": 16.0,
+          "pauseMin": 0.8, "pauseMax": 3.5 }
+      ],
+      "reactions": [
+        { "signal": "audio.bass", "target": "emissiveBoost", "depth": 1.8,
+          "chain": { "attackMs": 30.0, "decayMs": 280.0, "curve": "power", "curveAmount": 1.5 } },
+        { "signal": "audio.treble", "target": "emissiveBoost", "depth": 0.35,
+          "chain": { "attackMs": 6.0, "decayMs": 90.0 } }
+      ],
+      "clips": { "idle": "Idle", "walk": "Walk", "run": "Run", "react": "Dance" }
+    },
+    "onlooker": {
+      "description": "Stands, watches, and answers a quarter as much. The one that makes a crowd read as a crowd rather than as a chorus line, because a room where everybody dances is as flat as a room where nobody does.",
+      "tags": ["crowd", "onlooker"],
+      "behaviors": [
+        { "kind": "interest", "observeChance": 0.55, "minDwell": 3.0, "maxDwell": 11.0 }
+      ],
+      "reactions": [
+        { "signal": "audio.bass", "target": "emissiveBoost", "depth": 0.45,
+          "chain": { "attackMs": 60.0, "decayMs": 420.0 } }
+      ],
+      "clips": { "idle": "Idle", "observe": "Idle", "react": "Cheer" }
+    },
+    "lamp": {
+      "description": "Not a character: a prop with reactions and no behaviours, which ADR-088 already allowed and ADR-097 makes spatial. Point it at a field's occupancy and a light answers a room filling up rather than answering the music directly.",
+      "tags": ["fixture"],
+      "reactions": [
+        { "signal": "audio.rms", "target": "emissiveBoost", "depth": 0.8,
+          "chain": { "attackMs": 120.0, "decayMs": 900.0 } }
+      ]
+    }
+  }
+}

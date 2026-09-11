@@ -1363,3 +1363,89 @@ frame.
 - `lookAtWeight` is per shot, not animated, so a shot whose subject *changes* has to author its
   targets. The proof-of-concept's reveal does exactly that.
 - Every scene slot is resident.
+
+## 2026-09-11 — Spatial reactivity: trigger volumes, music influence fields and the arc (ADR-097)
+
+Group C of the *All You Got* cinematic world brief: §18 spatial triggers, §19 the music influence
+field, §20 a profile library, §21 the reaction arc, §39–§43 applied to things that are not
+characters.
+
+The brief asks for a region of the world inside which things answer the music more strongly, and it
+says twice — once in each document — **do not build a second audio-reactivity system**. Those two
+sentences are the whole design problem, because the obvious implementation of the first violates the
+second. What was built instead attaches to the reactivity that already exists: an entity's
+`reactions` already compile to `params::ModRoute`s whose `amount` *is* the authored depth, so a
+field's entire output is a second multiplier next to it. `ModRoute` gained `spatialGain` and
+`ownerEntity`, `applyRoutes` multiplies by the first, and an author who already wrote
+`audio.bass -> parts/Lamp/emissiveGain` gets a spatial version by putting a field in the scene and
+tagging the entity. They write nothing else, and the reaction they already tuned is the one that
+plays.
+
+### What that forced
+
+**A third per-frame hook, on the other side of the routes from the second one.**
+`SceneController::updateFields` runs after `timeline_.apply()` and before
+`modulator_.applyRoutes()`. Both placements are forced and they are mirror images: a behaviour's
+knobs must have been modulated before it reads them and its output must land after the routes, so it
+runs after; a field's output is a gain *on* those routes, so it must run before. Running after the
+timeline is also what makes ADR-091's promise real — a field following a baked actor reads that
+actor's position at this instant from the finals the automation just wrote, so the chain is a pure
+function of time.
+
+**The arc needed almost no code, because `wander` already had the contract.** §21 asks for
+`Walking → Dance → Walking`, never `Walking → Dance → Idle`. `wander` already says, in its own
+comment, that it yields to `Activity::React` and keeps its destination and pause timer. So the arc
+writes React *before* the behaviours run rather than after, and the existing yield does the work.
+Nothing is reset and nothing is stored to be put back. The test proves it by the fact that the walk
+that comes back resumes within ten frames — a *reset* wander draws a fresh 0–2 s pause and stands
+still, which is the negative control in the same test.
+
+### Found by writing it
+
+- **The seed for per-entity variation cannot come from the entity's own stream.** `Entity::rng_`
+  advances once per frame per behaviour, so a jitter drawn from it depends on the frame rate and on
+  what else the entity was doing. `arcStream(seed, field name, entry count)` is a pure function of
+  three values instead; the second time an entity enters a field it always draws the same numbers.
+- **A route from `field.<name>.occupancy` binds to nothing at load**, because the field has not
+  published itself yet. `Composition::updateFields` re-binds once on the frame the bus grows. Without
+  it, the §39–§43 answer for a light would have been a reaction that resolved to nothing and said
+  nothing — this project's recurring failure, reproduced inside the fix for it.
+- **The warning about an entity driving a missing node was wrong for fixtures.** A light is not a
+  composition node, so an entity whose reactions are every one of them absolute
+  (`@lightrig/key/fill/intensity`) has no use for one. `needsNode()` now decides, and warning about a
+  node nobody wanted would have trained the reader to ignore the warning that matters.
+- **A governed entity must start at its floor, not at 1.** Otherwise an entity far enough away to be
+  on the coarse LOD interval reads as fully inside every field until its first query — a crowd that
+  lights up before the camera gets to it.
+- **`inverseSquare` is the *sharpest* falloff, not the gentlest.** Written as an assertion first, in
+  the wrong direction, and the test said so.
+- **A field knob can be keyframed but not modulated, and that had to be said out loud.** The knobs
+  are registered as parameters (ADR-088's standard: an authored number that cannot be keyframed stops
+  being interesting the moment a shot needs it to change) and read from the finals, which at that
+  point in the frame are exactly base plus automation. A *route* pointed at one is written after the
+  read and wiped before the next — a route that resolves, runs and has no effect, which is this
+  project's signature failure. `Composition::updateFields` scans once after an install and warns by
+  name.
+
+### Numbers
+
+Best of 7 runs of 120 frames on an M-series Mac, Release, measured as a difference so the field pass
+is isolated rather than reported with everything else baked in: **512 entities, 16 fields, 38.7
+µs/frame with no fields and 64.7 µs/frame with them — the field pass costs 26.0 µs/frame, 51 ns per
+entity**, about 0.16 % of a 60 fps frame. The broad phase performs **23 exact point-in-volume tests**
+where a scan of entities × volumes would perform 8,192.
+
+### Known limitations
+
+- **A field cannot be a source for another field** (§22's propagation). The data shape allows it —
+  `source` names an entity, and an influenced entity could own a field — but nothing evaluates the
+  dependency order, so it is not offered.
+- **`ownerEntity` is an index into `EntityWorld`.** Safe only because routes and entities are rebuilt
+  together in `installEntities`; it is range-checked rather than trusted.
+- **A `Multiply` route is muted rather than quietened** by a gain of zero, because scaling depth to
+  zero means what writing depth zero means. `"spatial": false` is the opt-out.
+- **A field source on a *child* node follows that node's local animation offset applied at its
+  authored world position**; nested parent transforms are not composed. The same approximation the
+  entity layer already makes for its own anchors.
+- Trigger edges are published as signals and listed in `EntityWorld::triggerEvents()`, but nothing
+  dispatches them into an action queue, because there is no action queue yet (§4, Group B).

@@ -1570,4 +1570,16 @@ const char* activityName(Activity activity) {
     return "idle";
 }
 
+bool activityFromName(std::string_view name, Activity& out) {
+    constexpr Activity kAll[] = {Activity::Idle,  Activity::Walk,    Activity::Run,
+                                 Activity::Turn,  Activity::Observe, Activity::React};
+    for (const Activity a : kAll) {
+        if (name == activityName(a)) {
+            out = a;
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace avgen::entity

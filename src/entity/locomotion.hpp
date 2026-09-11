@@ -36,6 +36,10 @@ enum class Activity : std::uint8_t {
     React,    // a one-shot response to an event
 };
 [[nodiscard]] const char* activityName(Activity activity);
+// The inverse, for the one place an activity is named in data: a field's reaction arc says which
+// activity it holds, and "react" in a scene file has to become Activity::React without the field
+// layer owning a second copy of this list. False for a name that is not one.
+[[nodiscard]] bool activityFromName(std::string_view name, Activity& out);
 
 // Everything an animation layer needs from a behaviour layer, and nothing else.
 struct LocomotionState {

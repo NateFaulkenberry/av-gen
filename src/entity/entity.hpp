@@ -30,6 +30,7 @@
 #include "entity/action.hpp"
 #include "entity/behavior.hpp"
 #include "entity/gait.hpp"
+#include "entity/field.hpp"
 #include "entity/locomotion.hpp"
 #include "entity/navigation.hpp"
 #include "params/modulation.hpp"
@@ -63,6 +64,12 @@ struct ReactionDesc {
     params::Polarity polarity = params::Polarity::Unipolar;
     params::ProcessorChain chain{};
     bool enabled = true;
+    // Whether a music influence field is allowed to scale this reaction's depth (ADR-097). True by
+    // default, which is what makes an existing `audio.bass -> emissiveGain` spatial for free. Set
+    // false for a reaction whose neutral output is not zero -- a Multiply route whose chain rests
+    // at 1 is scaled to silence by a gain of 0, which is a property being *muted* rather than a
+    // reaction being *quiet*, and an author has to be able to say so.
+    bool spatial = true;
 };
 
 // A named place on an entity that a prop can hang from. `joint` names a skeleton joint; an entity
@@ -89,6 +96,11 @@ struct EntityDesc {
     std::vector<ReactionDesc> reactions;
     std::vector<SocketDesc> sockets;
     std::vector<AttachmentDesc> attachments;
+    // What this entity *is*, for a trigger volume or a field to filter on (ADR-097): "dancer",
+    // "pedestrian", "vehicle". A field matches an entity on its tags or on the name of the profile
+    // it was built from, so "every NPC built from the dancer profile" is one word in a scene file
+    // rather than a list of forty names that goes stale.
+    std::vector<std::string> tags;
     // Which animation state plays for each activity, by activity name ("idle", "walk", "run",
     // "turn", "observe", "react"). Declared here rather than chosen in a behaviour because a clip
     // name belongs to an asset: a behaviour that named one would break the day a character shipped
@@ -119,6 +131,7 @@ struct EntityDesc {
     std::size_t profileReactions = 0;
     std::size_t profileClips = 0;
     std::size_t profileSockets = 0;
+    std::size_t profileTags = 0;
 
     // Behaviour level of detail. Beyond `fullDetailDistance` metres from the view, the entity is
     // updated every `coarseInterval` seconds instead of every frame, with the accumulated dt; past
@@ -175,6 +188,16 @@ struct EntityUpdate {
     std::uint64_t frameIndex = 0;
     const signals::SignalBus* bus = nullptr;
     glm::vec3 viewPosition{0.0f}; // where the camera is, for behaviour level of detail
+};
+
+// What the field pass needs. The bus is not const here because a field *publishes*: occupancy and
+// the enter/exit edges become ordinary named signals, which is how a light, a material or a
+// particle system reacts to a volume without any of them learning what a volume is (§39-§43).
+struct FieldUpdate {
+    double time = 0.0;
+    double dt = 0.0;
+    signals::SignalBus* bus = nullptr;
+    glm::vec3 viewPosition{0.0f}; // the same three-band behaviour LOD the behaviour pass uses
 };
 
 class Entity {
@@ -234,6 +257,32 @@ public:
     [[nodiscard]] const std::vector<AttachmentDesc>& attachments() const { return attachments_; }
     bool attach(const std::string& node, const std::string& socket);
     bool detach(const std::string& node);
+    // ---- fields (ADR-097) --------------------------------------------------------------------
+
+    // The spatial gain the fields governing this entity settled on this frame. Exactly 1 when no
+    // field governs it, so an entity in a scene with no fields is bit-for-bit what it was before
+    // fields existed. Larger than 1 when a field's `strength` boosts it.
+    [[nodiscard]] float influence() const { return influence_; }
+    // False when no field's filter matches this entity at all, which is the case that costs
+    // nothing: an ungoverned entity never enters the broad phase.
+    [[nodiscard]] bool governedByField() const { return governed_; }
+    // Where this entity is, for a field query. The parameter delta is what makes a node the
+    // timeline drives report the position it has *at this instant* rather than where it was
+    // authored -- which is what makes a field over a baked actor a pure function of time.
+    [[nodiscard]] glm::vec3 fieldPosition() const;
+
+    // §21. The reaction arc: 0 when nothing is happening, rising to the drawn intensity for the
+    // hold and falling back over the release. The animation layer reads it as LocomotionState's
+    // `reaction`; nothing here ever resets a behaviour, which is what makes the arc end in
+    // `Walking` rather than in `Idle`.
+    [[nodiscard]] float arcLevel() const { return arcLevel_; }
+    [[nodiscard]] bool arcActive() const { return arcPhase_ != ArcPhase::None; }
+    // Which field triggered the arc that is running, or kNoField.
+    static constexpr std::uint32_t kNoField = 0xFFFFFFFFu;
+    [[nodiscard]] std::uint32_t arcField() const { return arcField_; }
+    // How many times this entity has entered each field, in field order. The seeded draw for an
+    // arc is a pure function of (seed, field name, this count), so a replay redraws exactly.
+    [[nodiscard]] const std::vector<std::uint32_t>& fieldEntryCounts() const { return entryCount_; }
 
 private:
     friend class EntityWorld;
@@ -271,6 +320,29 @@ private:
     std::vector<AttachmentDesc> attachments_;
     // verb -> the entity currently using it. A vector because a prop offers two or three verbs.
     std::vector<std::pair<std::string, std::string>> claims_;
+
+    // ---- field state (ADR-097) ---------------------------------------------------------------
+    enum class ArcPhase : std::uint8_t { None, Delay, Hold, Release };
+
+    float influence_ = 1.0f;
+    float fieldFloor_ = 0.0f;  // the largest `floorGain` of the fields that govern this entity
+    bool governed_ = false;
+    std::vector<std::uint8_t> insideField_;   // per field: was this entity inside it last frame
+    std::vector<std::uint8_t> insideNow_;     // per field: is it inside it this frame
+    std::vector<std::uint8_t> governedBy_;    // per field: does this field's filter match at all
+    std::vector<std::uint32_t> entryCount_;   // per field: how many enter edges so far
+    ArcPhase arcPhase_ = ArcPhase::None;
+    std::uint32_t arcField_ = kNoField;
+    double arcTimer_ = 0.0;
+    float arcDelay_ = 0.0f;
+    float arcHold_ = 0.0f;
+    float arcRelease_ = 0.0f;
+    float arcIntensity_ = 0.0f;
+    float arcLevel_ = 0.0f;
+    bool arcHoldStill_ = false;
+    Activity arcActivity_ = Activity::React;
+    double arcCooldownUntil_ = -1.0e30;
+    double fieldAccum_ = 0.0;
 
     IPoseSink* pose_ = nullptr;
     const ISkeletonQuery* skeleton_ = nullptr;
@@ -330,6 +402,53 @@ public:
     // A director override: it preempts whatever the entity was doing and, when it drains, the
     // entity resumes rather than resets (ADR-091).
     bool direct(std::string_view entity, std::vector<ActionDesc> actions, double now);
+    // ---- trigger volumes and music influence fields (ADR-097) --------------------------------
+
+    // Replaces the field set. Call *before* registerParameters(): a field's strength, scale, inner
+    // ratio, floor and centre are ordinary params::Parameters, registered there, for the same
+    // reason a behaviour's knobs are (ADR-088) -- an authored number that cannot be keyframed is a
+    // number that stops being interesting the moment a shot needs it to change.
+    //
+    // Which fields govern which entities is decided at bind(), because a filter is a function of an
+    // entity's tags and its profile and neither changes at runtime, so matching costs nothing per
+    // frame.
+    void setFields(std::vector<FieldDesc> fields);
+    [[nodiscard]] const std::vector<FieldDesc>& fields() const { return fields_; }
+    [[nodiscard]] const std::vector<FieldRuntime>& fieldRuntime() const { return fieldRuntime_; }
+    // One line per field, saying what it resolved to and which determinism guarantee it therefore
+    // has (ADR-091). Written at bind and logged at install, unconditionally, and available to the
+    // editor -- because "a field on a baked actor is scrub-exact and a field on a live entity is
+    // not" is a distinction an author has to be able to *read*, not one they discover by rendering
+    // the same frame twice. No panel draws it yet; the log and `requireScrubExact` are what exist.
+    [[nodiscard]] const std::vector<std::string>& fieldReport() const { return fieldReport_; }
+    // The parameter namespace a field's knobs live in -- `<prefix>fields/<name>/strength` and the
+    // rest. Public because the host has to be able to tell an author that a *modulation route*
+    // pointed here does nothing: the field pass runs before the routes, deliberately, so a field
+    // knob is keyframeable and presettable but not modulatable, and that is worth one warning
+    // rather than an afternoon.
+    [[nodiscard]] std::string fieldParameterPrefix() const { return prefix_ + "fields/"; }
+
+    // The field pass. Runs *before* the modulation routes, unlike update(), because its whole
+    // output is a gain on those routes: a frame late here is a frame late on every reaction in the
+    // scene, and it would make a scrubbed frame depend on the frame before it.
+    void updateFields(const FieldUpdate& ctx, params::ParameterSet& params);
+    // Writes each entity's influence onto the routes its own `reactions` produced. O(routes), and
+    // it leaves every route that is not an entity reaction exactly alone.
+    void applySpatialGain(std::vector<params::ModRoute>& routes) const;
+    // The enter and exit edges of the last field pass, in field-then-entity order. Cleared and
+    // refilled every pass; empty in a scene with no fields.
+    [[nodiscard]] const std::vector<TriggerEvent>& triggerEvents() const { return triggerEvents_; }
+
+    // What the last field pass actually did. Read by the budget test; the material an editor
+    // overlay would draw from (§45/§46), which does not exist yet.
+    struct FieldCounts {
+        std::size_t governed = 0;  // entities at least one field's filter matches
+        std::size_t queried = 0;   // entities the broad phase put in the grid this frame
+        std::size_t tested = 0;    // exact point-in-volume tests performed
+        std::size_t inside = 0;    // (entity, field) pairs that came out inside
+        std::size_t cells = 0;     // grid cells the build produced
+    };
+    [[nodiscard]] FieldCounts fieldCounts() const { return fieldCounts_; }
 
     // Named places a behaviour may attend to: the scene's heroes, and any node an entity drives.
     // Set by the host, because only the host knows what the scene contains.
@@ -474,6 +593,42 @@ private:
     std::vector<std::string> registered_;
     std::string prefix_ = "entity/";
     Counts counts_{};
+
+    // ---- fields (ADR-097) --------------------------------------------------------------------
+    std::vector<FieldDesc> fields_;
+    std::vector<FieldRuntime> fieldRuntime_;
+    std::vector<std::string> fieldReport_;
+    std::vector<TriggerEvent> triggerEvents_;
+    EntityGrid grid_;
+    FieldCounts fieldCounts_{};
+    // Scratch reused between frames so a field pass allocates nothing once it has run once.
+    std::vector<glm::vec3> gridPoints_;
+    std::vector<std::uint32_t> gridEntity_;
+    std::vector<std::uint8_t> enteredThisFrame_;
+    std::vector<std::uint8_t> exitedThisFrame_;
+    bool fieldsBound_ = false;
+
+    [[nodiscard]] static bool needsNode(const Entity& entity);
+    void bindFields();
+    // One field's live knobs. Resolved at registerParameters(); null when a field was added after
+    // it, which bind() then fixes.
+    struct FieldParams {
+        params::Parameter<float>* strength = nullptr;
+        params::Parameter<float>* scale = nullptr;
+        params::Parameter<float>* inner = nullptr;
+        params::Parameter<float>* floorGain = nullptr;
+        params::Parameter<glm::vec3>* center = nullptr;
+    };
+    std::vector<FieldParams> fieldParams_;
+    // This frame's fields with their live knobs folded in. A member so the pass allocates nothing.
+    std::vector<FieldDesc> resolved_;
+    [[nodiscard]] FieldDesc resolvedField(std::size_t index) const;
+    [[nodiscard]] bool fieldMatches(const FieldDesc& field, const Entity& entity) const;
+    [[nodiscard]] bool resolveFieldSource(const FieldDesc& field, glm::vec3& out,
+                                          FieldAuthority& authority) const;
+    void beginArc(Entity& entity, std::uint32_t fieldIndex, double time);
+    void advanceArc(Entity& entity, double dt);
+
     std::uint32_t sceneSeed_ = 0;
     // False between unregisterParameters() and the next registerParameters(). update() does
     // nothing while it is false: the behaviours' cached parameter pointers are stale then, and a
@@ -486,13 +641,19 @@ private:
 // The `entities` array of an avgen-scene document. Sibling of `nodes` and `heroes`, because an
 // entity describes a node that the scene has already placed.
 
+class ProfileLibrary;
+
 // `baseDir` is the folder a `"profile"` reference is resolved against -- the scene file's own, the
-// same rule every other asset path in a scene file follows.
+// same rule every other asset path in a scene file follows. `library`, when given, is consulted
+// *first*: a `"profile"` that names an entry in it is a library reference, and only a name the
+// library does not have is treated as a path.
 [[nodiscard]] Result<std::vector<EntityDesc>> entitiesFromJson(const nlohmann::json& j,
-                                                               const std::filesystem::path& baseDir = {});
+                                                               const std::filesystem::path& baseDir = {},
+                                                               const ProfileLibrary* library = nullptr);
 [[nodiscard]] nlohmann::json entitiesToJson(const std::vector<EntityDesc>& entities);
 [[nodiscard]] Result<EntityDesc> entityFromJson(const nlohmann::json& j,
-                                                const std::filesystem::path& baseDir = {});
+                                                const std::filesystem::path& baseDir = {},
+                                                const ProfileLibrary* library = nullptr);
 [[nodiscard]] nlohmann::json entityToJson(const EntityDesc& entity);
 
 // A behaviour profile: the reusable half of an entity, in its own file.
@@ -506,5 +667,39 @@ private:
 // reaction lands on top of a profile's on the same property rather than instead of it.
 [[nodiscard]] Result<EntityDesc> profileFromJson(const nlohmann::json& j);
 [[nodiscard]] Result<EntityDesc> loadProfile(const std::filesystem::path& path);
+
+// A profile *library*: many named profiles in one file, referenced by name (ADR-097).
+//
+//     { "format": "avgen-entity-profile-library", "version": 1,
+//       "profiles": { "dancer": { "behaviors": [...], "reactions": [...], "clips": {...} },
+//                     "barfly": { ... } } }
+//
+// A scene names the library once, as `"entityProfiles": "profiles/night-shift.json"`, and each
+// entity then says `"profile": "dancer"`. One file is read once for a crowd of forty, instead of
+// forty path resolutions of forty copies of the same twenty lines -- which is §20's actual
+// complaint. A per-entity `"profile"` that is a *path* still works and is still resolved against
+// the scene's folder, so nothing written before this file existed has to change.
+//
+// A library entry is an ordinary profile and obeys the same rule: profiles do not chain. One level
+// of indirection is a library, two is a maze.
+class ProfileLibrary {
+public:
+    [[nodiscard]] const EntityDesc* find(std::string_view name) const;
+    void add(std::string name, EntityDesc profile);
+    [[nodiscard]] bool empty() const { return profiles_.empty(); }
+    [[nodiscard]] std::size_t size() const { return profiles_.size(); }
+    // Every name it holds, in file order. What a diagnostic prints when a lookup misses, because
+    // "no such profile" without the list is how a typo costs an afternoon.
+    [[nodiscard]] std::vector<std::string> names() const;
+    [[nodiscard]] const std::string& source() const { return source_; }
+    void setSource(std::string source) { source_ = std::move(source); }
+
+private:
+    std::vector<std::pair<std::string, EntityDesc>> profiles_;
+    std::string source_;
+};
+
+[[nodiscard]] Result<ProfileLibrary> profileLibraryFromJson(const nlohmann::json& j);
+[[nodiscard]] Result<ProfileLibrary> loadProfileLibrary(const std::filesystem::path& path);
 
 } // namespace avgen::entity

@@ -243,6 +243,7 @@ public:
     [[nodiscard]] std::string name() const override { return name_; }
     void update(const FrameTime& time) override;
     void updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) override;
+    void updateFields(const FrameTime& time, signals::SignalBus& bus, params::Modulator& modulator) override;
     [[nodiscard]] const Scene& scene() const override { return scene_; }
     [[nodiscard]] Scene& scene() override { return scene_; }
 
@@ -357,6 +358,17 @@ public:
     // Rejects the whole set and names the offender rather than dropping one, for the same reason
     // setHeroes does: an entity silently missing is a scene that does nothing with no explanation.
     Result<void> setEntities(std::vector<entity::EntityDesc> entities);
+
+    // ---- trigger volumes and music influence fields (ADR-097) --------------------------------
+    //
+    // The `fields` array of a scene file, a sibling of `entities` for the same reason: the volumes
+    // are places in the world, and what they do is scale the reactions the entities already have.
+    [[nodiscard]] const std::vector<entity::FieldDesc>& fields() const { return fieldDescs_; }
+    Result<void> setFields(std::vector<entity::FieldDesc> fields);
+    // The profile library this scene named, or an empty one. Held so a save can write the name
+    // back and an editor can list what an entity may choose from.
+    [[nodiscard]] const std::string& entityProfileLibraryPath() const { return profileLibraryPath_; }
+    void setEntityProfileLibraryPath(std::string path) { profileLibraryPath_ = std::move(path); }
     // Rebuilds the entity layer's view of this composition -- which node each entity drives, what
     // its material parts are called, where the ground is -- and reinstalls its reaction routes on
     // the modulator. Called from attach() and after a rebuild; safe to call again.
@@ -642,6 +654,9 @@ private:
 
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
+    std::vector<entity::FieldDesc> fieldDescs_;   // ADR-097: authored, round-tripped as "fields"
+    std::string profileLibraryPath_;              // ADR-097: "entityProfiles", relative to the scene
+    bool fieldRoutesChecked_ = false;             // has the "a route cannot drive a field" scan run
     entity::EntityWorld entityWorld_;
     // Every solid a walker has to go round, built once per rebuild from the scatter clouds and the
     // heroes (ADR-093, §5). Shared rather than owned outright: the navigator every entity reads is
