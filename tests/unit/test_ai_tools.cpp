@@ -17,6 +17,7 @@
 #include "scene/composition.hpp"
 #include "support/synth.hpp"
 #include "audio/audio_file.hpp"
+#include "support/gltf_fixture.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -1115,6 +1116,43 @@ TEST_CASE("Importing refuses a file outside the readable folders", "[ai][tools][
     // And nothing was copied into the project by the attempts.
     CHECK_FALSE(std::filesystem::exists(root / "projects" / "Guarded" / "audio"));
 
+    std::filesystem::remove_all(root);
+}
+
+TEST_CASE("The assistant imports visual assets transactionally", "[ai][tools][asset][import]") {
+    const auto root = std::filesystem::temp_directory_path() /
+                      ("avgen_ai_visual_import_" + std::to_string(static_cast<long long>(getpid())));
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root / "allowed");
+    const auto source = testsupport::writeTriangleGlb("ai_visual_import");
+    std::filesystem::copy_file(source, root / "allowed" / "tree.glb", std::filesystem::copy_options::overwrite_existing);
+
+    Fixture f;
+    f.ctx.setProjectsRoot(root / "projects");
+    f.ctx.setContentRoots({root / "allowed"});
+    REQUIRE(f.call("project.create", json{{"name", "Visual"}}).success);
+
+    const auto imported = f.call("asset.import", json{{"file", (root / "allowed" / "tree.glb").string()}});
+    REQUIRE(imported.success);
+    CHECK(imported.value["source"] == "project");
+    CHECK(imported.value["id"].get<std::string>().rfind("asset://project/models/", 0) == 0);
+    const auto projectRoot = root / "projects" / "Visual";
+    CHECK(std::filesystem::exists(projectRoot / "assets" / "manifest.json"));
+    CHECK(std::filesystem::exists(projectRoot / "assets" / "models" / "tree.glb"));
+
+    const auto duplicate = f.call("asset.import", json{{"file", (root / "allowed" / "tree.glb").string()}});
+    REQUIRE(duplicate.success);
+    CHECK(duplicate.value["duplicate"] == true);
+
+    std::ofstream(root / "allowed" / "broken.gltf")
+        << R"({"asset":{"version":"2.0"},"buffers":[{"uri":"missing.bin","byteLength":4}]})";
+    const auto broken = f.call("asset.import", json{{"file", (root / "allowed" / "broken.gltf").string()}});
+    CHECK_FALSE(broken.success);
+    CHECK_FALSE(std::filesystem::exists(projectRoot / "assets" / "models" / "broken.gltf"));
+
+    std::ofstream(root / "allowed" / "notes.txt") << "no";
+    CHECK_FALSE(f.call("asset.import", json{{"file", (root / "allowed" / "notes.txt").string()}}).success);
+    std::filesystem::remove(source);
     std::filesystem::remove_all(root);
 }
 
