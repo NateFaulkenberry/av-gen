@@ -11,6 +11,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <array>
 #include <cstdlib>
 #include <filesystem>
 #include <limits>
@@ -298,6 +299,30 @@ TEST_CASE("SceneRenderer renders a lit cube deterministically", "[gpu][renderer]
         auto withoutWater = renderer.renderToImage(scene, time, 128, 96);
         REQUIRE(withoutWater.has_value());
         CHECK(gpu::hashImage(*withWater) != gpu::hashImage(*withoutWater));
+        CHECK(ctx->errorCount() == 0);
+    }
+
+    TEST_CASE("water remains stable across above, grazing and below-surface views", "[gpu][renderer][water]") {
+        auto ctx = makeContext();
+        auto shaders = makeShaders(*ctx);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        auto scene = waterTestScene();
+        FrameTime time{};
+        const std::array<std::pair<glm::vec3, glm::vec3>, 4> views = {
+            std::pair{glm::vec3(0.0f, 2.5f, 4.5f), glm::vec3(0.0f, 0.0f, 0.0f)},
+            std::pair{glm::vec3(0.0f, 1.0f, 8.0f), glm::vec3(2.8f, 0.0f, 0.0f)},
+            std::pair{glm::vec3(0.0f, 0.2f, 8.0f), glm::vec3(2.8f, 0.0f, 0.0f)},
+            std::pair{glm::vec3(0.0f, -2.0f, 4.5f), glm::vec3(0.0f, 0.0f, 0.0f)}};
+        for (const auto& [position, target] : views) {
+            scene.camera.position = position;
+            scene.camera.target = target;
+            const auto first = renderer.renderToImage(scene, time, 128, 96);
+            REQUIRE(first.has_value());
+            const auto second = renderer.renderToImage(scene, time, 128, 96);
+            REQUIRE(second.has_value());
+            CHECK(gpu::hashImage(*first) == gpu::hashImage(*second));
+        }
         CHECK(ctx->errorCount() == 0);
     }
 

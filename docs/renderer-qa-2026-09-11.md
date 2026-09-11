@@ -166,8 +166,9 @@ tone mapping and composition overlay.
   alpha, matching `water_renderer.cpp`'s `SrcAlpha/OneMinusSrcAlpha` blend.
 - [x] Minimal native water image regression covers compositing over an opaque bed, deterministic
   repeat rendering and a distinct no-water frame. Broader shoreline angle/camera cases remain open.
-- [ ] Build a larger water QA scene with flat/steep/shallow/deep/angled shore cases and camera
-  views above, below, grazing and near-parallel to the surface.
+- [x] Native water image coverage now includes above-water, grazing, near-parallel and below-surface
+  camera views with deterministic repeat checks. A larger authored shoreline scene remains open.
+- [ ] Build a larger water QA scene with flat/steep/shallow/deep/angled shore cases.
 - [ ] Visualize water geometry mask, opaque linear depth, reconstructed thickness, shoreline fade,
   foam mask and water object ID. Confirm all effects are zero outside water geometry.
 - [ ] Add GPU image tests for no water over dry terrain, stable edge under camera motion, no z-fight,
