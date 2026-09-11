@@ -31,6 +31,7 @@
 #include "world/ecology.hpp"
 #include "world/hero.hpp"
 #include "world/terrain.hpp"
+#include "world/terrain_query.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -258,6 +259,22 @@ public:
     // Rejects the whole set rather than dropping the bad member, and names it. A hero silently
     // dropped is a camera director that frames nothing with no explanation of why.
     Result<void> setHeroes(std::vector<world::HeroPoint> heroes);
+
+    // ---- the ground (§3, ADR-090) --------------------------------------------------------------
+    //
+    // The scene's spatial queries: height, normal, slope, walkability, water, occupancy and the
+    // nearest valid point, over this composition's terrain node, its ecology and its heroes. This is
+    // the accessor everything that needs to know about the ground should use -- navigation, water
+    // placement, the editor's placement preview, a scatter pass -- rather than reaching for the
+    // terrain node's `worldMap` and re-deriving the parts.
+    //
+    // Returned by value and cheap (pointers, a span and a few floats), but it borrows from this
+    // composition: it is valid until the terrain node, the ecology or the hero list changes. Take it
+    // where you use it rather than holding one across a rebuild.
+    //
+    // `obstacles` is left null: §5's per-object set belongs to navigation, and a query with no
+    // obstacle field says so through `hasObstacles()` rather than pretending the world is empty.
+    [[nodiscard]] world::TerrainQuery terrainQuery() const;
 
     // ---- entities (ADR-088) ------------------------------------------------------------------
     //
