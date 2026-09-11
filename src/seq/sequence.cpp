@@ -943,8 +943,8 @@ Result<ShotCamera> cameraFromJson(const json& j) {
         }
     }
     cam.lookAtActor = readString(j, "lookAtActor");
-    cam.lookAtHeight = static_cast<float>(readNumber(j, "lookAtHeight", cam.lookAtHeight));
-    cam.lookAtWeight = static_cast<float>(readNumber(j, "lookAtWeight", cam.lookAtWeight));
+    cam.lookAtHeight = static_cast<float>(readNumber(j, "lookAtHeight", static_cast<double>(cam.lookAtHeight)));
+    cam.lookAtWeight = static_cast<float>(readNumber(j, "lookAtWeight", static_cast<double>(cam.lookAtWeight)));
     return cam;
 }
 

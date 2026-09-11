@@ -1,0 +1,122 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "night-shift",
+ "camera": {
+  "mode": 1,
+  "position": [
+   -46.0,
+   26.0,
+   52.0
+  ],
+  "target": [
+   -10.0,
+   2.0,
+   0.0
+  ],
+  "fov": 26.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../lightrigs/night-shift.rig.json",
+ "environment": {
+  "stylized": true,
+  "shadowCascades": 4,
+  "intensity": 0.085,
+  "skyIntensity": 0.22,
+  "background": [
+   0.03,
+   0.038,
+   0.062
+  ],
+  "fogColor": [
+   0.075,
+   0.07,
+   0.09
+  ],
+  "fogDensity": 0.0016,
+  "fogHeight": 40.0,
+  "fogHeightFalloff": 0.035,
+  "volumeDensity": 0.003,
+  "volumeScattering": 0.45,
+  "volumeAnisotropy": 0.42,
+  "volumeSteps": 16,
+  "volumeMaxDistance": 260.0,
+  "styledSkyAmbient": [
+   0.013,
+   0.019,
+   0.04
+  ],
+  "styledGroundAmbient": [
+   0.006,
+   0.0055,
+   0.005
+  ],
+  "sky": {
+   "zenithColor": [
+    0.055,
+    0.08,
+    0.17
+   ],
+   "horizonColor": [
+    0.42,
+    0.26,
+    0.22
+   ],
+   "groundColor": [
+    0.02,
+    0.022,
+    0.026
+   ],
+   "haze": 0.4,
+   "sunColor": [
+    1.0,
+    0.62,
+    0.36
+   ],
+   "sunIntensity": 4.0,
+   "sunSize": 1.4,
+   "sunGlow": 0.8,
+   "intensity": 0.9,
+   "background": true
+  }
+ },
+ "nodes": [
+  {
+   "name": "plaza",
+   "kind": "scene",
+   "asset": "plaza.scene.json"
+  },
+  {
+   "name": "downtown",
+   "kind": "scene",
+   "asset": "downtown.scene.json",
+   "visible": false
+  },
+  {
+   "name": "walker",
+   "kind": "gltf",
+   "asset": "../../assets/imported/alien.gltf",
+   "position": [
+    -62.0,
+    0.0,
+    -3.4
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "scale": [
+    0.0135,
+    0.0135,
+    0.0135
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.3,
+    "updateHz": 0.0,
+    "cullDistance": 0.0
+   }
+  }
+ ]
+}

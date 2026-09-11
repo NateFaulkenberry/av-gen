@@ -1,0 +1,72 @@
+{
+ "format": "avgen-lightrig",
+ "version": 1,
+ "name": "NightShift",
+ "description": "Dusk over a miniature city. The key is a low sodium-warm sun a few degrees above the rooftops, so every building throws a long shadow down the street and the terraces read as a row of separate objects rather than as one extruded shape -- at a high key they merge into a single silhouette, which is the failure mode of every isometric city render. The fill is a broad cool sky term at a sixth of the key: warm light, cool shadow, which is the whole of what makes a frame read as evening. The bounce is warm again and comes from below, standing in for the road giving the undersides back a little of the sun.",
+ "keyIntensity": 1.5,
+ "ambientIntensity": 0.07,
+ "ambientColor": [
+  0.3,
+  0.42,
+  0.7
+ ],
+ "ambientTemperature": 8200,
+ "lights": [
+  {
+   "name": "sun",
+   "type": "directional",
+   "role": "key",
+   "azimuth": 74.0,
+   "elevation": 13.0,
+   "distance": 3.0,
+   "intensity": 1.0,
+   "color": [
+    1.0,
+    0.7,
+    0.44
+   ],
+   "temperature": 3000,
+   "castsShadow": true,
+   "shadowStrength": 0.88,
+   "softness": 1.4,
+   "volumetric": 0.22,
+   "followCamera": false
+  },
+  {
+   "name": "skyfill",
+   "type": "directional",
+   "role": "fill",
+   "azimuth": -122.0,
+   "elevation": 46.0,
+   "distance": 3.0,
+   "intensity": 0.3,
+   "color": [
+    0.44,
+    0.6,
+    1.0
+   ],
+   "temperature": 11000,
+   "castsShadow": false,
+   "volumetric": 0.0,
+   "followCamera": false
+  },
+  {
+   "name": "streetbounce",
+   "type": "directional",
+   "role": "ambient",
+   "azimuth": 150.0,
+   "elevation": -28.0,
+   "distance": 4.0,
+   "intensity": 0.16,
+   "color": [
+    1.0,
+    0.66,
+    0.4
+   ],
+   "temperature": 2800,
+   "castsShadow": false,
+   "volumetric": 0.0,
+   "followCamera": false
+  }
+ ]
+}

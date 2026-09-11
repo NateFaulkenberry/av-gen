@@ -18,7 +18,7 @@ constexpr int kFormatVersion = 1;
 // The panels, grouped the way the View menu reads them: what you build with on the left, what you
 // inspect and tune on the right, what runs underneath along the bottom. Nothing is assigned to the
 // centre -- see DockRegion.
-constexpr std::array<EditorPanel, 11> kPanels{{
+constexpr std::array<EditorPanel, 12> kPanels{{
     {"World Builder", "World Builder", DockRegion::Left, true,
      "recipe, Generate World, asset placement and the job monitor"},
     {"Assets", "Assets", DockRegion::Left, false, "everything the asset scan found, by kind"},
@@ -27,6 +27,8 @@ constexpr std::array<EditorPanel, 11> kPanels{{
     {"Parameters", "Parameters", DockRegion::Right, true, "every exposed parameter, by group"},
     {"Composition", "Composition", DockRegion::Right, true,
      "the 2D layers over the frame: text, shapes, timing and keys"},
+    {"Sequence", "Sequence", DockRegion::Bottom, true,
+     "the piece in time: shots, scene cuts, character cues, lyrics and markers"},
     {"Render", "Render", DockRegion::Right, false, "offline render settings, progress and the queue"},
     {"Control", "Control", DockRegion::Bottom, true, "transport, audio response and performance"},
     {"Analysis", "Analysis", DockRegion::Bottom, true, "bands, spectrum, onsets and the waveform"},

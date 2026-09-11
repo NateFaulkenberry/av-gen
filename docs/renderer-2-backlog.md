@@ -62,6 +62,18 @@ to the image, which is an art decision and not a default.
 - **The shadow mask's normal is geometric; the lit pass shades with the material's.** Residual 5.6%
   of pixels before half-resolution sampling. Fixing it wants a full-res RG16F attachment and a
   fragment shader in three renderers — not worth it against an 8.4% total.
+- **A wide scene of small objects gets almost no cast shadows.** Found while building the ADR-089
+  proof-of-concept: a 260-metre city of about 220 nodes reports `draws=95 shadowDraws=2`, and the
+  streets come out flat. Not the light rig (removing it changes nothing), not the sun's elevation
+  (11 or 38 degrees, same), and not instancing (a `single`-distribution probe box in the middle of
+  the frame is culled too). `sceneRadius` is `max(bounds diagonal / 2, camera standoff)` and
+  `shadowFar = sceneRadius * 3`, so a big ground plane pushes the cascade split points far past the
+  geometry; three or four cascades then cover 900 metres and the per-cascade `aabbInsideFrustum`
+  test rejects nearly every caster. Small scenes are fine (the alien fixture gets 7-9 shadow draws
+  from 5 entities), and objects *near the camera* still cast -- the street trees and lamps do, the
+  buildings do not. Worth measuring where the split points actually land before changing anything;
+  the fix is probably to fit `shadowFar` to what the camera can *see* rather than to the whole
+  scene's bounds.
 - **GPU timing tests fail under `ctest -j4` when other work is on the GPU.** Happened three times
   in one session; each passed 3/3 standalone. `RESOURCE_LOCK gpu` serialises GPU tests against each
   other but cannot serialise against another process. The harness could detect a busy GPU and skip

@@ -1,6 +1,12 @@
 {
  "examples": [
   {
+   "name": "Night Shift",
+   "category": "Showcase",
+   "description": "A sequenced music video (ADR-089): five shots cut to a generated song's own sections, a recurring character who walks a stylised miniature city from dusk to night, a camera that follows and then reveals, sixteen lyric lines, a title, a border, and four small audio-reactive relationships. The whole piece is one seq::Sequence baked onto the ordinary timeline, so the frame at any second is a pure evaluation.",
+   "project": "city/night-shift.json"
+  },
+  {
    "name": "The Living Constellation",
    "category": "Showcase",
    "description": "A particle sculpture that performs its own score. Three logarithmic spiral arms authored as splines, carried by a differentially rotating field around a hot core; an onset launches a radial wave that crosses the sculpture at 19 m/s, so a beat reaches the rim a second and a half after the centre. 190,000 particles, no C++.",

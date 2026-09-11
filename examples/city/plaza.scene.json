@@ -1,0 +1,8316 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "plaza",
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "procedural",
+   "position": [
+    0,
+    -0.6,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      260,
+      1.2,
+      260
+     ],
+     "subdivisions": 1,
+     "bevel": 0.0,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.04,
+      0.045,
+      0.04
+     ],
+     "roughness": 0.95,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "road",
+   "kind": "procedural",
+   "position": [
+    0,
+    0.02,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      230,
+      0.16,
+      11.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.022,
+      0.022,
+      0.026
+     ],
+     "roughness": 0.95,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "road-line",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9,
+      0.02,
+      0.16
+     ],
+     "subdivisions": 1,
+     "bevel": 0.0,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 22,
+     "start": [
+      -62,
+      0.11,
+      0.0
+     ],
+     "end": [
+      62,
+      0.11,
+      0.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.3,
+      0.28,
+      0.22
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "kerb-1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0.12,
+    -7.2
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      230,
+      0.34,
+      3.4
+     ],
+     "subdivisions": 1,
+     "bevel": 0.06,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.115,
+      0.11,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "kerb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0.12,
+    7.2
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      230,
+      0.34,
+      3.4
+     ],
+     "subdivisions": 1,
+     "bevel": 0.06,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.115,
+      0.11,
+      0.1
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "north",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      4.011428571428572,
+      11.5,
+      9.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 7,
+     "start": [
+      -58,
+      0,
+      13.5
+     ],
+     "end": [
+      -22,
+      0,
+      13.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.62,
+      0.56,
+      0.44
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      5.75,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 868575705,
+     "randomScale": [
+      0.1,
+      0.3,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "north-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      4.32,
+      0.5175,
+      9.540000000000001
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 7,
+     "start": [
+      -58,
+      0,
+      13.5
+     ],
+     "end": [
+      -22,
+      0,
+      13.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      11.5,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 868575705,
+     "randomScale": [
+      0.1,
+      0.3,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "north-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.72,
+      0.8624999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -58,
+      2.53,
+      8.95
+     ],
+     "end": [
+      -22,
+      2.53,
+      8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.125
+    },
+    "variation": {
+     "seed": 868575722
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.72,
+      0.8624999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -58,
+      2.53,
+      18.05
+     ],
+     "end": [
+      -22,
+      2.53,
+      18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.8874999999999997
+    },
+    "variation": {
+     "seed": 868576633
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.72,
+      0.8624999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -58,
+      5.136666666666667,
+      8.95
+     ],
+     "end": [
+      -22,
+      5.136666666666667,
+      8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.125
+    },
+    "variation": {
+     "seed": 868575723
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.72,
+      0.8624999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -58,
+      5.136666666666667,
+      18.05
+     ],
+     "end": [
+      -22,
+      5.136666666666667,
+      18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.8874999999999997
+    },
+    "variation": {
+     "seed": 868576634
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.72,
+      0.8624999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -58,
+      7.743333333333333,
+      8.95
+     ],
+     "end": [
+      -22,
+      7.743333333333333,
+      8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.125
+    },
+    "variation": {
+     "seed": 868575724
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.72,
+      0.8624999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -58,
+      7.743333333333333,
+      18.05
+     ],
+     "end": [
+      -22,
+      7.743333333333333,
+      18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.8874999999999997
+    },
+    "variation": {
+     "seed": 868576635
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-win3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.72,
+      0.8624999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -58,
+      10.35,
+      8.95
+     ],
+     "end": [
+      -22,
+      10.35,
+      8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.125
+    },
+    "variation": {
+     "seed": 868575725
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-winb3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.72,
+      0.8624999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 21,
+     "start": [
+      -58,
+      10.35,
+      18.05
+     ],
+     "end": [
+      -22,
+      10.35,
+      18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.8874999999999997
+    },
+    "variation": {
+     "seed": 868576636
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      4.367999999999999,
+      8.2,
+      9.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      -10,
+      0,
+      13.5
+     ],
+     "end": [
+      18,
+      0,
+      13.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.54,
+      0.47,
+      0.4
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.1,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 648064455,
+     "randomScale": [
+      0.1,
+      0.26,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "north2-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      4.704,
+      0.36899999999999994,
+      9.540000000000001
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      -10,
+      0,
+      13.5
+     ],
+     "end": [
+      18,
+      0,
+      13.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      8.2,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 648064455,
+     "randomScale": [
+      0.1,
+      0.26,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "north2-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.784,
+      0.6149999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -10,
+      1.8039999999999998,
+      8.95
+     ],
+     "end": [
+      18,
+      1.8039999999999998,
+      8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.65
+    },
+    "variation": {
+     "seed": 648064472
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north2-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.784,
+      0.6149999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -10,
+      1.8039999999999998,
+      18.05
+     ],
+     "end": [
+      18,
+      1.8039999999999998,
+      18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.255
+    },
+    "variation": {
+     "seed": 648065383
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north2-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.784,
+      0.6149999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -10,
+      4.592,
+      8.95
+     ],
+     "end": [
+      18,
+      4.592,
+      8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.65
+    },
+    "variation": {
+     "seed": 648064473
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north2-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.784,
+      0.6149999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -10,
+      4.592,
+      18.05
+     ],
+     "end": [
+      18,
+      4.592,
+      18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.255
+    },
+    "variation": {
+     "seed": 648065384
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north2-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.784,
+      0.6149999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -10,
+      7.38,
+      8.95
+     ],
+     "end": [
+      18,
+      7.38,
+      8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.65
+    },
+    "variation": {
+     "seed": 648064474
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north2-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.784,
+      0.6149999999999999,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      -10,
+      7.38,
+      18.05
+     ],
+     "end": [
+      18,
+      7.38,
+      18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.255
+    },
+    "variation": {
+     "seed": 648065385
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      5.6160000000000005,
+      14.0,
+      9.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      30,
+      0,
+      13.5
+     ],
+     "end": [
+      66,
+      0,
+      13.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.26,
+      0.3,
+      0.34
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      7.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 388859876,
+     "randomScale": [
+      0.1,
+      0.34,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "north3-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.048,
+      0.63,
+      9.540000000000001
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      30,
+      0,
+      13.5
+     ],
+     "end": [
+      66,
+      0,
+      13.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      14.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 388859876,
+     "randomScale": [
+      0.1,
+      0.34,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "north3-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.008,
+      1.05,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      30,
+      3.08,
+      8.95
+     ],
+     "end": [
+      66,
+      3.08,
+      8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 388859893
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north3-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.008,
+      1.05,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      30,
+      3.08,
+      18.05
+     ],
+     "end": [
+      66,
+      3.08,
+      18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 388860804
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north3-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.008,
+      1.05,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      30,
+      5.46,
+      8.95
+     ],
+     "end": [
+      66,
+      5.46,
+      8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 388859894
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north3-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.008,
+      1.05,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      30,
+      5.46,
+      18.05
+     ],
+     "end": [
+      66,
+      5.46,
+      18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 388860805
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north3-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.008,
+      1.05,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      30,
+      7.840000000000001,
+      8.95
+     ],
+     "end": [
+      66,
+      7.840000000000001,
+      8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 388859895
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north3-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.008,
+      1.05,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      30,
+      7.840000000000001,
+      18.05
+     ],
+     "end": [
+      66,
+      7.840000000000001,
+      18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 388860806
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north3-win3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.008,
+      1.05,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      30,
+      10.219999999999999,
+      8.95
+     ],
+     "end": [
+      66,
+      10.219999999999999,
+      8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 388859896
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north3-winb3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.008,
+      1.05,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      30,
+      10.219999999999999,
+      18.05
+     ],
+     "end": [
+      66,
+      10.219999999999999,
+      18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 388860807
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north3-win4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.008,
+      1.05,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      30,
+      12.6,
+      8.95
+     ],
+     "end": [
+      66,
+      12.6,
+      8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 388859897
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north3-winb4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.008,
+      1.05,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      30,
+      12.6,
+      18.05
+     ],
+     "end": [
+      66,
+      12.6,
+      18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 388860808
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      4.16,
+      8.0,
+      9.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 6,
+     "start": [
+      -58,
+      0,
+      -13.5
+     ],
+     "end": [
+      -26,
+      0,
+      -13.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.48,
+      0.3,
+      0.24
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 16403307,
+     "randomScale": [
+      0.1,
+      0.26,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "south-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      4.4799999999999995,
+      0.36,
+      9.540000000000001
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 6,
+     "start": [
+      -58,
+      0,
+      -13.5
+     ],
+     "end": [
+      -26,
+      0,
+      -13.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      8.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 16403307,
+     "randomScale": [
+      0.1,
+      0.26,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "south-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7466666666666666,
+      0.6,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -58,
+      1.76,
+      -8.95
+     ],
+     "end": [
+      -26,
+      1.76,
+      -8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.5
+    },
+    "variation": {
+     "seed": 16403324
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7466666666666666,
+      0.6,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -58,
+      1.76,
+      -18.05
+     ],
+     "end": [
+      -26,
+      1.76,
+      -18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.15
+    },
+    "variation": {
+     "seed": 16404235
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7466666666666666,
+      0.6,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -58,
+      4.48,
+      -8.95
+     ],
+     "end": [
+      -26,
+      4.48,
+      -8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.5
+    },
+    "variation": {
+     "seed": 16403325
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7466666666666666,
+      0.6,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -58,
+      4.48,
+      -18.05
+     ],
+     "end": [
+      -26,
+      4.48,
+      -18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.15
+    },
+    "variation": {
+     "seed": 16404236
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7466666666666666,
+      0.6,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -58,
+      7.2,
+      -8.95
+     ],
+     "end": [
+      -26,
+      7.2,
+      -8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.5
+    },
+    "variation": {
+     "seed": 16403326
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7466666666666666,
+      0.6,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 18,
+     "start": [
+      -58,
+      7.2,
+      -18.05
+     ],
+     "end": [
+      -26,
+      7.2,
+      -18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.15
+    },
+    "variation": {
+     "seed": 16404237
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      4.29,
+      12.5,
+      9.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 4,
+     "start": [
+      -14,
+      0,
+      -13.5
+     ],
+     "end": [
+      8,
+      0,
+      -13.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.33,
+      0.27,
+      0.32
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      6.25,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 481656260,
+     "randomScale": [
+      0.1,
+      0.3,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "south2-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      4.62,
+      0.5625,
+      9.540000000000001
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 4,
+     "start": [
+      -14,
+      0,
+      -13.5
+     ],
+     "end": [
+      8,
+      0,
+      -13.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      12.5,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 481656260,
+     "randomScale": [
+      0.1,
+      0.3,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "south2-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7699999999999999,
+      0.9375,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 12,
+     "start": [
+      -14,
+      2.75,
+      -8.95
+     ],
+     "end": [
+      8,
+      2.75,
+      -8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 481656277
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south2-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7699999999999999,
+      0.9375,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 12,
+     "start": [
+      -14,
+      2.75,
+      -18.05
+     ],
+     "end": [
+      8,
+      2.75,
+      -18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 481657188
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south2-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7699999999999999,
+      0.9375,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 12,
+     "start": [
+      -14,
+      5.583333333333333,
+      -8.95
+     ],
+     "end": [
+      8,
+      5.583333333333333,
+      -8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 481656278
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south2-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7699999999999999,
+      0.9375,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 12,
+     "start": [
+      -14,
+      5.583333333333333,
+      -18.05
+     ],
+     "end": [
+      8,
+      5.583333333333333,
+      -18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 481657189
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south2-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7699999999999999,
+      0.9375,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 12,
+     "start": [
+      -14,
+      8.416666666666666,
+      -8.95
+     ],
+     "end": [
+      8,
+      8.416666666666666,
+      -8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 481656279
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south2-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7699999999999999,
+      0.9375,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 12,
+     "start": [
+      -14,
+      8.416666666666666,
+      -18.05
+     ],
+     "end": [
+      8,
+      8.416666666666666,
+      -18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 481657190
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south2-win3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7699999999999999,
+      0.9375,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 12,
+     "start": [
+      -14,
+      11.25,
+      -8.95
+     ],
+     "end": [
+      8,
+      11.25,
+      -8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.75
+    },
+    "variation": {
+     "seed": 481656280
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south2-winb3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7699999999999999,
+      0.9375,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 12,
+     "start": [
+      -14,
+      11.25,
+      -18.05
+     ],
+     "end": [
+      8,
+      11.25,
+      -18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.625
+    },
+    "variation": {
+     "seed": 481657191
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      7.175999999999999,
+      9.5,
+      9.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      20,
+      0,
+      -13.5
+     ],
+     "end": [
+      66,
+      0,
+      -13.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.62,
+      0.56,
+      0.44
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      4.75,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 960259117,
+     "randomScale": [
+      0.1,
+      0.24,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "south3-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      7.727999999999999,
+      0.4275,
+      9.540000000000001
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      20,
+      0,
+      -13.5
+     ],
+     "end": [
+      66,
+      0,
+      -13.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      9.5,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 960259117,
+     "randomScale": [
+      0.1,
+      0.24,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "south3-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.288,
+      0.7125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      20,
+      2.09,
+      -8.95
+     ],
+     "end": [
+      66,
+      2.09,
+      -8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.95
+    },
+    "variation": {
+     "seed": 960259134
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south3-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.288,
+      0.7125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      20,
+      2.09,
+      -18.05
+     ],
+     "end": [
+      66,
+      2.09,
+      -18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.465
+    },
+    "variation": {
+     "seed": 960260045
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south3-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.288,
+      0.7125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      20,
+      5.32,
+      -8.95
+     ],
+     "end": [
+      66,
+      5.32,
+      -8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.95
+    },
+    "variation": {
+     "seed": 960259135
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south3-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.288,
+      0.7125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      20,
+      5.32,
+      -18.05
+     ],
+     "end": [
+      66,
+      5.32,
+      -18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.465
+    },
+    "variation": {
+     "seed": 960260046
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south3-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.288,
+      0.7125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      20,
+      8.55,
+      -8.95
+     ],
+     "end": [
+      66,
+      8.55,
+      -8.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 4.95
+    },
+    "variation": {
+     "seed": 960259136
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south3-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.288,
+      0.7125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 15,
+     "start": [
+      20,
+      8.55,
+      -18.05
+     ],
+     "end": [
+      66,
+      8.55,
+      -18.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.465
+    },
+    "variation": {
+     "seed": 960260047
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-back",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      11.093333333333334,
+      17.0,
+      11.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 9,
+     "start": [
+      -62,
+      0,
+      27.5
+     ],
+     "end": [
+      66,
+      0,
+      27.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.26,
+      0.3,
+      0.34
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      8.5,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 98017703,
+     "randomScale": [
+      0.1,
+      0.4,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "north-back-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      11.946666666666665,
+      0.765,
+      11.66
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 9,
+     "start": [
+      -62,
+      0,
+      27.5
+     ],
+     "end": [
+      66,
+      0,
+      27.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      17.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 98017703,
+     "randomScale": [
+      0.1,
+      0.4,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "north-back-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.275,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      3.74,
+      21.95
+     ],
+     "end": [
+      66,
+      3.74,
+      21.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.15
+    },
+    "variation": {
+     "seed": 98017720
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-back-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.275,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      3.74,
+      33.05
+     ],
+     "end": [
+      66,
+      3.74,
+      33.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.2049999999999996
+    },
+    "variation": {
+     "seed": 98018631
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-back-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.275,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      6.63,
+      21.95
+     ],
+     "end": [
+      66,
+      6.63,
+      21.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.15
+    },
+    "variation": {
+     "seed": 98017721
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-back-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.275,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      6.63,
+      33.05
+     ],
+     "end": [
+      66,
+      6.63,
+      33.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.2049999999999996
+    },
+    "variation": {
+     "seed": 98018632
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-back-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.275,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      9.520000000000001,
+      21.95
+     ],
+     "end": [
+      66,
+      9.520000000000001,
+      21.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.15
+    },
+    "variation": {
+     "seed": 98017722
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-back-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.275,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      9.520000000000001,
+      33.05
+     ],
+     "end": [
+      66,
+      9.520000000000001,
+      33.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.2049999999999996
+    },
+    "variation": {
+     "seed": 98018633
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-back-win3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.275,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      12.41,
+      21.95
+     ],
+     "end": [
+      66,
+      12.41,
+      21.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.15
+    },
+    "variation": {
+     "seed": 98017723
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-back-winb3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.275,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      12.41,
+      33.05
+     ],
+     "end": [
+      66,
+      12.41,
+      33.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.2049999999999996
+    },
+    "variation": {
+     "seed": 98018634
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-back-win4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.275,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      15.3,
+      21.95
+     ],
+     "end": [
+      66,
+      15.3,
+      21.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 3.15
+    },
+    "variation": {
+     "seed": 98017724
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "north-back-winb4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.275,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      15.3,
+      33.05
+     ],
+     "end": [
+      66,
+      15.3,
+      33.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.2049999999999996
+    },
+    "variation": {
+     "seed": 98018635
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-back",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      11.093333333333334,
+      15.0,
+      11.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 9,
+     "start": [
+      -62,
+      0,
+      -27.5
+     ],
+     "end": [
+      66,
+      0,
+      -27.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.32,
+      0.36,
+      0.29
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      7.5,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 711372445,
+     "randomScale": [
+      0.1,
+      0.38,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "south-back-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      11.946666666666665,
+      0.6749999999999999,
+      11.66
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 9,
+     "start": [
+      -62,
+      0,
+      -27.5
+     ],
+     "end": [
+      66,
+      0,
+      -27.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      15.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 711372445,
+     "randomScale": [
+      0.1,
+      0.38,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "south-back-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      3.3,
+      -21.95
+     ],
+     "end": [
+      66,
+      3.3,
+      -21.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 711372462
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-back-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      3.3,
+      -33.05
+     ],
+     "end": [
+      66,
+      3.3,
+      -33.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 711373373
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-back-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      5.8500000000000005,
+      -21.95
+     ],
+     "end": [
+      66,
+      5.8500000000000005,
+      -21.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 711372463
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-back-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      5.8500000000000005,
+      -33.05
+     ],
+     "end": [
+      66,
+      5.8500000000000005,
+      -33.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 711373374
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-back-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      8.4,
+      -21.95
+     ],
+     "end": [
+      66,
+      8.4,
+      -21.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 711372464
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-back-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      8.4,
+      -33.05
+     ],
+     "end": [
+      66,
+      8.4,
+      -33.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 711373375
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-back-win3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      10.95,
+      -21.95
+     ],
+     "end": [
+      66,
+      10.95,
+      -21.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 711372465
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-back-winb3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      10.95,
+      -33.05
+     ],
+     "end": [
+      66,
+      10.95,
+      -33.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 711373376
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-back-win4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      13.5,
+      -21.95
+     ],
+     "end": [
+      66,
+      13.5,
+      -21.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.85
+    },
+    "variation": {
+     "seed": 711372466
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "south-back-winb4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.9911111111111108,
+      1.125,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 27,
+     "start": [
+      -62,
+      13.5,
+      -33.05
+     ],
+     "end": [
+      66,
+      13.5,
+      -33.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.9949999999999999
+    },
+    "variation": {
+     "seed": 711373377
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-north",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      18.72,
+      26.0,
+      16.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 8,
+     "start": [
+      -96,
+      0,
+      48.0
+     ],
+     "end": [
+      96,
+      0,
+      48.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.26,
+      0.3,
+      0.34
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      13.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 989683222,
+     "randomScale": [
+      0.1,
+      0.55,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "far-north-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      20.16,
+      1.17,
+      16.96
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 8,
+     "start": [
+      -96,
+      0,
+      48.0
+     ],
+     "end": [
+      96,
+      0,
+      48.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      26.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 989683222,
+     "randomScale": [
+      0.1,
+      0.55,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "far-north-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.95,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      5.72,
+      39.95
+     ],
+     "end": [
+      96,
+      5.72,
+      39.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.25
+    },
+    "variation": {
+     "seed": 989683239
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-north-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.95,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      5.72,
+      56.05
+     ],
+     "end": [
+      96,
+      5.72,
+      56.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.575
+    },
+    "variation": {
+     "seed": 989684150
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-north-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.95,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      9.256,
+      39.95
+     ],
+     "end": [
+      96,
+      9.256,
+      39.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.25
+    },
+    "variation": {
+     "seed": 989683240
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-north-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.95,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      9.256,
+      56.05
+     ],
+     "end": [
+      96,
+      9.256,
+      56.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.575
+    },
+    "variation": {
+     "seed": 989684151
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-north-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.95,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      12.792,
+      39.95
+     ],
+     "end": [
+      96,
+      12.792,
+      39.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.25
+    },
+    "variation": {
+     "seed": 989683241
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-north-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.95,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      12.792,
+      56.05
+     ],
+     "end": [
+      96,
+      12.792,
+      56.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.575
+    },
+    "variation": {
+     "seed": 989684152
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-north-win3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.95,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      16.328,
+      39.95
+     ],
+     "end": [
+      96,
+      16.328,
+      39.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.25
+    },
+    "variation": {
+     "seed": 989683242
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-north-winb3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.95,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      16.328,
+      56.05
+     ],
+     "end": [
+      96,
+      16.328,
+      56.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.575
+    },
+    "variation": {
+     "seed": 989684153
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-north-win4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.95,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      19.864,
+      39.95
+     ],
+     "end": [
+      96,
+      19.864,
+      39.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.25
+    },
+    "variation": {
+     "seed": 989683243
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-north-winb4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.95,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      19.864,
+      56.05
+     ],
+     "end": [
+      96,
+      19.864,
+      56.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.575
+    },
+    "variation": {
+     "seed": 989684154
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-north-win5",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.95,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      23.400000000000002,
+      39.95
+     ],
+     "end": [
+      96,
+      23.400000000000002,
+      39.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.25
+    },
+    "variation": {
+     "seed": 989683244
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-north-winb5",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.95,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      23.400000000000002,
+      56.05
+     ],
+     "end": [
+      96,
+      23.400000000000002,
+      56.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.575
+    },
+    "variation": {
+     "seed": 989684155
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-south",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      18.72,
+      22.0,
+      16.0
+     ],
+     "subdivisions": 1,
+     "bevel": 0.1,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 8,
+     "start": [
+      -96,
+      0,
+      -48.0
+     ],
+     "end": [
+      96,
+      0,
+      -48.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.33,
+      0.27,
+      0.32
+     ],
+     "roughness": 0.82,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      11.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 186616905,
+     "randomScale": [
+      0.1,
+      0.5,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.035,
+     "valueRandom": 0.22
+    }
+   }
+  },
+  {
+   "name": "far-south-cap",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      20.16,
+      0.99,
+      16.96
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 8,
+     "start": [
+      -96,
+      0,
+      -48.0
+     ],
+     "end": [
+      96,
+      0,
+      -48.0
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.085,
+      0.09,
+      0.1
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      22.0,
+      0.0
+     ]
+    },
+    "variation": {
+     "seed": 186616905,
+     "randomScale": [
+      0.1,
+      0.5,
+      0.12
+     ],
+     "randomRotation": [
+      0.0,
+      0.02,
+      0.0
+     ],
+     "randomPosition": [
+      0.0,
+      0.0,
+      0.25
+     ]
+    }
+   }
+  },
+  {
+   "name": "far-south-win0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.65,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      4.84,
+      -39.95
+     ],
+     "end": [
+      96,
+      4.84,
+      -39.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.1
+    },
+    "variation": {
+     "seed": 186616922
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-south-winb0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.65,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      4.84,
+      -56.05
+     ],
+     "end": [
+      96,
+      4.84,
+      -56.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.47
+    },
+    "variation": {
+     "seed": 186617833
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-south-win1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.65,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      8.58,
+      -39.95
+     ],
+     "end": [
+      96,
+      8.58,
+      -39.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.1
+    },
+    "variation": {
+     "seed": 186616923
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-south-winb1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.65,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      8.58,
+      -56.05
+     ],
+     "end": [
+      96,
+      8.58,
+      -56.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.47
+    },
+    "variation": {
+     "seed": 186617834
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-south-win2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.65,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      12.32,
+      -39.95
+     ],
+     "end": [
+      96,
+      12.32,
+      -39.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.1
+    },
+    "variation": {
+     "seed": 186616924
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-south-winb2",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.65,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      12.32,
+      -56.05
+     ],
+     "end": [
+      96,
+      12.32,
+      -56.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.47
+    },
+    "variation": {
+     "seed": 186617835
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-south-win3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.65,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      16.06,
+      -39.95
+     ],
+     "end": [
+      96,
+      16.06,
+      -39.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.1
+    },
+    "variation": {
+     "seed": 186616925
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-south-winb3",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.65,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      16.06,
+      -56.05
+     ],
+     "end": [
+      96,
+      16.06,
+      -56.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.47
+    },
+    "variation": {
+     "seed": 186617836
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-south-win4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.65,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      19.8,
+      -39.95
+     ],
+     "end": [
+      96,
+      19.8,
+      -39.95
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 2.1
+    },
+    "variation": {
+     "seed": 186616926
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "far-south-winb4",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.36,
+      1.65,
+      0.06
+     ],
+     "subdivisions": 1,
+     "bevel": 0.01,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 24,
+     "start": [
+      -96,
+      19.8,
+      -56.05
+     ],
+     "end": [
+      96,
+      19.8,
+      -56.05
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.35,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62,
+      0.26
+     ],
+     "emissiveIntensity": 1.47
+    },
+    "variation": {
+     "seed": 186617837
+    },
+    "materialVariation": {
+     "emissiveRandom": 1.0,
+     "valueRandom": 0.15
+    }
+   }
+  },
+  {
+   "name": "park",
+   "kind": "procedural",
+   "position": [
+    28,
+    0.08,
+    -14.5
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      26,
+      0.22,
+      12
+     ],
+     "subdivisions": 1,
+     "bevel": 0.3,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.055,
+      0.095,
+      0.06
+     ],
+     "roughness": 0.95,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "park-trees-0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/CommonTree_2.gltf",
+     "assetPart": 0
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      18,
+      0.2,
+      -14.5
+     ],
+     "end": [
+      38,
+      0.2,
+      -14.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.24,
+      0.17,
+      0.11
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "scale": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "variation": {
+     "seed": 101,
+     "randomUniformScale": 0.22,
+     "randomRotation": [
+      0.0,
+      3.14,
+      0.0
+     ],
+     "randomPosition": [
+      0.4,
+      0.0,
+      0.4
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.02,
+     "valueRandom": 0.18
+    }
+   }
+  },
+  {
+   "name": "park-trees-1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/CommonTree_2.gltf",
+     "assetPart": 1
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 5,
+     "start": [
+      18,
+      0.2,
+      -14.5
+     ],
+     "end": [
+      38,
+      0.2,
+      -14.5
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.14,
+      0.26,
+      0.14
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "scale": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "variation": {
+     "seed": 108,
+     "randomUniformScale": 0.22,
+     "randomRotation": [
+      0.0,
+      3.14,
+      0.0
+     ],
+     "randomPosition": [
+      0.4,
+      0.0,
+      0.4
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.02,
+     "valueRandom": 0.18
+    }
+   }
+  },
+  {
+   "name": "street-trees-n-0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/CommonTree_2.gltf",
+     "assetPart": 0
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 11,
+     "start": [
+      -52,
+      0.2,
+      8.4
+     ],
+     "end": [
+      56,
+      0.2,
+      8.4
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.24,
+      0.17,
+      0.11
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "scale": [
+      0.58,
+      0.58,
+      0.58
+     ]
+    },
+    "variation": {
+     "seed": 211,
+     "randomUniformScale": 0.22,
+     "randomRotation": [
+      0.0,
+      3.14,
+      0.0
+     ],
+     "randomPosition": [
+      0.4,
+      0.0,
+      0.4
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.02,
+     "valueRandom": 0.18
+    }
+   }
+  },
+  {
+   "name": "street-trees-n-1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/CommonTree_2.gltf",
+     "assetPart": 1
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 11,
+     "start": [
+      -52,
+      0.2,
+      8.4
+     ],
+     "end": [
+      56,
+      0.2,
+      8.4
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.14,
+      0.26,
+      0.14
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "scale": [
+      0.58,
+      0.58,
+      0.58
+     ]
+    },
+    "variation": {
+     "seed": 218,
+     "randomUniformScale": 0.22,
+     "randomRotation": [
+      0.0,
+      3.14,
+      0.0
+     ],
+     "randomPosition": [
+      0.4,
+      0.0,
+      0.4
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.02,
+     "valueRandom": 0.18
+    }
+   }
+  },
+  {
+   "name": "street-trees-s-0",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/CommonTree_2.gltf",
+     "assetPart": 0
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 11,
+     "start": [
+      -48,
+      0.2,
+      -8.4
+     ],
+     "end": [
+      60,
+      0.2,
+      -8.4
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.24,
+      0.17,
+      0.11
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "scale": [
+      0.54,
+      0.54,
+      0.54
+     ]
+    },
+    "variation": {
+     "seed": 307,
+     "randomUniformScale": 0.22,
+     "randomRotation": [
+      0.0,
+      3.14,
+      0.0
+     ],
+     "randomPosition": [
+      0.4,
+      0.0,
+      0.4
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.02,
+     "valueRandom": 0.18
+    }
+   }
+  },
+  {
+   "name": "street-trees-s-1",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../assets/quaternius/glTF/CommonTree_2.gltf",
+     "assetPart": 1
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 11,
+     "start": [
+      -48,
+      0.2,
+      -8.4
+     ],
+     "end": [
+      60,
+      0.2,
+      -8.4
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.14,
+      0.26,
+      0.14
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0
+    },
+    "sourceTransform": {
+     "scale": [
+      0.54,
+      0.54,
+      0.54
+     ]
+    },
+    "variation": {
+     "seed": 314,
+     "randomUniformScale": 0.22,
+     "randomRotation": [
+      0.0,
+      3.14,
+      0.0
+     ],
+     "randomPosition": [
+      0.4,
+      0.0,
+      0.4
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.02,
+     "valueRandom": 0.18
+    }
+   }
+  },
+  {
+   "name": "lamps-n-post",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.075,
+     "height": 3.4,
+     "radialSegments": 8,
+     "caps": true,
+     "bevel": 0.02,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 11,
+     "start": [
+      -54,
+      0.3,
+      6.4
+     ],
+     "end": [
+      58,
+      0.3,
+      6.4
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.06,
+      0.065,
+      0.07
+     ],
+     "roughness": 0.45,
+     "metallic": 0.6
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      1.7,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "lamps-n-head",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.42,
+      0.1,
+      0.22
+     ],
+     "subdivisions": 1,
+     "bevel": 0.04,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 11,
+     "start": [
+      -54,
+      3.4,
+      6.4
+     ],
+     "end": [
+      58,
+      3.4,
+      6.4
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.07,
+      0.075,
+      0.08
+     ],
+     "roughness": 0.4,
+     "metallic": 0.6
+    }
+   }
+  },
+  {
+   "name": "lamps-n-bulb",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.11,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 11,
+     "start": [
+      -54,
+      3.3,
+      6.4
+     ],
+     "end": [
+      58,
+      3.3,
+      6.4
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.3,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.55,
+      0.18
+     ],
+     "emissiveIntensity": 16.0
+    }
+   }
+  },
+  {
+   "name": "lamps-s-post",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "cylinder",
+     "radius": 0.075,
+     "height": 3.4,
+     "radialSegments": 8,
+     "caps": true,
+     "bevel": 0.02,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 11,
+     "start": [
+      -50,
+      0.3,
+      -6.4
+     ],
+     "end": [
+      62,
+      0.3,
+      -6.4
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.06,
+      0.065,
+      0.07
+     ],
+     "roughness": 0.45,
+     "metallic": 0.6
+    },
+    "sourceTransform": {
+     "position": [
+      0.0,
+      1.7,
+      0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "lamps-s-head",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.42,
+      0.1,
+      0.22
+     ],
+     "subdivisions": 1,
+     "bevel": 0.04,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 11,
+     "start": [
+      -50,
+      3.4,
+      -6.4
+     ],
+     "end": [
+      62,
+      3.4,
+      -6.4
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.07,
+      0.075,
+      0.08
+     ],
+     "roughness": 0.4,
+     "metallic": 0.6
+    }
+   }
+  },
+  {
+   "name": "lamps-s-bulb",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.11,
+     "segments": 10,
+     "rings": 6
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 11,
+     "start": [
+      -50,
+      3.3,
+      -6.4
+     ],
+     "end": [
+      62,
+      3.3,
+      -6.4
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.3,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.55,
+      0.18
+     ],
+     "emissiveIntensity": 16.0
+    }
+   }
+  },
+  {
+   "name": "cars",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.9,
+      0.95,
+      1.75
+     ],
+     "subdivisions": 2,
+     "bevel": 0.32,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 12,
+     "start": [
+      -52,
+      0.62,
+      4.6
+     ],
+     "end": [
+      58,
+      0.62,
+      4.6
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.16,
+      0.16,
+      0.18
+     ],
+     "roughness": 0.35,
+     "metallic": 0.25
+    },
+    "variation": {
+     "seed": 4242,
+     "randomScale": [
+      0.08,
+      0.06,
+      0.05
+     ],
+     "randomPosition": [
+      1.2,
+      0,
+      0.1
+     ]
+    },
+    "materialVariation": {
+     "hueShift": 0.5,
+     "valueRandom": 0.5
+    }
+   }
+  },
+  {
+   "name": "cars-top",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.1,
+      0.62,
+      1.58
+     ],
+     "subdivisions": 2,
+     "bevel": 0.26,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "linear",
+     "count": 12,
+     "start": [
+      -52.2,
+      1.35,
+      4.6
+     ],
+     "end": [
+      57.8,
+      1.35,
+      4.6
+     ],
+     "orientAlong": false
+    },
+    "material": {
+     "baseColor": [
+      0.1,
+      0.12,
+      0.14
+     ],
+     "roughness": 0.2,
+     "metallic": 0.1
+    },
+    "variation": {
+     "seed": 4242,
+     "randomScale": [
+      0.08,
+      0.06,
+      0.05
+     ],
+     "randomPosition": [
+      1.2,
+      0,
+      0.1
+     ]
+    }
+   }
+  },
+  {
+   "name": "door-frame",
+   "kind": "procedural",
+   "position": [
+    56,
+    2.1,
+    -8.6
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.6,
+      4.2,
+      0.5
+     ],
+     "subdivisions": 1,
+     "bevel": 0.08,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.42,
+      0.3,
+      0.22
+     ],
+     "roughness": 0.7,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "door-glow",
+   "kind": "procedural",
+   "position": [
+    56,
+    1.75,
+    -8.35
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.8,
+      3.2,
+      0.16
+     ],
+     "subdivisions": 1,
+     "bevel": 0.05,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.3,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.72,
+      0.34
+     ],
+     "emissiveIntensity": 13.0
+    }
+   }
+  },
+  {
+   "name": "door-sign",
+   "kind": "procedural",
+   "position": [
+    56,
+    4.6,
+    -8.3
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.2,
+      0.34,
+      0.12
+     ],
+     "subdivisions": 1,
+     "bevel": 0.04,
+     "bevelSegments": 2
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.02,
+      0.02,
+      0.02
+     ],
+     "roughness": 0.3,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.16,
+      0.46
+     ],
+     "emissiveIntensity": 7.0
+    }
+   }
+  }
+ ]
+}
