@@ -952,14 +952,27 @@ void registerParameterTools(ToolRegistry& registry) {
                 }
             }
             const std::filesystem::path target = assetRoot / source->filename();
+            const bool targetExisted = std::filesystem::exists(target, ec);
+            std::vector<std::filesystem::path> createdFiles;
+            bool committed = false;
+            const auto rollback = [&] {
+                if (committed) return;
+                for (auto it = createdFiles.rbegin(); it != createdFiles.rend(); ++it) {
+                    std::error_code removeError;
+                    std::filesystem::remove(*it, removeError);
+                }
+            };
             std::filesystem::copy_file(*source, target, std::filesystem::copy_options::overwrite_existing, ec);
             if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy asset: " + ec.message());
+            if (!targetExisted) createdFiles.push_back(target);
             std::vector<std::string> copied;
             copied.push_back(target.string());
             for (const auto& dependency : dependencies) {
                     const std::filesystem::path dependencyTarget = assetRoot / dependency.filename();
+                    const bool dependencyExisted = std::filesystem::exists(dependencyTarget, ec);
                     std::filesystem::copy_file(dependency, dependencyTarget, std::filesystem::copy_options::overwrite_existing, ec);
-                    if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy glTF dependency: " + ec.message());
+                    if (ec) { rollback(); return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy glTF dependency: " + ec.message()); }
+                    if (!dependencyExisted) createdFiles.push_back(dependencyTarget);
                     copied.push_back(dependencyTarget.string());
             }
             const std::string id = "asset://project/" + type + "/" + target.stem().string();
@@ -991,7 +1004,8 @@ void registerParameterTools(ToolRegistry& registry) {
             const std::filesystem::path manifestTemp = manifestPath.string() + ".tmp";
             { std::ofstream out(manifestTemp, std::ios::trunc); out << manifest.dump(2) << '\n'; }
             std::filesystem::rename(manifestTemp, manifestPath, ec);
-            if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot update project asset manifest: " + ec.message());
+            if (ec) { rollback(); return ToolResult::failure(ToolErrorCode::Unavailable, "cannot update project asset manifest: " + ec.message()); }
+            committed = true;
             return ToolResult::ok(json{{"id", id}, {"source", "project"}, {"type", type},
                                        {"path", target.string()}, {"sha256", *hash}, {"copied", copied}},
                                   "asset imported into project");

@@ -42,7 +42,8 @@ is reported as a duplicate instead of copied again. A `.gltf` import preflights 
 referenced buffer and image sidecars, rejecting missing dependencies before any project file is
 written rather than creating a half-imported asset. No source file is modified, and no destination
 outside the project is writable by this tool. Filesystem I/O failures are returned as hard tool
-errors; a future phase should add a full rollback journal for mid-copy failures as well.
+errors. Newly created files are tracked during the operation and removed if dependency copying or
+manifest replacement fails; pre-existing files are never removed by rollback.
 
 Every successful visual import also updates `<project>/assets/manifest.json` atomically. The
 manifest stores the stable project ID, asset type, project-relative path and SHA-256 source hash.
