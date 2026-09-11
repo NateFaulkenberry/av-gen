@@ -425,10 +425,6 @@ void HelpPanel::drawToolbar() {
     }
     ImGui::SameLine();
 
-    if (focusSearchBox_) {
-        ImGui::SetKeyboardFocusHere();
-        focusSearchBox_ = false;
-    }
     ImGui::SetNextItemWidth(-90.0f);
     if (ImGui::InputTextWithHint("##help-search", "search the documentation",
                                  search_, sizeof(search_))) {

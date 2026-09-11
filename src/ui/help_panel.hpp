@@ -73,8 +73,6 @@ private:
 
     char search_[192] = {};
     std::vector<help::SearchResult> results_;
-    std::string pendingFocus_;           // an anchor to scroll to on the next frame
-    bool focusSearchBox_ = false;
     std::string status_;
 
     int selfTestStep_ = -1; // -1 until ensureLoaded decides whether the self-test is on

@@ -260,8 +260,8 @@ void ControlPanel::drawHelpMenu() {
             }
             help.open(topic);
         }
-        if (ImGui::IsItemHovered() && hint != nullptr) {
-            ImGui::SetTooltip("%s", hint);
+        if (hint != nullptr) {
+            helpTooltip(hint, topic);
         }
     };
     go("Help Contents", "start/welcome", "the documentation, from the beginning");
