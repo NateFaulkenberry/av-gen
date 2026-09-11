@@ -27,6 +27,7 @@
 #include "gpu/transient_pool.hpp"
 #include "rendering/ao_renderer.hpp"
 #include "rendering/field_uniforms.hpp"
+#include "rendering/frame_overlay.hpp"
 #include "rendering/light_data.hpp"
 #include "rendering/material_programs.hpp"
 #include "rendering/particle_renderer.hpp"
@@ -315,6 +316,13 @@ public:
     [[nodiscard]] const wgpu::Buffer& lightBuffer() const { return lightBuffer_; }
     [[nodiscard]] const wgpu::Buffer& clusterBuffer() const { return clusterBuffer_; }
 
+    // The 2D composition (ADR-081). The one hook the renderer offers whatever draws over the
+    // finished picture: it is called after the tone map has written `target` and before the frame
+    // timeline is resolved, and the renderer knows nothing else about it. Null by default, so a
+    // frame with no composition is encoded exactly as it was before.
+    void setOverlay(FrameOverlay* overlay) { overlay_ = overlay; }
+    [[nodiscard]] FrameOverlay* overlay() const { return overlay_; }
+
     // Debug drawing (ADR-031): the host fills this before render() and the geometry is drawn over
     // the lit scene. Empty by default, so a frame with no debug geometry is encoded as before.
     [[nodiscard]] DebugDraw& debugDraw() { return *debug_; }
@@ -399,6 +407,7 @@ private:
     std::unique_ptr<SdfRenderer> sdfs_;
     std::unique_ptr<VolumeRenderer> volumes_;
     std::unique_ptr<DebugDraw> debug_;
+    FrameOverlay* overlay_ = nullptr;
     bool debugDepthTest_ = true;
     std::unique_ptr<Simulation> simulation_;
     std::unique_ptr<ShadowRenderer> shadows_; // ADR-034

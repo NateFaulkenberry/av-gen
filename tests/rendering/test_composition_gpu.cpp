@@ -1,0 +1,318 @@
+// The 2D composition over the finished 3D frame (ADR-081), on the device: that text actually
+// appears, that it appears in the right place at any resolution, that compositing order is the
+// stack order, that a layer outside its time range is absent, and -- the one that matters most --
+// that the frame an offline render produces is the frame live playback produces.
+
+#include "comp/layer_stack.hpp"
+#include "core/log.hpp"
+#include "gpu/context.hpp"
+#include "gpu/readback.hpp"
+#include "gpu/shader_library.hpp"
+#include "rendering/composition_renderer.hpp"
+#include "rendering/scene_renderer.hpp"
+#include "scene/scene.hpp"
+
+#include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
+
+#include <chrono>
+#include <cmath>
+#include <filesystem>
+#include <memory>
+
+using namespace avgen;
+using Catch::Approx;
+
+namespace {
+
+std::unique_ptr<gpu::Context> makeContext() {
+    static bool logInit = false;
+    if (!logInit) {
+        log::init(log::Level::Warn);
+        logInit = true;
+    }
+    auto ctx = gpu::Context::create(gpu::ContextDesc{});
+    if (!ctx) {
+        SKIP("no GPU adapter available: " << ctx.error().message);
+    }
+    return std::move(*ctx);
+}
+
+// A deliberately plain, entirely black 3D frame, so every non-black pixel in the output came from
+// the composition and nothing else.
+scene::Scene blackScene() {
+    scene::Scene s;
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.camera.position = {0.0f, 0.0f, 8.0f};
+    s.post.bloomEnabled = false;
+    s.post.tonemap = scene::TonemapOperator::AgX;
+    return s;
+}
+
+int luma(const std::uint8_t* px) { return px[0] + px[1] + px[2]; }
+
+std::uint64_t litPixels(const gpu::Image8& img, int threshold = 24) {
+    std::uint64_t count = 0;
+    for (std::uint32_t y = 0; y < img.height; ++y) {
+        for (std::uint32_t x = 0; x < img.width; ++x) {
+            if (luma(img.pixel(x, y)) > threshold) {
+                ++count;
+            }
+        }
+    }
+    return count;
+}
+
+// Centre of mass of the lit pixels, normalised to the frame. The one measurement that says "the
+// words are where the author put them" without depending on which letters they are.
+glm::vec2 centroid(const gpu::Image8& img, int threshold = 24) {
+    double sx = 0.0;
+    double sy = 0.0;
+    double total = 0.0;
+    for (std::uint32_t y = 0; y < img.height; ++y) {
+        for (std::uint32_t x = 0; x < img.width; ++x) {
+            const double w = std::max(0, luma(img.pixel(x, y)) - threshold);
+            sx += w * x;
+            sy += w * y;
+            total += w;
+        }
+    }
+    if (total <= 0.0) {
+        return {-1.0f, -1.0f};
+    }
+    // Back to composition coordinates: origin bottom left, y up.
+    return {static_cast<float>(sx / total / img.width), 1.0f - static_cast<float>(sy / total / img.height)};
+}
+
+struct Harness {
+    std::unique_ptr<gpu::Context> ctx;
+    std::unique_ptr<gpu::ShaderLibrary> shaders;
+    std::unique_ptr<rendering::SceneRenderer> renderer;
+    std::unique_ptr<rendering::CompositionRenderer> compositor;
+
+    static Harness make() {
+        Harness h;
+        h.ctx = makeContext();
+        h.shaders = std::make_unique<gpu::ShaderLibrary>(*h.ctx,
+                                                         std::vector{std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+        h.renderer = std::make_unique<rendering::SceneRenderer>(*h.ctx, *h.shaders);
+        REQUIRE(h.renderer->init().has_value());
+        h.compositor = std::make_unique<rendering::CompositionRenderer>(*h.ctx, *h.shaders);
+        REQUIRE(h.compositor->init().has_value());
+        h.compositor->setTimeline(&h.renderer->timeline());
+        h.renderer->setOverlay(h.compositor.get());
+        return h;
+    }
+
+    gpu::Image8 shot(const scene::Scene& scene, comp::LayerStack& stack, double seconds, std::uint32_t w,
+                     std::uint32_t h) {
+        compositor->setInput(&stack, seconds);
+        FrameTime time{};
+        time.renderTime = seconds;
+        auto image = renderer->renderToImage(scene, time, w, h);
+        REQUIRE(image.has_value());
+        return std::move(*image);
+    }
+};
+
+} // namespace
+
+TEST_CASE("text appears over the 3D frame", "[gpu][composition]") {
+    Harness h = Harness::make();
+    const scene::Scene scene = blackScene();
+
+    comp::LayerStack empty;
+    const gpu::Image8 without = h.shot(scene, empty, 0.0, 320, 180);
+    CHECK(litPixels(without) == 0);
+
+    comp::LayerStack stack;
+    auto& text = stack.addText("HELLO");
+    text.size = 0.3f;
+    text.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    const gpu::Image8 with = h.shot(scene, stack, 0.0, 320, 180);
+    CHECK(litPixels(with) > 200);
+
+    // White text is actually white: this is what compositing after the tone map buys.
+    int brightest = 0;
+    for (std::uint32_t y = 0; y < with.height; ++y) {
+        for (std::uint32_t x = 0; x < with.width; ++x) {
+            brightest = std::max(brightest, luma(with.pixel(x, y)));
+        }
+    }
+    CHECK(brightest >= 3 * 250);
+}
+
+TEST_CASE("text lands where it was placed, at every resolution", "[gpu][composition]") {
+    Harness h = Harness::make();
+    const scene::Scene scene = blackScene();
+    comp::LayerStack stack;
+    auto& text = stack.addText("OO");
+    text.size = 0.2f;
+    text.position = glm::vec2(0.25f, 0.75f);
+
+    for (const auto [w, hh] : {std::pair<std::uint32_t, std::uint32_t>{320, 180},
+                               std::pair<std::uint32_t, std::uint32_t>{640, 360},
+                               std::pair<std::uint32_t, std::uint32_t>{512, 512}}) {
+        const gpu::Image8 image = h.shot(scene, stack, 0.0, w, hh);
+        const glm::vec2 c = centroid(image);
+        INFO(w << "x" << hh);
+        CHECK(c.x == Approx(0.25f).margin(0.04f));
+        CHECK(c.y == Approx(0.75f).margin(0.04f));
+    }
+}
+
+TEST_CASE("a layer outside its time range does not draw", "[gpu][composition]") {
+    Harness h = Harness::make();
+    const scene::Scene scene = blackScene();
+    comp::LayerStack stack;
+    auto& text = stack.addText("LATER");
+    text.size = 0.3f;
+    text.startTime = 5.0;
+    text.endTime = 7.0;
+
+    CHECK(litPixels(h.shot(scene, stack, 1.0, 256, 144)) == 0);
+    CHECK(litPixels(h.shot(scene, stack, 6.0, 256, 144)) > 100);
+    CHECK(litPixels(h.shot(scene, stack, 9.0, 256, 144)) == 0);
+}
+
+TEST_CASE("compositing order is stack order", "[gpu][composition]") {
+    Harness h = Harness::make();
+    const scene::Scene scene = blackScene();
+    comp::LayerStack stack;
+    auto& red = stack.addShape(comp::ShapeKind::Rectangle);
+    red.size = glm::vec2(0.6f, 0.6f);
+    red.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    auto& green = stack.addShape(comp::ShapeKind::Rectangle);
+    green.size = glm::vec2(0.3f, 0.3f);
+    green.color = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
+
+    const gpu::Image8 image = h.shot(scene, stack, 0.0, 128, 128);
+    const std::uint8_t* centre = image.pixel(64, 64);
+    CHECK(centre[1] > 200); // green on top in the middle
+    CHECK(centre[0] < 60);
+    // The big square spans 26..102 px at this size and the small one 45..83, so this row is
+    // inside the first and outside the second.
+    const std::uint8_t* ring = image.pixel(64, 32);
+    CHECK(ring[0] > 200);
+    CHECK(ring[1] < 60);
+
+    // Move the red square to the top of the stack and it covers the green one.
+    REQUIRE(stack.moveTo(red.id, 1));
+    const gpu::Image8 swapped = h.shot(scene, stack, 0.0, 128, 128);
+    const std::uint8_t* centre2 = swapped.pixel(64, 64);
+    CHECK(centre2[0] > 200);
+    CHECK(centre2[1] < 60);
+}
+
+TEST_CASE("opacity composites against what is underneath", "[gpu][composition]") {
+    Harness h = Harness::make();
+    const scene::Scene scene = blackScene();
+    comp::LayerStack stack;
+    auto& under = stack.addShape(comp::ShapeKind::Rectangle);
+    under.size = glm::vec2(0.8f, 0.8f);
+    under.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    auto& over = stack.addShape(comp::ShapeKind::Rectangle);
+    over.size = glm::vec2(0.4f, 0.4f);
+    over.color = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+
+    over.opacity = 1.0f;
+    const std::uint8_t* opaque = nullptr;
+    gpu::Image8 a = h.shot(scene, stack, 0.0, 128, 128);
+    opaque = a.pixel(64, 64);
+    const int opaqueBlue = opaque[2];
+    const int opaqueRed = opaque[0];
+
+    over.opacity = 0.5f;
+    gpu::Image8 b = h.shot(scene, stack, 0.0, 128, 128);
+    const std::uint8_t* half = b.pixel(64, 64);
+    CHECK(half[2] < opaqueBlue - 40);
+    CHECK(half[0] > opaqueRed + 40); // the red underneath now shows through
+
+    over.opacity = 0.0f;
+    gpu::Image8 c = h.shot(scene, stack, 0.0, 128, 128);
+    const std::uint8_t* gone = c.pixel(64, 64);
+    CHECK(gone[2] < 20);
+    CHECK(gone[0] > 200);
+}
+
+TEST_CASE("a shape can be a border: stroke only, no fill", "[gpu][composition]") {
+    Harness h = Harness::make();
+    const scene::Scene scene = blackScene();
+    comp::LayerStack stack;
+    auto& border = stack.addShape(comp::ShapeKind::Rectangle);
+    border.size = glm::vec2(0.7f, 0.7f);
+    border.color = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f); // no fill
+    border.strokeWidth = 0.04f;
+    border.strokeColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+    const gpu::Image8 image = h.shot(scene, stack, 0.0, 128, 128);
+    CHECK(luma(image.pixel(64, 64)) < 24);            // hollow in the middle
+    CHECK(luma(image.pixel(64, 19)) > 300);           // the top edge of the box is drawn
+    CHECK(luma(image.pixel(4, 4)) < 24);              // and nothing outside it
+}
+
+TEST_CASE("the same second produces the same frame however it was reached",
+          "[gpu][composition][determinism]") {
+    Harness h = Harness::make();
+    const scene::Scene scene = blackScene();
+    comp::LayerStack stack;
+    auto& text = stack.addText("DRIFT");
+    text.size = 0.25f;
+    text.startTime = 1.0;
+
+    // "Live": stepped forward one frame at a time at 60 fps to 2.0 s.
+    gpu::Image8 stepped;
+    for (int i = 0; i <= 120; ++i) {
+        stepped = h.shot(scene, stack, static_cast<double>(i) / 60.0, 192, 108);
+    }
+    // "Offline": the same second, arrived at by seeking.
+    const gpu::Image8 sought = h.shot(scene, stack, 2.0, 192, 108);
+
+    REQUIRE(stepped.rgba.size() == sought.rgba.size());
+    std::size_t differing = 0;
+    for (std::size_t i = 0; i < stepped.rgba.size(); ++i) {
+        if (stepped.rgba[i] != sought.rgba[i]) {
+            ++differing;
+        }
+    }
+    CHECK(differing == 0);
+}
+
+TEST_CASE("a hundred text layers stay one pass and a handful of draws",
+          "[gpu][composition][performance]") {
+    Harness h = Harness::make();
+    const scene::Scene scene = blackScene();
+
+    const auto measure = [&](std::size_t count) {
+        comp::LayerStack stack;
+        for (std::size_t i = 0; i < count; ++i) {
+            auto& text = stack.addText("performance");
+            text.size = 0.04f;
+            text.position = glm::vec2(0.5f, 0.05f + 0.9f * static_cast<float>(i) / static_cast<float>(count + 1));
+        }
+        // Warm the atlas and the pipelines before timing.
+        h.shot(scene, stack, 0.0, 640, 360);
+        constexpr int kFrames = 20;
+        const auto start = std::chrono::steady_clock::now();
+        for (int f = 0; f < kFrames; ++f) {
+            h.shot(scene, stack, 0.0, 640, 360);
+        }
+        const double ms =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() / kFrames;
+        return std::pair{ms, h.compositor->stats()};
+    };
+
+    const auto [msNone, statsNone] = measure(0);
+    const auto [msOne, statsOne] = measure(1);
+    const auto [msHundred, statsHundred] = measure(100);
+    WARN("composition frame cost: 0 layers " << msNone << " ms, 1 layer " << msOne << " ms, 100 layers "
+                                             << msHundred << " ms; draws " << statsHundred.draws << ", items "
+                                             << statsHundred.items << ", glyphs " << statsHundred.glyphs);
+    CHECK(statsOne.draws == 1);
+    // A hundred plain text layers share one blend mode and contiguous geometry, so they are one
+    // draw call. This is the property that stops the system collapsing at scale.
+    CHECK(statsHundred.draws == 1);
+    CHECK(statsHundred.layers == 100);
+    // The same eleven letters in a hundred layers rasterise once.
+    CHECK(statsHundred.glyphs <= 12);
+}
