@@ -21,6 +21,7 @@
 #include "ui/sequence_panel.hpp"
 #include "ui/editor_layout.hpp"
 #include "ui/graph_editor.hpp"
+#include "ui/help_panel.hpp"
 #include "ui/world_builder_panel.hpp"
 #include "ui/world_panel.hpp"
 
@@ -130,6 +131,9 @@ public:
     // The 2D composition over the frame (ADR-083): the layer stack and its inspector.
     CompositionPanel composition;
     SequencePanel sequence;
+    // The documentation (help-system spec). Owns its own content database and loads it lazily on
+    // the first frame it is drawn, so a session that never opens Help pays nothing for it.
+    HelpPanel help;
 
     // How much of the canvas's pixel count the world is actually rendered at, before being shown
     // stretched to fill it (ADR-084). One means every canvas pixel, which is what the editor has
@@ -176,6 +180,7 @@ private:
     // ---- the shell (ADR-076) ----
     void drawMenuBar(app::Engine& engine);
     void drawViewMenu();
+    void drawHelpMenu();
     void drawStatusBar(app::Engine& engine, const FrameStats& stats);
     void drawPanels(app::Engine& engine, const FrameStats& stats);
     // Writes the open-panel set when it has moved and the throttle is due.
