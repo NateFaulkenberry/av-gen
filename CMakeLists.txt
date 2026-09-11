@@ -23,6 +23,11 @@ endif()
 
 option(AVGEN_BUILD_TESTS "Build the test suite" ON)
 option(AVGEN_DAWN_FROM_SOURCE "Build Dawn from source instead of using the prebuilt archive" OFF)
+# Interpose the global operator new/delete with per-thread allocation counters, so a profile run
+# can say where a frame's allocations come from. Off by default not because it measured slow -- its
+# cost does not rise above run-to-run variance on this machine -- but because it replaces the global
+# operators for the whole program, Dawn and SDL included. See docs/application-performance.md.
+option(AVGEN_ALLOC_COUNTERS "Count heap allocations per thread (replaces global new/delete)" OFF)
 option(AVGEN_ENABLE_ASAN "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(AVGEN_ENABLE_TSAN "Enable ThreadSanitizer" OFF)
 option(AVGEN_WARNINGS_AS_ERRORS "Treat warnings as errors for engine targets" OFF)

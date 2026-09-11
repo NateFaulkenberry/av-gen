@@ -15,6 +15,23 @@
 // Every one forwards to malloc/free exactly as libc++'s own do, so the pairing rules are unchanged:
 // anything malloc'd here is free'd here, and the aligned forms use the aligned allocator whose
 // memory macOS's free() accepts.
+//
+// OFF BY DEFAULT (-DAVGEN_ALLOC_COUNTERS=ON). Not because a cost was measured -- it was not.
+//
+// A first A/B said the interposition cost about 0.4 ms of main-thread work per frame. That number
+// was wrong: it compared two runs taken minutes apart on a machine running builds. Repeated back to
+// back, three runs each, the counters-on build came out *faster* than the counters-off one
+// (ui.build min 0.086 vs 0.114 ms), which is causally impossible and is therefore the answer -- on
+// this machine the cost does not rise above run-to-run variance. The honest statement is that it
+// was not resolvable, not that it is 0.4 ms.
+//
+// It is off by default anyway, for a reason needing no measurement: this replaces the global
+// operator new and delete for the entire program, Dawn and SDL and ImGui included, and routes
+// aligned allocations through posix_memalign instead of libc++'s own path. That is a real change to
+// a shipping binary in exchange for a diagnostic, and a diagnostic should be asked for.
+//
+// With it off, allocCounters() still exists and reads zero, so nothing has to be compiled
+// conditionally at the call sites and a profile report simply shows no allocations.
 
 #include "core/phase_profiler.hpp"
 
@@ -30,6 +47,8 @@ thread_local AllocCounters tlsCounters{};
 const AllocCounters& allocCounters() noexcept { return tlsCounters; }
 
 } // namespace avgen::core
+
+#ifdef AVGEN_ALLOC_COUNTERS
 
 namespace {
 
@@ -114,3 +133,5 @@ void operator delete(void* p, std::size_t, std::align_val_t) noexcept { countedF
 void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { countedFree(p); }
 void operator delete(void* p, std::align_val_t, const std::nothrow_t&) noexcept { countedFree(p); }
 void operator delete[](void* p, std::align_val_t, const std::nothrow_t&) noexcept { countedFree(p); }
+
+#endif // AVGEN_ALLOC_COUNTERS

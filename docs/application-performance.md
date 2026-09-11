@@ -73,12 +73,26 @@ with order statistics computed on demand.
 ### Allocation counters (`src/core/alloc_counters.cpp`)
 
 The global `operator new`/`delete` are interposed with **thread-local, non-atomic** counters.
+**Off by default; `-DAVGEN_ALLOC_COUNTERS=ON` to enable**, and every allocation figure in this
+document was taken with it on.
 
 Counting at call sites finds the allocations you already suspected. Counting here finds the ones
 nobody wrote on purpose — a string a formatter built, a vector an `unordered_map` grew, a
-`shared_ptr` control block. An increment is a load-add-store on a line no other thread touches,
-which is cheap enough to leave compiled in on the audio callback, where the reading that matters is
-binary: did this callback allocate at all.
+`shared_ptr` control block. An increment is a load-add-store on a line no other thread touches.
+
+It is off by default for a reason worth stating precisely, because the first version of this
+sentence was wrong. An early A/B said the interposition cost about 0.4 ms of main-thread work per
+frame. That compared two runs taken minutes apart on a machine running builds. Repeated back to
+back, three runs each, the **counters-on build came out faster** than the counters-off one
+(`ui.build` min 0.086 vs 0.114 ms) — which is causally impossible, and is therefore the result: on
+this machine the cost does not rise above run-to-run variance. The honest statement is that it was
+not resolvable, not that it is 0.4 ms.
+
+It is off anyway for a reason needing no measurement: it replaces the global operators for the
+entire program, Dawn and SDL and ImGui included, and routes aligned allocations through
+`posix_memalign` rather than libc++'s own path. That is a real change to a shipping binary in
+exchange for a diagnostic, and a diagnostic should be asked for. With it off, `allocCounters()`
+still exists and reads zero.
 
 ### `app::UiScript` (`src/app/ui_script.{hpp,cpp}`) — `--ui-script <arms>`
 

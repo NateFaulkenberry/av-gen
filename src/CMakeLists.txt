@@ -30,6 +30,9 @@ endif()
 target_compile_definitions(avgen_core PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FORCE_RADIANS GLM_ENABLE_EXPERIMENTAL)
 avgen_set_warnings(avgen_core)
 target_compile_definitions(avgen_core PUBLIC AVGEN_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+if(AVGEN_ALLOC_COUNTERS)
+    target_compile_definitions(avgen_core PUBLIC AVGEN_ALLOC_COUNTERS)
+endif()
 
 # ---- avgen_gpu: WebGPU facade and scene renderer (needs Dawn) ---------------------------------
 file(GLOB_RECURSE AVGEN_GPU_SOURCES CONFIGURE_DEPENDS gpu/*.cpp rendering/*.cpp share/*.cpp)
