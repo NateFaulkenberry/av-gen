@@ -443,7 +443,74 @@ project name, active scene, selection, current time, play state, active camera �
 must **explicitly request**, such as all 300 vegetation entities. Literal URI resources are optional;
 the separation is what matters.
 
-**§14 Thinking / reasoning UX** — *the addendum was truncated mid-sentence here and the rest has not
-yet arrived.* What survives is the heading and "Do NOT expo…", most plausibly a caution about
-exposing raw reasoning traces. **Treat this section as unknown rather than guessing**, and ask
-before designing around it.
+**§14 Thinking / reasoning UX.** **Do not expose raw private chain-of-thought.** Expose structured
+execution state instead — *Planning, Analyzing scene, Executing, Validating, Complete* — and
+optionally the plan itself as a numbered list. This gives the user the useful part of agent
+reasoning without making the architecture depend on exposing private model reasoning.
+
+**§15 The agent loop is first-class.** `AgentTask → GatherContext → ModelTurn → ToolCalls? → (yes:
+ExecuteTools → ToolResults → ModelTurn | no: FinalResponse)`. **Make the state machine explicit; do
+not bury it inside a giant function.** States along the lines of: Idle, Preparing, Planning,
+WaitingForModel, ExecutingTools, Validating, WaitingForApproval, Completed, Failed, Cancelled,
+RollingBack.
+
+**§16 Parallel tool execution.** Where safe, run reads concurrently — `scene.get_summary`,
+`lighting.list`, `camera.list`, `performance.get_stats`, `audio.get_analysis`. Mutations need
+explicit dependency semantics: `scene.create_entity` then `scene.set_property(newEntityId)` cannot
+be parallelized. **The tool metadata should eventually let the scheduler reason about this.**
+
+**§17 Long-running tasks.** Do not assume every request finishes in two seconds — large scene
+analysis, procedural construction, optimization, render/evaluate/revise loops and large sequencer
+creation may take ten seconds or ten minutes. **Task ID, progress, cancellation, persistence and
+recovery are foundational concepts**, and the UI stays responsive throughout.
+
+**§18 Verification is not optional.** For *"make the water reflect the moon"* the agent should not
+call `material.set_reflection(0.8)` and declare success — it should inspect water, lighting and
+renderer capabilities, modify, query the resulting state, verify and report. As visual inspection
+arrives the architecture should allow modify → render preview → inspect → modify again. **Do not
+fake visual verification before that capability exists.**
+
+**§19 External architecture is inspiration, not a reason to rewrite AV Gen.** *This is critical.*
+Do **not** replace the engine with an MCP server, replace the UI with a web application, rewrite the
+renderer, introduce Python because an AI framework uses it, force an external agent framework into
+the application, or restructure the project around a vendor SDK. Integrate the concepts. **The AI
+layer should feel like it was designed as part of AV Gen from the beginning.**
+
+**§20 Multimodal readiness.** Keep the architecture ready for models that accept screenshots,
+rendered frames, thumbnails, scene diagrams, audio and analysis data — eventually a screenshot plus
+scene state plus performance metrics plus audio state would make Creative Director mode far more
+capable. **Do not implement multimodal prematurely** unless the provider architecture naturally
+supports it.
+
+**§21 External agent interoperability.** Preserve the possibility of an external agent driving AV Gen
+through the same semantic interface over MCP. That is a reason to keep the internal tool API clean
+and protocol-neutral.
+
+**§22 Research order, and an architecture note before locking the implementation.** Study, in order:
+OpenAI Responses/tool calling; Anthropic tool use and agentic guidance; Gemini function calling; MCP
+tools/resources/prompts; llama.cpp server and tool calling; Apple Keychain. Then produce a short
+internal note answering: **What should AV Gen copy? What should it deliberately not copy? What
+should be normalized across providers? What stays provider-specific? Which MCP concepts are useful
+internally? Should local inference be embedded or externalized? How should tool metadata be
+represented? How should long-running tasks work? How should transactions interact with agent loops?**
+Do this analysis *before* locking the implementation.
+
+**§23 Reference library** — keep in the architecture documentation:
+[OpenAI Responses](https://platform.openai.com/docs/quickstart/make-your-first-api-request) ·
+[Anthropic agentic guidance](https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prompt-templates-and-variables) ·
+[Gemini function calling](https://ai.google.dev/gemini-api/docs/function-calling) ·
+[MCP tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools) ·
+[MCP architecture](https://modelcontextprotocol.io/specification/2024-11-05/server/index) ·
+[llama.cpp](https://github.com/ggml-org/llama.cpp) ·
+[llama.cpp server](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md) ·
+[Keychain Services](https://developer.apple.com/documentation/security/keychain-services/) ·
+[Keychain user secrets](https://developer.apple.com/documentation/security/using-the-keychain-to-manage-user-secrets)
+
+**§24 Final direction.** The goal is not *"add AI chat to AV Gen"*. It is to **turn AV Gen into an
+AI-operable audiovisual engine** — a model that understands scenes, worlds, assets, materials,
+lights, cameras, animation, the sequencer, audio, modulation, parameters, rendering, performance,
+cinematography and visual style, and operates them through a structured semantic interface.
+
+**The prompt panel is the first user-facing manifestation. The underlying Tool API is the actual
+feature.** Build that foundation correctly and increasingly capable models make AV Gen progressively
+more powerful without redesigning the engine each time.
