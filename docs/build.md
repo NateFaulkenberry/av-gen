@@ -22,6 +22,10 @@ cmake --build --preset debug  # build everything
 ctest --preset debug          # run tests (see docs/testing.md)
 ```
 
+Verify a change against `ctest --preset release` rather than debug: both pass, but the
+`[performance]` tests can only check their wall-clock ceilings in an optimised build.
+`docs/testing.md` says what that changes.
+
 Binaries: `build/<preset>/src/avgen`, `build/<preset>/tests/avgen_tests`,
 `build/<preset>/tests/avgen_render_tests`. `compile_commands.json` is exported in each build dir.
 

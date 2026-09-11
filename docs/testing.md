@@ -4,7 +4,8 @@ Strategy: ADR-009. Tests are Catch2 v3, discovered into CTest with labels `unit`
 `avgen_tests`) and `gpu` (`avgen_render_tests`, skips itself when no adapter is available).
 
 ```sh
-ctest --preset debug                 # everything
+ctest --preset release               # everything -- the configuration to verify a change in
+ctest --preset debug                 # everything, with assertions and a debugger
 ctest --preset debug -L unit         # GPU-free only
 ctest --preset debug -L gpu          # rendering tests
 cmake --preset asan && cmake --build --preset asan && ctest --preset asan   # ASan + UBSan
@@ -13,6 +14,27 @@ cmake --preset tsan && cmake --build --preset tsan && ctest --preset tsan   # Th
 ./build/debug/tests/avgen_tests "[analysis]"   # Catch2 tag filter
 ./build/debug/tests/avgen_tests "[audio][device]"  # tests needing an output device (SKIP if none)
 ```
+
+## Which build to run
+
+**Verify a change against `--preset release`.** Debug is for stepping through a failure, not for
+deciding whether the suite is green.
+
+Both configurations pass. The difference is what the `[performance]`-tagged tests can measure: a
+wall-clock ceiling means nothing without the optimiser, and those are checked only in an optimised
+build (see `kOptimised` in `tests/integration/test_world_navigation.cpp`, which records the measured
+gap -- the same navigation grid builds in 161 ms release and 5,080 ms debug, 31x apart). A ceiling
+loose enough to hold in both would catch nothing.
+
+What those tests assert unconditionally is the half that does not vary: cells expanded per route,
+routes found, object counts. Those are properties of the algorithm rather than of the code
+generator, they are identical to the unit in both builds, and they are the stronger check -- "the
+search stopped being bounded" is caught exactly by a count, and only through a proxy by a
+millisecond.
+
+Catch2 tags are not CTest labels here: only `unit` and `gpu` are registered as labels
+(`catch_discover_tests` in `tests/CMakeLists.txt`), so `ctest -L performance` selects nothing. Reach
+a tag through the test binary instead: `./build/release/tests/avgen_tests "[performance]"`.
 
 ## What is covered (milestone 0.1)
 

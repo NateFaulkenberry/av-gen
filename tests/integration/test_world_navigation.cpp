@@ -31,6 +31,14 @@
 #include <vector>
 
 using namespace avgen;
+
+// Whether this build had the optimiser on. Wall-clock ceilings are only meaningful when it did;
+// see "navigation costs what it claims to" for the measurements that make the case.
+#ifdef NDEBUG
+constexpr bool kOptimised = true;
+#else
+constexpr bool kOptimised = false;
+#endif
 namespace fs = std::filesystem;
 
 namespace {
@@ -446,6 +454,21 @@ TEST_CASE("navigation costs what it claims to", "[integration][glowmere][navigat
     // Numbers, not "performance is good". Each of these is a cost the navigation stack added, and
     // each has a ceiling generous enough not to fail on a loaded machine and tight enough to catch
     // a regression of the kind that matters -- an accidental linear scan, a per-query allocation.
+    //
+    // The measurements come in two kinds, and they are asserted differently on purpose.
+    //
+    // *Wall clock* means nothing without optimisation. The same three measurements on this machine:
+    // the grid builds in 161 ms release and 5,080 ms debug, `isOccupied` costs 25 ns release and
+    // 544 ns debug, a route plans in 1.1 ms release and 13.8 ms debug -- 12x to 31x apart. A ceiling
+    // that holds in both is so loose it catches nothing, so these are checked only in an optimised
+    // build, and `kOptimised` says so rather than the test quietly passing for the wrong reason.
+    // (The nanosecond ceiling was the one to watch: 544 against a limit of 900 was luck, not room.)
+    //
+    // *Counts* are identical in both builds -- 107 of 120 routes found, 9,492 cells expanded each,
+    // to the unit -- because they are properties of the algorithm and not of the code generator. So
+    // they are asserted unconditionally, and they are the better test: "the search stopped being
+    // bounded" is what the ceiling below was really trying to catch, and a count catches it exactly
+    // where a millisecond catches it through a proxy that a faster machine hides.
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(root / "examples/world/glowmere-stylized.json"));
     const entity::Navigator& nav = engine.composition()->entityWorld().navigator();
@@ -454,8 +477,11 @@ TEST_CASE("navigation costs what it claims to", "[integration][glowmere][navigat
 
     const entity::NavGridStats& grid = nav.grid()->stats();
     INFO("grid built in " << grid.buildMs << " ms for " << grid.cells << " cells");
+    CHECK(grid.cells > 0);
     // One-time, at scene load, next to a 50 ms terrain build and a second of glTF decoding.
-    CHECK(grid.buildMs < 900.0);
+    if (kOptimised) {
+        CHECK(grid.buildMs < 900.0);
+    }
 
     SECTION("the obstacle index is an index, not a scan") {
         const auto begin = std::chrono::steady_clock::now();
@@ -469,7 +495,9 @@ TEST_CASE("navigation costs what it claims to", "[integration][glowmere][navigat
                               .count() / 200000.0;
         INFO(nav.obstacles()->size() << " obstacles, " << ns << " ns per isOccupied, " << hits << " hits");
         // A linear scan over 2,000-odd obstacles is microseconds, not hundreds of nanoseconds.
-        CHECK(ns < 900.0);
+        if (kOptimised) {
+            CHECK(ns < 900.0);
+        }
     }
 
     SECTION("a route across the world is planned in about a millisecond") {
@@ -494,8 +522,22 @@ TEST_CASE("navigation costs what it claims to", "[integration][glowmere][navigat
         INFO(routed << " of " << kQueries << " corner-to-corner routes found, " << ms
                     << " ms each, " << (routed > 0 ? expansions / routed : 0) << " cells expanded");
         // Corner to corner is the worst case this world has, and a character asks for one every few
-        // seconds. Anything in this range is free; the ceiling is here to catch a search that
-        // stopped being bounded.
-        CHECK(ms < 45.0);
+        // seconds. Anything in this range is free.
+        if (kOptimised) {
+            CHECK(ms < 45.0);
+        }
+        // The bounded-search checks, which is what the ceiling above was a proxy for. Both hold in
+        // any build.
+        //
+        // A* with a consistent heuristic and a closed set expands each cell at most once, so a route
+        // that expands more cells than the grid contains has started re-expanding them -- the
+        // specific way this search would stop being bounded, and the one a wall-clock ceiling only
+        // notices once it is slow enough to trip a limit calibrated on somebody else's machine.
+        REQUIRE(routed > 0);
+        CHECK(expansions / routed < nav.grid()->stats().cells);
+        // And the grid stays passable. 107 of 120 corner-to-corner routes are findable here; the
+        // rest start or end inside an obstacle, which is a legitimate refusal. A grid that silently
+        // became impassable would still satisfy every ceiling above by doing no work at all.
+        CHECK(routed >= 90);
     }
 }
