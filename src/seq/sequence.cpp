@@ -1046,7 +1046,7 @@ Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) c
         // continuity across a change of subject, scene and lighting. `subjectCoverageAt` already
         // states the apparent size as a fraction of frame height, and a shot's opening distance is
         // in radii -- so the match is one inversion of that expression, decided here, costing the
-        // renderer nothing. Crossfade is still not implemented; ADR-096 records why a second look
+        // renderer nothing. Crossfade is still not implemented; ADR-098 records why a second look
         // did not change the answer.
         if (si > 0 && s.in.kind == TransitionKind::MatchCut) {
             const ShotCamera& previous = shots[si - 1].camera;
@@ -1275,7 +1275,7 @@ Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) c
     if (!result.events.dispatches.empty()) {
         result.warnings.push_back(fmt::format(
             "{} event firing(s) act on a live system and cannot be baked; forward play delivers "
-            "each once and a seek restores the latest standing one per target (ADR-096)",
+            "each once and a seek restores the latest standing one per target (ADR-098)",
             result.events.dispatches.size()));
     }
 

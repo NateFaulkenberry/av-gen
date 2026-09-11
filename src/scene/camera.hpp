@@ -101,7 +101,7 @@ struct FocusState {
 // returns the new distance.
 float updateFocus(FocusState& state, float target, float deltaSeconds, float speed);
 
-// ---- camera shake (ADR-096, brief section 14) ---------------------------------------------------
+// ---- camera shake (ADR-098, brief section 14) ---------------------------------------------------
 //
 // The one thing the cinematic camera vocabulary deliberately did not have. `app/cinematic.hpp` says
 // so in as many words -- "there is no shake in this file and there is not going to be one" -- and

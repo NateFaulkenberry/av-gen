@@ -1610,7 +1610,7 @@ void Engine::seekSeconds(double seconds) {
     cueApplied_ = false;
     // A live event belongs to the moment it happened and the moment is gone; the scheduled tier is
     // rebased rather than cleared, so the next frame restores the standing intents at the new
-    // playhead instead of replaying everything between here and there (ADR-096).
+    // playhead instead of replaying everything between here and there (ADR-098).
     sequenceEvents_.reset(seconds);
     firedEvents_.clear();
 }
@@ -1972,7 +1972,7 @@ void Engine::update(const FrameTime& time) {
     if (auto* comp = composition(); comp != nullptr && !sequence_.actors.empty()) {
         seq::applyAnimation(sequence_, sequenceReport_.events.clips, *comp, timelineClock_.seconds);
     }
-    // The two tiers of the event system a track cannot carry (ADR-096). `advanceTo` decides for
+    // The two tiers of the event system a track cannot carry (ADR-098). `advanceTo` decides for
     // itself whether the playhead stepped or jumped; the drain is per frame so nothing accumulates
     // when no host is listening.
     sequenceEvents_.advanceTo(timelineClock_.seconds);

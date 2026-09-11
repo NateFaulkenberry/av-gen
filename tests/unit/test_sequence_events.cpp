@@ -1,4 +1,4 @@
-// Cinematic events (ADR-096): the boundary between what bakes and what cannot, and the properties
+// Cinematic events (ADR-098): the boundary between what bakes and what cannot, and the properties
 // that boundary exists to protect.
 //
 // The brief's testing section asks for event ordering, shot edges firing exactly once, deterministic
@@ -100,7 +100,7 @@ bool hasTrack(const params::Timeline& timeline, const std::string& target) {
 
 TEST_CASE("The bake/live boundary is a pure predicate an author can read", "[seq][events]") {
     // Both halves have to be knowable: a trigger says whether the event can be *scheduled*, an
-    // action says whether it can be *baked*. This is the whole of ADR-096's decision, and it is
+    // action says whether it can be *baked*. This is the whole of ADR-098's decision, and it is
     // checkable without running anything -- which is the point.
     for (const seq::TriggerKind kind :
          {seq::TriggerKind::Time, seq::TriggerKind::Beat, seq::TriggerKind::Bar,
@@ -1051,7 +1051,7 @@ TEST_CASE("A seek does not replay a scheduled tier; it restores the standing int
         CHECK(back[0].restored);
 
         // And playing to 60 s leaves the same standing intents a jump to 60 s does. That is the
-        // guarantee ADR-096 offers for this tier, and the one it explicitly does not extend.
+        // guarantee ADR-098 offers for this tier, and the one it explicitly does not extend.
         seq::EventDispatcher played;
         played.setEvents(piece.events, baked->events);
         std::string playedLast;

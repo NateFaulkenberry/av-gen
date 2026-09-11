@@ -175,7 +175,7 @@ public:
     // Parameter paths the installed sequence owns. Anything else on the timeline is the author's.
     [[nodiscard]] const std::vector<std::string>& sequenceTargets() const { return sequenceTargets_; }
 
-    // ---- cinematic events (ADR-096) ----
+    // ---- cinematic events (ADR-098) ----
     //
     // Most of a sequence's events are not here: they stopped being events at bake and are now keys
     // on the timeline above. What is here is the two tiers a track cannot carry -- an imperative

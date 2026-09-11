@@ -1,4 +1,4 @@
-# ADR-096: Cinematic events — three tiers, and where the bake stops
+# ADR-098: Cinematic events — three tiers, and where the bake stops
 
 **Status:** accepted
 **Date:** 2026-09-11

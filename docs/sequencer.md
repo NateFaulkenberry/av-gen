@@ -200,7 +200,7 @@ as well as to dragging in the strip — so "cut on the downbeat" is a drag, not 
 
 ## Events: when X happens, do Y
 
-An event is a **when** and a **what** (ADR-096). It is not a second sequencer: almost all of them
+An event is a **when** and a **what** (ADR-098). It is not a second sequencer: almost all of them
 stop being events at bake and become the same timeline keys everything else in a sequence becomes.
 
 ```cpp
@@ -381,6 +381,6 @@ difference between 8.7 and 63.3 frames per second over the whole piece at 1280x7
 - Every scene slot is resident.
 - Entity behaviours are not scrub-deterministic; see above.
 - An event that acts on a live system (an entity action, a notification) is not scrub-exact. A seek
-  restores the latest standing intent per target rather than replaying the history (ADR-096).
+  restores the latest standing intent per target rather than replaying the history (ADR-098).
 - Procedurally instanced geometry does not reliably reach the shadow cascades in a large scene. This
   is a renderer-side limitation, not a sequencer one; see `docs/renderer-2-backlog.md`.

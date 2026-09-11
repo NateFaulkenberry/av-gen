@@ -1778,7 +1778,7 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     cameraSplineT_ = &params.add(floatDesc(prefix_ + "camera/splineT", 0.0f, -10.0f, 10.0f, 0.0f, 1.0f));
     cameraLookAhead_ = &params.add(floatDesc(prefix_ + "camera/lookAhead", 2.0f, -100.0f, 100.0f, 0.0f, 10.0f));
     cameraSplineOffset_ = &params.add(vec3Desc(prefix_ + "camera/splineOffset", glm::vec3(0.0f), -1e3f, 1e3f, -5.0f, 5.0f));
-    // Camera shake (ADR-096). Ordinary parameters, so a beat drives the amplitude through an
+    // Camera shake (ADR-098). Ordinary parameters, so a beat drives the amplitude through an
     // ordinary modulation route and a sequence keys it like anything else; `start` carries the
     // second the impulse began so the decay is `now - start` rather than an accumulated timer.
     cameraShakeAmplitude_ =
@@ -3358,7 +3358,7 @@ void Composition::applyParameters() {
     }
     // Shake last, and in every mode: it is an offset applied to whatever placed the camera, which
     // is what makes it compose with an orbit, a spline ride and a baked cinematic move alike
-    // instead of being a fourth way to position a camera (ADR-096, brief section 14).
+    // instead of being a fourth way to position a camera (ADR-098, brief section 14).
     if (cameraShakeAmplitude_ != nullptr) {
         CameraShake shake;
         shake.amplitude = cameraShakeAmplitude_->value();
