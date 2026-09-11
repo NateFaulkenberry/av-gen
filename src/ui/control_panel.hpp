@@ -18,7 +18,9 @@
 #include "rendering/scene_renderer.hpp"
 #include "rendering/sdf_renderer.hpp"
 #include "ui/composition_panel.hpp"
+#include "ui/ai_panel.hpp"
 #include "ui/sequence_panel.hpp"
+#include "ui/settings_panel.hpp"
 #include "ui/editor_layout.hpp"
 #include "ui/graph_editor.hpp"
 #include "ui/world_builder_panel.hpp"
@@ -130,6 +132,10 @@ public:
     // The 2D composition over the frame (ADR-083): the layer stack and its inspector.
     CompositionPanel composition;
     SequencePanel sequence;
+    // The AI control plane's two panels (ADR-094). Both are inert until the host installs a
+    // control plane, which is what makes AI optional rather than load-bearing.
+    AiPanel ai;
+    SettingsPanel settings;
 
     // How much of the canvas's pixel count the world is actually rendered at, before being shown
     // stretched to fill it (ADR-084). One means every canvas pixel, which is what the editor has

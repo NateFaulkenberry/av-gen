@@ -336,9 +336,13 @@ void registerCapabilityTools(ToolRegistry& registry) {
                     ++unavailable;
                 }
             }
-            return ToolResult::ok(std::move(doc),
-                                  fmt::format("{} domain(s), {} unavailable",
-                                              doc["domains"].size(), unavailable));
+            // The summary is built *before* the document is moved. Reading `doc` inside the same
+            // call that moves it is unsequenced, and it reported zeros for a document that was
+            // perfectly correct -- the exact "the report disagrees with reality" failure this API
+            // is written against, committed in the API itself.
+            const auto summary = fmt::format("{} domain(s), {} unavailable",
+                                             doc.at("domains").size(), unavailable);
+            return ToolResult::ok(std::move(doc), summary);
         });
 
     add(registry, "capability.list_tools", "List tools",
@@ -360,10 +364,11 @@ void registerCapabilityTools(ToolRegistry& registry) {
                 t["mutatesProject"] = tool->definition.annotations.mutatesProject;
                 tools.push_back(std::move(t));
             }
+            const auto summary = fmt::format("{} tool(s)", tools.size());
             json out;
-            out["tools"] = tools;
             out["count"] = tools.size();
-            return ToolResult::ok(std::move(out), fmt::format("{} tool(s)", out["count"].get<int>()));
+            out["tools"] = std::move(tools);
+            return ToolResult::ok(std::move(out), summary);
         });
 }
 
@@ -502,11 +507,11 @@ void registerParameterTools(ToolRegistry& registry) {
             for (const auto& [name, count] : groups) {
                 list.push_back(json{{"group", name}, {"parameters", count}});
             }
+            const auto summary = fmt::format("{} group(s), {} parameter(s)", groups.size(),
+                                             ctx.engine().params().size());
             out["groups"] = std::move(list);
             out["total"] = ctx.engine().params().size();
-            return ToolResult::ok(std::move(out),
-                                  fmt::format("{} group(s), {} parameter(s)", groups.size(),
-                                              ctx.engine().params().size()));
+            return ToolResult::ok(std::move(out), summary);
         });
 
     add(registry, "parameter.search", "Search parameters",
@@ -544,15 +549,16 @@ void registerParameterTools(ToolRegistry& registry) {
             for (std::size_t i = offset; i < matches.size() && list.size() < limit; ++i) {
                 list.push_back(paramJson(*matches[i], false));
             }
+            const std::size_t returned = list.size();
             json out;
             out["parameters"] = std::move(list);
             out["matched"] = matches.size();
-            out["returned"] = out["parameters"].size();
-            if (offset + out["returned"].get<std::size_t>() < matches.size()) {
-                out["nextOffset"] = offset + out["returned"].get<std::size_t>();
+            out["returned"] = returned;
+            if (offset + returned < matches.size()) {
+                out["nextOffset"] = offset + returned;
             }
-            return ToolResult::ok(std::move(out),
-                                  fmt::format("{} match(es) for '{}'", matches.size(), query));
+            const auto summary = fmt::format("{} match(es) for '{}'", matches.size(), query);
+            return ToolResult::ok(std::move(out), summary);
         });
 
     add(registry, "parameter.get", "Get parameters",
@@ -702,8 +708,9 @@ void registerSceneTools(ToolRegistry& registry) {
                                            scene.camera.target.z}},
                                {"fovDegrees", glm::degrees(scene.camera.effectiveFovY())}};
             j["environmentMapLoaded"] = !engine.environmentPath().empty();
-            return ToolResult::ok(std::move(j), fmt::format("{} node(s), {} light(s)",
-                                                            j["nodes"].size(), scene.lights.size()));
+            const auto summary = fmt::format("{} node(s), {} light(s)", j.at("nodes").size(),
+                                             scene.lights.size());
+            return ToolResult::ok(std::move(j), summary);
         });
 
     add(registry, "scene.find_nodes", "Find nodes",
@@ -1120,18 +1127,18 @@ void registerEnvironmentTools(ToolRegistry& registry) {
                 applied[path] = outcomeJson(*p, outcome);
                 ctx.changes().note(path, valueJson(outcome.after).dump(), outcome.clamped);
             }
-            json out;
-            out["applied"] = std::move(applied);
-            if (!unknown.empty()) {
-                out["notFound"] = unknown;
-            }
-            if (out["applied"].empty()) {
+            if (applied.empty()) {
                 return ToolResult::failure(
                     ToolErrorCode::NotFound, "none of the given paths exist in this scene",
                     "call environment.get for the paths this scene actually has");
             }
-            return ToolResult::ok(std::move(out),
-                                  fmt::format("{} environment value(s) set", out["applied"].size()));
+            const auto summary = fmt::format("{} environment value(s) set", applied.size());
+            json out;
+            out["applied"] = std::move(applied);
+            if (!unknown.empty()) {
+                out["notFound"] = std::move(unknown);
+            }
+            return ToolResult::ok(std::move(out), summary);
         });
 
     add(registry, "lighting.list", "List lights",
@@ -1184,8 +1191,8 @@ void registerEnvironmentTools(ToolRegistry& registry) {
                 "lightrig/* parameters, scene/keyLight or env/sky/sunIntensity listed here; a "
                 "direct write to a light would be discarded at the next rebuild, so this build "
                 "exposes no such tool.";
-            return ToolResult::ok(std::move(out),
-                                  fmt::format("{} light(s)", engine.scene().lights.size()));
+            const auto summary = fmt::format("{} light(s)", engine.scene().lights.size());
+            return ToolResult::ok(std::move(out), summary);
         });
 
     add(registry, "material.list", "List material controls",
@@ -1289,10 +1296,10 @@ void registerSequencerTools(ToolRegistry& registry) {
                     "tracks on these targets belong to the installed cinematic sequence and are "
                     "replaced whenever it is re-installed";
             }
-            return ToolResult::ok(std::move(out),
-                                  fmt::format("{} track(s), {} cue(s)",
-                                              engine.timeline().tracks().size(),
-                                              engine.timeline().cues().size()));
+            const auto summary = fmt::format("{} track(s), {} cue(s)",
+                                             engine.timeline().tracks().size(),
+                                             engine.timeline().cues().size());
+            return ToolResult::ok(std::move(out), summary);
         });
 
     add(registry, "sequencer.add_keyframe", "Add a keyframe",
@@ -1595,11 +1602,12 @@ void registerModulationTools(ToolRegistry& registry) {
                 }
                 list.push_back(routeJson(routes[i], i));
             }
+            const auto summary = fmt::format("{} route(s)", list.size());
             json out;
             out["routes"] = std::move(list);
             out["total"] = routes.size();
             out["masterGain"] = ctx.engine().modulator().masterGain;
-            return ToolResult::ok(std::move(out), fmt::format("{} route(s)", out["routes"].size()));
+            return ToolResult::ok(std::move(out), summary);
         });
 
     add(registry, "modulation.create", "Create a modulation route",

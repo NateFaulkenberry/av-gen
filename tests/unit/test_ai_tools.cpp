@@ -703,6 +703,55 @@ TEST_CASE("project.create_snapshot and restore_snapshot work through the tool AP
     }
 }
 
+TEST_CASE("A tool's one-line summary agrees with its structured result",
+          "[ai][tools][regression]") {
+    // Caught by running the thing: several summaries read the result object in the same expression
+    // that moved it into `ToolResult::ok`, which is unsequenced -- so `environment.set` said "0
+    // environment value(s) set" while having set four of them, and `scene.get_summary` said "0
+    // node(s)" about a scene with nodes. A tool whose report disagrees with what it did is the
+    // precise failure this whole API exists to prevent, committed inside the API.
+    Fixture f;
+    REQUIRE(f.engine.loadComposition(helixScene()).has_value());
+
+    const auto summary = f.call("scene.get_summary");
+    REQUIRE(summary.success);
+    CHECK(summary.summary.find(std::to_string(summary.value.at("nodes").size()) + " node") !=
+          std::string::npos);
+    CHECK_FALSE(summary.summary.starts_with("0 node"));
+
+    const auto capability = f.call("capability.list");
+    REQUIRE(capability.success);
+    CHECK(capability.summary.find(std::to_string(capability.value.at("domains").size()) +
+                                  " domain") != std::string::npos);
+
+    const auto env = f.call(
+        "environment.set",
+        json{{"values", json{{"scene/fogDensity", 0.2}, {"scene/brightness", 1.1}}}});
+    REQUIRE(env.success);
+    CHECK(env.value.at("applied").size() == 2);
+    CHECK(env.summary.find("2 environment value") != std::string::npos);
+
+    const auto tools = f.call("capability.list_tools");
+    REQUIRE(tools.success);
+    CHECK(tools.summary.find(std::to_string(tools.value.at("tools").size()) + " tool") !=
+          std::string::npos);
+
+    const auto groups = f.call("parameter.list_groups");
+    REQUIRE(groups.success);
+    CHECK(groups.summary.find(std::to_string(groups.value.at("groups").size()) + " group") !=
+          std::string::npos);
+
+    const auto search = f.call("parameter.search", json{{"query", "fog"}, {"limit", 3}});
+    REQUIRE(search.success);
+    CHECK(search.value.at("returned").get<std::size_t>() ==
+          search.value.at("parameters").size());
+
+    const auto routes = f.call("modulation.list");
+    REQUIRE(routes.success);
+    CHECK(routes.summary.find(std::to_string(routes.value.at("routes").size()) + " route") !=
+          std::string::npos);
+}
+
 TEST_CASE("Tool results are compact and carry the error shape the spec asks for", "[ai][tools]") {
     Fixture f;
     const auto ok = f.call("parameter.set", json{{"path", "orb/scale"}, {"value", 2.0}});

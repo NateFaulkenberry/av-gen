@@ -18,7 +18,7 @@ constexpr int kFormatVersion = 1;
 // The panels, grouped the way the View menu reads them: what you build with on the left, what you
 // inspect and tune on the right, what runs underneath along the bottom. Nothing is assigned to the
 // centre -- see DockRegion.
-constexpr std::array<EditorPanel, 12> kPanels{{
+constexpr std::array<EditorPanel, 14> kPanels{{
     {"World Builder", "World Builder", DockRegion::Left, true,
      "recipe, Generate World, asset placement and the job monitor"},
     {"Assets", "Assets", DockRegion::Left, false, "everything the asset scan found, by kind"},
@@ -35,6 +35,10 @@ constexpr std::array<EditorPanel, 12> kPanels{{
     {"Modulation", "Modulation", DockRegion::Bottom, true,
      "routes, sources, presets, shaders, scene, timeline, control and outputs"},
     {"Graph", "Graph", DockRegion::Bottom, false, "the procedural graph editor"},
+    {"AI", "AI Assistant", DockRegion::Right, false,
+     "ask for changes in words; the assistant inspects the project and makes them"},
+    {"Settings", "Settings", DockRegion::Right, false,
+     "application settings: rendering, AI providers and credentials"},
     {"Dear ImGui Demo", "ImGui Demo", DockRegion::Floating, false, "the Dear ImGui widget gallery"},
 }};
 

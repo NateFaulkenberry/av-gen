@@ -6,6 +6,10 @@
 #include "core/log.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <thread>
+#include <chrono>
+#include <thread>
 
 namespace avgen::ai {
 
@@ -308,6 +312,27 @@ void ControlPlane::shutdown() {
     // Release every worker waiting on the main thread before the engine goes away, or one will
     // wait for a pump that is never coming and take the shutdown with it.
     queue_.shutdown();
+    // Then *wait* for the running task, bounded. The job body captures `this`, so returning while
+    // it is still inside the agent loop would leave a worker running over a destroyed control
+    // plane. Cancellation plus a shut-down queue makes this prompt: the HTTP client polls the
+    // token and unwinds, and every queued tool call has already been released.
+    std::shared_ptr<AgentTask> running;
+    {
+        const std::lock_guard lock(taskMutex_);
+        running = current_;
+    }
+    if (!running || running->finished()) {
+        return;
+    }
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{10};
+    while (!running->finished() && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds{5});
+    }
+    if (!running->finished()) {
+        // Said out loud rather than hidden. If this ever fires it is a bug in cancellation, and a
+        // silent ten-second pause on quit is exactly the kind of thing nobody tracks down.
+        log::error("ai: task {} did not stop within 10s of shutdown", running->id());
+    }
 }
 
 } // namespace avgen::ai

@@ -13,6 +13,8 @@
 #include "app/render_job.hpp"
 #include "app/output_manager.hpp"
 #include "app/render_settings.hpp"
+#include "app/settings.hpp"
+#include "ai/control_plane.hpp"
 #include "rendering/composition_renderer.hpp"
 #include "app/ui_script.hpp"
 #include "core/phase_profiler.hpp"
@@ -76,6 +78,13 @@ struct AppOptions {
     // repeatable interaction so "it feels sluggish" can be measured rather than described;
     // --profile-cpu prints the main thread's per-phase distribution on the way out.
     std::string uiScript;
+    // The AI control plane (ADR-094). `--ai-prompt` runs one task at start-up against whatever
+    // provider Settings has configured; `--ai-script` swaps in a scripted provider so the whole
+    // path -- context, agent loop, main-thread dispatch, transaction, validation -- can be run and
+    // diffed deterministically without a key or a network. The script replaces only the model's
+    // judgement: every tool it calls is the real tool against the real engine.
+    std::string aiPrompt;
+    std::optional<std::filesystem::path> aiScript;
     float canvasScale = 1.0f; // --canvas-scale: the world's share of the canvas's pixels
 
     bool profileCpu = false;
@@ -265,6 +274,28 @@ private:
     std::unique_ptr<WorldBuilder> worldBuilder_;
     std::unique_ptr<Engine> engine_;
     FileWatcher engineShaderWatcher_{0.5};
+
+    // ---- the AI control plane (ADR-094) ---------------------------------------------------------
+    // Optional in the strongest sense: null in a headless run, and with no provider configured the
+    // rest of the application behaves exactly as it did. The frame loop's only obligation to it is
+    // `pump()`, which runs queued tool bodies on this thread under a time budget -- everything
+    // else happens on a job worker. Reset first in the destructor, because it cancels the running
+    // task and waits for it, and the panel holds a raw pointer to it.
+    std::unique_ptr<ai::ControlPlane> ai_;
+    AppSettings settings_;
+    std::filesystem::path settingsPath_;
+    void saveSettings();
+    void initControlPlane();
+    // Runs `--ai-prompt` / `--ai-script` to completion on this thread, servicing the control
+    // plane's queue the way the frame loop would. Returns a process exit code.
+    int runAiTask();
+    // The frame numbers the performance tool reports, copied once per frame from the same values
+    // the status bar shows. Plain doubles rather than a `ui::FrameStats`, so this header does not
+    // have to pull the UI layer in for four numbers.
+    double lastCpuFrameMs_ = 0.0;
+    double lastFrameIntervalMs_ = 0.0;
+    double lastFps_ = 0.0;
+    double lastGpuFrameMs_ = -1.0;
 };
 
 } // namespace avgen::app

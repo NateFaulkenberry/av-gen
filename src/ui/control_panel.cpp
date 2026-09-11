@@ -387,6 +387,8 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     panel("Analysis", ImVec2(520, 620), [&] { drawAnalysis(engine); });
     panel("Modulation", ImVec2(560, 420), [&] { drawModulation(engine); });
     panel("Graph", ImVec2(900, 560), [&] { drawGraphWindow(engine); });
+    panel("AI", ImVec2(460, 620), [&] { ai.draw(engine); });
+    panel("Settings", ImVec2(560, 520), [&] { settings.draw(engine); });
     if (bool* demo = layout_.slot("Dear ImGui Demo"); demo != nullptr && *demo) {
         ImGui::ShowDemoWindow(demo);
     }

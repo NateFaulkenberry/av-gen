@@ -1,0 +1,84 @@
+{
+  "_comment": [
+    "A scripted AI run (ADR-094). This stands in for a model's judgement and nothing else: every",
+    "tool call below is executed against the real engine, through the real registry, inside a real",
+    "transaction, on the real main-thread queue. Only the choosing is scripted.",
+    "",
+    "It exists so the whole path can be run and diffed without a credential or a network:",
+    "",
+    "  avgen --headless --frames 2 --composition examples/helix/helix.scene.json \\",
+    "        --ai-script examples/ai/atmosphere.ai.json \\",
+    "        --ai-prompt \"make this feel like a cold, foggy night and push the camera in\"",
+    "",
+    "The turns follow the behaviour spec section 31 asks for: inspect first, then make a coherent",
+    "multi-property change rather than one knob, then verify, then report."
+  ],
+  "turns": [
+    {
+      "text": "Let me see what this scene exposes before changing anything.",
+      "toolCalls": [
+        { "name": "capability.list" },
+        { "name": "scene.get_summary" },
+        { "name": "parameter.list_groups" }
+      ]
+    },
+    {
+      "text": "Finding the atmosphere and the camera.",
+      "toolCalls": [
+        { "name": "environment.get" },
+        { "name": "camera.get" },
+        { "name": "parameter.search", "arguments": { "query": "emissive", "limit": 10 } }
+      ]
+    },
+    {
+      "text": "A cold night is fog, a cooler sky, a dimmer key and a lower ambient level -- changing one of those alone would look like one thing had been changed.",
+      "toolCalls": [
+        {
+          "name": "environment.set",
+          "arguments": {
+            "values": {
+              "scene/fogDensity": 0.09,
+              "scene/fogHeightFalloff": 0.06,
+              "scene/brightness": 0.72,
+              "scene/keyLight": 0.45
+            }
+          }
+        },
+        { "name": "parameter.set", "arguments": { "path": "scene/windSpeed", "value": 0.35 } }
+      ]
+    },
+    {
+      "text": "Now the camera move: a ten-second push, keyed in seconds.",
+      "toolCalls": [
+        {
+          "name": "sequencer.add_keyframe",
+          "arguments": {
+            "target": "camera/position",
+            "time": 0.0,
+            "value": [0.0, 4.0, 26.0],
+            "interp": "smooth"
+          }
+        },
+        {
+          "name": "sequencer.add_keyframe",
+          "arguments": {
+            "target": "camera/position",
+            "time": 10.0,
+            "value": [0.0, 7.0, 9.0],
+            "interp": "easeinout"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Verifying that the automation bound and nothing is animating a parameter that does not exist.",
+      "toolCalls": [
+        { "name": "sequencer.get_state" },
+        { "name": "environment.get" }
+      ]
+    },
+    {
+      "text": "The scene now reads as a cold night: fog at 0.09 with a shallower height falloff, ambient brightness down to 0.72 and the key light at 0.45, with a little wind so the silhouettes are not static. The camera pushes from 26 metres out to 9 over ten seconds, eased at both ends. All of it is one transaction, so it undoes as one action."
+    }
+  ]
+}
