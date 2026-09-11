@@ -8,12 +8,14 @@
 #include "app/camera_director.hpp"
 #include "app/engine.hpp"
 #include "params/timeline.hpp"
+#include "scene/composition.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <algorithm>
 #include <filesystem>
+#include <set>
 
 using namespace avgen;
 
@@ -276,5 +278,90 @@ TEST_CASE("The Glowmere score folds into a structure with a drop in it", "[direc
     INFO((sequence ? std::string() : sequence.error().message));
     REQUIRE(sequence.has_value());
     CHECK(sequence->shots.size() >= 3);
+#endif
+}
+
+TEST_CASE("Glowmere's own heroes and score direct a camera that travels between them",
+          "[director][camera][glowmere]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    // The whole chain on the real showcase: the scene's declared heroes, the real soundtrack, the
+    // real fold, the real director. Verifying this through the *authored* camera would be the wrong
+    // test -- that camera is a hand-authored path that knows nothing about the heroes, which is
+    // precisely the thing directing replaces.
+    const std::filesystem::path project =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-stylized.json";
+    if (!std::filesystem::exists(project)) {
+        SKIP("the Glowmere project is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    auto loaded = engine.loadProject(project);
+    INFO((loaded ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+    REQUIRE(engine.composition() != nullptr);
+
+    const auto& heroes = engine.composition()->heroes();
+    INFO("declared heroes: " << heroes.size());
+    REQUIRE(heroes.size() >= 3);
+    // Strictly descending, so the director can choose what the film is about.
+    for (std::size_t i = 1; i < heroes.size(); ++i) {
+        CHECK(heroes[i].importance < heroes[i - 1].importance);
+    }
+    // The warm accent belongs to one hero and one only. A second hero wearing it is the cheapest
+    // possible way to lose the thing that makes the elder findable from anywhere in frame.
+    const glm::vec3 warm(1.0f, 0.47f, 0.15f);
+    const auto warmHeroes = std::count_if(heroes.begin(), heroes.end(), [&](const world::HeroPoint& h) {
+        return glm::length(h.colorAccent - warm) < 0.2f;
+    });
+    CHECK(warmHeroes == 1);
+
+    // Requires the generated soundtrack. It is deterministic and gitignored, so a checkout that has
+    // not run the generator skips rather than fails.
+    if (engine.track() == nullptr) {
+        SKIP("glowmere-valley.wav is generated, not committed: run tools/make_glowmere_score.py");
+    }
+    auto installed = app::directEngine(engine, heroes);
+    INFO((installed ? std::string() : installed.error().message));
+    REQUIRE(installed.has_value());
+    CHECK(*installed > 0);
+
+    // And it visits more than one of them. A director handed four subjects that shoots one of them
+    // is a director that has not been given anything the authored path did not already do.
+    auto structure = app::structureOfTrack(*engine.track());
+    REQUIRE(structure.has_value());
+    auto sequence = app::directHeroes(heroes, *structure);
+    REQUIRE(sequence.has_value());
+    // Counted over subject *and* handoff. A transition's subject is where it starts -- the previous
+    // shot's subject -- and its handoff is where it goes, so counting `subject` alone reports one
+    // hero for a sequence that visits three. That is what this assertion did on its first run, and
+    // it read as the director refusing to leave the elder.
+    std::set<std::string> visited;
+    for (const auto& shot : sequence->shots) {
+        if (!shot.subject.name.empty()) {
+            visited.insert(shot.subject.name);
+        }
+        if (shot.handoff && !shot.handoff->name.empty()) {
+            visited.insert(shot.handoff->name);
+        }
+    }
+    INFO("shots: " << sequence->shots.size() << ", heroes visited: " << visited.size());
+    CHECK(sequence->shots.size() >= 3);
+    CHECK(visited.size() >= 3);
+
+    // The payoff lands on the payoff. A drop the camera does not answer is the single most
+    // conspicuous way for a directed sequence to feel undirected.
+    auto drop = std::find_if(structure->sections.begin(), structure->sections.end(),
+                             [](const signals::StructureSection& sec) {
+                                 return sec.kind == signals::MusicalSection::Drop ||
+                                        sec.kind == signals::MusicalSection::FinalDrop;
+                             });
+    REQUIRE(drop != structure->sections.end());
+    const bool shotOpensOnDrop =
+        std::any_of(sequence->shots.begin(), sequence->shots.end(), [&](const app::Shot& shot) {
+            return std::abs(shot.startSeconds - drop->startSeconds) < 0.5;
+        });
+    INFO("drop at " << drop->startSeconds << "s");
+    CHECK(shotOpensOnDrop);
 #endif
 }

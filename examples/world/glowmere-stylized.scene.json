@@ -55,6 +55,78 @@
     0.15
    ],
    "reactionProfile": "organism"
+  },
+  {
+   "name": "monument",
+   "assembly": "monument-spire",
+   "position": [
+    -24.0,
+    -2.7,
+    -72.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 2.9,
+   "height": 21.0,
+   "importance": 0.8,
+   "focalWeight": 0.7,
+   "preferredCameraDistance": 62.0,
+   "preferredCameraElevation": 7.0,
+   "activationRadius": 190.0,
+   "colorAccent": [
+    0.06,
+    0.82,
+    1.0
+   ],
+   "reactionProfile": "monument"
+  },
+  {
+   "name": "far-arch",
+   "assembly": "far-arch",
+   "position": [
+    -44.0,
+    9.3,
+    -120.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 16.6,
+   "height": 30.0,
+   "importance": 0.72,
+   "focalWeight": 0.55,
+   "preferredCameraDistance": 88.0,
+   "preferredCameraElevation": 4.0,
+   "activationRadius": 320.0,
+   "colorAccent": [
+    0.31,
+    0.12,
+    1.0
+   ],
+   "reactionProfile": "still"
+  },
+  {
+   "name": "beacon-grove",
+   "assembly": "beacon-grove",
+   "position": [
+    6.0,
+    -7.0,
+    -58.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 6.2,
+   "height": 5.0,
+   "importance": 0.62,
+   "focalWeight": 0.6,
+   "preferredCameraDistance": 22.0,
+   "preferredCameraElevation": 9.0,
+   "activationRadius": 95.0,
+   "colorAccent": [
+    0.06,
+    0.82,
+    1.0
+   ],
+   "reactionProfile": "organism"
   }
  ],
  "environment": {
@@ -1178,6 +1250,216 @@
     ]
    },
    "visible": true
+  },
+  {
+   "name": "monument-spire",
+   "kind": "procedural",
+   "position": [
+    -24.0,
+    -2.7,
+    -72.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "tube",
+     "tubeRadius": 2.1,
+     "tubeTaper": 0.22,
+     "tubeSides": 7,
+     "tubeSegments": 28,
+     "tubeCaps": true,
+     "curve": {
+      "kind": "catmullRom",
+      "generator": "points",
+      "points": [
+       {
+        "position": [
+         0.0,
+         0.0,
+         0.0
+        ],
+        "scale": 1.35
+       },
+       {
+        "position": [
+         0.6,
+         7.0,
+         -0.4
+        ],
+        "scale": 0.9
+       },
+       {
+        "position": [
+         0.2,
+         14.0,
+         0.5
+        ],
+        "scale": 0.62
+       },
+       {
+        "position": [
+         -0.5,
+         20.5,
+         0.1
+        ],
+        "scale": 0.3
+       }
+      ]
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.1,
+      0.12,
+      0.16
+     ],
+     "roughness": 0.82,
+     "emissiveColor": [
+      0.06,
+      0.82,
+      1.0
+     ],
+     "emissiveIntensity": 1.9
+    },
+    "motion": {
+     "stiffness": 26.0,
+     "mass": 260.0,
+     "damping": 0.96,
+     "windSensitivity": 0.04,
+     "bendLimit": 0.006,
+     "tipAmplitude": 0.004
+    },
+    "deformers": [
+     {
+      "kind": "displacement",
+      "amount": 0.1,
+      "scale": 1.1,
+      "seed": 311,
+      "speed": 0.0
+     },
+     {
+      "kind": "displacement",
+      "amount": 0.035,
+      "scale": 3.6,
+      "seed": 907,
+      "speed": 0.0
+     }
+    ]
+   }
+  },
+  {
+   "name": "beacon-grove",
+   "kind": "procedural",
+   "position": [
+    6.0,
+    -7.0,
+    -58.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 40,
+     "rings": 20
+    },
+    "sourceTransform": {
+     "scale": [
+      1.5,
+      0.55,
+      1.5
+     ]
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 9,
+     "radius": 4.6
+    },
+    "variation": {
+     "seed": 5150,
+     "scale": [
+      0.35,
+      0.8,
+      0.35
+     ]
+    },
+    "material": {
+     "program": "glowmereTissue",
+     "baseColor": [
+      0.05,
+      0.14,
+      0.12
+     ],
+     "roughness": 0.5,
+     "emissiveColor": [
+      0.06,
+      0.82,
+      1.0
+     ],
+     "emissiveIntensity": 4.6
+    },
+    "materialVariation": {
+     "emissiveRandom": 0.55
+    },
+    "motion": {
+     "stiffness": 3.2,
+     "mass": 1.1,
+     "damping": 0.9,
+     "windSensitivity": 0.32,
+     "bendLimit": 0.07,
+     "tipAmplitude": 0.05
+    }
+   }
+  },
+  {
+   "name": "far-arch",
+   "kind": "procedural",
+   "position": [
+    -44.0,
+    9.3,
+    -120.0
+   ],
+   "rotation": [
+    90.0,
+    18.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 15.0,
+     "minorRadius": 1.6,
+     "majorSegments": 40,
+     "minorSegments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.07,
+      0.08,
+      0.13
+     ],
+     "roughness": 0.75,
+     "emissiveColor": [
+      0.31,
+      0.12,
+      1.0
+     ],
+     "emissiveIntensity": 0.85
+    },
+    "deformers": [
+     {
+      "kind": "displacement",
+      "amount": 0.055,
+      "scale": 0.8,
+      "seed": 77,
+      "speed": 0.0
+     }
+    ]
+   }
   }
  ],
  "post": {
