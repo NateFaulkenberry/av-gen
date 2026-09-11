@@ -70,7 +70,9 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       volumes_(std::make_unique<VolumeRenderer>(context, shaders)),
       debug_(std::make_unique<DebugDraw>(context, shaders)),
       simulation_(std::make_unique<Simulation>(context, shaders)),
-      shadows_(std::make_unique<ShadowRenderer>(context)), ao_(std::make_unique<AoRenderer>(context, shaders)),
+      shadows_(std::make_unique<ShadowRenderer>(context)),
+      skinning_(std::make_unique<SkinningRenderer>(context, shaders)),
+      ao_(std::make_unique<AoRenderer>(context, shaders)),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
     objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
 }
@@ -340,6 +342,13 @@ Result<void> SceneRenderer::init() {
         return r;
     }
     sdfs_->setMeshPipelines(litOpaqueCull_, litOpaqueNoCull_); // Mesh-mode objects draw as entities
+    // ADR-086: the skinned variants of the lit and depth-only pipelines, and the joint buffer they
+    // read. Same frame, material and IBL groups; only group 1 differs.
+    if (auto r = skinning_->init(frameLayout_, materialLayout_, iblLayout_, objectUniforms_,
+                                 sizeof(ObjectUniforms), kHdrFormat, kDepthFormat);
+        !r) {
+        return r;
+    }
     if (auto r = debug_->init(kHdrFormat, kDepthFormat, frameLayout_); !r) {
         return r;
     }
@@ -1131,6 +1140,7 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     } else {
         keep("pbr.wgsl", std::unexpected(pbr.error()));
     }
+    keep("pbr_skinned.wgsl", skinning_->reload()); // ADR-086
     if (auto grid = shaders_.load("grid.wgsl")) {
         if (auto g = createGridPipeline(*grid)) {
             gridPipeline_ = *g;
@@ -1286,6 +1296,14 @@ void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
         gpuMesh.indices = context_.device().CreateBuffer(&idesc);
         context_.queue().WriteBuffer(gpuMesh.indices, 0, mesh.indices.data(), idesc.size);
         gpuMesh.indexCount = static_cast<std::uint32_t>(mesh.indices.size());
+        if (mesh.skinned()) { // ADR-086
+            wgpu::BufferDescriptor sdesc{};
+            sdesc.label = "mesh-skin";
+            sdesc.size = mesh.skin.size() * sizeof(scene::SkinInfluence);
+            sdesc.usage = wgpu::BufferUsage::Vertex | wgpu::BufferUsage::CopyDst;
+            gpuMesh.skin = context_.device().CreateBuffer(&sdesc);
+            context_.queue().WriteBuffer(gpuMesh.skin, 0, mesh.skin.data(), sdesc.size);
+        }
         meshes_.push_back(std::move(gpuMesh));
     }
     meshVersion_ = scene.meshVersion;
@@ -1485,6 +1503,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     stats_.shadowCasters = 0;
     uploadMeshes(scene);
     uploadTextures(scene);
+    // ADR-086: this frame's joint palettes. The renderer never *poses* anything -- the scene
+    // arrives already posed by scene::updateRigs -- it only moves matrices the scene computed.
+    skinning_->resetFrameStats();
+    skinning_->update(scene);
     updateEnvironment(scene);
     ensureTonemapBindGroup();
 
@@ -1628,10 +1650,29 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         std::uint32_t offset;
         const scene::Entity* entity;
         float viewDepth;
+        // ADR-086: where this entity's joint palette sits in the joint buffer. A zero slice means
+        // a static mesh, which is every entity in a scene with no character in it.
+        SkinningRenderer::Slice skin;
+        [[nodiscard]] bool skinned() const { return skin.valid(); }
     };
     std::vector<DrawItem> opaque;
     std::vector<DrawItem> grid;
     std::vector<DrawItem> blended;
+    // ADR-086. Everything a skinned entity does differently at a draw site: the skinned pipeline, a
+    // second dynamic offset naming its slice of the joint buffer, and the influence stream in
+    // vertex slot 1. A frame with no skinned entity in it never reaches this, and records exactly
+    // the command stream it recorded before skinning existed.
+    const auto bindSkinned = [&](wgpu::RenderPassEncoder& rp, const DrawItem& item, const GpuMesh& mesh,
+                                 const wgpu::RenderPipeline& pipeline, bool& skinnedBound) {
+        rp.SetPipeline(pipeline);
+        const std::array<std::uint32_t, 2> offsets = {item.offset, item.skin.offset};
+        rp.SetBindGroup(1, skinning_->objectBindGroup(), static_cast<std::uint32_t>(offsets.size()),
+                        offsets.data());
+        rp.SetVertexBuffer(SkinningRenderer::kInfluenceSlot, mesh.skin);
+        skinning_->countDraw();
+        ++stats_.state.vertexBufferBinds; // the influence stream; the draw site counts slot 0
+        skinnedBound = true;
+    };
     // The shadow passes' candidate list. It is the opaque draw list plus the entities the *camera*
     // frustum rejected that a cascade can still see, because "off screen" is not a reason to stop
     // casting (ADR-046): a hill behind the camera throws its shadow across the frame. Camera-culled
@@ -1704,14 +1745,22 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         if (has(m.occlusionTexture)) mask |= 16;
         obj.flags = glm::vec4(static_cast<float>(m.alphaMode), m.alphaCutoff, m.unlit ? 1.0f : 0.0f,
                               static_cast<float>(mask));
+        // ADR-086: a skinned entity only counts as one if its mesh carries influences and the
+        // scene posed its rig. Anything short of that draws as the static mesh it is.
+        SkinningRenderer::Slice skin;
+        if (entity.rig != scene::kInvalidRig && entity.mesh < meshes_.size() && meshes_[entity.mesh].skin) {
+            skin = skinning_->slice(entity.rig);
+        }
         // x = the ADR-030 `objectId` input; y = material id and z = bloom weight feed the
-        // identifier and emission targets (ADR-035).
-        obj.ids = glm::vec4(static_cast<float>(thisEntity), static_cast<float>(thisEntity + 1), 1.0f, 0.0f);
+        // identifier and emission targets (ADR-035); w = the joint count, which is how the skinned
+        // vertex stage finds the previous frame's half of its palette slice.
+        obj.ids = glm::vec4(static_cast<float>(thisEntity), static_cast<float>(thisEntity + 1), 1.0f,
+                            static_cast<float>(skin.jointCount));
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
         const float depth = -(view * glm::vec4(entity.transform.position, 1.0f)).z;
         ++objectIndex;
-        return DrawItem{offset, &entity, depth};
+        return DrawItem{offset, &entity, depth, skin};
     };
     // True when the shadow passes would draw this entity: they take the opaque list only.
     const auto shadowEligible = [](const scene::Entity& entity) {
@@ -1878,6 +1927,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         rp.SetPipeline(depthOnlyPipeline_);
         stats_.state.bindGroupBinds += 2;
         ++stats_.state.pipelineBinds;
+        bool skinnedBound = false;
         for (const auto& item : shadowCasters) {
             if (cullCascade) {
                 const auto [wlo, whi] = entityWorldBounds(*item.entity);
@@ -1887,7 +1937,17 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                 }
             }
             const GpuMesh& mesh = meshes_[item.entity->mesh];
-            rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
+            if (item.skinned()) {
+                bindSkinned(rp, item, mesh, skinning_->depthPipeline(), skinnedBound);
+                ++stats_.state.pipelineBinds;
+            } else {
+                if (skinnedBound) {
+                    rp.SetPipeline(depthOnlyPipeline_);
+                    ++stats_.state.pipelineBinds;
+                    skinnedBound = false;
+                }
+                rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
+            }
             rp.SetBindGroup(2, materialBindGroup(item.entity->material));
             rp.SetVertexBuffer(0, mesh.vertices);
             rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
@@ -1957,9 +2017,20 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         rp.SetPipeline(depthOnlyPipeline_);
         stats_.state.bindGroupBinds += 2;
         ++stats_.state.pipelineBinds;
+        bool skinnedBound = false;
         for (const auto& item : opaque) {
             const GpuMesh& mesh = meshes_[item.entity->mesh];
-            rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
+            if (item.skinned()) {
+                bindSkinned(rp, item, mesh, skinning_->depthPipeline(), skinnedBound);
+                ++stats_.state.pipelineBinds;
+            } else {
+                if (skinnedBound) {
+                    rp.SetPipeline(depthOnlyPipeline_);
+                    ++stats_.state.pipelineBinds;
+                    skinnedBound = false;
+                }
+                rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
+            }
             rp.SetBindGroup(2, materialBindGroup(item.entity->material));
             rp.SetVertexBuffer(0, mesh.vertices);
             rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
@@ -2043,19 +2114,30 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         rp.SetBindGroup(3, iblBindGroup_);
         stats_.state.bindGroupBinds += 2;
         auto drawItems = [&](const std::vector<DrawItem>& items, bool lit) {
+            bool skinnedBound = false;
             for (const auto& item : items) {
                 const GpuMesh& mesh = meshes_[item.entity->mesh];
-                if (lit) {
-                    const auto& m = item.entity->material;
+                const auto& m = item.entity->material;
+                const bool skinned = lit && item.skinned();
+                if (skinned) {
+                    // ADR-086: the same shading, reached through a vertex stage that poses the
+                    // mesh first. pbr_skinned.wgsl includes pbr.wgsl, so `fs_main` is the same
+                    // function, not a copy of it.
+                    bindSkinned(rp, item, mesh,
+                                skinning_->litPipeline(m.alphaMode == scene::AlphaMode::Blend, m.doubleSided),
+                                skinnedBound);
+                    rp.SetBindGroup(2, materialBindGroup(m));
+                } else if (lit) {
                     rp.SetPipeline(m.alphaMode == scene::AlphaMode::Blend ? litBlend_
                                    : m.doubleSided                        ? litOpaqueNoCull_
                                                                           : litOpaqueCull_);
                     rp.SetBindGroup(2, materialBindGroup(m));
+                    rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
                 } else {
                     rp.SetPipeline(gridPipeline_);
-                    rp.SetBindGroup(2, materialBindGroup(item.entity->material));
+                    rp.SetBindGroup(2, materialBindGroup(m));
+                    rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
                 }
-                rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
                 rp.SetVertexBuffer(0, mesh.vertices);
                 rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
                 rp.DrawIndexed(mesh.indexCount);
@@ -2476,6 +2558,7 @@ void SceneRenderer::collectFrameTimings() {
     stats_.sdf = sdfs_->stats();
     stats_.volume = volumes_->stats();
     stats_.simulation = simulation_->stats();
+    stats_.skinning = skinning_->stats(); // ADR-086
     stats_.ao = ao_->stats();
     stats_.shadows.shadowMs = stats_.shadows.views > 0 ? timeline_->msFor("shadow") : -1.0;
     stats_.post.postMs = timeline_->msForPrefix("post/");
