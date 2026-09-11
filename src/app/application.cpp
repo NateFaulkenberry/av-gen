@@ -475,11 +475,15 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     options_ = options;
     engine_ = std::make_unique<Engine>(options.headless ? EngineMode::Offline : EngineMode::Live);
     if (options.headless) {
-        // A headless run gets a control plane too, so `--ai-script` and `--ai-prompt` are testable
-        // without a window. No preferences file: settings are session-only, and a credential comes
-        // from the environment, which is how a render farm or a CI job is configured.
+        // A headless run gets a control plane too, so `--ai-script` and `--ai-prompt` work without
+        // a window. It *reads* the settings file -- an operator who configured a provider in the
+        // app expects a batch run to use it -- and never writes one, because a render has no
+        // business changing the user's configuration. The credential still comes from the keychain
+        // or, on a machine where that cannot be read, from AVGEN_AI_<PROVIDER>_KEY.
+        settingsPath_ = AppSettings::pathIn(platform::preferencesDirectory());
         jobs_ = std::make_unique<JobSystem>(2);
         initControlPlane();
+        settingsPath_.clear(); // read-only from here: saveSettings() is now a no-op
     }
 
     if (!options.headless) {
@@ -2433,6 +2437,15 @@ int Application::runHeadless() {
         engine_->update(time);
         lastEngineUpdateMs_ =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - updateStart).count();
+        // The AI control plane's queue, drained here for the same reason the live loop drains it
+        // (ADR-094): this is the thread that owns engine state, so it is the thread tool bodies
+        // run on. A headless run that never pumped would leave a task submitted during the loop
+        // waiting for a service that never came -- which is the exact shape of the bug this
+        // repository keeps shipping, so it is drained even though nothing in the offline path
+        // submits one today.
+        if (ai_) {
+            ai_->pump();
+        }
         // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
         // options; an empty set costs nothing.
         if (panel_) {
