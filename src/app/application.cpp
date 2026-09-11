@@ -441,6 +441,26 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                 });
             };
         };
+        panel_->onDirectCamera = [this] {
+            if (auto r = directCameraFromTrack(); !r) {
+                log::warn("direct: {}", r.error().message);
+                panel_->setStatus(r.error().message);
+            } else {
+                panel_->setStatus("camera cut to the track");
+            }
+        };
+        panel_->onClearCameraAutomation = [this] {
+            // Removing the automation rather than disabling the whole timeline: a project may
+            // automate other things, and handing the camera back is not a reason to stop those.
+            auto& tracks = engine_->timeline().tracks();
+            const std::size_t before = tracks.size();
+            const auto owned = directedCameraTargets();
+            std::erase_if(tracks, [&](const params::Track& t) {
+                return std::find(owned.begin(), owned.end(), t.target) != owned.end();
+            });
+            panel_->setStatus("camera handed back to the viewport (" +
+                              std::to_string(before - tracks.size()) + " track(s) removed)");
+        };
         panel_->onOpenAudio = dialog(platform::Window::DialogKind::Audio);
         panel_->onOpenScene = dialog(platform::Window::DialogKind::Scene);
         panel_->onOpenEnvironment = dialog(platform::Window::DialogKind::Environment);

@@ -204,6 +204,35 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
         }
         ImGui::EndMenu();
     }
+    if (ImGui::BeginMenu("Camera")) {
+        // Directing needs a track to cut to. Disabling rather than hiding, with the reason in the
+        // tooltip: a menu item that is absent looks like a feature that does not exist, and one
+        // that fails on click looks like a bug.
+        const bool haveAudio = engine.track() != nullptr;
+        ImGui::BeginDisabled(!haveAudio || !onDirectCamera);
+        if (ImGui::MenuItem("Direct to Music")) {
+            onDirectCamera();
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            ImGui::SetTooltip(haveAudio
+                                  ? "folds the track into musical sections and cuts the camera "
+                                    "between this world's heroes, landing a reveal on the drop"
+                                  : "load audio first: the camera is cut to the track's structure, "
+                                    "so there has to be a track");
+        }
+        ImGui::BeginDisabled(!onClearCameraAutomation || !engine.timeline().isAutomated("camera/position"));
+        if (ImGui::MenuItem("Hand Camera Back to the Viewport")) {
+            onClearCameraAutomation();
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            ImGui::SetTooltip("removes the camera's automation. While the timeline drives the "
+                              "camera, a viewport drag writes a value the timeline replaces on the "
+                              "next frame, so the mouse appears to do nothing.");
+        }
+        ImGui::EndMenu();
+    }
     if (ImGui::BeginMenu("View")) {
         drawViewMenu();
         ImGui::EndMenu();

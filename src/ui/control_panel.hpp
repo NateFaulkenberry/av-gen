@@ -48,6 +48,11 @@ struct FrameStats {
 class ControlPanel {
 public:
     // Called when the user asks to open a file. The host shows the dialog and loads the file.
+    // Cuts the camera to the loaded track (ADR-075). A callback rather than something this panel
+    // does itself, because directing mutates the engine's timeline and the panel does not own it.
+    std::function<void()> onDirectCamera;
+    // Clears whatever the director installed, handing the camera back to the viewport.
+    std::function<void()> onClearCameraAutomation;
     std::function<void()> onOpenAudio;
     std::function<void()> onOpenScene;
     std::function<void()> onOpenEnvironment;

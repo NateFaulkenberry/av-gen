@@ -71,6 +71,17 @@ CPMAddPackage(
     SYSTEM YES EXCLUDE_FROM_ALL YES
     OPTIONS "FASTGLTF_COMPILE_AS_CPP20 ON" "FASTGLTF_ENABLE_TESTS OFF" "FASTGLTF_ENABLE_EXAMPLES OFF")
 
+# ---- meshoptimizer (mesh optimisation and LOD simplification) ----------------------------------
+# ADR-078. Only the library target is built: the demo and gltfpack pull in extra sources and, in
+# gltfpack's case, its own dependencies, and neither is used from the engine.
+CPMAddPackage(
+    NAME meshoptimizer
+    GITHUB_REPOSITORY zeux/meshoptimizer
+    GIT_TAG v1.2
+    SYSTEM YES EXCLUDE_FROM_ALL YES
+    OPTIONS "MESHOPT_BUILD_DEMO OFF" "MESHOPT_BUILD_GLTFPACK OFF" "MESHOPT_BUILD_SHARED_LIBS OFF"
+            "MESHOPT_WERROR OFF" "MESHOPT_INSTALL OFF")
+
 # ---- stb (image decode/encode), header-only, implementation in src/assets --------------------------
 CPMAddPackage(
     NAME stb
