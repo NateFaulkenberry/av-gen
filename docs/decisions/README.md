@@ -91,3 +91,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [083](ADR-083-composition-and-layers.md) | Composition and layers | Accepted |
 | [084](ADR-084-the-editors-frame.md) | The editor's frame: where the swapchain wait stands, and what a drag may cost | Accepted |
 | [085](ADR-085-lod-chain-wired.md) | The LOD ladder is built by meshoptimizer, and it has to descend | Accepted |
+| [086](ADR-086-skeletal-animation.md) | Skeletal animation is an engine substrate, not a character feature | Accepted |
