@@ -181,6 +181,10 @@ tone mapping and composition overlay.
 - [ ] Build a larger water QA scene with flat/steep/shallow/deep/angled shore cases.
 - [ ] Visualize water geometry mask, opaque linear depth, reconstructed thickness, shoreline fade,
   foam mask and water object ID. Confirm all effects are zero outside water geometry.
+- [ ] Dedicated water-mask diagnostics are intentionally deferred: the current five-target contract
+  preserves opaque IDs/normals/velocity behind blended water, and changing it would require a new
+  scene target plus every pipeline declaration. Existing auxiliary depth/ID views remain the
+  available diagnostics until that contract is designed.
 - [ ] Add GPU image tests for no water over dry terrain, stable edge under camera motion, no z-fight,
   correct terrain-through-water depth and deterministic flow after seek.
 - [ ] Verify water sort order for overlapping chunk surfaces and that chunk/world transforms match
