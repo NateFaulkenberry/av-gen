@@ -1806,15 +1806,15 @@
     },
     {
      "kind": "wander",
-     "speed": 0.85,
-     "runSpeed": 2.3,
+     "speed": 5.5,
+     "runSpeed": 13.0,
      "turnRate": 140.0,
-     "arrive": 1.0,
-     "minRange": 4.0,
-     "maxRange": 11.0,
-     "pauseMin": 2.0,
-     "pauseMax": 7.0,
-     "homeRadius": 14.0
+     "arrive": 2.5,
+     "minRange": 6.0,
+     "maxRange": 14.0,
+     "pauseMin": 2.5,
+     "pauseMax": 8.0,
+     "homeRadius": 16.0
     },
     {
      "kind": "lookAt",
@@ -1826,7 +1826,7 @@
     {
      "signal": "audio.rms",
      "target": "wander/speed",
-     "depth": 1.4,
+     "depth": 11.2,
      "chain": {
       "attackMs": 520.0,
       "decayMs": 1800.0

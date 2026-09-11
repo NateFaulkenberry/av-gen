@@ -64,9 +64,10 @@ NavSample Navigator::sample(glm::vec2 p) const {
         out.reject = NavReject::Submerged;
         return out;
     }
-    if (out.canopy > 0.0f && out.canopy < settings_.headroom) {
-        // Something grows here and it is shorter than the walker: undergrowth, not a canopy. The
-        // tall-canopy case is the walkable one -- a forest floor is walkable, a bramble is not.
+    if (out.canopy > settings_.walkableVegetation && out.canopy < settings_.headroom) {
+        // Tall enough to stop a walker and too low to duck under: a thicket. Either side of that
+        // band is passable -- grass and ferns are waded through, and a forest floor beneath a
+        // fourteen-metre canopy is the most walkable ground there is.
         out.reject = NavReject::NoHeadroom;
         return out;
     }

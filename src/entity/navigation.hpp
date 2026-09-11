@@ -33,6 +33,14 @@ struct NavSettings {
     float maxSlope = 0.55f;         // 0 flat .. 1 vertical (1 - normal.y); above this it is a cliff
     float waterMargin = 0.35f;      // metres of dry land required above any water surface
     float headroom = 2.2f;          // metres a walker needs under whatever grows here
+    // Vegetation up to this height is walked *through*, not around. Without it, the undergrowth
+    // test below rejects anywhere anything short grows -- and because the canopy model is
+    // statistical (ADR-080: "trees about nine metres tall grow around here", not "there is a trunk
+    // at this spot"), that is every square metre of a meadow. Glowmere grows grass at 0.7 m, ferns
+    // at 1.4 and bushes at 1.1, so its entire open ground read as impassable bramble while the
+    // forest floor under fourteen-metre trees read as fine. A walker picked a destination, took one
+    // step, found the way blocked, dropped it and repeated -- walk animation, no travel.
+    float walkableVegetation = 1.5f;
     float heroMargin = 1.0f;        // metres to stay outside a hero's sphere
     float boundaryMargin = 12.0f;   // metres to stay inside the world's edge
     float stepHeight = 1.4f;        // metres of rise tolerated between two samples of a step
