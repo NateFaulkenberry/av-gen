@@ -18,9 +18,14 @@ constexpr int kFormatVersion = 1;
 // The panels, grouped the way the View menu reads them: what you build with on the left, what you
 // inspect and tune on the right, what runs underneath along the bottom. Nothing is assigned to the
 // centre -- see DockRegion.
-constexpr std::array<EditorPanel, 12> kPanels{{
+constexpr std::array<EditorPanel, 13> kPanels{{
     {"World Builder", "World Builder", DockRegion::Left, true,
-     "recipe, Generate World, asset placement and the job monitor"},
+     "recipe, Generate World and the job monitor"},
+    // ADR-092. One panel, not two: the brush and the selection are the same job seen from two
+    // sides, and an artist who has to remember which of two windows holds "rotate" has been given a
+    // filing system rather than a tool. It shows the controls for the mode it is in.
+    {"Edit", "Edit", DockRegion::Left, true,
+     "place and paint assets, select, move, group and undo"},
     {"Assets", "Assets", DockRegion::Left, false, "everything the asset scan found, by kind"},
     {"World", "World", DockRegion::Right, true,
      "layers, inspector, scene states, direction, macros and debug draw"},

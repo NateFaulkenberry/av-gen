@@ -131,6 +131,10 @@ void WorldEditor::updateGhost(app::Engine& engine, const assets::AssetLibrary* l
         stroke_.selectionBefore = selection.nodes();
         strokeGroup_.clear();
         hasStrokePoint_ = false;
+        // The name is taken now, not at commit: by the time the button comes up the pointer may
+        // have left the canvas and the preview been cleared, and "Place 36 x asset" is a history
+        // entry that tells the artist nothing about which 36 they are taking back.
+        strokeAsset_ = preview_.assetName;
     }
     if (stroking_ && input.leftDown && ground.valid) {
         // A paint drag lays down more as the cursor travels. The threshold is the brush's own
@@ -215,8 +219,8 @@ void WorldEditor::commitStroke(app::Engine& engine) {
     } else if (erased > 0) {
         stroke_.label = fmt::format("Erase {} object{}", erased, erased == 1 ? "" : "s");
     } else {
-        stroke_.label = fmt::format("Place {} x {}", placed,
-                                    preview_.assetName.empty() ? "asset" : preview_.assetName);
+        stroke_.label =
+            fmt::format("Place {} x {}", placed, strokeAsset_.empty() ? "asset" : strokeAsset_);
     }
     stroke_.selectionAfter = selection.nodes();
     history.push(std::move(stroke_));

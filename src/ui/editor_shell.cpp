@@ -195,7 +195,8 @@ std::size_t enforceCanvasCentre(ImGuiID dockspace, const EditorLayout& layout) {
     return evicted;
 }
 
-CanvasRect drawCanvasWindow(std::uint64_t texture, std::uint32_t centreNode) {
+CanvasRect drawCanvasWindow(std::uint64_t texture, std::uint32_t centreNode,
+                            const std::function<void(const CanvasRect&)>& overlay) {
     CanvasRect rect;
     if (centreNode != 0) {
         ImGui::SetNextWindowDockID(centreNode, ImGuiCond_FirstUseEver);
@@ -220,6 +221,9 @@ CanvasRect drawCanvasWindow(std::uint64_t texture, std::uint32_t centreNode) {
         // What decides whether a mouse event is the scene's. Asked here, while the canvas is the
         // current window, so that a panel, a popup or a menu over the canvas answers false.
         rect.hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
+        if (overlay) {
+            overlay(rect);
+        }
     }
     ImGui::End();
     return rect;

@@ -188,6 +188,30 @@ struct CompositionNode {
     spatial::Spline splineRest;
     SdfParameters sdfParams;
     SdfObject sdfRest;
+    // Terrain: what the last flatten produced, kept so the next one does not produce it again
+    // (ADR-092). A terrain's chunk meshes and its ecology scatter are pure functions of the map,
+    // the terrain settings and the ecology -- and on a Glowmere world they are ~390 ms of a
+    // rebuild, most of it `world::scatter` walking a quarter of a million grid cells. `dirty_` has
+    // no granularity: adding one flower re-flattens the world, so without this an artist painting
+    // a meadow pays for the whole terrain once per dab.
+    //
+    // Keyed on the hash of exactly those inputs, so a terrain that *has* changed rebuilds and one
+    // that has not does not. Cleared by `setEcology`/`setWorldMap`-shaped edits by virtue of the
+    // hash moving; nothing has to remember to invalidate it.
+    struct TerrainProducts {
+        std::uint64_t hash = 0; // 0 means nothing is cached
+        std::vector<std::shared_ptr<spatial::PointCloud>> clouds; // one per ecology layer, in order
+        std::vector<world::GlowCluster> glow;
+        // Chunk mesh ids are stored **relative to the first mesh this terrain contributed**, because
+        // the absolute ids depend on what else the scene flattened before it and that changes
+        // whenever a node is added. They are rebased on reuse.
+        std::vector<world::TerrainChunk> chunks;
+        std::vector<MeshData> meshes; // in the order buildTerrain emitted them
+        [[nodiscard]] bool usable(std::uint64_t want) const {
+            return hash != 0 && hash == want && !meshes.empty();
+        }
+    };
+    TerrainProducts terrainProducts;
     std::vector<world::TerrainChunk> chunks;  // Terrain: built at rebuild, indexed by entity offset
     // Terrain: the emissive scatter layers reduced to soft emitters, built at rebuild. The
     // per-frame pass picks the ones near the camera and makes them lights (ADR-053).

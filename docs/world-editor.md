@@ -152,7 +152,13 @@ mouse until you release, even if the cursor crosses a panel — otherwise an orb
 | **Right drag** | Look around — the eye stays put |
 | **Wheel** | Dolly toward or away from the target |
 | **Left click** (without dragging) | Pick: select the node under the cursor |
+| **Shift + left click** | Add to / remove from the selection |
+| **Alt + left click** | Select the object inside a group rather than the group |
+| **Left drag a box** (Select mode) | Select everything the box covers |
 | **Left click on the sky** | Deselect |
+
+In **Place** mode the left button paints instead, and while the pointer is over a gizmo handle it
+drags that handle. The other buttons are always the camera's, so you can look around in any mode.
 
 Panning is scaled by distance, so a drag moves the same amount of *picture* whether you are two
 metres from your subject or two hundred.
@@ -175,40 +181,161 @@ drawn outside the entity list. That is expected, and the position is still what 
 
 ---
 
-## 5. Placing things by hand
+## 5. Building by hand: the Edit panel
 
-**World Builder → Place assets.**
+Everything you do to a world by pointing at it is in one panel, and it shows the controls for the
+mode you are in (ADR-092). Two modes, and the viewport says which one you are in at all times:
 
-Filter and pick an asset from the library list to **arm** it. While something is armed, clicking in
-the viewport places rather than selects; press **Stop** to go back to selecting. "None" is the resting
-state on purpose — a viewport that places something every time you click is one you cannot look
-around in.
+| Mode | Key | What a click does |
+|---|---|---|
+| **Select** | `Q` | Picks the object under the cursor and gives it a transform gizmo. |
+| **Place** | `B` | Paints the armed asset. |
 
-### Modes
+### 5.1 The palette
 
-| Mode | What a click makes |
+Filter by name, or click a category chip. Each asset is a swatch whose **bar height is its real
+height** against the tallest thing in the library, so the palette shows scale at a glance — which is
+the fact a placement gets wrong most often. A ring means the species glows. Hover for its name,
+category, height, footprint, triangle count and importance.
+
+Click a swatch to arm it and switch to Place.
+
+### 5.2 The ghost
+
+**With an asset armed, the viewport shows exactly what a click would make**, before you make it:
+
+- a **footprint circle** on the ground for every instance, drawn on the surface so it follows a
+  hillside;
+- a **bounding cage** and an **orientation line** for each one, so height and facing are visible
+  before they are committed;
+- the **brush disc** itself, so the radius is something you can see rather than a number you have to
+  imagine;
+- a **terrain-contact cross** and the **surface normal** at the exact point under the cursor;
+- a heads-up panel giving the **ground height**, the **slope in degrees**, and warnings for **water**
+  and **outside the world**.
+
+The panel's border is **green when the click will place something and red when it will not**, and
+when it is red it says *why*, with the numbers in it:
+
+| It says | What it means |
+|---|---|
+| `too steep: 47 degrees, limit 30` | The ground is steeper than **Max slope**. |
+| `under 1.4 m of water` | **Keep out of water** is on and this is a lake. |
+| `blocked by elder_tree` | **Keep clear of other objects** is on and something is already there. |
+| `outside the world` | Past the terrain's extent. |
+| `no ground under the cursor` | The sky, or past the far edge. |
+
+Instances are checked **one at a time**: a stroke on a shoreline places the half that is on the bank
+and refuses the half that is in the water, and shows you which is which while you are still holding
+the button. Each instance is dropped onto the ground under *itself*, so a stroke across a hillside
+follows the hillside.
+
+### 5.3 Brush modes
+
+| Mode | What a stroke makes |
 |---|---|
 | **Single** | One object where you clicked. |
-| **Brush** | A scatter filling the brush radius, spaced apart. Set **Radius** and **Spacing**. |
-| **Cluster** | A few objects tight together, as one thing that grew there. Set **Count** and **Spread**. |
-| **Landmark** | One, deliberately enormous. Set **Times normal size**. |
+| **Scatter** | A spaced scatter filling the brush. Drag to keep painting. **Radius**, **Spacing**, **Density**. |
+| **Cluster** | A few objects tight together, as one thing that grew there. **Count**, **Spread**, **Clumping**. |
+| **Landmark** | One, deliberately enormous. **Times normal size**. |
+| **Eraser** | Drag over what you want gone. |
+| **Replace** | Removes what the brush covers, then paints over it. |
 
-Shared settings: **Scale jitter**, **Yaw jitter**, **Sink** (metres pushed into the ground), and **Lie
-along the slope** (stand along the surface normal rather than upright — right for rocks and fallen
-logs, wrong for anything that grows toward the sky).
+**Variation**: scale range, random turn, sink (negative lifts it clear of the ground), lie along the
+slope, and a seed — `0` means a new arrangement every stroke, anything else repeats exactly.
+
+**Where it may land**: max slope, keep out of water, keep clear of other objects, and how much
+clearance to demand.
+
+**A stroke makes a group** turns everything one drag lays down into a single group, so a thicket
+painted in one gesture is one thing to move afterwards.
 
 Three things worth knowing about how these behave:
 
-- A **brush throws darts** against the spacing radius rather than scattering uniformly, because a
+- A **scatter throws darts** against the spacing radius rather than scattering uniformly, because a
   uniform scatter over a disc clumps — and you are already deciding where the density goes by moving
-  the mouse.
-- A **cluster** fills its disc evenly rather than bunching at the centre, so it reads as a patch of
-  something growing rather than as a target.
-- **Brush and cluster lay out on the surface**, using the picked normal. A stroke on a 45° hillside
-  lands on the hillside instead of putting half of itself underground.
+  the mouse. **Density** thins the stroke without ever letting two things get closer than the
+  spacing.
+- A **cluster** fills its disc evenly by default, so it reads as a patch of something growing rather
+  than as a target. **Clumping** pulls it toward the centre when you want that.
+- Every placement is deterministic given its seed, and placed objects are **ordinary glTF nodes** —
+  select, move, rename and delete them like anything else.
 
-Every placement is deterministic given its seed, and placed objects are ordinary glTF nodes — select,
-move, rename and delete them like anything else.
+### 5.4 Selecting and moving
+
+Click to select. **Shift-click** adds. **Drag a box** over the viewport to catch several. Clicking
+something inside a group selects **the group**; **alt-click** reaches the object inside it.
+
+A selection gets a gizmo in the middle of its bounding box:
+
+| | |
+|---|---|
+| `W` | **Move** — three axis arrows and three plane handles; the centre dot slides in the screen plane |
+| `E` | **Rotate** — three rings |
+| `R` | **Scale** — three axis handles and three plane handles; the centre scales uniformly |
+| `X` | **World / local** space |
+
+Snapping is three fields in the panel: a **grid** in metres, an **angle** in degrees and a **step**
+for scale. `0` is off, which is the default. While you drag, the value is printed next to the
+cursor: `+4.00 m along X`, `-30.0 deg about Y`.
+
+Several objects rotate and scale about the **shared pivot**, not each about its own, so turning a
+group of rocks looks like turning an arrangement.
+
+The panel also gives numeric **Position / Rotation / Scale** for the active object, and its size in
+metres. Typing in them is one undo step, the same as a drag.
+
+**Arrow keys** nudge the selection by the snap grid (or 0.1 m when there is none); hold shift for ten
+times as far. With nothing selected they still scrub the transport, as they always did.
+
+### 5.5 Groups
+
+Select two or more things and press **Group** (`Cmd+G`). A group is an empty node the members are
+parented to: it **moves, rotates and scales as one unit**, and the members stay ordinary nodes you
+can still select and edit individually. Grouping moves nothing, and neither does **Ungroup**
+(`Shift+Cmd+G`).
+
+Deleting a group deletes its contents, because a group whose deletion left twenty rocks scattered at
+the origin would be a trap. Undo brings all of it back, still grouped.
+
+### 5.6 Duplicate, copy, paste
+
+`Cmd+D` duplicates the selection beside itself and selects the copies, so duplicate-move-duplicate
+works. A duplicated group copies its whole hierarchy — the copy's children hang off the *copy*.
+`Cmd+C` / `Cmd+V` do the same through a clipboard.
+
+### 5.7 Undo
+
+`Cmd+Z`, `Shift+Cmd+Z`. The Edit panel names what the next undo will take back, and so does the
+status bar.
+
+It covers **everything in this panel**: placement, painting (a whole stroke is one step), erasing,
+deletion, moves, rotations, scales, numeric entry, nudges, grouping, ungrouping, duplication and
+paste. A drag is one step however many frames it took, and a drag that ends where it started is no
+step at all. Pressing escape during a drag puts it back.
+
+Undo restores **what was selected** at the time, so undoing a delete hands you back the things that
+came back rather than leaving you with nothing chosen.
+
+What it does **not** cover: Generate World (it replaces the composer's nodes wholesale, and the
+history is cleared), and anything done through the Parameters panel or the timeline.
+
+### 5.8 Keyboard
+
+| | |
+|---|---|
+| `Q` / `B` | Select / Place mode |
+| `W` / `E` / `R` | Move / rotate / scale gizmo |
+| `X` | World / local space |
+| `F` | Frame the selection |
+| `Cmd+A` | Select everything |
+| `Cmd+D` | Duplicate |
+| `Cmd+C` / `Cmd+V` | Copy / paste |
+| `Cmd+G` / `Shift+Cmd+G` | Group / ungroup |
+| `Delete` / `Backspace` | Delete the selection |
+| Arrows (+shift) | Nudge |
+| `Cmd+Z` / `Shift+Cmd+Z` | Undo / redo |
+| `Escape` | Cancel the drag in progress |
 
 ---
 
@@ -261,7 +388,9 @@ All of it is ordinary scene data. Save the project and it round-trips.
   implementation yet.
 - **The camera director is not driven by the editor.** `app::camera_director` will direct heroes from
   a musical structure and install the result on the timeline, but nothing in the UI calls it yet.
-- **There is no undo.** Save before generating over something you want.
+- **Generate World is not undoable.** The editor's undo covers everything you do by hand (§5.7),
+  but a generate replaces the composer's own nodes wholesale and clears the history. Save before
+  generating over something you want.
 - The generated world is roughly four times sparser per square metre than the authored Glowmere
   scene, for reasons partly diagnosed and recorded in [world-performance.md](world-performance.md).
 
@@ -279,7 +408,7 @@ Around the world:
 | Where | What | Open at first launch |
 |---|---|---|
 | Top | Menu bar — **File** and **View** | always |
-| Left | **World Builder**, **Assets** | World Builder |
+| Left | **World Builder**, **Edit**, **Assets** | World Builder, Edit |
 | Right | **World**, **Parameters**, **Render** | World, Parameters |
 | Bottom | **Control**, **Analysis**, **Modulation**, **Graph** | Control, Analysis, Modulation |
 | Foot | Status bar | always |
@@ -331,7 +460,8 @@ the machine that the ordinary two-second write might not survive.
 One line across the foot. Every number on it is measured:
 
 `fps · frame interval · CPU frame time · GPU frame time · resolution · draw calls · triangles ·
-selection · armed placement · status message`, with the GPU adapter on the right.
+selection · what the next click does · the last edit · status message`, with the GPU adapter on the
+right.
 
 The GPU time reads `gpu n/a` when the timer has not reported yet, rather than showing a zero.
 

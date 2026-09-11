@@ -66,12 +66,6 @@ BrushPreview planBrush(scene::Composition& composition, const app::PlacementSett
                               ? settings.brushRadius
                               : (settings.mode == app::PlacementMode::Cluster ? settings.clusterRadius : 0.0f);
 
-    if (!cursor.valid) {
-        preview.issue = PlacementIssue::NoSurface;
-        preview.reason = "nothing under the cursor -- the ray met no ground";
-        return preview;
-    }
-
     // Eraser and Replace both remove what the brush covers. Done before the placement plan so that
     // Replace's ghosts are tested against a world with the removed objects already gone -- a
     // replace brush that reported every instance as colliding with what it was about to delete
@@ -114,9 +108,20 @@ BrushPreview planBrush(scene::Composition& composition, const app::PlacementSett
         preview.reason = "choose an asset to place";
         return preview;
     }
+    // Armed *before* the surface is checked, and this order is the whole point. Reporting "no
+    // asset" for a brush that is holding a fern and pointing at the sky is a message that sends the
+    // artist to the palette to fix something that is not broken; what they need told is that there
+    // is no ground where they are pointing. A preview that is wrong about *which* thing is wrong is
+    // worse than one that says nothing.
     preview.armed = true;
     preview.assetId = asset.descriptor->id;
     preview.assetName = asset.descriptor->name.empty() ? asset.descriptor->id : asset.descriptor->name;
+
+    if (!cursor.valid) {
+        preview.issue = PlacementIssue::NoSurface;
+        preview.reason = "no ground under the cursor -- that is the sky, or past the far edge";
+        return preview;
+    }
 
     const std::uint32_t strokeSeed = settings.seed != 0 ? settings.seed : seed;
     const std::vector<app::Placement> plan =

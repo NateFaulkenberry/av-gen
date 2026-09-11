@@ -8,6 +8,8 @@
 
 #include <imgui.h>
 
+#include <functional>
+
 namespace avgen::ui {
 
 // Fills the viewport's work area with a dockspace. The centre node holds the canvas window and
@@ -33,7 +35,13 @@ namespace avgen::ui {
 // many it evicted, which is zero on every run after the first.
 std::size_t enforceCanvasCentre(ImGuiID dockspace, const EditorLayout& layout);
 
-[[nodiscard]] CanvasRect drawCanvasWindow(std::uint64_t texture, std::uint32_t centreNode);
+// `overlay` is called while the canvas window is still current and after the image has been
+// submitted, which is the only moment at which both are true: the canvas's rectangle is known (it
+// is only known once ImGui has laid the window out) and `IsWindowHovered` still answers for the
+// canvas. Everything the world editor draws over the world, and every mouse position it reads, goes
+// through it (ADR-092). May be empty.
+[[nodiscard]] CanvasRect drawCanvasWindow(std::uint64_t texture, std::uint32_t centreNode,
+                                          const std::function<void(const CanvasRect&)>& overlay = {});
 
 // Rebuilds the default dock tree under `dockspace`, discarding whatever is there: a column each
 // side, a strip along the foot, and the canvas in the middle. Records the four node ids in

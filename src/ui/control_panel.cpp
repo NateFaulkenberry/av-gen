@@ -1,6 +1,7 @@
 #include "ui/control_panel.hpp"
 
 #include "ui/editor_shell.hpp"
+#include "ui/viewport_overlay.hpp"
 #include "ui/ui_logic.hpp"
 
 #include "audio/audio_input.hpp"
@@ -131,7 +132,10 @@ void ControlPanel::draw(app::Engine& engine, const FrameStats& stats) {
     enforceCanvasCentre(dockspace, layout_);
 
     // The canvas before the panels, so the world is submitted whatever a panel does afterwards.
-    canvas_ = drawCanvasWindow(canvasTexture, layout_.regionNode(DockRegion::Centre));
+    // The editor runs inside it (ADR-092): the pointer is only the canvas's while the canvas is the
+    // current window, and the canvas's rectangle is only known once ImGui has laid it out.
+    canvas_ = drawCanvasWindow(canvasTexture, layout_.regionNode(DockRegion::Centre),
+                               [&](const CanvasRect& rect) { drawViewportEditor(engine, rect); });
     drawPanels(engine, stats);
     serviceLayoutStore();
 }
@@ -298,14 +302,30 @@ void ControlPanel::drawStatusBar(app::Engine& engine, const FrameStats& stats) {
     ImGui::Separator();
     ImGui::Text("%u draws / %u tris", stats.drawCalls, stats.triangles);
     ImGui::Separator();
-    if (world.selection.kind == WorldSelection::Kind::Node && !world.selection.name.empty()) {
+    // The editor's selection, which is the one that can hold several things. The World panel's
+    // single `selection` is still what the inspector shows; this is what the artist has in hand.
+    if (editor.selection.size() > 1) {
+        ImGui::Text("%zu selected", editor.selection.size());
+    } else if (!editor.selection.empty()) {
+        ImGui::Text("selected %s", editor.selection.primary().c_str());
+    } else if (world.selection.kind == WorldSelection::Kind::Node && !world.selection.name.empty()) {
         ImGui::Text("selected %s", world.selection.name.c_str());
     } else {
         ImGui::TextDisabled("no selection");
     }
-    if (!worldBuilder.placementAssetId.empty()) {
+    ImGui::Separator();
+    // What the next click does, and what the last edit was. Both are things an artist checks
+    // constantly and neither of them was on screen before (ADR-092).
+    if (editor.mode == EditorMode::Place) {
+        ImGui::TextColored(editor.preview().placeable() ? ImVec4(0.5f, 0.88f, 0.62f, 1.0f)
+                                                        : ImVec4(0.94f, 0.45f, 0.4f, 1.0f),
+                           "%s", editor.status().c_str());
+    } else {
+        ImGui::TextDisabled("%s", editor.status().c_str());
+    }
+    if (editor.history.canUndo()) {
         ImGui::Separator();
-        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "placing %s", worldBuilder.placementAssetId.c_str());
+        ImGui::TextDisabled("undo: %s", editor.history.undoLabel().c_str());
     }
     if (!engine.projectPath().empty()) {
         ImGui::Separator();
@@ -371,6 +391,7 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     };
 
     panel("World Builder", ImVec2(400, 620), [&] { drawWorldBuilderWindow(engine); });
+    panel("Edit", ImVec2(400, 640), [&] { drawEditWindow(engine); });
     panel("Assets", ImVec2(520, 420), [&] { drawAssetsWindow(); });
     panel("World", ImVec2(460, 520), [&] { drawWorldWindow(engine); });
     panel("Parameters", ImVec2(420, 360), [&] { drawParameters(engine); });
@@ -417,6 +438,34 @@ void ControlPanel::drawWorldBuilderWindow(app::Engine& engine) {
     // worker that composed it.
     worldBuilder.applyFinished(engine, *builder);
     worldBuilder.draw(engine, *jobs, *builder);
+    // Generating replaces the composer's own nodes, so anything selected that it took away has to
+    // go out of the selection rather than sit there as a name with no object (ADR-092).
+    editor.reconcile(engine);
+}
+
+void ControlPanel::drawViewportEditor(app::Engine& engine, const CanvasRect& rect) {
+    if (!rect.valid()) {
+        return;
+    }
+    const float aspect = rect.width / std::max(rect.height, 1.0f);
+    const EditorInput input = editorInputFromImGui(rect);
+    editor.update(engine, worldBuilder.library(), engine.scene().camera, aspect, input);
+    // AVGEN_EDITOR_TRACE=1 prints the editor's per-frame inputs and what it made of them. The
+    // editor's wiring is the half of it that no unit test reaches and that this machine cannot
+    // screenshot, so it needs a way to say what it saw (ADR-092).
+    static const bool trace = std::getenv("AVGEN_EDITOR_TRACE") != nullptr;
+    if (trace) {
+        log::info("editor: mode={} over={} ndc=({:.2f},{:.2f}) down={} armed={} ground={} n={}",
+                  editorModeName(editor.mode), input.overCanvas, input.ndc.x, input.ndc.y,
+                  input.leftDown, editor.preview().armed, editor.preview().ground.valid,
+                  editor.preview().instances.size());
+    }
+    drawViewportOverlay(editor, engine.scene().camera, rect, aspect);
+    drawViewportHud(editor, rect);
+}
+
+void ControlPanel::drawEditWindow(app::Engine& engine) {
+    editPanel.draw(engine, editor, worldBuilder.library());
 }
 
 void ControlPanel::drawAssetsWindow() {

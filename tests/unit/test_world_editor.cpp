@@ -737,3 +737,76 @@ TEST_CASE("copy and paste leave the original alone") {
     editor.undo(f.engine);
     CHECK(f.engine.composition()->nodeCount() == 1);
 }
+
+// ---- §44: placing one thing must not rebuild the world ------------------------------------------------
+
+TEST_CASE("reusing a terrain's products builds the same scene as re-meshing it") {
+    // The whole risk of the cache (ADR-092) is that a reused terrain is not the terrain that would
+    // have been built. So: flatten a world, add a node, flatten again, and compare the two against
+    // a run with the reuse switched off. If the scene differs by a single mesh or a single chunk
+    // bound, the optimisation is a bug with a benchmark attached.
+    const auto build = [](bool cache) {
+        app::Engine engine(app::EngineMode::Offline);
+        engine.newComposition();
+        scene::CompositionNode terrain;
+        terrain.name = "ground";
+        terrain.kind = scene::NodeKind::Terrain;
+        terrain.worldMap = world::defaultWorld();
+        terrain.worldMap.size = glm::vec2(160.0f, 160.0f);
+        terrain.worldMap.prepare();
+        terrain.terrain.chunkSize = 40.0f;
+        terrain.terrain.resolution = 16;
+        REQUIRE(engine.composition()->addNode(std::move(terrain)).has_value());
+
+        if (!cache) {
+            ::setenv("AVGEN_NO_TERRAIN_CACHE", "1", 1);
+        } else {
+            ::unsetenv("AVGEN_NO_TERRAIN_CACHE");
+        }
+        // First flatten.
+        static_cast<void>(engine.composition()->nodeBounds("ground"));
+        // A structural edit that has nothing to do with the terrain, then a second flatten.
+        scene::CompositionNode orb;
+        orb.name = "orb";
+        orb.kind = scene::NodeKind::Orb;
+        orb.transform.position = glm::vec3(3.0f, 1.0f, 0.0f);
+        REQUIRE(engine.composition()->addNode(std::move(orb)).has_value());
+        static_cast<void>(engine.composition()->nodeBounds("orb"));
+
+        struct Shape {
+            std::size_t meshes = 0;
+            std::size_t entities = 0;
+            std::size_t chunks = 0;
+            std::size_t triangles = 0;
+            glm::vec3 lo{0.0f};
+            glm::vec3 hi{0.0f};
+        } shape;
+        const scene::Scene& s = engine.composition()->scene();
+        shape.meshes = s.meshes.size();
+        shape.entities = s.entities.size();
+        const scene::CompositionNode* built = engine.composition()->findNode("ground");
+        shape.chunks = built->chunks.size();
+        for (const world::TerrainChunk& chunk : built->chunks) {
+            shape.triangles += s.meshes[chunk.meshes[0]].indices.size() / 3;
+            shape.lo = glm::min(shape.lo, chunk.boundsMin);
+            shape.hi = glm::max(shape.hi, chunk.boundsMax);
+        }
+        return shape;
+    };
+
+    const auto reused = build(true);
+    const auto rebuilt = build(false);
+    ::unsetenv("AVGEN_NO_TERRAIN_CACHE");
+
+    CHECK(reused.chunks > 0);
+    CHECK(reused.triangles > 0);
+    CHECK(reused.meshes == rebuilt.meshes);
+    CHECK(reused.entities == rebuilt.entities);
+    CHECK(reused.chunks == rebuilt.chunks);
+    // The triangle count is read through the chunks' *mesh ids*, so this also proves the rebasing:
+    // a cached chunk whose ids were not moved to where its meshes actually landed would index some
+    // other node's geometry and the count would not match.
+    CHECK(reused.triangles == rebuilt.triangles);
+    CHECK_THAT(reused.lo.y, Catch::Matchers::WithinAbs(rebuilt.lo.y, 1e-4));
+    CHECK_THAT(reused.hi.y, Catch::Matchers::WithinAbs(rebuilt.hi.y, 1e-4));
+}

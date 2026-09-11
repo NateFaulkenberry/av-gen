@@ -1128,6 +1128,14 @@ void Application::handleViewportEvent(const SDL_Event& event) {
     //    width of the left-hand panel -- which is the kind of wrong that survives a demo.
     const auto scale = [this]() { return std::max(window_->pixelScale(), 1e-3f); };
 
+    // The world editor gets first refusal on the left button (ADR-092). It says so when the pointer
+    // is over a gizmo handle, mid-drag, mid-box or in Place mode -- all the cases where a left drag
+    // means something to the editor. A drag that started on a handle and orbited the camera instead
+    // is the single most infuriating thing a viewport can do, and it is the default outcome unless
+    // somebody asks this question in this order. The other buttons are always the camera's, so
+    // looking around never stops being possible whatever mode the editor is in.
+    const bool editorOwnsLeft = panel_ != nullptr && panel_->editor.wantsMouse();
+
     switch (event.type) {
     case SDL_EVENT_MOUSE_BUTTON_DOWN: {
         viewportLastMouse_ = glm::vec2(event.button.x, event.button.y);
@@ -1138,7 +1146,7 @@ void Application::handleViewportEvent(const SDL_Event& event) {
             viewportGesture_ = ViewportGesture::Pan;
         } else if (event.button.button == SDL_BUTTON_RIGHT) {
             viewportGesture_ = ViewportGesture::Look;
-        } else if (event.button.button == SDL_BUTTON_LEFT) {
+        } else if (event.button.button == SDL_BUTTON_LEFT && !editorOwnsLeft) {
             viewportGesture_ = ViewportGesture::Orbit;
         }
         break;
@@ -1161,11 +1169,15 @@ void Application::handleViewportEvent(const SDL_Event& event) {
         const bool moved = viewportDragTotal_.x + viewportDragTotal_.y > 4.0f;
         const SDL_Keymod mods = SDL_GetModState();
         // A left button that went down and up without travelling is a click, not a tiny orbit.
-        if (wasLeft && !moved && (mods & SDL_KMOD_SHIFT) == 0) {
+        // Shift no longer disqualifies it: shift-click is how a selection is added to, and it only
+        // means "pan" while the button is being *dragged*.
+        if (wasLeft && !moved && !editorOwnsLeft) {
             const ui::CanvasPixel pixel = ui::canvasPixelFor(canvas_, event.button.x, event.button.y,
                                                              scale(), renderWidth_, renderHeight_);
             viewportPickPixel_ = glm::uvec2(pixel.x, pixel.y);
             viewportPickPending_ = true;
+            viewportPickAdditive_ = (mods & SDL_KMOD_SHIFT) != 0;
+            viewportPickInsideGroup_ = (mods & SDL_KMOD_ALT) != 0;
         }
         viewportGesture_ = ViewportGesture::None;
         break;
@@ -1231,6 +1243,10 @@ void Application::handleInputEvent(const SDL_Event& event) {
             if (canvas_.hovered || viewportGesture_ != ViewportGesture::None) {
                 handleViewportEvent(event);
             }
+            if (event.type == SDL_EVENT_KEY_DOWN && !imgui_->wantsKeyboard() &&
+                handleEditorShortcut(event)) {
+                return;
+            }
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && !imgui_->wantsKeyboard()) {
                 if (event.key.key == SDLK_SPACE) {
                     engine_->togglePlay();
@@ -1246,6 +1262,130 @@ void Application::handleInputEvent(const SDL_Event& event) {
                     engine_->seekSeconds(engine_->positionSeconds() + 5.0);
                 }
             }
+}
+
+// The editor's keyboard shortcuts (world-authoring-spec §43). The set is the one every 3D tool
+// uses -- Q/W/E/R for the tool, G to group, Cmd+D to duplicate, Cmd+Z to undo -- because an artist
+// arrives already knowing it, and a tool that renames the shortcuts everybody has in their hands
+// is a tool that has to be learned before it can be used.
+//
+// Repeat is allowed for the nudge keys and for undo, which are the two anybody holds down.
+bool Application::handleEditorShortcut(const SDL_Event& event) {
+    if (panel_ == nullptr || engine_ == nullptr) {
+        return false;
+    }
+    ui::WorldEditor& editor = panel_->editor;
+    const SDL_Keymod mods = SDL_GetModState();
+    const bool command = (mods & (SDL_KMOD_GUI | SDL_KMOD_CTRL)) != 0;
+    const bool shift = (mods & SDL_KMOD_SHIFT) != 0;
+
+    if (command) {
+        switch (event.key.key) {
+        case SDLK_Z:
+            // Cmd+Z / Cmd+Shift+Z. The one shortcut that has to work when everything else has gone
+            // wrong, which is why it is first.
+            if (shift) {
+                editor.redo(*engine_);
+            } else {
+                editor.undo(*engine_);
+            }
+            return true;
+        case SDLK_Y:
+            editor.redo(*engine_);
+            return true;
+        case SDLK_D:
+            editor.duplicateSelection(*engine_);
+            return true;
+        case SDLK_G:
+            if (shift) {
+                editor.ungroupSelection(*engine_);
+            } else {
+                editor.groupSelection(*engine_);
+            }
+            return true;
+        case SDLK_C:
+            editor.copySelection(*engine_);
+            return true;
+        case SDLK_V:
+            editor.paste(*engine_);
+            return true;
+        case SDLK_A:
+            editor.selectAll(*engine_);
+            return true;
+        default:
+            return false;
+        }
+    }
+    if (event.key.repeat) {
+        // Only the nudges repeat below this line.
+        switch (event.key.key) {
+        case SDLK_UP:
+        case SDLK_DOWN:
+        case SDLK_LEFT:
+        case SDLK_RIGHT:
+            break;
+        default:
+            return false;
+        }
+    }
+
+    // Arrow keys nudge the selection along the world axes, by the snap grid when one is set and by
+    // a tenth of a metre when it is not. Holding shift makes it ten times as far, which is the
+    // gesture for "about there" against "exactly there".
+    const float step = (editor.snap.move > 0.0f ? editor.snap.move : 0.1f) * (shift ? 10.0f : 1.0f);
+    switch (event.key.key) {
+    case SDLK_Q:
+        editor.mode = ui::EditorMode::Select;
+        return true;
+    case SDLK_B:
+        editor.mode = ui::EditorMode::Place;
+        return true;
+    case SDLK_W:
+        editor.gizmoMode = ui::GizmoMode::Move;
+        editor.mode = ui::EditorMode::Select;
+        return true;
+    case SDLK_E:
+        // E is also "open environment" in the File menu's bindings. The editor takes it while
+        // something is selected, because that is when it means "rotate"; with nothing selected it
+        // falls through and still opens an HDR.
+        if (editor.selection.empty()) {
+            return false;
+        }
+        editor.gizmoMode = ui::GizmoMode::Rotate;
+        return true;
+    case SDLK_R:
+        editor.gizmoMode = ui::GizmoMode::Scale;
+        editor.mode = ui::EditorMode::Select;
+        return true;
+    case SDLK_X:
+        editor.localSpace = !editor.localSpace;
+        return true;
+    case SDLK_DELETE:
+    case SDLK_BACKSPACE:
+        editor.deleteSelection(*engine_);
+        return true;
+    case SDLK_UP:
+        editor.nudgeSelection(*engine_, glm::vec3(0.0f, 0.0f, -step));
+        return !editor.selection.empty();
+    case SDLK_DOWN:
+        editor.nudgeSelection(*engine_, glm::vec3(0.0f, 0.0f, step));
+        return !editor.selection.empty();
+    case SDLK_LEFT:
+        editor.nudgeSelection(*engine_, glm::vec3(-step, 0.0f, 0.0f));
+        return !editor.selection.empty();
+    case SDLK_RIGHT:
+        editor.nudgeSelection(*engine_, glm::vec3(step, 0.0f, 0.0f));
+        return !editor.selection.empty();
+    case SDLK_F: {
+        if (editor.selection.empty()) {
+            return false;
+        }
+        panel_->editPanel.frameSelectionRequested = true;
+        return true;
+    }
+    default:
+        return false;
+    }
 }
 
 void Application::runViewportProbe(int frameIndex) {
@@ -1424,26 +1564,18 @@ void Application::serviceViewportPick() {
     }
     if (!result->hit) {
         // The sky. Deselecting is what a click on nothing means everywhere else, so it means it
-        // here too rather than leaving the previous selection stuck.
+        // here too rather than leaving the previous selection stuck -- unless this was a shift
+        // click, which is an addition and must not throw away what is already chosen.
         viewportSelectedNode_.clear();
         if (panel_ != nullptr) {
-            panel_->world.selection = ui::WorldSelection{};
+            panel_->editor.applyPick(*engine_, {}, viewportPickAdditive_, viewportPickInsideGroup_);
+            if (!viewportPickAdditive_) {
+                panel_->world.selection = ui::WorldSelection{};
+            }
         }
         return;
     }
     viewportPickPosition_ = result->position;
-    // Armed tool: the click places rather than selects. Placement needs a surface normal and the
-    // identifier target does not carry one, so it is estimated from two neighbouring picks -- which
-    // is enough for "lie along the slope" and costs two more four-byte reads.
-    if (!placementAssetId_.empty()) {
-        glm::vec3 normal(0.0f, 1.0f, 0.0f);
-        if (auto surface = pickNormalAt(*context_, renderer_->linearDepthTexture(), view,
-                                        viewportPickPixel_)) {
-            normal = *surface;
-        }
-        placeAt(result->position, normal);
-        return;
-    }
     const auto* composition = engine_->composition();
     const scene::CompositionNode* node =
         composition != nullptr ? composition->nodeForEntity(result->objectId) : nullptr;
@@ -1457,8 +1589,14 @@ void Application::serviceViewportPick() {
     }
     viewportSelectedNode_ = node->name;
     if (panel_ != nullptr) {
+        // The editor decides what a click on this node *means* -- whether it selects the node or
+        // the group it is in, and whether it replaces the selection or adds to it (ADR-092). The
+        // World panel's single selection follows it so the inspector still shows what is in hand.
+        panel_->editor.applyPick(*engine_, node->name, viewportPickAdditive_, viewportPickInsideGroup_);
         panel_->world.selection.kind = ui::WorldSelection::Kind::Node;
-        panel_->world.selection.name = node->name;
+        panel_->world.selection.name = panel_->editor.selection.empty()
+                                           ? node->name
+                                           : panel_->editor.selection.primary();
     }
     log::info("pick: '{}' at ({:.2f}, {:.2f}, {:.2f})", node->name, result->position.x,
               result->position.y, result->position.z);
@@ -1869,12 +2007,28 @@ int Application::runLive() {
         }
         renderer_->collectFrameTimings();
         compositor_->collectTimings();
-        // What the panel armed this frame. Copied rather than read through the panel at click time
-        // so the application does not reach into UI state from the event handler, and so a headless
-        // or scripted caller can arm a placement without a panel existing at all.
         if (panel_ != nullptr) {
-            placementAssetId_ = panel_->worldBuilder.placementAssetId;
-            placement_ = panel_->worldBuilder.placement;
+            // Placement is the world editor's now (ADR-092): it plans and commits inside the UI
+            // pass against the CPU ground probe, so a click no longer costs a GPU round trip and a
+            // *hover* can show what the click would do. These two are kept in step with it so a
+            // scripted or headless caller still has one place to arm a brush from.
+            placementAssetId_ = panel_->editor.brushAssetId;
+            placement_ = panel_->editor.brush;
+            // What the Edit panel asked for: look at what is selected.
+            if (panel_->editPanel.frameSelectionRequested) {
+                panel_->editPanel.frameSelectionRequested = false;
+                if (auto* composition = engine_->composition()) {
+                    const scene::WorldBounds bounds =
+                        ui::selectionBounds(*composition, panel_->editor.selection.nodes());
+                    if (bounds.valid) {
+                        ensureFreeCamera();
+                        setViewportPose(frameSphere(viewportPose(), bounds.centre(),
+                                                    std::max(bounds.radius(), 0.5f),
+                                                    engine_->scene().camera.effectiveFovY()));
+                        log::info("viewport: framed {} object(s)", panel_->editor.selection.size());
+                    }
+                }
+            }
             // "Frame it" on a hero. The panel asks and the viewport answers, because the camera
             // belongs to the viewport: a panel that moved the camera itself would be a second thing
             // writing camera/position, and the two would fight during a drag.
@@ -2011,6 +2165,11 @@ int Application::runLive() {
         out << cpuProfile_.csv();
         log::info("frame phases written to {}", options_.profileCsv->string());
     }
+    // What the scripted editor run actually did, in order. This is the only record that survives a
+    // run the machine cannot screenshot (ADR-092), so it is printed whether or not anything else is.
+    for (const std::string& line : uiScript_.editLog()) {
+        log::info("{}", line);
+    }
     log::info("rendered {} frames; GPU errors: {}", framesRendered, context_->errorCount());
     return context_->errorCount() == 0 ? 0 : 5;
 }
@@ -2036,6 +2195,12 @@ RenderSettings Application::renderSettingsFromOptions() const {
 }
 
 Result<void> Application::openAny(const std::filesystem::path& path) {
+    // A history that describes a world that is gone is worse than no history: pressing undo would
+    // try to restore nodes into a scene that never had them, and the labels would describe edits to
+    // somebody else's project (ADR-092). The nodes the commands were holding go with it.
+    if (panel_ != nullptr) {
+        panel_->editor.reset();
+    }
     if (world::isRecipeFile(path)) {
         return generateWorldFromRecipe(path);
     }

@@ -160,6 +160,7 @@ private:
     bool stroking_ = false;
     EditCommand stroke_;
     std::string strokeGroup_;
+    std::string strokeAsset_;
     glm::vec3 lastStrokePoint_{0.0f};
     bool hasStrokePoint_ = false;
     std::uint32_t strokeSeed_ = 1u;

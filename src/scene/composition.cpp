@@ -8,6 +8,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include <algorithm>
+#include <cstdlib>
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -2260,6 +2261,11 @@ void Composition::ensureBuilt() {
 }
 
 void Composition::rebuild() {
+    // A flatten is the single most expensive thing the editor does on the main thread, it is
+    // triggered by structural edits an artist makes constantly, and until ADR-092 nothing said what
+    // it cost. One line per rebuild, so "why did that stutter" has an answer in the log of the run
+    // it happened in rather than in a profiler nobody was running.
+    const auto rebuildStart = std::chrono::steady_clock::now();
     scene_.meshes.clear();
     scene_.textures.clear();
     scene_.entities.clear();
@@ -2483,6 +2489,24 @@ void Composition::rebuild() {
             // new kind of drawable.
             std::vector<world::GlowCluster> nodeGlow;
             std::unordered_map<std::string, std::shared_ptr<spatial::PointCloud>> habitats;
+            // Everything this terrain produces is a pure function of these five. A rebuild caused by
+            // anything else -- a node placed, a material program added, an HDR swapped -- reuses
+            // what the last one made (ADR-092); a change to any of them moves the key and the
+            // terrain is built again, with nothing to remember to invalidate.
+            CompositionNode& mutableNode = *nodePtr;
+            const std::uint64_t terrainKey =
+                node.worldMap.structuralHash() ^ (node.terrain.structuralHash() * 0x9E3779B97F4A7C15ull) ^
+                (node.ecology.structuralHash() * 0xC2B2AE3D27D4EB4Full) ^
+                (static_cast<std::uint64_t>(ecologyLightGain_ * 1024.0f) * 0x165667B19E3779F9ull) ^
+                (static_cast<std::uint64_t>(ecologyGlowCell_ * 1024.0f) * 0x27D4EB2F165667C5ull);
+            // AVGEN_NO_TERRAIN_CACHE=1 turns the reuse off, so the claim "placing a node used to
+            // cost a whole terrain" can be measured rather than believed. A benchmark whose
+            // baseline has to be reconstructed by reverting a commit is a benchmark nobody re-runs.
+            static const bool cacheDisabled = std::getenv("AVGEN_NO_TERRAIN_CACHE") != nullptr;
+            const bool reuseTerrain = !cacheDisabled && mutableNode.terrainProducts.usable(terrainKey);
+            CompositionNode::TerrainProducts fresh;
+            fresh.hash = terrainKey;
+            std::size_t layerIndex = 0;
             for (const world::ScatterLayer& layer : node.ecology.layers) {
                 std::span<const glm::vec3> anchors;
                 if (layer.proximity) {
@@ -2491,7 +2515,18 @@ void Composition::rebuild() {
                         anchors = found->second->positions();
                     }
                 }
-                auto cloud = std::make_shared<spatial::PointCloud>(world::scatter(node.worldMap, layer, anchors, node.ecology.clearances));
+                std::shared_ptr<spatial::PointCloud> cloud;
+                if (reuseTerrain && layerIndex < mutableNode.terrainProducts.clouds.size()) {
+                    // A shared_ptr, so reuse is free rather than a copy of a quarter of a million
+                    // placements. The cloud is immutable once scattered, and the procedural object
+                    // below already holds it by the same pointer.
+                    cloud = mutableNode.terrainProducts.clouds[layerIndex];
+                } else {
+                    cloud = std::make_shared<spatial::PointCloud>(
+                        world::scatter(node.worldMap, layer, anchors, node.ecology.clearances));
+                }
+                ++layerIndex;
+                fresh.clouds.push_back(cloud);
                 habitats.emplace(layer.name, cloud);
                 if (cloud->count() == 0) {
                     log::warn("terrain '{}': scatter '{}' placed nothing", node.name, layer.name);
@@ -2587,15 +2622,17 @@ void Composition::rebuild() {
                         pg.sourceTransform.scale = glm::vec3(layer.height / authored);
                     }
                 }
-                if (layer.emissiveIntensity > 0.0f && ecologyLightGain_ > 0.0f) {
+                if (layer.emissiveIntensity > 0.0f && ecologyLightGain_ > 0.0f && !reuseTerrain) {
                     auto clusters = world::aggregateGlow(*cloud, layer, ecologyGlowCell_,
                                                          pg.variation.seed);
                     log::info("terrain '{}': scatter '{}' glow reduced to {} emitters", node.name,
                               layer.name, clusters.size());
                     nodeGlow.insert(nodeGlow.end(), clusters.begin(), clusters.end());
                 }
-                log::info("terrain '{}': scatter '{}' placed {} instances", node.name, layer.name,
-                          cloud->count());
+                if (!reuseTerrain) {
+                    log::info("terrain '{}': scatter '{}' placed {} instances", node.name, layer.name,
+                              cloud->count());
+                }
                 // The asset's other materials, each an object identical to this one but for its
                 // mesh, its material and its share of the triangle budget. The layer's tint and
                 // emission are applied to each part's *own* colour, which is the whole point: the
@@ -2624,14 +2661,58 @@ void Composition::rebuild() {
                     scene_.procedurals.push_back(std::move(sub));
                 }
             }
-            // The whole world is built here, once. Chunk meshes are static: only which of a chunk's
-            // four meshes is drawn, and whether it is drawn at all, changes per frame.
-            CompositionNode& mutableNode = *nodePtr;
-            mutableNode.glow = std::move(nodeGlow);
+            // The whole world is built here, once -- and, since ADR-092, once *ever* for a given
+            // map and settings rather than once per rebuild. Chunk meshes are static: only which of
+            // a chunk's four meshes is drawn, and whether it is drawn at all, changes per frame.
             const auto buildStart = std::chrono::steady_clock::now();
-            mutableNode.chunks = world::buildTerrain(
-                node.worldMap, node.terrain,
-                [&](std::size_t, int, MeshData&& mesh) { return scene_.addMesh(std::move(mesh)); });
+            // Where this terrain's meshes start in the scene, so cached ids can be stored relative
+            // to it and rebased on the way back in. The absolute ids move whenever anything else in
+            // the scene flattens a mesh before this node, which is exactly what placing an asset
+            // does.
+            const auto meshBase = static_cast<MeshId>(scene_.meshes.size());
+            if (reuseTerrain) {
+                mutableNode.glow = mutableNode.terrainProducts.glow;
+                for (const MeshData& mesh : mutableNode.terrainProducts.meshes) {
+                    scene_.addMesh(MeshData(mesh));
+                }
+                mutableNode.chunks = mutableNode.terrainProducts.chunks;
+                for (world::TerrainChunk& chunk : mutableNode.chunks) {
+                    for (MeshId& id : chunk.meshes) {
+                        if (id != kInvalidMesh) {
+                            id += meshBase;
+                        }
+                    }
+                    if (chunk.water != kInvalidMesh) {
+                        chunk.water += meshBase;
+                    }
+                }
+                fresh.glow = mutableNode.terrainProducts.glow;
+                fresh.chunks = mutableNode.terrainProducts.chunks;
+                fresh.meshes = mutableNode.terrainProducts.meshes;
+            } else {
+                mutableNode.glow = std::move(nodeGlow);
+                fresh.glow = mutableNode.glow;
+                mutableNode.chunks = world::buildTerrain(
+                    node.worldMap, node.terrain, [&](std::size_t, int, MeshData&& mesh) {
+                        // Kept as well as installed. A copy of the terrain's meshes is tens of
+                        // megabytes and it buys back a third of a second per edit; the alternative
+                        // is re-meshing a world every time somebody places a flower.
+                        fresh.meshes.push_back(mesh);
+                        return scene_.addMesh(std::move(mesh));
+                    });
+                fresh.chunks = mutableNode.chunks;
+                for (world::TerrainChunk& chunk : fresh.chunks) {
+                    for (MeshId& id : chunk.meshes) {
+                        if (id != kInvalidMesh) {
+                            id -= meshBase;
+                        }
+                    }
+                    if (chunk.water != kInvalidMesh) {
+                        chunk.water -= meshBase;
+                    }
+                }
+            }
+            mutableNode.terrainProducts = std::move(fresh);
             for (std::size_t c = 0; c < mutableNode.chunks.size(); ++c) {
                 const world::TerrainChunk& chunk = mutableNode.chunks[c];
                 Entity& e = scene_.addEntity(fmt::format("{}.chunk{}", node.name, c), chunk.meshes[0]);
@@ -2679,8 +2760,9 @@ void Composition::rebuild() {
             const auto wet = static_cast<std::size_t>(std::count_if(
                 mutableNode.chunks.begin(), mutableNode.chunks.end(),
                 [](const world::TerrainChunk& c) { return c.water != kInvalidMesh; }));
-            log::info("terrain '{}': {} chunks ({} with water), {} triangles at LOD 0, built in {:.0f} ms",
-                      node.name, mutableNode.chunks.size(), wet, triangles, buildMs);
+            log::info("terrain '{}': {} chunks ({} with water), {} triangles at LOD 0, {} in {:.0f} ms",
+                      node.name, mutableNode.chunks.size(), wet, triangles,
+                      reuseTerrain ? "reused" : "built", buildMs);
             break;
         }
         case NodeKind::Particles: {
@@ -2996,6 +3078,11 @@ void Composition::rebuild() {
     // The procedural vector has just been rebuilt from the node list, so every index into it is
     // new. Costs measured against the old one describe objects that no longer exist.
     proceduralRebuild_.clear();
+    log::info("composition '{}': flattened {} node(s) -> {} entities, {} meshes, {} procedurals in {:.1f} ms",
+              name_, nodes_.size(), scene_.entities.size(), scene_.meshes.size(),
+              scene_.procedurals.size(),
+              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - rebuildStart)
+                  .count());
     dirty_ = false;
 }
 

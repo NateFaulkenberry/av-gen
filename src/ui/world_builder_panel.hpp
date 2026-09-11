@@ -45,13 +45,10 @@ public:
     [[nodiscard]] const assets::AssetLibrary* library() const {
         return library_ ? &*library_ : nullptr;
     }
-    // What the viewport is armed to place, and how. Held here because the panel is where they are
-    // chosen; the application reads them when a click lands on a surface.
-    std::string placementAssetId;
-    bool placementChanged = false;
-
-    // How a click places things. Public so the application can read it when a pick lands.
-    app::PlacementSettings placement;
+    // What the viewport is armed to place and how used to live here. It lives in `ui::WorldEditor`
+    // now (ADR-092), with the ghost that shows where it will land and the history that takes it
+    // back; the Edit panel is where it is chosen. Nothing here holds a second copy of it, because a
+    // second copy is a second thing to keep in step.
 
     // What the last generation produced, kept so the world can be inspected and adjusted after the
     // fact. A world you can generate and not then look at is a world you have to regenerate to

@@ -229,6 +229,11 @@ private:
     // identifier target still holds the previous frame and the camera may already have moved.
     bool viewportPickPending_ = false;
     glm::uvec2 viewportPickPixel_{0u};
+    // The modifiers the click carried, held with it: the pick is answered a frame later and
+    // SDL_GetModState by then is whatever the keyboard happens to be doing, not what was held down
+    // when the button went up. Shift adds to the selection; alt reaches inside a group.
+    bool viewportPickAdditive_ = false;
+    bool viewportPickInsideGroup_ = false;
     std::string viewportSelectedNode_;
     glm::vec3 viewportPickPosition_{0.0f};
     bool viewportFreeModeAnnounced_ = false;
@@ -241,7 +246,15 @@ private:
     std::uint32_t placementSeed_ = 1u;
 
     // Places whatever the tool is armed with at a picked surface. Returns how many nodes it made.
+    //
+    // Superseded for interactive use by the world editor (ADR-092), which plans and commits inside
+    // the UI pass against the CPU ground probe and so can show a ghost before the click. Kept
+    // because it is the one entry point a scripted or headless caller can place through without a
+    // pointer, and because `--ui-script`'s placement arm drives it.
     std::size_t placeAt(glm::vec3 position, glm::vec3 normal);
+    // The editor's keyboard shortcuts (§43). Returns true when the key was the editor's, so the
+    // application's own bindings do not also fire on it.
+    bool handleEditorShortcut(const SDL_Event& event);
 
     // Reads `camera/position` and `camera/target`. Returns the scene camera's own pose when the
     // parameters are missing, so a gesture over a scene without them still does something sensible.

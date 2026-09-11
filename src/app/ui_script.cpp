@@ -2,14 +2,21 @@
 
 #include "app/engine.hpp"
 #include "platform/window.hpp"
+#include "app/placement.hpp"
+#include "assets/asset_library.hpp"
 #include "ui/control_panel.hpp"
 
 #include <SDL3/SDL.h>
+
+#include <fmt/format.h>
+#include <imgui.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <string>
+#include <utility>
 
 namespace avgen::app {
 
@@ -19,7 +26,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 7> kArms{{
+constexpr std::array<ArmName, 8> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
@@ -27,6 +34,7 @@ constexpr std::array<ArmName, 7> kArms{{
     {"scrub", UiScriptArm::Scrub},
     {"camera", UiScriptArm::Camera},
     {"tabs", UiScriptArm::Tabs},
+    {"edit", UiScriptArm::Edit},
 }};
 
 // Pushes a motion event as though the device had produced it. SDL routes it to the window under
@@ -201,6 +209,10 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
         }
     }
 
+    if (has(arms_, UiScriptArm::Edit)) {
+        stepEdit(engine, *panel, window, frame);
+    }
+
     if (has(arms_, UiScriptArm::Panels)) {
         // Open and close one panel every few frames. Panel open/close is the interaction most
         // likely to cost something structural -- a dock rebuild, a first-use layout, a texture --
@@ -212,6 +224,180 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
                 *slot = !*slot;
             }
         }
+    }
+}
+
+
+// The world editor, driven the way a person drives it: with the pointer, over the canvas, through
+// SDL. Nothing is called directly that a click would not reach -- the events go onto the process
+// queue, are routed by Window::pumpEvents, seen by ImGui, gated by the canvas's hover state and
+// answered by the editor inside the canvas window -- because the point of this arm is to prove the
+// wiring, and a call straight into WorldEditor would prove only the arithmetic the unit tests
+// already cover.
+//
+// **The press comes before the moves, and it has to.** Dear ImGui's SDL3 backend replaces the
+// pointer position with the operating system's cursor at the top of every frame in which the window
+// is focused and no mouse button is held (`ImGui_ImplSDL3_UpdateMouseData`). A synthetic motion on
+// its own is therefore overwritten before the frame that would have used it -- which is why the
+// first version of this arm reported "no ground under the cursor" while the physical mouse sat over
+// a panel. While a button is down the backend leaves the position alone, so a press with a motion
+// in the same frame pins the pointer for the whole of the drag. Anything this arm wants to check
+// about the pointer it therefore checks mid-stroke.
+//
+// The script, in frames, over a single run:
+//
+//     2  restore the default layout, so "the middle of the canvas" means the same thing every run
+//    30  arm the first asset in the library, Place mode, a scatter brush
+//    34  motion + press together, low in the frame where there is ground
+//  35-90 drag across the canvas, painting
+//    44  report what the ghost says: position, slope, instance count, refusals
+//    92  release -- one stroke, one undo step
+//   110  count what was made
+//   120  undo, and count again: it must be back to where it started
+//   135  redo
+//   150  Select mode, click
+//   165  group two objects
+//   180  undo the group
+void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                        std::uint64_t frame) {
+    const ui::CanvasRect& canvas = panel.canvas();
+    if (!canvas.valid()) {
+        return;
+    }
+    const auto at = [&](float u, float v) {
+        return std::pair<float, float>(canvas.x + canvas.width * u, canvas.y + canvas.height * v);
+    };
+    const auto say = [&](std::string line) { editLog_.push_back(std::move(line)); };
+    const auto nodes = [&] {
+        const auto* composition = engine.composition();
+        return composition != nullptr ? composition->nodeCount() : 0u;
+    };
+
+    ui::WorldEditor& editor = panel.editor;
+    switch (frame) {
+    case 2:
+        // The layout this editor ships with, not whatever the machine happened to have saved. A
+        // scripted run that clicks at "the middle of the canvas" has to know where the canvas is,
+        // and a restored layout from another session can put a panel there -- the first attempt at
+        // this arm opened an example project because its click landed in the Assets list.
+        panel.restoreDefaultLayout();
+        break;
+    case 20:
+        say(fmt::format("edit: canvas at ({:.0f},{:.0f}) {:.0f}x{:.0f} points", canvas.x, canvas.y,
+                        canvas.width, canvas.height));
+        break;
+    case 30: {
+        const assets::AssetLibrary* library = panel.worldBuilder.library();
+        if (library == nullptr || library->size() == 0) {
+            say("edit: no asset library, nothing to paint with");
+            return;
+        }
+        editor.mode = ui::EditorMode::Place;
+        editor.brushAssetId = library->assets().front().id;
+        editor.brush.mode = PlacementMode::Brush;
+        editor.brush.brushRadius = 6.0f;
+        editor.brush.spacing = 2.0f;
+        editor.brush.seed = 11u; // a fixed seed: a scripted run has to be the same run twice
+        editor.brush.avoidCollisions = false; // the world is already full; this arm is about wiring
+        editNodesBefore_ = nodes();
+        say(fmt::format("edit: library has {} assets; armed '{}'; {} nodes to start", library->size(),
+                        editor.brushAssetId, editNodesBefore_));
+        break;
+    }
+    case 34: {
+        // Low in the frame, where a camera framed on a subject is looking at ground rather than at
+        // the horizon. Motion and press together: see the note above.
+        const auto [x, y] = at(0.45f, 0.78f);
+        pushMotion(window, x, y);
+        pushButton(window, x, y, true);
+        break;
+    }
+    case 44: {
+        // Mid-stroke, which is when a person is actually looking at the ghost. Everything §22 asks
+        // it to communicate, printed.
+        const ui::BrushPreview& preview = editor.preview();
+        const ImGuiIO& io = ImGui::GetIO();
+        say(fmt::format("edit: ghost armed={} mouse=({:.0f},{:.0f}) ground=({:.1f}, {:.1f}, {:.1f}) "
+                        "slope {:.0f} deg, {} instance(s), {} valid, {} blocked -- {}",
+                        preview.armed, io.MousePos.x, io.MousePos.y, preview.ground.position.x,
+                        preview.ground.position.y, preview.ground.position.z,
+                        preview.ground.slopeDegrees, preview.instances.size(), preview.validCount,
+                        preview.blockedCount, ui::previewSummary(preview)));
+        if (!preview.instances.empty()) {
+            const ui::GhostInstance& first = preview.instances.front();
+            say(fmt::format("edit: first ghost at ({:.1f}, {:.1f}, {:.1f}), {:.2f} m tall, footprint "
+                            "{:.2f} m, {}",
+                            first.position.x, first.position.y, first.position.z, first.height,
+                            first.footprintRadius, ui::placementIssueName(first.issue)));
+        }
+        break;
+    }
+    case 92: {
+        const auto [x, y] = at(0.60f, 0.86f);
+        pushButton(window, x, y, false);
+        break;
+    }
+    case 110:
+        say(fmt::format("edit: painted {} node(s) in one stroke; undo stack {} deep, top '{}'",
+                        nodes() - editNodesBefore_, editor.history.undoSize(),
+                        editor.history.undoLabel()));
+        break;
+    case 120:
+        editor.undo(engine);
+        say(fmt::format("edit: after undo, {} nodes (started at {})", nodes(), editNodesBefore_));
+        break;
+    case 135:
+        editor.redo(engine);
+        say(fmt::format("edit: after redo, {} nodes", nodes()));
+        break;
+    case 150: {
+        editor.mode = ui::EditorMode::Select;
+        const auto [x, y] = at(0.45f, 0.78f);
+        pushMotion(window, x, y);
+        pushButton(window, x, y, true);
+        break;
+    }
+    case 152: {
+        const auto [x, y] = at(0.45f, 0.78f);
+        pushButton(window, x, y, false);
+        break;
+    }
+    case 160:
+        say(fmt::format("edit: click selected {} -- '{}'", editor.selection.size(),
+                        editor.selection.primary()));
+        break;
+    case 165: {
+        // Two objects in hand, however the click went: a scripted click cannot guarantee it landed
+        // on something, and the grouping half of this arm is about the command path rather than
+        // about picking.
+        const auto* composition = engine.composition();
+        if (composition != nullptr) {
+            std::vector<std::string> pair;
+            for (const auto& node : composition->nodes()) {
+                if (node && node->kind == scene::NodeKind::Gltf && pair.size() < 2) {
+                    pair.push_back(node->name);
+                }
+            }
+            editor.selection.set(pair);
+        }
+        editor.groupSelection(engine);
+        say(fmt::format("edit: grouped -> '{}', {} nodes", editor.selection.primary(), nodes()));
+        break;
+    }
+    case 180:
+        editor.undo(engine);
+        say(fmt::format("edit: ungrouped by undo, {} nodes, selection {}", nodes(),
+                        editor.selection.size()));
+        break;
+    default:
+        break;
+    }
+    // The drag itself: every frame between the press and the release, so the stroke actually travels
+    // and the brush lays down more than one dab.
+    if (frame > 34 && frame < 92) {
+        const float t = static_cast<float>(frame - 34) / 58.0f;
+        const auto [x, y] = at(0.45f + 0.15f * t, 0.78f + 0.08f * t);
+        pushMotion(window, x, y);
     }
 }
 
