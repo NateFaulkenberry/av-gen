@@ -633,9 +633,8 @@ public:
             state.speed = 0.0f;
             state.activity = Activity::Observe;
         }
-        // While observing, hold still and attend to the subject. `lookAt` does the turning; this
-        // only says what is worth turning towards, which is the division that lets either be
-        // replaced without touching the other.
+        // What is worth attending to. `lookAt` does the turning; this only names the subject,
+        // which is the division that lets either be replaced without touching the other.
         if (subjects_.empty() || ctx.world == nullptr) {
             return;
         }

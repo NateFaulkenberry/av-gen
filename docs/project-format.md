@@ -179,6 +179,81 @@ Parameters a composition registers (all saveable in a project and modulatable):
 | `particles/<name>/…` | the particle node's system (see `docs/rendering.md`) |
 | `camera/distance`, `height`, `orbitSpeed`, `fov`; `env/intensity`, `env/rotation`; `scene/brightness`, `scene/gridIntensity`; `root/scale`, `root/rotationSpeed`, `root/impulse` | as in the orb and glTF scenes |
 
+### `"entities"` — what moves on its own, and how it answers the music (ADR-087)
+
+A sibling of `"nodes"` and `"heroes"`. An entity does not add geometry: it *drives* a node the
+scene has already placed, which is what lets one entity type drive an imported craft, a procedural
+rock or a skinned character.
+
+```json
+"entities": [
+  {
+    "name": "visitor",
+    "node": "visitor",
+    "seed": 20260911,
+    "fullDetailDistance": 420.0, "coarseInterval": 0.1, "cullDistance": 900.0,
+    "clips": { "idle": "Idle", "walk": "Walk", "run": "Run" },
+    "behaviors": [
+      { "kind": "hover", "amplitude": 0.85, "rate": 0.055, "tilt": 1.7 },
+      { "kind": "spin", "signal": "audio.beat", "baseRate": 1.1, "impulse": 13.0, "damping": 0.5 }
+    ],
+    "reactions": [
+      { "signal": "audio.bass", "target": "parts/Light/emissiveGain", "depth": 2.6,
+        "chain": { "attackMs": 35, "decayMs": 260, "curve": "power", "curveAmount": 1.6 } },
+      { "signal": "audio.onset", "target": "position", "component": 1, "depth": -0.28,
+        "chain": { "envelope": "peakhold", "envelopeHoldMs": 8, "envelopeFallPerSecond": 6 } }
+    ],
+    "sockets": [ { "name": "RightHand", "joint": "mixamorig:RightHand", "position": [0, 0, 0] } ],
+    "attachments": [ { "node": "lantern", "socket": "RightHand" } ]
+  }
+]
+```
+
+**Behaviours** are autonomous, stateful motion. Every knob one owns is registered at
+`entity/<entity>/<behaviour>/<knob>`, so it is keyframeable, presettable and a legal modulation
+target like anything else — the music can drive a wander's speed. They run in declaration order and
+each sees what the ones before it wrote, which is the contract by which `interest` points `lookAt`
+at something without either knowing about the other.
+
+| Kind | What it does | Knobs |
+|---|---|---|
+| `hover` | aperiodic vertical float with a matching tilt | `amplitude`, `rate`, `tilt`, `phase` |
+| `drift` | lateral wander inside a radius | `radius`, `rate` |
+| `bank` | leans into the direction of travel | `degrees`, `responseMs` |
+| `spin` | a yaw *rate* that events push and damping pulls back | `signal`, `baseRate`, `impulse`, `damping`, `maxRate` |
+| `orbit` | slow travel around a named point | `around`, `radius`, `rate`, `phase` |
+| `wander` | navigable destination, walk, pause, repeat | `speed`, `runSpeed`, `turnRate`, `arrive`, `minRange`, `maxRange`, `pauseMin`, `pauseMax`, `homeRadius` |
+| `lookAt` | turns the body towards a subject when not travelling | `target`, `turnRate`, `weight` |
+| `interest` | probabilistic stop-and-look, plus a decaying reaction to a strong audio event | `signal`, `subjects`, `observeChance`, `minDwell`, `maxDwell`, `alertThreshold`, `reactionDecay`, `reactionCooldown` |
+
+**Reactions** are `property <- signal`, declared in data. Each compiles to an ordinary modulation
+route with an ordinary `chain` (every field of `docs/control.md`'s route chain applies). What the
+entity adds is addressing: a `target` is resolved against, in order,
+
+1. the entity's own behaviour knobs — `hover/amplitude` → `entity/<entity>/hover/amplitude`
+2. the driven node's transform — `position`, `rotation`, `scale`, `visible`, `emissiveBoost`
+3. the driven node's geometry — `material/emissive`, `parts/<i>/tint`, and for a `particles` node
+   `spawnRate`, `emissive`, `size`, `speed`, …
+
+with `parts/<material name>/…` rewritten to the part index the asset's material landed in, so a
+scene file writes the name an artist can see in the model rather than an index ordered by surface
+area. `@` prefixes an absolute parameter path when none of that fits. **A target that resolves to
+nothing is reported by name with the candidates that were tried and the material parts that were
+available**, both in the log and in `Engine::projectWarnings`.
+
+**Budget.** Past `fullDetailDistance` metres from the camera an entity updates every
+`coarseInterval` seconds with the accumulated delta instead of every frame; past `cullDistance` it
+is not updated at all and its node stays where the scene put it. 0 disables either stage.
+
+**Characters.** `clips` maps an activity (`idle`, `walk`, `run`, `turn`, `observe`, `react`) onto
+the animation state name the asset carries (ADR-086), so a behaviour never names a clip. An entity
+with no `clips` drives no rig. `sockets` name a place on the entity — a skeleton joint when there
+is one, its own origin until then — and `attachments` make another node follow one.
+
+Determinism: every behaviour draws from a per-entity PCG32 seeded from `seed` (or from the world
+seed and the entity's name), and nothing reads a clock other than the timeline second. The same
+scene, seed, audio and timeline produce the same frame.
+
 
 ## Assets and app blocks (milestone 0.9, ADR-019)
 

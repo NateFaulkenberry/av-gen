@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <memory>
+#include <vector>
 
 using namespace avgen;
 
@@ -162,20 +163,31 @@ TEST_CASE("the craft hangs where the world says it may", "[entity][placement]") 
         CHECK(craft.underside - (ground + canopy) > 8.0f);
     }
 
-    SECTION("it is inside no hero") {
-        // heroPenetration is a capsule test over the hero's declared radius and height, which is
-        // the same test the camera clearance uses -- so "does not intersect" here means the same
-        // thing it means for a directed camera.
+    SECTION("it is inside no other hero") {
+        // heroPenetration is a capsule test over each hero's declared radius and height -- the same
+        // test a directed camera is kept out of them by, so "does not intersect" here means the
+        // same thing it means there. The craft is itself a hero, so it is left out of its own
+        // test; every other one has to be clear.
+        std::vector<world::HeroPoint> others;
+        for (const world::HeroPoint& hero : comp.heroes()) {
+            if (hero.name != "visitor") {
+                others.push_back(hero);
+            }
+        }
+        REQUIRE(others.size() == comp.heroes().size() - 1);
         world::ClearanceField wide = field;
+        wide.heroes = others;
         wide.cameraRadius = craft.radius;
         CHECK(wide.heroPenetration(craft.position) == 0.0f);
-        // And the whole craft, not only its centre: check the rim at eight bearings.
+        // And the whole craft, not only its centre: the rim at eight bearings, top and bottom.
+        world::ClearanceField point = wide;
+        point.cameraRadius = 0.0f;
         for (int i = 0; i < 8; ++i) {
             const float a = static_cast<float>(i) * 0.7853981634f;
             const glm::vec3 rim = craft.position + glm::vec3(std::cos(a), 0.0f, std::sin(a)) * craft.radius;
-            world::ClearanceField point = field;
-            point.cameraRadius = 0.0f;
             CHECK(point.heroPenetration(rim) == 0.0f);
+            CHECK(point.heroPenetration(rim + glm::vec3(0.0f, craft.halfHeight, 0.0f)) == 0.0f);
+            CHECK(point.heroPenetration(rim - glm::vec3(0.0f, craft.halfHeight, 0.0f)) == 0.0f);
         }
     }
 
