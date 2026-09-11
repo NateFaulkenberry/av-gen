@@ -4856,7 +4856,8 @@ nlohmann::json Composition::toJson() const {
                              {"roadCells", cs.roadCells},
                              {"seed", cs.seed},
                              {"plazaFraction", cs.plazaFraction},
-                             {"crossingFraction", cs.crossingFraction}};
+                             {"crossingFraction", cs.crossingFraction},
+                             {"plotFill", cs.plotFill}};
             if (!node.cityLibrary.empty()) {
                 n["cityLibrary"] = node.cityLibrary.generic_string();
             }
@@ -5566,6 +5567,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     cs.seed = c.value("seed", cs.seed);
                     cs.plazaFraction = c.value("plazaFraction", cs.plazaFraction);
                     cs.crossingFraction = c.value("crossingFraction", cs.crossingFraction);
+                    cs.plotFill = c.value("plotFill", cs.plotFill);
                     // Refused at load rather than at rebuild: a city that cannot be planned is a
                     // scene file somebody has to fix, and the error names the field.
                     if (auto r = cs.validate(); !r) {

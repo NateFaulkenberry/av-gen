@@ -2,11 +2,11 @@
  "format": "avgen-scene",
  "version": 1,
  "name": "first-block",
- "camera": { "mode": 0, "position": [86, 44, 104], "target": [0, 2, 0], "fov": 42.0 },
+ "camera": { "mode": 1, "position": [58, 26, 74], "target": [-6, 6, -6], "fov": 42.0 },
  "lightRig": "../lightrigs/city-dawn.rig.json",
  "environment": {
-  "stylized": true,
-  "intensity": 0.9,
+  "stylized": false,
+  "intensity": 0.35,
   "skyIntensity": 1.0,
   "lightFromEnvironment": false,
   "background": [0.10, 0.12, 0.17],
@@ -14,7 +14,7 @@
   "fogDensity": 0.0035,
   "fogHeight": 12.0,
   "fogHeightFalloff": 0.12,
-  "styledSkyAmbient": [0.30, 0.34, 0.42],
+  "styledSkyAmbient": [0.16, 0.19, 0.26],
   "styledGroundAmbient": [0.07, 0.07, 0.08],
   "sky": {
    "enabled": true, "background": true,
@@ -30,7 +30,7 @@
   { "name": "city", "kind": "city",
     "cityLibrary": "../../assets/city-pieces.manifest.json",
     "city": { "moduleSize": 8.0, "tileUnits": 1.0, "blocksX": 3, "blocksZ": 3,
-              "blockCells": 3, "roadCells": 1, "seed": 20260911,
+              "blockCells": 5, "roadCells": 1, "seed": 20260911,
               "plazaFraction": 0.15, "crossingFraction": 0.5 } }
  ]
 }

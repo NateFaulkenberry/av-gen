@@ -15,6 +15,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <map>
 #include <set>
 
 using namespace avgen;
@@ -346,14 +347,35 @@ TEST_CASE("The placer dresses every cell the library has a piece for", "[world][
 
     // One instance per dressable cell, no more and no fewer. A tile placed twice is z-fighting and a
     // tile missed is a hole in the road, and both read as "the city looks a bit wrong".
+    // A plot counts twice: a building, and the ground it stands on. Every other cell is its own
+    // floor -- a road tile *is* the road -- but a building is a solid thing on top of something, and
+    // a plot given only a building has the void around its feet.
     const std::size_t dressable =
         plan.countOf(world::CellKind::Road) + plan.countOf(world::CellKind::Junction) +
-        plan.countOf(world::CellKind::Crossing) + plan.countOf(world::CellKind::Pavement);
+        plan.countOf(world::CellKind::Crossing) + plan.countOf(world::CellKind::Pavement) +
+        plan.countOf(world::CellKind::Courtyard) + plan.countOf(world::CellKind::Plot) * 2;
     CHECK(placed->instanceCount() == dressable);
 
-    // Buildings have no piece in this manifest yet, so the plots are reported as undressed rather
-    // than quietly skipped -- a city missing its buildings still renders, as an empty grid.
-    CHECK(std::ranges::find(placed->undressed, std::string("plot")) != placed->undressed.end());
+    // Including the buildings, which is what distinguishes a city from a road layout. A plot left
+    // undressed is not an error and still renders -- as an empty block -- so the report is the only
+    // thing that would say why.
+    CHECK(plan.countOf(world::CellKind::Plot) > 0);
+    CHECK(std::ranges::find(placed->undressed, std::string("plot")) == placed->undressed.end());
+
+    // The negative control. Without it the check above passes just as well against a placer that
+    // never reports anything at all. The gap is made here rather than borrowed from the manifest:
+    // an earlier version of this control relied on plazas having no piece, and silently stopped
+    // testing anything the moment one was tagged.
+    world::CityLibrary stripped = roles;
+    stripped.plaza.clear();
+    world::CitySettings openSettings = s;
+    openSettings.plazaFraction = 1.0f;
+    const world::CityPlan open = planOrFail(openSettings);
+    REQUIRE(open.countOf(world::CellKind::Plaza) > 0);
+    auto openPlaced = world::placeCity(open, stripped, *library);
+    REQUIRE(openPlaced.has_value());
+    CHECK(std::ranges::find(openPlaced->undressed, std::string("plaza")) !=
+          openPlaced->undressed.end());
 }
 
 TEST_CASE("A placed tile is one module across and square to the lattice", "[world][city][place]") {
@@ -378,6 +400,12 @@ TEST_CASE("A placed tile is one module across and square to the lattice", "[worl
 
     std::set<std::pair<int, int>> occupied;
     for (const world::CityPlacement& p : placed->placements) {
+        // Ground pieces only. A building is not a tile: it has no neighbour to meet across its
+        // edges, and it is scaled to its plot rather than to the pack (see "A building fits its
+        // plot whatever size it was drawn").
+        if (p.kind == world::CellKind::Plot) {
+            continue;
+        }
         const assets::AssetDescriptor* asset = library->find(p.asset);
         REQUIRE(asset != nullptr);
         REQUIRE(p.cloud != nullptr);
@@ -534,7 +562,12 @@ TEST_CASE("A city node turns into instanced geometry", "[world][city][node]") {
     const scene::CompositionNode* node = (*composition)->findNode("city");
     REQUIRE(node != nullptr);
     CHECK(node->kind == scene::NodeKind::City);
-    CHECK(node->city.blockCells == 3);
+    // Against the file, not against a number typed here: the example is art direction and its
+    // settings get retuned. A test that hardcodes one of them fails every time somebody makes the
+    // city look better, which teaches people to edit the test rather than read it.
+    const nlohmann::json raw = nlohmann::json::parse(std::ifstream(scene));
+    CHECK(node->city.blockCells == raw["nodes"][0]["city"]["blockCells"].get<int>());
+    CHECK(node->city.moduleSize == raw["nodes"][0]["city"]["moduleSize"].get<float>());
     CHECK(node->cityCells > 0); // the rebuild planned it
 
     // One instanced object per distinct piece, each carrying a cloud rather than a single transform.
@@ -606,4 +639,213 @@ TEST_CASE("A city whose settings cannot be planned is refused at load", "[world]
     REQUIRE_FALSE(loaded.has_value());
     CHECK(loaded.error().message.find("footway") != std::string::npos);
     std::filesystem::remove_all(dir);
+}
+
+// ---- buildings ----------------------------------------------------------------------------------
+
+TEST_CASE("Every building faces a street", "[world][city]") {
+    // A plan property, so it needs no library: which way a building faces is decided by where the
+    // roads are, and a row of buildings each facing a different way is the clearest sign that a city
+    // was scattered rather than laid out.
+    world::CitySettings s;
+    s.blocksX = 3;
+    s.blocksZ = 3;
+    s.blockCells = 5;
+    s.plazaFraction = 0.0f;
+    s.seed = 1234u;
+    const world::CityPlan plan = planOrFail(s);
+    REQUIRE(plan.countOf(world::CellKind::Plot) > 0);
+
+    std::size_t checked = 0;
+    for (int z = 0; z < plan.depth; ++z) {
+        for (int x = 0; x < plan.width; ++x) {
+            const world::CityCell cell = plan.at({x, z});
+            if (cell.kind != world::CellKind::Plot) {
+                continue;
+            }
+            // The direction the quarter turn points, as a unit step. A piece faces +Z at rest.
+            static constexpr glm::ivec2 kFacing[4] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
+            const glm::ivec2 dir = kFacing[static_cast<int>(cell.rotation)];
+
+            // Walk that way. A carriageway must be reachable without passing through another plot's
+            // building: a house whose front door opens onto the back of the next house is exactly
+            // the failure this rule exists to prevent.
+            bool reachedRoad = false;
+            for (int step = 1; step <= s.blockCells + 2; ++step) {
+                const glm::ivec2 probe{x + dir.x * step, z + dir.y * step};
+                if (!plan.inBounds(probe)) {
+                    break;
+                }
+                if (plan.isCarriageway(probe)) {
+                    reachedRoad = true;
+                    break;
+                }
+                if (plan.kindAt(probe) == world::CellKind::Plot) {
+                    break;
+                }
+            }
+            INFO("plot at " << x << "," << z << " faces quarter "
+                            << static_cast<int>(cell.rotation));
+            CHECK(reachedRoad);
+            ++checked;
+        }
+    }
+    CHECK(checked > 0);
+}
+
+TEST_CASE("A building faces the nearest street, not just any street", "[world][city]") {
+    // The negative control for the test above, which a plan that faced every building the same way
+    // would also pass on a small block. An edge plot has one street closer than the rest, and that
+    // is the one it must face.
+    world::CitySettings s;
+    s.blocksX = 1;
+    s.blocksZ = 1;
+    s.blockCells = 7;
+    s.plazaFraction = 0.0f;
+    const world::CityPlan plan = planOrFail(s);
+
+    std::set<int> facings;
+    for (int z = 0; z < plan.depth; ++z) {
+        for (int x = 0; x < plan.width; ++x) {
+            const world::CityCell cell = plan.at({x, z});
+            if (cell.kind != world::CellKind::Plot) {
+                continue;
+            }
+            facings.insert(static_cast<int>(cell.rotation));
+            // Distance to the street it faces, against the distance to the nearest street at all.
+            static constexpr glm::ivec2 kDirs[4] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
+            const auto stepsTo = [&plan, &s](glm::ivec2 from, glm::ivec2 dir) {
+                for (int step = 1; step <= s.blockCells + 2; ++step) {
+                    const glm::ivec2 probe{from.x + dir.x * step, from.y + dir.y * step};
+                    if (!plan.inBounds(probe)) {
+                        return 9999;
+                    }
+                    if (plan.isCarriageway(probe)) {
+                        return step;
+                    }
+                }
+                return 9999;
+            };
+            int nearest = 9999;
+            for (const glm::ivec2 d : kDirs) {
+                nearest = std::min(nearest, stepsTo({x, z}, d));
+            }
+            const int faced = stepsTo({x, z}, kDirs[static_cast<int>(cell.rotation)]);
+            INFO("plot at " << x << "," << z);
+            CHECK(faced == nearest);
+        }
+    }
+    // And they do not all face the same way, which is what a block of buildings looks like when the
+    // rule is written but never actually applied.
+    CHECK(facings.size() > 1);
+}
+
+TEST_CASE("A block builds from one family", "[world][city][place]") {
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+    // More than one family, or the property below holds for reasons that have nothing to do with the
+    // code under test.
+    REQUIRE(roles.plotFamilies.size() > 1);
+
+    world::CitySettings s;
+    s.blocksX = 4;
+    s.blocksZ = 4;
+    s.blockCells = 5;
+    s.plazaFraction = 0.0f;
+    s.seed = 99u;
+    const world::CityPlan plan = planOrFail(s);
+
+    // Which family each asset belongs to.
+    std::map<std::string, std::string> familyOf;
+    for (const auto& [family, names] : roles.plotFamilies) {
+        for (const std::string& n : names) {
+            familyOf[n] = family;
+        }
+    }
+
+    auto placed = world::placeCity(plan, roles, *library);
+    REQUIRE(placed.has_value());
+
+    // Every building instance, back to the block it stands on, by position.
+    std::map<std::pair<int, int>, std::set<std::string>> familiesPerBlock;
+    for (const world::CityPlacement& p : placed->placements) {
+        if (p.kind != world::CellKind::Plot) {
+            continue;
+        }
+        const auto it = familyOf.find(p.asset);
+        REQUIRE(it != familyOf.end());
+        for (const glm::vec3& pos : p.cloud->positions()) {
+            // Back to cell coordinates, then to the block that cell belongs to.
+            const float m = s.moduleSize;
+            const int cx = static_cast<int>(std::floor(
+                (pos.x + static_cast<float>(plan.width) * m * 0.5f) / m));
+            const int cz = static_cast<int>(std::floor(
+                (pos.z + static_cast<float>(plan.depth) * m * 0.5f) / m));
+            const glm::ivec2 block = plan.at({cx, cz}).block;
+            REQUIRE(block.x >= 0);
+            familiesPerBlock[{block.x, block.y}].insert(it->second);
+        }
+    }
+    REQUIRE(familiesPerBlock.size() > 1);
+    std::set<std::string> distinct;
+    for (const auto& [block, families] : familiesPerBlock) {
+        INFO("block " << block.first << "," << block.second << " has " << families.size()
+                      << " families");
+        CHECK(families.size() == 1);
+        distinct.insert(*families.begin());
+    }
+    // And the whole city is not one family either, which is what "every block picks one family"
+    // degenerates to if the choice ignores the block.
+    CHECK(distinct.size() > 1);
+}
+
+TEST_CASE("A building fits its plot whatever size it was drawn", "[world][city][place]") {
+    if (!std::filesystem::exists(cityPiecesManifest())) {
+        SKIP("assets/city-pieces.manifest.json is not present");
+    }
+    auto library = assets::AssetLibrary::loadFile(cityPiecesManifest());
+    REQUIRE(library.has_value());
+    const world::CityLibrary roles = world::CityLibrary::fromTags(*library);
+
+    world::CitySettings s;
+    s.blocksX = 3;
+    s.blocksZ = 3;
+    s.blockCells = 4;
+    s.plazaFraction = 0.0f;
+    const world::CityPlan plan = planOrFail(s);
+    auto placed = world::placeCity(plan, roles, *library);
+    REQUIRE(placed.has_value());
+
+    // The footprints really do differ, or the property below is about nothing.
+    std::set<int> footprints;
+    bool sawBuilding = false;
+    for (const world::CityPlacement& p : placed->placements) {
+        if (p.kind != world::CellKind::Plot) {
+            continue;
+        }
+        const assets::AssetDescriptor* asset = library->find(p.asset);
+        REQUIRE(asset != nullptr);
+        const float footprint = std::max(asset->naturalSize.x, asset->naturalSize.z);
+        footprints.insert(static_cast<int>(footprint * 100.0f));
+        sawBuilding = true;
+
+        for (const glm::vec3& scale : p.cloud->scales()) {
+            // Uniform, so a building is never squashed to a square. A tower stays a tower.
+            CHECK_THAT(scale.x, WithinAbs(scale.y, 1e-5f));
+            CHECK_THAT(scale.y, WithinAbs(scale.z, 1e-5f));
+            // And it covers its plot without overhanging it. This is the property the pack-wide tile
+            // scale gets wrong: applied to a 1.3-unit building it gives a 10.4 m footprint on an 8 m
+            // plot, which stands in the pavement.
+            const float width = footprint * scale.x;
+            INFO(p.asset << " is " << width << " m across an " << s.moduleSize << " m plot");
+            CHECK(width <= s.moduleSize);
+            CHECK(width > s.moduleSize * 0.5f);
+        }
+    }
+    CHECK(sawBuilding);
+    CHECK(footprints.size() > 1);
 }

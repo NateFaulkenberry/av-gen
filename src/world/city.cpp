@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace avgen::world {
 namespace {
@@ -26,6 +27,7 @@ const char* cellKindName(CellKind kind) {
     case CellKind::Crossing: return "crossing";
     case CellKind::Pavement: return "pavement";
     case CellKind::Plot:     return "plot";
+    case CellKind::Courtyard: return "courtyard";
     case CellKind::Plaza:    return "plaza";
     }
     return "empty";
@@ -33,6 +35,17 @@ const char* cellKindName(CellKind kind) {
 
 float quarterRadians(Quarter q) {
     return static_cast<float>(static_cast<int>(q)) * 1.57079633f;
+}
+
+Quarter quarterTowards(glm::ivec2 delta) {
+    // Quarter turns are anticlockwise about +Y, and a piece faces +Z at rest, so the turns take that
+    // front round +Z, +X, -Z, -X. Z is tested first so a diagonal delta -- which should not reach
+    // here, but might -- resolves the same way every time rather than by argument order.
+    if (delta.y > 0) return Quarter::Zero;
+    if (delta.x > 0) return Quarter::One;
+    if (delta.y < 0) return Quarter::Two;
+    if (delta.x < 0) return Quarter::Three;
+    return Quarter::Zero;
 }
 
 Result<void> CitySettings::validate() const {
@@ -68,6 +81,10 @@ Result<void> CitySettings::validate() const {
     }
     if (crossingFraction < 0.0f || crossingFraction > 1.0f) {
         return fail("city: crossingFraction must be between 0 and 1");
+    }
+    if (!(plotFill > 0.0f) || plotFill > 1.0f) {
+        return fail("city: plotFill must be above 0 and at most 1; it is the fraction of its plot a "
+                    "building fills");
     }
     return {};
 }
@@ -163,15 +180,65 @@ Result<CityPlan> planCity(const CitySettings& settings) {
                     cell.block = glm::ivec2(bx, bz);
                     const bool edge = dx == 0 || dz == 0 || dx == settings.blockCells - 1 ||
                                       dz == settings.blockCells - 1;
+                    // Inside the pavement ring is the block's core, and inside *that* is the part
+                    // of a block no street reaches. Buildings take the core's perimeter and what is
+                    // left becomes a courtyard -- the back of the block, where the bins and the
+                    // parking are. Without this, a block five cells across has a plot in the middle
+                    // with no frontage in any direction: a building whose front door opens onto the
+                    // back of the building in front of it. A test found exactly that.
+                    const bool coreEdge = dx == 1 || dz == 1 || dx == settings.blockCells - 2 ||
+                                          dz == settings.blockCells - 2;
                     if (plaza) {
                         cell.kind = CellKind::Plaza;
                     } else if (edge) {
                         cell.kind = CellKind::Pavement;
-                    } else {
+                    } else if (coreEdge) {
                         cell.kind = CellKind::Plot;
+                    } else {
+                        cell.kind = CellKind::Courtyard;
                     }
                 }
             }
+        }
+    }
+
+    // ---- which way the buildings face ----
+    // A building presents its front to a street. Done here rather than in the placer because it
+    // needs only the lattice -- where the roads are -- and so can be checked exhaustively without an
+    // asset, a mesh or a device, which is the whole reason planning is separate from placing.
+    //
+    // Not random: a row of buildings each facing a different way is the single clearest sign that a
+    // city was scattered rather than laid out.
+    for (int z = 0; z < plan.depth; ++z) {
+        for (int x = 0; x < plan.width; ++x) {
+            CityCell& cell = plan.cells[index(x, z)];
+            if (cell.kind != CellKind::Plot) {
+                continue;
+            }
+            // The four axis directions, nearest carriageway wins. A block is at most `blockCells`
+            // across and roads bound every block, so the search cannot run past the grid.
+            static constexpr glm::ivec2 kDirs[4] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
+            int bestSteps = std::numeric_limits<int>::max();
+            glm::ivec2 bestDir = kDirs[0];
+            for (const glm::ivec2 dir : kDirs) {
+                for (int step = 1; step <= settings.blockCells + 1; ++step) {
+                    const glm::ivec2 probe{x + dir.x * step, z + dir.y * step};
+                    if (!plan.inBounds(probe)) {
+                        break;
+                    }
+                    if (plan.isCarriageway(probe)) {
+                        // Strictly nearer, so the fixed direction order breaks every tie. A plot in
+                        // the middle of a block is equidistant from all four streets and must still
+                        // face one of them the same way on every run.
+                        if (step < bestSteps) {
+                            bestSteps = step;
+                            bestDir = dir;
+                        }
+                        break;
+                    }
+                }
+            }
+            cell.rotation = quarterTowards(bestDir);
         }
     }
 

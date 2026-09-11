@@ -310,18 +310,65 @@ Three things that cost time and would cost it again:
   scene, and `AssetRegistry::setBaseDirectory` has to be set first or relative paths resolve
   somewhere else and the rebuild warns into a log nobody reads. Both bit this work's own tests.
 
-## Next — buildings, and then a frame worth looking at
+**Buildings — families, facing and two scale rules.** Plots are built on. 26 building pieces from
+the Kenney commercial, suburban and industrial kits are tagged in the manifest, and the example now
+renders **19x19 cells, 28 pieces, 425 instances, 0 GPU errors** as a city rather than a road layout.
+Four decisions, each recorded in ADR-100:
 
-The street is flat, which is correct and is also why the render is a 100-pixel band: there is nothing
-vertical in the city yet. The measured brightness profile shows sky, then that band with real
-per-pixel variation in it (road markings, kerbs), then ground.
+- **A block builds from one family**, chosen from the seed and the block's coordinates. Drawing each
+  plot from the whole library independently puts a bungalow between two towers on every block, which
+  is the characteristic look of a city nobody planned. The family comes from a `family:<name>` tag —
+  a *prefix*, because the code has to tell a family from any other word an artist writes, and "a tag
+  only some of them carry" silently reclassifies the vocabulary the moment somebody tags one
+  `damaged`.
+- **A building faces the nearest street.** Decided in `planCity`, not the placer, because it needs
+  only the lattice — so it is checked exhaustively with no asset, mesh or device.
+- **Two scale rules.** Ground pieces take the pack-wide tile scale (`tileUnits`, above). A building
+  is scaled to *its plot* instead: it has no tile to meet a neighbour across, and its footprint is
+  its own — the same kit ranges 0.9 to 1.3 units — so the pack scale would leave some overhanging
+  the footway and others adrift in the middle of the plot. `CitySettings::plotFill` (0.9) is the
+  fraction of the plot it fills.
+- **A plot gets ground *and* a building.** Every other cell is its own floor — a road tile *is* the
+  road — but a building is a solid thing standing on something, and a plot given only a building has
+  the void around its feet. Visible in the frame immediately.
 
-1. **Tag building pieces in `assets/city-pieces.manifest.json`.** The plot cells are already planned
-   and already reported as `undressed`, so the work is choosing a piece per plot and giving it the
-   `building` tag. The Kenney commercial, industrial, suburban and modular kits are on disk; the
-   Quaternius downtown modules are the taller option.
-2. **Vary height by block**, or every street is the same. `CityCell::block` is carried for this.
-3. Then look at a frame properly, and only then add props, trees and the plaza ground.
+Four things found by doing it, all of which would have shipped as "the city looks a bit wrong":
+
+- **A block 5 cells across has a landlocked plot in the middle** — no street frontage in any
+  direction, so its front door opens onto the back of the building in front of it. Found by the
+  facing test. The block's core now builds on its *perimeter* and what is left becomes
+  `CellKind::Courtyard`: the back of the block, where the bins and the parking are. A perimeter
+  block, which is what real ones are.
+- **Six of the building pieces are modelled about a corner, not their middle.**
+  `industrial-building-h` spans -0.58 units to one side, which at plot scale is **4.6 m** — half the
+  building in the road. `AssetDescriptor::naturalCentre` now records the bounds centre and buildings
+  are recentred on their plot. Note `road-side` is off-centre too and is deliberately *not*
+  recentred: that is its kerb overhanging the tile on purpose. Same measurement, opposite meaning.
+- **`environment.stylized` discards base-colour texture RGB.** This is engine behaviour, not a bug
+  (`shaders/pbr_shade.wgsl`, gated on `frame.lightCounts.z`), and it is why every Kenney asset
+  rendered bone white for several passes. **Any palette-textured import needs `"stylized": false`.**
+  Worth knowing well beyond the city: it applies to all 1,071 imported meshes.
+- **Camera `"mode": 0` is orbit and ignores `position`/`target`** — mode 1 is the free camera. Two
+  renders came back pixel-identical after retuning the camera before this was spotted.
+
+A test that hardcoded the example's `blockCells` broke the moment the example was retuned. It reads
+the value from the file now: an example is art direction, and a test that pins one of its numbers
+teaches people to edit the test rather than read it.
+
+Tests: 22 cases under `[city]`, 2,540 assertions.
+
+## Next — dressing, then the road graph
+
+The city reads as a city. What is missing is everything *between* the buildings:
+
+1. **A plot's ground is currently `road-square`** — plain asphalt, shared with courtyards and plazas.
+   It reads as a hole from a low angle. A grass or forecourt tile per family would fix it; the
+   suburban kit has `path-*` and `driveway-*` pieces on disk.
+2. **Props, trees and fences.** `planter`, `tree-large`, `tree-small`, `fence-*` are in the suburban
+   kit and untagged. These want a *sub-cell* scatter — several per cell — which the placer does not
+   do yet: it places one piece per role per cell. That is the next structural change.
+3. **Height variation within a family.** A block picks a family; every building in it is then equally
+   likely, so a block is uniform in *character* but random in height. Real streets step.
 
 ## Not started
 

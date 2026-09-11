@@ -155,6 +155,9 @@ Result<AssetDescriptor> assetFromJson(const json& j, AssetCategory fallbackCateg
             }
         }
     }
+    if (auto centre = readVec3(j, "naturalCentre")) {
+        a.naturalCentre = *centre;
+    }
     if (auto size = readVec3(j, "naturalSize")) {
         a.naturalSize = *size;
     }
@@ -408,6 +411,9 @@ json AssetLibrary::toJson() const {
         }
         if (!a.tags.empty()) {
             e["tags"] = a.tags;
+        }
+        if (a.naturalCentre != def.naturalCentre) {
+            e["naturalCentre"] = vec3ToJson(a.naturalCentre);
         }
         if (a.naturalSize != def.naturalSize) {
             e["naturalSize"] = vec3ToJson(a.naturalSize);

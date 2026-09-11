@@ -46,6 +46,7 @@ enum class CellKind : std::uint8_t {
     Crossing,   // a pedestrian crossing laid over a road cell
     Pavement,   // the footway beside a road; where people walk
     Plot,       // a building stands here
+    Courtyard,  // inside a block, behind the buildings: yards, bins, parking, gardens
     Plaza,      // deliberately open: the space a stage or a crowd needs
 };
 [[nodiscard]] const char* cellKindName(CellKind kind);
@@ -54,9 +55,15 @@ enum class CellKind : std::uint8_t {
 // one axis and a junction is symmetric, so this is all the orientation a lattice needs.
 enum class Quarter : std::uint8_t { Zero, One, Two, Three };
 [[nodiscard]] float quarterRadians(Quarter q);
+// The quarter turn that points a piece along `delta`, which must be one axis step. Pieces are
+// modelled facing +Z -- a declared convention, like `tileUnits`, and for the same reason: it is a
+// property of how the pack was authored and cannot be recovered from a mesh's bounds.
+[[nodiscard]] Quarter quarterTowards(glm::ivec2 delta);
 
 struct CityCell {
     CellKind kind = CellKind::Empty;
+    // For a road, the axis it runs along. For a plot, the way the building faces: towards the
+    // nearest carriageway, so a building presents its front to a street rather than its back.
     Quarter rotation = Quarter::Zero;
     // Which block this cell belongs to, or (-1,-1) for the street network between them. Carried so a
     // placer can vary a block's character without re-deriving which cells are in it.
@@ -91,6 +98,14 @@ struct CitySettings {
     float plazaFraction = 0.12f;
     // Crossings are placed on road cells adjacent to a junction. 0 leaves them out.
     float crossingFraction = 0.5f;
+    // How much of its cell a building's footprint fills. Buildings are not tiles: a road piece is
+    // drawn on a 1x1 tile and is scaled by the pack (`tileUnits`) so that it meets its neighbour,
+    // but a building's footprint is its own -- these vary from 0.9 to 1.3 units in the same kit --
+    // and scaling them all by the pack's tile factor would leave some overhanging the pavement and
+    // others floating in the middle of their plot. So a building is scaled to fit its plot instead,
+    // uniformly, keeping the proportions it was drawn with. Below 1 so neighbouring buildings on
+    // adjacent plots do not touch.
+    float plotFill = 0.9f;
 
     [[nodiscard]] Result<void> validate() const;
     // Cells across the whole plan, in each direction.
@@ -141,11 +156,27 @@ struct CityLibrary {
     std::vector<std::string> junction;
     std::vector<std::string> crossing;
     std::vector<std::string> pavement;
-    std::vector<std::string> plot;     // buildings
+    std::vector<std::string> plot;     // buildings, all of them, whatever family
+    std::vector<std::string> courtyard; // what fills the inside of a block
     std::vector<std::string> plaza;    // ground for an open block
+
+    // Buildings grouped by the family they belong to, from a `family:<name>` tag. A block picks one
+    // family and every plot in it draws from that family alone, which is what makes a street read as
+    // a street: houses together, warehouses together, offices together. Drawing each plot from the
+    // whole library independently gives a bungalow between two towers on every block, which is the
+    // characteristic look of a city nobody planned.
+    //
+    // Sorted by family name, and every family's assets sorted, for the same reason the flat lists
+    // are: the choice must be a function of the seed, not of manifest order.
+    std::vector<std::pair<std::string, std::vector<std::string>>> plotFamilies;
 
     [[nodiscard]] const std::vector<std::string>& forKind(CellKind kind) const;
     [[nodiscard]] bool empty() const;
+    // The assets a given block should build from: one family, chosen from `seed` and the block's
+    // coordinates. Falls back to the whole `plot` list when nothing declares a family, so a manifest
+    // that never adopted the convention still builds a city.
+    [[nodiscard]] const std::vector<std::string>& forBlock(glm::ivec2 block,
+                                                           std::uint32_t seed) const;
     // Builds a library by reading the tags of an asset library: an entry tagged "road" dresses road
     // cells, and so on. Keeps the role vocabulary in the manifest, where an artist can change it,
     // rather than in this header.

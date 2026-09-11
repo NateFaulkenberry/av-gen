@@ -81,6 +81,12 @@ struct AssetDescriptor {
     std::string archetype;               // the specific noun: "twisted_pine", "shelf_fungus"
     std::vector<std::string> tags;       // foreground, hero, bioluminescent, delicate, rare, ...
     glm::vec3 naturalSize{1.0f};         // the mesh's own bounds, from the manifest
+    // Where the centre of those bounds sits relative to the mesh's origin, in the mesh's own units.
+    // Zero for a mesh modelled about its own middle, which most are -- but not all: Kenney's
+    // `building-o` spans x -0.884..0 and z 0..1.240, so its origin is a *corner*. A placer that puts
+    // such a mesh at the centre of a plot puts half of it in the road. Only a placer that means to
+    // centre something needs this; scattering does not.
+    glm::vec3 naturalCentre{0.0f};
     int triangles = 0;
 
     // Artistic role. `visualImportance` is what a composer sorts by when it decides what may
