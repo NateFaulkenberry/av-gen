@@ -55,6 +55,9 @@ Result<void> FloatSpec::validate() const {
     if (clusters < 1 || clusters > 4096) {
         return fail("float: clusters must be in [1, 4096]");
     }
+    if (minDepth < 0.0f || minDepth > 100.0f) {
+        return fail("float: minDepth must be in [0, 100] metres");
+    }
     if (bob < 0.0f || bob > 100.0f) {
         return fail("float: bob must be in [0, 100] metres");
     }
@@ -84,6 +87,7 @@ std::uint64_t FloatSpec::structuralHash() const {
     h.f32(bobRate);
     h.f32(tilt);
     h.f32(sink);
+    h.f32(minDepth);
     return h.value();
 }
 
@@ -94,7 +98,7 @@ json FloatSpec::toJson() const {
                 {"driftSpread", driftSpread},                   {"lateral", lateral},
                 {"margin", margin},   {"clustering", clustering}, {"clusters", clusters},
                 {"spin", spin},       {"bob", bob},             {"bobRate", bobRate},
-                {"tilt", tilt},       {"sink", sink}};
+                {"tilt", tilt},       {"sink", sink},         {"minDepth", minDepth}};
 }
 
 Result<FloatSpec> FloatSpec::fromJson(const json& j) {
@@ -135,7 +139,7 @@ Result<FloatSpec> FloatSpec::fromJson(const json& j) {
           std::pair{"lateral", &s.lateral}, std::pair{"margin", &s.margin},
           std::pair{"clustering", &s.clustering}, std::pair{"spin", &s.spin},
           std::pair{"bob", &s.bob}, std::pair{"bobRate", &s.bobRate}, std::pair{"tilt", &s.tilt},
-          std::pair{"sink", &s.sink}}) {
+          std::pair{"sink", &s.sink}, std::pair{"minDepth", &s.minDepth}}) {
         if (auto r = readFloat(key, *target); !r) {
             return std::unexpected(r.error());
         }
@@ -147,7 +151,7 @@ Result<FloatSpec> FloatSpec::fromJson(const json& j) {
 }
 
 void evaluateFloaters(const world::WaterBodySet& bodies, const FloatSpec& spec, float time,
-                      std::vector<Floater>& out) {
+                      std::vector<Floater>& out, const world::TerrainQuery* terrain) {
     out.clear();
     if (!spec.enabled || spec.count <= 0 || bodies.empty()) {
         return;
@@ -156,7 +160,7 @@ void evaluateFloaters(const world::WaterBodySet& bodies, const FloatSpec& spec, 
     // leaves on the river without two worlds.
     std::vector<const world::WaterBody*> pool;
     for (const world::WaterBody& b : bodies.bodies) {
-        if (spec.body.empty() || b.name == spec.body) {
+        if (spec.body.empty() || b.name() == spec.body) {
             pool.push_back(&b);
         }
     }
@@ -186,7 +190,7 @@ void evaluateFloaters(const world::WaterBodySet& bodies, const FloatSpec& spec, 
         // course that empties out over a long shot.
         const float spread = 1.0f + (r.z - 0.5f) * 2.0f * spec.driftSpread;
         const float metresPerSecond = body.speed * spec.driftScale * std::max(spread, 0.05f);
-        const float transit = body.length > 1e-3f ? body.length : 1.0f;
+        const float transit = body.length() > 1e-3f ? body.length() : 1.0f;
         along = fractional(along + metresPerSecond * time / transit);
 
         Floater f;
@@ -196,8 +200,24 @@ void evaluateFloaters(const world::WaterBodySet& bodies, const FloatSpec& spec, 
         // Across the channel, pulled off the bank by `margin`. The offset is fixed per instance: a
         // leaf does not wander across a river inside one shot, and one that does reads as a fish.
         const float usable = std::max(spec.lateral - spec.margin, 0.0f);
-        const float across = (r.w * 2.0f - 1.0f) * usable * body.halfWidth;
-        const glm::vec2 p = glm::vec2(centre.x, centre.z) + normal * across;
+        float across = (r.w * 2.0f - 1.0f) * usable * body.halfWidth();
+        glm::vec2 p = glm::vec2(centre.x, centre.z) + normal * across;
+        // The banks are a planar test; the bed is not planar. Where there is a terrain query to
+        // ask, an instance that landed on a shoal walks in toward the centreline -- halving its
+        // offset, which converges in a handful of steps because the channel is deepest in the
+        // middle -- and is dropped if even the centreline is dry there. Dropping is the honest
+        // outcome: a river's head is genuinely too shallow to hold a lily pad.
+        if (terrain != nullptr && terrain->valid() && spec.minDepth > 0.0f) {
+            bool wet = terrain->waterDepthAt(p) >= spec.minDepth;
+            for (int attempt = 0; attempt < 5 && !wet; ++attempt) {
+                across *= 0.5f;
+                p = glm::vec2(centre.x, centre.z) + normal * across;
+                wet = terrain->waterDepthAt(p) >= spec.minDepth;
+            }
+            if (!wet) {
+                continue;
+            }
+        }
 
         // The surface it actually sits on, asked of the body rather than assumed from the
         // centreline: a wide channel's surface is the same level across it, but the shear profile

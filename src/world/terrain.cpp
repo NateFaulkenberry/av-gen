@@ -256,12 +256,7 @@ scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& sett
     mesh.vertices.resize(static_cast<std::size_t>(side) * side);
     // Speed is baked as a fraction of the fastest body in the world rather than in metres per
     // second, so the lane stays in [0, 1] and a world of slow water does not come out still.
-    float maxSpeed = 0.0f;
-    if (bodies != nullptr) {
-        for (const WaterBody& body : bodies->bodies) {
-            maxSpeed = std::max(maxSpeed, body.speed);
-        }
-    }
+    const float maxSpeed = bodies != nullptr ? bodies->fastest() : 0.0f;
     for (int j = 0; j <= res; ++j) {
         for (int i = 0; i <= res; ++i) {
             const std::size_t k = static_cast<std::size_t>(j) * side + i;
@@ -312,16 +307,20 @@ scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& sett
             // along the real course without the GPU ever hearing of a river. A world with no
             // bodies derived leaves it at +Y, which is exactly the vertex the sheet used to carry.
             v.normal = glm::vec3(0.0f, 1.0f, 0.0f);
+            float channel = 0.0f;
             if (bodies != nullptr && !bodies->empty()) {
                 const FlowSample flow = bodies->flowAt(p);
                 const float scale = maxSpeed > 1e-4f ? flow.speed / maxSpeed : 0.0f;
                 v.normal = glm::vec3(flow.direction.x, glm::clamp(scale, 0.0f, 1.0f), flow.direction.y);
+                // 1 at the centreline, 0 at the bank. The bed's depth does not answer this: a wide
+                // shallow reach is shallow everywhere, and the middle of it is still the middle.
+                // It falls out of the same query the flow does, so it costs nothing.
+                channel = 1.0f - std::fabs(flow.across);
             }
             // uv.x is the bed depth in *metres* -- the shader curves it itself, and the shoreline it
             // draws is sub-quad because it comes from the scene depth rather than from this. uv.y is
-            // the old normalised shore term, kept because it is the one cue a fragment has when
-            // there is no depth prepass to read.
-            v.uv = glm::vec2(depth, glm::clamp(depth / std::max(settings.water.shoreFade, 1e-3f), 0.0f, 1.0f));
+            // where across the channel this is, 1 at the centreline and 0 at the bank.
+            v.uv = glm::vec2(depth, channel);
             mesh.vertices[k] = v;
         }
     }

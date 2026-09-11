@@ -13,9 +13,6 @@ Result<void> WaterSettings::validate() const {
     if (roughness < 0.0f || roughness > 1.0f) {
         return fail("water: roughness must be in [0, 1]");
     }
-    if (shoreFade < 0.0f || shoreFade > 1000.0f) {
-        return fail("water: shoreFade must be in [0, 1000]");
-    }
     if (emissiveIntensity < 0.0f || emissiveIntensity > 1000.0f) {
         return fail("water: emissiveIntensity must be in [0, 1000]");
     }
@@ -83,7 +80,6 @@ std::uint64_t WaterSettings::structuralHash() const {
     StructHash h;
     h.boolean(enabled);
     h.f32(shallow);
-    h.f32(shoreFade);
     // Only the fields that change the *mesh* are structural; colours are material uniforms.
     return h.value();
 }

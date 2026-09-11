@@ -24,16 +24,6 @@ glm::vec2 safeNormalize(glm::vec2 v, glm::vec2 fallback = {0.0f, 1.0f}) {
     return len > kEps ? v / len : fallback;
 }
 
-// Where p projects onto the segment a-b, as a parameter in [0, 1].
-float projectOnSegment(glm::vec2 p, glm::vec2 a, glm::vec2 b) {
-    const glm::vec2 ab = b - a;
-    const float d2 = glm::dot(ab, ab);
-    if (d2 < kEps) {
-        return 0.0f;
-    }
-    return glm::clamp(glm::dot(p - a, ab) / d2, 0.0f, 1.0f);
-}
-
 Result<float> readFloat(const json& j, const char* key, float def) {
     if (!j.contains(key)) {
         return def;
@@ -46,22 +36,12 @@ Result<float> readFloat(const json& j, const char* key, float def) {
 
 } // namespace
 
-const char* waterBodyKindName(WaterBodyKind kind) {
-    switch (kind) {
-    case WaterBodyKind::River:
-        return "river";
-    case WaterBodyKind::Still:
-        return "still";
-    }
-    return "river";
-}
-
 Result<void> WaterFlowSettings::validate() const {
-    if (!(flowSpeed >= 0.0f) || flowSpeed > 100.0f) {
-        return fail("water flow: flowSpeed must be in [0, 100] m/s");
+    if (!(speedScale >= 0.0f) || speedScale > 100.0f) {
+        return fail("water flow: speedScale must be in [0, 100]");
     }
-    if (gradientResponse < 0.0f || gradientResponse > 4.0f) {
-        return fail("water flow: gradientResponse must be in [0, 4]");
+    if (!(speedOverride >= 0.0f) || speedOverride > 100.0f) {
+        return fail("water flow: speedOverride must be in [0, 100] m/s (0 = use the course)");
     }
     if (bankShear < 0.0f || bankShear > 1.0f) {
         return fail("water flow: bankShear must be in [0, 1]");
@@ -72,16 +52,20 @@ Result<void> WaterFlowSettings::validate() const {
     if (stillFactor < 0.0f || stillFactor > 1.0f) {
         return fail("water flow: stillFactor must be in [0, 1]");
     }
+    if (!(stillSpeed >= 0.0f) || stillSpeed > 100.0f) {
+        return fail("water flow: stillSpeed must be in [0, 100] m/s");
+    }
     return {};
 }
 
 std::uint64_t WaterFlowSettings::structuralHash() const {
     StructHash h;
-    h.f32(flowSpeed);
-    h.f32(gradientResponse);
+    h.f32(speedScale);
+    h.f32(speedOverride);
     h.f32(bankShear);
     h.f32(meander);
     h.f32(stillFactor);
+    h.f32(stillSpeed);
     h.f32(windDirection.x);
     h.f32(windDirection.y);
     return h.value();
@@ -90,139 +74,120 @@ std::uint64_t WaterFlowSettings::structuralHash() const {
 // ---- WaterBody ------------------------------------------------------------------------------
 
 float WaterBody::transitSeconds() const {
-    return speed > kEps ? length / speed : 0.0f;
+    return speed > kEps ? length() / speed : 0.0f;
+}
+
+float WaterBody::shearProfile(float r) const {
+    // A parabola, not a linear ramp: that is the profile an open channel has, and the difference is
+    // visible -- a linear ramp puts the whole of midstream at one speed and reads as a belt.
+    return glm::clamp(bankShear * r * r, 0.0f, 1.0f);
 }
 
 glm::vec3 WaterBody::pointAt(float along01) const {
-    if (centre.empty()) {
+    const std::vector<glm::vec3>& line = centre();
+    if (line.empty()) {
         return glm::vec3(0.0f);
     }
-    if (centre.size() == 1 || length <= kEps) {
-        return centre.front();
+    if (line.size() == 1 || length() <= kEps || arc.size() != line.size()) {
+        return line.front();
     }
-    const float s = glm::clamp(along01, 0.0f, 1.0f) * length;
-    // The arc table is ascending, so the segment is found by a binary search rather than a walk:
-    // a drifting object asks this every frame and a smoothed river is a few hundred points.
+    const float s = glm::clamp(along01, 0.0f, 1.0f) * arc.back();
+    // The arc table is ascending, so the segment is a binary search rather than a walk: a drifting
+    // object asks this every frame and a smoothed river is a few hundred nodes.
     const auto it = std::upper_bound(arc.begin(), arc.end(), s);
-    const std::size_t hi = std::min<std::size_t>(
-        static_cast<std::size_t>(it - arc.begin()), centre.size() - 1);
+    const std::size_t hi = std::min<std::size_t>(static_cast<std::size_t>(it - arc.begin()), line.size() - 1);
     const std::size_t lo = hi > 0 ? hi - 1 : 0;
     const float span = arc[hi] - arc[lo];
     const float t = span > kEps ? (s - arc[lo]) / span : 0.0f;
-    return glm::mix(centre[lo], centre[hi], t);
+    return glm::mix(line[lo], line[hi], t);
 }
 
 glm::vec2 WaterBody::tangentAt(float along01) const {
-    if (centre.size() < 2) {
+    const std::vector<glm::vec3>& line = centre();
+    if (line.size() < 2 || arc.size() != line.size()) {
         return stillDirection;
     }
-    const float s = glm::clamp(along01, 0.0f, 1.0f) * length;
+    const float s = glm::clamp(along01, 0.0f, 1.0f) * arc.back();
     const auto it = std::upper_bound(arc.begin(), arc.end(), s);
-    const std::size_t hi = std::min<std::size_t>(
-        static_cast<std::size_t>(it - arc.begin()), centre.size() - 1);
+    const std::size_t hi = std::min<std::size_t>(static_cast<std::size_t>(it - arc.begin()), line.size() - 1);
     const std::size_t lo = hi > 0 ? hi - 1 : 0;
-    return safeNormalize(xz(centre[hi]) - xz(centre[lo]));
+    return safeNormalize(xz(line[hi]) - xz(line[lo]), stillDirection);
 }
 
 FlowSample WaterBody::flowAt(glm::vec2 p) const {
     FlowSample out;
-    if (centre.empty()) {
+    const std::vector<glm::vec3>& line = centre();
+    if (line.empty()) {
         return out;
     }
-    if (centre.size() == 1) {
-        out.surface = centre.front().y;
-        out.distance = glm::distance(p, xz(centre.front()));
-        out.inside = out.distance <= halfWidth;
-        out.direction = stillDirection;
-        out.speed = speed * (out.inside ? 1.0f : 0.0f);
-        return out;
-    }
+    // Everything topological comes from the course: which way it runs, how high its surface is here,
+    // how far along this is, and whether it is between the banks. This file adds only the motion.
+    out.surface = course.surfaceAt(p);
+    out.inside = course.contains(p);
+    out.along = course.alongAt(p);
+    const glm::vec2 downstream = course.flowAt(p);
 
-    // Nearest point on the polyline. Linear in the number of segments and called per water vertex
-    // at build time and per floating object per frame; a smoothed Glowmere river is 113 segments,
-    // which is a few microseconds. If a world ever carries a hundred rivers this wants a grid, and
-    // the place to put one is here rather than in each of this function's callers.
+    // Distance and side. The nearest point on the polyline is not something `WaterCourse` reports,
+    // so it is measured here -- the only projection this file does, and only for the two numbers
+    // the course does not expose.
     float best = std::numeric_limits<float>::max();
-    std::size_t bestSeg = 0;
-    float bestT = 0.0f;
-    for (std::size_t i = 0; i + 1 < centre.size(); ++i) {
-        const glm::vec2 a = xz(centre[i]);
-        const glm::vec2 b = xz(centre[i + 1]);
-        const float t = projectOnSegment(p, a, b);
-        const glm::vec2 q = glm::mix(a, b, t);
+    glm::vec2 nearest = xz(line.front());
+    glm::vec2 tangent = downstream;
+    for (std::size_t i = 0; i + 1 < line.size(); ++i) {
+        const glm::vec2 a = xz(line[i]);
+        const glm::vec2 b = xz(line[i + 1]);
+        const glm::vec2 ab = b - a;
+        const float len2 = glm::dot(ab, ab);
+        const float t = len2 > 1e-12f ? glm::clamp(glm::dot(p - a, ab) / len2, 0.0f, 1.0f) : 0.0f;
+        const glm::vec2 q = a + ab * t;
         const float d2 = glm::dot(p - q, p - q);
         if (d2 < best) {
             best = d2;
-            bestSeg = i;
-            bestT = t;
+            nearest = q;
+            tangent = safeNormalize(ab, downstream);
         }
     }
-    const glm::vec2 a = xz(centre[bestSeg]);
-    const glm::vec2 b = xz(centre[bestSeg + 1]);
-    const glm::vec2 q = glm::mix(a, b, bestT);
-    const glm::vec2 tangent = safeNormalize(b - a, stillDirection);
-
+    if (line.size() == 1) {
+        nearest = xz(line.front());
+        best = glm::dot(p - nearest, p - nearest);
+    }
     out.distance = std::sqrt(best);
-    out.surface = glm::mix(centre[bestSeg].y, centre[bestSeg + 1].y, bestT);
-    out.inside = out.distance <= halfWidth;
-    // Signed side: positive to the right of the downstream direction.
-    const glm::vec2 normal(-tangent.y, tangent.x);
-    const float side = glm::dot(p - q, normal);
-    out.across = halfWidth > kEps ? glm::clamp(side / halfWidth, -1.0f, 1.0f) : 0.0f;
-    const float s = glm::mix(arc[bestSeg], arc[bestSeg + 1], bestT);
-    out.along = length > kEps ? glm::clamp(s / length, 0.0f, 1.0f) : 0.0f;
+    const glm::vec2 reference = glm::length(downstream) > kEps ? downstream : tangent;
+    const glm::vec2 normal(-reference.y, reference.x);
+    out.across = halfWidth() > kEps ? glm::clamp(glm::dot(p - nearest, normal) / halfWidth(), -1.0f, 1.0f)
+                                    : 0.0f;
 
-    if (kind == WaterBodyKind::Still) {
+    if (!flowing) {
+        // Still water: no downstream, a slow wind-driven drift instead, and only inside the body.
         out.direction = stillDirection;
-        out.speed = speed * (out.inside ? 1.0f : 0.0f);
+        out.speed = out.inside ? speed : 0.0f;
         return out;
     }
-    out.direction = tangent;
-    // Shear: fastest at the centreline, slowest at the bank, and nothing outside it. The profile is
-    // the parabola a real open channel has, not a linear ramp, because the difference is visible --
-    // a linear ramp puts the whole midstream at one speed and reads as a belt.
-    const float r = glm::clamp(out.distance / std::max(halfWidth, kEps), 0.0f, 1.0f);
+    out.direction = downstream;
+    const float r = glm::clamp(out.distance / std::max(halfWidth(), kEps), 0.0f, 1.0f);
     out.speed = speed * (1.0f - shearProfile(r));
     return out;
 }
 
-float WaterBody::shearProfile(float r) const {
-    return glm::clamp(bankShear * r * r, 0.0f, 1.0f);
-}
-
 // ---- WaterBodySet ---------------------------------------------------------------------------
-
-int WaterBodySet::nearestBody(glm::vec2 p) const {
-    int best = -1;
-    float bestD = std::numeric_limits<float>::max();
-    for (std::size_t i = 0; i < bodies.size(); ++i) {
-        const FlowSample s = bodies[i].flowAt(p);
-        // A point inside a channel belongs to it outright, whatever else is nearby.
-        const float d = s.inside ? -1.0f : s.distance;
-        if (d < bestD) {
-            bestD = d;
-            best = static_cast<int>(i);
-        }
-    }
-    return best;
-}
 
 FlowSample WaterBodySet::flowAt(glm::vec2 p) const {
     FlowSample out;
     float bestD = std::numeric_limits<float>::max();
     for (const WaterBody& body : bodies) {
         const FlowSample s = body.flowAt(p);
-        const float d = s.inside ? s.distance - body.halfWidth : s.distance;
+        // A point between a body's banks belongs to it; otherwise the nearest bank wins.
+        const float d = s.inside ? s.distance - body.halfWidth() : s.distance;
         if (d < bestD) {
             bestD = d;
             out = s;
         }
     }
-    if (settings.meander > 0.0f && out.speed > kEps) {
+    if (settings.meander > 0.0f && out.speed > kEps && glm::length(out.direction) > kEps) {
         // A slow wander off the centreline tangent, from noise in world space, so the current is a
         // current and not an arrow: neighbouring points differ a little and the same point always
-        // differs the same way. Deterministic (no time term): the *pattern* moves because the water
-        // moves through it, which is what a river looks like.
+        // differs the same way. No time term -- the *pattern* moves because the water moves through
+        // it, which is what a river looks like.
         const float wobble =
             noise::valueNoise(glm::vec3(p.x * 0.012f, 0.0f, p.y * 0.012f), 0x5EA51DEu) * 2.0f - 1.0f;
         const float a = wobble * settings.meander;
@@ -236,24 +201,32 @@ FlowSample WaterBodySet::flowAt(glm::vec2 p) const {
 
 const WaterBody* WaterBodySet::find(std::string_view name) const {
     for (const WaterBody& body : bodies) {
-        if (body.name == name) {
+        if (body.name() == name) {
             return &body;
         }
     }
     return nullptr;
 }
 
+float WaterBodySet::fastest() const {
+    float best = 0.0f;
+    for (const WaterBody& body : bodies) {
+        best = std::max(best, body.speed);
+    }
+    return best;
+}
+
 std::uint64_t WaterBodySet::structuralHash() const {
     StructHash h;
     h.u64(settings.structuralHash());
     for (const WaterBody& body : bodies) {
-        h.str(body.name);
-        h.u32(static_cast<std::uint32_t>(body.kind));
-        h.f32(body.halfWidth);
-        h.f32(body.length);
+        h.str(body.name());
+        h.u32(static_cast<std::uint32_t>(body.course.kind));
+        h.f32(body.halfWidth());
+        h.f32(body.length());
         h.f32(body.speed);
-        h.u64(body.centre.size());
-        for (const glm::vec3& p : body.centre) {
+        h.u64(body.centre().size());
+        for (const glm::vec3& p : body.centre()) {
             h.v3(p);
         }
     }
@@ -262,93 +235,36 @@ std::uint64_t WaterBodySet::structuralHash() const {
 
 // ---- derivation -----------------------------------------------------------------------------
 
-WaterBodySet waterBodies(const WorldMap& map, const WaterFlowSettings& settings) {
+WaterBodySet waterBodies(const std::vector<WaterCourse>& courses, const WaterFlowSettings& settings) {
     WaterBodySet set;
     set.settings = settings;
     const glm::vec2 wind = safeNormalize(settings.windDirection, glm::vec2(0.7071f, 0.7071f));
 
-    // The average gradient over every water feature, so `gradientResponse` measures a reach against
-    // this world's own rivers rather than against an absolute nobody can name. Computed first
-    // because every body needs it and it is cheap.
-    float gradientSum = 0.0f;
-    int gradientCount = 0;
-    for (const Feature& f : map.features) {
-        if (!f.water) {
-            continue;
-        }
-        const std::vector<glm::vec3>& path = f.samplePath();
-        if (path.size() < 2) {
-            continue;
-        }
-        float len = 0.0f;
-        for (std::size_t i = 0; i + 1 < path.size(); ++i) {
-            len += glm::distance(xz(path[i]), xz(path[i + 1]));
-        }
-        if (len > kEps) {
-            gradientSum += std::fabs(path.front().y - path.back().y) / len;
-            ++gradientCount;
-        }
-    }
-    const float meanGradient = gradientCount > 0 ? gradientSum / static_cast<float>(gradientCount) : 0.0f;
-
-    for (const Feature& f : map.features) {
-        if (!f.water) {
-            continue;
-        }
-        const std::vector<glm::vec3>& path = f.samplePath();
-        if (path.empty()) {
+    for (const WaterCourse& course : courses) {
+        if (course.centreline.empty()) {
             continue;
         }
         WaterBody body;
-        body.name = f.name;
-        body.centre = path;
-        body.halfWidth = std::max(f.width, 0.5f);
+        body.course = course;
         body.bankShear = glm::clamp(settings.bankShear, 0.0f, 1.0f);
-        // The feature holds water `waterDepth` above the level its path carries, so the body's
-        // surface is the path lifted by that much -- the same arithmetic WorldMap::waterSurface
-        // does, read here so a floating thing and the surface it floats on cannot disagree.
-        for (glm::vec3& p : body.centre) {
-            p.y += f.waterDepth;
+        body.arc.assign(course.centreline.size(), 0.0f);
+        for (std::size_t i = 1; i < course.centreline.size(); ++i) {
+            body.arc[i] = body.arc[i - 1] +
+                          glm::distance(xz(course.centreline[i - 1]), xz(course.centreline[i]));
         }
 
-        body.arc.assign(body.centre.size(), 0.0f);
-        for (std::size_t i = 1; i < body.centre.size(); ++i) {
-            body.arc[i] = body.arc[i - 1] + glm::distance(xz(body.centre[i - 1]), xz(body.centre[i]));
-        }
-        body.length = body.arc.back();
-        glm::vec3 sum(0.0f);
-        for (const glm::vec3& p : body.centre) {
-            sum += p;
-        }
-        body.centroid = sum / static_cast<float>(body.centre.size());
-
-        // Downstream is the direction the level falls. A path authored uphill is reversed here
-        // rather than rejected: which end an artist started drawing from is not a statement about
-        // which way the water runs, and the terrain was cut from the same levels either way.
-        body.fall = body.centre.front().y - body.centre.back().y;
-        if (body.fall < 0.0f && body.length > kEps) {
-            std::reverse(body.centre.begin(), body.centre.end());
-            for (std::size_t i = 1; i < body.centre.size(); ++i) {
-                body.arc[i] = body.arc[i - 1] + glm::distance(xz(body.centre[i - 1]), xz(body.centre[i]));
-            }
-            body.fall = -body.fall;
-        }
-        body.gradient = body.length > kEps ? body.fall / body.length : 0.0f;
-
-        // A course with no fall in it is not a river, whatever kind the feature calls itself: the
-        // tarn is authored as a Valley with one point and no descent, and a lake bed drawn as a
-        // long flat Flat would be the same. One centimetre of fall over the whole course is the
-        // threshold, which is below what any authored river has and above float noise.
-        const bool flowing = body.length > kEps && body.fall > 0.01f && path.size() >= 2;
-        body.kind = flowing ? WaterBodyKind::River : WaterBodyKind::Still;
-        if (flowing) {
-            const float ratio = meanGradient > kEps ? body.gradient / meanGradient : 1.0f;
-            body.speed = settings.flowSpeed *
-                         glm::clamp(glm::mix(1.0f, ratio, glm::clamp(settings.gradientResponse, 0.0f, 4.0f)),
-                                    0.15f, 4.0f);
-            body.stillDirection = safeNormalize(xz(body.centre.back()) - xz(body.centre.front()), wind);
+        // Whether it flows is the course's own answer -- terrain already refuses to report a
+        // negative descent, and a River that descends is the only kind with a direction. A world
+        // that generates a flat river gets a still body rather than a conveyor running at zero.
+        const float courseSpeed = course.flowSpeed();
+        body.flowing = course.kind == WaterKind::River && courseSpeed > 0.0f && course.centreline.size() >= 2;
+        if (body.flowing) {
+            body.speed = settings.speedOverride > 0.0f ? settings.speedOverride
+                                                       : courseSpeed * std::max(settings.speedScale, 0.0f);
+            body.stillDirection =
+                safeNormalize(xz(course.centreline.back()) - xz(course.centreline.front()), wind);
         } else {
-            body.speed = settings.flowSpeed * glm::clamp(settings.stillFactor, 0.0f, 1.0f);
+            body.speed = settings.stillSpeed * glm::clamp(settings.stillFactor, 0.0f, 1.0f);
             body.stillDirection = wind;
         }
         set.bodies.push_back(std::move(body));
@@ -356,26 +272,23 @@ WaterBodySet waterBodies(const WorldMap& map, const WaterFlowSettings& settings)
     return set;
 }
 
+WaterBodySet waterBodies(const WorldMap& map, const WaterFlowSettings& settings) {
+    return waterBodies(waterCourses(map), settings);
+}
+
 Result<WaterFlowSettings> waterFlowFromJson(const json& j) {
     WaterFlowSettings f;
     if (!j.is_object()) {
         return fail("water flow must be an object");
     }
-    auto speed = readFloat(j, "flowSpeed", f.flowSpeed);
-    if (!speed) return std::unexpected(speed.error());
-    f.flowSpeed = *speed;
-    auto gradient = readFloat(j, "gradientResponse", f.gradientResponse);
-    if (!gradient) return std::unexpected(gradient.error());
-    f.gradientResponse = *gradient;
-    auto shear = readFloat(j, "bankShear", f.bankShear);
-    if (!shear) return std::unexpected(shear.error());
-    f.bankShear = *shear;
-    auto meander = readFloat(j, "meander", f.meander);
-    if (!meander) return std::unexpected(meander.error());
-    f.meander = *meander;
-    auto still = readFloat(j, "stillFactor", f.stillFactor);
-    if (!still) return std::unexpected(still.error());
-    f.stillFactor = *still;
+    for (const auto& [key, target] :
+         {std::pair{"speedScale", &f.speedScale}, std::pair{"speedOverride", &f.speedOverride},
+          std::pair{"bankShear", &f.bankShear}, std::pair{"meander", &f.meander},
+          std::pair{"stillFactor", &f.stillFactor}, std::pair{"stillSpeed", &f.stillSpeed}}) {
+        auto v = readFloat(j, key, *target);
+        if (!v) return std::unexpected(v.error());
+        *target = *v;
+    }
     if (j.contains("windDirection")) {
         const json& w = j.at("windDirection");
         if (!w.is_array() || w.size() != 2 || !w.at(0).is_number() || !w.at(1).is_number()) {
@@ -390,11 +303,12 @@ Result<WaterFlowSettings> waterFlowFromJson(const json& j) {
 }
 
 json waterFlowToJson(const WaterFlowSettings& flow) {
-    return json{{"flowSpeed", flow.flowSpeed},
-                {"gradientResponse", flow.gradientResponse},
+    return json{{"speedScale", flow.speedScale},
+                {"speedOverride", flow.speedOverride},
                 {"bankShear", flow.bankShear},
                 {"meander", flow.meander},
                 {"stillFactor", flow.stillFactor},
+                {"stillSpeed", flow.stillSpeed},
                 {"windDirection", json::array({flow.windDirection.x, flow.windDirection.y})}};
 }
 

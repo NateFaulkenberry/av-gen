@@ -175,10 +175,10 @@ struct ChunkField {
 // a single plane cannot be its surface, and a mesh that samples `waterSurface` follows the course
 // down the valley for free.
 //
-// Vertex uv carries (depth, shore) rather than a texture coordinate, the same trade the ground makes
-// -- depth is how far the bed is below the surface in metres, and shore is how close this point is
-// to dry land, normalised over `shoreFade`. Between them a material can be clear at the edge and
-// dark in the channel without knowing anything about the world.
+// Vertex uv carries (depth, channel) rather than a texture coordinate, the same trade the ground
+// makes. `depth` is how far the bed is below the surface, in metres. `channel` is where across the
+// body this point is: 1 on the centreline and 0 at the bank, which the bed's depth cannot say --
+// a wide shallow reach is shallow all the way across and its middle is still its middle.
 //
 // The vertex *normal* carries the flow (ADR-091): xz is the downstream direction at this point and
 // y is the speed as a fraction of the body's own, so the surface knows which way it runs without a

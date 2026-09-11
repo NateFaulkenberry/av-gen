@@ -29,7 +29,6 @@ struct WaterSettings {
     glm::vec3 shallowColor{0.045f, 0.16f, 0.15f}; // linear; the edge, where the bed shows through
     glm::vec3 deepColor{0.004f, 0.020f, 0.043f};  // linear; the channel
     float roughness = 0.06f;                    // low: water is a mirror before it is a colour
-    float shoreFade = 1.6f;                     // metres over which the surface fades into the bank
     float emissiveIntensity = 0.0f;             // for a world whose water carries light
     glm::vec3 emissiveColor{0.0f};
 

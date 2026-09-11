@@ -21,6 +21,7 @@
 // InstanceRecords once a frame; see Composition::updateFloaters.
 
 #include "core/error.hpp"
+#include "world/terrain_query.hpp"
 #include "world/water.hpp"
 
 #include <glm/glm.hpp>
@@ -73,6 +74,12 @@ struct FloatSpec {
     float bobRate = 0.32f;     // cycles per second of the bob
     float tilt = 0.10f;        // radians of static lean off level, per instance
     float sink = 0.01f;        // metres below the surface the origin sits
+    // Metres of standing water an instance needs under it. Checked against
+    // `world::TerrainQuery::waterDepthAt` (ADR-090 §3) rather than against a shape this file
+    // invents: the course's banks are a planar test and the bed wanders inside them, so a pad
+    // placed by the planar test alone ends up sitting on a shoal. An instance that lands too
+    // shallow is pulled toward the centreline and, failing that, dropped.
+    float minDepth = 0.15f;
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const; // everything except the clock
@@ -91,7 +98,9 @@ struct Floater {
 
 // Places `spec.count` floaters on `bodies` at timeline second `time`. Pure and deterministic: the
 // same arguments always give the same vector, and `time` is the only one that moves.
+// `terrain` may be null, in which case the course's banks are the only test available and an
+// instance may end up over a shoal; pass one whenever there is one.
 void evaluateFloaters(const world::WaterBodySet& bodies, const FloatSpec& spec, float time,
-                      std::vector<Floater>& out);
+                      std::vector<Floater>& out, const world::TerrainQuery* terrain = nullptr);
 
 } // namespace avgen::scene

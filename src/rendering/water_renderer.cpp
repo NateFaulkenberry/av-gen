@@ -48,7 +48,7 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
     // on a night sky is the star field reproduced sharply in the river, and reads as a bug.
     u.surface = glm::vec4(s.fresnel, s.specular, std::clamp(s.roughness, 0.02f, 1.0f), s.maxOpacity);
     u.ripples = glm::vec4(s.ripple, std::max(s.rippleScale, 1e-4f), s.rippleSpeed, s.chop);
-    u.shore = glm::vec4(s.foamWidth, s.edgeFade, s.refraction, s.shoreFade);
+    u.shore = glm::vec4(s.foamWidth, s.edgeFade, s.refraction, 0.0f);
     u.life = glm::vec4(std::max(s.glowScale, 1e-4f), s.glowCoverage, s.glowDepth, s.swell);
     u.params = glm::vec4(flowTime, std::max(fastest, 1e-3f), linearDepthValid ? 1.0f : 0.0f, 0.0f);
     return u;

@@ -2620,15 +2620,15 @@ void Composition::rebuild() {
             // camera all read -- so publishing it costs one conversion and means a mist emitter
             // that runs down the river is a scene file away, with no new emitter kind.
             for (const world::WaterBody& body : mutableNode.waterBodies.bodies) {
-                if (body.centre.size() < 2) {
+                if (body.centre().size() < 2) {
                     continue;
                 }
                 spatial::Spline sp;
-                sp.name = prefixed(sanitise(prefix_), fmt::format("{}.{}", node.name, body.name));
+                sp.name = prefixed(sanitise(prefix_), fmt::format("{}.{}", node.name, body.name()));
                 sp.kind = spatial::SplineKind::Polyline;
                 sp.generator = spatial::SplineGenerator::Points;
-                sp.points.reserve(body.centre.size());
-                for (const glm::vec3& c : body.centre) {
+                sp.points.reserve(body.centre().size());
+                for (const glm::vec3& c : body.centre()) {
                     spatial::SplinePoint sp0;
                     sp0.position = transformPoint(nodeT, c);
                     sp.points.push_back(sp0);
@@ -2636,14 +2636,10 @@ void Composition::rebuild() {
                 scene_.splines.splines.push_back(std::move(sp));
             }
             if (node.terrain.water.enabled) {
-                float fastest = 0.0f;
-                for (const world::WaterBody& body : mutableNode.waterBodies.bodies) {
-                    fastest = std::max(fastest, body.speed);
-                }
                 WaterSurface surface;
                 surface.program = prefixed(sanitise(prefix_), terrainWaterProgramName(node.name));
                 surface.settings = node.terrain.water;
-                surface.fastestFlow = std::max(fastest, 0.05f);
+                surface.fastestFlow = std::max(mutableNode.waterBodies.fastest(), 0.05f);
                 mutableNode.waterSurfaceIndex = static_cast<int>(scene_.waters.size());
                 scene_.waters.push_back(std::move(surface));
             }
@@ -2662,6 +2658,17 @@ void Composition::rebuild() {
                 [](const world::TerrainChunk& c) { return c.water != kInvalidMesh; }));
             log::info("terrain '{}': {} chunks ({} with water), {} triangles at LOD 0, built in {:.0f} ms",
                       node.name, mutableNode.chunks.size(), wet, triangles, buildMs);
+            // What the water actually came out as. A river whose speed or direction is wrong is
+            // invisible in a still frame and obvious in one line of log, and a body that silently
+            // failed to derive is exactly the failure this codebase keeps shipping.
+            for (const world::WaterBody& body : mutableNode.waterBodies.bodies) {
+                const glm::vec2 dir = body.flowAt(glm::vec2(body.centre().front().x,
+                                                            body.centre().front().z)).direction;
+                log::info("  water '{}': {} {:.0f} m, half width {:.1f} m, descent {:.1f} m, "
+                          "{:.2f} m/s, heading ({:.2f}, {:.2f})",
+                          body.name(), world::waterKindName(body.course.kind), body.length(),
+                          body.halfWidth(), body.course.descent, body.speed, dir.x, dir.y);
+            }
             break;
         }
         case NodeKind::Particles: {
@@ -3725,7 +3732,13 @@ void Composition::updateFloaters(double time) {
             }
             continue;
         }
-        evaluateFloaters(source->waterBodies, *node.floats, static_cast<float>(time), floaterScratch_);
+        // ADR-090 §3: the terrain query answers "how much water is over the bed here", which is
+        // what decides whether a pad can actually sit at a point. The course's banks say where the
+        // channel is; only this says where it holds water.
+        const world::TerrainQuery query =
+            world::terrainQuery(source->worldMap, &source->ecology, heroes_);
+        evaluateFloaters(source->waterBodies, *node.floats, static_cast<float>(time), floaterScratch_,
+                         &query);
 
         ProceduralGeometry& pg = scene_.procedurals[slot];
         // The node's own transform moves the world the water is in, so it moves what floats on it.
@@ -4253,7 +4266,6 @@ nlohmann::json Composition::toJson() const {
                                  json{{"enabled", ts.water.enabled},
                                       {"shallow", ts.water.shallow},
                                       {"roughness", ts.water.roughness},
-                                      {"shoreFade", ts.water.shoreFade},
                                       {"shallowColor", vecToJson(ts.water.shallowColor)},
                                       {"deepColor", vecToJson(ts.water.deepColor)},
                                       {"emissiveColor", vecToJson(ts.water.emissiveColor)},
@@ -4939,7 +4951,6 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         }
                         for (const TerrainFloat& f :
                              {TerrainFloat{"shallow", &w.shallow}, TerrainFloat{"roughness", &w.roughness},
-                              TerrainFloat{"shoreFade", &w.shoreFade},
                               TerrainFloat{"emissiveIntensity", &w.emissiveIntensity},
                               TerrainFloat{"clarity", &w.clarity}, TerrainFloat{"maxOpacity", &w.maxOpacity},
                               TerrainFloat{"edgeFade", &w.edgeFade}, TerrainFloat{"fresnel", &w.fresnel},

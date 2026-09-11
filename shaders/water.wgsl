@@ -20,7 +20,7 @@
 // The vertex carries, from world::buildChunkWater:
 //   position  the surface, at the water level
 //   normal    xz = the downstream direction here, y = speed as a fraction of the world's fastest
-//   uv        x = bed depth in metres, y = the normalised shore term
+//   uv        x = bed depth in metres, y = across the channel (1 centreline, 0 bank)
 #include "common.wgsl"
 #include "lighting.wgsl"
 
@@ -34,7 +34,7 @@ struct WaterUniforms {
     emissive: vec4<f32>,       // rgb * intensity, w = 0
     surface: vec4<f32>,        // x = fresnel, y = specular, z = roughness, w = maxOpacity
     ripples: vec4<f32>,        // x = amplitude, y = scale (cycles/m), z = speed, w = chop
-    shore: vec4<f32>,          // x = foamWidth (m), y = edgeFade (m), z = refraction (m), w = shoreFade (m)
+    shore: vec4<f32>,          // x = foamWidth (m), y = edgeFade (m), z = refraction (m), w = 0
     life: vec4<f32>,           // x = glowScale, y = glowCoverage, z = glowDepth (m), w = swell (m)
     params: vec4<f32>,         // x = flow time (s), y = world's fastest body (m/s), z = 1 when the
                                //   linear-depth texture is real, w = 0
@@ -116,14 +116,25 @@ fn noiseD(p: vec2<f32>) -> vec3<f32> {
 // across the world: everything moves at the same speed in the same direction and the eye finds the
 // repeat immediately. Three that disagree never line up, and the slowest of them is the only one
 // travelling at the water's real speed -- the finer ones are the wind on it.
-// `footprint` is the world-space size of one pixel on this surface. A layer whose wavelength is
-// smaller than a couple of pixels cannot be resolved and only aliases, and on water that aliasing
-// is not a static shimmer but a crawling one, because the pattern is travelling. Fading each layer
-// out as its wavelength approaches the footprint is the whole of the level of detail here, and it
-// is why the far reach of a river stays smooth instead of boiling.
+// `footprint` is the world-space size of one pixel on this surface, so `wavelength / footprint` is
+// how many pixels one cycle of a layer spans. A layer under a couple of pixels cannot be resolved
+// and only aliases -- and on water that aliasing is not a static shimmer but a crawling one, because
+// the pattern is travelling. Fading each layer out as it approaches the footprint is the whole of
+// the level of detail here, and it is why the far reach of a river stays smooth instead of boiling.
 fn rippleLayerFade(frequency: f32, footprint: f32) -> f32 {
-    let wavelength = 1.0 / max(frequency, 1e-4);
-    return smoothstep(1.0, 3.0, wavelength / max(footprint, 1e-4));
+    let pixels = 1.0 / (max(frequency, 1e-4) * max(footprint, 1e-4));
+    return smoothstep(1.0, 3.0, pixels);
+}
+
+// The sparkle wants the *other* end of that too. A glint is a point of light; a glint field whose
+// cells are eighty pixels across is a handful of white ovals lying on the water, which is what the
+// near field gives when the frequency is fixed in world space. This is a band pass in screen space:
+// a sparkle cell shows between about three and seventy pixels wide and nowhere else, so the effect
+// looks the same size whatever the resolution and whatever the distance, and simply is not there a
+// metre from the lens -- where a real surface shows you its ripples, not its glitter.
+fn sparkleBandFade(frequency: f32, footprint: f32) -> f32 {
+    let pixels = 1.0 / (max(frequency, 1e-4) * max(footprint, 1e-4));
+    return smoothstep(2.0, 5.0, pixels) * (1.0 - smoothstep(28.0, 70.0, pixels));
 }
 
 fn rippleGradient(p: vec2<f32>, flowDir: vec2<f32>, speed: f32, t: f32, footprint: f32) -> vec2<f32> {
@@ -243,8 +254,12 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         let grain = noiseD(drift * water.life.x * 6.3 + vec2<f32>(11.0, -4.0)).x * 0.5 + 0.5;
         let depthGate = smoothstep(water.life.z * 0.35, water.life.z, vertical) *
                         (1.0 - smoothstep(water.life.z * 6.0, water.life.z * 14.0, vertical));
+        // And it keeps to the channel. Depth alone does not say where the middle of a river is -- a
+        // wide shallow reach is shallow all the way across -- so the vertex carries the cross-channel
+        // coordinate and the glow lives where the water is, not where the bed happens to dip.
+        let midstream = smoothstep(0.12, 0.55, in.uv.y);
         body = body + water.glowColor.rgb * water.glowColor.w * mask *
-                          mix(0.45, 1.0, grain) * depthGate;
+                          mix(0.45, 1.0, grain) * depthGate * midstream;
     }
     body = body + water.emissive.rgb * depthMix;
 
@@ -307,7 +322,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     var sparkle = vec3<f32>(0.0);
     if (water.sparkleColor.w > 0.0) {
         let frequency = water.ripples.y * 26.0;
-        let fade = rippleLayerFade(frequency, footprint);
+        let fade = sparkleBandFade(frequency, footprint);
         if (fade > 0.0) {
             let sp = in.worldPos.xz * frequency - dir * (speed * t * 2.1);
             let crest = noiseD(sp).x * 0.5 + 0.5;
@@ -331,10 +346,16 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     var foam = 0.0;
     if (water.foamColor.w > 0.0) {
         let band = 1.0 - smoothstep(0.0, max(water.shore.x, 1e-3), vertical);
-        // The break-up: the same travelling field as the ripples, at a coarser scale, so the surf
-        // moves with the water instead of being painted on the terrain.
-        let surf = noiseD(in.worldPos.xz * (water.ripples.y * 3.1) - dir * (speed * t * 0.9)).x * 0.5 + 0.5;
-        let broken = smoothstep(0.34, 0.78, surf * 0.7 + band * 0.6);
+        // The break-up: the same travelling field as the ripples, so the surf moves with the water
+        // rather than sitting painted on the terrain, at a frequency fine enough to read as surf and
+        // faded against the pixel footprint like everything else here. A coarse break-up field is
+        // what turns a foam line into a row of white blobs lying on the shallows.
+        let surfFrequency = water.ripples.y * 7.0;
+        let surf = noiseD(in.worldPos.xz * surfFrequency - dir * (speed * t * 0.9)).x * 0.5 + 0.5;
+        // Two thresholds, not one: the band says "near the waterline" and the field says "and on a
+        // crest", and a foam that fires on either reads as scum on still water.
+        let broken = smoothstep(0.46, 0.88, surf * 0.55 + band * 0.55) *
+                     rippleLayerFade(surfFrequency, footprint);
         foam = band * broken * water.foamColor.w * mix(0.45, 1.0, speedFraction);
     }
 

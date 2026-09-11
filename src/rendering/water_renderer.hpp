@@ -52,7 +52,7 @@ struct WaterUniforms {
     glm::vec4 emissive{0.0f};     // rgb * intensity
     glm::vec4 surface{0.0f};      // fresnel, specular, roughness, maxOpacity
     glm::vec4 ripples{0.0f};      // amplitude, scale, speed, chop
-    glm::vec4 shore{0.0f};        // foamWidth, edgeFade, refraction, shoreFade
+    glm::vec4 shore{0.0f};        // foamWidth, edgeFade, refraction, 0
     glm::vec4 life{0.0f};         // glowScale, glowCoverage, glowDepth, swell
     glm::vec4 params{0.0f};       // flow time, fastest body speed, linear depth valid, 0
 };

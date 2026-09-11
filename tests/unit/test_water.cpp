@@ -63,8 +63,9 @@ TEST_CASE("downstream is the direction the bed falls, whichever end it was drawn
         const world::WaterBodySet set = world::waterBodies(map);
         REQUIRE(set.bodies.size() == 1);
         const world::WaterBody& body = set.bodies.front();
-        CHECK(body.kind == world::WaterBodyKind::River);
-        CHECK(body.fall > 4.0f); // it descends five metres, whichever way it was authored
+        CHECK(body.flowing);
+        CHECK(body.course.kind == world::WaterKind::River);
+        CHECK(body.course.descent > 4.0f); // five metres of fall, whichever way it was authored
         // Mid-channel, the flow points toward +Z, which is downhill.
         const world::FlowSample s = body.flowAt(glm::vec2(0.0f, 0.0f));
         INFO("reversed=" << reversed << " direction (" << s.direction.x << ", " << s.direction.y << ")");
@@ -72,7 +73,7 @@ TEST_CASE("downstream is the direction the bed falls, whichever end it was drawn
         CHECK(s.inside);
         CHECK(s.speed > 0.0f);
         // And the head is upstream of the mouth.
-        CHECK(body.centre.front().y > body.centre.back().y);
+        CHECK(body.centre().front().y > body.centre().back().y);
     }
 }
 
@@ -84,23 +85,25 @@ TEST_CASE("a body with no fall in it is still water, not a river at zero", "[uni
     map.layers = {{0.02f, 2.0f, 0.0f, 0.0f}};
     world::Feature pond;
     pond.name = "tarn";
-    pond.kind = world::FeatureKind::Valley;
+    pond.kind = world::FeatureKind::Flat;
     pond.path = {{0.0f, -3.0f, 0.0f}};
     pond.width = 20.0f;
     pond.amplitude = 6.0f;
     pond.water = true;
+    pond.waterDepth = 1.2f;
     map.features.push_back(pond);
     map.prepare();
 
     const world::WaterBodySet set = world::waterBodies(map);
     REQUIRE(set.bodies.size() == 1);
-    CHECK(set.bodies.front().kind == world::WaterBodyKind::Still);
+    CHECK(!set.bodies.front().flowing);
+    CHECK(set.bodies.front().course.kind == world::WaterKind::Pond);
     // A still body moves, slowly, in the wind's direction rather than in none at all: a mirror
     // reads as glass and the surface shader needs something to carry its pattern along.
     const world::FlowSample s = set.bodies.front().flowAt(glm::vec2(0.0f, 0.0f));
     CHECK(glm::length(s.direction) == Approx(1.0f).margin(1e-3f));
     CHECK(s.speed > 0.0f);
-    CHECK(s.speed < set.settings.flowSpeed * 0.5f);
+    CHECK(s.speed < set.settings.stillSpeed * 0.5f);
 }
 
 TEST_CASE("the water is fastest in the channel and slowest at the bank", "[unit][water]") {
@@ -108,7 +111,7 @@ TEST_CASE("the water is fastest in the channel and slowest at the bank", "[unit]
     const world::WaterBodySet set = world::waterBodies(map);
     const world::WaterBody& body = set.bodies.front();
     const float centre = body.flowAt(glm::vec2(0.0f, 0.0f)).speed;
-    const float bank = body.flowAt(glm::vec2(body.halfWidth * 0.95f, 0.0f)).speed;
+    const float bank = body.flowAt(glm::vec2(body.halfWidth() * 0.95f, 0.0f)).speed;
     INFO("centre " << centre << " m/s, bank " << bank << " m/s");
     CHECK(centre > bank);
     CHECK(bank >= 0.0f);
@@ -300,9 +303,9 @@ TEST_CASE("floating objects stay inside the water they float on", "[unit][water]
         for (const scene::Floater& one : f) {
             const world::FlowSample s = body.flowAt(glm::vec2(one.position.x, one.position.z));
             INFO("t=" << t << " at (" << one.position.x << ", " << one.position.z << ") distance "
-                      << s.distance << " of half width " << body.halfWidth);
+                      << s.distance << " of half width " << body.halfWidth());
             // Inside the nominal channel, with the authored margin kept clear of the bank.
-            CHECK(s.distance <= body.halfWidth * (spec.lateral - spec.margin) + 1e-3f);
+            CHECK(s.distance <= body.halfWidth() * (spec.lateral - spec.margin) + 1e-3f);
             // And sitting on the surface, not under the bed or in the air over it.
             CHECK(std::fabs(one.position.y - (s.surface - spec.sink)) <= spec.bob + 1e-3f);
         }
@@ -340,7 +343,7 @@ TEST_CASE("water settings round-trip and reject nonsense", "[unit][water]") {
     const nlohmann::json j = world::waterFlowToJson(world::WaterFlowSettings{});
     auto parsed = world::waterFlowFromJson(j);
     REQUIRE(parsed);
-    CHECK(parsed->flowSpeed == Approx(world::WaterFlowSettings{}.flowSpeed));
+    CHECK(parsed->speedScale == Approx(world::WaterFlowSettings{}.speedScale));
     CHECK(parsed->structuralHash() == world::WaterFlowSettings{}.structuralHash());
 }
 
