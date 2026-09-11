@@ -187,6 +187,37 @@ TEST_CASE("SceneRenderer renders a lit cube deterministically", "[gpu][renderer]
     }
 }
 
+    TEST_CASE("camera motion never mutates a static entity transform", "[gpu][renderer][transform]") {
+        auto ctx = makeContext();
+        auto shaders = makeShaders(*ctx);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        auto scene = cubeScene();
+        const scene::Transform authored = scene.entities[0].transform;
+        FrameTime time{};
+        auto first = renderer.renderToImage(scene, time, 96, 64);
+        REQUIRE(first.has_value());
+
+        scene.camera.position = {4.0f, 2.0f, 3.0f};
+        scene.camera.target = {0.0f, 1.0f, 0.0f};
+        time.frameIndex = 1;
+        time.renderTime = 1.0 / 30.0;
+        auto movedCamera = renderer.renderToImage(scene, time, 96, 64);
+        REQUIRE(movedCamera.has_value());
+        CHECK(scene.entities[0].transform.position == authored.position);
+        CHECK(scene.entities[0].transform.rotation == authored.rotation);
+        CHECK(scene.entities[0].transform.scale == authored.scale);
+
+        scene.camera.position = {0.0f, 1.5f, 5.0f};
+        scene.camera.target = {0.0f, 1.0f, 0.0f};
+        time.frameIndex = 2;
+        time.renderTime = 2.0 / 30.0;
+        auto returned = renderer.renderToImage(scene, time, 96, 64);
+        REQUIRE(returned.has_value());
+        CHECK(gpu::hashImage(*returned) == gpu::hashImage(*first));
+        CHECK(ctx->errorCount() == 0);
+    }
+
 TEST_CASE("Stylized shading is distinct, deterministic and reversible", "[gpu][renderer][stylized]") {
     auto context = makeContext();
     auto shaders = makeShaders(*context);

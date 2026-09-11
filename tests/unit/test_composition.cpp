@@ -1245,12 +1245,11 @@ TEST_CASE("A mushroom's cap and its stem keep their own colours", "[composition]
 }
 
 TEST_CASE("A chunk the camera cannot see still casts into the shadow maps", "[composition][terrain][shadows]") {
-    // ADR-046 recorded this as a known limitation: frustum culling set `Entity::visible`, the
-    // shadow pass honours `visible`, so a hill behind the camera stopped casting into the frame.
     // The camera's frustum is the wrong question for a shadow map, and the shadow pass already
     // applies the right one -- each cascade's own frustum. So the chunk must survive as a
     // candidate: visible, camera-culled, still casting, and still pointing at a real mesh, because
-    // a caster with no geometry casts nothing.
+    // a caster with no geometry casts nothing. View-distance culling is separate runtime state and
+    // must not permanently overwrite authored visibility when the camera comes back.
     const std::string text = R"({
       "format": "avgen-scene", "version": 1, "name": "terra",
       "camera": { "mode": 1, "position": [0, 30, 60], "target": [0, 0, -60], "fov": 50.0 },
@@ -1297,8 +1296,8 @@ TEST_CASE("A chunk the camera cannot see still casts into the shadow maps", "[co
     }
     CHECK(culled > 0); // the camera must actually be looking away, or this test proves nothing
 
-    // Distance is a different claim, and still removes a chunk outright: nothing a cascade covers
-    // reaches out there. Pull the view distance in under the near chunks and they leave the world.
+    // Distance is a different claim, and still removes a chunk from this frame: nothing a cascade
+    // covers reaches out there. Pull the view distance in under the near chunks.
     params::Parameter<float>* viewDistance = params.findAs<float>("nodes/ground/terrainViewDistance");
     REQUIRE(viewDistance != nullptr);
     viewDistance->setBase(5.0f);
@@ -1306,13 +1305,45 @@ TEST_CASE("A chunk the camera cannot see still casts into the shadow maps", "[co
     params.resetFinals();
     (*comp)->update(FrameTime{});
     std::size_t dropped = 0;
+    std::size_t waterIndex = node->chunks.size();
     for (std::size_t c = 0; c < chunkCount; ++c) {
-        if (!s.entities[c].visible) {
+        if (s.entities[c].cameraCulled) {
             ++dropped;
-            CHECK_FALSE(s.entities[c].cameraCulled);
+            CHECK(s.entities[c].visible);       // authored visibility survives runtime culling
+            CHECK_FALSE(s.entities[c].castsShadow);
+        }
+        if (node->chunks[c].water != scene::kInvalidMesh) {
+            CHECK(s.entities[waterIndex].visible);
+            CHECK(s.entities[waterIndex].cameraCulled);
+            ++waterIndex;
         }
     }
     CHECK(dropped > 0);
+
+    // Return the view distance and camera to the authored state. Chunks must become drawable again
+    // without rebuilding the composition or restoring visibility from a second source of truth.
+    viewDistance->setBase(400.0f);
+    target->setBase(glm::vec3(0.0f, 0.0f, -60.0f));
+    params.resetFinals();
+    (*comp)->update(FrameTime{});
+    std::size_t drawable = 0;
+    std::size_t drawableWater = 0;
+    waterIndex = node->chunks.size();
+    for (std::size_t c = 0; c < chunkCount; ++c) {
+        CHECK(s.entities[c].visible);
+        if (!s.entities[c].cameraCulled) {
+            ++drawable;
+        }
+        if (node->chunks[c].water != scene::kInvalidMesh) {
+            CHECK(s.entities[waterIndex].visible);
+            if (!s.entities[waterIndex].cameraCulled) {
+                ++drawableWater;
+            }
+            ++waterIndex;
+        }
+    }
+    CHECK(drawable > 0);
+    CHECK(drawableWater > 0);
 }
 
 TEST_CASE("Terrain LOD follows the viewport as well as the lens", "[composition][terrain][lod]") {

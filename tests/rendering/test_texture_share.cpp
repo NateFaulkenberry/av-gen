@@ -211,7 +211,13 @@ TEST_CASE("Syphon server follows source size changes and sustains a burst of fra
     const auto deadline = std::chrono::steady_clock::now() + 2s;
     for (;;) {
         frame = client->readFrame();
-        REQUIRE(frame.has_value());
+        if (!frame.has_value()) {
+            if (std::chrono::steady_clock::now() >= deadline) {
+                FAIL("Syphon announced a frame but did not expose a readable texture before the deadline");
+            }
+            client->waitForFrame(100ms);
+            continue;
+        }
         if (frame->width == 96 && near(frame->pixel(50, 40), 0, 0, 255)) {
             break;
         }

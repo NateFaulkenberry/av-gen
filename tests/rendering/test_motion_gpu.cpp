@@ -191,6 +191,42 @@ TEST_CASE("Motion blur is deterministic: two fresh renderers produce identical f
     CHECK(a.rgba == b.rgba);
 }
 
+TEST_CASE("camera-culling history does not create a false re-entry velocity", "[gpu][motion][blur]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    scene::Scene sequence = movingBox();
+    sequence.post.motionBlurAmount = 1.0f;
+    sequence.post.motionBlurSamples = 12;
+
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FrameTime time;
+    time.deltaTime = 1.0 / 30.0;
+    time.frameIndex = 0;
+    time.renderTime = 0.0;
+    REQUIRE(renderer.renderToImage(sequence, time, 256, 256).has_value());
+
+    sequence.entities[0].transform.position = {-0.8f, 0.0f, 0.0f};
+    sequence.entities[0].cameraCulled = true;
+    time.frameIndex = 1;
+    time.renderTime = 1.0 / 30.0;
+    REQUIRE(renderer.renderToImage(sequence, time, 256, 256).has_value());
+
+    // The object re-enters at the same position it had while culled. A stale previous-model entry
+    // would incorrectly report motion from the first frame's origin and smear this frame.
+    sequence.entities[0].cameraCulled = false;
+    time.frameIndex = 2;
+    time.renderTime = 2.0 / 30.0;
+    const auto reentered = renderer.renderToImage(sequence, time, 256, 256);
+    REQUIRE(reentered.has_value());
+
+    rendering::SceneRenderer fresh(*ctx, shaders);
+    REQUIRE(fresh.init().has_value());
+    const auto expected = fresh.renderToImage(sequence, time, 256, 256);
+    REQUIRE(expected.has_value());
+    CHECK(gpu::hashImage(*reentered) == gpu::hashImage(*expected));
+}
+
 namespace {
 
 // A hero emitter: few particles, a long life, no randomness in the forces, trails on.

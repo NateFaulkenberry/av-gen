@@ -4286,9 +4286,9 @@ void Composition::updateTerrainLod() {
             const world::TerrainChunk& chunk = node.chunks[c];
             Entity& e = scene_.entities[range.firstEntity + c];
             const std::size_t water = chunk.water != kInvalidMesh ? waterEntity++ : scene_.entities.size();
-            const auto setWater = [&](bool on) {
+            const auto setWaterCulled = [&](bool culled) {
                 if (water < scene_.entities.size()) {
-                    scene_.entities[water].visible = scene_.entities[water].visible && on;
+                    scene_.entities[water].cameraCulled = culled;
                 }
             };
             // The camera's verdict on this chunk, re-decided every frame; a chunk that was off
@@ -4301,7 +4301,7 @@ void Composition::updateTerrainLod() {
             };
             setCameraCulled(false);
             if (!e.visible) {
-                setWater(false);
+                setWaterCulled(true);
                 continue; // the node itself is hidden; nothing below can turn it back on
             }
             // Chunk bounds are in the world map's own space; the node transform moves the world.
@@ -4328,8 +4328,8 @@ void Composition::updateTerrainLod() {
                 // Past the view distance the chunk is not in this world as far as the frame is
                 // concerned: no mesh is picked for it and nothing it might cast could reach a
                 // cascade, which only ever covers the near part of the camera's frustum.
-                e.visible = false;
-                setWater(false);
+                e.castsShadow = false;
+                setCameraCulled(true);
                 continue;
             }
             e.castsShadow = distance <= shadowReach;

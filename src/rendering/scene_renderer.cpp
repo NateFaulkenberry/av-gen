@@ -1718,6 +1718,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     std::vector<DrawItem> grid;
     std::vector<DrawItem> blended;
     std::vector<DrawItem> water;
+    // Model history belongs to the scene entity, not to whether this frame happened to submit a
+    // camera or shadow draw. Advancing it for every entity prevents a moving object from carrying
+    // a stale transform through several culled frames and producing a false re-entry velocity.
+    prevModelsNext_.clear();
+    for (const scene::Entity& entity : scene.entities) {
+        prevModelsNext_.insert_or_assign(entity.name, entity.transform.matrix());
+    }
     // ADR-086. Everything a skinned entity does differently at a draw site: the skinned pipeline, a
     // second dynamic offset naming its slice of the joint buffer, and the influence stream in
     // vertex slot 1. A frame with no skinned entity in it never reaches this, and records exactly
@@ -1789,7 +1796,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         {
             const auto previous = prevModels_.find(entity.name);
             obj.prevModel = previous != prevModels_.end() ? previous->second : obj.model;
-            prevModelsNext_.insert_or_assign(entity.name, obj.model);
         }
         obj.baseColor = glm::vec4(m.baseColor, m.opacity);
         obj.emissive = glm::vec4(m.emissiveColor, m.emissiveIntensity);
