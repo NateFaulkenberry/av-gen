@@ -283,24 +283,64 @@
    "keys": "Space",
    "context": "General",
    "description": "Play or pause.",
-   "document": "audio/input",
-   "callSite": "src/app/application.cpp, the SDL_EVENT_KEY_DOWN block"
+   "document": "sequencer/transport",
+   "callSite": "src/app/application.cpp, Application::handleTransportShortcut"
   },
   {
-   "command": "transport.seek-back",
+   "command": "transport.step-back",
    "keys": "Left",
    "context": "General",
-   "description": "Seek back five seconds.",
-   "document": "audio/input",
-   "callSite": "src/app/application.cpp, the SDL_EVENT_KEY_DOWN block"
+   "description": "Step back one frame; with shift, back one beat.",
+   "document": "sequencer/transport",
+   "callSite": "src/app/application.cpp, Application::handleTransportShortcut"
   },
   {
-   "command": "transport.seek-forward",
+   "command": "transport.step-forward",
    "keys": "Right",
    "context": "General",
-   "description": "Seek forward five seconds.",
-   "document": "audio/input",
-   "callSite": "src/app/application.cpp, the SDL_EVENT_KEY_DOWN block"
+   "description": "Step forward one frame; with shift, forward one beat.",
+   "document": "sequencer/transport",
+   "callSite": "src/app/application.cpp, Application::handleTransportShortcut"
+  },
+  {
+   "command": "transport.return-to-start",
+   "keys": "Home",
+   "context": "General",
+   "description": "Return to the start of the play range.",
+   "document": "sequencer/transport",
+   "callSite": "src/app/application.cpp, Application::handleTransportShortcut"
+  },
+  {
+   "command": "transport.go-to-end",
+   "keys": "End",
+   "context": "General",
+   "description": "Go to the end of the play range.",
+   "document": "sequencer/transport",
+   "callSite": "src/app/application.cpp, Application::handleTransportShortcut"
+  },
+  {
+   "command": "transport.previous-marker",
+   "keys": "Up",
+   "context": "General",
+   "description": "Jump to the previous marker.",
+   "document": "sequencer/transport",
+   "callSite": "src/app/application.cpp, Application::handleTransportShortcut"
+  },
+  {
+   "command": "transport.next-marker",
+   "keys": "Down",
+   "context": "General",
+   "description": "Jump to the next marker.",
+   "document": "sequencer/transport",
+   "callSite": "src/app/application.cpp, Application::handleTransportShortcut"
+  },
+  {
+   "command": "transport.toggle-loop",
+   "keys": "L",
+   "context": "General",
+   "description": "Turn the loop on or off.",
+   "document": "sequencer/transport",
+   "callSite": "src/app/application.cpp, Application::handleTransportShortcut"
   },
   {
    "command": "file.open-audio",

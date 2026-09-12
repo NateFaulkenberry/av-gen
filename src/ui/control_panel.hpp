@@ -22,6 +22,7 @@
 #include "ui/ai_panel.hpp"
 #include "ui/sequence_panel.hpp"
 #include "ui/settings_panel.hpp"
+#include "ui/transport_bar.hpp"
 #include "ui/editor_layout.hpp"
 #include "ui/graph_editor.hpp"
 #include "ui/help_panel.hpp"
@@ -148,6 +149,10 @@ public:
     // The 2D composition over the frame (ADR-083): the layer stack and its inspector.
     CompositionPanel composition;
     SequencePanel sequence;
+    // The application's transport (ADR-102): drawn full across the top of the Sequence panel and
+    // compact in Control. One instance, so the time format chosen in one place is the one the other
+    // shows.
+    TransportBar transport;
     // The documentation (help-system spec). Owns its own content database and loads it lazily on
     // the first frame it is drawn, so a session that never opens Help pays nothing for it.
     HelpPanel help;

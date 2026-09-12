@@ -326,6 +326,34 @@ render time. A subject with a `preferredDistance` can refuse the match, and the 
 
 ---
 
+## The transport
+
+Across the top of the Sequence panel, and in a shorter form in Control. One playhead, and everything
+follows it. The full account is [ADR-102](decisions/ADR-102-the-transport.md); what matters when
+using it:
+
+- **A project does not need audio to play.** Its length is the longest of the audio, the sequence and
+  the timeline, so a sequence over a shorter piece of audio plays to *its* end rather than the wav's.
+- **Pause freezes the piece, not the world.** Wind, water and anything else animated continuously
+  keep going, because they are not on the timeline.
+- **Stop returns to the start of the play range** -- the loop start when a loop is on, else zero.
+- **Frames are the project's frame rate**, which is the Render panel's: the frames you step through
+  are the frames the project exports. 29.97 and 59.94 are the exact rationals, not the decimals.
+- **The loop** wraps when playback *crosses* its end, so a playhead parked past it plays on rather
+  than being pulled backwards. It is saved with the project and is ignored by offline renders.
+- **Playback speed** is picture-only away from 1x: `AudioPlayer` has no rate control, so the sound is
+  silenced rather than allowed to drift, and the bar says which you are getting.
+- `Space` plays, the arrows step a frame, shift and the arrows step a beat, `Home`/`End` go to the
+  ends, `L` toggles the loop.
+
+**Adding something that follows the playhead.** Read `Engine::timelineClock().seconds` (or
+`Engine::transport().positionSeconds()`), never `FrameTime::renderTime` -- the second is the render
+clock and keeps running while the piece is paused. Everything timed by the piece must be a pure
+function of that position, because that is what makes scrubbing and offline rendering agree; if it
+cannot be, it needs a `seek` like `EntityWorld` has (ADR-091) and a line in `Engine::seekSeconds`.
+
+---
+
 ## The Sequence panel
 
 One horizontal time axis. A ruler with the song's sections and beats on it, a lane showing the

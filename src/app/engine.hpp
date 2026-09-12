@@ -10,6 +10,7 @@
 #include "app/music_runtime.hpp"
 #include "app/render_settings.hpp"
 #include "app/scene_states.hpp"
+#include "app/transport.hpp"
 #include "app/world_director.hpp"
 #include "audio/audio_input.hpp"
 #include "analysis/analysis_track.hpp"
@@ -42,6 +43,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>
@@ -329,7 +331,18 @@ public:
     [[nodiscard]] const std::filesystem::path& audioPath() const { return audioPath_; }
     [[nodiscard]] std::shared_ptr<const audio::AudioFile> audioFile() const { return audioFile_; }
 
-    // Transport (Live mode; no-ops offline).
+    // ---- transport (ADR-102) --------------------------------------------------------------------
+    //
+    // These are the same five calls they have always been, and every caller -- the panels, the
+    // keyboard, the OSC/MIDI control map, the AI tools, the UI script driver -- keeps working. What
+    // changed is what is behind them: the application's `Transport`, rather than the audio device.
+    //
+    // Before this, "playing" meant "the audio device is running", so a project with no audio could
+    // not be played, paused, seeked or stopped at all, and one with audio stopped at the end of the
+    // wav however long the sequence was.
+    //
+    // `play()` still returns a Result because it can still fail -- an audio device that will not
+    // start, say -- but no longer fails merely for want of a file.
     [[nodiscard]] Result<void> play();
     void pause();
     void togglePlay();
@@ -337,7 +350,30 @@ public:
     void seekSeconds(double seconds);
     [[nodiscard]] bool isPlaying() const;
     [[nodiscard]] double positionSeconds() const;
+    // The project's length: the longest of the audio, the baked sequence and the timeline. Not the
+    // audio file's length -- `audioDurationSeconds()` is that, for the places that mean the file.
     [[nodiscard]] double durationSeconds() const;
+    [[nodiscard]] double audioDurationSeconds() const;
+    // The transport itself, for everything the five calls above do not cover: the loop, the rate,
+    // frame stepping, the frame rate and the snapshot the UI draws from.
+    [[nodiscard]] Transport& transport() { return transport_; }
+    [[nodiscard]] const Transport& transport() const { return transport_; }
+    // Re-reads the project's length and tempo into the transport. Called after anything that can
+    // change either -- loading audio, baking a sequence, editing the timeline -- and once per
+    // update, which is cheap and means nothing has to remember.
+    void refreshTransport();
+    // Frame stepping and beat stepping, here rather than on the transport because the beat grid is
+    // the analysis's and the resynchronising a seek needs is the engine's.
+    void stepFrames(std::int64_t frames);
+    void stepBeats(int beats);
+    // The next/previous beat boundary from the analysed beat grid, or from the tempo when there is
+    // no grid. Returns the position unchanged when there is neither.
+    [[nodiscard]] double beatBoundary(double fromSeconds, int direction) const;
+    // The next or previous marker on the sequence, skipping the `Beat` markers -- those are the beat
+    // grid drawn on the strip, there are thousands of them, and "jump to the next marker" means the
+    // next *place*, not the next beat. Returns the position unchanged when there is none that way.
+    [[nodiscard]] double markerBoundary(double fromSeconds, int direction) const;
+    void stepMarkers(int direction);
     void setVolume(float volume);
     [[nodiscard]] float volume() const;
 
@@ -387,6 +423,10 @@ private:
     void updateTimeSignals(const FrameTime& time, bool newAnalysisFrame);
     void addDefaultPostRoutes();
     void updateTimelineClock(const FrameTime& time);
+    // Puts the audio device where the transport is. The one place that knows the rule: audio
+    // follows, and it only follows at unit rate, because `AudioPlayer` has no rate control and a
+    // silent device is honest where a resampled one would be a lie (see ADR-102).
+    [[nodiscard]] Result<void> syncAudioToTransport(bool seekDevice);
     void applyCues();
     // Logs (and records in projectWarnings()) every value a cue preset will overwrite that the
     // scene file or the project set to something else. Presets are meant to win; they are not
@@ -462,6 +502,10 @@ private:
     std::uint32_t beatClockCount_ = 0;
     std::uint32_t lastAnalysisBeatCount_ = 0;
 
+    Transport transport_;
+    // What the audio player was last told to do, so the engine can tell whether the device needs
+    // starting, stopping or seeking this frame without asking it every frame.
+    bool audioFollowing_ = false;
     std::shared_ptr<const audio::AudioFile> audioFile_;
     std::filesystem::path audioPath_;
     analysis::AnalyzerConfig analyzerConfig_;

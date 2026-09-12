@@ -7,6 +7,9 @@ target_include_directories(avgen_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
+    # The transport (ADR-102): the playback state machine and the frame arithmetic. Deliberately
+    # engine-free and clock-free so the state machine can be checked without a device or a window.
+    "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
@@ -74,6 +77,7 @@ endif()
 if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
     add_executable(avgen_render_tests ${AVGEN_RENDER_TEST_SOURCES}
         "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_job.cpp"

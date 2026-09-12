@@ -67,6 +67,21 @@ always evaluated at N / fps. Analysis frames carry the PCM frame index of their 
 seeking and offline evaluation never depend on wall time. Randomness goes through the seedable
 `Rng`; `std::random_device` and `rand()` are banned.
 
+**The transport (ADR-102)** owns the playback state and the timeline position; `Engine` owns the
+transport, and `Engine::play/pause/stop/seekSeconds/isPlaying/positionSeconds/durationSeconds` are
+its public face. Audio *follows* it -- while the device runs at 1x the transport reads the play-head
+(ADR-012's master-clock rule, unchanged); with no audio, or at any other rate, it integrates
+`deltaTime * rate`. This is what a new subsystem has to choose between:
+
+| read | for | while parked |
+|---|---|---|
+| `FrameTime::renderTime` | continuous animation: wind, water, shader layers, `deltaTime` integration | keeps running |
+| `Engine::timelineClock()` / the transport | anything timed by the piece: automation, cues, baked sequence animation, overlays, events | frozen |
+
+They are equal whenever the transport governs time -- playing, or offline. Offline the
+`FixedStepClock` is the authority and the transport merely records what it said, with no clamp, no
+loop and no playback rate, so an export cannot inherit a preview's loop.
+
 ## 4. Parameters and modulation (ADR-011)
 
 Every animated scene property is a `Parameter<T>` with a path (`orb/scale`), default, hard and

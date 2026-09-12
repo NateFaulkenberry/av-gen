@@ -18,6 +18,7 @@
 #include <fstream>
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
 #include <chrono>
 
@@ -178,6 +179,7 @@ Result<seq::InstallReport> Engine::installSequence() {
     sequenceEvents_.setEvents(sequence_.events, sequenceReport_.events);
     sequenceEvents_.reset(timelineClock_.seconds);
     firedEvents_.clear();
+    refreshTransport(); // a bake can lengthen or shorten the piece
     for (const std::string& warning : report->warnings) {
         noteBindingProblem(warning);
     }
@@ -200,6 +202,7 @@ void Engine::clearSequence() {
     sequenceEvents_.clear();
     firedEvents_.clear();
     sequence_ = seq::Sequence{};
+    refreshTransport();
 }
 
 void Engine::removeLayerParameters() {
@@ -764,6 +767,17 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
         doc["sequence"] = sequence_.toJson();
     }
     doc["render"] = render_.toJson();
+    // The transport's persistent half (ADR-102). Additively, and only when there is something to
+    // say: a project that never set a loop gains no key, so files written before this round-trip
+    // unchanged. The playing state, the position and the playback rate are deliberately *not* here
+    // -- they are how you are working, not what the piece is.
+    if (const TransportLoop& loop = transport_.loop();
+        loop.enabled || loop.endSeconds > loop.startSeconds) {
+        doc["transport"] = {{"loop",
+                             {{"enabled", loop.enabled},
+                              {"start", loop.startSeconds},
+                              {"end", loop.endSeconds}}}};
+    }
     doc["control"] = controlHub_.map().toJson();
     if (outputs_.is_array() && !outputs_.empty()) {
         doc["outputs"] = outputs_;
@@ -1037,6 +1051,21 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     } else {
         render_ = RenderSettings{};
     }
+    // The transport's persistent half. A project with no "transport" block clears the loop rather
+    // than inheriting the one from whatever was open before: loading a project must not leave a
+    // range from another piece quietly governing this one.
+    transport_.clearLoop();
+    if (doc.contains("transport") && doc["transport"].is_object()) {
+        const auto& block = doc["transport"];
+        if (block.contains("loop") && block["loop"].is_object()) {
+            const auto& loop = block["loop"];
+            TransportLoop parsed;
+            parsed.enabled = loop.value("enabled", false);
+            parsed.startSeconds = loop.value("start", 0.0);
+            parsed.endSeconds = loop.value("end", 0.0);
+            transport_.setLoop(parsed);
+        }
+    }
     // Parameter values for sources and shader inputs arrive in the same document; apply them
     // again now that those parameters exist (unknown-at-first-pass paths were skipped).
     if (auto r = params::loadProject(doc, params_, modulator_, nullptr, nullptr); !r) {
@@ -1065,6 +1094,12 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         }
     }
     projectPath_ = path;
+    // A loaded project is a different piece. The transport stops and parks at its start rather than
+    // carrying the previous project's playhead into it -- opening a project while another is playing
+    // used to leave the new one running from wherever the old one had got to.
+    refreshTransport();
+    transport_.stop();
+    seekSeconds(transport_.positionSeconds());
     reportCuePresetOverrides();
     log::info("project '{}' loaded: {} parameters, {} routes, {} sources, {} presets, {} timeline tracks, {} cues, {} warning(s)",
               path.filename().string(), params_.size(), modulator_.routes().size(), sources_.sources().size(),
@@ -1101,6 +1136,9 @@ void Engine::newProject() {
     modulator_.masterGain = 1.0f;
     projectPath_.clear();
     projectWarnings_.clear();
+    transport_.clearLoop();
+    refreshTransport();
+    transport_.stop();
 }
 
 std::vector<std::filesystem::path> Engine::referencedFiles() const {
@@ -1575,17 +1613,28 @@ Result<double> Engine::loadAudio(const std::filesystem::path& path) {
     modulator_.resetState();
     music_.reset();
     hasFrame_ = false;
+    // The piece just got a length, or a different one. Refreshed here rather than left to the next
+    // frame so that everything which asks the engine how long the project is between loading and
+    // rendering -- the AI tools, a script, a render job built before the first tick -- gets the
+    // answer the file just gave.
+    refreshTransport();
     return shared->durationSeconds();
 }
 
 Result<void> Engine::play() {
-    if (!player_ || !player_->hasSource()) {
-        return fail("no audio loaded");
+    refreshTransport();
+    // Play from the end starts again, which the transport decides; the position it lands on is what
+    // the audio device has to be told about, so the device is synchronised after the state change
+    // rather than before it.
+    if (!transport_.play()) {
+        return {}; // already playing: not a failure, and not a reason to restart the device
     }
-    return player_->play();
+    return syncAudioToTransport(true);
 }
 
 void Engine::pause() {
+    transport_.pause();
+    audioFollowing_ = false;
     if (player_) {
         player_->pause();
     }
@@ -1600,21 +1649,34 @@ void Engine::togglePlay() {
 }
 
 void Engine::stop() {
+    // Stop parks at the start of the play range -- the loop start with a loop on, else zero -- which
+    // is the conventional stop and is what this did before by way of AudioPlayer::stop (pause, then
+    // seek to 0). The seek carries the rest: modulation, sources, the music classifier, the beat
+    // clock, the entities and the event scheduler.
+    transport_.stopInPlace();
+    audioFollowing_ = false;
     if (player_) {
-        player_->stop();
-        modulator_.resetState();
-        sources_.reset();
-        music_.reset();
-        beatClockPhase_ = 0.0;
+        player_->pause();
     }
+    seekSeconds(transport_.playStartSeconds());
 }
 
 void Engine::seekSeconds(double seconds) {
+    // Clamped by the transport first, and everything below resynchronises to the position it
+    // actually took. Passing the *requested* second on to the entity world and the event scheduler
+    // while the playhead sat somewhere else is how a seek past the end used to leave the two
+    // disagreeing about where the piece was.
+    const double target = transport_.seek(seconds);
     if (player_) {
-        player_->seekSeconds(seconds);
-    } else if (track_) {
+        player_->seekSeconds(target);
+    }
+    if (track_) {
+        // The offline analysis cursor walks forward through the frames, so a backwards seek has to
+        // rewind it or every frame between here and where it had got to is skipped. Rewound rather
+        // than reset to zero: a forward seek keeps its place.
         offlineFrameCursor_ = 0;
     }
+    seconds = target;
     modulator_.resetState();
     sources_.reset();
     // A seek discontinuity in the energy history reads as a drop; the detector must not carry
@@ -1638,21 +1700,174 @@ void Engine::seekSeconds(double seconds) {
     // playhead instead of replaying everything between here and there (ADR-098).
     sequenceEvents_.reset(seconds);
     firedEvents_.clear();
+    // The timeline clock, now rather than on the next update. Everything above has just been told
+    // the new second; leaving the clock a frame behind means anything that reads it between a seek
+    // and the next frame -- a panel drawing the playhead, a script asserting where it landed, a tool
+    // reporting the position -- sees the second the playhead has left.
+    timelineClock_.seconds = seconds;
 }
 
-bool Engine::isPlaying() const { return player_ && player_->isPlaying(); }
+bool Engine::isPlaying() const { return transport_.isPlaying(); }
 
 double Engine::positionSeconds() const {
     if (input_) {
+        // Live capture has no timeline to be positioned on: "now" is how much has been captured, and
+        // that is what every meter and readout in the application means by it.
         return input_->sampleRate() > 0 ? static_cast<double>(input_->framesCaptured()) / input_->sampleRate() : 0.0;
     }
-    if (player_) {
-        return player_->positionSeconds();
-    }
-    return lastRenderTime_;
+    return transport_.positionSeconds();
 }
 
-double Engine::durationSeconds() const { return audioFile_ ? audioFile_->durationSeconds() : 0.0; }
+double Engine::audioDurationSeconds() const { return audioFile_ ? audioFile_->durationSeconds() : 0.0; }
+
+double Engine::durationSeconds() const { return transport_.durationSeconds(); }
+
+void Engine::refreshTransport() {
+    // The project's length is the longest thing in it. A sequence that runs past its audio is a
+    // sequence that should play to its end, and a project with no audio at all still has a length.
+    double duration = audioDurationSeconds();
+    duration = std::max(duration, sequence_.duration());
+    duration = std::max(duration, timeline_.durationSeconds());
+    transport_.setDuration(duration);
+    // The tempo is for the bars/beats readout and for beat stepping with no analysed grid. It comes
+    // from wherever the beat clock came from this frame, so the display cannot disagree with the
+    // signals.
+    const double bpm = midiClockActive_ ? controlHub_.midiClock().bpm()
+                                        : (hasFrame_ ? static_cast<double>(latest_.tempoBpm) : 0.0);
+    transport_.setTempo(bpm, 4);
+    // The project's frame rate *is* the render settings' frame rate. Not a second one: the frames a
+    // person steps through have to be the frames the project exports, and two numbers that are
+    // nearly always equal are two numbers that will one day not be.
+    transport_.setFrameRate(FrameRate::fromFps(render_.fps));
+}
+
+Result<void> Engine::syncAudioToTransport(bool seekDevice) {
+    if (!player_ || !player_->hasSource()) {
+        audioFollowing_ = false;
+        return {};
+    }
+    // Audio follows at unit rate and is silent otherwise. `AudioPlayer` has no rate control, and
+    // ADR-102 refuses to fake one: a device left running at 1x under a 2x transport drifts a second
+    // out every second, which is worse than silence and much harder to notice.
+    const bool wants = transport_.isPlaying() && transport_.rate() == 1.0;
+    if (seekDevice) {
+        player_->seekSeconds(transport_.positionSeconds());
+    }
+    if (wants == audioFollowing_) {
+        return {};
+    }
+    audioFollowing_ = wants;
+    if (!wants) {
+        player_->pause();
+        return {};
+    }
+    if (auto r = player_->play(); !r) {
+        // The transport keeps playing: the visuals are not hostage to a device that would not
+        // start, and a piece running silently is a better answer than nothing happening at all.
+        audioFollowing_ = false;
+        return r;
+    }
+    return {};
+}
+
+void Engine::stepFrames(std::int64_t frames) {
+    if (frames == 0) {
+        return;
+    }
+    // Through the transport's own arithmetic for *where*, and through seekSeconds for *everything
+    // else that has to move with it*.
+    const double target =
+        transport_.secondsOfFrame(transport_.frameOf(transport_.positionSeconds()) + frames);
+    seekSeconds(target);
+}
+
+double Engine::beatBoundary(double fromSeconds, int direction) const {
+    if (direction == 0) {
+        return fromSeconds;
+    }
+    // The analysed grid first: it is where the beats actually are, as opposed to where a constant
+    // tempo says they ought to be, and a piece that breathes is exactly where that difference shows.
+    if (track_ != nullptr) {
+        const auto& beats = track_->beats().beatTimes;
+        if (!beats.empty()) {
+            constexpr double kNudge = 1e-3; // so "next" from exactly on a beat is the following one
+            if (direction > 0) {
+                for (const float t : beats) {
+                    if (static_cast<double>(t) > fromSeconds + kNudge) {
+                        return static_cast<double>(t);
+                    }
+                }
+                return fromSeconds;
+            }
+            double best = fromSeconds;
+            bool found = false;
+            for (const float t : beats) {
+                if (static_cast<double>(t) < fromSeconds - kNudge) {
+                    best = static_cast<double>(t);
+                    found = true;
+                } else {
+                    break;
+                }
+            }
+            return found ? best : fromSeconds;
+        }
+    }
+    const double bpm = transport_.tempoBpm();
+    if (!(bpm > 0.0)) {
+        return fromSeconds; // no grid and no tempo: a beat step has nothing to step to
+    }
+    const double beatSeconds = 60.0 / bpm;
+    const double beat = fromSeconds / beatSeconds;
+    const double next = direction > 0 ? std::floor(beat + 1e-6) + 1.0 : std::ceil(beat - 1e-6) - 1.0;
+    return std::max(0.0, next * beatSeconds);
+}
+
+double Engine::markerBoundary(double fromSeconds, int direction) const {
+    if (direction == 0) {
+        return fromSeconds;
+    }
+    constexpr double kNudge = 1e-3;
+    double best = fromSeconds;
+    bool found = false;
+    for (const seq::Marker& marker : sequence_.markers) {
+        if (marker.kind == seq::MarkerKind::Beat) {
+            continue;
+        }
+        if (direction > 0) {
+            if (marker.timeSeconds > fromSeconds + kNudge && (!found || marker.timeSeconds < best)) {
+                best = marker.timeSeconds;
+                found = true;
+            }
+        } else if (marker.timeSeconds < fromSeconds - kNudge && (!found || marker.timeSeconds > best)) {
+            best = marker.timeSeconds;
+            found = true;
+        }
+    }
+    return found ? best : fromSeconds;
+}
+
+void Engine::stepMarkers(int direction) {
+    const double target = markerBoundary(transport_.positionSeconds(), direction);
+    if (target != transport_.positionSeconds()) {
+        seekSeconds(target);
+    }
+}
+
+void Engine::stepBeats(int beats) {
+    if (beats == 0) {
+        return;
+    }
+    double position = transport_.positionSeconds();
+    const int direction = beats > 0 ? 1 : -1;
+    for (int i = 0; i < std::abs(beats); ++i) {
+        const double next = beatBoundary(position, direction);
+        if (next == position) {
+            break; // ran out of grid
+        }
+        position = next;
+    }
+    seekSeconds(position);
+}
 
 void Engine::setVolume(float volume) {
     if (player_) {
@@ -1702,10 +1917,35 @@ void Engine::stopAudioInput() {
 
 FrameTime Engine::tick(FrameClock& clock) {
     FrameTime time = clock.tick();
-    if (mode_ == EngineMode::Live && isPlaying()) {
-        // Audio is the master clock while playing (ADR-012); dt stays wall-derived for smooth
-        // integration because the play-head advances in device-period steps.
-        time.renderTime = player_->positionSeconds();
+    if (mode_ == EngineMode::Offline) {
+        // Nothing to decide: the fixed-step clock is the authority offline. `update` is what records
+        // the position on the transport, because an offline caller may build its own `FrameTime` and
+        // call `update` without ever coming through here -- the render job does not, but several
+        // tests and the headless benchmark do, and a timeline that only advanced for callers who
+        // used the right entry point would be a trap.
+        lastRenderTime_ = time.renderTime;
+        return time;
+    }
+    transport_.setMode(TransportMode::Realtime);
+    refreshTransport();
+    if (transport_.isPlaying()) {
+        // Audio is still the master clock while it is running (ADR-012): the transport reads the
+        // play-head rather than integrating, so a device that jitters or stalls cannot make the
+        // visuals drift away from the sound. With no audio -- or at any rate but 1x, where the
+        // device is deliberately silent -- it integrates the elapsed wall time instead, which is the
+        // case that did not exist before and is the whole point of this class.
+        const bool follow = audioFollowing_ && player_ && player_->isPlaying();
+        const TransportTick tick = follow ? transport_.follow(player_->positionSeconds())
+                                          : transport_.advance(time.deltaTime);
+        if (tick.looped) {
+            // A wrap is a discontinuity like any seek, and everything a seek resynchronises has to
+            // be resynchronised here too -- the entities, the event scheduler, the cue state, the
+            // music classifier -- or the second lap is not the first lap.
+            seekSeconds(tick.positionSeconds);
+        } else if (tick.reachedEnd) {
+            static_cast<void>(syncAudioToTransport(false)); // the piece is over; the device stops with it
+        }
+        time.renderTime = transport_.positionSeconds();
         clock.seek(time.renderTime);
     }
     lastRenderTime_ = time.renderTime;
@@ -1844,7 +2084,16 @@ void Engine::setViewport(std::uint32_t width, std::uint32_t height) {
 }
 
 void Engine::updateTimelineClock(const FrameTime& time) {
-    timelineClock_.seconds = audioFile_ ? positionSeconds() : time.renderTime;
+    // The transport, unconditionally. This line used to read
+    //
+    //     timelineClock_.seconds = audioFile_ ? positionSeconds() : time.renderTime;
+    //
+    // and that ternary was the defect (ADR-102): with no audio file the timeline followed the
+    // free-running render clock, so a project without audio could not be paused or seeked -- any
+    // seek was overwritten on the very next frame -- and one with audio was bounded by the length of
+    // the wav however long the sequence was.
+    static_cast<void>(time);
+    timelineClock_.seconds = transport_.positionSeconds();
     timelineClock_.beats = static_cast<double>(beatClockCount_) + beatClockPhase_;
 }
 
@@ -1889,6 +2138,14 @@ void Engine::applyCues() {
 void Engine::update(const FrameTime& time) {
     const auto start = std::chrono::steady_clock::now();
     bool newFrame = false;
+
+    if (mode_ == EngineMode::Offline) {
+        // The offline position, taken from whatever clock produced this frame. No clamp, no loop and
+        // no end rule: a render of 0..120 s against 30 s of audio renders 120 seconds, and a loop
+        // set for previewing must not silently become part of an export (ADR-102).
+        transport_.setMode(TransportMode::Offline);
+        transport_.setOfflinePosition(time.renderTime);
+    }
 
     if (mode_ == EngineMode::Live) {
         if (runner_ && runner_->acquire()) {

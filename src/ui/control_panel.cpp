@@ -1,5 +1,7 @@
 #include "ui/control_panel.hpp"
 
+#include "app/transport.hpp"
+
 #include "ui/editor_shell.hpp"
 #include "ui/viewport_overlay.hpp"
 #include "ui/ui_logic.hpp"
@@ -381,6 +383,22 @@ void ControlPanel::drawStatusBar(app::Engine& engine, const FrameStats& stats) {
     ImGui::Separator();
     ImGui::Text("%u draws / %u tris", stats.drawCalls, stats.triangles);
     ImGui::Separator();
+    {
+        // The playhead, in whichever format the transport bar is showing -- the same call, so the
+        // status bar and the bar cannot disagree about what second it is.
+        const app::TransportSnapshot snapshot = engine.transport().snapshot();
+        const ImVec4 running(0.5f, 0.88f, 0.62f, 1.0f);
+        if (snapshot.playing()) {
+            ImGui::TextColored(running, "%s", transport.format(snapshot, snapshot.positionSeconds).c_str());
+        } else {
+            ImGui::TextDisabled("%s", transport.format(snapshot, snapshot.positionSeconds).c_str());
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s%s", app::transportStateName(snapshot.state),
+                              snapshot.loop.usable() ? ", looping" : "");
+        }
+    }
+    ImGui::Separator();
     // The editor's selection, which is the one that can hold several things. The World panel's
     // single `selection` is still what the inspector shows; this is what the artist has in hand.
     if (editor.selection.size() > 1) {
@@ -476,7 +494,14 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     panel("Parameters", ImVec2(420, 360), [&] { drawParameters(engine); });
     panel("Composition", ImVec2(460, 640), [&] { composition.draw(engine); });
     panel("Render", ImVec2(460, 420), [&] { drawRender(engine); });
-    panel("Sequence", ImVec2(900, 420), [&] { sequence.draw(engine); });
+    panel("Sequence", ImVec2(900, 420), [&] {
+        // The transport across the top of the timeline, where the timeline is. Drawn here rather
+        // than inside SequencePanel so that one TransportBar serves both places and the time format
+        // a person picks in one is the format they get in the other.
+        transport.draw(engine);
+        ImGui::Separator();
+        sequence.draw(engine);
+    });
     panel("Control", ImVec2(420, 300), [&] {
         drawTransport(engine);
         ImGui::Separator();
@@ -968,17 +993,10 @@ void ControlPanel::drawTransport(app::Engine& engine) {
         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "%s", status_.c_str());
     }
 
-    ImGui::BeginDisabled(!engine.hasAudio());
-    const bool playing = engine.isPlaying();
-    if (ImGui::Button(playing ? "Pause" : "Play", ImVec2(80, 0))) {
-        engine.togglePlay();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Stop", ImVec2(80, 0))) {
-        engine.stop();
-    }
-    ImGui::SameLine();
-    ImGui::Text("%s / %s", formatTime(engine.positionSeconds()).c_str(), formatTime(engine.durationSeconds()).c_str());
+    // The same widget the Sequence panel draws, in its compact form. These used to be their own
+    // Play/Pause/Stop buttons, disabled whenever no audio was loaded -- which is exactly the
+    // assumption ADR-102 removed: a project without audio has a transport like any other.
+    transport.draw(engine, true);
 
     float position = static_cast<float>(engine.positionSeconds());
     const float duration = static_cast<float>(std::max(engine.durationSeconds(), 0.001));
@@ -986,6 +1004,7 @@ void ControlPanel::drawTransport(app::Engine& engine) {
     if (ImGui::SliderFloat("##seek", &position, 0.0f, duration, "%.2f s")) {
         engine.seekSeconds(static_cast<double>(position));
     }
+    ImGui::BeginDisabled(!engine.hasAudio());
     float volume = engine.volume();
     ImGui::SetNextItemWidth(-1);
     if (ImGui::SliderFloat("Volume", &volume, 0.0f, 1.0f)) {

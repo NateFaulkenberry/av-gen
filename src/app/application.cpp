@@ -1572,22 +1572,88 @@ void Application::handleInputEvent(const SDL_Event& event) {
                 !imgui_->itemActive() && handleEditorShortcut(event)) {
                 return;
             }
+            // The transport's keys are allowed to repeat -- holding an arrow walks the piece frame
+            // by frame, which is the gesture frame stepping exists for -- so they are tested before
+            // the non-repeat block below rather than inside it.
+            if (event.type == SDL_EVENT_KEY_DOWN && !imgui_->wantsTextInput() && !imgui_->itemActive() &&
+                handleTransportShortcut(event)) {
+                return;
+            }
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && !imgui_->wantsTextInput() &&
                 !imgui_->itemActive()) {
-                if (event.key.key == SDLK_SPACE) {
-                    engine_->togglePlay();
-                } else if (event.key.key == SDLK_O && panel_ && panel_->onOpenAudio) {
+                if (event.key.key == SDLK_O && panel_ && panel_->onOpenAudio) {
                     panel_->onOpenAudio();
                 } else if (event.key.key == SDLK_S && panel_ && panel_->onOpenScene) {
                     panel_->onOpenScene();
                 } else if (event.key.key == SDLK_E && panel_ && panel_->onOpenEnvironment) {
                     panel_->onOpenEnvironment();
-                } else if (event.key.key == SDLK_LEFT) {
-                    engine_->seekSeconds(engine_->positionSeconds() - 5.0);
-                } else if (event.key.key == SDLK_RIGHT) {
-                    engine_->seekSeconds(engine_->positionSeconds() + 5.0);
                 }
             }
+}
+
+// The transport's keyboard (ADR-102). The set every editing tool uses: space plays, the arrows step
+// a frame, shift and the arrows step a beat, home and end go to the ends of the piece.
+//
+// Arrows reach here only when the world editor declined them, which it does when nothing is
+// selected -- with a selection they nudge it, and that is the older and more specific meaning.
+//
+// Deliberately not J/K/L. The three-key shuttle is a video-editing convention and `L` is worth more
+// here as the loop toggle, which this application has and a shuttle it does not.
+bool Application::handleTransportShortcut(const SDL_Event& event) {
+    if (engine_ == nullptr) {
+        return false;
+    }
+    const SDL_Keymod mods = SDL_GetModState();
+    const bool shift = (mods & SDL_KMOD_SHIFT) != 0;
+    const bool command = (mods & (SDL_KMOD_GUI | SDL_KMOD_CTRL)) != 0;
+    if (command) {
+        return false; // Cmd+arrow and Cmd+L belong to whoever wants them; the transport takes neither
+    }
+    app::Transport& transport = engine_->transport();
+    switch (event.key.key) {
+    case SDLK_SPACE:
+        if (!event.key.repeat) {
+            engine_->togglePlay();
+        }
+        return true;
+    case SDLK_HOME:
+        engine_->seekSeconds(transport.playStartSeconds());
+        return true;
+    case SDLK_END:
+        engine_->seekSeconds(transport.playEndSeconds());
+        return true;
+    case SDLK_LEFT:
+        if (shift) {
+            engine_->stepBeats(-1);
+        } else {
+            engine_->stepFrames(-1);
+        }
+        return true;
+    case SDLK_RIGHT:
+        if (shift) {
+            engine_->stepBeats(1);
+        } else {
+            engine_->stepFrames(1);
+        }
+        return true;
+    case SDLK_UP:
+        engine_->stepMarkers(-1);
+        return true;
+    case SDLK_DOWN:
+        engine_->stepMarkers(1);
+        return true;
+    case SDLK_L:
+        if (!event.key.repeat) {
+            const bool wanted = !transport.loop().enabled;
+            transport.setLoopEnabled(wanted);
+            if (wanted && !transport.loop().usable() && engine_->durationSeconds() > 0.0) {
+                transport.setLoop(app::TransportLoop{true, 0.0, engine_->durationSeconds()});
+            }
+        }
+        return true;
+    default:
+        return false;
+    }
 }
 
 // The editor's keyboard shortcuts (world-authoring-spec §43). The set is the one every 3D tool

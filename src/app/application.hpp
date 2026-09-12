@@ -273,6 +273,10 @@ private:
     // The editor's keyboard shortcuts (§43). Returns true when the key was the editor's, so the
     // application's own bindings do not also fire on it.
     bool handleEditorShortcut(const SDL_Event& event);
+    // The transport's keys (ADR-102): space, home/end, the arrows and the loop toggle. Separate from
+    // the editor's because they are allowed to repeat and because they mean the same thing whichever
+    // panel has the focus.
+    bool handleTransportShortcut(const SDL_Event& event);
 
     // Reads `camera/position` and `camera/target`. Returns the scene camera's own pose when the
     // parameters are missing, so a gesture over a scene without them still does something sensible.
