@@ -180,6 +180,23 @@ TEST_CASE("Seeking is clamped and the whole engine lands on the clamped second",
     CHECK_THAT(s.timelineSeconds(), WithinAbs(s.engine.durationSeconds(), 1e-6));
 }
 
+TEST_CASE("Transport discontinuity revision changes only for moved seeks", "[integration][transport]") {
+    Silent s;
+    const std::uint64_t initial = s.engine.transport().discontinuityRevision();
+    s.engine.seekSeconds(0.0);
+    CHECK(s.engine.transport().discontinuityRevision() == initial);
+
+    s.engine.seekSeconds(1.0);
+    const std::uint64_t afterSeek = s.engine.transport().discontinuityRevision();
+    CHECK(afterSeek > initial);
+    s.engine.seekSeconds(1.0);
+    CHECK(s.engine.transport().discontinuityRevision() == afterSeek);
+
+    REQUIRE(s.engine.play().has_value());
+    s.steps(2);
+    CHECK(s.engine.transport().discontinuityRevision() == afterSeek);
+}
+
 TEST_CASE("Frame stepping moves the timeline by exactly one frame", "[integration][transport]") {
     Silent s;
     s.engine.timeline().enabled = true;

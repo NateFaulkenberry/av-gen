@@ -210,8 +210,9 @@ open in Phase 7.
   open.
   - `[x]` Repeated frame indices are deterministic: the renderer drops AO history on a non-advancing
     index, and a same-index replay with motion blur matches a fresh renderer.
-  - `[ ]` Wire transport revision/discontinuity events to the renderer so forward seeks reset
-    temporal state even when render time increases.
+  - `[x]` Added a seek-only transport discontinuity revision and wired both live/headless render
+    loops to reset temporal state when it changes, including forward seeks whose render time rises.
+  - `[ ]` Run longer application-level seek/scrub/reload sequences and capture their frame hashes.
 - `[ ]` Add a conservative synchronization option to the reference path if evidence points to reuse hazards.
 - `[ ]` Add validation for resources destroyed, replaced, resized or rebound while still referenced.
 - `[~]` Sanitizer coverage exists for selected animation/sequence paths; expand it to renderer resource lifetime and full relevant suites.

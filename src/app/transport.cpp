@@ -215,7 +215,11 @@ bool Transport::returnToStart() {
 }
 
 double Transport::seek(double seconds) {
+    const double before = position_;
     moveTo(clampToRange(seconds));
+    if (std::abs(position_ - before) >= kEpsilon) {
+        ++discontinuityRevision_;
+    }
     return position_;
 }
 

@@ -197,6 +197,9 @@ public:
     [[nodiscard]] bool isPlaying() const { return state_ == TransportState::Playing; }
     [[nodiscard]] std::int64_t frame() const { return frameOf(position_); }
     [[nodiscard]] std::uint64_t revision() const { return revision_; }
+    // Changes only when an explicit seek moves the playhead; normal playback advances revision()
+    // but is not a temporal discontinuity for renderer history.
+    [[nodiscard]] std::uint64_t discontinuityRevision() const { return discontinuityRevision_; }
     [[nodiscard]] TransportSnapshot snapshot() const;
 
     // ---- frames and time ----------------------------------------------------------------------
@@ -230,6 +233,7 @@ private:
     int beatsPerBar_ = 4;
     TransportLoop loop_{};
     std::uint64_t revision_ = 1;
+    std::uint64_t discontinuityRevision_ = 1;
 };
 
 // ---- display ---------------------------------------------------------------------------------

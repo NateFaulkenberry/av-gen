@@ -322,6 +322,7 @@ private:
     double lastFrameIntervalMs_ = 0.0;
     double lastFps_ = 0.0;
     double lastGpuFrameMs_ = -1.0;
+    std::uint64_t lastTransportDiscontinuity_ = 0;
 };
 
 } // namespace avgen::app

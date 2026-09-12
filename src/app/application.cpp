@@ -2313,6 +2313,11 @@ int Application::runLive() {
 
         const FrameTime time = engine_->tick(clock);
         lastTime = time;
+        const std::uint64_t discontinuity = engine_->transport().discontinuityRevision();
+        if (discontinuity != lastTransportDiscontinuity_) {
+            renderer_->resetTemporalHistory();
+            lastTransportDiscontinuity_ = discontinuity;
+        }
         engine_->setViewport(renderWidth_, renderHeight_);
         {
             const std::uint64_t allocsBefore = core::allocCounters().allocations;
@@ -2835,6 +2840,11 @@ int Application::runHeadless() {
     for (int i = 0; i < frames; ++i) {
         const auto frameStart = std::chrono::steady_clock::now();
         time = engine_->tick(clock);
+        const std::uint64_t discontinuity = engine_->transport().discontinuityRevision();
+        if (discontinuity != lastTransportDiscontinuity_) {
+            renderer_->resetTemporalHistory();
+            lastTransportDiscontinuity_ = discontinuity;
+        }
         // The scene rebuild is CPU work that scales with the size of the world rather than with
         // what is on screen, and nothing measured it: a world scene with the camera turned to
         // face empty sky spends 12-14 ms on the GPU and 21 ms of wall clock, and the difference
