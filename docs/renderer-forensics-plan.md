@@ -110,7 +110,11 @@ open in Phase 7.
 - `[ ]` Add finite-value validation for transforms, matrices, bounds, camera state, materials and GPU upload structures.
   - `[x]` Camera/entity matrix and skinning palette validation exists.
   - `[ ]` Complete joint, bounds, material and water validation coverage.
-- `[ ]` Document and test camera-relative origin ownership across entities, terrain, water and particles.
+- `[~]` Document and test camera-relative origin ownership across entities, terrain, water and particles.
+  The renderer audit found no camera-relative conversion or authoritative scene-transform write under
+  `src/rendering`; the static-camera regression confirms authored entity TRS survives camera motion.
+  Explicit origin ownership for terrain, water and particles is still open because no shared origin
+  contract is currently documented.
 
 ## Phase 2: Immutable frame boundary and reference renderer
 
