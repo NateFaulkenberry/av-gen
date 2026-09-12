@@ -200,6 +200,9 @@ open in Phase 7.
 - `[~]` `FrameTimeline` uses a four-slot non-stalling resolve/map ring and waits for in-flight maps
   during destruction. A 32-frame GPU stress regression now proves sustained slot reuse, readback
   completion and zero timeline overflow; the broader resource inventory remains open.
+- `[~]` Repeated render-target replacement is covered by an eight-size alternating GPU regression;
+  HDR/auxiliary targets, bind groups and tonemap views recreate without WebGPU errors. Live-path
+  asynchronous replacement and the remaining texture/buffer resource inventory are still open.
 - `[x]` Skinning palette upload cache is scene-aware. Distinct scenes with equal rig palette versions
   now force a palette upload; a GPU regression renders rest and posed same-version scenes through one
   renderer and verifies the pixels differ.

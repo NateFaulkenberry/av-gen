@@ -531,6 +531,28 @@ TEST_CASE("SceneRenderer supports explicit temporal reset after in-place reload"
     CHECK(ctx->errorCount() == 0);
 }
 
+TEST_CASE("SceneRenderer survives repeated target replacement", "[gpu][renderer][forensics]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    const auto scene = cubeScene();
+    const std::array<std::pair<std::uint32_t, std::uint32_t>, 8> sizes = {
+        std::pair{64u, 64u},  {128u, 72u}, {32u, 96u}, {160u, 40u},
+        std::pair{48u, 48u}, {96u, 128u}, {24u, 80u}, {64u, 64u}};
+    for (std::size_t i = 0; i < sizes.size(); ++i) {
+        FrameTime time{};
+        time.frameIndex = static_cast<std::uint64_t>(i);
+        time.renderTime = static_cast<double>(i) / 60.0;
+        const auto image = renderer.renderToImage(scene, time, sizes[i].first, sizes[i].second);
+        REQUIRE(image.has_value());
+        CHECK(image->width == sizes[i].first);
+        CHECK(image->height == sizes[i].second);
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("SceneRenderer repeats a frame index deterministically", "[gpu][renderer][forensics]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);
