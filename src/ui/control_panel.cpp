@@ -193,13 +193,26 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Open Recent", !recentProjects.empty())) {
-            for (const auto& recent : recentProjects) {
-                if (ImGui::MenuItem(recent.filename().string().c_str()) && onOpenRecent) {
+            // Two entries called `night-shift.json` -- one in this checkout, one in a worktree --
+            // are not duplicates, so the list is right to hold both. The label has to say which is
+            // which, and only the ambiguous ones grow: lengthening every label to separate two of
+            // them turns the menu into a column of full paths.
+            const std::vector<std::string> labels = ui::uniqueFileLabels(recentProjects);
+            for (std::size_t i = 0; i < recentProjects.size(); ++i) {
+                const std::filesystem::path& recent = recentProjects[i];
+                // By index, not by label. Two files can be identical all the way up -- a symlinked
+                // checkout, say -- and then even the longest label repeats; an id that repeats is a
+                // menu item that answers to the wrong click, which is what the warning was about.
+                ImGui::PushID(static_cast<int>(i));
+                const std::string& label =
+                    i < labels.size() ? labels[i] : recent.filename().string();
+                if (ImGui::MenuItem(label.c_str()) && onOpenRecent) {
                     onOpenRecent(recent);
                 }
                 if (ImGui::IsItemHovered()) {
                     ImGui::SetTooltip("%s", recent.string().c_str());
                 }
+                ImGui::PopID();
             }
             ImGui::EndMenu();
         }

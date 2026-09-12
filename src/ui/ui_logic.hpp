@@ -6,9 +6,11 @@
 
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace avgen::ui {
 
@@ -141,6 +143,73 @@ enum class ViewportIntent : std::uint8_t {
         return true;
     }
     return hoveredLastFrame && pointerInsideCanvas;
+}
+
+// Labels for a list of file paths: the file name where that is enough to tell them apart, and as
+// much of the trailing path as it takes where it is not.
+//
+// "Open Recent" showed `night-shift.json` twice. They were not duplicates -- one lived in the main
+// checkout and one in an agent's worktree -- so the list was right and the label was the problem. It
+// told the reader nothing, and it gave Dear ImGui the same id twice, which is a warning and a menu
+// item that answers to the wrong click.
+//
+// Only the ambiguous entries grow. Lengthening every label to make two of them distinct would make
+// a list of full paths, which is worse than the thing being fixed.
+[[nodiscard]] inline std::vector<std::string> uniqueFileLabels(
+    const std::vector<std::filesystem::path>& paths) {
+    const auto tail = [](const std::filesystem::path& p, std::size_t parts) {
+        std::filesystem::path out;
+        std::vector<std::filesystem::path> segments;
+        for (const auto& part : p) {
+            segments.push_back(part);
+        }
+        const std::size_t take = std::min(parts, segments.size());
+        for (std::size_t i = segments.size() - take; i < segments.size(); ++i) {
+            out /= segments[i];
+        }
+        return out.generic_string();
+    };
+
+    std::vector<std::string> labels(paths.size());
+    std::vector<bool> settled(paths.size(), false);
+    // One segment, then two, and so on, settling whatever has become unique at each depth. Bounded
+    // by the longest path, so a pair that is identical all the way up simply ends as equal strings
+    // rather than looping -- the PushID at the call site is what keeps those clickable.
+    std::size_t longest = 1;
+    for (const auto& p : paths) {
+        std::size_t n = 0;
+        for ([[maybe_unused]] const auto& part : p) {
+            ++n;
+        }
+        longest = std::max(longest, n);
+    }
+    for (std::size_t depth = 1; depth <= longest; ++depth) {
+        std::vector<std::string> candidate(paths.size());
+        for (std::size_t i = 0; i < paths.size(); ++i) {
+            candidate[i] = tail(paths[i], depth);
+        }
+        for (std::size_t i = 0; i < paths.size(); ++i) {
+            if (settled[i]) {
+                continue;
+            }
+            std::size_t sharing = 0;
+            for (std::size_t j = 0; j < paths.size(); ++j) {
+                sharing += (candidate[j] == candidate[i]) ? 1 : 0;
+            }
+            if (sharing == 1) {
+                labels[i] = candidate[i];
+                settled[i] = true;
+            }
+        }
+        // Anything still unsettled keeps the longest form tried so far, so a pair that never
+        // separates still reads as much of itself as exists.
+        for (std::size_t i = 0; i < paths.size(); ++i) {
+            if (!settled[i]) {
+                labels[i] = candidate[i];
+            }
+        }
+    }
+    return labels;
 }
 
 [[nodiscard]] inline bool intentIsCamera(ViewportIntent intent) {

@@ -1,4 +1,5 @@
 // Regression: the route-amount slider range must not feed back on the value it edits.
+#include <set>
 #include "ui/ui_logic.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -142,5 +143,61 @@ TEST_CASE("A click on a panel is not a click on the world", "[ui][viewport]") {
         // the next click anywhere is treated as part of it.
         CHECK(ui::viewportOwnsPointer(false, false, true));
         CHECK(ui::viewportOwnsPointer(true, false, true));
+    }
+}
+
+TEST_CASE("Recent files are labelled by what tells them apart", "[ui][recent]") {
+    // "Open Recent" listed `night-shift.json` twice and Dear ImGui warned about a duplicate id.
+    // They were not duplicates: one lived in the checkout and one in an agent's worktree. The list
+    // was right; the label told the reader nothing and gave two menu items the same identity.
+    SECTION("a unique file name stays a file name") {
+        const std::vector<std::filesystem::path> paths = {"/a/b/one.json", "/c/d/two.json"};
+        const auto labels = ui::uniqueFileLabels(paths);
+        CHECK(labels[0] == "one.json");
+        CHECK(labels[1] == "two.json");
+    }
+
+    SECTION("a shared name grows by as much as it takes, and only where it is needed") {
+        const std::vector<std::filesystem::path> paths = {
+            "/Users/x/av-gen/examples/city/night-shift.json",
+            "/Users/x/av-gen-wt-seqaudio/examples/city/night-shift.json",
+            "/Users/x/av-gen/examples/world/terrain.json"};
+        const auto labels = ui::uniqueFileLabels(paths);
+        // The one that was never ambiguous is untouched -- the whole menu must not become paths.
+        CHECK(labels[2] == "terrain.json");
+        // The two that clashed now differ, and each still ends in the file it names.
+        CHECK(labels[0] != labels[1]);
+        CHECK(labels[0].ends_with("night-shift.json"));
+        CHECK(labels[1].ends_with("night-shift.json"));
+        // Only as far up as it takes: these separate at the checkout, four segments in, so neither
+        // label is the whole absolute path.
+        CHECK(labels[0].find("/Users/") == std::string::npos);
+        CHECK(labels[1].find("/Users/") == std::string::npos);
+        INFO("labels: '" << labels[0] << "' and '" << labels[1] << "'");
+        CHECK(labels[0].find("av-gen/") != std::string::npos);
+        CHECK(labels[1].find("av-gen-wt-seqaudio/") != std::string::npos);
+    }
+
+    SECTION("three sharing a name all separate") {
+        const std::vector<std::filesystem::path> paths = {
+            "/r/one/city/night-shift.json", "/r/two/city/night-shift.json",
+            "/r/three/city/night-shift.json"};
+        const auto labels = ui::uniqueFileLabels(paths);
+        std::set<std::string> distinct(labels.begin(), labels.end());
+        CHECK(distinct.size() == 3);
+    }
+
+    SECTION("identical paths do not loop, and are left equal for the caller to scope") {
+        // A symlinked checkout can produce these. The rule cannot separate them, so it stops at the
+        // longest form rather than spinning; the PushID at the call site keeps them clickable.
+        const std::vector<std::filesystem::path> paths = {"/a/b/same.json", "/a/b/same.json"};
+        const auto labels = ui::uniqueFileLabels(paths);
+        REQUIRE(labels.size() == 2);
+        CHECK(labels[0] == labels[1]);
+        CHECK(labels[0].ends_with("same.json"));
+    }
+
+    SECTION("an empty list is an empty list") {
+        CHECK(ui::uniqueFileLabels({}).empty());
     }
 }
