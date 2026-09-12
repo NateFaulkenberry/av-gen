@@ -412,7 +412,9 @@ open in Phase 7.
 - `[~]` Add scripted camera translation, rotation, orbit, dolly, clipping and resize paths.
   A RendererQA camera-cut regression now covers four distinct poses and compares reused versus fresh
   renderers after an explicit temporal reset. A paired-renderer sequence now covers eight orbit/dolly
-  frames with alternating target sizes; clipping, timeline seek/scrub and scene reload remain.
+  frames with alternating target sizes. The same regression now covers forward/backward/fractional
+  timeline updates and a composition reload against a fresh renderer; clipping and interactive scrub
+  scripting remain.
 - `[ ]` Add scripted playback, pause, seek, scrub, reverse, scene reload and resolution changes.
 
 ### 8.2 Run the progressive matrix

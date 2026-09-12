@@ -253,6 +253,40 @@ TEST_CASE("RendererQA camera cuts match fresh renderers", "[gpu][composition][fo
         REQUIRE(b.has_value());
         CHECK(gpu::hashImage(*a) == gpu::hashImage(*b));
     }
+
+    rendering::SceneRenderer seekA(*ctx, shaders);
+    rendering::SceneRenderer seekB(*ctx, shaders);
+    REQUIRE(seekA.init().has_value());
+    REQUIRE(seekB.init().has_value());
+    for (const double seconds : {0.0, 1.0, 0.25}) {
+        time.renderTime = seconds;
+        time.frameIndex += 1;
+        composition.update(time);
+        seekA.resetTemporalHistory();
+        seekB.resetTemporalHistory();
+        const auto a = seekA.renderToImage(composition.scene(), time, 640, 360);
+        const auto b = seekB.renderToImage(composition.scene(), time, 640, 360);
+        REQUIRE(a.has_value());
+        REQUIRE(b.has_value());
+        CHECK(gpu::hashImage(*a) == gpu::hashImage(*b));
+    }
+
+    auto reloaded = scene::Composition::loadFile(sceneFile, registry);
+    REQUIRE(reloaded.has_value());
+    auto& reloadedComposition = **reloaded;
+    params::ParameterSet reloadedParameters;
+    params::Modulator reloadedModulator;
+    reloadedComposition.attach(reloadedParameters, reloadedModulator);
+    reloadedComposition.setViewport(640, 360);
+    reloadedComposition.update(time);
+    seekA.resetTemporalHistory();
+    const auto reloadImage = seekA.renderToImage(reloadedComposition.scene(), time, 640, 360);
+    REQUIRE(reloadImage.has_value());
+    rendering::SceneRenderer freshReload(*ctx, shaders);
+    REQUIRE(freshReload.init().has_value());
+    const auto freshReloadImage = freshReload.renderToImage(reloadedComposition.scene(), time, 640, 360);
+    REQUIRE(freshReloadImage.has_value());
+    CHECK(gpu::hashImage(*reloadImage) == gpu::hashImage(*freshReloadImage));
     CHECK(ctx->errorCount() == 0);
 }
 
