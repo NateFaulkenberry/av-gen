@@ -402,9 +402,19 @@ void WorldEditPanel::drawSelection(app::Engine& engine, WorldEditor& editor) {
 
     ImGui::Separator();
     const float third = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
-    if (ImGui::Button("Duplicate", ImVec2(third, 0.0f))) {
-        editor.duplicateSelection(engine);
-    }
+    // Through the application's dispatcher, like the menu and the keyboard. A panel button with its
+    // own route is a second implementation of the same action, and the one that drifts.
+    app::EditSystem* edits = editor.edits();
+    const auto act = [&](app::EditAction action, const char* text, ImVec2 size) {
+        const bool available = edits != nullptr && edits->canExecute(action);
+        ImGui::BeginDisabled(!available);
+        const bool pressed = ImGui::Button(text, size);
+        ImGui::EndDisabled();
+        if (pressed && available) {
+            static_cast<void>(edits->execute(action, engine));
+        }
+    };
+    act(app::EditAction::Duplicate, "Duplicate", ImVec2(third, 0.0f));
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Cmd+D");
     }
@@ -421,39 +431,60 @@ void WorldEditPanel::drawSelection(app::Engine& engine, WorldEditor& editor) {
     if (ImGui::Button("Ungroup", ImVec2(third, 0.0f))) {
         editor.ungroupSelection(engine);
     }
-    if (ImGui::Button("Delete", ImVec2(-1.0f, 0.0f))) {
-        editor.deleteSelection(engine);
-    }
+    act(app::EditAction::Delete, "Delete", ImVec2(-1.0f, 0.0f));
 }
 
 void WorldEditPanel::drawHistory(app::Engine& engine, WorldEditor& editor) {
-    EditHistory& history = editor.history();
+    app::EditSystem* edits = editor.edits();
+    if (edits == nullptr) {
+        ImGui::TextDisabled("no edit system attached");
+        return;
+    }
+    // The application's history, not this editor's. It is shown here because this is where the
+    // editor's other controls are, but what it lists is every edit the application has made -- so an
+    // entry from another editor appears in it, and undoing from here takes that back.
+    const EditHistory& history = edits->history();
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-    ImGui::BeginDisabled(!history.canUndo());
-    if (ImGui::Button(history.canUndo() ? ("Undo " + history.undoLabel()).c_str() : "Undo",
-                      ImVec2(half, 0.0f))) {
-        editor.undo(engine);
-    }
-    ImGui::EndDisabled();
-    ImGui::SameLine();
-    ImGui::BeginDisabled(!history.canRedo());
-    if (ImGui::Button(history.canRedo() ? ("Redo " + history.redoLabel()).c_str() : "Redo",
-                      ImVec2(half, 0.0f))) {
-        editor.redo(engine);
-    }
-    ImGui::EndDisabled();
 
-    if (ImGui::TreeNode("History")) {
-        const std::vector<std::string> labels = history.labels();
-        if (labels.empty()) {
+    // Through `execute`, the same call the menu and the keyboard make. A button that undid by its
+    // own route would be a second implementation of undo, and the first thing to disagree with the
+    // other two about what is available.
+    const auto button = [&](app::EditAction action) {
+        const bool available = edits->canExecute(action);
+        ImGui::BeginDisabled(!available);
+        if (ImGui::Button(edits->menuLabel(action).c_str(), ImVec2(half, 0.0f))) {
+            static_cast<void>(edits->execute(action, engine));
+        }
+        ImGui::EndDisabled();
+    };
+    button(app::EditAction::Undo);
+    ImGui::SameLine();
+    button(app::EditAction::Redo);
+
+    if (ImGui::TreeNodeEx("History", ImGuiTreeNodeFlags_DefaultOpen)) {
+        const std::vector<std::string> done = history.labels();
+        const std::vector<std::string> ahead = history.redoLabels();
+        if (done.empty() && ahead.empty()) {
             ImGui::TextDisabled("nothing yet");
         }
-        // Newest first: that is the order they will be taken back in.
-        for (auto it = labels.rbegin(); it != labels.rend(); ++it) {
-            ImGui::BulletText("%s", it->c_str());
+        // The future first, greyed: these are the steps a redo would walk back up. Showing them
+        // rather than a count is what makes "where am I in this list" a thing to look at.
+        for (auto it = ahead.rbegin(); it != ahead.rend(); ++it) {
+            ImGui::TextDisabled("   %s", it->c_str());
         }
-        if (history.redoSize() > 0) {
-            ImGui::TextDisabled("%zu step(s) redoable", history.redoSize());
+        // Then where the document actually stands, then what led to it, newest first -- which is the
+        // order it will be taken back in.
+        bool first = true;
+        for (auto it = done.rbegin(); it != done.rend(); ++it) {
+            if (first) {
+                ImGui::TextColored(ImVec4(0.55f, 0.80f, 1.0f, 1.0f), "-> %s", it->c_str());
+                first = false;
+            } else {
+                ImGui::Text("   %s", it->c_str());
+            }
+        }
+        if (done.empty() && !ahead.empty()) {
+            ImGui::TextColored(ImVec4(0.55f, 0.80f, 1.0f, 1.0f), "-> (start)");
         }
         ImGui::TreePop();
     }

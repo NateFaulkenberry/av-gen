@@ -171,6 +171,9 @@ public:
     [[nodiscard]] std::size_t redoSize() const { return redo_.size(); }
     // The labels of the undo stack, newest last. For the history list in the editor.
     [[nodiscard]] std::vector<std::string> labels() const;
+    // The redo stack's labels, next-to-be-redone first. The history panel shows these as the future
+    // they are, so "where am I" is a thing to look at rather than to work out from two counts.
+    [[nodiscard]] std::vector<std::string> redoLabels() const;
 
     // ---- coalescing a continuous edit ----------------------------------------------------------
     //

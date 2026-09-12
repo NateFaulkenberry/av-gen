@@ -277,6 +277,16 @@ void EditHistory::clear() {
     drag_ = EditCommand{};
 }
 
+std::vector<std::string> EditHistory::redoLabels() const {
+    std::vector<std::string> out;
+    out.reserve(redo_.size());
+    // `redo_` has the next one to redo at the back, so walking backwards puts it first.
+    for (auto it = redo_.rbegin(); it != redo_.rend(); ++it) {
+        out.push_back(it->label);
+    }
+    return out;
+}
+
 std::vector<std::string> EditHistory::labels() const {
     std::vector<std::string> out;
     out.reserve(undo_.size());

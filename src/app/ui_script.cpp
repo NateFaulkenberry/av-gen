@@ -345,11 +345,15 @@ void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Windo
                         editor.history().undoLabel()));
         break;
     case 120:
-        editor.undo(engine);
+        if (app::EditSystem* edits = editor.edits(); edits != nullptr) {
+            static_cast<void>(edits->execute(app::EditAction::Undo, engine));
+        }
         say(fmt::format("edit: after undo, {} nodes (started at {})", nodes(), editNodesBefore_));
         break;
     case 135:
-        editor.redo(engine);
+        if (app::EditSystem* edits = editor.edits(); edits != nullptr) {
+            static_cast<void>(edits->execute(app::EditAction::Redo, engine));
+        }
         say(fmt::format("edit: after redo, {} nodes", nodes()));
         break;
     case 150: {
@@ -395,7 +399,9 @@ void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Windo
         break;
     }
     case 180:
-        editor.undo(engine);
+        if (app::EditSystem* edits = editor.edits(); edits != nullptr) {
+            static_cast<void>(edits->execute(app::EditAction::Undo, engine));
+        }
         say(fmt::format("edit: ungrouped by undo, {} nodes, selection {}", nodes(),
                         editor.selection.size()));
         break;

@@ -122,6 +122,7 @@ public:
         edits.addContext(*this);
     }
     [[nodiscard]] bool hasEdits() const { return edits_ != nullptr; }
+    [[nodiscard]] app::EditSystem* edits() const { return edits_; }
     [[nodiscard]] EditHistory& history() { return edits_->history(); }
     [[nodiscard]] const EditHistory& history() const { return edits_->history(); }
 
