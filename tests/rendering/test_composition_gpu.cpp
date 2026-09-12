@@ -232,6 +232,27 @@ TEST_CASE("RendererQA camera cuts match fresh renderers", "[gpu][composition][fo
     CHECK(hashes[0] != hashes[1]);
     CHECK(hashes[1] != hashes[2]);
     CHECK(hashes[2] != hashes[3]);
+
+    rendering::SceneRenderer sequenceA(*ctx, shaders);
+    rendering::SceneRenderer sequenceB(*ctx, shaders);
+    REQUIRE(sequenceA.init().has_value());
+    REQUIRE(sequenceB.init().has_value());
+    for (std::uint64_t frame = 0; frame < 8; ++frame) {
+        const float angle = static_cast<float>(frame) * 0.35f;
+        composition.scene().camera.position = {std::sin(angle) * 8.0f, 2.5f + 0.2f * static_cast<float>(frame),
+                                               10.0f + std::cos(angle) * 4.0f};
+        composition.scene().camera.target = {0.0f, 1.0f, -8.0f};
+        time.frameIndex = frame;
+        time.renderTime = static_cast<double>(frame) / 30.0;
+        time.deltaTime = 1.0 / 30.0;
+        const std::uint32_t width = frame % 2 == 0 ? 640u : 576u;
+        const std::uint32_t height = frame % 2 == 0 ? 360u : 324u;
+        const auto a = sequenceA.renderToImage(composition.scene(), time, width, height);
+        const auto b = sequenceB.renderToImage(composition.scene(), time, width, height);
+        REQUIRE(a.has_value());
+        REQUIRE(b.has_value());
+        CHECK(gpu::hashImage(*a) == gpu::hashImage(*b));
+    }
     CHECK(ctx->errorCount() == 0);
 }
 
