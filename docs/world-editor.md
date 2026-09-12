@@ -304,10 +304,36 @@ the origin would be a trap. Undo brings all of it back, still grouped.
 works. A duplicated group copies its whole hierarchy — the copy's children hang off the *copy*.
 `Cmd+C` / `Cmd+V` do the same through a clipboard.
 
-### 5.7 Undo
+### 5.7 The object list: lock and hide
+
+The Edit panel's **Objects** list is every node in the scene, nested the way it is parented, with the
+two switches an image editor puts beside a layer.
+
+**The eye** shows and hides. Hiding a **group** hides what is inside it. It writes the node's
+`visible` parameter, so it is an ordinary edit: undoable, saved with the scene, and animatable from
+the timeline like anything else.
+
+**The padlock** takes an object out of the pointer's reach. A locked object still renders and still
+belongs to the scene; it simply stops answering clicks, drag boxes and `Cmd+A`. This is the answer to
+aiming at something standing on the ground and selecting the ground — lock the terrain once and it
+gets out of the way. A lock on a group covers everything under it, and locking something that is
+currently selected lets it go, so its gizmo goes with it.
+
+Locking is **not** an edit. It says how you are working rather than what the scene is, so it does not
+enter the undo history — a padlock sitting between two real edits would make `Cmd+Z` appear to do
+nothing. It *is* saved with the scene, because which things you had put out of the way is worth
+keeping between sessions. A locked row is greyed and cannot be selected from the list either; the
+count and an **Unlock all** button sit above the list so nothing can be locked away and lost.
+
+### 5.8 Undo
 
 `Cmd+Z`, `Shift+Cmd+Z`. The Edit panel names what the next undo will take back, and so does the
 status bar.
+
+The panel's **History** list is clickable: every entry moves the document to the point just after
+that edit, and the greyed entries above the current one are the future you undid your way out of.
+Clicking runs the undos or redos you would have pressed by hand, so a jump cannot reach a state that
+stepping could not.
 
 It covers **everything in this panel**: placement, painting (a whole stroke is one step), erasing,
 deletion, moves, rotations, scales, numeric entry, nudges, grouping, ungrouping, duplication and
@@ -320,7 +346,7 @@ came back rather than leaving you with nothing chosen.
 What it does **not** cover: Generate World (it replaces the composer's nodes wholesale, and the
 history is cleared), and anything done through the Parameters panel or the timeline.
 
-### 5.8 Keyboard
+### 5.9 Keyboard
 
 | | |
 |---|---|
@@ -388,7 +414,7 @@ All of it is ordinary scene data. Save the project and it round-trips.
   implementation yet.
 - **The camera director is not driven by the editor.** `app::camera_director` will direct heroes from
   a musical structure and install the result on the timeline, but nothing in the UI calls it yet.
-- **Generate World is not undoable.** The editor's undo covers everything you do by hand (§5.7),
+- **Generate World is not undoable.** The editor's undo covers everything you do by hand (§5.8),
   but a generate replaces the composer's own nodes wholesale and clears the history. Save before
   generating over something you want.
 - The generated world is roughly four times sparser per square metre than the authored Glowmere

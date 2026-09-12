@@ -33,7 +33,12 @@ week they ship, which is the one thing this Help system is not allowed to do.
 
 - There are **no keyboard shortcuts** in the world editor. See
   [Keyboard shortcuts](help://reference/keyboard-shortcuts).
-- There is **no global undo or redo** and no Edit menu.
+- Undo, redo, cut, copy, paste, duplicate, delete and select all **are** wired up, application-wide:
+  the Edit menu, the keyboard and the Edit panel's buttons all go through one history (ADR-101), and
+  the panel's history list is clickable. The wording of each item and what it does in each panel is
+  part of what this page does not describe yet.
+- Objects can be **hidden** (undoable, saved) and **locked** out of the pointer (not undoable, saved)
+  from the Edit panel's object list.
 - Clicking in the viewport picks an object, and the status bar names the selection.
 - A drag that begins on the canvas keeps the mouse until the button is released, so a gesture is not
   stolen halfway through by a panel the cursor passed over.

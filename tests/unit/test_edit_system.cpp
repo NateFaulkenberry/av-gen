@@ -359,3 +359,62 @@ TEST_CASE("An assistant's task becomes one entry in the history", "[app][edits][
         CHECK_FALSE(sink.available());
     }
 }
+
+TEST_CASE("Jumping to a point in the history is the steps you would have taken", "[app][edits]") {
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    app::EditSystem edits;
+    auto& gain = engine.params().add(params::ParamDesc<float>{
+        .path = "test/gain", .defaultValue = 0.0f, .hardMin = 0.0f, .hardMax = 100.0f});
+
+    const auto edit = [&](const char* label, float from, float to) {
+        ui::EditCommand command(label);
+        command.params.push_back(ui::ParamChange{"test/gain", {from}, {to}});
+        edits.history().push(std::move(command));
+        gain.setBaseComponent(0, to);
+    };
+    edit("A", 0.0f, 1.0f);
+    edit("B", 1.0f, 2.0f);
+    edit("C", 2.0f, 3.0f);
+    REQUIRE(edits.history().undoSize() == 3);
+
+    SECTION("back to a chosen point, and forward again") {
+        CHECK(edits.jumpTo(1, engine) == 2); // two undos
+        CHECK(edits.history().undoSize() == 1);
+        CHECK(gain.baseComponent(0) == 1.0f);
+        CHECK(edits.history().undoLabel() == "A");
+
+        CHECK(edits.jumpTo(3, engine) == 2); // two redos
+        CHECK(gain.baseComponent(0) == 3.0f);
+        CHECK(edits.history().undoLabel() == "C");
+    }
+
+    SECTION("all the way back") {
+        CHECK(edits.jumpTo(0, engine) == 3);
+        CHECK_FALSE(edits.canExecute(app::EditAction::Undo));
+        CHECK(gain.baseComponent(0) == 0.0f);
+    }
+
+    SECTION("jumping where you already are does nothing") {
+        CHECK(edits.jumpTo(3, engine) == 0);
+        CHECK(gain.baseComponent(0) == 3.0f);
+    }
+
+    SECTION("past the end is clamped rather than refused") {
+        CHECK(edits.jumpTo(99, engine) == 0); // already at the newest
+        edits.jumpTo(1, engine);
+        CHECK(edits.jumpTo(99, engine) == 2); // as far forward as there is
+        CHECK(gain.baseComponent(0) == 3.0f);
+    }
+
+    SECTION("editing after a jump discards what was ahead") {
+        // The standard rule, and it needs no special handling here precisely because a jump is made
+        // of ordinary undos: the next push clears the redo stack the way it always does.
+        edits.jumpTo(1, engine);
+        REQUIRE(edits.history().redoSize() == 2);
+        edit("D", 1.0f, 9.0f);
+        CHECK(edits.history().redoSize() == 0);
+        CHECK(edits.history().undoSize() == 2);
+        CHECK(edits.history().undoLabel() == "D");
+    }
+}

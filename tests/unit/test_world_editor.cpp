@@ -1362,3 +1362,167 @@ TEST_CASE("A continuous edit is one entry, however many writes it made", "[ui][e
         CHECK(ui::baseComponents(f.engine, path)[0] == 0.0f);
     }
 }
+
+// ---- lock and hide ---------------------------------------------------------------------------------
+//
+// The complaint this answers: in Glowmere, aiming at anything standing on the valley floor selects
+// the valley floor, because the ground is under the pointer everywhere. The image-editor answer is
+// a padlock on the layer, so that is the answer here.
+
+TEST_CASE("A lock covers what it is on and everything under it", "[ui][editor][lock]") {
+    Fixture f;
+    const std::string a = f.add("a", glm::vec3(-2.0f, 0.0f, 0.0f));
+    const std::string b = f.add("b", glm::vec3(2.0f, 0.0f, 0.0f));
+    auto* composition = f.engine.composition();
+
+    std::string group;
+    const std::vector<std::string> members{a, b};
+    ui::EditCommand command = ui::groupNodes(f.engine, members, "rocks", &group);
+    REQUIRE_FALSE(group.empty());
+
+    // The control: nothing is locked, so nothing answers yes.
+    CHECK_FALSE(ui::nodeLocked(*composition, a));
+    CHECK_FALSE(ui::nodeLocked(*composition, group));
+
+    composition->findNode(a)->locked = true;
+    CHECK(ui::nodeLocked(*composition, a));
+    CHECK_FALSE(ui::nodeLocked(*composition, b));    // a sibling is not swept up
+    CHECK_FALSE(ui::nodeLocked(*composition, group)); // nor is the parent
+
+    composition->findNode(a)->locked = false;
+    composition->findNode(group)->locked = true;
+    CHECK(ui::nodeLocked(*composition, a)); // but a lock above does reach down
+    CHECK(ui::nodeLocked(*composition, b));
+
+    CHECK_FALSE(ui::nodeLocked(*composition, "no such node"));
+}
+
+TEST_CASE("A locked object does not answer the pointer", "[ui][editor][lock]") {
+    Fixture f;
+    const std::string a = f.add("a", glm::vec3(-2.0f, 0.0f, 0.0f));
+    const std::string b = f.add("b", glm::vec3(2.0f, 0.0f, 0.0f));
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+
+    // The control first, and it is the important half: every check below has to be able to fail.
+    editor.applyPick(f.engine, a, false, false);
+    REQUIRE(editor.selection.nodes() == std::vector<std::string>{a});
+
+    const std::vector<std::string> one{a};
+    editor.setNodesLocked(f.engine, one, true);
+    // Locking what was held lets it go: a locked object with a gizmo still on it is still being
+    // moved by the arrow keys, which is the one thing the lock was for.
+    CHECK(editor.selection.empty());
+
+    editor.applyPick(f.engine, a, false, false);
+    CHECK(editor.selection.empty());
+    // And it does not quietly select something else instead -- the click lands on nothing, the way
+    // a click on the sky does.
+    editor.applyPick(f.engine, b, false, false);
+    REQUIRE(editor.selection.nodes() == std::vector<std::string>{b});
+    editor.applyPick(f.engine, a, true, false); // shift-click: adds nothing, drops nothing
+    CHECK(editor.selection.nodes() == std::vector<std::string>{b});
+
+    SECTION("Select All leaves it out") {
+        editor.selectAll(f.engine);
+        CHECK(editor.selection.nodes() == std::vector<std::string>{b});
+        editor.setNodesLocked(f.engine, one, false);
+        editor.selectAll(f.engine);
+        CHECK(editor.selection.size() == 2); // the control
+    }
+
+    SECTION("a drag box sweeps past it") {
+        const scene::Camera camera = lookingDown();
+        const float aspect = 16.0f / 9.0f;
+        // Wide enough to catch both, so what it catches is decided by the lock and nothing else.
+        const std::vector<std::string> caught =
+            ui::nodesInScreenRect(*f.engine.composition(), camera, aspect, glm::vec2(-1.0f, -1.0f),
+                                  glm::vec2(1.0f, 1.0f));
+        REQUIRE(std::find(caught.begin(), caught.end(), a) != caught.end());
+        REQUIRE(std::find(caught.begin(), caught.end(), b) != caught.end());
+
+        const auto box = [&](ui::WorldEditor& ed) {
+            ui::EditorInput input;
+            input.overCanvas = true;
+            input.ndc = glm::vec2(-0.95f, -0.95f);
+            input.leftPressed = true;
+            input.leftDown = true;
+            ed.update(f.engine, nullptr, camera, aspect, input);
+            input.leftPressed = false;
+            input.ndc = glm::vec2(0.95f, 0.95f);
+            ed.update(f.engine, nullptr, camera, aspect, input);
+            REQUIRE(ed.visuals().boxing);
+            input.leftDown = false;
+            input.leftReleased = true;
+            ed.update(f.engine, nullptr, camera, aspect, input);
+        };
+
+        editor.selection.clear();
+        box(editor);
+        CHECK(editor.selection.nodes() == std::vector<std::string>{b});
+
+        // The control: unlocked, the very same drag catches both.
+        editor.setNodesLocked(f.engine, one, false);
+        editor.selection.clear();
+        box(editor);
+        CHECK(editor.selection.size() == 2);
+    }
+}
+
+TEST_CASE("Hiding is an edit and locking is not", "[ui][editor][lock]") {
+    Fixture f;
+    const std::string a = f.add("a", glm::vec3(-2.0f, 0.0f, 0.0f));
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    const std::vector<std::string> one{a};
+
+    // Locking says how you are working, not what the scene is. Undo must not spend a press on it --
+    // a padlock sitting between two real edits makes Cmd+Z do nothing visible and the user press it
+    // again, which takes back the edit they wanted to keep.
+    editor.setNodesLocked(f.engine, one, true);
+    CHECK(edits.history().undoSize() == 0);
+    editor.setNodesLocked(f.engine, one, false);
+    CHECK(edits.history().undoSize() == 0);
+
+    // Hiding is a change to the document, so it is one entry, and undo brings it back.
+    const std::string path = "nodes/" + a + "/visible";
+    REQUIRE(ui::baseComponents(f.engine, path).size() == 1);
+    REQUIRE(ui::baseComponents(f.engine, path)[0] != 0.0f);
+    editor.setNodesVisible(f.engine, one, false);
+    REQUIRE(edits.history().undoSize() == 1);
+    CHECK(edits.history().undoLabel() == "Hide " + a);
+    CHECK(ui::baseComponents(f.engine, path)[0] == 0.0f);
+    CHECK_FALSE(f.engine.composition()->findNode(a)->visible);
+
+    REQUIRE(edits.execute(app::EditAction::Undo, f.engine));
+    CHECK(ui::baseComponents(f.engine, path)[0] != 0.0f);
+    CHECK(f.engine.composition()->findNode(a)->visible);
+
+    // Hiding what is already hidden is not an edit either: an entry here is one the user would
+    // press Cmd+Z for and watch nothing happen.
+    const std::size_t before = edits.history().undoSize();
+    editor.setNodesVisible(f.engine, one, true);
+    CHECK(edits.history().undoSize() == before);
+}
+
+TEST_CASE("A lock is saved with the scene, and a scene with no locks is written as it was",
+          "[ui][editor][lock]") {
+    Fixture f;
+    const std::string a = f.add("a", glm::vec3(-2.0f, 0.0f, 0.0f));
+    f.add("b", glm::vec3(2.0f, 0.0f, 0.0f));
+    auto* composition = f.engine.composition();
+
+    const std::string clean = composition->toJson().dump();
+    CHECK(clean.find("locked") == std::string::npos); // additive: an untouched scene gains no key
+
+    composition->findNode(a)->locked = true;
+    const nlohmann::json saved = composition->toJson();
+    CHECK(saved["nodes"][0]["locked"] == true);
+
+    auto reloaded = scene::Composition::fromJson(saved, f.engine.assets());
+    REQUIRE(reloaded.has_value());
+    CHECK((*reloaded)->findNode(a)->locked);
+    CHECK_FALSE((*reloaded)->findNode("b")->locked);
+}

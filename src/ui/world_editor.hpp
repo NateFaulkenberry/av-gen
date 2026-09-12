@@ -31,6 +31,7 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -178,6 +179,20 @@ public:
     [[nodiscard]] bool clipboardEmpty() const {
         return !hasEdits() || !edits_->clipboard().holds(kWorldNodesClipboardType);
     }
+
+    // ---- lock and hide, the way an image editor's layer list does it ---------------------------
+    //
+    // Two different kinds of thing, deliberately kept different.
+    //
+    // Hiding is an **edit**: it changes what the scene looks like, it is saved with the scene, it
+    // goes through the `visible` parameter, and so it is undoable and animatable like anything else.
+    //
+    // Locking is **not an edit**. It says which things should stop answering the pointer while you
+    // work -- a statement about you, not about the scene -- so it does not enter the history, where
+    // it would sit between two real edits and make Cmd+Z take back a click on a padlock. It is still
+    // saved with the scene, because which things you had put out of the way is worth keeping.
+    void setNodesVisible(app::Engine& engine, std::span<const std::string> names, bool visible);
+    void setNodesLocked(app::Engine& engine, std::span<const std::string> names, bool locked);
 
     // Drops selected names that no longer exist (after a scene swap or a Generate).
     void reconcile(app::Engine& engine);

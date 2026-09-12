@@ -68,6 +68,16 @@ private:
 // inside a group selects the group, which is what every tool does and what makes a group worth
 // making; holding the modifier that bypasses it is the caller's decision, not this function's.
 [[nodiscard]] std::string groupRootOf(const scene::Composition& composition, const std::string& name);
+// Whether `name` is locked out of the pointer -- itself, or by anything it sits under. A lock on a
+// group covers what is inside it, the way a locked layer group does in an image editor: an artist
+// who locks "terrain" means the ground and everything the ground is made of, not one node whose
+// children stay clickable through it.
+//
+// Lives here rather than in the picker because it is a question about the scene, and the picker, the
+// drag box and Select All all have to answer it the same way. One of them answering differently is
+// exactly the bug this feature exists to remove.
+[[nodiscard]] bool nodeLocked(const scene::Composition& composition, const std::string& name);
+
 // Every node parented under `name`, transitively, not including `name`.
 [[nodiscard]] std::vector<std::string> descendantsOf(const scene::Composition& composition,
                                                      const std::string& name);
@@ -96,6 +106,12 @@ private:
 bool setNodePosition(app::Engine& engine, const std::string& node, glm::vec3 value);
 bool setNodeRotation(app::Engine& engine, const std::string& node, glm::vec3 eulerDegrees);
 bool setNodeScale(app::Engine& engine, const std::string& node, glm::vec3 value);
+
+// Shows or hides a node. Goes through the `visible` parameter rather than the node's own flag,
+// because the parameter is what the renderer, the project file and the timeline all read -- so a
+// hide is undoable, saveable and animatable for free, and is the same edit whether it came from
+// this panel, a script or the assistant.
+bool setNodeVisible(app::Engine& engine, const std::string& node, bool value);
 
 // The three parameter paths a transform of `names` will write, for EditHistory::beginDrag.
 [[nodiscard]] std::vector<std::string> transformParamPaths(std::span<const std::string> names);

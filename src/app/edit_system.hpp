@@ -172,6 +172,15 @@ public:
     // Does it. False when nothing could.
     bool execute(EditAction action, Engine& engine);
 
+    // Moves the document to a chosen point in the history: `depth` is how many commands should be
+    // applied, so 0 is "before everything the history still holds" and `undoSize()` is now.
+    //
+    // Undo and redo repeatedly rather than by any other route. A jump is not a new kind of
+    // operation -- it is the operations the user could have performed by hand, done for them -- so
+    // it cannot get the document into a state that stepping could not, and it cannot need its own
+    // correctness argument. Returns how many steps it took.
+    std::size_t jumpTo(std::size_t depth, Engine& engine);
+
     // What the menu should say: "Undo Move 3 objects", or plain "Undo" with nothing to undo. The
     // description comes from the command, so the menu says what will actually happen.
     [[nodiscard]] std::string menuLabel(EditAction action) const;

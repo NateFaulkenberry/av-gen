@@ -1821,6 +1821,7 @@ CompositionNode cloneNodeSpec(const CompositionNode& node) {
     copy.parent = node.parent;
     copy.transform = node.transform;
     copy.visible = node.visible;
+    copy.locked = node.locked;
     copy.emissiveBoost = node.emissiveBoost;
     copy.roughnessScale = node.roughnessScale;
     copy.particles = node.particles;
@@ -2540,8 +2541,21 @@ Transform Composition::nodeTransform(const CompositionNode& node) const {
     return t;
 }
 
-bool Composition::nodeVisible(const CompositionNode& node) {
-    return node.visibleParam != nullptr ? node.visibleParam->value() : node.visible;
+bool Composition::nodeVisible(const CompositionNode& node) const {
+    const CompositionNode* n = &node;
+    // Bounded by the node count: a hand-edited file can describe a parent cycle, and a flatten that
+    // never returns is worse than one that draws a broken scene.
+    for (std::size_t guard = 0; n != nullptr && guard <= nodes_.size(); ++guard) {
+        const bool own = n->visibleParam != nullptr ? n->visibleParam->value() : n->visible;
+        if (!own) {
+            return false;
+        }
+        if (n->parent.empty()) {
+            break;
+        }
+        n = findNode(n->parent);
+    }
+    return true;
 }
 
 void Composition::ensureBuilt() {
@@ -4830,6 +4844,12 @@ nlohmann::json Composition::toJson() const {
                                                           : node.transform.scale);
         
         n["visible"] = node.visible;
+        // Only when locked: an additive key that no existing scene carries, so a file written by
+        // this build and read by an older one loses a working preference and nothing else, and a
+        // file that was never locked round-trips byte for byte.
+        if (node.locked) {
+            n["locked"] = true;
+        }
         n["emissiveBoost"] = node.emissiveBoost;
         n["roughnessScale"] = node.roughnessScale;
         if (node.kind == NodeKind::Gltf && node.animation.authored()) { // ADR-086
@@ -5511,6 +5531,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             auto rotation = readVec<3>(item, "rotation", glm::vec3(0.0f));
             auto scale = readVec<3>(item, "scale", node.transform.scale);
             auto visible = readBool(item, "visible", true);
+            auto locked = readBool(item, "locked", false);
             auto emissive = readFloat(item, "emissiveBoost", 1.0f);
             auto roughness = readFloat(item, "roughnessScale", 1.0f);
             const Error* fieldError = nullptr;
@@ -5532,6 +5553,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             node.transform.rotation = quatFromEulerDegrees(*rotation);
             node.transform.scale = *scale;
             node.visible = *visible;
+            node.locked = *locked;
             node.emissiveBoost = *emissive;
             node.roughnessScale = *roughness;
             if (item.contains("animation")) { // ADR-086: a skinned character's opening state

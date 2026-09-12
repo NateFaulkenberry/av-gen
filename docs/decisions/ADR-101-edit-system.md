@@ -107,6 +107,29 @@ This is also why `ai::TransactionSink` is a virtual: core cannot reach the histo
 application installs the implementation. That seam was designed for this and is honoured rather than
 replaced.
 
+## What is an edit, and what is only how you are working
+
+The object list added a lock and an eye, and they are deliberately not the same kind of thing.
+
+**Hiding is an edit.** It changes what the scene looks like, so it goes through the `visible`
+parameter and gets undo, save and automation for nothing. Visibility is also **inherited** from the
+moment it had an eye beside it: a group that hides and leaves its contents standing is the feature
+not working, and a `Group` has no geometry of its own, so nothing else would visibly change.
+
+**Locking is not an edit.** It says which things should stop answering the pointer while you work --
+a statement about the person, not about the document. Recording it would put a padlock between two
+real edits, and `Cmd+Z` would then appear to do nothing and be pressed again, taking back the edit
+the user meant to keep. So it writes `CompositionNode::locked` directly and never enters the history.
+
+It is still **saved with the scene**, as an additive key: a scene that was never locked round-trips
+byte for byte. That pair -- not undoable, but persistent -- is the one thing here that does not
+follow from "everything that changes the document is a command", and it is why it is written down.
+
+One rule holds it together: **locked means it does not get selected**, everywhere. The click, the
+drag box, `Cmd+A` and the object list's own rows all ask `ui::nodeLocked`, and locking something
+drops it from the selection. Four answers to "can I select this" is how a lock becomes a thing to
+aim around instead of a thing that gets out of the way.
+
 ## Consequences
 
 **Good.** One place to ask for an edit, so a menu item, a shortcut, a panel button and a scripted

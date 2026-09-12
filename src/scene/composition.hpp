@@ -137,6 +137,15 @@ struct CompositionNode {
     std::string parent;            // name of the parent node ("" = root); world = parent world x local
     Transform transform;           // local transform of the instance
     bool visible = true;
+    // Locked out of the pointer, the way a locked layer is in an image editor. It still renders and
+    // still belongs to the scene -- it simply stops answering clicks and box selections, so the
+    // ground plane a world is built on stops being what you select every time you aim at something
+    // standing on it.
+    //
+    // Not a parameter, and deliberately not undoable: locking is a statement about how you are
+    // working, not an edit to the work. It is saved with the scene, because which things you had
+    // put out of the way is worth keeping between sessions.
+    bool locked = false;
     float emissiveBoost = 1.0f;
     float roughnessScale = 1.0f;
     ParticleSystem particles;      // settings for kind Particles (name is taken from the node)
@@ -563,7 +572,10 @@ private:
     [[nodiscard]] Transform nodeTransform(const CompositionNode& node) const; // params or authored values (local)
     // True when making `parent` the parent of `node` would close a cycle (node and parent by name).
     [[nodiscard]] bool wouldCycle(const std::string& node, const std::string& parent) const;
-    [[nodiscard]] static bool nodeVisible(const CompositionNode& node);
+    // Whether a node is drawn: its own `visible`, and every ancestor's. Inherited, because a group
+    // is a thing an artist hides -- hiding "the village" and watching the houses stay up is not a
+    // subtlety, it is the feature not working. Non-static for that reason; it has to walk parents.
+    [[nodiscard]] bool nodeVisible(const CompositionNode& node) const;
     [[nodiscard]] float fitDistance() const;
     // Loads a nested scene file for a Scene node (cycle and depth checks against this chain).
     [[nodiscard]] Result<std::unique_ptr<Composition>> loadChild(const std::filesystem::path& asset) const;

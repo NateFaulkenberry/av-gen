@@ -348,6 +348,30 @@ TEST_CASE("Composition registers parameters that drive instances, materials and 
         CHECK(sc.entities[1].material.emissiveIntensity == 1.0f);
         CHECK_FALSE(comp.findNode("b")->visible);
     }
+    SECTION("hiding a group hides what is inside it") {
+        // The layer-list model: an eye on a group is an eye on its contents. Before this, hiding a
+        // group left every child standing, because visibility was read off one node at a time --
+        // which looks like the feature simply not working, since a Group has no geometry of its own
+        // and so nothing visibly changes at all.
+        auto group = makeNode(scene::NodeKind::Group, "holder");
+        REQUIRE(comp.addNode(std::move(group)).has_value());
+        REQUIRE(comp.setParent("b", "holder").has_value());
+        params.resetFinals();
+        comp.update(FrameTime{});
+        REQUIRE(sc.entities[1].visible); // the control: parented, still shown
+
+        params.findAs<bool>("nodes/holder/visible")->setBase(false);
+        params.resetFinals();
+        comp.update(FrameTime{});
+        CHECK_FALSE(sc.entities[1].visible);
+        CHECK(sc.entities[0].visible); // and only what is under it
+
+        // And back, so this is a switch rather than a one-way door.
+        params.findAs<bool>("nodes/holder/visible")->setBase(true);
+        params.resetFinals();
+        comp.update(FrameTime{});
+        CHECK(sc.entities[1].visible);
+    }
     SECTION("particle node parameters apply and follow the node transform") {
         params.findAs<float>("particles/sparks/spawnRate")->setBase(123.0f);
         params.findAs<glm::vec3>("nodes/sparks/position")->setBase(glm::vec3(0.0f, 0.0f, 4.0f));

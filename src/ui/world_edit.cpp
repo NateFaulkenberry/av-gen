@@ -120,6 +120,23 @@ std::string groupRootOf(const scene::Composition& composition, const std::string
     return best;
 }
 
+bool nodeLocked(const scene::Composition& composition, const std::string& name) {
+    const scene::CompositionNode* node = composition.findNode(name);
+    // Bounded for the same reason `groupRootOf` is: a hand-edited scene file can describe a cycle,
+    // and an editor that hangs when the pointer passes over one is worse than one that answers
+    // "not locked" about a scene that is already broken.
+    for (std::size_t guard = 0; node != nullptr && guard <= composition.nodeCount(); ++guard) {
+        if (node->locked) {
+            return true;
+        }
+        if (node->parent.empty()) {
+            break;
+        }
+        node = composition.findNode(node->parent);
+    }
+    return false;
+}
+
 std::vector<std::string> descendantsOf(const scene::Composition& composition, const std::string& name) {
     std::vector<std::string> out;
     std::vector<std::string> frontier{name};
@@ -221,6 +238,17 @@ bool setNodeRotation(app::Engine& engine, const std::string& node, glm::vec3 deg
 
 bool setNodeScale(app::Engine& engine, const std::string& node, glm::vec3 value) {
     return writeVec3(engine, node, "scale", value);
+}
+
+bool setNodeVisible(app::Engine& engine, const std::string& node, bool value) {
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr || composition->findNode(node) == nullptr) {
+        return false;
+    }
+    // `setBaseComponents` writes the node's own `visible` flag too, the way it does a transform: the
+    // flag is what a re-added node re-registers its parameter from, so writing only the parameter
+    // would give a hidden node back visible after a delete and an undo.
+    return setBaseComponents(engine, nodeParamPath(node, "visible"), {value ? 1.0f : 0.0f});
 }
 
 std::vector<std::string> transformParamPaths(std::span<const std::string> names) {

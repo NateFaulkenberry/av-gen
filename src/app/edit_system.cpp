@@ -157,6 +157,27 @@ bool EditSystem::execute(EditAction action, Engine& engine) {
     return context->doEdit(action, engine, *this);
 }
 
+std::size_t EditSystem::jumpTo(std::size_t depth, Engine& engine) {
+    const std::size_t reachable = history_.undoSize() + history_.redoSize();
+    depth = std::min(depth, reachable);
+    std::size_t steps = 0;
+    // Bounded by the number of commands that exist, so a target that cannot be reached -- an undo
+    // that refuses, a command whose apply fails -- stops rather than spinning.
+    while (history_.undoSize() > depth && history_.canUndo()) {
+        if (!execute(EditAction::Undo, engine)) {
+            break;
+        }
+        ++steps;
+    }
+    while (history_.undoSize() < depth && history_.canRedo()) {
+        if (!execute(EditAction::Redo, engine)) {
+            break;
+        }
+        ++steps;
+    }
+    return steps;
+}
+
 std::string EditSystem::menuLabel(EditAction action) const {
     const std::string name = editActionName(action);
     // Undo and redo name the command they would act on, so the menu says what will happen rather

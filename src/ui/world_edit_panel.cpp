@@ -5,7 +5,12 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
+#include <functional>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace avgen::ui {
 namespace {
@@ -59,6 +64,45 @@ void drawSwatch(const assets::AssetDescriptor& asset, float tallest, float side)
     ImGui::Dummy(ImVec2(side, side));
 }
 
+// An eye and a padlock, drawn rather than typed. The UI's font is ImGui's default, which is ASCII
+// only, so the two symbols a layer list is actually read by cannot be written as text -- and a
+// column of the letters "V" and "L" is not a thing anyone scans. Returns true when clicked.
+bool iconToggle(const char* id, bool on, bool padlock, const char* tooltip) {
+    const float side = ImGui::GetFrameHeight() * 0.78f;
+    const ImVec2 lo = ImGui::GetCursorScreenPos();
+    const bool clicked = ImGui::InvisibleButton(id, ImVec2(side, side));
+    const bool hovered = ImGui::IsItemHovered();
+    if (hovered && tooltip != nullptr) {
+        ImGui::SetTooltip("%s", tooltip);
+    }
+    // Off is dim rather than absent: an empty cell reads as "this row has no eye", and the artist
+    // then cannot find the thing they hid.
+    const ImU32 colour = on ? (hovered ? IM_COL32(235, 238, 245, 255) : IM_COL32(196, 202, 212, 255))
+                            : (hovered ? IM_COL32(150, 154, 162, 255) : IM_COL32(92, 96, 104, 255));
+    ImDrawList* list = ImGui::GetWindowDrawList();
+    const ImVec2 c(lo.x + side * 0.5f, lo.y + side * 0.5f);
+    if (!padlock) {
+        if (on) {
+            list->AddCircle(c, side * 0.30f, colour, 0, 1.4f);
+            list->AddCircleFilled(c, side * 0.12f, colour);
+        } else {
+            // A shut lid: the eye's outline flattened to the line it closes to.
+            list->AddLine(ImVec2(lo.x + side * 0.16f, c.y), ImVec2(lo.x + side * 0.84f, c.y), colour, 1.6f);
+        }
+        return clicked;
+    }
+    const ImVec2 bodyLo(c.x - side * 0.26f, c.y - side * 0.02f);
+    const ImVec2 bodyHi(c.x + side * 0.26f, c.y + side * 0.34f);
+    list->AddRectFilled(bodyLo, bodyHi, colour, 1.5f);
+    // The shackle. Closed it sits centred on the body; open it is swung clear to one side, which is
+    // the difference a padlock is recognised by at this size.
+    const float shackleX = on ? c.x : c.x + side * 0.22f;
+    constexpr float kPi = 3.14159265f; // IM_PI lives in imgui_internal.h, which this does not include
+    list->PathArcTo(ImVec2(shackleX, bodyLo.y), side * 0.17f, kPi, kPi * 2.0f);
+    list->PathStroke(colour, 0, 1.5f);
+    return clicked;
+}
+
 void helpMarker(const char* text) {
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
@@ -79,6 +123,8 @@ void WorldEditPanel::draw(app::Engine& engine, WorldEditor& editor, const assets
     } else {
         drawSelection(engine, editor);
     }
+    ImGui::Separator();
+    drawObjects(engine, editor);
     ImGui::Separator();
     drawHistory(engine, editor);
 }
@@ -434,6 +480,139 @@ void WorldEditPanel::drawSelection(app::Engine& engine, WorldEditor& editor) {
     act(app::EditAction::Delete, "Delete", ImVec2(-1.0f, 0.0f));
 }
 
+void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
+    scene::Composition* composition = engine.composition();
+    if (!ImGui::TreeNodeEx("Objects", ImGuiTreeNodeFlags_DefaultOpen)) {
+        return;
+    }
+    if (composition == nullptr || composition->nodeCount() == 0) {
+        ImGui::TextDisabled("no objects");
+        ImGui::TreePop();
+        return;
+    }
+
+    // Children by parent, once, rather than a scan of every node per row. A scene with four hundred
+    // nodes would otherwise be a hundred and sixty thousand string comparisons a frame.
+    std::unordered_map<std::string, std::vector<const scene::CompositionNode*>> children;
+    std::vector<const scene::CompositionNode*> roots;
+    std::size_t lockedCount = 0;
+    for (const auto& node : composition->nodes()) {
+        if (!node) {
+            continue;
+        }
+        if (node->locked) {
+            ++lockedCount;
+        }
+        if (node->parent.empty() || composition->findNode(node->parent) == nullptr) {
+            roots.push_back(node.get());
+        } else {
+            children[node->parent].push_back(node.get());
+        }
+    }
+
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputTextWithHint("##objectfilter", "filter", objectFilter_, sizeof(objectFilter_));
+    if (lockedCount > 0) {
+        // A way back. Locking is the one thing here that hides its own effect -- a locked object
+        // looks exactly like an unlocked one in the viewport -- so "why can I not click this" has to
+        // have an answer that does not involve finding the row.
+        ImGui::Text("%zu locked", lockedCount);
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Unlock all")) {
+            std::vector<std::string> all;
+            for (const auto& node : composition->nodes()) {
+                if (node && node->locked) {
+                    all.push_back(node->name);
+                }
+            }
+            editor.setNodesLocked(engine, all, false);
+        }
+    }
+
+    const std::string filter = objectFilter_;
+    const auto matches = [&](const std::string& name) {
+        if (filter.empty()) {
+            return true;
+        }
+        const auto lower = [](std::string t) {
+            std::transform(t.begin(), t.end(), t.begin(),
+                           [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+            return t;
+        };
+        return lower(name).find(lower(filter)) != std::string::npos;
+    };
+
+    ImGui::BeginChild("##objects", ImVec2(0.0f, 190.0f), ImGuiChildFlags_Borders);
+    // Recursive, and depth-limited for the same reason every other walk of this graph is: a scene
+    // file can be hand-edited into a cycle, and a panel that recurses forever takes the app with it.
+    const std::function<void(const scene::CompositionNode&, int)> row = [&](const scene::CompositionNode& node,
+                                                                           int depth) {
+        const auto kids = children.find(node.name);
+        const bool hasKids = kids != children.end() && !kids->second.empty();
+        const bool showSelf = matches(node.name);
+        ImGui::PushID(node.name.c_str());
+
+        if (showSelf) {
+            const bool visible = node.visibleParam != nullptr ? node.visibleParam->base() : node.visible;
+            if (iconToggle("##eye", visible, false,
+                           visible ? "Hide (undoable, saved with the scene)" : "Show")) {
+                const std::vector<std::string> one{node.name};
+                editor.setNodesVisible(engine, one, !visible);
+            }
+            ImGui::SameLine();
+            if (iconToggle("##lock", node.locked, true,
+                           node.locked ? "Unlock -- let it answer clicks again"
+                                       : "Lock -- stop it answering clicks and drag boxes")) {
+                const std::vector<std::string> one{node.name};
+                editor.setNodesLocked(engine, one, !node.locked);
+            }
+            ImGui::SameLine();
+            if (depth > 0) {
+                ImGui::Dummy(ImVec2(static_cast<float>(depth) * 10.0f, 0.0f));
+                ImGui::SameLine();
+            }
+
+            const bool selected = editor.selection.contains(node.name);
+            // Locked rows are greyed and inert. A lock means "this does not get selected"; a panel
+            // that let you select it anyway would put a gizmo back on the thing you locked to get
+            // the gizmo off, and there would then be two answers to what locked means.
+            if (node.locked) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            }
+            if (ImGui::Selectable(node.name.c_str(), selected) && !node.locked) {
+                if (ImGui::GetIO().KeyShift) {
+                    editor.selection.toggle(node.name);
+                } else {
+                    editor.selection.set(node.name);
+                }
+            }
+            if (node.locked) {
+                ImGui::PopStyleColor();
+            }
+            if (node.kind == scene::NodeKind::Group && hasKids) {
+                ImGui::SameLine();
+                ImGui::TextDisabled("(%zu)", kids->second.size());
+            }
+        }
+
+        if (hasKids && depth < 12) {
+            for (const scene::CompositionNode* child : kids->second) {
+                if (child != nullptr) {
+                    row(*child, showSelf ? depth + 1 : depth);
+                }
+            }
+        }
+        ImGui::PopID();
+    };
+    for (const scene::CompositionNode* node : roots) {
+        if (node != nullptr) {
+            row(*node, 0);
+        }
+    }
+    ImGui::EndChild();
+    ImGui::TreePop();
+}
+
 void WorldEditPanel::drawHistory(app::Engine& engine, WorldEditor& editor) {
     app::EditSystem* edits = editor.edits();
     if (edits == nullptr) {
@@ -462,32 +641,68 @@ void WorldEditPanel::drawHistory(app::Engine& engine, WorldEditor& editor) {
     button(app::EditAction::Redo);
 
     if (ImGui::TreeNodeEx("History", ImGuiTreeNodeFlags_DefaultOpen)) {
-        const std::vector<std::string> done = history.labels();
-        const std::vector<std::string> ahead = history.redoLabels();
+        // One list, oldest at the bottom, with the document's current position marked -- and every
+        // row clickable, because "take me back to before I did that" is the question a history is
+        // actually asked. Clicking runs the undos or redos it would have taken by hand, so nothing
+        // here can reach a state that stepping could not.
+        const std::vector<std::string> done = history.labels();      // oldest first
+        const std::vector<std::string> ahead = history.redoLabels();  // next to redo first
+        const std::size_t here = done.size();
+
         if (done.empty() && ahead.empty()) {
             ImGui::TextDisabled("nothing yet");
         }
-        // The future first, greyed: these are the steps a redo would walk back up. Showing them
-        // rather than a count is what makes "where am I in this list" a thing to look at.
-        for (auto it = ahead.rbegin(); it != ahead.rend(); ++it) {
-            ImGui::TextDisabled("   %s", it->c_str());
-        }
-        // Then where the document actually stands, then what led to it, newest first -- which is the
-        // order it will be taken back in.
-        bool first = true;
-        for (auto it = done.rbegin(); it != done.rend(); ++it) {
-            if (first) {
-                ImGui::TextColored(ImVec4(0.55f, 0.80f, 1.0f, 1.0f), "-> %s", it->c_str());
-                first = false;
-            } else {
-                ImGui::Text("   %s", it->c_str());
+
+        // The future, newest last: walking down the list is walking forward in time.
+        for (std::size_t i = ahead.size(); i-- > 0;) {
+            const std::size_t depth = here + i + 1;
+            ImGui::PushID(static_cast<int>(depth));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            if (ImGui::Selectable(("   " + ahead[i]).c_str())) {
+                static_cast<void>(edits->jumpTo(depth, engine));
             }
+            ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Redo forward to here");
+            }
+            ImGui::PopID();
         }
-        if (done.empty() && !ahead.empty()) {
-            ImGui::TextColored(ImVec4(0.55f, 0.80f, 1.0f, 1.0f), "-> (start)");
+
+        // The past, newest first, with the top one marking where the document stands.
+        for (std::size_t i = done.size(); i-- > 0;) {
+            const bool current = i + 1 == here;
+            ImGui::PushID(static_cast<int>(i));
+            if (current) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.80f, 1.0f, 1.0f));
+            }
+            const std::string row = (current ? "-> " : "   ") + done[i];
+            if (ImGui::Selectable(row.c_str(), current)) {
+                static_cast<void>(edits->jumpTo(i + 1, engine));
+            }
+            if (current) {
+                ImGui::PopStyleColor();
+            }
+            if (ImGui::IsItemHovered() && !current) {
+                ImGui::SetTooltip("Undo back to here");
+            }
+            ImGui::PopID();
+        }
+
+        // Before anything the history still holds. Named rather than blank, because "the beginning"
+        // is only the beginning of what is *kept*: once commands have been trimmed off the bottom,
+        // this is as far back as the history can take you and saying so avoids implying otherwise.
+        if (!done.empty()) {
+            ImGui::PushID("start");
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            if (ImGui::Selectable("   (as far back as this goes)")) {
+                static_cast<void>(edits->jumpTo(0, engine));
+            }
+            ImGui::PopStyleColor();
+            ImGui::PopID();
         }
         ImGui::TreePop();
     }
+
 }
 
 } // namespace avgen::ui

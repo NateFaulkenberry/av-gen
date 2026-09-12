@@ -32,9 +32,15 @@ private:
     void drawPalette(WorldEditor& editor, const assets::AssetLibrary* library);
     void drawBrush(WorldEditor& editor);
     void drawSelection(app::Engine& engine, WorldEditor& editor);
+    // The object list: every node in the scene, with the two switches an image editor puts beside a
+    // layer -- an eye and a padlock. Here rather than in a window of its own because §43 asks for
+    // one editor panel with contextual contents, and because what you lock is what you are about to
+    // stop clicking on, which is a thing you do in the middle of selecting.
+    void drawObjects(app::Engine& engine, WorldEditor& editor);
     void drawHistory(app::Engine& engine, WorldEditor& editor);
 
     char filter_[64] = {};
+    char objectFilter_[64] = {};
     int categoryFilter_ = 0;
 };
 

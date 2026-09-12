@@ -467,6 +467,9 @@ void WorldEditor::updateBox(app::Engine& engine, const scene::Camera& camera, fl
         // the thicket.
         std::vector<std::string> roots;
         for (const std::string& name : caught) {
+            if (nodeLocked(*composition, name)) {
+                continue; // locked out of the pointer, and a box is the pointer
+            }
             const std::string root = groupRootOf(*composition, name);
             if (std::find(roots.begin(), roots.end(), root) == roots.end()) {
                 roots.push_back(root);
@@ -490,6 +493,16 @@ void WorldEditor::applyPick(app::Engine& engine, const std::string& node, bool a
         return;
     }
     if (node.empty()) {
+        if (!additive) {
+            selection.clear();
+        }
+        return;
+    }
+    if (nodeLocked(*composition, node)) {
+        // A locked object answers a click the way empty space does: the click still lands, it simply
+        // does not land on *this*. Anything else makes a lock a thing you have to aim around rather
+        // than a thing that gets out of the way -- and the ground a world is built on is under the
+        // pointer everywhere.
         if (!additive) {
             selection.clear();
         }
@@ -641,7 +654,7 @@ void WorldEditor::selectAll(app::Engine& engine) {
         if (!node || node->kind == scene::NodeKind::Terrain) {
             continue;
         }
-        if (node->parent.empty()) {
+        if (node->parent.empty() && !node->locked) {
             selection.add(node->name);
         }
     }
@@ -768,6 +781,64 @@ void WorldEditor::paste(app::Engine& engine) {
     selection.set(created);
     command.selectionAfter = selection.nodes();
     history().push(std::move(command));
+}
+
+void WorldEditor::setNodesVisible(app::Engine& engine, std::span<const std::string> names, bool visible) {
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr || names.empty() || !hasEdits()) {
+        return;
+    }
+    EditCommand command(fmt::format("{} {}", visible ? "Show" : "Hide",
+                                    names.size() == 1 ? names[0]
+                                                      : std::to_string(names.size()) + " objects"));
+    for (const std::string& name : names) {
+        ParamChange change;
+        change.path = "nodes/" + name + "/visible";
+        change.before = baseComponents(engine, change.path);
+        if (change.before.empty()) {
+            continue; // no such node, or a kind that registers no visibility
+        }
+        setNodeVisible(engine, name, visible);
+        change.after = baseComponents(engine, change.path);
+        if (change.after != change.before) {
+            command.params.push_back(std::move(change));
+        }
+    }
+    if (command.empty()) {
+        return; // everything asked for was already in the state asked for
+    }
+    // The selection is not part of this edit either side: hiding something does not deselect it,
+    // any more than hiding a layer deselects it, so undoing a hide must not move the selection.
+    command.selectionBefore = selection.nodes();
+    command.selectionAfter = selection.nodes();
+    history().push(std::move(command));
+}
+
+void WorldEditor::setNodesLocked(app::Engine& engine, std::span<const std::string> names, bool locked) {
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        return;
+    }
+    for (const std::string& name : names) {
+        if (scene::CompositionNode* node = composition->findNode(name)) {
+            node->locked = locked;
+        }
+    }
+    if (!locked) {
+        return;
+    }
+    // Something that has stopped answering the pointer should not still be held by it. Leaving a
+    // locked object selected leaves its gizmo up and the arrow keys still moving it, which is the
+    // one thing a lock is for.
+    std::vector<std::string> keep;
+    for (const std::string& held : selection.nodes()) {
+        if (!nodeLocked(*composition, held)) {
+            keep.push_back(held);
+        }
+    }
+    if (keep.size() != selection.size()) {
+        selection.set(std::move(keep));
+    }
 }
 
 void WorldEditor::reconcile(app::Engine& engine) {
