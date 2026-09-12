@@ -341,8 +341,8 @@ void UiScript::stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Windo
     }
     case 110:
         say(fmt::format("edit: painted {} node(s) in one stroke; undo stack {} deep, top '{}'",
-                        nodes() - editNodesBefore_, editor.history.undoSize(),
-                        editor.history.undoLabel()));
+                        nodes() - editNodesBefore_, editor.history().undoSize(),
+                        editor.history().undoLabel()));
         break;
     case 120:
         editor.undo(engine);

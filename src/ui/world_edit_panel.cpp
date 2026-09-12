@@ -427,7 +427,7 @@ void WorldEditPanel::drawSelection(app::Engine& engine, WorldEditor& editor) {
 }
 
 void WorldEditPanel::drawHistory(app::Engine& engine, WorldEditor& editor) {
-    EditHistory& history = editor.history;
+    EditHistory& history = editor.history();
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     ImGui::BeginDisabled(!history.canUndo());
     if (ImGui::Button(history.canUndo() ? ("Undo " + history.undoLabel()).c_str() : "Undo",

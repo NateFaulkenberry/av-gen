@@ -16,6 +16,7 @@
 // editor -- the viewport navigation gestures work in every mode, which is what an artist expects
 // and one fewer state to be stuck in.
 
+#include "app/edit_system.hpp"
 #include "app/placement.hpp"
 #include "assets/asset_library.hpp"
 #include "scene/camera.hpp"
@@ -24,6 +25,8 @@
 #include "ui/gizmo.hpp"
 #include "ui/world_edit.hpp"
 #include "ui/world_probe.hpp"
+
+#include <string_view>
 
 #include <glm/glm.hpp>
 
@@ -36,6 +39,10 @@ class Engine;
 }
 
 namespace avgen::ui {
+
+// What the world editor puts on the application clipboard. Checked before Paste is offered, so a
+// timeline never offers to paste a tree and this editor never offers to paste a marker.
+inline constexpr std::string_view kWorldNodesClipboardType = "world/nodes";
 
 enum class EditorMode : std::uint8_t { Select, Place };
 [[nodiscard]] const char* editorModeName(EditorMode mode);
@@ -84,7 +91,7 @@ struct EditorVisuals {
     std::vector<SelectedBox> selectionBoxes;
 };
 
-class WorldEditor {
+class WorldEditor : public app::EditContext {
 public:
     // ---- what the artist has set -------------------------------------------------------------
     EditorMode mode = EditorMode::Select;
@@ -97,7 +104,25 @@ public:
     bool groupStrokes = false;
 
     Selection selection;
-    EditHistory history;
+
+    // ---- the application's edit system (ADR-101) ------------------------------------------------
+    //
+    // The editor does not own a history. It used to, and that was right while it was the only thing
+    // that edited anything: the moment a second editor exists, a stack per editor cannot answer
+    // "take back the last thing I did", because neither editor knows which of them acted last.
+    //
+    // Attached once by the application. Required: an editor with nowhere to record an edit would
+    // perform edits nobody could undo, which is worse than refusing, so the edit methods check.
+    void attachEdits(app::EditSystem& edits) { edits_ = &edits; }
+    [[nodiscard]] bool hasEdits() const { return edits_ != nullptr; }
+    [[nodiscard]] EditHistory& history() { return edits_->history(); }
+    [[nodiscard]] const EditHistory& history() const { return edits_->history(); }
+
+    // ---- EditContext: what this editor offers the application -----------------------------------
+    [[nodiscard]] std::string_view editContextName() const override { return "World"; }
+    [[nodiscard]] bool canEdit(app::EditAction action) const override;
+    bool doEdit(app::EditAction action, app::Engine& engine, app::EditSystem& edits) override;
+    void editSelectionRestored(const std::vector<std::string>& names) override;
 
     // ---- per frame ---------------------------------------------------------------------------
     // Recomputes the ghost, services the gizmo and the box selection, and performs placements.
@@ -135,6 +160,10 @@ public:
     // Copy / paste (§27). The clipboard holds names; paste duplicates them where they are plus an
     // offset, which is what "paste" means in a 3D scene with no cursor position of its own.
     void copySelection(app::Engine& engine);
+    // Cut: copy, then remove, as *one* history entry (ADR-101). Copy changes nothing and so is not
+    // an edit; the removal is, and undoing a cut must bring the objects back in one press rather
+    // than leaving the user to discover that the first Cmd+Z only took back a copy.
+    bool cutSelection(app::Engine& engine);
     void paste(app::Engine& engine);
     [[nodiscard]] bool clipboardEmpty() const { return clipboard_.empty(); }
 
@@ -144,6 +173,12 @@ public:
     void reset();
 
 private:
+    app::EditSystem* edits_ = nullptr;
+    // Whether the last frame had a composition to edit. `canEdit` is const and has no engine, and
+    // the menu must not offer Select All in a session with no scene -- so the answer is recorded
+    // when `update` runs, which is the only place the editor sees the engine.
+    bool sceneAvailable_ = false;
+
     void updateGhost(app::Engine& engine, const assets::AssetLibrary* library, const scene::Camera& camera,
                      float aspect, const EditorInput& input);
     void updateGizmo(app::Engine& engine, const scene::Camera& camera, float aspect,

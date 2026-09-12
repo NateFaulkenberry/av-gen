@@ -367,9 +367,9 @@ void ControlPanel::drawStatusBar(app::Engine& engine, const FrameStats& stats) {
     } else {
         ImGui::TextDisabled("%s", editor.status().c_str());
     }
-    if (editor.history.canUndo()) {
+    if (editor.history().canUndo()) {
         ImGui::Separator();
-        ImGui::TextDisabled("undo: %s", editor.history.undoLabel().c_str());
+        ImGui::TextDisabled("undo: %s", editor.history().undoLabel().c_str());
     }
     if (!engine.projectPath().empty()) {
         ImGui::Separator();

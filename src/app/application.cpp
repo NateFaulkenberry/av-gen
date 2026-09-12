@@ -695,6 +695,10 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         });
 
         panel_ = std::make_unique<ui::ControlPanel>();
+        // The world editor records into the application's history rather than one of its own, and
+        // registers as the context that answers Copy, Delete and the rest for world objects.
+        panel_->editor.attachEdits(edits_);
+        edits_.addContext(panel_->editor);
         panel_->canvasRenderScale =
             options_.canvasScale != 1.0f ? options_.canvasScale : settings_.canvasRenderScale;
         panel_->ai.plane = ai_.get();

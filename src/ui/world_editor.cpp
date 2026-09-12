@@ -41,6 +41,9 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
     visuals_ = EditorVisuals{};
     wantsMouse_ = false;
     scene::Composition* composition = engine.composition();
+    // Recorded for `canEdit`, which is const and sees no engine: the menu must not offer Select All
+    // in a session that has no scene.
+    sceneAvailable_ = composition != nullptr;
     if (composition == nullptr) {
         status_ = "no scene";
         preview_ = BrushPreview{};
@@ -57,7 +60,7 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
     // released, because the handle it was following is no longer under the pointer.
     if (input.cameraDrag) {
         if (drag_.active) {
-            history.cancelDrag(engine);
+            history().cancelDrag(engine);
             drag_ = GizmoDrag{};
             startTransforms_.clear();
         }
@@ -69,7 +72,7 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
 
     if (input.escape) {
         if (drag_.active) {
-            history.cancelDrag(engine);
+            history().cancelDrag(engine);
             drag_ = GizmoDrag{};
             startTransforms_.clear();
         }
@@ -264,7 +267,7 @@ void WorldEditor::commitStroke(app::Engine& engine) {
             fmt::format("Place {} x {}", placed, strokeAsset_.empty() ? "asset" : strokeAsset_);
     }
     stroke_.selectionAfter = selection.nodes();
-    history.push(std::move(stroke_));
+    history().push(std::move(stroke_));
     stroke_ = EditCommand{};
     static_cast<void>(engine);
 }
@@ -298,7 +301,7 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
     scene::Composition* composition = engine.composition();
     if (!buildGizmoFrame(engine, camera)) {
         if (drag_.active) {
-            history.commitDrag(engine);
+            history().commitDrag(engine);
             drag_ = GizmoDrag{};
             startTransforms_.clear();
         }
@@ -385,7 +388,7 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
             }
         }
         if (input.leftReleased || !input.leftDown) {
-            history.commitDrag(engine);
+            history().commitDrag(engine);
             drag_ = GizmoDrag{};
             startTransforms_.clear();
         }
@@ -422,7 +425,7 @@ void WorldEditor::updateGizmo(app::Engine& engine, const scene::Camera& camera, 
             const std::string label = fmt::format(
                 "{} {}", gizmoMode == GizmoMode::Move ? "Move" : gizmoMode == GizmoMode::Rotate ? "Rotate" : "Scale",
                 selection.size() == 1 ? selection.primary() : std::to_string(selection.size()) + " objects");
-            history.beginDrag(engine, label, transformParamPaths(topmostOf(*composition, selection.nodes())),
+            history().beginDrag(engine, label, transformParamPaths(topmostOf(*composition, selection.nodes())),
                               selection.nodes());
         }
     }
@@ -504,7 +507,7 @@ void WorldEditor::applyPick(app::Engine& engine, const std::string& node, bool a
 
 void WorldEditor::undo(app::Engine& engine) {
     std::vector<std::string> restored;
-    const EditApply applied = history.undo(engine, &restored);
+    const EditApply applied = history().undo(engine, &restored);
     for (const std::string& problem : applied.problems) {
         log::warn("undo: {}", problem);
     }
@@ -514,7 +517,7 @@ void WorldEditor::undo(app::Engine& engine) {
 
 void WorldEditor::redo(app::Engine& engine) {
     std::vector<std::string> restored;
-    const EditApply applied = history.redo(engine, &restored);
+    const EditApply applied = history().redo(engine, &restored);
     for (const std::string& problem : applied.problems) {
         log::warn("redo: {}", problem);
     }
@@ -530,7 +533,28 @@ void WorldEditor::deleteSelection(app::Engine& engine) {
     command.selectionBefore = selection.nodes();
     selection.clear();
     command.selectionAfter.clear();
-    history.push(std::move(command));
+    history().push(std::move(command));
+}
+
+bool WorldEditor::cutSelection(app::Engine& engine) {
+    if (selection.empty() || !hasEdits()) {
+        return false;
+    }
+    copySelection(engine);
+    // One command, labelled for what the user did. Built here rather than calling deleteSelection so
+    // the history says "Cut 3 objects" -- a person looking for what to undo is looking for the verb
+    // they used, not for the one the implementation happened to reuse.
+    EditCommand command = deleteNodes(engine, selection.nodes());
+    if (command.empty()) {
+        return false;
+    }
+    command.label = "Cut " + std::to_string(command.touched()) +
+                    (command.touched() == 1 ? " object" : " objects");
+    command.selectionBefore = selection.nodes();
+    selection.clear();
+    command.selectionAfter.clear();
+    history().push(std::move(command));
+    return true;
 }
 
 void WorldEditor::duplicateSelection(app::Engine& engine) {
@@ -556,7 +580,7 @@ void WorldEditor::duplicateSelection(app::Engine& engine) {
     command.selectionBefore = selection.nodes();
     selection.set(created);
     command.selectionAfter = selection.nodes();
-    history.push(std::move(command));
+    history().push(std::move(command));
 }
 
 void WorldEditor::groupSelection(app::Engine& engine) {
@@ -571,7 +595,7 @@ void WorldEditor::groupSelection(app::Engine& engine) {
     command.selectionBefore = selection.nodes();
     selection.set(made);
     command.selectionAfter = selection.nodes();
-    history.push(std::move(command));
+    history().push(std::move(command));
 }
 
 void WorldEditor::ungroupSelection(app::Engine& engine) {
@@ -604,7 +628,7 @@ void WorldEditor::ungroupSelection(app::Engine& engine) {
     combined.selectionBefore = chosen;
     selection.set(freed);
     combined.selectionAfter = selection.nodes();
-    history.push(std::move(combined));
+    history().push(std::move(combined));
 }
 
 void WorldEditor::selectAll(app::Engine& engine) {
@@ -633,7 +657,7 @@ void WorldEditor::nudgeSelection(app::Engine& engine, glm::vec3 delta) {
     }
     command.selectionBefore = selection.nodes();
     command.selectionAfter = selection.nodes();
-    history.push(std::move(command));
+    history().push(std::move(command));
 }
 
 namespace {
@@ -673,17 +697,17 @@ EditCommand oneShot(app::Engine& engine, const Selection& selection, const char*
 } // namespace
 
 void WorldEditor::setSelectionPosition(app::Engine& engine, glm::vec3 position) {
-    history.push(oneShot(engine, selection, "Position",
+    history().push(oneShot(engine, selection, "Position",
                          [&](const std::string& name) { setNodePosition(engine, name, position); }));
 }
 
 void WorldEditor::setSelectionRotation(app::Engine& engine, glm::vec3 degrees) {
-    history.push(oneShot(engine, selection, "Rotate",
+    history().push(oneShot(engine, selection, "Rotate",
                          [&](const std::string& name) { setNodeRotation(engine, name, degrees); }));
 }
 
 void WorldEditor::setSelectionScale(app::Engine& engine, glm::vec3 scale) {
-    history.push(oneShot(engine, selection, "Scale",
+    history().push(oneShot(engine, selection, "Scale",
                          [&](const std::string& name) { setNodeScale(engine, name, scale); }));
 }
 
@@ -724,7 +748,7 @@ void WorldEditor::paste(app::Engine& engine) {
     command.selectionBefore = selection.nodes();
     selection.set(created);
     command.selectionAfter = selection.nodes();
-    history.push(std::move(command));
+    history().push(std::move(command));
 }
 
 void WorldEditor::reconcile(app::Engine& engine) {
@@ -734,7 +758,7 @@ void WorldEditor::reconcile(app::Engine& engine) {
 }
 
 void WorldEditor::reset() {
-    history.clear();
+    history().clear();
     selection.clear();
     clipboard_.clear();
     drag_ = GizmoDrag{};
@@ -743,6 +767,74 @@ void WorldEditor::reset() {
     stroke_ = EditCommand{};
     preview_ = BrushPreview{};
     visuals_ = EditorVisuals{};
+}
+
+// ---- EditContext (ADR-101) ----------------------------------------------------------------------
+
+bool WorldEditor::canEdit(app::EditAction action) const {
+    // An editor with nowhere to record an edit must not claim it can make one: the action would
+    // happen and nothing could take it back, which is worse than the menu greying the item.
+    if (!hasEdits()) {
+        return false;
+    }
+    const bool chosen = !selection.empty();
+    switch (action) {
+    case app::EditAction::Copy:
+    case app::EditAction::Cut:
+    case app::EditAction::Duplicate:
+    case app::EditAction::Delete:
+    case app::EditAction::SelectNone:
+        return chosen;
+    case app::EditAction::Paste:
+        // What is on the clipboard, not merely that something is: a world editor offering to paste
+        // a timeline marker is a menu item that cannot do what it says.
+        return edits_->clipboard().holds(kWorldNodesClipboardType);
+    case app::EditAction::SelectAll:
+        return sceneAvailable_;
+    case app::EditAction::Undo:
+    case app::EditAction::Redo:
+        return false; // the system's, never an editor's
+    }
+    return false;
+}
+
+bool WorldEditor::doEdit(app::EditAction action, app::Engine& engine, app::EditSystem& edits) {
+    if (!canEdit(action)) {
+        return false;
+    }
+    switch (action) {
+    case app::EditAction::Copy:
+        copySelection(engine);
+        return true;
+    case app::EditAction::Cut:
+        return cutSelection(engine);
+    case app::EditAction::Paste:
+        paste(engine);
+        return true;
+    case app::EditAction::Duplicate:
+        duplicateSelection(engine);
+        return true;
+    case app::EditAction::Delete:
+        deleteSelection(engine);
+        return true;
+    case app::EditAction::SelectAll:
+        selectAll(engine);
+        return true;
+    case app::EditAction::SelectNone:
+        selection.clear();
+        return true;
+    case app::EditAction::Undo:
+    case app::EditAction::Redo:
+        return false;
+    }
+    static_cast<void>(edits);
+    return false;
+}
+
+void WorldEditor::editSelectionRestored(const std::vector<std::string>& names) {
+    // Undoing a delete gives the objects back; without this it gives them back with nothing
+    // selected, and the user cannot tell which ones returned.
+    selection.set(names);
 }
 
 } // namespace avgen::ui

@@ -3,6 +3,7 @@
 // Application lifecycle: window + GPU + engine + UI in live mode, or a headless deterministic
 // frame loop in offline mode (ADR-012). Both modes drive the same Engine and SceneRenderer.
 
+#include "app/edit_system.hpp"
 #include "app/engine.hpp"
 #include "app/viewport_camera.hpp"
 #include "app/placement.hpp"
@@ -205,6 +206,10 @@ private:
     // overlay hook; fed the engine's layer stack and timeline clock once per frame.
     std::unique_ptr<rendering::CompositionRenderer> compositor_;
     std::unique_ptr<ui::ImGuiLayer> imgui_;
+    // The application's one edit history, clipboard and action dispatch (ADR-101). Owned here
+    // rather than by any editor: an editor that owns a history can only answer for its own edits,
+    // and the user's question is "take back the last thing I did".
+    EditSystem edits_;
     std::unique_ptr<ui::ControlPanel> panel_;
 
     // ---- viewport interaction (ADR-068) --------------------------------------------------------

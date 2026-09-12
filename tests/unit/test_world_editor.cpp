@@ -10,6 +10,7 @@
 #include "app/engine.hpp"
 #include "support/gltf_fixture.hpp"
 #include "ui/brush.hpp"
+#include "app/edit_system.hpp"
 #include "ui/edit_history.hpp"
 #include "ui/gizmo.hpp"
 #include "ui/world_edit.hpp"
@@ -680,7 +681,9 @@ TEST_CASE("a node that is deleted and undone saves the transform it had, not the
 
 TEST_CASE("the editor's own commands go through the history") {
     Fixture f;
+    app::EditSystem edits;
     ui::WorldEditor editor;
+    editor.attachEdits(edits);
     const std::string a = f.add("a", glm::vec3(-2.0f, 0.0f, 0.0f));
     const std::string b = f.add("b", glm::vec3(2.0f, 0.0f, 0.0f));
     auto* composition = f.engine.composition();
@@ -724,7 +727,9 @@ TEST_CASE("the editor's own commands go through the history") {
 
 TEST_CASE("copy and paste leave the original alone") {
     Fixture f;
+    app::EditSystem edits;
     ui::WorldEditor editor;
+    editor.attachEdits(edits);
     const std::string a = f.add("a", glm::vec3(0.0f));
     editor.selection.set(a);
     CHECK(editor.clipboardEmpty());
@@ -1009,7 +1014,9 @@ TEST_CASE("rotating an object inside a turned group turns it about the world axi
     // it: the first version of this one rotated the group about Y and passed either way.
     ui::setNodeRotation(f.engine, group, glm::vec3(90.0f, 0.0f, 0.0f));
 
+    app::EditSystem edits;
     ui::WorldEditor editor;
+    editor.attachEdits(edits);
     editor.gizmoMode = ui::GizmoMode::Rotate;
     editor.localSpace = false; // the world's Y, which is the axis the handle stands for
     editor.selection.set(a);
@@ -1057,7 +1064,7 @@ TEST_CASE("rotating an object inside a turned group turns it about the world axi
     input.leftDown = false;
     input.leftReleased = true;
     editor.update(f.engine, nullptr, camera, aspect, input);
-    CHECK(editor.history.undoSize() == 1); // and the whole drag is one thing to undo
+    CHECK(editor.history().undoSize() == 1); // and the whole drag is one thing to undo
 }
 
 TEST_CASE("A drag that began on a panel does not open a selection box", "[ui][editor][box]") {
@@ -1073,7 +1080,9 @@ TEST_CASE("A drag that began on a panel does not open a selection box", "[ui][ed
     f.add("a", glm::vec3(-2.0f, 0.0f, 0.0f));
     f.add("b", glm::vec3(2.0f, 0.0f, 0.0f));
 
+    app::EditSystem edits;
     ui::WorldEditor editor;
+    editor.attachEdits(edits);
     const scene::Camera camera = lookingDown();
     const float aspect = 16.0f / 9.0f;
 
