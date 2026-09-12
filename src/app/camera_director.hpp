@@ -77,6 +77,43 @@ class Engine;
                                                std::span<const world::HeroPoint> heroes,
                                                std::uint32_t seed = 1);
 
+// ---- keeping a directed camera in step with the heroes -----------------------------------------
+//
+// Directing bakes: `installSequence` writes timeline tracks, and from then on the camera is those
+// keyframes. So starring an object after a shot was cut changed nothing until the shot was cut
+// again, and the way to do that was to hand the camera back to the viewport and re-direct it --
+// two menu items to see the effect of one click.
+//
+// The fix is not to make the director live. A directed camera *is* a bake, deliberately: it is
+// scrubbable, renderable offline and identical every time, none of which survives a camera that
+// re-derives itself per frame. What can be automatic is noticing that the bake is out of date.
+
+// What the application remembers about the shot it cut.
+struct DirectorState {
+    bool directed = false;            // the camera's automation is the director's, not somebody's work
+    std::uint64_t heroRevision = 0;   // the hero set it was cut from (Composition::heroRevision)
+    std::uint32_t seed = 1;           // so a re-cut is the same shot minus what actually changed
+};
+
+enum class Redirect : std::uint8_t {
+    Nothing,      // not directed, or the heroes have not moved on
+    Recut,        // the shot was cut again from the heroes as they are now
+    HandedBack,   // the last hero went, so the camera went back to the viewport
+    Released,     // somebody else took the camera: the automation is gone or no longer ours
+};
+
+// Re-cuts the shot when the heroes have changed since it was cut. Call once a frame; it is a
+// counter comparison until something actually changes.
+//
+// Self-healing rather than notified: it checks that the camera is still automated at all, so a
+// project load, an undo, or a hand-deleted track leaves the state correct without every one of
+// those places having to know that a director exists.
+//
+// An empty hero set hands the camera back instead of failing. A shot with nothing to point at is
+// not a shot, and leaving the last trajectory running would be a camera flying a path towards
+// something the user has just said is not there.
+[[nodiscard]] Result<Redirect> refreshDirection(Engine& engine, DirectorState& state);
+
 // The camera parameters a directed sequence owns. Anything targeting one of these is replaced by
 // `installSequence`; anything else survives.
 [[nodiscard]] std::span<const std::string_view> directedCameraTargets();

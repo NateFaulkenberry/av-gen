@@ -1248,6 +1248,7 @@ Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
         }
     }
     heroes_ = std::move(heroes);
+    ++heroRevision_;
     return {};
 }
 

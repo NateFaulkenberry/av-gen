@@ -5,6 +5,7 @@
 
 #include "app/ai_edit_sink.hpp"
 #include "app/edit_system.hpp"
+#include "app/camera_director.hpp"
 #include "app/engine.hpp"
 #include "app/viewport_camera.hpp"
 #include "app/placement.hpp"
@@ -323,6 +324,8 @@ private:
     double lastFps_ = 0.0;
     double lastGpuFrameMs_ = -1.0;
     std::uint64_t lastTransportDiscontinuity_ = 0;
+    // The shot the director cut, so starring an object re-cuts it (see `refreshDirection`).
+    DirectorState cameraDirection_;
 };
 
 } // namespace avgen::app

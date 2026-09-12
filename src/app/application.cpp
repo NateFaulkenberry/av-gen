@@ -746,10 +746,13 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                 panel_->setStatus(r.error().message);
             } else {
                 renderer_->resetTemporalHistory();
-                panel_->setStatus("camera cut to the track");
+                panel_->setStatus("camera cut to the track -- it re-cuts as you star and unstar");
             }
         };
         panel_->onClearCameraAutomation = [this] {
+            // Handing the camera back also ends the director's claim on it: from here a star is
+            // just a declaration again, and re-cutting is something the user asks for.
+            cameraDirection_ = DirectorState{};
             // Removing the automation rather than disabling the whole timeline: a project may
             // automate other things, and handing the camera back is not a reason to stop those.
             auto& tracks = engine_->timeline().tracks();
@@ -2070,6 +2073,10 @@ Result<void> Application::directCameraFromTrack() {
         return std::unexpected(installed.error());
     }
     log::info("direct: {} camera track(s) from {} hero(es)", *installed, heroes.size());
+    // From now until the camera is handed back, the shot follows the heroes: starring an object
+    // re-cuts it on the next frame rather than waiting to be asked (`refreshDirection`).
+    cameraDirection_.directed = true;
+    cameraDirection_.heroRevision = engine_->composition()->heroRevision();
     return {};
 }
 
@@ -2309,6 +2316,23 @@ int Application::runLive() {
                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - lateStart).count());
             if (events.quit) {
                 break;
+            }
+        }
+
+        // Before the clock, so a shot re-cut this frame is the shot this frame renders.
+        if (auto redirected = refreshDirection(*engine_, cameraDirection_); !redirected) {
+            log::warn("direct: {}", redirected.error().message);
+            if (panel_) {
+                panel_->setStatus("could not re-cut the shot: " + redirected.error().message);
+            }
+        } else if (panel_ != nullptr) {
+            if (*redirected == Redirect::Recut) {
+                renderer_->resetTemporalHistory();
+                panel_->setStatus(fmt::format("camera re-cut for {} hero(es)",
+                                              engine_->composition()->heroes().size()));
+            } else if (*redirected == Redirect::HandedBack) {
+                renderer_->resetTemporalHistory();
+                panel_->setStatus("no heroes left: the camera is back with the viewport");
             }
         }
 

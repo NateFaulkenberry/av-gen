@@ -58,6 +58,39 @@ const scene::CompositionNode* terrainNodeOf(Engine& engine) {
 
 std::span<const std::string_view> directedCameraTargets() { return kCameraTargets; }
 
+Result<Redirect> refreshDirection(Engine& engine, DirectorState& state) {
+    if (!state.directed) {
+        return Redirect::Nothing;
+    }
+    const scene::Composition* composition = engine.composition();
+    // No composition, or nothing driving the camera any more: a project was loaded, the camera was
+    // handed back, an undo took the tracks, somebody deleted them by hand. Whatever happened, this
+    // is no longer our camera and the next Direct to Music starts the relationship again.
+    if (composition == nullptr || !engine.timeline().isAutomated("camera/position")) {
+        state = DirectorState{};
+        return Redirect::Released;
+    }
+    if (composition->heroRevision() == state.heroRevision) {
+        return Redirect::Nothing;
+    }
+    // Recorded before the work, not after: a re-cut that fails must not be retried every frame for
+    // the rest of the session, and the failure is the same one until the heroes change again.
+    state.heroRevision = composition->heroRevision();
+    if (composition->heroes().empty()) {
+        auto& tracks = engine.timeline().tracks();
+        const auto owned = directedCameraTargets();
+        std::erase_if(tracks, [&](const params::Track& t) {
+            return std::find(owned.begin(), owned.end(), t.target) != owned.end();
+        });
+        state = DirectorState{};
+        return Redirect::HandedBack;
+    }
+    if (auto installed = directEngine(engine, composition->heroes(), state.seed); !installed) {
+        return std::unexpected(installed.error());
+    }
+    return Redirect::Recut;
+}
+
 Result<DirectionBrief> briefFromHeroes(std::span<const world::HeroPoint> heroes) {
     if (heroes.empty()) {
         return fail("the camera director needs something to point at: this world has no heroes");

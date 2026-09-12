@@ -377,6 +377,11 @@ public:
     // Rejects the whole set rather than dropping the bad member, and names it. A hero silently
     // dropped is a camera director that frames nothing with no explanation of why.
     Result<void> setHeroes(std::vector<world::HeroPoint> heroes);
+    // Bumped by every accepted `setHeroes`. A counter rather than a comparison of the lists,
+    // because what reads it is asking "is the shot I cut still the shot these heroes describe" --
+    // a question about *when*, not about which fields differ -- and because comparing two vectors
+    // of heroes every frame to answer "no" is work nobody needs done.
+    [[nodiscard]] std::uint64_t heroRevision() const { return heroRevision_; }
 
     // ---- the ground (§3, ADR-090) --------------------------------------------------------------
     //
@@ -717,6 +722,7 @@ private:
     std::vector<std::unique_ptr<AnimationSink>> animationSinks_;
 
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
+    std::uint64_t heroRevision_ = 1;
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
     std::vector<entity::FieldDesc> fieldDescs_;   // ADR-097: authored, round-tripped as "fields"
     std::string profileLibraryPath_;              // ADR-097: "entityProfiles", relative to the scene

@@ -370,3 +370,114 @@ TEST_CASE("Glowmere's own heroes and score direct a camera that travels between 
     CHECK(shotOpensOnDrop);
 #endif
 }
+
+// Directing bakes: the shot is timeline keys from the moment it is cut, so starring an object
+// afterwards changed nothing until it was cut again -- and the only way to ask for that was to hand
+// the camera back to the viewport and re-direct it. Two menu items to see the effect of one click.
+//
+// `refreshDirection` is the noticing. It does not make the director live (a bake is what makes a
+// directed camera scrubbable and renderable); it re-cuts when the heroes it was cut from have moved
+// on, and gets out of the way in every case where the camera is no longer the director's.
+TEST_CASE("A directed shot re-cuts itself when the heroes change", "[director][camera][redirect]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path wav =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "glowmere-valley.wav";
+    if (!std::filesystem::exists(wav)) {
+        SKIP("glowmere-valley.wav is generated, not committed: run tools/make_glowmere_score.py");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    REQUIRE(engine.loadAudio(wav).has_value());
+    REQUIRE(engine.track() != nullptr);
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition->setHeroes(threeHeroes()).has_value());
+
+    // What a shot looks like, so a re-cut can be told from a repeat.
+    const auto cameraKeys = [&]() -> std::vector<float> {
+        const auto& tracks = engine.timeline().tracks();
+        const auto it = std::find_if(tracks.begin(), tracks.end(), [](const params::Track& t) {
+            return t.target == "camera/position";
+        });
+        if (it == tracks.end()) {
+            return {};
+        }
+        std::vector<float> out;
+        for (const params::Key& key : it->keys) {
+            out.insert(out.end(), key.value.begin(), key.value.end());
+        }
+        return out;
+    };
+
+    app::DirectorState state;
+    // Nothing is directed yet, so nothing happens however much the heroes change.
+    REQUIRE(composition->setHeroes({threeHeroes()[1]}).has_value());
+    auto quiet = app::refreshDirection(engine, state);
+    REQUIRE(quiet.has_value());
+    CHECK(*quiet == app::Redirect::Nothing);
+    CHECK(cameraKeys().empty());
+
+    // Cut the shot, the way the menu item does.
+    REQUIRE(composition->setHeroes(threeHeroes()).has_value());
+    REQUIRE(app::directEngine(engine, composition->heroes()).has_value());
+    state.directed = true;
+    state.heroRevision = composition->heroRevision();
+    const std::vector<float> first = cameraKeys();
+    REQUIRE(!first.empty());
+
+    // A frame with nothing changed is a counter comparison and no more.
+    auto idle = app::refreshDirection(engine, state);
+    REQUIRE(idle.has_value());
+    CHECK(*idle == app::Redirect::Nothing);
+    CHECK(cameraKeys() == first);
+
+    // Unstar the subject: the shot is cut again, and it is a different shot.
+    std::vector<world::HeroPoint> fewer = composition->heroes();
+    fewer.erase(fewer.begin());
+    REQUIRE(composition->setHeroes(fewer).has_value());
+    auto recut = app::refreshDirection(engine, state);
+    INFO((recut ? std::string() : recut.error().message));
+    REQUIRE(recut.has_value());
+    CHECK(*recut == app::Redirect::Recut);
+    const std::vector<float> second = cameraKeys();
+    CHECK(!second.empty());
+    CHECK(second != first);
+    CHECK(state.heroRevision == composition->heroRevision());
+    // ...and having caught up, it stops.
+    auto settled = app::refreshDirection(engine, state);
+    REQUIRE(settled.has_value());
+    CHECK(*settled == app::Redirect::Nothing);
+    CHECK(cameraKeys() == second);
+
+    SECTION("the last hero going hands the camera back rather than flying at nothing") {
+        REQUIRE(composition->setHeroes({}).has_value());
+        auto handed = app::refreshDirection(engine, state);
+        REQUIRE(handed.has_value());
+        CHECK(*handed == app::Redirect::HandedBack);
+        CHECK(cameraKeys().empty());
+        CHECK_FALSE(engine.timeline().isAutomated("camera/position"));
+        CHECK_FALSE(state.directed);   // and it stops claiming a camera it no longer drives
+    }
+
+    SECTION("somebody else taking the camera ends the claim") {
+        // What handing the camera back to the viewport does, done behind the director's back --
+        // which is also what a project load, an undo or a deleted track look like from here.
+        auto& tracks = engine.timeline().tracks();
+        const auto owned = app::directedCameraTargets();
+        std::erase_if(tracks, [&](const params::Track& t) {
+            return std::find(owned.begin(), owned.end(), t.target) != owned.end();
+        });
+        auto released = app::refreshDirection(engine, state);
+        REQUIRE(released.has_value());
+        CHECK(*released == app::Redirect::Released);
+        CHECK_FALSE(state.directed);
+        // A hero change now does nothing at all: the camera is somebody else's.
+        REQUIRE(composition->setHeroes(threeHeroes()).has_value());
+        auto after = app::refreshDirection(engine, state);
+        REQUIRE(after.has_value());
+        CHECK(*after == app::Redirect::Nothing);
+        CHECK(cameraKeys().empty());
+    }
+#endif
+}
