@@ -510,6 +510,8 @@ For every level, run camera translation, rotation, orbit, dolly, playback, pause
 - `[ ]` Re-measure CPU/GPU frame time, p90/tail, draw calls, visible/culled renderables, animated vertices, water/shadow/post costs and buffer uploads.
 - `[ ]` Profile Constellation and Glowmere separately; do not generalize one workload to the other.
 - `[ ]` Run release, debug, ASan/UBSan and TSan suites relevant to changed paths.
+- `[~]` ASan/UBSan focused renderer-forensics coverage passes: 264 assertions across 16 cases with
+  no sanitizer findings. Full sanitizer suites and TSan resource-lifetime coverage remain open.
 - `[x]` Complete release suite baseline: 1,677 tests passed, zero failures, with four expected
   platform/asset-gated skips (two Khronos sample imports, external ffmpeg/libx264 and NDI runtime).
   The run took 345.85 seconds on the current Apple M2 Max environment. Existing compiler warnings
