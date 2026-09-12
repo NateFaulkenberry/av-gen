@@ -114,6 +114,8 @@ void ImGuiLayer::render(wgpu::CommandEncoder& encoder, const gpu::TargetView& ta
 }
 
 bool ImGuiLayer::wantsKeyboard() const { return ImGui::GetIO().WantCaptureKeyboard; }
+bool ImGuiLayer::wantsTextInput() const { return ImGui::GetIO().WantTextInput; }
+bool ImGuiLayer::itemActive() const { return ImGui::IsAnyItemActive(); }
 bool ImGuiLayer::wantsMouse() const { return ImGui::GetIO().WantCaptureMouse; }
 
 } // namespace avgen::ui

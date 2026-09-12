@@ -1561,11 +1561,19 @@ void Application::handleInputEvent(const SDL_Event& event) {
                                         viewportGesture_ != ViewportGesture::None)) {
                 handleViewportEvent(event);
             }
-            if (event.type == SDL_EVENT_KEY_DOWN && !imgui_->wantsKeyboard() &&
-                handleEditorShortcut(event)) {
+            // Not `wantsKeyboard`. With `NavEnableKeyboard` set, Dear ImGui reports that it wants
+            // the keyboard whenever a window has nav focus, and in a docked UI where the canvas is
+            // itself a window that is always -- so this guard silently disabled every editor
+            // shortcut in the application. The Edit menu is what made it visible: the menu item
+            // worked and Cmd+Z did not.
+            //
+            // The question is whether the user is *typing*, which is what must not be interrupted.
+            if (event.type == SDL_EVENT_KEY_DOWN && !imgui_->wantsTextInput() &&
+                !imgui_->itemActive() && handleEditorShortcut(event)) {
                 return;
             }
-            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && !imgui_->wantsKeyboard()) {
+            if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && !imgui_->wantsTextInput() &&
+                !imgui_->itemActive()) {
                 if (event.key.key == SDLK_SPACE) {
                     engine_->togglePlay();
                 } else if (event.key.key == SDLK_O && panel_ && panel_->onOpenAudio) {

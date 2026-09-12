@@ -46,7 +46,16 @@ public:
     // pipeline and font rebuild on the next frame; call it only when a view is actually retired.
     void forgetCachedTextures();
 
+    // True when Dear ImGui would use the keyboard *for anything*, which with keyboard navigation
+    // enabled means "a window has focus" -- in a docked UI, essentially always. Almost never the
+    // question a caller wants: guarding shortcuts on it disables every shortcut in the application.
     [[nodiscard]] bool wantsKeyboard() const;
+    // True when the user is typing into a field. This is the one that decides whether a shortcut
+    // may be taken: Cmd+C in a text box is copy-the-text, and Delete is delete-a-character.
+    [[nodiscard]] bool wantsTextInput() const;
+    // True when a widget is being interacted with -- a slider mid-drag, a combo open. Arrow keys
+    // belong to it while that lasts, so an editor nudge must not also fire.
+    [[nodiscard]] bool itemActive() const;
     [[nodiscard]] bool wantsMouse() const;
     // Whether the ini file already existed when the context was made. False means a first run, and
     // the shell has to build its default dock tree rather than trust an empty one.
