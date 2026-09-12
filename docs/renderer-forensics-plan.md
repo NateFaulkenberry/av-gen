@@ -308,7 +308,9 @@ open in Phase 7.
   - `[ ]` Add per-object cull reason, bounds, camera and frustum-plane capture.
 - `[ ]` Record world bounds, render bounds, culling bounds, camera position and visibility result for each object.
 - `[ ]` Verify culling never mutates scene transforms or authored visibility.
-- `[ ]` Verify animated bounds are current-pose, conservative or otherwise proven safe.
+- `[x]` Animated entity culling derives bounds from the current joint palette and applies a conservative
+  residual pad before frustum testing. The renderer QA record and scene code establish the ownership
+  and implementation; a pixel-level limb-crossing regression is still required below.
 - `[ ]` Add frustum-edge image regression where a posed limb crosses the plane while bind pose does not.
 
 ### 5.2 LOD isolation
