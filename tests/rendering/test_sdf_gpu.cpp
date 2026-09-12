@@ -791,6 +791,31 @@ TEST_CASE("SDF rendering is deterministic across fresh renderers", "[gpu][sdf]")
     CHECK(ctx->errorCount() == 0);
 }
 
+TEST_CASE("SDF scene swaps produce fresh renderer pixels", "[gpu][sdf][forensics]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    rendering::SceneRenderer fresh(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    REQUIRE(fresh.init().has_value());
+
+    auto first = baseScene();
+    first.sdfs.push_back(unlitSphere("blob", {-0.8f, 0.0f, 0.0f}, 0.8f, {1.0f, 0.0f, 0.0f}));
+    auto second = baseScene();
+    second.sdfs.push_back(unlitSphere("blob", {0.8f, 0.0f, 0.0f}, 0.8f, {0.0f, 1.0f, 0.0f}));
+    FrameTime time{};
+    time.frameIndex = 0;
+    const auto firstImage = renderer.renderToImage(first, time, 160, 120);
+    REQUIRE(firstImage.has_value());
+    const auto reused = renderer.renderToImage(second, time, 160, 120);
+    REQUIRE(reused.has_value());
+    const auto expected = fresh.renderToImage(second, time, 160, 120);
+    REQUIRE(expected.has_value());
+    CHECK(gpu::hashImage(*reused) == gpu::hashImage(*expected));
+    CHECK(gpu::hashImage(*firstImage) != gpu::hashImage(*reused));
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("SDF pass leaves a scene without SDF objects untouched", "[gpu][sdf]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);

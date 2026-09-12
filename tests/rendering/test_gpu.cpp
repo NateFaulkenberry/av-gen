@@ -382,6 +382,30 @@ TEST_CASE("SceneRenderer resets temporal history across scene swaps", "[gpu][ren
         CHECK(ctx->errorCount() == 0);
     }
 
+    TEST_CASE("water scene swaps produce fresh renderer pixels", "[gpu][renderer][water][forensics]") {
+        auto ctx = makeContext();
+        auto shaders = makeShaders(*ctx);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        rendering::SceneRenderer fresh(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        REQUIRE(fresh.init().has_value());
+
+        auto first = waterTestScene();
+        auto second = waterTestScene();
+        second.waters[0].settings.shallowColor = {0.9f, 0.1f, 0.1f};
+        second.waters[0].settings.deepColor = second.waters[0].settings.shallowColor;
+        FrameTime time{};
+        const auto firstImage = renderer.renderToImage(first, time, 128, 96);
+        REQUIRE(firstImage.has_value());
+        const auto reused = renderer.renderToImage(second, time, 128, 96);
+        REQUIRE(reused.has_value());
+        const auto expected = fresh.renderToImage(second, time, 128, 96);
+        REQUIRE(expected.has_value());
+        CHECK(gpu::hashImage(*reused) == gpu::hashImage(*expected));
+        CHECK(gpu::hashImage(*firstImage) != gpu::hashImage(*reused));
+        CHECK(ctx->errorCount() == 0);
+    }
+
     TEST_CASE("water remains stable across above, grazing and below-surface views", "[gpu][renderer][water]") {
         auto ctx = makeContext();
         auto shaders = makeShaders(*ctx);

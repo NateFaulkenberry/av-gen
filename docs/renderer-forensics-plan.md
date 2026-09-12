@@ -374,9 +374,9 @@ open in Phase 7.
 - `[~]` Procedural draws reset local pipeline/material/mesh trackers at each helper entry and particle
   draws bind their render group and blend-specific pipeline per system. These contracts are visible in
   code; equivalent assertions/regressions for all helper pass boundaries remain open.
-- `[~]` SDF state is rebuilt from the current scene each frame and water materials are uploaded each
-  frame rather than retained as scene-local simulation state. Compile-time guards now cover their
-  dynamic uniform strides; dedicated SDF/water state-swap regressions remain open.
+- `[x]` SDF state is rebuilt from the current scene each frame and water materials are uploaded each
+  frame rather than retained as scene-local simulation state. Compile-time guards cover their
+  dynamic uniform strides, and reused-versus-fresh SDF/water scene-swap image regressions pass.
 - `[ ]` Add pass-boundary assertions or explicit state setup where the API does not make state implicit.
 - `[ ]` Verify render target load/store/clear behavior and resource transitions.
 - `[ ]` Verify depth prepass, terrain, water, transparent, particle, shadow, volume, debug and post pass interactions.
