@@ -204,6 +204,9 @@ open in Phase 7.
 - `[~]` Repeated render-target replacement is covered by an eight-size alternating GPU regression;
   HDR/auxiliary targets, bind groups and tonemap views recreate without WebGPU errors. Live-path
   asynchronous replacement and the remaining texture/buffer resource inventory are still open.
+- `[x]` The real post chain is stress-tested across twelve frames with alternating bloom, DoF, motion
+  blur, antialiasing and target sizes. Every frame leaves the transient pool with zero textures in
+  use, and the sequence completes without WebGPU errors.
 - `[x]` Skinning palette upload cache is scene-aware. Distinct scenes with equal rig palette versions
   now force a palette upload; a GPU regression renders rest and posed same-version scenes through one
   renderer and verifies the pixels differ.

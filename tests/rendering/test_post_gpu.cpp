@@ -295,3 +295,27 @@ TEST_CASE("Transient pool reuses textures across frames", "[gpu][post]") {
     }
     CHECK(pool.size() == 0); // everything aged out
 }
+
+TEST_CASE("post chain releases transient targets across feature changes", "[gpu][post][forensics]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    auto scene = brightCubeScene();
+    FrameTime time{};
+
+    for (std::uint64_t frame = 0; frame < 12; ++frame) {
+        scene.post.bloomEnabled = (frame % 2) == 0;
+        scene.post.dofEnabled = (frame % 3) == 0;
+        scene.post.motionBlurAmount = (frame % 4) == 0 ? 1.0f : 0.0f;
+        scene.post.antialias = (frame % 5) == 0 ? 0.75f : 0.0f;
+        time.frameIndex = frame;
+        time.renderTime = static_cast<double>(frame) / 60.0;
+        const std::uint32_t width = (frame % 2) == 0 ? 128u : 96u;
+        const std::uint32_t height = (frame % 3) == 0 ? 96u : 64u;
+        REQUIRE(renderer.renderToImage(scene, time, width, height).has_value());
+        CHECK(renderer.transientPool().inUse() == 0);
+    }
+    CHECK(renderer.transientPool().allocations() > 0);
+    CHECK(ctx->errorCount() == 0);
+}
