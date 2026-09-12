@@ -160,6 +160,11 @@ bool helpLink(const char* label, std::string_view documentId) {
     return pressed;
 }
 
+void helpHeader(std::string_view documentId) {
+    // No SameLine: the button owns its line and the panel's first row starts below it.
+    static_cast<void>(helpLink("? Help", documentId));
+}
+
 void helpTooltip(const char* oneLine, std::string_view documentId) {
     if (!ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         return;

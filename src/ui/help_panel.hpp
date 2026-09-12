@@ -88,7 +88,18 @@ private:
 void helpOpen(std::string_view documentId);
 
 // A small "?" affordance that opens a topic. Place it beside a setting. Returns true if clicked.
+//
+// `helpLink` is for a link *within* a row -- beside the control it explains. It does not end the
+// line, so a caller that wants the next widget below it must not add `SameLine` after it.
 bool helpLink(const char* label, std::string_view documentId);
+
+// A panel's help affordance, on a line of its own above the panel's contents.
+//
+// Every panel used to write `helpLink("? Help", id); ImGui::SameLine();`, copied from the one
+// before it, and that `SameLine` pulled the panel's first row up beside the button: the Parameters
+// panel opened with "? Help" and "camera" sharing a line, the tree node jammed against the button.
+// One call that ends its own line leaves nothing to copy wrongly.
+void helpHeader(std::string_view documentId);
 
 // §12: a tooltip that says what a control does in one line, and offers the topic that says how and
 // when. Short by design -- the paragraph belongs in the topic, not in the tooltip.

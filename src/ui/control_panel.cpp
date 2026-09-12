@@ -634,8 +634,7 @@ void ControlPanel::drawWorldWindow(app::Engine& engine) {
 }
 
 void ControlPanel::drawModulation(app::Engine& engine) {
-    helpLink("? Help", "modulation/overview");
-    ImGui::SameLine();
+    helpHeader("modulation/overview");
 
     if (ImGui::BeginTabBar("modtabs")) {
         if (ImGui::BeginTabItem("Routes")) {
@@ -988,8 +987,7 @@ void ControlPanel::drawResponse(app::Engine& engine) {
 }
 
 void ControlPanel::drawParameters(app::Engine& engine) {
-    helpLink("? Help", "modulation/parameters");
-    ImGui::SameLine();
+    helpHeader("modulation/parameters");
 
     using namespace params;
     // Gathered by group before anything is drawn, rather than emitting a header whenever the group
@@ -1096,8 +1094,7 @@ void ControlPanel::drawParameters(app::Engine& engine) {
 }
 
 void ControlPanel::drawAnalysis(app::Engine& engine) {
-    helpLink("? Help", "audio/analysis");
-    ImGui::SameLine();
+    helpHeader("audio/analysis");
 
     const auto& frame = engine.latestFrame();
     const bool have = engine.hasFrame();
@@ -1191,8 +1188,7 @@ void ControlPanel::drawAnalysis(app::Engine& engine) {
 }
 
 void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats) {
-    helpLink("? Help", "performance/diagnosis");
-    ImGui::SameLine();
+    helpHeader("performance/diagnosis");
 
     ImGui::Text("%.1f fps (%.1f ms)  cpu work %.2f ms  gpu %s", stats.fps, stats.frameIntervalMs, stats.cpuFrameMs,
                 stats.gpuFrameMs >= 0.0 ? (std::to_string(stats.gpuFrameMs).substr(0, 5) + " ms").c_str() : "n/a");
@@ -1248,8 +1244,7 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
 
 
 void ControlPanel::drawShadersTab(app::Engine& engine) {
-    helpLink("? Help", "shaders/overview");
-    ImGui::SameLine();
+    helpHeader("shaders/overview");
 
     if (ImGui::Button("Add background...") && onOpenShader) {
         onOpenShader();
@@ -1582,8 +1577,7 @@ void ControlPanel::drawTimelineTab(app::Engine& engine) {
 
 
 void ControlPanel::drawRender(app::Engine& engine) {
-    helpLink("? Help", "rendering/offline-render");
-    ImGui::SameLine();
+    helpHeader("rendering/offline-render");
 
     if (renderSettings == nullptr) {
         ImGui::TextDisabled("render settings unavailable");
