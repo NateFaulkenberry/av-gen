@@ -1284,6 +1284,10 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
                             static_cast<double>(object->worldBoundsMin.y), static_cast<double>(object->worldBoundsMin.z));
                 ImGui::Text("bounds max (%.3f, %.3f, %.3f)", static_cast<double>(object->worldBoundsMax.x),
                             static_cast<double>(object->worldBoundsMax.y), static_cast<double>(object->worldBoundsMax.z));
+                ImGui::Text("frustum margins L %.3f R %.3f B %.3f T %.3f N %.3f F %.3f",
+                            static_cast<double>(object->frustumMargins[0]), static_cast<double>(object->frustumMargins[1]),
+                            static_cast<double>(object->frustumMargins[2]), static_cast<double>(object->frustumMargins[3]),
+                            static_cast<double>(object->frustumMargins[4]), static_cast<double>(object->frustumMargins[5]));
                 ImGui::Text("camera (%.4f, %.4f, %.4f)", static_cast<double>(frame.cameraPosition.x),
                             static_cast<double>(frame.cameraPosition.y), static_cast<double>(frame.cameraPosition.z));
                 ImGui::Text("reason %s", object->cullReason.c_str());

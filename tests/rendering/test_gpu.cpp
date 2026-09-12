@@ -10,6 +10,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <array>
 #include <cstdlib>
@@ -251,6 +252,8 @@ TEST_CASE("SceneRenderer exposes stable selected-object diagnostics", "[gpu][ren
     CHECK(renderer.diagnosticObject("cube")->cullReason == "submitted");
     CHECK(std::abs(renderer.diagnosticObject("cube")->worldBoundsMin.x + 1.0f) < 1e-5f);
     CHECK(std::abs(renderer.diagnosticObject("cube")->worldBoundsMax.y - 2.0f) < 1e-5f);
+    CHECK(std::all_of(renderer.diagnosticObject("cube")->frustumMargins.begin(),
+                      renderer.diagnosticObject("cube")->frustumMargins.end(), [](float margin) { return margin >= 0.0f; }));
     CHECK(renderer.diagnosticObject("second")->objectSlot == 1);
     CHECK(renderer.diagnosticObject("second")->submitted);
 

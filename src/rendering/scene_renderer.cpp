@@ -1641,6 +1641,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     diagnosticFrame_.view = view;
     diagnosticFrame_.projection = proj;
     diagnosticFrame_.viewProjection = proj * view;
+    const FrustumPlanes diagnosticPlanes = frustumPlanes(diagnosticFrame_.viewProjection);
     diagnosticFrame_.objects.reserve(scene.entities.size());
     for (const scene::Entity& entity : scene.entities) {
         const glm::mat4 model = entity.transform.matrix();
@@ -1668,6 +1669,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                 const glm::vec3 world = glm::vec3(model * glm::vec4(local, 1.0f));
                 diagnostic.worldBoundsMin = glm::min(diagnostic.worldBoundsMin, world);
                 diagnostic.worldBoundsMax = glm::max(diagnostic.worldBoundsMax, world);
+            }
+            for (std::size_t plane = 0; plane < diagnosticPlanes.size(); ++plane) {
+                const glm::vec4& p = diagnosticPlanes[plane];
+                const glm::vec3 far(p.x >= 0.0f ? diagnostic.worldBoundsMax.x : diagnostic.worldBoundsMin.x,
+                                    p.y >= 0.0f ? diagnostic.worldBoundsMax.y : diagnostic.worldBoundsMin.y,
+                                    p.z >= 0.0f ? diagnostic.worldBoundsMax.z : diagnostic.worldBoundsMin.z);
+                diagnostic.frustumMargins[plane] = glm::dot(glm::vec3(p), far) + p.w;
             }
             diagnostic.cullReason = !entity.visible ? "hidden" : entity.cameraCulled ? "camera-frustum" : "eligible";
         }

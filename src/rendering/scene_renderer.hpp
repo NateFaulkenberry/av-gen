@@ -85,6 +85,7 @@ struct RenderObjectDiagnostic {
     glm::mat4 worldMatrix{1.0f};
     glm::vec3 worldBoundsMin{0.0f};
     glm::vec3 worldBoundsMax{0.0f};
+    std::array<float, 6> frustumMargins{};
     std::string cullReason;
     bool visible = false;
     bool cameraCulled = false;

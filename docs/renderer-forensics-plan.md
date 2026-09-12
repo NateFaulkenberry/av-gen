@@ -305,9 +305,9 @@ open in Phase 7.
 
 - `[~]` Compare culling on/off in controlled scenes.
   - `[x]` Existing terrain, authored-node and animation culling regressions cover several cases.
-- `[~]` Selected-object diagnostics now capture world bounds, camera position, visibility, cull reason
-  and submission/object-slot state. Per-object frustum planes, all-object change-only logging and
-  explicit cull-reason codes remain open.
+- `[x]` Selected-object diagnostics now capture world bounds, camera position, visibility, cull reason,
+  submission/object-slot state and six signed frustum margins. All-object change-only logging and
+  richer explicit cull-reason codes remain open.
 - `[~]` Record world bounds, render bounds, culling bounds, camera position and visibility result for
   each object. World bounds and selected-object state are captured; current-pose culling bounds and
   plane-level rejection evidence remain open.
