@@ -2421,6 +2421,7 @@ int Application::runLive() {
             core::PhaseProfiler::Scope scope(prof, kPhDebug);
             panel_->composition.stats = &compositor_->stats();
             const rendering::DebugViewOptions& options = panel_->world.debug;
+            renderer_->setDiagnosticEntity(options.selectedEntity);
             renderer_->setDebugDepthTest(options.depthTest);
             rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime);
         }

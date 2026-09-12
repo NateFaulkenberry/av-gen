@@ -76,6 +76,27 @@ struct ShaderFrameInputs {
     const analysis::AnalysisFrame* frame = nullptr; // for the audio spectrum texture (may be null)
 };
 
+struct RenderObjectDiagnostic {
+    std::string name;
+    std::size_t entityIndex = 0;
+    std::uint32_t objectSlot = std::numeric_limits<std::uint32_t>::max();
+    glm::vec3 worldPosition{0.0f};
+    glm::mat4 worldMatrix{1.0f};
+    bool visible = false;
+    bool cameraCulled = false;
+    bool submitted = false;
+    bool finite = true;
+};
+
+struct RendererDiagnosticFrame {
+    std::uint64_t frameIndex = 0;
+    glm::vec3 cameraPosition{0.0f};
+    glm::mat4 view{1.0f};
+    glm::mat4 projection{1.0f};
+    glm::mat4 viewProjection{1.0f};
+    std::vector<RenderObjectDiagnostic> objects;
+};
+
 struct RenderStats {
     double gpuFrameMs = -1.0; // -1 when timestamp queries are unavailable
     std::uint32_t drawCalls = 0;       // draws recorded by the camera-side passes
@@ -292,6 +313,14 @@ public:
     [[nodiscard]] const IblResources& ibl() const { return ibl_; }
 
     [[nodiscard]] const RenderStats& stats() const { return stats_; }
+
+    // Developer-only snapshot of the last frame's scene-side object and camera state. The
+    // renderer owns the snapshot and replaces it at the next frame boundary; callers must not
+    // retain references into it across renders.
+    void setDiagnosticEntity(std::string name) { diagnosticEntity_ = std::move(name); }
+    [[nodiscard]] const std::string& diagnosticEntity() const { return diagnosticEntity_; }
+    [[nodiscard]] const RendererDiagnosticFrame& diagnosticFrame() const { return diagnosticFrame_; }
+    [[nodiscard]] const RenderObjectDiagnostic* diagnosticObject(std::string_view name) const;
 
     // ---- lighting and quality (ADR-033/034/035) ----
     // Sample counts, resolutions and history lengths only; the scene and its determinism are the
@@ -552,6 +581,10 @@ private:
     // Previous-frame model matrices by entity name, so velocity survives reordering (ADR-035).
     std::unordered_map<std::string, glm::mat4> prevModels_;
     std::unordered_map<std::string, glm::mat4> prevModelsNext_;
+    std::string diagnosticEntity_;
+    RendererDiagnosticFrame diagnosticFrame_;
+    std::optional<RenderObjectDiagnostic> previousDiagnosticObject_;
+    RendererDiagnosticFrame previousDiagnosticFrame_;
     RenderStats stats_;
 };
 

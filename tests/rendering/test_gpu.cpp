@@ -226,6 +226,43 @@ TEST_CASE("SceneRenderer renders a lit cube deterministically", "[gpu][renderer]
     }
 }
 
+TEST_CASE("SceneRenderer exposes stable selected-object diagnostics", "[gpu][renderer][forensics]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    auto scene = cubeScene();
+    const auto mesh = scene.entities.front().mesh;
+    auto& second = scene.addEntity("second", mesh);
+    second.transform.position = {2.0f, 1.0f, 0.0f};
+    const glm::mat4 authored = scene.entities.front().transform.matrix();
+    renderer.setDiagnosticEntity("cube");
+
+    FrameTime time{};
+    REQUIRE(renderer.renderToImage(scene, time, 96, 64).has_value());
+    const auto& firstFrame = renderer.diagnosticFrame();
+    REQUIRE(renderer.diagnosticObject("cube") != nullptr);
+    REQUIRE(renderer.diagnosticObject("second") != nullptr);
+    CHECK(firstFrame.frameIndex == 0);
+    CHECK(firstFrame.cameraPosition == scene.camera.position);
+    CHECK(renderer.diagnosticObject("cube")->entityIndex == 0);
+    CHECK(renderer.diagnosticObject("cube")->objectSlot == 0);
+    CHECK(renderer.diagnosticObject("cube")->submitted);
+    CHECK(renderer.diagnosticObject("second")->objectSlot == 1);
+    CHECK(renderer.diagnosticObject("second")->submitted);
+
+    scene.camera.position = {4.0f, 2.0f, 5.0f};
+    scene.camera.target = {0.0f, 1.0f, 0.0f};
+    ++time.frameIndex;
+    REQUIRE(renderer.renderToImage(scene, time, 96, 64).has_value());
+    CHECK(scene.entities.front().transform.matrix() == authored);
+    CHECK(renderer.diagnosticFrame().cameraPosition == scene.camera.position);
+    CHECK(renderer.diagnosticObject("cube")->worldMatrix == authored);
+    CHECK(renderer.diagnosticObject("cube")->objectSlot == 0);
+    CHECK(ctx->errorCount() == 0);
+}
+
     TEST_CASE("camera motion never mutates a static entity transform", "[gpu][renderer][transform]") {
         auto ctx = makeContext();
         auto shaders = makeShaders(*ctx);

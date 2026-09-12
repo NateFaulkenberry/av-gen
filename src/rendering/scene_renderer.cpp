@@ -65,7 +65,31 @@ bool finiteMatrix(const glm::mat4& matrix) {
     return true;
 }
 
+bool nearlyEqual(const glm::vec3& a, const glm::vec3& b) {
+    return glm::all(glm::lessThanEqual(glm::abs(a - b), glm::vec3(1e-5f)));
+}
+
+bool nearlyEqual(const glm::mat4& a, const glm::mat4& b) {
+    for (int column = 0; column < 4; ++column) {
+        for (int row = 0; row < 4; ++row) {
+            if (std::abs(a[column][row] - b[column][row]) > 1e-5f) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 } // namespace
+
+const RenderObjectDiagnostic* SceneRenderer::diagnosticObject(std::string_view name) const {
+    for (const RenderObjectDiagnostic& object : diagnosticFrame_.objects) {
+        if (object.name == name) {
+            return &object;
+        }
+    }
+    return nullptr;
+}
 
 SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
     : context_(context), shaders_(shaders), timeline_(std::make_unique<gpu::FrameTimeline>(context)),
@@ -1591,11 +1615,27 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     if (!finiteMatrix(view) || !finiteMatrix(proj)) {
         return fail("scene render: camera produced a non-finite view or projection matrix");
     }
+    diagnosticFrame_ = RendererDiagnosticFrame{};
+    diagnosticFrame_.frameIndex = time.frameIndex;
+    diagnosticFrame_.cameraPosition = scene.camera.position;
+    diagnosticFrame_.view = view;
+    diagnosticFrame_.projection = proj;
+    diagnosticFrame_.viewProjection = proj * view;
+    diagnosticFrame_.objects.reserve(scene.entities.size());
     for (const scene::Entity& entity : scene.entities) {
         const glm::mat4 model = entity.transform.matrix();
         if (!finiteMatrix(model)) {
             return fail("scene render: entity '{}' produced a non-finite model matrix", entity.name);
         }
+        RenderObjectDiagnostic diagnostic;
+        diagnostic.name = entity.name;
+        diagnostic.entityIndex = diagnosticFrame_.objects.size();
+        diagnostic.worldPosition = entity.transform.position;
+        diagnostic.worldMatrix = model;
+        diagnostic.visible = entity.visible;
+        diagnostic.cameraCulled = entity.cameraCulled;
+        diagnostic.finite = finiteMatrix(model);
+        diagnosticFrame_.objects.push_back(std::move(diagnostic));
     }
 
     // ---- frame uniforms ----
@@ -1866,6 +1906,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
         const float depth = -(view * glm::vec4(entity.transform.position, 1.0f)).z;
+        RenderObjectDiagnostic& diagnostic = diagnosticFrame_.objects[thisEntity];
+        diagnostic.objectSlot = objectIndex;
+        diagnostic.submitted = true;
         ++objectIndex;
         return DrawItem{offset, &entity, depth, skin};
     };
@@ -1932,6 +1975,31 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         shadowCasters.push_back(*item);
     }
     stats_.shadowCasters = static_cast<std::uint32_t>(shadowCasters.size());
+    if (!diagnosticEntity_.empty()) {
+        if (const RenderObjectDiagnostic* current = diagnosticObject(diagnosticEntity_); current != nullptr) {
+            const bool cameraChanged = !nearlyEqual(diagnosticFrame_.cameraPosition, previousDiagnosticFrame_.cameraPosition) ||
+                                       !nearlyEqual(diagnosticFrame_.view, previousDiagnosticFrame_.view) ||
+                                       !nearlyEqual(diagnosticFrame_.projection, previousDiagnosticFrame_.projection);
+            const bool objectChanged = !previousDiagnosticObject_.has_value() ||
+                                       !nearlyEqual(current->worldPosition, previousDiagnosticObject_->worldPosition) ||
+                                       !nearlyEqual(current->worldMatrix, previousDiagnosticObject_->worldMatrix) ||
+                                       current->cameraCulled != previousDiagnosticObject_->cameraCulled ||
+                                       current->submitted != previousDiagnosticObject_->submitted ||
+                                       current->objectSlot != previousDiagnosticObject_->objectSlot ||
+                                       current->finite != previousDiagnosticObject_->finite;
+            if (cameraChanged || objectChanged || !current->finite) {
+                log::debug("renderer diagnostic '{}' frame {} world=({:.5f}, {:.5f}, {:.5f}) camera=({:.5f}, {:.5f}, {:.5f}) slot={} visible={} culled={} submitted={} finite={}",
+                           current->name, time.frameIndex, current->worldPosition.x, current->worldPosition.y,
+                           current->worldPosition.z, diagnosticFrame_.cameraPosition.x, diagnosticFrame_.cameraPosition.y,
+                           diagnosticFrame_.cameraPosition.z, current->objectSlot, current->visible,
+                           current->cameraCulled, current->submitted, current->finite);
+            }
+            previousDiagnosticObject_ = *current;
+            previousDiagnosticFrame_ = diagnosticFrame_;
+        }
+    } else {
+        previousDiagnosticObject_.reset();
+    }
     if (objectIndex > 0) {
         queue.WriteBuffer(objectUniforms_, 0, objectStaging_.data(),
                           static_cast<std::size_t>(objectIndex) * kObjectStride);

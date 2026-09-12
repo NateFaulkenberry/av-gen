@@ -185,6 +185,10 @@ This is an investigation and correctness effort, not a visual feature sprint. No
 
 - `[ ]` Add a developer-only `Renderer Forensics` mode that does not alter production scene behavior.
 - `[ ]` Add a panel for isolation toggles, diagnostic views, selected-object inspection, frame capture and snapshot replay.
+- `[~]` Selected-object transform diagnostics are now available through `SceneRenderer`'s last-frame
+  snapshot and the existing World-panel selection. The snapshot includes world transform, camera
+  matrices, culling/submission state and GPU object slot; change-only logging is enabled. A readable
+  in-panel matrix/state inspector remains open.
 - `[ ]` Make all controls truthful: every enabled control must isolate or visualize a real path.
 - `[ ]` Record toggle state in captured frame metadata.
 
