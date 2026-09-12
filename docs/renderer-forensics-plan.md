@@ -517,7 +517,9 @@ For every level, run camera translation, rotation, orbit, dolly, playback, pause
   race. ASan then found and fixed a real composition lifecycle use-after-free: `detach()` now
   invalidates light, terrain and water node parameter pointers as well as the common node fields;
   the exact lifecycle test passes 466 assertions under ASan/UBSan. Full sanitizer suites and TSan
-  resource-lifetime coverage remain open.
+  resource-lifetime coverage remain open. A post-fix full ASan unit rerun reached test 412 without
+  sanitizer findings but was terminated during the long world/example section; it is inconclusive,
+  not a pass.
 - `[x]` Complete release suite baseline: 1,677 tests passed, zero failures, with four expected
   platform/asset-gated skips (two Khronos sample imports, external ffmpeg/libx264 and NDI runtime).
   The run took 345.85 seconds on the current Apple M2 Max environment. Existing compiler warnings
