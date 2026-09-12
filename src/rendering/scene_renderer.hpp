@@ -409,6 +409,8 @@ public:
 
     static constexpr std::uint32_t kMaxObjects = 256;
     static constexpr std::uint32_t kObjectStride = 512; // dynamic-offset alignment (256) x 2
+    static_assert(kObjectStride % 256 == 0);
+    static_assert(sizeof(ObjectUniforms) <= kObjectStride);
     static constexpr wgpu::TextureFormat kHdrFormat = wgpu::TextureFormat::RGBA16Float;
     static constexpr wgpu::TextureFormat kDepthFormat = wgpu::TextureFormat::Depth24Plus;
     // Auxiliary targets (ADR-035). Normal + roughness packs an octahedral normal in rg, the

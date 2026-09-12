@@ -181,6 +181,9 @@ open in Phase 7.
 - `[ ]` Track entity ID, render-object ID, GPU object index, buffer offset, frame index and buffer generation for every submitted object.
 - `[ ]` Add debug object-ID coloring with stable IDs for the UFO, alien, tree, water and test geometry.
 - `[ ]` Audit uniform/storage buffers, dynamic offsets, ring buffers, staging buffers, bind groups, views and frame allocators.
+  - `[~]` Object uniform slot stride and capacity now have compile-time guards, and focused GPU
+    diagnostics verify stable object-slot assignment. Ring-buffer/resource reuse and full pass
+    bind-state auditing remain open.
 - `[~]` Verify CPU/WGSL structure size, alignment, offsets, padding, type widths and matrix layout.
   Frame and object uniform sizes were already asserted; explicit C++ field-offset assertions now
   guard the WGSL field order. Alignment/padding and the remaining GPU-side structures still need
