@@ -892,6 +892,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // ---- offline rendering from the UI ----
         uiRender_ = engine_->renderSettings();
         panel_->renderSettings = &uiRender_;
+        panel_->renderer = renderer_.get();
         panel_->videoBackends = assets::describeVideoBackends();
         panel_->renderProgress = [this]() -> RenderProgress { return job_ ? job_->progress() : lastRender_; };
         panel_->onStartRender = [this] { startRenderFromUi(); };

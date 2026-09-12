@@ -1271,6 +1271,31 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
         ImGui::Text("particles: %u systems  %u capacity  %u emitted  simulate %.3f ms", stats.particles.systems,
                     stats.particles.capacity, stats.particles.emittedThisFrame, stats.particles.simulateMs);
     }
+    if (renderer != nullptr && !world.debug.selectedEntity.empty()) {
+        if (const auto* object = renderer->diagnosticObject(world.debug.selectedEntity); object != nullptr) {
+            const auto& frame = renderer->diagnosticFrame();
+            if (ImGui::TreeNode("Selected renderer diagnostic")) {
+                ImGui::Text("frame %llu  entity %zu  slot %s", static_cast<unsigned long long>(frame.frameIndex),
+                            object->entityIndex,
+                            !object->submitted ? "unassigned" : std::to_string(object->objectSlot).c_str());
+                ImGui::Text("world (%.4f, %.4f, %.4f)", static_cast<double>(object->worldPosition.x),
+                            static_cast<double>(object->worldPosition.y), static_cast<double>(object->worldPosition.z));
+                ImGui::Text("camera (%.4f, %.4f, %.4f)", static_cast<double>(frame.cameraPosition.x),
+                            static_cast<double>(frame.cameraPosition.y), static_cast<double>(frame.cameraPosition.z));
+                ImGui::Text("visible %s  culled %s  submitted %s  finite %s", object->visible ? "yes" : "no",
+                            object->cameraCulled ? "yes" : "no", object->submitted ? "yes" : "no",
+                            object->finite ? "yes" : "no");
+                for (int row = 0; row < 4; ++row) {
+                    ImGui::Text("model %d  %.4f  %.4f  %.4f  %.4f", row,
+                                static_cast<double>(object->worldMatrix[0][row]),
+                                static_cast<double>(object->worldMatrix[1][row]),
+                                static_cast<double>(object->worldMatrix[2][row]),
+                                static_cast<double>(object->worldMatrix[3][row]));
+                }
+                ImGui::TreePop();
+            }
+        }
+    }
     ImGui::Separator();
     // The one lever in the editor that moves the GPU's share of the frame, and the reason it is
     // here rather than buried: on a Retina display the canvas is several times the pixel count of

@@ -113,6 +113,7 @@ public:
     // The frame to show in the canvas, as the ImGui texture id for the render target the host just
     // drew into (a WGPUTextureView, in this backend). Zero before the first frame exists.
     std::uint64_t canvasTexture = 0;
+    rendering::SceneRenderer* renderer = nullptr; // selected-object diagnostics, developer-only
 
     void draw(app::Engine& engine, const FrameStats& stats);
 
