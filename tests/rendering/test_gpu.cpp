@@ -248,6 +248,9 @@ TEST_CASE("SceneRenderer exposes stable selected-object diagnostics", "[gpu][ren
     CHECK(renderer.diagnosticObject("cube")->entityIndex == 0);
     CHECK(renderer.diagnosticObject("cube")->objectSlot == 0);
     CHECK(renderer.diagnosticObject("cube")->submitted);
+    CHECK(renderer.diagnosticObject("cube")->cullReason == "submitted");
+    CHECK(std::abs(renderer.diagnosticObject("cube")->worldBoundsMin.x + 1.0f) < 1e-5f);
+    CHECK(std::abs(renderer.diagnosticObject("cube")->worldBoundsMax.y - 2.0f) < 1e-5f);
     CHECK(renderer.diagnosticObject("second")->objectSlot == 1);
     CHECK(renderer.diagnosticObject("second")->submitted);
 

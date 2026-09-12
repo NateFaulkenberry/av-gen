@@ -83,6 +83,9 @@ struct RenderObjectDiagnostic {
     std::uint32_t objectSlot = std::numeric_limits<std::uint32_t>::max();
     glm::vec3 worldPosition{0.0f};
     glm::mat4 worldMatrix{1.0f};
+    glm::vec3 worldBoundsMin{0.0f};
+    glm::vec3 worldBoundsMax{0.0f};
+    std::string cullReason;
     bool visible = false;
     bool cameraCulled = false;
     bool submitted = false;

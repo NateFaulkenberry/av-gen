@@ -1280,8 +1280,13 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
                             !object->submitted ? "unassigned" : std::to_string(object->objectSlot).c_str());
                 ImGui::Text("world (%.4f, %.4f, %.4f)", static_cast<double>(object->worldPosition.x),
                             static_cast<double>(object->worldPosition.y), static_cast<double>(object->worldPosition.z));
+                ImGui::Text("bounds min (%.3f, %.3f, %.3f)", static_cast<double>(object->worldBoundsMin.x),
+                            static_cast<double>(object->worldBoundsMin.y), static_cast<double>(object->worldBoundsMin.z));
+                ImGui::Text("bounds max (%.3f, %.3f, %.3f)", static_cast<double>(object->worldBoundsMax.x),
+                            static_cast<double>(object->worldBoundsMax.y), static_cast<double>(object->worldBoundsMax.z));
                 ImGui::Text("camera (%.4f, %.4f, %.4f)", static_cast<double>(frame.cameraPosition.x),
                             static_cast<double>(frame.cameraPosition.y), static_cast<double>(frame.cameraPosition.z));
+                ImGui::Text("reason %s", object->cullReason.c_str());
                 ImGui::Text("visible %s  culled %s  submitted %s  finite %s", object->visible ? "yes" : "no",
                             object->cameraCulled ? "yes" : "no", object->submitted ? "yes" : "no",
                             object->finite ? "yes" : "no");

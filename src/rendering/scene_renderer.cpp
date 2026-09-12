@@ -1655,6 +1655,22 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         diagnostic.visible = entity.visible;
         diagnostic.cameraCulled = entity.cameraCulled;
         diagnostic.finite = finiteMatrix(model);
+        if (entity.mesh >= scene.meshes.size()) {
+            diagnostic.cullReason = "invalid-mesh";
+        } else {
+            const auto [meshLo, meshHi] = scene.meshes[entity.mesh].bounds();
+            diagnostic.worldBoundsMin = glm::vec3(std::numeric_limits<float>::max());
+            diagnostic.worldBoundsMax = glm::vec3(std::numeric_limits<float>::lowest());
+            for (int corner = 0; corner < 8; ++corner) {
+                const glm::vec3 local((corner & 1) ? meshHi.x : meshLo.x,
+                                      (corner & 2) ? meshHi.y : meshLo.y,
+                                      (corner & 4) ? meshHi.z : meshLo.z);
+                const glm::vec3 world = glm::vec3(model * glm::vec4(local, 1.0f));
+                diagnostic.worldBoundsMin = glm::min(diagnostic.worldBoundsMin, world);
+                diagnostic.worldBoundsMax = glm::max(diagnostic.worldBoundsMax, world);
+            }
+            diagnostic.cullReason = !entity.visible ? "hidden" : entity.cameraCulled ? "camera-frustum" : "eligible";
+        }
         diagnosticFrame_.objects.push_back(std::move(diagnostic));
     }
 
@@ -1929,6 +1945,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         RenderObjectDiagnostic& diagnostic = diagnosticFrame_.objects[thisEntity];
         diagnostic.objectSlot = objectIndex;
         diagnostic.submitted = true;
+        diagnostic.cullReason = "submitted";
         ++objectIndex;
         return DrawItem{offset, &entity, depth, skin};
     };
