@@ -86,6 +86,10 @@ struct RenderObjectDiagnostic {
     glm::vec3 worldBoundsMin{0.0f};
     glm::vec3 worldBoundsMax{0.0f};
     std::array<float, 6> frustumMargins{};
+    std::uint32_t rigIndex = std::numeric_limits<std::uint32_t>::max();
+    std::uint32_t jointCount = 0;
+    std::uint64_t paletteVersion = 0;
+    double paletteTime = -1.0;
     std::string cullReason;
     bool visible = false;
     bool cameraCulled = false;

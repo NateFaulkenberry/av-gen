@@ -230,8 +230,12 @@ TEST_CASE("posing a rig moves the pixels, and the same second gives the same pix
     REQUIRE(renderer.init().has_value());
 
     scene::Scene s = barScene(true);
+    renderer.setDiagnosticEntity("bar");
     auto rest = renderer.renderToImage(s, frameAt(1), 512, 384);
     REQUIRE(rest.has_value());
+    REQUIRE(renderer.diagnosticObject("bar") != nullptr);
+    CHECK(renderer.diagnosticObject("bar")->rigIndex == 0);
+    CHECK(renderer.diagnosticObject("bar")->jointCount == 2);
 
     // Bend the tip joint 40 degrees about +Z.
     s.rigs[0].pose.local[1].rotation = glm::angleAxis(glm::radians(40.0f), glm::vec3(0.0f, 0.0f, 1.0f));

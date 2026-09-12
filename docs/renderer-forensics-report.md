@@ -129,6 +129,7 @@ transform/material fields.
   submission state and GPU object slot.
 - Six signed frustum margins for the selected object's conservative world bounds.
 - Deterministic CPU diagnostic-frame hash over camera/object/culling/submission state.
+- Selected skinned-object rig index, joint count, palette version and palette time metadata.
 - Change-only selected-object/camera logging.
 - Performance-panel inspection of selected renderer state.
 - Compile-time CPU/WGSL size, field-offset and dynamic-offset stride guards.

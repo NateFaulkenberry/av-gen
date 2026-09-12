@@ -1291,6 +1291,11 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
                 ImGui::Text("camera (%.4f, %.4f, %.4f)", static_cast<double>(frame.cameraPosition.x),
                             static_cast<double>(frame.cameraPosition.y), static_cast<double>(frame.cameraPosition.z));
                 ImGui::Text("reason %s", object->cullReason.c_str());
+                if (object->rigIndex != std::numeric_limits<std::uint32_t>::max()) {
+                    ImGui::Text("rig %u  joints %u  palette v%llu  time %.4f", object->rigIndex,
+                                object->jointCount, static_cast<unsigned long long>(object->paletteVersion),
+                                object->paletteTime);
+                }
                 ImGui::Text("visible %s  culled %s  submitted %s  finite %s", object->visible ? "yes" : "no",
                             object->cameraCulled ? "yes" : "no", object->submitted ? "yes" : "no",
                             object->finite ? "yes" : "no");

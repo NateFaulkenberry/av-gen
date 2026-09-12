@@ -102,6 +102,10 @@ void hashDiagnosticFrame(RendererDiagnosticFrame& frame) {
         hashBytes(frame.stateHash, &object.worldBoundsMin, sizeof(object.worldBoundsMin));
         hashBytes(frame.stateHash, &object.worldBoundsMax, sizeof(object.worldBoundsMax));
         hashBytes(frame.stateHash, object.frustumMargins.data(), sizeof(object.frustumMargins));
+        hashBytes(frame.stateHash, &object.rigIndex, sizeof(object.rigIndex));
+        hashBytes(frame.stateHash, &object.jointCount, sizeof(object.jointCount));
+        hashBytes(frame.stateHash, &object.paletteVersion, sizeof(object.paletteVersion));
+        hashBytes(frame.stateHash, &object.paletteTime, sizeof(object.paletteTime));
         hashBytes(frame.stateHash, &object.visible, sizeof(object.visible));
         hashBytes(frame.stateHash, &object.cameraCulled, sizeof(object.cameraCulled));
         hashBytes(frame.stateHash, &object.submitted, sizeof(object.submitted));
@@ -1682,6 +1686,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         diagnostic.entityIndex = diagnosticFrame_.objects.size();
         diagnostic.worldPosition = entity.transform.position;
         diagnostic.worldMatrix = model;
+        if (entity.rig != scene::kInvalidRig && entity.rig < scene.rigs.size()) {
+            const scene::SkinnedRig& rig = scene.rigs[entity.rig];
+            diagnostic.rigIndex = entity.rig;
+            diagnostic.jointCount = static_cast<std::uint32_t>(rig.palette.size());
+            diagnostic.paletteVersion = rig.paletteVersion;
+            diagnostic.paletteTime = rig.paletteTime;
+        }
         diagnostic.visible = entity.visible;
         diagnostic.cameraCulled = entity.cameraCulled;
         diagnostic.finite = finiteMatrix(model);

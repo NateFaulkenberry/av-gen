@@ -462,9 +462,9 @@ For every level, run camera translation, rotation, orbit, dolly, playback, pause
 - `[ ]` Implement the frame-100 -> frame-500 -> frame-100 replay experiment.
 - `[ ]` Compare static transforms, animation state, camera state and deterministic object ordering.
 - `[~]` Diagnostic frames now carry a deterministic CPU state hash over camera matrices, object
-  transforms/bounds, frustum margins, visibility and GPU slot/submission state. A focused regression
-  verifies the hash is stable for the same state and changes with camera state; full frame-100/500
-  replay and animation/scene-state hashes remain open.
+  transforms/bounds, frustum margins, visibility, GPU slot/submission state and selected rig palette
+  metadata. A focused regression verifies the hash is stable for the same state and changes with
+  camera state; full frame-100/500 replay and bone-matrix/scene-state hashes remain open.
 - `[ ]` Log hash transitions with frame number and seek direction.
 - `[ ]` Add tests for timeline seeking, reverse playback, scene reload and renderer reuse.
 - `[ ]` Distinguish same-GPU bit equality from cross-GPU perceptual comparison.
