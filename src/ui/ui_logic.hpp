@@ -217,6 +217,77 @@ enum class ViewportIntent : std::uint8_t {
            intent == ViewportIntent::CameraLook;
 }
 
+// ---- the sequencer strip's lanes -----------------------------------------------------------------
+//
+// Which lane a y-coordinate falls in, and how tall the strip is. Here rather than inside
+// `SequencePanel::drawStrip` because the drawing and the hit testing have to agree about it, and
+// when they stopped agreeing the symptom was a click meant to scrub the music moving the music
+// instead (ADR-103). That is a arithmetic question and it should be answerable without a window.
+enum class StripLane : std::uint8_t {
+    Ruler,    // the time axis and the marker row: always a scrub
+    Waveform, // the mixed audio: deliberately holds no blocks, so it is always a scrub
+    Clips,    // the audio clips: blocks, draggable
+    Shots,
+    Actors,
+    Overlays,
+    None,
+};
+
+struct StripLanes {
+    bool hasAudio = false;
+    std::size_t actorCount = 0;
+    bool hasOverlays = false;
+    float rulerHeight = 20.0f;
+    float markerHeight = 16.0f;
+    float laneHeight = 24.0f;
+    float clipLaneHeight = 15.0f;
+    float gap = 3.0f;
+
+    // Where the lanes start, measured from the top of the strip.
+    [[nodiscard]] float lanesTop() const { return rulerHeight + markerHeight + gap; }
+    [[nodiscard]] float waveformTop() const { return lanesTop(); }
+    [[nodiscard]] float clipsTop() const { return waveformTop() + laneHeight + gap; }
+    [[nodiscard]] float shotsTop() const {
+        return hasAudio ? clipsTop() + clipLaneHeight + gap : lanesTop();
+    }
+    [[nodiscard]] float actorsTop() const { return shotsTop() + laneHeight + gap; }
+    [[nodiscard]] float overlaysTop() const {
+        return actorsTop() + static_cast<float>(actorCount) * (laneHeight + gap);
+    }
+    [[nodiscard]] float height() const {
+        const int lanes = (hasAudio ? 1 : 0) + 1 + static_cast<int>(actorCount) + (hasOverlays ? 1 : 0);
+        return rulerHeight + markerHeight + static_cast<float>(lanes) * (laneHeight + gap) + gap +
+               (hasAudio ? clipLaneHeight + gap : 0.0f);
+    }
+
+    // `y` relative to the top of the strip. The gaps between lanes belong to no lane, and that is
+    // deliberate: a click that lands in one is a scrub, which is the safe answer.
+    [[nodiscard]] StripLane at(float y) const {
+        const auto within = [y](float top, float h) { return y >= top && y < top + h; };
+        if (y < lanesTop()) {
+            return StripLane::Ruler;
+        }
+        if (hasAudio) {
+            if (within(waveformTop(), laneHeight)) {
+                return StripLane::Waveform;
+            }
+            if (within(clipsTop(), clipLaneHeight)) {
+                return StripLane::Clips;
+            }
+        }
+        if (within(shotsTop(), laneHeight)) {
+            return StripLane::Shots;
+        }
+        if (actorCount > 0 && y >= actorsTop() && y < overlaysTop()) {
+            return StripLane::Actors;
+        }
+        if (hasOverlays && within(overlaysTop(), laneHeight)) {
+            return StripLane::Overlays;
+        }
+        return StripLane::None;
+    }
+};
+
 inline std::pair<float, float> routeAmountBounds(const params::ModRoute& /*route*/) {
     return {-kRouteAmountLimit, kRouteAmountLimit};
 }

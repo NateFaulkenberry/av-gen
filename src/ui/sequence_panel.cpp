@@ -1,5 +1,7 @@
 #include "ui/sequence_panel.hpp"
 
+#include "ui/ui_logic.hpp"
+
 #include <chrono>
 
 #include "analysis/analysis_track.hpp"
@@ -36,6 +38,10 @@ constexpr float kMarkerHeight = 16.0f;
 constexpr float kLaneHeight = 24.0f;
 constexpr float kLaneGap = 3.0f;
 constexpr float kEdgeGrab = 5.0f; // points either side of a block's right edge that resize it
+// The clip lane is thinner than the others: it carries names and edges, not content. It is a lane of
+// its own rather than an overlay on the waveform because the waveform lane is a scrub and must stay
+// one -- see the comment where a click is dispatched.
+constexpr float kClipLaneHeight = 15.0f;
 
 ImU32 shotColour(int index, bool selected) {
     // Alternating so a cut is visible even between two shots on the same scene, and warmer when
@@ -304,10 +310,19 @@ void SequencePanel::drawStrip(app::Engine& engine) {
 
     const float width = std::max(ImGui::GetContentRegionAvail().x, 80.0f);
     const bool hasAudio = engine.audioFile() != nullptr;
-    const int lanes = (hasAudio ? 1 : 0) + 1 + static_cast<int>(piece.actors.size()) +
-                      (piece.overlays.empty() ? 0 : 1);
-    const float height = kRulerHeight + kMarkerHeight +
-                         static_cast<float>(lanes) * (kLaneHeight + kLaneGap) + kLaneGap;
+    // One description of where the lanes are, for the height, the drawing and the hit test alike.
+    // They were three separate calculations, and when two of them disagreed a click meant to scrub
+    // the music moved the music instead (ADR-103); the arithmetic is in `ui_logic.hpp` so it can be
+    // checked without a window, and `tests/unit/test_ui_logic.cpp` checks it.
+    const StripLanes lanes{.hasAudio = hasAudio,
+                           .actorCount = piece.actors.size(),
+                           .hasOverlays = !piece.overlays.empty(),
+                           .rulerHeight = kRulerHeight,
+                           .markerHeight = kMarkerHeight,
+                           .laneHeight = kLaneHeight,
+                           .clipLaneHeight = kClipLaneHeight,
+                           .gap = kLaneGap};
+    const float height = lanes.height();
 
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     ImGui::InvisibleButton("strip", ImVec2(width, height),
@@ -383,7 +398,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     }
 
     // ---- lanes ----
-    float laneY = markerTop + kMarkerHeight + kLaneGap;
+    float laneY = origin.y + lanes.waveformTop();
     const auto laneRect = [&](double from, double to) {
         return std::pair<ImVec2, ImVec2>{ImVec2(toX(from), laneY),
                                          ImVec2(toX(to), laneY + kLaneHeight)};
@@ -432,18 +447,24 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         }
         draw->AddLine(ImVec2(laneA.x, mid), ImVec2(laneB.x, mid), IM_COL32(120, 150, 200, 40));
         draw->AddRect(laneA, laneB, IM_COL32(0, 0, 0, 120), 3.0f);
-        // The file's own name, because "which song is this" is a question the strip should answer
-        // without opening anything.
-        const std::string label = engine.audioPath().filename().string();
-        if (!label.empty()) {
-            draw->PushClipRect(laneA, laneB, true);
-            draw->AddText(ImVec2(laneA.x + 5.0f, laneA.y + 3.0f), IM_COL32(190, 215, 245, 150),
-                          label.c_str());
-            draw->PopClipRect();
-        }
-        // The arrangement's own shape, over the mixdown's. The lane shows the whole piece as one
-        // waveform, which is what it *is* once mixed -- so where one file ends and the next begins
-        // is invisible without this, and "which take is this" is the question the lane is read for.
+        // No file name here any more. It used to carry one, because there was one file; the clip
+        // lane below names every clip, and a lane label naming the song *and* a clip naming the same
+        // file reads as two copies of it -- which is exactly what it was reported as.
+        laneY = origin.y + lanes.clipsTop();
+
+        // ---- the clip lane ----
+        //
+        // Under the waveform, not on it. The lane above is a scrub and has to stay one (see where a
+        // click is dispatched); putting draggable blocks in it meant a click meant to move the
+        // playhead moved the *audio* instead, which is how a piece ended up starting fourteen
+        // seconds in with its name showing twice.
+        //
+        // It shows the arrangement's shape: the mixdown is one waveform, so where one file ends and
+        // the next begins is invisible without it, and "which take is this" is what the lane is read
+        // for.
+        clipLaneY_ = laneY;
+        draw->AddRectFilled(ImVec2(origin.x, laneY), ImVec2(origin.x + width, laneY + kClipLaneHeight),
+                            IM_COL32(22, 25, 33, 190), 2.0f);
         for (const audio::AudioClip& clip : clipsForDrawing(engine)) {
             const double end = audio::clipEndSeconds(clip, engine.clipSource(clip.file).get());
             const float a = toX(clip.startSeconds);
@@ -454,28 +475,28 @@ void SequencePanel::drawStrip(app::Engine& engine) {
             const std::vector<audio::AudioClip>& drawn = clipsForDrawing(engine);
             const bool chosen = audioSelected_ >= 0 && audioSelected_ < static_cast<int>(drawn.size()) &&
                                 &clip == &drawn[static_cast<std::size_t>(audioSelected_)];
-            const ImU32 edge = clip.enabled ? (chosen ? IM_COL32(240, 220, 150, 255)
-                                                      : IM_COL32(150, 195, 245, 160))
-                                            : IM_COL32(130, 130, 140, 120);
-            draw->AddRect(ImVec2(std::max(a, origin.x), laneY),
-                          ImVec2(std::min(b, origin.x + width), laneY + kLaneHeight), edge, 3.0f, 0,
-                          chosen ? 2.0f : 1.0f);
-            if (b - a > 30.0f) {
+            const ImVec2 lo(std::max(a, origin.x), laneY);
+            const ImVec2 hi(std::min(b, origin.x + width), laneY + kClipLaneHeight);
+            const ImU32 fill = clip.enabled ? (chosen ? IM_COL32(58, 84, 118, 235)
+                                                      : IM_COL32(40, 60, 88, 220))
+                                            : IM_COL32(44, 46, 52, 200);
+            const ImU32 edge = chosen ? IM_COL32(240, 220, 150, 255) : IM_COL32(0, 0, 0, 120);
+            draw->AddRectFilled(lo, hi, fill, 2.0f);
+            draw->AddRect(lo, hi, edge, 2.0f, 0, chosen ? 2.0f : 1.0f);
+            if (hi.x - lo.x > 30.0f) {
                 const std::string clipLabel =
                     clip.name.empty() ? clip.file.filename().string() : clip.name;
-                draw->PushClipRect(ImVec2(std::max(a, origin.x), laneY),
-                                   ImVec2(std::min(b, origin.x + width) - 3.0f, laneY + kLaneHeight), true);
-                draw->AddText(ImVec2(std::max(a, origin.x) + 5.0f, laneY + kLaneHeight - 16.0f),
-                              clip.enabled ? IM_COL32(210, 230, 250, 200) : IM_COL32(150, 150, 160, 160),
+                draw->PushClipRect(lo, ImVec2(hi.x - 3.0f, hi.y), true);
+                draw->AddText(ImVec2(lo.x + 5.0f, lo.y + 1.0f),
+                              clip.enabled ? IM_COL32(210, 230, 250, 220) : IM_COL32(150, 150, 160, 170),
                               clipLabel.c_str());
                 draw->PopClipRect();
             }
         }
-        audioLaneY_ = laneY;
-        laneY += kLaneHeight + kLaneGap;
     } else {
-        audioLaneY_ = -1.0f;
+        clipLaneY_ = -1.0f;
     }
+    laneY = origin.y + lanes.shotsTop();
 
     // Shots (spec 29).
     for (std::size_t i = 0; i < piece.shots.size(); ++i) {
@@ -505,8 +526,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                                 IM_COL32(0, 0, 0, 140), 3.0f);
         }
     }
-    const float shotLaneY = laneY;
-    laneY += kLaneHeight + kLaneGap;
+    laneY = origin.y + lanes.actorsTop();
 
     // One lane per actor, showing its clip cues (spec 13).
     for (std::size_t ai = 0; ai < piece.actors.size(); ++ai) {
@@ -541,7 +561,8 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     }
 
     // The overlay lane (spec 23, 26).
-    const float overlayLaneY = laneY;
+    const float overlayLaneY = origin.y + lanes.overlaysTop();
+    laneY = overlayLaneY;
     if (!piece.overlays.empty()) {
         for (std::size_t i = 0; i < piece.overlays.size(); ++i) {
             const seq::OverlayCue& cue = piece.overlays[i];
@@ -578,15 +599,19 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     const double mouseTime = toTime(mouse.x);
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        // Which lane was hit decides what the click means. Above the shot lane -- the ruler, the
-        // marker row and the waveform -- is always a scrub, so there is one place on the strip that
-        // is guaranteed not to grab a block. The waveform holds no blocks and is deliberately left
-        // that way: clicking a moment in the music to hear it is worth more than anything a block
-        // there could offer.
+        // Which lane was hit decides what the click means. The ruler, the marker row and the
+        // **waveform** are always a scrub, so there is one place on the strip that is guaranteed not
+        // to grab a block. The waveform holds no blocks and is deliberately left that way: clicking
+        // a moment in the music to hear it is worth more than anything a block there could offer.
+        //
+        // Audio clips are blocks, so they live in a thin lane of their own *under* the waveform
+        // (ADR-103). Drawing them on the waveform was tried and reported within the hour: a click
+        // meant to scrub moved the audio instead, leaving the piece starting fourteen seconds in.
         dragKind_ = 0;
         dragIndex_ = -1;
         bool hitBlock = false;
-        if (audioLaneY_ >= 0.0f && mouse.y >= audioLaneY_ && mouse.y < audioLaneY_ + kLaneHeight) {
+        const StripLane lane = lanes.at(mouse.y - origin.y);
+        if (lane == StripLane::Clips) {
             const std::vector<audio::AudioClip>& clips = engine.audioClips();
             for (std::size_t i = 0; i < clips.size(); ++i) {
                 const double end = audio::clipEndSeconds(clips[i], engine.clipSource(clips[i].file).get());
@@ -603,7 +628,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                 audioEdit_ = clips; // the drag edits a copy; applying one re-mixes the piece
                 break;
             }
-        } else if (mouse.y >= shotLaneY && mouse.y < shotLaneY + kLaneHeight) {
+        } else if (lane == StripLane::Shots) {
             for (std::size_t i = 0; i < piece.shots.size(); ++i) {
                 const seq::Shot& shot = piece.shots[i];
                 const float a = toX(shot.startSeconds);
@@ -619,8 +644,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                 dragGrab_ = mouseTime - shot.startSeconds;
                 break;
             }
-        } else if (!piece.overlays.empty() && mouse.y >= overlayLaneY &&
-                   mouse.y < overlayLaneY + kLaneHeight) {
+        } else if (lane == StripLane::Overlays) {
             for (std::size_t i = 0; i < piece.overlays.size(); ++i) {
                 const seq::OverlayCue& cue = piece.overlays[i];
                 const float a = toX(cue.startSeconds);
@@ -636,12 +660,12 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                 dragGrab_ = mouseTime - cue.startSeconds;
                 break;
             }
-        } else if (mouse.y >= shotLaneY + kLaneHeight + kLaneGap && mouse.y < overlayLaneY) {
-            const int lane = static_cast<int>((mouse.y - (shotLaneY + kLaneHeight + kLaneGap)) /
-                                              (kLaneHeight + kLaneGap));
-            if (lane >= 0 && lane < static_cast<int>(piece.actors.size())) {
+        } else if (lane == StripLane::Actors) {
+            const int row = static_cast<int>((mouse.y - origin.y - lanes.actorsTop()) /
+                                             (kLaneHeight + kLaneGap));
+            if (row >= 0 && row < static_cast<int>(piece.actors.size())) {
                 selection_ = Selection::Actor;
-                selected_ = lane;
+                selected_ = row;
                 hitBlock = true;
             }
         }

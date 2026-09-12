@@ -81,7 +81,7 @@ private:
     // would turn a smooth drag into a slideshow. The copy is applied on release, exactly as the
     // sequence's own bake waits for the mouse.
     std::vector<audio::AudioClip> audioEdit_;
-    float audioLaneY_ = -1.0f; // where the audio lane was drawn this frame, for hit testing
+    float clipLaneY_ = -1.0f; // where the clip lane was drawn this frame, for hit testing
     int audioSelected_ = -1;
     char audioPath_[512] = {};
 

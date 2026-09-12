@@ -3,6 +3,7 @@
 #include "ui/ui_logic.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <cmath>
 #include <limits>
@@ -200,4 +201,74 @@ TEST_CASE("Recent files are labelled by what tells them apart", "[ui][recent]") 
     SECTION("an empty list is an empty list") {
         CHECK(ui::uniqueFileLabels({}).empty());
     }
+}
+
+// ---- the sequencer strip's lanes --------------------------------------------------------------
+//
+// Extracted from `SequencePanel::drawStrip` after a reported bug (ADR-103): audio clips were drawn
+// as draggable blocks *on* the waveform lane, so a click meant to scrub the music moved the music
+// instead, and a piece was reported as starting fourteen seconds in with its name showing twice.
+// The drawing and the hit testing have to agree about where a lane is, and that is arithmetic.
+
+TEST_CASE("The waveform lane never holds a block", "[ui][sequencer][lanes]") {
+    ui::StripLanes lanes{.hasAudio = true, .actorCount = 2, .hasOverlays = true};
+
+    // Every point in the waveform lane is the waveform lane -- not the clips, and not a shot. This
+    // is the property that broke.
+    for (float y = lanes.waveformTop(); y < lanes.waveformTop() + lanes.laneHeight; y += 0.5f) {
+        INFO(y);
+        REQUIRE(lanes.at(y) == ui::StripLane::Waveform);
+    }
+    // And the clips are somewhere else entirely, below it.
+    CHECK(lanes.clipsTop() >= lanes.waveformTop() + lanes.laneHeight);
+    for (float y = lanes.clipsTop(); y < lanes.clipsTop() + lanes.clipLaneHeight; y += 0.5f) {
+        INFO(y);
+        REQUIRE(lanes.at(y) == ui::StripLane::Clips);
+    }
+}
+
+TEST_CASE("Every lane is where the strip's own height says it is", "[ui][sequencer][lanes]") {
+    // The lanes tile the strip in order and none of them runs off the end of it: a lane drawn past
+    // the strip's height is one the mouse can never reach.
+    for (bool audio : {false, true}) {
+        for (std::size_t actors : {std::size_t{0}, std::size_t{1}, std::size_t{4}}) {
+            for (bool overlays : {false, true}) {
+                ui::StripLanes lanes{.hasAudio = audio, .actorCount = actors, .hasOverlays = overlays};
+                INFO("audio=" << audio << " actors=" << actors << " overlays=" << overlays);
+
+                CHECK(lanes.at(0.0f) == ui::StripLane::Ruler);
+                CHECK(lanes.at(lanes.lanesTop() - 0.1f) == ui::StripLane::Ruler);
+                CHECK(lanes.at(lanes.shotsTop() + 1.0f) == ui::StripLane::Shots);
+                CHECK(lanes.shotsTop() + lanes.laneHeight <= lanes.height());
+                if (audio) {
+                    CHECK(lanes.at(lanes.waveformTop() + 1.0f) == ui::StripLane::Waveform);
+                    CHECK(lanes.at(lanes.clipsTop() + 1.0f) == ui::StripLane::Clips);
+                } else {
+                    // With no audio the shots are the first lane, exactly where the waveform would
+                    // have been -- so a project without audio loses no space to lanes it has not got.
+                    CHECK(lanes.shotsTop() == lanes.lanesTop());
+                }
+                if (actors > 0) {
+                    CHECK(lanes.at(lanes.actorsTop() + 1.0f) == ui::StripLane::Actors);
+                    CHECK(lanes.at(lanes.overlaysTop() - lanes.gap - 1.0f) == ui::StripLane::Actors);
+                }
+                if (overlays) {
+                    CHECK(lanes.at(lanes.overlaysTop() + 1.0f) == ui::StripLane::Overlays);
+                    CHECK(lanes.overlaysTop() + lanes.laneHeight <= lanes.height());
+                }
+                // Past the bottom is nothing, rather than the last lane extended forever.
+                CHECK(lanes.at(lanes.height() + 10.0f) == ui::StripLane::None);
+            }
+        }
+    }
+}
+
+TEST_CASE("The audio lanes cost nothing when there is no audio", "[ui][sequencer][lanes]") {
+    const ui::StripLanes without{.hasAudio = false, .actorCount = 1, .hasOverlays = false};
+    const ui::StripLanes with{.hasAudio = true, .actorCount = 1, .hasOverlays = false};
+    CHECK(with.height() > without.height());
+    CHECK_THAT(static_cast<double>(with.height() - without.height()),
+               Catch::Matchers::WithinAbs(static_cast<double>(with.laneHeight + with.clipLaneHeight +
+                                                              2.0f * with.gap),
+                                          1e-4));
 }

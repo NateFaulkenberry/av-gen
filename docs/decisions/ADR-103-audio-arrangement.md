@@ -96,6 +96,26 @@ two places to disagree about it.
 Each clip writes only what differs from the default, so a clip that was merely dropped on the
 timeline reads as one line rather than eight fields of zero.
 
+## The clips get a lane of their own
+
+Drawn on the waveform first, and reported within the hour: a click meant to scrub the music grabbed
+the clip and moved it, so the piece began fourteen seconds in and its name appeared twice — once as
+the waveform lane's label and once on the clip.
+
+The panel already had the rule, in a comment directly above the code that broke it:
+
+> The waveform holds no blocks and is deliberately left that way: clicking a moment in the music to
+> hear it is worth more than anything a block there could offer.
+
+So clips are a thin lane of their own, under the waveform, and the waveform lane lost its file label
+— the clips name themselves, and a lane label naming the song beside a clip naming the same file is
+the double that was reported.
+
+The deeper fault was that the strip's height, its drawing and its hit testing were three separate
+calculations of where the lanes are, and only two of them were changed. They are now one
+(`ui::StripLanes` in `ui_logic.hpp`), which is ImGui-free and tested — the waveform lane holding no
+block is an assertion rather than a comment.
+
 ## Consequences
 
 **Good.** A piece can be several files. The transport, the analysis, the waveform, the offline

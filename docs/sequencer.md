@@ -368,9 +368,10 @@ Two consequences worth knowing:
 - A project with a single untouched file is *bit-identical* to that file and is saved exactly as it
   was before arrangements existed, so nothing about an existing project changes.
 
-On the strip, the audio lane shows the whole mix with each clip outlined and named. Drag a clip to
-move it, its right edge to trim it. The re-mix happens when you let go, not during the drag — it is a
-pass over every sample, about 50 ms for six minutes.
+On the strip, the waveform lane shows the whole mix and is **always a scrub** — clicking it moves the
+playhead, and nothing there can be grabbed by accident. The clips live in a thin lane under it, each
+outlined and named: drag one to move it, its right edge to trim it. The re-mix happens when you let
+go, not during the drag — it is a pass over every sample, about 50 ms for six minutes.
 
 Clips at different sample rates are resampled linearly and **warned about**: it is audible on music,
 and converting the file is the real fix. See
