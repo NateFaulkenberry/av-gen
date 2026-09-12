@@ -169,6 +169,27 @@ TEST_CASE("the frame timeline's passes partition the frame", "[timeline][gpu]") 
     CHECK(ctx->errorCount() == 0);
 }
 
+TEST_CASE("the frame timeline ring survives sustained frame reuse", "[timeline][gpu][forensics]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    auto renderer = makeRenderer(*ctx, shaders);
+    if (!renderer->timeline().available()) {
+        SKIP("timestamp queries unavailable on this adapter");
+    }
+
+    const scene::Scene s = boxScene();
+    for (std::uint64_t frame = 0; frame < 32; ++frame) {
+        FrameTime time{};
+        time.renderTime = static_cast<double>(frame) / 60.0;
+        time.deltaTime = 1.0 / 60.0;
+        time.frameIndex = frame;
+        REQUIRE(renderer->renderFrame(s, time, kSize, kSize).has_value());
+    }
+    CHECK(renderer->timeline().completedFrames() > 0);
+    CHECK(renderer->timeline().overflowed() == 0);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("a phase that does not run is absent from the timeline", "[timeline][gpu]") {
     auto ctx = makeContext();
     gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});

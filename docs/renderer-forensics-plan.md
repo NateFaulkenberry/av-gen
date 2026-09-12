@@ -197,6 +197,9 @@ open in Phase 7.
 
 - `[ ]` Document when CPU state updates, GPU data is written, GPU consumes it, GPU finishes and memory is reused.
 - `[ ]` Audit textures, buffers, bind groups, pipelines, materials, meshes, animation buffers, depth textures, water textures and post-process targets.
+- `[~]` `FrameTimeline` uses a four-slot non-stalling resolve/map ring and waits for in-flight maps
+  during destruction. A 32-frame GPU stress regression now proves sustained slot reuse, readback
+  completion and zero timeline overflow; the broader resource inventory remains open.
 - `[x]` Skinning palette upload cache is scene-aware. Distinct scenes with equal rig palette versions
   now force a palette upload; a GPU regression renders rest and posed same-version scenes through one
   renderer and verifies the pixels differ.
