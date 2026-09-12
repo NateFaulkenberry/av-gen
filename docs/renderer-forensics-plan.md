@@ -510,7 +510,10 @@ For every level, run camera translation, rotation, orbit, dolly, playback, pause
 - `[ ]` Re-measure CPU/GPU frame time, p90/tail, draw calls, visible/culled renderables, animated vertices, water/shadow/post costs and buffer uploads.
 - `[ ]` Profile Constellation and Glowmere separately; do not generalize one workload to the other.
 - `[ ]` Run release, debug, ASan/UBSan and TSan suites relevant to changed paths.
-- `[ ]` Run the complete release suite and document skips, failures and platform-gated tests.
+- `[x]` Complete release suite baseline: 1,677 tests passed, zero failures, with four expected
+  platform/asset-gated skips (two Khronos sample imports, external ffmpeg/libx264 and NDI runtime).
+  The run took 345.85 seconds on the current Apple M2 Max environment. Existing compiler warnings
+  in `engine.cpp` remain unrelated to this forensic work.
 - `[ ]` Investigate any order-dependent, contention-sensitive or intermittently failing test before sign-off.
 
 ### 11.3 Architectural repair standard
