@@ -484,6 +484,29 @@ TEST_CASE("SceneRenderer survives resizes and invalid meshes", "[gpu][renderer]"
     CHECK_FALSE(renderer.resize(0, 10).has_value());
 }
 
+TEST_CASE("SceneRenderer resets temporal history after resize", "[gpu][renderer][forensics]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    rendering::SceneRenderer fresh(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    REQUIRE(fresh.init().has_value());
+
+    auto scene = cubeScene();
+    scene.post.motionBlurAmount = 1.0f;
+    scene.post.motionBlurSamples = 8;
+    FrameTime time{};
+    time.frameIndex = 4;
+    time.renderTime = 1.0;
+    REQUIRE(renderer.renderToImage(scene, time, 96, 64).has_value());
+    const auto resized = renderer.renderToImage(scene, time, 128, 80);
+    REQUIRE(resized.has_value());
+    const auto expected = fresh.renderToImage(scene, time, 128, 80);
+    REQUIRE(expected.has_value());
+    CHECK(gpu::hashImage(*resized) == gpu::hashImage(*expected));
+    CHECK(ctx->errorCount() == 0);
+}
+
 namespace {
 // Synthetic equirect: bright warm sky above the horizon, dark cool ground below.
 scene::TextureData syntheticSky(std::uint32_t w, std::uint32_t h) {

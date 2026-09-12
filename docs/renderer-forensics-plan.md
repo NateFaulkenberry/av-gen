@@ -203,7 +203,10 @@ open in Phase 7.
 - `[x]` Renderer temporal history now resets at a scene boundary: previous model matrices, previous
   view-projection state and AO history cannot leak between distinct scenes. A reused-versus-fresh
   renderer regression covers a same-time scene swap.
-- `[ ]` Stress resource reuse through resize, scene reload, timeline seek/reverse, camera cuts and frame-index reuse.
+- `[~]` Stress resource reuse through resize, scene reload, timeline seek/reverse, camera cuts and frame-index reuse.
+  Resize now clears previous view/model history in addition to AO history, with a motion-blur
+  reused-versus-fresh renderer regression. Scene reload, camera-cut and frame-index reuse cases
+  remain open.
 - `[ ]` Add a conservative synchronization option to the reference path if evidence points to reuse hazards.
 - `[ ]` Add validation for resources destroyed, replaced, resized or rebound while still referenced.
 - `[~]` Sanitizer coverage exists for selected animation/sequence paths; expand it to renderer resource lifetime and full relevant suites.

@@ -1121,6 +1121,9 @@ Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
     }
     rebuildFrameBindGroups();
     ao_->resetHistory();
+    havePrevViewProj_ = false;
+    prevModels_.clear();
+    prevModelsNext_.clear();
     tonemapBindGroup_ = nullptr;
     tonemapBoundView_ = nullptr;
     tonemapGroups_.clear();
