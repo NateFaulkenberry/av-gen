@@ -33,6 +33,7 @@
 #include "scene/composition.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -149,6 +150,23 @@ public:
     EditApply redo(app::Engine& engine, std::vector<std::string>* selection = nullptr);
 
     void clear();
+
+    // ---- identity, for save state and for the UI ------------------------------------------------
+    //
+    // `stateId` names *the document state*, not the depth of the stack. Depth cannot answer "is this
+    // what was saved": undo twice and make a different edit and the stack is the same height as it
+    // was, holding an entirely different document. Every command gets a serial when it is pushed and
+    // the state is named by the newest one, so a re-edit after an undo is a state nobody has saved
+    // even though the count agrees.
+    //
+    // The empty-stack state has its own id, and it *moves* when the oldest command is trimmed away:
+    // once a command has fallen off the bottom, "no commands" means the document as it stood after
+    // that one, which is a different document from the one the session opened with.
+    [[nodiscard]] std::uint64_t stateId() const;
+    // Bumps on every change -- push, undo, redo, clear. A panel can compare it against what it drew
+    // last rather than re-reading the whole stack every frame.
+    [[nodiscard]] std::uint64_t revision() const { return revision_; }
+
     [[nodiscard]] std::size_t undoSize() const { return undo_.size(); }
     [[nodiscard]] std::size_t redoSize() const { return redo_.size(); }
     // The labels of the undo stack, newest last. For the history list in the editor.
@@ -176,6 +194,13 @@ private:
 
     std::vector<EditCommand> undo_;
     std::vector<EditCommand> redo_;
+    // Parallel to the two stacks: which state each command produced. Kept beside rather than inside
+    // EditCommand because it is the *history's* bookkeeping, not part of what the command does.
+    std::vector<std::uint64_t> undoIds_;
+    std::vector<std::uint64_t> redoIds_;
+    std::uint64_t nextId_ = 1;
+    std::uint64_t baseId_ = 0;    // the state with an empty undo stack
+    std::uint64_t revision_ = 0;
     std::size_t capacity_;
     bool dragging_ = false;
     EditCommand drag_;

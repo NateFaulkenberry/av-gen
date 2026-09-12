@@ -1124,3 +1124,94 @@ TEST_CASE("A drag that began on a panel does not open a selection box", "[ui][ed
     editor.update(f.engine, nullptr, camera, aspect, input);
     CHECK(editor.selection.empty());
 }
+
+TEST_CASE("A history state has an identity, not just a depth", "[ui][editor][history]") {
+    // What "is this what was saved?" needs. Depth cannot answer it: undo twice, make a different
+    // edit, and the stack stands at the same height holding an entirely different document. A save
+    // marker compared against a count would call that saved. So each command names the state it
+    // produced, and the state is named by the newest one.
+    Fixture f;
+    const std::string a = f.add("a", glm::vec3(0.0f));
+    const std::vector<std::string> one{a};
+    ui::EditHistory history;
+
+    const std::uint64_t empty = history.stateId();
+    history.push(ui::moveNodes(f.engine, one, glm::vec3(1.0f, 0.0f, 0.0f)));
+    const std::uint64_t afterFirst = history.stateId();
+    CHECK(afterFirst != empty);
+
+    history.push(ui::moveNodes(f.engine, one, glm::vec3(0.0f, 1.0f, 0.0f)));
+    const std::uint64_t afterSecond = history.stateId();
+    CHECK(afterSecond != afterFirst);
+
+    SECTION("undo returns to the state that was there before, not to a new one") {
+        history.undo(f.engine);
+        CHECK(history.stateId() == afterFirst);
+        history.undo(f.engine);
+        CHECK(history.stateId() == empty);
+        history.redo(f.engine);
+        CHECK(history.stateId() == afterFirst);
+        history.redo(f.engine);
+        CHECK(history.stateId() == afterSecond);
+    }
+
+    SECTION("a different edit at the same depth is a different state") {
+        // The case the save marker exists for. Both stacks are one deep; the documents are not the
+        // same document, and nothing may call the second one saved because the first one was.
+        history.undo(f.engine);
+        REQUIRE(history.undoSize() == 1);
+        history.push(ui::moveNodes(f.engine, one, glm::vec3(0.0f, 0.0f, 9.0f)));
+        // Two deep again -- the same depth the second edit reached -- holding a different document.
+        // A save marker that compared depths would call this saved.
+        CHECK(history.undoSize() == 2);
+        CHECK(history.stateId() != afterSecond);
+        CHECK(history.stateId() != afterFirst);
+        CHECK_FALSE(history.canRedo()); // and the old branch is gone
+    }
+
+    SECTION("clearing is a new identity, not a return to the beginning") {
+        // A project was loaded or a scene swapped: the empty history now describes a different
+        // document, and a marker taken before the clear must not match after it.
+        history.clear();
+        CHECK(history.stateId() != empty);
+        CHECK(history.stateId() != afterFirst);
+        CHECK(history.stateId() != afterSecond);
+    }
+
+    SECTION("the revision moves on every change, so a panel can tell without re-reading") {
+        const std::uint64_t r0 = history.revision();
+        history.undo(f.engine);
+        const std::uint64_t r1 = history.revision();
+        CHECK(r1 != r0);
+        history.redo(f.engine);
+        CHECK(history.revision() != r1);
+        history.clear();
+        CHECK(history.revision() != r0);
+    }
+}
+
+TEST_CASE("Trimming moves what the empty stack means", "[ui][editor][history]") {
+    // With a command dropped off the bottom, "undo everything" no longer lands on the document the
+    // session opened with -- it lands on the document as it stood after the dropped command. If the
+    // empty-stack identity did not move with it, a save marker could match a state the history can
+    // no longer reach, and the project would claim to be saved when it is not.
+    Fixture f;
+    const std::string a = f.add("a", glm::vec3(0.0f));
+    const std::vector<std::string> one{a};
+    ui::EditHistory history(2); // capacity two, so the third push drops the first
+
+    const std::uint64_t openedWith = history.stateId();
+    history.push(ui::moveNodes(f.engine, one, glm::vec3(1.0f, 0.0f, 0.0f)));
+    history.push(ui::moveNodes(f.engine, one, glm::vec3(1.0f, 0.0f, 0.0f)));
+    CHECK(history.undoSize() == 2);
+    CHECK(history.stateId() != openedWith);
+
+    history.push(ui::moveNodes(f.engine, one, glm::vec3(1.0f, 0.0f, 0.0f)));
+    CHECK(history.undoSize() == 2); // capacity held
+
+    history.undo(f.engine);
+    history.undo(f.engine);
+    CHECK_FALSE(history.canUndo());
+    // Back as far as the history goes -- and that is not where the session started.
+    CHECK(history.stateId() != openedWith);
+}

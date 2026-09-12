@@ -186,8 +186,15 @@ void EditHistory::push(EditCommand command) {
         return;
     }
     redo_.clear();
+    redoIds_.clear();
     undo_.push_back(std::move(command));
+    undoIds_.push_back(nextId_++);
+    ++revision_;
     trim();
+}
+
+std::uint64_t EditHistory::stateId() const {
+    return undoIds_.empty() ? baseId_ : undoIds_.back();
 }
 
 void EditHistory::trim() {
@@ -196,6 +203,13 @@ void EditHistory::trim() {
     }
     while (undo_.size() > capacity_) {
         undo_.erase(undo_.begin());
+        // The dropped command's state becomes the empty-stack state: with it gone, "undo everything"
+        // lands on the document as it stood *after* that command, not on the one the session opened
+        // with. Without this the save marker could match a state the history can no longer reach.
+        if (!undoIds_.empty()) {
+            baseId_ = undoIds_.front();
+            undoIds_.erase(undoIds_.begin());
+        }
     }
 }
 
@@ -220,6 +234,11 @@ EditApply EditHistory::undo(app::Engine& engine, std::vector<std::string>* selec
         *selection = command.selectionBefore;
     }
     redo_.push_back(std::move(command));
+    if (!undoIds_.empty()) {
+        redoIds_.push_back(undoIds_.back());
+        undoIds_.pop_back();
+    }
+    ++revision_;
     return out;
 }
 
@@ -236,12 +255,24 @@ EditApply EditHistory::redo(app::Engine& engine, std::vector<std::string>* selec
         *selection = command.selectionAfter;
     }
     undo_.push_back(std::move(command));
+    if (!redoIds_.empty()) {
+        undoIds_.push_back(redoIds_.back());
+        redoIds_.pop_back();
+    }
+    ++revision_;
     return out;
 }
 
 void EditHistory::clear() {
     undo_.clear();
     redo_.clear();
+    undoIds_.clear();
+    redoIds_.clear();
+    // A fresh identity rather than back to zero: a cleared history describes a different document
+    // -- a project was loaded, a scene swapped -- and a save marker taken before the clear must not
+    // match the state after it.
+    baseId_ = nextId_++;
+    ++revision_;
     dragging_ = false;
     drag_ = EditCommand{};
 }
