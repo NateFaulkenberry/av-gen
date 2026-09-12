@@ -263,6 +263,27 @@ TEST_CASE("SceneRenderer exposes stable selected-object diagnostics", "[gpu][ren
     CHECK(ctx->errorCount() == 0);
 }
 
+TEST_CASE("SceneRenderer does not reuse same-version meshes across scenes", "[gpu][renderer][forensics]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    auto large = cubeScene();
+    auto small = cubeScene();
+    small.meshes[0] = cubeMesh(0.25f);
+    REQUIRE(large.meshVersion == small.meshVersion);
+    REQUIRE(large.meshes.size() == small.meshes.size());
+
+    FrameTime time{};
+    auto largeImage = renderer.renderToImage(large, time, 96, 64);
+    REQUIRE(largeImage.has_value());
+    auto smallImage = renderer.renderToImage(small, time, 96, 64);
+    REQUIRE(smallImage.has_value());
+    CHECK(gpu::hashImage(*largeImage) != gpu::hashImage(*smallImage));
+    CHECK(ctx->errorCount() == 0);
+}
+
     TEST_CASE("camera motion never mutates a static entity transform", "[gpu][renderer][transform]") {
         auto ctx = makeContext();
         auto shaders = makeShaders(*ctx);

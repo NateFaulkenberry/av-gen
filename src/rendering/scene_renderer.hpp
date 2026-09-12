@@ -572,8 +572,10 @@ private:
     IblResources ibl_;
 
     std::vector<GpuMesh> meshes_;
+    const scene::Scene* meshScene_ = nullptr;
     std::uint64_t meshVersion_ = ~0ull;
     std::vector<gpu::GpuTexture> textures_;
+    const scene::Scene* textureScene_ = nullptr;
     std::uint64_t textureVersion_ = ~0ull;
     std::unordered_map<std::uint64_t, wgpu::BindGroup> materialBindGroups_;
     std::vector<std::uint8_t> objectStaging_;

@@ -179,7 +179,9 @@ open in Phase 7.
 - `[ ]` Audit uniform/storage buffers, dynamic offsets, ring buffers, staging buffers, bind groups, views and frame allocators.
 - `[ ]` Verify CPU/WGSL structure size, alignment, offsets, padding, type widths and matrix layout.
 - `[ ]` Add an alternating-transform two-object test to detect stale or swapped GPU data.
-- `[ ]` Fix mesh upload identity/version collisions; specifically verify that two fresh scenes with same local mesh versions cannot reuse the wrong geometry.
+- `[x]` Fix mesh and texture upload identity/version collisions by keying renderer caches to the owning
+  `Scene` as well as its local version. A GPU regression renders distinct same-version geometry through
+  one renderer and verifies the images differ. The broader buffer-layout audit remains open.
 
 ### 3.4 Frame synchronization and resource lifetime
 

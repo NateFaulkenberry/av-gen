@@ -1336,7 +1336,7 @@ wgpu::BindGroup SceneRenderer::tonemapBindGroupFor(const wgpu::TextureView& view
 }
 
 void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
-    if (scene.meshVersion == meshVersion_ && meshes_.size() == scene.meshes.size()) {
+    if (&scene == meshScene_ && scene.meshVersion == meshVersion_ && meshes_.size() == scene.meshes.size()) {
         return;
     }
     meshes_.clear();
@@ -1372,11 +1372,13 @@ void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
         }
         meshes_.push_back(std::move(gpuMesh));
     }
+    meshScene_ = &scene;
     meshVersion_ = scene.meshVersion;
 }
 
 void SceneRenderer::uploadTextures(const scene::Scene& scene) {
-    if (scene.textureVersion == textureVersion_ && textures_.size() == scene.textures.size()) {
+    if (&scene == textureScene_ && scene.textureVersion == textureVersion_ &&
+        textures_.size() == scene.textures.size()) {
         return;
     }
     textures_.clear();
@@ -1396,6 +1398,7 @@ void SceneRenderer::uploadTextures(const scene::Scene& scene) {
         textures_.push_back(std::move(*tex));
     }
     materialBindGroups_.clear();
+    textureScene_ = &scene;
     textureVersion_ = scene.textureVersion;
     stats_.textures = static_cast<std::uint32_t>(textures_.size());
 }
