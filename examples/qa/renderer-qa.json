@@ -1,16 +1,930 @@
 {
- "format": "avgen-project",
- "version": 4,
- "app": {"name": "Renderer QA"},
- "assets": {"scene": {"kind": "composition", "path": "renderer-qa.scene.json"}},
- "parameters": {
-  "post/bloom/enabled": false,
-  "post/output/vignette": 0.0,
-  "post/output/grain": 0.0
- },
- "sources": [],
- "routes": [],
- "presets": [],
- "timeline": {"enabled": false, "tracks": [], "cues": []},
- "render": {"width": 1280, "height": 720, "fps": 30, "output": "sequence"}
+  "app": {
+    "name": "avgen",
+    "version": "0.1.0"
+  },
+  "assets": {
+    "audio": {
+      "path": "../../../../../Desktop/MP3/Bittersweet.mp3",
+      "sha256": "015a3784fad2798fb6d313ba8ec4a033e46651d0e2693d086cbcdba0c81a6bc6",
+      "size": 4740544
+    },
+    "scene": {
+      "kind": "composition",
+      "path": {
+        "path": "renderer-qa.scene.json",
+        "sha256": "20b54da064e89ffc51dd1963149c92136a769a7b37b23622310a2d308cf72283",
+        "size": 1985
+      }
+    }
+  },
+  "control": {
+    "midi": {
+      "bindings": [],
+      "enabled": true,
+      "filter": "*"
+    },
+    "osc": {
+      "bind": "0.0.0.0",
+      "bindings": [],
+      "direct": true,
+      "enabled": true,
+      "feedback": false,
+      "feedbackHost": "",
+      "feedbackPort": 9001,
+      "port": 9000,
+      "prefix": "/avgen"
+    },
+    "phraseBars": 4,
+    "sectionPhrases": 4,
+    "tempoSource": "analysis"
+  },
+  "format": "avgen-project",
+  "parameters": {
+    "audio/inputGain": 1.0,
+    "camera/distance": 146.24563598632813,
+    "camera/exposure/aperture": 5.599999904632568,
+    "camera/exposure/compensation": -1.2999999523162842,
+    "camera/exposure/iso": 400.0,
+    "camera/exposure/maxEv": 16.0,
+    "camera/exposure/meterCenterWeight": 0.6000000238418579,
+    "camera/exposure/minEv": -4.0,
+    "camera/exposure/mode": 0,
+    "camera/exposure/shutterSeconds": 0.019999999552965164,
+    "camera/exposure/speedDown": 1.0,
+    "camera/exposure/speedUp": 3.0,
+    "camera/focus/mode": 0,
+    "camera/focus/point": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "camera/focus/speed": 0.0,
+    "camera/fov": 42.0,
+    "camera/height": 21.6829891204834,
+    "camera/lens/aperture": 2.799999952316284,
+    "camera/lens/focalLength": 35.0,
+    "camera/lens/focusDistance": 22.650651931762695,
+    "camera/lens/sensorHeight": 24.0,
+    "camera/lens/sensorWidth": 36.0,
+    "camera/lens/shutterAngle": 172.0,
+    "camera/lens/useExplicitFov": true,
+    "camera/lookAhead": 2.0,
+    "camera/mode": 1,
+    "camera/orbitSpeed": 0.0,
+    "camera/position": [
+      0.0,
+      5.0,
+      16.0
+    ],
+    "camera/shake/amplitude": 0.0,
+    "camera/shake/decay": 0.0,
+    "camera/shake/frequency": 9.0,
+    "camera/shake/rotation": 0.0,
+    "camera/shake/start": 0.0,
+    "camera/splineOffset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "camera/splineT": 0.0,
+    "camera/target": [
+      0.0,
+      1.0,
+      -8.0
+    ],
+    "env/intensity": 0.18000000715255737,
+    "env/rotation": 0.0,
+    "env/sky/background": false,
+    "env/sky/enabled": false,
+    "env/sky/groundColor": [
+      0.04500000178813934,
+      0.041999999433755875,
+      0.03799999877810478
+    ],
+    "env/sky/haze": 0.25,
+    "env/sky/horizonColor": [
+      0.30000001192092896,
+      0.3400000035762787,
+      0.41999998688697815
+    ],
+    "env/sky/intensity": 1.0,
+    "env/sky/sunColor": [
+      1.0,
+      0.9300000071525574,
+      0.8199999928474426
+    ],
+    "env/sky/sunGlow": 0.18000000715255737,
+    "env/sky/sunIntensity": 8.0,
+    "env/sky/sunSize": 0.04500000178813934,
+    "env/sky/zenithColor": [
+      0.054999999701976776,
+      0.10499999672174454,
+      0.23499999940395355
+    ],
+    "nodes/alien/emissiveBoost": 1.0,
+    "nodes/alien/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/alien/lightIntensity": 1.0,
+    "nodes/alien/position": [
+      0.0,
+      0.0,
+      -5.0
+    ],
+    "nodes/alien/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/alien/roughnessScale": 1.0,
+    "nodes/alien/scale": [
+      0.009999999776482582,
+      0.009999999776482582,
+      0.009999999776482582
+    ],
+    "nodes/alien/visible": true,
+    "nodes/behind-camera/emissiveBoost": 1.0,
+    "nodes/behind-camera/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/behind-camera/lightIntensity": 1.0,
+    "nodes/behind-camera/position": [
+      0.0,
+      1.0,
+      24.0
+    ],
+    "nodes/behind-camera/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/behind-camera/roughnessScale": 1.0,
+    "nodes/behind-camera/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/behind-camera/visible": true,
+    "nodes/far-cube/emissiveBoost": 1.0,
+    "nodes/far-cube/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/far-cube/lightIntensity": 1.0,
+    "nodes/far-cube/position": [
+      5.0,
+      1.0,
+      -90.0
+    ],
+    "nodes/far-cube/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/far-cube/roughnessScale": 1.0,
+    "nodes/far-cube/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/far-cube/visible": true,
+    "nodes/floor/emissiveBoost": 1.0,
+    "nodes/floor/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/floor/lightIntensity": 1.0,
+    "nodes/floor/position": [
+      0.0,
+      0.0,
+      -8.0
+    ],
+    "nodes/floor/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/floor/roughnessScale": 1.0,
+    "nodes/floor/scale": [
+      10.0,
+      1.0,
+      10.0
+    ],
+    "nodes/floor/visible": true,
+    "nodes/near-cube/emissiveBoost": 1.0,
+    "nodes/near-cube/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/near-cube/lightIntensity": 1.0,
+    "nodes/near-cube/position": [
+      -5.0,
+      1.0,
+      -4.0
+    ],
+    "nodes/near-cube/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/near-cube/roughnessScale": 1.0,
+    "nodes/near-cube/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/near-cube/visible": true,
+    "nodes/particles/emissiveBoost": 1.0,
+    "nodes/particles/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/particles/lightIntensity": 1.0,
+    "nodes/particles/position": [
+      -3.0,
+      1.0,
+      -6.0
+    ],
+    "nodes/particles/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/particles/roughnessScale": 1.0,
+    "nodes/particles/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/particles/visible": true,
+    "nodes/transparent-orb/emissiveBoost": 1.0,
+    "nodes/transparent-orb/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/transparent-orb/lightIntensity": 1.0,
+    "nodes/transparent-orb/position": [
+      3.0,
+      1.2000000476837158,
+      -5.0
+    ],
+    "nodes/transparent-orb/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/transparent-orb/roughnessScale": 1.0,
+    "nodes/transparent-orb/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/transparent-orb/visible": true,
+    "particles/particles/attractorPosition": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/particles/attractorStrength": 0.0,
+    "particles/particles/burst": 0.0,
+    "particles/particles/colorEnd": [
+      0.10000000149011612,
+      0.20000000298023224,
+      1.0,
+      0.0
+    ],
+    "particles/particles/colorStart": [
+      0.20000000298023224,
+      0.800000011920929,
+      1.0,
+      1.0
+    ],
+    "particles/particles/drag": 0.20000000298023224,
+    "particles/particles/emissive": 2.0,
+    "particles/particles/enabled": true,
+    "particles/particles/extent": 1.0,
+    "particles/particles/gravity": [
+      0.0,
+      -0.5,
+      0.0
+    ],
+    "particles/particles/lifetime": 1.0,
+    "particles/particles/orbit": 0.0,
+    "particles/particles/position": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/particles/size": 1.0,
+    "particles/particles/spawnRate": 80.0,
+    "particles/particles/speed": 1.0,
+    "particles/particles/spread": 0.5,
+    "particles/particles/stretch": 0.0,
+    "particles/particles/trailWidth": 1.0,
+    "particles/particles/turbulence": 0.800000011920929,
+    "particles/particles/turbulenceScale": 1.0,
+    "particles/particles/turbulenceSpeed": 0.30000001192092896,
+    "post/anamorphic/enabled": false,
+    "post/anamorphic/ghosts": 0.22300000488758087,
+    "post/anamorphic/intensity": 0.4699999988079071,
+    "post/anamorphic/stretch": 10.38599967956543,
+    "post/anamorphic/tint": [
+      0.3499999940395355,
+      0.550000011920929,
+      1.0
+    ],
+    "post/bloom/emissionWeight": 0.75,
+    "post/bloom/enabled": false,
+    "post/bloom/intensity": 0.18000000715255737,
+    "post/bloom/knee": 0.5,
+    "post/bloom/radius": 1.149999976158142,
+    "post/bloom/threshold": 1.0,
+    "post/dof/enabled": true,
+    "post/dof/focusDistance": 22.650651931762695,
+    "post/dof/focusRange": 1.7760000228881836,
+    "post/dof/maxRadius": 1.2389999628067017,
+    "post/dof/physical": true,
+    "post/grade/contrast": 1.3960000276565552,
+    "post/grade/gain": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "post/grade/gamma": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "post/grade/hueShift": 0.0,
+    "post/grade/lift": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "post/grade/saturation": 1.11899995803833,
+    "post/grade/temperature": 0.0,
+    "post/grade/tint": 0.0,
+    "post/halation/enabled": false,
+    "post/halation/intensity": 0.5,
+    "post/halation/radius": 2.0,
+    "post/halation/threshold": 2.0,
+    "post/halation/tint": [
+      1.0,
+      0.30000001192092896,
+      0.11999999731779099
+    ],
+    "post/halation/warmth": 0.6000000238418579,
+    "post/lens/chromaticAberration": 0.0,
+    "post/lens/distortion": 0.0,
+    "post/motionBlur/amount": 0.0,
+    "post/output/antialias": 0.75,
+    "post/output/grain": 0.0,
+    "post/output/sharpen": 0.0,
+    "post/output/sharpenId": 0,
+    "post/output/vignette": 0.0,
+    "post/tiltShift/bandWidth": 0.20000000298023224,
+    "post/tiltShift/centre": [
+      0.4699999988079071,
+      0.5360000133514404
+    ],
+    "post/tiltShift/enabled": true,
+    "post/tiltShift/falloff": 0.25,
+    "post/tiltShift/maxRadius": 8.0,
+    "post/tiltShift/rotation": 0.0,
+    "post/tonemap/chroma-retention": 0.6000000238418579,
+    "post/tonemap/operator": 1,
+    "procedural/behind-camera/distribution/alignToSpline": true,
+    "procedural/behind-camera/distribution/center": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/behind-camera/distribution/count": 32,
+    "procedural/behind-camera/distribution/end": [
+      5.0,
+      0.0,
+      0.0
+    ],
+    "procedural/behind-camera/distribution/endAngle": 6.2831854820251465,
+    "procedural/behind-camera/distribution/gridCountX": 4,
+    "procedural/behind-camera/distribution/gridCountY": 1,
+    "procedural/behind-camera/distribution/gridCountZ": 4,
+    "procedural/behind-camera/distribution/gridSpacing": [
+      2.0,
+      2.0,
+      2.0
+    ],
+    "procedural/behind-camera/distribution/kind": 0,
+    "procedural/behind-camera/distribution/orientAlong": false,
+    "procedural/behind-camera/distribution/orientation": 1,
+    "procedural/behind-camera/distribution/plane": 0,
+    "procedural/behind-camera/distribution/radius": 6.0,
+    "procedural/behind-camera/distribution/radiusGrowth": 0.0,
+    "procedural/behind-camera/distribution/roll": 0.0,
+    "procedural/behind-camera/distribution/spacing": 0.0,
+    "procedural/behind-camera/distribution/spiralAngle": 0.0,
+    "procedural/behind-camera/distribution/spiralHeight": 8.0,
+    "procedural/behind-camera/distribution/splineEnd": 1.0,
+    "procedural/behind-camera/distribution/splineOffset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/behind-camera/distribution/splineStart": 0.0,
+    "procedural/behind-camera/distribution/start": [
+      -5.0,
+      0.0,
+      0.0
+    ],
+    "procedural/behind-camera/distribution/startAngle": 0.0,
+    "procedural/behind-camera/distribution/turns": 3.0,
+    "procedural/behind-camera/emissiveFieldAmount": 0.0,
+    "procedural/behind-camera/hierarchy/depth": 0,
+    "procedural/behind-camera/hierarchy/offsetPerLevel": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/behind-camera/hierarchy/rotationPerLevel": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/behind-camera/hierarchy/scalePerLevel": 0.5,
+    "procedural/behind-camera/lod/distance1": 0.0,
+    "procedural/behind-camera/lod/distance2": 0.0,
+    "procedural/behind-camera/lod/distance3": 0.0,
+    "procedural/behind-camera/lod/enabled": false,
+    "procedural/behind-camera/lod/hysteresis": 0.0,
+    "procedural/behind-camera/lod/maxDistance": 0.0,
+    "procedural/behind-camera/lod/minScreenRadius": 0.0,
+    "procedural/behind-camera/lod/spread": 0.11999999731779099,
+    "procedural/behind-camera/material/baseColor": [
+      0.20000000298023224,
+      0.800000011920929,
+      0.3499999940395355
+    ],
+    "procedural/behind-camera/material/emissive": 0.0,
+    "procedural/behind-camera/material/emissiveColor": [
+      0.8999999761581421,
+      0.44999998807907104,
+      1.0
+    ],
+    "procedural/behind-camera/material/metallic": 0.0,
+    "procedural/behind-camera/material/roughness": 0.4000000059604645,
+    "procedural/behind-camera/materialVariation/emissiveGradient": 0.0,
+    "procedural/behind-camera/materialVariation/emissiveRandom": 0.0,
+    "procedural/behind-camera/materialVariation/hueGradient": 0.0,
+    "procedural/behind-camera/materialVariation/hueShift": 0.0,
+    "procedural/behind-camera/materialVariation/valueRandom": 0.0,
+    "procedural/behind-camera/source/bevel": 0.0,
+    "procedural/behind-camera/source/bevelSegments": 3,
+    "procedural/behind-camera/source/caps": true,
+    "procedural/behind-camera/source/height": 2.0,
+    "procedural/behind-camera/source/heightSegments": 1,
+    "procedural/behind-camera/source/kind": 2,
+    "procedural/behind-camera/source/majorRadius": 1.0,
+    "procedural/behind-camera/source/majorSegments": 48,
+    "procedural/behind-camera/source/minorRadius": 0.25,
+    "procedural/behind-camera/source/minorSegments": 16,
+    "procedural/behind-camera/source/pointSize": 0.05000000074505806,
+    "procedural/behind-camera/source/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/behind-camera/source/radialSegments": 24,
+    "procedural/behind-camera/source/radius": 1.0,
+    "procedural/behind-camera/source/rings": 12,
+    "procedural/behind-camera/source/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "procedural/behind-camera/source/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "procedural/behind-camera/source/segments": 24,
+    "procedural/behind-camera/source/size": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "procedural/behind-camera/source/subdivisions": 1,
+    "procedural/behind-camera/transform/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/behind-camera/transform/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "procedural/behind-camera/transform/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "procedural/behind-camera/variation/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/behind-camera/variation/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/behind-camera/variation/scale": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/behind-camera/variation/seed": 12345,
+    "procedural/behind-camera/variation/uniformScale": 0.0,
+    "procedural/behind-camera/visible": true,
+    "procedural/far-cube/distribution/alignToSpline": true,
+    "procedural/far-cube/distribution/center": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/far-cube/distribution/count": 32,
+    "procedural/far-cube/distribution/end": [
+      5.0,
+      0.0,
+      0.0
+    ],
+    "procedural/far-cube/distribution/endAngle": 6.2831854820251465,
+    "procedural/far-cube/distribution/gridCountX": 4,
+    "procedural/far-cube/distribution/gridCountY": 1,
+    "procedural/far-cube/distribution/gridCountZ": 4,
+    "procedural/far-cube/distribution/gridSpacing": [
+      2.0,
+      2.0,
+      2.0
+    ],
+    "procedural/far-cube/distribution/kind": 0,
+    "procedural/far-cube/distribution/orientAlong": false,
+    "procedural/far-cube/distribution/orientation": 1,
+    "procedural/far-cube/distribution/plane": 0,
+    "procedural/far-cube/distribution/radius": 6.0,
+    "procedural/far-cube/distribution/radiusGrowth": 0.0,
+    "procedural/far-cube/distribution/roll": 0.0,
+    "procedural/far-cube/distribution/spacing": 0.0,
+    "procedural/far-cube/distribution/spiralAngle": 0.0,
+    "procedural/far-cube/distribution/spiralHeight": 8.0,
+    "procedural/far-cube/distribution/splineEnd": 1.0,
+    "procedural/far-cube/distribution/splineOffset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/far-cube/distribution/splineStart": 0.0,
+    "procedural/far-cube/distribution/start": [
+      -5.0,
+      0.0,
+      0.0
+    ],
+    "procedural/far-cube/distribution/startAngle": 0.0,
+    "procedural/far-cube/distribution/turns": 3.0,
+    "procedural/far-cube/emissiveFieldAmount": 0.0,
+    "procedural/far-cube/hierarchy/depth": 0,
+    "procedural/far-cube/hierarchy/offsetPerLevel": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/far-cube/hierarchy/rotationPerLevel": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/far-cube/hierarchy/scalePerLevel": 0.5,
+    "procedural/far-cube/lod/distance1": 0.0,
+    "procedural/far-cube/lod/distance2": 0.0,
+    "procedural/far-cube/lod/distance3": 0.0,
+    "procedural/far-cube/lod/enabled": false,
+    "procedural/far-cube/lod/hysteresis": 0.0,
+    "procedural/far-cube/lod/maxDistance": 0.0,
+    "procedural/far-cube/lod/minScreenRadius": 0.0,
+    "procedural/far-cube/lod/spread": 0.11999999731779099,
+    "procedural/far-cube/material/baseColor": [
+      0.11999999731779099,
+      0.30000001192092896,
+      0.8999999761581421
+    ],
+    "procedural/far-cube/material/emissive": 0.0,
+    "procedural/far-cube/material/emissiveColor": [
+      0.8999999761581421,
+      0.44999998807907104,
+      1.0
+    ],
+    "procedural/far-cube/material/metallic": 0.0,
+    "procedural/far-cube/material/roughness": 0.6499999761581421,
+    "procedural/far-cube/materialVariation/emissiveGradient": 0.0,
+    "procedural/far-cube/materialVariation/emissiveRandom": 0.0,
+    "procedural/far-cube/materialVariation/hueGradient": 0.0,
+    "procedural/far-cube/materialVariation/hueShift": 0.0,
+    "procedural/far-cube/materialVariation/valueRandom": 0.0,
+    "procedural/far-cube/source/bevel": 0.0,
+    "procedural/far-cube/source/bevelSegments": 3,
+    "procedural/far-cube/source/caps": true,
+    "procedural/far-cube/source/height": 2.0,
+    "procedural/far-cube/source/heightSegments": 1,
+    "procedural/far-cube/source/kind": 0,
+    "procedural/far-cube/source/majorRadius": 1.0,
+    "procedural/far-cube/source/majorSegments": 48,
+    "procedural/far-cube/source/minorRadius": 0.25,
+    "procedural/far-cube/source/minorSegments": 16,
+    "procedural/far-cube/source/pointSize": 0.05000000074505806,
+    "procedural/far-cube/source/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/far-cube/source/radialSegments": 24,
+    "procedural/far-cube/source/radius": 0.5,
+    "procedural/far-cube/source/rings": 16,
+    "procedural/far-cube/source/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "procedural/far-cube/source/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "procedural/far-cube/source/segments": 32,
+    "procedural/far-cube/source/size": [
+      2.0,
+      2.0,
+      2.0
+    ],
+    "procedural/far-cube/source/subdivisions": 2,
+    "procedural/far-cube/transform/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/far-cube/transform/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "procedural/far-cube/transform/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "procedural/far-cube/variation/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/far-cube/variation/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/far-cube/variation/scale": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/far-cube/variation/seed": 12345,
+    "procedural/far-cube/variation/uniformScale": 0.0,
+    "procedural/far-cube/visible": true,
+    "procedural/near-cube/distribution/alignToSpline": true,
+    "procedural/near-cube/distribution/center": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/near-cube/distribution/count": 32,
+    "procedural/near-cube/distribution/end": [
+      5.0,
+      0.0,
+      0.0
+    ],
+    "procedural/near-cube/distribution/endAngle": 6.2831854820251465,
+    "procedural/near-cube/distribution/gridCountX": 4,
+    "procedural/near-cube/distribution/gridCountY": 1,
+    "procedural/near-cube/distribution/gridCountZ": 4,
+    "procedural/near-cube/distribution/gridSpacing": [
+      2.0,
+      2.0,
+      2.0
+    ],
+    "procedural/near-cube/distribution/kind": 0,
+    "procedural/near-cube/distribution/orientAlong": false,
+    "procedural/near-cube/distribution/orientation": 1,
+    "procedural/near-cube/distribution/plane": 0,
+    "procedural/near-cube/distribution/radius": 6.0,
+    "procedural/near-cube/distribution/radiusGrowth": 0.0,
+    "procedural/near-cube/distribution/roll": 0.0,
+    "procedural/near-cube/distribution/spacing": 0.0,
+    "procedural/near-cube/distribution/spiralAngle": 0.0,
+    "procedural/near-cube/distribution/spiralHeight": 8.0,
+    "procedural/near-cube/distribution/splineEnd": 1.0,
+    "procedural/near-cube/distribution/splineOffset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/near-cube/distribution/splineStart": 0.0,
+    "procedural/near-cube/distribution/start": [
+      -5.0,
+      0.0,
+      0.0
+    ],
+    "procedural/near-cube/distribution/startAngle": 0.0,
+    "procedural/near-cube/distribution/turns": 3.0,
+    "procedural/near-cube/emissiveFieldAmount": 0.0,
+    "procedural/near-cube/hierarchy/depth": 0,
+    "procedural/near-cube/hierarchy/offsetPerLevel": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/near-cube/hierarchy/rotationPerLevel": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/near-cube/hierarchy/scalePerLevel": 0.5,
+    "procedural/near-cube/lod/distance1": 0.0,
+    "procedural/near-cube/lod/distance2": 0.0,
+    "procedural/near-cube/lod/distance3": 0.0,
+    "procedural/near-cube/lod/enabled": false,
+    "procedural/near-cube/lod/hysteresis": 0.0,
+    "procedural/near-cube/lod/maxDistance": 0.0,
+    "procedural/near-cube/lod/minScreenRadius": 0.0,
+    "procedural/near-cube/lod/spread": 0.11999999731779099,
+    "procedural/near-cube/material/baseColor": [
+      0.800000011920929,
+      0.20000000298023224,
+      0.11999999731779099
+    ],
+    "procedural/near-cube/material/emissive": 0.0,
+    "procedural/near-cube/material/emissiveColor": [
+      0.8999999761581421,
+      0.44999998807907104,
+      1.0
+    ],
+    "procedural/near-cube/material/metallic": 0.0,
+    "procedural/near-cube/material/roughness": 0.44999998807907104,
+    "procedural/near-cube/materialVariation/emissiveGradient": 0.0,
+    "procedural/near-cube/materialVariation/emissiveRandom": 0.0,
+    "procedural/near-cube/materialVariation/hueGradient": 0.0,
+    "procedural/near-cube/materialVariation/hueShift": 0.0,
+    "procedural/near-cube/materialVariation/valueRandom": 0.0,
+    "procedural/near-cube/source/bevel": 0.0,
+    "procedural/near-cube/source/bevelSegments": 3,
+    "procedural/near-cube/source/caps": true,
+    "procedural/near-cube/source/height": 2.0,
+    "procedural/near-cube/source/heightSegments": 1,
+    "procedural/near-cube/source/kind": 0,
+    "procedural/near-cube/source/majorRadius": 1.0,
+    "procedural/near-cube/source/majorSegments": 48,
+    "procedural/near-cube/source/minorRadius": 0.25,
+    "procedural/near-cube/source/minorSegments": 16,
+    "procedural/near-cube/source/pointSize": 0.05000000074505806,
+    "procedural/near-cube/source/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/near-cube/source/radialSegments": 24,
+    "procedural/near-cube/source/radius": 0.5,
+    "procedural/near-cube/source/rings": 16,
+    "procedural/near-cube/source/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "procedural/near-cube/source/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "procedural/near-cube/source/segments": 32,
+    "procedural/near-cube/source/size": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "procedural/near-cube/source/subdivisions": 2,
+    "procedural/near-cube/transform/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/near-cube/transform/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "procedural/near-cube/transform/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "procedural/near-cube/variation/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/near-cube/variation/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/near-cube/variation/scale": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/near-cube/variation/seed": 12345,
+    "procedural/near-cube/variation/uniformScale": 0.0,
+    "procedural/near-cube/visible": true,
+    "root/impulse": 0.0,
+    "root/rotationSpeed": 0.0,
+    "root/scale": 1.0,
+    "scene/brightness": 1.0,
+    "scene/fogColor": [
+      0.014999999664723873,
+      0.02500000037252903,
+      0.05000000074505806
+    ],
+    "scene/fogDensity": 0.0020000000949949026,
+    "scene/fogHeight": 0.0,
+    "scene/fogHeightFalloff": 0.0,
+    "scene/gridIntensity": 0.6000000238418579,
+    "scene/keyLight": 1.0,
+    "scene/styledGroundAmbient": [
+      0.11999999731779099,
+      0.10000000149011612,
+      0.2199999988079071
+    ],
+    "scene/styledSkyAmbient": [
+      0.3799999952316284,
+      0.5600000023841858,
+      0.6499999761581421
+    ],
+    "scene/stylized": false,
+    "scene/volumeAbsorption": 0.5,
+    "scene/volumeAnisotropy": 0.30000001192092896,
+    "scene/volumeDensity": 0.0,
+    "scene/volumeEmission": 0.0,
+    "scene/volumeNoise": 0.0,
+    "scene/volumeNoiseScale": 0.10000000149011612,
+    "scene/volumeNoiseSpeed": 0.10000000149011612,
+    "scene/volumeScattering": 1.0,
+    "scene/volumeSteps": 32,
+    "scene/windDirection": 0.0,
+    "scene/windSpeed": 0.0
+  },
+  "presets": [],
+  "render": {
+    "backend": "auto",
+    "codec": "h264",
+    "encoderThreads": 0,
+    "end": -1.0,
+    "fps": 60.0,
+    "height": 1080,
+    "muxAudio": true,
+    "output": "video",
+    "path": "/Users/natefaulkenberry/Desktop/torp.mov",
+    "pattern": "frame_{:06d}.png",
+    "quality": 100,
+    "start": 0.0,
+    "width": 1920
+  },
+  "routes": [],
+  "shaders": [],
+  "sources": [
+    {
+      "kind": "control",
+      "name": "control",
+      "settings": {
+        "channels": []
+      }
+    }
+  ],
+  "version": 4
 }

@@ -1,997 +1,3698 @@
 {
- "format": "avgen-project",
- "version": 4,
- "app": {
-  "name": "The Living Constellation"
- },
- "assets": {
-  "scene": {
-   "kind": "composition",
-   "path": "constellation.scene.json"
+  "app": {
+    "name": "avgen",
+    "version": "0.1.0"
   },
-  "audio": {
-   "path": "../../assets/audio/glowmere-valley.wav"
-  }
- },
- "parameters": {
-  "camera/lens/focalLength": 34.0,
-  "camera/lens/aperture": 2.8,
-  "camera/exposure/mode": 0,
-  "camera/exposure/compensation": 0.0,
-  "post/grade/contrast": 1.1,
-  "post/grade/saturation": 1.06
- },
- "routes": [
-  {
-   "source": "audio.rms",
-   "target": "field/corePull/strength",
-   "op": "add",
-   "amount": 0.55,
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 1400.0,
-    "decayMs": 3000.0
-   }
+  "assets": {
+    "audio": {
+      "path": "../../../../../Desktop/Nate/acid test.mp3",
+      "sha256": "1343e630a2710835151254b28f3233dde990d134c2898416801d2409d8a2c5fd",
+      "size": 3681856
+    },
+    "scene": {
+      "kind": "composition",
+      "path": {
+        "path": "constellation.scene.json",
+        "sha256": "37b7c0f8da9fd28b9eceb5bacd5f417d2c515c2413a03e6fd577d450c5c1732f",
+        "size": 29348
+      }
+    }
   },
-  {
-   "source": "audio.rms",
-   "target": "particles/veil/emissive",
-   "op": "add",
-   "amount": 0.1,
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 1800.0,
-    "decayMs": 3600.0
-   }
+  "control": {
+    "midi": {
+      "bindings": [],
+      "enabled": true,
+      "filter": "*"
+    },
+    "osc": {
+      "bind": "0.0.0.0",
+      "bindings": [],
+      "direct": true,
+      "enabled": true,
+      "feedback": false,
+      "feedbackHost": "",
+      "feedbackPort": 9001,
+      "port": 9000,
+      "prefix": "/avgen"
+    },
+    "phraseBars": 4,
+    "sectionPhrases": 4,
+    "tempoSource": "analysis"
   },
-  {
-   "source": "audio.bass",
-   "target": "particles/coreKnot/extent",
-   "op": "add",
-   "amount": 1.3,
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 120.0,
-    "decayMs": 700.0
-   }
+  "format": "avgen-project",
+  "parameters": {
+    "audio/inputGain": 1.0,
+    "camera/distance": 48.62895202636719,
+    "camera/exposure/aperture": 5.599999904632568,
+    "camera/exposure/compensation": 0.0,
+    "camera/exposure/iso": 400.0,
+    "camera/exposure/maxEv": 16.0,
+    "camera/exposure/meterCenterWeight": 0.6000000238418579,
+    "camera/exposure/minEv": -4.0,
+    "camera/exposure/mode": 0,
+    "camera/exposure/shutterSeconds": 0.019999999552965164,
+    "camera/exposure/speedDown": 1.0,
+    "camera/exposure/speedUp": 3.0,
+    "camera/focus/mode": 0,
+    "camera/focus/point": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "camera/focus/speed": 0.0,
+    "camera/fov": 34.0,
+    "camera/height": 8.63297176361084,
+    "camera/lens/aperture": 2.799999952316284,
+    "camera/lens/focalLength": 34.0,
+    "camera/lens/focusDistance": 8.0,
+    "camera/lens/sensorHeight": 24.0,
+    "camera/lens/sensorWidth": 36.0,
+    "camera/lens/shutterAngle": 180.0,
+    "camera/lens/useExplicitFov": true,
+    "camera/lookAhead": 2.0,
+    "camera/mode": 1,
+    "camera/orbitSpeed": 0.0,
+    "camera/position": [
+      36.0,
+      19.0,
+      45.0
+    ],
+    "camera/shake/amplitude": 0.0,
+    "camera/shake/decay": 0.0,
+    "camera/shake/frequency": 9.0,
+    "camera/shake/rotation": 0.0,
+    "camera/shake/start": 0.0,
+    "camera/splineOffset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "camera/splineT": 0.0,
+    "camera/target": [
+      -1.0,
+      -0.5,
+      0.0
+    ],
+    "env/intensity": 0.25,
+    "env/rotation": 0.0,
+    "env/sky/background": false,
+    "env/sky/enabled": false,
+    "env/sky/groundColor": [
+      0.04500000178813934,
+      0.041999999433755875,
+      0.03799999877810478
+    ],
+    "env/sky/haze": 0.25,
+    "env/sky/horizonColor": [
+      0.30000001192092896,
+      0.3400000035762787,
+      0.41999998688697815
+    ],
+    "env/sky/intensity": 1.0,
+    "env/sky/sunColor": [
+      1.0,
+      0.9300000071525574,
+      0.8199999928474426
+    ],
+    "env/sky/sunGlow": 0.18000000715255737,
+    "env/sky/sunIntensity": 8.0,
+    "env/sky/sunSize": 0.04500000178813934,
+    "env/sky/zenithColor": [
+      0.054999999701976776,
+      0.10499999672174454,
+      0.23499999940395355
+    ],
+    "field/corePull/amplitude": 1.0,
+    "field/corePull/axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "field/corePull/colorA": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/corePull/colorB": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "field/corePull/enabled": true,
+    "field/corePull/falloff/exponent": 2.0,
+    "field/corePull/falloff/inner": 2.0,
+    "field/corePull/falloff/noiseAmount": 0.5,
+    "field/corePull/falloff/noiseScale": 1.0,
+    "field/corePull/falloff/outer": 34.0,
+    "field/corePull/frequency": 0.20000000298023224,
+    "field/corePull/invert": false,
+    "field/corePull/length": 10.0,
+    "field/corePull/mix": 0.5,
+    "field/corePull/phase": 0.0,
+    "field/corePull/point": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/corePull/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/corePull/radius": 10.0,
+    "field/corePull/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/corePull/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/corePull/size": [
+      5.0,
+      5.0,
+      5.0
+    ],
+    "field/corePull/softness": 0.5,
+    "field/corePull/speed": 0.0,
+    "field/corePull/spiralBias": 0.5,
+    "field/corePull/strength": 1.0,
+    "field/corePull/waveOrigin": 0.0,
+    "field/corePull/waveSpeed": 4.0,
+    "field/corePull/waveWidth": 6.0,
+    "field/corePull/wavelength": 4.0,
+    "field/coreVoid/amplitude": 1.0,
+    "field/coreVoid/axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "field/coreVoid/colorA": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/coreVoid/colorB": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "field/coreVoid/enabled": true,
+    "field/coreVoid/falloff/exponent": 2.0,
+    "field/coreVoid/falloff/inner": 0.0,
+    "field/coreVoid/falloff/noiseAmount": 0.5,
+    "field/coreVoid/falloff/noiseScale": 1.0,
+    "field/coreVoid/falloff/outer": 4.5,
+    "field/coreVoid/frequency": 0.20000000298023224,
+    "field/coreVoid/invert": false,
+    "field/coreVoid/length": 10.0,
+    "field/coreVoid/mix": 0.5,
+    "field/coreVoid/phase": 0.0,
+    "field/coreVoid/point": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/coreVoid/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/coreVoid/radius": 10.0,
+    "field/coreVoid/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/coreVoid/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/coreVoid/size": [
+      5.0,
+      5.0,
+      5.0
+    ],
+    "field/coreVoid/softness": 0.5,
+    "field/coreVoid/speed": 0.0,
+    "field/coreVoid/spiralBias": 0.5,
+    "field/coreVoid/strength": 1.0,
+    "field/coreVoid/waveOrigin": 0.0,
+    "field/coreVoid/waveSpeed": 4.0,
+    "field/coreVoid/waveWidth": 6.0,
+    "field/coreVoid/wavelength": 4.0,
+    "field/discSpin/amplitude": 1.0,
+    "field/discSpin/axis": [
+      0.23999999463558197,
+      0.9300000071525574,
+      0.2800000011920929
+    ],
+    "field/discSpin/colorA": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/discSpin/colorB": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "field/discSpin/enabled": true,
+    "field/discSpin/falloff/exponent": 2.0,
+    "field/discSpin/falloff/inner": 2.5,
+    "field/discSpin/falloff/noiseAmount": 0.5,
+    "field/discSpin/falloff/noiseScale": 1.0,
+    "field/discSpin/falloff/outer": 32.0,
+    "field/discSpin/frequency": 0.20000000298023224,
+    "field/discSpin/invert": false,
+    "field/discSpin/length": 10.0,
+    "field/discSpin/mix": 0.5,
+    "field/discSpin/phase": 0.0,
+    "field/discSpin/point": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/discSpin/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/discSpin/radius": 10.0,
+    "field/discSpin/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/discSpin/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/discSpin/size": [
+      5.0,
+      5.0,
+      5.0
+    ],
+    "field/discSpin/softness": 0.5,
+    "field/discSpin/speed": 0.0,
+    "field/discSpin/spiralBias": 0.5,
+    "field/discSpin/strength": 1.0,
+    "field/discSpin/waveOrigin": 0.0,
+    "field/discSpin/waveSpeed": 4.0,
+    "field/discSpin/waveWidth": 6.0,
+    "field/discSpin/wavelength": 4.0,
+    "field/macroWarp/amplitude": 1.0,
+    "field/macroWarp/axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "field/macroWarp/colorA": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/macroWarp/colorB": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "field/macroWarp/enabled": true,
+    "field/macroWarp/falloff/exponent": 2.0,
+    "field/macroWarp/falloff/inner": 0.0,
+    "field/macroWarp/falloff/noiseAmount": 0.5,
+    "field/macroWarp/falloff/noiseScale": 1.0,
+    "field/macroWarp/falloff/outer": 0.0,
+    "field/macroWarp/frequency": 0.020999999716877937,
+    "field/macroWarp/invert": false,
+    "field/macroWarp/length": 10.0,
+    "field/macroWarp/mix": 0.5,
+    "field/macroWarp/phase": 0.0,
+    "field/macroWarp/point": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/macroWarp/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/macroWarp/radius": 10.0,
+    "field/macroWarp/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/macroWarp/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/macroWarp/size": [
+      5.0,
+      5.0,
+      5.0
+    ],
+    "field/macroWarp/softness": 0.5,
+    "field/macroWarp/speed": 0.029999999329447746,
+    "field/macroWarp/spiralBias": 0.5,
+    "field/macroWarp/strength": 1.0,
+    "field/macroWarp/waveOrigin": 0.0,
+    "field/macroWarp/waveSpeed": 4.0,
+    "field/macroWarp/waveWidth": 6.0,
+    "field/macroWarp/wavelength": 4.0,
+    "field/mesoWarp/amplitude": 1.0,
+    "field/mesoWarp/axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "field/mesoWarp/colorA": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/mesoWarp/colorB": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "field/mesoWarp/enabled": true,
+    "field/mesoWarp/falloff/exponent": 2.0,
+    "field/mesoWarp/falloff/inner": 0.0,
+    "field/mesoWarp/falloff/noiseAmount": 0.5,
+    "field/mesoWarp/falloff/noiseScale": 1.0,
+    "field/mesoWarp/falloff/outer": 38.0,
+    "field/mesoWarp/frequency": 0.0949999988079071,
+    "field/mesoWarp/invert": false,
+    "field/mesoWarp/length": 10.0,
+    "field/mesoWarp/mix": 0.5,
+    "field/mesoWarp/phase": 0.0,
+    "field/mesoWarp/point": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/mesoWarp/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/mesoWarp/radius": 10.0,
+    "field/mesoWarp/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/mesoWarp/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/mesoWarp/size": [
+      5.0,
+      5.0,
+      5.0
+    ],
+    "field/mesoWarp/softness": 0.5,
+    "field/mesoWarp/speed": 0.20000000298023224,
+    "field/mesoWarp/spiralBias": 0.5,
+    "field/mesoWarp/strength": 1.0,
+    "field/mesoWarp/waveOrigin": 0.0,
+    "field/mesoWarp/waveSpeed": 4.0,
+    "field/mesoWarp/waveWidth": 6.0,
+    "field/mesoWarp/wavelength": 4.0,
+    "field/nodeA/amplitude": 1.0,
+    "field/nodeA/axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "field/nodeA/colorA": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/nodeA/colorB": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "field/nodeA/enabled": true,
+    "field/nodeA/falloff/exponent": 2.0,
+    "field/nodeA/falloff/inner": 0.800000011920929,
+    "field/nodeA/falloff/noiseAmount": 0.5,
+    "field/nodeA/falloff/noiseScale": 1.0,
+    "field/nodeA/falloff/outer": 13.0,
+    "field/nodeA/frequency": 0.20000000298023224,
+    "field/nodeA/invert": false,
+    "field/nodeA/length": 10.0,
+    "field/nodeA/mix": 0.5,
+    "field/nodeA/phase": 0.0,
+    "field/nodeA/point": [
+      -0.9259999990463257,
+      -2.9549999237060547,
+      17.22800064086914
+    ],
+    "field/nodeA/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/nodeA/radius": 10.0,
+    "field/nodeA/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/nodeA/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/nodeA/size": [
+      5.0,
+      5.0,
+      5.0
+    ],
+    "field/nodeA/softness": 0.5,
+    "field/nodeA/speed": 0.0,
+    "field/nodeA/spiralBias": 0.5,
+    "field/nodeA/strength": 1.0,
+    "field/nodeA/waveOrigin": 0.0,
+    "field/nodeA/waveSpeed": 4.0,
+    "field/nodeA/waveWidth": 6.0,
+    "field/nodeA/wavelength": 4.0,
+    "field/nodeASpin/amplitude": 1.0,
+    "field/nodeASpin/axis": [
+      0.800000011920929,
+      0.15000000596046448,
+      -0.5799999833106995
+    ],
+    "field/nodeASpin/colorA": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/nodeASpin/colorB": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "field/nodeASpin/enabled": true,
+    "field/nodeASpin/falloff/exponent": 2.0,
+    "field/nodeASpin/falloff/inner": 0.5,
+    "field/nodeASpin/falloff/noiseAmount": 0.5,
+    "field/nodeASpin/falloff/noiseScale": 1.0,
+    "field/nodeASpin/falloff/outer": 11.0,
+    "field/nodeASpin/frequency": 0.20000000298023224,
+    "field/nodeASpin/invert": false,
+    "field/nodeASpin/length": 10.0,
+    "field/nodeASpin/mix": 0.5,
+    "field/nodeASpin/phase": 0.0,
+    "field/nodeASpin/point": [
+      -0.9259999990463257,
+      -2.9549999237060547,
+      17.22800064086914
+    ],
+    "field/nodeASpin/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/nodeASpin/radius": 10.0,
+    "field/nodeASpin/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/nodeASpin/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/nodeASpin/size": [
+      5.0,
+      5.0,
+      5.0
+    ],
+    "field/nodeASpin/softness": 0.5,
+    "field/nodeASpin/speed": 0.0,
+    "field/nodeASpin/spiralBias": 0.5,
+    "field/nodeASpin/strength": 1.0,
+    "field/nodeASpin/waveOrigin": 0.0,
+    "field/nodeASpin/waveSpeed": 4.0,
+    "field/nodeASpin/waveWidth": 6.0,
+    "field/nodeASpin/wavelength": 4.0,
+    "field/nodeB/amplitude": 1.0,
+    "field/nodeB/axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "field/nodeB/colorA": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/nodeB/colorB": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "field/nodeB/enabled": true,
+    "field/nodeB/falloff/exponent": 2.0,
+    "field/nodeB/falloff/inner": 0.6000000238418579,
+    "field/nodeB/falloff/noiseAmount": 0.5,
+    "field/nodeB/falloff/noiseScale": 1.0,
+    "field/nodeB/falloff/outer": 9.0,
+    "field/nodeB/frequency": 0.20000000298023224,
+    "field/nodeB/invert": false,
+    "field/nodeB/length": 10.0,
+    "field/nodeB/mix": 0.5,
+    "field/nodeB/phase": 0.0,
+    "field/nodeB/point": [
+      -14.0,
+      -5.0,
+      12.0
+    ],
+    "field/nodeB/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/nodeB/radius": 10.0,
+    "field/nodeB/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/nodeB/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/nodeB/size": [
+      5.0,
+      5.0,
+      5.0
+    ],
+    "field/nodeB/softness": 0.5,
+    "field/nodeB/speed": 0.0,
+    "field/nodeB/spiralBias": 0.5,
+    "field/nodeB/strength": 1.0,
+    "field/nodeB/waveOrigin": 0.0,
+    "field/nodeB/waveSpeed": 4.0,
+    "field/nodeB/waveWidth": 6.0,
+    "field/nodeB/wavelength": 4.0,
+    "field/nodeBSpin/amplitude": 1.0,
+    "field/nodeBSpin/axis": [
+      -0.3199999928474426,
+      0.6200000047683716,
+      0.7200000286102295
+    ],
+    "field/nodeBSpin/colorA": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/nodeBSpin/colorB": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "field/nodeBSpin/enabled": true,
+    "field/nodeBSpin/falloff/exponent": 2.0,
+    "field/nodeBSpin/falloff/inner": 0.4000000059604645,
+    "field/nodeBSpin/falloff/noiseAmount": 0.5,
+    "field/nodeBSpin/falloff/noiseScale": 1.0,
+    "field/nodeBSpin/falloff/outer": 8.0,
+    "field/nodeBSpin/frequency": 0.20000000298023224,
+    "field/nodeBSpin/invert": false,
+    "field/nodeBSpin/length": 10.0,
+    "field/nodeBSpin/mix": 0.5,
+    "field/nodeBSpin/phase": 0.0,
+    "field/nodeBSpin/point": [
+      -14.0,
+      -5.0,
+      12.0
+    ],
+    "field/nodeBSpin/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/nodeBSpin/radius": 10.0,
+    "field/nodeBSpin/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/nodeBSpin/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/nodeBSpin/size": [
+      5.0,
+      5.0,
+      5.0
+    ],
+    "field/nodeBSpin/softness": 0.5,
+    "field/nodeBSpin/speed": 0.0,
+    "field/nodeBSpin/spiralBias": 0.5,
+    "field/nodeBSpin/strength": 1.0,
+    "field/nodeBSpin/waveOrigin": 0.0,
+    "field/nodeBSpin/waveSpeed": 4.0,
+    "field/nodeBSpin/waveWidth": 6.0,
+    "field/nodeBSpin/wavelength": 4.0,
+    "field/shock/amplitude": 1.0,
+    "field/shock/axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "field/shock/colorA": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/shock/colorB": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "field/shock/enabled": true,
+    "field/shock/falloff/exponent": 2.0,
+    "field/shock/falloff/inner": 0.0,
+    "field/shock/falloff/noiseAmount": 0.5,
+    "field/shock/falloff/noiseScale": 1.0,
+    "field/shock/falloff/outer": 44.0,
+    "field/shock/frequency": 0.20000000298023224,
+    "field/shock/invert": false,
+    "field/shock/length": 10.0,
+    "field/shock/mix": 0.5,
+    "field/shock/phase": 0.0,
+    "field/shock/point": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/shock/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/shock/radius": 10.0,
+    "field/shock/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "field/shock/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "field/shock/size": [
+      5.0,
+      5.0,
+      5.0
+    ],
+    "field/shock/softness": 0.5,
+    "field/shock/speed": 0.0,
+    "field/shock/spiralBias": 0.5,
+    "field/shock/strength": 0.0,
+    "field/shock/waveOrigin": 0.0,
+    "field/shock/waveSpeed": 19.0,
+    "field/shock/waveWidth": 12.0,
+    "field/shock/wavelength": 26.0,
+    "lightrig/ConstellationVoid/ambientColor": [
+      0.10000000149011612,
+      0.11999999731779099,
+      0.30000001192092896
+    ],
+    "lightrig/ConstellationVoid/ambientIntensity": 0.0,
+    "lightrig/ConstellationVoid/ambientTemperature": 9000.0,
+    "lightrig/ConstellationVoid/keyIntensity": 0.3499999940395355,
+    "lightrig/ConstellationVoid/rim/azimuth": 128.0,
+    "lightrig/ConstellationVoid/rim/distance": 2.5,
+    "lightrig/ConstellationVoid/rim/elevation": 18.0,
+    "lightrig/ConstellationVoid/rim/intensity": 1.0,
+    "lightrig/ConstellationVoid/rim/shadowStrength": 1.0,
+    "lightrig/ConstellationVoid/rim/size": 0.5,
+    "lightrig/ConstellationVoid/rim/temperature": 9000.0,
+    "nodes/armMajor/emissiveBoost": 1.0,
+    "nodes/armMajor/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/armMajor/lightIntensity": 1.0,
+    "nodes/armMajor/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/armMajor/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/armMajor/roughnessScale": 1.0,
+    "nodes/armMajor/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/armMajor/visible": true,
+    "nodes/armMajorP/emissiveBoost": 1.0,
+    "nodes/armMajorP/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/armMajorP/lightIntensity": 1.0,
+    "nodes/armMajorP/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/armMajorP/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/armMajorP/roughnessScale": 1.0,
+    "nodes/armMajorP/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/armMajorP/visible": true,
+    "nodes/armMinor/emissiveBoost": 1.0,
+    "nodes/armMinor/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/armMinor/lightIntensity": 1.0,
+    "nodes/armMinor/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/armMinor/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/armMinor/roughnessScale": 1.0,
+    "nodes/armMinor/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/armMinor/visible": true,
+    "nodes/armMinorP/emissiveBoost": 1.0,
+    "nodes/armMinorP/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/armMinorP/lightIntensity": 1.0,
+    "nodes/armMinorP/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/armMinorP/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/armMinorP/roughnessScale": 1.0,
+    "nodes/armMinorP/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/armMinorP/visible": true,
+    "nodes/armStub/emissiveBoost": 1.0,
+    "nodes/armStub/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/armStub/lightIntensity": 1.0,
+    "nodes/armStub/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/armStub/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/armStub/roughnessScale": 1.0,
+    "nodes/armStub/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/armStub/visible": true,
+    "nodes/armStubP/emissiveBoost": 1.0,
+    "nodes/armStubP/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/armStubP/lightIntensity": 1.0,
+    "nodes/armStubP/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/armStubP/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/armStubP/roughnessScale": 1.0,
+    "nodes/armStubP/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/armStubP/visible": true,
+    "nodes/bridge/emissiveBoost": 1.0,
+    "nodes/bridge/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/bridge/lightIntensity": 1.0,
+    "nodes/bridge/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/bridge/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/bridge/roughnessScale": 1.0,
+    "nodes/bridge/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/bridge/visible": true,
+    "nodes/coreKnot/emissiveBoost": 1.0,
+    "nodes/coreKnot/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/coreKnot/lightIntensity": 1.0,
+    "nodes/coreKnot/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/coreKnot/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/coreKnot/roughnessScale": 1.0,
+    "nodes/coreKnot/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/coreKnot/visible": true,
+    "nodes/corePull/emissiveBoost": 1.0,
+    "nodes/corePull/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/corePull/lightIntensity": 1.0,
+    "nodes/corePull/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/corePull/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/corePull/roughnessScale": 1.0,
+    "nodes/corePull/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/corePull/visible": true,
+    "nodes/coreVoid/emissiveBoost": 1.0,
+    "nodes/coreVoid/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/coreVoid/lightIntensity": 1.0,
+    "nodes/coreVoid/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/coreVoid/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/coreVoid/roughnessScale": 1.0,
+    "nodes/coreVoid/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/coreVoid/visible": true,
+    "nodes/discDust/emissiveBoost": 1.0,
+    "nodes/discDust/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/discDust/lightIntensity": 1.0,
+    "nodes/discDust/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/discDust/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/discDust/roughnessScale": 1.0,
+    "nodes/discDust/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/discDust/visible": true,
+    "nodes/discSpin/emissiveBoost": 1.0,
+    "nodes/discSpin/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/discSpin/lightIntensity": 1.0,
+    "nodes/discSpin/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/discSpin/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/discSpin/roughnessScale": 1.0,
+    "nodes/discSpin/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/discSpin/visible": true,
+    "nodes/macroWarp/emissiveBoost": 1.0,
+    "nodes/macroWarp/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/macroWarp/lightIntensity": 1.0,
+    "nodes/macroWarp/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/macroWarp/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/macroWarp/roughnessScale": 1.0,
+    "nodes/macroWarp/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/macroWarp/visible": true,
+    "nodes/mesoWarp/emissiveBoost": 1.0,
+    "nodes/mesoWarp/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/mesoWarp/lightIntensity": 1.0,
+    "nodes/mesoWarp/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/mesoWarp/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/mesoWarp/roughnessScale": 1.0,
+    "nodes/mesoWarp/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/mesoWarp/visible": true,
+    "nodes/nodeA/emissiveBoost": 1.0,
+    "nodes/nodeA/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/nodeA/lightIntensity": 1.0,
+    "nodes/nodeA/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/nodeA/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/nodeA/roughnessScale": 1.0,
+    "nodes/nodeA/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/nodeA/visible": true,
+    "nodes/nodeAOrbit/emissiveBoost": 1.0,
+    "nodes/nodeAOrbit/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/nodeAOrbit/lightIntensity": 1.0,
+    "nodes/nodeAOrbit/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/nodeAOrbit/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/nodeAOrbit/roughnessScale": 1.0,
+    "nodes/nodeAOrbit/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/nodeAOrbit/visible": true,
+    "nodes/nodeASpin/emissiveBoost": 1.0,
+    "nodes/nodeASpin/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/nodeASpin/lightIntensity": 1.0,
+    "nodes/nodeASpin/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/nodeASpin/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/nodeASpin/roughnessScale": 1.0,
+    "nodes/nodeASpin/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/nodeASpin/visible": true,
+    "nodes/nodeB/emissiveBoost": 1.0,
+    "nodes/nodeB/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/nodeB/lightIntensity": 1.0,
+    "nodes/nodeB/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/nodeB/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/nodeB/roughnessScale": 1.0,
+    "nodes/nodeB/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/nodeB/visible": true,
+    "nodes/nodeBOrbit/emissiveBoost": 1.0,
+    "nodes/nodeBOrbit/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/nodeBOrbit/lightIntensity": 1.0,
+    "nodes/nodeBOrbit/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/nodeBOrbit/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/nodeBOrbit/roughnessScale": 1.0,
+    "nodes/nodeBOrbit/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/nodeBOrbit/visible": true,
+    "nodes/nodeBSpin/emissiveBoost": 1.0,
+    "nodes/nodeBSpin/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/nodeBSpin/lightIntensity": 1.0,
+    "nodes/nodeBSpin/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/nodeBSpin/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/nodeBSpin/roughnessScale": 1.0,
+    "nodes/nodeBSpin/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/nodeBSpin/visible": true,
+    "nodes/shards/emissiveBoost": 1.0,
+    "nodes/shards/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/shards/lightIntensity": 1.0,
+    "nodes/shards/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/shards/rotation": [
+      -16.25299835205078,
+      -0.0,
+      14.470002174377441
+    ],
+    "nodes/shards/roughnessScale": 1.0,
+    "nodes/shards/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/shards/visible": true,
+    "nodes/shock/emissiveBoost": 1.0,
+    "nodes/shock/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/shock/lightIntensity": 1.0,
+    "nodes/shock/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/shock/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/shock/roughnessScale": 1.0,
+    "nodes/shock/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/shock/visible": true,
+    "nodes/veil/emissiveBoost": 1.0,
+    "nodes/veil/lightColor": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/veil/lightIntensity": 1.0,
+    "nodes/veil/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "nodes/veil/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "nodes/veil/roughnessScale": 1.0,
+    "nodes/veil/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "nodes/veil/visible": true,
+    "particles/armMajorP/attractorPosition": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/armMajorP/attractorStrength": 0.0,
+    "particles/armMajorP/burst": 0.0,
+    "particles/armMajorP/colorEnd": [
+      0.36000001430511475,
+      0.14000000059604645,
+      0.9800000190734863,
+      0.0
+    ],
+    "particles/armMajorP/colorStart": [
+      0.46000000834465027,
+      0.8999999761581421,
+      1.0,
+      0.6200000047683716
+    ],
+    "particles/armMajorP/drag": 0.8999999761581421,
+    "particles/armMajorP/emissive": 5.199999809265137,
+    "particles/armMajorP/enabled": true,
+    "particles/armMajorP/extent": 1.0,
+    "particles/armMajorP/fieldForce/1/strength": 3.5999999046325684,
+    "particles/armMajorP/fieldForce/2/strength": 1.100000023841858,
+    "particles/armMajorP/fieldForce/3/strength": 9.0,
+    "particles/armMajorP/fieldForce/4/strength": 0.3400000035762787,
+    "particles/armMajorP/gravity": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "particles/armMajorP/lifetime": 1.0,
+    "particles/armMajorP/orbit": 0.0,
+    "particles/armMajorP/position": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/armMajorP/size": 1.0,
+    "particles/armMajorP/spawnRate": 1625.0,
+    "particles/armMajorP/speed": 1.0,
+    "particles/armMajorP/spread": 1.0,
+    "particles/armMajorP/stretch": 0.30000001192092896,
+    "particles/armMajorP/trailWidth": 0.800000011920929,
+    "particles/armMajorP/turbulence": 0.0,
+    "particles/armMajorP/turbulenceScale": 1.0,
+    "particles/armMajorP/turbulenceSpeed": 0.30000001192092896,
+    "particles/armMinorP/attractorPosition": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/armMinorP/attractorStrength": 0.0,
+    "particles/armMinorP/burst": 0.0,
+    "particles/armMinorP/colorEnd": [
+      0.36000001430511475,
+      0.14000000059604645,
+      0.9800000190734863,
+      0.0
+    ],
+    "particles/armMinorP/colorStart": [
+      0.46000000834465027,
+      0.8999999761581421,
+      1.0,
+      0.47999998927116394
+    ],
+    "particles/armMinorP/drag": 0.8999999761581421,
+    "particles/armMinorP/emissive": 3.9519999027252197,
+    "particles/armMinorP/enabled": true,
+    "particles/armMinorP/extent": 1.0,
+    "particles/armMinorP/fieldForce/1/strength": 3.5999999046325684,
+    "particles/armMinorP/fieldForce/2/strength": 1.100000023841858,
+    "particles/armMinorP/fieldForce/3/strength": 9.0,
+    "particles/armMinorP/fieldForce/4/strength": 0.3400000035762787,
+    "particles/armMinorP/gravity": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "particles/armMinorP/lifetime": 1.0,
+    "particles/armMinorP/orbit": 0.0,
+    "particles/armMinorP/position": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/armMinorP/size": 1.0,
+    "particles/armMinorP/spawnRate": 1000.0,
+    "particles/armMinorP/speed": 1.0,
+    "particles/armMinorP/spread": 1.0,
+    "particles/armMinorP/stretch": 0.30000001192092896,
+    "particles/armMinorP/trailWidth": 0.800000011920929,
+    "particles/armMinorP/turbulence": 0.0,
+    "particles/armMinorP/turbulenceScale": 1.0,
+    "particles/armMinorP/turbulenceSpeed": 0.30000001192092896,
+    "particles/armStubP/attractorPosition": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/armStubP/attractorStrength": 0.0,
+    "particles/armStubP/burst": 0.0,
+    "particles/armStubP/colorEnd": [
+      0.36000001430511475,
+      0.14000000059604645,
+      0.9800000190734863,
+      0.0
+    ],
+    "particles/armStubP/colorStart": [
+      0.46000000834465027,
+      0.8999999761581421,
+      1.0,
+      0.3400000035762787
+    ],
+    "particles/armStubP/drag": 0.8999999761581421,
+    "particles/armStubP/emissive": 2.859999895095825,
+    "particles/armStubP/enabled": true,
+    "particles/armStubP/extent": 1.0,
+    "particles/armStubP/fieldForce/1/strength": 3.5999999046325684,
+    "particles/armStubP/fieldForce/2/strength": 1.100000023841858,
+    "particles/armStubP/fieldForce/3/strength": 9.0,
+    "particles/armStubP/fieldForce/4/strength": 0.3400000035762787,
+    "particles/armStubP/gravity": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "particles/armStubP/lifetime": 1.0,
+    "particles/armStubP/orbit": 0.0,
+    "particles/armStubP/position": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/armStubP/size": 1.0,
+    "particles/armStubP/spawnRate": 450.0,
+    "particles/armStubP/speed": 1.0,
+    "particles/armStubP/spread": 1.0,
+    "particles/armStubP/stretch": 0.30000001192092896,
+    "particles/armStubP/trailWidth": 0.800000011920929,
+    "particles/armStubP/turbulence": 0.0,
+    "particles/armStubP/turbulenceScale": 1.0,
+    "particles/armStubP/turbulenceSpeed": 0.30000001192092896,
+    "particles/bridge/attractorPosition": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/bridge/attractorStrength": 0.0,
+    "particles/bridge/burst": 0.0,
+    "particles/bridge/colorEnd": [
+      0.4000000059604645,
+      0.20000000298023224,
+      1.0,
+      0.0
+    ],
+    "particles/bridge/colorStart": [
+      0.6200000047683716,
+      0.7200000286102295,
+      1.0,
+      0.6000000238418579
+    ],
+    "particles/bridge/drag": 0.800000011920929,
+    "particles/bridge/emissive": 4.400000095367432,
+    "particles/bridge/enabled": true,
+    "particles/bridge/extent": 1.0,
+    "particles/bridge/fieldForce/1/strength": 4.199999809265137,
+    "particles/bridge/fieldForce/2/strength": 2.200000047683716,
+    "particles/bridge/fieldForce/3/strength": 1.100000023841858,
+    "particles/bridge/fieldForce/4/strength": 0.41999998688697815,
+    "particles/bridge/gravity": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "particles/bridge/lifetime": 1.0,
+    "particles/bridge/orbit": 0.0,
+    "particles/bridge/position": [
+      -0.9259999990463257,
+      -2.9549999237060547,
+      17.22800064086914
+    ],
+    "particles/bridge/size": 1.0,
+    "particles/bridge/spawnRate": 700.0,
+    "particles/bridge/speed": 1.0,
+    "particles/bridge/spread": 1.0,
+    "particles/bridge/stretch": 0.0,
+    "particles/bridge/trailWidth": 0.75,
+    "particles/bridge/turbulence": 0.0,
+    "particles/bridge/turbulenceScale": 1.0,
+    "particles/bridge/turbulenceSpeed": 0.30000001192092896,
+    "particles/coreKnot/attractorPosition": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/coreKnot/attractorStrength": 0.0,
+    "particles/coreKnot/burst": 0.0,
+    "particles/coreKnot/colorEnd": [
+      0.3400000035762787,
+      0.5199999809265137,
+      1.0,
+      0.0
+    ],
+    "particles/coreKnot/colorStart": [
+      0.8799999952316284,
+      0.9399999976158142,
+      1.0,
+      0.949999988079071
+    ],
+    "particles/coreKnot/drag": 1.399999976158142,
+    "particles/coreKnot/emissive": 11.0,
+    "particles/coreKnot/enabled": true,
+    "particles/coreKnot/extent": 1.0,
+    "particles/coreKnot/fieldForce/1/strength": 1.399999976158142,
+    "particles/coreKnot/fieldForce/2/strength": 1.2000000476837158,
+    "particles/coreKnot/fieldForce/3/strength": 4.0,
+    "particles/coreKnot/gravity": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "particles/coreKnot/lifetime": 1.0,
+    "particles/coreKnot/orbit": 0.0,
+    "particles/coreKnot/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "particles/coreKnot/size": 1.0,
+    "particles/coreKnot/spawnRate": 1400.0,
+    "particles/coreKnot/speed": 1.0,
+    "particles/coreKnot/spread": 1.0,
+    "particles/coreKnot/stretch": 0.20000000298023224,
+    "particles/coreKnot/trailWidth": 1.0,
+    "particles/coreKnot/turbulence": 0.550000011920929,
+    "particles/coreKnot/turbulenceScale": 0.550000011920929,
+    "particles/coreKnot/turbulenceSpeed": 0.44999998807907104,
+    "particles/discDust/attractorPosition": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/discDust/attractorStrength": 0.0,
+    "particles/discDust/burst": 0.0,
+    "particles/discDust/colorEnd": [
+      0.20000000298023224,
+      0.10000000149011612,
+      0.5799999833106995,
+      0.0
+    ],
+    "particles/discDust/colorStart": [
+      0.08500000089406967,
+      0.10000000149011612,
+      0.41999998688697815,
+      0.07500000298023224
+    ],
+    "particles/discDust/drag": 0.8999999761581421,
+    "particles/discDust/emissive": 0.30000001192092896,
+    "particles/discDust/enabled": true,
+    "particles/discDust/extent": 1.0,
+    "particles/discDust/fieldForce/1/strength": 3.5999999046325684,
+    "particles/discDust/fieldForce/2/strength": 0.8500000238418579,
+    "particles/discDust/fieldForce/3/strength": 0.8999999761581421,
+    "particles/discDust/fieldForce/4/strength": 6.0,
+    "particles/discDust/gravity": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "particles/discDust/lifetime": 1.0,
+    "particles/discDust/orbit": 0.0,
+    "particles/discDust/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "particles/discDust/size": 1.0,
+    "particles/discDust/spawnRate": 1100.0,
+    "particles/discDust/speed": 1.0,
+    "particles/discDust/spread": 1.0,
+    "particles/discDust/stretch": 0.0,
+    "particles/discDust/trailWidth": 1.0,
+    "particles/discDust/turbulence": 0.05999999865889549,
+    "particles/discDust/turbulenceScale": 0.30000001192092896,
+    "particles/discDust/turbulenceSpeed": 0.10000000149011612,
+    "particles/nodeAOrbit/attractorPosition": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/nodeAOrbit/attractorStrength": 0.0,
+    "particles/nodeAOrbit/burst": 0.0,
+    "particles/nodeAOrbit/colorEnd": [
+      0.3400000035762787,
+      0.20000000298023224,
+      0.949999988079071,
+      0.0
+    ],
+    "particles/nodeAOrbit/colorStart": [
+      0.7200000286102295,
+      0.3799999952316284,
+      1.0,
+      0.5
+    ],
+    "particles/nodeAOrbit/drag": 1.149999976158142,
+    "particles/nodeAOrbit/emissive": 3.0999999046325684,
+    "particles/nodeAOrbit/enabled": true,
+    "particles/nodeAOrbit/extent": 1.0,
+    "particles/nodeAOrbit/fieldForce/1/strength": 2.5999999046325684,
+    "particles/nodeAOrbit/fieldForce/2/strength": 1.600000023841858,
+    "particles/nodeAOrbit/fieldForce/3/strength": 0.30000001192092896,
+    "particles/nodeAOrbit/gravity": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "particles/nodeAOrbit/lifetime": 1.0,
+    "particles/nodeAOrbit/orbit": 0.0,
+    "particles/nodeAOrbit/position": [
+      -0.9259999990463257,
+      -2.9549999237060547,
+      17.22800064086914
+    ],
+    "particles/nodeAOrbit/size": 1.0,
+    "particles/nodeAOrbit/spawnRate": 950.0,
+    "particles/nodeAOrbit/speed": 1.0,
+    "particles/nodeAOrbit/spread": 1.0,
+    "particles/nodeAOrbit/stretch": 0.3199999928474426,
+    "particles/nodeAOrbit/trailWidth": 0.8500000238418579,
+    "particles/nodeAOrbit/turbulence": 0.0,
+    "particles/nodeAOrbit/turbulenceScale": 1.0,
+    "particles/nodeAOrbit/turbulenceSpeed": 0.30000001192092896,
+    "particles/nodeBOrbit/attractorPosition": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/nodeBOrbit/attractorStrength": 0.0,
+    "particles/nodeBOrbit/burst": 0.0,
+    "particles/nodeBOrbit/colorEnd": [
+      0.2800000011920929,
+      0.1599999964237213,
+      0.8799999952316284,
+      0.0
+    ],
+    "particles/nodeBOrbit/colorStart": [
+      0.30000001192092896,
+      0.44999998807907104,
+      0.949999988079071,
+      0.30000001192092896
+    ],
+    "particles/nodeBOrbit/drag": 0.949999988079071,
+    "particles/nodeBOrbit/emissive": 1.5,
+    "particles/nodeBOrbit/enabled": true,
+    "particles/nodeBOrbit/extent": 1.0,
+    "particles/nodeBOrbit/fieldForce/1/strength": 1.899999976158142,
+    "particles/nodeBOrbit/fieldForce/2/strength": 1.2000000476837158,
+    "particles/nodeBOrbit/fieldForce/3/strength": 0.25,
+    "particles/nodeBOrbit/gravity": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "particles/nodeBOrbit/lifetime": 1.0,
+    "particles/nodeBOrbit/orbit": 0.0,
+    "particles/nodeBOrbit/position": [
+      -14.0,
+      -5.0,
+      12.0
+    ],
+    "particles/nodeBOrbit/size": 1.0,
+    "particles/nodeBOrbit/spawnRate": 480.0,
+    "particles/nodeBOrbit/speed": 1.0,
+    "particles/nodeBOrbit/spread": 1.0,
+    "particles/nodeBOrbit/stretch": 0.2800000011920929,
+    "particles/nodeBOrbit/trailWidth": 1.0,
+    "particles/nodeBOrbit/turbulence": 0.0,
+    "particles/nodeBOrbit/turbulenceScale": 1.0,
+    "particles/nodeBOrbit/turbulenceSpeed": 0.30000001192092896,
+    "particles/veil/attractorPosition": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "particles/veil/attractorStrength": 0.0,
+    "particles/veil/burst": 0.0,
+    "particles/veil/colorEnd": [
+      0.14000000059604645,
+      0.07500000298023224,
+      0.4000000059604645,
+      0.0
+    ],
+    "particles/veil/colorStart": [
+      0.07500000298023224,
+      0.06499999761581421,
+      0.30000001192092896,
+      0.04500000178813934
+    ],
+    "particles/veil/drag": 0.6000000238418579,
+    "particles/veil/emissive": 0.1599999964237213,
+    "particles/veil/enabled": true,
+    "particles/veil/extent": 1.0,
+    "particles/veil/fieldForce/1/strength": 0.41999998688697815,
+    "particles/veil/fieldForce/2/strength": 0.11999999731779099,
+    "particles/veil/gravity": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "particles/veil/lifetime": 1.0,
+    "particles/veil/orbit": 0.0,
+    "particles/veil/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "particles/veil/size": 1.0,
+    "particles/veil/spawnRate": 460.0,
+    "particles/veil/speed": 1.0,
+    "particles/veil/spread": 1.0,
+    "particles/veil/stretch": 0.0,
+    "particles/veil/trailWidth": 1.0,
+    "particles/veil/turbulence": 0.0,
+    "particles/veil/turbulenceScale": 1.0,
+    "particles/veil/turbulenceSpeed": 0.30000001192092896,
+    "post/anamorphic/enabled": false,
+    "post/anamorphic/ghosts": 0.0,
+    "post/anamorphic/intensity": 0.3499999940395355,
+    "post/anamorphic/stretch": 8.0,
+    "post/anamorphic/tint": [
+      0.3499999940395355,
+      0.550000011920929,
+      1.0
+    ],
+    "post/bloom/emissionWeight": 1.0,
+    "post/bloom/enabled": true,
+    "post/bloom/intensity": 0.25999999046325684,
+    "post/bloom/knee": 0.44999998807907104,
+    "post/bloom/radius": 1.25,
+    "post/bloom/threshold": 1.0,
+    "post/dof/enabled": false,
+    "post/dof/focusDistance": 6.0,
+    "post/dof/focusRange": 2.0,
+    "post/dof/maxRadius": 8.0,
+    "post/dof/physical": false,
+    "post/grade/contrast": 1.100000023841858,
+    "post/grade/gain": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "post/grade/gamma": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "post/grade/hueShift": 0.0,
+    "post/grade/lift": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "post/grade/saturation": 1.059999942779541,
+    "post/grade/temperature": 0.0,
+    "post/grade/tint": 0.0,
+    "post/halation/enabled": false,
+    "post/halation/intensity": 0.5,
+    "post/halation/radius": 2.0,
+    "post/halation/threshold": 2.0,
+    "post/halation/tint": [
+      1.0,
+      0.30000001192092896,
+      0.11999999731779099
+    ],
+    "post/halation/warmth": 0.6000000238418579,
+    "post/lens/chromaticAberration": 0.0,
+    "post/lens/distortion": 0.0,
+    "post/motionBlur/amount": 0.0,
+    "post/output/antialias": 0.6499999761581421,
+    "post/output/grain": 0.0,
+    "post/output/sharpen": 0.0,
+    "post/output/sharpenId": 0,
+    "post/output/vignette": 0.2199999988079071,
+    "post/tiltShift/bandWidth": 0.20000000298023224,
+    "post/tiltShift/centre": [
+      0.5,
+      0.5
+    ],
+    "post/tiltShift/enabled": false,
+    "post/tiltShift/falloff": 0.25,
+    "post/tiltShift/maxRadius": 8.0,
+    "post/tiltShift/rotation": 0.0,
+    "post/tonemap/chroma-retention": 0.800000011920929,
+    "post/tonemap/operator": 1,
+    "procedural/shards/distribution/alignToSpline": true,
+    "procedural/shards/distribution/center": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/shards/distribution/count": 260,
+    "procedural/shards/distribution/end": [
+      5.0,
+      0.0,
+      0.0
+    ],
+    "procedural/shards/distribution/endAngle": 6.2831854820251465,
+    "procedural/shards/distribution/gridCountX": 4,
+    "procedural/shards/distribution/gridCountY": 1,
+    "procedural/shards/distribution/gridCountZ": 4,
+    "procedural/shards/distribution/gridSpacing": [
+      2.0,
+      2.0,
+      2.0
+    ],
+    "procedural/shards/distribution/kind": 4,
+    "procedural/shards/distribution/orientAlong": false,
+    "procedural/shards/distribution/orientation": 3,
+    "procedural/shards/distribution/plane": 0,
+    "procedural/shards/distribution/radius": 5.5,
+    "procedural/shards/distribution/radiusGrowth": 3.5999999046325684,
+    "procedural/shards/distribution/roll": 0.0,
+    "procedural/shards/distribution/spacing": 0.0,
+    "procedural/shards/distribution/spiralAngle": 0.0,
+    "procedural/shards/distribution/spiralHeight": 3.0,
+    "procedural/shards/distribution/splineEnd": 1.0,
+    "procedural/shards/distribution/splineOffset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/shards/distribution/splineStart": 0.0,
+    "procedural/shards/distribution/start": [
+      -5.0,
+      0.0,
+      0.0
+    ],
+    "procedural/shards/distribution/startAngle": 0.0,
+    "procedural/shards/distribution/turns": 2.3499999046325684,
+    "procedural/shards/effector/1/enabled": true,
+    "procedural/shards/effector/1/strength": 2.5999999046325684,
+    "procedural/shards/effector/1/weight": 1.0,
+    "procedural/shards/effector/2/enabled": true,
+    "procedural/shards/effector/2/strength": 1.399999976158142,
+    "procedural/shards/effector/2/weight": 1.0,
+    "procedural/shards/effector/3/enabled": true,
+    "procedural/shards/effector/3/strength": 6.0,
+    "procedural/shards/effector/3/weight": 1.0,
+    "procedural/shards/effector/4/enabled": true,
+    "procedural/shards/effector/4/strength": 1.7999999523162842,
+    "procedural/shards/effector/4/weight": 1.0,
+    "procedural/shards/emissiveFieldAmount": 0.0,
+    "procedural/shards/hierarchy/depth": 0,
+    "procedural/shards/hierarchy/offsetPerLevel": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/shards/hierarchy/rotationPerLevel": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/shards/hierarchy/scalePerLevel": 0.5,
+    "procedural/shards/lod/distance1": 0.0,
+    "procedural/shards/lod/distance2": 0.0,
+    "procedural/shards/lod/distance3": 0.0,
+    "procedural/shards/lod/enabled": false,
+    "procedural/shards/lod/hysteresis": 0.0,
+    "procedural/shards/lod/maxDistance": 0.0,
+    "procedural/shards/lod/minScreenRadius": 0.0,
+    "procedural/shards/lod/spread": 0.11999999731779099,
+    "procedural/shards/material/baseColor": [
+      0.2800000011920929,
+      0.41999998688697815,
+      0.7200000286102295
+    ],
+    "procedural/shards/material/emissive": 0.550000011920929,
+    "procedural/shards/material/emissiveColor": [
+      0.44999998807907104,
+      0.7200000286102295,
+      1.0
+    ],
+    "procedural/shards/material/metallic": 0.550000011920929,
+    "procedural/shards/material/roughness": 0.3499999940395355,
+    "procedural/shards/materialVariation/emissiveGradient": 0.0,
+    "procedural/shards/materialVariation/emissiveRandom": 0.0,
+    "procedural/shards/materialVariation/hueGradient": 0.0,
+    "procedural/shards/materialVariation/hueShift": 0.0,
+    "procedural/shards/materialVariation/valueRandom": 0.0,
+    "procedural/shards/source/bevel": 0.0,
+    "procedural/shards/source/bevelSegments": 3,
+    "procedural/shards/source/caps": true,
+    "procedural/shards/source/height": 2.0,
+    "procedural/shards/source/heightSegments": 1,
+    "procedural/shards/source/kind": 0,
+    "procedural/shards/source/majorRadius": 1.0,
+    "procedural/shards/source/majorSegments": 48,
+    "procedural/shards/source/minorRadius": 0.25,
+    "procedural/shards/source/minorSegments": 16,
+    "procedural/shards/source/pointSize": 0.05000000074505806,
+    "procedural/shards/source/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/shards/source/radialSegments": 24,
+    "procedural/shards/source/radius": 0.5,
+    "procedural/shards/source/rings": 16,
+    "procedural/shards/source/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "procedural/shards/source/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "procedural/shards/source/segments": 32,
+    "procedural/shards/source/size": [
+      0.1599999964237213,
+      0.05000000074505806,
+      0.25999999046325684
+    ],
+    "procedural/shards/source/subdivisions": 1,
+    "procedural/shards/transform/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/shards/transform/rotation": [
+      0.0,
+      -0.0,
+      0.0
+    ],
+    "procedural/shards/transform/scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "procedural/shards/variation/position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/shards/variation/rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/shards/variation/scale": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "procedural/shards/variation/seed": 12345,
+    "procedural/shards/variation/uniformScale": 0.0,
+    "procedural/shards/visible": true,
+    "root/impulse": 0.0,
+    "root/rotationSpeed": 0.0,
+    "root/scale": 1.0,
+    "scene/brightness": 1.0,
+    "scene/fogColor": [
+      0.029999999329447746,
+      0.035999998450279236,
+      0.09000000357627869
+    ],
+    "scene/fogDensity": 0.00419999985024333,
+    "scene/fogHeight": 0.0,
+    "scene/fogHeightFalloff": 0.0,
+    "scene/gridIntensity": 0.6000000238418579,
+    "scene/keyLight": 1.0,
+    "scene/styledGroundAmbient": [
+      0.11999999731779099,
+      0.10000000149011612,
+      0.2199999988079071
+    ],
+    "scene/styledSkyAmbient": [
+      0.3799999952316284,
+      0.5600000023841858,
+      0.6499999761581421
+    ],
+    "scene/stylized": false,
+    "scene/volumeAbsorption": 0.30000001192092896,
+    "scene/volumeAnisotropy": 0.3499999940395355,
+    "scene/volumeDensity": 0.0035000001080334187,
+    "scene/volumeEmission": 0.0,
+    "scene/volumeNoise": 0.30000001192092896,
+    "scene/volumeNoiseScale": 0.04500000178813934,
+    "scene/volumeNoiseSpeed": 0.10000000149011612,
+    "scene/volumeScattering": 0.550000011920929,
+    "scene/volumeSteps": 32,
+    "scene/windDirection": 0.0,
+    "scene/windSpeed": 0.0,
+    "spline/armMajor/axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "spline/armMajor/center": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "spline/armMajor/count": 16,
+    "spline/armMajor/end": [
+      0.0,
+      0.0,
+      10.0
+    ],
+    "spline/armMajor/height": 10.0,
+    "spline/armMajor/noiseAmount": 0.0,
+    "spline/armMajor/noiseScale": 0.30000001192092896,
+    "spline/armMajor/p0": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "spline/armMajor/p1": [
+      0.0,
+      5.0,
+      5.0
+    ],
+    "spline/armMajor/p2": [
+      0.0,
+      5.0,
+      10.0
+    ],
+    "spline/armMajor/p3": [
+      0.0,
+      0.0,
+      15.0
+    ],
+    "spline/armMajor/radius": 5.0,
+    "spline/armMajor/radiusGrowth": 0.0,
+    "spline/armMajor/start": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "spline/armMajor/startAngle": 0.0,
+    "spline/armMajor/tension": 0.5,
+    "spline/armMajor/turns": 1.0,
+    "spline/armMajor/up": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "spline/armMinor/axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "spline/armMinor/center": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "spline/armMinor/count": 16,
+    "spline/armMinor/end": [
+      0.0,
+      0.0,
+      10.0
+    ],
+    "spline/armMinor/height": 10.0,
+    "spline/armMinor/noiseAmount": 0.0,
+    "spline/armMinor/noiseScale": 0.30000001192092896,
+    "spline/armMinor/p0": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "spline/armMinor/p1": [
+      0.0,
+      5.0,
+      5.0
+    ],
+    "spline/armMinor/p2": [
+      0.0,
+      5.0,
+      10.0
+    ],
+    "spline/armMinor/p3": [
+      0.0,
+      0.0,
+      15.0
+    ],
+    "spline/armMinor/radius": 5.0,
+    "spline/armMinor/radiusGrowth": 0.0,
+    "spline/armMinor/start": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "spline/armMinor/startAngle": 0.0,
+    "spline/armMinor/tension": 0.5,
+    "spline/armMinor/turns": 1.0,
+    "spline/armMinor/up": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "spline/armStub/axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "spline/armStub/center": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "spline/armStub/count": 16,
+    "spline/armStub/end": [
+      0.0,
+      0.0,
+      10.0
+    ],
+    "spline/armStub/height": 10.0,
+    "spline/armStub/noiseAmount": 0.0,
+    "spline/armStub/noiseScale": 0.30000001192092896,
+    "spline/armStub/p0": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "spline/armStub/p1": [
+      0.0,
+      5.0,
+      5.0
+    ],
+    "spline/armStub/p2": [
+      0.0,
+      5.0,
+      10.0
+    ],
+    "spline/armStub/p3": [
+      0.0,
+      0.0,
+      15.0
+    ],
+    "spline/armStub/radius": 5.0,
+    "spline/armStub/radiusGrowth": 0.0,
+    "spline/armStub/start": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "spline/armStub/startAngle": 0.0,
+    "spline/armStub/tension": 0.5,
+    "spline/armStub/turns": 1.0,
+    "spline/armStub/up": [
+      0.0,
+      1.0,
+      0.0
+    ]
   },
-  {
-   "source": "audio.bass",
-   "target": "particles/coreKnot/emissive",
-   "op": "add",
-   "amount": 7.0,
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 90.0,
-    "decayMs": 620.0
-   }
+  "presets": [],
+  "render": {
+    "backend": "auto",
+    "codec": "h264",
+    "encoderThreads": 0,
+    "end": -1.0,
+    "fps": 60.0,
+    "height": 1080,
+    "muxAudio": true,
+    "output": "sequence",
+    "path": "",
+    "pattern": "frame_{:06d}.png",
+    "quality": 80,
+    "start": 0.0,
+    "width": 1920
   },
-  {
-   "source": "audio.bass",
-   "target": "field/coreVoid/strength",
-   "op": "add",
-   "amount": 0.75,
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 180.0,
-    "decayMs": 900.0
-   }
+  "routes": [
+    {
+      "amount": 0.550000011920929,
+      "chain": {
+        "attackMs": 1400.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 3000.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "audio.rms",
+      "target": "field/corePull/strength"
+    },
+    {
+      "amount": 0.10000000149011612,
+      "chain": {
+        "attackMs": 1800.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 3600.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "audio.rms",
+      "target": "particles/veil/emissive"
+    },
+    {
+      "amount": 1.2999999523162842,
+      "chain": {
+        "attackMs": 120.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 700.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "audio.bass",
+      "target": "particles/coreKnot/extent"
+    },
+    {
+      "amount": 7.0,
+      "chain": {
+        "attackMs": 90.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 620.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "audio.bass",
+      "target": "particles/coreKnot/emissive"
+    },
+    {
+      "amount": 0.75,
+      "chain": {
+        "attackMs": 180.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 900.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "audio.bass",
+      "target": "field/coreVoid/strength"
+    },
+    {
+      "amount": 1.0,
+      "chain": {
+        "attackMs": 10.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 900.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "audio.onset",
+      "target": "field/shock/strength"
+    },
+    {
+      "amount": 260.0,
+      "chain": {
+        "attackMs": 5.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 240.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "audio.onset",
+      "target": "particles/coreKnot/burst"
+    },
+    {
+      "amount": 900.0,
+      "chain": {
+        "attackMs": 220.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 1100.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "audio.mid",
+      "target": "particles/bridge/spawnRate"
+    },
+    {
+      "amount": 0.5,
+      "chain": {
+        "attackMs": 320.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 1400.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "audio.mid",
+      "target": "field/mesoWarp/strength"
+    },
+    {
+      "amount": 1500.0,
+      "chain": {
+        "attackMs": 90.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 800.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "audio.treble",
+      "target": "particles/armMajorP/spawnRate"
+    },
+    {
+      "amount": 0.44999998807907104,
+      "chain": {
+        "attackMs": 70.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 600.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "audio.treble",
+      "target": "particles/coreKnot/turbulence"
+    },
+    {
+      "amount": 0.30000001192092896,
+      "chain": {
+        "attackMs": 2200.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 3600.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "bipolar",
+      "source": "audio.spectralCentroid",
+      "target": "post/grade/hueShift"
+    },
+    {
+      "amount": 0.1599999964237213,
+      "chain": {
+        "attackMs": 60.0,
+        "clampEnabled": false,
+        "clampMax": 1.0,
+        "clampMin": 0.0,
+        "curve": "linear",
+        "curveAmount": 1.0,
+        "decayMs": 520.0,
+        "envelope": "none",
+        "envelopeFallPerSecond": 4.0,
+        "envelopeHoldMs": 0.0,
+        "gain": 1.0,
+        "offset": 0.0,
+        "remapEnabled": false,
+        "remapInMax": 1.0,
+        "remapInMin": 0.0,
+        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "threshold": "none",
+        "thresholdLevel": 0.5
+      },
+      "component": -1,
+      "enabled": true,
+      "op": "add",
+      "polarity": "unipolar",
+      "source": "beat.pulse",
+      "target": "field/discSpin/strength"
+    }
+  ],
+  "shaders": [],
+  "sources": [
+    {
+      "kind": "control",
+      "name": "control",
+      "settings": {
+        "channels": []
+      }
+    }
+  ],
+  "timeline": {
+    "cues": [],
+    "enabled": true,
+    "tracks": [
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              64.0,
+              30.0,
+              88.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 12.0,
+            "value": [
+              54.0,
+              26.0,
+              74.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 26.0,
+            "value": [
+              41.0,
+              17.0,
+              54.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 40.0,
+            "value": [
+              26.0,
+              7.0,
+              33.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 52.0,
+            "value": [
+              11.0,
+              2.0,
+              15.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 60.0,
+            "value": [
+              -2.0,
+              -1.5,
+              6.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 70.0,
+            "value": [
+              -19.0,
+              8.0,
+              -15.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 80.0,
+            "value": [
+              -36.0,
+              23.0,
+              -31.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              -48.0,
+              31.0,
+              -44.0
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "camera/position",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 12.0,
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 26.0,
+            "value": [
+              2.0,
+              -1.0,
+              -2.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 40.0,
+            "value": [
+              4.0,
+              0.0,
+              -2.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 52.0,
+            "value": [
+              1.0,
+              0.0,
+              -1.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 60.0,
+            "value": [
+              3.0,
+              1.0,
+              -4.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 70.0,
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 80.0,
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "camera/target",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              0.3499999940395355
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 10.0,
+            "value": [
+              0.550000011920929
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 26.0,
+            "value": [
+              0.949999988079071
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 46.0,
+            "value": [
+              1.100000023841858
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 62.0,
+            "value": [
+              1.25
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 70.0,
+            "value": [
+              1.600000023841858
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 78.0,
+            "value": [
+              3.4000000953674316
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 85.0,
+            "value": [
+              3.9000000953674316
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 88.0,
+            "value": [
+              1.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              0.699999988079071
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "field/corePull/strength",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              1.600000023841858
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 12.0,
+            "value": [
+              1.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 60.0,
+            "value": [
+              1.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 72.0,
+            "value": [
+              0.550000011920929
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 84.0,
+            "value": [
+              0.11999999731779099
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 87.5,
+            "value": [
+              2.5999999046325684
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              1.399999976158142
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "field/coreVoid/strength",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              0.550000011920929
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 14.0,
+            "value": [
+              0.8500000238418579
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 40.0,
+            "value": [
+              1.149999976158142
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 56.0,
+            "value": [
+              1.350000023841858
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 72.0,
+            "value": [
+              1.5
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 84.0,
+            "value": [
+              1.149999976158142
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              0.800000011920929
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "field/discSpin/strength",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              0.3499999940395355
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 20.0,
+            "value": [
+              0.699999988079071
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 44.0,
+            "value": [
+              1.25
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 58.0,
+            "value": [
+              1.5
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 74.0,
+            "value": [
+              0.8999999761581421
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 86.0,
+            "value": [
+              0.30000001192092896
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              0.4000000059604645
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "field/mesoWarp/strength",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              420.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 8.0,
+            "value": [
+              900.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 40.0,
+            "value": [
+              1400.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 56.0,
+            "value": [
+              2100.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 78.0,
+            "value": [
+              2600.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 86.0,
+            "value": [
+              700.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              300.0
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "particles/coreKnot/spawnRate",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 7.0,
+            "value": [
+              120.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 18.0,
+            "value": [
+              900.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 40.0,
+            "value": [
+              1650.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 62.0,
+            "value": [
+              1900.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 80.0,
+            "value": [
+              700.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              120.0
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "particles/armMajorP/spawnRate",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 13.0,
+            "value": [
+              90.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 26.0,
+            "value": [
+              700.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 48.0,
+            "value": [
+              1000.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 66.0,
+            "value": [
+              1100.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 82.0,
+            "value": [
+              380.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              60.0
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "particles/armMinorP/spawnRate",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 20.0,
+            "value": [
+              80.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 34.0,
+            "value": [
+              450.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 60.0,
+            "value": [
+              520.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 80.0,
+            "value": [
+              180.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              40.0
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "particles/armStubP/spawnRate",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              90.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 10.0,
+            "value": [
+              320.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 24.0,
+            "value": [
+              900.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 44.0,
+            "value": [
+              1300.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 68.0,
+            "value": [
+              1500.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 84.0,
+            "value": [
+              500.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              160.0
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "particles/discDust/spawnRate",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 15.0,
+            "value": [
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 22.0,
+            "value": [
+              320.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 38.0,
+            "value": [
+              950.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 64.0,
+            "value": [
+              1100.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 80.0,
+            "value": [
+              420.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              90.0
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "particles/nodeAOrbit/spawnRate",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 28.0,
+            "value": [
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 36.0,
+            "value": [
+              180.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 58.0,
+            "value": [
+              520.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 78.0,
+            "value": [
+              300.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              60.0
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "particles/nodeBOrbit/spawnRate",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 30.0,
+            "value": [
+              0.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 38.0,
+            "value": [
+              220.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 56.0,
+            "value": [
+              760.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 74.0,
+            "value": [
+              520.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 88.0,
+            "value": [
+              80.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              40.0
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "particles/bridge/spawnRate",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              120.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 16.0,
+            "value": [
+              340.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 50.0,
+            "value": [
+              520.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 76.0,
+            "value": [
+              560.0
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              300.0
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "particles/veil/spawnRate",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              -0.2199999988079071
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 20.0,
+            "value": [
+              -0.10000000149011612
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 40.0,
+            "value": [
+              0.05999999865889549
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 56.0,
+            "value": [
+              0.30000001192092896
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 70.0,
+            "value": [
+              0.1599999964237213
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 84.0,
+            "value": [
+              -0.11999999731779099
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              -0.25999999046325684
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "post/grade/hueShift",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              -0.1599999964237213
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 26.0,
+            "value": [
+              -0.05999999865889549
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 52.0,
+            "value": [
+              0.10000000149011612
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 72.0,
+            "value": [
+              0.019999999552965164
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              -0.18000000715255737
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "post/grade/temperature",
+        "timeBase": "seconds"
+      },
+      {
+        "component": -1,
+        "enabled": true,
+        "keys": [
+          {
+            "interp": "smooth",
+            "time": 0.0,
+            "value": [
+              1.1200000047683716
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 30.0,
+            "value": [
+              1.059999942779541
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 56.0,
+            "value": [
+              0.9800000190734863
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 74.0,
+            "value": [
+              1.100000023841858
+            ]
+          },
+          {
+            "interp": "smooth",
+            "time": 90.0,
+            "value": [
+              1.159999966621399
+            ]
+          }
+        ],
+        "loopLength": 0.0,
+        "mode": "replace",
+        "target": "post/grade/saturation",
+        "timeBase": "seconds"
+      }
+    ]
   },
-  {
-   "source": "audio.onset",
-   "target": "field/shock/strength",
-   "op": "add",
-   "amount": 1.0,
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 10.0,
-    "decayMs": 900.0
-   }
-  },
-  {
-   "source": "audio.onset",
-   "target": "particles/coreKnot/burst",
-   "op": "add",
-   "amount": 260.0,
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 5.0,
-    "decayMs": 240.0
-   }
-  },
-  {
-   "source": "audio.mid",
-   "target": "particles/bridge/spawnRate",
-   "op": "add",
-   "amount": 900.0,
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 220.0,
-    "decayMs": 1100.0
-   }
-  },
-  {
-   "source": "audio.mid",
-   "target": "field/mesoWarp/strength",
-   "op": "add",
-   "amount": 0.5,
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 320.0,
-    "decayMs": 1400.0
-   }
-  },
-  {
-   "source": "audio.treble",
-   "target": "particles/armMajorP/spawnRate",
-   "op": "add",
-   "amount": 1500.0,
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 90.0,
-    "decayMs": 800.0
-   }
-  },
-  {
-   "source": "audio.treble",
-   "target": "particles/coreKnot/turbulence",
-   "op": "add",
-   "amount": 0.45,
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 70.0,
-    "decayMs": 600.0
-   }
-  },
-  {
-   "source": "audio.spectralCentroid",
-   "target": "post/grade/hueShift",
-   "op": "add",
-   "amount": 0.3,
-   "polarity": "bipolar",
-   "chain": {
-    "attackMs": 2200.0,
-    "decayMs": 3600.0
-   }
-  },
-  {
-   "source": "beat.pulse",
-   "target": "field/discSpin/strength",
-   "op": "add",
-   "amount": 0.16,
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 60.0,
-    "decayMs": 520.0
-   }
-  }
- ],
- "timeline": {
-  "enabled": true,
-  "tracks": [
-   {
-    "target": "camera/position",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       64,
-       30,
-       88
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 12.0,
-      "value": [
-       54,
-       26,
-       74
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 26.0,
-      "value": [
-       41,
-       17,
-       54
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 40.0,
-      "value": [
-       26,
-       7,
-       33
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 52.0,
-      "value": [
-       11,
-       2,
-       15
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 60.0,
-      "value": [
-       -2,
-       -1.5,
-       6
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 70.0,
-      "value": [
-       -19,
-       8,
-       -15
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 80.0,
-      "value": [
-       -36,
-       23,
-       -31
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": [
-       -48,
-       31,
-       -44
-      ],
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "camera/target",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       0,
-       0,
-       0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 12.0,
-      "value": [
-       0,
-       0,
-       0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 26.0,
-      "value": [
-       2,
-       -1,
-       -2
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 40.0,
-      "value": [
-       4,
-       0,
-       -2
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 52.0,
-      "value": [
-       1,
-       0,
-       -1
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 60.0,
-      "value": [
-       3,
-       1,
-       -4
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 70.0,
-      "value": [
-       0,
-       0,
-       0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 80.0,
-      "value": [
-       0,
-       0,
-       0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": [
-       0,
-       0,
-       0
-      ],
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "field/corePull/strength",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 0.35,
-      "interp": "smooth"
-     },
-     {
-      "time": 10.0,
-      "value": 0.55,
-      "interp": "smooth"
-     },
-     {
-      "time": 26.0,
-      "value": 0.95,
-      "interp": "smooth"
-     },
-     {
-      "time": 46.0,
-      "value": 1.1,
-      "interp": "smooth"
-     },
-     {
-      "time": 62.0,
-      "value": 1.25,
-      "interp": "smooth"
-     },
-     {
-      "time": 70.0,
-      "value": 1.6,
-      "interp": "smooth"
-     },
-     {
-      "time": 78.0,
-      "value": 3.4,
-      "interp": "smooth"
-     },
-     {
-      "time": 85.0,
-      "value": 3.9,
-      "interp": "smooth"
-     },
-     {
-      "time": 88.0,
-      "value": 1.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 0.7,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "field/coreVoid/strength",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 1.6,
-      "interp": "smooth"
-     },
-     {
-      "time": 12.0,
-      "value": 1.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 60.0,
-      "value": 1.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 72.0,
-      "value": 0.55,
-      "interp": "smooth"
-     },
-     {
-      "time": 84.0,
-      "value": 0.12,
-      "interp": "smooth"
-     },
-     {
-      "time": 87.5,
-      "value": 2.6,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 1.4,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "field/discSpin/strength",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 0.55,
-      "interp": "smooth"
-     },
-     {
-      "time": 14.0,
-      "value": 0.85,
-      "interp": "smooth"
-     },
-     {
-      "time": 40.0,
-      "value": 1.15,
-      "interp": "smooth"
-     },
-     {
-      "time": 56.0,
-      "value": 1.35,
-      "interp": "smooth"
-     },
-     {
-      "time": 72.0,
-      "value": 1.5,
-      "interp": "smooth"
-     },
-     {
-      "time": 84.0,
-      "value": 1.15,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 0.8,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "field/mesoWarp/strength",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 0.35,
-      "interp": "smooth"
-     },
-     {
-      "time": 20.0,
-      "value": 0.7,
-      "interp": "smooth"
-     },
-     {
-      "time": 44.0,
-      "value": 1.25,
-      "interp": "smooth"
-     },
-     {
-      "time": 58.0,
-      "value": 1.5,
-      "interp": "smooth"
-     },
-     {
-      "time": 74.0,
-      "value": 0.9,
-      "interp": "smooth"
-     },
-     {
-      "time": 86.0,
-      "value": 0.3,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 0.4,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "particles/coreKnot/spawnRate",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 420.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 8.0,
-      "value": 900.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 40.0,
-      "value": 1400.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 56.0,
-      "value": 2100.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 78.0,
-      "value": 2600.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 86.0,
-      "value": 700.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 300.0,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "particles/armMajorP/spawnRate",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 0.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 7.0,
-      "value": 120.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 18.0,
-      "value": 900.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 40.0,
-      "value": 1650.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 62.0,
-      "value": 1900.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 80.0,
-      "value": 700.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 120.0,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "particles/armMinorP/spawnRate",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 0.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 13.0,
-      "value": 90.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 26.0,
-      "value": 700.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 48.0,
-      "value": 1000.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 66.0,
-      "value": 1100.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 82.0,
-      "value": 380.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 60.0,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "particles/armStubP/spawnRate",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 0.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 20.0,
-      "value": 80.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 34.0,
-      "value": 450.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 60.0,
-      "value": 520.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 80.0,
-      "value": 180.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 40.0,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "particles/discDust/spawnRate",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 90.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 10.0,
-      "value": 320.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 24.0,
-      "value": 900.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 44.0,
-      "value": 1300.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 68.0,
-      "value": 1500.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 84.0,
-      "value": 500.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 160.0,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "particles/nodeAOrbit/spawnRate",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 0.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 15.0,
-      "value": 0.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 22.0,
-      "value": 320.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 38.0,
-      "value": 950.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 64.0,
-      "value": 1100.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 80.0,
-      "value": 420.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 90.0,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "particles/nodeBOrbit/spawnRate",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 0.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 28.0,
-      "value": 0.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 36.0,
-      "value": 180.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 58.0,
-      "value": 520.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 78.0,
-      "value": 300.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 60.0,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "particles/bridge/spawnRate",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 0.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 30.0,
-      "value": 0.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 38.0,
-      "value": 220.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 56.0,
-      "value": 760.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 74.0,
-      "value": 520.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 88.0,
-      "value": 80.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 40.0,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "particles/veil/spawnRate",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 120.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 16.0,
-      "value": 340.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 50.0,
-      "value": 520.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 76.0,
-      "value": 560.0,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 300.0,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "post/grade/hueShift",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": -0.22,
-      "interp": "smooth"
-     },
-     {
-      "time": 20.0,
-      "value": -0.1,
-      "interp": "smooth"
-     },
-     {
-      "time": 40.0,
-      "value": 0.06,
-      "interp": "smooth"
-     },
-     {
-      "time": 56.0,
-      "value": 0.3,
-      "interp": "smooth"
-     },
-     {
-      "time": 70.0,
-      "value": 0.16,
-      "interp": "smooth"
-     },
-     {
-      "time": 84.0,
-      "value": -0.12,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": -0.26,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "post/grade/temperature",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": -0.16,
-      "interp": "smooth"
-     },
-     {
-      "time": 26.0,
-      "value": -0.06,
-      "interp": "smooth"
-     },
-     {
-      "time": 52.0,
-      "value": 0.1,
-      "interp": "smooth"
-     },
-     {
-      "time": 72.0,
-      "value": 0.02,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": -0.18,
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "post/grade/saturation",
-    "timeBase": "seconds",
-    "mode": "replace",
-    "keys": [
-     {
-      "time": 0.0,
-      "value": 1.12,
-      "interp": "smooth"
-     },
-     {
-      "time": 30.0,
-      "value": 1.06,
-      "interp": "smooth"
-     },
-     {
-      "time": 56.0,
-      "value": 0.98,
-      "interp": "smooth"
-     },
-     {
-      "time": 74.0,
-      "value": 1.1,
-      "interp": "smooth"
-     },
-     {
-      "time": 90.0,
-      "value": 1.16,
-      "interp": "smooth"
-     }
-    ]
-   }
-  ]
- }
+  "version": 4
 }
