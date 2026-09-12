@@ -197,6 +197,9 @@ open in Phase 7.
 
 - `[ ]` Document when CPU state updates, GPU data is written, GPU consumes it, GPU finishes and memory is reused.
 - `[ ]` Audit textures, buffers, bind groups, pipelines, materials, meshes, animation buffers, depth textures, water textures and post-process targets.
+- `[x]` Skinning palette upload cache is scene-aware. Distinct scenes with equal rig palette versions
+  now force a palette upload; a GPU regression renders rest and posed same-version scenes through one
+  renderer and verifies the pixels differ.
 - `[ ]` Stress resource reuse through resize, scene reload, timeline seek/reverse, camera cuts and frame-index reuse.
 - `[ ]` Add a conservative synchronization option to the reference path if evidence points to reuse hazards.
 - `[ ]` Add validation for resources destroyed, replaced, resized or rebound while still referenced.

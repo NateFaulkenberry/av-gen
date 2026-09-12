@@ -103,6 +103,7 @@ private:
     std::vector<Slice> slices_;
     std::vector<std::uint64_t> uploadedVersions_;
     std::vector<std::uint8_t> staging_;
+    const scene::Scene* scene_ = nullptr;
     SkinningStats stats_;
     bool ready_ = false;
 };

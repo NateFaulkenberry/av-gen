@@ -252,6 +252,28 @@ TEST_CASE("posing a rig moves the pixels, and the same second gives the same pix
     CHECK(differingPixels(*bent, *again) == 0);
 }
 
+TEST_CASE("skinning uploads palettes independently for same-version scenes", "[gpu][skinning][forensics]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    auto rest = barScene(true);
+    auto bent = barScene(true);
+    bent.rigs[0].pose.local[1].rotation = glm::angleAxis(glm::radians(40.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    scene::skinningPalette(bent.rigs[0].skeleton, bent.rigs[0].pose, bent.rigs[0].scratchModel,
+                           bent.rigs[0].palette);
+    REQUIRE(rest.rigs[0].paletteVersion == bent.rigs[0].paletteVersion);
+
+    const auto first = renderer.renderToImage(rest, frameAt(0), 512, 384);
+    REQUIRE(first.has_value());
+    const auto second = renderer.renderToImage(bent, frameAt(0), 512, 384);
+    REQUIRE(second.has_value());
+    CHECK(differingPixels(*first, *second) > 2000);
+    CHECK(renderer.stats().skinning.uploadBytes > 0);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("non-finite joint palettes are rejected before GPU upload", "[gpu][skinning][validation]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);

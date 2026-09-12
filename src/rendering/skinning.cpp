@@ -264,6 +264,8 @@ void SkinningRenderer::ensureBuffer(std::uint32_t sliceBytes, std::uint32_t rigC
 }
 
 void SkinningRenderer::update(const scene::Scene& scene) {
+    const bool sceneChanged = scene_ != &scene;
+    scene_ = &scene;
     stats_.rigs = 0;
     stats_.joints = 0;
     stats_.uploadBytes = 0;
@@ -303,7 +305,8 @@ void SkinningRenderer::update(const scene::Scene& scene) {
         }
         slices_[i] = Slice{sliceBytes * i, joints};
         ++stats_.rigs;
-        if (!rebuilt && uploadedVersions_[i] == rig.paletteVersion && rig.previousPalette.size() == joints) {
+        if (!sceneChanged && !rebuilt && uploadedVersions_[i] == rig.paletteVersion &&
+            rig.previousPalette.size() == joints) {
             // A rig that did not re-pose is already on the GPU with prev == current, which is
             // exactly what a still character should report to the velocity target.
             continue;
