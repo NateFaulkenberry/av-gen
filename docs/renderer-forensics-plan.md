@@ -37,25 +37,81 @@ This is an investigation and correctness effort, not a visual feature sprint. No
 
 - `[x]` Read and preserve the current renderer QA baseline in [renderer-qa-2026-09-11.md](renderer-qa-2026-09-11.md).
 - `[x]` Record the active reference scenes: The Living Constellation, Glowmere and `RendererQA`.
-- `[~]` Record the current build machine, GPU, OS, renderer tier, resolution, frame rate and workload conditions for every benchmark.
+- `[x]` Record the current build machine, GPU, OS, renderer tier, resolution, frame rate and workload conditions for every benchmark.
   - `[x]` Apple M2 Max and release/WebGPU-on-Metal environment recorded.
-  - `[ ]` Add a repeatable benchmark command and result table for each canonical scene.
-  - `[ ]` Separate warm-up, steady-state and background-load conditions.
-- `[~]` Record known symptoms without assuming their causes.
+  - `[x]` Add a repeatable benchmark command and result table for each canonical scene.
+  - `[x]` Separate warm-up, steady-state and background-load conditions.
+
+**Canonical baselines.** One command shape, three scenes, measured 12 September 2026 on Apple M2 Max,
+release, Dawn/Metal, `--tier realtime --size 1280x800 --frames 120 --fps 30`:
+
+```sh
+./build/release/src/avgen --headless --project <scene> --frames 120 --fps 30 --size 1280x800 --tier realtime
+```
+
+| Scene | GPU median | Wall median | p10 / p90 | Dominant pass | Draws | Triangles | Bound by |
+|---|---:|---:|---|---|---:|---:|---|
+| `examples/world/glowmere-stylized.json` | 18.87 ms | 23.60 ms | 21.52 / 26.25 | `scene` 15.79 (84%) | 141 | 430,233 | scene geometry, fragment side |
+| `examples/constellation/constellation.json` | 6.09 ms | 8.40 ms | 6.90 / 13.60 | `volume` 3.93 (64%) | 11 | 3,121 | volumetrics |
+| `examples/qa/renderer-qa.json` | 1.70 ms | 2.75 ms | 2.46 / 3.37 | `scene` 0.72 (42%) | 8 | 7,961 | nothing; it is the control |
+
+**Conditions, stated because they change the numbers.** The first 12 frames are discarded as warm-up
+(the harness reports a median over 108 *steady* frames); pipelines are compiled and Metal replaces
+their GPU binaries shortly after creation, so a cold frame is not comparable. Background load matters
+more than it should: **treat the shares as durable and the absolutes as machine state.** The
+11 September QA record measured 23.79 ms GPU for the Glowmere scene with near-identical geometry
+counters; the same command measured 18.87 ms today, and the cause has not been established. Only a
+controlled A/B *within one run* is evidence for a change.
+
+- `[x]` Record known symptoms without assuming their causes.
   - `[x]` Static-object/UFO motion, alien flicker/culling, water boundary artifacts and timing instability are named regression areas.
-  - `[ ]` Give every symptom a stable identifier, exact scene, frame/time range and reproduction command.
+  - `[x]` Give every symptom a stable identifier, exact scene, frame/time range and reproduction command.
+
+**Symptom register.** Identifiers are stable; a symptom keeps its id after it is fixed, so evidence
+stays quotable.
+
+| Id | Symptom | Scene | Where | State |
+|---|---|---|---|---|
+| `SYM-STATIC-1` | A static object appears to move as the camera moves | Glowmere (UFO), RendererQA | any camera motion | **Not reproduced in the renderer.** 680 frames over five camera motions hold the authored TRS bit-for-bit, and a 240-frame excursion returns byte-identical. The composition-side path (node flattening, terrain grounding, sequencer writes) is untested and is the remaining half. |
+| `SYM-ANIM-1` | A character's pose jumps when the playhead is scrubbed | `examples/characters/alien.scene.json` | any seek | **Reproduced and fixed.** Frame 500 reached from frame 100 differed from frame 500 reached directly by 98 joint matrices. Root cause: the authored animation state's phase origin was the engine's first update. See the report. |
+| `SYM-ANIM-2` | The alien flickers or disappears near a frustum edge | Glowmere, alien | camera edge | **Not reproduced.** A 65-position sweep across the edge, each step rendered against a no-cull control, shows culling never removes a pixel the character would draw. Note the alien cannot discriminate bind-pose from posed bounds (a T-pose bind is wider); that property is tested separately against a rig that reaches past its bind pose. |
+| `SYM-WATER-1` | Water leaks past or intersects terrain incorrectly at a shoreline | Glowmere | shoreline, grazing angles | **Open.** Basic view cases pass; the flat/steep/shallow/deep/angled matrix and the mask/depth visualisations are not built. |
+| `SYM-TIME-1` | GPU timing tests fail intermittently | any | `ctest -j4` | **Understood, not fixed.** Contention-sensitive; passes alone and at `-j2`. Same root cause as the reproducibility limitation. |
 
 ### 0.2 Define evidence standards
 
-- `[ ]` Define the minimum evidence package for every bug:
-  - symptom and visible result;
-  - exact reproduction steps and scene revision;
-  - enabled/disabled subsystem matrix;
-  - captured frame state;
-  - root-cause classification;
-  - fix and regression test;
-  - remaining uncertainty.
-- `[ ]` Define when a subsystem is `PASS`, `FAILED`, `FAILED -> FIXED`, `NOT ISOLATED` or `UNKNOWN`.
+- `[x]` Define the minimum evidence package for every bug.
+
+**Evidence package.** A bug is not written up without all seven, and "not established" is an
+acceptable entry for any of them -- an honest gap is evidence and a guess is not:
+
+1. **Symptom** as a person would describe it, and what is visible.
+2. **Reproduction**: the exact command, scene file, resolution, tier and frame or second range.
+3. **Subsystem matrix**: which of `--disable shadows,ao,volume,post,shadowmask` and which
+   engine/composition paths change the symptom, and which do not.
+4. **Captured state** at the divergent frame -- diagnostic frame, palettes, transforms, bounds,
+   culling verdicts -- *not only an image hash*. An image hash says something differs; it never says
+   what, and the Phase 9.2 defect was localised in one comparison by checking palettes and transforms
+   separately.
+5. **Root-cause classification**: the state transition, named, in one sentence that identifies the
+   owner.
+6. **Fix and regression**, where the regression *fails without the fix*. A regression that passes
+   either way is not evidence, and Phase 5.1 shipped one such test before it was caught.
+7. **Residual uncertainty**: what the fix does not cover, and what would still be believed if it were
+   wrong.
+
+- `[x]` Define when a subsystem is `PASS`, `FAILED`, `FAILED -> FIXED`, `NOT ISOLATED` or `UNKNOWN`.
+
+**Status definitions.** These are claims about *evidence*, not about confidence:
+
+| Status | Means |
+|---|---|
+| `PASS` | Its failure mode has a controlled reproducer that **can** fail, the reproducer passes, and the scope of the claim is stated. Never "we looked and saw nothing". |
+| `FAILED` | Reproduced, with the reproducer recorded; root cause may be unknown. |
+| `FAILED -> FIXED` | Reproduced, root-caused, repaired, and a regression that fails without the repair. |
+| `NOT ISOLATED` | The symptom is real and reproducible but no subsystem boundary has been established. |
+| `UNKNOWN` | Not investigated. Distinct from `PASS`: no test has been pointed at it. |
+| `PARTIAL` | Some failure modes are `PASS` and others are `UNKNOWN`; the table entry must say which. |
 - `[x]` Add a root-cause ledger and subsystem status table in the linked [interim forensic report](renderer-forensics-report.md).
 - `[ ]` Decide which evidence is automated, manual visual review, GPU capture or performance measurement.
 
@@ -87,9 +143,25 @@ open in Phase 7.
 - `[~]` Confirm authoritative scene world transforms.
   - `[x]` `scene::Entity::transform` and `scene::Transform::matrix()` are documented as authoritative.
   - `[ ]` Audit every caller that writes transforms during update, composition flattening, animation, terrain grounding and sequencer evaluation.
-- `[~]` Confirm authoritative camera state and matrix generation.
+- `[x]` Confirm authoritative camera state and matrix generation.
   - `[x]` `Camera::view()` and `glm::perspectiveRH_ZO` are documented.
-  - `[ ]` Find and compare every competing view/projection construction path.
+  - `[x]` Find and compare every competing view/projection construction path.
+    **There are none.** `Camera::view()` is the only `glm::lookAt*` in `src/` outside the shadow
+    light-views, and `Camera::projection()` the only camera `glm::perspective*`. Every consumer calls
+    those two: `SceneRenderer`, `ProceduralRenderer`, `Composition::cullEntityNodes`,
+    `Composition::updateTerrainLod`, `Application` (inverse view-projection for picking),
+    `entity::placement`, `ai::engine_tools` and `ui::world_probe`.
+    - One deliberate asymmetry, recorded rather than fixed: **terrain culling widens the aspect to a
+      floor of 2.5** (`kCullAspect` in `updateTerrainLod`) while entity culling uses the exact
+      viewport aspect. It is documented in place and the error is taken on the safe side -- a hole in
+      the ground is worse than an extra draw -- but it means an entity can be culled in a frame where
+      the terrain under it is not.
+    - The conventions those two functions choose are now pinned by test, because everything else
+      assumes them: right-handed with the target at negative view-space z, the eye at the view-space
+      origin, WebGPU's 0..1 depth (near -> 0, far -> 1, further is larger), and an aspect that widens
+      horizontally rather than cropping vertically. `tests/unit/test_camera.cpp`,
+      `[scene][camera][forensics]`. The degenerate forward/up case is pinned there too rather than
+      left to the one GPU test that happened to catch it.
 - `[~]` Confirm authoritative animation time and pose ownership.
   - `[x]` Timeline/render-time ownership is documented; renderer does not pose rigs.
   - `[ ]` Trace seek, reverse, pause, loop and frame-rate paths for duplicate time writes.
@@ -193,8 +265,13 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 - `[ ]` Instrument camera world position and rotation.
 - `[ ]` Instrument view, projection, view-projection, inverse-view and inverse-projection matrices.
 - `[ ]` Instrument near plane, far plane, aspect ratio, viewport width and viewport height.
-- `[ ]` Verify multiplication order, handedness, forward direction, up axis, clip-space range and depth convention.
-- `[ ]` Verify that culling, shading, depth reconstruction, shadows, volumetrics, picking and overlays consume the same authoritative camera model.
+- `[x]` Verify multiplication order, handedness, forward direction, up axis, clip-space range and depth convention.
+  Pinned in `tests/unit/test_camera.cpp`, `[scene][camera][forensics]`: handedness, view-space origin,
+  0..1 depth in the conventional direction, aspect behaviour, finiteness, and the parallel
+  forward/up fallback.
+- `[x]` Verify that culling, shading, depth reconstruction, shadows, volumetrics, picking and overlays consume the same authoritative camera model.
+  Established by the audit above: every one of them calls `Camera::view()` and `Camera::projection()`.
+  Shadow views are the intended exception -- they are light views, built in `shadow_math.cpp`.
 - `[ ]` Add camera basis and frustum visualizations to the diagnostics path.
 
 ### 3.2 Camera-relative rendering audit

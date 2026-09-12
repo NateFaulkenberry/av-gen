@@ -330,3 +330,96 @@ TEST_CASE("An authored field of view outranks the lens until the scene says othe
     CHECK(far > 0.0f);
     CHECK(cam.lens.circleOfConfusion(10.0f) == Catch::Approx(0.0f).margin(1e-6));
 }
+
+// ---- Phase 1.2 / 3.1: the camera's conventions, pinned -----------------------------------------
+//
+// The forensics plan asks for every competing view/projection construction path to be found and
+// compared. The audit result is that **there are none**: `Camera::view()` is the only `glm::lookAt`
+// in `src/` outside the shadow light-views, `Camera::projection()` the only camera `glm::perspective`,
+// and every consumer -- the renderer, procedural culling, entity culling, terrain culling, picking,
+// placement, the AI tools and the world probe -- calls those two.
+//
+// That makes the conventions those two functions choose load-bearing for the whole engine, and this
+// pins them. Each of these is a thing that produces a plausible-looking image while being wrong in a
+// way that only shows up in depth reconstruction, culling or a shadow lookup.
+
+TEST_CASE("the camera's matrices obey the conventions everything else assumes",
+          "[scene][camera][forensics]") {
+    scene::Camera camera;
+    camera.position = {3.0f, 4.0f, 10.0f};
+    camera.target = {0.0f, 1.0f, 0.0f};
+    camera.nearPlane = 0.25f;
+    camera.farPlane = 400.0f;
+    camera.lens.useExplicitFov = true;
+    camera.fovYRadians = 0.9f;
+    constexpr float kAspect = 16.0f / 9.0f;
+
+    const glm::mat4 view = camera.view();
+    const glm::mat4 proj = camera.projection(kAspect);
+
+    // Right-handed, looking down -Z in view space: the target is in front, so its view-space z is
+    // negative. A left-handed view would put it positive and every frustum test would invert.
+    const glm::vec4 targetInView = view * glm::vec4(camera.target, 1.0f);
+    CHECK(targetInView.z < 0.0f);
+    // The camera itself is the origin of view space.
+    const glm::vec4 eyeInView = view * glm::vec4(camera.position, 1.0f);
+    CHECK(std::abs(eyeInView.x) < 1e-4f);
+    CHECK(std::abs(eyeInView.y) < 1e-4f);
+    CHECK(std::abs(eyeInView.z) < 1e-4f);
+
+    // WebGPU's 0..1 depth range, not OpenGL's -1..1. A -1..1 projection renders a perfectly
+    // reasonable picture and puts everything in the near half of the depth buffer, which is what
+    // breaks linear-depth reconstruction, AO and the contact march at once.
+    const glm::vec3 forward = glm::normalize(camera.target - camera.position);
+    const auto ndcOf = [&](glm::vec3 world) {
+        const glm::vec4 clip = proj * view * glm::vec4(world, 1.0f);
+        REQUIRE(clip.w > 1e-6f);
+        return glm::vec3(clip) / clip.w;
+    };
+    const float nearZ = ndcOf(camera.position + forward * camera.nearPlane).z;
+    const float farZ = ndcOf(camera.position + forward * camera.farPlane).z;
+    CHECK(std::abs(nearZ - 0.0f) < 1e-3f);
+    CHECK(std::abs(farZ - 1.0f) < 1e-3f);
+    // And it is reversed-Z-free in the conventional direction: further is larger.
+    CHECK(ndcOf(camera.position + forward * 10.0f).z < ndcOf(camera.position + forward * 100.0f).z);
+
+    // The aspect widens horizontally rather than cropping vertically: a point at the top edge stays
+    // at the top edge when the viewport gets wider. A projection that did the opposite would make
+    // culling and the rendered frame disagree about what is on screen at non-16:9 sizes.
+    const glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+    const glm::vec3 highPoint = camera.position + forward * 10.0f + up * 3.0f;
+    const glm::vec4 wideClip = camera.projection(3.0f) * view * glm::vec4(highPoint, 1.0f);
+    const glm::vec4 narrowClip = camera.projection(1.0f) * view * glm::vec4(highPoint, 1.0f);
+    CHECK(std::abs((wideClip.y / wideClip.w) - (narrowClip.y / narrowClip.w)) < 1e-4f);
+    CHECK(std::abs(wideClip.x / wideClip.w) < std::abs(narrowClip.x / narrowClip.w) + 1e-4f);
+
+    // Every entry finite, which is the guard the renderer relies on before upload.
+    for (int c = 0; c < 4; ++c) {
+        for (int r = 0; r < 4; ++r) {
+            CHECK(std::isfinite(view[c][r]));
+            CHECK(std::isfinite(proj[c][r]));
+        }
+    }
+}
+
+TEST_CASE("a camera looking along its own up axis still produces a finite view",
+          "[scene][camera][forensics]") {
+    // A top-down shot makes `lookAt`'s lateral basis undefined; the renderer QA record traced a
+    // non-finite view matrix to exactly this. The fallback is pinned here rather than left to the
+    // one GPU test that happened to catch it.
+    for (const glm::vec3 straight : {glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)}) {
+        scene::Camera camera;
+        camera.position = {0.0f, 20.0f, 0.0f};
+        camera.target = camera.position + straight;
+        const glm::mat4 view = camera.view();
+        for (int c = 0; c < 4; ++c) {
+            for (int r = 0; r < 4; ++r) {
+                INFO("straight " << straight.y << " entry " << c << "," << r);
+                REQUIRE(std::isfinite(view[c][r]));
+            }
+        }
+        // And it still looks where it was told: the target is in front of the eye.
+        const glm::vec4 targetInView = view * glm::vec4(camera.target, 1.0f);
+        CHECK(targetInView.z < 0.0f);
+    }
+}
