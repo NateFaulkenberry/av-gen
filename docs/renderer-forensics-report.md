@@ -45,6 +45,7 @@ Application::runLive / Application::runHeadless
 |---|---|---|---|
 | Entity world TRS | `scene::Entity::transform` | `ObjectUniforms::model` | Static-object invariant over 680 renderer frames and 4,488 composition comparisons across five camera motions |
 | Authored node TRS | **`nodes/<name>/position\|rotation\|scale`**, not `CompositionNode::transform` | flattened into `Entity::transform` | `applyParameters` re-derives the node field from the parameter every frame; a direct write to it does not survive one update (negative control) |
+| Composition camera | **`camera/mode`, `camera/position`, `camera/target`** (or the orbit block), not `scene::Scene::camera` | `view`, `projection` | Same re-derivation: writing `scene().camera` is overwritten before the frame is drawn, which made two forensic tests vacuous until they were caught |
 | Camera pose | `scene::Camera` | `view`, `projection`, `FrameUniforms` | **No competing construction exists**: `Camera::view()` is the only `glm::lookAt*` outside shadow light-views and `Camera::projection()` the only camera `glm::perspective*`; conventions pinned by test |
 | Animation time/pose | timeline/scene update and `scene::updateRigs` | skinning palette upload | Skinning tests and scene culling audit |
 | Visibility/culling | composition/procedural cull paths | draw lists and GPU cull buffers | Culling/LOD suite; selected-object diagnostics |
@@ -203,6 +204,19 @@ ever driven through the same path it would be silently excused by this test.
 - Broader TSan transport filter: benchmark-inconclusive under sanitizer overhead.
 - Full post-fix ASan unit suite: inconclusive because the long world/example portion was terminated;
   no second sanitizer finding was established after the composition fix.
+
+## A note on vacuous tests
+
+Three tests written during this investigation could not fail, and each was caught by a negative
+control rather than by review:
+
+- the alien limb-crossing sweep (a T-pose bind box is wider than every pose it animates into);
+- the RendererQA static-object matrix and the Glowmere one (both wrote `scene().camera`, which the
+  composition overwrites, so the camera never moved).
+
+The common shape is a test whose *setup* silently did nothing. None of them would have been found by
+reading the assertions, because the assertions were correct. **A forensic test is not evidence until
+it has been shown to fail**, which is why the status definitions in the plan require it.
 
 ## Open evidence gaps
 

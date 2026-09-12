@@ -72,7 +72,7 @@ stays quotable.
 
 | Id | Symptom | Scene | Where | State |
 |---|---|---|---|---|
-| `SYM-STATIC-1` | A static object appears to move as the camera moves | Glowmere (UFO), RendererQA | any camera motion | **Not reproduced in the renderer.** 680 frames over five camera motions hold the authored TRS bit-for-bit, and a 240-frame excursion returns byte-identical. The composition-side path (node flattening, terrain grounding, sequencer writes) is untested and is the remaining half. |
+| `SYM-STATIC-1` | A static object appears to move as the camera moves | Glowmere (`visitor`), RendererQA | any camera motion | **Not reproduced**, on both paths and on the scene it was reported against: 680 renderer frames, 4,488 RendererQA comparisons and 75,939 Glowmere comparisons with time held still, all bit-identical, and a 240-frame excursion returning byte-identical. **Likely explanation:** the `visitor` is an animated procedural that turns and hovers ~2.4 cm/1.5 s, which at 190 m with no animation cue reads as drift. Remaining: seek, scrub, reload and resolution-change axes. |
 | `SYM-ANIM-1` | A character's pose jumps when the playhead is scrubbed | `examples/characters/alien.scene.json` | any seek | **Reproduced and fixed.** Frame 500 reached from frame 100 differed from frame 500 reached directly by 98 joint matrices. Root cause: the authored animation state's phase origin was the engine's first update. See the report. |
 | `SYM-ANIM-2` | The alien flickers or disappears near a frustum edge | Glowmere, alien | camera edge | **Not reproduced.** A 65-position sweep across the edge, each step rendered against a no-cull control, shows culling never removes a pixel the character would draw. Note the alien cannot discriminate bind-pose from posed bounds (a T-pose bind is wider); that property is tested separately against a rig that reaches past its bind pose. |
 | `SYM-WATER-1` | Water leaks past or intersects terrain incorrectly at a shoreline | Glowmere | shoreline, grazing angles | **Open.** Basic view cases pass; the flat/steep/shallow/deep/angled matrix and the mask/depth visualisations are not built. |
@@ -431,8 +431,9 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 - `[x]` Add frustum-edge regression where a posed limb crosses the plane while bind pose does not.
   `tests/unit/test_skeleton.cpp`, `[scene][skeleton][culling]`, 218 assertions.
 
-  **Disproven hypothesis, recorded so it is not retried:** the same regression written against the
-  alien composition *cannot discriminate*. A T-pose bind box is **wider** than every pose the clip
+  **Disproven hypothesis, recorded so it is not retried** (an experiment, deliberately not shipped as
+  a test -- a test that cannot fail must not be in the suite): the same regression written against
+  the alien composition *cannot discriminate*. A T-pose bind box is **wider** than every pose the clip
   animates into, so bind-pose bounds are conservative there and both implementations agree. A sweep
   of 65 positions across the frustum edge, each rendered twice (as culled, and with `cameraCulled`
   cleared as a no-cull control), passed identically with the posed-bounds path deliberately reverted
@@ -761,6 +762,33 @@ Phase 9.2 experiment on its first run, which is what the experiment was for.
 **Also:** the cull-bounds computation was written out twice inside `Composition` and is now one
 function, `scene::entityCullBounds` -- which is what made the Phase 5.1 property testable at all.
 
+**Check 2 done: `SYM-STATIC-1` on Glowmere, against the `visitor`.**
+`[gpu][composition][forensics][static][glowmere]`, 75,939 assertions. Five camera motions aimed at
+the object the symptom was reported against -- a static procedural 190 m from the origin -- asserting
+its authored node world transform, its flattened entity transforms and, the part RendererQA never
+reached, `ProceduralGeometry::sourceTransform` and `distributionTransform`. **Nothing moves.**
+
+Three things had to be got right before that meant anything, and each was wrong first:
+
+1. **Time must be held still.** The symptom is that an object moves *as the camera moves*, so the
+   camera has to be the only variable. Advancing the clock as well finds the `visitor` turning --
+   which is the scene working, and an experiment that cannot tell that from drift answers nothing.
+2. **A composition's camera is not `scene().camera`.** That field is re-derived from `camera/mode`,
+   `camera/position` and `camera/target` on every `applyParameters`, so writing it directly is
+   overwritten before the frame is drawn. Both composition tests were written that way first and
+   were therefore **vacuous** -- asserting nothing moved while the camera in fact stood still. They
+   now drive the parameters, select free mode, and `REQUIRE` that the camera took the pose, which is
+   what makes the vacuity impossible rather than merely unlikely. This is also the answer to the
+   11 September QA note that "camera overrides via the project's parameters did not move the camera":
+   free mode has to be selected or the orbit computes over the writes.
+3. **The `visitor` hovers.** With the camera parked and time advancing it turns *and* drifts about
+   2.4 cm over a second and a half -- measured, and now asserted as a bounded hover rather than the
+   "it does not travel" the test claimed first.
+
+**That third point is the likely explanation for the original report.** A large, distant, slowly
+turning object with a small periodic drift and no animation cue reads as a static object moving. The
+first version of this very test made the same mistake.
+
 **Check 1 done: the replay on Glowmere.** `[gpu][composition][forensics][determinism][glowmere]`.
 278 entities, terrain, water, vegetation, a wind field and two characters. Exactly **one** transform
 diverged -- the `wanderer` -- by about 25 m, with joints, visibility and culling flags all identical.
@@ -778,12 +806,13 @@ there would be demanding what ADR-091 declines to promise.
 
 **Next smallest falsifiable checks**, in the order I would take them:
 
-1. Drive the five camera motions over Glowmere with the UFO, closing `SYM-STATIC-1` on the scene it
-   was reported against. The transform path is proven generically; the asset-specific axis is not.
-2. Extend the static-object matrix along the axes it does not cover: timeline seek, scrub, scene
+1. Extend the static-object matrix along the axes it does not cover: timeline seek, scrub, scene
    reload and resolution change. The renderer has separate coverage for each; nothing crosses them
    with a static object.
-3. Then `SYM-WATER-1`, which needs a scene before it needs a test.
+2. Then `SYM-WATER-1`, which needs a scene before it needs a test.
+3. Audit the remaining derived-copy pairs. Two have now been found by accident rather than by search
+   -- `CompositionNode::transform` and `scene::Camera` are both re-derived from parameters every
+   frame -- and Phase 1.3's table has not actually been built.
 
 ## Session handoff
 

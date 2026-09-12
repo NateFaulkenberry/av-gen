@@ -27,6 +27,7 @@
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <optional>
 #include <ranges>
 #include <memory>
 #include <string>
@@ -837,6 +838,32 @@ TEST_CASE("a frame rendered offline matches the same frame rendered live",
     fs::remove_all(dir);
 }
 
+namespace {
+
+// A composition's camera is **not** `scene().camera`. That field is re-derived from `camera/mode`,
+// `camera/position` and `camera/target` (or the orbit block) on every `applyParameters`, so a test
+// that writes it directly is overwritten before the frame is drawn -- and then asserts that nothing
+// moved while the camera in fact stood still, which is a test that cannot fail. Both composition
+// tests below were written that way first.
+//
+// This is also the answer to a note in the 11 September QA record ("camera overrides via the
+// project's parameters did not move the camera"): free mode has to be selected, or position and
+// target are computed by the orbit and the writes are ignored.
+void aimCompositionCamera(params::ParameterSet& parameters, glm::vec3 position, glm::vec3 target) {
+    auto* mode = parameters.findAs<int>("camera/mode");
+    auto* pos = parameters.findAs<glm::vec3>("camera/position");
+    auto* aim = parameters.findAs<glm::vec3>("camera/target");
+    REQUIRE(mode != nullptr);
+    REQUIRE(pos != nullptr);
+    REQUIRE(aim != nullptr);
+    mode->setBase(1); // free
+    pos->setBase(position);
+    aim->setBase(target);
+    parameters.resetFinals();
+}
+
+} // namespace
+
 // ---- Phase 10.1 / SYM-STATIC-1: the composition-side half ---------------------------------------
 //
 // `tests/rendering/test_gpu.cpp` proves `SceneRenderer` does not move a static object. That covers
@@ -904,39 +931,41 @@ TEST_CASE("a composition's static nodes hold their transforms under camera motio
     }
     REQUIRE_FALSE(entityTransforms.empty());
 
+    struct Pose {
+        glm::vec3 position;
+        glm::vec3 target;
+    };
     struct Motion {
         const char* name;
         int frames;
-        void (*place)(scene::Camera&, float);
+        Pose (*place)(float);
     };
     const Motion motions[] = {
         {"translation", 60,
-         [](scene::Camera& c, float t) {
-             c.position = {-14.0f + 28.0f * t, 4.0f, 8.0f};
-             c.target = c.position + glm::vec3(0.0f, -0.15f, -1.0f);
+         [](float t) {
+             const glm::vec3 p{-14.0f + 28.0f * t, 4.0f, 8.0f};
+             return Pose{p, p + glm::vec3(0.0f, -0.15f, -1.0f)};
          }},
         {"rotation", 60,
-         [](scene::Camera& c, float t) {
+         [](float t) {
              const float a = t * 2.0f * 3.14159265f;
-             c.position = {0.0f, 3.0f, 2.0f};
-             c.target = c.position + glm::vec3(std::sin(a), -0.1f, -std::cos(a));
+             const glm::vec3 p{0.0f, 3.0f, 2.0f};
+             return Pose{p, p + glm::vec3(std::sin(a), -0.1f, -std::cos(a))};
          }},
         {"dolly", 60,
-         [](scene::Camera& c, float t) {
-             c.position = {-5.0f, 2.0f, 20.0f - 24.0f * t};
-             c.target = {-5.0f, 1.0f, -4.0f};
+         [](float t) {
+             return Pose{{-5.0f, 2.0f, 20.0f - 24.0f * t}, {-5.0f, 1.0f, -4.0f}};
          }},
         {"through", 60,
-         [](scene::Camera& c, float t) {
-             c.position = {-5.0f, 1.0f, 6.0f - 20.0f * t};
-             c.target = c.position + glm::vec3(0.0f, 0.0f, -1.0f);
+         [](float t) {
+             const glm::vec3 p{-5.0f, 1.0f, 6.0f - 20.0f * t};
+             return Pose{p, p + glm::vec3(0.0f, 0.0f, -1.0f)};
          }},
         {"orbit", 80,
-         [](scene::Camera& c, float t) {
+         [](float t) {
              const float a = t * 2.0f * 3.14159265f;
-             c.position = glm::vec3(-5.0f, 1.0f, -4.0f) +
-                          glm::vec3(16.0f * std::sin(a), 6.0f, 16.0f * std::cos(a));
-             c.target = {-5.0f, 1.0f, -4.0f};
+             const glm::vec3 c{-5.0f, 1.0f, -4.0f};
+             return Pose{c + glm::vec3(16.0f * std::sin(a), 6.0f, 16.0f * std::cos(a)), c};
          }},
     };
 
@@ -946,9 +975,11 @@ TEST_CASE("a composition's static nodes hold their transforms under camera motio
         INFO("motion: " << motion.name);
         for (int i = 0; i < motion.frames; ++i) {
             const float t = static_cast<float>(i) / static_cast<float>(motion.frames - 1);
-            motion.place(composition->scene().camera, t);
+            const Pose pose = motion.place(t);
+            aimCompositionCamera(engine.params(), pose.position, pose.target);
             step(frame, static_cast<double>(frame) / 60.0);
             ++frame;
+            REQUIRE(composition->scene().camera.position == pose.position);
 
             for (const Authored& a : authored) {
                 const scene::CompositionNode* node = composition->findNode(a.node);
@@ -1150,6 +1181,253 @@ TEST_CASE("Glowmere replays identically outside the live tier after a seek away 
     compare(capture(engine, renderer, kFar), freshFar, "seeking forward to 500");
     compare(capture(engine, renderer, kNear), freshNear, "seeking back to 100");
     compare(capture(engine, renderer, kFar), freshFar, "forward again");
+
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- SYM-STATIC-1 on the scene it was reported against -----------------------------------------
+//
+// The transform path is proven generically -- 680 renderer frames and 4,488 composition comparisons
+// on RendererQA -- but the symptom was reported on Glowmere, against the `visitor`: a static
+// procedural sitting 190 m from the origin that appeared to drift as the camera moved. A generic
+// proof does not cover an asset-specific one, and distance is exactly where float precision in a
+// transform chain would show.
+//
+// So: the same five camera motions over Glowmere, asserting every static thing holds still. Three
+// places, because a Glowmere node lands in three different containers:
+//
+//   * the authored node's world transform (`nodeWorldTransform`),
+//   * the flattened `Entity::transform` for mesh nodes,
+//   * `ProceduralGeometry::sourceTransform` and `distributionTransform` for procedural nodes --
+//     which is where the `visitor` actually lives, and which the RendererQA test never touched.
+//
+// The `wanderer` is excluded by name: ADR-091's live tier is allowed to move, and it is the only
+// thing here that is.
+//
+// **Time is held still.** The symptom is that a static object moves *as the camera moves*, so the
+// camera has to be the only thing that varies. Advancing the clock as well finds the `visitor`
+// rotating -- it is an animated procedural -- which is the scene working, not the renderer failing,
+// and an experiment that cannot tell those apart answers nothing.
+TEST_CASE("Glowmere's static geometry holds still under every camera motion",
+          "[gpu][composition][forensics][static][glowmere]") {
+    const fs::path sceneFile = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-stylized.scene.json";
+    if (!fs::is_regular_file(sceneFile)) {
+        SKIP("the Glowmere scene is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(sceneFile).has_value());
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+
+    // The live tier, excluded. Everything else in this scene is static or baked.
+    std::vector<std::string> liveNodes;
+    for (const auto& e : composition->entityWorld().entities()) {
+        liveNodes.push_back(e->desc().driven());
+    }
+    const auto isLive = [&](const std::string& name) {
+        return std::ranges::any_of(liveNodes, [&](const std::string& node) {
+            return name == node || name.rfind(node + "/", 0) == 0;
+        });
+    };
+
+    constexpr std::uint32_t kW = 192;
+    constexpr std::uint32_t kH = 120;
+    std::uint64_t frame = 0;
+    constexpr double kFixedSecond = 4.0; // one second of the piece, held for every camera pose
+    const auto step = [&]() {
+        FixedStepClock clock(60.0);
+        clock.restartAt(kFixedSecond);
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(kW, kH);
+        engine.update(time);
+        auto image = renderer.renderToImage(engine.scene(), time, kW, kH);
+        REQUIRE(image.has_value());
+    };
+
+    step();
+
+    // The reference: every static node, entity and procedural as the first frame left them.
+    std::vector<std::pair<std::string, glm::mat4>> nodeWorld;
+    for (const auto& nodePtr : composition->nodes()) {
+        if (!nodePtr || isLive(nodePtr->name)) {
+            continue;
+        }
+        nodeWorld.emplace_back(nodePtr->name, composition->nodeWorldTransform(*nodePtr).matrix());
+    }
+    std::vector<std::pair<std::string, glm::mat4>> entityWorld;
+    for (const scene::Entity& e : engine.scene().entities) {
+        if (isLive(e.name)) {
+            continue;
+        }
+        entityWorld.emplace_back(e.name, e.transform.matrix());
+    }
+    std::vector<std::pair<std::string, std::pair<glm::mat4, glm::mat4>>> proceduralWorld;
+    for (const scene::ProceduralGeometry& p : engine.scene().procedurals) {
+        if (isLive(p.name)) {
+            continue;
+        }
+        proceduralWorld.emplace_back(
+            p.name, std::pair{p.sourceTransform.matrix(), p.distributionTransform.matrix()});
+    }
+    REQUIRE(nodeWorld.size() >= 10);
+    REQUIRE(entityWorld.size() >= 50);
+    REQUIRE_FALSE(proceduralWorld.empty());
+    // The one the symptom was about, and it is 190 m out. A multi-material asset arrives as one
+    // procedural per material -- `visitor_m1`, `_m2`, `_m3` -- so it is a prefix, and asserting it
+    // was found is what stops this test quietly covering everything except the object it is for.
+    const std::size_t visitorParts =
+        static_cast<std::size_t>(std::ranges::count_if(proceduralWorld, [](const auto& entry) {
+            return entry.first.rfind("visitor", 0) == 0;
+        }));
+    INFO("visitor procedural parts: " << visitorParts);
+    REQUIRE(visitorParts >= 1);
+
+    struct Pose {
+        glm::vec3 position;
+        glm::vec3 target;
+    };
+    struct Motion {
+        const char* name;
+        int frames;
+        Pose (*place)(float);
+    };
+    // Aimed at the visitor at (-45, 31.7, 185), which is the object the report was about.
+    const glm::vec3 subject{-45.0f, 31.7f, 185.0f};
+    const Motion motions[] = {
+        {"translation", 40,
+         [](float t) {
+             return Pose{{-120.0f + 150.0f * t, 40.0f, 120.0f}, {-45.0f, 31.7f, 185.0f}};
+         }},
+        {"rotation", 40,
+         [](float t) {
+             const float a = t * 2.0f * 3.14159265f;
+             const glm::vec3 p{-45.0f, 35.0f, 120.0f};
+             return Pose{p, p + glm::vec3(std::sin(a), -0.05f, std::cos(a))};
+         }},
+        {"dolly", 40,
+         [](float t) {
+             return Pose{{-45.0f, 33.0f, 120.0f - 55.0f * t}, {-45.0f, 31.7f, 185.0f}};
+         }},
+        {"through", 40,
+         [](float t) {
+             const glm::vec3 p{-45.0f, 31.7f, 145.0f + 80.0f * t};
+             return Pose{p, p + glm::vec3(0.0f, 0.0f, 1.0f)};
+         }},
+        {"orbit", 48,
+         [](float t) {
+             const float a = t * 2.0f * 3.14159265f;
+             const glm::vec3 c{-45.0f, 31.7f, 185.0f};
+             return Pose{c + glm::vec3(70.0f * std::sin(a), 22.0f, 70.0f * std::cos(a)), c};
+         }},
+    };
+    static_cast<void>(subject);
+
+    std::size_t comparisons = 0;
+    for (const Motion& motion : motions) {
+        INFO("motion: " << motion.name);
+        for (int i = 0; i < motion.frames; ++i) {
+            const float t = static_cast<float>(i) / static_cast<float>(motion.frames - 1);
+            const Pose pose = motion.place(t);
+            aimCompositionCamera(engine.params(), pose.position, pose.target);
+            ++frame;
+            step();
+            // The camera really is where it was asked to be. Without this the whole test could pass
+            // by never moving the camera at all, which is how it was written the first time.
+            REQUIRE(composition->scene().camera.position == pose.position);
+
+            for (const auto& [name, matrix] : nodeWorld) {
+                const scene::CompositionNode* node = composition->findNode(name);
+                REQUIRE(node != nullptr);
+                INFO("node '" << name << "'");
+                REQUIRE(composition->nodeWorldTransform(*node).matrix() == matrix);
+                ++comparisons;
+            }
+            for (const scene::Entity& e : engine.scene().entities) {
+                if (isLive(e.name)) {
+                    continue;
+                }
+                for (const auto& [name, matrix] : entityWorld) {
+                    if (e.name != name) {
+                        continue;
+                    }
+                    INFO("entity '" << name << "'");
+                    REQUIRE(e.transform.matrix() == matrix);
+                    ++comparisons;
+                }
+            }
+            for (const scene::ProceduralGeometry& p : engine.scene().procedurals) {
+                if (isLive(p.name)) {
+                    continue;
+                }
+                for (const auto& [name, matrices] : proceduralWorld) {
+                    if (p.name != name) {
+                        continue;
+                    }
+                    INFO("procedural '" << name << "'");
+                    REQUIRE(p.sourceTransform.matrix() == matrices.first);
+                    REQUIRE(p.distributionTransform.matrix() == matrices.second);
+                    comparisons += 2;
+                }
+            }
+        }
+    }
+
+    INFO(comparisons << " transform comparisons over " << frame << " frames");
+    CHECK(comparisons > 5000);
+
+    // And the other half of the answer: with the *camera* held still and time advancing, the visitor
+    // does change -- it is an animated procedural. Its translation never moves; its orientation does.
+    //
+    // This is worth asserting rather than assuming, because it is the likely explanation for the
+    // original report. A large, distant, slowly turning object with no obvious animation cue reads
+    // as drift, and the first version of this very test mistook it for exactly that.
+    {
+        const glm::vec3 parked{-45.0f, 33.0f, 120.0f};
+        aimCompositionCamera(engine.params(), parked, {-45.0f, 31.7f, 185.0f});
+
+        const auto visitorDistribution = [&]() -> std::optional<glm::mat4> {
+            for (const scene::ProceduralGeometry& p : engine.scene().procedurals) {
+                if (p.name.rfind("visitor", 0) == 0) {
+                    return p.distributionTransform.matrix();
+                }
+            }
+            return std::nullopt;
+        };
+
+        FixedStepClock clock(60.0);
+        clock.restartAt(2.0);
+        FrameTime time = engine.tick(clock);
+        engine.setViewport(kW, kH);
+        engine.update(time);
+        const auto before = visitorDistribution();
+        REQUIRE(before.has_value());
+
+        for (int i = 0; i < 90; ++i) {
+            time = engine.tick(clock);
+            engine.setViewport(kW, kH);
+            engine.update(time);
+        }
+        const auto after = visitorDistribution();
+        REQUIRE(after.has_value());
+
+        CHECK(composition->scene().camera.position == parked); // nothing but time changed
+
+        // It moves: the visitor is an animated procedural that turns and hovers.
+        CHECK(*after != *before);
+        // But it hovers rather than travels -- a couple of centimetres over a second and a half,
+        // measured, not assumed. That is the shape of the thing the original report saw: a large
+        // distant object, slowly turning, with a small periodic drift and no animation cue.
+        const glm::vec3 moved{(*after)[3][0] - (*before)[3][0], (*after)[3][1] - (*before)[3][1],
+                              (*after)[3][2] - (*before)[3][2]};
+        INFO("hover over 90 frames: " << moved.x << ", " << moved.y << ", " << moved.z);
+        CHECK(glm::length(moved) > 0.0f);
+        CHECK(glm::length(moved) < 0.5f);
+    }
 
     CHECK(ctx->errorCount() == 0);
 }
