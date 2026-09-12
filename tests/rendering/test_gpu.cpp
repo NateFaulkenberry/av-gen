@@ -245,6 +245,8 @@ TEST_CASE("SceneRenderer exposes stable selected-object diagnostics", "[gpu][ren
     REQUIRE(renderer.diagnosticObject("cube") != nullptr);
     REQUIRE(renderer.diagnosticObject("second") != nullptr);
     CHECK(firstFrame.frameIndex == 0);
+    const std::uint64_t firstStateHash = firstFrame.stateHash;
+    CHECK(firstStateHash != 0);
     CHECK(firstFrame.cameraPosition == scene.camera.position);
     CHECK(renderer.diagnosticObject("cube")->entityIndex == 0);
     CHECK(renderer.diagnosticObject("cube")->objectSlot == 0);
@@ -263,6 +265,7 @@ TEST_CASE("SceneRenderer exposes stable selected-object diagnostics", "[gpu][ren
     REQUIRE(renderer.renderToImage(scene, time, 96, 64).has_value());
     CHECK(scene.entities.front().transform.matrix() == authored);
     CHECK(renderer.diagnosticFrame().cameraPosition == scene.camera.position);
+    CHECK(renderer.diagnosticFrame().stateHash != firstStateHash);
     CHECK(renderer.diagnosticObject("cube")->worldMatrix == authored);
     CHECK(renderer.diagnosticObject("cube")->objectSlot == 0);
     CHECK(ctx->errorCount() == 0);

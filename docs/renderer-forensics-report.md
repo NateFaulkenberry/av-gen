@@ -128,6 +128,7 @@ transform/material fields.
 - Selected-object renderer snapshot with world TRS/matrix, bounds, camera state, cull reason,
   submission state and GPU object slot.
 - Six signed frustum margins for the selected object's conservative world bounds.
+- Deterministic CPU diagnostic-frame hash over camera/object/culling/submission state.
 - Change-only selected-object/camera logging.
 - Performance-panel inspection of selected renderer state.
 - Compile-time CPU/WGSL size, field-offset and dynamic-offset stride guards.

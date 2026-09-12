@@ -95,6 +95,7 @@ struct RenderObjectDiagnostic {
 
 struct RendererDiagnosticFrame {
     std::uint64_t frameIndex = 0;
+    std::uint64_t stateHash = 0;
     glm::vec3 cameraPosition{0.0f};
     glm::mat4 view{1.0f};
     glm::mat4 projection{1.0f};

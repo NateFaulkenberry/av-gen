@@ -80,6 +80,35 @@ bool nearlyEqual(const glm::mat4& a, const glm::mat4& b) {
     return true;
 }
 
+void hashBytes(std::uint64_t& hash, const void* data, std::size_t size) {
+    constexpr std::uint64_t kPrime = 1099511628211ull;
+    const auto* bytes = static_cast<const std::uint8_t*>(data);
+    for (std::size_t i = 0; i < size; ++i) {
+        hash ^= bytes[i];
+        hash *= kPrime;
+    }
+}
+
+void hashDiagnosticFrame(RendererDiagnosticFrame& frame) {
+    frame.stateHash = 1469598103934665603ull;
+    hashBytes(frame.stateHash, &frame.cameraPosition, sizeof(frame.cameraPosition));
+    hashBytes(frame.stateHash, &frame.view, sizeof(frame.view));
+    hashBytes(frame.stateHash, &frame.projection, sizeof(frame.projection));
+    for (const RenderObjectDiagnostic& object : frame.objects) {
+        hashBytes(frame.stateHash, &object.entityIndex, sizeof(object.entityIndex));
+        hashBytes(frame.stateHash, &object.objectSlot, sizeof(object.objectSlot));
+        hashBytes(frame.stateHash, &object.worldPosition, sizeof(object.worldPosition));
+        hashBytes(frame.stateHash, &object.worldMatrix, sizeof(object.worldMatrix));
+        hashBytes(frame.stateHash, &object.worldBoundsMin, sizeof(object.worldBoundsMin));
+        hashBytes(frame.stateHash, &object.worldBoundsMax, sizeof(object.worldBoundsMax));
+        hashBytes(frame.stateHash, object.frustumMargins.data(), sizeof(object.frustumMargins));
+        hashBytes(frame.stateHash, &object.visible, sizeof(object.visible));
+        hashBytes(frame.stateHash, &object.cameraCulled, sizeof(object.cameraCulled));
+        hashBytes(frame.stateHash, &object.submitted, sizeof(object.submitted));
+        hashBytes(frame.stateHash, &object.finite, sizeof(object.finite));
+    }
+}
+
 } // namespace
 
 const RenderObjectDiagnostic* SceneRenderer::diagnosticObject(std::string_view name) const {
@@ -2020,6 +2049,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         shadowCasters.push_back(*item);
     }
     stats_.shadowCasters = static_cast<std::uint32_t>(shadowCasters.size());
+    hashDiagnosticFrame(diagnosticFrame_);
     if (!diagnosticEntity_.empty()) {
         if (const RenderObjectDiagnostic* current = diagnosticObject(diagnosticEntity_); current != nullptr) {
             const bool cameraChanged = !nearlyEqual(diagnosticFrame_.cameraPosition, previousDiagnosticFrame_.cameraPosition) ||
