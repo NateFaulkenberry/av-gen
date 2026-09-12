@@ -1,6 +1,7 @@
 #include "app/edit_system.hpp"
 
 #include "app/engine.hpp"
+#include "core/log.hpp"
 
 #include <algorithm>
 
@@ -90,6 +91,19 @@ EditContext* EditSystem::contextFor(EditAction action) const {
     return nullptr;
 }
 
+void EditSystem::report(const ui::EditApply& applied, const char* what) {
+    // An undo that could only restore four of five nodes has to say so -- and one that restored
+    // nothing at all especially. This was being discarded, so an undo against a session with no
+    // composition reported success and changed nothing, which is the worst available outcome: the
+    // user believes the edit is back.
+    if (applied.ok()) {
+        return;
+    }
+    for (const std::string& problem : applied.problems) {
+        log::warn("{}: {}", what, problem);
+    }
+}
+
 void EditSystem::announceSelection(const std::vector<std::string>& names) {
     // Every context, not just the focused one: the command may have come from an editor the user
     // has since left, and an undo must put back what that edit had selected. A context that does
@@ -122,7 +136,7 @@ bool EditSystem::execute(EditAction action, Engine& engine) {
             return false;
         }
         std::vector<std::string> selection;
-        static_cast<void>(history_.undo(engine, &selection));
+        report(history_.undo(engine, &selection), "undo");
         announceSelection(selection);
         return true;
     }
@@ -131,7 +145,7 @@ bool EditSystem::execute(EditAction action, Engine& engine) {
             return false;
         }
         std::vector<std::string> selection;
-        static_cast<void>(history_.redo(engine, &selection));
+        report(history_.redo(engine, &selection), "redo");
         announceSelection(selection);
         return true;
     }

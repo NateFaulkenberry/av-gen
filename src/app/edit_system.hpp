@@ -189,6 +189,7 @@ public:
 private:
     [[nodiscard]] EditContext* contextFor(EditAction action) const;
     void announceSelection(const std::vector<std::string>& names);
+    static void report(const ui::EditApply& applied, const char* what);
 
     ui::EditHistory history_;
     Clipboard clipboard_;

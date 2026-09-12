@@ -22,6 +22,7 @@ target_sources(avgen_tests PRIVATE
     # Generate World: composition on a worker, install on the main thread (ADR-066).
     "${CMAKE_SOURCE_DIR}/src/app/world_builder.cpp"
     # Viewport camera gestures are vector arithmetic over an eye and a target (ADR-068).
+    "${CMAKE_SOURCE_DIR}/src/app/ai_edit_sink.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/edit_system.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
     # The editor shell's panel registry and layout file (ADR-076). Deliberately ImGui-free so it

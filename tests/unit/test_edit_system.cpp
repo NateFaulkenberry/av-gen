@@ -4,6 +4,7 @@
 // the *dispatch* -- who gets asked, in what order, and what the menu is told -- and a real editor
 // would answer those questions with its own behaviour mixed in.
 
+#include "app/ai_edit_sink.hpp"
 #include "app/edit_system.hpp"
 #include "app/engine.hpp"
 
@@ -264,4 +265,97 @@ TEST_CASE("The clipboard carries what it holds, not just bytes", "[app][edits]")
     edits.clipboard().clear();
     CHECK(edits.clipboard().empty());
     CHECK_FALSE(edits.clipboard().holds("world/nodes"));
+}
+
+// ---- the AI transaction bridge (ADR-101) --------------------------------------------------------
+
+namespace {
+
+// Stands in for the snapshot sink that sits underneath. Records what it was told so the test can
+// check that the promise it makes -- rollback -- is still being made.
+class FakeFallback : public ai::TransactionSink {
+public:
+    void begin(const std::string& label) override { began.push_back(label); }
+    void commit(const std::string& label) override { committed.push_back(label); }
+    void abort() override { ++aborts; }
+    [[nodiscard]] bool available() const override { return ok; }
+    [[nodiscard]] std::string_view kind() const override { return "fake"; }
+
+    bool ok = true;
+    std::vector<std::string> began;
+    std::vector<std::string> committed;
+    int aborts = 0;
+};
+
+} // namespace
+
+TEST_CASE("An assistant's task becomes one entry in the history", "[app][edits][ai]") {
+    // Before this, a task that succeeded left nothing in the history: it was backed by a snapshot
+    // that only a failure ever used. "The assistant moved my camera" could not be taken back the
+    // way every other edit can.
+    app::Engine engine(app::EngineMode::Offline);
+    app::EditSystem edits;
+    FakeFallback fallback;
+    app::EditHistoryTransactionSink sink(engine, edits, fallback);
+    // `applyEdit` refuses a session with no composition, so an undo here would report success and
+    // do nothing -- which is how the missing warning above was found.
+    engine.newComposition();
+
+    // Something for the task to change. Registered before `begin`, so there is a "before" for it.
+    params::IParameter& gain =
+        engine.params().add(params::ParamDesc<float>{.path = "test/gain", .defaultValue = 1.0f,
+                                                     .hardMin = 0.0f, .hardMax = 10.0f});
+
+    SECTION("a task that changes parameters is one undoable command") {
+        sink.begin("Make it night");
+        // Several writes, the way a task makes them.
+        gain.setBaseComponent(0, 2.0f);
+        gain.setBaseComponent(0, 3.0f);
+        gain.setBaseComponent(0, 4.0f);
+        sink.commit("Make it night");
+
+        // One entry, named for the task rather than for any of its writes.
+        REQUIRE(edits.history().undoSize() == 1);
+        CHECK(edits.history().undoLabel() == "Make it night");
+        CHECK(edits.canExecute(app::EditAction::Undo));
+
+        // And undoing it returns the value it had before the task, not the one before the last write.
+        REQUIRE(edits.execute(app::EditAction::Undo, engine));
+        CHECK(gain.baseComponent(0) == 1.0f);
+        REQUIRE(edits.execute(app::EditAction::Redo, engine));
+        CHECK(gain.baseComponent(0) == 4.0f);
+    }
+
+    SECTION("a task that changed nothing leaves no entry") {
+        // An entry saying "Describe the scene" that undoes nothing is a history nobody can read.
+        sink.begin("Describe the scene");
+        sink.commit("Describe the scene");
+        CHECK(edits.history().undoSize() == 0);
+        CHECK_FALSE(edits.canExecute(app::EditAction::Undo));
+    }
+
+    SECTION("an aborted task leaves no entry") {
+        // It did not happen. An entry for it would offer to undo an edit the user never saw.
+        sink.begin("A task that fails");
+        gain.setBaseComponent(0, 9.0f);
+        sink.abort();
+        CHECK(edits.history().undoSize() == 0);
+        CHECK(fallback.aborts == 1); // and the snapshot underneath is what put the document back
+    }
+
+    SECTION("the snapshot underneath still gets its calls") {
+        // This sink makes a task undoable; the snapshot makes it abortable. Different promises, and
+        // dropping the second while adding the first would be a quiet loss of rollback.
+        sink.begin("Something");
+        gain.setBaseComponent(0, 5.0f);
+        sink.commit("Something");
+        CHECK(fallback.began == std::vector<std::string>{"Something"});
+        CHECK(fallback.committed == std::vector<std::string>{"Something"});
+    }
+
+    SECTION("availability is the fallback's answer, since it is what can roll back") {
+        CHECK(sink.available());
+        fallback.ok = false;
+        CHECK_FALSE(sink.available());
+    }
 }
