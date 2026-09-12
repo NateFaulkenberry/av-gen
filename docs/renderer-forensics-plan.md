@@ -738,6 +738,41 @@ cmake --preset tsan && cmake --build --preset tsan -j 4 && ctest --preset tsan -
   --frames 120 --fps 30 --size 1280x800 --tier realtime
 ```
 
+## Session log: 12 September 2026 (second pass)
+
+**Closed.** Phase 0.1 (baselines, conditions, symptom register), Phase 0.2 (evidence package and
+status definitions), Phase 1.2 camera ownership, Phase 2.3 in full, Phase 3.1 matrix conventions,
+Phase 5.1's limb-crossing regression, Phase 9.2's replay experiment, and the transform half of
+Phase 10.1.
+
+**One defect found and fixed:** the animation phase origin (`SYM-ANIM-1`). It was found by the
+Phase 9.2 experiment on its first run, which is what the experiment was for.
+
+**Three hypotheses disproven, recorded so they are not retried:**
+
+1. *A limb-crossing regression can be written against the alien.* It cannot. A T-pose bind box is
+   wider than every pose the clip animates into, so bind-pose and posed bounds agree there and the
+   test passes with the posed-bounds path reverted. Use a rig that reaches past its bind pose.
+2. *The diagnostic state hash can serve as a replay identity.* It cannot; it folds in a monotonic
+   `paletteVersion`. It is a change detector.
+3. *`CompositionNode::transform` is authoritative.* It is not; it is re-derived from
+   `nodes/<name>/position` every frame. The parameter is the authoritative value.
+
+**Also:** the cull-bounds computation was written out twice inside `Composition` and is now one
+function, `scene::entityCullBounds` -- which is what made the Phase 5.1 property testable at all.
+
+**Next smallest falsifiable checks**, in the order I would take them:
+
+1. Run the Phase 9.2 replay against **Glowmere** rather than the alien. It has terrain, water,
+   vegetation and an imported asset; the animation phase origin was one history-dependent store and
+   there is no reason to believe it was the only one. Same shape of test, one scene swap.
+2. Drive the five camera motions over Glowmere with the UFO, closing `SYM-STATIC-1` on the scene it
+   was reported against. The transform path is proven generically; the asset-specific axis is not.
+3. Extend the static-object matrix along the axes it does not cover: timeline seek, scrub, scene
+   reload and resolution change. The renderer has separate coverage for each; nothing crosses them
+   with a static object.
+4. Then `SYM-WATER-1`, which needs a scene before it needs a test.
+
 ## Session handoff
 
 At the end of every work session:
