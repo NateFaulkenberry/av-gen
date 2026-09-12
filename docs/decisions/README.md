@@ -111,3 +111,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [103](ADR-103-audio-arrangement.md) | Several audio files are one arrangement, mixed down to one buffer | Accepted |
 | [104](ADR-104-designating-heroes.md) | A hero is declared by starring the object that is one | Accepted |
 | [105](ADR-105-the-directed-camera-follows-its-heroes.md) | A directed camera follows its heroes until somebody else takes it | Accepted |
+| [106](ADR-106-a-hero-follows-its-object.md) | A hero follows the object it describes | Accepted |

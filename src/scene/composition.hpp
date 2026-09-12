@@ -382,6 +382,9 @@ public:
     // a question about *when*, not about which fields differ -- and because comparing two vectors
     // of heroes every frame to answer "no" is work nobody needs done.
     [[nodiscard]] std::uint64_t heroRevision() const { return heroRevision_; }
+    // How long a hero's object has to stop moving before the declaration is considered settled and
+    // the revision moves. Exposed so a test does not have to sleep.
+    void setHeroSettleSeconds(double seconds) { heroSettleSeconds_ = std::max(0.0, seconds); }
 
     // ---- the ground (§3, ADR-090) --------------------------------------------------------------
     //
@@ -723,6 +726,21 @@ private:
 
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
     std::uint64_t heroRevision_ = 1;
+    // Where each hero's node stood when the hero was last in step with it, so a move can be applied
+    // to the hero as a *delta*. A delta rather than a re-measurement, because a hero's position is
+    // allowed to be somewhere other than the middle of its object -- Glowmere's elder sits below
+    // its crown on purpose -- and re-measuring would quietly throw that authorship away.
+    //
+    // Parallel to `heroes_`. An empty optional means "no node of that name", which is a legitimate
+    // state: a hero may name an assembly of several nodes rather than one object.
+    std::vector<std::optional<glm::vec3>> heroAnchors_;
+    // A hero moved and the world has not settled yet. Moving an object is a *drag* -- sixty
+    // positions a second -- and each one that reached `heroRevision_` would re-cut the directed
+    // shot, which is a fold of the whole track. The revision moves once, when the motion stops.
+    bool heroMotionPending_ = false;
+    double heroSettleAt_ = 0.0;
+    double heroSettleSeconds_ = 0.25;
+    void syncHeroesToNodes();
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
     std::vector<entity::FieldDesc> fieldDescs_;   // ADR-097: authored, round-tripped as "fields"
     std::string profileLibraryPath_;              // ADR-097: "entityProfiles", relative to the scene

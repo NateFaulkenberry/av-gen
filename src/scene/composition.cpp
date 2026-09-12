@@ -1248,8 +1248,72 @@ Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
         }
     }
     heroes_ = std::move(heroes);
+    // Anchored where their objects stand *now*, so the first sync after this reports no motion. A
+    // hero declared at the same moment its object is placed must not read as having been dragged.
+    heroAnchors_.assign(heroes_.size(), std::nullopt);
+    for (std::size_t i = 0; i < heroes_.size(); ++i) {
+        if (const CompositionNode* node = findNode(heroes_[i].name)) {
+            heroAnchors_[i] = nodeWorldTransform(*node).position;
+        }
+    }
+    heroMotionPending_ = false;
     ++heroRevision_;
     return {};
+}
+
+// A hero describes an object that is already placed (ADR-074), so moving the object has to move the
+// description with it. Before this it did not: the position was a snapshot taken at declaration, so
+// dragging a hero's object left the director framing the empty space it used to occupy, and the
+// editor's own hero mark stayed behind on the ground.
+//
+// Translation only, and by delta. A hero's position is allowed to sit somewhere other than the
+// middle of its object -- an authored one deliberately does -- so re-measuring from the bounds would
+// silently discard that. Size is not followed either: scaling an object is a rarer, more deliberate
+// act than moving it, and re-measuring `radius` and `height` would overwrite numbers a person may
+// have chosen. Undeclaring and declaring again is the way to take a fresh measurement.
+//
+// A hero that names an assembly rather than a node has no anchor and is left alone; there is no one
+// object whose movement would be the assembly's.
+void Composition::syncHeroesToNodes() {
+    if (heroes_.empty()) {
+        return;
+    }
+    heroAnchors_.resize(heroes_.size());
+    bool moved = false;
+    for (std::size_t i = 0; i < heroes_.size(); ++i) {
+        const CompositionNode* node = findNode(heroes_[i].name);
+        if (node == nullptr) {
+            heroAnchors_[i].reset();
+            continue;
+        }
+        const glm::vec3 at = nodeWorldTransform(*node).position;
+        if (!heroAnchors_[i]) {
+            // First sight of this node: adopt where it is without moving the hero. A node that
+            // arrives later -- an undone deletion, a renamed object -- must not teleport the hero
+            // by the whole distance between them.
+            heroAnchors_[i] = at;
+            continue;
+        }
+        const glm::vec3 delta = at - *heroAnchors_[i];
+        if (glm::dot(delta, delta) < 1e-8f) {
+            continue;
+        }
+        heroes_[i].position += delta;
+        heroAnchors_[i] = at;
+        moved = true;
+    }
+    if (moved) {
+        // Everything that reads a hero's *position* -- the editor's mark, the clearance field, the
+        // obstacles entities walk around -- is already correct, because it reads `heroes_`. Only the
+        // revision waits, because the one thing that is expensive to redo is the directed shot.
+        heroMotionPending_ = true;
+        heroSettleAt_ = currentTime_ + heroSettleSeconds_;
+        return;
+    }
+    if (heroMotionPending_ && currentTime_ >= heroSettleAt_) {
+        heroMotionPending_ = false;
+        ++heroRevision_;
+    }
 }
 
 Result<void> Composition::setEntities(std::vector<entity::EntityDesc> entities) {
@@ -3614,6 +3678,9 @@ void Composition::update(const FrameTime& time) {
         cameraAngle_ += cameraOrbitSpeed_->value() * dt;
     }
     applyParameters();
+    // After the parameters, because a node's position is one of them: a hero follows the object it
+    // describes, and where that object is has only just been decided for this frame.
+    syncHeroesToNodes();
     // ADR-099 §13. After the parameters, because a floating layer's node transform is one of them,
     // and before the culling, so a drifting layer's bounds are this frame's rather than last
     // frame's -- a raft that has moved out of frame must be culled on where it is now.

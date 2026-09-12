@@ -1724,3 +1724,111 @@ TEST_CASE("the overlay is told about every hero, and which one is the subject") 
     REQUIRE(editor.visuals().heroMarkers.size() == 1);
     CHECK(editor.visuals().heroMarkers.front().name == a);
 }
+
+// A hero describes an object that is already placed, so moving the object has to move the
+// description with it. It used to be a snapshot taken at designation: drag the object and the
+// director went on framing the space it used to occupy, with the editor's hero mark still on the
+// ground where it had been. The screenshot that reported this had the ring twenty metres under the
+// thing it was supposed to be describing.
+TEST_CASE("a hero follows the object it describes") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    const std::string a = f.add("arch", glm::vec3(0.0f, 0.0f, 0.0f));
+    auto* composition = f.engine.composition();
+    composition->setHeroSettleSeconds(0.0);   // settle immediately; the debounce has its own test
+    editor.setNodesHero(f.engine, std::vector<std::string>{a}, true);
+    REQUIRE(composition->heroes().size() == 1);
+
+    auto tick = [&](double at) {
+        FrameTime time;
+        time.renderTime = at;
+        time.deltaTime = 1.0 / 60.0;
+        f.engine.update(time);
+    };
+    tick(0.0);
+    const glm::vec3 declaredAt = composition->heroes().front().position;
+    const float declaredRadius = composition->heroes().front().radius;
+
+    // Move it the way the editor does, through the parameter.
+    edits.history().push(ui::moveNodes(f.engine, std::vector<std::string>{a}, glm::vec3(12.0f, 3.0f, -7.0f)));
+    tick(1.0);
+    const world::HeroPoint& moved = composition->heroes().front();
+    CHECK_THAT(moved.position.x, Catch::Matchers::WithinAbs(declaredAt.x + 12.0, 1e-3));
+    CHECK_THAT(moved.position.y, Catch::Matchers::WithinAbs(declaredAt.y + 3.0, 1e-3));
+    CHECK_THAT(moved.position.z, Catch::Matchers::WithinAbs(declaredAt.z - 7.0, 1e-3));
+    // By a delta, so a hero deliberately placed off-centre stays off-centre, and its size is not
+    // re-measured behind the user's back.
+    CHECK_THAT(moved.radius, Catch::Matchers::WithinAbs(declaredRadius, 1e-4));
+
+    // Undo puts the object back, and the hero comes with it.
+    CHECK(edits.history().undo(f.engine).ok());
+    tick(2.0);
+    CHECK_THAT(composition->heroes().front().position.x, Catch::Matchers::WithinAbs(declaredAt.x, 1e-3));
+    CHECK_THAT(composition->heroes().front().position.z, Catch::Matchers::WithinAbs(declaredAt.z, 1e-3));
+
+    SECTION("an authored offset between hero and object survives the move") {
+        std::vector<world::HeroPoint> offset = composition->heroes();
+        offset.front().position += glm::vec3(0.0f, -9.0f, 0.0f);   // as Glowmere's elder is
+        REQUIRE(composition->setHeroes(offset).has_value());
+        const glm::vec3 before = composition->heroes().front().position;
+        edits.history().push(ui::moveNodes(f.engine, std::vector<std::string>{a}, glm::vec3(4.0f, 0.0f, 0.0f)));
+        tick(3.0);
+        CHECK_THAT(composition->heroes().front().position.x, Catch::Matchers::WithinAbs(before.x + 4.0, 1e-3));
+        CHECK_THAT(composition->heroes().front().position.y, Catch::Matchers::WithinAbs(before.y, 1e-3));
+    }
+
+    SECTION("a hero naming an assembly has no object to follow and is left alone") {
+        world::HeroPoint assembly;
+        assembly.name = "elder";
+        assembly.assembly = "elder";
+        assembly.position = glm::vec3(1.0f, 2.0f, 3.0f);
+        REQUIRE(composition->setHeroes({assembly}).has_value());
+        edits.history().push(ui::moveNodes(f.engine, std::vector<std::string>{a}, glm::vec3(50.0f, 0.0f, 0.0f)));
+        tick(4.0);
+        CHECK_THAT(composition->heroes().front().position.x, Catch::Matchers::WithinAbs(1.0, 1e-4));
+    }
+}
+
+// Moving an object is a drag: sixty positions a second. Each one reaching the hero revision would
+// re-cut the directed shot sixty times a second, and a re-cut folds the whole track. The world
+// follows immediately; the revision waits for the motion to stop.
+TEST_CASE("a hero's move reaches the director once, when the object stops") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    const std::string a = f.add("arch", glm::vec3(0.0f, 0.0f, 0.0f));
+    auto* composition = f.engine.composition();
+    composition->setHeroSettleSeconds(0.25);
+    editor.setNodesHero(f.engine, std::vector<std::string>{a}, true);
+    auto tick = [&](double at) {
+        FrameTime time;
+        time.renderTime = at;
+        time.deltaTime = 1.0 / 60.0;
+        f.engine.update(time);
+    };
+    tick(0.0);
+    const std::uint64_t before = composition->heroRevision();
+    const float declaredX = composition->heroes().front().position.x;
+
+    // A drag: twenty frames of movement inside the settle window.
+    double now = 0.0;
+    for (int frame = 1; frame <= 20; ++frame) {
+        now = static_cast<double>(frame) / 60.0;
+        REQUIRE(ui::setNodePosition(f.engine, a, glm::vec3(static_cast<float>(frame) * 0.5f, 0.0f, 0.0f)));
+        tick(now);
+        INFO("frame " << frame);
+        CHECK(composition->heroRevision() == before);   // the shot is not re-cut mid-drag
+    }
+    // ...but the world already knows where it is, so nothing that reads a hero is stale meanwhile.
+    CHECK_THAT(composition->heroes().front().position.x,
+               Catch::Matchers::WithinAbs(static_cast<double>(declaredX) + 10.0, 0.5));
+
+    // Let go: one bump, and only one.
+    tick(now + 0.3);
+    CHECK(composition->heroRevision() == before + 1);
+    tick(now + 0.6);
+    CHECK(composition->heroRevision() == before + 1);
+}
