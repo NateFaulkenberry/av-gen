@@ -54,6 +54,7 @@
 #include <webgpu/webgpu_cpp.h>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <limits>
@@ -219,6 +220,14 @@ struct FrameUniforms {
 // `skySun` was added; this assert is what caught the WGSL side needing the same field in the same
 // place, which is the whole reason it is written as a sum rather than a number.
 static_assert(sizeof(FrameUniforms) == 192 + 368 + 64 + 512);
+static_assert(offsetof(FrameUniforms, viewProj) == 0);
+static_assert(offsetof(FrameUniforms, invViewProj) == 64);
+static_assert(offsetof(FrameUniforms, prevViewProj) == 128);
+static_assert(offsetof(FrameUniforms, cameraPos) == 192);
+static_assert(offsetof(FrameUniforms, params) == 256);
+static_assert(offsetof(FrameUniforms, shadowMaskParams) == 544);
+static_assert(offsetof(FrameUniforms, wind) == 560);
+static_assert(offsetof(FrameUniforms, lights) == 624);
 
 struct ObjectUniforms {
     glm::mat4 model;
@@ -232,6 +241,14 @@ struct ObjectUniforms {
                    // y = material id, z = bloom weight of this object's emission, w = 0
 };
 static_assert(sizeof(ObjectUniforms) == 272);
+static_assert(offsetof(ObjectUniforms, model) == 0);
+static_assert(offsetof(ObjectUniforms, normalMatrix) == 64);
+static_assert(offsetof(ObjectUniforms, prevModel) == 128);
+static_assert(offsetof(ObjectUniforms, baseColor) == 192);
+static_assert(offsetof(ObjectUniforms, emissive) == 208);
+static_assert(offsetof(ObjectUniforms, material) == 224);
+static_assert(offsetof(ObjectUniforms, flags) == 240);
+static_assert(offsetof(ObjectUniforms, ids) == 256);
 
 struct TonemapUniforms {
     float exposure;
