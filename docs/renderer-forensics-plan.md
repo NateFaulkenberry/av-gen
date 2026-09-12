@@ -69,6 +69,17 @@ This is an investigation and correctness effort, not a visual feature sprint. No
 - `[ ]` Identify every render pass, its inputs, outputs, clears, readbacks and resource ownership.
 - `[ ]` Record where culling, LOD, animation, water, shadows, particles and post effects execute relative to extraction and submission.
 
+**Current code-level map:** `Application::runLive` / the headless render loop owns the command
+encoder and calls `Engine::update` before `SceneRenderer::render` or `renderFrame`. `Engine::update`
+evaluates signals, parameters, timeline and the active scene controller. `Composition::update` runs
+composition-node updates, `cullEntityNodes`, terrain/water updates and character updates; the latter
+calls `scene::updateRigs`, which poses rigs before renderer submission. `SceneRenderer::render`
+constructs camera matrices, updates environment/lights, uploads skinning data, writes object
+uniforms in `makeItem`, builds camera and shadow draw lists, and encodes the ordered GPU passes.
+`SceneRenderer::renderFrame` and `renderToImage` wrap the same render path for headless/capture use.
+The current map is sufficient to begin instrumentation; pass-by-pass resource ownership remains
+open in Phase 7.
+
 ### 1.2 Identify authoritative owners
 
 - `[~]` Confirm authoritative scene world transforms.
