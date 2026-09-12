@@ -142,7 +142,14 @@ open in Phase 7.
 
 - `[~]` Confirm authoritative scene world transforms.
   - `[x]` `scene::Entity::transform` and `scene::Transform::matrix()` are documented as authoritative.
-  - `[ ]` Audit every caller that writes transforms during update, composition flattening, animation, terrain grounding and sequencer evaluation.
+  - `[x]` **`CompositionNode::transform` is a derived copy, not an authoritative value.**
+    `Composition::applyParameters` re-derives it from `nodes/<name>/position|rotation|scale` every
+    frame, so a direct write to the node field does not survive one update. Found by a negative
+    control: perturbing the node field by a millimetre did **not** fail the static-transform
+    regression, and perturbing the parameter did. The authoritative value for an authored node is the
+    parameter; the node field is a cache of its base. (`ui::setNodePosition` already writes both, and
+    says why.)
+  - `[ ]` Audit the remaining writers: animation, terrain grounding and sequencer evaluation.
 - `[x]` Confirm authoritative camera state and matrix generation.
   - `[x]` `Camera::view()` and `glm::perspectiveRH_ZO` are documented.
   - `[x]` Find and compare every competing view/projection construction path.
@@ -616,7 +623,18 @@ For every level, run camera translation, rotation, orbit, dolly, playback, pause
 
 ### 10.1 Glowmere/UFO regression
 
-- `[ ]` Test static UFO close-up with camera dolly, orbit, rotation, cut, timeline seek, scrub, reload and resolution change.
+- `[~]` Test static geometry with camera dolly, orbit, rotation, translation and a pass through it.
+  `[x]` **Both halves of the transform path are now covered, and neither moves.**
+  - Renderer: `tests/rendering/test_gpu.cpp` `[gpu][renderer][forensics][static]` -- 680 frames,
+    five motions, authored TRS and the renderer's diagnostic world matrix bit-identical throughout,
+    plus a projection cross-check and a byte-identical return after a 240-frame excursion.
+  - Composition: `tests/rendering/test_composition_gpu.cpp` `[gpu][composition][forensics][static]`
+    -- the same five motions through `Engine` over RendererQA, asserting both the authored node world
+    transform *and* the flattened entity transform on every frame. 4,488 comparisons.
+    Negative-controlled: a one-millimetre change to `nodes/near-cube/position` fails it.
+  - `[ ]` Remaining: the same matrix on Glowmere itself with the UFO asset, and the seek/scrub/reload/
+    resolution-change axes. The transform path is proven; the asset- and transport-specific axes are
+    not.
 - `[ ]` Capture world transform, GPU transform, camera, bounds, visibility, LOD and object ID.
 - `[ ]` Classify apparent motion as transform, camera, GPU, culling, LOD, shader or post-processing behavior.
 - `[ ]` Add a permanent regression test for the proven root cause.

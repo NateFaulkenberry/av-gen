@@ -43,8 +43,9 @@ Application::runLive / Application::runHeadless
 
 | State | Authoritative owner | Renderer representation | Evidence |
 |---|---|---|---|
-| Entity world TRS | `scene::Entity::transform` | `ObjectUniforms::model` | Static-camera invariant; renderer write audit |
-| Camera pose | `scene::Camera` | `view`, `projection`, `FrameUniforms` | Camera matrix path and QA camera sequence |
+| Entity world TRS | `scene::Entity::transform` | `ObjectUniforms::model` | Static-object invariant over 680 renderer frames and 4,488 composition comparisons across five camera motions |
+| Authored node TRS | **`nodes/<name>/position\|rotation\|scale`**, not `CompositionNode::transform` | flattened into `Entity::transform` | `applyParameters` re-derives the node field from the parameter every frame; a direct write to it does not survive one update (negative control) |
+| Camera pose | `scene::Camera` | `view`, `projection`, `FrameUniforms` | **No competing construction exists**: `Camera::view()` is the only `glm::lookAt*` outside shadow light-views and `Camera::projection()` the only camera `glm::perspective*`; conventions pinned by test |
 | Animation time/pose | timeline/scene update and `scene::updateRigs` | skinning palette upload | Skinning tests and scene culling audit |
 | Visibility/culling | composition/procedural cull paths | draw lists and GPU cull buffers | Culling/LOD suite; selected-object diagnostics |
 | Object GPU slot | `SceneRenderer::makeItem` | aligned dynamic object buffer slot | Forensic object-slot regression |
@@ -55,8 +56,8 @@ Application::runLive / Application::runHeadless
 
 | Subsystem | Status | Evidence / remaining risk |
 |---|---|---|
-| Core transforms | `PASS` for audited renderer path | Renderer does not mutate authoritative entity TRS, proven over 680 frames of five camera motions with bit equality, and a 240-frame excursion returns byte-identical. Full scene-writer audit remains open. |
-| Camera matrices | `PASS` for current path | RH/WebGPU 0..1 path, finite guards, camera-cut and motion sequences pass. Competing-path audit remains open. |
+| Core transforms | `PASS` for renderer and composition paths | Renderer does not mutate authoritative entity TRS, proven over 680 frames of five camera motions with bit equality, and a 240-frame excursion returns byte-identical. Full scene-writer audit remains open. |
+| Camera matrices | `PASS` | RH/WebGPU 0..1 path, finite guards, camera-cut and motion sequences pass. Competing-path audit **closed**: there are none. One deliberate asymmetry recorded -- terrain culls at an aspect floor of 2.5 while entities cull at the exact viewport aspect. |
 | Basic opaque geometry | `PASS` | Deterministic cube and full release suite pass. |
 | GPU object state | `PASS` for audited slots/caches | Dynamic slot guards, stable object diagnostics and scene-owned cache fixes pass. Full buffer generation audit remains open. |
 | Resource lifetime | `PARTIAL` | Timeline ring, target replacement, post transient release and scene swaps pass. Full asynchronous/live lifetime audit remains open. |
@@ -69,7 +70,7 @@ Application::runLive / Application::runHeadless
 | Shadows | `PARTIAL` | Existing shadow regressions and full release suite pass. Workload timing can be contention-sensitive. |
 | Particles | `PARTIAL` | Deterministic compaction, scene-owned pools and post/helper stress pass. Full camera/depth isolation remains open. |
 | Post-processing | `PARTIAL` | Existing effect tests and transient target stress pass. Full pass-state and temporal history inventory remains open. |
-| Sequencer/transport | `PARTIAL` | Seek-only discontinuity reset and repeated-frame determinism pass. Full application scrub matrix remains open. |
+| Sequencer/transport | `PARTIAL` | Seek-only discontinuity reset, repeated-frame determinism and the frame-100/500/100 replay pass. Full application scrub matrix remains open. |
 | Assets | `PARTIAL` | Existing asset/import regressions pass; renderer asset-specific isolation is not complete. |
 | Performance | `PARTIAL` | Release baseline is clean; per-scene forensic remeasurement and diagnostic overhead remain open. |
 

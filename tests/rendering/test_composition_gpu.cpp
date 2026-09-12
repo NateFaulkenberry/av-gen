@@ -835,3 +835,150 @@ TEST_CASE("a frame rendered offline matches the same frame rendered live",
     fs::current_path(previous);
     fs::remove_all(dir);
 }
+
+// ---- Phase 10.1 / SYM-STATIC-1: the composition-side half ---------------------------------------
+//
+// `tests/rendering/test_gpu.cpp` proves `SceneRenderer` does not move a static object. That covers
+// the renderer and nothing else: the reported symptom is on the *composition* path, where a node's
+// authored transform is flattened through a parent chain into an entity every frame, terrain
+// grounding may write a Y, and the sequencer may write anything.
+//
+// So this drives the same five camera motions through `Engine` over the RendererQA scene and asserts
+// the two places the transform lives -- the authored `CompositionNode::transform` and the flattened
+// `Entity::transform` it produces -- are bit-identical on every frame. The flattening is re-run each
+// update, so a transform that drifts would drift here and nowhere the renderer test could see it.
+TEST_CASE("a composition's static nodes hold their transforms under camera motion",
+          "[gpu][composition][forensics][static]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the RendererQA scene is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(project).has_value());
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+
+    // Every node the scene authors as static geometry, and the entity range each produced.
+    const std::vector<std::string> staticNodes{"floor", "near-cube", "far-cube", "behind-camera",
+                                               "transparent-orb"};
+    struct Authored {
+        std::string node;
+        glm::mat4 nodeMatrix{1.0f};
+    };
+    std::vector<Authored> authored;
+
+    constexpr std::uint32_t kW = 192;
+    constexpr std::uint32_t kH = 120;
+    const auto step = [&](std::uint64_t index, double seconds) {
+        FixedStepClock clock(60.0);
+        clock.restartAt(seconds);
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(kW, kH);
+        engine.update(time);
+        auto image = renderer.renderToImage(engine.scene(), time, kW, kH);
+        REQUIRE(image.has_value());
+        static_cast<void>(index);
+    };
+
+    step(0, 0.0);
+    for (const std::string& name : staticNodes) {
+        const scene::CompositionNode* node = composition->findNode(name);
+        if (node == nullptr) {
+            continue; // the scene may be edited; assert on what it actually has
+        }
+        authored.push_back({name, composition->nodeWorldTransform(*node).matrix()});
+    }
+    REQUIRE(authored.size() >= 4);
+
+    // The entity transforms the flatten produced, keyed by entity name so a re-ordered scene does
+    // not silently compare different objects.
+    std::vector<std::pair<std::string, glm::mat4>> entityTransforms;
+    for (const scene::Entity& e : engine.scene().entities) {
+        entityTransforms.emplace_back(e.name, e.transform.matrix());
+    }
+    REQUIRE_FALSE(entityTransforms.empty());
+
+    struct Motion {
+        const char* name;
+        int frames;
+        void (*place)(scene::Camera&, float);
+    };
+    const Motion motions[] = {
+        {"translation", 60,
+         [](scene::Camera& c, float t) {
+             c.position = {-14.0f + 28.0f * t, 4.0f, 8.0f};
+             c.target = c.position + glm::vec3(0.0f, -0.15f, -1.0f);
+         }},
+        {"rotation", 60,
+         [](scene::Camera& c, float t) {
+             const float a = t * 2.0f * 3.14159265f;
+             c.position = {0.0f, 3.0f, 2.0f};
+             c.target = c.position + glm::vec3(std::sin(a), -0.1f, -std::cos(a));
+         }},
+        {"dolly", 60,
+         [](scene::Camera& c, float t) {
+             c.position = {-5.0f, 2.0f, 20.0f - 24.0f * t};
+             c.target = {-5.0f, 1.0f, -4.0f};
+         }},
+        {"through", 60,
+         [](scene::Camera& c, float t) {
+             c.position = {-5.0f, 1.0f, 6.0f - 20.0f * t};
+             c.target = c.position + glm::vec3(0.0f, 0.0f, -1.0f);
+         }},
+        {"orbit", 80,
+         [](scene::Camera& c, float t) {
+             const float a = t * 2.0f * 3.14159265f;
+             c.position = glm::vec3(-5.0f, 1.0f, -4.0f) +
+                          glm::vec3(16.0f * std::sin(a), 6.0f, 16.0f * std::cos(a));
+             c.target = {-5.0f, 1.0f, -4.0f};
+         }},
+    };
+
+    std::uint64_t frame = 1;
+    std::size_t checks = 0;
+    for (const Motion& motion : motions) {
+        INFO("motion: " << motion.name);
+        for (int i = 0; i < motion.frames; ++i) {
+            const float t = static_cast<float>(i) / static_cast<float>(motion.frames - 1);
+            motion.place(composition->scene().camera, t);
+            step(frame, static_cast<double>(frame) / 60.0);
+            ++frame;
+
+            for (const Authored& a : authored) {
+                const scene::CompositionNode* node = composition->findNode(a.node);
+                REQUIRE(node != nullptr);
+                INFO("node " << a.node);
+                REQUIRE(composition->nodeWorldTransform(*node).matrix() == a.nodeMatrix);
+                ++checks;
+            }
+            // The flattened entities too: the node transform surviving while the entity it produces
+            // drifts would be exactly the reported symptom, and only this half can see it.
+            std::size_t compared = 0;
+            for (const scene::Entity& e : engine.scene().entities) {
+                for (const auto& [name, matrix] : entityTransforms) {
+                    if (e.name != name) {
+                        continue;
+                    }
+                    // Skinned characters and particles legitimately move; static geometry does not.
+                    if (e.rig != scene::kInvalidRig) {
+                        continue;
+                    }
+                    INFO("entity " << e.name);
+                    REQUIRE(e.transform.matrix() == matrix);
+                    ++compared;
+                }
+            }
+            REQUIRE(compared > 0);
+            checks += compared;
+        }
+    }
+
+    INFO(checks << " transform comparisons over " << frame << " frames");
+    CHECK(checks > 2000);
+    CHECK(ctx->errorCount() == 0);
+}
