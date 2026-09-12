@@ -1311,3 +1311,54 @@ TEST_CASE("Cut is one step, and undoing it brings the objects back", "[ui][edito
     // And the selection comes back with them, so the user can see what returned.
     CHECK(editor.selection.nodes().size() == 2);
 }
+
+TEST_CASE("A continuous edit is one entry, however many writes it made", "[ui][editor][history]") {
+    // §20's requirement, at the level the edit system sees it. A slider or a numeric field writes a
+    // parameter on every frame it is touched; sixty entries for one interaction makes undo useless,
+    // because taking back "that change" becomes sixty presses and the user cannot tell how many.
+    //
+    // The mechanism is the history's drag coalescing: open once, write through, close once. This
+    // tests it against the *system*, since that is what the menu and Cmd+Z now act on.
+    Fixture f;
+    app::EditSystem edits;
+    const std::string a = f.add("lamp", glm::vec3(0.0f));
+    const std::string path = "nodes/" + a + "/position";
+
+    edits.history().beginDrag(f.engine, "Change Position", {path}, {a});
+    CHECK(edits.history().dragging());
+    // Many writes, the way an interaction makes them.
+    for (int i = 1; i <= 60; ++i) {
+        ui::setBaseComponents(f.engine, path, {static_cast<float>(i) * 0.1f, 0.0f, 0.0f});
+    }
+    // Nothing is in the history yet: the interaction is still happening.
+    CHECK(edits.history().undoSize() == 0);
+    CHECK_FALSE(edits.canExecute(app::EditAction::Undo));
+
+    edits.history().commitDrag(f.engine);
+    // One entry for the whole interaction.
+    REQUIRE(edits.history().undoSize() == 1);
+    CHECK(edits.history().undoLabel() == "Change Position");
+
+    // And one press takes back the whole of it -- to where it stood before the interaction began,
+    // not to the second-to-last frame of it.
+    REQUIRE(edits.execute(app::EditAction::Undo, f.engine));
+    CHECK(ui::baseComponents(f.engine, path)[0] == 0.0f);
+
+    SECTION("an interaction that ends where it started leaves no entry") {
+        // Press, wobble, come back, release. Nothing changed, so there is nothing to take back --
+        // an entry here is one the user would press Cmd+Z for and see nothing happen.
+        edits.history().beginDrag(f.engine, "Change Position", {path}, {a});
+        ui::setBaseComponents(f.engine, path, {5.0f, 0.0f, 0.0f});
+        ui::setBaseComponents(f.engine, path, {0.0f, 0.0f, 0.0f});
+        edits.history().commitDrag(f.engine);
+        CHECK(edits.history().undoSize() == 0);
+    }
+
+    SECTION("a cancelled interaction puts the value back and leaves no entry") {
+        edits.history().beginDrag(f.engine, "Change Position", {path}, {a});
+        ui::setBaseComponents(f.engine, path, {9.0f, 0.0f, 0.0f});
+        edits.history().cancelDrag(f.engine);
+        CHECK(edits.history().undoSize() == 0);
+        CHECK(ui::baseComponents(f.engine, path)[0] == 0.0f);
+    }
+}
