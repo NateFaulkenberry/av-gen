@@ -761,17 +761,29 @@ Phase 9.2 experiment on its first run, which is what the experiment was for.
 **Also:** the cull-bounds computation was written out twice inside `Composition` and is now one
 function, `scene::entityCullBounds` -- which is what made the Phase 5.1 property testable at all.
 
+**Check 1 done: the replay on Glowmere.** `[gpu][composition][forensics][determinism][glowmere]`.
+278 entities, terrain, water, vegetation, a wind field and two characters. Exactly **one** transform
+diverged -- the `wanderer` -- by about 25 m, with joints, visibility and culling flags all identical.
+
+The investigation ended at a **contract, not a defect**: ADR-091 puts an ambient `EntityWorld`
+character in the **live tier**, "stateful, reset on seek, and *explicitly not frame-accurate under
+scrub*". Its `seek` makes the result plausible, not reproducible, and that is the decision. Recorded
+because the next person to run this will read 25 m and call it a bug.
+
+The test now asserts the **boundary** instead of blanket equality: every entity outside the live tier
+must replay exactly, the live ones may differ, and an entity that is not live and moves is named in
+the failure. Negative-controlled by classifying nothing as live, which fails it. The image hash is
+deliberately *not* compared -- a live character 25 m away changes pixels, and demanding equality
+there would be demanding what ADR-091 declines to promise.
+
 **Next smallest falsifiable checks**, in the order I would take them:
 
-1. Run the Phase 9.2 replay against **Glowmere** rather than the alien. It has terrain, water,
-   vegetation and an imported asset; the animation phase origin was one history-dependent store and
-   there is no reason to believe it was the only one. Same shape of test, one scene swap.
-2. Drive the five camera motions over Glowmere with the UFO, closing `SYM-STATIC-1` on the scene it
+1. Drive the five camera motions over Glowmere with the UFO, closing `SYM-STATIC-1` on the scene it
    was reported against. The transform path is proven generically; the asset-specific axis is not.
-3. Extend the static-object matrix along the axes it does not cover: timeline seek, scrub, scene
+2. Extend the static-object matrix along the axes it does not cover: timeline seek, scrub, scene
    reload and resolution change. The renderer has separate coverage for each; nothing crosses them
    with a static object.
-4. Then `SYM-WATER-1`, which needs a scene before it needs a test.
+3. Then `SYM-WATER-1`, which needs a scene before it needs a test.
 
 ## Session handoff
 

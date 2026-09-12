@@ -27,6 +27,7 @@
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <ranges>
 #include <memory>
 #include <string>
 
@@ -980,5 +981,175 @@ TEST_CASE("a composition's static nodes hold their transforms under camera motio
 
     INFO(checks << " transform comparisons over " << frame << " frames");
     CHECK(checks > 2000);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- Phase 9.2 on the hard scene ----------------------------------------------------------------
+//
+// The alien replay found one history-dependent store (the animation phase origin) and there was no
+// reason to believe it was the only one. Glowmere is the scene that would hold the others: terrain
+// with view-distance culling, water that follows the chunks, scattered vegetation, a wind field,
+// simulated plants and an imported character.
+//
+// Same experiment, harder scene, and the comparison is by subsystem rather than by image hash --
+// because "the pixels differ" is where the last one started and "98 joint matrices, no transforms"
+// is where it became a fix.
+//
+// It found one divergence, and the investigation ended at a contract rather than a defect: the
+// `wanderer` -- an ambient `EntityWorld` character -- lands about 25 m apart depending on where the
+// playhead came from. ADR-091 puts exactly that in the **live tier**: "stateful, reset on seek, and
+// **explicitly not frame-accurate under scrub**". Its `seek` makes the result plausible, not
+// reproducible, and that is the decision rather than a bug.
+//
+// So this asserts the *boundary*: everything outside the live tier must replay exactly, and the only
+// entities permitted to differ are the ones `EntityWorld` drives. A baked actor, a terrain chunk, a
+// water surface or a scattered plant drifting would fail here, which is the regression worth having.
+TEST_CASE("Glowmere replays identically outside the live tier after a seek away and back",
+          "[gpu][composition][forensics][determinism][glowmere]") {
+    const fs::path sceneFile = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-stylized.scene.json";
+    if (!fs::is_regular_file(sceneFile)) {
+        SKIP("the Glowmere scene is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+
+    constexpr std::uint32_t kW = 192;
+    constexpr std::uint32_t kH = 120;
+    constexpr double kFps = 30.0;
+    constexpr double kNear = 100.0 / kFps;
+    constexpr double kFar = 500.0 / kFps;
+
+    // What a frame of this scene *is*, beyond its pixels. Compared field by field so a divergence
+    // names its own subsystem.
+    struct Snapshot {
+        std::vector<glm::mat4> transforms;
+        std::vector<glm::mat4> joints;
+        std::vector<std::uint8_t> visible;
+        std::vector<std::uint8_t> culled;
+        std::vector<std::string> names;
+        std::vector<std::uint8_t> live; // driven by EntityWorld: ADR-091's live tier
+        std::uint64_t image = 0;
+    };
+
+    const auto capture = [&](app::Engine& engine, rendering::SceneRenderer& renderer, double seconds) {
+        engine.seekSeconds(seconds);
+        FixedStepClock clock(kFps);
+        clock.restartAt(seconds);
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(kW, kH);
+        engine.update(time);
+        renderer.resetTemporalHistory();
+        auto image = renderer.renderToImage(engine.scene(), time, kW, kH);
+        REQUIRE(image.has_value());
+
+        Snapshot snap;
+        const scene::Scene& s = engine.scene();
+        // The nodes EntityWorld drives. An entity belongs to the live tier when its name is that
+        // node's or is prefixed by it, which is how the flatten names an asset's parts.
+        std::vector<std::string> liveNodes;
+        if (const scene::Composition* comp = engine.composition()) {
+            for (const auto& e : comp->entityWorld().entities()) {
+                liveNodes.push_back(e->desc().driven());
+            }
+        }
+        snap.transforms.reserve(s.entities.size());
+        snap.visible.reserve(s.entities.size());
+        snap.culled.reserve(s.entities.size());
+        for (const scene::Entity& e : s.entities) {
+            snap.transforms.push_back(e.transform.matrix());
+            snap.visible.push_back(e.visible ? 1u : 0u);
+            snap.culled.push_back(e.cameraCulled ? 1u : 0u);
+            snap.names.push_back(e.name);
+            const bool live = std::ranges::any_of(liveNodes, [&](const std::string& node) {
+                return e.name == node || e.name.rfind(node + "/", 0) == 0;
+            });
+            snap.live.push_back(live ? 1u : 0u);
+        }
+        for (const scene::SkinnedRig& rig : s.rigs) {
+            snap.joints.insert(snap.joints.end(), rig.palette.begin(), rig.palette.end());
+        }
+        snap.image = gpu::hashImage(*image);
+        return snap;
+    };
+
+    const auto compare = [](const Snapshot& a, const Snapshot& b, const char* what) {
+        INFO(what);
+        REQUIRE(a.transforms.size() == b.transforms.size());
+        REQUIRE(a.joints.size() == b.joints.size());
+        REQUIRE(a.visible.size() == b.visible.size());
+        std::size_t transforms = 0;
+        std::size_t joints = 0;
+        std::size_t visibility = 0;
+        std::size_t culling = 0;
+        std::size_t liveTierDiffering = 0;
+        for (std::size_t i = 0; i < a.transforms.size(); ++i) {
+            if (a.transforms[i] != b.transforms[i]) {
+                // Permitted only for the live tier, and named when it is not.
+                if (a.live[i] != 0u) {
+                    ++liveTierDiffering;
+                } else {
+                    INFO("entity '" << a.names[i] << "' is not live and moved");
+                    ++transforms;
+                }
+            }
+            visibility += a.visible[i] == b.visible[i] ? 0 : 1;
+            culling += a.culled[i] == b.culled[i] ? 0 : 1;
+        }
+        for (std::size_t i = 0; i < a.joints.size(); ++i) {
+            joints += a.joints[i] == b.joints[i] ? 0 : 1;
+        }
+        INFO(transforms << " non-live transforms, " << liveTierDiffering << " live-tier, " << joints
+                        << " joints, " << visibility << " visibility, " << culling
+                        << " culling flags differ of " << a.transforms.size() << " entities and "
+                        << a.joints.size() << " joint matrices");
+        CHECK(transforms == 0);
+        CHECK(joints == 0);
+        CHECK(visibility == 0);
+        CHECK(culling == 0);
+        // The image is *not* compared: a live-tier character 25 m from where it would otherwise be
+        // changes pixels, and demanding equality here would be demanding what ADR-091 declines to
+        // promise. The state comparison above is the assertion; the hash is reported for the record.
+        INFO("image hashes " << a.image << " vs " << b.image);
+    };
+
+    // Two engines that have been nowhere else: the references.
+    Snapshot freshNear;
+    Snapshot freshFar;
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadComposition(sceneFile).has_value());
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        freshNear = capture(engine, renderer, kNear);
+    }
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadComposition(sceneFile).has_value());
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        freshFar = capture(engine, renderer, kFar);
+    }
+    CHECK(freshNear.image != freshFar.image); // the scene really does change between the two
+
+    // One engine, walked across the gap and back.
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(sceneFile).has_value());
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    // The live tier really is present in this scene: without it the boundary assertion would be
+    // vacuous and this would be an ordinary determinism test wearing a forensic hat.
+    {
+        app::Engine probe(app::EngineMode::Offline);
+        REQUIRE(probe.loadComposition(sceneFile).has_value());
+        REQUIRE(probe.composition() != nullptr);
+        CHECK_FALSE(probe.composition()->entityWorld().entities().empty());
+    }
+
+    compare(capture(engine, renderer, kNear), freshNear, "arriving at 100");
+    compare(capture(engine, renderer, kFar), freshFar, "seeking forward to 500");
+    compare(capture(engine, renderer, kNear), freshNear, "seeking back to 100");
+    compare(capture(engine, renderer, kFar), freshFar, "forward again");
+
     CHECK(ctx->errorCount() == 0);
 }

@@ -156,6 +156,29 @@ transform/material fields.
 
 **Regression:** The exact lifecycle case passes 466 assertions under ASan/UBSan.
 
+## Established as contract, not defect
+
+### Live-tier entities do not replay across a seek
+
+**Symptom:** Glowmere's `wanderer` lands about 25 m apart at the same second depending on whether the
+playhead arrived there directly or was seeked from earlier.
+
+**Evidence:** the Phase 9.2 replay over Glowmere -- 278 entities -- reported exactly one differing
+transform, with every joint matrix, visibility flag and culling flag identical.
+
+**Not a defect.** ADR-091 divides simulation into a baked tier (`Track::evaluate(t)`, scrub-safe and
+offline-exact) and a **live tier**: "ambient population, props, background vehicles. Stateful, reset
+on seek, and **explicitly not frame-accurate under scrub**." An ambient `EntityWorld` character is
+live. `EntityWorld::seek` exists to make a seeked frame *plausible* -- it is why a character does not
+snap back to its t=0 pose -- not to make it reproducible.
+
+**Regression:** the test asserts the boundary rather than equality. Everything outside the live tier
+replays exactly; an entity that is not live and moves is named in the failure. Negative-controlled by
+classifying nothing as live.
+
+**Residual risk:** the live tier is identified by "driven by `EntityWorld`". If a *baked* actor were
+ever driven through the same path it would be silently excused by this test.
+
 ## Diagnostics delivered
 
 - Selected-object renderer snapshot with world TRS/matrix, bounds, camera state, cull reason,
@@ -189,7 +212,8 @@ transform/material fields.
 - All-object cull reason history and complete GPU object generation/offset audit.
 - Generic transparency/depth isolation and water mask/depth leakage proof.
 - Progressive RendererQA enablement levels 0 through 15.
-- Full Glowmere UFO, alien and water canonical regression matrix.
+- Glowmere UFO close-up matrix and the water canonical regression matrix. (Glowmere's seek replay is
+  now covered; the alien's is closed.)
 - Full sanitizer and resource-lifetime suites without environment timeout/benchmark interference.
 - Final CPU/GPU performance remeasurement and diagnostic overhead measurement.
 
