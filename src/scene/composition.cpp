@@ -3636,8 +3636,18 @@ void Composition::updateCharacters(const FrameTime& time) {
         }
         if (node.animation.state != node.animationApplied) {
             // A new request: it is made now, and it keeps that second for the rest of its life.
+            //
+            // Except the first one. The state a scene *file* authors has been in effect since the
+            // piece began; anchoring it to `time.renderTime` anchors it to whenever the engine
+            // happened to run its first update, which is not a property of the piece at all. The
+            // symptom is that a character's idle sits at a different point in its loop depending on
+            // where you seeked from: an engine seeked straight to 16.7 s and one that played from
+            // 3.3 s to 16.7 s disagreed on 98 joint matrices at the same second (renderer forensics
+            // Phase 9.2). A state requested *during* playback -- by a behaviour, a cue, the
+            // sequencer -- still starts when it was requested, which is what those mean.
+            const bool authoredFromTheStart = node.animationApplied.empty();
             node.animationApplied = node.animation.state;
-            node.animationAppliedAt = time.renderTime;
+            node.animationAppliedAt = authoredFromTheStart ? 0.0 : time.renderTime;
             node.animationPushed = false;
         }
         if (node.animationPushed) {

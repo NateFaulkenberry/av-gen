@@ -182,6 +182,147 @@ TEST_CASE("authored animated character culling changes pixels and recovers", "[g
     CHECK(ctx->errorCount() == 0);
 }
 
+// ---- Phase 9.2: the frame-100 -> frame-500 -> frame-100 replay ---------------------------------
+//
+// The plan names this experiment exactly. Its point is not that a renderer is deterministic from a
+// cold start -- that is already covered -- but that it is deterministic *after having been somewhere
+// else*. Every temporal store in the frame is a chance for frame 100 reached forwards and frame 100
+// reached backwards to differ, and every one of those failures looks like "the image flickers when I
+// scrub".
+//
+// **It is run through `Engine`, and that is the finding.** Driving `Composition::update` straight
+// from t=3.3 s to t=16.7 s produces a *different scene* at 16.7 s than loading fresh and going
+// there: measured, with a fresh renderer over each, 18196457925992915825 against
+// 9262657865428539071. That is not a defect. `Composition::update` is playback, not a seek -- a
+// jump integrates stateful simulation across the gap -- and `Engine::seekSeconds` is the operation
+// that makes a time jump reproducible (it reseeds modulation, sources, the music classifier, the
+// cue state, the entity world and the event scheduler). A forensic test that skips it is testing an
+// API contract nobody uses and calling the result a renderer bug.
+TEST_CASE("frame 100 replays identically after a seek to 500 and back",
+          "[gpu][composition][forensics][determinism]") {
+    const fs::path sceneFile = fs::path(AVGEN_SOURCE_DIR) / "examples" / "characters" / "alien.scene.json";
+    if (!fs::is_regular_file(sceneFile)) {
+        SKIP("the alien composition is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+
+    constexpr std::uint32_t kW = 256;
+    constexpr std::uint32_t kH = 160;
+    constexpr double kFps = 30.0;
+    constexpr double kNear = 100.0 / kFps;
+    constexpr double kFar = 500.0 / kFps;
+
+    // One engine, one renderer, seeked between the two times exactly as the transport does.
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(sceneFile).has_value());
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    const auto renderAt = [&](double seconds) {
+        engine.seekSeconds(seconds);
+        FixedStepClock clock(kFps);
+        clock.restartAt(seconds);
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(kW, kH);
+        engine.update(time);
+        renderer.resetTemporalHistory(); // a seek is a discontinuity, not motion
+        auto image = renderer.renderToImage(engine.scene(), time, kW, kH);
+        REQUIRE(image.has_value());
+        return gpu::hashImage(*image);
+    };
+
+    // The references: an engine and a renderer that have been nowhere else.
+    const auto renderFresh = [&](double seconds) {
+        app::Engine fresh(app::EngineMode::Offline);
+        REQUIRE(fresh.loadComposition(sceneFile).has_value());
+        rendering::SceneRenderer freshRenderer(*ctx, shaders);
+        REQUIRE(freshRenderer.init().has_value());
+        fresh.seekSeconds(seconds);
+        FixedStepClock clock(kFps);
+        clock.restartAt(seconds);
+        const FrameTime time = fresh.tick(clock);
+        fresh.setViewport(kW, kH);
+        fresh.update(time);
+        auto image = freshRenderer.renderToImage(fresh.scene(), time, kW, kH);
+        REQUIRE(image.has_value());
+        return gpu::hashImage(*image);
+    };
+
+    const std::uint64_t freshNear = renderFresh(kNear);
+    const std::uint64_t freshFar = renderFresh(kFar);
+    CHECK(freshNear != freshFar); // the scene really does animate between the two
+
+    // Where a divergence would be, asserted directly: an image hash says "something differs" and
+    // this says which subsystem. The first time this ran it reported 98 differing joint matrices
+    // with every entity transform identical, which is what identified the animation phase origin as
+    // the cause rather than transforms, culling or the renderer.
+    {
+        app::Engine direct(app::EngineMode::Offline);
+        REQUIRE(direct.loadComposition(sceneFile).has_value());
+        direct.seekSeconds(kFar);
+        FixedStepClock dc(kFps);
+        dc.restartAt(kFar);
+        FrameTime dt = direct.tick(dc);
+        direct.setViewport(kW, kH);
+        direct.update(dt);
+
+        app::Engine viaNear(app::EngineMode::Offline);
+        REQUIRE(viaNear.loadComposition(sceneFile).has_value());
+        viaNear.seekSeconds(kNear);
+        FixedStepClock nc(kFps);
+        nc.restartAt(kNear);
+        FrameTime nt = viaNear.tick(nc);
+        viaNear.setViewport(kW, kH);
+        viaNear.update(nt);
+        viaNear.seekSeconds(kFar);
+        FixedStepClock fc(kFps);
+        fc.restartAt(kFar);
+        nt = viaNear.tick(fc);
+        viaNear.setViewport(kW, kH);
+        viaNear.update(nt);
+
+        const scene::Scene& a = direct.scene();
+        const scene::Scene& b = viaNear.scene();
+        REQUIRE(a.rigs.size() == b.rigs.size());
+        REQUIRE(a.entities.size() == b.entities.size());
+        std::size_t jointsDiffering = 0;
+        for (std::size_t r = 0; r < a.rigs.size(); ++r) {
+            REQUIRE(a.rigs[r].palette.size() == b.rigs[r].palette.size());
+            for (std::size_t j = 0; j < a.rigs[r].palette.size(); ++j) {
+                jointsDiffering += a.rigs[r].palette[j] == b.rigs[r].palette[j] ? 0 : 1;
+            }
+        }
+        std::size_t transformsDiffering = 0;
+        for (std::size_t e = 0; e < a.entities.size(); ++e) {
+            transformsDiffering +=
+                a.entities[e].transform.matrix() == b.entities[e].transform.matrix() ? 0 : 1;
+        }
+        INFO(jointsDiffering << " joint matrices and " << transformsDiffering
+                             << " entity transforms differ at the same second");
+        CHECK(jointsDiffering == 0);
+        CHECK(transformsDiffering == 0);
+    }
+    const std::uint64_t walkedNear = renderAt(kNear);
+    const std::uint64_t walkedFar = renderAt(kFar);
+    const std::uint64_t returnedNear = renderAt(kNear);
+
+    INFO("fresh 100 = " << freshNear << ", walked 100 = " << walkedNear << ", far " << walkedFar
+                        << " vs fresh far " << freshFar << ", returned 100 = " << returnedNear);
+    CHECK(walkedNear == freshNear);
+    CHECK(walkedFar == freshFar);
+    // The experiment: coming back is the same as arriving.
+    CHECK(returnedNear == freshNear);
+
+    // Repeated, because a single round trip can hide a store that needs two to diverge.
+    for (int lap = 0; lap < 3; ++lap) {
+        INFO("lap " << lap);
+        REQUIRE(renderAt(kFar) == freshFar);
+        REQUIRE(renderAt(kNear) == freshNear);
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("RendererQA camera cuts match fresh renderers", "[gpu][composition][forensics]") {
     const fs::path sceneFile = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.scene.json";
     if (!fs::is_regular_file(sceneFile) ||

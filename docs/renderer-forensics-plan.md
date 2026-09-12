@@ -500,13 +500,30 @@ For every level, run camera translation, rotation, orbit, dolly, playback, pause
 
 ### 9.2 Determinism and hashing
 
-- `[ ]` Implement the frame-100 -> frame-500 -> frame-100 replay experiment.
+- `[x]` Implement the frame-100 -> frame-500 -> frame-100 replay experiment.
+  `tests/rendering/test_composition_gpu.cpp`, `[gpu][composition][forensics][determinism]`.
+  **It failed, and found a real defect** -- see "Animation phase origin" in the report. Frame 500
+  reached by seeking from frame 100 differed from frame 500 reached directly: 98 joint matrices, with
+  every entity transform identical. Root cause, fix and regression are recorded; the experiment now
+  passes including three extra laps.
+
+  Two things this established that are worth not re-deriving:
+  - **`Composition::update` is not a seek.** Jumping its clock forward integrates stateful
+    simulation across the gap. The experiment has to be driven through `Engine::seekSeconds`, which
+    is the operation that makes a time jump reproducible; a test that skips it is testing an API
+    contract nobody uses.
+  - **The diagnostic state hash cannot be a replay identity.** It folds in `paletteVersion`, a
+    monotonic counter, so two arrivals at the same second legitimately hash differently. It is a
+    change detector, not a state identity, and Phase 9.2 comparisons must use the state itself.
 - `[ ]` Compare static transforms, animation state, camera state and deterministic object ordering.
 - `[~]` Diagnostic frames now carry a deterministic CPU state hash over camera matrices, object
   transforms/bounds, frustum margins, visibility, GPU slot/submission state and selected rig palette
   metadata. A focused regression verifies the hash is stable for the same state and changes with
   camera state; full frame-100/500 replay and bone-matrix/scene-state hashes remain open.
-- `[ ]` Log hash transitions with frame number and seek direction.
+- `[~]` Log hash transitions with frame number and seek direction.
+  The replay regression reports differing joint matrices and entity transforms by count at the
+  divergent second, which is what localised the animation defect. Application-level logging of hash
+  transitions during an interactive scrub is still open.
 - `[ ]` Add tests for timeline seeking, reverse playback, scene reload and renderer reuse.
 - `[ ]` Distinguish same-GPU bit equality from cross-GPU perceptual comparison.
 

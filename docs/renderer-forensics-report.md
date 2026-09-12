@@ -55,14 +55,14 @@ Application::runLive / Application::runHeadless
 
 | Subsystem | Status | Evidence / remaining risk |
 |---|---|---|
-| Core transforms | `PASS` for audited renderer path | Renderer does not mutate authoritative entity TRS. Full scene-writer audit remains open. |
+| Core transforms | `PASS` for audited renderer path | Renderer does not mutate authoritative entity TRS, proven over 680 frames of five camera motions with bit equality, and a 240-frame excursion returns byte-identical. Full scene-writer audit remains open. |
 | Camera matrices | `PASS` for current path | RH/WebGPU 0..1 path, finite guards, camera-cut and motion sequences pass. Competing-path audit remains open. |
 | Basic opaque geometry | `PASS` | Deterministic cube and full release suite pass. |
 | GPU object state | `PASS` for audited slots/caches | Dynamic slot guards, stable object diagnostics and scene-owned cache fixes pass. Full buffer generation audit remains open. |
 | Resource lifetime | `PARTIAL` | Timeline ring, target replacement, post transient release and scene swaps pass. Full asynchronous/live lifetime audit remains open. |
-| Culling | `PARTIAL` | Terrain/authored/selected diagnostics and plane margins pass. Animated limb-crossing pixel regression remains open. |
+| Culling | `PASS` for the audited path | Terrain/authored/selected diagnostics and plane margins pass. The cull box is now one function (`scene::entityCullBounds`) rather than two copies inside `Composition`, and a rig that reaches past its bind pose proves the box contains the pose; bind-pose bounds fail it. |
 | LOD | `PASS` for transition stability | CPU/GPU threshold, spread and hysteresis tests pass. RendererQA image/performance calibration remains open. |
-| Animation/skinning | `PARTIAL` | Palette validation, scene-owned palette cache and culling-freeze fixes pass. Full idle/walk/run/terrain/water matrix remains open. |
+| Animation/skinning | `PARTIAL` | Palette validation, scene-owned palette cache, culling-freeze and phase-origin fixes pass; the pose is now a pure function of the timeline across seeks. Full idle/walk/run/terrain/water matrix remains open. |
 | Terrain | `PARTIAL` | Visibility leave/return regression passes. Larger terrain/water boundary QA remains open. |
 | Water | `PARTIAL` | Blend convention, view matrix cases, scene swaps and deterministic image tests pass. Mask/depth leakage isolation remains open. |
 | Transparency/depth | `PARTIAL` | Main pass contract and water compositing tests pass. Dedicated generic transparency isolation remains open. |
@@ -110,6 +110,38 @@ emission.
 
 **Repair:** `ParticleRenderer` tracks owning scene and resets pools on scene change.
 
+### Animation phase origin depended on when the engine first updated
+
+**Symptom:** the same second of the same piece produced a different character pose depending on where
+the playhead came from. Seeking straight to 16.67 s and playing to 16.67 s from 3.33 s disagreed. In
+an editor this reads as a character flicking to a different point in its walk cycle when you scrub.
+
+**Reproduction:** two `app::Engine`s over `examples/characters/alien.scene.json`; one seeked to
+16.67 s, the other seeked to 3.33 s, updated, then seeked to 16.67 s. Compare `scene().rigs[*].palette`.
+
+**Observed state:** 98 joint matrices differed. **Every entity transform was identical**, which ruled
+out transforms, culling and the renderer in one comparison and pointed at the pose.
+
+**Root cause:** `Composition` set `node.animationAppliedAt = time.renderTime` the first time it
+applied a node's authored animation state, and `AnimationPlayer::localTime` measures a clip's phase
+from that second. So the phase origin of a state a *scene file* authored was "whenever the engine
+happened to run its first update" -- not a property of the piece, and different for every playback
+history.
+
+**Repair:** the first application of an authored state anchors at 0.0, the timeline's origin, because
+that state has been in effect since the piece began. A state requested *during* playback -- by a
+behaviour, a cue or the sequencer -- still starts when it was requested, which is what those mean.
+One condition, at the one place that could tell the two apart.
+
+**Regression:** the Phase 9.2 replay case, which asserts the palettes and transforms agree at the
+divergent second as well as comparing image hashes, and runs three further laps. Full release suite
+unchanged at 1,682 passing.
+
+**Residual risk:** this changes the pose an authored state shows at any given second in a scene whose
+first update was not at t=0. No existing test moved, and an offline render from 0 is unaffected by
+construction, but a scene authored by eye against the old behaviour would now be a fraction of a
+cycle further on.
+
 ### Detached composition parameter use-after-free
 
 **Symptom:** `Composition::update()` dereferenced node light/terrain/water parameter pointers after
@@ -150,12 +182,12 @@ transform/material fields.
 
 ## Open evidence gaps
 
-- Pixel-level animated limb crossing a frustum plane while bind-pose bounds differ.
+- Composition-side static-object proof (node flattening, terrain grounding, sequencer writes). The
+  renderer side is closed; the Glowmere UFO matrix in Phase 10.1 is the remaining half.
 - Full reference/minimal renderer path and immutable frame snapshot/replay.
 - All-object cull reason history and complete GPU object generation/offset audit.
 - Generic transparency/depth isolation and water mask/depth leakage proof.
 - Progressive RendererQA enablement levels 0 through 15.
-- Frame hash/state replay from frame 100 to 500 and back.
 - Full Glowmere UFO, alien and water canonical regression matrix.
 - Full sanitizer and resource-lifetime suites without environment timeout/benchmark interference.
 - Final CPU/GPU performance remeasurement and diagnostic overhead measurement.
