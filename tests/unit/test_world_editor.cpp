@@ -1526,3 +1526,129 @@ TEST_CASE("A lock is saved with the scene, and a scene with no locks is written 
     CHECK((*reloaded)->findNode(a)->locked);
     CHECK_FALSE((*reloaded)->findNode("b")->locked);
 }
+
+// ---- heroes (ADR-072/074) --------------------------------------------------------------------
+//
+// The `heroes` block existed and could only be reached by hand-editing a scene file -- the camera
+// director's "found no heroes to shoot" had no answer inside the application. These cover the half
+// of the toggle that is not pixels: what a designated hero is measured to be, that it is undoable,
+// and that undoing one gives back the hero that was there rather than a fresh guess at it.
+
+TEST_CASE("designating an object measures the hero from the object") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    const std::string a = f.add("tower", glm::vec3(3.0f, 0.0f, -4.0f));
+    auto* composition = f.engine.composition();
+    CHECK_FALSE(ui::nodeIsHero(*composition, a));
+
+    editor.setNodesHero(f.engine, std::vector<std::string>{a}, true);
+    REQUIRE(composition->heroes().size() == 1);
+    const world::HeroPoint& hero = composition->heroes().front();
+    CHECK(hero.name == a);
+    CHECK(hero.assembly == a);      // the node is the assembly; it is not a library asset id
+    CHECK(hero.assetId.empty());
+    CHECK(ui::nodeIsHero(*composition, a));
+
+    // Measured, not guessed: the hero sits at the middle of the box the object occupies, and is as
+    // big as that box.
+    const scene::WorldBounds bounds = composition->nodeBounds(a);
+    REQUIRE(bounds.valid);
+    CHECK_THAT(hero.position.x, Catch::Matchers::WithinAbs(bounds.centre().x, 1e-4));
+    CHECK_THAT(hero.position.y, Catch::Matchers::WithinAbs(bounds.centre().y, 1e-4));
+    CHECK_THAT(hero.position.z, Catch::Matchers::WithinAbs(bounds.centre().z, 1e-4));
+    CHECK_THAT(hero.height, Catch::Matchers::WithinAbs(bounds.size().y, 1e-4));
+    CHECK_THAT(hero.radius,
+               Catch::Matchers::WithinAbs(std::max(bounds.size().x, bounds.size().z) * 0.5f, 1e-4));
+    // A camera has somewhere to stand, and the hero activates before the camera gets there --
+    // `validate()` rejects the other way round, and a hero that activates inside its own shot never
+    // activates while it is being looked at.
+    CHECK(hero.preferredCameraDistance > 0.0f);
+    CHECK(hero.activationRadius >= hero.preferredCameraDistance);
+    CHECK(hero.validate().has_value());
+
+    // Designating it again is not a second hero.
+    editor.setNodesHero(f.engine, std::vector<std::string>{a}, true);
+    CHECK(composition->heroes().size() == 1);
+}
+
+TEST_CASE("undesignating a hero is undoable and gives the authored one back") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    const std::string a = f.add("elder", glm::vec3(0.0f, 0.0f, 0.0f));
+    auto* composition = f.engine.composition();
+
+    // An authored hero, with the judgements a person would have made about it: which one the shot
+    // is about, and how it answers the music. None of that is derivable from the geometry, which is
+    // the whole reason the command carries the hero rather than a flag.
+    world::HeroPoint authored = ui::heroFromNode(*composition, a);
+    authored.importance = 0.93f;
+    authored.reactionProfile = "organism";
+    authored.colorAccent = glm::vec3(0.1f, 0.8f, 0.4f);
+    REQUIRE(composition->setHeroes({authored}).has_value());
+    REQUIRE(ui::nodeIsHero(*composition, a));
+
+    editor.setNodesHero(f.engine, std::vector<std::string>{a}, false);
+    CHECK(composition->heroes().empty());
+    CHECK_FALSE(ui::nodeIsHero(*composition, a));
+
+    REQUIRE(edits.history().canUndo());
+    CHECK(edits.history().undo(f.engine).ok());
+    REQUIRE(composition->heroes().size() == 1);
+    const world::HeroPoint& back = composition->heroes().front();
+    CHECK(back.reactionProfile == "organism");          // not re-measured from the node
+    CHECK_THAT(back.importance, Catch::Matchers::WithinAbs(0.93, 1e-6));
+    CHECK_THAT(back.colorAccent.g, Catch::Matchers::WithinAbs(0.8, 1e-6));
+
+    CHECK(edits.history().redo(f.engine).ok());
+    CHECK(composition->heroes().empty());
+}
+
+TEST_CASE("heroes stay ranked, so the director's subject is the most important one") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    const std::string small = f.add("lamp", glm::vec3(-5.0f, 0.0f, 0.0f));
+    const std::string big = f.add("spire", glm::vec3(5.0f, 0.0f, 0.0f));
+    auto* composition = f.engine.composition();
+
+    editor.setNodesHero(f.engine, std::vector<std::string>{small}, true);
+    editor.setNodesHero(f.engine, std::vector<std::string>{big}, true);
+    REQUIRE(composition->heroes().size() == 2);
+    // Equal importance: the tie is broken by the order they were designated in, which is the rule
+    // the panel's tooltip states.
+    CHECK(composition->heroes().front().name == small);
+
+    // ...and a hero that is more important than the rest is the subject wherever it was declared.
+    std::vector<world::HeroPoint> ranked = composition->heroes();
+    ranked.back().importance = 0.9f;
+    REQUIRE(composition->setHeroes(ranked).has_value());
+    const std::string third = f.add("arch", glm::vec3(0.0f, 0.0f, -9.0f));
+    editor.setNodesHero(f.engine, std::vector<std::string>{third}, true);
+    CHECK(composition->heroes().front().name == big);
+}
+
+TEST_CASE("a designated hero survives a save and a load") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    const std::string a = f.add("monument", glm::vec3(1.0f, 0.0f, 2.0f));
+    editor.setNodesHero(f.engine, std::vector<std::string>{a}, true);
+    const world::HeroPoint declared = f.engine.composition()->heroes().front();
+
+    const auto scenePath = f.dir / "heroic.scene.json";
+    REQUIRE(f.engine.saveComposition(scenePath).has_value());
+    app::Engine reopened(app::EngineMode::Offline);
+    REQUIRE(reopened.loadComposition(scenePath).has_value());
+    REQUIRE(reopened.composition()->heroes().size() == 1);
+    const world::HeroPoint& loaded = reopened.composition()->heroes().front();
+    CHECK(loaded.name == declared.name);
+    CHECK(loaded.assembly == declared.assembly);
+    CHECK_THAT(loaded.radius, Catch::Matchers::WithinAbs(declared.radius, 1e-4));
+    CHECK(ui::nodeIsHero(*reopened.composition(), a));
+}

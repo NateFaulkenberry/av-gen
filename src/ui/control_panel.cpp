@@ -225,17 +225,28 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
         // tooltip: a menu item that is absent looks like a feature that does not exist, and one
         // that fails on click looks like a bug.
         const bool haveAudio = engine.track() != nullptr;
-        ImGui::BeginDisabled(!haveAudio || !onDirectCamera);
+        // ...and something to point at. This used to be gated on the audio alone, so a world with no
+        // heroes gave an enabled menu item that failed with "declare some in the scene's heroes
+        // block" -- an instruction that could only be followed in a text editor. Saying it here, in
+        // terms of the button that now does it, is the difference between a dead end and a next step.
+        const scene::Composition* composition = engine.composition();
+        const bool haveHeroes =
+            (composition != nullptr && !composition->heroes().empty()) ||
+            (worldBuilder.lastWorld && !worldBuilder.lastWorld->composed.plan.heroes.empty());
+        ImGui::BeginDisabled(!haveAudio || !haveHeroes || !onDirectCamera);
         if (ImGui::MenuItem("Direct to Music")) {
             onDirectCamera();
         }
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-            ImGui::SetTooltip(haveAudio
-                                  ? "folds the track into musical sections and cuts the camera "
-                                    "between this world's heroes, landing a reveal on the drop"
-                                  : "load audio first: the camera is cut to the track's structure, "
-                                    "so there has to be a track");
+            ImGui::SetTooltip(!haveAudio
+                                  ? "load audio first: the camera is cut to the track's structure, "
+                                    "so there has to be a track"
+                              : !haveHeroes
+                                  ? "nothing to travel to: star an object in World > Objects to make "
+                                    "it a hero, or generate a world"
+                                  : "folds the track into musical sections and cuts the camera "
+                                    "between this world's heroes, landing a reveal on the drop");
         }
         ImGui::BeginDisabled(!onClearCameraAutomation || !engine.timeline().isAutomated("camera/position"));
         if (ImGui::MenuItem("Hand Camera Back to the Viewport")) {

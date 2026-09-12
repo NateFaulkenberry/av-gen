@@ -2061,7 +2061,8 @@ Result<void> Application::directCameraFromTrack() {
         heroes = panel_->worldBuilder.lastWorld->composed.plan.heroes;
     }
     if (heroes.empty()) {
-        return fail("--direct found no heroes to shoot: declare some in the scene's \"heroes\" "
+        return fail("--direct found no heroes to shoot: open the World window and star an object "
+                    "in its Objects list to make it a hero, declare them in the scene's \"heroes\" "
                     "block, or generate a world");
     }
     auto installed = directEngine(*engine_, heroes);

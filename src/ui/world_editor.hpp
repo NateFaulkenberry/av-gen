@@ -193,6 +193,9 @@ public:
     // saved with the scene, because which things you had put out of the way is worth keeping.
     void setNodesVisible(app::Engine& engine, std::span<const std::string> names, bool visible);
     void setNodesLocked(app::Engine& engine, std::span<const std::string> names, bool locked);
+    // Declares objects heroes, or takes the declaration back (ADR-072/074). Undoable, and saved
+    // with the scene: a hero is authored state, not a view setting.
+    void setNodesHero(app::Engine& engine, std::span<const std::string> names, bool hero);
 
     // Drops selected names that no longer exist (after a scene swap or a Generate).
     void reconcile(app::Engine& engine);

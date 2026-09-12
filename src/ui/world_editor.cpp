@@ -841,6 +841,20 @@ void WorldEditor::setNodesLocked(app::Engine& engine, std::span<const std::strin
     }
 }
 
+void WorldEditor::setNodesHero(app::Engine& engine, std::span<const std::string> names, bool hero) {
+    if (names.empty() || !hasEdits()) {
+        return;
+    }
+    EditCommand command = ui::setNodesHero(engine, names, hero);
+    if (command.empty()) {
+        return;   // already in the state asked for, or the set the scene would end up with is invalid
+    }
+    // Designating something does not select or deselect it, so an undo must not move the selection.
+    command.selectionBefore = selection.nodes();
+    command.selectionAfter = selection.nodes();
+    history().push(std::move(command));
+}
+
 void WorldEditor::reconcile(app::Engine& engine) {
     if (scene::Composition* composition = engine.composition()) {
         selection.retainOnly(*composition);

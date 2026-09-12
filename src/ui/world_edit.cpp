@@ -566,6 +566,93 @@ EditCommand ungroupNode(app::Engine& engine, const std::string& groupName,
     return command;
 }
 
+// ---- heroes ------------------------------------------------------------------------------------
+
+bool nodeIsHero(const scene::Composition& composition, const std::string& name) {
+    const auto& heroes = composition.heroes();
+    return std::any_of(heroes.begin(), heroes.end(),
+                       [&](const world::HeroPoint& hero) { return heroNamesNode(hero, name); });
+}
+
+world::HeroPoint heroFromNode(scene::Composition& composition, const std::string& name) {
+    world::HeroPoint hero;
+    hero.name = name;
+    // The node *is* the assembly: what stands here is whatever this object and its children draw.
+    // `assetId` is left empty on purpose -- it means "look this up in the asset library", and a
+    // node in a scene is not a library entry.
+    hero.assembly = name;
+    const scene::CompositionNode* node = composition.findNode(name);
+    if (node == nullptr) {
+        return hero;   // validate() will reject it; the caller checks the node first
+    }
+    hero.yaw = scene::eulerDegrees(composition.nodeWorldTransform(*node).rotation).y;
+
+    const scene::WorldBounds bounds = composition.nodeBounds(name);
+    if (bounds.valid) {
+        hero.position = bounds.centre();
+        const glm::vec3 size = bounds.size();
+        // Half the horizontal extent, and the full height: what `radius` and `height` are defined
+        // as, and what everything that clears space around a hero or stands a camera off from one
+        // reads instead of holding the asset library to ask how big it is.
+        hero.radius = std::max(0.05f, std::max(size.x, size.z) * 0.5f);
+        hero.height = std::max(0.05f, size.y);
+    } else {
+        // A group with nothing under it, or an asset that did not load. The node's own position is
+        // still the truth about where it is; its size is not knowable, so the defaults stand.
+        hero.position = composition.nodeWorldTransform(*node).position;
+    }
+    hero.preferredCameraDistance = std::max(6.0f, hero.radius * 3.0f + hero.height * 1.5f);
+    hero.activationRadius = hero.preferredCameraDistance * 3.0f;
+    return hero;
+}
+
+EditCommand setNodesHero(app::Engine& engine, std::span<const std::string> names, bool hero) {
+    EditCommand command;
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr || names.empty()) {
+        return command;
+    }
+    for (const std::string& name : names) {
+        if (composition->findNode(name) == nullptr) {
+            continue;
+        }
+        HeroChange change;
+        change.node = name;
+        for (const world::HeroPoint& declared : composition->heroes()) {
+            if (heroNamesNode(declared, name)) {
+                change.before.push_back(declared);
+            }
+        }
+        if (hero) {
+            if (!change.before.empty()) {
+                continue;   // already one; designating it again would only re-measure it
+            }
+            change.after.push_back(heroFromNode(*composition, name));
+        } else if (change.before.empty()) {
+            continue;       // not one to begin with
+        }
+        command.heroes.push_back(std::move(change));
+    }
+    if (command.heroes.empty()) {
+        return command;
+    }
+    command.label = fmt::format("{} {}", hero ? "Make hero" : "Unmake hero",
+                                command.heroes.size() == 1
+                                    ? command.heroes.front().node
+                                    : std::to_string(command.heroes.size()) + " objects");
+    // Performed by the same code that replays it, rather than here and then again differently.
+    // `applyEdit` assembles the whole list and validates it in one go, which is the only way
+    // `Composition::setHeroes` can be called -- it rejects a set rather than a member.
+    EditApply applied = applyEdit(engine, command, true);
+    if (!applied.ok()) {
+        for (const std::string& problem : applied.problems) {
+            log::warn("hero: {}", problem);
+        }
+        command = EditCommand{};   // nothing changed, so there is nothing to put on the history
+    }
+    return command;
+}
+
 EditCommand moveNodes(app::Engine& engine, std::span<const std::string> names, glm::vec3 delta) {
     EditCommand command;
     scene::Composition* composition = engine.composition();

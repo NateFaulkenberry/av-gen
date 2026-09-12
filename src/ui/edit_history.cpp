@@ -13,7 +13,7 @@ const std::string kNoLabel;
 } // namespace
 
 std::size_t EditCommand::touched() const {
-    return params.size() + parents.size() + added.size() + removed.size();
+    return params.size() + parents.size() + heroes.size() + added.size() + removed.size();
 }
 
 std::vector<float> baseComponents(app::Engine& engine, const std::string& path) {
@@ -87,6 +87,10 @@ bool setBaseComponents(app::Engine& engine, const std::string& path, const std::
         syncNodeTransform(*composition, path);
     }
     return true;
+}
+
+bool heroNamesNode(const world::HeroPoint& hero, const std::string& node) {
+    return hero.name == node || hero.assembly == node || hero.assetId == node;
 }
 
 EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
@@ -173,6 +177,31 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
             continue;
         }
         ++out.paramsWritten;
+    }
+
+    // Heroes last, and as a whole list: `setHeroes` validates the set and rejects all of it if one
+    // member is bad, so the list is assembled first and handed over once. A rejected set is reported
+    // rather than half-applied -- a scene with a hero the director cannot use is worse than a scene
+    // where the toggle plainly did not work.
+    if (!command.heroes.empty()) {
+        std::vector<world::HeroPoint> heroes = composition->heroes();
+        for (const HeroChange& change : command.heroes) {
+            std::erase_if(heroes, [&](const world::HeroPoint& hero) { return heroNamesNode(hero, change.node); });
+            const std::vector<world::HeroPoint>& want = forward ? change.after : change.before;
+            heroes.insert(heroes.end(), want.begin(), want.end());
+        }
+        // Ranked, because that is how the director reads them: `briefFromHeroes` takes the first as
+        // the subject. Stable, so heroes of equal importance stay in the order they were declared
+        // in -- which makes "designate the subject first" a rule that works.
+        std::stable_sort(heroes.begin(), heroes.end(),
+                         [](const world::HeroPoint& a, const world::HeroPoint& b) {
+                             return a.importance > b.importance;
+                         });
+        if (auto ok = composition->setHeroes(std::move(heroes)); !ok) {
+            out.problems.push_back(ok.error().message);
+        } else {
+            out.heroesSet += command.heroes.size();
+        }
     }
 
     // Once, at the end. A node that came back brings its parameter paths with it, and the routes

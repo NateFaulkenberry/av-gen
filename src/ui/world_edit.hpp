@@ -158,6 +158,40 @@ bool setNodeVisible(app::Engine& engine, const std::string& node, bool value);
 [[nodiscard]] EditCommand ungroupNode(app::Engine& engine, const std::string& groupName,
                                       std::vector<std::string>* members = nullptr);
 
+// ---- heroes (ADR-072/074) --------------------------------------------------------------------
+//
+// A hero is what the camera director travels towards and what a reaction profile answers the music
+// through. Until now the only way to declare one was to hand-write a `heroes` block into the scene
+// file, which meant the feature existed and could not be reached from the application.
+//
+// Designation is a *description* of a node that is already placed, not a change to it: nothing
+// moves, resizes or relights. What the hero gets is measured from the node -- where it stands, how
+// big it is, how far a camera should stand off to see it -- which is the part nobody should have to
+// type.
+
+// Is this node declared a hero? True when any of the scene's heroes names it (see `heroNamesNode`).
+[[nodiscard]] bool nodeIsHero(const scene::Composition& composition, const std::string& name);
+
+// The hero `name` would become, measured from the flattened scene.
+//
+// The numbers that cannot be measured take the type's defaults, with two exceptions that are
+// derived because a default would be actively wrong at scale: a camera stand-off of `3r + 1.5h`
+// (which puts Glowmere's authored heroes within a few metres of the distances a person chose for
+// them by eye), and an activation radius of three times that, which is the ratio those same
+// authored heroes use.
+//
+// `importance` is deliberately left at the default: it is a judgement about the piece, not about
+// the geometry, and heroes that all claim to be the subject are heroes among which nothing can be
+// chosen. Ties are broken by the order they were designated in.
+//
+// Non-const because measuring means reading the flattened scene, which may have to be rebuilt.
+[[nodiscard]] world::HeroPoint heroFromNode(scene::Composition& composition, const std::string& name);
+
+// Declares or undeclares `names` as heroes, as one command. Toggling off keeps the whole hero in
+// the command, so an undo brings back an authored importance and reaction profile rather than a
+// fresh guess at them.
+[[nodiscard]] EditCommand setNodesHero(app::Engine& engine, std::span<const std::string> names, bool hero);
+
 // Moves a selection by a world-space delta as one command. Used by numeric entry and by the arrow
 // keys; the gizmo drag uses EditHistory's drag coalescing instead, because a drag is one edit made
 // of sixty writes.

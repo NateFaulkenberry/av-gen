@@ -60,6 +60,25 @@ struct ParentChange {
     std::string after;
 };
 
+// One object's hero declaration, before and after (ADR-072/074). Usually one or none either side;
+// a vector because the rule for "this node is a hero" is a name match and a hand-edited scene can
+// contain two heroes that both name it.
+//
+// The whole `HeroPoint` is kept rather than a flag, because a hero carries authored judgement --
+// how important it is, how far a camera should stand off, which reaction profile it answers the
+// music with -- and a toggle that threw that away would be a toggle nobody could take back.
+struct HeroChange {
+    std::string node;
+    std::vector<world::HeroPoint> before;
+    std::vector<world::HeroPoint> after;
+};
+
+// Does this hero declaration stand for that node? The link is by *name*, and deliberately loose: a
+// hero can be an assembly of several nodes (Glowmere's "elder" is three), so it names either the
+// node it stands on or the assembly the node belongs to. All three fields are checked because a
+// hand-authored scene uses whichever one read best at the time.
+[[nodiscard]] bool heroNamesNode(const world::HeroPoint& hero, const std::string& node);
+
 // A node the command moves in or out of the scene. `held` owns it while it is *out*: null while the
 // node is live in the composition, non-null while the history is the only thing keeping it alive.
 struct NodeRecord {
@@ -79,6 +98,7 @@ struct EditCommand {
     std::string label;
     std::vector<ParamChange> params;
     std::vector<ParentChange> parents;
+    std::vector<HeroChange> heroes;
     std::vector<NodeRecord> added;    // put into the scene by this command
     std::vector<NodeRecord> removed;  // taken out of the scene by this command
     // The selection either side, so undoing a delete gives you back what you had selected rather
@@ -94,7 +114,7 @@ struct EditCommand {
     EditCommand& operator=(const EditCommand&) = delete;
 
     [[nodiscard]] bool empty() const {
-        return params.empty() && parents.empty() && added.empty() && removed.empty();
+        return params.empty() && parents.empty() && heroes.empty() && added.empty() && removed.empty();
     }
     // How many things the user would say this touched, for the label and for tests.
     [[nodiscard]] std::size_t touched() const;
@@ -108,6 +128,7 @@ struct EditApply {
     std::size_t nodesRemoved = 0;
     std::size_t paramsWritten = 0;
     std::size_t parentsSet = 0;
+    std::size_t heroesSet = 0;
     std::vector<std::string> problems;
     [[nodiscard]] bool ok() const { return problems.empty(); }
 };

@@ -64,10 +64,12 @@ void drawSwatch(const assets::AssetDescriptor& asset, float tallest, float side)
     ImGui::Dummy(ImVec2(side, side));
 }
 
-// An eye and a padlock, drawn rather than typed. The UI's font is ImGui's default, which is ASCII
-// only, so the two symbols a layer list is actually read by cannot be written as text -- and a
-// column of the letters "V" and "L" is not a thing anyone scans. Returns true when clicked.
-bool iconToggle(const char* id, bool on, bool padlock, const char* tooltip) {
+// An eye, a padlock and a star, drawn rather than typed. The UI's font is ImGui's default, which is
+// ASCII only, so the symbols a layer list is actually read by cannot be written as text -- and a
+// column of the letters "V", "L" and "H" is not a thing anyone scans. Returns true when clicked.
+enum class Icon : std::uint8_t { Eye, Padlock, Star };
+
+bool iconToggle(const char* id, bool on, Icon icon, const char* tooltip) {
     const float side = ImGui::GetFrameHeight() * 0.78f;
     const ImVec2 lo = ImGui::GetCursorScreenPos();
     const bool clicked = ImGui::InvisibleButton(id, ImVec2(side, side));
@@ -81,7 +83,7 @@ bool iconToggle(const char* id, bool on, bool padlock, const char* tooltip) {
                             : (hovered ? IM_COL32(150, 154, 162, 255) : IM_COL32(92, 96, 104, 255));
     ImDrawList* list = ImGui::GetWindowDrawList();
     const ImVec2 c(lo.x + side * 0.5f, lo.y + side * 0.5f);
-    if (!padlock) {
+    if (icon == Icon::Eye) {
         if (on) {
             list->AddCircle(c, side * 0.30f, colour, 0, 1.4f);
             list->AddCircleFilled(c, side * 0.12f, colour);
@@ -91,6 +93,26 @@ bool iconToggle(const char* id, bool on, bool padlock, const char* tooltip) {
         }
         return clicked;
     }
+    if (icon == Icon::Star) {
+        // Five points, filled when it is a hero and outlined when it is not, so the row reads at a
+        // glance the way the eye does: the shape is always there, and only the fill changes.
+        constexpr int kPoints = 5;
+        constexpr float kTurn = 3.14159265f * 2.0f / static_cast<float>(kPoints);
+        const float outer = side * 0.42f;
+        const float inner = outer * 0.42f;
+        for (int i = 0; i < kPoints * 2; ++i) {
+            const float radius = (i % 2 == 0) ? outer : inner;
+            const float angle = -3.14159265f * 0.5f + static_cast<float>(i) * kTurn * 0.5f;
+            list->PathLineTo(ImVec2(c.x + std::cos(angle) * radius, c.y + std::sin(angle) * radius));
+        }
+        if (on) {
+            list->PathFillConvex(colour);   // a concave path, but at this size the difference is
+        } else {                            // under a pixel and the alternative is a triangulator
+            list->PathStroke(colour, ImDrawFlags_Closed, 1.3f);
+        }
+        return clicked;
+    }
+
     const ImVec2 bodyLo(c.x - side * 0.26f, c.y - side * 0.02f);
     const ImVec2 bodyHi(c.x + side * 0.26f, c.y + side * 0.34f);
     list->AddRectFilled(bodyLo, bodyHi, colour, 1.5f);
@@ -528,6 +550,16 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
             editor.setNodesLocked(engine, all, false);
         }
     }
+    // Heroes have no appearance of their own -- a designated object looks exactly like an
+    // undesignated one -- so the only place the count can be seen is here, and "does this world
+    // have anything for the camera director to shoot" is the question people arrive with.
+    if (const std::size_t heroes = composition->heroes().size(); heroes > 0) {
+        ImGui::TextDisabled("%zu hero%s", heroes, heroes == 1 ? "" : "es");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("What Direct to Music travels between. The most important one is the "
+                              "subject; ties are broken by the order they were declared in.");
+        }
+    }
 
     const std::string filter = objectFilter_;
     const auto matches = [&](const std::string& name) {
@@ -554,17 +586,30 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
 
         if (showSelf) {
             const bool visible = node.visibleParam != nullptr ? node.visibleParam->base() : node.visible;
-            if (iconToggle("##eye", visible, false,
+            if (iconToggle("##eye", visible, Icon::Eye,
                            visible ? "Hide (undoable, saved with the scene)" : "Show")) {
                 const std::vector<std::string> one{node.name};
                 editor.setNodesVisible(engine, one, !visible);
             }
             ImGui::SameLine();
-            if (iconToggle("##lock", node.locked, true,
+            if (iconToggle("##lock", node.locked, Icon::Padlock,
                            node.locked ? "Unlock -- let it answer clicks again"
                                        : "Lock -- stop it answering clicks and drag boxes")) {
                 const std::vector<std::string> one{node.name};
                 editor.setNodesLocked(engine, one, !node.locked);
+            }
+            ImGui::SameLine();
+            // A hero is what the camera director travels towards and what a reaction profile answers
+            // the music through (ADR-072/074). Declaring one describes an object that is already
+            // placed -- nothing moves, resizes or relights -- and what it is worth is measured from
+            // the object itself.
+            const bool hero = nodeIsHero(*composition, node.name);
+            if (iconToggle("##hero", hero, Icon::Star,
+                           hero ? "Not a hero -- the director stops travelling to it"
+                                : "Make it a hero -- somewhere the camera director travels to, and "
+                                  "something a reaction profile can answer the music through")) {
+                const std::vector<std::string> one{node.name};
+                editor.setNodesHero(engine, one, !hero);
             }
             ImGui::SameLine();
             if (depth > 0) {
