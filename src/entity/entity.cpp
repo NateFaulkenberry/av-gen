@@ -853,6 +853,43 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
     }
     crowd_.build();
 
+    // Folding an entity's offsets onto its node's parameter *finals*, which has to happen on every
+    // frame whether or not the simulation advanced on it.
+    //
+    // Finals are rebuilt from bases at the top of every `Engine::update`, so "leave the parameters
+    // alone" does not mean "leave the entity where it was" -- it means the node snaps back to the
+    // position the author placed it at. A coarse entity that skipped the write was therefore drawn
+    // at its authored spot on the frames it skipped and at its simulated spot on the frames it did
+    // not: past `fullDetailDistance` that is five frames in six, which reads as a character
+    // flickering between two places in the world.
+    //
+    // On a skipped frame the offsets are the ones the last update produced, so the pose is held
+    // rather than recomputed. That is what "nothing on screen moves" was always supposed to mean.
+    const auto applyOffsets = [](Entity& e) {
+        const glm::vec3 offset = e.motion_.position + e.state_.travel;
+        if (e.positionParam_ != nullptr) {
+            for (int i = 0; i < 3; ++i) {
+                const auto c = static_cast<std::size_t>(i);
+                e.positionParam_->setFinalComponent(c, e.positionParam_->finalComponent(c) + offset[i]);
+            }
+        }
+        if (e.rotationParam_ != nullptr) {
+            const glm::vec3 rotation(e.motion_.rotation.x,
+                                     e.motion_.rotation.y + e.state_.yaw * kDegrees,
+                                     e.motion_.rotation.z);
+            for (int i = 0; i < 3; ++i) {
+                const auto c = static_cast<std::size_t>(i);
+                e.rotationParam_->setFinalComponent(c, e.rotationParam_->finalComponent(c) + rotation[i]);
+            }
+        }
+        if (e.scaleParam_ != nullptr) {
+            for (int i = 0; i < 3; ++i) {
+                const auto c = static_cast<std::size_t>(i);
+                e.scaleParam_->setFinalComponent(c, e.scaleParam_->finalComponent(c) * e.motion_.scale[i]);
+            }
+        }
+    };
+
     for (std::size_t entityIndex = 0; entityIndex < entities_.size(); ++entityIndex) {
         auto& entityPtr = entities_[entityIndex];
         Entity& entity = *entityPtr;
@@ -884,7 +921,11 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
             entity.coarseAccum_ += ctx.dt;
             if (entity.coarseAccum_ < static_cast<double>(entity.desc_.coarseInterval)) {
                 ++counts_.skipped;
-                continue; // its parameters keep last frame's values; nothing on screen moves
+                // The simulation does not advance, but the transform is still written: finals are
+                // rebuilt from bases every frame, so skipping the write puts the node back where
+                // the author placed it rather than leaving it where the entity is.
+                applyOffsets(entity);
+                continue;
             }
             dt = entity.coarseAccum_;
             entity.coarseAccum_ = 0.0;
@@ -950,28 +991,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // Fold the behaviours' offsets onto the node's parameter *finals*. Bases are left alone, so
         // saving the project writes back what the author placed rather than wherever the entity
         // happened to be when they hit save.
-        const glm::vec3 offset = entity.motion_.position + entity.state_.travel;
-        if (entity.positionParam_ != nullptr) {
-            for (int i = 0; i < 3; ++i) {
-                const auto c = static_cast<std::size_t>(i);
-                entity.positionParam_->setFinalComponent(c, entity.positionParam_->finalComponent(c) + offset[i]);
-            }
-        }
-        if (entity.rotationParam_ != nullptr) {
-            const glm::vec3 rotation(entity.motion_.rotation.x,
-                                     entity.motion_.rotation.y + entity.state_.yaw * kDegrees,
-                                     entity.motion_.rotation.z);
-            for (int i = 0; i < 3; ++i) {
-                const auto c = static_cast<std::size_t>(i);
-                entity.rotationParam_->setFinalComponent(c, entity.rotationParam_->finalComponent(c) + rotation[i]);
-            }
-        }
-        if (entity.scaleParam_ != nullptr) {
-            for (int i = 0; i < 3; ++i) {
-                const auto c = static_cast<std::size_t>(i);
-                entity.scaleParam_->setFinalComponent(c, entity.scaleParam_->finalComponent(c) * entity.motion_.scale[i]);
-            }
-        }
+        applyOffsets(entity);
 
         // §21, the return half of the arc. The arc *overrides* an activity while it runs and then
         // stops overriding it; it never writes Idle, never resets a behaviour and never clears a

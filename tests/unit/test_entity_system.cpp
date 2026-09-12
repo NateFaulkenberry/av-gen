@@ -566,3 +566,66 @@ TEST_CASE("a profile that is not there is an error naming the file", "[entity][d
     REQUIRE_FALSE(read);
     CHECK_THAT(read.error().message, ContainsSubstring("no-such-profile.json"));
 }
+
+TEST_CASE("A coarse entity holds its pose on the frames it skips", "[entity][performance]") {
+    // The bug: past `fullDetailDistance` the character flickered between two places in the world.
+    //
+    // Parameter *finals* are rebuilt from bases at the top of every engine update, so an entity that
+    // skipped writing its transform did not "leave the parameters alone" -- the node snapped back to
+    // the position the author placed it at. A coarse entity was therefore drawn at its authored spot
+    // on the frames it skipped and at its simulated spot on the frames it did not, which past the
+    // threshold is five frames in six.
+    //
+    // The simulation may be rate-limited. The *write* may not.
+    entity::EntityDesc d = craftDesc();
+    d.fullDetailDistance = 50.0f;
+    d.coarseInterval = 0.25f;
+    d.cullDistance = 200.0f;
+    Fixture f(d);
+
+    auto* position = f.params.findAs<glm::vec3>("nodes/craft/position");
+    REQUIRE(position != nullptr);
+    const float authored = position->base().y;
+
+    // Far away, so every update is coarse. Run long enough that the entity has actually travelled
+    // somewhere -- a pose identical to the authored one proves nothing about holding it.
+    const glm::vec3 far(0.0f, 10.0f, 120.0f);
+    std::vector<float> drawn;
+    for (int i = 0; i <= 120; ++i) {
+        f.params.resetFinals();
+        entity::EntityUpdate u;
+        u.time = static_cast<double>(i) / 60.0;
+        u.dt = i == 0 ? 0.0 : 1.0 / 60.0;
+        u.bus = &f.bus;
+        u.viewPosition = far;
+        f.world.update(u, f.params);
+        drawn.push_back(position->value().y);
+    }
+    REQUIRE(f.world.counts().skipped > 0); // frames were skipped, or this tests nothing
+
+    // It moved: the simulation did advance across those 120 frames.
+    const auto [lo, hi] = std::ranges::minmax_element(drawn);
+    INFO("drawn y ranged " << *lo << " to " << *hi << ", authored " << authored);
+    CHECK(*hi != *lo);
+
+    // And it never once snapped back to where the author put it. That return is the flicker: the
+    // frames that skipped the write drew the authored position, and the ones that did not drew the
+    // simulated one.
+    std::size_t atAuthored = 0;
+    for (std::size_t i = 1; i < drawn.size(); ++i) { // frame 0 legitimately is the authored pose
+        atAuthored += (std::abs(drawn[i] - authored) < 1e-6f) ? 1 : 0;
+    }
+    INFO(atAuthored << " of " << drawn.size() << " frames drew the authored position");
+    CHECK(atAuthored == 0);
+
+    // Nor did it ever jump backwards and forwards between two values on consecutive frames, which
+    // is what the flicker looked like from outside.
+    std::size_t reversals = 0;
+    for (std::size_t i = 2; i < drawn.size(); ++i) {
+        if (drawn[i] == drawn[i - 2] && drawn[i] != drawn[i - 1]) {
+            ++reversals;
+        }
+    }
+    INFO(reversals << " frame(s) returned to the value from two frames earlier");
+    CHECK(reversals == 0);
+}
