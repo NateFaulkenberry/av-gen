@@ -598,6 +598,23 @@ json Sequence::toTimelineTracks(int samplesPerShot) const {
                           {"timeBase", "seconds"},
                           {"mode", "replace"},
                           {"keys", std::move(emphasisKeys)}});
+    // Free mode, as part of the bake.
+    //
+    // A composition ignores `camera/position` and `camera/target` entirely unless `camera/mode` is 1
+    // (free), and a composition defaults to orbit. So directing a scene nobody had already switched
+    // over installed six tracks that bound, evaluated, wrote their values every frame and changed
+    // nothing you could see -- the camera went on circling the bounds centre. Glowmere and every
+    // generated world escaped it only because something else had set the mode; a scene built by hand
+    // did not, which is the shape this arrived in.
+    //
+    // A step key at zero, because a mode is a state and not a curve. In the bake rather than in the
+    // installer, so a directed camera saved into a project still works when it is reopened; last in
+    // the array rather than first, because the timeline writes every track before anything reads a
+    // parameter, so the order carries no meaning and the existing five have index-shaped tests.
+    tracks.push_back(json{{"target", "camera/mode"},
+                          {"timeBase", "seconds"},
+                          {"mode", "replace"},
+                          {"keys", json::array({json{{"time", 0.0}, {"value", 1.0}, {"interp", "step"}}})}});
     return tracks;
 }
 
@@ -887,14 +904,40 @@ bool isDropSection(MusicalSection s) {
 // The hero owns the payoffs and the run-ups to them, and the wide shots that bracket the film.
 // Everything in between belongs to the supporting cast, because a film in which every shot is of
 // the same object has no scale: the hero is only big if something else was small.
-bool heroOwns(MusicalSection s) {
+// The arc that lands the reveal: a build is the camera setting off towards the subject and a drop is
+// arriving at it, so both belong to the hero and nothing else does.
+//
+// The intro and the outro used to belong to it as well, and on a sparse structure that was most of
+// the film -- a ninety-second piece folding to intro/verse/finalDrop/verse gave the hero a
+// thirty-one-second establish, the drop, and the opening of both transitions: seventy per cent of
+// the running time on one object while two other declared heroes were glimpsed at the end of a move.
+// An establish is "the world, not the subject" by its own definition, so it is the cast's.
+// Which sections are "the world going past" and can therefore be more than one shot.
+//
+// Everything else is a single deliberate move and cutting into it would destroy the thing it is
+// for: a build "sets the camera going and is not cut into", a drop has to land on the beat it was
+// built for, and a breakdown is the close, quiet hold a loud section could not carry. An intro, a
+// phrase, a verse and an outro are passages -- the camera travelling through a world -- and a
+// thirty-second one of those is not restraint, it is the film being about whichever object the
+// longest section happened to land on.
+bool mayBeSplit(MusicalSection s) {
     switch (s) {
     case MusicalSection::Intro:
+    case MusicalSection::Phrase:
+    case MusicalSection::Verse:
+    case MusicalSection::Outro:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool heroOwns(MusicalSection s) {
+    switch (s) {
     case MusicalSection::Build:
     case MusicalSection::Drop:
     case MusicalSection::FinalBuild:
     case MusicalSection::FinalDrop:
-    case MusicalSection::Outro:
         return true;
     default:
         return false;
@@ -953,7 +996,30 @@ std::vector<ShotSpan> groupSections(const signals::MusicalStructure& structure,
             spans.back().end = section.endSeconds();
         }
     }
-    return spans;
+    if (!(brief.maxShotSeconds > 0.0)) {
+        return spans;
+    }
+    // The other end of the same judgement. `minShotSeconds` stops the director cutting on every
+    // section the analyser found; this stops one section becoming a shot nobody would hold. The
+    // pieces stay inside the section, so every cut is still on the music, and each piece is cast
+    // separately -- which is what stops a long verse being one subject for half a minute.
+    std::vector<ShotSpan> split;
+    split.reserve(spans.size());
+    for (const ShotSpan& span : spans) {
+        const double length = span.end - span.start;
+        if (!mayBeSplit(span.opener->kind) || length <= brief.maxShotSeconds) {
+            split.push_back(span);
+            continue;
+        }
+        const auto pieces = static_cast<std::size_t>(std::ceil(length / brief.maxShotSeconds));
+        const double each = length / static_cast<double>(pieces);
+        for (std::size_t i = 0; i < pieces; ++i) {
+            const double from = span.start + each * static_cast<double>(i);
+            split.push_back(ShotSpan{span.opener, from,
+                                     i + 1 == pieces ? span.end : from + each});
+        }
+    }
+    return split;
 }
 } // namespace
 
@@ -973,14 +1039,31 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
     seq.name = "directed";
     seq.shots.reserve(spans.size());
 
-    // A deterministic walk through the supporting cast rather than a draw from a stream. A PRNG
-    // stream would make every later choice depend on how many earlier ones were made, so adding one
-    // section to the structure would re-cast the whole rest of the film.
+    // Who the sections the hero does not own are cast from.
+    //
+    // Normally the supporting cast: the hero has the builds and the drops, which is the arc the film
+    // is about, so holding it off until then is the shape of a reveal rather than a gap. But a
+    // structure with no build and no drop -- a mellow piece, a fold that found only phrases -- gives
+    // the hero nothing at all, and a film that never shows its subject is not restraint either. Then
+    // the hero joins the rotation, at the front.
+    const bool heroHasASection = std::any_of(spans.begin(), spans.end(), [](const ShotSpan& span) {
+        return heroOwns(span.opener->kind);
+    });
+    std::vector<FocalTarget> cast;
+    cast.reserve(brief.supporting.size() + 1);
+    if (!heroHasASection) {
+        cast.push_back(brief.hero);
+    }
+    cast.insert(cast.end(), brief.supporting.begin(), brief.supporting.end());
+
+    // A deterministic walk through the cast rather than a draw from a stream. A PRNG stream would
+    // make every later choice depend on how many earlier ones were made, so adding one section to
+    // the structure would re-cast the whole rest of the film.
     std::uint32_t h = brief.seed * 0x9E3779B1u;
     h ^= h >> 15;
     h *= 0x2C1B3C6Du;
     h ^= h >> 12;
-    const std::size_t offset = brief.supporting.empty() ? 0 : (h >> 8) % brief.supporting.size();
+    const std::size_t offset = cast.empty() ? 0 : (h >> 8) % cast.size();
     std::size_t supportingIndex = 0;
 
     for (std::size_t i = 0; i < spans.size(); ++i) {
@@ -993,9 +1076,8 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
         shot.startSeconds = span.start;
         shot.durationSeconds = span.end - span.start;
 
-        const bool hero = heroOwns(sectionKind) || brief.supporting.empty();
-        shot.subject = hero ? brief.hero
-                            : brief.supporting[(offset + supportingIndex) % brief.supporting.size()];
+        const bool hero = heroOwns(sectionKind) || cast.empty();
+        shot.subject = hero ? brief.hero : cast[(offset + supportingIndex) % cast.size()];
         if (!hero) {
             ++supportingIndex;
         }

@@ -118,7 +118,7 @@ TEST_CASE("A sequence bakes into ordinary timeline tracks", "[app][cinematic]") 
     REQUIRE(seq.has_value());
     const auto tracks = seq->toTimelineTracks(6);
     REQUIRE(tracks.is_array());
-    REQUIRE(tracks.size() == 6);
+    REQUIRE(tracks.size() == 7);
 
     // The targets are the parameter paths the engine's timeline already drives; nothing new had to
     // be taught to the camera.
@@ -128,6 +128,12 @@ TEST_CASE("A sequence bakes into ordinary timeline tracks", "[app][cinematic]") 
     CHECK(tracks[3]["target"] == "camera/lens/aperture");
     CHECK(tracks[4]["target"] == "camera/lens/focusDistance");
     CHECK(tracks[5]["target"] == "camera/focus/emphasis");
+    // ...and the mode that makes the first two readable at all: a composition ignores
+    // `camera/position` and `camera/target` unless it is in free mode, and defaults to orbit.
+    CHECK(tracks[6]["target"] == "camera/mode");
+    REQUIRE(tracks[6]["keys"].size() == 1);
+    CHECK(tracks[6]["keys"][0]["interp"] == "step");
+    CHECK_THAT(tracks[6]["keys"][0]["value"].get<double>(), Catch::Matchers::WithinAbs(1.0, 1e-9));
 
     REQUIRE(tracks[0]["keys"].size() == 12); // two shots x six samples
     CHECK_THAT(tracks[0]["keys"][0]["time"].get<double>(), Catch::Matchers::WithinAbs(0.0, 1e-9));
@@ -618,11 +624,17 @@ TEST_CASE("A drop that arrives before the shot before it has settled still gets 
     REQUIRE(seq2.has_value());
     REQUIRE(seq2->shotAt(50.0) != nullptr);
     CHECK_THAT(seq2->shotAt(50.0)->startSeconds, Catch::Matchers::WithinAbs(41.0, 1e-6));
-    CHECK(seq2->shots.size() == 2);
+    // The drop is one shot from 41 s to the end, and nothing in the film is a flash. The intro
+    // ahead of it is forty seconds of passage, which is several shots rather than one hold.
+    CHECK(seq2->shots.back().startSeconds == 41.0);
+    CHECK(seq2->shots.size() >= 2);
+    int dropShots = 0;
     for (const auto& shot : seq2->shots) {
         INFO(shot.name);
         CHECK(shot.durationSeconds > 2.0);
+        dropShots += shot.startSeconds >= 41.0 ? 1 : 0;
     }
+    CHECK(dropShots == 1);
 }
 
 TEST_CASE("A build sets the camera going and is not cut into", "[app][cinematic][director]") {
@@ -685,7 +697,8 @@ TEST_CASE("The director does not cut constantly", "[app][cinematic][director]") 
     REQUIRE(seq.has_value());
 
     // Three hundred and sixty beats and a dozen section changes come out as a handful of shots.
-    CHECK(seq->shots.size() <= structure.sections.size());
+    // Not one per section: a passage longer than a shot anybody would hold becomes several, so the
+    // count is bounded by the cadence below rather than by the number of sections.
     CHECK(seq->shots.size() <= 10);
     const auto cadence = seq->validateCadence(4.0, 8.0);
     INFO((cadence ? std::string() : cadence.error().message));

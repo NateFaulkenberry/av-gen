@@ -90,7 +90,7 @@ bool setBaseComponents(app::Engine& engine, const std::string& path, const std::
 }
 
 bool heroNamesNode(const world::HeroPoint& hero, const std::string& node) {
-    return hero.name == node || hero.assembly == node || hero.assetId == node;
+    return hero.name == node;
 }
 
 EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {

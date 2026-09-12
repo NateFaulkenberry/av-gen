@@ -24,7 +24,11 @@ namespace {
 // writing the same parameter, which is not a blend but whichever the timeline applies last. A test
 // that walks the installed tracks and checks each is on this list caught it immediately, which is
 // the argument for the list existing at all rather than being implied.
-constexpr std::array<std::string_view, 6> kCameraTargets{
+constexpr std::array<std::string_view, 7> kCameraTargets{
+    // The mode belongs to the director for as long as the director owns the camera: it is what
+    // makes the other six readable at all. Handing the camera back removes this with them, so the
+    // scene returns to whichever way of placing the camera it was authored with.
+    "camera/mode",
     "camera/position",
     "camera/target",
     "camera/lens/focalLength",

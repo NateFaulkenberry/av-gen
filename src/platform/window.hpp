@@ -110,8 +110,20 @@ public:
     // Opens a native file-open dialog asynchronously; `onChosen` runs on the main thread from
     // pollEvents() with the selected path (empty string on cancel).
     void openFileDialog(DialogKind kind, std::function<void(std::string)> onChosen);
-    // Native save dialog (JSON projects). Same delivery contract as openFileDialog.
-    void saveFileDialog(std::function<void(std::string)> onChosen);
+
+    // What a save dialog is saving, which decides the extension the platform offers and appends.
+    //
+    // It is not cosmetic. macOS adds the filter's extension to whatever name is typed, so a render
+    // output chosen through the project filter came back as "my-take.json" -- and the render
+    // settings then read that extension, saw no video in it, and switched the output back to a PNG
+    // sequence in front of the person who had just chosen Video.
+    enum class SaveKind { Project, Video };
+    // Native save dialog. Same delivery contract as openFileDialog.
+    void saveFileDialog(SaveKind kind, std::function<void(std::string)> onChosen);
+    // Native folder picker, for the outputs that are a directory rather than a file -- an image
+    // sequence writes many files into one place, so asking for a file name is asking the wrong
+    // question.
+    void chooseFolderDialog(std::function<void(std::string)> onChosen);
 
 private:
     Window() = default;

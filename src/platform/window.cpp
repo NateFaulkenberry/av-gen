@@ -390,14 +390,29 @@ void Window::openFileDialog(DialogKind kind, std::function<void(std::string)> on
     SDL_ShowOpenFileDialog(dialogCallback, &dialogState(), window_, filters, 2, nullptr, false);
 }
 
-void Window::saveFileDialog(std::function<void(std::string)> onChosen) {
+void Window::saveFileDialog(SaveKind kind, std::function<void(std::string)> onChosen) {
     if (pendingDialog_) {
         log::warn("a file dialog is already open");
         return;
     }
     pendingDialog_ = std::move(onChosen);
-    static const SDL_DialogFileFilter filters[] = {{"avgen project", "json"}};
-    SDL_ShowSaveFileDialog(dialogCallback, &dialogState(), window_, filters, 1, nullptr);
+    static const SDL_DialogFileFilter projectFilters[] = {{"avgen project", "json"}};
+    // QuickTime first: it is the container ProRes needs, and ProRes is the default codec.
+    static const SDL_DialogFileFilter videoFilters[] = {{"QuickTime movie", "mov"},
+                                                        {"MPEG-4 video", "mp4;m4v"},
+                                                        {"Matroska / WebM", "mkv;webm"}};
+    const bool video = kind == SaveKind::Video;
+    SDL_ShowSaveFileDialog(dialogCallback, &dialogState(), window_,
+                           video ? videoFilters : projectFilters, video ? 3 : 1, nullptr);
+}
+
+void Window::chooseFolderDialog(std::function<void(std::string)> onChosen) {
+    if (pendingDialog_) {
+        log::warn("a file dialog is already open");
+        return;
+    }
+    pendingDialog_ = std::move(onChosen);
+    SDL_ShowOpenFolderDialog(dialogCallback, &dialogState(), window_, nullptr, false);
 }
 
 } // namespace avgen::platform

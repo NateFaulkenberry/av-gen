@@ -243,6 +243,12 @@ struct DirectionBrief {
     std::vector<FocalTarget> supporting;  // everything else worth a shot, most interesting first
     double minShotSeconds = 5.0;          // below this a sequence is chopped rather than cut
     double minBuildShotSeconds = 2.0;     // ...except a build, which exists to end
+    // Above this a section is more than one shot. A fold can hand back a thirty-second verse, and
+    // holding one move on one subject for a third of a piece is not restraint -- it is the film
+    // being about whatever the longest section happened to land on. Splitting it keeps the cut on
+    // the music (the pieces are inside one section) while letting the cast change. Drops are never
+    // split: the whole point of reading the structure is that the reveal lands on the beat.
+    double maxShotSeconds = 12.0;
     float wideFocalLength = 24.0f;
     float heroFocalLength = 50.0f;
     // The reference camera "never orbits, never zooms, and holds its final pose" (audit 1.4), and

@@ -71,11 +71,14 @@ struct HeroReactionProfile {
 // A hero, placed.
 struct HeroPoint {
     std::string name;
-    // What stands here. Either an asset id from the library, or the name of an authored assembly
-    // (see `HeroAssembly`). An assembly wins when both are set, because an assembly is a design and
-    // an asset id is a fallback.
+    // The library asset the world composer placed here, when one did. Empty for a hero declared in
+    // the editor or by hand: what stands there is the scene's own node of the same name.
+    //
+    // A hero is **one object**. It used to be able to name an "assembly" instead -- a group of nodes
+    // sharing a prefix -- which meant a hero that no row in the editor was, that no reaction could
+    // reach (reactions are wired to `nodes/<hero name>/...`), and that nothing but a naming
+    // convention tied to anything. See ADR-107.
     std::string assetId;
-    std::string assembly;
 
     glm::vec3 position{0.0f};
     float yaw = 0.0f;

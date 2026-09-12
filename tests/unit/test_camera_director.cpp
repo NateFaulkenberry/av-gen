@@ -15,6 +15,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <map>
+#include <limits>
 #include <set>
 
 using namespace avgen;
@@ -548,4 +550,145 @@ TEST_CASE("Each camera mode reads its own parameters and no others", "[camera][m
         setVec("camera/position", glm::vec3(5.0f, 6.0f, 7.0f));
         CHECK(glm::length(placed() - before) > 1.0f);
     }
+}
+
+// A composition ignores `camera/position` and `camera/target` unless `camera/mode` is 1 (free), and
+// a composition defaults to orbit. Directing a scene nobody had already switched over installed six
+// tracks that bound, evaluated, wrote their values every frame and moved nothing: the camera went on
+// circling the bounds centre. Glowmere and every generated world escaped it only because something
+// else had set the mode -- a scene built by hand did not.
+TEST_CASE("Directing places the camera even when the scene was left in orbit mode",
+          "[director][camera][mode]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path wav =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "glowmere-valley.wav";
+    if (!std::filesystem::exists(wav)) {
+        SKIP("glowmere-valley.wav is generated, not committed: run tools/make_glowmere_score.py");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    REQUIRE(engine.loadAudio(wav).has_value());
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition->setHeroes(threeHeroes()).has_value());
+
+    const params::IParameter* mode = engine.params().find("camera/mode");
+    REQUIRE(mode != nullptr);
+    REQUIRE(mode->baseComponent(0) == 0.0f);   // orbit: the default nobody changed
+
+    auto at = [&](double seconds) {
+        engine.transport().seek(seconds);
+        FrameTime time;
+        time.renderTime = seconds;
+        time.deltaTime = 1.0 / 60.0;
+        engine.update(time);
+        return engine.scene().camera.position;
+    };
+    REQUIRE(app::directEngine(engine, composition->heroes()).has_value());
+
+    // The camera is where the shot says, and it travels the world rather than circling the origin
+    // at the fitted distance.
+    const glm::vec3 opening = at(1.0);
+    const glm::vec3 later = at(60.0);
+    CHECK(glm::length(later - opening) > 20.0f);
+    CHECK(glm::length(opening) > 20.0f);
+    // The mode is driven, not overwritten: the base value is still what the scene was authored
+    // with, so handing the camera back gives that scene its own camera again.
+    CHECK(mode->baseComponent(0) == 0.0f);
+    CHECK(mode->finalComponent(0) == 1.0f);
+
+    // And handing it back takes the mode with it -- the director owns it only while it owns the
+    // camera.
+    auto& tracks = engine.timeline().tracks();
+    const auto owned = app::directedCameraTargets();
+    CHECK(std::find(owned.begin(), owned.end(), std::string_view("camera/mode")) != owned.end());
+    std::erase_if(tracks, [&](const params::Track& t) {
+        return std::find(owned.begin(), owned.end(), t.target) != owned.end();
+    });
+    const glm::vec3 handedBack = at(61.0);
+    CHECK(glm::length(handedBack - later) > 1.0f);   // back to the orbit it was authored with
+#endif
+}
+
+// Three heroes, one film, and the film has to be about all three.
+//
+// Reported as "the camera only focuses on far-arch -- it seems to only pay attention to whatever
+// hero is currently first in the list", and measured on the real score it was: the fold gives a
+// ninety-second piece four sections (intro, verse, finalDrop, verse), the hero owned the intro and
+// the outro as well as the drop, and both transitions *start* on the previous subject -- so one
+// object held sixty-five of ninety seconds while two declared heroes were glimpsed at the end of a
+// move. Two causes, both fixed: an establish is "the world, not the subject" and belongs to the
+// cast, and a thirty-second passage is several shots rather than one hold.
+TEST_CASE("A film with three heroes is about three heroes", "[director][camera][casting]") {
+    // The structure the real Glowmere score actually folds to, written out so this measures the
+    // director rather than the analyser.
+    avgen::signals::MusicalStructure structure;
+    structure.sections = {{signals::MusicalSection::Intro, 0.0, 31.1, 0.3f},
+                          {signals::MusicalSection::Verse, 31.1, 24.8, 0.6f},
+                          {signals::MusicalSection::FinalDrop, 55.9, 6.6, 1.0f},
+                          {signals::MusicalSection::Verse, 62.5, 27.5, 0.6f}};
+    // Three heroes designated in the editor: all at the default importance, so the ranking is the
+    // order they were starred in and nothing about them says one deserves the whole film.
+    std::vector<world::HeroPoint> heroes{hero("far-arch", glm::vec3(0.0f, 0.0f, -40.0f), 20.0f, 4.0f, 0.5f),
+                                         hero("elder-crown", glm::vec3(60.0f, 0.0f, 20.0f), 20.0f, 4.0f, 0.5f),
+                                         hero("wanderer", glm::vec3(-50.0f, 0.0f, 10.0f), 20.0f, 4.0f, 0.5f)};
+    auto seq = app::directHeroes(heroes, structure);
+    INFO((seq ? std::string() : seq.error().message));
+    REQUIRE(seq.has_value());
+
+    // Whoever the camera is actually looking at, second by second. Sampling the aim rather than
+    // reading the shot's `subject` field on purpose: a Transition is *named* for where it came from,
+    // so counting subjects would have called the old behaviour fair when it was not.
+    std::map<std::string, int> seconds;
+    for (double t = 0.0; t < 90.0; t += 1.0) {
+        const app::Shot* shot = seq->shotAt(t);
+        if (shot == nullptr) {
+            continue;
+        }
+        const auto local = static_cast<float>((t - shot->startSeconds) / shot->durationSeconds);
+        const glm::vec3 aim = shot->targetAt(local);
+        std::string nearest;
+        float best = std::numeric_limits<float>::max();
+        for (const world::HeroPoint& h : heroes) {
+            const float d = glm::length(h.position - aim);
+            if (d < best) {
+                best = d;
+                nearest = h.name;
+            }
+        }
+        ++seconds[nearest];
+    }
+
+    int total = 0;
+    for (const auto& [name, count] : seconds) {
+        INFO(name << ": " << count << " s");
+        total += count;
+    }
+    REQUIRE(total > 80);
+    for (const world::HeroPoint& h : heroes) {
+        INFO(h.name << " holds " << seconds[h.name] << " of " << total << " s");
+        // Every hero is really on screen -- not one frame at the end of a move.
+        CHECK(seconds[h.name] >= total / 10);
+        // ...and none of them is the whole film. The old behaviour put one at 72%.
+        CHECK(seconds[h.name] <= total * 6 / 10);
+    }
+
+    // The hero still owns the drop: sharing the film is not the same as having no subject, and the
+    // reveal landing on the drop is the reason for reading the structure at all.
+    const app::Shot* atTheDrop = seq->shotAt(58.0);
+    REQUIRE(atTheDrop != nullptr);
+    CHECK(atTheDrop->subject.name == "far-arch");
+    CHECK(atTheDrop->kind == app::ShotKind::Reveal);
+    CHECK_THAT(atTheDrop->startSeconds, Catch::Matchers::WithinAbs(55.9, 1e-6));   // on the beat
+
+    // A passage becomes several shots; the hero's own sections stay one move.
+    const auto intros = std::count_if(seq->shots.begin(), seq->shots.end(), [](const app::Shot& s) {
+        return s.startSeconds < 31.0;
+    });
+    CHECK(intros > 1);
+    const auto drops = std::count_if(seq->shots.begin(), seq->shots.end(), [](const app::Shot& s) {
+        return s.startSeconds >= 55.0 && s.startSeconds < 62.0;
+    });
+    CHECK(drops == 1);
 }

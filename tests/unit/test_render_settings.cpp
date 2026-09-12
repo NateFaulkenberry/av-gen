@@ -124,3 +124,44 @@ TEST_CASE("Render settings round-trip JSON and reject bad fields", "[render][set
     CHECK_FALSE(RenderSettings::fromJson(nlohmann::json{{"fps", -1}}).has_value());
     CHECK_FALSE(RenderSettings::fromJson(nlohmann::json::array()).has_value());
 }
+
+// Choosing an output file used to change the output *kind* under the person choosing it.
+//
+// The Choose... button opened the project save dialog, whose filter is "json", so macOS appended
+// `.json` to whatever name was typed. `outputForPath` then read that extension, found no video in
+// it, and answered PngSequence -- so picking Video, clicking Choose and typing a name left you with
+// a PNG sequence called "my-take.json". Both halves are fixed: the dialog matches the kind, and the
+// path is no longer allowed to contradict a kind that has been chosen.
+TEST_CASE("A chosen path never silently changes the output kind", "[render][settings]") {
+    // An extension that identifies a kind still wins: typing "take.mov" means a video whatever the
+    // radio button said, and that is the one case where the path is the better evidence.
+    CHECK(RenderSettings::outputForPath("take.mov", RenderOutput::PngSequence) == RenderOutput::Video);
+    CHECK(RenderSettings::outputForPath("take.MOV", RenderOutput::ExrSequence) == RenderOutput::Video);
+    CHECK(RenderSettings::outputForPath("frames.png", RenderOutput::Video) == RenderOutput::PngSequence);
+    CHECK(RenderSettings::outputForPath("frames.exr", RenderOutput::Video) == RenderOutput::ExrSequence);
+
+    // An extension that says nothing keeps the kind that was chosen -- a bare folder name, and the
+    // `.json` a project save dialog appends.
+    for (const char* path : {"my-take", "renders/tonight", "my-take.json", "my-take.txt"}) {
+        INFO(path);
+        CHECK(RenderSettings::outputForPath(path, RenderOutput::Video) == RenderOutput::Video);
+        CHECK(RenderSettings::outputForPath(path, RenderOutput::ExrSequence) == RenderOutput::ExrSequence);
+        CHECK(RenderSettings::outputForPath(path, RenderOutput::PngSequence) == RenderOutput::PngSequence);
+    }
+
+    // ...and a video gets a container the muxer understands, so a name typed without one still
+    // names a movie rather than a file nothing can play.
+    CHECK(RenderSettings::withVideoExtension("my-take").string() == "my-take.mov");
+    CHECK(RenderSettings::withVideoExtension("my-take.json").string() == "my-take.mov");
+    CHECK(RenderSettings::withVideoExtension("my-take.mp4").string() == "my-take.mp4");   // left alone
+    CHECK(RenderSettings::withVideoExtension("my-take.MOV").string() == "my-take.MOV");
+    CHECK(RenderSettings::withVideoExtension("").string().empty());
+    // The directory is kept: only the extension changes.
+    CHECK(RenderSettings::withVideoExtension("renders/tonight.json").parent_path().string() == "renders");
+
+    // A sequence is a directory and a video is a file, which is what decides whether Choose... asks
+    // for a folder or a file name.
+    CHECK(isSequence(RenderOutput::PngSequence));
+    CHECK(isSequence(RenderOutput::ExrSequence));
+    CHECK_FALSE(isSequence(RenderOutput::Video));
+}

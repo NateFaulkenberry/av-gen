@@ -62,13 +62,44 @@ std::filesystem::path RenderSettings::frameFile(const std::filesystem::path& dir
     }
 }
 
-RenderOutput RenderSettings::outputForPath(const std::filesystem::path& path) {
+namespace {
+
+std::string lowerExtension(const std::filesystem::path& path) {
     std::string ext = path.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    if (ext == ".mov" || ext == ".mp4" || ext == ".mkv" || ext == ".webm" || ext == ".m4v") {
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return ext;
+}
+
+bool isVideoExtension(std::string_view ext) {
+    return ext == ".mov" || ext == ".mp4" || ext == ".mkv" || ext == ".webm" || ext == ".m4v";
+}
+
+} // namespace
+
+RenderOutput RenderSettings::outputForPath(const std::filesystem::path& path, RenderOutput fallback) {
+    const std::string ext = lowerExtension(path);
+    if (isVideoExtension(ext)) {
         return RenderOutput::Video;
     }
-    return RenderOutput::PngSequence;
+    if (ext == ".exr") {
+        return RenderOutput::ExrSequence;
+    }
+    if (ext == ".png") {
+        return RenderOutput::PngSequence;
+    }
+    return fallback;   // a directory, a bare name, or an extension that means nothing here
+}
+
+std::filesystem::path RenderSettings::withVideoExtension(const std::filesystem::path& path) {
+    if (path.empty() || isVideoExtension(lowerExtension(path))) {
+        return path;
+    }
+    // QuickTime, because it is the container ProRes needs and ProRes is the default codec; the
+    // muxer accepts the rest and the person can type one if they want it.
+    std::filesystem::path out = path;
+    out.replace_extension(".mov");
+    return out;
 }
 
 Result<void> RenderSettings::validate() const {

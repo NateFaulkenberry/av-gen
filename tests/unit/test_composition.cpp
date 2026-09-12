@@ -1757,7 +1757,7 @@ TEST_CASE("An authored scene declares heroes and they survive a file round trip"
           "[scene][composition][json][hero]") {
     Fixture fx;
     const std::string text = heroScene(R"([
-      {"name": "elder", "assembly": "elder", "position": [-1, -9, -46], "yaw": 0.5, "scale": 1.0,
+      {"name": "elder", "position": [-1, -9, -46], "yaw": 0.5, "scale": 1.0,
        "radius": 8.2, "height": 16.5, "importance": 0.95, "focalWeight": 0.9,
        "preferredCameraDistance": 50.0, "preferredCameraElevation": 6.0, "activationRadius": 160.0,
        "colorAccent": [1.0, 0.47, 0.15], "reactionProfile": "organism"},
@@ -1769,7 +1769,8 @@ TEST_CASE("An authored scene declares heroes and they survive a file round trip"
     REQUIRE(comp.heroes().size() == 2);
     const world::HeroPoint& elder = comp.heroes()[0];
     CHECK(elder.name == "elder");
-    CHECK(elder.assembly == "elder");
+    // No asset id: what stands here is the scene's own node of that name, not a library entry
+    // (ADR-107).
     CHECK(elder.assetId.empty());
     checkVec(elder.position, glm::vec3(-1.0f, -9.0f, -46.0f));
     CHECK_THAT(static_cast<double>(elder.yaw), WithinAbs(0.5, 1e-6));
@@ -1783,12 +1784,12 @@ TEST_CASE("An authored scene declares heroes and they survive a file round trip"
     checkVec(elder.colorAccent, glm::vec3(1.0f, 0.47f, 0.15f));
     CHECK(elder.reactionProfile == "organism");
     CHECK(comp.heroes()[1].assetId == "rock_big");
-    CHECK(comp.heroes()[1].assembly.empty());
 
     const nlohmann::json j = comp.toJson();
     REQUIRE(j.contains("heroes"));
     REQUIRE(j["heroes"].size() == 2);
-    CHECK(j["heroes"][0]["assembly"] == "elder");
+    CHECK(j["heroes"][0]["name"] == "elder");
+    CHECK_FALSE(j["heroes"][0].contains("assembly"));   // the concept is gone, ADR-107
     CHECK(j["heroes"][0]["reactionProfile"] == "organism");
     // A second pass through the format reproduces the first exactly.
     auto again = scene::Composition::fromJson(j, fx.registry);
@@ -1807,7 +1808,7 @@ TEST_CASE("An authored scene declares heroes and they survive a file round trip"
     REQUIRE((*reloaded)->heroes().size() == 2);
     const world::HeroPoint& afterFile = (*reloaded)->heroes()[0];
     CHECK(afterFile.name == "elder");
-    CHECK(afterFile.assembly == "elder");
+    CHECK(afterFile.name == "elder");
     CHECK(afterFile.reactionProfile == "organism");
     checkVec(afterFile.position, glm::vec3(-1.0f, -9.0f, -46.0f));
     checkVec(afterFile.colorAccent, glm::vec3(1.0f, 0.47f, 0.15f));
@@ -1837,7 +1838,7 @@ TEST_CASE("An invalid hero names itself and refuses the scene rather than vanish
 
     // Inside the stand-off: the hero would never be active on the shot designed for it.
     {
-        auto r = load(R"([{"name": "elder", "assembly": "elder", "preferredCameraDistance": 50.0,
+        auto r = load(R"([{"name": "elder", "preferredCameraDistance": 50.0,
                            "activationRadius": 20.0}])");
         REQUIRE_FALSE(r.has_value());
         INFO(r.error().message);
@@ -1846,23 +1847,20 @@ TEST_CASE("An invalid hero names itself and refuses the scene rather than vanish
     }
     // A profile nobody wrote: the hero would load and then react to nothing.
     {
-        auto r = load(R"([{"name": "elder", "assembly": "elder", "reactionProfile": "mycelial"}])");
+        auto r = load(R"([{"name": "elder", "reactionProfile": "mycelial"}])");
         REQUIRE_FALSE(r.has_value());
         INFO(r.error().message);
         CHECK(r.error().message.find("elder") != std::string::npos);
         CHECK(r.error().message.find("mycelial") != std::string::npos);
     }
-    // Nothing stands here at all.
+    // A name and nothing else is a complete hero: it stands on the node of that name (ADR-107).
     {
         auto r = load(R"([{"name": "elder"}])");
-        REQUIRE_FALSE(r.has_value());
-        INFO(r.error().message);
-        CHECK(r.error().message.find("elder") != std::string::npos);
+        REQUIRE(r.has_value());
     }
     // Two heroes by the same name: every downstream reference to "elder" would be ambiguous.
     {
-        auto r = load(R"([{"name": "elder", "assembly": "elder"},
-                          {"name": "elder", "assembly": "elder-2"}])");
+        auto r = load(R"([{"name": "elder"}, {"name": "elder"}])");
         REQUIRE_FALSE(r.has_value());
         INFO(r.error().message);
         CHECK(r.error().message.find("elder") != std::string::npos);
@@ -1870,14 +1868,13 @@ TEST_CASE("An invalid hero names itself and refuses the scene rather than vanish
     // Shape errors.
     CHECK_FALSE(load(R"({"name": "elder"})").has_value());
     CHECK_FALSE(load(R"([42])").has_value());
-    CHECK_FALSE(load(R"([{"assembly": "elder"}])").has_value());
+    CHECK_FALSE(load(R"([{"radius": 4.0}])").has_value());   // a hero with no name names nothing
 
     // And the same refusals reach setHeroes directly, so an in-memory scene cannot hold a hero a
     // file would be refused for.
     scene::Composition comp(fx.registry, "direct");
     world::HeroPoint bad;
     bad.name = "elder";
-    bad.assembly = "elder";
     bad.preferredCameraDistance = 50.0f;
     bad.activationRadius = 20.0f;
     auto rejected = comp.setHeroes({bad});
@@ -1907,12 +1904,12 @@ TEST_CASE("examples/world/glowmere-stylized.scene.json declares the elder as its
     REQUIRE(!j["heroes"].empty());
     const auto entry = std::find_if(j["heroes"].begin(), j["heroes"].end(),
                                     [](const nlohmann::json& h) {
-                                        return h.value("name", std::string()) == "elder";
+                                        return h.value("name", std::string()) == "elder-crown";
                                     });
     REQUIRE(entry != j["heroes"].end());
     auto hero = world::HeroPoint::fromJson(*entry);
     REQUIRE(hero.has_value());
-    CHECK(hero->name == "elder");
+    CHECK(hero->name == "elder-crown");
     // Every hero in the file has to load, or one of them is silently broken.
     for (const nlohmann::json& h : j["heroes"]) {
         INFO("hero '" << h.value("name", std::string("?")) << "'");
@@ -1926,19 +1923,25 @@ TEST_CASE("examples/world/glowmere-stylized.scene.json declares the elder as its
                                         return c.size() == 3 && c[0] > 0.9f && c[1] < 0.6f && c[2] < 0.3f;
                                     });
     CHECK(warm == 1);
-    // An assembly, not an asset: the elder is elder-crown, elder-stem and elder-filaments, and no
-    // asset id could name three nodes.
-    CHECK(hero->assembly == "elder");
+    // One object, and it is really in the scene (ADR-107). The elder used to be declared as an
+    // "assembly" -- a hero named `elder` standing for the three `elder-*` nodes by prefix -- which
+    // made it a hero no row in the editor was and, because reactions are wired to
+    // `nodes/<hero name>/...`, one its `organism` profile could never have reached.
     CHECK(hero->assetId.empty());
-    // The three nodes it names are really there, under that prefix.
-    std::vector<std::string> parts;
-    for (const nlohmann::json& n : j.at("nodes")) {
-        const std::string name = n.at("name").get<std::string>();
-        if (name.starts_with(hero->assembly)) {
-            parts.push_back(name);
-        }
+    const bool onANode = std::any_of(j.at("nodes").begin(), j.at("nodes").end(),
+                                     [&](const nlohmann::json& n) {
+                                         return n.at("name").get<std::string>() == hero->name;
+                                     });
+    CHECK(onANode);
+    // Every hero in this file names an object, which is what one-to-one means.
+    for (const nlohmann::json& h : j["heroes"]) {
+        const std::string name = h.value("name", std::string());
+        INFO("hero '" << name << "'");
+        CHECK_FALSE(h.contains("assembly"));
+        CHECK(std::any_of(j.at("nodes").begin(), j.at("nodes").end(), [&](const nlohmann::json& n) {
+            return n.at("name").get<std::string>() == name;
+        }));
     }
-    CHECK(parts == std::vector<std::string>{"elder-crown", "elder-stem", "elder-filaments"});
     // Its root is the stem's base and its accent is the filaments' emissive colour, so the hero
     // describes the geometry rather than sitting next to it.
     checkVec(hero->position, glm::vec3(-1.0f, -9.0f, -46.0f));

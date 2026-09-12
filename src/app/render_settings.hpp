@@ -41,8 +41,18 @@ struct RenderSettings {
     [[nodiscard]] double resolvedEnd(double audioSeconds, double timelineSeconds) const;
     // Output file for frame `index` of a sequence.
     [[nodiscard]] std::filesystem::path frameFile(const std::filesystem::path& dir, std::uint64_t index) const;
-    // Infers the output kind from the path: a known video extension → Video, else PngSequence.
-    static RenderOutput outputForPath(const std::filesystem::path& path);
+    // Infers the output kind from a path's extension, keeping `fallback` when the extension says
+    // nothing about it.
+    //
+    // A path is weak evidence and the setting is strong evidence. This used to answer PngSequence
+    // for everything that was not a video -- for a directory, for an `.exr`, for the `.json` a save
+    // dialog had appended -- so choosing an output file silently moved the radio button back to PNG
+    // under someone who had just pressed Video.
+    static RenderOutput outputForPath(const std::filesystem::path& path,
+                                      RenderOutput fallback = RenderOutput::PngSequence);
+    // The path a video would actually be written to: the same name with a container extension the
+    // muxer understands, so a name typed without one (or with somebody else's) still names a movie.
+    static std::filesystem::path withVideoExtension(const std::filesystem::path& path);
     // The default frame pattern of a sequence kind ("frame_{:06d}.png" / ".exr").
     static const char* defaultPattern(RenderOutput output);
     // Swaps a pattern that is still the other sequence kind's default for this kind's default, so

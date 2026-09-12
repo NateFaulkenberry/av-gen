@@ -1,5 +1,7 @@
 #include "world/hero.hpp"
 
+#include "core/log.hpp"
+
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -93,9 +95,6 @@ Result<void> HeroPoint::validate() const {
     if (name.empty()) {
         return fail("a hero needs a name");
     }
-    if (assetId.empty() && assembly.empty()) {
-        return fail("hero '{}': needs either an asset id or an assembly to stand here", name);
-    }
     if (!(scale > 0.0f) || !std::isfinite(scale)) {
         return fail("hero '{}': scale must be positive", name);
     }
@@ -126,9 +125,6 @@ json HeroPoint::toJson() const {
     j["name"] = name;
     if (!assetId.empty()) {
         j["asset"] = assetId;
-    }
-    if (!assembly.empty()) {
-        j["assembly"] = assembly;
     }
     j["position"] = {position.x, position.y, position.z};
     j["yaw"] = yaw;
@@ -177,7 +173,14 @@ Result<HeroPoint> HeroPoint::fromJson(const json& j) {
         return {};
     };
     str("asset", h.assetId);
-    str("assembly", h.assembly);
+    if (j.contains("assembly")) {
+        // Read and dropped rather than rejected, so a scene written before ADR-107 still opens. The
+        // hero is now the object of its own name; an assembly that named a group of nodes named
+        // nothing the rest of the engine could act on.
+        log::warn("hero '{}': 'assembly' is no longer used -- a hero is the object it is named "
+                  "after; this one now stands on whatever node is called '{}'",
+                  h.name, h.name);
+    }
     str("reactionProfile", h.reactionProfile);
     if (auto ok = vec("position", h.position); !ok) {
         return std::unexpected(ok.error());

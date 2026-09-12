@@ -73,10 +73,14 @@ struct HeroChange {
     std::vector<world::HeroPoint> after;
 };
 
-// Does this hero declaration stand for that node? The link is by *name*, and deliberately loose: a
-// hero can be an assembly of several nodes (Glowmere's "elder" is three), so it names either the
-// node it stands on or the assembly the node belongs to. All three fields are checked because a
-// hand-authored scene uses whichever one read best at the time.
+// One object's hero declaration is one hero, so `before`/`after` hold at most one -- vectors because
+// a hand-edited scene can still name the same object twice and undo has to put back what was there.
+
+// Does this hero declaration stand for that node?
+//
+// One object, one hero, matched by name (ADR-107). The link used to be looser -- a hero could name
+// an "assembly" of several nodes -- which produced heroes that no row in the editor was and that no
+// reaction could reach, because everything downstream addresses a hero as `nodes/<its name>/...`.
 [[nodiscard]] bool heroNamesNode(const world::HeroPoint& hero, const std::string& node);
 
 // A node the command moves in or out of the scene. `held` owns it while it is *out*: null while the

@@ -783,7 +783,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         panel_->shaderErrorFor = [this](std::uint32_t id) { return renderer_->shaderStack().errorFor(id); };
         panel_->onSaveScene = [this] {
-            window_->saveFileDialog([this](std::string path) {
+            window_->saveFileDialog(platform::Window::SaveKind::Project, [this](std::string path) {
                 if (path.empty()) return;
                 if (auto r = engine_->saveComposition(path); !r) {
                     panel_->setStatus(r.error().message);
@@ -819,7 +819,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             }
         };
         panel_->onSaveProject = [this, saveTo] {
-            window_->saveFileDialog([saveTo](std::string path) {
+            window_->saveFileDialog(platform::Window::SaveKind::Project, [saveTo](std::string path) {
                 if (!path.empty()) {
                     saveTo(path);
                 }
@@ -836,7 +836,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         panel_->onOpenRecent = [this](const std::filesystem::path& path) { loadAny(path); };
         panel_->onExportBundle = [this] {
-            window_->saveFileDialog([this](std::string path) {
+            window_->saveFileDialog(platform::Window::SaveKind::Project, [this](std::string path) {
                 if (path.empty()) {
                     return;
                 }
@@ -947,11 +947,28 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         panel_->onStopAudioInput = [this] { engine_->stopAudioInput(); };
         panel_->onChooseRenderOutput = [this] {
-            window_->saveFileDialog([this](std::string path) {
-                if (path.empty()) return;
+            // Two different questions, because a video is a file and a sequence is a directory full
+            // of them. Asking for a file name when the answer is a folder is how the output path of
+            // a PNG render ended up being a file that was never written.
+            const RenderOutput kind = uiRender_.output;
+            auto chosen = [this, kind](std::string path) {
+                if (path.empty()) {
+                    return;
+                }
                 uiRender_.outputPath = path;
-                uiRender_.output = RenderSettings::outputForPath(path);
-            });
+                // The extension can *confirm* a kind but never silently contradicts the one that is
+                // selected: the dialog was opened for that kind, and a person who has just picked
+                // Video did not mean to pick a PNG sequence by typing a name without a dot in it.
+                uiRender_.output = RenderSettings::outputForPath(path, kind);
+                if (uiRender_.output == RenderOutput::Video) {
+                    uiRender_.outputPath = RenderSettings::withVideoExtension(uiRender_.outputPath);
+                }
+            };
+            if (isSequence(kind)) {
+                window_->chooseFolderDialog(std::move(chosen));
+            } else {
+                window_->saveFileDialog(platform::Window::SaveKind::Video, std::move(chosen));
+            }
         };
     }
 

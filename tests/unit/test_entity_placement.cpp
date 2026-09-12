@@ -208,7 +208,7 @@ TEST_CASE("the craft hangs where the world says it may", "[entity][placement]") 
         // Clear of the elder in the frame. The elder's crown is the scene's declared focal point.
         const world::HeroPoint* elder = nullptr;
         for (const world::HeroPoint& hero : comp.heroes()) {
-            if (hero.name == "elder") {
+            if (hero.name == "elder-crown") {   // one hero, one object (ADR-107)
                 elder = &hero;
             }
         }

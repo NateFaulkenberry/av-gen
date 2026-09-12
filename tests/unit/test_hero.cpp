@@ -53,10 +53,15 @@ TEST_CASE("A hero validates the things that would make it undiscoverable", "[wor
     h.assetId = "elder";
     REQUIRE(h.validate().has_value());
 
-    // Something has to stand here.
-    world::HeroPoint empty = h;
-    empty.assetId.clear();
-    CHECK(!empty.validate().has_value());
+    // A hero declared in the editor names a node instead of a library asset, so an empty asset id
+    // is an ordinary state (ADR-107). A hero with no *name* is not: the name is how the scene, the
+    // reactions and the editor all refer to it.
+    world::HeroPoint fromTheEditor = h;
+    fromTheEditor.assetId.clear();
+    CHECK(fromTheEditor.validate().has_value());
+    world::HeroPoint nameless = h;
+    nameless.name.clear();
+    CHECK(!nameless.validate().has_value());
 
     // A hero that activates closer than the camera is meant to stand never activates on the shot
     // designed for it, which is a silent failure: the hero is there and simply never does anything.

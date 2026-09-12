@@ -576,11 +576,10 @@ bool nodeIsHero(const scene::Composition& composition, const std::string& name) 
 
 world::HeroPoint heroFromNode(scene::Composition& composition, const std::string& name) {
     world::HeroPoint hero;
+    // The hero is the object: same name, and that name is the only tie between them (ADR-107).
+    // `assetId` is left empty on purpose -- it means "look this up in the asset library", and a node
+    // in a scene is not a library entry.
     hero.name = name;
-    // The node *is* the assembly: what stands here is whatever this object and its children draw.
-    // `assetId` is left empty on purpose -- it means "look this up in the asset library", and a
-    // node in a scene is not a library entry.
-    hero.assembly = name;
     const scene::CompositionNode* node = composition.findNode(name);
     if (node == nullptr) {
         return hero;   // validate() will reject it; the caller checks the node first

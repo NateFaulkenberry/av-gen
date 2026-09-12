@@ -1546,9 +1546,8 @@ TEST_CASE("designating an object measures the hero from the object") {
     editor.setNodesHero(f.engine, std::vector<std::string>{a}, true);
     REQUIRE(composition->heroes().size() == 1);
     const world::HeroPoint& hero = composition->heroes().front();
-    CHECK(hero.name == a);
-    CHECK(hero.assembly == a);      // the node is the assembly; it is not a library asset id
-    CHECK(hero.assetId.empty());
+    CHECK(hero.name == a);          // the hero is the object: the name is the whole of the tie
+    CHECK(hero.assetId.empty());    // and it is a node in a scene, not an entry in a library
     CHECK(ui::nodeIsHero(*composition, a));
 
     // Measured, not guessed: the hero sits at the middle of the box the object occupies, and is as
@@ -1648,33 +1647,31 @@ TEST_CASE("a designated hero survives a save and a load") {
     REQUIRE(reopened.composition()->heroes().size() == 1);
     const world::HeroPoint& loaded = reopened.composition()->heroes().front();
     CHECK(loaded.name == declared.name);
-    CHECK(loaded.assembly == declared.assembly);
+    CHECK(loaded.assetId.empty());
     CHECK_THAT(loaded.radius, Catch::Matchers::WithinAbs(declared.radius, 1e-4));
     CHECK(ui::nodeIsHero(*reopened.composition(), a));
 }
 
-// Glowmere's elder is a hero named `elder` standing on three nodes called `elder-crown`,
-// `elder-stem` and `elder-filaments`. No row in the Objects list is that hero, so before this it
-// could not be undeclared from the application at all -- which is what "the camera stays locked on
-// the mushroom no matter what I unstar" turned out to be.
-TEST_CASE("a hero that names an assembly can still be undeclared") {
+// A hero is one object (ADR-107), and the name is the whole of the tie. A hero left in a file whose
+// object is gone -- renamed, deleted, or written by hand for something that never existed -- still
+// has to be visible in the panel and still has to be removable, or it is a subject the director
+// keeps travelling to that nothing in the application can talk about. That is what the old
+// "assembly" hero was, permanently.
+TEST_CASE("a hero whose object is missing can still be undeclared") {
     Fixture f;
     app::EditSystem edits;
     ui::WorldEditor editor;
     editor.attachEdits(edits);
     f.add("elder-crown", glm::vec3(0.0f, 0.0f, 0.0f));
-    f.add("elder-stem", glm::vec3(0.0f, -1.0f, 0.0f));
     auto* composition = f.engine.composition();
 
-    world::HeroPoint elder;
-    elder.name = "elder";
-    elder.assembly = "elder";     // three nodes; none of them is the hero
-    elder.importance = 0.95f;
-    REQUIRE(composition->setHeroes({elder}).has_value());
+    world::HeroPoint orphan;
+    orphan.name = "elder";     // nothing in this scene is called that
+    orphan.importance = 0.95f;
+    REQUIRE(composition->setHeroes({orphan}).has_value());
     CHECK_FALSE(ui::nodeIsHero(*composition, "elder-crown"));   // no row carries it
-
-    // Undeclaring takes the hero's own name, and works although nothing in the scene is called that.
     REQUIRE(composition->findNode("elder") == nullptr);
+
     editor.setNodesHero(f.engine, std::vector<std::string>{"elder"}, false);
     CHECK(composition->heroes().empty());
     CHECK(edits.history().undo(f.engine).ok());
@@ -1687,8 +1684,6 @@ TEST_CASE("a hero that names an assembly can still be undeclared") {
     CHECK(composition->heroes().size() == 1);
 }
 
-// The editor draws heroes because nothing else does: designation has no other appearance, and a
-// toggle with no visible effect is indistinguishable from a broken one.
 TEST_CASE("the overlay is told about every hero, and which one is the subject") {
     Fixture f;
     app::EditSystem edits;
@@ -1779,12 +1774,11 @@ TEST_CASE("a hero follows the object it describes") {
         CHECK_THAT(composition->heroes().front().position.y, Catch::Matchers::WithinAbs(before.y, 1e-3));
     }
 
-    SECTION("a hero naming an assembly has no object to follow and is left alone") {
-        world::HeroPoint assembly;
-        assembly.name = "elder";
-        assembly.assembly = "elder";
-        assembly.position = glm::vec3(1.0f, 2.0f, 3.0f);
-        REQUIRE(composition->setHeroes({assembly}).has_value());
+    SECTION("a hero whose object is missing has nothing to follow and is left alone") {
+        world::HeroPoint orphan;
+        orphan.name = "elder";   // no node of that name
+        orphan.position = glm::vec3(1.0f, 2.0f, 3.0f);
+        REQUIRE(composition->setHeroes({orphan}).has_value());
         edits.history().push(ui::moveNodes(f.engine, std::vector<std::string>{a}, glm::vec3(50.0f, 0.0f, 0.0f)));
         tick(4.0);
         CHECK_THAT(composition->heroes().front().position.x, Catch::Matchers::WithinAbs(1.0, 1e-4));

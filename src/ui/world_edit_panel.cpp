@@ -552,11 +552,11 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
     }
     // The heroes, as a list of their own and not only as stars on the rows.
     //
-    // Two reasons it cannot be rows alone. A hero may name an *assembly* rather than a node --
-    // Glowmere's elder is three nodes and no single one of them -- so it has no row to be unstarred
-    // from, and the camera kept travelling to a subject the application could not talk about. And a
-    // hero has no appearance in the viewport beyond the mark the editor draws, so "what is this
-    // world about, and in what order" has to be answerable somewhere.
+    // Two reasons it cannot be rows alone. A hero has no appearance in the viewport beyond the mark
+    // the editor draws, so "what is this world about, and in what order" has to be answerable
+    // somewhere. And a hero can outlive its object -- a file written by hand, an object renamed or
+    // deleted -- and one with no row would be a subject the director keeps travelling to that
+    // nothing in the application can take back.
     if (const std::size_t heroCount = composition->heroes().size(); heroCount > 0) {
         if (ImGui::TreeNodeEx("##heroes", ImGuiTreeNodeFlags_DefaultOpen, "Heroes (%zu)", heroCount)) {
             if (ImGui::IsItemHovered()) {
@@ -584,7 +584,7 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
                                       static_cast<double>(hero.importance),
                                       static_cast<double>(hero.height),
                                       static_cast<double>(hero.preferredCameraDistance),
-                                      onANode ? "" : "\nassembly: no single object carries it");
+                                      onANode ? "" : "\nno object of this name is in the scene");
                 }
                 ImGui::PopID();
             }
