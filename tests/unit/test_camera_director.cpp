@@ -481,3 +481,71 @@ TEST_CASE("A directed shot re-cuts itself when the heroes change", "[director][c
     }
 #endif
 }
+
+// The behaviour the panel's "[ignored]" marker describes, asserted against the engine rather than
+// against the comment that claims it. Three ways of placing a camera, each reading its own
+// parameters: this is the test that would fail if free mode ever started reading the orbit trio, or
+// if orbit mode stopped.
+TEST_CASE("Each camera mode reads its own parameters and no others", "[camera][modes]") {
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    auto set = [&](const char* path, float value) {
+        params::IParameter* p = engine.params().find(path);
+        REQUIRE(p != nullptr);
+        p->setBaseComponent(0, value);
+    };
+    auto setVec = [&](const char* path, glm::vec3 v) {
+        params::IParameter* p = engine.params().find(path);
+        REQUIRE(p != nullptr);
+        for (int i = 0; i < 3; ++i) {
+            p->setBaseComponent(static_cast<std::size_t>(i), v[i]);
+        }
+    };
+    auto placed = [&] {
+        FrameTime time;
+        time.renderTime = 1.0;
+        time.deltaTime = 1.0 / 60.0;
+        engine.update(time);
+        return engine.scene().camera.position;
+    };
+
+    set("camera/orbitSpeed", 0.0f);   // a still camera, so a move means a parameter and not time
+    setVec("camera/position", glm::vec3(0.0f, 2.0f, 10.0f));
+    setVec("camera/target", glm::vec3(0.0f));
+
+    SECTION("orbit mode is placed by distance and height") {
+        set("camera/mode", 0.0f);
+        set("camera/distance", 10.0f);
+        set("camera/height", 3.0f);
+        const glm::vec3 before = placed();
+        CHECK_THAT(before.y, Catch::Matchers::WithinAbs(3.0, 1e-3));
+        set("camera/distance", 90.0f);
+        set("camera/height", 40.0f);
+        const glm::vec3 after = placed();
+        CHECK_THAT(after.y, Catch::Matchers::WithinAbs(40.0, 1e-3));
+        CHECK(glm::length(glm::vec2(after.x, after.z)) > glm::length(glm::vec2(before.x, before.z)) + 50.0f);
+
+        // ...and it turns only when it is told to.
+        const glm::vec3 still = placed();
+        CHECK_THAT(glm::length(still - after), Catch::Matchers::WithinAbs(0.0, 1e-4));
+        set("camera/orbitSpeed", 1.0f);
+        CHECK(glm::length(placed() - after) > 1e-3f);
+    }
+
+    SECTION("free mode ignores them entirely -- which is the reported 'nothing happens'") {
+        set("camera/mode", 1.0f);
+        set("camera/distance", 10.0f);
+        set("camera/height", 3.0f);
+        const glm::vec3 before = placed();
+        CHECK_THAT(before.y, Catch::Matchers::WithinAbs(2.0, 1e-4));   // camera/position, not height
+        set("camera/distance", 900.0f);
+        set("camera/height", 400.0f);
+        set("camera/orbitSpeed", 2.0f);
+        const glm::vec3 after = placed();
+        CHECK_THAT(glm::length(after - before), Catch::Matchers::WithinAbs(0.0, 1e-4));
+        // The free camera's own parameters do move it, so this is a mode boundary and not a stuck
+        // camera.
+        setVec("camera/position", glm::vec3(5.0f, 6.0f, 7.0f));
+        CHECK(glm::length(placed() - before) > 1.0f);
+    }
+}

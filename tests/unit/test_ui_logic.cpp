@@ -271,3 +271,75 @@ TEST_CASE("The audio lane costs nothing when there is no audio", "[ui][sequencer
     CHECK_THAT(static_cast<double>(with.height() - without.height()),
                Catch::Matchers::WithinAbs(static_cast<double>(with.audioLaneHeight + with.gap), 1e-4));
 }
+
+// A camera is placed one of three ways and each has its own parameters; the other two families are
+// still registered, still exposed and still drag under the mouse without reaching the picture. On
+// Glowmere -- a free camera -- that is `camera/distance`, `camera/height` and `camera/orbitSpeed`,
+// and it was reported as "changing them doesn't appear to change anything", which is exactly what
+// it looks like.
+TEST_CASE("The panel can tell which camera parameters the current mode ignores", "[ui][camera]") {
+    constexpr int kOrbit = 0;
+    constexpr int kFree = 1;
+    constexpr int kSpline = 2;
+
+    SECTION("the orbit camera's parameters are ignored in free mode, and only there") {
+        for (const char* path : {"camera/distance", "camera/height", "camera/orbitSpeed"}) {
+            INFO(path);
+            CHECK_FALSE(ui::parameterInertness(path, kOrbit, true).inert);
+            CHECK(ui::parameterInertness(path, kFree, true).inert);
+            // Spline mode falls back to the orbit placement when the scene names no camera spline,
+            // so claiming these are ignored there would be claiming more than is true.
+            CHECK_FALSE(ui::parameterInertness(path, kSpline, true).inert);
+        }
+        const auto inert = ui::parameterInertness("camera/height", kFree, true);
+        CHECK(inert.because == "the camera is in free mode");
+        CHECK(inert.belongsTo == "the orbit camera");
+        // The explanation is also the fix: what to write, and what to call it.
+        CHECK(inert.fixPath == "camera/mode");
+        CHECK(inert.fixValue == 0.0f);
+        CHECK(!inert.fixLabel.empty());
+    }
+
+    SECTION("the free camera's are ignored in the other two") {
+        for (const char* path : {"camera/position", "camera/target"}) {
+            INFO(path);
+            CHECK_FALSE(ui::parameterInertness(path, kFree, true).inert);
+            CHECK(ui::parameterInertness(path, kOrbit, true).inert);
+            CHECK(ui::parameterInertness(path, kSpline, true).inert);
+            CHECK(ui::parameterInertness(path, kOrbit, true).fixValue == 1.0f);
+        }
+    }
+
+    SECTION("the spline camera's are ignored unless the camera is riding one") {
+        for (const char* path : {"camera/splineT", "camera/lookAhead", "camera/splineOffset"}) {
+            INFO(path);
+            CHECK_FALSE(ui::parameterInertness(path, kSpline, true).inert);
+            CHECK(ui::parameterInertness(path, kFree, true).inert);
+            CHECK(ui::parameterInertness(path, kOrbit, true).fixValue == 2.0f);
+        }
+    }
+
+    SECTION("an explicit field of view is ignored while the lens is deciding it") {
+        CHECK_FALSE(ui::parameterInertness("camera/fov", kFree, true).inert);
+        const auto lens = ui::parameterInertness("camera/fov", kFree, false);
+        CHECK(lens.inert);
+        CHECK(lens.fixPath == "camera/lens/useExplicitFov");
+        CHECK(lens.fixValue == 1.0f);
+        // ...but the lens's own numbers are never marked: `focalLength` still sets the depth of
+        // field through the circle of confusion whichever way the field of view is decided, so
+        // calling it ignored would be false.
+        CHECK_FALSE(ui::parameterInertness("camera/lens/focalLength", kFree, true).inert);
+        CHECK_FALSE(ui::parameterInertness("camera/lens/focalLength", kFree, false).inert);
+    }
+
+    SECTION("everything else is left alone") {
+        for (const char* path : {"post/bloom/intensity", "nodes/valley/position", "audio/inputGain",
+                                 "camera/mode", "camera/shake/amplitude"}) {
+            INFO(path);
+            for (int mode : {kOrbit, kFree, kSpline}) {
+                CHECK_FALSE(ui::parameterInertness(path, mode, true).inert);
+                CHECK_FALSE(ui::parameterInertness(path, mode, false).inert);
+            }
+        }
+    }
+}

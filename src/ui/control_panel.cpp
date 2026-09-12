@@ -1073,6 +1073,15 @@ void ControlPanel::drawParameters(app::Engine& engine) {
         it->second.push_back(param);
     }
 
+    // What the camera is doing right now, so a parameter belonging to one of the other two ways of
+    // placing it can say that it is not being read (`parameterInertness`).
+    const auto readInt = [&](const char* path, int fallback) {
+        const params::IParameter* p = engine.params().find(path);
+        return p != nullptr ? static_cast<int>(std::lround(p->finalComponent(0))) : fallback;
+    };
+    const int cameraMode = readInt("camera/mode", 1);
+    const bool explicitFov = readInt("camera/lens/useExplicitFov", 1) != 0;
+
     for (const std::string& group : order) {
       const bool groupOpen = ImGui::TreeNodeEx(group.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
       if (!groupOpen) {
@@ -1133,7 +1142,32 @@ void ControlPanel::drawParameters(app::Engine& engine) {
                 ImGui::SetTooltip("automated by the timeline; the slider is the base value");
             }
         }
+        // Not reaching the picture in the state the scene is in. Said next to the slider, in the
+        // same place and the same way as "[A]", because the two are the same kind of fact: the
+        // number is real and something else is deciding what you see.
+        const ParameterInertness inert = parameterInertness(param->path(), cameraMode, explicitFov);
+        if (inert.inert) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("[ignored]");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%.*s, and this belongs to %.*s. The value is kept and saved; "
+                                  "right-click to switch.",
+                                  static_cast<int>(inert.because.size()), inert.because.data(),
+                                  static_cast<int>(inert.belongsTo.size()), inert.belongsTo.data());
+            }
+        }
         if (ImGui::BeginPopupContextItem("reset")) {
+            if (inert.inert) {
+                // The explanation, as an action. Knowing *why* a slider does nothing is only half
+                // an answer if acting on it means going to find another parameter by name.
+                const std::string label(inert.fixLabel);
+                if (ImGui::MenuItem(label.c_str())) {
+                    if (params::IParameter* fix = engine.params().find(std::string(inert.fixPath))) {
+                        fix->setBaseComponent(0, inert.fixValue);
+                    }
+                }
+                ImGui::Separator();
+            }
             if (ImGui::MenuItem("Reset to default")) {
                 param->resetToDefault();
             }

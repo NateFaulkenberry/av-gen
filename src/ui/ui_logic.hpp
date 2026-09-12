@@ -283,6 +283,70 @@ struct StripLanes {
     }
 };
 
+// ---- parameters the current state ignores ------------------------------------------------------
+//
+// The camera has three mutually exclusive ways of being placed (`camera/mode`: 0 orbit, 1 free,
+// 2 spline) and each has its own parameters. The other two families are still registered, still
+// exposed, and still move under the mouse -- they simply do not reach the picture. Glowmere is a
+// free camera, so its `camera/distance`, `camera/height` and `camera/orbitSpeed` sliders drag and
+// do nothing, which is indistinguishable from a broken engine and was reported as one.
+//
+// The same is true of `camera/fov` when the lens is driving the field of view.
+//
+// Marking rather than hiding, and marking rather than disabling: the value is real, it is saved,
+// and it is what the camera will use the moment the mode changes -- so it must stay visible and
+// stay editable. What it must not do is look like it is working.
+struct ParameterInertness {
+    bool inert = false;
+    std::string_view because;    // "the camera is in free mode"
+    std::string_view belongsTo;  // "the orbit camera"
+    std::string_view fixPath;    // the parameter that would make it live again
+    float fixValue = 0.0f;
+    std::string_view fixLabel;   // what to call that in a menu
+};
+
+// `mode` is `camera/mode`; `explicitFov` is `camera/lens/useExplicitFov`.
+[[nodiscard]] inline ParameterInertness parameterInertness(std::string_view path, int mode,
+                                                           bool explicitFov) {
+    const auto cameraModeName = [](int m) -> std::string_view {
+        return m == 0 ? "orbit" : (m == 1 ? "free" : "spline");
+    };
+    ParameterInertness out;
+    const auto ignoredUnless = [&](bool live, int wantedMode, std::string_view family) {
+        if (live) {
+            return;
+        }
+        out.inert = true;
+        out.because = cameraModeName(mode) == std::string_view("orbit")   ? "the camera is in orbit mode"
+                      : cameraModeName(mode) == std::string_view("free")  ? "the camera is in free mode"
+                                                                          : "the camera is in spline mode";
+        out.belongsTo = family;
+        out.fixPath = "camera/mode";
+        out.fixValue = static_cast<float>(wantedMode);
+        out.fixLabel = wantedMode == 0   ? "Switch the camera to orbit mode"
+                       : wantedMode == 1 ? "Switch the camera to free mode"
+                                         : "Switch the camera to spline mode";
+    };
+    if (path == "camera/distance" || path == "camera/height" || path == "camera/orbitSpeed") {
+        // Mode 2 falls back to the orbit placement when the scene names no camera spline, so only
+        // free mode is certain to ignore these. Claiming more than is true is how a marker like
+        // this loses its meaning.
+        ignoredUnless(mode != 1, 0, "the orbit camera");
+    } else if (path == "camera/position" || path == "camera/target") {
+        ignoredUnless(mode == 1, 1, "the free camera");
+    } else if (path == "camera/splineT" || path == "camera/lookAhead" || path == "camera/splineOffset") {
+        ignoredUnless(mode == 2, 2, "the spline camera");
+    } else if (path == "camera/fov" && !explicitFov) {
+        out.inert = true;
+        out.because = "the lens is driving the field of view";
+        out.belongsTo = "an explicit field of view";
+        out.fixPath = "camera/lens/useExplicitFov";
+        out.fixValue = 1.0f;
+        out.fixLabel = "Use this field of view instead of the lens";
+    }
+    return out;
+}
+
 inline std::pair<float, float> routeAmountBounds(const params::ModRoute& /*route*/) {
     return {-kRouteAmountLimit, kRouteAmountLimit};
 }
