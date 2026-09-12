@@ -514,7 +514,10 @@ For every level, run camera translation, rotation, orbit, dolly, playback, pause
   no sanitizer findings. The new transport discontinuity contract also passes under TSan (5
   assertions, no race diagnostics). The broader TSan transport filter is benchmark-inconclusive:
   an existing 100-us `refreshTransport` ceiling measured 111.97 us under sanitizer overhead, not a
-  race. Full sanitizer suites and TSan resource-lifetime coverage remain open.
+  race. ASan then found and fixed a real composition lifecycle use-after-free: `detach()` now
+  invalidates light, terrain and water node parameter pointers as well as the common node fields;
+  the exact lifecycle test passes 466 assertions under ASan/UBSan. Full sanitizer suites and TSan
+  resource-lifetime coverage remain open.
 - `[x]` Complete release suite baseline: 1,677 tests passed, zero failures, with four expected
   platform/asset-gated skips (two Khronos sample imports, external ffmpeg/libx264 and NDI runtime).
   The run took 345.85 seconds on the current Apple M2 Max environment. Existing compiler warnings

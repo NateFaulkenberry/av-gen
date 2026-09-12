@@ -2438,6 +2438,19 @@ void Composition::detach() {
         node->visibleParam = nullptr;
         node->emissiveParam = nullptr;
         node->roughnessParam = nullptr;
+        node->lightIntensityParam = nullptr;
+        node->lightColorParam = nullptr;
+        node->terrainLodParam = nullptr;
+        node->terrainCullParam = nullptr;
+        node->terrainLodDistanceParam = nullptr;
+        node->terrainViewDistanceParam = nullptr;
+        node->waterGlowParam = nullptr;
+        node->waterSparkleParam = nullptr;
+        node->waterRippleParam = nullptr;
+        node->waterFlowSpeedParam = nullptr;
+        node->waterSwellParam = nullptr;
+        node->waterFoamParam = nullptr;
+        node->waterGlowColorParam = nullptr;
         node->particleParams = {};
         if (node->child) {
             node->child->detach();
