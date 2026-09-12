@@ -375,6 +375,12 @@ void Application::initControlPlane() {
         settings_ = std::move(*loaded);
     }
     ai_ = std::make_unique<ai::ControlPlane>(*engine_, jobs_.get());
+    // ADR-101: an assistant's edit lands in the same history as a person's, so Cmd+Z takes back
+    // "the last thing that happened" rather than "the last thing *I* did". The snapshot sink stays
+    // underneath -- it is what makes a task abortable, which is a different promise from undoable.
+    aiEditSink_ = std::make_unique<EditHistoryTransactionSink>(*engine_, edits_,
+                                                               ai_->transactionSink());
+    ai_->setTransactionSink(aiEditSink_.get());
     ai_->settings() = settings_.ai;
     if (auto r = ai_->applySettings(); !r) {
         // Not an error: "no provider configured" is the ordinary state (ADR-065), and saying so at

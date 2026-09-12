@@ -3,6 +3,7 @@
 // Application lifecycle: window + GPU + engine + UI in live mode, or a headless deterministic
 // frame loop in offline mode (ADR-012). Both modes drive the same Engine and SceneRenderer.
 
+#include "app/ai_edit_sink.hpp"
 #include "app/edit_system.hpp"
 #include "app/engine.hpp"
 #include "app/viewport_camera.hpp"
@@ -210,6 +211,9 @@ private:
     // rather than by any editor: an editor that owns a history can only answer for its own edits,
     // and the user's question is "take back the last thing I did".
     EditSystem edits_;
+    // Bridges the AI control plane's transactions into the one history (ADR-101). Declared after
+    // `edits_` and before `ai_`, so it outlives the control plane that points at it.
+    std::unique_ptr<EditHistoryTransactionSink> aiEditSink_;
     std::unique_ptr<ui::ControlPanel> panel_;
 
     // ---- viewport interaction (ADR-068) --------------------------------------------------------
