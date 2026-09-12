@@ -381,3 +381,59 @@ TEST_CASE("Procedural sky build cost", "[.perf][sky]") {
     }
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("The moon is drawn where the sky's sun is, not where light zero points", "[sky][gpu][stylized]") {
+    // Glowmere showed two moons: a soft blue one inside the sky cube and a crisp white one painted
+    // over it, in different parts of the sky.
+    //
+    // They had two different ideas of where the moon was. `resolveSky` uses the light whose *role*
+    // is Key; the background pass used `lights[0]`, which is simply the first light in the scene --
+    // the frame's light buffer is filled in scene order and knows nothing about roles. Those agree
+    // only when the key happens to be first, which every existing test here arranged by using a
+    // one-light scene.
+    //
+    // So: two lights, and the key is the second one.
+    auto context = makeContext();
+    auto shaders = makeShaders(*context);
+    rendering::SceneRenderer renderer(*context, shaders);
+    REQUIRE(renderer.init());
+
+    auto scene = metalSphereScene(1.0f);
+    scene.entities.clear();
+    scene.environment.stylized = true;
+    scene.environment.showSkybox = true;
+    scene.environment.sky.showBackground = true;
+    scene.environment.environmentIntensity = 1.0f;
+    scene.environment.sky.zenithColor = {0.008f, 0.016f, 0.048f};
+    scene.environment.sky.horizonColor = {0.04f, 0.08f, 0.17f};
+
+    const glm::vec3 keyTravel = glm::normalize(glm::vec3(-0.4f, -0.8f, -0.45f));
+    const glm::vec3 fillTravel = glm::normalize(glm::vec3(0.9f, -0.3f, 0.3f));
+    scene::PunctualLight fill;
+    fill.type = scene::PunctualLight::Type::Directional;
+    fill.role = scene::PunctualLight::Role::Fill;
+    fill.direction = fillTravel;
+    fill.intensity = 0.4f;
+    // In front of the key, so the key is not light zero -- which is the whole point.
+    scene.lights.insert(scene.lights.begin(), fill);
+    REQUIRE(scene.lights.size() == 2);
+    REQUIRE(scene.lights[0].role == scene::PunctualLight::Role::Fill);
+    REQUIRE(scene.lights[1].role == scene::PunctualLight::Role::Key);
+
+    scene.camera.position = glm::vec3(0.0f);
+
+    // Looking at the key light: the moon is there, dead centre.
+    scene.camera.target = -keyTravel * 10.0f;
+    const auto atKey = renderWith(renderer, scene, 256, 256);
+    INFO("centre luminance looking at the key light: " << luminance8(atKey.pixel(128, 128)));
+    CHECK(luminance8(atKey.pixel(128, 128)) > 0.8f);
+
+    // Looking at the fill light: sky, and no second moon. This is the half that failed -- the
+    // background pass drew its disc here, because this is where light zero pointed.
+    scene.camera.target = -fillTravel * 10.0f;
+    const auto atFill = renderWith(renderer, scene, 256, 256);
+    INFO("centre luminance looking at the fill light: " << luminance8(atFill.pixel(128, 128)));
+    CHECK(luminance8(atFill.pixel(128, 128)) < 0.5f);
+
+    CHECK(context->errorCount() == 0);
+}

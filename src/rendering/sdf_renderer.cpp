@@ -76,7 +76,8 @@ ObjectUniforms objectUniformsFor(const scene::SdfObject& object, std::size_t obj
     obj.flags = glm::vec4(alphaMode, m.alphaCutoff, m.unlit ? 1.0f : 0.0f, 0.0f);
     obj.prevModel = obj.model; // SDF transforms are static within a frame; the camera supplies the motion
     // x = the ADR-030 `objectId` input; y = material id, z = bloom weight (ADR-035 targets).
-    obj.ids = glm::vec4(static_cast<float>(objectId), static_cast<float>(objectId + 1), 1.0f, 0.0f);
+    obj.ids = glm::vec4(static_cast<float>(scene::packPickId(scene::PickSpace::Sdf, objectId)),
+                        static_cast<float>(objectId + 1), 1.0f, 0.0f);
     return obj;
 }
 

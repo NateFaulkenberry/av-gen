@@ -489,7 +489,7 @@ fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
     }
     var info: MaterialInstanceInfo;
     info.localPosition = in.localPos;
-    info.objectId = object.ids.x;
+    info.objectId = pickIndex(object.ids.x);
     info.instanceIndex = in.instIndex;
     info.instanceId = in.instColor.a;
     info.instanceRandom = in.instRandom;

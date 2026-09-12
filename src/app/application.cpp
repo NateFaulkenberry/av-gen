@@ -1889,11 +1889,28 @@ void Application::serviceViewportPick() {
     }
     viewportPickPosition_ = result->position;
     const auto* composition = engine_->composition();
-    const scene::CompositionNode* node =
-        composition != nullptr ? composition->nodeForEntity(result->objectId) : nullptr;
+    // Which numbering this id belongs to, then the resolver for it. Three renderers write into one
+    // object id and each counts from zero, so the tag is the only thing that says what the number
+    // counts (scene_types.hpp, `PickSpace`). Resolving every id as an entity index -- which is what
+    // this did -- meant a click on anything scattered selected whichever node owned that entity, or
+    // nothing: in a scatter world, almost every click.
+    const scene::CompositionNode* node = nullptr;
+    if (composition != nullptr) {
+        const std::uint32_t index = scene::pickIndexOf(result->objectId);
+        switch (scene::pickSpaceOf(result->objectId)) {
+        case scene::PickSpace::Entity:
+            node = composition->nodeForEntity(index);
+            break;
+        case scene::PickSpace::Procedural:
+            node = composition->nodeForProcedural(index);
+            break;
+        case scene::PickSpace::Sdf:
+            break; // no resolver yet; a click on one deselects rather than selecting somebody else
+        }
+    }
     if (node == nullptr) {
-        // Geometry that no node owns: procedural instances and terrain chunks are drawn outside the
-        // entity list, so this is expected rather than broken. The position is still useful.
+        // Geometry no node owns -- terrain chunks, an SDF, a procedural the composition did not
+        // emit. The position is still useful.
         viewportSelectedNode_.clear();
         log::info("pick: surface at ({:.2f}, {:.2f}, {:.2f})", result->position.x,
                   result->position.y, result->position.z);

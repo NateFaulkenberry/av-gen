@@ -197,3 +197,72 @@ TEST_CASE("Picking outside the target is refused", "[viewport][pick]") {
                        glm::uvec2(kWidth, 10))
                .has_value());
 }
+
+TEST_CASE("A pick says which numbering its id belongs to", "[viewport][pick]") {
+    // The end of the bug this encodes. Three renderers write into one 16-bit object id and each
+    // counts from zero, so the number alone cannot say what it counts. The picker resolved every id
+    // as an entity index -- and a scene like Glowmere is almost entirely procedural, so almost every
+    // click selected whichever node owned that entity, or nothing.
+    //
+    // Drawn with no entity at all, so the procedural's id is 0 in its own numbering. Before the tag
+    // that was indistinguishable from "entity 0", which is precisely the collision.
+    auto context = makeContext();
+    gpu::ShaderLibrary shaders(*context, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*context, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    scene::Scene s;
+    s.environment.backgroundColor = glm::vec3(0.0f);
+    s.environment.showSkybox = false;
+    s.camera.position = {0.0f, 0.0f, 6.0f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    s.camera.nearPlane = 0.1f;
+    s.camera.farPlane = 200.0f;
+    scene::PunctualLight key;
+    key.direction = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.3f));
+    key.intensity = 3.0f;
+    s.addLight(key);
+
+    // Instances built here rather than described: the *distribution* is evaluated by the
+    // Composition, and the renderer draws the records it is handed. A bare description renders
+    // nothing, which is how the first version of this test came to report a miss.
+    scene::ProceduralGeometry pg;
+    pg.name = "scattered";
+    pg.source.kind = scene::PrimitiveKind::Box;
+    pg.source.size = {2.0f, 2.0f, 2.0f};
+    pg.source.subdivisions = 1;
+    pg.meshHash = 0xBEEF1234ull;
+    pg.structureVersion = 1;
+    pg.material.baseColor = {0.8f, 0.7f, 0.6f};
+    scene::InstanceRecord r{};
+    r.position = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    r.rotation = {0.0f, 0.0f, 0.0f, 1.0f};
+    r.scale = {1.0f, 1.0f, 1.0f, 0.0f};
+    r.random = {0.25f, 0.5f, 0.75f, 0.125f};
+    r.color = {1.0f, 1.0f, 1.0f, 0.0f};
+    r.emissive = {1.0f, 1.0f, 1.0f, 0.0f};
+    pg.instances.push_back(r);
+    s.procedurals.push_back(std::move(pg));
+    REQUIRE(s.entities.empty());
+
+    // A few frames: the procedural path builds its buffers and culls on the GPU, and its stats lag
+    // a frame or two behind the draw.
+    for (int i = 0; i < 4; ++i) {
+        renderOnce(renderer, s);
+    }
+    // No stats gate here: `visibleInstances` counts what survived the *cull* pass, and this object
+    // is not culled, so it draws while that number stays zero. The pick is the assertion.
+    const app::PickView view = viewFor(s);
+    auto hit = app::pickAt(*context, renderer.identifierTexture(), renderer.linearDepthTexture(),
+                           view, glm::uvec2(kWidth / 2, kHeight / 2));
+    REQUIRE(hit.has_value());
+    REQUIRE(hit->hit);
+
+    INFO("objectId " << hit->objectId << " -> space "
+                     << static_cast<int>(scene::pickSpaceOf(hit->objectId)) << " index "
+                     << scene::pickIndexOf(hit->objectId));
+    CHECK(scene::pickSpaceOf(hit->objectId) == scene::PickSpace::Procedural);
+    CHECK(scene::pickIndexOf(hit->objectId) == 0u);
+    // And it is not the bare index it used to be, or nothing has changed where it counts.
+    CHECK(hit->objectId != 0u);
+}

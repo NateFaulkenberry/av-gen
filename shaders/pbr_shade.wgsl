@@ -150,7 +150,7 @@ struct MaterialInstanceInfo {
 fn materialInstanceZero(localPosition: vec3<f32>) -> MaterialInstanceInfo {
     var info: MaterialInstanceInfo;
     info.localPosition = localPosition;
-    info.objectId = object.ids.x;
+    info.objectId = pickIndex(object.ids.x);
     info.instanceIndex = 0.0;
     info.instanceId = 0.0;
     info.instanceRandom = vec4<f32>(0.0);

@@ -303,6 +303,11 @@ public:
     // flattens nodes into entity ranges -- and exposing the lookup is better than a second table
     // built beside it that would drift the first time a node stopped emitting geometry.
     [[nodiscard]] const CompositionNode* nodeForEntity(std::size_t entityIndex) const;
+    // The node that owns a procedural, for resolving a click on anything scattered. A node with a
+    // multi-material asset owns a *run* of procedurals -- one per material over the same cloud --
+    // so this is a range test, not an equality one. Without that, clicking the second material of a
+    // two-material kerb selects nothing while clicking the first works.
+    [[nodiscard]] const CompositionNode* nodeForProcedural(std::size_t proceduralIndex) const;
 
     // ---- skinned characters (ADR-086) ----
     // Asks every rig `nodeName` owns to enter `state` at timeline second `now`, cross-fading over

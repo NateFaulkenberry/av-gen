@@ -1648,6 +1648,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                (!skyIbl || scene.environment.sky.showBackground) ? 1.0f : 0.0f,
                                std::max(scene.environment.skyIntensity, 0.0f),
                                std::clamp(scene.environment.skyBloom, 0.0f, 1.0f));
+    // The same answer the sky cube was built from, so the disc drawn over the sky lands on the one
+    // inside it. `resolveSky` is pure and cheap, and asking it again is better than keeping a second
+    // rule about which light the moon follows -- two rules is how they came to disagree.
+    {
+        const scene::SkyRuntime resolved = scene::resolveSky(scene.environment.sky, scene.lights);
+        frame.skySun = glm::vec4(resolved.sunDirection, skyIbl ? 1.0f : 0.0f);
+    }
     frame.fogParams = glm::vec4(scene.environment.fogColor, std::max(scene.environment.fogDensity, 0.0f));
     // ADR-058: the surface fog borrows the volumetric's mist layer rather than declaring one of
     // its own, so the air a ray is drawn through and the air it is marched through are the same
@@ -1849,7 +1856,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // x = the ADR-030 `objectId` input; y = material id and z = bloom weight feed the
         // identifier and emission targets (ADR-035); w = the joint count, which is how the skinned
         // vertex stage finds the previous frame's half of its palette slice.
-        obj.ids = glm::vec4(static_cast<float>(thisEntity), static_cast<float>(thisEntity + 1), 1.0f,
+        // Tagged as an entity id, so the picker knows which numbering to resolve it against; the
+        // material programs' `objectId` input is the untagged index and the shader strips it back.
+        obj.ids = glm::vec4(
+            static_cast<float>(scene::packPickId(scene::PickSpace::Entity, thisEntity)),
+            static_cast<float>(thisEntity + 1), 1.0f,
                             static_cast<float>(skin.jointCount));
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));

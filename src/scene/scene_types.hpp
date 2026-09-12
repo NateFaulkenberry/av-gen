@@ -106,6 +106,43 @@ struct TextureData {
     [[nodiscard]] bool isHdr() const { return format == TextureFormat::Rgba32Float; }
 };
 
+// ---- picking identity (ADR-030's identifier target) ---------------------------------------------
+//
+// The identifier target is one R32Uint: the low 16 bits an object id, the high 16 a material id.
+// Three renderers write into that one object id and each of them numbers from zero -- the scene
+// renderer by entity, the procedural renderer by procedural, the SDF renderer by SDF object. So the
+// number alone cannot say what it counts, and a click on a scattered tree used to be resolved as
+// though it were an entity index: it selected whichever node happened to own that entity, or
+// nothing. In a scatter world, where almost everything is procedural, almost every click was wrong.
+//
+// So the id carries a two-bit tag saying which numbering it belongs to. Two bits because there are
+// three writers, not two -- a one-bit tag would have left the SDFs still colliding with somebody.
+//
+// That leaves 14 bits, so 16,383 of each. For scale: Glowmere flattens to 278 entities and 30
+// procedurals, and its 150,000 instances are instances *of* procedurals, not procedurals. `packPickId`
+// saturates rather than wrapping, because an id that wraps selects a real and entirely unrelated
+// object, which is worse than one that selects nothing.
+enum class PickSpace : std::uint32_t {
+    Entity = 0,     // scene_.entities, resolved by Composition::nodeForEntity
+    Procedural = 1, // scene_.procedurals, resolved by Composition::nodeForProcedural
+    Sdf = 2,        // scene_.sdfs; no node resolver yet, so a click on one selects nothing
+};
+
+inline constexpr std::uint32_t kPickIndexBits = 14;
+inline constexpr std::uint32_t kPickIndexMask = (1u << kPickIndexBits) - 1u;
+inline constexpr std::uint32_t kPickMaxIndex = kPickIndexMask;
+
+[[nodiscard]] inline constexpr std::uint32_t packPickId(PickSpace space, std::size_t index) {
+    const auto clamped = static_cast<std::uint32_t>(index < kPickMaxIndex ? index : kPickMaxIndex);
+    return (static_cast<std::uint32_t>(space) << kPickIndexBits) | clamped;
+}
+[[nodiscard]] inline constexpr PickSpace pickSpaceOf(std::uint32_t id) {
+    return static_cast<PickSpace>((id >> kPickIndexBits) & 0x3u);
+}
+[[nodiscard]] inline constexpr std::uint32_t pickIndexOf(std::uint32_t id) {
+    return id & kPickIndexMask;
+}
+
 using TextureId = std::uint32_t;
 constexpr TextureId kInvalidTexture = 0xFFFFFFFFu;
 

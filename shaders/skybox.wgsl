@@ -82,8 +82,12 @@ fn fs_sky(in: SkyOut) -> SceneOut {
         isSky = true;
     }
     if (frame.lightCounts.z > 0.5 && frame.skyExtra.x > 0.5 && isSky) {
-        if (frame.envParams.z > 0.5 && frame.lights[0].positionType.w < 0.5) {
-            let separation = length(dir + normalize(frame.lights[0].directionRange.xyz));
+        // Where the *sky* says its sun or moon is, not where the first light in the scene happens
+        // to point. Those are the same thing only when the key light is also light zero, and when
+        // they were not, the sky's own soft disc and this crisp one sat in different parts of the
+        // sky -- two moons, one of them glowing.
+        if (frame.skySun.w > 0.5) {
+            let separation = length(dir - normalize(frame.skySun.xyz));
             let moon = 1.0 - smoothstep(0.014, 0.018, separation);
             color = mix(color, vec3<f32>(1.8, 2.1, 2.4), moon);
         }

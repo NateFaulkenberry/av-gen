@@ -1765,6 +1765,22 @@ const CompositionNode* Composition::nodeForEntity(std::size_t entityIndex) const
     return nullptr;
 }
 
+const CompositionNode* Composition::nodeForProcedural(std::size_t proceduralIndex) const {
+    // Same shape as nodeForEntity: ranges_ is parallel to nodes_, so this is a scan over nodes.
+    for (std::size_t i = 0; i < ranges_.size() && i < nodes_.size(); ++i) {
+        const NodeRange& range = ranges_[i];
+        if (range.proceduralIndex < 0) {
+            continue;
+        }
+        const auto first = static_cast<std::size_t>(range.proceduralIndex);
+        // The node's own procedural, plus the one-per-extra-material run that follows it.
+        if (proceduralIndex >= first && proceduralIndex <= first + range.proceduralSubCount) {
+            return nodes_[i].get();
+        }
+    }
+    return nullptr;
+}
+
 Result<void> Composition::setParent(const std::string& name, const std::string& parent) {
     CompositionNode* node = findNode(name);
     if (node == nullptr) {

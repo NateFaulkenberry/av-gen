@@ -1612,7 +1612,11 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         obj.flags = glm::vec4(alphaMode, m.alphaCutoff, m.unlit ? 1.0f : 0.0f, static_cast<float>(mask));
         // x = the ADR-030 `objectId` material input; y = material id and z = bloom weight feed the
         // identifier and emission targets (ADR-035).
-        obj.ids = glm::vec4(static_cast<float>(i), static_cast<float>(i + 1), 1.0f, 0.0f);
+        // Tagged, because this `i` counts procedurals and the scene renderer's counts entities.
+        // Untagged they are the same small numbers, and a click on a scattered tree resolved as
+        // whichever entity shared its index.
+        obj.ids = glm::vec4(static_cast<float>(scene::packPickId(scene::PickSpace::Procedural, i)),
+                            static_cast<float>(i + 1), 1.0f, 0.0f);
         const std::uint32_t offset = slot * kObjectStride;
         std::memcpy(im.staging.data() + offset, &obj, sizeof(obj));
 

@@ -167,6 +167,11 @@ struct FrameUniforms {
     glm::vec4 skyExtra;       // ADR-036: x = 1 when the IBL is the procedural sky, y = draw it as
                               // the background; ADR-049: z = sky (background) intensity,
                               // w = how much of the sky reaches the bloom mask
+    // Where the sky puts its sun or moon: xyz = the direction *towards* it, w = 1 when there is
+    // one to draw. The background pass used to take this from `lights[0]`, which is whichever light
+    // happened to be first in the scene and not necessarily the key -- so the disc it drew and the
+    // one the sky itself contains ended up in two different places, and Glowmere showed two moons.
+    glm::vec4 skySun{0.0f, 1.0f, 0.0f, 0.0f};
     glm::vec4 fogParams;      // rgb = fog colour, w = density (0 = off)
     glm::vec4 fogHeight;      // ADR-058: x = layer top (m), y = falloff per metre above it,
                               // z = how much of that layer the surface fog sees, w = 0
@@ -189,7 +194,10 @@ struct FrameUniforms {
     wind::WindUniforms wind;
     LightUniform lights[kMaxLights];
 };
-static_assert(sizeof(FrameUniforms) == 192 + 352 + 64 + 512);
+// 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights. The middle term grew by one vec4 when
+// `skySun` was added; this assert is what caught the WGSL side needing the same field in the same
+// place, which is the whole reason it is written as a sum rather than a number.
+static_assert(sizeof(FrameUniforms) == 192 + 368 + 64 + 512);
 
 struct ObjectUniforms {
     glm::mat4 model;

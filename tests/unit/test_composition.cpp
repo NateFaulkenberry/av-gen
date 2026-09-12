@@ -2099,3 +2099,81 @@ TEST_CASE("The interactive rebuild policy defers a drag and always converges",
         CHECK(expensive > cheap);
     }
 }
+
+TEST_CASE("A pick id says which numbering it belongs to", "[scene][pick]") {
+    // Three renderers write into one 16-bit object id and each counts from zero. Untagged, the
+    // number cannot say what it counts, and the picker read every one as an entity index -- so a
+    // click on a scattered tree selected whichever node owned that entity, or nothing.
+    for (const auto space : {scene::PickSpace::Entity, scene::PickSpace::Procedural,
+                             scene::PickSpace::Sdf}) {
+        for (const std::size_t index : {std::size_t{0}, std::size_t{1}, std::size_t{277},
+                                        std::size_t{scene::kPickMaxIndex}}) {
+            const std::uint32_t id = scene::packPickId(space, index);
+            INFO("space " << static_cast<int>(space) << " index " << index);
+            CHECK(scene::pickSpaceOf(id) == space);
+            CHECK(scene::pickIndexOf(id) == index);
+        }
+    }
+
+    // The property that was missing: the same index in two numberings is two different ids.
+    CHECK(scene::packPickId(scene::PickSpace::Entity, 7) !=
+          scene::packPickId(scene::PickSpace::Procedural, 7));
+    CHECK(scene::packPickId(scene::PickSpace::Procedural, 7) !=
+          scene::packPickId(scene::PickSpace::Sdf, 7));
+
+    // An entity id is still its own index, so everything that already read one is unaffected.
+    CHECK(scene::packPickId(scene::PickSpace::Entity, 0) == 0u);
+    CHECK(scene::packPickId(scene::PickSpace::Entity, 123) == 123u);
+
+    // Saturates rather than wrapping. An id that wraps names a real and entirely unrelated object,
+    // which is worse than one that names nothing -- and it fits in the 16 bits the target has.
+    const std::uint32_t over = scene::packPickId(scene::PickSpace::Procedural, 1'000'000);
+    CHECK(scene::pickSpaceOf(over) == scene::PickSpace::Procedural);
+    CHECK(scene::pickIndexOf(over) == scene::kPickMaxIndex);
+    CHECK(over <= 0xFFFFu);
+}
+
+TEST_CASE("A procedural resolves to the node that emitted it", "[scene][composition][pick]") {
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(tempDir());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "composition");
+    comp.attach(params, modulator);
+
+    const auto addGrid = [&comp](const char* name) {
+        scene::CompositionNode node;
+        node.name = name;
+        node.kind = scene::NodeKind::Procedural;
+        node.procedural.name = name;
+        node.procedural.source.kind = scene::PrimitiveKind::Box;
+        node.procedural.distribution.kind = scene::DistributionKind::Grid;
+        node.procedural.distribution.gridCount = glm::ivec3(3, 1, 3);
+        REQUIRE(comp.addNode(std::move(node)));
+    };
+    addGrid("first");
+    addGrid("second");
+
+    FrameTime time{};
+    params.resetFinals();
+    comp.update(time);
+    REQUIRE(comp.scene().procedurals.size() == 2);
+
+    // Every procedural resolves, and to the node whose name it carries -- which is the check that
+    // would have caught the two id spaces sharing one channel, had it been asked of a procedural.
+    for (std::size_t i = 0; i < comp.scene().procedurals.size(); ++i) {
+        const scene::CompositionNode* node = comp.nodeForProcedural(i);
+        INFO("procedural " << i << " named " << comp.scene().procedurals[i].name);
+        REQUIRE(node != nullptr);
+        // The emitted procedural's name carries the node's, so the two must agree.
+        CHECK(comp.scene().procedurals[i].name.find(node->name) != std::string::npos);
+    }
+
+    // Two nodes, two different answers: a resolver that returned the first node for everything
+    // would satisfy the loop above.
+    CHECK(comp.nodeForProcedural(0) != comp.nodeForProcedural(1));
+
+    // Past the end is nothing, rather than the last node.
+    CHECK(comp.nodeForProcedural(comp.scene().procedurals.size()) == nullptr);
+    CHECK(comp.nodeForProcedural(9999) == nullptr);
+}

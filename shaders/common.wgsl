@@ -26,6 +26,7 @@ struct FrameUniforms {
     skyExtra: vec4<f32>,       // ADR-036: x = 1 when the IBL is the procedural sky, y = draw it as
                                // the background instead of the flat colour; ADR-049: z = the
                                // visible sky's intensity, w = how much of it the bloom mask sees
+    skySun: vec4<f32>,         // xyz = direction *towards* the sky's sun/moon, w = 1 when it has one
     fogParams: vec4<f32>,      // rgb = fog colour, w = fog density (0 = off; exp2 fog by view distance)
     fogHeight: vec4<f32>,      // ADR-058: x = mist layer top (m), y = falloff per metre above it,
                                // z = how much of that layer the surface fog integrates, w = 0
@@ -218,6 +219,14 @@ fn screenVelocityAt(fragCoord: vec4<f32>, prevClip: vec4<f32>) -> vec2<f32> {
     let before = prevClip.xy / max(abs(prevClip.w), 1e-6) * sign(max(prevClip.w, 1e-6));
     let beforeUv = vec2<f32>(before.x * 0.5 + 0.5, 0.5 - before.y * 0.5);
     return nowUv - beforeUv;
+}
+
+// The object id carries a two-bit tag naming which renderer numbered it (scene_types.hpp,
+// `PickSpace`). The identifier target wants it; a material program does not -- `objectId` is an
+// ADR-030 input whose meaning is "which object is this", and adding 16384 to every procedural would
+// silently change what every per-object hash in every material program produced.
+fn pickIndex(objectId: f32) -> f32 {
+    return f32(u32(max(objectId, 0.0)) & 0x3FFFu);
 }
 
 fn packIds(objectId: f32, materialId: f32) -> u32 {
