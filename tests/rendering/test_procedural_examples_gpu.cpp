@@ -37,12 +37,13 @@ std::unique_ptr<gpu::Context> makeContext() {
 }
 
 std::uint64_t renderSequenceHash(gpu::Context& ctx, gpu::ShaderLibrary& shaders, const fs::path& project,
-                                 const fs::path& out, double start, int frames) {
+                                 const fs::path& out, double start, int frames, std::uint32_t width = 192,
+                                 std::uint32_t height = 108) {
     auto engine = std::make_unique<app::Engine>(app::EngineMode::Offline);
     REQUIRE(engine->loadProject(project).has_value());
     app::RenderSettings s;
-    s.width = 192;
-    s.height = 108;
+    s.width = width;
+    s.height = height;
     s.fps = 30.0;
     s.startSeconds = start;
     s.endSeconds = start + frames / 30.0;
@@ -99,6 +100,30 @@ TEST_CASE("Showcase projects render bit-identically across fresh engines and ren
         }
         CHECK(ctx->errorCount() == 0);
     }
+    fs::remove_all(tmp);
+#endif
+}
+
+TEST_CASE("RendererQA stays deterministic across output sizes", "[gpu][procedural][examples][forensics]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.json";
+    if (!fs::exists(project)) {
+        SKIP("RendererQA project is not present");
+    }
+    const auto tmp = fs::temp_directory_path() / "avgen_renderer_qa_sizes";
+    fs::remove_all(tmp);
+    const auto a = renderSequenceHash(*ctx, shaders, project, tmp / "a", 0.0, 3, 128, 72);
+    const auto b = renderSequenceHash(*ctx, shaders, project, tmp / "b", 0.0, 3, 128, 72);
+    const auto c = renderSequenceHash(*ctx, shaders, project, tmp / "c", 0.0, 3, 96, 96);
+    const auto d = renderSequenceHash(*ctx, shaders, project, tmp / "d", 0.0, 3, 96, 96);
+    CHECK(a == b);
+    CHECK(c == d);
+    CHECK(a != c);
+    CHECK(ctx->errorCount() == 0);
     fs::remove_all(tmp);
 #endif
 }

@@ -407,6 +407,8 @@ open in Phase 7.
   - `[ ]` Add scene variants for minimal, water-only, character-only and transparency-only tests.
 - `[x]` RendererQA is included in the deterministic fresh-engine/fresh-renderer showcase hash suite;
   its static diagnostic content is compared for equality without assuming it changes over time.
+- `[x]` RendererQA deterministic output coverage includes both `128x72` and `96x96` targets; each
+  size matches across fresh runs and the aspect-ratio hashes differ as expected.
 - `[ ]` Add scripted camera translation, rotation, orbit, dolly, clipping and resize paths.
 - `[ ]` Add scripted playback, pause, seek, scrub, reverse, scene reload and resolution changes.
 
