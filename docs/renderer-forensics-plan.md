@@ -5,6 +5,8 @@
 **Scope:** forensic investigation of renderer instability, subsystem isolation, architectural ownership and regression proof  
 **Primary references:** [Renderer Stabilization QA](renderer-qa-2026-09-11.md), [Rendering](rendering.md), [Testing](testing.md), [Renderer 2 architecture](renderer-2-architecture.md), [Renderer 2 backlog](renderer-2-backlog.md)
 
+**Interim evidence report:** [renderer-forensics-report.md](renderer-forensics-report.md)
+
 ## Mission
 
 Determine, with reproducible evidence, which subsystem introduces each remaining rendering failure. The investigation must distinguish transforms, camera mathematics, render-object state, GPU buffers, render-pass state, depth, culling, LOD, animation/skinning, terrain, water, transparency, shadows, particles, post-processing, sequencer state and asset-specific behavior.
@@ -54,7 +56,7 @@ This is an investigation and correctness effort, not a visual feature sprint. No
   - fix and regression test;
   - remaining uncertainty.
 - `[ ]` Define when a subsystem is `PASS`, `FAILED`, `FAILED -> FIXED`, `NOT ISOLATED` or `UNKNOWN`.
-- `[ ]` Add a root-cause ledger to this document or a linked forensic report.
+- `[x]` Add a root-cause ledger and subsystem status table in the linked [interim forensic report](renderer-forensics-report.md).
 - `[ ]` Decide which evidence is automated, manual visual review, GPU capture or performance measurement.
 
 ## Phase 1: Architecture map and state ownership
