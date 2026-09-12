@@ -319,9 +319,13 @@ open in Phase 7.
 
 ### 5.2 LOD isolation
 
-- `[ ]` Run all canonical bugs with LOD disabled and enabled.
-- `[ ]` Instrument LOD selection, camera-relative distance, screen size, transition state and hysteresis.
-- `[ ]` Test rapidly moving cameras for deterministic, non-oscillating LOD transitions.
+- `[~]` Run all canonical bugs with LOD disabled and enabled.
+  Existing culling GPU coverage compares LOD-enabled behavior against direct/no-LOD rendering for
+  representative procedural scenes; canonical Glowmere/alien image toggles remain open.
+- `[x]` Instrumented LOD selection is covered by CPU/GPU count comparisons, camera-distance and
+  screen-size threshold tests, per-instance spread migration and hysteresis checks.
+- `[x]` Moving-camera threshold traversal proves deterministic, non-strobing transitions when spread
+  and hysteresis are configured; matched image/performance calibration on `RendererQA` remains open.
 - `[ ]` Verify mesh/material replacement cannot use stale GPU state.
 - `[ ]` Calibrate LOD ratios against a moving camera and record image/performance tradeoffs.
 
