@@ -208,6 +208,10 @@ open in Phase 7.
   reused-versus-fresh renderer regression. An explicit reset API now covers in-place scene reloads
   and the application camera-cut action. Timeline seek/reverse stress and frame-index reuse remain
   open.
+  - `[x]` Repeated frame indices are deterministic: the renderer drops AO history on a non-advancing
+    index, and a same-index replay with motion blur matches a fresh renderer.
+  - `[ ]` Wire transport revision/discontinuity events to the renderer so forward seeks reset
+    temporal state even when render time increases.
 - `[ ]` Add a conservative synchronization option to the reference path if evidence points to reuse hazards.
 - `[ ]` Add validation for resources destroyed, replaced, resized or rebound while still referenced.
 - `[~]` Sanitizer coverage exists for selected animation/sequence paths; expand it to renderer resource lifetime and full relevant suites.
