@@ -698,6 +698,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // The world editor records into the application's history rather than one of its own, and
         // registers as the context that answers Copy, Delete and the rest for world objects.
         panel_->editor.attachEdits(edits_);
+        panel_->edits = &edits_;
         edits_.addContext(panel_->editor);
         panel_->canvasRenderScale =
             options_.canvasScale != 1.0f ? options_.canvasScale : settings_.canvasRenderScale;
@@ -1590,38 +1591,43 @@ bool Application::handleEditorShortcut(const SDL_Event& event) {
     const bool command = (mods & (SDL_KMOD_GUI | SDL_KMOD_CTRL)) != 0;
     const bool shift = (mods & SDL_KMOD_SHIFT) != 0;
 
+    // The editing actions go through the application's dispatcher, not to this editor. The menu
+    // asks the same `execute`, so a shortcut and a menu item cannot come to mean different things
+    // -- which is the point of ADR-101 and the reason this switch stopped naming an editor.
+    //
+    // A recognised shortcut is consumed whether or not it could act: Cmd+Z with nothing to undo
+    // must not fall through and mean something else.
+    const auto dispatch = [this](EditAction action) {
+        if (edits_.canExecute(action)) {
+            static_cast<void>(edits_.execute(action, *engine_));
+        }
+        return true;
+    };
+
     if (command) {
         switch (event.key.key) {
         case SDLK_Z:
-            // Cmd+Z / Cmd+Shift+Z. The one shortcut that has to work when everything else has gone
-            // wrong, which is why it is first.
-            if (shift) {
-                editor.redo(*engine_);
-            } else {
-                editor.undo(*engine_);
-            }
-            return true;
+            return dispatch(shift ? EditAction::Redo : EditAction::Undo);
         case SDLK_Y:
-            editor.redo(*engine_);
-            return true;
+            return dispatch(EditAction::Redo);
+        case SDLK_X:
+            return dispatch(EditAction::Cut);
+        case SDLK_C:
+            return dispatch(EditAction::Copy);
+        case SDLK_V:
+            return dispatch(EditAction::Paste);
         case SDLK_D:
-            editor.duplicateSelection(*engine_);
-            return true;
+            return dispatch(EditAction::Duplicate);
+        case SDLK_A:
+            return dispatch(shift ? EditAction::SelectNone : EditAction::SelectAll);
         case SDLK_G:
+            // Grouping stays the world editor's: it is not an action other editors have, and
+            // inventing a global "group" for one editor is the pile of special cases this replaces.
             if (shift) {
                 editor.ungroupSelection(*engine_);
             } else {
                 editor.groupSelection(*engine_);
             }
-            return true;
-        case SDLK_C:
-            editor.copySelection(*engine_);
-            return true;
-        case SDLK_V:
-            editor.paste(*engine_);
-            return true;
-        case SDLK_A:
-            editor.selectAll(*engine_);
             return true;
         default:
             return false;
@@ -1674,12 +1680,13 @@ bool Application::handleEditorShortcut(const SDL_Event& event) {
     case SDLK_DELETE:
     case SDLK_BACKSPACE:
         // Only ours when there is something to delete. Swallowing the key with an empty selection
-        // takes it away from whatever else might want it and gives nothing back.
-        if (editor.selection.empty()) {
+        // takes it away from whatever else might want it and gives nothing back -- which is why
+        // this one asks availability first, where Cmd+Z is consumed either way: nothing else in
+        // this application wants Cmd+Z, and plenty might want Delete.
+        if (!edits_.canExecute(EditAction::Delete)) {
             return false;
         }
-        editor.deleteSelection(*engine_);
-        return true;
+        return dispatch(EditAction::Delete);
     case SDLK_UP:
         editor.nudgeSelection(*engine_, glm::vec3(0.0f, 0.0f, -step));
         return !editor.selection.empty();

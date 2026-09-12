@@ -227,6 +227,7 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
         }
         ImGui::EndMenu();
     }
+    drawEditMenu(engine);
     if (ImGui::BeginMenu("Camera")) {
         // Directing needs a track to cut to. Disabling rather than hiding, with the reason in the
         // tooltip: a menu item that is absent looks like a feature that does not exist, and one
@@ -289,6 +290,40 @@ void ControlPanel::drawHelpMenu() {
     go("Modulation Recipes", "modulation/recipes", "worked examples: bass-reactive glow, a beat-synced camera");
     go("Troubleshooting", "troubleshooting/index", "symptoms, and the topic that explains each one");
     go("Performance Guide", "performance/diagnosis", "how to find out what a frame is spent on");
+}
+
+// The Edit menu (ADR-101). Every item is the same action the keyboard dispatches, asked of the same
+// system -- so an item is grey exactly when the shortcut would do nothing, and neither can drift.
+//
+// Nothing here decides *what* an action means. The menu does not know the world editor exists.
+void ControlPanel::drawEditMenu(app::Engine& engine) {
+    if (edits == nullptr) {
+        return; // no edit system attached: better no menu than one that does nothing
+    }
+    if (!ImGui::BeginMenu("Edit")) {
+        return;
+    }
+    const auto item = [this, &engine](app::EditAction action) {
+        // The label says what will happen -- "Undo Move 3 objects" -- because a menu that only says
+        // "Undo" asks the user to find out by trying it.
+        const std::string label = edits->menuLabel(action);
+        const bool available = edits->canExecute(action);
+        if (ImGui::MenuItem(label.c_str(), app::editActionShortcut(action), false, available)) {
+            static_cast<void>(edits->execute(action, engine));
+        }
+    };
+    item(app::EditAction::Undo);
+    item(app::EditAction::Redo);
+    ImGui::Separator();
+    item(app::EditAction::Cut);
+    item(app::EditAction::Copy);
+    item(app::EditAction::Paste);
+    item(app::EditAction::Duplicate);
+    item(app::EditAction::Delete);
+    ImGui::Separator();
+    item(app::EditAction::SelectAll);
+    item(app::EditAction::SelectNone);
+    ImGui::EndMenu();
 }
 
 void ControlPanel::drawViewMenu() {

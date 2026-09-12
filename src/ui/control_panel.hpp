@@ -27,6 +27,7 @@
 #include "ui/help_panel.hpp"
 #include "ui/world_builder_panel.hpp"
 #include "ui/world_edit_panel.hpp"
+#include "app/edit_system.hpp"
 #include "ui/world_editor.hpp"
 #include "ui/world_panel.hpp"
 
@@ -61,6 +62,10 @@ public:
     std::function<void()> onDirectCamera;
     // Clears whatever the director installed, handing the camera back to the viewport.
     std::function<void()> onClearCameraAutomation;
+    // The application's edit system (ADR-101). The menu is a consumer of it, never an owner: an
+    // item asks `canExecute` to decide whether to grey itself and calls `execute` to act, so the
+    // menu and the keyboard cannot come to disagree about what is available or what it does.
+    app::EditSystem* edits = nullptr;
     std::function<void()> onOpenAudio;
     std::function<void()> onOpenScene;
     std::function<void()> onOpenEnvironment;
@@ -198,6 +203,7 @@ private:
     void drawGraphWindow(app::Engine& engine);
     // ---- the shell (ADR-076) ----
     void drawMenuBar(app::Engine& engine);
+    void drawEditMenu(app::Engine& engine);
     void drawViewMenu();
     void drawHelpMenu();
     void drawStatusBar(app::Engine& engine, const FrameStats& stats);
