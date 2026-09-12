@@ -132,7 +132,11 @@ fn fs_prefilter(in: FsIn) -> @location(0) vec4<f32> {
     // Selective bloom (ADR-039): weight by the emission target when the renderer wrote one, so a
     // merely bright lit surface stops glowing like a light source.
     if (emissionAvailable > 0.5 && emissionWeight > 0.0) {
-        let e = textureSampleLevel(emissionTex, linearSampler, in.uv, 0.0).rgb;
+        // The emission target is pre-exposure and `c` is post-exposure, so the emission is brought
+        // into the same space before the ratio is taken. Guarded because a zero here would mask
+        // everything away rather than nothing.
+        let exposureScale = max(post.params1.x, 1e-4);
+        let e = textureSampleLevel(emissionTex, linearSampler, in.uv, 0.0).rgb * exposureScale;
         let mask = clamp(luminance(e) / max(luminance(c), 1e-4), 0.0, 1.0);
         weight *= mix(1.0, mask, emissionWeight);
     }

@@ -26,7 +26,14 @@ struct ShadowView {
     float farDistance = 0.0f; // cascade: the view depth this cascade covers up to
     int lightIndex = -1;      // index into the packed light buffer
     bool cascade = false;
+    bool cube = false;        // one of six faces around a light with no single direction
 };
+
+// A light that shines in every direction needs six views, not one. They are ordinary views in the
+// ordinary atlas -- the shading pass picks the face from the direction to the fragment -- so nothing
+// else in the pipeline learns about cube maps: no cube texture, no cube sampler, and the depth
+// passes the encoder already writes per view are unchanged.
+constexpr std::uint32_t kPointShadowFaces = 6;
 
 // `ShadowUniforms::views[i]`, mirrored by `shaders/lighting.wgsl`.
 struct ShadowViewGpu {
@@ -47,6 +54,16 @@ static_assert(sizeof(ShadowUniforms) == 672);
 // `lambda` (0 = uniform, 1 = logarithmic). Returns `count` far distances, the last being `far`.
 [[nodiscard]] std::vector<float> cascadeSplits(float nearPlane, float farPlane, std::uint32_t count,
                                                float lambda = 0.85f);
+
+// The six faces around a point or area light, in the order the shader's dominant-axis test expects:
+// +X, -X, +Y, -Y, +Z, -Z. Each is a 90-degree perspective from the light's own position, widened a
+// hair so a PCF kernel at a face's edge still lands inside it rather than falling off and reading as
+// unshadowed.
+[[nodiscard]] std::array<ShadowView, kPointShadowFaces> fitPointShadow(const scene::PunctualLight& light,
+                                                                       std::uint32_t resolution, float range);
+// Which of the six a direction from the light falls in. Shared with the shader by construction:
+// the test is the same one, and `tests/unit/test_shadow_math.cpp` walks a sphere of directions.
+[[nodiscard]] std::uint32_t pointShadowFace(glm::vec3 fromLight);
 
 // The eight world-space corners of a view frustum, near face first (counter-clockwise from the
 // bottom left as seen from the camera), then the far face.

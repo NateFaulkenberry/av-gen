@@ -137,4 +137,50 @@ ShadowView fitSpotShadow(const scene::PunctualLight& light, std::uint32_t resolu
     return out;
 }
 
+std::uint32_t pointShadowFace(glm::vec3 fromLight) {
+    const glm::vec3 a = glm::abs(fromLight);
+    if (a.x >= a.y && a.x >= a.z) {
+        return fromLight.x > 0.0f ? 0u : 1u;
+    }
+    if (a.y >= a.z) {
+        return fromLight.y > 0.0f ? 2u : 3u;
+    }
+    return fromLight.z > 0.0f ? 4u : 5u;
+}
+
+std::array<ShadowView, kPointShadowFaces> fitPointShadow(const scene::PunctualLight& light,
+                                                         std::uint32_t resolution, float range) {
+    // The face axes in the order `pointShadowFace` returns, with an up that is never parallel to the
+    // forward axis -- the ±Y faces take Z, everything else takes Y, which is the standard cube
+    // convention and is why a lookAt here never degenerates.
+    static constexpr glm::vec3 kForward[kPointShadowFaces] = {
+        {1.0f, 0.0f, 0.0f},  {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f},
+        {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f},  {0.0f, 0.0f, -1.0f}};
+    static constexpr glm::vec3 kUp[kPointShadowFaces] = {
+        {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+
+    const float far = std::max(range, 0.5f);
+    const float near = std::max(far * 0.005f, 0.02f);
+    // A shade over ninety degrees. Exactly ninety tiles the cube with no overlap, and a PCF kernel
+    // at a face's edge then samples outside it -- which `shadowLookup` reports as invalid and the
+    // shading pass reads as *unshadowed*, drawing a bright seam along every face boundary. The
+    // overlap costs nothing: the face is still chosen by the dominant axis.
+    constexpr float kFaceFov = 1.5707963f * 1.04f;
+
+    std::array<ShadowView, kPointShadowFaces> out{};
+    for (std::uint32_t f = 0; f < kPointShadowFaces; ++f) {
+        const glm::mat4 view = glm::lookAt(light.position, light.position + kForward[f], kUp[f]);
+        const glm::mat4 proj = glm::perspective(kFaceFov, 1.0f, near, far);
+        out[f].viewProj = proj * view;
+        out[f].texelWorldSize =
+            2.0f * std::tan(kFaceFov * 0.5f) * far / static_cast<float>(std::max(resolution, 1u));
+        out[f].depthRange = far - near;
+        out[f].farDistance = far;
+        out[f].cascade = false;
+        out[f].cube = true;
+    }
+    return out;
+}
+
 } // namespace avgen::rendering

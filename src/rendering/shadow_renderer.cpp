@@ -1,5 +1,7 @@
 #include "rendering/shadow_renderer.hpp"
 
+#include "rendering/light_data.hpp"
+
 #include "core/log.hpp"
 #include "gpu/context.hpp"
 
@@ -188,8 +190,23 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
             view.lightIndex = static_cast<int>(i);
             views_.push_back(view);
             ++stats_.spots;
+        } else if (views_.size() + kPointShadowFaces <= kMaxShadowViews) {
+            // Point, and every area shape: six faces around the light. A Rect or a Disk only emits
+            // into a hemisphere, so three of its six faces are wasted -- but a single perspective
+            // map cannot cover 180 degrees, and a cube that is right for every shape is worth more
+            // than a special case per shape that is nearly right.
+            //
+            // Expensive by construction: six depth passes, which is why it is opt-in through the
+            // light's own `castsShadow` and why a light that does not fit the remaining budget goes
+            // without rather than getting a partial cube.
+            const float range = light.range > 0.0f ? light.range
+                                                   : std::max(lightInfluenceRadius(light), 1.0f);
+            for (ShadowView view : fitPointShadow(light, im.resolution, range)) {
+                view.lightIndex = static_cast<int>(i);
+                views_.push_back(view);
+            }
+            ++stats_.points;
         }
-        // Point and area lights: contact shadows and occlusion only in this implementation.
     }
     stats_.views = static_cast<std::uint32_t>(views_.size());
 
@@ -236,12 +253,14 @@ void ShadowRenderer::upload(const void* frameUniforms, std::uint64_t frameUnifor
     }
 }
 
-int ShadowRenderer::viewForLight(std::uint32_t lightIndex, bool& cascaded) const {
+int ShadowRenderer::viewForLight(std::uint32_t lightIndex, bool& cascaded, bool& cube) const {
     cascaded = false;
+    cube = false;
     for (std::size_t v = 0; v < views_.size(); ++v) {
         if (views_[v].lightIndex == static_cast<int>(lightIndex)) {
             cascaded = views_[v].cascade;
-            return static_cast<int>(v);
+            cube = views_[v].cube;
+            return static_cast<int>(v); // the first of its run: a cascade's, or a cube's +X face
         }
     }
     return -1;

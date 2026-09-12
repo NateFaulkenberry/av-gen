@@ -456,3 +456,50 @@ TEST_CASE("influence radius grows with intensity and is infinite for directional
     dark.intensity = 0.0f;
     CHECK(rendering::lightInfluenceRadius(dark) == 0.0f);
 }
+
+TEST_CASE("The six shadow faces tile every direction around a light", "[shadows][point]") {
+    // The C++ builds the six views in this order and the shader picks one by the same test; nothing
+    // else ties them together, so the agreement is asserted here rather than assumed.
+    scene::PunctualLight lamp;
+    lamp.type = scene::PunctualLight::Type::Point;
+    lamp.position = {3.0f, 4.0f, -5.0f};
+    const auto views = rendering::fitPointShadow(lamp, 1024, 40.0f);
+    REQUIRE(views.size() == rendering::kPointShadowFaces);
+
+    // Every face is a cube view, they all reach the same distance, and none of them is degenerate.
+    for (const rendering::ShadowView& view : views) {
+        CHECK(view.cube);
+        CHECK_FALSE(view.cascade);
+        CHECK(view.depthRange > 0.0f);
+        CHECK(view.texelWorldSize > 0.0f);
+    }
+
+    // A direction straight down the face axis picks that face, and -- the property that matters --
+    // whatever face a direction picks, that face's own projection actually contains the point.
+    const glm::vec3 axes[6] = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+    for (std::uint32_t f = 0; f < 6; ++f) {
+        CHECK(rendering::pointShadowFace(axes[f]) == f);
+    }
+
+    std::size_t checked = 0;
+    for (int i = 0; i < 400; ++i) {
+        // A deterministic spiral over the sphere: no clustering at the poles, no random seed.
+        const float t = static_cast<float>(i) / 400.0f;
+        const float z = 1.0f - 2.0f * t;
+        const float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
+        const float phi = static_cast<float>(i) * 2.39996f;
+        const glm::vec3 dir(r * std::cos(phi), r * std::sin(phi), z);
+
+        const std::uint32_t face = rendering::pointShadowFace(dir);
+        REQUIRE(face < 6);
+        const glm::vec3 world = lamp.position + dir * 6.0f;
+        const glm::vec4 clip = views[face].viewProj * glm::vec4(world, 1.0f);
+        REQUIRE(clip.w > 0.0f); // in front of that face
+        const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+        INFO("direction " << i << " picked face " << face << " ndc " << ndc.x << "," << ndc.y);
+        CHECK(std::abs(ndc.x) <= 1.0f);
+        CHECK(std::abs(ndc.y) <= 1.0f);
+        ++checked;
+    }
+    CHECK(checked == 400);
+}

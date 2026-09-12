@@ -469,7 +469,14 @@ TEST_CASE("The source scan finds the application's real panels, commands and key
     CHECK(surface.hasShortcutKeys("Space"));
     CHECK(surface.hasShortcutKeys("Left"));
     CHECK(surface.hasShortcutKeys("O"));
-    CHECK_FALSE(surface.hasShortcutKeys("Cmd+S"));
+    // `Cmd+S` used to be asserted *absent* here: the File menu advertised it, nothing bound it, and
+    // the scan could not have seen a modified binding anyway -- it only ever produced the bare key,
+    // so the warning could not be cleared by binding the key correctly. Both halves are fixed, and
+    // the assertion is the other way round.
+    CHECK(surface.hasShortcutKeys("Cmd+S"));
+    // A modifier named on the same line as the key is what makes that visible; one tested on its
+    // own line is still reported by its bare key, which is the older behaviour and is unchanged.
+    CHECK(surface.hasShortcutKeys("Z"));
 }
 
 TEST_CASE("The validator reports documentation that refers to things that are not there") {

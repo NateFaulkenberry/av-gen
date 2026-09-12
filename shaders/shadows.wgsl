@@ -28,6 +28,21 @@ const LIGHT_SPHERE: f32 = 6.0;
 const FLAG_CASTS_SHADOW: u32 = 1u;
 const FLAG_CASCADED: u32 = 2u;
 const FLAG_AREA: u32 = 4u;
+const FLAG_CUBE: u32 = 8u;
+
+// Which of the six faces around a light a direction falls in: +X, -X, +Y, -Y, +Z, -Z. The same test
+// as `rendering::pointShadowFace`, and it has to stay the same one -- the C++ builds the views in
+// this order and nothing else ties them together.
+fn cubeFace(fromLight: vec3<f32>) -> u32 {
+    let a = abs(fromLight);
+    if (a.x >= a.y && a.x >= a.z) {
+        return select(1u, 0u, fromLight.x > 0.0);
+    }
+    if (a.y >= a.z) {
+        return select(3u, 2u, fromLight.y > 0.0);
+    }
+    return select(5u, 4u, fromLight.z > 0.0);
+}
 
 const MAX_LIGHTS_PER_CLUSTER: u32 = 32u;
 
@@ -310,6 +325,10 @@ fn shadowFactor(light: GpuLight, worldPos: vec3<f32>, normal: vec3<f32>, toLight
                                         rotation, taps);
             visibility = mix(visibility, next, t);
         }
+    } else if ((flags & FLAG_CUBE) != 0u) {
+        // A light with no single direction: six views, and the fragment picks the one it is in.
+        let face = cubeFace(worldPos - light.positionType.xyz);
+        visibility = shadowVisibility(base + face, light, worldPos, normal, toLight, false, rotation, taps);
     } else {
         visibility = shadowVisibility(base, light, worldPos, normal, toLight, false, rotation, taps);
     }

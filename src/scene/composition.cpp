@@ -2256,6 +2256,12 @@ void Composition::registerNodeParameters(CompositionNode& node) {
         &params_->add(floatDesc(base + "emissiveBoost", node.emissiveBoost, 0.0f, 50.0f, 0.0f, 8.0f));
     node.roughnessParam =
         &params_->add(floatDesc(base + "roughnessScale", node.roughnessScale, 0.0f, 2.0f, 0.0f, 2.0f));
+    // The lights the node's asset brought with it. A scale and a tint rather than absolute values,
+    // because the asset's own numbers are the authored starting point and a scene should not have to
+    // restate them to dim one lamp.
+    node.lightIntensityParam =
+        &params_->add(floatDesc(base + "lightIntensity", 1.0f, 0.0f, 20.0f, 0.0f, 4.0f));
+    node.lightColorParam = &params_->add(vec3Desc(base + "lightColor", glm::vec3(1.0f), 0.0f, 4.0f, 0.0f, 1.0f));
     if (node.kind == NodeKind::Particles) {
         // registerParticleParameters has no prefix: fold it into the system name instead
         // ("particles/nodes_a_sparks/..." for node "sparks" inside node "a").
@@ -2748,13 +2754,19 @@ void Composition::rebuild() {
                 range.restEmissive.push_back(src.material.emissiveIntensity);
                 range.restRoughness.push_back(src.material.roughness);
             }
+            range.firstLight = scene_.lights.size();
             for (const PunctualLight& src : asset.scene.lights) {
                 PunctualLight light = src;
                 light.name = node.name + "/" + src.name;
                 light.position = transformPoint(nodeT, src.position);
                 light.direction = transformDirection(nodeT, src.direction);
+                // The asset's own numbers, kept so the per-frame scale multiplies the authored value
+                // rather than compounding on last frame's.
+                range.restLightIntensity.push_back(light.intensity);
+                range.restLightColor.push_back(light.color);
                 scene_.addLight(std::move(light));
             }
+            range.lightCount = scene_.lights.size() - range.firstLight;
             break;
         }
         case NodeKind::Orb: {
@@ -3775,6 +3787,29 @@ void Composition::applyParameters() {
         const float roughnessScale =
             node.roughnessParam != nullptr ? node.roughnessParam->value() : node.roughnessScale;
         const Transform full = compose(root, nodeT);
+
+        // The lights the node's asset brought in. Applied here, per frame, rather than at rebuild:
+        // `rebuild` repopulates `scene_.lights` wholesale, so a value written onto a light was
+        // discarded at the next rebuild -- which made lights the one thing in a scene that could not
+        // be keyed, modulated or edited at all. Multiplied onto the asset's own numbers so the scale
+        // does not compound frame on frame, and so a scene need not restate a lamp's candela to dim
+        // it. The node also carries the light *with* it: a moved lamp lights where it now is.
+        if (range.lightCount > 0 && range.firstLight + range.lightCount <= scene_.lights.size()) {
+            const float lightScale =
+                node.lightIntensityParam != nullptr ? node.lightIntensityParam->value() : 1.0f;
+            const glm::vec3 lightTint =
+                node.lightColorParam != nullptr ? node.lightColorParam->value() : glm::vec3(1.0f);
+            for (std::size_t k = 0; k < range.lightCount; ++k) {
+                PunctualLight& light = scene_.lights[range.firstLight + k];
+                if (k < range.restLightIntensity.size()) {
+                    // A hidden node's lights go out with it, which is what hiding a lamp means.
+                    light.intensity = visible ? range.restLightIntensity[k] * lightScale : 0.0f;
+                }
+                if (k < range.restLightColor.size()) {
+                    light.color = range.restLightColor[k] * lightTint;
+                }
+            }
+        }
 
         const Scene* child = (node.kind == NodeKind::Scene && node.child) ? &node.child->scene() : nullptr;
         if (child != nullptr && child->entities.size() == range.entityCount) {

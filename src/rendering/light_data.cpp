@@ -52,7 +52,7 @@ float lightInfluenceRadius(const scene::PunctualLight& light, float cutoff) {
     return std::clamp(radius + extent, 0.01f, 10000.0f);
 }
 
-GpuLight packLight(const scene::PunctualLight& light, int shadowView, bool cascaded) {
+GpuLight packLight(const scene::PunctualLight& light, int shadowView, bool cascaded, bool cube) {
     GpuLight g{};
     const glm::vec3 dir = safeNormalize(light.direction, glm::vec3(0.0f, -1.0f, 0.0f));
     glm::vec3 right;
@@ -74,6 +74,9 @@ GpuLight packLight(const scene::PunctualLight& light, int shadowView, bool casca
     }
     if (cascaded) {
         flags |= kLightFlagCascaded;
+    }
+    if (cube) {
+        flags |= kLightFlagCube;
     }
     if (isAreaType(light.type)) {
         flags |= kLightFlagArea;

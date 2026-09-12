@@ -343,6 +343,14 @@
    "callSite": "src/app/application.cpp, Application::handleTransportShortcut"
   },
   {
+   "command": "file.save-project",
+   "keys": "Cmd+S",
+   "context": "General",
+   "description": "Save the project to the path it was opened from; Save As when it has none.",
+   "document": "reference/menus",
+   "callSite": "src/app/application.cpp, the SDL_EVENT_KEY_DOWN block"
+  },
+  {
    "command": "file.open-audio",
    "keys": "O",
    "context": "General",

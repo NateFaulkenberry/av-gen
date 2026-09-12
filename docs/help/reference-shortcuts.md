@@ -10,7 +10,7 @@ tags: shortcuts, keys, keyboard, reference
 keywords: keyboard shortcuts; what keys are there; hotkeys; key bindings; is there a shortcut for
 related: reference/menus, audio/input, gaps/world-editor
 features: subsystem.shortcuts
-shortcuts: transport.play, file.open-audio, file.open-scene, file.open-environment, transport.step-back, transport.step-forward, transport.return-to-start, transport.go-to-end, transport.previous-marker, transport.next-marker, transport.toggle-loop, edit.undo, edit.redo, edit.duplicate, edit.group, edit.copy, edit.paste, edit.select-all, editor.mode-select, editor.mode-place, editor.gizmo-move, editor.gizmo-scale, editor.toggle-space, edit.delete, edit.delete-back, edit.nudge-forward, edit.nudge-back, editor.frame-selection
+shortcuts: file.save-project, transport.play, file.open-audio, file.open-scene, file.open-environment, transport.step-back, transport.step-forward, transport.return-to-start, transport.go-to-end, transport.previous-marker, transport.next-marker, transport.toggle-loop, edit.undo, edit.redo, edit.duplicate, edit.group, edit.copy, edit.paste, edit.select-all, editor.mode-select, editor.mode-place, editor.gizmo-move, editor.gizmo-scale, editor.toggle-space, edit.delete, edit.delete-back, edit.nudge-forward, edit.nudge-back, editor.frame-selection
 ---
 
 # Keyboard Shortcuts
@@ -26,6 +26,7 @@ shortcuts: transport.play, file.open-audio, file.open-scene, file.open-environme
 | `Return` | return to the start of the play range |
 | `End` | go to the end of it |
 | `L` | turn the loop on or off |
+| `Cmd+S` | save the project (Save As when it has no path yet) |
 | `O` | open audio |
 | `S` | open a glTF scene |
 | `E` | open an HDR environment |

@@ -1467,8 +1467,9 @@ void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Sce
 
     for (std::uint32_t i = 0; i < total; ++i) {
         bool cascaded = false;
-        const int shadowView = shadows_->viewForLight(i, cascaded);
-        lightStaging_[i] = packLight(*lightOrder_[i], shadowView, cascaded);
+        bool cube = false;
+        const int shadowView = shadows_->viewForLight(i, cascaded, cube);
+        lightStaging_[i] = packLight(*lightOrder_[i], shadowView, cascaded, cube);
     }
     if (total > 0) {
         context_.queue().WriteBuffer(lightBuffer_, 0, lightStaging_.data(),
@@ -2468,6 +2469,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         postIn.sceneHdr = finalHdr;
         postIn.depth = hdr_.depthView();
         postIn.velocity = velocity_.view; // ADR-040: motion blur reconstructs from it
+        // ADR-039's selective bloom: weight the bloom by how much of a pixel's radiance is actually
+        // *emitted*, so a brightly lit surface stops glowing like a light source. The target has
+        // always been written -- the debug view reads it -- and was never handed to the post chain,
+        // so `post/bloom/emissionWeight` resolved, ran and changed nothing.
+        postIn.emission = emission_.view;
         postIn.width = hdr_.width();
         postIn.height = hdr_.height();
         postIn.prevViewProj = havePrevViewProj_ ? prevViewProj_ : frame.viewProj;

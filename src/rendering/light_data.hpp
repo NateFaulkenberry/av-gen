@@ -34,6 +34,7 @@ enum LightFlagBits : std::uint32_t {
     kLightFlagCastsShadow = 1u << 0,
     kLightFlagCascaded = 1u << 1, // the shadow view index names the first of `cascadeCount` views
     kLightFlagArea = 1u << 2,     // Rect/Disk/Tube/Sphere: the shader takes the area path
+    kLightFlagCube = 1u << 3,     // the shadow view index names the first of six faces around it
 };
 
 // The distance past which a light contributes less than `cutoff` of its peak. Explicit `range`
@@ -43,7 +44,7 @@ enum LightFlagBits : std::uint32_t {
 // Packs one scene light. `colorTemperatureToRgb` is applied here, so the GPU never sees Kelvin.
 // `shadowView` is the index of its first shadow view, or -1.
 [[nodiscard]] GpuLight packLight(const scene::PunctualLight& light, int shadowView = -1,
-                                 bool cascaded = false);
+                                 bool cascaded = false, bool cube = false);
 
 // Scene lights ordered the way the shader expects: every enabled directional light first (they
 // are evaluated for every fragment), then the local ones (which go through the cluster grid).

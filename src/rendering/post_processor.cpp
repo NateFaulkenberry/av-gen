@@ -538,6 +538,11 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
                 u.texelSize = 1.0f / base.outputSize;
                 u.params0 = glm::vec4(s.bloomThreshold, s.bloomKnee, std::clamp(s.bloomEmissionWeight, 0.0f, 1.0f),
                                       in.emission ? 1.0f : 0.0f);
+                // The exposure the scene has already been scaled by. The emission target is written
+                // by the scene pass, *before* exposure; `source` here is after it. Without this the
+                // ratio of the two is off by the exposure factor -- which at ev-2 suppresses the
+                // glow on the very lights the mask exists to keep.
+                u.params1 = glm::vec4(exposure, 0.0f, 0.0f, 0.0f);
                 PassTextures textures;
                 textures.source = current;
                 textures.emission = in.emission;

@@ -1,11 +1,14 @@
 #pragma once
 
-// Cascaded shadow maps and spot shadow maps (ADR-034).
+// Cascaded, spot and point shadow maps (ADR-034).
 //
 // Directional lights that cast get `QualitySettings::cascadeCount` cascades fitted to the visible
 // depth range and stabilised by snapping the light-space origin to texel increments, so the shadow
-// edges do not crawl as the camera moves. Spot lights that cast get one perspective map. Point
-// lights get no map in this implementation and rely on contact shadows and occlusion.
+// edges do not crawl as the camera moves. Spot lights that cast get one perspective map.
+//
+// Point and area lights that cast get a six-face cube in the same atlas, chosen per fragment by the
+// dominant axis of the direction from the light. Six views is most of the budget, so it is opt-in
+// through the light's own `castsShadow` and a light that does not fit goes without.
 //
 // This class owns the maths, the atlas (a `texture_depth_2d_array`, one layer per view), the
 // per-view uniform buffers (a copy of the frame block with `viewProj` replaced by the light's, so
@@ -39,6 +42,7 @@ struct ShadowStats {
     std::uint32_t views = 0;      // depth-only passes encoded this frame
     std::uint32_t cascades = 0;   // of those, directional cascades
     std::uint32_t spots = 0;
+    std::uint32_t points = 0;  // of those, lights given a six-face cube
     std::uint32_t resolution = 0; // one square map
     double shadowMs = -1.0;       // GPU time of the depth passes (-1 = unavailable)
     std::uint32_t entityDraws = 0; // entity draws recorded across every cascade this frame
@@ -67,7 +71,7 @@ public:
 
     [[nodiscard]] const std::vector<ShadowView>& views() const { return views_; }
     // The shadow view index a packed light should carry, or -1. Cascaded lights name their first.
-    [[nodiscard]] int viewForLight(std::uint32_t lightIndex, bool& cascaded) const;
+    [[nodiscard]] int viewForLight(std::uint32_t lightIndex, bool& cascaded, bool& cube) const;
     [[nodiscard]] const wgpu::Buffer& viewUniforms(std::uint32_t view) const;
     [[nodiscard]] const wgpu::TextureView& layerView(std::uint32_t view) const;
     [[nodiscard]] const wgpu::TextureView& atlasView() const;     // the whole array, for shading

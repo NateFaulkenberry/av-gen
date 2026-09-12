@@ -188,6 +188,10 @@ struct CompositionNode {
     params::Parameter<bool>* visibleParam = nullptr;
     params::Parameter<float>* emissiveParam = nullptr;
     params::Parameter<float>* roughnessParam = nullptr;
+    // Scale and tint for the lights this node's asset contributed. Registered for every node and
+    // inert on one that brought none, exactly as `emissiveBoost` is on a node with no emission.
+    params::Parameter<float>* lightIntensityParam = nullptr;
+    params::Parameter<glm::vec3>* lightColorParam = nullptr;
     ParticleParameters particleParams;
     ParticleSystem particleRest;
     ProceduralParameters proceduralParams;
@@ -760,6 +764,15 @@ private:
         int sdfIndex = -1;                           // index into scene_.sdfs (Sdf kind)
         std::size_t firstSdf = 0;
         std::size_t sdfCount = 0;
+        // The lights an asset brought in with it (ADR-034 follow-up). Kept as a range with their
+        // rest values so a node's `lightIntensity` and `lightColor` can be applied every frame --
+        // `rebuild` repopulates `scene_.lights` wholesale, so a value written straight onto a light
+        // was discarded at the next rebuild and lights were the one thing in a scene that could not
+        // be animated.
+        std::size_t firstLight = 0;
+        std::size_t lightCount = 0;
+        std::vector<float> restLightIntensity;
+        std::vector<glm::vec3> restLightColor;
         std::size_t firstMaterial = 0;               // Scene kind: the child's material programs copied in
         std::size_t materialCount = 0;
         std::size_t firstProcedural = 0;             // Scene kind: the child's procedurals copied in

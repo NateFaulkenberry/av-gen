@@ -159,6 +159,62 @@ TEST_CASE("a shadow-casting key light darkens the floor under an object", "[gpu]
     CHECK(openDark > openLit * 0.9f);      // and leaves the open floor alone
 }
 
+// The same floor and box, lit by a *point* light directly above the box instead of a directional
+// one. Point lights had no shadow map at all until ADR-034 was extended with cube faces, so the box
+// floated over a lit floor.
+scene::Scene pointShadowScene(bool castsShadow) {
+    scene::Scene s = shadowScene(false);
+    s.lights.clear();
+    scene::PunctualLight lamp;
+    lamp.name = "lamp";
+    lamp.type = scene::PunctualLight::Type::Point;
+    lamp.position = {0.0f, 11.0f, 0.0f};
+    lamp.color = glm::vec3(1.0f);
+    lamp.intensity = 900.0f; // candela; the floor is six metres below the box
+    lamp.range = 60.0f;
+    lamp.castsShadow = castsShadow;
+    lamp.contactShadow = false;
+    lamp.softness = 0.3f;
+    s.addLight(lamp);
+    return s;
+}
+
+TEST_CASE("a point light casts a shadow", "[gpu][shadows][point]") {
+    // Six faces in the ordinary shadow atlas, picked per fragment by the dominant axis of the
+    // direction from the light -- no cube texture and no cube sampler, so the depth passes the
+    // encoder already writes per view are unchanged.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    const scene::Scene lit = pointShadowScene(false);
+    const scene::Scene shadowed = pointShadowScene(true);
+    auto without = renderer->renderToImage(lit, frameAt(3), kSize, kSize);
+    REQUIRE(without.has_value());
+    auto with = renderer->renderToImage(shadowed, frameAt(3), kSize, kSize);
+    REQUIRE(with.has_value());
+    CHECK(ctx->errorCount() == 0);
+
+    // Six views were built for it, and they are the whole cube rather than part of one.
+    CHECK(renderer->stats().shadows.points == 1);
+    CHECK(renderer->stats().shadows.views == 6);
+
+    const std::uint32_t shadowX = kSize / 2;
+    const std::uint32_t shadowY = kSize / 2;
+    const std::uint32_t openX = kSize / 12;
+
+    const float shadowLit = luminanceAt(*without, shadowX, shadowY);
+    const float shadowDark = luminanceAt(*with, shadowX, shadowY);
+    const float openLit = luminanceAt(*without, openX, shadowY);
+    const float openDark = luminanceAt(*with, openX, shadowY);
+
+    INFO("under the box: " << shadowLit << " -> " << shadowDark << ", open floor: " << openLit
+                           << " -> " << openDark);
+    REQUIRE(shadowLit > 0.05f);            // the control frame really is lit under the box
+    CHECK(shadowDark < shadowLit * 0.75f); // and the point light's shadow darkens it
+    CHECK(openDark > openLit * 0.85f);     // while the open floor, lit from the same lamp, stays lit
+}
+
 TEST_CASE("a caster the camera cannot see still casts", "[gpu][shadows]") {
     // ADR-046: terrain's frustum cull set Entity::visible, the shadow pass honours visible, so a
     // hill behind the camera stopped casting into shot. `cameraCulled` is the camera's verdict and

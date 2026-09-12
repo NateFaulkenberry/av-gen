@@ -139,8 +139,12 @@ quarter of a step and the ray's own length as an occluder - beyond that the dept
 unrelated geometry rather than a blocker. The last steps fade out so the shadow ends in a gradient.
 
 This is what makes small parts sit against each other: an object resting on a floor, a pipe against
-a wall, the base of a column. It runs per light for any light with `contactShadow` set, which is how
-a point or area light gets a shadow at all.
+a wall, the base of a column. It runs per light for any light with `contactShadow` set.
+
+It used to be *the only* shadow a point or area light had. Since 2026-09-12 those get a real map too:
+six faces in the ordinary shadow atlas, picked per fragment by the dominant axis of the direction
+from the light (ADR-034). It is opt-in through the light's own `castsShadow` and costs six of the
+eight shadow views, so it is for the lamp a shot is about rather than for every practical in a scene.
 
 `contactShadow` defaults to true, so a light that casts no map still marches -- deliberately, per
 ADR-034, because otherwise most lights would cast nothing. It is not free: Glowmere runs three

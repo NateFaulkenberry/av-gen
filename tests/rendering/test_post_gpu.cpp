@@ -8,6 +8,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
+#include "scene/scene_types.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -85,6 +86,91 @@ TEST_CASE("Bloom spreads light beyond a bright object", "[gpu][post]") {
     CHECK(renderer.stats().post.passes >= 8);
     if (const char* dumpDir = std::getenv("AVGEN_DUMP_DIR")) {
         REQUIRE(gpu::writePpm(*on, std::filesystem::path(dumpDir) / "bloom.ppm").has_value());
+    }
+}
+
+TEST_CASE("Selective bloom glows what emits rather than what is merely bright", "[gpu][post]") {
+    // ADR-039. `post/bloom/emissionWeight` was inert for its whole life: the scene pass wrote the
+    // emission target, the prefilter knew how to weight by it, and `SceneRenderer` never handed the
+    // target to the post chain -- so the flag the shader gates on was always zero. A parameter that
+    // resolves, runs and changes nothing is this project's signature failure, and this is the test
+    // that would have caught it.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    // Two cubes of similar screen brightness, one emitting and one merely lit very hard. Matched by
+    // measurement below rather than by eye, because the whole test is a comparison between them.
+    scene::Scene s;
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.camera.position = {0.0f, 0.0f, 9.0f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    const auto mesh = s.addMesh(scene::makeCube(0.4f));
+
+    auto& emitter = s.addEntity("emitter", mesh);
+    emitter.transform.position = {-1.6f, 0.0f, 0.0f};
+    emitter.material.baseColor = {0.0f, 0.0f, 0.0f};
+    emitter.material.emissiveColor = {1.0f, 1.0f, 1.0f};
+    emitter.material.emissiveIntensity = 24.0f;
+
+    auto& lit = s.addEntity("lit", mesh);
+    lit.transform.position = {1.6f, 0.0f, 0.0f};
+    lit.material.baseColor = {1.0f, 1.0f, 1.0f};
+    lit.material.roughness = 1.0f;
+    lit.material.metallic = 0.0f;
+    lit.material.emissiveIntensity = 0.0f;
+
+    scene::PunctualLight key;
+    key.name = "key";
+    key.type = scene::PunctualLight::Type::Directional;
+    key.direction = glm::normalize(glm::vec3(0.0f, 0.0f, -1.0f));
+    key.color = {1.0f, 1.0f, 1.0f};
+    key.intensity = 300.0f;
+    s.addLight(key);
+
+    s.post.bloomEnabled = true;
+    s.post.bloomIntensity = 1.0f;
+    s.post.bloomThreshold = 1.0f;
+    s.post.exposure.mode = scene::ExposureSettings::Mode::Manual;
+
+    FrameTime time{};
+    constexpr std::uint32_t kSize = 160;
+    // Where each cube's halo lands: above the cube, outside its own footprint.
+    constexpr std::uint32_t kEmitterX = 46;
+    constexpr std::uint32_t kLitX = 114;
+    constexpr std::uint32_t kHaloY = 52;
+
+    s.post.bloomEmissionWeight = 0.0f;
+    auto unweighted = renderer.renderToImage(s, time, kSize, kSize);
+    REQUIRE(unweighted.has_value());
+    s.post.bloomEmissionWeight = 1.0f;
+    auto weighted = renderer.renderToImage(s, time, kSize, kSize);
+    REQUIRE(weighted.has_value());
+    CHECK(ctx->errorCount() == 0);
+
+    const int emitterOff = sum3(unweighted->pixel(kEmitterX, kHaloY));
+    const int litOff = sum3(unweighted->pixel(kLitX, kHaloY));
+    const int emitterOn = sum3(weighted->pixel(kEmitterX, kHaloY));
+    const int litOn = sum3(weighted->pixel(kLitX, kHaloY));
+    INFO("emitter " << emitterOff << " -> " << emitterOn << ", lit " << litOff << " -> " << litOn);
+
+    // The premise: with no weighting both are glowing. Without this the rest proves nothing.
+    REQUIRE(emitterOff > 24);
+    REQUIRE(litOff > 24);
+
+    // Turning the weight up suppresses the lit cube's halo and leaves the emitter's.
+    //
+    // The emitter keeps most of its glow rather than all of it, and that is the technique rather
+    // than a fault: the prefilter's four-tap box mixes black background into `c` at the silhouette
+    // while the emission is sampled at the pixel centre, so edge pixels mask down a little. Measured
+    // at about three quarters; the bar is half, so this asserts the behaviour and not the number.
+    CHECK(litOn < litOff / 2);
+    CHECK(emitterOn > emitterOff / 2);
+    CHECK(emitterOn > litOn * 4);
+
+    if (const char* dumpDir = std::getenv("AVGEN_DUMP_DIR")) {
+        REQUIRE(gpu::writePpm(*weighted, std::filesystem::path(dumpDir) / "selective-bloom.ppm").has_value());
     }
 }
 

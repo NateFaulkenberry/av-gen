@@ -2474,9 +2474,9 @@ void registerEnvironmentTools(ToolRegistry& registry) {
         });
 
     add(registry, "lighting.list", "List lights",
-        "Every light in the flattened scene, with the parameter paths that control it where those "
-        "exist. Read the note in the result: a scene's lights are rebuilt from its description, so "
-        "lights that no parameter drives cannot be edited through this API in this build.",
+        "Every light in the flattened scene, with the parameter paths that control it. A light that "
+        "came in with a glTF node is scaled and tinted by that node's lightIntensity and lightColor; "
+        "rig lights are driven by lightrig/*; ecology lights are derived and are not editable.",
         noArgs(), readOnly(),
         [](const json&, ToolContext& ctx) -> ToolResult {
             app::Engine& engine = ctx.engine();
@@ -2492,11 +2492,23 @@ void registerEnvironmentTools(ToolRegistry& registry) {
                 j["direction"] = {light.direction.x, light.direction.y, light.direction.z};
                 j["range"] = light.range;
                 j["castsShadow"] = light.castsShadow;
-                // The controlling parameters, found by the naming convention the light rig uses.
+                // The controlling parameters. Two conventions, because there are two kinds of light
+                // here: the rig names its own, and a light an asset brought in is controlled through
+                // the node that brought it -- "<node>/<light>" is the name, so the node is the part
+                // before the slash.
                 json controls = json::array();
                 for (const params::IParameter* p : engine.params().ordered()) {
                     if (p->group() == "lightrig" && containsNoCase(p->path(), light.name)) {
                         controls.push_back(p->path());
+                    }
+                }
+                if (const auto slash = light.name.find('/'); slash != std::string::npos) {
+                    const std::string owner = light.name.substr(0, slash);
+                    for (const char* field : {"lightIntensity", "lightColor"}) {
+                        const std::string path = "nodes/" + owner + "/" + field;
+                        if (engine.params().find(path) != nullptr) {
+                            controls.push_back(path);
+                        }
                     }
                 }
                 if (!controls.empty()) {
@@ -2519,10 +2531,12 @@ void registerEnvironmentTools(ToolRegistry& registry) {
                 out["keyLightScale"] = key->baseComponent(0);
             }
             out["note"] =
-                "Lights are regenerated whenever the scene rebuilds. Change them through the "
-                "lightrig/* parameters, scene/keyLight or env/sky/sunIntensity listed here; a "
-                "direct write to a light would be discarded at the next rebuild, so this build "
-                "exposes no such tool.";
+                "Lights are regenerated whenever the scene rebuilds, so they are changed through "
+                "parameters rather than written directly: a light from a glTF node through that "
+                "node's nodes/<node>/lightIntensity and nodes/<node>/lightColor (a scale and a tint "
+                "on the asset's own values), a rig light through lightrig/*, and the whole scene "
+                "through scene/keyLight or env/sky/sunIntensity. Ecology lights are aggregates "
+                "derived from glowing vegetation and have no individual controls.";
             const auto summary = fmt::format("{} light(s)", engine.scene().lights.size());
             return ToolResult::ok(std::move(out), summary);
         });

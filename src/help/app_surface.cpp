@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <initializer_list>
+#include <ranges>
 #include <sstream>
 #include <system_error>
 
@@ -132,6 +134,33 @@ bool mentionsModifier(std::string_view line) {
         }
     }
     return false;
+}
+
+// The modifiers named on the same line as the key, in the order the documentation writes them.
+//
+// A binding whose modifier is tested on its own line -- a `command` bool computed further up -- is
+// invisible to this and is reported by its bare key, which is the older behaviour and is why the
+// handlers that want to be *recognised* as modified say so on the line that names the key. Without
+// this, a menu advertising "Cmd+S" could never be satisfied: the scan only ever produced "S", so
+// binding the key correctly left the warning standing and the only way to clear it was to stop
+// advertising the truth.
+std::string modifierPrefix(std::string_view line) {
+    std::string prefix;
+    const auto has = [line](std::initializer_list<std::string_view> tokens) {
+        return std::ranges::any_of(tokens, [line](std::string_view t) {
+            return line.find(t) != std::string_view::npos;
+        });
+    };
+    if (has({"KMOD_GUI", "KMOD_CTRL", "ImGuiMod_Ctrl", "ImGuiMod_Super", "KeyCtrl", "KeySuper"})) {
+        prefix += "Cmd+";
+    }
+    if (has({"KMOD_SHIFT", "ImGuiMod_Shift", "KeyShift"})) {
+        prefix += "Shift+";
+    }
+    if (has({"KMOD_ALT", "ImGuiMod_Alt", "KeyAlt"})) {
+        prefix += "Alt+";
+    }
+    return prefix;
 }
 
 // The call the branch makes, for the report. The first `foo()` or `foo->bar()` after the condition.
@@ -302,7 +331,7 @@ void scanShortcuts(const SourceFile& file, AppSurface& surface) {
         }
 
         AppShortcut shortcut;
-        shortcut.keys = std::move(keys);
+        shortcut.keys = modifierPrefix(line) + keys;
         shortcut.modified = mentionsModifier(line);
         shortcut.sourceRef = sourceRef(file, i);
         shortcut.action = actionAfter(file.lines, i);

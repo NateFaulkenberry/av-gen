@@ -348,6 +348,53 @@ TEST_CASE("Composition registers parameters that drive instances, materials and 
         CHECK(sc.entities[1].material.emissiveIntensity == 1.0f);
         CHECK_FALSE(comp.findNode("b")->visible);
     }
+    SECTION("an asset's lights are scaled, tinted and moved by the node that brought them") {
+        // Lights were the one thing in a scene that could not be edited at all: `rebuild`
+        // repopulates `scene_.lights` wholesale, so a value written onto a light was discarded at
+        // the next rebuild, and the AI tool for them said so in its own description. The fix is a
+        // scale and a tint on the node, applied every frame like every other final.
+        const auto lightIndex = [&]() -> std::size_t {
+            for (std::size_t i = 0; i < sc.lights.size(); ++i) {
+                if (sc.lights[i].name.find("lamp") != std::string::npos) {
+                    return i;
+                }
+            }
+            FAIL("the fixture's light is not in the scene");
+            return 0;
+        };
+        const std::size_t idx = lightIndex();
+        const float rest = sc.lights[idx].intensity;
+        const glm::vec3 restColour = sc.lights[idx].color;
+        REQUIRE(rest > 0.0f);
+
+        params.findAs<float>("nodes/a/lightIntensity")->setBase(0.5f);
+        params.resetFinals();
+        comp.update(FrameTime{});
+        CHECK_THAT(static_cast<double>(sc.lights[idx].intensity), WithinAbs(rest * 0.5, 1e-4));
+
+        // And again, because the bug was that it did not *survive*: a second frame must not
+        // compound the scale, and a rebuild must not throw it away.
+        comp.update(FrameTime{});
+        CHECK_THAT(static_cast<double>(sc.lights[idx].intensity), WithinAbs(rest * 0.5, 1e-4));
+        REQUIRE(comp.addNode(makeNode(scene::NodeKind::Orb, "forcerebuild")).has_value());
+        params.resetFinals();
+        comp.update(FrameTime{});
+        const std::size_t after = lightIndex();
+        CHECK_THAT(static_cast<double>(sc.lights[after].intensity), WithinAbs(rest * 0.5, 1e-4));
+
+        // The tint multiplies the asset's own colour rather than replacing it.
+        params.findAs<glm::vec3>("nodes/a/lightColor")->setBase(glm::vec3(1.0f, 0.0f, 0.0f));
+        params.resetFinals();
+        comp.update(FrameTime{});
+        CHECK_THAT(static_cast<double>(sc.lights[after].color.r), WithinAbs(restColour.r, 1e-4));
+        CHECK_THAT(static_cast<double>(sc.lights[after].color.g), WithinAbs(0.0, 1e-4));
+
+        // Hiding the node puts its lamp out, which is what hiding a lamp means.
+        params.findAs<bool>("nodes/a/visible")->setBase(false);
+        params.resetFinals();
+        comp.update(FrameTime{});
+        CHECK_THAT(static_cast<double>(sc.lights[after].intensity), WithinAbs(0.0, 1e-6));
+    }
     SECTION("hiding a group hides what is inside it") {
         // The layer-list model: an eye on a group is an eye on its contents. Before this, hiding a
         // group left every child standing, because visibility was read off one node at a time --

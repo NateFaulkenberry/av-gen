@@ -1581,7 +1581,28 @@ void Application::handleInputEvent(const SDL_Event& event) {
             }
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && !imgui_->wantsTextInput() &&
                 !imgui_->itemActive()) {
-                if (event.key.key == SDLK_O && panel_ && panel_->onOpenAudio) {
+                // The File menu's plain keys, and the one modified one. The modifier has to be
+                // tested: without it `Cmd+S` fell through to the plain `S` below and opened the Open
+                // Scene dialog -- a menu advertising a key the application did not bind, which the
+                // Help validator reported on every run.
+                const SDL_Keymod fileMods = SDL_GetModState();
+                const bool command = (fileMods & (SDL_KMOD_GUI | SDL_KMOD_CTRL)) != 0;
+                // The modifier is named on the same line as the key on purpose: that is how the Help
+                // scanner recognises a binding as `Cmd+S` rather than as a bare `S`, and a menu item
+                // that advertises `Cmd+S` is only satisfied by a binding of that name.
+                if (event.key.key == SDLK_S && (fileMods & (SDL_KMOD_GUI | SDL_KMOD_CTRL)) != 0) {
+                    // Save Project. Only when there is a path to save to, exactly as the menu item
+                    // is enabled: Cmd+S on an unsaved project must not silently do nothing, so it
+                    // falls through to Save As.
+                    if (panel_ != nullptr && !engine_->projectPath().empty() && panel_->onSaveProjectHere) {
+                        panel_->onSaveProjectHere();
+                    } else if (panel_ != nullptr && panel_->onSaveProject) {
+                        panel_->onSaveProject();
+                    }
+                } else if (command) {
+                    // Every other modified key belongs to somebody else; the plain bindings below
+                    // must not answer for it.
+                } else if (event.key.key == SDLK_O && panel_ && panel_->onOpenAudio) {
                     panel_->onOpenAudio();
                 } else if (event.key.key == SDLK_S && panel_ && panel_->onOpenScene) {
                     panel_->onOpenScene();
