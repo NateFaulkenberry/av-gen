@@ -405,6 +405,8 @@ open in Phase 7.
   - `[ ]` Add explicit UFO/static object, flat/slope/irregular terrain, water shoreline/depth cases, LOD distance ladder, shadow casters and labeled camera positions.
   - `[ ]` Add stable object IDs and labels that map to the forensic panel.
   - `[ ]` Add scene variants for minimal, water-only, character-only and transparency-only tests.
+- `[x]` RendererQA is included in the deterministic fresh-engine/fresh-renderer showcase hash suite;
+  its static diagnostic content is compared for equality without assuming it changes over time.
 - `[ ]` Add scripted camera translation, rotation, orbit, dolly, clipping and resize paths.
 - `[ ]` Add scripted playback, pause, seek, scrub, reverse, scene reload and resolution changes.
 

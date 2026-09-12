@@ -67,6 +67,7 @@ TEST_CASE("Showcase projects render bit-identically across fresh engines and ren
     struct Case {
         const char* project;
         double start;
+        bool changesOverTime = true;
     };
     for (const Case c : {Case{"temple/temple.json", 1.0}, Case{"helix/helix.json", 2.0}, Case{"chamber/chamber.json", 0.5},
                          Case{"hyperspace/hyperspace.json", 3.0}, Case{"lab/lab.json", 0.5},
@@ -79,7 +80,10 @@ TEST_CASE("Showcase projects render bit-identically across fresh engines and ren
                          // things in it has to reproduce exactly like one without, and the only
                          // way to know it still does is to render it twice.
                          Case{"characters/alien-wander.json", 6.0},
-                         Case{"constellation/constellation.json", 12.0}}) {
+                         Case{"constellation/constellation.json", 12.0},
+                         // Static diagnostic content is expected to remain stable; its purpose is
+                         // subsystem coverage, not autonomous motion.
+                         Case{"qa/renderer-qa.json", 0.0, false}}) {
         const auto project = examples / c.project;
         if (!fs::exists(project)) {
             continue;
@@ -88,9 +92,11 @@ TEST_CASE("Showcase projects render bit-identically across fresh engines and ren
         const auto a = renderSequenceHash(*ctx, shaders, project, tmp / "a", c.start, 4);
         const auto b = renderSequenceHash(*ctx, shaders, project, tmp / "b", c.start, 4);
         CHECK(a == b);
-        // A different start time must give different frames (the worlds move on their own).
-        const auto later = renderSequenceHash(*ctx, shaders, project, tmp / "c", c.start + 2.0, 4);
-        CHECK(later != a);
+        if (c.changesOverTime) {
+            // A different start time must give different frames for autonomous showcase worlds.
+            const auto later = renderSequenceHash(*ctx, shaders, project, tmp / "c", c.start + 2.0, 4);
+            CHECK(later != a);
+        }
         CHECK(ctx->errorCount() == 0);
     }
     fs::remove_all(tmp);
