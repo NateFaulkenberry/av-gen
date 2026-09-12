@@ -1552,7 +1552,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // itself also writes the frame origin, and every later pass's cost is the interval from the
     // previous pass's end to its own.
     timeline_->beginFrame();
-    if (time.renderTime < previousRenderTime_) {
+    const bool sceneChanged = temporalScene_ != &scene;
+    if (sceneChanged) {
+        havePrevViewProj_ = false;
+        prevModels_.clear();
+        prevModelsNext_.clear();
+        ao_->resetHistory();
+        temporalScene_ = &scene;
+    }
+    if (sceneChanged || time.renderTime < previousRenderTime_) {
         // A seek/reverse is a discontinuity, not motion. Reusing forward temporal history would
         // create false object/camera velocities and make the first reversed frame differ from a
         // fresh renderer at the same timeline second.

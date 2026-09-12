@@ -284,6 +284,29 @@ TEST_CASE("SceneRenderer does not reuse same-version meshes across scenes", "[gp
     CHECK(ctx->errorCount() == 0);
 }
 
+TEST_CASE("SceneRenderer resets temporal history across scene swaps", "[gpu][renderer][forensics]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    rendering::SceneRenderer fresh(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    REQUIRE(fresh.init().has_value());
+
+    auto first = cubeScene();
+    auto second = cubeScene();
+    second.entities[0].transform.position.x = 0.8f;
+    FrameTime time{};
+    time.frameIndex = 12;
+    time.renderTime = 2.0;
+    REQUIRE(renderer.renderToImage(first, time, 96, 64).has_value());
+    const auto reused = renderer.renderToImage(second, time, 96, 64);
+    REQUIRE(reused.has_value());
+    const auto expected = fresh.renderToImage(second, time, 96, 64);
+    REQUIRE(expected.has_value());
+    CHECK(gpu::hashImage(*reused) == gpu::hashImage(*expected));
+    CHECK(ctx->errorCount() == 0);
+}
+
     TEST_CASE("camera motion never mutates a static entity transform", "[gpu][renderer][transform]") {
         auto ctx = makeContext();
         auto shaders = makeShaders(*ctx);

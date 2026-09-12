@@ -200,6 +200,9 @@ open in Phase 7.
 - `[x]` Skinning palette upload cache is scene-aware. Distinct scenes with equal rig palette versions
   now force a palette upload; a GPU regression renders rest and posed same-version scenes through one
   renderer and verifies the pixels differ.
+- `[x]` Renderer temporal history now resets at a scene boundary: previous model matrices, previous
+  view-projection state and AO history cannot leak between distinct scenes. A reused-versus-fresh
+  renderer regression covers a same-time scene swap.
 - `[ ]` Stress resource reuse through resize, scene reload, timeline seek/reverse, camera cuts and frame-index reuse.
 - `[ ]` Add a conservative synchronization option to the reference path if evidence points to reuse hazards.
 - `[ ]` Add validation for resources destroyed, replaced, resized or rebound while still referenced.

@@ -602,6 +602,7 @@ private:
     // Previous-frame model matrices by entity name, so velocity survives reordering (ADR-035).
     std::unordered_map<std::string, glm::mat4> prevModels_;
     std::unordered_map<std::string, glm::mat4> prevModelsNext_;
+    const scene::Scene* temporalScene_ = nullptr;
     std::string diagnosticEntity_;
     RendererDiagnosticFrame diagnosticFrame_;
     std::optional<RenderObjectDiagnostic> previousDiagnosticObject_;
