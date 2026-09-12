@@ -190,6 +190,11 @@ bool setNodeVisible(app::Engine& engine, const std::string& node, bool value);
 // Declares or undeclares `names` as heroes, as one command. Toggling off keeps the whole hero in
 // the command, so an undo brings back an authored importance and reaction profile rather than a
 // fresh guess at them.
+//
+// Declaring takes node names, because the hero is measured from the node. Undeclaring takes either
+// a node name or a hero's own name, because a hero that names an assembly has no single node to be
+// found from -- and one that could not be undeclared from the application would be a hero the
+// director keeps travelling to with nothing to say about it.
 [[nodiscard]] EditCommand setNodesHero(app::Engine& engine, std::span<const std::string> names, bool hero);
 
 // Moves a selection by a world-space delta as one command. Used by numeric entry and by the arrow

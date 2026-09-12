@@ -24,6 +24,10 @@ constexpr ImU32 kGhostOk = IM_COL32(120, 225, 160, 210);
 constexpr ImU32 kGhostBad = IM_COL32(240, 96, 88, 220);
 constexpr ImU32 kFootprint = IM_COL32(140, 225, 180, 120);
 constexpr ImU32 kFootprintBad = IM_COL32(240, 110, 100, 130);
+// A hero's mark. Dim, because it is a standing annotation rather than something happening now, and
+// the subject reads a little brighter than the rest so the ranking is visible without a number.
+constexpr ImU32 kHero = IM_COL32(150, 190, 255, 130);
+constexpr ImU32 kHeroSubject = IM_COL32(190, 216, 255, 210);
 
 // NDC -> the canvas's own pixels, in ImGui's screen space. The one conversion in the file; every
 // world point goes through here and nowhere else.
@@ -203,6 +207,21 @@ void drawViewportOverlay(const WorldEditor& editor, const scene::Camera& camera,
         painter.label(glm::vec3(selected.bounds.centre().x, selected.bounds.max.y,
                                 selected.bounds.centre().z),
                       text, kSelection);
+    }
+
+    // ---- the heroes ----
+    // The circle is the space the hero claims, the stalk is how tall it is, and the label says
+    // which of them the director would open on. Drawn before the selection reads over it, and thin
+    // enough to stay out of the way of the work.
+    for (const EditorVisuals::HeroMarker& hero : visuals.heroMarkers) {
+        const ImU32 colour = hero.subject ? kHeroSubject : kHero;
+        const glm::vec3 base(hero.position.x, hero.position.y - hero.height * 0.5f, hero.position.z);
+        painter.ring(base, glm::vec3(0.0f, 1.0f, 0.0f), hero.radius, colour, 32, 1.4f);
+        painter.line(base, glm::vec3(base.x, base.y + hero.height, base.z), colour, 1.2f);
+        char text[192];
+        std::snprintf(text, sizeof(text), "%s hero %s  %.2f", hero.subject ? "*" : " ",
+                      hero.name.c_str(), static_cast<double>(hero.importance));
+        painter.label(glm::vec3(base.x, base.y + hero.height, base.z), text, colour);
     }
 
     // ---- the ghost ----

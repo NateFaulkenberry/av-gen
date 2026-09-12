@@ -550,14 +550,45 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
             editor.setNodesLocked(engine, all, false);
         }
     }
-    // Heroes have no appearance of their own -- a designated object looks exactly like an
-    // undesignated one -- so the only place the count can be seen is here, and "does this world
-    // have anything for the camera director to shoot" is the question people arrive with.
-    if (const std::size_t heroes = composition->heroes().size(); heroes > 0) {
-        ImGui::TextDisabled("%zu hero%s", heroes, heroes == 1 ? "" : "es");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("What Direct to Music travels between. The most important one is the "
-                              "subject; ties are broken by the order they were declared in.");
+    // The heroes, as a list of their own and not only as stars on the rows.
+    //
+    // Two reasons it cannot be rows alone. A hero may name an *assembly* rather than a node --
+    // Glowmere's elder is three nodes and no single one of them -- so it has no row to be unstarred
+    // from, and the camera kept travelling to a subject the application could not talk about. And a
+    // hero has no appearance in the viewport beyond the mark the editor draws, so "what is this
+    // world about, and in what order" has to be answerable somewhere.
+    if (const std::size_t heroCount = composition->heroes().size(); heroCount > 0) {
+        if (ImGui::TreeNodeEx("##heroes", ImGuiTreeNodeFlags_DefaultOpen, "Heroes (%zu)", heroCount)) {
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("What Camera > Direct to Music travels between, in the order it "
+                                  "ranks them. Starring an object here or in the list below only "
+                                  "changes the *next* shot the director cuts -- it does not move a "
+                                  "camera that has already been directed or hand-placed.");
+            }
+            // Copied rather than iterated: unstarring one rewrites the list under the loop.
+            const std::vector<world::HeroPoint> heroes = composition->heroes();
+            for (std::size_t i = 0; i < heroes.size(); ++i) {
+                const world::HeroPoint& hero = heroes[i];
+                ImGui::PushID(static_cast<int>(i));
+                if (iconToggle("##declared", true, Icon::Star,
+                               "Not a hero -- the director stops travelling to it")) {
+                    const std::vector<std::string> one{hero.name};
+                    editor.setNodesHero(engine, one, false);
+                }
+                ImGui::SameLine();
+                const bool onANode = composition->findNode(hero.name) != nullptr;
+                // The first is the subject: that is what `briefFromHeroes` opens the shot on.
+                ImGui::Text("%s%s", i == 0 ? "* " : "  ", hero.name.c_str());
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("importance %.2f, %.0f m tall, camera stands off %.0f m%s",
+                                      static_cast<double>(hero.importance),
+                                      static_cast<double>(hero.height),
+                                      static_cast<double>(hero.preferredCameraDistance),
+                                      onANode ? "" : "\nassembly: no single object carries it");
+                }
+                ImGui::PopID();
+            }
+            ImGui::TreePop();
         }
     }
 

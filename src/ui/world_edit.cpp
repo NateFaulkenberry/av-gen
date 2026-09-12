@@ -613,7 +613,11 @@ EditCommand setNodesHero(app::Engine& engine, std::span<const std::string> names
         return command;
     }
     for (const std::string& name : names) {
-        if (composition->findNode(name) == nullptr) {
+        // Declaring one measures the object, so there has to be an object. *Un*declaring one does
+        // not: a hero may name an assembly rather than a node -- Glowmere's elder is three nodes and
+        // no single one of them -- and a hero with no row in the Objects list was a hero nothing in
+        // the application could take back.
+        if (hero && composition->findNode(name) == nullptr) {
             continue;
         }
         HeroChange change;

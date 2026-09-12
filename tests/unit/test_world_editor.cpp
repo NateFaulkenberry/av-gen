@@ -1652,3 +1652,75 @@ TEST_CASE("a designated hero survives a save and a load") {
     CHECK_THAT(loaded.radius, Catch::Matchers::WithinAbs(declared.radius, 1e-4));
     CHECK(ui::nodeIsHero(*reopened.composition(), a));
 }
+
+// Glowmere's elder is a hero named `elder` standing on three nodes called `elder-crown`,
+// `elder-stem` and `elder-filaments`. No row in the Objects list is that hero, so before this it
+// could not be undeclared from the application at all -- which is what "the camera stays locked on
+// the mushroom no matter what I unstar" turned out to be.
+TEST_CASE("a hero that names an assembly can still be undeclared") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    f.add("elder-crown", glm::vec3(0.0f, 0.0f, 0.0f));
+    f.add("elder-stem", glm::vec3(0.0f, -1.0f, 0.0f));
+    auto* composition = f.engine.composition();
+
+    world::HeroPoint elder;
+    elder.name = "elder";
+    elder.assembly = "elder";     // three nodes; none of them is the hero
+    elder.importance = 0.95f;
+    REQUIRE(composition->setHeroes({elder}).has_value());
+    CHECK_FALSE(ui::nodeIsHero(*composition, "elder-crown"));   // no row carries it
+
+    // Undeclaring takes the hero's own name, and works although nothing in the scene is called that.
+    REQUIRE(composition->findNode("elder") == nullptr);
+    editor.setNodesHero(f.engine, std::vector<std::string>{"elder"}, false);
+    CHECK(composition->heroes().empty());
+    CHECK(edits.history().undo(f.engine).ok());
+    REQUIRE(composition->heroes().size() == 1);
+    CHECK(composition->heroes().front().name == "elder");
+
+    // Declaring still needs an object to measure, so a name that is nobody's is refused rather than
+    // producing a hero standing at the origin with a made-up size.
+    editor.setNodesHero(f.engine, std::vector<std::string>{"nothing-called-this"}, true);
+    CHECK(composition->heroes().size() == 1);
+}
+
+// The editor draws heroes because nothing else does: designation has no other appearance, and a
+// toggle with no visible effect is indistinguishable from a broken one.
+TEST_CASE("the overlay is told about every hero, and which one is the subject") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    const std::string a = f.add("lamp", glm::vec3(-5.0f, 0.0f, 0.0f));
+    const std::string b = f.add("spire", glm::vec3(5.0f, 0.0f, 0.0f));
+    editor.setNodesHero(f.engine, std::vector<std::string>{a, b}, true);
+    // Ranked as a scene file would carry them -- most important first, which is the order
+    // `briefFromHeroes` reads and the order the editor's writes keep.
+    std::vector<world::HeroPoint> ranked = f.engine.composition()->heroes();
+    REQUIRE(ranked.size() == 2);
+    std::sort(ranked.begin(), ranked.end(),
+              [&](const world::HeroPoint& x, const world::HeroPoint& y) { return x.name > y.name; });
+    ranked.front().importance = 0.9f;   // spire
+    ranked.back().importance = 0.3f;    // lamp
+    REQUIRE(ranked.front().name == b);
+    REQUIRE(f.engine.composition()->setHeroes(ranked).has_value());
+
+    const scene::Camera camera = lookingDown();
+    editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{});
+    const auto& markers = editor.visuals().heroMarkers;
+    REQUIRE(markers.size() == 2);
+    CHECK(markers[0].name == b);        // ranked, so the subject is first
+    CHECK(markers[0].subject);
+    CHECK_FALSE(markers[1].subject);
+    CHECK(markers[0].radius > 0.0f);
+    CHECK(markers[0].height > 0.0f);
+
+    // Unstarring takes the mark away with it: that is the feedback the toggle was missing.
+    editor.setNodesHero(f.engine, std::vector<std::string>{b}, false);
+    editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{});
+    REQUIRE(editor.visuals().heroMarkers.size() == 1);
+    CHECK(editor.visuals().heroMarkers.front().name == a);
+}

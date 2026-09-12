@@ -5,15 +5,21 @@
 #include "app/engine.hpp"
 #include "app/job_system.hpp"
 #include "app/world_builder.hpp"
+#include "support/gltf_fixture.hpp"
+#include "ui/world_edit.hpp"
 #include "scene/composition.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <nlohmann/json.hpp>
 
 #include <chrono>
+#include <filesystem>
+#include <unistd.h>
 
 using namespace avgen;
 using namespace std::chrono_literals;
+namespace fs = std::filesystem;
 
 namespace {
 assets::AssetLibrary library() {
@@ -205,4 +211,74 @@ TEST_CASE("Installing without a composition says so instead of crashing", "[app]
     auto installed = app::installWorld(engine, worlds[0]);
     REQUIRE(!installed.has_value());
     CHECK(installed.error().message.find("composition") != std::string::npos);
+}
+
+// The plan's heroes used to be seen only by `installWorld` and by the camera director's fallback to
+// the panel that still held the plan: the composition's own hero list stayed empty. A generated
+// world therefore had nothing starred in the editor, saved no heroes with its scene, and lost them
+// the moment that panel let go -- while `--direct` still worked, which is what kept it hidden.
+//
+// This needs a library of files that exist, unlike the fixture above: a hero is declared only if its
+// node was actually placed, and a node whose glTF cannot be loaded is not placed.
+TEST_CASE("A generated world declares the heroes it placed", "[app][worldbuilder][heroes]") {
+    const fs::path dir = fs::temp_directory_path() /
+                         ("avgen_world_heroes_" + std::to_string(static_cast<long long>(::getpid())));
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    const auto triangle = testsupport::writeTriangleGlb("world_heroes");
+    for (const char* name : {"a.glb", "b.glb", "c.glb", "d.glb", "e.glb"}) {
+        fs::copy_file(triangle, dir / name, fs::copy_options::overwrite_existing);
+    }
+    fs::remove(triangle);
+    const auto doc = nlohmann::json::parse(R"({"assets":[
+      {"name":"hero","category":"flora","file":"a.glb","visualImportance":0.95,"preferredScale":12.0},
+      {"name":"bush","category":"flora","file":"b.glb","visualImportance":0.3,"preferredScale":2.0},
+      {"name":"fern","category":"flora","file":"c.glb","visualImportance":0.15,"preferredScale":0.6},
+      {"name":"cap","category":"fungi","file":"d.glb","visualImportance":0.4,"preferredScale":0.5},
+      {"name":"rock","category":"rock","file":"e.glb","visualImportance":0.25,"preferredScale":3.0}
+    ]})");
+    auto lib = assets::AssetLibrary::fromJson(doc, dir.string());
+    REQUIRE(lib.has_value());
+
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    app::JobSystem jobs(1);
+    app::WorldBuilder builder(jobs);
+    const auto id = builder.generate(recipe(), std::move(*lib));
+    REQUIRE(jobs.waitFor(id, 30s));
+    auto worlds = builder.collect();
+    REQUIRE(worlds.size() == 1);
+    REQUIRE(!worlds[0].composed.plan.heroes.empty());
+    REQUIRE(app::installWorld(engine, worlds[0]).has_value());
+
+    const std::vector<world::HeroPoint>& declared = engine.composition()->heroes();
+    REQUIRE(!declared.empty());
+    for (const world::HeroPoint& hero : declared) {
+        INFO(hero.name);
+        // Each stands on a node that is really in the scene, and the editor's star finds it.
+        const scene::CompositionNode* node = engine.composition()->findNode(hero.name);
+        REQUIRE(node != nullptr);
+        CHECK(ui::nodeIsHero(*engine.composition(), hero.name));
+        // At the height the node was placed at, not the one the planner guessed: the installer
+        // drops a hero onto the terrain, and a hero declared in the air above its object would
+        // stand the camera off from a point in the sky.
+        CHECK_THAT(hero.position.y, Catch::Matchers::WithinAbs(node->transform.position.y, 1e-4));
+        CHECK(hero.validate().has_value());
+    }
+    // Ranked, which is what `briefFromHeroes` reads: the first is the subject.
+    for (std::size_t i = 1; i < declared.size(); ++i) {
+        CHECK(declared[i - 1].importance >= declared[i].importance);
+    }
+
+    // Generating again replaces the declaration rather than stacking a second copy of every hero.
+    const std::size_t once = declared.size();
+    const auto again = builder.generate(recipe(), assets::AssetLibrary(worlds[0].library));
+    REQUIRE(jobs.waitFor(again, 30s));
+    auto second = builder.collect();
+    REQUIRE(second.size() == 1);
+    REQUIRE(app::installWorld(engine, second[0]).has_value());
+    CHECK(engine.composition()->heroes().size() == once);
+
+    std::error_code ec;
+    fs::remove_all(dir, ec);
 }

@@ -287,6 +287,14 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
         }
     }
     const assets::AssetLibrary* library = world.library.size() > 0 ? &world.library : nullptr;
+    // What actually got placed, declared on the composition afterwards (ADR-074/104).
+    //
+    // The plan's heroes were a thing only this function and the camera director's own fallback ever
+    // saw: the composition itself was left with an empty hero list, so a generated world had nothing
+    // starred in the editor, saved no heroes with its scene, and lost them entirely the moment the
+    // panel that held the plan went away. Declaring them here is what makes a generated hero the
+    // same object as a hand-authored one.
+    std::vector<world::HeroPoint> placed;
     for (const world::HeroPoint& hero : world.composed.plan.heroes) {
         if (hero.assetId.empty() || library == nullptr) {
             continue;
@@ -313,10 +321,17 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
         node.transform.position = glm::vec3(hero.position.x, ground + hero.position.y, hero.position.z);
         node.transform.scale = glm::vec3(hero.scale);
         node.transform.rotation = glm::angleAxis(hero.yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+        const glm::vec3 grounded = node.transform.position;
         if (auto added = engine.addNode(std::move(node)); !added) {
             log::warn("world '{}': hero '{}': {}", world.recipe.world, hero.name,
                       added.error().message);
         } else {
+            // The *placed* position, not the plan's: the node was dropped onto the terrain above,
+            // and a hero declared at the height the planner guessed would stand a camera off from a
+            // point in the air above the thing it is looking at.
+            world::HeroPoint declared = hero;
+            declared.position = grounded;
+            placed.push_back(std::move(declared));
             // Reactions are installed after the node exists, because a route binds to a parameter
             // and the node's parameters are registered when it is added.
             const std::size_t routes = installHeroReactions(engine, hero);
@@ -324,6 +339,20 @@ Result<void> installWorld(Engine& engine, const GeneratedWorld& world) {
                       "{} reaction(s)",
                       world.recipe.world, hero.name, hero.importance,
                       asset->naturalSize.y * hero.scale, hero.preferredCameraDistance, routes);
+        }
+    }
+
+    if (!placed.empty()) {
+        // Ranked, as `briefFromHeroes` requires; the composer already orders them, and sorting is
+        // what makes that a property of the list rather than a habit of one producer.
+        std::stable_sort(placed.begin(), placed.end(),
+                         [](const world::HeroPoint& a, const world::HeroPoint& b) {
+                             return a.importance > b.importance;
+                         });
+        if (auto ok = composition->setHeroes(std::move(placed)); !ok) {
+            // Named rather than swallowed: a world whose heroes were rejected is a world the camera
+            // director will refuse to shoot, and the reason has to be findable.
+            log::warn("world '{}': heroes: {}", world.recipe.world, ok.error().message);
         }
     }
 

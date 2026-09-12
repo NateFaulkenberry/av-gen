@@ -90,6 +90,22 @@ struct EditorVisuals {
         std::size_t members = 0; // for a group
     };
     std::vector<SelectedBox> selectionBoxes;
+
+    // The heroes this scene declares (ADR-104), drawn whether or not anything is selected.
+    //
+    // Designation has no other appearance -- a hero looks exactly like the object it was made from
+    // -- and a toggle whose effect cannot be seen reads as a toggle that does nothing, which is
+    // precisely how this arrived as a bug report. What is drawn is what the hero *means* to a
+    // director: where it stands, how much room it claims, and how tall it is.
+    struct HeroMarker {
+        std::string name;
+        glm::vec3 position{0.0f};
+        float radius = 1.0f;
+        float height = 1.0f;
+        float importance = 0.5f;
+        bool subject = false;   // the most important one: what a directed shot is about
+    };
+    std::vector<HeroMarker> heroMarkers;
 };
 
 class WorldEditor : public app::EditContext {

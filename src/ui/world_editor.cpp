@@ -109,6 +109,23 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
         visuals_.selectionBoxes.push_back(std::move(box));
     }
 
+    // The heroes, always: they are the one piece of authored state with no appearance of its own.
+    // `heroes()` is kept ranked, so the first is the subject a directed shot would be about.
+    {
+        const std::vector<world::HeroPoint>& heroes = composition->heroes();
+        visuals_.heroMarkers.reserve(heroes.size());
+        for (std::size_t i = 0; i < heroes.size(); ++i) {
+            EditorVisuals::HeroMarker marker;
+            marker.name = heroes[i].name;
+            marker.position = heroes[i].position;
+            marker.radius = heroes[i].radius;
+            marker.height = heroes[i].height;
+            marker.importance = heroes[i].importance;
+            marker.subject = i == 0;
+            visuals_.heroMarkers.push_back(std::move(marker));
+        }
+    }
+
     // The status line. Whatever else is true, it says what the next click does.
     if (mode == EditorMode::Place) {
         status_ = previewSummary(preview_);
