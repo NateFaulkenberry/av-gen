@@ -362,6 +362,12 @@ open in Phase 7.
 ## Phase 7: Render-pass state and pass contracts
 
 - `[ ]` Enumerate every pass's pipeline, bind groups, vertex/index buffers, dynamic offsets, blend, depth, stencil, viewport, scissor and target ownership.
+- `[~]` The main `SceneRenderer` pass contract is traced: shadow and depth passes clear/store depth;
+  linear depth writes R32F; the scene pass loads background color and clears auxiliary targets;
+  water/blended pipelines disable depth writes; debug/post/auxiliary/tonemap passes load or clear
+  their declared color targets. Remaining work is to extend this inventory through procedural,
+  particle, SDF, water, post-layer and external renderer helpers and add state assertions where
+  descriptors do not make the contract visible.
 - `[ ]` Verify every pass establishes the state it requires rather than relying on a previous pass.
 - `[ ]` Add pass-boundary assertions or explicit state setup where the API does not make state implicit.
 - `[ ]` Verify render target load/store/clear behavior and resource transitions.
