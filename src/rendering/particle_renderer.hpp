@@ -207,6 +207,7 @@ private:
     wgpu::RenderPipeline ribbonAdditivePipeline_;
     wgpu::RenderPipeline ribbonAlphaPipeline_;
     std::vector<Pool> pools_;
+    const scene::Scene* scene_ = nullptr;
     ParticleStats stats_;
 
     static constexpr wgpu::TextureFormat kHdrFormat = wgpu::TextureFormat::RGBA16Float;

@@ -442,6 +442,10 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
     if (!initialised_) {
         return;
     }
+    if (scene_ != &scene) {
+        resetAll();
+        scene_ = &scene;
+    }
     collectTimings(); // the previous frame's measurement (its command buffer was submitted by now)
     std::size_t encoded = 0;
     const glm::mat4 invView = glm::inverse(view);

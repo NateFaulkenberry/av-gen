@@ -207,6 +207,8 @@ open in Phase 7.
 - `[x]` Skinning palette upload cache is scene-aware. Distinct scenes with equal rig palette versions
   now force a palette upload; a GPU regression renders rest and posed same-version scenes through one
   renderer and verifies the pixels differ.
+- `[x]` Particle simulation pools are scene-aware. Switching scenes resets alive/dead lists, emission
+  carry and trail history; a reused-versus-fresh renderer regression covers visible same-frame output.
 - `[x]` Renderer temporal history now resets at a scene boundary: previous model matrices, previous
   view-projection state and AO history cannot leak between distinct scenes. A reused-versus-fresh
   renderer regression covers a same-time scene swap.
@@ -369,6 +371,9 @@ open in Phase 7.
   particle, SDF, water, post-layer and external renderer helpers and add state assertions where
   descriptors do not make the contract visible.
 - `[ ]` Verify every pass establishes the state it requires rather than relying on a previous pass.
+- `[~]` Procedural draws reset local pipeline/material/mesh trackers at each helper entry and particle
+  draws bind their render group and blend-specific pipeline per system. These contracts are visible in
+  code; equivalent assertions/regressions for all helper pass boundaries remain open.
 - `[ ]` Add pass-boundary assertions or explicit state setup where the API does not make state implicit.
 - `[ ]` Verify render target load/store/clear behavior and resource transitions.
 - `[ ]` Verify depth prepass, terrain, water, transparent, particle, shadow, volume, debug and post pass interactions.

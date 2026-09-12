@@ -270,6 +270,33 @@ private:
 };
 } // namespace
 
+TEST_CASE("particle pools reset when a renderer changes scenes", "[gpu][particles][forensics]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    rendering::SceneRenderer fresh(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    REQUIRE(fresh.init().has_value());
+
+    auto first = sceneWith(recyclingSystem());
+    auto second = sceneWith(recyclingSystem());
+    first.particles[0].burst = 1.0f;
+    second.particles[0].burst = 1.0f;
+    second.particles[0].position = {1.0f, 0.0f, 0.0f};
+    FrameTime time{};
+    time.frameIndex = 0;
+    time.deltaTime = 1.0 / 60.0;
+    const auto firstImage = renderer.renderToImage(first, time, 96, 96);
+    REQUIRE(firstImage.has_value());
+    const auto reused = renderer.renderToImage(second, time, 96, 96);
+    REQUIRE(reused.has_value());
+    const auto expected = fresh.renderToImage(second, time, 96, 96);
+    REQUIRE(expected.has_value());
+    CHECK(gpu::hashImage(*reused) == gpu::hashImage(*expected));
+    CHECK(gpu::hashImage(*firstImage) != gpu::hashImage(*reused));
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("Particle emission, compaction and draw order are bit-deterministic across runs", "[gpu][particles]") {
     constexpr int kFrames = 200;
     auto ctx = makeContext();
