@@ -35,8 +35,6 @@
 
 #include "ui/edit_history.hpp"
 
-#include <nlohmann/json_fwd.hpp>
-
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -84,9 +82,31 @@ struct ClipboardPayload {
     std::string type;    // "world/nodes"
     int version = 1;
     std::string source;  // the editor that produced it, for the UI
-    std::shared_ptr<const nlohmann::json> data;
+    std::size_t count = 0; // how many things it holds, so the UI can say "Paste 4 objects"
+
+    // What it holds, read according to `type` and nothing else. Deliberately not JSON.
+    //
+    // Serialising a world node would lose exactly what a scene file does not write -- a loaded glTF
+    // asset, a nested child composition, a terrain's built chunks -- and lose it in the situation
+    // where the user is most certain nothing was lost. `EditCommand` already owns departing nodes
+    // for that reason rather than describing them, and the clipboard has the same problem: a
+    // clipboard is a place a thing waits, not a format it is written in.
+    //
+    // Putting it on the operating system's pasteboard *would* need a serialisation, and that is
+    // when `version` starts earning its place. Until then it costs nothing to carry.
+    std::shared_ptr<const void> data;
 
     [[nodiscard]] bool empty() const { return type.empty() || data == nullptr; }
+
+    // Reads the payload back as what `type` says it is. Null when the type does not match, so a
+    // caller cannot reinterpret a timeline's payload as a tree by asking confidently.
+    template <typename T>
+    [[nodiscard]] std::shared_ptr<const T> as(std::string_view expected) const {
+        if (type != expected || data == nullptr) {
+            return nullptr;
+        }
+        return std::static_pointer_cast<const T>(data);
+    }
 };
 
 class Clipboard {

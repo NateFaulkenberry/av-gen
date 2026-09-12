@@ -7,6 +7,7 @@
 // ImGui frame, so an editor whose behaviour could only be checked by looking at it would be an
 // editor nobody checked.
 
+#include <set>
 #include "app/engine.hpp"
 #include "support/gltf_fixture.hpp"
 #include "ui/brush.hpp"
@@ -1223,4 +1224,90 @@ TEST_CASE("Trimming moves what the empty stack means", "[ui][editor][history]") 
     CHECK_FALSE(history.canUndo());
     // Back as far as the history goes -- and that is not where the session started.
     CHECK(history.stateId() != openedWith);
+}
+
+TEST_CASE("What you copied is still yours after deleting it", "[ui][editor][clipboard]") {
+    // The clipboard used to hold the *names* of the selected nodes, so copy, delete, paste pasted
+    // nothing -- and said so in a warning, which is a clear symptom of a clipboard that never held
+    // anything. A person who copies something expects to still have it after deleting the original.
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+
+    const std::string a = f.add("rock", glm::vec3(1.0f, 0.0f, 0.0f));
+    editor.selection.set(a);
+    editor.copySelection(f.engine);
+    CHECK(edits.clipboard().holds(ui::kWorldNodesClipboardType));
+    CHECK(edits.clipboard().payload().count == 1);
+
+    // Delete the original. The clipboard is unaffected: it is holding a clone, not a reference.
+    editor.deleteSelection(f.engine);
+    REQUIRE(f.engine.composition()->findNode(a) == nullptr);
+    CHECK(edits.clipboard().holds(ui::kWorldNodesClipboardType));
+
+    editor.paste(f.engine);
+    // Something came back, under a name of its own rather than colliding with the deleted one.
+    const std::size_t nodes = f.engine.composition()->nodes().size();
+    CHECK(nodes == 1);
+    CHECK_FALSE(editor.selection.empty());
+
+    // And the paste is one undoable step that takes it away again.
+    REQUIRE(edits.execute(app::EditAction::Undo, f.engine));
+    CHECK(f.engine.composition()->nodes().empty());
+}
+
+TEST_CASE("Paste gives new objects, never a second name for an old one", "[ui][editor][clipboard]") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+
+    const std::string a = f.add("rock", glm::vec3(0.0f));
+    editor.selection.set(a);
+    editor.copySelection(f.engine);
+    editor.paste(f.engine);
+    editor.paste(f.engine);
+
+    auto* composition = f.engine.composition();
+    REQUIRE(composition->nodes().size() == 3); // the original and two pastes
+    std::set<std::string> names;
+    for (const auto& node : composition->nodes()) {
+        names.insert(node->name);
+    }
+    // Three objects, three names: a paste that reused a name would be a second handle on one object,
+    // and moving either would move both.
+    CHECK(names.size() == 3);
+    CHECK(names.contains(a));
+
+    // The original is untouched by either paste.
+    const scene::CompositionNode* original = composition->findNode(a);
+    REQUIRE(original != nullptr);
+    CHECK(original->transform.position == glm::vec3(0.0f));
+}
+
+TEST_CASE("Cut is one step, and undoing it brings the objects back", "[ui][editor][clipboard]") {
+    // Copy changes nothing and is not an edit; the removal is. Undoing a cut has to bring the
+    // objects back in one press rather than leaving the user to discover that the first Cmd+Z only
+    // took back a copy.
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+
+    const std::string a = f.add("rock", glm::vec3(0.0f));
+    const std::string b = f.add("fern", glm::vec3(2.0f, 0.0f, 0.0f));
+    editor.selection.set(std::vector<std::string>{a, b});
+
+    REQUIRE(editor.cutSelection(f.engine));
+    CHECK(f.engine.composition()->nodes().empty());
+    CHECK(edits.clipboard().holds(ui::kWorldNodesClipboardType));
+    // One entry, and it says what the user did rather than what the code reused.
+    CHECK(edits.history().undoSize() == 1);
+    CHECK(edits.history().undoLabel() == "Cut 2 objects");
+
+    REQUIRE(edits.execute(app::EditAction::Undo, f.engine));
+    CHECK(f.engine.composition()->nodes().size() == 2);
+    // And the selection comes back with them, so the user can see what returned.
+    CHECK(editor.selection.nodes().size() == 2);
 }

@@ -117,6 +117,17 @@ bool setNodeScale(app::Engine& engine, const std::string& node, glm::vec3 value)
 
 // Copies nodes (and their descendants, keeping the hierarchy) and offsets the copies. §27: select,
 // duplicate, move, duplicate again.
+// Puts nodes the caller already owns into the scene, under fresh names, as one command. What Paste
+// is: the clipboard holds clones that are no longer in the scene (and may never return to it, if
+// what they were copied from has since been deleted), so this takes nodes rather than names.
+//
+// Hierarchy inside the batch is preserved -- a copied group's children hang off the *copy* -- and a
+// parent naming something outside the batch is dropped to a root, because the thing it named may
+// not exist in this scene at all.
+[[nodiscard]] EditCommand pasteNodes(app::Engine& engine,
+                                     const std::vector<scene::CompositionNode>& nodes,
+                                     glm::vec3 offset, std::vector<std::string>* created);
+
 [[nodiscard]] EditCommand duplicateNodes(app::Engine& engine, std::span<const std::string> names,
                                          glm::vec3 offset, std::vector<std::string>* created = nullptr);
 

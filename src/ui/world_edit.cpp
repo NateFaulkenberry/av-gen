@@ -360,6 +360,64 @@ EditCommand duplicateNodes(app::Engine& engine, std::span<const std::string> nam
     return command;
 }
 
+EditCommand pasteNodes(app::Engine& engine, const std::vector<scene::CompositionNode>& nodes,
+                       glm::vec3 offset, std::vector<std::string>* created) {
+    EditCommand command;
+    if (nodes.empty()) {
+        return command;
+    }
+    if (engine.composition() == nullptr) {
+        engine.newComposition();
+    }
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        return command;
+    }
+    // Which names are in this batch, so a child can tell whether its parent came with it.
+    std::vector<std::string> batch;
+    batch.reserve(nodes.size());
+    for (const scene::CompositionNode& node : nodes) {
+        batch.push_back(node.name);
+    }
+    std::vector<std::pair<std::string, std::string>> renames;
+    for (const scene::CompositionNode& node : nodes) {
+        scene::CompositionNode copy = scene::cloneNodeSpec(node);
+        const std::string original = copy.name;
+        const bool insideBatch = std::find(batch.begin(), batch.end(), copy.parent) != batch.end();
+        if (!insideBatch) {
+            // Its parent did not come with it. Dropping to a root rather than keeping the name: the
+            // scene being pasted into may not have that node, and a parent naming something absent
+            // is a node that never appears.
+            copy.parent.clear();
+            copy.transform.position += offset;
+        }
+        for (const auto& [from, to] : renames) {
+            if (copy.parent == from) {
+                copy.parent = to;
+                break;
+            }
+        }
+        auto added = composition->addNode(std::move(copy));
+        if (!added) {
+            log::warn("paste: {}", added.error().message);
+            continue;
+        }
+        renames.emplace_back(original, (*added)->name);
+        command.added.emplace_back((*added)->name);
+        if (created != nullptr) {
+            created->push_back((*added)->name);
+        }
+    }
+    engine.rebind();
+    if (command.added.empty()) {
+        return command;
+    }
+    command.label = command.added.size() == 1
+                        ? "Paste " + command.added.front().name
+                        : "Paste " + std::to_string(command.added.size()) + " objects";
+    return command;
+}
+
 EditCommand groupNodes(app::Engine& engine, std::span<const std::string> names, std::string groupName,
                        std::string* created) {
     EditCommand command;

@@ -7,8 +7,6 @@
 #include "app/edit_system.hpp"
 #include "app/engine.hpp"
 
-#include <nlohmann/json.hpp>
-
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
@@ -248,7 +246,8 @@ TEST_CASE("The clipboard carries what it holds, not just bytes", "[app][edits]")
     app::ClipboardPayload payload;
     payload.type = "world/nodes";
     payload.source = "World";
-    payload.data = std::make_shared<const nlohmann::json>(nlohmann::json::array({1, 2, 3}));
+    payload.count = 3;
+    payload.data = std::make_shared<const std::vector<int>>(std::vector<int>{1, 2, 3});
     edits.clipboard().set(std::move(payload));
 
     CHECK_FALSE(edits.clipboard().empty());
@@ -256,6 +255,11 @@ TEST_CASE("The clipboard carries what it holds, not just bytes", "[app][edits]")
     // A context asks before offering Paste, so a timeline never offers to paste a tree.
     CHECK_FALSE(edits.clipboard().holds("timeline/items"));
     CHECK(edits.clipboard().payload().version == 1);
+    CHECK(edits.clipboard().payload().count == 3);
+    // Read back as what the type says, and null for anything else -- a caller cannot reinterpret a
+    // timeline's payload as a tree by asking confidently.
+    CHECK(edits.clipboard().payload().as<std::vector<int>>("world/nodes") != nullptr);
+    CHECK(edits.clipboard().payload().as<std::vector<int>>("timeline/items") == nullptr);
 
     edits.clipboard().clear();
     CHECK(edits.clipboard().empty());

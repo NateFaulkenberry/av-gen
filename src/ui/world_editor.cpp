@@ -712,39 +712,58 @@ void WorldEditor::setSelectionScale(app::Engine& engine, glm::vec3 scale) {
 }
 
 void WorldEditor::copySelection(app::Engine& engine) {
-    static_cast<void>(engine);
-    clipboard_ = selection.nodes();
-}
-
-void WorldEditor::paste(app::Engine& engine) {
-    if (clipboard_.empty()) {
+    if (!hasEdits() || selection.empty()) {
         return;
     }
     scene::Composition* composition = engine.composition();
     if (composition == nullptr) {
         return;
     }
-    // Names that have since been deleted are dropped rather than failing the whole paste.
-    std::vector<std::string> live;
-    for (const std::string& name : clipboard_) {
-        if (composition->findNode(name) != nullptr) {
-            live.push_back(name);
+    // Clones, not names. The clipboard used to hold the names of the selected nodes, which meant
+    // copy-then-delete-then-paste pasted nothing -- the editor said so in a warning, which is a
+    // clear symptom of a clipboard that never held anything. What a person copies, they expect to
+    // still have after deleting the original.
+    //
+    // Descendants come too, so copying a group copies what is in it.
+    auto nodes = std::make_shared<std::vector<scene::CompositionNode>>();
+    for (const std::string& name : withDescendants(*composition, topmostOf(*composition, selection.nodes()))) {
+        if (const scene::CompositionNode* source = composition->findNode(name); source != nullptr) {
+            nodes->push_back(scene::cloneNodeSpec(*source));
         }
     }
-    if (live.empty()) {
-        log::warn("paste: nothing on the clipboard is still in the scene");
+    if (nodes->empty()) {
         return;
     }
-    const scene::WorldBounds bounds = selectionBounds(*composition, live);
-    const glm::vec3 offset = bounds.valid
-                                 ? glm::vec3(std::max(bounds.size().x, 0.5f) * 1.1f, 0.0f, 0.0f)
-                                 : glm::vec3(1.0f, 0.0f, 0.0f);
+    app::ClipboardPayload payload;
+    payload.type = std::string(kWorldNodesClipboardType);
+    payload.source = "World";
+    payload.count = nodes->size();
+    payload.data = std::move(nodes);
+    edits_->clipboard().set(std::move(payload));
+}
+
+void WorldEditor::paste(app::Engine& engine) {
+    if (!hasEdits()) {
+        return;
+    }
+    const auto nodes = edits_->clipboard().payload().as<std::vector<scene::CompositionNode>>(
+        kWorldNodesClipboardType);
+    if (nodes == nullptr || nodes->empty()) {
+        return;
+    }
+    // Offset, so a paste on top of the original is visibly a second object rather than looking like
+    // nothing happened. Sized from what is being pasted, the way duplicate does it: a fixed metre
+    // is invisible beside a hillside and enormous beside a mushroom.
+    glm::vec3 extent(1.0f, 0.0f, 0.0f);
+    if (!nodes->empty()) {
+        const glm::vec3 size = nodes->front().transform.scale;
+        extent = glm::vec3(std::max(std::abs(size.x), 0.5f) * 1.1f, 0.0f, 0.0f);
+    }
     std::vector<std::string> created;
-    EditCommand command = duplicateNodes(engine, live, offset, &created);
+    EditCommand command = pasteNodes(engine, *nodes, extent, &created);
     if (command.empty()) {
         return;
     }
-    command.label = "Paste " + std::to_string(created.size()) + " object(s)";
     command.selectionBefore = selection.nodes();
     selection.set(created);
     command.selectionAfter = selection.nodes();
@@ -758,9 +777,15 @@ void WorldEditor::reconcile(app::Engine& engine) {
 }
 
 void WorldEditor::reset() {
-    history().clear();
+    // Through the system, so the save marker moves with the history: a freshly loaded scene is not
+    // "modified", and a marker taken against the old document must not match the new one.
+    if (hasEdits()) {
+        edits_->clearHistory();
+    }
     selection.clear();
-    clipboard_.clear();
+    // The clipboard is *not* cleared. It holds clones rather than references, so what was copied
+    // survives the scene it came from -- and copying out of one scene into another is a thing people
+    // do on purpose. It is the application's clipboard, not the scene's.
     drag_ = GizmoDrag{};
     startTransforms_.clear();
     stroking_ = false;

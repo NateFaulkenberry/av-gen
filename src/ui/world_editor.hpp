@@ -113,7 +113,14 @@ public:
     //
     // Attached once by the application. Required: an editor with nowhere to record an edit would
     // perform edits nobody could undo, which is worse than refusing, so the edit methods check.
-    void attachEdits(app::EditSystem& edits) { edits_ = &edits; }
+    // Attaching *is* registering. They were two calls, and a caller that made only the first got an
+    // editor that recorded edits but was never asked to do any, and whose selection stopped coming
+    // back after an undo -- silently, because nothing is wrong with half of it. One call cannot be
+    // half done.
+    void attachEdits(app::EditSystem& edits) {
+        edits_ = &edits;
+        edits.addContext(*this);
+    }
     [[nodiscard]] bool hasEdits() const { return edits_ != nullptr; }
     [[nodiscard]] EditHistory& history() { return edits_->history(); }
     [[nodiscard]] const EditHistory& history() const { return edits_->history(); }
@@ -165,7 +172,11 @@ public:
     // than leaving the user to discover that the first Cmd+Z only took back a copy.
     bool cutSelection(app::Engine& engine);
     void paste(app::Engine& engine);
-    [[nodiscard]] bool clipboardEmpty() const { return clipboard_.empty(); }
+    // The application's clipboard, not one of the editor's own. Asks whether it holds *world nodes*:
+    // something being on the clipboard is not the same as something this editor can paste.
+    [[nodiscard]] bool clipboardEmpty() const {
+        return !hasEdits() || !edits_->clipboard().holds(kWorldNodesClipboardType);
+    }
 
     // Drops selected names that no longer exist (after a scene swap or a Generate).
     void reconcile(app::Engine& engine);
@@ -223,7 +234,6 @@ private:
     glm::vec2 boxFrom_{0.0f};
     bool boxAdditive_ = false;
 
-    std::vector<std::string> clipboard_;
 };
 
 } // namespace avgen::ui
