@@ -786,8 +786,32 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
     doc["control"]["phraseBars"] = phraseBars_;
     doc["control"]["sectionPhrases"] = sectionPhrases_;
     nlohmann::json assets = nlohmann::json::object();
-    if (!audioPath_.empty()) {
+    // One plain clip is written as it always was -- `assets.audio`, a single reference -- so every
+    // project made before arrangements existed round-trips byte for byte. Anything richer is a clip
+    // list instead, and the two are never both present: two places naming the audio is two places to
+    // disagree about it.
+    const bool plainSingle =
+        audioClips_.size() == 1 && audioClips_.front() == audio::AudioClip{audioClips_.front().file};
+    if (plainSingle && !audioPath_.empty()) {
         assets["audio"] = assetRefJson(audioPath_, dir);
+    } else if (!audioClips_.empty()) {
+        nlohmann::json list = nlohmann::json::array();
+        for (const audio::AudioClip& clip : audioClips_) {
+            nlohmann::json item = nlohmann::json::object();
+            item["file"] = assetRefJson(clip.file, dir);
+            // Only what differs from the default, so a clip that was merely dropped on the timeline
+            // reads as one line rather than as eight fields of zero.
+            if (clip.startSeconds != 0.0) item["start"] = clip.startSeconds;
+            if (clip.inSeconds != 0.0) item["in"] = clip.inSeconds;
+            if (clip.durationSeconds != 0.0) item["duration"] = clip.durationSeconds;
+            if (clip.gain != 1.0f) item["gain"] = clip.gain;
+            if (clip.fadeInSeconds != 0.0) item["fadeIn"] = clip.fadeInSeconds;
+            if (clip.fadeOutSeconds != 0.0) item["fadeOut"] = clip.fadeOutSeconds;
+            if (!clip.enabled) item["enabled"] = false;
+            if (!clip.name.empty()) item["name"] = clip.name;
+            list.push_back(std::move(item));
+        }
+        assets["audioClips"] = std::move(list);
     }
     if (!environmentPath_.empty()) {
         assets["environment"] = assetRefJson(environmentPath_, dir);
@@ -868,7 +892,29 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     // ---- assets first: they define the parameter surface the rest of the document targets ----
     if (const auto assets = doc.find("assets"); assets != doc.end() && assets->is_object()) {
         std::filesystem::path sceneEnvironment;
-        if (assets->contains("audio")) {
+        if (assets->contains("audioClips") && (*assets)["audioClips"].is_array()) {
+            // An arrangement wins over a single reference; they are never both written.
+            std::vector<audio::AudioClip> clips;
+            for (const auto& item : (*assets)["audioClips"]) {
+                if (!item.is_object() || !item.contains("file")) {
+                    continue;
+                }
+                audio::AudioClip clip;
+                clip.file = resolveAsset(item["file"], "audio clip").value_or(std::filesystem::path());
+                clip.startSeconds = item.value("start", 0.0);
+                clip.inSeconds = item.value("in", 0.0);
+                clip.durationSeconds = item.value("duration", 0.0);
+                clip.gain = item.value("gain", 1.0f);
+                clip.fadeInSeconds = item.value("fadeIn", 0.0);
+                clip.fadeOutSeconds = item.value("fadeOut", 0.0);
+                clip.enabled = item.value("enabled", true);
+                clip.name = item.value("name", std::string{});
+                clips.push_back(std::move(clip));
+            }
+            if (auto r = setAudioClips(std::move(clips)); !r) {
+                warn("audio: " + r.error().message);
+            }
+        } else if (assets->contains("audio")) {
             if (const auto audio = resolveAsset((*assets)["audio"], "audio"); audio && *audio != audioPath_) {
                 if (auto r = loadAudio(*audio); !r) {
                     warn("audio: " + r.error().message);
@@ -1134,6 +1180,9 @@ void Engine::newProject() {
     ensureControlSource();
     sources_.attach(bus_, params_);
     modulator_.masterGain = 1.0f;
+    audioClips_.clear();
+    clipSources_.clear();
+    audioMix_ = audio::MixReport{};
     projectPath_.clear();
     projectWarnings_.clear();
     transport_.clearLoop();
@@ -1153,6 +1202,9 @@ std::vector<std::filesystem::path> Engine::referencedFiles() const {
         }
     };
     add(audioPath_);
+    for (const audio::AudioClip& clip : audioClips_) {
+        add(clip.file); // every file the arrangement plays, not only the one `audioPath_` names
+    }
     add(environmentPath_);
     if (const auto* gltf = dynamic_cast<const scene::GltfScene*>(controller_.get())) {
         add(gltf->path());
@@ -1575,17 +1627,28 @@ Engine::~Engine() {
     player_.reset();
 }
 
-Result<double> Engine::loadAudio(const std::filesystem::path& path) {
-    auto file = audio::AudioFile::load(path);
-    if (!file) {
-        return std::unexpected(file.error());
+Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) {
+    if (!file || file->frameCount() == 0) {
+        // An empty arrangement is "no audio", which is an ordinary state -- not a device with
+        // nothing in it. Opening one for a buffer of no samples would hold the sound card for a
+        // project that has none.
+        if (mode_ == EngineMode::Live && player_) {
+            runner_.reset();
+            static_cast<void>(player_->setSource(nullptr));
+        }
+        track_.reset();
+        audioFile_.reset();
+        audioPath_.clear();
+        offlineFrameCursor_ = 0;
+        hasFrame_ = false;
+        refreshTransport();
+        return {};
     }
-    auto shared = std::make_shared<const audio::AudioFile>(std::move(*file));
-    analyzerConfig_.sampleRate = shared->sampleRate();
+    analyzerConfig_.sampleRate = file->sampleRate();
 
     if (mode_ == EngineMode::Live) {
         runner_.reset();
-        if (auto r = player_->setSource(shared); !r) {
+        if (auto r = player_->setSource(file); !r) {
             return std::unexpected(r.error());
         }
         runner_ = std::make_unique<analysis::AnalysisRunner>(analyzerConfig_, player_->analysisStream());
@@ -1605,11 +1668,10 @@ Result<double> Engine::loadAudio(const std::filesystem::path& path) {
     // places that read `track_` are already behind a mode or player check, so this is inert for
     // live rendering.
     track_ = std::make_unique<analysis::AnalysisTrack>(
-        analysis::AnalysisTrack::analyze(*shared, analyzerConfig_));
+        analysis::AnalysisTrack::analyze(*file, analyzerConfig_));
     offlineFrameCursor_ = 0;
-    log::info("analysed '{}': {} frames", path.filename().string(), track_->frames().size());
-    audioFile_ = shared;
-    audioPath_ = path;
+    log::info("analysed {:.2f} s of audio: {} frames", file->durationSeconds(), track_->frames().size());
+    audioFile_ = std::move(file);
     modulator_.resetState();
     music_.reset();
     hasFrame_ = false;
@@ -1618,7 +1680,65 @@ Result<double> Engine::loadAudio(const std::filesystem::path& path) {
     // rendering -- the AI tools, a script, a render job built before the first tick -- gets the
     // answer the file just gave.
     refreshTransport();
-    return shared->durationSeconds();
+    return {};
+}
+
+Result<double> Engine::loadAudio(const std::filesystem::path& path) {
+    // One file is an arrangement of one clip, and goes through exactly the same mixer as ten. That
+    // is only safe because a one-clip mix is bit-identical to the file (ADR-103, and the test that
+    // says so); it is worth it because there is then one audio path rather than two that agree most
+    // of the time.
+    if (auto r = setAudioClips({audio::AudioClip{.file = path}}); !r) {
+        return std::unexpected(r.error());
+    }
+    if (!audioFile_) {
+        return fail("'{}' decoded to no audio", path.filename().string());
+    }
+    audioPath_ = path;
+    return audioFile_->durationSeconds();
+}
+
+Result<void> Engine::setAudioClips(std::vector<audio::AudioClip> clips) {
+    audioClips_ = std::move(clips);
+    return rebuildAudio();
+}
+
+Result<void> Engine::rebuildAudio() {
+    const std::vector<std::string> failures = clipSources_.sync(audioClips_);
+    if (audioClips_.size() == 1 && !failures.empty()) {
+        // One file, and it did not load. That is exactly the old `loadAudio` failure, so it is
+        // *returned* rather than noted: the project loader turns it into one warning in its own
+        // words, and noting it here as well would report the same missing file twice.
+        return fail("{}", failures.front());
+    }
+    for (const std::string& problem : failures) {
+        noteBindingProblem(problem);
+        log::warn("{}", problem);
+    }
+    auto mixed = audio::mixArrangement(audioClips_, clipSources_, &audioMix_);
+    if (!mixed) {
+        return std::unexpected(mixed.error());
+    }
+    for (const std::string& warning : audioMix_.warnings) {
+        noteBindingProblem(warning);
+        log::warn("{}", warning);
+    }
+    if (audioMix_.clipsMixed > 1) {
+        log::info("audio: {} clip(s) mixed to {:.2f} s at {} Hz, {} ch in {:.1f} ms",
+                  audioMix_.clipsMixed, audioMix_.durationSeconds, audioMix_.sampleRate,
+                  audioMix_.channels, audioMix_.millis);
+    }
+    auto shared = std::make_shared<const audio::AudioFile>(std::move(*mixed));
+    if (auto r = installAudio(shared); !r) {
+        return r;
+    }
+    // The path a project writes as its audio asset, and the one the UI shows. Only meaningful when
+    // the arrangement is a single untouched file; anything richer is written as a clip list instead.
+    audioPath_.clear();
+    if (audioClips_.size() == 1 && audioClips_.front().enabled && audioFile_) {
+        audioPath_ = audioClips_.front().file;
+    }
+    return {};
 }
 
 Result<void> Engine::play() {

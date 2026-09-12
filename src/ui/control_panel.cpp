@@ -33,16 +33,6 @@ constexpr const char* kStatusBarName = "##avgen-status";
 // toggles items on the way past, and each of those should not be a file write.
 constexpr double kLayoutSaveIntervalSeconds = 2.0;
 
-std::string formatTime(double seconds) {
-    if (seconds < 0.0) {
-        seconds = 0.0;
-    }
-    const int minutes = static_cast<int>(seconds / 60.0);
-    const double rest = seconds - minutes * 60.0;
-    char buffer[32];
-    std::snprintf(buffer, sizeof(buffer), "%d:%05.2f", minutes, rest);
-    return buffer;
-}
 
 const char* bandName(std::size_t i) {
     static const char* names[] = {"bass", "lowMid", "mid", "highMid", "treble"};

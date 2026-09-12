@@ -108,3 +108,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [100](ADR-100-city-layout.md) | A city is a plan, and the plan is what places the buildings | Accepted |
 | [101](ADR-101-edit-system.md) | Editing is an application concern, and the history belongs to the application | Accepted |
 | [102](ADR-102-the-transport.md) | The transport owns the timeline position; audio follows it | Accepted |
+| [103](ADR-103-audio-arrangement.md) | Several audio files are one arrangement, mixed down to one buffer | Accepted |

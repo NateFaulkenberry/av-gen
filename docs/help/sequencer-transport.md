@@ -47,6 +47,10 @@ because that is where the next Play will begin.
 **You do not need audio.** A project with no sound plays, pauses, seeks and loops like any other. Its
 length is the longest thing in it: the audio, the sequence, or the timeline.
 
+**You can have more than one audio file.** **Sequence → Audio...** places several: a song and a
+spoken outro, two cues with a gap, a stem set. They are mixed into one piece, and the strip outlines
+each one so you can see where the takes change. Drag a clip to move it, its right edge to trim it.
+
 ## Time display
 
 Click the time to change how it reads:

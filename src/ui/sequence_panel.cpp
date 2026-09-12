@@ -219,6 +219,14 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
     }
 
     ImGui::SameLine();
+    if (ImGui::Button("Audio...")) {
+        ImGui::OpenPopup("audio-clips");
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("The files this piece is made of. Several are allowed: they are mixed into "
+                          "one, and the strip shows where each one starts.");
+    }
+    ImGui::SameLine();
     if (ImGui::Button("Import Lyrics...")) {
         if (onImportLyrics) {
             onImportLyrics();
@@ -227,6 +235,11 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
         }
     }
     ImGui::PopStyleVar();
+    if (ImGui::BeginPopup("audio-clips")) {
+        ImGui::SetNextItemWidth(460.0f);
+        drawAudioClips(engine);
+        ImGui::EndPopup();
+    }
     if (ImGui::BeginPopup("import-lyrics")) {
         ImGui::TextUnformatted("LRC, SRT or WebVTT");
         char buffer[512];
@@ -428,7 +441,40 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                           label.c_str());
             draw->PopClipRect();
         }
+        // The arrangement's own shape, over the mixdown's. The lane shows the whole piece as one
+        // waveform, which is what it *is* once mixed -- so where one file ends and the next begins
+        // is invisible without this, and "which take is this" is the question the lane is read for.
+        for (const audio::AudioClip& clip : clipsForDrawing(engine)) {
+            const double end = audio::clipEndSeconds(clip, engine.clipSource(clip.file).get());
+            const float a = toX(clip.startSeconds);
+            const float b = toX(end);
+            if (b < origin.x || a > origin.x + width) {
+                continue;
+            }
+            const std::vector<audio::AudioClip>& drawn = clipsForDrawing(engine);
+            const bool chosen = audioSelected_ >= 0 && audioSelected_ < static_cast<int>(drawn.size()) &&
+                                &clip == &drawn[static_cast<std::size_t>(audioSelected_)];
+            const ImU32 edge = clip.enabled ? (chosen ? IM_COL32(240, 220, 150, 255)
+                                                      : IM_COL32(150, 195, 245, 160))
+                                            : IM_COL32(130, 130, 140, 120);
+            draw->AddRect(ImVec2(std::max(a, origin.x), laneY),
+                          ImVec2(std::min(b, origin.x + width), laneY + kLaneHeight), edge, 3.0f, 0,
+                          chosen ? 2.0f : 1.0f);
+            if (b - a > 30.0f) {
+                const std::string clipLabel =
+                    clip.name.empty() ? clip.file.filename().string() : clip.name;
+                draw->PushClipRect(ImVec2(std::max(a, origin.x), laneY),
+                                   ImVec2(std::min(b, origin.x + width) - 3.0f, laneY + kLaneHeight), true);
+                draw->AddText(ImVec2(std::max(a, origin.x) + 5.0f, laneY + kLaneHeight - 16.0f),
+                              clip.enabled ? IM_COL32(210, 230, 250, 200) : IM_COL32(150, 150, 160, 160),
+                              clipLabel.c_str());
+                draw->PopClipRect();
+            }
+        }
+        audioLaneY_ = laneY;
         laneY += kLaneHeight + kLaneGap;
+    } else {
+        audioLaneY_ = -1.0f;
     }
 
     // Shots (spec 29).
@@ -540,7 +586,24 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         dragKind_ = 0;
         dragIndex_ = -1;
         bool hitBlock = false;
-        if (mouse.y >= shotLaneY && mouse.y < shotLaneY + kLaneHeight) {
+        if (audioLaneY_ >= 0.0f && mouse.y >= audioLaneY_ && mouse.y < audioLaneY_ + kLaneHeight) {
+            const std::vector<audio::AudioClip>& clips = engine.audioClips();
+            for (std::size_t i = 0; i < clips.size(); ++i) {
+                const double end = audio::clipEndSeconds(clips[i], engine.clipSource(clips[i].file).get());
+                const float a = toX(clips[i].startSeconds);
+                const float b = toX(end);
+                if (mouse.x < a || mouse.x > b) {
+                    continue;
+                }
+                audioSelected_ = static_cast<int>(i);
+                hitBlock = true;
+                dragIndex_ = static_cast<int>(i);
+                dragKind_ = mouse.x > b - kEdgeGrab ? 6 : 5;
+                dragGrab_ = mouseTime - clips[i].startSeconds;
+                audioEdit_ = clips; // the drag edits a copy; applying one re-mixes the piece
+                break;
+            }
+        } else if (mouse.y >= shotLaneY && mouse.y < shotLaneY + kLaneHeight) {
             for (std::size_t i = 0; i < piece.shots.size(); ++i) {
                 const seq::Shot& shot = piece.shots[i];
                 const float a = toX(shot.startSeconds);
@@ -608,13 +671,31 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                    dragIndex_ < static_cast<int>(piece.overlays.size())) {
             seq::OverlayCue& cue = piece.overlays[static_cast<std::size_t>(dragIndex_)];
             cue.endSeconds = std::max(cue.startSeconds + 0.2, t);
+        } else if ((dragKind_ == 5 || dragKind_ == 6) && dragIndex_ >= 0 &&
+                   dragIndex_ < static_cast<int>(audioEdit_.size())) {
+            audio::AudioClip& clip = audioEdit_[static_cast<std::size_t>(dragIndex_)];
+            if (dragKind_ == 5) {
+                clip.startSeconds = std::max(0.0, t - dragGrab_);
+            } else {
+                // Trimming the end sets the clip's duration. The mixer already refuses to play past
+                // the end of the file, so a drag beyond it simply stops having an effect.
+                clip.durationSeconds = std::max(0.05, t - clip.startSeconds);
+            }
         }
     } else if (dragKind_ == 0 && hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
         engine.seekSeconds(std::clamp(snap(engine, mouseTime), 0.0, duration));
     }
     if (dragKind_ != 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         // The bake waits for the mouse. A drag is sixty edits a second and a bake rebuilds tracks
-        // and layers; doing both together would make a smooth drag feel like a stutter.
+        // and layers; doing both together would make a smooth drag feel like a stutter. The
+        // arrangement waits for the same reason and costs more: a re-mix is a pass over every
+        // sample in the piece.
+        if ((dragKind_ == 5 || dragKind_ == 6) && !audioEdit_.empty()) {
+            if (auto r = engine.setAudioClips(audioEdit_); !r) {
+                status_ = r.error().message;
+            }
+        }
+        audioEdit_.clear();
         dragKind_ = 0;
         dragIndex_ = -1;
         touch();
@@ -1169,6 +1250,107 @@ const std::vector<double>& SequencePanel::beats(const app::Engine& engine) {
         beatSource_ = track;
     }
     return beatCache_;
+}
+
+const std::vector<audio::AudioClip>& SequencePanel::clipsForDrawing(const app::Engine& engine) const {
+    return audioEdit_.empty() ? engine.audioClips() : audioEdit_;
+}
+
+void SequencePanel::drawAudioClips(app::Engine& engine) {
+    const std::vector<audio::AudioClip>& clips = engine.audioClips();
+    ImGui::TextDisabled("%zu clip(s)", clips.size());
+    if (const audio::MixReport& mix = engine.audioMix(); mix.clipsMixed > 1) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("mixed to %.1f s at %u Hz in %.0f ms", mix.durationSeconds, mix.sampleRate,
+                            mix.millis);
+    }
+    ImGui::Separator();
+
+    ImGui::SetNextItemWidth(-90.0f);
+    ImGui::InputTextWithHint("##clippath", "path to an audio file", audioPath_, sizeof(audioPath_));
+    ImGui::SameLine();
+    ImGui::BeginDisabled(audioPath_[0] == '\0');
+    if (ImGui::Button("Add", ImVec2(-1.0f, 0.0f))) {
+        // At the playhead, which is where a person looking at the strip means. Appending at the end
+        // would be right for a first clip and wrong for every one after it.
+        std::vector<audio::AudioClip> next = clips;
+        next.push_back(audio::AudioClip{.file = audioPath_, .startSeconds = engine.positionSeconds()});
+        if (auto r = engine.setAudioClips(std::move(next)); !r) {
+            status_ = r.error().message;
+        } else {
+            audioSelected_ = static_cast<int>(engine.audioClips().size()) - 1;
+            audioPath_[0] = '\0';
+        }
+    }
+    ImGui::EndDisabled();
+
+    if (clips.empty()) {
+        ImGui::TextWrapped("A project can be made of several files: a song and a spoken outro, two "
+                           "cues with a gap, a stem set. They are mixed into one piece; drag them on "
+                           "the strip to move or trim them.");
+        return;
+    }
+
+    // Edited through a copy and applied once, so one field change is one re-mix rather than one per
+    // keystroke of a drag.
+    std::vector<audio::AudioClip> next = clips;
+    bool changed = false;
+    for (std::size_t i = 0; i < next.size(); ++i) {
+        audio::AudioClip& clip = next[i];
+        ImGui::PushID(static_cast<int>(i));
+        const bool chosen = audioSelected_ == static_cast<int>(i);
+        const std::string label = (clip.name.empty() ? clip.file.filename().string() : clip.name) +
+                                  (engine.clipSource(clip.file) == nullptr ? "  (missing)" : "");
+        if (ImGui::Selectable(label.c_str(), chosen)) {
+            audioSelected_ = static_cast<int>(i);
+        }
+        if (chosen) {
+            ImGui::Indent();
+            changed |= ImGui::Checkbox("Play", &clip.enabled);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(70.0f);
+            auto gain = clip.gain;
+            if (ImGui::DragFloat("gain", &gain, 0.01f, 0.0f, 4.0f, "%.2f")) {
+                clip.gain = gain;
+                changed = true;
+            }
+            auto seconds = [&](const char* name, double& value, double low, const char* tip) {
+                auto v = static_cast<float>(value);
+                ImGui::SetNextItemWidth(80.0f);
+                if (ImGui::DragFloat(name, &v, 0.02f, static_cast<float>(low), 1e5f, "%.2f s")) {
+                    value = std::max(low, static_cast<double>(v));
+                    changed = true;
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s", tip);
+                }
+            };
+            seconds("start", clip.startSeconds, 0.0, "Where it sits on the timeline.");
+            ImGui::SameLine();
+            seconds("in", clip.inSeconds, 0.0, "How far into the file it starts.");
+            ImGui::SameLine();
+            seconds("length", clip.durationSeconds, 0.0, "0 plays to the end of the file.");
+            seconds("fade in", clip.fadeInSeconds, 0.0,
+                    "A cut between two takes clicks without one.");
+            ImGui::SameLine();
+            seconds("fade out", clip.fadeOutSeconds, 0.0, "Likewise at the other edge.");
+            if (ImGui::SmallButton("Remove")) {
+                next.erase(next.begin() + static_cast<std::ptrdiff_t>(i));
+                audioSelected_ = -1;
+                changed = true;
+                ImGui::Unindent();
+                ImGui::PopID();
+                break;
+            }
+            ImGui::Unindent();
+        }
+        ImGui::PopID();
+    }
+    if (changed) {
+        if (auto r = engine.setAudioClips(std::move(next)); !r) {
+            status_ = r.error().message;
+        }
+    }
 }
 
 const audio::WaveformSummary& SequencePanel::waveform(const app::Engine& engine) {

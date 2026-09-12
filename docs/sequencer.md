@@ -354,6 +354,30 @@ cannot be, it needs a `seek` like `EntityWorld` has (ADR-091) and a line in `Eng
 
 ---
 
+## Audio: one piece, several files
+
+**Sequence panel → Audio...**. A project's sound can be more than one file: a song and a spoken
+outro, two cues with a gap, a stem set. Each clip says where it sits on the timeline, how far into
+its file it starts, how long it plays and how loud, with optional fades at its edges.
+
+The clips are **mixed down** to one buffer, and everything else in the engine — the player, the
+analysis, the waveform, the transport, the offline renderer — sees that buffer and nothing else.
+Two consequences worth knowing:
+
+- Overlapping clips sum. Gaps are silence. The arrangement's length is where the last clip ends.
+- A project with a single untouched file is *bit-identical* to that file and is saved exactly as it
+  was before arrangements existed, so nothing about an existing project changes.
+
+On the strip, the audio lane shows the whole mix with each clip outlined and named. Drag a clip to
+move it, its right edge to trim it. The re-mix happens when you let go, not during the drag — it is a
+pass over every sample, about 50 ms for six minutes.
+
+Clips at different sample rates are resampled linearly and **warned about**: it is audible on music,
+and converting the file is the real fix. See
+[ADR-103](decisions/ADR-103-audio-arrangement.md).
+
+---
+
 ## The Sequence panel
 
 One horizontal time axis. A ruler with the song's sections and beats on it, a lane showing the

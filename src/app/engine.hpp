@@ -16,6 +16,7 @@
 #include "analysis/analysis_track.hpp"
 #include "analysis/analyzer.hpp"
 #include "audio/audio_file.hpp"
+#include "audio/arrangement.hpp"
 #include "audio/audio_player.hpp"
 #include "comp/layer_stack.hpp"
 #include "core/error.hpp"
@@ -328,6 +329,24 @@ public:
     void setSectionPhrases(int phrases) { sectionPhrases_ = std::max(1, phrases); }
     [[nodiscard]] const signals::SourceContext& sourceContext() const { return sourceContext_; }
     [[nodiscard]] bool hasAudio() const { return audioFile_ != nullptr; }
+
+    // ---- the audio arrangement (ADR-103) ---------------------------------------------------------
+    //
+    // A piece can be made of several files: a stem set, a song with a spoken outro, two cues with a
+    // gap. The clips are mixed down to one buffer and that buffer is installed exactly as a loaded
+    // file is, so the player, the analyser, the waveform and the transport are unchanged -- a
+    // one-clip arrangement is bit-identical to the file it names, which is what makes routing
+    // `loadAudio` through here safe.
+    [[nodiscard]] const std::vector<audio::AudioClip>& audioClips() const { return audioClips_; }
+    [[nodiscard]] Result<void> setAudioClips(std::vector<audio::AudioClip> clips);
+    // Re-mixes the current clips and installs the result. Called after an edit to one of them.
+    [[nodiscard]] Result<void> rebuildAudio();
+    // What the last mix did, for the sequencer's lane labels and the warnings list.
+    [[nodiscard]] const audio::MixReport& audioMix() const { return audioMix_; }
+    // The decoded source behind a clip, for drawing its waveform. Null while it is missing.
+    [[nodiscard]] std::shared_ptr<const audio::AudioFile> clipSource(const std::filesystem::path& p) const {
+        return clipSources_.find(p);
+    }
     [[nodiscard]] const std::filesystem::path& audioPath() const { return audioPath_; }
     [[nodiscard]] std::shared_ptr<const audio::AudioFile> audioFile() const { return audioFile_; }
 
@@ -502,6 +521,14 @@ private:
     std::uint32_t beatClockCount_ = 0;
     std::uint32_t lastAnalysisBeatCount_ = 0;
 
+    // Installs a decoded buffer as *the* audio: the player's source, the analysis runner, the
+    // offline analysis track and `audioFile_`. The one place that does it, so `loadAudio` and a
+    // re-mix of the arrangement cannot drift apart. A buffer with no frames means "no audio".
+    [[nodiscard]] Result<void> installAudio(std::shared_ptr<const audio::AudioFile> file);
+
+    std::vector<audio::AudioClip> audioClips_;
+    audio::ClipSources clipSources_;
+    audio::MixReport audioMix_;
     Transport transport_;
     // What the audio player was last told to do, so the engine can tell whether the device needs
     // starting, stopping or seeking this frame without asking it every frame.

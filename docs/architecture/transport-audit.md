@@ -248,7 +248,7 @@ Not built, and why:
 
 | §  | Requirement | Status |
 |----|---|---|
-| 8  | Multiple audio files, clips, offsets, trims, gaps | **Not built.** The model does not exist (§3). The transport owns the position and audio follows through one call, so a clip model is a second follower rather than a change here |
+| 8  | Multiple audio files, clips, offsets, trims, gaps | **Built afterwards**, as [ADR-103](../decisions/ADR-103-audio-arrangement.md): an arrangement of clips mixed down to the one buffer the audio path already consumes. Overlaps sum; a one-clip arrangement is bit-identical to the file, which is what made it safe to route the existing single-file path through it |
 | 15 | Rate-corrected audio playback | **Refused.** `AudioPlayer` has no rate control; away from 1x the device is silenced and the bar says so, rather than drifting a second per second |
 | 6  | Drop-frame timecode | **Not built.** Non-drop, stated in the UI and the docs. Nothing here has broadcast timecode to match, and drop-frame done wrong is worse than absent |
 | 12 | Audio preview while scrubbing | **Not built.** Scrubbing moves the play-head; it does not play the samples under it |

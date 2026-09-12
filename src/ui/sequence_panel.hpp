@@ -22,6 +22,7 @@
 // would make the drag feel like the thing it is not.
 
 #include "app/engine.hpp"
+#include "audio/arrangement.hpp"
 #include "audio/waveform.hpp"
 #include "seq/sequence.hpp"
 
@@ -68,6 +69,21 @@ private:
     // sample -- five million of them for a three-minute song -- so it happens when the file changes
     // and never while drawing.
     [[nodiscard]] const audio::WaveformSummary& waveform(const app::Engine& engine);
+    // The audio arrangement's editor (ADR-103): the clip list in the toolbar, and the clip outlines
+    // drawn over the waveform lane.
+    void drawAudioClips(app::Engine& engine);
+    // The clips as they should be drawn *now*: the engine's, or the in-progress drag's. A drag
+    // edits a copy because applying one would re-mix the whole piece, sixty times a second.
+    [[nodiscard]] const std::vector<audio::AudioClip>& clipsForDrawing(const app::Engine& engine) const;
+
+    // The audio lane's own state. The clips being dragged are a copy: `Engine::setAudioClips`
+    // re-mixes the arrangement, which is a pass over every sample, and doing that per drag frame
+    // would turn a smooth drag into a slideshow. The copy is applied on release, exactly as the
+    // sequence's own bake waits for the mouse.
+    std::vector<audio::AudioClip> audioEdit_;
+    float audioLaneY_ = -1.0f; // where the audio lane was drawn this frame, for hit testing
+    int audioSelected_ = -1;
+    char audioPath_[512] = {};
 
     Selection selection_ = Selection::None;
     int selected_ = -1;
@@ -75,7 +91,9 @@ private:
     int snapMode_ = 2; // Beats
     float zoom_ = 1.0f;
     double view_ = 0.0; // leftmost second shown
-    int dragKind_ = 0;  // 0 none, 1 move shot, 2 resize shot, 3 move overlay, 4 resize overlay
+    // 0 none, 1 move shot, 2 resize shot, 3 move overlay, 4 resize overlay, 5 move audio clip,
+    // 6 trim an audio clip's end
+    int dragKind_ = 0;
     int dragIndex_ = -1;
     double dragGrab_ = 0.0;
     std::string status_;
