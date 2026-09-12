@@ -409,7 +409,9 @@ open in Phase 7.
   its static diagnostic content is compared for equality without assuming it changes over time.
 - `[x]` RendererQA deterministic output coverage includes both `128x72` and `96x96` targets; each
   size matches across fresh runs and the aspect-ratio hashes differ as expected.
-- `[ ]` Add scripted camera translation, rotation, orbit, dolly, clipping and resize paths.
+- `[~]` Add scripted camera translation, rotation, orbit, dolly, clipping and resize paths.
+  A RendererQA camera-cut regression now covers four distinct poses and compares reused versus fresh
+  renderers after an explicit temporal reset; continuous motion, clipping and resize scripts remain.
 - `[ ]` Add scripted playback, pause, seek, scrub, reverse, scene reload and resolution changes.
 
 ### 8.2 Run the progressive matrix

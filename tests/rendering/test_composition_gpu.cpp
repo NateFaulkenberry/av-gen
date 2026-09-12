@@ -24,6 +24,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
+#include <array>
 #include <cmath>
 #include <filesystem>
 #include <memory>
@@ -178,6 +179,59 @@ TEST_CASE("authored animated character culling changes pixels and recovers", "[g
     const auto restored = renderer.renderToImage(composition.scene(), time, 640, 360);
     REQUIRE(restored.has_value());
     CHECK(gpu::hashImage(*restored) == gpu::hashImage(*original));
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("RendererQA camera cuts match fresh renderers", "[gpu][composition][forensics]") {
+    const fs::path sceneFile = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.scene.json";
+    if (!fs::is_regular_file(sceneFile) ||
+        !fs::is_regular_file(fs::path(AVGEN_SOURCE_DIR) / "assets" / "imported" / "alien.gltf")) {
+        SKIP("RendererQA or its alien asset is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    assets::AssetRegistry registry(sceneFile.parent_path());
+    auto loaded = scene::Composition::loadFile(sceneFile, registry);
+    REQUIRE(loaded.has_value());
+    auto& composition = **loaded;
+    params::ParameterSet parameters;
+    params::Modulator modulator;
+    composition.attach(parameters, modulator);
+    composition.setViewport(640, 360);
+    FrameTime time{};
+    time.frameIndex = 0;
+    composition.update(time);
+
+    struct CameraState {
+        glm::vec3 position;
+        glm::vec3 target;
+    };
+    const std::array<CameraState, 4> states = {
+        CameraState{{0.0f, 5.0f, 16.0f}, {0.0f, 1.0f, -8.0f}},
+        CameraState{{-7.0f, 3.0f, 8.0f}, {0.0f, 1.0f, -5.0f}},
+        CameraState{{0.0f, 1.5f, 2.0f}, {0.0f, 1.0f, -5.0f}},
+        CameraState{{0.0f, 5.0f, 30.0f}, {0.0f, 1.0f, -90.0f}},
+    };
+    std::array<std::uint64_t, states.size()> hashes{};
+    for (std::size_t i = 0; i < states.size(); ++i) {
+        composition.scene().camera.position = states[i].position;
+        composition.scene().camera.target = states[i].target;
+        renderer.resetTemporalHistory();
+        const auto reused = renderer.renderToImage(composition.scene(), time, 640, 360);
+        REQUIRE(reused.has_value());
+
+        rendering::SceneRenderer fresh(*ctx, shaders);
+        REQUIRE(fresh.init().has_value());
+        const auto expected = fresh.renderToImage(composition.scene(), time, 640, 360);
+        REQUIRE(expected.has_value());
+        CHECK(gpu::hashImage(*reused) == gpu::hashImage(*expected));
+        hashes[i] = gpu::hashImage(*reused);
+    }
+    CHECK(hashes[0] != hashes[1]);
+    CHECK(hashes[1] != hashes[2]);
+    CHECK(hashes[2] != hashes[3]);
     CHECK(ctx->errorCount() == 0);
 }
 
