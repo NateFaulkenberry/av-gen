@@ -38,10 +38,9 @@ constexpr float kMarkerHeight = 16.0f;
 constexpr float kLaneHeight = 24.0f;
 constexpr float kLaneGap = 3.0f;
 constexpr float kEdgeGrab = 5.0f; // points either side of a block's right edge that resize it
-// The clip lane is thinner than the others: it carries names and edges, not content. It is a lane of
-// its own rather than an overlay on the waveform because the waveform lane is a scrub and must stay
-// one -- see the comment where a click is dispatched.
-constexpr float kClipLaneHeight = 15.0f;
+// The audio lane is half again as tall as the others. It is the only lane whose content is a
+// picture rather than a label, and a waveform drawn three pixels high says nothing about the music.
+constexpr float kAudioLaneHeight = kLaneHeight * 1.5f;
 
 ImU32 shotColour(int index, bool selected) {
     // Alternating so a cut is visible even between two shots on the same scene, and warmer when
@@ -320,7 +319,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                            .rulerHeight = kRulerHeight,
                            .markerHeight = kMarkerHeight,
                            .laneHeight = kLaneHeight,
-                           .clipLaneHeight = kClipLaneHeight,
+                           .audioLaneHeight = kAudioLaneHeight,
                            .gap = kLaneGap};
     const float height = lanes.height();
 
@@ -398,7 +397,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     }
 
     // ---- lanes ----
-    float laneY = origin.y + lanes.waveformTop();
+    float laneY = origin.y + lanes.audioTop();
     const auto laneRect = [&](double from, double to) {
         return std::pair<ImVec2, ImVec2>{ImVec2(toX(from), laneY),
                                          ImVec2(toX(to), laneY + kLaneHeight)};
@@ -410,91 +409,65 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     // boundary that does not land on anything in the waveform is the thing an author most needs to
     // be able to see, and it is only visible when the two are adjacent.
     //
-    // Drawn from a summary keyed on the file (see `waveform`), so this loop reads two floats per
-    // column rather than a slice of a twenty-megabyte file per column per frame.
+    // **A clip is a box and its waveform is drawn inside it.** That is what an audio clip looks like
+    // in every tool that has one, and both of the ways this was got wrong came from separating them:
+    // clips drawn as blocks *on* a full-width waveform stole the click that scrubs, and clips moved
+    // to a lane of their own left the waveform floating above the box it belongs to.
+    //
+    // The summary is of the mixdown and covers the whole timeline, so a clip's own shape is that
+    // summary restricted to the clip's span -- and the gaps between clips draw nothing, which is
+    // more truthful than a flat line through silence that might be a bug.
     if (hasAudio) {
         const audio::WaveformSummary& wave = waveform(engine);
-        const auto [laneA, laneB] = laneRect(view_, view_ + span);
-        draw->AddRectFilled(laneA, laneB, IM_COL32(26, 30, 40, 210), 3.0f);
-        const float mid = laneY + kLaneHeight * 0.5f;
-        const float halfHeight = kLaneHeight * 0.5f - 2.0f;
-
-        // Where the audio actually stops. Past it the lane is empty rather than flat-lined, so a
-        // piece longer than its song reads as "the music has ended" instead of as silence that
-        // might be a bug.
-        const float audioEndX = toX(wave.durationSeconds);
-        if (audioEndX < laneB.x) {
-            draw->AddRectFilled(ImVec2(std::max(audioEndX, laneA.x), laneA.y), laneB,
-                                IM_COL32(0, 0, 0, 90), 3.0f);
-        }
-        const auto first = static_cast<int>(std::max(laneA.x, origin.x));
-        const auto last = static_cast<int>(std::min(laneB.x, origin.x + width));
+        const ImVec2 laneA(origin.x, laneY);
+        const ImVec2 laneB(origin.x + width, laneY + kAudioLaneHeight);
+        // The empty channel the clips sit in.
+        draw->AddRectFilled(laneA, laneB, IM_COL32(20, 23, 30, 200), 3.0f);
+        const float mid = laneY + kAudioLaneHeight * 0.5f;
+        const float halfHeight = kAudioLaneHeight * 0.5f - 3.0f;
         const double perPixel = span / static_cast<double>(width);
-        for (int px = first; px <= last; ++px) {
-            const double from = toTime(static_cast<float>(px));
-            const auto [lo, hi] = wave.peak(from, from + perPixel);
-            if (lo == 0.0f && hi == 0.0f) {
-                continue;
-            }
-            const float x = static_cast<float>(px) + 0.5f;
-            // Clamped rather than scaled by the peak: a waveform whose height depends on the
-            // loudest moment in view changes shape as you scroll, which makes it useless for
-            // finding a moment again.
-            const float top = mid - std::min(hi, 1.0f) * halfHeight;
-            const float bottom = mid - std::max(lo, -1.0f) * halfHeight;
-            draw->AddLine(ImVec2(x, top), ImVec2(x, std::max(bottom, top + 1.0f)),
-                          IM_COL32(108, 156, 214, 200));
-        }
-        draw->AddLine(ImVec2(laneA.x, mid), ImVec2(laneB.x, mid), IM_COL32(120, 150, 200, 40));
-        draw->AddRect(laneA, laneB, IM_COL32(0, 0, 0, 120), 3.0f);
-        // No file name here any more. It used to carry one, because there was one file; the clip
-        // lane below names every clip, and a lane label naming the song *and* a clip naming the same
-        // file reads as two copies of it -- which is exactly what it was reported as.
-        laneY = origin.y + lanes.clipsTop();
 
-        // ---- the clip lane ----
-        //
-        // Under the waveform, not on it. The lane above is a scrub and has to stay one (see where a
-        // click is dispatched); putting draggable blocks in it meant a click meant to move the
-        // playhead moved the *audio* instead, which is how a piece ended up starting fourteen
-        // seconds in with its name showing twice.
-        //
-        // It shows the arrangement's shape: the mixdown is one waveform, so where one file ends and
-        // the next begins is invisible without it, and "which take is this" is what the lane is read
-        // for.
-        clipLaneY_ = laneY;
-        draw->AddRectFilled(ImVec2(origin.x, laneY), ImVec2(origin.x + width, laneY + kClipLaneHeight),
-                            IM_COL32(22, 25, 33, 190), 2.0f);
-        for (const audio::AudioClip& clip : clipsForDrawing(engine)) {
+        for (std::size_t i = 0; i < engine.audioClips().size(); ++i) {
+            const audio::AudioClip& clip = engine.audioClips()[i];
             const double end = audio::clipEndSeconds(clip, engine.clipSource(clip.file).get());
-            const float a = toX(clip.startSeconds);
-            const float b = toX(end);
-            if (b < origin.x || a > origin.x + width) {
+            const ImVec2 lo(std::max(toX(clip.startSeconds), origin.x), laneY);
+            const ImVec2 hi(std::min(toX(end), origin.x + width), laneY + kAudioLaneHeight);
+            if (hi.x <= lo.x) {
                 continue;
             }
-            const std::vector<audio::AudioClip>& drawn = clipsForDrawing(engine);
-            const bool chosen = audioSelected_ >= 0 && audioSelected_ < static_cast<int>(drawn.size()) &&
-                                &clip == &drawn[static_cast<std::size_t>(audioSelected_)];
-            const ImVec2 lo(std::max(a, origin.x), laneY);
-            const ImVec2 hi(std::min(b, origin.x + width), laneY + kClipLaneHeight);
-            const ImU32 fill = clip.enabled ? (chosen ? IM_COL32(58, 84, 118, 235)
-                                                      : IM_COL32(40, 60, 88, 220))
-                                            : IM_COL32(44, 46, 52, 200);
-            const ImU32 edge = chosen ? IM_COL32(240, 220, 150, 255) : IM_COL32(0, 0, 0, 120);
-            draw->AddRectFilled(lo, hi, fill, 2.0f);
-            draw->AddRect(lo, hi, edge, 2.0f, 0, chosen ? 2.0f : 1.0f);
-            if (hi.x - lo.x > 30.0f) {
-                const std::string clipLabel =
-                    clip.name.empty() ? clip.file.filename().string() : clip.name;
-                draw->PushClipRect(lo, ImVec2(hi.x - 3.0f, hi.y), true);
-                draw->AddText(ImVec2(lo.x + 5.0f, lo.y + 1.0f),
-                              clip.enabled ? IM_COL32(210, 230, 250, 220) : IM_COL32(150, 150, 160, 170),
-                              clipLabel.c_str());
-                draw->PopClipRect();
+            const bool chosen = audioSelected_ == static_cast<int>(i);
+            draw->AddRectFilled(lo, hi,
+                                clip.enabled ? IM_COL32(33, 48, 70, 235) : IM_COL32(40, 42, 48, 210),
+                                3.0f);
+
+            // The waveform, inside the box and clipped to it.
+            draw->PushClipRect(lo, hi, true);
+            const ImU32 ink = clip.enabled ? IM_COL32(108, 156, 214, 200) : IM_COL32(120, 124, 134, 150);
+            for (int px = static_cast<int>(lo.x); px <= static_cast<int>(hi.x); ++px) {
+                const double from = toTime(static_cast<float>(px));
+                const auto [low, high] = wave.peak(from, from + perPixel);
+                if (low == 0.0f && high == 0.0f) {
+                    continue;
+                }
+                const float x = static_cast<float>(px) + 0.5f;
+                // Clamped rather than scaled by the peak: a waveform whose height depends on the
+                // loudest moment in view changes shape as you scroll, which makes it useless for
+                // finding a moment again.
+                const float top = mid - std::min(high, 1.0f) * halfHeight;
+                const float bottom = mid - std::max(low, -1.0f) * halfHeight;
+                draw->AddLine(ImVec2(x, top), ImVec2(x, std::max(bottom, top + 1.0f)), ink);
             }
+            draw->AddLine(ImVec2(lo.x, mid), ImVec2(hi.x, mid), IM_COL32(120, 150, 200, 40));
+            const std::string clipLabel = clip.name.empty() ? clip.file.filename().string() : clip.name;
+            draw->AddText(ImVec2(lo.x + 5.0f, lo.y + 2.0f),
+                          clip.enabled ? IM_COL32(215, 232, 250, 210) : IM_COL32(150, 150, 160, 170),
+                          clipLabel.c_str());
+            draw->PopClipRect();
+
+            draw->AddRect(lo, hi, chosen ? IM_COL32(240, 220, 150, 255) : IM_COL32(0, 0, 0, 140), 3.0f,
+                          0, chosen ? 2.0f : 1.0f);
         }
-    } else {
-        clipLaneY_ = -1.0f;
+        draw->AddRect(laneA, laneB, IM_COL32(0, 0, 0, 120), 3.0f);
     }
     laneY = origin.y + lanes.shotsTop();
 
@@ -611,22 +584,20 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         dragIndex_ = -1;
         bool hitBlock = false;
         const StripLane lane = lanes.at(mouse.y - origin.y);
-        if (lane == StripLane::Clips) {
-            const std::vector<audio::AudioClip>& clips = engine.audioClips();
-            for (std::size_t i = 0; i < clips.size(); ++i) {
-                const double end = audio::clipEndSeconds(clips[i], engine.clipSource(clips[i].file).get());
-                const float a = toX(clips[i].startSeconds);
-                const float b = toX(end);
-                if (mouse.x < a || mouse.x > b) {
-                    continue;
+        if (lane == StripLane::Audio) {
+            // The clip under the pointer is highlighted, and the click still scrubs: `hitBlock` stays
+            // false on purpose. Clips are not dragged here. Making them draggable is what stole the
+            // click that moves the playhead, and this lane's promise -- clicking a moment in the
+            // music to hear it -- is worth more than a gesture the Audio... popup already offers as
+            // numbers. Trimming and moving live there until this has somewhere safe to put them.
+            audioSelected_ = -1;
+            for (std::size_t i = 0; i < engine.audioClips().size(); ++i) {
+                const audio::AudioClip& clip = engine.audioClips()[i];
+                const double end = audio::clipEndSeconds(clip, engine.clipSource(clip.file).get());
+                if (mouse.x >= toX(clip.startSeconds) && mouse.x <= toX(end)) {
+                    audioSelected_ = static_cast<int>(i);
+                    break;
                 }
-                audioSelected_ = static_cast<int>(i);
-                hitBlock = true;
-                dragIndex_ = static_cast<int>(i);
-                dragKind_ = mouse.x > b - kEdgeGrab ? 6 : 5;
-                dragGrab_ = mouseTime - clips[i].startSeconds;
-                audioEdit_ = clips; // the drag edits a copy; applying one re-mixes the piece
-                break;
             }
         } else if (lane == StripLane::Shots) {
             for (std::size_t i = 0; i < piece.shots.size(); ++i) {
@@ -695,16 +666,6 @@ void SequencePanel::drawStrip(app::Engine& engine) {
                    dragIndex_ < static_cast<int>(piece.overlays.size())) {
             seq::OverlayCue& cue = piece.overlays[static_cast<std::size_t>(dragIndex_)];
             cue.endSeconds = std::max(cue.startSeconds + 0.2, t);
-        } else if ((dragKind_ == 5 || dragKind_ == 6) && dragIndex_ >= 0 &&
-                   dragIndex_ < static_cast<int>(audioEdit_.size())) {
-            audio::AudioClip& clip = audioEdit_[static_cast<std::size_t>(dragIndex_)];
-            if (dragKind_ == 5) {
-                clip.startSeconds = std::max(0.0, t - dragGrab_);
-            } else {
-                // Trimming the end sets the clip's duration. The mixer already refuses to play past
-                // the end of the file, so a drag beyond it simply stops having an effect.
-                clip.durationSeconds = std::max(0.05, t - clip.startSeconds);
-            }
         }
     } else if (dragKind_ == 0 && hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
         engine.seekSeconds(std::clamp(snap(engine, mouseTime), 0.0, duration));
@@ -714,12 +675,6 @@ void SequencePanel::drawStrip(app::Engine& engine) {
         // and layers; doing both together would make a smooth drag feel like a stutter. The
         // arrangement waits for the same reason and costs more: a re-mix is a pass over every
         // sample in the piece.
-        if ((dragKind_ == 5 || dragKind_ == 6) && !audioEdit_.empty()) {
-            if (auto r = engine.setAudioClips(audioEdit_); !r) {
-                status_ = r.error().message;
-            }
-        }
-        audioEdit_.clear();
         dragKind_ = 0;
         dragIndex_ = -1;
         touch();
@@ -1266,18 +1221,14 @@ const std::vector<double>& SequencePanel::beats(const app::Engine& engine) {
     const analysis::AnalysisTrack* track = engine.track();
     if (track == nullptr) {
         beatCache_.clear();
-        beatSource_ = nullptr;
+        beatRevision_ = 0;
         return beatCache_;
     }
-    if (beatSource_ != track) {
+    if (beatRevision_ != engine.audioRevision()) {
         beatCache_ = track->beats().beatTimes;
-        beatSource_ = track;
+        beatRevision_ = engine.audioRevision();
     }
     return beatCache_;
-}
-
-const std::vector<audio::AudioClip>& SequencePanel::clipsForDrawing(const app::Engine& engine) const {
-    return audioEdit_.empty() ? engine.audioClips() : audioEdit_;
 }
 
 void SequencePanel::drawAudioClips(app::Engine& engine) {
@@ -1381,16 +1332,16 @@ const audio::WaveformSummary& SequencePanel::waveform(const app::Engine& engine)
     const std::shared_ptr<const audio::AudioFile> file = engine.audioFile();
     if (file == nullptr) {
         waveCache_ = {};
-        waveSource_ = nullptr;
+        waveRevision_ = 0;
         return waveCache_;
     }
-    // Keyed on the file, so loading a different song rebuilds and scrubbing does not. The summary
-    // is the one expensive thing on this panel and it must happen exactly as often as the audio
-    // changes, which is approximately never.
-    if (waveSource_ != file.get()) {
+    // Keyed on the engine's audio revision, so a load or a re-mix rebuilds and scrubbing does not.
+    // The summary is the one expensive thing on this panel and it must happen exactly as often as
+    // the audio changes -- no more, and crucially no less.
+    if (waveRevision_ != engine.audioRevision()) {
         const auto started = std::chrono::steady_clock::now();
         waveCache_ = audio::summarise(*file);
-        waveSource_ = file.get();
+        waveRevision_ = engine.audioRevision();
         // Logged because it is the one pass over the whole file this panel makes, and because a
         // line that appears once per load rather than once per frame is the cheapest possible proof
         // that the cache is a cache.

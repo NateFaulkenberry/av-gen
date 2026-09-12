@@ -151,7 +151,7 @@ std::string TransportBar::format(const app::TransportSnapshot& snapshot, double 
 void TransportBar::drawTransportButtons(app::Engine& engine, const app::TransportSnapshot& snapshot) {
     const bool playing = snapshot.playing();
 
-    if (glyphButton("start", Glyph::Start, "Return to start (Home)")) {
+    if (glyphButton("start", Glyph::Start, "Return to start (Return)")) {
         engine.seekSeconds(engine.transport().playStartSeconds());
     }
     ImGui::SameLine(0.0f, 2.0f);

@@ -48,10 +48,10 @@ because that is where the next Play will begin.
 length is the longest thing in it: the audio, the sequence, or the timeline.
 
 **You can have more than one audio file.** **Sequence → Audio...** places several: a song and a
-spoken outro, two cues with a gap, a stem set. They are mixed into one piece, and a thin lane under
-the waveform shows each one so you can see where the takes change: drag a clip to move it, its right
-edge to trim it. The waveform itself is always a scrub — clicking it moves the playhead and never
-grabs anything.
+spoken outro, two cues with a gap, a stem set. They are mixed into one piece, and each one is a box
+on the strip with its own waveform inside it, so you can see where the takes change. Clicking the
+lane always moves the playhead and never grabs anything; move and trim a clip with the `start`, `in`
+and `length` fields in **Audio...**.
 
 ## Time display
 
@@ -105,7 +105,7 @@ are not affected by this at all.
 | `Left`, `Right` | step one frame (held: walks frame by frame) |
 | `Shift` + `Left`/`Right` | step one beat |
 | `Up`, `Down` | jump to the previous or next marker |
-| `Home` | return to the start |
+| `Return` | return to the start |
 | `End` | go to the end |
 | `L` | loop on or off |
 

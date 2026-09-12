@@ -343,6 +343,16 @@ public:
     [[nodiscard]] Result<void> rebuildAudio();
     // What the last mix did, for the sequencer's lane labels and the warnings list.
     [[nodiscard]] const audio::MixReport& audioMix() const { return audioMix_; }
+    // Changes whenever the installed audio changes -- a load, a re-mix after a clip edit, or the
+    // audio going away. Anything that caches something derived from it (a waveform summary, a beat
+    // grid) keys on this.
+    //
+    // Not on the `AudioFile*`, which is what the sequencer used to do. The file is freed and a new
+    // one allocated on every re-mix, and an allocator may hand back the same address -- so a cache
+    // comparing pointers concluded "same file" about a different mix and kept drawing the old
+    // waveform under the new clips. That was rare when audio changed only on an explicit load and
+    // became likely the moment a clip drag started re-mixing.
+    [[nodiscard]] std::uint64_t audioRevision() const { return audioRevision_; }
     // The decoded source behind a clip, for drawing its waveform. Null while it is missing.
     [[nodiscard]] std::shared_ptr<const audio::AudioFile> clipSource(const std::filesystem::path& p) const {
         return clipSources_.find(p);
@@ -527,6 +537,7 @@ private:
     [[nodiscard]] Result<void> installAudio(std::shared_ptr<const audio::AudioFile> file);
 
     std::vector<audio::AudioClip> audioClips_;
+    std::uint64_t audioRevision_ = 1;
     audio::ClipSources clipSources_;
     audio::MixReport audioMix_;
     Transport transport_;

@@ -222,11 +222,10 @@ enum class ViewportIntent : std::uint8_t {
 // Which lane a y-coordinate falls in, and how tall the strip is. Here rather than inside
 // `SequencePanel::drawStrip` because the drawing and the hit testing have to agree about it, and
 // when they stopped agreeing the symptom was a click meant to scrub the music moving the music
-// instead (ADR-103). That is a arithmetic question and it should be answerable without a window.
+// instead (ADR-103). That is arithmetic, and it should be answerable without a window.
 enum class StripLane : std::uint8_t {
     Ruler,    // the time axis and the marker row: always a scrub
-    Waveform, // the mixed audio: deliberately holds no blocks, so it is always a scrub
-    Clips,    // the audio clips: blocks, draggable
+    Audio,    // the clips and their waveforms: deliberately holds nothing draggable
     Shots,
     Actors,
     Overlays,
@@ -240,24 +239,25 @@ struct StripLanes {
     float rulerHeight = 20.0f;
     float markerHeight = 16.0f;
     float laneHeight = 24.0f;
-    float clipLaneHeight = 15.0f;
+    // The audio lane is taller than the others: it is the only one whose content is a picture rather
+    // than a label, and a waveform three pixels high says nothing about the music.
+    float audioLaneHeight = 36.0f;
     float gap = 3.0f;
 
     // Where the lanes start, measured from the top of the strip.
     [[nodiscard]] float lanesTop() const { return rulerHeight + markerHeight + gap; }
-    [[nodiscard]] float waveformTop() const { return lanesTop(); }
-    [[nodiscard]] float clipsTop() const { return waveformTop() + laneHeight + gap; }
+    [[nodiscard]] float audioTop() const { return lanesTop(); }
     [[nodiscard]] float shotsTop() const {
-        return hasAudio ? clipsTop() + clipLaneHeight + gap : lanesTop();
+        return hasAudio ? audioTop() + audioLaneHeight + gap : lanesTop();
     }
     [[nodiscard]] float actorsTop() const { return shotsTop() + laneHeight + gap; }
     [[nodiscard]] float overlaysTop() const {
         return actorsTop() + static_cast<float>(actorCount) * (laneHeight + gap);
     }
     [[nodiscard]] float height() const {
-        const int lanes = (hasAudio ? 1 : 0) + 1 + static_cast<int>(actorCount) + (hasOverlays ? 1 : 0);
-        return rulerHeight + markerHeight + static_cast<float>(lanes) * (laneHeight + gap) + gap +
-               (hasAudio ? clipLaneHeight + gap : 0.0f);
+        const int rows = 1 + static_cast<int>(actorCount) + (hasOverlays ? 1 : 0);
+        return rulerHeight + markerHeight + static_cast<float>(rows) * (laneHeight + gap) + gap +
+               (hasAudio ? audioLaneHeight + gap : 0.0f);
     }
 
     // `y` relative to the top of the strip. The gaps between lanes belong to no lane, and that is
@@ -267,13 +267,8 @@ struct StripLanes {
         if (y < lanesTop()) {
             return StripLane::Ruler;
         }
-        if (hasAudio) {
-            if (within(waveformTop(), laneHeight)) {
-                return StripLane::Waveform;
-            }
-            if (within(clipsTop(), clipLaneHeight)) {
-                return StripLane::Clips;
-            }
+        if (hasAudio && within(audioTop(), audioLaneHeight)) {
+            return StripLane::Audio;
         }
         if (within(shotsTop(), laneHeight)) {
             return StripLane::Shots;

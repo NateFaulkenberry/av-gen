@@ -1616,7 +1616,10 @@ bool Application::handleTransportShortcut(const SDL_Event& event) {
             engine_->togglePlay();
         }
         return true;
-    case SDLK_HOME:
+    case SDLK_RETURN:
+        // Return, not Home: this is the key a person's hand is already on, and Home on a laptop
+        // keyboard is a chord. Safe because the transport's keys are only tested when no text field
+        // and no widget has the keyboard, so Return still commits what you were typing.
         engine_->seekSeconds(transport.playStartSeconds());
         return true;
     case SDLK_END:

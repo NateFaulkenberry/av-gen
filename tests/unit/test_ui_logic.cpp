@@ -210,21 +210,23 @@ TEST_CASE("Recent files are labelled by what tells them apart", "[ui][recent]") 
 // instead, and a piece was reported as starting fourteen seconds in with its name showing twice.
 // The drawing and the hit testing have to agree about where a lane is, and that is arithmetic.
 
-TEST_CASE("The waveform lane never holds a block", "[ui][sequencer][lanes]") {
+TEST_CASE("The audio lane is one lane, and it holds nothing draggable", "[ui][sequencer][lanes]") {
+    // A clip is a box with its waveform inside it, in one lane. Both of the ways this was got wrong
+    // came from separating those: clips drawn as blocks on a full-width waveform stole the click
+    // that scrubs, and clips moved to a lane of their own left the waveform floating above the box
+    // it belongs to. One lane, and every point of it answers the same way.
     ui::StripLanes lanes{.hasAudio = true, .actorCount = 2, .hasOverlays = true};
 
-    // Every point in the waveform lane is the waveform lane -- not the clips, and not a shot. This
-    // is the property that broke.
-    for (float y = lanes.waveformTop(); y < lanes.waveformTop() + lanes.laneHeight; y += 0.5f) {
+    for (float y = lanes.audioTop(); y < lanes.audioTop() + lanes.audioLaneHeight; y += 0.5f) {
         INFO(y);
-        REQUIRE(lanes.at(y) == ui::StripLane::Waveform);
+        REQUIRE(lanes.at(y) == ui::StripLane::Audio);
     }
-    // And the clips are somewhere else entirely, below it.
-    CHECK(lanes.clipsTop() >= lanes.waveformTop() + lanes.laneHeight);
-    for (float y = lanes.clipsTop(); y < lanes.clipsTop() + lanes.clipLaneHeight; y += 0.5f) {
-        INFO(y);
-        REQUIRE(lanes.at(y) == ui::StripLane::Clips);
-    }
+    // The shots begin after it, with a gap that belongs to nothing.
+    CHECK(lanes.shotsTop() > lanes.audioTop() + lanes.audioLaneHeight);
+    CHECK(lanes.at(lanes.audioTop() + lanes.audioLaneHeight + 1.0f) == ui::StripLane::None);
+
+    // Taller than the others, because it carries a picture rather than a label.
+    CHECK(lanes.audioLaneHeight > lanes.laneHeight);
 }
 
 TEST_CASE("Every lane is where the strip's own height says it is", "[ui][sequencer][lanes]") {
@@ -241,11 +243,10 @@ TEST_CASE("Every lane is where the strip's own height says it is", "[ui][sequenc
                 CHECK(lanes.at(lanes.shotsTop() + 1.0f) == ui::StripLane::Shots);
                 CHECK(lanes.shotsTop() + lanes.laneHeight <= lanes.height());
                 if (audio) {
-                    CHECK(lanes.at(lanes.waveformTop() + 1.0f) == ui::StripLane::Waveform);
-                    CHECK(lanes.at(lanes.clipsTop() + 1.0f) == ui::StripLane::Clips);
+                    CHECK(lanes.at(lanes.audioTop() + 1.0f) == ui::StripLane::Audio);
                 } else {
-                    // With no audio the shots are the first lane, exactly where the waveform would
-                    // have been -- so a project without audio loses no space to lanes it has not got.
+                    // With no audio the shots are the first lane, exactly where the audio would have
+                    // been -- so a project without audio loses no space to a lane it has not got.
                     CHECK(lanes.shotsTop() == lanes.lanesTop());
                 }
                 if (actors > 0) {
@@ -263,12 +264,10 @@ TEST_CASE("Every lane is where the strip's own height says it is", "[ui][sequenc
     }
 }
 
-TEST_CASE("The audio lanes cost nothing when there is no audio", "[ui][sequencer][lanes]") {
+TEST_CASE("The audio lane costs nothing when there is no audio", "[ui][sequencer][lanes]") {
     const ui::StripLanes without{.hasAudio = false, .actorCount = 1, .hasOverlays = false};
     const ui::StripLanes with{.hasAudio = true, .actorCount = 1, .hasOverlays = false};
     CHECK(with.height() > without.height());
     CHECK_THAT(static_cast<double>(with.height() - without.height()),
-               Catch::Matchers::WithinAbs(static_cast<double>(with.laneHeight + with.clipLaneHeight +
-                                                              2.0f * with.gap),
-                                          1e-4));
+               Catch::Matchers::WithinAbs(static_cast<double>(with.audioLaneHeight + with.gap), 1e-4));
 }

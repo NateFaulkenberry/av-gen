@@ -96,25 +96,76 @@ two places to disagree about it.
 Each clip writes only what differs from the default, so a clip that was merely dropped on the
 timeline reads as one line rather than eight fields of zero.
 
-## The clips get a lane of their own
+## A clip is a box with its waveform inside it
 
-Drawn on the waveform first, and reported within the hour: a click meant to scrub the music grabbed
-the clip and moved it, so the piece began fourteen seconds in and its name appeared twice — once as
-the waveform lane's label and once on the clip.
+Got wrong twice, both times by separating those two things.
 
-The panel already had the rule, in a comment directly above the code that broke it:
+First, clips were drawn as draggable blocks *on* a full-width waveform. That stole the click that
+scrubs — the panel already had the rule, in a comment directly above the code that broke it:
 
 > The waveform holds no blocks and is deliberately left that way: clicking a moment in the music to
 > hear it is worth more than anything a block there could offer.
 
-So clips are a thin lane of their own, under the waveform, and the waveform lane lost its file label
-— the clips name themselves, and a lane label naming the song beside a clip naming the same file is
-the double that was reported.
+— so a click meant to move the playhead moved the *audio*, and the file appeared twice because the
+lane still carried its own label beside a clip naming the same file.
+
+Second, the clips were moved to a thin lane of their own *under* the waveform. That fixed the click
+and kept the problem: a box in one place and the picture of what is in it in another.
+
+**One lane. The clip is the box; the waveform is drawn inside it, clipped to it; the gaps draw
+nothing** — which is truer than a flat line through silence that might be a bug. The lane is half
+again as tall as the others, because it is the only one whose content is a picture rather than a
+label. The summary is of the mixdown and covers the whole timeline, so a clip's shape is that
+summary restricted to the clip's span.
+
+**Nothing in the lane is draggable.** A click there scrubs and highlights the clip under it, and
+moving and trimming are numbers in the Audio… popup. Making a clip draggable is what stole the scrub;
+the lane's promise — click a moment in the music to hear it — is worth more than a gesture that
+already exists as a field. Drag handles can come back when they have somewhere safe to live, such as
+edge grips that do not swallow the body of the clip.
 
 The deeper fault was that the strip's height, its drawing and its hit testing were three separate
-calculations of where the lanes are, and only two of them were changed. They are now one
-(`ui::StripLanes` in `ui_logic.hpp`), which is ImGui-free and tested — the waveform lane holding no
-block is an assertion rather than a comment.
+calculations of where the lanes are, and a change touched two of them. They are now one
+(`ui::StripLanes` in `ui_logic.hpp`), ImGui-free and tested — the audio lane holding nothing
+draggable is an assertion rather than a comment.
+
+## Derived caches key on a revision, not an address
+
+The sequencer caches two expensive things derived from the audio — the waveform summary and the beat
+grid — and both keyed on the **address** of the object they came from (`const AudioFile*`, the
+`AnalysisTrack*`). The engine frees that object and allocates a new one on every install, and an
+allocator may hand the same address straight back. The cache then concludes "same file, nothing to
+do" about a *different mix*, and the panel keeps drawing the previous waveform under the new clips.
+
+That was nearly unreachable while audio changed only on an explicit load, with a whole file decode
+between the free and the allocation. Re-mixing on every clip edit is what made it reachable — the
+feature did not introduce the bug, it introduced the conditions for it.
+
+So `Engine::audioRevision()` is a counter that moves whenever the installed audio changes, including
+when it goes away, and the caches compare that. A counter cannot be reused.
+
+## Derived caches key on a revision, not an address
+
+The second thing reported: the clip block and the waveform disagreeing about where the audio is.
+
+The sequencer caches two expensive things derived from the audio — the waveform summary and the beat
+grid — and both keyed on the **address** of the object they came from (`const AudioFile*`, the
+`AnalysisTrack*`). The engine frees that object and allocates a new one on every install, and an
+allocator may hand the same address straight back. The cache then concludes "same file, nothing to
+do" about a *different mix*, and the panel keeps drawing the previous waveform under the new clips.
+
+That was nearly unreachable while audio changed only on an explicit load, with a whole file decode
+between the free and the allocation. Re-mixing on every clip edit is what made it likely — the
+feature did not introduce the bug, it introduced the conditions for it.
+
+So `Engine::audioRevision()` is a counter that moves whenever the installed audio changes, including
+when it goes away, and the caches compare that. A counter cannot be reused.
+
+The same class of fault produced a third: a clip drag edits a copy and applies it on release, and the
+copy was only cleared in the release branch — so a release the panel never saw (docked behind another
+tab, the window hidden mid-gesture) stranded it, and the lane went on drawing clips the engine did
+not have. It is now cleared whenever the button is up and no drag is in progress, which is the one
+moment that cannot be ambiguous.
 
 ## Consequences
 
@@ -131,6 +182,7 @@ of writing it down.
 a load; a much longer piece would want it on a job (`app::JobSystem` already exists) with the old mix
 kept until the new one lands.
 
-**Not built.** Per-clip effects, crossfade handles on the strip, packaging a multi-clip project with
+**Not built.** Dragging a clip on the strip (see above), per-clip effects, crossfade handles,
+packaging a multi-clip project with
 `--collect` (it copies `assets.audio` only; the clip list is reported by `referencedFiles()` but not
 rewritten), and a waveform drawn per clip rather than of the mixdown.

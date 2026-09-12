@@ -23,7 +23,7 @@ shortcuts: transport.play, file.open-audio, file.open-scene, file.open-environme
 | `Left`, `Right` | step one frame |
 | `Shift` + `Left`/`Right` | step one beat |
 | `Up`, `Down` | jump to the previous or next marker |
-| `Home` | return to the start of the play range |
+| `Return` | return to the start of the play range |
 | `End` | go to the end of it |
 | `L` | turn the loop on or off |
 | `O` | open audio |

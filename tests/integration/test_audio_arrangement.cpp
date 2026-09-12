@@ -217,3 +217,41 @@ TEST_CASE("Editing one clip re-mixes without re-decoding the others",
     CHECK_FALSE(engine.hasAudio());
     CHECK(engine.clipSource(a) == nullptr);
 }
+
+TEST_CASE("The audio revision changes whenever the installed audio does",
+          "[integration][audio][arrangement]") {
+    // What every cache of something derived from the audio keys on -- the sequencer's waveform
+    // summary and its beat grid. They used to key on the *address* of the `AudioFile`, which is
+    // freed and reallocated on every re-mix: an allocator handing back the same address made a cache
+    // conclude "nothing changed" about a different mix, and the panel drew the old waveform under
+    // the new clips. A counter cannot be reused.
+    Scratch scratch("revision");
+    const fs::path a = scratch.tone("a.wav", 1.0, 220.0f);
+    const fs::path b = scratch.tone("b.wav", 1.0, 440.0f);
+
+    app::Engine engine(app::EngineMode::Offline);
+    const std::uint64_t empty = engine.audioRevision();
+
+    REQUIRE(engine.loadAudio(a).has_value());
+    const std::uint64_t loaded = engine.audioRevision();
+    CHECK(loaded != empty);
+
+    // A re-mix that changes the audio changes the revision, even though the clip count does not.
+    REQUIRE(engine.setAudioClips({AudioClip{.file = a, .startSeconds = 3.0}}).has_value());
+    const std::uint64_t moved = engine.audioRevision();
+    CHECK(moved != loaded);
+
+    REQUIRE(engine.setAudioClips({AudioClip{.file = a}, AudioClip{.file = b, .startSeconds = 2.0}})
+                .has_value());
+    CHECK(engine.audioRevision() != moved);
+
+    // Audio going away is a change too: a cache holding the last summary would otherwise draw a
+    // waveform for a project that has none.
+    const std::uint64_t two = engine.audioRevision();
+    REQUIRE(engine.setAudioClips({}).has_value());
+    CHECK(engine.audioRevision() != two);
+    CHECK_FALSE(engine.hasAudio());
+
+    // And it only moves forward, so a cache can compare rather than merely detect inequality.
+    CHECK(engine.audioRevision() > empty);
+}

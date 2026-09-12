@@ -1641,6 +1641,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
         audioPath_.clear();
         offlineFrameCursor_ = 0;
         hasFrame_ = false;
+        ++audioRevision_;
         refreshTransport();
         return {};
     }
@@ -1672,6 +1673,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
     offlineFrameCursor_ = 0;
     log::info("analysed {:.2f} s of audio: {} frames", file->durationSeconds(), track_->frames().size());
     audioFile_ = std::move(file);
+    ++audioRevision_;
     modulator_.resetState();
     music_.reset();
     hasFrame_ = false;

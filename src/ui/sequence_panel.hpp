@@ -69,19 +69,12 @@ private:
     // sample -- five million of them for a three-minute song -- so it happens when the file changes
     // and never while drawing.
     [[nodiscard]] const audio::WaveformSummary& waveform(const app::Engine& engine);
-    // The audio arrangement's editor (ADR-103): the clip list in the toolbar, and the clip outlines
-    // drawn over the waveform lane.
+    // The audio arrangement's editor (ADR-103): the clip list behind the toolbar's Audio... button.
+    // Where a clip is moved and trimmed, because the strip's audio lane is a scrub and stays one.
     void drawAudioClips(app::Engine& engine);
-    // The clips as they should be drawn *now*: the engine's, or the in-progress drag's. A drag
-    // edits a copy because applying one would re-mix the whole piece, sixty times a second.
-    [[nodiscard]] const std::vector<audio::AudioClip>& clipsForDrawing(const app::Engine& engine) const;
 
-    // The audio lane's own state. The clips being dragged are a copy: `Engine::setAudioClips`
-    // re-mixes the arrangement, which is a pass over every sample, and doing that per drag frame
-    // would turn a smooth drag into a slideshow. The copy is applied on release, exactly as the
-    // sequence's own bake waits for the mouse.
-    std::vector<audio::AudioClip> audioEdit_;
-    float clipLaneY_ = -1.0f; // where the clip lane was drawn this frame, for hit testing
+    // Which clip the pointer last landed on, for the highlight and the popup. Nothing else: the
+    // audio lane holds no drag state, because it holds no drag.
     int audioSelected_ = -1;
     char audioPath_[512] = {};
 
@@ -91,9 +84,7 @@ private:
     int snapMode_ = 2; // Beats
     float zoom_ = 1.0f;
     double view_ = 0.0; // leftmost second shown
-    // 0 none, 1 move shot, 2 resize shot, 3 move overlay, 4 resize overlay, 5 move audio clip,
-    // 6 trim an audio clip's end
-    int dragKind_ = 0;
+    int dragKind_ = 0;  // 0 none, 1 move shot, 2 resize shot, 3 move overlay, 4 resize overlay
     int dragIndex_ = -1;
     double dragGrab_ = 0.0;
     std::string status_;
@@ -101,9 +92,13 @@ private:
     char nameBuffer_[96] = "";
     char textBuffer_[512] = "";
     std::vector<double> beatCache_;
-    const void* beatSource_ = nullptr;
+    // Keyed on the engine's audio revision, not on the address of the track or the file. Those are
+    // freed and reallocated on every re-mix, and an allocator that hands back the same address made
+    // the cache conclude "nothing changed" about a different mix -- which is how a waveform ended up
+    // drawn under clips it did not belong to. 0 means "nothing cached yet".
+    std::uint64_t beatRevision_ = 0;
     audio::WaveformSummary waveCache_;
-    const void* waveSource_ = nullptr;
+    std::uint64_t waveRevision_ = 0;
 };
 
 } // namespace avgen::ui

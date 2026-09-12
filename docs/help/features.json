@@ -304,7 +304,7 @@
   },
   {
    "command": "transport.return-to-start",
-   "keys": "Home",
+   "keys": "Return",
    "context": "General",
    "description": "Return to the start of the play range.",
    "document": "sequencer/transport",
