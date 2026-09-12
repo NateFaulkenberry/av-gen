@@ -134,7 +134,6 @@ TEST_CASE("Shader compilation reports errors with diagnostics and succeeds on va
                                 "good.wgsl");
     REQUIRE(good.has_value());
     CHECK(ctx->errorCount() == 0);
-
     auto missing = shaders.load("does_not_exist.wgsl");
     REQUIRE_FALSE(missing.has_value());
     CHECK(missing.error().message.find("not found") != std::string::npos);
@@ -504,6 +503,31 @@ TEST_CASE("SceneRenderer resets temporal history after resize", "[gpu][renderer]
     const auto expected = fresh.renderToImage(scene, time, 128, 80);
     REQUIRE(expected.has_value());
     CHECK(gpu::hashImage(*resized) == gpu::hashImage(*expected));
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("SceneRenderer supports explicit temporal reset after in-place reload", "[gpu][renderer][forensics]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    rendering::SceneRenderer fresh(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    REQUIRE(fresh.init().has_value());
+
+    auto scene = cubeScene();
+    scene.post.motionBlurAmount = 1.0f;
+    scene.post.motionBlurSamples = 8;
+    FrameTime time{};
+    time.frameIndex = 5;
+    time.renderTime = 1.0;
+    REQUIRE(renderer.renderToImage(scene, time, 96, 64).has_value());
+    scene.entities[0].transform.position.x = 0.8f;
+    renderer.resetTemporalHistory();
+    const auto reloaded = renderer.renderToImage(scene, time, 96, 64);
+    REQUIRE(reloaded.has_value());
+    const auto expected = fresh.renderToImage(scene, time, 96, 64);
+    REQUIRE(expected.has_value());
+    CHECK(gpu::hashImage(*reloaded) == gpu::hashImage(*expected));
     CHECK(ctx->errorCount() == 0);
 }
 

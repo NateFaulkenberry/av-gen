@@ -1120,10 +1120,7 @@ Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
         return r;
     }
     rebuildFrameBindGroups();
-    ao_->resetHistory();
-    havePrevViewProj_ = false;
-    prevModels_.clear();
-    prevModelsNext_.clear();
+    resetTemporalHistory();
     tonemapBindGroup_ = nullptr;
     tonemapBoundView_ = nullptr;
     tonemapGroups_.clear();
@@ -1131,6 +1128,17 @@ Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
     stats_.height = height;
     log::debug("HDR target resized to {}x{}", width, height);
     return {};
+}
+
+void SceneRenderer::resetTemporalHistory() {
+    havePrevViewProj_ = false;
+    prevModels_.clear();
+    prevModelsNext_.clear();
+    previousRenderTime_ = -std::numeric_limits<double>::infinity();
+    temporalScene_ = nullptr;
+    if (ao_ != nullptr) {
+        ao_->resetHistory();
+    }
 }
 
 void SceneRenderer::ensureTonemapBindGroup() {
@@ -1557,10 +1565,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     timeline_->beginFrame();
     const bool sceneChanged = temporalScene_ != &scene;
     if (sceneChanged) {
-        havePrevViewProj_ = false;
-        prevModels_.clear();
-        prevModelsNext_.clear();
-        ao_->resetHistory();
+        resetTemporalHistory();
         temporalScene_ = &scene;
     }
     if (sceneChanged || time.renderTime < previousRenderTime_) {

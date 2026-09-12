@@ -205,8 +205,9 @@ open in Phase 7.
   renderer regression covers a same-time scene swap.
 - `[~]` Stress resource reuse through resize, scene reload, timeline seek/reverse, camera cuts and frame-index reuse.
   Resize now clears previous view/model history in addition to AO history, with a motion-blur
-  reused-versus-fresh renderer regression. Scene reload, camera-cut and frame-index reuse cases
-  remain open.
+  reused-versus-fresh renderer regression. An explicit reset API now covers in-place scene reloads
+  and the application camera-cut action. Timeline seek/reverse stress and frame-index reuse remain
+  open.
 - `[ ]` Add a conservative synchronization option to the reference path if evidence points to reuse hazards.
 - `[ ]` Add validation for resources destroyed, replaced, resized or rebound while still referenced.
 - `[~]` Sanitizer coverage exists for selected animation/sequence paths; expand it to renderer resource lifetime and full relevant suites.

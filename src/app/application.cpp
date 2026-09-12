@@ -745,6 +745,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                 log::warn("direct: {}", r.error().message);
                 panel_->setStatus(r.error().message);
             } else {
+                renderer_->resetTemporalHistory();
                 panel_->setStatus("camera cut to the track");
             }
         };

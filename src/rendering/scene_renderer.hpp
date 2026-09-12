@@ -282,6 +282,9 @@ public:
     [[nodiscard]] Result<void> init();
     // (Re)creates the HDR target. Idempotent for equal sizes.
     [[nodiscard]] Result<void> resize(std::uint32_t width, std::uint32_t height);
+    // Invalidates camera/model/AO temporal state after an in-place scene reload or camera cut.
+    // The next frame is treated as a new temporal sequence rather than as motion from the old one.
+    void resetTemporalHistory();
 
     // Encodes the scene and tonemap passes. `target` must match the size passed to resize().
     [[nodiscard]] Result<void> render(wgpu::CommandEncoder& encoder, const scene::Scene& scene,
