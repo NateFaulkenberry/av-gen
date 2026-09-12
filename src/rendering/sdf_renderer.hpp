@@ -27,6 +27,7 @@
 #include <webgpu/webgpu_cpp.h>
 
 #include <cstdint>
+#include <cstddef>
 #include <functional>
 #include <memory>
 
@@ -129,6 +130,8 @@ public:
 
     static constexpr std::uint32_t kMaxObjects = 256;   // 256-byte uniform slots
     static constexpr std::uint32_t kObjectStride = 512;
+    static_assert(kObjectStride % 256 == 0);
+    static_assert(sizeof(SdfObjectUniforms) <= kObjectStride);
 
 private:
     struct Impl;

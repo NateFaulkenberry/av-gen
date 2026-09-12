@@ -30,6 +30,7 @@
 #include <webgpu/webgpu_cpp.h>
 
 #include <cstdint>
+#include <cstddef>
 #include <vector>
 
 namespace avgen::gpu {
@@ -98,6 +99,8 @@ private:
     // Dynamic uniform offsets must be a multiple of the device's minimum alignment, which is 256
     // on every backend this runs on. 192 bytes of record, padded.
     static constexpr std::uint32_t kStride = 256;
+    static_assert(kStride % 256 == 0);
+    static_assert(sizeof(WaterUniforms) <= kStride);
 
     [[nodiscard]] Result<void> createPipeline(gpu::ShaderLibrary& shaders);
 
