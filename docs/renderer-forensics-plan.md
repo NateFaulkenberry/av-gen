@@ -189,9 +189,10 @@ open in Phase 7.
   guard the WGSL field order. Alignment/padding and the remaining GPU-side structures still need
   the same treatment.
 - `[ ]` Add an alternating-transform two-object test to detect stale or swapped GPU data.
-- `[x]` Fix mesh and texture upload identity/version collisions by keying renderer caches to the owning
-  `Scene` as well as its local version. A GPU regression renders distinct same-version geometry through
-  one renderer and verifies the images differ. The broader buffer-layout audit remains open.
+- `[x]` Fix mesh, texture and environment/IBL upload identity/version collisions by keying renderer
+  caches to the owning `Scene` as well as local IDs/versions. GPU regressions cover distinct
+  same-version geometry and HDR data through one renderer, both matching fresh-renderer results.
+  The broader buffer-layout audit remains open.
 
 ### 3.4 Frame synchronization and resource lifetime
 

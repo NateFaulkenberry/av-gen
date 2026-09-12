@@ -466,7 +466,7 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
         skyHash_ = hash;
         return;
     }
-    if (id == environmentTexture_ && scene.textureVersion == environmentVersion_) {
+    if (&scene == environmentScene_ && id == environmentTexture_ && scene.textureVersion == environmentVersion_) {
         return;
     }
     auto ibl = environment_->process(scene.textures[id]);
@@ -478,6 +478,7 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
     }
     skyBuilt_ = false;
     skyHash_ = 0;
+    environmentScene_ = &scene;
     environmentTexture_ = id;
     environmentVersion_ = scene.textureVersion;
 }

@@ -512,6 +512,7 @@ private:
     std::vector<std::uint16_t> spectrumStaging_;
     std::uint32_t engineReloads_ = 0;
     scene::TextureId environmentTexture_ = scene::kInvalidTexture;
+    const scene::Scene* environmentScene_ = nullptr;
     std::uint64_t environmentVersion_ = ~0ull;
     // ADR-036: the procedural sky is rebuilt only when its resolved parameters change.
     std::uint64_t skyHash_ = 0;

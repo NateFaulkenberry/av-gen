@@ -140,6 +140,29 @@ std::unique_ptr<rendering::SceneRenderer> makeRenderer(gpu::Context& ctx, gpu::S
 
 } // namespace
 
+TEST_CASE("HDR environment cache is isolated across same-version scenes", "[sky][hdri][gpu][forensics]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    auto renderer = makeRenderer(*ctx, shaders);
+    auto fresh = makeRenderer(*ctx, shaders);
+
+    auto bright = skyScene(discMap(256, glm::vec3(0.5f, 0.35f, -0.8f), 0.05f, 30.0f, 0.05f));
+    auto dim = skyScene(discMap(256, glm::vec3(-0.5f, 0.35f, 0.8f), 0.05f, 0.2f, 0.01f));
+    REQUIRE(bright.textureVersion == dim.textureVersion);
+    REQUIRE(bright.environment.environmentMap == dim.environment.environmentMap);
+
+    FrameTime time{};
+    const auto first = renderer->renderToImage(bright, time, 128, 128);
+    REQUIRE(first.has_value());
+    const auto reused = renderer->renderToImage(dim, time, 128, 128);
+    REQUIRE(reused.has_value());
+    const auto expected = fresh->renderToImage(dim, time, 128, 128);
+    REQUIRE(expected.has_value());
+    CHECK(gpu::hashImage(*reused) == gpu::hashImage(*expected));
+    CHECK(gpu::hashImage(*first) != gpu::hashImage(*reused));
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("the HDRI sky does not move when the camera does", "[sky][hdri][gpu]") {
     auto ctx = makeContext();
     gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
