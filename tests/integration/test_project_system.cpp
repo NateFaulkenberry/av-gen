@@ -24,6 +24,7 @@
 #include <fstream>
 #include <array>
 #include <ranges>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -463,7 +464,10 @@ TEST_CASE("Glowmere's directed shot stays grounded, bounded and fully connected"
     }
 }
 
-TEST_CASE("New project resets everything but the audio", "[integration][project]") {
+// Audio is project state like everything else: File > New leaves no piece loaded. It used to keep
+// the last one -- the clip list was cleared but the mixed buffer stayed installed, so a brand new
+// project opened playing the previous project's song.
+TEST_CASE("New project resets everything, the audio included", "[integration][project]") {
     Fixture f;
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadAudio(f.wav).has_value());
@@ -475,7 +479,8 @@ TEST_CASE("New project resets everything but the audio", "[integration][project]
     engine.params().find("post/bloom/intensity")->setBaseComponent(0, 3.0f);
     REQUIRE(engine.saveProject(f.dir / "before.json").has_value());
     engine.newProject();
-    CHECK(engine.hasAudio());
+    CHECK_FALSE(engine.hasAudio());
+    CHECK(engine.audioClips().empty());
     CHECK(engine.orbScene() != nullptr);
     CHECK(engine.environmentPath().empty());
     CHECK(engine.sources().find("lfo", "wobble") == nullptr);
@@ -652,4 +657,172 @@ TEST_CASE("Every example in the index exists and loads", "[integration][project]
         }
     }
 #endif
+}
+
+// Opening a project used to be a *merge*: `params::loadProject` applied the values the document
+// listed and left every other parameter alone, so anything the engine owns rather than the scene
+// -- all of `post/*`, the camera's lens, exposure and focus, the input gain -- carried over from
+// whatever was open before. Change the hue shift in one project, open another that says nothing
+// about it, and the previous project's grade was still on the picture. `Engine::loadProject` now
+// resets every serialised parameter before it applies anything, so silence in the document means
+// "the default", not "whatever was there".
+TEST_CASE("Opening a project resets the parameters it does not mention",
+          "[integration][project][parameters]") {
+    Fixture f;
+    const auto graded = f.dir / "graded.json";
+    std::ofstream(graded) << R"({"format":"avgen-project","version":4,
+      "assets":{"scene":{"kind":"composition","path":"media/stage.json"}},
+      "parameters":{"post/grade/hueShift":1.1,"post/bloom/intensity":0.9,
+                    "camera/lens/focalLength":85.0,"camera/exposure/iso":1600.0,
+                    "audio/inputGain":2.5}})";
+    const auto plain = f.dir / "plain.json";
+    std::ofstream(plain) << R"({"format":"avgen-project","version":4,
+      "assets":{"scene":{"kind":"composition","path":"media/stage.json"}}})";
+
+    app::Engine engine(app::EngineMode::Offline);
+    auto value = [&](const char* path) {
+        const auto* p = engine.params().find(path);
+        REQUIRE(p != nullptr);
+        return p->baseComponent(0);
+    };
+    auto engineOwned = [](std::string_view path) {
+        return path.starts_with("post/") || path.starts_with("camera/lens/") ||
+               path.starts_with("camera/exposure/") || path.starts_with("camera/focus/") ||
+               path == "audio/inputGain";
+    };
+    // Factory values read off an engine that has never opened anything.
+    //
+    // Not `defaultComponent` on the engine under test: a scene swap re-registers these parameters
+    // *from the engine's current settings*, so the leak pollutes the defaults along with the
+    // values and comparing a parameter against its own default would agree with itself. This is
+    // the negative control for the assertion, not a convenience.
+    std::map<std::string, std::vector<float>> factory;
+    {
+        app::Engine pristine(app::EngineMode::Offline);
+        for (const auto* p : pristine.params().ordered()) {
+            if (!engineOwned(p->path())) {
+                continue;
+            }
+            std::vector<float> v;
+            for (std::size_t i = 0; i < p->componentCount(); ++i) {
+                v.push_back(p->defaultComponent(i));
+            }
+            factory.emplace(std::string(p->path()), std::move(v));
+        }
+        REQUIRE(factory.size() > 50);  // the whole post chain plus the camera, not a handful
+    }
+    // Every engine-owned parameter, against factory, so this covers the whole family rather than
+    // the five paths the documents happen to name.
+    auto engineOwnedAtDefault = [&] {
+        std::vector<std::string> off;
+        for (const auto* p : engine.params().ordered()) {
+            const auto it = factory.find(std::string(p->path()));
+            if (it == factory.end()) {
+                continue;
+            }
+            for (std::size_t i = 0; i < it->second.size(); ++i) {
+                if (std::abs(p->baseComponent(i) - it->second[i]) > 1e-6f) {
+                    off.push_back(std::string(p->path()));
+                    break;
+                }
+            }
+        }
+        return off;
+    };
+
+    REQUIRE(engine.loadProject(graded).has_value());
+    // A frame, because that is what makes the leak real: `update` copies the parameter values into
+    // the engine's own `PostSettings`/`LensSettings` structs, and those structs are what a scene
+    // swap re-registers the parameters *from*. Without a frame in between, the swap alone happened
+    // to hide the bug -- which is why this test asserts nothing until one has run.
+    engine.update(FrameTime{});
+    CHECK_THAT(value("post/grade/hueShift"), Catch::Matchers::WithinAbs(1.1, 1e-5));
+    CHECK_THAT(value("camera/lens/focalLength"), Catch::Matchers::WithinAbs(85.0, 1e-4));
+    CHECK_THAT(value("camera/exposure/iso"), Catch::Matchers::WithinAbs(1600.0, 1e-2));
+    CHECK_THAT(value("audio/inputGain"), Catch::Matchers::WithinAbs(2.5, 1e-5));
+
+    // The other project says nothing about any of them, so all of them go home.
+    REQUIRE(engine.loadProject(plain).has_value());
+    engine.update(FrameTime{});
+    CHECK(engineOwnedAtDefault() == std::vector<std::string>{});
+
+    // ...and so does a value the operator changed by hand, when the same project is reopened: the
+    // document is the state, not a set of edits on top of the session.
+    REQUIRE(engine.loadProject(graded).has_value());
+    engine.update(FrameTime{});
+    engine.params().find("post/grade/saturation")->setBaseComponent(0, 1.75f);
+    engine.update(FrameTime{});
+    REQUIRE(engine.loadProject(graded).has_value());
+    engine.update(FrameTime{});
+    CHECK_THAT(value("post/grade/saturation"),
+               Catch::Matchers::WithinAbs(factory.at("post/grade/saturation").front(), 1e-6));
+    CHECK_THAT(value("post/grade/hueShift"), Catch::Matchers::WithinAbs(1.1, 1e-5));  // still the project's
+
+    // A scene's own `post` block is authored state, not a leftover, so it must survive the reset:
+    // it is applied after the parameters are cleared and before the project's values land.
+    const auto scenePath = f.dir / "media" / "warm.json";
+    std::ofstream(scenePath) << R"({"format":"avgen-scene","version":1,"name":"warm","nodes":[],
+      "post":{"chromaRetention":0.42}})";
+    const auto warm = f.dir / "warm-project.json";
+    std::ofstream(warm) << R"({"format":"avgen-project","version":4,
+      "assets":{"scene":{"kind":"composition","path":"media/warm.json"}}})";
+    REQUIRE(engine.loadProject(warm).has_value());
+    engine.update(FrameTime{});
+    CHECK_THAT(value("post/tonemap/chroma-retention"), Catch::Matchers::WithinAbs(0.42, 1e-5));
+    // ...and it does not leak into the next project either.
+    REQUIRE(engine.loadProject(plain).has_value());
+    engine.update(FrameTime{});
+    CHECK(engineOwnedAtDefault() == std::vector<std::string>{});
+}
+
+// File > New is the same promise as opening a project: what you get is factory state. It used to
+// reset only `post/*`, leaving the lens, exposure, focus and input gain from the last session.
+TEST_CASE("A new project resets the camera as well as the post chain",
+          "[integration][project][parameters]") {
+    Fixture f;
+    app::Engine engine(app::EngineMode::Offline);
+    auto* focal = engine.params().find("camera/lens/focalLength");
+    auto* iso = engine.params().find("camera/exposure/iso");
+    auto* gain = engine.params().find("audio/inputGain");
+    REQUIRE(focal != nullptr);
+    REQUIRE(iso != nullptr);
+    REQUIRE(gain != nullptr);
+    focal->setBaseComponent(0, 135.0f);
+    iso->setBaseComponent(0, 3200.0f);
+    gain->setBaseComponent(0, 2.0f);
+    engine.newProject();
+    CHECK(focal->baseComponent(0) == focal->defaultComponent(0));
+    CHECK(iso->baseComponent(0) == iso->defaultComponent(0));
+    CHECK(gain->baseComponent(0) == gain->defaultComponent(0));
+}
+
+// The same promise as the parameters above, for the audio: what plays is what the project says.
+TEST_CASE("A project that names no audio opens silent", "[integration][project][audio]") {
+    Fixture f;
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadAudio(f.wav).has_value());
+    const auto scored = f.dir / "scored.json";
+    REQUIRE(engine.saveProject(scored).has_value());
+
+    const auto silent = f.dir / "silent.json";
+    std::ofstream(silent) << R"({"format":"avgen-project","version":4,
+      "assets":{"scene":{"kind":"composition","path":"media/stage.json"}}})";
+    REQUIRE(engine.loadProject(silent).has_value());
+    CHECK_FALSE(engine.hasAudio());
+    CHECK(engine.audioClips().empty());
+    CHECK(engine.durationSeconds() == 0.0);
+
+    // ...and the project that does name one still gets it back.
+    REQUIRE(engine.loadProject(scored).has_value());
+    CHECK(engine.hasAudio());
+    CHECK(engine.durationSeconds() > 0.0);
+
+    // A named file that cannot be loaded is silence too, not the piece that happened to be open:
+    // the warning says what went wrong, and nothing plays under it.
+    const auto broken = f.dir / "broken.json";
+    std::ofstream(broken) << R"({"format":"avgen-project","version":4,
+      "assets":{"audio":"media/missing.wav","scene":{"kind":"composition","path":"media/stage.json"}}})";
+    REQUIRE(engine.loadProject(broken).has_value());
+    CHECK_FALSE(engine.projectWarnings().empty());
+    CHECK_FALSE(engine.hasAudio());
 }

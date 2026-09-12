@@ -866,6 +866,32 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     }
     const auto dir = std::filesystem::absolute(path).parent_path();
     projectWarnings_.clear();
+    // Back to factory before anything of this project's is applied.
+    //
+    // Opening a project is a *replacement*, not a merge: a parameter the document does not mention
+    // is the default, not whatever the last project left behind. Sources, routes and presets were
+    // always replaced; parameters were not, and the ones that leaked are the ones the engine owns
+    // rather than the scene -- all of `post/*`, the camera's lens, exposure and focus, the input
+    // gain -- because a scene swap is what clears the parameter set and those are re-registered
+    // immediately afterwards.
+    //
+    // It has to happen *here*, before the scene loads, and not in the parameter pass further down:
+    // a composition's own `post` block is authored state that lands between the two, and a reset
+    // after it would erase it.
+    //
+    // Resetting the structs as well as the parameters matters for the same ordering reason:
+    // `installController` re-registers post and camera parameters from them (`keep = post_`),
+    // using the current values as the new *defaults*, so a stale struct here would come back as a
+    // stale default that no later reset could tell from an authored one.
+    for (params::IParameter* param : params_.ordered()) {
+        if (param != nullptr && param->flags().serialized) {
+            param->resetToDefault();
+        }
+    }
+    post_ = scene::PostSettings{};
+    lens_ = scene::LensSettings{};
+    exposure_ = scene::ExposureSettings{};
+    focus_ = scene::FocusSettings{};
     auto warn = [&](std::string message) {
         log::warn("project: {}", message);
         projectWarnings_.push_back(std::move(message));
@@ -888,6 +914,23 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         }
         return path; // still missing: the loader reports it
     };
+
+    // The audio is the project's too. A document that names none means silence, not whatever was
+    // playing before: opening a project with no `assets.audio` used to leave the previous piece
+    // loaded, under a scene it was never written for, with a transport whose duration came from it.
+    //
+    // A live *input* is a device choice rather than project state and is left alone -- it already
+    // holds no file, so there is nothing here for this to clear.
+    {
+        const auto assets = doc.find("assets");
+        const bool statesAudio = assets != doc.end() && assets->is_object() &&
+                                 (assets->contains("audioClips") || assets->contains("audio"));
+        if (!statesAudio && input_ == nullptr && (hasAudio() || !audioClips_.empty())) {
+            if (auto r = setAudioClips({}); !r) {
+                warn("audio: " + r.error().message);
+            }
+        }
+    }
 
     // ---- assets first: they define the parameter surface the rest of the document targets ----
     if (const auto assets = doc.find("assets"); assets != doc.end() && assets->is_object()) {
@@ -913,11 +956,15 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             }
             if (auto r = setAudioClips(std::move(clips)); !r) {
                 warn("audio: " + r.error().message);
+                // The arrangement this project names could not be built. Silence, not the last
+                // project's piece standing in for it.
+                static_cast<void>(setAudioClips({}));
             }
         } else if (assets->contains("audio")) {
             if (const auto audio = resolveAsset((*assets)["audio"], "audio"); audio && *audio != audioPath_) {
                 if (auto r = loadAudio(*audio); !r) {
                     warn("audio: " + r.error().message);
+                    static_cast<void>(setAudioClips({})); // as above: silence, not the last piece
                 }
             }
         }
@@ -1167,12 +1214,21 @@ void Engine::newProject() {
     shaderLayers_.clear();
     environmentPath_.clear();
     loadOrbScene(); // clears the parameter set and routes, re-registers sources/post/shaders
+    // Every parameter the engine owns, not only post. `camera/lens`, `camera/exposure` and
+    // `camera/focus` sit in the same never-cleared set and used to survive File > New, which made
+    // "new project" mean something different from "open project".
     for (auto* p : params_.ordered()) {
-        if (p->path().rfind("post/", 0) == 0) {
+        const std::string_view path = p->path();
+        if (path.starts_with("post/") || path.starts_with("camera/lens/") ||
+            path.starts_with("camera/exposure/") || path.starts_with("camera/focus/") ||
+            path == "audio/inputGain") {
             p->resetToDefault();
         }
     }
     post_ = scene::PostSettings{};
+    lens_ = scene::LensSettings{};
+    exposure_ = scene::ExposureSettings{};
+    focus_ = scene::FocusSettings{};
     render_ = RenderSettings{};
     controlHub_.setMap(control::ControlMap{});
     outputs_ = nlohmann::json::array();
@@ -1180,9 +1236,15 @@ void Engine::newProject() {
     ensureControlSource();
     sources_.attach(bus_, params_);
     modulator_.masterGain = 1.0f;
+    // File > New is a project with no audio, like opening one that names none: the clip list was
+    // already cleared here but the *installed* buffer was not, so the last piece kept playing.
+    // A live input is a device choice and is left running (see `loadProject`).
     audioClips_.clear();
     clipSources_.clear();
     audioMix_ = audio::MixReport{};
+    if (input_ == nullptr) {
+        static_cast<void>(installAudio(nullptr));
+    }
     projectPath_.clear();
     projectWarnings_.clear();
     transport_.clearLoop();
