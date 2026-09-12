@@ -69,4 +69,28 @@ private:
     mutable std::uint64_t meshBoundsVersion_ = ~0ULL;
 };
 
+// ---- culling bounds (ADR-046 culling, renderer forensics Phase 5.1) ----------------------------
+//
+// The world-space box the camera cull tests an entity against. Extracted from `Composition` because
+// it was written out twice there -- once for EntityWorld-driven characters and once for authored
+// mesh nodes -- and because the property it has to satisfy is not one a composition test can reach:
+// *a posed skeleton may reach outside its bind-pose bounds, and the box must still contain it.*
+//
+// A bind pose is usually the widest a character gets (a T-pose has the arms out), so for most rigs
+// bind-pose bounds are conservative and the distinction is invisible. It is a reach, a jump or a
+// swing -- a pose that extends past bind -- where using the wrong one makes a limb disappear at a
+// frustum edge, and that is what `tests/unit/test_skeleton.cpp` exercises.
+//
+// `padFraction` and `padAbsolute` are the conservative residual: interpolation between palette
+// updates and numerical edge cases can put a vertex slightly outside the box computed from the
+// palette this frame.
+struct CullBounds {
+    glm::vec3 min{0.0f};
+    glm::vec3 max{0.0f};
+    bool posed = false; // the palette was used; false means the mesh's own bind-pose bounds
+};
+
+[[nodiscard]] CullBounds entityCullBounds(const Scene& scene, const Entity& entity,
+                                          float padFraction = 0.25f, float padAbsolute = 0.25f);
+
 } // namespace avgen::scene

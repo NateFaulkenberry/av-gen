@@ -11,7 +11,9 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #include <algorithm>
 #include <filesystem>
@@ -525,4 +527,150 @@ TEST_CASE("the animation block survives a save and reload", "[scene][composition
     REQUIRE(walk != nullptr);
     CHECK(walk->animation.state == "Walk");
     CHECK(walk->animation.blend == Approx(0.35f));
+}
+
+// ---- Phase 5.1: culling bounds must contain the pose, not the bind ------------------------------
+//
+// The renderer forensics plan's longest-standing open evidence gap. The failure it describes is a
+// posed limb crossing a frustum plane while the bind pose does not, so the character is culled and
+// the limb disappears.
+//
+// The first attempt at this used the alien composition and could not discriminate: with a T-pose
+// bind, the bind-pose box is *wider* than every pose the clip animates into, so bind-pose bounds are
+// conservative there and both implementations agree. Recorded so it is not retried. The instrument
+// this actually needs is a rig that reaches *past* its bind pose, which is what the bar below does:
+// its tip joint swings the top half a metre and a half sideways, well outside the bind box.
+
+namespace {
+
+// A vertical bar, subdivided so it can bend, weighted by height between a root and a tip joint.
+scene::MeshData reachingBar() {
+    scene::MeshData m;
+    constexpr float half = 0.2f;
+    constexpr float height = 3.0f;
+    constexpr int segments = 12;
+    for (int s = 0; s <= segments; ++s) {
+        const float y = height * static_cast<float>(s) / static_cast<float>(segments);
+        const glm::vec3 corners[4] = {{-half, y, -half}, {half, y, -half}, {half, y, half}, {-half, y, half}};
+        for (const glm::vec3& c : corners) {
+            m.vertices.push_back({c, glm::vec3(0.0f, 1.0f, 0.0f), {0.0f, 0.0f}});
+        }
+    }
+    for (int s = 0; s < segments; ++s) {
+        const auto a = static_cast<std::uint32_t>(s * 4);
+        const auto b = static_cast<std::uint32_t>((s + 1) * 4);
+        for (std::uint32_t c = 0; c < 4; ++c) {
+            const std::uint32_t n = (c + 1) % 4;
+            m.indices.insert(m.indices.end(), {a + c, b + c, b + n, a + c, b + n, a + n});
+        }
+    }
+    m.skin.assign(m.vertices.size(), scene::SkinInfluence{});
+    for (std::size_t i = 0; i < m.vertices.size(); ++i) {
+        const float t = std::clamp(m.vertices[i].position.y / height, 0.0f, 1.0f);
+        m.skin[i].joints[0] = 0;
+        m.skin[i].joints[1] = 1;
+        m.skin[i].weights = {1.0f - t, t, 0.0f, 0.0f};
+    }
+    return m;
+}
+
+// The palette for a bar whose tip joint is rotated `radians` about +Z, which swings the top of the
+// bar out along -X. At a right angle the tip reaches about 1.5 m past the bind box.
+std::vector<glm::mat4> barPalette(float radians) {
+    const glm::mat4 identity(1.0f);
+    const glm::mat4 toTip = glm::translate(identity, glm::vec3(0.0f, 1.5f, 0.0f));
+    const glm::mat4 fromTip = glm::translate(identity, glm::vec3(0.0f, -1.5f, 0.0f));
+    const glm::mat4 bend = toTip * glm::mat4_cast(glm::angleAxis(radians, glm::vec3(0.0f, 0.0f, 1.0f))) * fromTip;
+    return {identity, bend};
+}
+
+} // namespace
+
+TEST_CASE("cull bounds contain a pose that reaches outside the bind pose", "[scene][skeleton][culling]") {
+    scene::Scene scene;
+    const auto mesh = scene.addMesh(reachingBar());
+    REQUIRE(scene.meshes[mesh].skinned());
+
+    scene::SkinnedRig rig;
+    rig.skeleton.name = "bar";
+    scene::Joint root;
+    root.name = "root";
+    root.parent = -1;
+    rig.skeleton.joints.push_back(root);
+    scene::Joint tip;
+    tip.name = "tip";
+    tip.parent = 0;
+    tip.rest.position = {0.0f, 1.5f, 0.0f};
+    rig.skeleton.joints.push_back(tip);
+    rig.skeleton.palette = {0, 1};
+    scene.rigs.push_back(rig);
+
+    auto& entity = scene.addEntity("bar", mesh);
+    entity.rig = 0;
+
+    const auto [bindLo, bindHi] = scene.meshes[mesh].bounds();
+
+    // At rest the palette is the identity, so the posed box is the bind box.
+    scene.rigs[0].palette = barPalette(0.0f);
+    const scene::CullBounds rest = scene::entityCullBounds(scene, entity);
+    CHECK(rest.posed);
+    CHECK(rest.min.x == Approx(bindLo.x - ((bindHi.x - bindLo.x) * 0.25f + 0.25f)).margin(1e-4));
+
+    // Bent a right angle: the top half swings out along -X, past anything the bind pose covers.
+    scene.rigs[0].palette = barPalette(1.5707963f);
+    const scene::CullBounds bent = scene::entityCullBounds(scene, entity);
+    REQUIRE(bent.posed);
+
+    // The discriminating fact: the pose genuinely leaves the bind box. Without this the rest of the
+    // test would pass against a bind-pose implementation, which is how the first attempt at this
+    // regression fooled itself.
+    INFO("bind x " << bindLo.x << ".." << bindHi.x << ", posed cull box x " << bent.min.x << ".." << bent.max.x);
+    REQUIRE(bent.min.x < bindLo.x - 1.0f);
+
+    // And the box contains every posed vertex, which is the property culling depends on.
+    const scene::MeshData& bar = scene.meshes[mesh];
+    std::size_t checked = 0;
+    for (std::size_t i = 0; i < bar.vertices.size(); ++i) {
+        glm::vec3 posed(0.0f);
+        float sum = 0.0f;
+        for (std::size_t j = 0; j < scene::kJointInfluences; ++j) {
+            const float w = bar.skin[i].weights[j];
+            if (w <= 0.0f) {
+                continue;
+            }
+            posed += glm::vec3(scene.rigs[0].palette[bar.skin[i].joints[j]] *
+                               glm::vec4(bar.vertices[i].position, 1.0f)) * w;
+            sum += w;
+        }
+        if (sum <= 1e-6f) {
+            continue;
+        }
+        posed /= sum;
+        REQUIRE(posed.x >= bent.min.x);
+        REQUIRE(posed.x <= bent.max.x);
+        REQUIRE(posed.y >= bent.min.y);
+        REQUIRE(posed.y <= bent.max.y);
+        ++checked;
+    }
+    CHECK(checked == bar.vertices.size());
+
+    // The counterfactual, stated as an assertion rather than as a comment: the bind-pose box does
+    // *not* contain the posed geometry, so an implementation using it would cull this character
+    // while part of it was still on screen.
+    const glm::vec3 bindPad = (bindHi - bindLo) * 0.25f + glm::vec3(0.25f);
+    CHECK(bent.min.x < bindLo.x - bindPad.x);
+}
+
+TEST_CASE("an unskinned entity uses its mesh bounds and says so", "[scene][skeleton][culling]") {
+    scene::Scene scene;
+    const auto mesh = scene.addMesh(reachingBar());
+    scene.meshes[mesh].skin.clear(); // no influences: nothing to pose with
+    auto& entity = scene.addEntity("static", mesh);
+    entity.transform.position = {5.0f, 0.0f, -2.0f};
+
+    const scene::CullBounds bounds = scene::entityCullBounds(scene, entity);
+    CHECK_FALSE(bounds.posed);
+    // Moved with the entity, which is the other half of what the box is for.
+    CHECK(bounds.min.x > 3.0f);
+    CHECK(bounds.max.x > 5.0f);
 }

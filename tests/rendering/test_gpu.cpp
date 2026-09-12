@@ -8,7 +8,11 @@
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -683,4 +687,226 @@ TEST_CASE("Image-based lighting lights a rough white sphere from above", "[gpu][
     if (const char* dumpDir = std::getenv("AVGEN_DUMP_DIR")) {
         REQUIRE(gpu::writePpm(*sky, std::filesystem::path(dumpDir) / "ibl.ppm").has_value());
     }
+}
+
+// ---- Phase 2.3: the static-object invariant ----------------------------------------------------
+//
+// The forensics plan's first completion-gate question is "why does a static object move?", and the
+// only way to answer it is to prove that it does not -- under every camera motion, over many frames,
+// at the three places the transform exists: the authored scene TRS, the renderer's diagnostic world
+// matrix, and the projection the renderer's own camera matrices produce.
+//
+// The last of those is the point. A transform that is *stable* and a transform that is *correct* are
+// different claims: an object whose authored TRS never changes can still appear to swim if the
+// renderer's view-projection disagrees with the camera it was built from. So each frame also checks
+// the object's screen position against one predicted independently from `Camera::view()` and the
+// same projection convention, which is what separates correct parallax from corruption.
+
+namespace {
+
+// The plan names (10, 2, -20). Kept exactly, so a failure here is quotable against the document.
+constexpr glm::vec3 kStaticTestPosition{10.0f, 2.0f, -20.0f};
+
+scene::Scene staticObjectScene() {
+    scene::Scene s;
+    s.environment.backgroundColor = glm::vec3(0.02f);
+    s.environment.showSkybox = false;
+    const auto mesh = s.addMesh(cubeMesh(1.0f));
+    auto& e = s.addEntity("STATIC_TEST_OBJECT", mesh);
+    e.transform.position = kStaticTestPosition;
+    e.transform.rotation = glm::angleAxis(0.7f, glm::normalize(glm::vec3(0.2f, 1.0f, 0.1f)));
+    e.transform.scale = glm::vec3(1.25f, 0.75f, 1.5f);
+    e.material.baseColor = {0.8f, 0.5f, 0.2f};
+    // A second, near object so the frame is not a single cube on black: a renderer that lost the
+    // object-slot mapping would otherwise have nothing to confuse it with.
+    auto& near = s.addEntity("companion", mesh);
+    near.transform.position = {0.0f, 0.0f, 0.0f};
+    s.camera.nearPlane = 0.1f;
+    s.camera.farPlane = 400.0f;
+    s.camera.lens.useExplicitFov = true;
+    s.camera.fovYRadians = 0.9f;
+    return s;
+}
+
+// Where the renderer's own camera says the object's origin lands, in normalised device coordinates.
+// Built from `Camera::view()` and the WebGPU 0..1 depth convention -- the same two the renderer
+// uses, reconstructed here rather than read back, so agreement is evidence and not a tautology.
+glm::vec3 predictedNdc(const scene::Camera& camera, float aspect, glm::vec3 world) {
+    const glm::mat4 view = camera.view();
+    const glm::mat4 proj = glm::perspectiveRH_ZO(camera.fovYRadians, aspect, camera.nearPlane, camera.farPlane);
+    const glm::vec4 clip = proj * view * glm::vec4(world, 1.0f);
+    REQUIRE(std::abs(clip.w) > 1e-6f);
+    return glm::vec3(clip) / clip.w;
+}
+
+} // namespace
+
+TEST_CASE("a static object holds its transform under every camera motion", "[gpu][renderer][forensics][static]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    auto scene = staticObjectScene();
+    renderer.setDiagnosticEntity("STATIC_TEST_OBJECT");
+    const glm::mat4 authored = scene.entities.front().transform.matrix();
+    const glm::vec3 authoredPosition = scene.entities.front().transform.position;
+    const glm::quat authoredRotation = scene.entities.front().transform.rotation;
+    const glm::vec3 authoredScale = scene.entities.front().transform.scale;
+
+    constexpr std::uint32_t kWidth = 160;
+    constexpr std::uint32_t kHeight = 100;
+    constexpr float kAspect = static_cast<float>(kWidth) / static_cast<float>(kHeight);
+
+    // Each motion is a function of a normalised parameter, so every case runs the same loop and the
+    // same assertions; only the camera path differs.
+    struct Motion {
+        const char* name;
+        int frames;
+        void (*place)(scene::Camera&, float);
+    };
+    const Motion motions[] = {
+        {"translation", 120,
+         [](scene::Camera& c, float t) {
+             c.position = {-30.0f + 60.0f * t, 6.0f, 12.0f};
+             c.target = c.position + glm::vec3(0.0f, -0.1f, -1.0f);
+         }},
+        {"rotation", 120,
+         [](scene::Camera& c, float t) {
+             const float a = t * 2.0f * 3.14159265f;
+             c.position = {0.0f, 4.0f, 0.0f};
+             c.target = c.position + glm::vec3(std::sin(a), -0.15f, -std::cos(a));
+         }},
+        {"dolly", 120,
+         [](scene::Camera& c, float t) {
+             // From 70 m out to 3 m short of the object, straight down the line to it.
+             const glm::vec3 to = glm::normalize(kStaticTestPosition - glm::vec3(10.0f, 2.0f, 60.0f));
+             c.position = glm::vec3(10.0f, 2.0f, 60.0f) + to * (77.0f * t);
+             c.target = kStaticTestPosition;
+         }},
+        {"through", 160,
+         [](scene::Camera& c, float t) {
+             // Straight through the object and out the far side, which crosses the near plane
+             // against its geometry -- the case that breaks a renderer holding camera-relative state.
+             c.position = {10.0f, 2.0f, 20.0f - 80.0f * t};
+             c.target = c.position + glm::vec3(0.0f, 0.0f, -1.0f);
+         }},
+        {"orbit", 160,
+         [](scene::Camera& c, float t) {
+             const float a = t * 2.0f * 3.14159265f;
+             c.position = kStaticTestPosition + glm::vec3(28.0f * std::sin(a), 9.0f, 28.0f * std::cos(a));
+             c.target = kStaticTestPosition;
+         }},
+    };
+
+    std::uint64_t frameIndex = 0;
+    std::size_t framesChecked = 0;
+    std::size_t framesProjected = 0;
+    for (const Motion& motion : motions) {
+        INFO("motion: " << motion.name);
+        for (int i = 0; i < motion.frames; ++i) {
+            const float t = static_cast<float>(i) / static_cast<float>(motion.frames - 1);
+            motion.place(scene.camera, t);
+            FrameTime time{};
+            time.frameIndex = frameIndex++;
+            time.renderTime = static_cast<double>(time.frameIndex) / 60.0;
+            time.deltaTime = 1.0 / 60.0;
+            REQUIRE(renderer.renderToImage(scene, time, kWidth, kHeight).has_value());
+
+            // 1. The authored scene state is untouched, bit for bit. Nothing in the renderer may
+            //    write back through it -- not culling, not the camera, not a camera-relative rebase.
+            const scene::Entity& entity = scene.entities.front();
+            REQUIRE(entity.transform.position == authoredPosition);
+            REQUIRE(entity.transform.rotation == authoredRotation);
+            REQUIRE(entity.transform.scale == authoredScale);
+            REQUIRE(entity.transform.matrix() == authored);
+
+            // 2. The renderer's own record of the world matrix is that same matrix.
+            const rendering::RenderObjectDiagnostic* diag = renderer.diagnosticObject("STATIC_TEST_OBJECT");
+            REQUIRE(diag != nullptr);
+            REQUIRE(diag->finite);
+            REQUIRE(diag->worldMatrix == authored);
+            REQUIRE(diag->worldPosition == authoredPosition);
+            // Its world bounds move with nothing, because the object moves with nothing.
+            REQUIRE(diag->worldBoundsMin.x == Catch::Approx(diag->worldBoundsMin.x));
+            ++framesChecked;
+
+            // 3. Where it lands on screen is what the camera predicts, and only that. This is the
+            //    check that distinguishes correct parallax from a transform drifting underneath it.
+            const glm::mat4 vp = renderer.diagnosticFrame().viewProjection;
+            const glm::vec4 clip = vp * glm::vec4(authoredPosition, 1.0f);
+            if (clip.w > 1e-4f) {
+                const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+                const glm::vec3 expected = predictedNdc(scene.camera, kAspect, authoredPosition);
+                REQUIRE(std::abs(ndc.x - expected.x) < 2e-3f);
+                REQUIRE(std::abs(ndc.y - expected.y) < 2e-3f);
+                REQUIRE(std::abs(ndc.z - expected.z) < 2e-3f);
+                ++framesProjected;
+            }
+        }
+    }
+
+    CHECK(framesChecked == 680);
+    // Most frames have it in front of the camera; the through-pass deliberately does not.
+    CHECK(framesProjected > 400);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("returning the camera to a pose reproduces the frame exactly", "[gpu][renderer][forensics][static]") {
+    // The other half of "why does a static object move": if the object is still and the camera comes
+    // back to where it was, the image has to come back too. A renderer carrying state forward --
+    // temporal history, a stale object slot, an accumulated camera-relative origin -- fails here
+    // while passing every transform assertion above, because the transform was never the problem.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    auto scene = staticObjectScene();
+    renderer.setDiagnosticEntity("STATIC_TEST_OBJECT");
+    const scene::Camera home = scene.camera;
+
+    const auto renderAt = [&](std::uint64_t index) {
+        FrameTime time{};
+        time.frameIndex = index;
+        time.renderTime = static_cast<double>(index) / 60.0;
+        time.deltaTime = 1.0 / 60.0;
+        auto image = renderer.renderToImage(scene, time, 128, 96);
+        REQUIRE(image.has_value());
+        return std::move(*image);
+    };
+
+    scene.camera.position = {10.0f, 8.0f, 10.0f};
+    scene.camera.target = kStaticTestPosition;
+    const auto first = renderAt(0);
+    const std::uint64_t firstHash = renderer.diagnosticFrame().stateHash;
+
+    // A long excursion: orbit away, dolly in, pass through, come back.
+    for (int i = 1; i <= 240; ++i) {
+        const float t = static_cast<float>(i) / 240.0f;
+        const float a = t * 4.0f * 3.14159265f;
+        scene.camera.position = kStaticTestPosition +
+                                glm::vec3(30.0f * std::sin(a), 4.0f + 10.0f * t, 30.0f * std::cos(a));
+        scene.camera.target = kStaticTestPosition;
+        FrameTime time{};
+        time.frameIndex = static_cast<std::uint64_t>(i);
+        time.renderTime = static_cast<double>(i) / 60.0;
+        time.deltaTime = 1.0 / 60.0;
+        REQUIRE(renderer.renderToImage(scene, time, 128, 96).has_value());
+    }
+
+    scene.camera = home;
+    scene.camera.position = {10.0f, 8.0f, 10.0f};
+    scene.camera.target = kStaticTestPosition;
+    const auto returned = renderAt(0); // the same frame index, so temporal history is the only difference
+
+    CHECK(renderer.diagnosticFrame().stateHash == firstHash);
+    REQUIRE(first.rgba.size() == returned.rgba.size());
+    std::size_t differing = 0;
+    for (std::size_t i = 0; i < first.rgba.size(); ++i) {
+        differing += first.rgba[i] == returned.rgba[i] ? 0 : 1;
+    }
+    INFO(differing << " of " << first.rgba.size() << " channels differ after the excursion");
+    CHECK(differing == 0);
+    CHECK(ctx->errorCount() == 0);
 }

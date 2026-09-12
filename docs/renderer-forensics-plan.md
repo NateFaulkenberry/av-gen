@@ -98,7 +98,14 @@ open in Phase 7.
 
 ### 1.3 Audit duplicated state
 
-- `[ ]` Search for duplicated position, rotation, scale, world matrix, camera position/orientation, bounds, visibility and animation time.
+- `[~]` Search for duplicated position, rotation, scale, world matrix, camera position/orientation, bounds, visibility and animation time.
+  - `[x]` **Culling bounds were computed twice.** `Composition::cullEntityNodes` contained the posed
+    box, the conservative pad and the world-AABB corner transform written out in full, once for
+    EntityWorld-driven characters and once for authored mesh nodes. Two copies of a rule is two
+    places for it to drift, and neither copy was reachable by a test. Extracted to
+    `scene::entityCullBounds` (`src/scene/scene.hpp`), both call sites replaced, and the property is
+    now unit-tested directly. Full release suite unchanged at 1,681 passing.
+  - `[ ]` Continue the search for the remaining duplicated values.
 - `[ ]` Search for duplicated material, object ID, render ID, GPU index, buffer offset and generation values.
 - `[ ]` Build a table for each duplicate:
   `value | authoritative source | derived copies | writer | reader | update timing | lifetime | thread | GPU sync risk`.
@@ -149,15 +156,35 @@ open in Phase 7.
 
 ### 2.3 Static-object invariant and camera experiments
 
-- `[ ]` Add a known `STATIC_TEST_OBJECT` at a fixed position such as `(10, 2, -20)`.
-- `[ ]` Capture world position, rotation, scale, world matrix, render transform, GPU transform and camera state over hundreds/thousands of frames.
-- `[ ]` Test static object with camera translation.
-- `[ ]` Test static object with camera rotation.
-- `[ ]` Test camera dolly toward the object.
-- `[ ]` Test camera passing through or near the object.
-- `[ ]` Test camera orbit.
-- `[ ]` Require authored world transform stability in every case.
-- `[ ]` Stop downstream investigation if the minimal renderer fails these tests; repair transform/camera ownership first.
+- `[x]` Add a known `STATIC_TEST_OBJECT` at a fixed position such as `(10, 2, -20)`.
+  Exactly `(10, 2, -20)`, with a non-identity rotation and non-uniform scale so a lost or re-derived
+  TRS cannot look correct by accident. `tests/rendering/test_gpu.cpp`, `[gpu][renderer][forensics][static]`.
+- `[x]` Capture world position, rotation, scale, world matrix, render transform, GPU transform and camera state over hundreds/thousands of frames.
+  680 rendered frames per run; each asserts authored TRS, authored matrix, the renderer's diagnostic
+  world matrix and world position, and the diagnostic frame's camera state.
+- `[x]` Test static object with camera translation. *(120 frames, lateral sweep.)*
+- `[x]` Test static object with camera rotation. *(120 frames, full turn from a fixed position.)*
+- `[x]` Test camera dolly toward the object. *(120 frames, 70 m to 3 m along the sight line.)*
+- `[x]` Test camera passing through or near the object. *(160 frames straight through and out the far
+  side, which crosses the near plane against its geometry.)*
+- `[x]` Test camera orbit. *(160 frames, full orbit at 28 m.)*
+- `[x]` Require authored world transform stability in every case.
+  Bit equality, not tolerance: `transform.position/rotation/scale` and `matrix()` compare with `==`.
+- `[x]` Add a projection check that distinguishes correct parallax from transform corruption.
+  Each frame also predicts the object's NDC from `Camera::view()` and `perspectiveRH_ZO`
+  independently and compares it with the renderer's own view-projection: 2e-3 in all three axes,
+  over the ~500 frames where the object is in front of the camera.
+- `[x]` Prove a camera excursion is reversible. A 240-frame orbit/climb away and back reproduces the
+  first frame **byte for byte** (0 of 49,152 channels differ) and reproduces its diagnostic state
+  hash. This is the half that transform assertions cannot reach: temporal history, a stale object
+  slot or an accumulated camera-relative origin all pass the TRS checks and fail this one.
+- `[x]` Stop downstream investigation if the minimal renderer fails these tests; repair transform/camera ownership first.
+  Not triggered: the renderer path passes every case.
+
+**Result: `SceneRenderer` does not move a static object.** The renderer-side half of completion-gate
+question 1 is answered with evidence. The *composition*-side path (node hierarchy flattening,
+terrain grounding, sequencer writes) is a separate surface and is still covered only by the existing
+static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 
 ## Phase 3: Camera, GPU object data and frame synchronization
 
@@ -317,7 +344,21 @@ open in Phase 7.
 - `[x]` Animated entity culling derives bounds from the current joint palette and applies a conservative
   residual pad before frustum testing. The renderer QA record and scene code establish the ownership
   and implementation; a pixel-level limb-crossing regression is still required below.
-- `[ ]` Add frustum-edge image regression where a posed limb crosses the plane while bind pose does not.
+- `[x]` Add frustum-edge regression where a posed limb crosses the plane while bind pose does not.
+  `tests/unit/test_skeleton.cpp`, `[scene][skeleton][culling]`, 218 assertions.
+
+  **Disproven hypothesis, recorded so it is not retried:** the same regression written against the
+  alien composition *cannot discriminate*. A T-pose bind box is **wider** than every pose the clip
+  animates into, so bind-pose bounds are conservative there and both implementations agree. A sweep
+  of 65 positions across the frustum edge, each rendered twice (as culled, and with `cameraCulled`
+  cleared as a no-cull control), passed identically with the posed-bounds path deliberately reverted
+  to bind-pose bounds. Any future regression here needs a rig that reaches **past** its bind pose.
+
+  The instrument that does discriminate is a two-joint bar whose tip rotates a right angle, swinging
+  the top half ~1.5 m outside the bind box. The test asserts the pose genuinely leaves that box
+  (`REQUIRE(bent.min.x < bindLo.x - 1.0f)`) before asserting the cull box contains every posed
+  vertex, so it cannot pass for the wrong reason. Negative-controlled: forcing bind-pose bounds fails
+  it.
 
 ### 5.2 LOD isolation
 

@@ -1500,60 +1500,17 @@ void Composition::cullEntityNodes() {
     }
     const float aspect = static_cast<float>(viewportWidth_) / static_cast<float>(viewportHeight_);
     const world::FrustumPlanes planes = world::frustumPlanes(scene_.camera.projection(aspect) * scene_.camera.view());
-    const auto posedBounds = [&](const Entity& entity, const glm::vec3& lo, const glm::vec3& hi) {
-        if (entity.rig == kInvalidRig || entity.rig >= scene_.rigs.size() || entity.mesh >= scene_.meshes.size() ||
-            !scene_.meshes[entity.mesh].skinned()) {
-            return std::pair{lo, hi};
-        }
-        const SkinnedRig& rig = scene_.rigs[entity.rig];
-        const MeshData& mesh = scene_.meshes[entity.mesh];
-        if (rig.palette.empty() || rig.skeleton.palette.empty()) {
-            return std::pair{lo, hi};
-        }
-        glm::vec3 posedLo(std::numeric_limits<float>::max());
-        glm::vec3 posedHi(std::numeric_limits<float>::lowest());
-        bool any = false;
-        for (std::size_t i = 0; i < mesh.vertices.size() && i < mesh.skin.size(); ++i) {
-            glm::vec3 position(0.0f);
-            float weightSum = 0.0f;
-            const SkinInfluence& influence = mesh.skin[i];
-            for (std::size_t j = 0; j < kJointInfluences; ++j) {
-                const float weight = influence.weights[j];
-                if (weight <= 0.0f || influence.joints[j] >= rig.palette.size()) {
-                    continue;
-                }
-                position += glm::vec3(rig.palette[influence.joints[j]] * glm::vec4(mesh.vertices[i].position, 1.0f)) * weight;
-                weightSum += weight;
-            }
-            if (weightSum <= 1e-6f) {
-                continue;
-            }
-            position /= weightSum;
-            posedLo = glm::min(posedLo, position);
-            posedHi = glm::max(posedHi, position);
-            any = true;
-        }
-        return any ? std::pair{posedLo, posedHi} : std::pair{lo, hi};
-    };
+    // One description of the box, in `scene::entityCullBounds`. It was written out twice here --
+    // once for EntityWorld-driven characters and once for authored mesh nodes -- and two copies of
+    // a rule is two places for it to drift. It is also the only way to test the property that
+    // matters: a posed skeleton may reach outside its bind-pose bounds, and a composition test
+    // cannot reach a rig that does (a T-pose bind is wider than the poses it animates into).
     const auto cullEntity = [&](Entity& entity) {
         if (entity.mesh == kInvalidMesh || entity.mesh >= scene_.meshes.size() || entity.style == MeshStyle::Water) {
             return;
         }
-        const auto [meshLo, meshHi] = scene_.meshes[entity.mesh].bounds();
-        const auto [lo, hi] = posedBounds(entity, meshLo, meshHi);
-        const glm::vec3 pad = (hi - lo) * 0.25f + glm::vec3(0.25f);
-        const glm::mat4 model = entity.transform.matrix();
-        glm::vec3 worldLo(std::numeric_limits<float>::max());
-        glm::vec3 worldHi(std::numeric_limits<float>::lowest());
-        for (int corner = 0; corner < 8; ++corner) {
-            const glm::vec3 local((corner & 1) ? hi.x + pad.x : lo.x - pad.x,
-                                  (corner & 2) ? hi.y + pad.y : lo.y - pad.y,
-                                  (corner & 4) ? hi.z + pad.z : lo.z - pad.z);
-            const glm::vec3 world = glm::vec3(model * glm::vec4(local, 1.0f));
-            worldLo = glm::min(worldLo, world);
-            worldHi = glm::max(worldHi, world);
-        }
-        entity.cameraCulled = !world::aabbVisible(planes, worldLo, worldHi);
+        const CullBounds bounds = entityCullBounds(scene_, entity);
+        entity.cameraCulled = !world::aabbVisible(planes, bounds.min, bounds.max);
     };
     for (const auto& entityPtr : entityWorld_.entities()) {
         const CompositionNode* node = findNode(entityPtr->desc().driven());
@@ -1573,24 +1530,8 @@ void Composition::cullEntityNodes() {
                     e.cameraCulled = false;
                     continue;
                 }
-                const auto [meshLo, meshHi] = scene_.meshes[e.mesh].bounds();
-                const auto [lo, hi] = posedBounds(e, meshLo, meshHi);
-                // A posed skeleton can reach outside its bind-pose bounds. Skinned meshes use the
-                // current palette above; the small residual pad covers interpolation and numerical
-                // edge cases without disabling culling for the whole character.
-                const glm::vec3 pad = (hi - lo) * 0.25f + glm::vec3(0.25f);
-                const glm::mat4 m = e.transform.matrix();
-                glm::vec3 wlo(std::numeric_limits<float>::max());
-                glm::vec3 whi(std::numeric_limits<float>::lowest());
-                for (int corner = 0; corner < 8; ++corner) {
-                    const glm::vec3 p((corner & 1) ? hi.x + pad.x : lo.x - pad.x,
-                                      (corner & 2) ? hi.y + pad.y : lo.y - pad.y,
-                                      (corner & 4) ? hi.z + pad.z : lo.z - pad.z);
-                    const glm::vec3 w = glm::vec3(m * glm::vec4(p, 1.0f));
-                    wlo = glm::min(wlo, w);
-                    whi = glm::max(whi, w);
-                }
-                e.cameraCulled = !world::aabbVisible(planes, wlo, whi);
+                const CullBounds bounds = entityCullBounds(scene_, e);
+                e.cameraCulled = !world::aabbVisible(planes, bounds.min, bounds.max);
             }
             break;
         }

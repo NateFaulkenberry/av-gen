@@ -184,4 +184,69 @@ void Scene::clear() {
     ++textureVersion;
 }
 
+CullBounds entityCullBounds(const Scene& scene, const Entity& entity, float padFraction,
+                            float padAbsolute) {
+    CullBounds out;
+    if (entity.mesh == kInvalidMesh || entity.mesh >= scene.meshes.size()) {
+        return out;
+    }
+    const MeshData& mesh = scene.meshes[entity.mesh];
+    auto [lo, hi] = mesh.bounds();
+
+    // The posed box, when there is a palette to pose with. Every vertex is transformed by its own
+    // weighted joints -- the same arithmetic the skinning shader does -- so the box is the geometry
+    // the frame will actually draw rather than the geometry the asset was authored in.
+    if (entity.rig != kInvalidRig && entity.rig < scene.rigs.size() && mesh.skinned()) {
+        const SkinnedRig& rig = scene.rigs[entity.rig];
+        if (!rig.palette.empty() && !rig.skeleton.palette.empty()) {
+            glm::vec3 posedLo(std::numeric_limits<float>::max());
+            glm::vec3 posedHi(std::numeric_limits<float>::lowest());
+            bool any = false;
+            for (std::size_t i = 0; i < mesh.vertices.size() && i < mesh.skin.size(); ++i) {
+                glm::vec3 position(0.0f);
+                float weightSum = 0.0f;
+                const SkinInfluence& influence = mesh.skin[i];
+                for (std::size_t j = 0; j < kJointInfluences; ++j) {
+                    const float weight = influence.weights[j];
+                    if (weight <= 0.0f || influence.joints[j] >= rig.palette.size()) {
+                        continue;
+                    }
+                    position += glm::vec3(rig.palette[influence.joints[j]] *
+                                          glm::vec4(mesh.vertices[i].position, 1.0f)) *
+                                weight;
+                    weightSum += weight;
+                }
+                if (weightSum <= 1e-6f) {
+                    continue; // an unweighted vertex is not posed by anything; the bind box covers it
+                }
+                position /= weightSum;
+                posedLo = glm::min(posedLo, position);
+                posedHi = glm::max(posedHi, position);
+                any = true;
+            }
+            if (any) {
+                lo = posedLo;
+                hi = posedHi;
+                out.posed = true;
+            }
+        }
+    }
+
+    const glm::vec3 pad = (hi - lo) * padFraction + glm::vec3(padAbsolute);
+    const glm::mat4 model = entity.transform.matrix();
+    glm::vec3 worldLo(std::numeric_limits<float>::max());
+    glm::vec3 worldHi(std::numeric_limits<float>::lowest());
+    for (int corner = 0; corner < 8; ++corner) {
+        const glm::vec3 local((corner & 1) ? hi.x + pad.x : lo.x - pad.x,
+                              (corner & 2) ? hi.y + pad.y : lo.y - pad.y,
+                              (corner & 4) ? hi.z + pad.z : lo.z - pad.z);
+        const glm::vec3 world = glm::vec3(model * glm::vec4(local, 1.0f));
+        worldLo = glm::min(worldLo, world);
+        worldHi = glm::max(worldHi, world);
+    }
+    out.min = worldLo;
+    out.max = worldHi;
+    return out;
+}
+
 } // namespace avgen::scene
