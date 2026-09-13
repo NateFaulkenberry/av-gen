@@ -141,6 +141,21 @@ TEST_CASE("The ceiling of an impostor and HLOD proxy system on Glowmere",
     fs::create_directories(outDir, ec);
 
     // One arm, one run. Returns the medians over the steady window.
+    // Every culling procedural's authored minScreenRadius, captured once. An arm **assigns** from
+    // this rather than raising the live value, because `Composition::update` does not rewrite
+    // `lod.minScreenRadius` each frame and a `std::max` therefore never comes back down.
+    //
+    // The first version did raise it, and the leak is on the record: after the 200 px arm, runs 1
+    // and 2 reported 99,820 triangles for **every** arm including the baseline -- eight
+    // measurements of the 200 px arm wearing four different labels. This is the failure the
+    // measurement protocol names: a probe that changes state must re-establish it before each
+    // measurement.
+    std::vector<float> authoredMinRadius;
+    authoredMinRadius.reserve(composition->scene().procedurals.size());
+    for (const scene::ProceduralGeometry& p : composition->scene().procedurals) {
+        authoredMinRadius.push_back(p.lod.minScreenRadius);
+    }
+
     const auto measure = [&](const Arm& arm, bool capture) {
         std::vector<double> frames;
         std::vector<double> scenes;
@@ -154,8 +169,10 @@ TEST_CASE("The ceiling of an impostor and HLOD proxy system on Glowmere",
             // After update, because update is what rebuilds the scene each frame. This is a
             // per-frame uniform (LodSettings::structuralHash covers lodCount only), so raising it
             // costs no rebuild and changes nothing but which instances the cull pass keeps.
-            if (arm.minScreenRadius > 0.0f) {
-                for (scene::ProceduralGeometry& p : composition->scene().procedurals) {
+            {
+                auto& procs = composition->scene().procedurals;
+                for (std::size_t pi = 0; pi < procs.size(); ++pi) {
+                    scene::ProceduralGeometry& p = procs[pi];
                     // Only objects whose author already turned culling on. The first version of
                     // this arm set `lod.cull = true` on every procedural, which switched culling on
                     // for hand-placed hero geometry that never had it -- and deleted the elder
@@ -169,7 +186,9 @@ TEST_CASE("The ceiling of an impostor and HLOD proxy system on Glowmere",
                     if (!p.lod.cull) {
                         continue;
                     }
-                    p.lod.minScreenRadius = std::max(p.lod.minScreenRadius, arm.minScreenRadius);
+                    const float authored =
+                        pi < authoredMinRadius.size() ? authoredMinRadius[pi] : p.lod.minScreenRadius;
+                    p.lod.minScreenRadius = std::max(authored, arm.minScreenRadius);
                 }
             }
             auto image = renderer.renderToImage(engine.scene(), time, kWidth, kHeight);
@@ -250,13 +269,22 @@ TEST_CASE("The ceiling of an impostor and HLOD proxy system on Glowmere",
     // A null delta is only evidence if the arm really removed the geometry, so this asserts that it
     // did. It says nothing about how much time was saved, because that is the measurement.
     //
-    // It asserts on **triangles**, not on `visibleInstances`. That counter is read back from the
-    // cull pass a frame or more late (ADR-077: the CPU cannot have it without stalling the frame it
-    // is measuring), and on the first run of this test it reported 1 instance for the baseline
-    // against 71 for an arm that draws strictly less -- backwards, and by three orders of
-    // magnitude. It is printed above, because a reader should see it, and it is not asserted on,
-    // because it does not mean what its name says on the frame it is sampled from.
+    // It asserts on **triangles**, not on `visibleInstances`. An earlier version asserted on the
+    // instance count and failed with the baseline at 1 against an arm at 71 -- backwards. That was
+    // first blamed on the counter being read back late (ADR-077); it was not. It was the state leak
+    // below, and once the leak was fixed the instance counts came out in the right order. The
+    // attribution is recorded because a wrong one that is never corrected is how a healthy counter
+    // acquires a reputation. Triangles remain the guard regardless: they are exact, CPU-side, and
+    // not a GPU readback at all.
+    // The baseline must submit the same geometry every time it is measured. This is the assertion
+    // the state leak above would have failed loudly instead of silently: three identical labels
+    // reporting three different triangle counts is a probe contaminating itself, and no delta
+    // measured beside it means anything.
     REQUIRE(results[0].back().triangles > 0);
+    for (std::size_t run = 1; run < results[0].size(); ++run) {
+        INFO("the baseline arm must be re-established before every run");
+        CHECK(results[0][run].triangles == results[0][0].triangles);
+    }
     for (std::size_t a = 1; a < kArms.size(); ++a) {
         INFO("arm " << kArms[a].name << " must submit strictly fewer triangles than the baseline");
         CHECK(results[a].back().triangles < results[0].back().triangles);
