@@ -97,6 +97,8 @@ void hashDiagnosticFrame(RendererDiagnosticFrame& frame) {
     for (const RenderObjectDiagnostic& object : frame.objects) {
         hashBytes(frame.stateHash, &object.entityIndex, sizeof(object.entityIndex));
         hashBytes(frame.stateHash, &object.objectSlot, sizeof(object.objectSlot));
+        hashBytes(frame.stateHash, &object.mesh, sizeof(object.mesh));
+        hashBytes(frame.stateHash, &object.materialHash, sizeof(object.materialHash));
         hashBytes(frame.stateHash, &object.worldPosition, sizeof(object.worldPosition));
         hashBytes(frame.stateHash, &object.worldMatrix, sizeof(object.worldMatrix));
         hashBytes(frame.stateHash, &object.worldBoundsMin, sizeof(object.worldBoundsMin));
@@ -1714,6 +1716,31 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         diagnostic.name = entity.name;
         diagnostic.entityIndex = diagnosticFrame_.objects.size();
         diagnostic.worldPosition = entity.transform.position;
+        diagnostic.mesh = entity.mesh;
+        // A fingerprint of the surface, not the surface. Enough to answer "is this the same
+        // material" in a capture comparison, which is the question a diff asks; the fields
+        // themselves live in the scene.
+        {
+            std::uint64_t h = 1469598103934665603ull;
+            const auto mix = [&h](const void* data, std::size_t size) {
+                const auto* bytes = static_cast<const std::uint8_t*>(data);
+                for (std::size_t i = 0; i < size; ++i) {
+                    h ^= bytes[i];
+                    h *= 1099511628211ull;
+                }
+            };
+            const scene::Material& m = entity.material;
+            mix(&m.baseColor, sizeof(m.baseColor));
+            mix(&m.emissiveColor, sizeof(m.emissiveColor));
+            mix(&m.emissiveIntensity, sizeof(m.emissiveIntensity));
+            mix(&m.roughness, sizeof(m.roughness));
+            mix(&m.metallic, sizeof(m.metallic));
+            mix(&m.opacity, sizeof(m.opacity));
+            mix(&m.alphaMode, sizeof(m.alphaMode));
+            mix(&m.alphaCutoff, sizeof(m.alphaCutoff));
+            mix(m.program.data(), m.program.size());
+            diagnostic.materialHash = h;
+        }
         diagnostic.worldMatrix = model;
         if (entity.rig != scene::kInvalidRig && entity.rig < scene.rigs.size()) {
             const scene::SkinnedRig& rig = scene.rigs[entity.rig];

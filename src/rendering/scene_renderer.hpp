@@ -81,6 +81,13 @@ struct RenderObjectDiagnostic {
     std::string name;
     std::size_t entityIndex = 0;
     std::uint32_t objectSlot = std::numeric_limits<std::uint32_t>::max();
+    // What this object is *made of*, which the transform cannot say (Phase 2.1). A mesh or material
+    // swapped for another produces a wrong picture with every matrix identical, and a capture that
+    // carried only the geometry's placement would compare as unchanged. The material is a
+    // fingerprint rather than the struct: the question a diff asks is "is this the same surface",
+    // and one number answers it without the snapshot growing a copy of every material field.
+    scene::MeshId mesh = scene::kInvalidMesh;
+    std::uint64_t materialHash = 0;
     glm::vec3 worldPosition{0.0f};
     glm::mat4 worldMatrix{1.0f};
     glm::vec3 worldBoundsMin{0.0f};

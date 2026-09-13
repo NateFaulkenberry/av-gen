@@ -73,6 +73,8 @@ json snapshotToJson(const FrameSnapshot& s) {
         objects.push_back(json{{"name", o.name},
                                {"entityIndex", o.entityIndex},
                                {"objectSlot", o.objectSlot},
+                               {"mesh", o.mesh},
+                               {"materialHash", o.materialHash},
                                {"worldPosition", vec3(o.worldPosition)},
                                {"worldMatrix", mat4(o.worldMatrix)},
                                {"boundsMin", vec3(o.worldBoundsMin)},
@@ -160,6 +162,8 @@ Result<FrameSnapshot> snapshotFromJson(const json& doc) {
         d.name = o.value("name", std::string());
         d.entityIndex = o.value("entityIndex", std::size_t{0});
         d.objectSlot = o.value("objectSlot", d.objectSlot);
+        d.mesh = o.value("mesh", d.mesh);
+        d.materialHash = o.value("materialHash", std::uint64_t{0});
         auto position = readVec3(o, "worldPosition");
         auto matrix = readMat4(o, "worldMatrix");
         auto lo = readVec3(o, "boundsMin");
@@ -278,6 +282,15 @@ std::vector<std::string> compareSnapshots(const FrameSnapshot& expected, const F
         }
         if (was.submitted != now.submitted) {
             out.push_back(fmt::format("'{}' submission: {} -> {}", now.name, was.submitted, now.submitted));
+        }
+        if (was.mesh != now.mesh) {
+            out.push_back(fmt::format("'{}' is drawing mesh {} instead of {}", now.name, now.mesh,
+                                      was.mesh));
+        }
+        if (was.materialHash != now.materialHash) {
+            // A wrong picture with every matrix identical looks like a renderer fault until this
+            // line appears and says it is a different surface.
+            out.push_back(fmt::format("'{}' has a different material", now.name));
         }
         if (was.objectSlot != now.objectSlot) {
             out.push_back(fmt::format("'{}' took GPU slot {} instead of {}", now.name, now.objectSlot,

@@ -299,19 +299,41 @@ frame in its modulation pass; a composition updated on its own does not, so a te
 
 ### 2.1 Design the render snapshot contract
 
-- `[ ]` Define an explicit per-frame render snapshot or equivalent immutable contract.
-- `[ ]` Ensure each renderable carries, directly or through stable references:
-  - object/entity ID;
-  - mesh and material IDs;
-  - world position, rotation and scale;
-  - world/model matrix;
-  - world bounds;
-  - visibility/cull reason;
-  - animation/skin state when applicable;
-  - GPU slot/index metadata.
-- `[ ]` Define which values are copied at extraction and which are resolved by the renderer.
-- `[ ]` Ensure the render frame consumes the snapshot without mutating scene state.
-- `[ ]` Add unit coverage for snapshot stability and repeated extraction.
+The contract exists, in a different shape from the one this phase imagined, and the difference is
+worth stating plainly: **the renderer consumes the `Scene` itself, by const reference, and records a
+snapshot as it goes.** There is no separate extraction step that builds an immutable copy for the
+renderer to draw from.
+
+That answers the same questions more cheaply. Immutability is enforced by the type system rather than
+by copying -- all three `SceneRenderer` entry points take `const scene::Scene&`, and the only
+`const_cast` under `src/rendering` is on the renderer's own LOD bookkeeping -- and the per-frame
+record is `RendererDiagnosticFrame`, which is written during the same walk that submits the draws, so
+it cannot describe a different frame from the one that was drawn.
+
+- `[x]` Define an explicit per-frame render snapshot or equivalent immutable contract.
+  `RendererDiagnosticFrame` + `rendering::FrameSnapshot`, serialisable and diffable (Phase 9.1).
+- `[x]` Ensure each renderable carries, directly or through stable references:
+  - `[x]` object/entity ID -- `name` and `entityIndex`;
+  - `[x]` mesh and material IDs -- `mesh`, and `materialHash`, a fingerprint of the surface rather
+    than a copy of it: the question a comparison asks is "is this the same material", and one number
+    answers it without the snapshot growing a copy of every material field;
+  - `[x]` world position, rotation and scale -- carried as the `worldMatrix`, which is what the GPU
+    receives, plus `worldPosition`;
+  - `[x]` world/model matrix;
+  - `[x]` world bounds, and the six signed frustum margins;
+  - `[x]` visibility/cull reason -- `visible`, `cameraCulled`, `cullReason`, `submitted`;
+  - `[x]` animation/skin state -- `rigIndex`, `jointCount`, `paletteVersion`, `paletteTime`;
+  - `[x]` GPU slot/index metadata -- `objectSlot`.
+- `[x]` Define which values are copied at extraction and which are resolved by the renderer.
+  Everything in the snapshot is *copied at submission*, by value, at the moment the object's uniforms
+  are written. Nothing in it is a reference into the scene, which is what lets a capture outlive the
+  frame and be compared against one from another process.
+- `[x]` Ensure the render frame consumes the snapshot without mutating scene state. By the type
+  system; see above.
+- `[x]` Add unit coverage for snapshot stability and repeated extraction.
+  `[gpu][composition][forensics][snapshot]`: the same state captured twice reports no difference, a
+  capture survives a round trip through a file, and each kind of change -- moved, culled, resubmitted,
+  slot-swapped, mesh-swapped, material-swapped, gone, new, camera, arms -- is reported as itself.
 
 ### 2.2 Build the minimal reference renderer
 

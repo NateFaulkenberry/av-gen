@@ -2500,6 +2500,18 @@ TEST_CASE("a captured frame replays, and two of them differ in words",
             CHECK(reports(diff, "culling"));
             CHECK(reports(diff, "submission"));
         }
+        // A swapped mesh or material: a wrong picture with every matrix identical, which is what
+        // Phase 2.1 asks a snapshot to carry beyond the geometry's placement.
+        {
+            rendering::FrameSnapshot other = first;
+            other.frame.objects.front().mesh += 1;
+            CHECK(reports(rendering::compareSnapshots(first, other), "instead of"));
+        }
+        {
+            rendering::FrameSnapshot other = first;
+            other.frame.objects.front().materialHash ^= 0x9E3779B97F4A7C15ull;
+            CHECK(reports(rendering::compareSnapshots(first, other), "different material"));
+        }
         // A swapped GPU slot: the mechanism Phase 3.3 is about.
         {
             rendering::FrameSnapshot swapped = first;
