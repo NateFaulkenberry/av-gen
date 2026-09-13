@@ -389,10 +389,23 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
     diagnostics verify stable object-slot assignment -- including under alternating transforms and a
     coming-and-going third object, where a stale or swapped slot would show. Ring-buffer/resource
     reuse and full pass bind-state auditing remain open.
-- `[~]` Verify CPU/WGSL structure size, alignment, offsets, padding, type widths and matrix layout.
-  Frame and object uniform sizes were already asserted; explicit C++ field-offset assertions now
-  guard the WGSL field order. Alignment/padding and the remaining GPU-side structures still need
-  the same treatment.
+- `[x]` Verify CPU/WGSL structure size, alignment, offsets, padding, type widths and matrix layout.
+  `tests/unit/test_renderer_layout_guards.cpp`, `[unit][renderer][forensics][layout]`. Rather than
+  restating sizes in a second place, it *parses both declarations* -- a WGSL layout engine (uniform
+  address space: vec3 aligns to 16, matrix column stride, array element stride rounded to 16) and a
+  C++ one (Itanium ABI, glm's real alignments, array extents resolved against constants scraped from
+  the headers) -- flattens both to leaf scalars at absolute offsets and compares offset, width and
+  type class, then the member names in order. **21 structure pairs agree.** Nine dynamic-offset
+  strides are checked for `% 256` and against their record size.
+
+  Its controls are the argument for the approach: adding a `vec4` to the WGSL `WaterUniforms` is
+  caught while the existing `static_assert(sizeof == 192)` still passes, and swapping two same-typed
+  members is invisible to every byte-level check and caught only by the name comparison.
+
+  Left open deliberately: `GpuLight`, `ShadowUniforms`/`ShadowViewGpu` and `WindUniforms` report
+  `alignof == 4` because `glm::vec4` is not over-aligned in this build. Harmless today -- all are
+  16-byte-multiple sized and uploaded at 0 or a 256-multiple -- and the fix is `alignas(16)` on each,
+  matching what `spatial::FieldGpu` already does.
 - `[x]` Add an alternating-transform two-object test to detect stale or swapped GPU data.
   `tests/rendering/test_gpu.cpp`, `[gpu][renderer][forensics][objects]`, 399 assertions: two cubes of
   different sizes exchange places for 24 frames, then a third comes and goes for 12 more so a
@@ -896,9 +909,27 @@ that check is what found the two gaps recorded below.
 
 ### 9.3 NaN/Inf guards and transform history
 
-- `[~]` Keep existing finite camera/entity/palette guards.
-- `[ ]` Extend guards to bounds, materials, water state, packed GPU structures and all diagnostic snapshot values.
-- `[ ]` Report entity, frame, system, property and value when invalid data is found.
+- `[x]` Keep existing finite camera/entity/palette guards.
+- `[~]` Extend guards to bounds, materials, water state, packed GPU structures and all diagnostic snapshot values.
+
+**The reason this phase mattered more than it looked.** `glm::min` and `glm::max` are `(y<x)?y:x`
+and `(x<y)?y:x`, so a NaN loses every comparison it takes part in and is **silently discarded rather
+than propagated**. Every bounds accumulator in the engine folds that way, which means a corrupt value
+does not arrive downstream as a NaN a guard could catch -- it arrives as a *plausible finite number*,
+or as an inverted sentinel that is finite and contains nothing.
+
+Four doors were open and are now shut, each reporting the entity and the value:
+`entityCullBounds` (an infinite scale returned `min = FLT_MAX, max = lowest()` -- finite, inverted,
+culled everywhere, silent: the shape of a "the object is just gone" report), `MeshData::bounds`
+(non-finite vertices dropped without a word, giving a box that is finite and too small),
+`fitDirectionalCascade` (nothing stood between a cascade fit and the GPU) and `packLight` (whose
+clamps cannot help, being comparisons).
+
+Still open, and all needing a device so they belong in `tests/rendering/`: water state
+(`waterUniformsFrom`), the diagnostic snapshot, and the material-to-`ObjectUniforms` packing inside
+`SceneRenderer::render`.
+- `[x]` Report entity, frame, system, property and value when invalid data is found. Each of the four
+  guards above names the object and prints the offending numbers.
 - `[ ]` Add selected-object transform history containing frame, world TRS/matrix, GPU TRS/matrix and camera state.
 - `[ ]` Add screen-space projection history to distinguish correct camera parallax from transform corruption.
 

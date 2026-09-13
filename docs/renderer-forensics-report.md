@@ -195,6 +195,32 @@ not have; it does not prove the pixel is gone in every water program, because a 
 `uv.x` would still draw the overhang. The GPU shoreline test below covers the depth-test half of the
 question on synthetic geometry, not this one on a real world.
 
+### NaN is discarded by the bounds folds, not propagated
+
+**Symptom:** none reported -- this was found by audit rather than by a bug. It is recorded because it
+explains a *class* of report: an object that is simply gone, a mesh that looks mis-modelled, a frame
+that goes black around one light.
+
+**Evidence:** `tests/unit/test_renderer_layout_guards.cpp`. `glm::min`/`glm::max` are `(y<x)?y:x`, so
+a NaN loses every comparison and is dropped. Four consequences, each reproduced by poisoning one
+field and observing the output:
+
+| Door | What arrived downstream |
+|---|---|
+| `entityCullBounds`, infinite scale | `min = FLT_MAX`, `max = lowest()` -- **finite**, so no `isfinite` guard can fire, and **inverted**, so every frustum test rejects it. Silent. |
+| `MeshData::bounds`, NaN vertex | a finite box, too small, with no mention of the vertex |
+| `fitDirectionalCascade` | a non-finite `viewProj` straight into the shadow uniforms |
+| `packLight` | NaN intensity survives `std::max(x, 0)`; NaN position copied verbatim |
+
+**Repair:** each door now tests for a *valid* result rather than a finite one, names the object and
+prints the values. `entityCullBounds` falls back to a small box at the entity's position, so the
+object draws in the wrong place instead of vanishing -- a thing in the wrong place can be chased.
+`packLight` drops the light rather than correcting it: a missing light is something to look for; a
+light that quietly became a different light is a wrong picture nobody can explain.
+
+**Residual risk:** water state, the diagnostic snapshot and the material-to-object packing are all
+inside the GPU-linked code and were not reachable from the unit binary; they are untested.
+
 ### Detached composition parameter use-after-free
 
 **Symptom:** `Composition::update()` dereferenced node light/terrain/water parameter pointers after
