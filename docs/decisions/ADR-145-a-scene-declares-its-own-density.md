@@ -74,9 +74,16 @@ the horizon, thin cover, and the composition weight in the background band rathe
 foreground. Same seed, same asset library, same art profile as the rungs, so a difference between
 them is a difference in the *shot* and not in the content.
 
-Measured on first run: 15.66 ms GPU against `glowmere-medium`'s 9.24 ms, 125 draws, 304 visible
-instances — and a 26.3 ms wall clock against a 15.7 ms GPU, which says this profile is bound
-somewhere the density ladder is not.
+Measured: 125 draws, 304 visible instances, 277,661 submitted triangles, 15.99 ms GPU under a
+26.81 ms wall clock — a bottleneck no rung on the ladder has.
+
+**And then looked at, which changed what is claimed for it.** The frame is sparse ground running out
+to a distant ridge under a lot of sky: a real vista, and a real workload distinct from every rung.
+It is *not* the distant-representation torture case §45 has in mind, because the composer still
+places its foreground hero — 914 submitted triangles per visible instance against
+`glowmere-medium`'s 103, which is the same fact from the counters' side. The recipe says this about
+itself rather than leaving the claim standing; reaching the harder case is a composition problem and
+is not solved here.
 
 §45's other two named profiles, Character and the AV Gen Showcase, are **not** built here and are
 not claimed. They need authored content rather than a recipe.
