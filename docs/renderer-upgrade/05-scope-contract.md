@@ -41,7 +41,6 @@ capability AV Gen does not need).
 | 37 | Transient resources / attachments | B | Apple: load and store actions "consume the majority of your app's system bandwidth" |
 | 40 | Shader audit (`pbr`, `shadow_mask`, `volume` first) | B | the pass is fragment-bound; this is where per-invocation cost lives |
 | 17 | Screen-space importance | C | the central system the spec asks for, and the input to everything below |
-| 11 | Screen-space-error LOD selection | C | replaces distance thresholds with a measurable criterion |
 | 11 | Screen-space-error LOD selection, wired | C | ADR-151: `RepresentationSelector` is built and calibrated and consumes nothing. Run on Glowmere's real ladders it halves the frame's triangles for -4.7% of the triangle-size-weighted cost, with no new machinery. The open question is quality, not cost. |
 | 20 | Material quality tiers | D | per-invocation cost for pixels that do not deserve full PBR |
 | 18–19 | Subsystem quality budgets, not a global slider | D | the spec is explicit that binary quality is not professional scalability |
