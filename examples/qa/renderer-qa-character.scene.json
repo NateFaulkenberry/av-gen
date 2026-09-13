@@ -1,0 +1,19 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Renderer QA: character",
+ "_note": "Phase 5.3's isolation scene: camera, ground, one character, one light. Nothing else, so a flicker, a pose jump or a culling verdict has one place to have come from.",
+ "camera": {"mode": 1, "position": [0, 1.6, 4.5], "target": [0, 1, 0], "fov": 42, "orbitSpeed": 0},
+ "environment": {
+  "background": [0.004, 0.006, 0.012],
+  "intensity": 0.6,
+  "fogDensity": 0.0,
+  "volumeDensity": 0.0,
+  "sky": {"enabled": false, "background": false}
+ },
+ "nodes": [
+  {"name": "floor", "kind": "grid", "position": [0, 0, 0], "scale": [4, 1, 4]},
+  {"name": "alien", "kind": "gltf", "asset": "../../assets/imported/alien.gltf", "position": [0, 0, 0],
+   "scale": [0.01, 0.01, 0.01], "animation": {"state": "Walk", "blend": 0.2}}
+ ]
+}

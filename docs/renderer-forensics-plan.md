@@ -673,9 +673,22 @@ turns it off, the symptom stays, and a subsystem is wrongly cleared.
 
 - `[~]` Maintain `examples/qa/renderer-qa.json` as the permanent controlled test scene.
   - `[x]` Existing scene contains near/far/behind-camera geometry, skinned alien, transparent orb, particles and floor.
-  - `[ ]` Add explicit UFO/static object, flat/slope/irregular terrain, water shoreline/depth cases, LOD distance ladder, shadow casters and labeled camera positions.
-  - `[ ]` Add stable object IDs and labels that map to the forensic panel.
-  - `[ ]` Add scene variants for minimal, water-only, character-only and transparency-only tests.
+  - `[~]` Add explicit UFO/static object, flat/slope/irregular terrain, water shoreline/depth cases, LOD distance ladder, shadow casters and labeled camera positions.
+    The static object is `static-cube` in the minimal variant, at Phase 2.3's documented
+    `(10, 2, -20)` with a non-identity rotation and non-uniform scale. Terrain and a generated
+    shoreline are in the water variant. A LOD distance ladder and labelled camera positions are not
+    added: the LOD ladder wants a control that does not exist yet (Phase 4.2), and camera positions
+    live in the tests that use them rather than in the scene, where nothing reads them.
+  - `[x]` Add stable object IDs and labels that map to the forensic panel. Node names are the
+    identifiers throughout -- the panel's selection, the renderer's per-object diagnostics and every
+    forensic test address objects by name, and the names in these scenes are chosen to say what each
+    object is for.
+  - `[x]` Add scene variants for minimal, water-only, character-only and transparency-only tests.
+    `examples/qa/renderer-qa-{minimal,water,character,transparency}.scene.json`. Variants rather than
+    a fatter QA scene, because `renderer-qa.scene.json` is the control the performance baselines are
+    measured against. Each is asserted to contain the subsystem it isolates and to put something on
+    screen -- `[gpu][composition][forensics][qa]` -- because a variant that loads and contains
+    nothing is the same trap one level down.
 - `[x]` RendererQA is included in the deterministic fresh-engine/fresh-renderer showcase hash suite;
   its static diagnostic content is compared for equality without assuming it changes over time.
 - `[x]` RendererQA deterministic output coverage includes both `128x72` and `96x96` targets; each
@@ -713,14 +726,15 @@ that check is what found the two gaps recorded below.
 - `[!]` Level 2: terrain. No isolation control exists (Phase 4.2); terrain is present at every rung.
 - `[!]` Level 3: lighting. Same: no control, present throughout.
 - `[x]` Level 4: shadows. Two rungs, the cascades and the shadow mask.
-- `[!]` Level 5: water geometry. **RendererQA has no water in it**, so the rung drew the frame below
-  it and was removed rather than faked. Water's coverage is the six-view shoreline test and the
-  generator invariant; putting a shoreline in RendererQA is Phase 8.1's job.
-- `[!]` Level 6: water effects. Same reason.
+- `[x]` Level 5: water geometry. The rung runs against `renderer-qa-water.scene.json`, a generated
+  shoreline from the shipped world, because the control scene has no water -- which is what this
+  matrix found.
+- `[~]` Level 6: water effects. Present in the same rung; there is no control that separates the
+  surface's effects from the surface.
 - `[x]` Level 7: transparent objects. Reachable only after the material fix -- the scene's
   "transparent orb" had been opaque since it was written.
 - `[~]` Level 8: characters. The alien is in the scene at every rung; there is no "characters off"
-  control separate from animation.
+  control separate from animation. `renderer-qa-character.scene.json` isolates one for Phase 5.3.
 - `[x]` Level 9: animation.
 - `[x]` Level 10: particles.
 - `[x]` Level 11: post-processing. Three rungs: ambient occlusion, volumetrics, the post chain.

@@ -1,0 +1,23 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Renderer QA: water",
+ "_note": "The water case the main QA scene does not have. `{\"kind\": \"terrain\"}` with no `world` block is the shipped world, which has a river in it, so the shoreline here is a real generated one rather than two planes. The camera stands on the bank at a grazing angle, which is where SYM-WATER-1 was reported.",
+ "camera": {"mode": 1, "position": [40, 6, -86], "target": [12, -1, -108], "fov": 45, "orbitSpeed": 0},
+ "environment": {
+  "background": [0.004, 0.006, 0.012],
+  "intensity": 0.5,
+  "fogColor": [0.015, 0.025, 0.05],
+  "fogDensity": 0.002,
+  "volumeDensity": 0.0,
+  "sky": {"enabled": false, "background": false}
+ },
+ "nodes": [
+  {"name": "ground", "kind": "terrain", "position": [0, 0, 0],
+   "terrain": {"chunkSize": 40.0, "resolution": 32, "lodLevels": 3, "lodDistance": 80.0, "viewDistance": 320.0,
+               "water": {"enabled": true, "shallow": 2.0, "shallowColor": [0.05, 0.22, 0.24],
+                         "deepColor": [0.006, 0.035, 0.075], "clarity": 1.25, "maxOpacity": 0.93,
+                         "edgeFade": 0.8, "foam": 0.6, "foamWidth": 0.22, "ripple": 1.0}},
+   "material": {"baseColor": [0.05, 0.14, 0.09], "roughness": 0.9}}
+ ]
+}

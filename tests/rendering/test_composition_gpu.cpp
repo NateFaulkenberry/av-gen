@@ -2127,6 +2127,9 @@ TEST_CASE("the progressive matrix finds the first level that misbehaves",
         // the *control* for the performance baselines, and changing what it draws to make a test
         // meaningful would spend a fixed point to buy a variable one.
         float volumeDensity = 0.0f;
+        // Which scene the rung runs against. Water needs a shoreline, and the control scene has
+        // none: `renderer-qa-water.scene.json` is the variant that does (Phase 8.1).
+        const char* scene = nullptr;
     };
     std::vector<Level> levels;
     Toggles t = bare();
@@ -2135,13 +2138,11 @@ TEST_CASE("the progressive matrix finds the first level that misbehaves",
     levels.push_back({"4 shadows", t});
     t.shadowMask = true;
     levels.push_back({"4b shadow mask", t});
-    // Level 5 of the plan's list -- water -- is **absent from this ladder**, because RendererQA has
-    // no water in it. A rung whose subsystem the scene does not contain draws the same frame as the
-    // rung below and localises nothing, and rather than pretend, the water toggle stays on
-    // throughout and water has its own coverage: the six-view shoreline test in `test_gpu.cpp` and
-    // the generator invariant in `test_world.cpp`. Adding a shoreline to RendererQA is Phase 8.1's
-    // job and would change the scene the performance baselines are controlled against.
+    // Level 5, water, runs against the variant that has a shoreline in it. The control scene has
+    // none -- which is what this matrix found -- and a rung whose subsystem the scene does not
+    // contain draws the frame below it and localises nothing.
     t.water = true;
+    levels.push_back({"5 water", t, 0.0f, "renderer-qa-water.scene.json"});
     t.transparency = true;
     levels.push_back({"7 transparency", t});
     t.animation = true;
@@ -2188,8 +2189,11 @@ TEST_CASE("the progressive matrix finds the first level that misbehaves",
     // renderer doing exactly what it is built to do. That is worth knowing on its own: a frame is
     // not a pure function of the scene state while particles are in it.
     const auto runScript = [&](const Level& level, std::vector<std::uint64_t>& hashes) {
+        const fs::path file = level.scene != nullptr
+                                  ? fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / level.scene
+                                  : project;
         app::Engine engine(app::EngineMode::Offline);
-        REQUIRE(engine.loadComposition(project).has_value());
+        REQUIRE(engine.loadComposition(file).has_value());
         rendering::SceneRenderer own(*ctx, shaders);
         REQUIRE(own.init().has_value());
         own.setPassToggles(level.toggles);
@@ -2202,7 +2206,7 @@ TEST_CASE("the progressive matrix finds the first level that misbehaves",
         FixedStepClock clock(60.0);
         for (const Step& step : kScript) {
             if (std::string_view(step.what) == "reload") {
-                REQUIRE(engine.loadComposition(project).has_value());
+                REQUIRE(engine.loadComposition(file).has_value());
                 own.resetTemporalHistory();
             }
             if (step.seek >= 0.0) {
@@ -2223,6 +2227,7 @@ TEST_CASE("the progressive matrix finds the first level that misbehaves",
     std::size_t steps = 0;
     std::vector<std::uint64_t> previousLevel;
     std::string previousName;
+    const char* previousScene = nullptr;
     for (const Level& level : levels) {
         INFO("level: " << level.name);
         const std::uint32_t errorsBefore = ctx->errorCount();
@@ -2250,7 +2255,7 @@ TEST_CASE("the progressive matrix finds the first level that misbehaves",
         // subsystem is invisible in this scene cannot localise anything, and "the symptom appeared
         // at level 6" would be meaningless if level 6 drew the same frame as level 5. This is the
         // control on the whole matrix as well as an assertion about the scene.
-        if (!previousLevel.empty()) {
+        if (!previousLevel.empty() && level.scene == nullptr && previousScene == nullptr) {
             bool changedSomething = false;
             for (std::size_t i = 0; i < first.size() && i < previousLevel.size(); ++i) {
                 changedSomething = changedSomething || first[i] != previousLevel[i];
@@ -2258,13 +2263,121 @@ TEST_CASE("the progressive matrix finds the first level that misbehaves",
             INFO("'" << level.name << "' against '" << previousName << "'");
             CHECK(changedSomething);
         }
-        previousLevel = first;
-        previousName = level.name;
+        // A rung on another scene is not comparable with the one below it; what makes *that* rung
+        // meaningful is the variant test, which asserts the scene contains water at all.
+        if (level.scene == nullptr) {
+            previousLevel = first;
+            previousName = level.name;
+        }
+        previousScene = level.scene;
     }
 
     INFO(steps << " rendered steps across " << levels.size()
                << " levels; first misbehaving level: " << (firstBad.empty() ? "none" : firstBad));
     CHECK(firstBad.empty());
     CHECK(steps >= levels.size() * 10);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- Phase 8.1: the QA variants contain what they are named for ----------------------------------
+//
+// The progressive matrix found that RendererQA has no water in it and authors zero volumetric
+// density, so two of its rungs drew the frame below them and could localise nothing. The answer is
+// variants rather than a fatter QA scene: `renderer-qa.scene.json` is the *control* the performance
+// baselines are measured against, and changing what it draws to make a test meaningful spends a
+// fixed point to buy a variable one.
+//
+// A variant that loads and contains nothing is the same trap one level down, so each is asserted to
+// hold the thing it is named for -- and to hold *only* that, where the point is isolation.
+TEST_CASE("the RendererQA variants each contain the subsystem they isolate",
+          "[gpu][composition][forensics][qa]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    struct Counts {
+        std::size_t entities = 0;
+        std::size_t rigged = 0;
+        std::size_t blended = 0;
+        std::size_t water = 0;
+        std::size_t particles = 0;
+        std::size_t procedurals = 0;
+        [[nodiscard]] std::size_t objects() const { return entities + procedurals; }
+    };
+    const auto inspect = [&](const char* file, int frames) {
+        const fs::path path = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / file;
+        REQUIRE(fs::is_regular_file(path));
+        app::Engine engine(app::EngineMode::Offline);
+        INFO(file);
+        REQUIRE(engine.loadComposition(path).has_value());
+        FixedStepClock clock(60.0);
+        for (int i = 0; i < frames; ++i) {
+            const FrameTime time = engine.tick(clock);
+            engine.setViewport(160, 120);
+            engine.update(time);
+        }
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(160, 120);
+        engine.update(time);
+        const auto image = renderer.renderToImage(engine.scene(), time, 160, 120);
+        REQUIRE(image.has_value());
+        Counts c;
+        for (const scene::Entity& e : engine.scene().entities) {
+            ++c.entities;
+            c.rigged += e.rig != scene::kInvalidRig ? 1 : 0;
+            c.blended += e.material.alphaMode == scene::AlphaMode::Blend ? 1 : 0;
+            c.water += e.style == scene::MeshStyle::Water ? 1 : 0;
+        }
+        c.particles = engine.scene().particles.size();
+        // Procedural nodes become `Scene::procedurals` rather than entities, so a count of entities
+        // alone reports a scene of boxes as empty.
+        c.procedurals = engine.scene().procedurals.size();
+        // Something has to be on screen, or a variant is a black frame that agrees with everything.
+        std::size_t lit = 0;
+        for (std::uint32_t y = 0; y < 120; ++y) {
+            for (std::uint32_t x = 0; x < 160; ++x) {
+                const std::uint8_t* p = image->pixel(x, y);
+                lit += (p[0] > 12 || p[1] > 12 || p[2] > 12) ? 1 : 0;
+            }
+        }
+        INFO(c.entities << " entities, " << c.procedurals << " procedurals, " << c.rigged
+                        << " rigged, " << c.blended << " blended, " << c.water << " water, "
+                        << c.particles << " particle systems, " << lit << " lit pixels");
+        CHECK(lit > 200);
+        return c;
+    };
+
+    SECTION("minimal is opaque geometry and nothing else") {
+        const Counts c = inspect("renderer-qa-minimal.scene.json", 2);
+        CHECK(c.objects() >= 3);
+        CHECK(c.rigged == 0);
+        CHECK(c.blended == 0);
+        CHECK(c.water == 0);
+        CHECK(c.particles == 0);
+    }
+
+    SECTION("water has a generated shoreline in it") {
+        const Counts c = inspect("renderer-qa-water.scene.json", 2);
+        CHECK(c.water > 0);        // real chunk water, not two planes
+        CHECK(c.entities > c.water);   // ...and the ground it cuts through
+        CHECK(c.rigged == 0);
+        CHECK(c.blended == 0);
+    }
+
+    SECTION("character is one skinned character") {
+        const Counts c = inspect("renderer-qa-character.scene.json", 30);
+        CHECK(c.rigged == 1);
+        CHECK(c.water == 0);
+        CHECK(c.particles == 0);
+    }
+
+    SECTION("transparency is two blended layers over an opaque backstop") {
+        const Counts c = inspect("renderer-qa-transparency.scene.json", 2);
+        CHECK(c.blended == 2);
+        CHECK(c.objects() >= 3);
+        CHECK(c.rigged == 0);
+    }
+
     CHECK(ctx->errorCount() == 0);
 }
