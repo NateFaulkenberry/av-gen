@@ -11,6 +11,28 @@ now 11.9 ms, so a fixed-cost item's share has risen and a triangle-count item's 
 **Every percentage in Phase A's attribution table must be re-derived before it is used to order work
 in Phase C.** That is task L1 below, and it is deliberately cheap and first.
 
+## Amendment, from C1's result (during the wave)
+
+`repr` measured Glowmere's own quad-overdraw share (§4.9) and it changes the ordering the plan was
+written with. Phase C was "the main line" because the gate measurement showed 4.9x the fragment cost
+from triangle size alone. That mechanism is real, but Glowmere's *own* excess is **1.52x**, and it is
+not where the plan assumed:
+
+- **authored entities, including the terrain, have zero sub-pixel triangles after LOD0.** The
+  representation work already done has finished that job for the geometry it covers.
+- **all of the remaining quad overdraw is procedural scatter** — 54.7% of the ecology's triangles are
+  sub-pixel, and they cover 9% of its coverage.
+
+So Phase C's remaining value is narrower and more specific than "the main line" implied: it is an
+*ecology* problem, not a scene-wide one. And **Phase B's per-pixel work is at least as valuable for
+this scene**, which is the opposite of how these two were sequenced.
+
+This does not reorder the wave — both are already running — but it should be settled before Phase C
+commits to HLOD and impostors, since those are justified by a share that has just been measured
+smaller than assumed. The cheap next measurement is the one ADR-124 names: the 4-arm sweep that puts
+more than one data point in the 500–512,000 px/triangle region, where the estimate currently rests on
+a single sample contributing 1.01x of the 1.52x.
+
 ## Assignments
 
 Four agents, isolated worktrees, disjoint file ownership, pre-assigned ADR ranges — the topology
