@@ -12,7 +12,7 @@ the wave.
 | G2 | scalability curves, cost against object and instance count | `tests/rendering/test_scalability_perf.cpp` | built; see §3 |
 | G3 | frame pacing p50/p90/p95/p99 and the 1% low | `tools/certify.py --report` | built; see §2 |
 | G4 | visual comparison on the canonical frames | `tools/certify.py --capture` | built |
-| G5 | offline parity | `tests/rendering/test_phase_g_certification.cpp` | **two failures, both real** — ADR-146, ADR-147 |
+| G5 | offline parity | `tests/rendering/test_phase_g_certification.cpp` | **two failures, both real — since fixed by the coordinator; see the closing note** |
 | G6 | frame-state baselines green | `examples/qa/baselines/*.snapshot.json` | green, 29 assertions, unchanged |
 | — | the A/B harness certified a null as a result | `src/rendering/render_stats.cpp` | fixed — ADR-148; one past claim left in doubt |
 
@@ -334,3 +334,35 @@ tools/gpu-lock.sh ./build/release/tests/avgen_render_tests "[.perf][scalability]
 tools/gpu-lock.sh ./build/release/tests/avgen_render_tests "[certification]"
 tools/gpu-lock.sh ./build/release/tests/avgen_render_tests "[baseline]"
 ```
+
+---
+
+## Closing note: both G5 failures are fixed
+
+They were left failing deliberately, as this document says, and that was the right call for an agent
+that did not own the files. They are now closed, in the order this document specified.
+
+**ADR-147 — the batch path asks for its tier.** `RenderSettings` gained a `tier` field defaulting to
+`offline`, and `RenderJob` calls `setQuality` with it. This is a **user-visible change**: a batch
+render now looks better and takes longer than before, because it finally renders at the tier the
+tier table always promised for a deliverable.
+
+**ADR-146 — offline zeroes the ladder's dead zone.** The rule lived in the CPU representation
+selector while the GPU cull ladder read the scene's authored `lodHysteresis` at every tier and had
+no idea what tier it was in. Rather than special-case the cull path, it is expressed as policy data
+(`QualitySettings::lodHysteresisAllowed`, false for Offline) that both paths read — the same shape
+as the rest of the tier table. 55 assertions pass; the histogram no longer depends on the camera's
+approach.
+
+**And a third, from this document's "found, not fixed" list.** `WorldRecipe::toJson` rebuilt the
+document from typed fields, so every top-level key the loader did not model was dropped — which is
+how the `certification` blocks this phase added vanished on the first load-and-save. Unknown keys
+now round-trip verbatim.
+
+**Four tests had to change, and all four were passing by agreeing with a bug.** Two compared a batch
+render against a default-tier interactive one, one compared an offline frame against a live one, and
+one asserted that an isolation arm removes exactly one pass after the volumetric pass had been split
+in two. None of them was weakened: each now names the tier or the pass family explicitly instead of
+inheriting a default that happened to match. A test that compares two paths through the same defect
+cannot fail, and the only thing that found these was a measurement taken from outside — which is
+what this phase was for.
