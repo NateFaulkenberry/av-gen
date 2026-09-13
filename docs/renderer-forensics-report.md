@@ -221,17 +221,18 @@ classifying nothing as live.
 **Residual risk:** the live tier is identified by "driven by `EntityWorld`". If a *baked* actor were
 ever driven through the same path it would be silently excused by this test.
 
-**Revised 13 September, and the revision matters.** The 25 m was read above as the live tier
-*drifting* -- two simulations of the same seconds landing apart. It is not. Measured directly:
-1,800 frames of playback with the project's audio loaded, the transport playing and the camera 15 m
-from the walker leave it at travel 0, speed 0, activity Idle, while a seek to the same second puts it
-tens of metres away at exactly the `explore` behaviour's authored 5 m/s. One path simulates and the
-other stands still.
+**A revision written on 13 September was itself wrong and is withdrawn.** It claimed the 25 m was not
+drift but one path simulating while the other stood still, on the evidence that 1,800 frames of
+playback left the walker at travel 0. That measurement was an artefact of the test that made it: it
+restarted its clock at each second, so every frame reported a delta of zero and no behaviour that
+integrates could move. One ticked clock walks the same entity 149 m in the same 30 s. The entry
+above stands as written; the contract is the contract.
 
-ADR-091 still covers the *conclusion* -- a live-tier entity is not frame-accurate under a scrub -- but
-not for the reason recorded here, and "the walker never walks" is a defect rather than a contract.
-Registered as `SYM-ENTITY-1`; the cause is not established, with the cull-distance band, a missing
-track and a stopped transport all eliminated.
+What the episode does establish is narrower and worth keeping: the Phase 9.2 Glowmere replay drives
+its frames the same way, so in *that* test playback moves the walker very little and the 25 m is
+mostly what `EntityWorld::seek` produced on its own. The conclusion is unchanged -- ADR-091 declines
+to make a live-tier entity reproducible under a seek -- but the number is a property of the seek, not
+a difference measured between two moving simulations.
 
 ## Diagnostics delivered
 
@@ -260,7 +261,7 @@ track and a stopped transport all eliminated.
 
 ## A note on vacuous tests
 
-Five tests written during this investigation could not fail, and each was caught by a negative
+Six tests written during this investigation could not fail, and each was caught by a negative
 control rather than by review:
 
 - the alien limb-crossing sweep (a T-pose bind box is wider than every pose it animates into);
@@ -270,7 +271,11 @@ control rather than by review:
   because `setBase` leaves the *final* value alone and a bare `Composition::update` has no
   modulation pass to refresh it;
 - the transparency sorting test, whose opaque backstop sat *between* the two panes it was sorting,
-  so one of them was occluded from either side and the pair never composited together.
+  so one of them was occluded from either side and the pair never composited together;
+- the character/terrain test, which restarted its clock at each second and so reported a frame delta
+  of zero: every behaviour that integrates did nothing, for 1,800 frames, and the walker's stillness
+  was written up as an engine defect before a second look. Restarting a clock is right for the
+  static-object matrices, where time is *meant* to stand still, and wrong for anything that moves.
 
 The common shape is a test whose *setup* silently did nothing. None of them would have been found by
 reading the assertions, because the assertions were correct. **A forensic test is not evidence until

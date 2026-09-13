@@ -1817,14 +1817,15 @@ TEST_CASE("a walker's height is the ground's, every frame, with no second writer
     // *transport* position, and a stopped transport holds it at zero however many frames go past.
     REQUIRE(engine.play().has_value());
     constexpr int kFrames = 1800;   // thirty seconds at 60
+    FixedStepClock walkingClock(60.0);
     for (int i = 0; i < kFrames; ++i) {
         // Standing next to the walker, because an entity beyond its `cullDistance` from the view
         // gets no update at all.
         aimCompositionCamera(engine.params(), glm::vec3(150.0f, 30.0f, 20.0f),
                              glm::vec3(165.0f, 23.0f, 20.0f));
-        FixedStepClock clock(60.0);
-        clock.restartAt(static_cast<double>(i) / 60.0);
-        const FrameTime time = engine.tick(clock);
+        // One clock, ticked. Restarting a clock at each second reports a *delta* of zero, and every
+        // behaviour that integrates -- which is every behaviour that moves -- then does nothing.
+        const FrameTime time = engine.tick(walkingClock);
         engine.setViewport(192, 120);
         engine.update(time);
 
@@ -1902,26 +1903,21 @@ TEST_CASE("a walker's height is the ground's, every frame, with no second writer
         ++checked;
     }
     CHECK(checked > 0);
-    // `SYM-ENTITY-1`, pinned rather than asserted away.
+    // Something walked somewhere, over ground that is not flat, or every assertion above was made
+    // about a set of stationary objects.
     //
-    // Nothing walked. Thirty seconds of playback -- with the project's audio loaded, the transport
-    // playing and the camera fifteen metres from the walker -- leaves Glowmere's `wanderer` at
-    // travel 0 and speed 0, activity Idle, while a *seek* to the same second puts it tens of metres
-    // away at exactly the `explore` behaviour's authored 5 m/s.
-    //
-    // Three hypotheses eliminated on the way: it is not the `cullDistance` band (the camera is well
-    // inside `fullDetailDistance`), not a missing track (the project loads one, and the first
-    // behaviour keys on `music.impact`), and not a stopped transport (the signals it reads come from
-    // the analysis at the transport position, and it is playing).
-    //
-    // The test asserts the disagreement it measured rather than the behaviour it wants, because a
-    // test that demanded walking would fail for a reason nobody has established yet. When the cause
-    // is found, this is the case to invert.
+    // This is the line that caught the sixth vacuous setup of this investigation. Restarting a clock
+    // at each second -- the idiom the static-object matrices use, correctly, because there time is
+    // *meant* to stand still -- reports a delta of zero, and every behaviour that integrates then
+    // does nothing. Thirty seconds of it left the walker at travel 0, which looked exactly like an
+    // engine that never walks its ambient life, and was written up as one. One ticked clock walks it
+    // 149 m.
     INFO("playback: furthest walked " << mostTravelled << " m, largest height change "
                                       << mostHeightChange << " m. A seek to 30 s: " << seekedTravel
                                       << " m at " << seekedSpeed << " m/s.");
-    CHECK(seekedTravel > 5.0f);           // the seek path does simulate
+    CHECK(mostTravelled > 20.0f);
+    CHECK(mostHeightChange > 1.0f);
+    // ...and the seek path simulates too, so both routes to a second move the world.
+    CHECK(seekedTravel > 5.0f);
     CHECK(seekedSpeed > 1.0f);
-    CHECK(mostTravelled < 0.01f);         // ...and the per-frame path does not. SYM-ENTITY-1.
-    CHECK(mostHeightChange < 0.01f);
 }
