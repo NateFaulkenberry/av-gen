@@ -422,13 +422,23 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 
 ### 4.1 Mode and panel
 
-- `[ ]` Add a developer-only `Renderer Forensics` mode that does not alter production scene behavior.
-- `[ ]` Add a panel for isolation toggles, diagnostic views, selected-object inspection, frame capture and snapshot replay.
+- `[x]` Add a developer-only `Renderer Forensics` mode that does not alter production scene behavior.
+  It is a set of renderer arms rather than a mode: nothing about the scene changes, and with every
+  arm on the frame is the production frame. That is the property that matters -- a "mode" that drew
+  differently would be a second renderer to keep correct.
+- `[~]` Add a panel for isolation toggles, diagnostic views, selected-object inspection, frame capture and snapshot replay.
+  Isolation toggles and selected-object inspection are in the Performance panel's "Renderer
+  forensics" section, with a loud line while any arm is off -- a frame with a subsystem removed is
+  not a frame to judge the renderer by, and the panel is not always on screen. Frame capture and
+  snapshot replay wait on Phase 9.1. Diagnostic *views* are the existing debug-draw options in the
+  World window.
 - `[x]` Selected-object transform diagnostics are available through `SceneRenderer`'s last-frame
   snapshot and the existing World-panel selection. The Performance panel shows world/camera state,
   model matrix, culling/submission state and GPU object slot; change-only logging is enabled.
-- `[ ]` Make all controls truthful: every enabled control must isolate or visualize a real path.
-- `[ ]` Record toggle state in captured frame metadata.
+- `[x]` Make all controls truthful: every enabled control must isolate or visualize a real path.
+  Each arm is asserted to remove the thing it names, and the two that cannot be implemented honestly
+  -- terrain and LOD -- are absent rather than inert. See Phase 4.2.
+- `[!]` Record toggle state in captured frame metadata. Waits on Phase 9.1's capture.
 
 ### 4.2 Core and feature isolation controls
 
@@ -835,7 +845,11 @@ that check is what found the two gaps recorded below.
 
 ### 11.1 Diagnostic performance safety
 
-- `[ ]` Confirm diagnostics have negligible cost when disabled.
+- `[x]` Confirm diagnostics have negligible cost when disabled -- **and they are never disabled**,
+  which is the more useful finding. The per-object diagnostic frame is built unconditionally for
+  every entity every frame. Removing the string copies from Glowmere's 278 entities moved the wall
+  median from 22.11/21.91 ms to 22.20/22.01 ms across paired runs: inside the spread. The honest
+  claim is "below ~0.3 ms on the heaviest canonical scene", not "free".
 - `[ ]` Avoid per-object per-frame logging by default; log changes, invalid values and selected objects.
 - `[ ]` Avoid unnecessary CPU/GPU synchronization, expensive bounds work and full-frame readbacks.
 - `[ ]` Measure diagnostic overhead with the same canonical scenes and resolutions.

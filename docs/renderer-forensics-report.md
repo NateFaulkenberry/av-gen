@@ -1,6 +1,6 @@
 # Renderer Forensics Report
 
-**Status:** interim evidence report  
+**Status:** evidence report, third pass; Phase 12 findings included  
 **Date:** 2026-09-12  
 **Machine:** Apple M2 Max, macOS, Dawn WebGPU on Metal  
 **Execution checklist:** [renderer-forensics-plan.md](renderer-forensics-plan.md)
@@ -296,6 +296,63 @@ it has been shown to fail**, which is why the status definitions in the plan req
 - Full sanitizer and resource-lifetime suites without environment timeout/benchmark interference.
 - Diagnostic overhead measurement. (Frame-time remeasurement is done; see the plan's Phase 0.1 for
   the numbers and for why Constellation's median cannot be one of them.)
+
+## Phase 12: findings
+
+### The bug table
+
+| Bug | Symptom | Reproduction | Root cause | Subsystem | Fix | Regression | Residual risk |
+|---|---|---|---|---|---|---|---|
+| Animation phase origin | a pose jumps when the playhead is scrubbed | two engines over `alien.scene.json`, one seeked to 16.67 s, one played there | the phase origin of an *authored* state was the engine's first update, not the timeline's zero | animation | first application anchors at 0.0; a state requested during playback still starts when requested | `[gpu][composition][forensics][determinism]` and the alien matrix | a scene authored by eye against the old behaviour sits a fraction of a cycle further on |
+| Water over dry ground | the water sheet stands proud of the bank | mesh every chunk of `defaultWorld()` and compare vertices against `height`/`waterSurface` | a dry corner measured its depth against the surface level it borrowed from a wet neighbour, so the shore fade that hides the deliberate overhang did not fade it | water | a dry corner reports the depth at itself, which is none | `[unit][water][forensics][shoreline]` | geometry-level: a water program ignoring `uv.x` would still draw the overhang |
+| Scene-local GPU cache collisions | a renderer reused another scene's resources | same-version mesh/HDR/palette scene swaps | caches keyed on local ids and versions only | GPU resources | owning `Scene` joins the reuse key | scene-swap cases in three GPU files | — |
+| Temporal history crossing boundaries | history from another scene, size, cut or seek | reused-versus-fresh comparisons | no reset at the boundaries | temporal | `resetTemporalHistory` plus a transport discontinuity revision | resize/seek/replay cases | — |
+| Particle pools crossing scenes | alive lists and trails retained across a scene change | reused-versus-fresh swap | pools outlived their scene | particles | pools reset on scene change | particle swap case | — |
+| Detached composition parameters | use-after-free in `applyParameters` | ASan on the detach lifecycle test | `detach()` nulled only the common node fields | composition lifetime | every node-owned pointer is nulled | the lifecycle case under ASan | — |
+| A node's `material` block | authored material silently ignored on every kind but terrain; `alphaMode` never parsed at all | RendererQA's `transparent-orb` draws opaque | the parse sat inside `if (kind == Terrain)` | scene format | parsed for every kind, applied on orbs, warned where unused | `[gpu][composition][forensics][isolation]`, which needs a transparent object to exist | kinds other than orb and terrain still do not *use* it -- they now say so |
+
+### Subsystem isolation results
+
+Recorded in the subsystem table above. In one line: **transforms, camera, opaque geometry, GPU
+object state, culling and LOD are `PASS` with controlled reproducers; animation, terrain, water,
+transparency, shadows, particles, post, sequencer, assets and performance are `PARTIAL`,** each with
+its remaining risk named. Nothing is `FAILED` and nothing is `NOT ISOLATED`.
+
+### The reference renderer
+
+**Not built.** Phase 2 asks for a minimal path to compare against production, and the honest position
+is that its purpose was served by other means: the questions it was to answer -- does the renderer
+move a static object, does it mutate scene state, does it swap or stale GPU object data -- are
+answered by the static-object matrices (four axes, bit equality), by the type system (`const
+scene::Scene&` throughout), and by the alternating-transform case. A second renderer is a second
+thing to keep correct, and building one now would be building it to answer questions that already
+have answers. It remains the right tool if a future symptom survives all three.
+
+### Diagnostics and their overhead
+
+Listed under "Diagnostics delivered" above, plus the Phase 4 isolation arms: shadows, shadow mask,
+AO, volumetrics, post, culling, water, transparency, particles, animation and a view freeze, in the
+Performance panel and as `--disable <list>`.
+
+**Overhead: not measurable at the resolution available.** The per-object diagnostic frame is built
+unconditionally for every entity every frame -- a string copy, world bounds and six frustum margins
+each. Removing the string copies from Glowmere's 278 entities moved the wall-clock median from
+22.11/21.91 ms to 22.20/22.01 ms across paired runs, which is inside the run-to-run spread. The
+honest claim is therefore "below ~0.3 ms on the heaviest canonical scene", not "free".
+
+### Is the architecture sound enough to keep building on
+
+**Yes, with the reservation that the evidence is about the paths that have been walked.** Across two
+passes the investigation found six defects, five of them in *state ownership at a boundary* -- a
+cache key, a history, a pool, a parameter lifetime, a phase origin -- and one in geometry. None was
+in the transform chain, the camera model or the GPU object path, which were the three the original
+symptoms pointed at and which are now the best-evidenced parts of the renderer.
+
+The recurring weakness is not in the renderer at all: it is that **a scene can say something the
+engine silently ignores**. The `material` block, `volumeDensity: 0` keeping a pass off, an orb's
+hard-coded surface -- each was authored in good faith and did nothing, and the QA scene meant to
+torture the renderer turned out to contain no transparency and no water. That class costs more than
+any renderer bug found here and is where the next pass should look.
 
 ## Final classification rule
 

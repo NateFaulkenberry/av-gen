@@ -1316,6 +1316,79 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
         ImGui::Text("particles: %u systems  %u capacity  %u emitted  simulate %.3f ms", stats.particles.systems,
                     stats.particles.capacity, stats.particles.emittedThisFrame, stats.particles.simulateMs);
     }
+    // ---- Renderer Forensics (the plan's Phase 4) ------------------------------------------------
+    //
+    // The isolation arms, where a person can reach them. These are the same switches `--disable`
+    // drives headlessly, so a symptom cornered in the editor and a symptom cornered in a script are
+    // cornered with the same instrument.
+    //
+    // Every control here removes a real subsystem and is proved to by
+    // `[gpu][composition][forensics][isolation]`. Nothing is offered that does nothing: "disable
+    // terrain" and "disable LOD" are absent because the renderer cannot honestly implement them
+    // today, and an inert checkbox is worse than a missing one -- somebody switches it off, the
+    // symptom stays, and a subsystem is wrongly cleared.
+    if (renderer != nullptr) {
+        if (ImGui::TreeNode("Renderer forensics")) {
+            rendering::SceneRenderer::PassToggles toggles = renderer->passToggles();
+            bool changed = false;
+            const auto arm = [&](const char* label, bool& value, const char* tip) {
+                // Shown as "off" switches: the question being asked is always "does the symptom
+                // survive without this", so the box that is *ticked* is the one taking something
+                // away.
+                bool disabled = !value;
+                if (ImGui::Checkbox(label, &disabled)) {
+                    value = !disabled;
+                    changed = true;
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s", tip);
+                }
+            };
+            arm("no shadows", toggles.shadows, "the cascade and spot depth passes");
+            ImGui::SameLine();
+            arm("no shadow mask", toggles.shadowMask, "ADR-087's screen-space mask; the lit pass "
+                                                      "computes the term per pixel instead");
+            arm("no AO", toggles.ao, "GTAO and its temporal resolve");
+            ImGui::SameLine();
+            arm("no volumetrics", toggles.volume, "the volumetric march and composite");
+            ImGui::SameLine();
+            arm("no post", toggles.post, "the built-in post chain");
+            arm("no culling", toggles.culling, "submit everything, whatever the camera cull decided");
+            ImGui::SameLine();
+            arm("no water", toggles.water, "water surfaces are not drawn");
+            arm("no transparency", toggles.transparency, "blended entities are not drawn");
+            ImGui::SameLine();
+            arm("no particles", toggles.particles, "no simulation and no draw, so switching it back "
+                                                   "on does not reveal a system that has been "
+                                                   "running invisibly");
+            arm("no animation", toggles.animation, "skinned meshes draw in bind pose; the palettes "
+                                                   "are not uploaded at all");
+            arm("freeze the view", toggles.cameraMotion,
+                "holds the view and projection the scene pass draws with, and ignores the cull "
+                "verdicts decided against the camera that has since moved. The sky, the volumetrics "
+                "and the particles read the live camera themselves, so the frame still changes -- "
+                "what is frozen is the projection of the geometry.");
+            if (changed) {
+                renderer->setPassToggles(toggles);
+            }
+            const rendering::SceneRenderer::PassToggles defaults;
+            const bool anythingOff =
+                !toggles.shadows || !toggles.ao || !toggles.volume || !toggles.post ||
+                !toggles.shadowMask || !toggles.culling || !toggles.water || !toggles.transparency ||
+                !toggles.particles || !toggles.animation || !toggles.cameraMotion;
+            if (anythingOff) {
+                // Loud, because a frame with an arm switched off is not a frame anybody should
+                // judge the renderer by, and this panel is not always on screen.
+                ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f),
+                                   "isolation active: this frame is an A/B arm, not the picture");
+                ImGui::SameLine();
+                if (ImGui::SmallButton("restore all")) {
+                    renderer->setPassToggles(defaults);
+                }
+            }
+            ImGui::TreePop();
+        }
+    }
     if (renderer != nullptr && !world.debug.selectedEntity.empty()) {
         if (const auto* object = renderer->diagnosticObject(world.debug.selectedEntity); object != nullptr) {
             const auto& frame = renderer->diagnosticFrame();
