@@ -42,7 +42,7 @@ capability AV Gen does not need).
 | 40 | Shader audit (`pbr`, `shadow_mask`, `volume` first) | B | the pass is fragment-bound; this is where per-invocation cost lives |
 | 17 | Screen-space importance | C | the central system the spec asks for, and the input to everything below |
 | 11 | Screen-space-error LOD selection | C | replaces distance thresholds with a measurable criterion |
-| 13–14 | HLOD and its generation pipeline | C | **the main line** — quad overdraw confirmed at 4.9× |
+| 11 | Screen-space-error LOD selection, wired | C | ADR-151: `RepresentationSelector` is built and calibrated and consumes nothing. Run on Glowmere's real ladders it halves the frame's triangles for -4.7% of the triangle-size-weighted cost, with no new machinery. The open question is quality, not cost. |
 | 20 | Material quality tiers | D | per-invocation cost for pixels that do not deserve full PBR |
 | 18–19 | Subsystem quality budgets, not a global slider | D | the spec is explicit that binary quality is not professional scalability |
 | 34 | Fixed render scale (**not** dynamic) | D | dynamic was already rejected on measurement |
@@ -99,6 +99,7 @@ statement about sequencing and about what this engine is, not a refusal.
 | 15 | World streaming with residency levels | AV Gen renders *authored cinematic scenes*, not open worlds. No scene exists that does not fit memory. The infrastructure cost is large and the need is hypothetical. **Revisit if a scene ever exceeds memory — or on request.** |
 | 16 | Cinematic camera-aware streaming | Rides with streaming — but noted as AV Gen's genuine structural advantage over a game engine, and the first thing to build if §15 is ever justified. The camera path is known in advance, which almost no game engine can say. |
 | 45 | Stress scenes: City, Light Hell, Particle Hell | Game-engine stress profiles. AV Gen's content is organic and cinematic. **Building 4 of the 10 first:** Dense Forest (culling, LOD, HLOD, overdraw), Open Vista (distant representation, cascades), Character, and the AV Gen Showcase — the four that exercise what this engine actually renders. The other three remain on the board. |
+| 13–14 | HLOD proxies, impostors and the proxy generation pipeline | **Measured and refused on this content, ADR-151.** Deleting the whole 2–8 px band outright moves the scene pass **+1.8%** — inside the noise floor and the wrong sign. Deleting 8–40 px as well is worth 1.90 ms, but an *ideal free* proxy recovers 58% of a deletion and the `RepresentationSelector` that is already built and wired to nothing recovers 29% of it, so the marginal value of the new machinery is **≈0.4 ms of a 13.6 ms frame** against a High stale-proxy risk and a new bake pipeline. §56 governs. **Revisit on a scene whose 2–40 px band carries real coverage — §45's Dense Forest and Open Vista — or once the existing selector is wired and the remaining gap is re-measured.** Both instruments are committed. |
 | 46 | Scaling curves to 64× | Curves are being measured; the multiplier is scoped to what the content plausibly reaches. |
 
 ## Governing constraints, carried into every phase

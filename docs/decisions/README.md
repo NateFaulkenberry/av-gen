@@ -137,3 +137,8 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [130](ADR-130-the-object-ceiling-is-a-budget-below-the-naming-limit.md) | What remains of the object ceiling is a byte budget, kept below the naming limit | Accepted |
 | [131](ADR-131-the-cheap-half-of-the-curve-is-not-measurable.md) | The cheap half of the fragment curve is not measurable, and the target stays where it is | Accepted |
 | [132](ADR-132-spread-is-the-transition-mitigation.md) | Spread is the transition mitigation, and temporal AA is not a prerequisite | Accepted |
+| [150](ADR-150-the-ceiling-is-measured-on-the-frame.md) | The ceiling of a representation system is measured on the frame, not on the curve | Accepted |
+| [151](ADR-151-impostors-and-hlod-proxies-are-not-justified-on-this-content.md) | Impostors and HLOD proxies are not justified on this content, and the reason is measured | Accepted |
+| [152](ADR-152-the-cull-ladder-omits-the-source-transform.md) | The GPU cull ladder sizes a procedural by its raw mesh, not by the object | Accepted |
+| [153](ADR-153-the-impostor-rung-is-unreachable-and-would-cost-more.md) | The impostor rung exists, imported meshes cannot reach it, and reaching it would cost more | Accepted |
+| [154](ADR-154-hlod-has-nothing-to-merge-here-and-the-invalidation-rule-is-recorded-anyway.md) | HLOD has nothing left to merge on instanced content, and the invalidation rule is recorded anyway | Accepted |
