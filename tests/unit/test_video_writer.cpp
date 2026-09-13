@@ -9,7 +9,11 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <atomic>
+#include <condition_variable>
 #include <future>
+#include <mutex>
+#include <thread>
 #include <string>
 #include <vector>
 
@@ -459,6 +463,66 @@ TEST_CASE("video writer: ffmpeg backend drives an external process", "[assets][v
         }
         CHECK(!assets::openVideoWriter(tempPath("never.mp4"), settings).has_value());
     }
+}
+
+// The bug this pins: `writeAll` blocks SIGPIPE on the thread doing the writing, which protects the
+// process only while that thread is the only one with the signal unblocked. Any other live thread
+// is a candidate for delivery, and the signal then kills the process from a thread with no
+// connection to the pipe at all.
+//
+// It was found as an order-dependent death of the whole test binary: the native-backend test above
+// leaves AVFoundation's CoreMedia worker threads running, so every later EPIPE landed on one of
+// those and Catch2 never reached its summary. Depending on AVFoundation to reproduce it would make
+// this test a hostage to what some other test happens to leave behind, so it starts a thread of its
+// own and holds it there across the failing write.
+TEST_CASE("video writer: a dying encoder does not kill the process when other threads are running",
+          "[assets][video]") {
+    TempDir dir("sigpipe_ffmpeg_dir");
+    const auto fake = dir.path / "ffmpeg";
+    // Exits without reading stdin, so writes hit EPIPE once the pipe buffer fills.
+    writeScript(fake, "echo \"Unknown encoder 'nope'\" >&2\nexit 1\n");
+
+    auto settings = smallClip("libx264");
+    settings.backend = "ffmpeg";
+    settings.ffmpegPath = fake;
+
+    // A bystander thread, parked but alive and with SIGPIPE unblocked, exactly as CoreMedia's idle
+    // workers are. The barrier makes sure it is running before the write that fails, and that it
+    // outlives it -- a thread that has already exited proves nothing.
+    std::mutex m;
+    std::condition_variable cv;
+    bool running = false;
+    std::atomic<bool> stop{false};
+    std::thread bystander([&] {
+        {
+            std::lock_guard<std::mutex> lock(m);
+            running = true;
+        }
+        cv.notify_one();
+        while (!stop.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+    });
+    {
+        std::unique_lock<std::mutex> lock(m);
+        cv.wait(lock, [&] { return running; });
+    }
+
+    TempFile out("sigpipe_fail.mp4");
+    auto writer = assets::openVideoWriter(out.path, settings);
+    REQUIRE(writer.has_value());
+    for (std::size_t i = 0; i < kFrames; ++i) {
+        if (!(*writer)->writeFrame(gradientFrame(i)).has_value()) {
+            break;
+        }
+    }
+    // Reaching this line at all is most of the point: before the fix the process was gone by here.
+    const auto finished = (*writer)->finish();
+    REQUIRE(!finished.has_value());
+    CHECK(finished.error().message.find("Unknown encoder") != std::string::npos);
+
+    stop.store(true);
+    bystander.join();
 }
 #endif
 

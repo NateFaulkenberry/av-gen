@@ -116,6 +116,9 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [108](ADR-108-one-spatial-instance.md) | One spatial instance, drawn once per material | Accepted |
 | [109](ADR-109-a-scene-has-an-identity.md) | A scene has an identity, not just an address | Accepted |
 | [110](ADR-110-lod0-through-meshoptimizer.md) | LOD0 through meshoptimizer, like every rung below it | Accepted |
+| [111](ADR-111-shadow-terms-use-the-geometric-normal.md) | Shadow terms use the geometric normal, not the shading normal | Accepted |
+| [112](ADR-112-the-shadowed-range-is-sized-to-the-texel.md) | The shadowed range is sized to the texel, not to the world | Accepted |
 | [113](ADR-113-a-measurement-carries-its-conditions.md) | A measurement carries its conditions, and a comparison lives in one process | Accepted |
 | [114](ADR-114-cluster-occupancy-is-measured-uncapped.md) | Cluster occupancy is measured before the cap, not after it | Accepted |
 | [115](ADR-115-overdraw-is-counted-in-its-own-pass.md) | Overdraw is counted in its own pass, or not at all | Accepted |
+| [116](ADR-116-sigpipe-is-ignored-process-wide.md) | SIGPIPE is ignored process-wide, not blocked per thread | Accepted |

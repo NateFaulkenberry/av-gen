@@ -17,7 +17,7 @@ Four agents, isolated worktrees, disjoint file ownership, pre-assigned ADR range
 that worked in wave 1, with the ADR-index conflict anticipated this time (each agent appends to its
 own range and the master resolves the index).
 
-### Agent `frag` — Phase B, per-pixel cost (ADR 116–120)
+### Agent `frag` — Phase B, per-pixel cost (ADR 117–121)
 
 Owns `shaders/`, `src/rendering/shadow_mask*`, pass setup in `scene_renderer.cpp`.
 
@@ -35,7 +35,7 @@ Owns `shaders/`, `src/rendering/shadow_mask*`, pass setup in `scene_renderer.cpp
 Gate: no visual change on the canonical frames. Any quality reduction must be explicit,
 policy-exposed and general (§49).
 
-### Agent `repr` — Phase C foundations (ADR 121–126)
+### Agent `repr` — Phase C foundations (ADR 122–127)
 
 Owns `src/rendering/lod*`, a new `importance`/`representation` unit, `src/scene/` LOD metadata.
 
@@ -52,7 +52,7 @@ Owns `src/rendering/lod*`, a new `importance`/`representation` unit, `src/scene/
 master agent, not an agent. It decides whether §28 (temporal rendering) becomes a prerequisite, and
 that is a scope decision, not an implementation one.
 
-### Agent `cap` — Phase E, lift the object cap (ADR 127–129)
+### Agent `cap` — Phase E, lift the object cap (ADR 128–130)
 
 Owns the object uniform layout and `test_renderer_layout_guards.cpp`.
 
@@ -60,7 +60,7 @@ Self-contained, measurable, and the one phase whose success criterion is a hard 
 judgement: a scene with >256 visible entities renders correctly. E3 re-pins the object-slot contract
 so the guard tests still mean something afterwards.
 
-### Agent `chore` — low-effort batch (medium effort model, ADR 130+)
+### Agent `chore` — low-effort batch (medium effort model, ADR 131+)
 
 Docs, test retagging, limits-doc upkeep, baseline regeneration, the stale-number sweep (L1 above),
 CI hygiene. Explicitly **not** given anything whose failure mode is silent.

@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <mutex>
 #include <optional>
 #include <string_view>
 #include <system_error>
@@ -291,6 +292,21 @@ private:
             return fail("video: cannot create a log file for ffmpeg: {}", std::strerror(errno));
         }
         logPath_ = nameBuf.data();
+
+        // SIGPIPE has to be ignored process-wide, not merely blocked on whichever thread does the
+        // writing. `writeAll` blocks it around its own writes, and that is enough only while the
+        // writing thread is the only thread in the process with it unblocked. It stops being true
+        // the moment anything else starts a thread: AVFoundation leaves CoreMedia worker threads
+        // behind after a native render, and the signal is then delivered to one of those -- idle,
+        // parked in a semaphore, with nothing to do with this pipe -- which kills the process
+        // instead of returning EPIPE to the writer. That is a crash on the ordinary path where a
+        // user's ffmpeg dies mid-render, and it was reaching the whole test binary too.
+        //
+        // Ignoring it makes write() report EPIPE on every thread, which is what the error path
+        // below already expects. The per-thread block in `writeAll` stays: it costs nothing and it
+        // keeps the guarantee local to the code that relies on it.
+        static std::once_flag ignoreSigPipeOnce;
+        std::call_once(ignoreSigPipeOnce, [] { ::signal(SIGPIPE, SIG_IGN); });
 
         int fds[2] = {-1, -1};
         if (::pipe(fds) != 0) {
