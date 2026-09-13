@@ -1057,7 +1057,16 @@ Still open, and all needing a device so they belong in `tests/rendering/`: water
   They behave differently enough that one number for both would be meaningless: Glowmere is 84%
   `scene` and reproduces to 1.4%, while Constellation is volumetrics over an animated particle fill
   whose median is not a stable statistic at all. Both recorded in Phase 0.1.
-- `[ ]` Run release, debug, ASan/UBSan and TSan suites relevant to changed paths.
+- `[~]` Run release, debug, ASan/UBSan and TSan suites relevant to changed paths.
+  Release: clean, every run. **ASan/UBSan over the forensics unit tests: 1,822 assertions, 14 cases,
+  no sanitizer findings** -- and the run doubles as a check on the new guards, whose messages appear
+  in its log naming the light, the values, the entity and its transform. GPU forensics under ASan and
+  a TSan pass over the same filters remain.
+
+  One thing to know before running it: `cmake --build --preset asan` fails to *link* two auxiliary
+  tools (`avgen_world_preview`, `avgen_help_lint`) on undefined `libavgen_core` symbols. It predates
+  this work and does not touch the test binaries -- build `--target avgen_tests` or
+  `--target avgen_render_tests` and the sanitizer suites run fine.
 - `[~]` ASan/UBSan focused renderer-forensics coverage passes: 264 assertions across 16 cases with
   no sanitizer findings. The new transport discontinuity contract also passes under TSan (5
   assertions, no race diagnostics). The broader TSan transport filter is benchmark-inconclusive:
