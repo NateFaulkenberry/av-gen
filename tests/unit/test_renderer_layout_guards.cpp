@@ -1014,6 +1014,67 @@ TEST_CASE("every dynamic-offset stride is a 256-byte multiple large enough for i
     }
 }
 
+TEST_CASE("the object slot count is not the renderer's binding limit on entities",
+          "[unit][renderer][forensics][layout]") {
+    // ADR-128 re-pins this contract. What used to be here in spirit -- "`kMaxObjects` is 256 and
+    // `ObjectUniforms` fits a 512-byte slot" -- was half a contract: the stride half was checked
+    // above and is still checked above, unchanged, because a variable-size buffer addressed by
+    // dynamic offset needs a 256-aligned stride at least as badly as a fixed one did. The *count*
+    // half was never checked at all, and it was the half that was wrong: 256 slots against
+    // Glowmere's 278 entities.
+    //
+    // So the count half is now stated as a relation rather than as a number. The renderer's object
+    // buffer grows with the frame, and the assertion is that whatever ceiling remains is above the
+    // point at which the *identifier target* runs out of distinct names for entities. That is the
+    // property that makes the object buffer stop being the binding limit -- and it is the property
+    // that would quietly stop holding if somebody shrank the budget or widened the pick-id tag.
+    //
+    // Every number below is scraped from the headers. Nothing here is retyped, which is the only
+    // reason this file's checks survive the code changing.
+    const std::string renderer = bundle(sourceDir(), {"rendering/scene_renderer.hpp"});
+    const Constants rendererConstants = parseConstants(renderer);
+
+    SECTION("there is no compile-time cap on simultaneously visible entities") {
+        // `kMaxObjects` was that cap, and reintroducing a constant by that name is how it would
+        // come back: the failure mode is not a crash, it is entities silently not drawing, so
+        // nothing else in the suite would say anything.
+        INFO("scene_renderer.hpp must not declare a fixed visible-entity count");
+        CHECK(rendererConstants.count("kMaxObjects") == 0);
+        CHECK(renderer.find("kMaxObjects") == std::string::npos);
+    }
+
+    SECTION("a small scene still allocates exactly the 128 KB it used to") {
+        // The initial allocation is the old cap's size, deliberately: growth is the new behaviour,
+        // and a scene under 256 entities should not pay a byte more than it did before ADR-128.
+        const auto initial = rendererConstants.find("kInitialObjects");
+        const auto stride = rendererConstants.find("kObjectStride");
+        REQUIRE(initial != rendererConstants.end());
+        REQUIRE(stride != rendererConstants.end());
+        CHECK(initial->second * stride->second == 128 * 1024);
+    }
+
+    SECTION("the remaining ceiling is above the identifier target's naming capacity") {
+        // `packPickId` saturates at `kPickIndexMask` distinct indices per space, so past that point
+        // two entities share a name in the identifier target and picking resolves the wrong one.
+        // The object buffer must run out *after* that, or lifting the cap would have moved the
+        // failure rather than removed it -- and the new failure would be the silent one.
+        const std::string types = bundle(sourceDir(), {"scene/scene_types.hpp"});
+        const Constants typeConstants = parseConstants(types);
+        const auto pickBits = typeConstants.find("kPickIndexBits");
+        REQUIRE(pickBits != typeConstants.end());
+        const long long namesPerSpace = (1LL << pickBits->second) - 1;
+
+        const auto budgetMiB = rendererConstants.find("kObjectBufferBudgetMiB");
+        const auto stride = rendererConstants.find("kObjectStride");
+        REQUIRE(budgetMiB != rendererConstants.end());
+        REQUIRE(stride != rendererConstants.end());
+        const long long slots = budgetMiB->second * 1024 * 1024 / stride->second;
+
+        INFO(slots << " object slots against " << namesPerSpace << " nameable entity indices");
+        CHECK(slots > namesPerSpace);
+    }
+}
+
 // ---- Phase 9.3: which doors are open -------------------------------------------------------------
 
 namespace {

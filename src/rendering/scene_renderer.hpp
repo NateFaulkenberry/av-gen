@@ -508,7 +508,11 @@ public:
     // and eight times the 16,383 distinct entity indices the pick-id encoding can even name
     // (scene/scene_types.hpp, kPickIndexBits) -- so the identifier target runs out of names long
     // before this runs out of slots, and that is deliberate: this must never be the binding limit.
-    static constexpr std::uint64_t kObjectBufferByteBudget = 64ull * 1024ull * 1024ull;
+    // Written as a plain decimal mebibyte count and multiplied up, so the CPU/WGSL layout guards
+    // can scrape it the way they scrape every other constant they refuse to retype.
+    static constexpr std::uint32_t kObjectBufferBudgetMiB = 64;
+    static constexpr std::uint64_t kObjectBufferByteBudget =
+        static_cast<std::uint64_t>(kObjectBufferBudgetMiB) * 1024ull * 1024ull;
     static constexpr std::uint32_t kMaxObjectCapacity =
         static_cast<std::uint32_t>(kObjectBufferByteBudget / kObjectStride);
     static_assert(kObjectStride % 256 == 0);
