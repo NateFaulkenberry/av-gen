@@ -39,6 +39,16 @@ Application::runLive / Application::runHeadless
     -> Queue::Submit / FrameTimeline collection / present
 ```
 
+### The four paths
+
+`runLive`, the headless loop, `renderToImage` and the tests all call one `SceneRenderer::render`, so
+a difference between them is never pass order. Two differences are real: the capture path finishes,
+submits and **waits for the queue** (and collects timings twice) so an offline frame's CPU breakdown
+is complete, which a live frame never pays; and the live path shares its command encoder with the UI
+overlay, so a live frame carries commands no capture does. Tests use the capture path, which is why a
+bug reproducible in a test is reproducible in an offline render by construction -- and why one that
+appears only live is the UI, the shared encoder, or a real frame delta that a capture usually lacks.
+
 ### Ownership currently established
 
 | State | Authoritative owner | Renderer representation | Evidence |

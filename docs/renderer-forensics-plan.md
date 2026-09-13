@@ -144,8 +144,35 @@ acceptable entry for any of them -- an honest gap is evidence and a guess is not
 - `[~]` Document the actual application-to-GPU flow:
   `Application -> Engine -> Scene -> entities/components -> transforms -> animation -> visibility -> render extraction -> render queue -> GPU object data -> camera -> passes -> depth -> opaque -> terrain -> water -> transparent -> particles -> shadows -> post-processing -> output`.
   - `[x]` Existing high-level flow is documented in [architecture.md](architecture.md) and [rendering.md](rendering.md).
-  - `[ ]` Replace the conceptual flow with a code-level map naming the actual functions and files.
-  - `[ ]` Record ordering differences between live, headless, capture and test paths.
+  - `[x]` Replace the conceptual flow with a code-level map naming the actual functions and files.
+    The map is in the report; it names the functions rather than the concepts.
+  - `[x]` Record ordering differences between live, headless, capture and test paths.
+
+**The four paths, and where they differ.** All of them call the same `SceneRenderer::render(encoder,
+scene, time, target, shaderInputs)`, which is why a difference between them is never in the pass
+order:
+
+| Path | Entry | Encoder | After render | Waits |
+|---|---|---|---|---|
+| live | `Application::runLive` | the application's, shared with the UI overlay | UI draws into the same encoder, then present | no |
+| headless | `Application` headless loop | its own per frame | nothing | at submit |
+| capture | `SceneRenderer::renderToImage` / `renderToImageFloat` | its own | `Finish`, `Submit`, `collectFrameTimings`, `waitForQueue`, `collectFrameTimings` again, then read the texture back | **yes** |
+| test | the same `renderToImage` | same | same | yes |
+
+Two differences are real and worth stating because both have produced confusion:
+
+1. **The capture path blocks and the live path does not.** `renderSubmitted` finishes, submits,
+   waits for the queue and collects timings twice -- deliberately, so an offline frame's CPU
+   breakdown does not stop at the last pass encoded (ADR-077). A test measuring wall clock is
+   therefore measuring something the live path never pays.
+2. **The live path shares its encoder with the UI.** The overlay draws after the renderer into the
+   same encoder, so a live frame contains commands the capture path never encodes. Nothing the
+   renderer owns is affected, but a live-versus-capture *image* comparison is not comparing equals.
+
+There is no separate "test path": tests call the capture path, which is why a bug reproducible in a
+test is reproducible in an offline render by construction, and why one that only appears live is
+either the UI, the shared encoder, or the fact that live frames have a real frame delta and captures
+usually do not.
 - `[ ]` Identify every render pass, its inputs, outputs, clears, readbacks and resource ownership.
 - `[ ]` Record where culling, LOD, animation, water, shadows, particles and post effects execute relative to extraction and submission.
 
