@@ -86,6 +86,20 @@ fn materialTierOf() -> u32 {
     return u32(frame.materialTier.x + 0.5);
 }
 
+// ADR-138's deciding arm. `forcedMaterialTier` is frame-global (ADR-135: `ObjectUniforms` has no
+// free lane), but the question the arm has to answer is what tier assignment could realize -- and
+// on Glowmere the assignable share is the procedural scatter, because authored entities are 77% of
+// coverage and the terrain can never be demoted. `.w` carries a tier for procedural draws alone:
+// negative means "no override, use the frame's". This measures the assignable share directly
+// instead of estimating it from a coverage table.
+fn proceduralMaterialTierOf() -> u32 {
+    let override_ = frame.materialTier.w;
+    if (override_ < 0.0) {
+        return materialTierOf();
+    }
+    return u32(override_ + 0.5);
+}
+
 // How many *local* (clustered) lights a fragment of `tier` may evaluate. The table lives here and
 // in QualitySettings::localLightBudget and nowhere else.
 fn materialTierLocalLights(tier: u32) -> u32 {

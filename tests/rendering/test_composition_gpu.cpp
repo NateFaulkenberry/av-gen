@@ -812,11 +812,20 @@ TEST_CASE("a frame rendered offline matches the same frame rendered live",
     auto offline = assets::loadImage("frames/frame_000000.png", false);
     REQUIRE(offline.has_value());
 
-    // The same project, the same second, through the interactive path's encode.
+    // The same project, the same second, through the interactive path's encode -- at the job's
+    // tier. What this test is for is that the two *encode paths* agree, not that two tiers do.
+    // Until ADR-147 a RenderJob never called setQuality, so it ran at the renderer's default and
+    // this comparison was Realtime against Realtime: it passed by agreeing with the §5.9 violation
+    // Phase G measured, where the deliverable was byte-identical to an interactive frame.
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject("show.json").has_value());
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
+    {
+        rendering::QualityTier jobTier = rendering::QualityTier::Offline;
+        REQUIRE(rendering::qualityTierFromName(engine.renderSettings().tier, jobTier));
+        renderer.setQuality(jobTier);
+    }
     rendering::CompositionRenderer compositor(*ctx, shaders);
     REQUIRE(compositor.init().has_value());
     renderer.setOverlay(&compositor);

@@ -17,6 +17,11 @@
 // 2 array<SdfNodeGpu> (read-only storage, every object's records concatenated), 3 FieldBlock};
 // 2 material, 3 IBL (declared by pbr_shade.wgsl). Mirrors rendering/sdf_renderer.hpp.
 #include "common.wgsl"
+// ADR-138: whether this module's draws are the procedural scatter, which is the share tier
+// assignment could actually reach on Glowmere (authored entities are 77% of coverage and the
+// terrain can never be demoted). `pbr_shade.wgsl` reads it to pick which tier applies. Every
+// includer must define it -- a missing one is a compile error rather than a silent wrong tier.
+const kProceduralDraw: bool = false;
 #include "pbr_shade.wgsl"
 #include "sdf.wgsl"
 

@@ -141,6 +141,10 @@ struct QualitySettings {
     // the §5.9 guarantee spelled as data rather than as a special case in the assignment code.
     bool materialTiers = false;
     MaterialTier forcedMaterialTier = MaterialTier::Full;
+    // ADR-138: a tier for procedural draws alone, or < 0 for "whatever the frame is using". The
+    // frame-global tier measures a ceiling; this measures the share assignment could reach, because
+    // on this content the assignable geometry is the scatter. Not a shipping setting -- an arm.
+    int proceduralMaterialTier = -1;
 
     // ADR-125 / §5.9: hysteresis makes the image depend on the camera's history, so an offline
     // render may not have it -- two renders of the same frame must agree whatever route the camera

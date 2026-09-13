@@ -1412,6 +1412,15 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
          "every draw at the reduced-lights tier (the ceiling on that rung's saving)"},
         {"matflat", [](QualitySettings& q) { q.forcedMaterialTier = MaterialTier::Flat; },
          "every draw at the flat tier (the ceiling on that rung's saving)"},
+        // ADR-138's deciding arm: the flat tier on procedural draws only, entities left at Full.
+        // The frame-global arms above measure a ceiling nobody can ship; this one measures the
+        // share tier *assignment* could realize, which ADR-138 bounds at ~1.4 ms from a coverage
+        // table and does not measure. Run this before building assignment, not after.
+        {"matflatproc",
+         [](QualitySettings& q) {
+             q.proceduralMaterialTier = static_cast<int>(MaterialTier::Flat);
+         },
+         "the flat tier on procedural draws only (the assignable share, measured)"},
         // ADR-139. The volumetric march at the resolution the High and Offline tiers ask for --
         // their own setting, not a fabricated one -- so the pair says what half resolution buys
         // rather than what an invented scale would.
@@ -2296,7 +2305,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     frame.materialTier =
         glm::vec4(static_cast<float>(static_cast<std::uint8_t>(qualitySettings_.forcedMaterialTier)),
                   tierBudgetLane(qualitySettings_.reducedTierLocalLights),
-                  tierBudgetLane(qualitySettings_.flatTierLocalLights), 0.0f);
+                  tierBudgetLane(qualitySettings_.flatTierLocalLights),
+                  qualitySettings_.proceduralMaterialTier < 0
+                      ? -1.0f
+                      : static_cast<float>(qualitySettings_.proceduralMaterialTier));
     // ---- lights, shadow views and the froxel grid (ADR-033/034) ----
     updateLights(encoder, scene, view, aspect, frame);
     frame.lightCounts.z = scene.environment.stylized ? 1.0f : 0.0f;

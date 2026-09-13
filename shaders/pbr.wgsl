@@ -10,6 +10,11 @@
 // `fs_depth` is the depth-only entry the prepass and the shadow passes use: the same vertex stage,
 // so the depth it writes matches the lit pass exactly, and no fragment work beyond alpha cutout.
 #include "common.wgsl"
+// ADR-138: whether this module's draws are the procedural scatter, which is the share tier
+// assignment could actually reach on Glowmere (authored entities are 77% of coverage and the
+// terrain can never be demoted). `pbr_shade.wgsl` reads it to pick which tier applies. Every
+// includer must define it -- a missing one is a compile error rather than a silent wrong tier.
+const kProceduralDraw: bool = false;
 #include "pbr_shade.wgsl"
 #include "fields.wgsl"
 

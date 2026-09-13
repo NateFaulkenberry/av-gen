@@ -39,6 +39,11 @@
 // effectors), 2 ProceduralUniforms, 3 FieldBlock, 4 SplineTable, 5 visible list}, 2 material,
 // 3 IBL (both declared in pbr_shade.wgsl). Mirrors rendering/procedural_renderer.hpp.
 #include "common.wgsl"
+// ADR-138: whether this module's draws are the procedural scatter, which is the share tier
+// assignment could actually reach on Glowmere (authored entities are 77% of coverage and the
+// terrain can never be demoted). `pbr_shade.wgsl` reads it to pick which tier applies. Every
+// includer must define it -- a missing one is a compile error rather than a silent wrong tier.
+const kProceduralDraw: bool = true;
 #include "pbr_shade.wgsl"
 #include "fields.wgsl"
 #include "spline.wgsl"
