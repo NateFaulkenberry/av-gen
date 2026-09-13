@@ -137,3 +137,7 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [130](ADR-130-the-object-ceiling-is-a-budget-below-the-naming-limit.md) | What remains of the object ceiling is a byte budget, kept below the naming limit | Accepted |
 | [131](ADR-131-the-cheap-half-of-the-curve-is-not-measurable.md) | The cheap half of the fragment curve is not measurable, and the target stays where it is | Accepted |
 | [132](ADR-132-spread-is-the-transition-mitigation.md) | Spread is the transition mitigation, and temporal AA is not a prerequisite | Accepted |
+| [144](ADR-144-a-curve-carries-its-own-noise-floor.md) | A curve carries its own noise floor, or it is not a curve | Accepted |
+| [145](ADR-145-a-scene-declares-its-own-density.md) | A scene declares its own density, and the declaration is what is checked | Accepted |
+| [146](ADR-146-offline-is-only-half-hysteresis-free.md) | Offline is only half hysteresis-free, and the half that is not is measured | Accepted |
+| [147](ADR-147-the-batch-render-path-never-selects-the-offline-tier.md) | The batch render path never selects the offline tier | Accepted |
