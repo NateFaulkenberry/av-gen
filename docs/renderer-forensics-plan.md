@@ -597,13 +597,45 @@ rather than a continuum.
 
 - `[~]` Run all canonical bugs with LOD disabled and enabled.
   Existing culling GPU coverage compares LOD-enabled behavior against direct/no-LOD rendering for
-  representative procedural scenes; canonical Glowmere/alien image toggles remain open.
+  representative procedural scenes; canonical Glowmere/alien image toggles remain open. Note that
+  terrain LOD *does* have a switch -- `nodes/<node>/terrainLod` -- which is how the calibration below
+  was bounded; it is a scene parameter rather than a renderer arm.
 - `[x]` Instrumented LOD selection is covered by CPU/GPU count comparisons, camera-distance and
   screen-size threshold tests, per-instance spread migration and hysteresis checks.
 - `[x]` Moving-camera threshold traversal proves deterministic, non-strobing transitions when spread
   and hysteresis are configured; matched image/performance calibration on `RendererQA` remains open.
-- `[ ]` Verify mesh/material replacement cannot use stale GPU state.
-- `[ ]` Calibrate LOD ratios against a moving camera and record image/performance tradeoffs.
+- `[~]` Verify mesh/material replacement cannot use stale GPU state.
+  The scene-owned cache repairs cover mesh, texture, environment and palette reuse across scenes, and
+  the alternating-transform case covers object slots. What is *not* separately covered is a chunk
+  swapping between its own LOD meshes mid-frame; the calibration below exercises it across five
+  settings without a GPU error or a wrong triangle count, which is evidence rather than proof.
+- `[x]` Calibrate LOD ratios against a moving camera and record image/performance tradeoffs.
+
+**Terrain chunk LOD on Glowmere**, 1280x800, 60 frames, everything else fixed. Driven through
+`nodes/valley/terrainLodDistance`:
+
+| `lodDistance` | Triangles | GPU median |
+|---:|---:|---:|
+| 8 m | 402,201 | 18.48 ms |
+| 35 m | 412,057 | 18.42 ms |
+| **70 m (shipped)** | **430,233** | **18.61 ms** |
+| 280 m | 529,305 | 20.51 ms |
+| 2000 m | 544,281 | 20.25 ms |
+
+**The conclusion is that this knob is not worth tuning on this scene**, and the numbers say why:
+triangles move 35% across a 250x range while the frame moves 11%, not monotonically. The shipped
+70 m already sits at the knee -- going coarser buys 28,000 triangles and 0.13 ms, which is noise.
+Glowmere's frame is 15.7 ms of scene pass against 18.6 total and is fragment-bound, so removing
+terrain vertices cannot help it. Anyone reaching for LOD to make this scene faster is reaching for
+the wrong knob.
+
+**A trap, recorded because it caught the person who had just written the rule down.** The first four
+runs of this calibration changed `terrain.lodDistance` in the *scene file* and produced byte-identical
+frames across a 250x range -- 430,233 triangles every time, to the digit. Nothing was broken: the
+project's `parameters` block pins `nodes/valley/terrainLodDistance`, and `applyParameters` re-derives
+the setting from the parameter every frame. That is Phase 1.3's rule exactly -- **the parameter is
+authoritative and the scene value is its registered default** -- and it reads as a dead knob from the
+outside.
 
 ### 5.3 Character isolation and skinning
 
