@@ -409,6 +409,37 @@ Result<LodChain> buildLodChain(const scene::MeshData& mesh, const LodChainSettin
     return chain;
 }
 
+scene::MeshData sourceLodMesh(const scene::MeshData& mesh, int triangleBudget,
+                              const LodChainSettings& settings) {
+    if (mesh.skinned() || mesh.vertices.empty() || mesh.indices.empty() || mesh.indices.size() % 3 != 0 ||
+        !mesh.valid()) {
+        return mesh;
+    }
+    const auto triangles = static_cast<int>(mesh.indices.size() / 3);
+    LodChainSettings lod0 = settings;
+    lod0.optimise = true; // the whole point: LOD0 through the documented sequence
+    lod0.generateShadowIndices = false;
+    lod0.ratios = {1.0f};
+    const bool budgeted = triangleBudget > 0 && triangles > triangleBudget;
+    if (budgeted) {
+        // Below 1 so validate() accepts a strictly descending pair; the clamp only bites on a
+        // budget within one triangle of the source, where there is nothing to do anyway.
+        lod0.ratios.push_back(std::min(static_cast<float>(triangleBudget) / static_cast<float>(triangles),
+                                       0.999f));
+    }
+    auto chain = buildLodChain(mesh, lod0);
+    if (!chain || chain->levels.empty()) {
+        return mesh;
+    }
+    const std::size_t level = budgeted && chain->levels.size() > 1 ? 1 : 0;
+    scene::MeshData out = std::move(chain->levels[level].mesh);
+    if (out.indices.empty() || !out.valid()) {
+        return mesh;
+    }
+    out.name = mesh.name; // a source mesh keeps its own name; only a LOD rung is renamed
+    return out;
+}
+
 MeshCacheStats analyseMesh(const scene::MeshData& mesh) {
     if (!mesh.valid()) {
         return {};
@@ -444,6 +475,36 @@ LodChainSettings heroLodSettings() {
 // because a Quaternius tree's branches are full of non-manifold junctions and attribute seams, and
 // the preserving simplifier will not move a vertex where either sits: on CommonTree_1 it returns
 // 90% of the source at every ratio from 50% down to 7% -- correctly, and uselessly.
+// LOD0 of an imported mesh source with a triangle budget (ADR-110). Measured on an M2 Max against
+// Glowmere at 1280x800, three interleaved pairs per arm, from the frame the old path produced
+// (432,271 camera triangles, 18.68 ms GPU, 15.73 ms scene pass):
+//
+//   this calibration                    264,303 tris   14.48 ms GPU   11.86 ms scene
+//   preserving only (sloppyFallback 0)  the trees stall: valley_canopy's leaves come back at
+//                                       3,937 triangles against a share of a 900 budget, five
+//                                       times what the old grid clustering produced. Refused.
+//   weld + vertex-cache order off        14.42-14.81 ms over three pairs, against 14.48-14.68
+//                                       with them on: no measurable difference either way.
+//   overdraw pass at 1.05                15.01-15.20 ms, every pair slower. Left off.
+//
+// So: the reduction is the whole of the win, and it comes from the simplifier reaching the budget
+// the author wrote, which a grid clustering cannot do. The ordering steps are kept because welding
+// is what lets the simplifier work at all on an exporter-split mesh and neither costs anything
+// measurable here -- not because either was measured to pay. The overdraw pass is left off with a
+// number against it: meshoptimizer's own documentation warns it behaves differently on tiled GPUs,
+// and on this one it costs 4%. The depth prepass is already doing that job.
+//
+// The attribute weights are the hero calibration's, not vegetation's: LOD0 is the mesh the near
+// field draws and its shading is looked at. The sloppy fallback is armed, which the hero
+// calibration refuses, because a hero has no triangle budget to reach and a scattered asset does:
+// a budget that is quietly not met is the defect this replaces, not a quality setting.
+LodChainSettings lod0Settings() {
+    LodChainSettings s;
+    s.attributes = {.normal = 0.5f, .uv = 0.1f};
+    s.sloppyFallback = 1.5f;
+    return s;
+}
+
 LodChainSettings vegetationLodSettings() {
     LodChainSettings s;
     s.ratios = {1.0f, 0.35f, 0.12f, 0.04f};

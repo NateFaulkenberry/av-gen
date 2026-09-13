@@ -155,8 +155,32 @@ struct MeshCacheStats {
 };
 [[nodiscard]] MeshCacheStats analyseMesh(const scene::MeshData& mesh);
 
+// LOD0 of an imported mesh source: meshoptimizer's documented order -- index (weld), vertex cache,
+// vertex fetch -- and, when `triangleBudget` is positive and the mesh is over it, a simplification
+// that actually reaches it.
+//
+// The budget used to go through scene::decimateMesh, a vertex clustering on a uniform grid. A grid
+// cannot reach a triangle count: it snaps vertices into cells and keeps whatever triangles survive.
+// The levels below LOD0 stopped using it (ADR-078) and LOD0 never did, so the mesh the near field
+// draws was the only rung of the ladder that was neither simplified properly nor ordered for the
+// GPU -- and the near field is where a scatter's triangles actually are.
+//
+// `settings.ratios` is ignored: this builds LOD0, and the ratio it needs comes from the budget.
+// Everything else (attribute weights, the sloppy fallback, maxError) is honoured, so a caller
+// chooses between a level that stops short and says so and one that reaches its number.
+//
+// A skinned mesh is returned untouched: vertex-fetch optimisation reorders the vertex buffer and
+// MeshData::skin is parallel to it. So is a mesh the chain builder refuses to touch -- a
+// non-finite position, an index past the vertex buffer -- because nothing good comes of a grid
+// clustering over one of those either.
+[[nodiscard]] scene::MeshData sourceLodMesh(const scene::MeshData& mesh, int triangleBudget,
+                                            const LodChainSettings& settings);
+
 // The two calibrations ADR-078 measured. A hero is looked at; a fern is one of eighty thousand.
 [[nodiscard]] LodChainSettings heroLodSettings();
+// LOD0 of an imported mesh source with a triangle budget (ADR-110). See the definition for what
+// was measured and why the sloppy fallback is armed here and the overdraw pass is not.
+[[nodiscard]] LodChainSettings lod0Settings();
 [[nodiscard]] LodChainSettings vegetationLodSettings();
 
 } // namespace avgen::assets

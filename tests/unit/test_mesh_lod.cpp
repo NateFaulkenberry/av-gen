@@ -16,6 +16,7 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -538,4 +539,93 @@ TEST_CASE("Measure: meshoptimizer against the existing decimator", "[.lodmeasure
         }
     }
 #endif
+}
+
+// ---- ADR-110: LOD0 goes through meshoptimizer too ----------------------------------------------
+
+TEST_CASE("LOD0 reaches a triangle budget a grid clustering cannot", "[assets][lod]") {
+    // The fins stall the preserving simplifier the way a Quaternius tree does, and a uniform grid
+    // has no way to reach a triangle count on them at all: it snaps vertices into cells and keeps
+    // whatever triangles survive. This is the geometry a scatter's budget is written for.
+    const scene::MeshData fins = nonManifoldFins(400);
+    const auto sourceTris = triangles(fins);
+    REQUIRE(sourceTris == 1200u);
+    const int budget = 120;
+
+    const scene::MeshData lod0 = assets::sourceLodMesh(fins, budget, assets::lod0Settings());
+    CHECK(lod0.valid());
+    CHECK(triangles(lod0) <= static_cast<std::uint32_t>(budget));
+    // It reached the number by simplifying, not by deleting the mesh: the shape is still there.
+    CHECK(triangles(lod0) > 0u);
+    CHECK(boxDrift(fins, lod0) < 0.3f);
+
+    // The negative control, and the reason this exists: the path LOD0 used to take, on the same
+    // mesh, with the same budget.
+    const scene::MeshData clustered = scene::decimateMesh(fins, budget);
+    INFO("grid clustering left " << triangles(clustered) << " triangles of a " << budget << " budget");
+    CHECK(triangles(clustered) > static_cast<std::uint32_t>(budget));
+
+    // A second control: with no budget, nothing is simplified. A function that reduced here would
+    // be passing the check above for the wrong reason.
+    const scene::MeshData unbudgeted = assets::sourceLodMesh(fins, 0, assets::lod0Settings());
+    CHECK(triangles(unbudgeted) == sourceTris);
+}
+
+TEST_CASE("LOD0 comes back ordered for the GPU", "[assets][lod]") {
+    // Deliberately bad triangle order, which is what an unordered source mesh looks like to the
+    // vertex cache. LOD0 never went through any of this before: only LOD1 and below did.
+    scene::MeshData sphere = scene::makeUvSphere(1.0f, 64, 48);
+    for (std::size_t t = 0; t * 3 + 2 < sphere.indices.size(); ++t) {
+        const std::size_t other = (t * 7919u) % (sphere.indices.size() / 3);
+        for (std::size_t k = 0; k < 3; ++k) {
+            std::swap(sphere.indices[t * 3 + k], sphere.indices[other * 3 + k]);
+        }
+    }
+    const assets::MeshCacheStats before = assets::analyseMesh(sphere);
+    const scene::MeshData ordered = assets::sourceLodMesh(sphere, 0, assets::lod0Settings());
+    const assets::MeshCacheStats after = assets::analyseMesh(ordered);
+    INFO("acmr " << before.acmr << " -> " << after.acmr << ", overfetch " << before.overfetch << " -> "
+                 << after.overfetch);
+    CHECK(triangles(ordered) == triangles(sphere)); // no geometry was traded for the ordering
+    CHECK(after.acmr < before.acmr);
+    // A sphere's vertices are each used by six triangles however they are ordered, so overfetch
+    // starts at ~1.0 and there is nothing for the fetch pass to win; it must not lose either.
+    CHECK(after.overfetch <= before.overfetch);
+    CHECK(ordered.valid());
+
+    // The control: the shuffled mesh must actually show the bad number this claims to fix, or the
+    // check above is empty. 0.5 is the floor of ACMR and 3.0 is one transform per corner.
+    CHECK(before.acmr > 2.5f);
+    CHECK(after.acmr < 1.0f);
+}
+
+TEST_CASE("A skinned mesh is not reordered under its skin", "[assets][lod]") {
+    // Vertex-fetch optimisation permutes the vertex buffer; MeshData::skin is parallel to it and
+    // is not carried through. Reordering one without the other silently detaches every joint.
+    scene::MeshData skinned = scene::makeUvSphere(1.0f, 16, 12);
+    skinned.skin.assign(skinned.vertices.size(), scene::SkinInfluence{});
+    REQUIRE(skinned.skinned());
+    const scene::MeshData out = assets::sourceLodMesh(skinned, 8, assets::lod0Settings());
+    CHECK(sameBuffers(out, skinned));
+    CHECK(out.skin.size() == skinned.skin.size());
+}
+
+TEST_CASE("makeSourceMesh applies a mesh budget through the simplifier", "[assets][lod][procedural]") {
+    // The wiring, not the algorithm: the budget is applied where the source mesh is resolved, so a
+    // scene that writes `meshBudget` gets the mesh this test's siblings describe. Reverting the
+    // call site to decimateMesh fails here and nowhere else.
+    scene::SourceSpec spec;
+    spec.kind = scene::PrimitiveKind::Mesh;
+    spec.asset = "fins";
+    spec.assetMesh = std::make_shared<const scene::MeshData>(nonManifoldFins(400));
+    spec.meshBudget = 120;
+    const auto built = scene::makeSourceMesh(spec);
+    REQUIRE(built.has_value());
+    CHECK(triangles(*built) <= 120u);
+
+    // The control: no budget, and the mesh keeps every triangle it arrived with.
+    spec.meshBudget = 0;
+    const auto whole = scene::makeSourceMesh(spec);
+    REQUIRE(whole.has_value());
+    CHECK(triangles(*whole) == triangles(*spec.assetMesh));
 }
