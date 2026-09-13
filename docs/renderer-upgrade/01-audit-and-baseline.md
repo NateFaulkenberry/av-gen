@@ -656,3 +656,53 @@ that sweep's shader is simpler than Glowmere's and its absolute times do not tra
 Two defects found in the diagnostics and not fixed here (both outside this work's file ownership):
 the counting pass does not cover procedural instances, and the `FragmentDensity` view's default
 scale is 1.0, so it saturates to a white silhouette at the first fragment and says nothing.
+
+## 4.10 The ceiling of an impostor and HLOD proxy system, in milliseconds (tasks C5–C7)
+
+Full record and every caveat: **ADR-150** (the instruments), **ADR-151** (the verdict), **ADR-152**
+(a defect both walks had), **ADR-153**, **ADR-154**. Instruments, both committed and re-runnable:
+`tests/unit/test_representation_band_analysis.cpp` `[.analysis][bands]`, and
+`tests/rendering/test_representation_ceiling_perf.cpp` `[.perf][representation]`.
+
+§4.9 said how much excess exists. It did not say whether the machinery C5 and C6 propose can reach
+it, because §4.9 buckets by pixels per *triangle* and the machinery is selected by projected
+*radius* (ADR-123), and the two are independent. ADR-124 named a synthetic sweep to close the gap;
+ADR-131 ran it and found the region **unresolvable**. So the question was put to the frame instead.
+
+**The method is deletion.** `LodSettings::minScreenRadius` — shipped, general, policy-exposed, and
+in exactly the units the bands are cut in — deletes a band outright. No proxy can beat deletion: it
+still draws a silhouette and still casts shadows. Each row bounds every possible implementation.
+
+1280×800, fixed t = 4.0 s, three interleaved runs in one session under `tools/gpu-lock.sh`; every
+arm's triangle count identical across all three (asserted).
+
+| arm | frame | scene pass | vs baseline | triangles |
+|---|---|---|---|---|
+| baseline | 13.566 ms | 10.879 ms | — | 264,305 |
+| below **8 px** radius deleted (C5's whole band) | 13.763 | 11.076 | **+1.8%** | 260,866 |
+| below **40 px** radius deleted (C5 + C6) | 12.190 | **8.978** | **−17.5%** | 137,543 |
+| below 200 px radius (scale check) | 12.386 | 8.061 | −25.9% | 99,820 |
+
+**Three things this establishes.**
+
+1. **C5 is refused by its own ceiling.** Deleting every instance below 8 px of projected radius moves
+   the scene pass by +1.8% — inside the 2% floor and the wrong sign — and the capture is
+   indistinguishable from the baseline at full size. That band holds 0.4% of the frame's coverage.
+   It is the same finding as §4.9 in milliseconds: coverage is what costs.
+2. **C6's band is worth 1.90 ms, and most of it is already reachable.** The 40 px capture has lost
+   the entire mid-ground ecology, so a proxy would have to put that back. Costed against §4.5's
+   curve, an *ideal, free* proxy recovers 58% of what deletion does; the `RepresentationSelector`
+   ADR-125 records as built and wired to nothing recovers 29% of it — halving the frame's triangles
+   with no new code. **The marginal value of the new machinery is ≈0.4 ms of a 13.6 ms frame.**
+3. **C5–C7 move to *tracked, not removed*.** §56 governs: a High-severity stale-proxy risk and a new
+   bake pipeline do not buy four tenths of a millisecond. The verdict is about *this content* and
+   says so — §45's Dense Forest and Open Vista are the scenes that would reverse it.
+
+**Two defects found, one of which reaches back into §4.9.** The GPU cull ladder omits
+`sourceTransform` from its radius, so it mis-sizes every scatter layer — `valley_grass` by 1.9×,
+`valley_pebbles` by 3×, `elder-crown` by 8.2× — and both this walk and §4.9's inherit it (ADR-152).
+Corrected, per-layer attribution moves a great deal and the aggregate barely does: whole-frame excess
+1.52× → **1.51×**. §4.9's headline survives; any single layer's excess quoted from it does not. And
+the impostor rung `makeLodMesh` documents is unreachable for imported-mesh sources, so no Glowmere
+instance has ever drawn a billboard — and making it reachable is a measured **regression** of +3.25%,
+because a quad covers more pixels than the fern it replaces (ADR-153).
