@@ -203,6 +203,38 @@ Accepted on two further gates beyond the timing: the `[baseline]` frame-state te
 (29 assertions — derived state is identical), and the captured frame is visually correct at full
 size, which §50 of the spec requires independently of the measurement.
 
+## 3.2.2 Wave 1 merged head (current)
+
+Five locked runs, binary rebuilt at the measured revision so the record's provenance matches
+(`cbeeea3`, clean tree, 1280x800 -- the baseline's resolution).
+
+| | pre-upgrade (S3.2) | wave 1 merged |
+|---|---|---|
+| GPU median | 18.55-18.74 ms | **13.37 ms** |
+| scene pass | 15.73 ms | **10.88 ms** |
+| shadow pass | 0.66 ms | **0.33 ms** |
+| shadow draws | 189 | **34** |
+| submitted tris | 430,231 | **264,305** |
+
+Within-session spread 2.0% -- at the A/B threshold, not comfortably under it. Quoted as the current
+state of the renderer, which is what it is; it is not offered as a measured improvement of one
+change over another.
+
+**What is not established here.** The step from S3.2.1 (14.61-14.81 ms, post-LOD0, shadow branch not
+yet merged) to this one was measured in a *different session*, and S3.1 forbids comparing across
+sessions -- the same rule whose violation produced, and then withdrew, the Constellation claim in
+S4.7. So the shadow work's contribution to the timing is **not** established by these numbers, and
+the 4.2% its own ADR reports was measured pre-LOD0 and in blocks rather than interleaved. ADR-112
+flags that itself.
+
+What *is* established, because they are deterministic counters rather than timings and so carry no
+session noise: **shadow draws 189 -> 34** and shadow casters 55 -> 33. Those are real and they are
+the mechanism ADR-112 describes -- a shorter range holds fewer casters. But LOD0 also reduced draws,
+so even the counter change is the two merges together, not the shadow branch alone.
+
+A same-session interleaved A/B on `shadowTexelTarget` (zero restores the old range) is the way to
+settle it, and it is assigned to the Phase B agent, which needs that arm anyway.
+
 ## 3.3 Reproducibility — investigated, not assumed
 
 Five consecutive Glowmere runs, same session:
