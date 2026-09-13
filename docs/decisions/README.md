@@ -122,3 +122,8 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [114](ADR-114-cluster-occupancy-is-measured-uncapped.md) | Cluster occupancy is measured before the cap, not after it | Accepted |
 | [115](ADR-115-overdraw-is-counted-in-its-own-pass.md) | Overdraw is counted in its own pass, or not at all | Accepted |
 | [116](ADR-116-sigpipe-is-ignored-process-wide.md) | SIGPIPE is ignored process-wide, not blocked per thread | Accepted |
+| [122](ADR-122-importance-is-pixels-per-triangle.md) | A drawable's importance is measured in pixels per triangle | Accepted |
+| [123](ADR-123-representation-is-two-decisions.md) | Representation is two decisions, not one ladder | Accepted |
+| [124](ADR-124-the-band-is-a-band.md) | The target is a band of a few hundred pixels per triangle, not the fewest triangles | Accepted |
+| [125](ADR-125-hysteresis-is-opt-in-and-never-offline.md) | Hysteresis is opt-in, and offline never gets it | Accepted |
+| [126](ADR-126-glowmeres-quad-overdraw-share.md) | Glowmere's quad-overdraw share, and the instrument that had to be built to find it | Accepted |
