@@ -2506,10 +2506,18 @@ int Application::runLive() {
         if (panel_) {
             core::PhaseProfiler::Scope scope(prof, kPhDebug);
             panel_->composition.stats = &compositor_->stats();
-            const rendering::DebugViewOptions& options = panel_->world.debug;
+            rendering::DebugViewOptions options = panel_->world.debug;
+            // The frustum overlay is drawn at the aspect the frame is *actually* being rendered at,
+            // not the option's default: a box drawn at 16:9 over a 2:1 viewport is a wrong shape
+            // that looks like a culling bug.
+            if (renderHeight_ > 0) {
+                options.frustumAspect = static_cast<float>(renderWidth_) / static_cast<float>(renderHeight_);
+            }
             renderer_->setDiagnosticEntity(options.selectedEntity);
             renderer_->setDebugDepthTest(options.depthTest);
-            rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime);
+            transformHistory_.setSubject(options.selectedEntity);
+            rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime,
+                                          &transformHistory_);
         }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
@@ -2533,6 +2541,10 @@ int Application::runLive() {
                           describeWrites(uiScript_));
             }
         }
+        // The frame has published its diagnosis; keep it. Recording after the render and drawing
+        // before it means the trail is one frame behind the picture, which is the honest ordering:
+        // a trail drawn from a frame that has not been rendered would be a prediction.
+        transformHistory_.record(renderer_->diagnosticFrame());
         // Clearing the window is the whole of the main window's present now: the editor draws the
         // frame into its canvas, and the world no longer covers the surface for the panels to be
         // painted over. The clear still has to happen, because ImGui's pass loads rather than

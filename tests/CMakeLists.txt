@@ -59,6 +59,9 @@ target_sources(avgen_tests PRIVATE
     # widening, the per-label medians and the removal attribution are where these can be wrong.
     "${CMAKE_SOURCE_DIR}/src/rendering/render_stats.cpp"
     "${CMAKE_SOURCE_DIR}/src/rendering/shadow_math.cpp"
+    # The selected object's transform history (forensics 4.3/9.3): it reads the renderer's published
+    # diagnosis, which is names and numbers, so it belongs where it can be checked without a device.
+    "${CMAKE_SOURCE_DIR}/src/rendering/transform_history.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp")
 target_link_libraries(avgen_tests PRIVATE avgen_core Catch2::Catch2WithMain)
 avgen_set_warnings(avgen_tests)

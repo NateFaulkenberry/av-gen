@@ -2,6 +2,8 @@
 
 #include "spatial/field.hpp"
 
+#include <array>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -15,11 +17,48 @@ constexpr glm::vec4 kNormalColour{0.4f, 1.0f, 0.55f, 0.8f};
 constexpr glm::vec4 kSplineColour{1.0f, 0.65f, 0.85f, 0.9f};
 constexpr glm::vec4 kFieldColour{1.0f, 0.55f, 0.3f, 0.75f};
 constexpr glm::vec4 kSdfColour{0.5f, 1.0f, 0.9f, 0.7f};
+constexpr glm::vec4 kOriginColour{1.0f, 1.0f, 1.0f, 0.9f};
+constexpr glm::vec4 kTrailColour{1.0f, 0.45f, 0.15f, 0.9f};
+constexpr glm::vec4 kFrustumColour{0.85f, 0.85f, 0.4f, 0.7f};
 
 // Blue to red across a normalised value.
 glm::vec4 heat(float t, float alpha) {
     t = std::clamp(t, 0.0f, 1.0f);
     return glm::vec4(t, 0.35f * (1.0f - std::abs(t - 0.5f) * 2.0f) + 0.2f, 1.0f - t, alpha);
+}
+
+// The eight corners of a camera's frustum, through the inverse of the matrix the camera would draw
+// with. NDC z runs 0..1 here because that is what the projection produces (WebGPU/Metal); using the
+// OpenGL -1..1 cube would put the near plane halfway down the volume and the box would be a
+// plausible, wrong shape.
+void drawFrustum(DebugDraw& draw, const scene::Camera& camera, float aspect) {
+    const glm::mat4 inverse = glm::inverse(camera.projection(std::max(1e-3f, aspect)) * camera.view());
+    std::array<glm::vec3, 8> corner{};
+    for (int i = 0; i < 8; ++i) {
+        const glm::vec4 ndc((i & 1) ? 1.0f : -1.0f, (i & 2) ? 1.0f : -1.0f, (i & 4) ? 1.0f : 0.0f, 1.0f);
+        const glm::vec4 world = inverse * ndc;
+        if (std::abs(world.w) < 1e-8f || !std::isfinite(world.w)) {
+            return; // a degenerate projection draws nothing rather than a box at infinity
+        }
+        corner[static_cast<std::size_t>(i)] = glm::vec3(world) / world.w;
+    }
+    // Near face 0,1,3,2 -- the bit pattern makes 0-1 and 2-3 the horizontal edges.
+    const int nearLoop[4] = {0, 1, 3, 2};
+    const int farLoop[4] = {4, 5, 7, 6};
+    for (int i = 0; i < 4; ++i) {
+        draw.line(corner[static_cast<std::size_t>(nearLoop[i])], corner[static_cast<std::size_t>(nearLoop[(i + 1) % 4])],
+                  kFrustumColour);
+        draw.line(corner[static_cast<std::size_t>(farLoop[i])], corner[static_cast<std::size_t>(farLoop[(i + 1) % 4])],
+                  kFrustumColour);
+        draw.line(corner[static_cast<std::size_t>(nearLoop[i])], corner[static_cast<std::size_t>(farLoop[i])],
+                  kFrustumColour);
+    }
+    // The basis, so "which way is the camera facing" is answerable without reading the box.
+    const glm::mat4 view = camera.view();
+    const glm::mat3 basis = glm::transpose(glm::mat3(view));
+    glm::mat4 frame(basis);
+    frame[3] = glm::vec4(camera.position, 1.0f);
+    draw.axis(frame, glm::length(corner[0] - camera.position) * 0.5f);
 }
 
 glm::vec4 idColour(int id, float alpha) {
@@ -30,12 +69,42 @@ glm::vec4 idColour(int id, float alpha) {
 
 } // namespace
 
-void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugViewOptions& options, double time) {
+void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugViewOptions& options, double time,
+                        const TransformHistory* history) {
     int budget = std::max(0, options.maxPoints);
 
-    for (const scene::Entity& entity : scene.entities) {
+    if (options.worldAxes) {
+        // Sized from the distance to the camera so it stays legible in a two-metre room and in a
+        // kilometre of terrain, and floored so it never vanishes when the camera sits on the origin.
+        const float span = std::max(1.0f, glm::length(scene.camera.position) * 0.25f);
+        draw.axis(glm::mat4(1.0f), span);
+        draw.point(glm::vec3(0.0f), options.pointSize * 0.12f, kOriginColour);
+    }
+
+    if (options.frustum) {
+        drawFrustum(draw, scene.camera, options.frustumAspect);
+    }
+
+    if (options.transformTrail && history != nullptr) {
+        const std::vector<glm::vec3> points = history->path();
+        if (points.size() >= 2) {
+            draw.polyline(points, kTrailColour);
+        }
+        for (const glm::vec3& p : points) {
+            draw.point(p, options.pointSize * 0.5f, kTrailColour);
+        }
+    }
+
+    for (std::size_t entityIndex = 0; entityIndex < scene.entities.size(); ++entityIndex) {
+        const scene::Entity& entity = scene.entities[entityIndex];
         if (!entity.visible || (!options.selectedEntity.empty() && entity.name != options.selectedEntity) ||
             entity.mesh >= scene.meshes.size()) {
+            continue;
+        }
+        // What the frame submits is what survived the camera cull. This is the *set*, not the
+        // triangles: the arm answers "was this object handed to the GPU", which is the question a
+        // missing object raises, and it is a claim the visualiser can make honestly.
+        if (options.submittedOnly && entity.cameraCulled) {
             continue;
         }
         const auto [meshLo, meshHi] = scene.meshes[entity.mesh].bounds();
@@ -50,14 +119,20 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
             worldLo = glm::min(worldLo, world);
             worldHi = glm::max(worldHi, world);
         }
-        if (options.entityBounds) {
-            draw.box(worldLo, worldHi, entity.cameraCulled ? glm::vec4(1.0f, 0.2f, 0.1f, 0.9f)
-                                                           : kBoundsColour);
+        // The id the identifier target writes for this entity, so the overlay and the `Ids`
+        // auxiliary view agree on which object is which. Colouring by loop index instead would be a
+        // second numbering, and two numberings is how a pick used to select the wrong tree.
+        const std::uint32_t pickId = scene::packPickId(scene::PickSpace::Entity, entityIndex);
+        const glm::vec4 culledColour(1.0f, 0.2f, 0.1f, 0.9f);
+        const glm::vec4 boundsColour = options.entityIds ? idColour(static_cast<int>(pickId), 0.9f)
+                                       : entity.cameraCulled ? culledColour
+                                                             : kBoundsColour;
+        if (options.entityBounds || options.entityIds) {
+            draw.box(worldLo, worldHi, boundsColour);
         }
         if (options.entityOrigins && budget > 0) {
             draw.point(glm::vec3(model[3]), options.pointSize * 0.08f,
-                       entity.cameraCulled ? glm::vec4(1.0f, 0.2f, 0.1f, 0.9f)
-                                           : glm::vec4(1.0f, 0.9f, 0.2f, 0.9f));
+                       entity.cameraCulled ? culledColour : glm::vec4(1.0f, 0.9f, 0.2f, 0.9f));
             draw.axis(model, std::max(0.25f, glm::length(worldHi - worldLo) * 0.2f));
             --budget;
         }

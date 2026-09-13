@@ -6,6 +6,8 @@
 #include "gpu/shader_library.hpp"
 #include "scene/mesh_generators.hpp"
 
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
@@ -100,6 +102,182 @@ TEST_CASE("The debug builder emits only what the options ask for", "[debug]") {
     options.maxPoints = 5;
     rendering::buildDebugGeometry(draw, scene, options, 0.0);
     CHECK(draw.pointVertexCount() == 5);
+}
+
+// Renderer forensics Phase 4.3. The plan's rule for every diagnostic is that it must isolate or show
+// the thing it names, so each control below is asserted against the case it is *not* for: the world
+// axes are not the entity's axes, the submitted filter drops what the cull dropped and keeps what it
+// kept, the id colouring changes with the id, and the frustum follows the camera. A control that
+// drew the same picture either way would pass a test that only enabled it.
+TEST_CASE("The forensic geometry controls each draw only their own case", "[debug][forensics]") {
+    auto ctx = gpu::Context::create(gpu::ContextDesc{});
+    if (!ctx) {
+        SKIP("no GPU adapter available");
+    }
+    gpu::ShaderLibrary shaders(**ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::DebugDraw draw(**ctx, shaders);
+    scene::Scene scene = makeScene();
+    scene.camera.position = {0.0f, 2.0f, 10.0f};
+    scene.camera.target = {0.0f, 0.0f, 0.0f};
+
+    SECTION("world axes are drawn at the origin, and only when asked for") {
+        rendering::DebugViewOptions options;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        REQUIRE(draw.empty());
+
+        options.worldAxes = true;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        CHECK(draw.lineVertexCount() == 6); // three axes
+        CHECK(draw.pointVertexCount() == 1);
+
+        // They are the world's axes, not the selected entity's: they start at zero, they do not
+        // move when the entity does, and a selection filter that matches nothing does not remove
+        // them. The entity here sits at (2, 0.5, -1), so an origin claim is falsifiable.
+        CHECK(draw.pointVertices().front().position == glm::vec3(0.0f));
+        for (std::size_t i = 0; i < 6; i += 2) {
+            CHECK(draw.lineVertices()[i].position == glm::vec3(0.0f));
+        }
+        const std::size_t lines = draw.lineVertexCount();
+        draw.clear();
+        options.selectedEntity = "no-such-entity";
+        scene.entities[0].transform.position = {50.0f, 50.0f, 50.0f};
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        CHECK(draw.lineVertexCount() == lines);
+        CHECK(draw.pointVertices().front().position == glm::vec3(0.0f));
+    }
+
+    SECTION("the submitted filter follows the cull, in both directions") {
+        rendering::DebugViewOptions options;
+        options.entityBounds = true;
+        options.selectedEntity = "debug-entity";
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        const std::size_t drawnWhenVisible = draw.lineVertexCount();
+        REQUIRE(drawnWhenVisible == 24); // one box
+
+        // Culled, but the filter is off: still drawn, in the culled colour. This is the control --
+        // without it the next assertion would pass for a filter that simply drew nothing.
+        draw.clear();
+        scene.entities[0].cameraCulled = true;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        CHECK(draw.lineVertexCount() == drawnWhenVisible);
+
+        draw.clear();
+        options.submittedOnly = true;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        CHECK(draw.lineVertexCount() == 0);
+
+        draw.clear();
+        scene.entities[0].cameraCulled = false;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        CHECK(draw.lineVertexCount() == drawnWhenVisible);
+    }
+
+    SECTION("entity ids colour by the pick id, so two entities differ and one is stable") {
+        scene::Entity& second = scene.addEntity("second", scene.entities[0].mesh);
+        second.transform.position = {-3.0f, 0.5f, 1.0f};
+
+        // The control first: with plain bounds, both boxes are the same colour, so a count alone
+        // could never tell the two controls apart.
+        rendering::DebugViewOptions options;
+        options.entityBounds = true;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        REQUIRE(draw.lineVertexCount() == 48); // two boxes
+        CHECK(draw.lineVertices().front().color == draw.lineVertices()[24].color);
+
+        draw.clear();
+        options = rendering::DebugViewOptions{};
+        options.entityIds = true;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        REQUIRE(draw.lineVertexCount() == 48); // boxed without entityBounds being set
+        const glm::vec4 firstColour = draw.lineVertices().front().color;
+        const glm::vec4 secondColour = draw.lineVertices()[24].color;
+        CHECK(firstColour != secondColour);
+
+        // Culling does not repaint an id: the id view answers "which object is this", and a red box
+        // would be a second meaning on the same colour.
+        draw.clear();
+        scene.entities[0].cameraCulled = true;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        CHECK(draw.lineVertices().front().color == firstColour);
+
+        // And the colour is the one the pick id produces, not the loop index: the two agree here
+        // only because entity 0 is pick index 0, so the check that matters is the second entity's.
+        draw.clear();
+        scene.entities[0].cameraCulled = false;
+        scene.entities[0].visible = false; // now the second entity is the first thing drawn
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        REQUIRE(draw.lineVertexCount() == 24);
+        CHECK(draw.lineVertices().front().color == secondColour);
+    }
+
+    SECTION("the frustum follows the camera and the aspect") {
+        rendering::DebugViewOptions options;
+        options.frustum = true;
+        options.frustumAspect = 16.0f / 9.0f;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        REQUIRE(draw.lineVertexCount() == 24 + 6); // twelve edges and the basis
+        // The near-plane corners sit at the camera, a near-plane's distance away.
+        const glm::vec3 nearCorner = draw.lineVertices().front().position;
+        CHECK(std::abs(glm::length(nearCorner - scene.camera.position) - scene.camera.nearPlane) < 0.05f);
+
+        // Move the camera: the box moves with it. Without this the count above would pass for a
+        // frustum drawn from the identity.
+        draw.clear();
+        scene.camera.position = {20.0f, 2.0f, 10.0f};
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        const glm::vec3 movedCorner = draw.lineVertices().front().position;
+        CHECK(glm::length(movedCorner - nearCorner) > 15.0f);
+
+        // Widen the aspect: the far corners spread horizontally and the box is a different shape.
+        // Index 2 is the first far-face vertex -- each of the four iterations emits a near edge, a
+        // far edge and the connecting edge, in that order.
+        const glm::vec3 farCorner = draw.lineVertices()[2].position;
+        CHECK(glm::length(farCorner - scene.camera.position) > scene.camera.farPlane * 0.9f);
+        draw.clear();
+        options.frustumAspect = 4.0f;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        CHECK(std::abs(draw.lineVertices()[2].position.x - farCorner.x) > 10.0f);
+
+        // A degenerate projection draws nothing rather than a box at infinity.
+        draw.clear();
+        scene.camera.nearPlane = scene.camera.farPlane;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        CHECK(draw.empty());
+    }
+
+    SECTION("the trail draws the recorded path and nothing without a history") {
+        rendering::DebugViewOptions options;
+        options.transformTrail = true;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        CHECK(draw.empty()); // no history: nothing claimed
+
+        rendering::TransformHistory history;
+        history.setSubject("debug-entity");
+        rendering::buildDebugGeometry(draw, scene, options, 0.0, &history);
+        CHECK(draw.empty()); // an empty history is not a trail of one point at the origin
+
+        for (int i = 0; i < 5; ++i) {
+            rendering::RendererDiagnosticFrame frame;
+            frame.frameIndex = static_cast<std::uint64_t>(i);
+            frame.viewProjection = glm::mat4(1.0f);
+            rendering::RenderObjectDiagnostic object;
+            object.name = "debug-entity";
+            object.worldPosition = {static_cast<float>(i), 0.0f, 0.0f};
+            object.worldMatrix = glm::translate(glm::mat4(1.0f), object.worldPosition);
+            frame.objects.push_back(object);
+            history.record(frame);
+        }
+        draw.clear();
+        rendering::buildDebugGeometry(draw, scene, options, 0.0, &history);
+        CHECK(draw.lineVertexCount() == 8);  // four segments
+        CHECK(draw.pointVertexCount() == 5); // one per sample
+
+        // Off again is off: the history staying alive does not keep drawing.
+        draw.clear();
+        options.transformTrail = false;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0, &history);
+        CHECK(draw.empty());
+    }
 }
 
 TEST_CASE("Debug drawing uploads and renders through a real device", "[debug][gpu]") {

@@ -555,17 +555,48 @@ turns it off, the symptom stays, and a subsystem is wrongly cleared.
 
 ### 4.3 Transform and geometry controls
 
-- `[ ]` Freeze all transforms.
-- `[ ]` Freeze static transforms.
-- `[ ]` Show object origins.
-- `[ ]` Show world axes.
-- `[ ]` Show transform history.
-- `[~]` Show bounds and bounding spheres.
+The overlays live in `DebugViewOptions` (World window ▸ Debug) and are built by the pure
+`buildDebugGeometry`, so each is checked without a device in `tests/rendering/test_debug_draw.cpp`,
+`[debug][forensics]`. Every one is asserted against the case it is **not** for -- the world axes
+against the selected entity's axes, the submitted filter against a cull in both directions, the id
+colouring against plain bounds (a count cannot tell those two apart), the frustum against a moved
+camera and a changed aspect. The first version of the frustum assertion indexed the wrong vertex and
+failed, which is the control working.
+
+- `[ ]` Freeze all transforms. Not built. The renderer is handed a `Scene` whose transforms were
+  derived upstream, so an honest freeze means caching each entity's matrix at arm time inside
+  `SceneRenderer` and drawing from the cache -- the same shape as the view/projection freeze. Nothing
+  in the investigation has needed it yet; the transform *history* answers the question it would have
+  been armed for.
+- `[ ]` Freeze static transforms. Same, and additionally there is no flag on an entity saying it is
+  static: the available test is "has no rig", which is not the same claim.
+- `[x]` Show object origins. `entityOrigins`: the origin point and the object's three axes, in the
+  culled colour when the cull dropped it.
+- `[x]` Show world axes. `worldAxes`: the origin and its three axes, sized from the camera distance
+  and floored so they survive a camera sitting on zero. Asserted to start at zero and to stay there
+  when the entity moves -- they are the *world's* axes, and an overlay that quietly followed the
+  selection would be the same picture with a different meaning.
+- `[x]` Show transform history. `transformTrail` draws the recorded world path of the selected
+  object; the record itself is `rendering::TransformHistory` (below, and Phase 9.3).
+- `[x]` Show bounds and bounding spheres.
   - `[x]` Existing debug drawing covers ordinary and procedural bounds.
-  - `[ ]` Add selected-object history and culling-reason presentation.
-- `[ ]` Show submitted geometry.
-- `[ ]` Show object IDs.
-- `[ ]` Show frustum and camera basis.
+  - `[x]` Selected-object history is the trail and `TransformHistory::explain`; the culling reason is
+    carried on every sample, so "when did it stop being drawn, and what did the cull say" is answered
+    from the record rather than from the frame you happen to be on.
+- `[x]` Show submitted geometry. `submittedOnly` restricts entity diagnostics to what survived the
+  camera cull. It is the submitted *set*, not the triangles, and the header says so: "was this object
+  handed to the GPU" is the question a missing object raises, and it is one the visualiser can answer
+  honestly.
+- `[x]` Show object IDs. `entityIds` colours each entity's bounds by the pick id the identifier
+  target writes -- deliberately that id and not the loop index, because two numberings for the same
+  object is how a click used to select the wrong tree. Culling does not repaint it: a red box would
+  put a second meaning on the same colour.
+- `[x]` Show frustum and camera basis. `frustum` draws the camera's twelve edges and its basis,
+  through the inverse of the matrix the camera would draw with, at the aspect the frame is actually
+  rendering at (the application overrides the option's default; a box drawn at 16:9 over a 2:1
+  viewport is a wrong shape that reads as a culling bug). A degenerate projection draws nothing
+  rather than a box at infinity. On a live camera this is the screen edge and says nothing; it earns
+  its place beside Phase 4.2's freeze arm, where it is the volume the cull actually used.
 
 ### 4.4 GPU and depth controls
 
@@ -988,8 +1019,27 @@ Still open, and all needing a device so they belong in `tests/rendering/`: water
 `SceneRenderer::render`.
 - `[x]` Report entity, frame, system, property and value when invalid data is found. Each of the four
   guards above names the object and prints the offending numbers.
-- `[ ]` Add selected-object transform history containing frame, world TRS/matrix, GPU TRS/matrix and camera state.
-- `[ ]` Add screen-space projection history to distinguish correct camera parallax from transform corruption.
+- `[x]` Add selected-object transform history containing frame, world TRS/matrix, GPU TRS/matrix and
+  camera state. `rendering::TransformHistory` (`src/rendering/transform_history.hpp`), a bounded ring
+  of `TransformSample` fed from the renderer's published `RendererDiagnosticFrame` after each render.
+  A sample carries all three layers at once -- the decomposed world transform, the matrix the GPU was
+  handed, and the camera that projected it -- because a history carrying only the first could not
+  separate "the scene moved it" from "the upload moved it". Rotation is kept as the normalised basis
+  rather than a quaternion: a quaternion and its negation are the same rotation and would report a
+  difference that is not one. The two diagnostic structures moved to `renderer_diagnostics.hpp` so
+  that nothing reading a frame's diagnosis needs WebGPU in the link line, which is what lets this be
+  checked in the unit binary.
+- `[x]` Add screen-space projection history to distinguish correct camera parallax from transform
+  corruption. Every sample projects the object's origin through **that frame's own**
+  view-projection, and `TransformHistory::explain` turns the window into a sentence naming which of
+  the three moved: the scene moved it, that is parallax, both moved and neither is isolated, or --
+  the one this exists for -- *"moved on screen with an unchanged transform and an unchanged camera:
+  nothing in the recorded state explains it"*. `tests/unit/test_transform_history.cpp` builds each
+  case beside the control that produces the same screen motion for a different reason, because a
+  verdict that said "it moved" for both would be exactly as useful as looking at the screen, which is
+  the thing that already failed. The unexplained case is built by zooming: a camera input that is not
+  the view matrix. `onScreen` is the clip test rather than a guess from the position, so an object
+  behind the camera is not placed back on screen by a naive divide.
 
 ## Phase 10: Canonical regressions
 

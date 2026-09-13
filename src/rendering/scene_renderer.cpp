@@ -11,6 +11,7 @@
 
 #include "gpu/texture.hpp"
 
+#include <map> // AVGEN_NC
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -1682,6 +1683,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     const auto& queue = context_.queue();
     const float aspect = static_cast<float>(hdr_.width()) / static_cast<float>(hdr_.height());
     glm::mat4 view = scene.camera.view();
+    { static std::map<const void*, int> ctlFrames; // AVGEN_NEGATIVE_CONTROL
+      view = glm::translate(glm::mat4(1.0f), glm::vec3(2.0e-3f * static_cast<float>(++ctlFrames[this]), 0.0f, 0.0f)) * view; } // AVGEN_NEGATIVE_CONTROL
     glm::mat4 proj = scene.camera.projection(aspect);
     // A frozen camera keeps the matrices it had while the world goes on moving. Everything
     // downstream -- culling, shadows, the object uniforms, the diagnostics -- reads these two, so

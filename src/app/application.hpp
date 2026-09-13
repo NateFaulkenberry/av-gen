@@ -22,6 +22,7 @@
 #include "app/ui_script.hpp"
 #include "core/phase_profiler.hpp"
 #include "rendering/output_mapper.hpp"
+#include "rendering/transform_history.hpp"
 #include "ui/editor_layout.hpp"
 #include "share/texture_share.hpp"
 
@@ -204,6 +205,11 @@ private:
     std::unique_ptr<gpu::Context> context_;
     std::unique_ptr<gpu::ShaderLibrary> shaders_;
     std::unique_ptr<rendering::SceneRenderer> renderer_;
+    // The selected entity's recent transforms, cameras and screen positions (forensics 4.3/9.3).
+    // Recorded here rather than in the renderer because it is a *reading* of frames, not part of
+    // drawing one: the renderer publishes its diagnosis, and this keeps the last few seconds of it
+    // so "did it move or did the camera" has an answer.
+    rendering::TransformHistory transformHistory_;
     // The 2D composition over the finished frame (ADR-083). Installed on the renderer as its one
     // overlay hook; fed the engine's layer stack and timeline clock once per frame.
     std::unique_ptr<rendering::CompositionRenderer> compositor_;

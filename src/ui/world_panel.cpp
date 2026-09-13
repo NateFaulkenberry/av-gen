@@ -486,6 +486,28 @@ void WorldPanel::drawDebugOptions(app::Engine& engine) {
     ImGui::Checkbox("Entity bounds", &debug.entityBounds);
     ImGui::SameLine();
     ImGui::Checkbox("Entity origins", &debug.entityOrigins);
+    ImGui::SameLine();
+    ImGui::Checkbox("Entity ids", &debug.entityIds);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Colour each entity's bounds by the pick id the identifier target writes.");
+    }
+    ImGui::Checkbox("Submitted only", &debug.submittedOnly);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Draw entity diagnostics only for what survived the camera cull.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("World axes", &debug.worldAxes);
+    ImGui::SameLine();
+    ImGui::Checkbox("Frustum", &debug.frustum);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("The camera's own frustum and basis. On a live camera this is the screen edge;\n"
+                          "it is worth seeing while the view is frozen, when it is the volume the cull used.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Transform trail", &debug.transformTrail);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("The recorded world path of the selected entity, over the last few seconds.");
+    }
     if (ImGui::InputText("Selected entity", selectedEntity, sizeof(selectedEntity))) {
         debug.selectedEntity = selectedEntity;
     }

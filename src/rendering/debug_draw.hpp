@@ -52,6 +52,11 @@ public:
     void render(wgpu::RenderPassEncoder& pass, wgpu::BindGroup frameBindGroup, bool depthTest);
     [[nodiscard]] std::size_t lineVertexCount() const { return lines_.size(); }
     [[nodiscard]] std::size_t pointVertexCount() const { return points_.size(); }
+    // What was queued, for tests that need to check *what* was drawn rather than how much. A count
+    // cannot tell a control that colours by id from one that draws every object the same, and the
+    // plan's rule is that a diagnostic has to be checked against the case it is not for.
+    [[nodiscard]] std::span<const DebugVertex> lineVertices() const { return lines_; }
+    [[nodiscard]] std::span<const DebugVertex> pointVertices() const { return points_; }
     [[nodiscard]] bool empty() const { return lines_.empty() && points_.empty(); }
 
 private:
@@ -92,6 +97,20 @@ struct DebugViewOptions {
     std::string selectedEntity;   // restrict entity diagnostics when non-empty
     bool lod = false;             // colour by LOD level (ADR-029)
     bool culling = false;         // draw culled instances in red
+    // Renderer forensics, Phase 4.3. Each of these isolates or shows one thing, and each is checked
+    // in `[debug]` to draw only for the case it names -- the plan's rule is that a diagnostic which
+    // shows the same picture whatever the state is worse than none, because somebody trusts it.
+    bool worldAxes = false;       // the world origin and its three axes, so "where is zero" is answerable
+    bool entityIds = false;       // colour entity bounds by the pick id the identifier target writes
+    bool submittedOnly = false;   // restrict entity diagnostics to what the frame actually submits
+    // The camera frustum and basis. Drawn from `scene.camera` at `frustumAspect`, which is a
+    // separate number because the scene's camera does not carry one -- the viewport supplies it, and
+    // an overlay drawn at the wrong aspect is a box that does not match the screen it is over. On a
+    // live camera this is exactly the screen edge and tells you nothing; it is worth drawing when
+    // the camera is frozen (Phase 4.2's arm), because then it is the volume the cull used.
+    bool frustum = false;
+    float frustumAspect = 16.0f / 9.0f;
+    bool transformTrail = false;  // the recorded world path of the selected object (transform_history.hpp)
     bool depthTest = true;
     float pointSize = 3.0f;
     int maxPoints = 200000;       // safety cap per frame
