@@ -75,7 +75,7 @@ stays quotable.
 | `SYM-STATIC-1` | A static object appears to move as the camera moves | Glowmere (`visitor`), RendererQA | any camera motion | **Not reproduced on any of the four axes.** 680 renderer frames, 4,488 RendererQA comparisons and 75,939 Glowmere comparisons under camera motion with time held still; a 240-frame excursion returning byte-identical; and now 1,733 comparisons across timeline seeks, a 40-step scrub, playback, six resolution changes and three scene reloads, all bit-identical. Each axis negative-controlled separately. **Likely explanation:** the `visitor` is an animated procedural that turns and hovers ~2.4 cm/1.5 s, which at 190 m with no animation cue reads as drift. |
 | `SYM-ANIM-1` | A character's pose jumps when the playhead is scrubbed | `examples/characters/alien.scene.json` | any seek | **Reproduced and fixed.** Frame 500 reached from frame 100 differed from frame 500 reached directly by 98 joint matrices. Root cause: the authored animation state's phase origin was the engine's first update. See the report. |
 | `SYM-ANIM-2` | The alien flickers or disappears near a frustum edge | Glowmere, alien | camera edge | **Not reproduced.** A 65-position sweep across the edge, each step rendered against a no-cull control, shows culling never removes a pixel the character would draw. Note the alien cannot discriminate bind-pose from posed bounds (a T-pose bind is wider); that property is tested separately against a rig that reaches past its bind pose. |
-| `SYM-WATER-1` | Water leaks past or intersects terrain incorrectly at a shoreline | Glowmere | shoreline, grazing angles | **Open.** Basic view cases pass; the flat/steep/shallow/deep/angled matrix and the mask/depth visualisations are not built. |
+| `SYM-WATER-1` | Water leaks past or intersects terrain incorrectly at a shoreline | Glowmere | shoreline, grazing angles | **Reproduced and fixed.** 135 of 3,538 drawn water vertices on `defaultWorld()` stood over dry ground carrying up to 2.94 m of claimed depth against a 0.75 m shore fade -- so the fade that hides the sheet's deliberate one-cell overhang returned fully opaque. A dry corner now reports the depth at itself, which is none. Separately, a six-view GPU shoreline test proves the renderer draws no water on dry land, negative-controlled by disabling water's depth compare. Mask/foam visualisations are still not built. |
 | `SYM-TIME-1` | GPU timing tests fail intermittently | any | `ctest -j4` | **Understood, not fixed.** Contention-sensitive; passes alone and at `-j2`. Same root cause as the reproducibility limitation. |
 
 ### 0.2 Define evidence standards
@@ -511,9 +511,16 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 
 - `[ ]` Create a scene with camera, terrain plane, water plane and one light.
 - `[ ]` Keep characters, vegetation, particles, post FX and shadows disabled initially.
-- `[~]` Cover above-water, grazing, near-parallel and below-surface camera cases.
+- `[x]` Cover above-water, grazing, near-parallel and below-surface camera cases.
   - `[x]` Native water image tests cover these basic views.
-  - `[ ]` Add larger flat/steep/shallow/deep/angled shoreline cases.
+  - `[x]` Steep, ordinary, shallow, grazing, reversed and oblique shoreline views, each asking the
+    question that matters -- did any water reach the dry side -- rather than whether the view renders
+    the same way twice. `tests/rendering/test_gpu.cpp`,
+    `[gpu][renderer][water][forensics][shoreline]`. The regions are read out of a no-water control
+    render (the land bed is red, the submerged bed green) so the test does no projection arithmetic
+    of its own, and the two halves control each other: water must be absent on the land and present
+    on the bed. Negative-controlled by setting water's depth compare to `Always`, which tints land at
+    every one of the six views.
 - `[ ]` Progressively enable water geometry, depth, transparency, terrain intersection and shoreline effects.
 
 ### 6.2 Water mask and depth forensics
@@ -523,7 +530,10 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 - `[ ]` Audit every depth comparison for compatible spaces and nonlinear-to-linear conversion.
 - `[ ]` Document water/terrain/transparent pass order and every depth/color read/write/clear.
 - `[ ]` Verify overlapping chunk sort order and chunk/world transforms.
-- `[ ]` Add no-water-over-dry-terrain, stable-edge, no-z-fight, terrain-through-water and seek-determinism image tests.
+- `[x]` No water over dry terrain, on two instruments: pixels on synthetic shoreline geometry (the
+  six-view GPU test) and geometry on the real generator (`[unit][water][forensics][shoreline]`,
+  which found the defect). Stable-edge, no-z-fight, terrain-through-water and seek-determinism image
+  tests remain open.
 - `[ ]` Do not solve seams with arbitrary depth offsets without a reproduced cause.
 
 ### 6.3 Transparency and post-processing isolation

@@ -419,6 +419,162 @@ TEST_CASE("SceneRenderer resets temporal history across scene swaps", "[gpu][ren
         CHECK(ctx->errorCount() == 0);
     }
 
+    // ---- SYM-WATER-1 --------------------------------------------------------------------------
+    //
+    // "Water leaks past or intersects terrain incorrectly at a shoreline." Everything the suite had
+    // for water asked whether a view renders the same way twice, which is a determinism question: it
+    // cannot see water drawn over dry land, because water drawn over dry land is perfectly
+    // deterministic.
+    //
+    // The falsifiable question is *where* water is drawn. This scene puts a shoreline on the screen
+    // -- a bed above the water line on one side, a bed below it on the other, and one water plane
+    // spanning both -- and asks the only thing that matters: did any water reach the dry side?
+    //
+    // The regions are read out of the render itself rather than computed from the projection: the
+    // dry bed is red and the wet bed is green, so a no-water render classifies every pixel with no
+    // arithmetic in the test to get wrong. The two halves control each other. If the classification
+    // were inverted or the water never drew at all, the "the wet side is tinted" assertion fails; if
+    // water reached the dry side, the other one does.
+    struct Shoreline {
+        scene::Scene scene;
+        std::size_t waterEntity = 0;
+    };
+    const auto shorelineScene = []() {
+        Shoreline out;
+        scene::Scene& s = out.scene;
+        s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+        s.environment.showSkybox = false;
+        s.environment.sky.enabled = false;
+        s.environment.environmentIntensity = 0.0f;
+
+        // The land side, standing half a metre proud of the water line.
+        const auto plane = s.addMesh(scene::makePlane(2.0f, 4));
+        auto& dry = s.addEntity("dry-bed", plane);
+        dry.transform.position = {-2.0f, 0.5f, 0.0f};
+        dry.material.baseColor = {0.9f, 0.05f, 0.05f};
+        dry.material.roughness = 1.0f;
+        dry.material.metallic = 0.0f;
+
+        // ...and the bed under the water, half a metre below it.
+        auto& wet = s.addEntity("wet-bed", plane);
+        wet.transform.position = {2.0f, -0.5f, 0.0f};
+        wet.material.baseColor = {0.05f, 0.9f, 0.05f};
+        wet.material.roughness = 1.0f;
+        wet.material.metallic = 0.0f;
+
+        // One water plane over the pair of them. Its geometry deliberately covers the dry bed as
+        // well: what must keep it off the land is the depth test against terrain that is in front of
+        // it, which is exactly the mechanism the symptom accuses.
+        const auto surface = s.addMesh(scene::makePlane(4.5f, 8));
+        auto& water = s.addEntity("water", surface);
+        water.transform.position = {0.0f, 0.0f, 0.0f};
+        water.style = scene::MeshStyle::Water;
+        water.material.program = "shoreWater";
+        out.waterEntity = s.entities.size() - 1;
+        scene::WaterSurface body;
+        body.program = "shoreWater";
+        body.fastestFlow = 0.0f;
+        body.settings.shallow = 4.0f;
+        body.settings.shallowColor = {0.1f, 0.3f, 0.95f};
+        body.settings.deepColor = {0.05f, 0.1f, 0.7f};
+        body.settings.clarity = 6.0f;
+        body.settings.maxOpacity = 0.85f;
+        body.settings.fresnel = 0.0f;
+        body.settings.reflection = 0.0f;
+        body.settings.specular = 0.0f;
+        body.settings.ripple = 0.0f;
+        body.settings.foam = 0.0f;
+        s.waters.push_back(body);
+        return out;
+    };
+
+    TEST_CASE("water never reaches dry land at a shoreline", "[gpu][renderer][water][forensics][shoreline]") {
+        auto ctx = makeContext();
+        auto shaders = makeShaders(*ctx);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        FrameTime time{};
+        constexpr std::uint32_t kW = 160;
+        constexpr std::uint32_t kH = 120;
+
+        // Steep, ordinary, shallow and grazing, plus one from the far side so the near/far order of
+        // the two beds is reversed. A depth or sort error that only shows at one angle is the usual
+        // way this kind of defect hides.
+        struct View {
+            const char* name;
+            glm::vec3 eye;
+            glm::vec3 aim;
+        };
+        const View views[] = {
+            {"steep", {0.0f, 6.0f, 2.0f}, {0.0f, 0.0f, 0.0f}},
+            {"ordinary", {0.0f, 2.5f, 5.0f}, {0.0f, 0.0f, 0.0f}},
+            {"shallow", {0.0f, 1.0f, 7.0f}, {0.0f, 0.0f, 0.0f}},
+            {"grazing", {0.0f, 1.15f, 8.0f}, {0.0f, 0.2f, 0.0f}},
+            {"reversed", {0.0f, 2.5f, -5.0f}, {0.0f, 0.0f, 0.0f}},
+            {"oblique", {5.0f, 2.0f, 5.0f}, {0.0f, 0.0f, 0.0f}},
+        };
+
+        std::size_t dryTotal = 0;
+        std::size_t wetTotal = 0;
+        for (const View& view : views) {
+            INFO("view: " << view.name);
+            auto shore = shorelineScene();
+            shore.scene.camera.position = view.eye;
+            shore.scene.camera.target = view.aim;
+
+            // The control: the same frame with nothing but the beds in it.
+            shore.scene.entities[shore.waterEntity].cameraCulled = true;
+            const auto dryFrame = renderer.renderToImage(shore.scene, time, kW, kH);
+            REQUIRE(dryFrame.has_value());
+            shore.scene.entities[shore.waterEntity].cameraCulled = false;
+            const auto wetFrame = renderer.renderToImage(shore.scene, time, kW, kH);
+            REQUIRE(wetFrame.has_value());
+
+            std::size_t land = 0;
+            std::size_t landChanged = 0;
+            std::size_t submerged = 0;
+            std::size_t submergedChanged = 0;
+            for (std::uint32_t y = 0; y < kH; ++y) {
+                for (std::uint32_t x = 0; x < kW; ++x) {
+                    const std::uint8_t* before = dryFrame->pixel(x, y);
+                    const std::uint8_t* after = wetFrame->pixel(x, y);
+                    const bool changed = before[0] != after[0] || before[1] != after[1] ||
+                                         before[2] != after[2];
+                    // Classified from the control frame: land is the red bed, submerged bed is the
+                    // green one, and anything else (background, the horizon) is not this test's
+                    // business.
+                    const bool isLand = before[0] > 60 && before[0] > before[1] * 2 &&
+                                        before[0] > before[2] * 2;
+                    const bool isBed = before[1] > 60 && before[1] > before[0] * 2 &&
+                                       before[1] > before[2] * 2;
+                    if (isLand) {
+                        ++land;
+                        landChanged += changed ? 1 : 0;
+                    } else if (isBed) {
+                        ++submerged;
+                        submergedChanged += changed ? 1 : 0;
+                    }
+                }
+            }
+            INFO("land " << land << " px, " << landChanged << " changed; submerged bed " << submerged
+                         << " px, " << submergedChanged << " changed");
+            // The scene has to be on screen at all, or the rest of this asserts nothing.
+            REQUIRE(land > 200);
+            REQUIRE(submerged > 200);
+            // Nothing on the land side may change when the water is added. This is the symptom.
+            CHECK(landChanged == 0);
+            // ...and the water must genuinely be drawing, or the line above passes for the wrong
+            // reason. Not every submerged pixel: the far edge of the bed can fall outside the water
+            // plane's extent.
+            CHECK(submergedChanged > submerged / 2);
+            dryTotal += land;
+            wetTotal += submerged;
+        }
+        INFO(dryTotal << " land pixels and " << wetTotal << " submerged pixels examined");
+        CHECK(dryTotal > 5000);
+        CHECK(ctx->errorCount() == 0);
+    }
+
     TEST_CASE("water remains stable across above, grazing and below-surface views", "[gpu][renderer][water]") {
         auto ctx = makeContext();
         auto shaders = makeShaders(*ctx);

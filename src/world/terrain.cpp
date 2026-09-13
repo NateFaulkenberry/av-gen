@@ -298,7 +298,20 @@ scene::MeshData buildChunkWater(const WorldMap& map, const TerrainSettings& sett
                     surface = q.bed; // no wet neighbour: this corner is in no emitted quad
                 }
             }
-            const float depth = std::max(surface - q.bed, 0.0f);
+            // The depth this corner reports is the depth *here*, which at a dry corner is none.
+            //
+            // Not `surface - bed` against the borrowed level: a dry corner takes a wet neighbour's
+            // surface so the sheet stays flat to the bank (see above), and measuring depth against
+            // that says there are metres of water standing over ground the world calls dry. On the
+            // default world 135 drawn vertices claimed up to 2.9 m of it. That matters because the
+            // deliberate one-cell overhang is hidden by the shader's shore fade and nothing else --
+            // `shoreFade = smoothstep(0, edgeFade, uv.x)` with a 0.75 m fade -- so a corner claiming
+            // 2.9 m came out fully opaque, a sheet of water standing proud of the bank. It is
+            // `SYM-WATER-1` in the renderer forensics register.
+            //
+            // Zero here fades the overhang out and puts the visible shoreline where the water
+            // actually ends, sub-quad, which is what the attribute is for.
+            const float depth = q.wet ? std::max(q.surface - q.bed, 0.0f) : 0.0f;
             scene::Vertex v;
             v.position = glm::vec3(p.x, surface, p.y);
             // ADR-099: the normal slot carries the flow, because a flat sheet's normal is the one

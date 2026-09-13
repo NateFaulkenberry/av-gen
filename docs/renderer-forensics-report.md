@@ -67,7 +67,7 @@ Application::runLive / Application::runHeadless
 | LOD | `PASS` for transition stability | CPU/GPU threshold, spread and hysteresis tests pass. RendererQA image/performance calibration remains open. |
 | Animation/skinning | `PARTIAL` | Palette validation, scene-owned palette cache, culling-freeze and phase-origin fixes pass; the pose is now a pure function of the timeline across seeks. Full idle/walk/run/terrain/water matrix remains open. |
 | Terrain | `PARTIAL` | Visibility leave/return regression passes. Larger terrain/water boundary QA remains open. |
-| Water | `PARTIAL` | Blend convention, view matrix cases, scene swaps and deterministic image tests pass. Mask/depth leakage isolation remains open. |
+| Water | `FAILED -> FIXED` for shoreline leakage; `PARTIAL` overall | `SYM-WATER-1` reproduced, root-caused and repaired: a dry corner of the water sheet claimed the depth of the level it borrowed from its neighbour, so the shore fade that hides the deliberate overhang did not fade it. Six-view GPU shoreline test proves the renderer draws no water on dry land and is negative-controlled by disabling water's depth compare, which tints land at every angle. Mask/foam visualisation and the real-world GPU shoreline case remain open. |
 | Transparency/depth | `PARTIAL` | Main pass contract and water compositing tests pass. Dedicated generic transparency isolation remains open. |
 | Shadows | `PARTIAL` | Existing shadow regressions and full release suite pass. Workload timing can be contention-sensitive. |
 | Particles | `PARTIAL` | Deterministic compaction, scene-owned pools and post/helper stress pass. Full camera/depth isolation remains open. |
@@ -144,6 +144,46 @@ unchanged at 1,682 passing.
 first update was not at t=0. No existing test moved, and an offline render from 0 is unaffected by
 construction, but a scene authored by eye against the old behaviour would now be a fraction of a
 cycle further on.
+
+### Water standing over dry ground at a descending shoreline (`SYM-WATER-1`)
+
+**Symptom:** at a shoreline the water sheet stands proud of the bank -- opaque water over ground the
+world calls dry. Reported against Glowmere; reproduced on `world::defaultWorld()`.
+
+**Reproduction:** `tests/unit/test_world.cpp`, `[unit][water][forensics][shoreline]`. Mesh every
+chunk with `buildChunkWater`, keep the vertices a triangle actually uses, and compare each against
+`WorldMap::height` and `WorldMap::waterSurface` at its own position. **135 of 3,538 drawn vertices
+stood above dry ground, the worst 2.94 m proud, carrying 2.94 m of claimed water depth. The shore
+fade covers 0.75 m.**
+
+**Observed state:** the vertex positions are correct and deliberate. `buildChunkWater` emits a quad
+when *any* of its four corners is wet, so the sheet always reaches one grid cell past the true
+shoreline -- that overhang is what keeps the edge sub-quad instead of a staircase, and a dry corner
+takes a wet neighbour's surface level so the sheet stays flat to the bank rather than folding into
+the ground.
+
+What hides that overhang is the shader and nothing else: `shoreFade = smoothstep(0, edgeFade, uv.x)`,
+where `uv.x` is the bed depth in metres carried on the vertex. The depth test cannot help, because
+these vertices are *above* the terrain by construction.
+
+**Root cause:** the dry corner computed its depth against the level it had just borrowed --
+`max(borrowedSurface - localBed, 0)`. Where the borrowed surface is above the local ground, which is
+routine on a descending river or a bank lower than the water upstream, the corner claims metres of
+water. `smoothstep(0, 0.75, 2.94)` is 1, so the fade that was the only thing standing between the
+overhang and the frame returned "fully opaque".
+
+**Repair:** a dry corner reports the depth *at itself*, which is none. The borrowed position stays --
+that is what keeps the sheet flat and the shoreline sub-quad -- and only the attribute changes. One
+expression in `buildChunkWater`.
+
+**Regression:** the same test, now asserting the invariant that makes the overhang safe: *a water
+vertex standing above dry ground carries zero depth*. Negative-controlled by restoring the old
+expression, which fails it with the same 135.
+
+**Residual risk:** this is geometry-level evidence. It says the sheet no longer claims depth it does
+not have; it does not prove the pixel is gone in every water program, because a program that ignored
+`uv.x` would still draw the overhang. The GPU shoreline test below covers the depth-test half of the
+question on synthetic geometry, not this one on a real world.
 
 ### Detached composition parameter use-after-free
 
@@ -228,7 +268,9 @@ it has been shown to fail**, which is why the status definitions in the plan req
   path, and the composition path across camera motion, seeks, scrub, playback, resize and reload.
 - Full reference/minimal renderer path and immutable frame snapshot/replay.
 - All-object cull reason history and complete GPU object generation/offset audit.
-- Generic transparency/depth isolation and water mask/depth leakage proof.
+- Generic transparency/depth isolation. Water leakage is now proven on two instruments -- geometry
+  on the real generator, pixels on synthetic shoreline geometry -- but not yet pixels on a real
+  world's shoreline.
 - Progressive RendererQA enablement levels 0 through 15.
 - Glowmere UFO close-up matrix and the water canonical regression matrix. (Glowmere's seek replay is
   now covered; the alien's is closed.)

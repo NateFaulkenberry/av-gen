@@ -991,6 +991,93 @@ TEST_CASE("a water surface has no vertical faces in it", "[unit][water]") {
     CHECK(worstStep < spacing * 0.5f);
 }
 
+// SYM-WATER-1, as a geometry invariant on the real generator.
+//
+// The GPU shoreline test proves the renderer never draws water over dry land in a scene made of two
+// planes; it says nothing about the world's own water, which is meshed per chunk and deliberately
+// **overhangs**. `buildChunkWater` emits a quad when *any* of its four corners is wet, so the sheet
+// always reaches one grid cell past the true shoreline -- that is how the edge stays sub-quad
+// instead of a staircase, and the shader resolves it from scene depth.
+//
+// What makes that overhang safe is where the extra vertices are *put*: a dry corner takes a wet
+// neighbour's surface level, which at a dry corner is below the ground, so the overhanging quad
+// passes under the bank and the depth test hides it. If one were ever placed above its own ground
+// the sheet would stand out over the land, which is the reported symptom exactly -- and the comment
+// in `buildChunkWater` records that falling back to the bed did precisely that once.
+//
+// So: every water vertex that stands above the ground beneath it must be somewhere the world says
+// there is water.
+TEST_CASE("no water vertex stands above dry ground", "[unit][water][forensics][shoreline]") {
+    const world::WorldMap map = world::defaultWorld();
+    world::TerrainSettings settings;
+    settings.resolution = 32;
+
+    std::size_t vertices = 0;
+    std::size_t standing = 0;   // above the ground, and wet: ordinary water
+    std::size_t offending = 0;  // above the ground where the world says there is none
+    float worstOverhang = 0.0f;
+    float worstDepth = 0.0f;
+    glm::vec3 worstAt(0.0f);
+    for (const glm::ivec2 coord : world::chunkGrid(map, settings)) {
+        const scene::MeshData mesh = world::buildChunkWater(map, settings, coord, nullptr);
+        if (!mesh.valid()) {
+            continue;
+        }
+        // Only vertices a triangle actually uses. The grid carries a full side x side block and the
+        // corners of dry quads are never drawn, so judging those would fail the world for geometry
+        // that does not exist on screen.
+        std::vector<bool> used(mesh.vertices.size(), false);
+        for (const std::uint32_t i : mesh.indices) {
+            if (i < used.size()) {
+                used[i] = true;
+            }
+        }
+        for (std::size_t k = 0; k < mesh.vertices.size(); ++k) {
+            if (!used[k]) {
+                continue;
+            }
+            const glm::vec3 v = mesh.vertices[k].position;
+            ++vertices;
+            const glm::vec2 p(v.x, v.z);
+            const float bed = map.height(p);
+            if (v.y <= bed + 1e-3f) {
+                continue;   // under the ground: hidden by it, whatever else is true
+            }
+            ++standing;
+            const float surface = map.waterSurface(p);
+            const bool wetHere = std::isfinite(surface) && bed < surface;
+            if (wetHere) {
+                continue;
+            }
+            // Standing above dry ground. That is allowed -- it is the overhang the sub-quad
+            // shoreline is made of -- but only if the shader is told there is no water here, which
+            // is `uv.x`, the bed depth in metres. `shoreFade = smoothstep(0, edgeFade, uv.x)` is
+            // what fades the overhang out; a positive depth here is a sheet of opaque water standing
+            // proud of the bank, which is the reported symptom.
+            const float carriedDepth = mesh.vertices[k].uv.x;
+            if (carriedDepth > 1e-4f) {
+                ++offending;
+                const float over = v.y - bed;
+                if (over > worstOverhang) {
+                    worstOverhang = over;
+                    worstAt = v;
+                    worstDepth = carriedDepth;
+                }
+            }
+        }
+    }
+    INFO(vertices << " drawn water vertices, " << standing << " above the ground, " << offending
+                  << " of those over dry ground carrying a depth the shader will not fade; worst "
+                  << worstOverhang << " m proud carrying " << worstDepth << " m of depth, at ("
+                  << worstAt.x << ", " << worstAt.y << ", " << worstAt.z << "). The fade covers "
+                  << scene::WaterSettings{}.edgeFade << " m.");
+    // There has to be water in the world, and some of it has to stand above its bed, or this proves
+    // nothing at all.
+    REQUIRE(vertices > 500);
+    REQUIRE(standing > 100);
+    CHECK(offending == 0);
+}
+
 TEST_CASE("Glow aggregation reduces a scatter layer to bounded emitters", "[unit][world][ecology]") {
     using namespace avgen;
     world::ScatterLayer layer;
