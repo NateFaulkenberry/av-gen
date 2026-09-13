@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
 #include <numeric>
+#include <sstream>
 
 namespace avgen::rendering {
 
@@ -270,17 +272,41 @@ PairedDelta pairDeltas(const std::vector<double>& baselineMedians, const std::ve
     // aggregate.
     out.deltaMs = medianOf(blockDeltasOut);
     out.deltaPercent = out.baselineMs > 0.0 ? out.deltaMs / out.baselineMs * 100.0 : 0.0;
-    // What the baseline's own median did across the session. One block cannot show spread, so a
-    // single pair falls back on the calibrated constant and says so by reporting zero spread.
-    if (baseUsed.size() >= 2 && out.baselineMs > 0.0) {
-        const auto [lo, hi] = std::minmax_element(baseUsed.begin(), baseUsed.end());
-        spreadOut = (*hi - *lo) / out.baselineMs * 100.0;
-    } else {
-        spreadOut = 0.0;
-    }
-    // The floor is whichever is larger: the spread measured on the reference machine, or the
-    // spread this session actually showed. A session that wobbled 5% cannot certify a 3% win.
-    out.noiseFloorPercent = std::max(floorPercent, spreadOut);
+    // What this session actually did, measured three ways. One block cannot show spread, so a
+    // single pair reports zero for all three and falls back on the calibrated constant.
+    //
+    // Each is a peak-to-peak over a reference median, in percent. The three are not
+    // interchangeable and each catches a case the others cannot:
+    //
+    //   * the **baseline's** own spread -- the session was noisy (ADR-113 §4's rule, and what
+    //     correctly rejects a Constellation null);
+    //   * the **arm's** own spread -- the session was noisy *on the side the baseline could not
+    //     see*, which is the defect ADR-148 records: in a null A/B both arms are the same code, so
+    //     a tight baseline against a loose arm certified the looseness;
+    //   * the **per-pair deltas'** spread -- the pairs disagree with each other, which neither arm's
+    //     own steadiness can reveal and which is precisely a claim its own evidence contradicts.
+    const auto peakToPeakPercent = [](const std::vector<double>& values, double reference) {
+        if (values.size() < 2 || reference <= 0.0) {
+            return 0.0;
+        }
+        const auto [lo, hi] = std::minmax_element(values.begin(), values.end());
+        return (*hi - *lo) / reference * 100.0;
+    };
+    out.calibratedFloorPercent = floorPercent;
+    out.baselineSpreadPercent = peakToPeakPercent(baseUsed, out.baselineMs);
+    out.armSpreadPercent = peakToPeakPercent(armUsed, out.armMs);
+    // Against the baseline median, so it is on the same scale as `deltaPercent`, which is the number
+    // it is the floor for.
+    out.deltaSpreadPercent = peakToPeakPercent(blockDeltasOut, out.baselineMs);
+    // `spreadOut` stays the *baseline's* spread: it is published as `AbSummary::gpuSpreadPercent`
+    // and documented as that, and quietly changing what a named field means is how a reader ends up
+    // comparing two different quantities.
+    spreadOut = out.baselineSpreadPercent;
+    // The floor is the largest of the four. Never below the constant, because a session that
+    // happened to be quiet is not licence to certify below what the reference machine has been
+    // measured to produce; and never below anything this session actually showed.
+    out.noiseFloorPercent = std::max({floorPercent, out.baselineSpreadPercent, out.armSpreadPercent,
+                                      out.deltaSpreadPercent});
     return out;
 }
 
@@ -429,6 +455,16 @@ nlohmann::ordered_json pairedJson(const PairedDelta& d) {
                                   {"deltaMs", d.deltaMs},
                                   {"deltaPercent", d.deltaPercent},
                                   {"noiseFloorPercent", d.noiseFloorPercent},
+                                  // Which component bound is part of the result, not a detail: a
+                                  // difference rejected by the calibrated constant and one rejected
+                                  // because this session's arm wobbled are different findings and
+                                  // call for different next steps.
+                                  {"noiseFloorComponents",
+                                   nlohmann::ordered_json{
+                                       {"calibratedPercent", d.calibratedFloorPercent},
+                                       {"baselineBlockSpreadPercent", d.baselineSpreadPercent},
+                                       {"armBlockSpreadPercent", d.armSpreadPercent},
+                                       {"perPairDeltaSpreadPercent", d.deltaSpreadPercent}}},
                                   {"clearsNoiseFloor", d.isResult()}};
 }
 
@@ -477,6 +513,144 @@ std::string benchmarkJson(const std::vector<BenchmarkRecord>& records, const AbS
                                             {"baselineWallSpreadPercent", ab->wallSpreadPercent}};
     }
     return root.dump(2) + "\n";
+}
+
+
+// ---- scalability sweeps (ADR-144) --------------------------------------------------------------
+
+SweepSummary summariseSweep(std::string subject, std::string xLabel, std::string yLabel,
+                            std::vector<SweepPoint> points) {
+    SweepSummary out;
+    out.subject = std::move(subject);
+    out.xLabel = std::move(xLabel);
+    out.yLabel = std::move(yLabel);
+    out.points = std::move(points);
+
+    // The floor starts at the engine-wide constant and is raised by whatever this session's own
+    // arms actually did. It is never lowered: a curve that happened to repeat well is not licence
+    // to certify a difference smaller than the machine has been measured to produce.
+    out.noiseFloorPercent = kGpuNoiseFloorPercent;
+    for (SweepPoint& point : out.points) {
+        point.stats = describe(point.repeats);
+        if (!point.stats.valid() || point.stats.p50 <= 0.0) {
+            point.spreadPercent = 0.0;
+            continue;
+        }
+        point.spreadPercent = (point.stats.max - point.stats.min) / point.stats.p50 * 100.0;
+        out.noiseFloorPercent = std::max(out.noiseFloorPercent, point.spreadPercent);
+    }
+
+    // The ends are the first and last arms that actually measured something, not the first and last
+    // entries: an arm that failed is kept in the table and must not become an endpoint.
+    const SweepPoint* first = nullptr;
+    const SweepPoint* last = nullptr;
+    for (const SweepPoint& point : out.points) {
+        if (point.stats.valid() && point.stats.p50 > 0.0) {
+            if (first == nullptr) {
+                first = &point;
+            }
+            last = &point;
+        }
+    }
+    if (first == nullptr || last == nullptr || first == last) {
+        return out;
+    }
+    out.endpointChangePercent = (last->stats.p50 - first->stats.p50) / first->stats.p50 * 100.0;
+    out.endpointsSeparated = std::abs(out.endpointChangePercent) >= out.noiseFloorPercent;
+    const double dx = last->x - first->x;
+    out.slopePerUnitX = dx != 0.0 ? (last->stats.p50 - first->stats.p50) / dx : 0.0;
+
+    // The contention-robust reading. Its floor is not the arms' full spread -- that is the quantity
+    // the minimum exists to ignore -- but how far the two *fastest* repeats of an arm were apart. An
+    // arm whose two best repeats disagree has no reliable minimum either.
+    for (const SweepPoint& point : out.points) {
+        if (point.repeats.size() < 2) {
+            continue;
+        }
+        std::vector<double> sorted = point.repeats;
+        std::sort(sorted.begin(), sorted.end());
+        if (sorted[0] <= 0.0) {
+            continue;
+        }
+        out.minFloorPercent = std::max(out.minFloorPercent, (sorted[1] - sorted[0]) / sorted[0] * 100.0);
+    }
+    if (first->stats.min > 0.0) {
+        out.endpointChangeMinPercent = (last->stats.min - first->stats.min) / first->stats.min * 100.0;
+        out.endpointsSeparatedByMin =
+            std::abs(out.endpointChangeMinPercent) >= std::max(out.minFloorPercent, kGpuNoiseFloorPercent);
+    }
+
+    // Adjacent steps. A knee is a local property and an endpoint comparison cannot see one -- the
+    // whole reason ADR-131's sweep is reported as two halves rather than as one ratio.
+    const SweepPoint* previous = nullptr;
+    for (std::size_t i = 0; i < out.points.size(); ++i) {
+        const SweepPoint& point = out.points[i];
+        if (!point.stats.valid() || point.stats.p50 <= 0.0) {
+            continue;
+        }
+        if (previous != nullptr) {
+            const double step = (point.stats.p50 - previous->stats.p50) / previous->stats.p50 * 100.0;
+            if (std::abs(step) >= out.noiseFloorPercent && std::abs(step) > std::abs(out.largestStepPercent)) {
+                out.largestStepPercent = step;
+                out.largestStepIndex = i;
+                out.haveStep = true;
+            }
+        }
+        previous = &point;
+    }
+    return out;
+}
+
+std::string sweepTable(const SweepSummary& summary) {
+    std::ostringstream text;
+    text << summary.subject << "\n";
+    text << std::left << std::setw(22) << "  arm" << std::right << std::setw(12) << summary.xLabel
+         << std::setw(11) << summary.yLabel << std::setw(9) << "min" << std::setw(9) << "max"
+         << std::setw(9) << "spread" << std::setw(7) << "n" << std::setw(9) << "draws" << std::setw(12)
+         << "tris" << std::setw(11) << "visible" << "\n";
+    text << std::fixed;
+    for (const SweepPoint& point : summary.points) {
+        text << "  " << std::left << std::setw(20) << point.arm << std::right;
+        text << std::setw(12) << std::setprecision(0) << point.x;
+        if (!point.stats.valid()) {
+            text << std::setw(11) << "not measured" << "\n";
+            continue;
+        }
+        text << std::setw(11) << std::setprecision(3) << point.stats.p50;
+        text << std::setw(9) << std::setprecision(3) << point.stats.min;
+        text << std::setw(9) << std::setprecision(3) << point.stats.max;
+        text << std::setw(8) << std::setprecision(1) << point.spreadPercent << "%";
+        text << std::setw(7) << std::setprecision(0) << static_cast<double>(point.stats.count);
+        text << std::setw(9) << std::setprecision(0) << point.draws;
+        text << std::setw(12) << std::setprecision(0) << point.triangles;
+        text << std::setw(11) << std::setprecision(0) << point.visibleInstances;
+        text << "\n";
+    }
+    text << std::setprecision(2);
+    text << "  noise floor " << summary.noiseFloorPercent
+         << "% (the worst arm's own repeat spread, floored at " << kGpuNoiseFloorPercent << "%)\n";
+    if (!summary.valid()) {
+        text << "  NO CURVE: fewer than two arms\n";
+        return text.str();
+    }
+    text << "  ends: " << (summary.endpointChangePercent >= 0.0 ? "+" : "") << summary.endpointChangePercent
+         << "% over the swept range -- "
+         << (summary.endpointsSeparated ? "A RESULT: larger than this curve's floor"
+                                        : "NOT A RESULT: inside this curve's own noise")
+         << "\n";
+    text << "  fastest repeats: " << (summary.endpointChangeMinPercent >= 0.0 ? "+" : "")
+         << summary.endpointChangeMinPercent << "% over the range against a "
+         << summary.minFloorPercent << "% min-to-second-min floor -- "
+         << (summary.endpointsSeparatedByMin ? "A RESULT under contention" : "not a result even on the minima")
+         << "\n";
+    if (summary.haveStep) {
+        text << "  largest resolvable step: " << (summary.largestStepPercent >= 0.0 ? "+" : "")
+             << summary.largestStepPercent << "% at arm '" << summary.points[summary.largestStepIndex].arm
+             << "'\n";
+    } else {
+        text << "  no adjacent step clears the floor: every arm is indistinguishable from its neighbour\n";
+    }
+    return text.str();
 }
 
 } // namespace avgen::rendering

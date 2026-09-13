@@ -3476,6 +3476,14 @@ int Application::runHeadless() {
                       d.isResult() ? (d.deltaMs > 0.0 ? "A RESULT: the arm is faster"
                                                       : "A RESULT: the arm is slower")
                                    : "NOT A RESULT: inside the noise");
+            // Which component set the floor, on the line where the verdict is read (ADR-148). A
+            // difference rejected by the calibrated constant and one rejected because this
+            // session's *arm* wobbled are different findings with different next steps, and the
+            // floor alone cannot tell them apart.
+            log::info("A/B {} : floor components -- calibrated {:.2f}%, baseline blocks {:.2f}%, "
+                      "arm blocks {:.2f}%, per-pair deltas {:.2f}%",
+                      clock_, d.calibratedFloorPercent, d.baselineSpreadPercent, d.armSpreadPercent,
+                      d.deltaSpreadPercent);
         };
         if (ab.blocks == 0) {
             log::warn("A/B: no completed pair, so no comparison");

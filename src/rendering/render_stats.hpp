@@ -247,7 +247,26 @@ struct PairedDelta {
     double armMs = 0.0;
     double deltaMs = 0.0;
     double deltaPercent = 0.0;       // of the baseline
-    double noiseFloorPercent = 0.0;  // the floor actually applied, after the session's own spread
+    // The floor actually applied: the largest of the four components below. A difference smaller
+    // than it is reported as no result.
+    double noiseFloorPercent = 0.0;
+    // The components, reported separately so a reader can see which one bound rather than being
+    // handed one number and asked to trust it (ADR-148).
+    //
+    // **All three session components matter, and taking only the first was a defect.** The floor
+    // was originally derived from the baseline blocks alone. In a null A/B the two arms are the same
+    // code and are equally noisy, so a baseline that happened to land tight against an arm that
+    // happened to wobble certified the wobble: a Glowmere null was blessed at -2.39% against the
+    // 2.00% constant, and the agent that hit it withdrew two of its own rows rather than keep
+    // numbers the harness had approved.
+    double calibratedFloorPercent = 0.0; // the constant, from the reference machine
+    double baselineSpreadPercent = 0.0;  // (max-min)/median of the baseline blocks' medians
+    double armSpreadPercent = 0.0;       // the same, of the arm's
+    // The peak-to-peak of the **per-pair deltas**, as a percentage of the baseline median. This is
+    // the variability of the quantity actually being certified, and it is the only component that
+    // can see pairs which disagree with each other while each arm is individually steady. ADR-113
+    // printed the per-pair deltas for exactly that case and then certified their median anyway.
+    double deltaSpreadPercent = 0.0;
     [[nodiscard]] bool isResult() const;
 };
 
@@ -420,5 +439,96 @@ struct BenchmarkRecord {
 // printed, because these files are read by people at least as often as by scripts.
 [[nodiscard]] std::string benchmarkJson(const std::vector<BenchmarkRecord>& records,
                                         const AbSummary* ab);
+
+
+// ---- scalability sweeps (ADR-144) --------------------------------------------------------------
+//
+// A curve is a set of arms measured at different values of one independent variable, and the whole
+// difficulty of this project has been that a curve looks like a finding whether or not it is one.
+// ADR-131 records what that costs: a single-run sweep put a minimum at 8,000 px/triangle against a
+// competitor 52% slower, and three repeats dissolved every interval into every other. The instrument
+// was fine. The subject did not vary, and one run per arm could not tell the difference.
+//
+// So this type refuses to represent a curve that does not carry its own noise floor. A `SweepPoint`
+// holds *every repeat*, not a summary of them, and `summariseSweep` derives the floor from the arms'
+// own spread rather than from a constant somebody calibrated on another scene. Every comparison the
+// summary offers is against that floor. There is deliberately no way to ask this type "which arm was
+// fastest" without also being told whether the question is answerable.
+struct SweepPoint {
+    std::string arm;              // the label this arm is reported under
+    double x = 0.0;               // the independent variable: objects, instances, visible fraction
+    std::vector<double> repeats;  // one per repeat, in the order taken -- never pre-averaged
+    // Filled by `summariseSweep`.
+    Distribution stats;           // over the repeats, not over frames: n is the repeat count
+    double spreadPercent = 0.0;   // (max - min) / median, in percent: this arm's own reproducibility
+    // Counters the arm was taken at, carried so a curve records the workload it measured rather
+    // than only the number it produced. Zero means "not recorded", which is why they are doubles
+    // and not optionals: a curve that forgot to record them says so by reporting zero everywhere.
+    double draws = 0.0;
+    double triangles = 0.0;
+    double visibleInstances = 0.0;
+    double culledInstances = 0.0;
+    double entities = 0.0;
+};
+
+// The curve, with the verdict attached. `noiseFloorPercent` is the largest spread any single arm
+// showed, floored at `kGpuNoiseFloorPercent` -- so a quiet session cannot certify below the
+// engine-wide floor, and a noisy one raises the bar on itself. This is ADR-113 §4's rule applied to
+// a sweep instead of to an A/B pair.
+struct SweepSummary {
+    std::string subject;   // what was varied and what was held
+    std::string xLabel;
+    std::string yLabel;
+    std::vector<SweepPoint> points;  // in the order given, which is the order of x, not of time
+
+    double noiseFloorPercent = 0.0;
+    // The two ends, which is the question a scalability curve is asked: over the whole swept range,
+    // how much did cost move? `endpointChangePercent` is (last - first) / first.
+    double endpointChangePercent = 0.0;
+    // True when the ends differ by more than the floor. **When this is false the curve has measured
+    // that the cost does not depend on x at this instrument's resolution** -- which for an
+    // existence sweep is the result being hoped for, and for a visibility sweep is a broken fixture.
+    bool endpointsSeparated = false;
+    // Cost per unit x between the ends, in the y unit. Meaningless when `endpointsSeparated` is
+    // false, and reported anyway so a reader can see how small "not separated" was.
+    double slopePerUnitX = 0.0;
+    // The same endpoint comparison taken on each arm's **fastest repeat** instead of its median.
+    //
+    // This is the reading `docs/performance.md` reached and ADR-113 kept without adopting: under
+    // contention the medians of identical runs differed by 3x while the minima agreed to a tenth of
+    // a millisecond, because contention is never negative. On a machine shared with other agents --
+    // which is the machine this project actually has -- the median curve can be swamped while the
+    // minimum curve is clean.
+    //
+    // It is reported *alongside* the median reading and never instead of it, because it is blind to
+    // exactly what the 1% low was added to see: a change that leaves the fast frames alone and
+    // doubles the slow ones is invisible here. Read it as "what the hardware does when nothing else
+    // is in the way", not as "what the frame costs".
+    double endpointChangeMinPercent = 0.0;
+    // The floor for the minimum reading: the largest gap any arm showed between its own fastest
+    // repeat and its second-fastest, as a percentage. If the fastest repeats themselves scatter,
+    // the minimum is not the clean statistic it is being used as, and this says so.
+    double minFloorPercent = 0.0;
+    bool endpointsSeparatedByMin = false;
+    // The largest step between *adjacent* arms that clears the floor, and where it is. A curve can
+    // be flat end to end and still have a knee in the middle; ADR-131's expensive half is exactly
+    // that shape, and an endpoint-only verdict would have missed it.
+    std::size_t largestStepIndex = 0;   // index of the arm the step lands on; 0 when there is none
+    double largestStepPercent = 0.0;
+    bool haveStep = false;
+
+    [[nodiscard]] bool valid() const { return points.size() >= 2; }
+};
+
+// Derives the statistics above. Arms with no repeats are kept and reported as invalid rather than
+// dropped: an arm that failed to measure is information, and silently shortening a curve is how a
+// sweep comes to describe a different experiment than the one that ran.
+[[nodiscard]] SweepSummary summariseSweep(std::string subject, std::string xLabel, std::string yLabel,
+                                          std::vector<SweepPoint> points);
+
+// The curve as a fixed-width table, every repeat's spread in its own column and the verdict below
+// it. Printed by the perf tests; also the thing pasted into an ADR, which is why it is text and not
+// a struct somebody has to format again.
+[[nodiscard]] std::string sweepTable(const SweepSummary& summary);
 
 } // namespace avgen::rendering
