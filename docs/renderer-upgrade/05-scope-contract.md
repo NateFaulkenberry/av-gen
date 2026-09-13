@@ -37,7 +37,7 @@ capability AV Gen does not need).
 
 | § | Item | Phase | Why here |
 |---|---|---|---|
-| 27 | Contact shadow optimisation | B | ~19% of the scene pass — the highest-value single fragment target |
+| 27 | Contact shadow optimisation | B | **Measured: 2.36 ms, 22% of the scene pass** — the largest nameable item in the frame, and memory-bound on twelve dependent texture loads rather than arithmetic. Two optimisations were implemented and reverted; the obvious early-out is bit-exact and **4.4% slower** (ADR-118). |
 | 37 | Transient resources / attachments | B | Apple: load and store actions "consume the majority of your app's system bandwidth" |
 | 40 | Shader audit (`pbr`, `shadow_mask`, `volume` first) | B | the pass is fragment-bound; this is where per-invocation cost lives |
 | 17 | Screen-space importance | C | the central system the spec asks for, and the input to everything below |
@@ -61,7 +61,7 @@ capability AV Gen does not need).
 | 7 | Spatial hierarchy | traversal or culling is a measured cost. Today the entire cull pass is 0.33 ms and geometry work is 1.7% of the scene pass. |
 | 8 | Hierarchical occlusion culling | measured occlusion ratio > ~30% on a canonical scene **and** Unity's other two preconditions (shared meshes enabling single draws; high-vertex occluded objects). Unity's own docs: "If occlusion culling doesn't have a big effect on your scene, rendering time might increase." An open valley under a low horizon is close to the worst case. |
 | 9 | GPU-driven visibility | CPU encode exceeds ~10% of frame **and** Dawn-on-Metal ships multi-draw indirect. It is currently commented out in Dawn's Metal backend, so every draw stays one CPU call and the headline benefit is unavailable. Today: 0.66 ms CPU over 136 draws. |
-| 28 | Temporal rendering, broadly | **Partially promoted:** some temporal AA is a *prerequisite* for Phase C, because seamless LOD transition depends on it and this engine has only FXAA. Temporal volumetrics ride with Phase F. |
+| 28 | Temporal rendering, broadly | **Promoted, then demoted on measurement (ADR-132).** It was made a Phase C prerequisite because seamless LOD is said to depend on TAA and this engine has only FXAA. Measured, `lodSpread` already takes a simultaneous switch from 100% of a stand to 7.5% in the worst frame, so the stated reason does not hold and it returns to deferred. Justified when a transition is actually reported as visible. Temporal volumetrics still ride with Phase F and are evaluated on their own evidence. |
 | 29 | Motion vector audit | foundational and already working; audited when Phase C needs it for transitions |
 | 30 | Particle scalability | Constellation's particles are **flat under resolution change** (0.52 ms at every size) — simulation-bound, not fragment-bound. Not a measured problem. |
 | 32 | Water scalability | removing water changes the scene pass by +0.5 ms, i.e. nothing. Not a measured cost. |
