@@ -25,12 +25,22 @@ of the discrepancies matter.
 | ~141 draws, ~430,233 tris | **141 draws, 430,231 tris** | ✅ |
 | ~2,329 visible / ~114,283 culled | ✅ exactly | ✅ |
 | CPU scene ~0.67 ms | **0.66 ms** | ✅ |
-| Constellation ~6.09 ms GPU | **3.60 ms** | ⚠️ **materially different** |
-| Constellation volumetrics ~3.93 ms | **2.29 ms** | ⚠️ **materially different** |
+| Constellation ~6.09 ms GPU | 3.60 ms *in one block* | ⚠️ **withdrawn — see §4.7** |
+| Constellation volumetrics ~3.93 ms | 2.29 ms *in one block* | ⚠️ **withdrawn — see §4.7** |
 
-**Discrepancy 1 — Constellation is 41% faster than the brief states.** Not noise: five runs, 1%
-spread. The brief's number predates work in this repository or was taken under different conditions.
-Anyone A/B-ing against the brief's Constellation figure would measure a phantom improvement.
+**Discrepancy 1 — WITHDRAWN.** I recorded "Constellation is 41% faster than the brief states" and
+justified it as "not noise: five runs, 1% spread". **The 1% spread was Glowmere's and does not
+transfer.** Constellation's own within-session GPU spread is **36.97%** — eight block medians in one
+session ranged 6.16–10.16 ms, and inside a single 240-frame block p50 is 6.29 ms against p90 10.81
+and p99 12.98. The brief's 6.09 ms sits inside that range. There is no discrepancy; there is a scene
+whose median is not a stable statistic, which this document had already said of Constellation in a
+different sentence and which I then failed to apply to my own measurement of it.
+
+**How it was caught, and why that matters more than the error.** The A/B harness floors its noise
+threshold at *the session's own measured baseline spread* rather than at a fixed constant. With the
+fixed 2% constant alone, a null A/B on Constellation — the baseline against itself — would have been
+certified as a **16% improvement**. The instrument caught the mistake its designer had already made
+in prose.
 
 **Discrepancy 2 — a third Glowmere number exists.** `docs/renderer-qa-2026-09-11.md` records
 23.79 ms GPU. Today's measurement is 18.6 ms. The gap is 28% and is **not** explained by run-to-run
@@ -426,6 +436,35 @@ looked like a clean null result for quad overdraw. It was the plane being backfa
 inverted winding — the scene pass was shading nothing. The tell was the depth pass rising while the
 scene pass stayed at one timestamp quantum. The draw-call and submitted-triangle columns are printed
 now precisely so that failure cannot look like a result.
+
+## 4.7 Clustered lighting is instrumented, and the spec's premise is wrong for these scenes
+
+The spec calls clustered light evaluation "a known large untouched cost". Measured, with counts taken
+as **uncapped demand** rather than post-cap list lengths — a post-cap statistic saturates at 32 and
+can never show whether the cap binds:
+
+| | Glowmere | Constellation |
+|---|---|---|
+| froxels / local lights | 3072 / 222 | 3072 / **0** |
+| per-cluster min / p50 / p90 / p99 / max | 0 / 0 / 14 / 24 / **29** | all 0 |
+| mean | 5.70 | 0.00 |
+| empty clusters | 1720 (56.0%) | 3072 (100%) |
+| **overflowed** | **0** | **0** |
+| **lights dropped** | **0** | **0** |
+
+**Light overflow is not real.** The busiest froxel in Glowmere wants 29 of 32 — a margin of three,
+worth re-checking after any change that adds local lights, since nothing reports overflow at runtime.
+**Do not raise the cap.** And the cluster build is 0.07 ms of an 18.5 ms frame with 56% of the grid
+empty; Constellation never touches the grid at all.
+
+## 4.8 Two counters were wrong, and are corrected
+
+- **`RenderStats::lights` reported 8** while Glowmere shaded 230. It counts slots in the 8-long
+  *uniform fallback* array, not scene lights. Left in place for its one existing reader, documented,
+  and joined by `shadedLights` and `directionalLights`.
+- **The offline CPU frame is not CPU-bound.** 21 ms against 18.5 ms GPU looked like CPU cost; 19.99 ms
+  of it is `queueWait`. The stage split now separates finish, submit and queue wait, and the JSON
+  record warns about it — otherwise every future reader draws the same wrong conclusion.
 
 ## 4.6 Two further probes, and what they ruled out
 
