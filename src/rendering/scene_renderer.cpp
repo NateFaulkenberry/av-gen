@@ -3237,7 +3237,18 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             auxDebugGroup_ = context_.device().CreateBindGroup(&desc);
         }
         AuxDebugUniforms aux{};
-        const float defaultScale = auxDebugView_ == AuxDebugView::Velocity ? 40.0f : 1.0f;
+        // Each view needs a default in the range of the quantity it shows, or it saturates and
+        // reads as a silhouette. Velocity wants 40; FragmentDensity divides a 3x3 mean fragment
+        // count and clamps to 1, so at a scale of 1 every shaded pixel is white and the view is a
+        // black-and-white mask -- 8 puts an ordinary 1-8x shading load across the whole ramp.
+        // Overdraw (mode 11) genuinely wants 1: there the scale is a band divisor, not a ceiling,
+        // and one band per count is the palette those tools have always used.
+        float defaultScale = 1.0f;
+        if (auxDebugView_ == AuxDebugView::Velocity) {
+            defaultScale = 40.0f;
+        } else if (auxDebugView_ == AuxDebugView::FragmentDensity) {
+            defaultScale = 8.0f;
+        }
         aux.info = glm::vec4(static_cast<float>(auxDebugView_),
                              auxDebugScale_ > 0.0f ? auxDebugScale_ : defaultScale,
                              static_cast<float>(hdr_.width()), static_cast<float>(hdr_.height()));
