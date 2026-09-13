@@ -49,6 +49,10 @@ struct AoRenderer::Impl {
     std::uint64_t lastFrameIndex = 0;
     bool haveLastFrame = false;
     bool hasHistory = false;
+    // The state this frame index *started* with, so re-rendering it can reproduce it rather than
+    // resetting it. See the repeat handling in `render`.
+    int historyIndexAtFrameStart = 0;
+    bool hasHistoryAtFrameStart = false;
     bool activeThisFrame = false;
     bool passThisFrame = false;
     bool initialised = false;
@@ -265,9 +269,29 @@ void AoRenderer::update(std::uint32_t width, std::uint32_t height, const wgpu::T
         return;
     }
     // Determinism (ADR-035): the temporal history is only valid for a strictly advancing frame
-    // index. Re-rendering a frame, or seeking, drops it, so two renders of the same frame agree.
-    if (im.haveLastFrame && frameIndex != im.lastFrameIndex + 1) {
-        im.hasHistory = false;
+    // index. Two cases, and they need opposite treatment -- which is `SYM-TERRAIN-1`, where they
+    // were treated the same.
+    //
+    // A **discontinuity** (a seek, a cut) invalidates the history: the previous frame is not this
+    // frame's past, so accumulating against it smears across the jump. Drop it.
+    //
+    // A **repeat** -- the same frame index rendered twice -- is the opposite. The first render
+    // legitimately had history and used it; dropping it on the second makes the second render a
+    // *different picture from the first*, which is exactly the non-determinism the rule exists to
+    // prevent. Re-rendering a frame has to reproduce it, so the state this frame index started with
+    // is restored and the same computation runs against the same inputs. The previous render wrote
+    // into the other history buffer and left the one it read untouched, so there is nothing else to
+    // undo.
+    const bool repeat = im.haveLastFrame && frameIndex == im.lastFrameIndex;
+    if (repeat) {
+        im.historyIndex = im.historyIndexAtFrameStart;
+        im.hasHistory = im.hasHistoryAtFrameStart;
+    } else {
+        if (im.haveLastFrame && frameIndex != im.lastFrameIndex + 1) {
+            im.hasHistory = false;
+        }
+        im.historyIndexAtFrameStart = im.historyIndex;
+        im.hasHistoryAtFrameStart = im.hasHistory;
     }
     im.lastFrameIndex = frameIndex;
     im.haveLastFrame = true;
@@ -350,6 +374,10 @@ void AoRenderer::collectTimings() {
 
 void AoRenderer::resetHistory() {
     impl_->hasHistory = false;
+    // ...and the frame-start snapshot with it, or a repeat of the next frame would restore the
+    // history this call was asked to drop.
+    impl_->hasHistoryAtFrameStart = false;
+    impl_->haveLastFrame = false;
 }
 
 const wgpu::TextureView& AoRenderer::output() const {

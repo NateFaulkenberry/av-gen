@@ -307,8 +307,7 @@ open in Phase 7.
   rule. The composition table is in 1.3 (every entry: written by `applyParameters`, read by the
   renderer and by culling, refreshed every update, lifetime one frame, main thread only); the
   renderer-side table is directly above. The one synchronisation rule worth stating separately is the
-  one `SYM-TERRAIN-1` violates: **a frame's content must not depend on which asynchronous readback
-  has arrived.** That is the open defect, and it is a rule the code does not yet keep.
+  one `SYM-TERRAIN-1` violated and which now holds: **re-rendering a frame must reproduce it.**
 
 ### 1.3 Audit duplicated state
 
@@ -345,8 +344,8 @@ open in Phase 7.
   on the main thread, refreshed every update, and lives one frame. **The GPU sync risk column is one
   sentence for the whole table:** nothing in it is read by the GPU across a frame boundary, because
   every value is rewritten before the frame that reads it -- with one exception, which is
-  `SYM-TERRAIN-1`, where a *draw decision* is taken from an asynchronous readback whose arrival is not
-  a frame boundary at all.
+  `SYM-TERRAIN-1`, now fixed: ambient occlusion's history was valid on the first render of a frame
+  and dropped on the second, so a repeat was not a repeat.
 
 **Derived copies on the composition path.** All of them: written by `Composition::applyParameters`,
 read by the renderer and by culling, refreshed every update, lifetime one frame, main thread only.
@@ -708,7 +707,7 @@ discrimination the screen stage exists for.
 in its own comment since it was written that it is used on seek restarts, with no caller). And
 `SkinnedRig::previousPalette` survived a seek, so the first frame after every scrub carried joint
 motion vectors for a jump nobody made -- 49 of 49 joints, worst element 71.5 units on a ~100-unit
-character, which motion blur duly drew. It also found `SYM-TERRAIN-1`, which is open: see the report.
+character, which motion blur duly drew. It also found `SYM-TERRAIN-1`, since fixed: see the report.
 
 
 - `[x]` Document when CPU state updates, GPU data is written, GPU consumes it, GPU finishes and
@@ -728,10 +727,10 @@ character, which motion blur duly drew. It also found `SYM-TERRAIN-1`, which is 
      frame -- meshes, textures, palettes -- are keyed on the owning `Scene` and are dropped when it
      goes.
 
-  **The one place this order is broken is `SYM-TERRAIN-1`**, and stating the sequence is what makes
-  the break legible: a draw decision in step 3 is taken from a readback of a *previous* frame's step
-  4, whose completion is not one of these five points. Everything else in the frame is a pure
-  function of steps 1 and 2.
+  Stating the sequence is what made `SYM-TERRAIN-1` legible: ambient occlusion's history is carried
+  between one frame's step 5 and the next frame's step 1, and re-rendering a frame re-entered the
+  sequence without restoring it. With that fixed, **a frame is a pure function of steps 1 and 2**,
+  which is what every repeated-render comparison in this document now asserts.
 - `[x]` Audit textures, buffers, bind groups, pipelines, materials, meshes, animation buffers, depth
   textures, water textures and post-process targets. The table above is the buffer and texture half.
   **Bind groups** are cached per resource identity and rebuilt when the view they name changes -- the
@@ -769,8 +768,8 @@ character, which motion blur duly drew. It also found `SYM-TERRAIN-1`, which is 
   frame-index reuse. The interleaved sequence above does all five together rather than one at a time,
   which is the point: each is already covered alone, and the defects it found were only reachable by
   a walk that crossed them. Its one exclusion is stated and reasoned -- the terrain scene, because
-  `SYM-TERRAIN-1` means a fresh-reference comparison on it reports that open defect rather than
-  anything about reuse.
+  it was excluded from its checkpoints while `SYM-TERRAIN-1` stood, and is checkpointed again now
+  that it is fixed.
   Resize now clears previous view/model history in addition to AO history, with a motion-blur
   reused-versus-fresh renderer regression. An explicit reset API now covers in-place scene reloads
   and the application camera-cut action. Timeline seek/reverse stress and frame-index reuse remain
@@ -787,10 +786,9 @@ character, which motion blur duly drew. It also found `SYM-TERRAIN-1`, which is 
   hazards. **The evidence points elsewhere, so no option was added.** The reference path has no reuse
   to be hazardous: it uploads every mesh per call and caches nothing, deliberately, so a
   synchronisation knob there would protect state it does not keep. The hazard the investigation did
-  find -- `SYM-TERRAIN-1` -- is in *production*, and it is not a reuse hazard either: the
-  synchronisation is correct, and what is wrong is that a draw decision is taken from a non-blocking
-  readback whose arrival is not a frame boundary. A conservative option on the wrong path would have
-  been a change that made the symptom no better and the design worse.
+  find -- `SYM-TERRAIN-1` -- was not a reuse hazard either, and not a synchronisation problem at
+  all: it was a temporal-history guard that treated a repeated frame like a discontinuity. A
+  conservative synchronisation option would have made the symptom no better and the design worse.
 - `[x]` Add validation for resources destroyed, replaced, resized or rebound while still referenced.
   **Dawn's own validation is the check, and it is asserted rather than assumed**: `errorCount() == 0`
   after every resize, reload and scene swap in the interleaved sequence, and after every auxiliary
@@ -1461,9 +1459,9 @@ that check is what found the two gaps recorded below.
 - `[x]` Level 15: timeline seeking and scrubbing. (The script, at every level.)
 - `[x]` Record the first level where each instability appears. The matrix reports it by name. In
   release it reports none. In debug it names **level 5, water** on every step of the script, which is
-  `SYM-TERRAIN-1` -- the matrix compares two whole runs from two independent engines and renderers,
-  so a scene that does not render the same frame twice cannot pass it. That is the matrix working:
-  it is the instrument that localises the open defect to a rung, which is what it was built to do.
+  `SYM-TERRAIN-1`, since fixed -- the matrix compares two whole runs from two independent engines
+  and renderers, so a scene that did not render the same frame twice could not pass it. That was the
+  matrix working: it localised the defect to a rung, and the rung passes in debug now.
 
 ### 8.3 Automatic subsystem bisection
 
@@ -1757,8 +1755,8 @@ snapshot.
   reached only through `renderToImage*`, which is the offline and test path. Every blocking `WaitAny`
   in the renderer is a `PopErrorScope` at *pipeline creation*, not per frame. The cull-stats readback
   is deliberately non-blocking -- which is the right call for cost and is exactly what
-  `SYM-TERRAIN-1` is about, so the two entries in this plan pull in opposite directions and the
-  honest statement is that the *synchronisation* is right and the *decision taken from it* is not.
+  the right call for cost, and it was wrongly suspected of causing `SYM-TERRAIN-1` -- the
+  synchronisation here is right, and the defect was elsewhere.
   The one genuinely per-object per-frame cost is the diagnostic's world bounds and six frustum
   margins, measured below.
 - `[x]` Measure diagnostic overhead with the same canonical scenes and resolutions. Measured on the
@@ -1810,8 +1808,10 @@ snapshot.
   sign-off. Four found, and **only one of them is a defect** -- the other three are the harness
   lying, which is why they are listed here rather than quietly worked around.
 
-  1. **`SYM-TERRAIN-1` (a defect, open).** Seven debug failures that release does not have. Not
-     flakiness: reproducible, non-converging, and build-dependent because it is a race. See the
+  1. **`SYM-TERRAIN-1` (a defect, since fixed).** Seven debug failures that release did not have.
+     Not flakiness and not a race: ambient occlusion dropped its history on a repeated frame index,
+     so the second render of a frame was a different picture from the first. Debug and release now
+     agree, and the four wrong attributions made along the way are the more useful record -- see the
      report.
   2. **Concurrent GPU runs are not safe** (harness). Two test binaries at once produce failures in
      both -- 145 channels between two draws of one `FrameTime`, and checkpoint mismatches. `ctest`
@@ -1883,9 +1883,8 @@ snapshot.
   internal design could not hold its invariant. Rewriting any of them would have preserved every
   defect, because none of them live inside a subsystem; they live between two.
 
-  The single place where a *discipline* change is owed rather than a rewrite is `SYM-TERRAIN-1`:
-  frame content must not be decided from whichever asynchronous readback has arrived. That is a rule
-  to apply at each such decision site, not a subsystem to replace.
+  `SYM-TERRAIN-1` was the last candidate for a discipline change and turned out not to need one
+  either: it was one state machine conflating two cases, repaired in place.
 
 ## Phase 12: Final forensic report
 
@@ -1944,10 +1943,10 @@ The investigation is complete only when the team can answer, with evidence:
 
 ## Useful validation commands
 
-**Run the GPU suite in release.** `SYM-TERRAIN-1` is a race whose outcome depends on CPU timing, so
-debug fails seven cases that release passes -- same source, same GPU, same idle machine. Those seven
-are one defect with two faces, not seven problems, and the debug run is not evidence about anything
-else while they are red. Two further rules, both learned the hard way and both costing a session's
+**Debug and release now agree**, since `SYM-TERRAIN-1` was fixed; before it, debug failed seven
+cases release passed on the same source and the same idle machine. Release is still the acceptance
+configuration, and a divergence between the two is worth treating as a finding rather than as noise:
+last time it was one. Two further rules, both learned the hard way and both costing a session's
 worth of confusion each: **nothing else may be running** (`pgrep -f tests/avgen_render_tests`), and
 **no source may be edited while a run is in flight** -- shaders are loaded from
 `AVGEN_SHADER_SOURCE_DIR` at *runtime*, so editing a `.wgsl` mid-run invalidates the running
@@ -2139,19 +2138,16 @@ Three things, chosen because **none of them can be made afterwards**:
 - **Frame-state baselines.** `examples/qa/baselines/*.snapshot.json` and
   `[gpu][composition][forensics][baseline]`: the state the renderer derives from three canonical
   scenes, compared field by field, reported as sentences. Not pixels -- an upgrade changes those by
-  design. The terrain scene is deliberately excluded, because `SYM-TERRAIN-1` means its frame is
-  unstable and a baseline whose subject is unstable teaches people to ignore failures.
+  design. The terrain scene was excluded while `SYM-TERRAIN-1` stood; it is a candidate to add now
+  that the scene renders the same frame twice.
 - **A cost baseline with its conditions**, in [renderer-pre-upgrade-baseline.md](renderer-pre-upgrade-baseline.md),
   including the two caveats that stop it being misread: Constellation's median is not a stable
   statistic, and the two canonical scenes do not generalise to each other.
-- **`SYM-TERRAIN-1` recorded as pre-existing**, with its four eliminated suspects. After the upgrade
-  there is no way to tell an inherited race from an introduced one, and a race is exactly what an
-  upgrade gets blamed for.
+- **`SYM-TERRAIN-1` fixed**, rather than carried. It was the only known nondeterminism in the
+  renderer, and every image comparison used to validate an upgrade is weaker while one stands.
 
-### The one thing to decide before starting
+### `SYM-TERRAIN-1` is fixed, and that was the right order
 
-Whether to fix `SYM-TERRAIN-1` first or carry it. Carrying it is defensible -- it is documented, it
-is release-green, and its mechanism (a draw decision taken from a non-blocking readback) is a
-discipline the new renderer should adopt anyway. Fixing it first is the safer order, because it is
-the only *known* nondeterminism in the renderer, and every image comparison used to validate the
-upgrade is weaker while it stands.
+The only known nondeterminism in the renderer, and it turned out to be one state machine conflating a
+*repeat* with a *discontinuity*: 1,874 differing channels before, 0 after, debug and release now in
+agreement, and every assertion that had been softened to report it restored to exact.

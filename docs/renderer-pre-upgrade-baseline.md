@@ -55,11 +55,9 @@ If a snapshot field changes and the upgrade did not intend it, that is the upgra
 property the old renderer had -- which is exactly the class of thing that is invisible without a
 baseline and expensive to find later.
 
-## The one open defect to carry across
+## No open renderer defects
 
-`SYM-TERRAIN-1` (see [the forensics report](renderer-forensics-report.md)): a terrain scene does not
-render the same frame twice from the same `FrameTime`, does not converge, and is build-dependent --
-release green, debug red, ASan green. It is a race on frame content decided from a non-blocking
-readback. **Record it as pre-existing now**, because after the upgrade there will be no way to tell
-whether it was inherited or introduced, and a race is exactly the kind of defect an upgrade gets
-blamed for.
+`SYM-TERRAIN-1` -- the last one -- was fixed before this baseline was taken, so the numbers and
+snapshots above describe a renderer with no known nondeterminism. That matters for what comes next:
+every image comparison used to validate the upgrade is now measuring the upgrade rather than
+competing with a defect underneath it. Debug and release agree.

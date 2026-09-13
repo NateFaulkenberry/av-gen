@@ -330,62 +330,70 @@ covers two thirds of the frame, so "not the whole frame" passes for a view that 
 wrong. The assertion that works asks whether a *particular region* -- the sky -- is claimed by
 anybody.
 
-### A terrain scene does not render the same frame twice (`SYM-TERRAIN-1`, open)
+### Re-rendering a frame changed it (`SYM-TERRAIN-1`, fixed)
 
-**Symptom:** on `renderer-qa-water.scene.json` -- terrain with water, and nothing else -- the same
-`FrameTime` drawn twice through the same renderer gives two different pictures, by 0.1% to 0.5% of
-channels (measured 571, 215 and 9 of 108,160 at three checkpoints).
+**Symptom:** on a terrain and water scene, the same `FrameTime` drawn twice through the same renderer
+gave two different pictures, by 0.1% to 0.5% of channels. Seven debug test failures that release did
+not have, including the progressive matrix naming its water rung on every step.
 
-**It does not converge.** A third and fourth draw differ from the second by as much as the second
-differs from the first (571 / 127 / 135). So it is not warm-up, not a cache filling, and not a
-temporal filter settling -- it is a persistent per-call non-determinism.
+**Root cause: ambient occlusion's temporal history, and an intended guard that achieved the opposite
+of its intent.** `AoRenderer::render` dropped the history whenever the frame index did not advance by
+exactly one, with a comment saying this was so "two renders of the same frame agree". Two cases were
+being treated as one, and they need opposite treatment:
 
-**It is build-dependent, and that is the sharpest clue.** The same source, the same GPU, the same
-idle machine: `[gpu][renderer][forensics][water6_2]` passes all eight cases in **release** and fails
-four in **debug**. A renderer whose picture depends on the optimisation level, at a held timeline, is
-not doing arithmetic differently -- it is racing, and debug's slower CPU changes which side wins.
+- A **discontinuity** -- a seek, a cut -- must drop the history. The previous frame is not this
+  frame's past, so accumulating against it smears across the jump.
+- A **repeat** -- the same frame index rendered twice -- must *not*. The first render legitimately
+  had history and used it; dropping it on the second makes the second render a different picture from
+  the first. The guard was the cause of the non-determinism it existed to prevent.
 
-**Confirmed contributor: the procedural empty-level draw skip.** `procedural_renderer.cpp` decides
-whether to record an indirect draw from `emptyFrames[]`, which is driven by "the latest *completed*
-stats readback" of a non-blocking async map. So what a frame draws depends on when a callback landed.
-Raising `kEmptyLevelFrames` out of reach on the shoreline scene takes the drift from 426.7 to 122.8
-and the failures from four to three -- a contributor, and not the whole of it.
+**Repair:** a repeat now restores the state the frame index started with -- history index and history
+validity -- so the same computation runs against the same inputs. The previous render wrote into the
+other history buffer and left the one it read untouched, so there is nothing else to undo. A
+discontinuity still drops the history, unchanged. `resetHistory` clears the frame-start snapshot too,
+or a repeat of the next frame would restore the history that call was asked to drop.
 
-**A correction worth keeping.** That same suspect was written up here as *exonerated*, on the grounds
-that `renderer-qa-water.scene.json` records zero indirect draws and zero visible instances. That
-measurement was right and the conclusion was too broad: it exonerates the skip **on that scene**,
-which has no scatter, and says nothing about a scene that has some. Two scenes, two different
-subsets of the same mechanism. The general claim needed a general measurement and did not have one.
+**Evidence, and a lesson about the four suspects that were eliminated.** The confirmed measurement is
+1,874 differing channels before and **0** after, with the same probe. Every earlier attribution in
+this investigation was made with a probe that rendered *other frames between measurements*, which
+re-primed the state and moved the result -- so "it does not converge", "ambient occlusion survives
+the arm being off" and "the empty-level skip is a contributor" were all artefacts of measurement
+order. Re-priming before each measurement made the answer unambiguous on the first run: with the `ao`
+arm off the difference is zero and with every other arm off it remains.
 
-**Ruled out, each by measurement:**
+That is the sixth vacuous instrument in this investigation and the most expensive, because it did not
+merely fail to find the defect -- it produced four confident, wrong attributions, one of which was
+written into this report and had to be retracted. **A probe that measures state must re-establish that
+state before each measurement**, and the tell was available throughout: a bisection where removing
+*any* single arm gave zero is not a subsystem signature, it is an ordering signature.
 
-| Suspect | How it was eliminated |
-|---|---|
-| Ambient occlusion's temporal history | the difference survives the `ao` arm being off (136 / 195 / 9) |
-| The particle simulation, which *is* stepped inside `render` | `renderer-qa-water` contains no particles |
-| A stale readback returning last frame's pixels | `readTextureRaw` maps with `WaitAny`; the read is synchronous and exact |
-| The procedural path, **on `renderer-qa-water` only** | that scene records zero indirect draws and zero visible instances |
-| Contention between concurrent GPU test runs | it was first seen that way and attributed to load; it reproduces on an idle machine |
+**Regression:** `[gpu][renderer][forensics][lifetime3_4]` asserts the repeated-frame comparison
+exactly, on every scene including terrain and water, where it previously reported rather than
+asserted. The progressive matrix's water rung passes in debug. Debug and release now agree.
 
-So at least two sources remain: the skip on scatter scenes, and something else on a scene where the
-procedural path does not run at all.
+### Entity zero's pick id is zero, and only the material id makes it findable
 
-**Consequence for the suite.** `renderer-qa-water.scene.json` stays in the resource-lifetime rotation
--- reloading and swapping to and from a terrain scene is exactly the lifetime under test -- but is
-excluded from the fresh-reference checkpoints, and the repeated-frame comparison reports on it rather
-than asserting. A red test nobody can act on gets muted rather than fixed, and the measurement is
-more use in the report than in a failure nobody reads.
+**Symptom:** none in production, and the reason is a detail that could easily have been dropped.
 
-**Where to look next.** The family is *frame content decided from a non-blocking readback*, so the
-experiment is to enumerate every such decision on the camera path and make each one a pure function
-of the frame index -- consulting a snapshot at a fixed latency, and waiting for it, rather than
-whichever one has arrived. The empty-level skip is the known instance; the unidentified second source
-is on a scene with no procedural path at all, so it is elsewhere. The draw count on that scene also
-grows across rounds (11 → 50 → 113), so chunk residency is changing, and whether that is the
-renderer's lazy upload or the scene's streaming was not separated.
+**Evidence:** `packPickId(PickSpace::Entity, 0)` is `(0 << 14) | 0` = **0**, which is exactly the
+value the identifier target clears to. So the object id alone cannot distinguish "this is entity
+zero" from "nothing was drawn here". What saves it is that the packed word carries the *material* id
+in its high sixteen bits and that number is deliberately one-based (`thisEntity + 1`), so entity
+zero's word is `0x00010000` -- non-zero, and distinguishable. The picker reads the whole word and is
+correct. `aux_debug.wgsl`'s identifier view tests the whole word and is correct.
 
-**Consequence for every image test in this repository:** run the GPU suite in **release**. Debug's
-seven failures are this one defect with two faces, not seven problems.
+**Where it bit:** the new object-depth view compared only the low sixteen bits against a pick id, so
+selecting the first entity matched every empty pixel and painted the whole sky as that object. Found
+because a *culled* object's depth view came back showing the object everywhere -- the one framing
+where the wrong answer is obviously wrong. The view now tests the whole word for emptiness before
+matching the low half.
+
+**Why it is in this report rather than only in a commit:** the one-based material id is load-bearing
+and nothing said so. Anything new that reads this target must test `word != 0` and not
+`objectId != 0`, and the test that guards it cannot be a pixel count -- a large floor legitimately
+covers two thirds of the frame, so "not the whole frame" passes for a view that is almost entirely
+wrong. The assertion that works asks whether a *particular region* -- the sky -- is claimed by
+anybody.
 
 ## Established as contract, not defect
 
@@ -472,19 +480,21 @@ it has been shown to fail**, which is why the status definitions in the plan req
 
 ## Open evidence gaps
 
-- The Glowmere UFO close-up matrix. Everything else about the static object is closed: the renderer
-  path, and the composition path across camera motion, seeks, scrub, playback, resize and reload.
-- Full reference/minimal renderer path and immutable frame snapshot/replay.
-- All-object cull reason history and complete GPU object generation/offset audit.
-- Generic transparency/depth isolation. Water leakage is now proven on two instruments -- geometry
-  on the real generator, pixels on synthetic shoreline geometry -- but not yet pixels on a real
-  world's shoreline.
-- Progressive RendererQA enablement levels 0 through 15.
-- Glowmere UFO close-up matrix and the water canonical regression matrix. (Glowmere's seek replay is
-  now covered; the alien's is closed.)
-- Full sanitizer and resource-lifetime suites without environment timeout/benchmark interference.
-- Diagnostic overhead measurement. (Frame-time remeasurement is done; see the plan's Phase 0.1 for
-  the numbers and for why Constellation's median cannot be one of them.)
+Rewritten 2026-09-13, when `SYM-TERRAIN-1` was fixed and the checklist reached zero open items. **No
+renderer defect is open.** What remains is coverage that was chosen against, with the reason:
+
+- **The live swapchain path is untested.** Every test here renders through `renderToImage`; a surface
+  reconfigure racing a frame is a path no assertion touches.
+- **GPU capture covers nothing.** No finding needed "what did the driver actually do", and it is the
+  first tool to reach for if a symptom ever survives every measurement in this document.
+- **The full GPU suite under ASan was not run to completion** -- roughly six cases an hour, a
+  five-hour job. The paths this work changed were covered instead, and the targeting is stated rather
+  than implied.
+- **Four isolation controls cannot exist yet** -- terrain, LOD, depth test, depth write -- each
+  blocked on a change outside the renderer, each recorded with what unblocks it. Nine of the thirteen
+  blocked items reduce to one requirement: a draw should carry its origin and its LOD.
+- **Three matrix rungs have no control** (terrain, lighting, sequencer) and are unreachable until the
+  above lands.
 
 ## The pass contract (Phase 7)
 
@@ -555,6 +565,7 @@ begins with `post`.
 | Detached composition parameters | use-after-free in `applyParameters` | ASan on the detach lifecycle test | `detach()` nulled only the common node fields | composition lifetime | every node-owned pointer is nulled | the lifecycle case under ASan | — |
 | Particle pools survive a seek | a seeked renderer does not match a fresh one | 40 frames then a seek back to 0.5 s, compared to a fresh engine and renderer; 63 of 102,400 channels | `resetTemporalHistory` reset the AO history and not the particle pools -- `ParticleRenderer::resetAll` said in its own comment it was "used on seek/offline restarts" and had no caller but the scene-pointer change | particles / temporal | `resetTemporalHistory` resets the pools | `[gpu][renderer][forensics][lifetime3_4]`, asserted exactly, with the particles-off comparison as the control that says they were the whole difference | — |
 | Previous skinning palette survives a seek | the first frame after every scrub smears | motion blur on, seek to 1.0 s: the current palette matches a fresh engine joint for joint, 49 of 49 *previous* joints hold the pre-jump pose, worst element 71.5 units on a ~100-unit character | `previousPalette` means "a frame ago", which is false across a discontinuity; `SkinnedRig::evaluate` copies it forward before re-posing, right for playback and wrong for a jump | animation | a seek flags each rig; the next `evaluate` takes its previous from the pose it lands on | `[gpu][composition][forensics][lifetime][seek]`, exact, with ordinary playback still reporting motion as the control | — |
+| Re-rendering a frame changed it (`SYM-TERRAIN-1`) | the same FrameTime drawn twice gave two different pictures; seven debug failures release did not have | render a frame, render it again, difference the two | ambient occlusion dropped its temporal history whenever the frame index did not advance by one -- correct for a seek, wrong for a repeat, where the first render had used history and the second did not | ambient occlusion | a repeat restores the state the frame index started with; a discontinuity still drops it | `[gpu][renderer][forensics][lifetime3_4]`, exact on every scene including terrain, where it previously reported rather than asserted | — |
 | Diagnostic views tone-mapped (`SYM-AUX-1`) | none reported; the instrument was wrong, so nothing it said was trustworthy | a shader writing 1.0 reaches the screen as 202 | the auxiliary view pass drew into the HDR target, ahead of exposure and the filmic curve | renderer diagnostics | the pass draws after the tone map, one pipeline per target format | `[gpu][composition][forensics][views]`: the linear-depth view checked per pixel against a readback of the buffer, and four stops of exposure leaving it unchanged | the composition overlay still draws over a view -- visible, not silent |
 | A node's `material` block | authored material silently ignored on every kind but terrain; `alphaMode` never parsed at all | RendererQA's `transparent-orb` draws opaque | the parse sat inside `if (kind == Terrain)` | scene format | parsed for every kind, applied on orbs, warned where unused | `[gpu][composition][forensics][isolation]`, which needs a transparent object to exist | kinds other than orb and terrain still do not *use* it -- they now say so |
 
@@ -612,7 +623,7 @@ the rung below, which is what found the two gaps below.
 | 2 terrain | **no control exists** -- terrain is present at every rung; see Phase 4.2 |
 | 3 lighting | no control exists; present throughout |
 | 4 shadows | pass, two rungs (cascades, shadow mask) |
-| 5 water | pass in release. **In debug it names this rung on every step** -- that is `SYM-TERRAIN-1`, and the matrix localising an open defect to a rung is the matrix working |
+| 5 water | pass. It named this rung on every step in debug while `SYM-TERRAIN-1` stood, which was the matrix working -- localising a defect to a rung is what it was built for -- and passes there now that it is fixed |
 | 6 water effects | no control separates a surface's effects from the surface |
 | 7 transparent objects | pass -- **reachable only after the material fix**; the scene's "transparent orb" had been opaque since it was written, and the rung found it |
 | 8 characters | present at every rung; no "characters off" control separate from animation |
@@ -679,9 +690,8 @@ palette at seek time) pins the pose being *left* and reintroduces the jump -- th
 exist until the next evaluation, so something has to carry "a discontinuity happened" across the gap.
 The material NaN check is a guard, and a guard that repaired ownership would not be a guard.
 
-The one place a change is owed and a rewrite is still not the answer is `SYM-TERRAIN-1`: frame content
-must not be decided from whichever asynchronous readback has arrived. That is a discipline to apply at
-each decision site, not a subsystem to replace.
+`SYM-TERRAIN-1` was the last candidate for a discipline change and needed one even less than that:
+it was a single state machine conflating a repeated frame with a discontinuity, repaired in place.
 
 ### Is the architecture sound enough to keep building on
 
@@ -754,9 +764,10 @@ on restores exactly its own pass and nothing else.
 rather than implied: the derived-copy rule with its table, the renderer-side ownership table, the
 resource inventory with what invalidates each entry, and the five-step frame lifecycle.
 
-**Are remaining unknowns documented instead of implied to be fixed?** Yes. `SYM-TERRAIN-1` is open
-with four suspects eliminated and two sources remaining. The live-path swapchain race is untested.
-GPU capture covers nothing. The full GPU suite under ASan is a five-hour run and was not done.
+**Are remaining unknowns documented instead of implied to be fixed?** Yes, and the list is now
+short enough to read: the live-path swapchain replacement is untested (every test goes through
+`renderToImage`, not the surface), GPU capture covers nothing, and the full GPU suite under ASan is a
+five-hour run that was targeted rather than completed. **There is no open renderer defect.**
 
 ## Final classification rule
 

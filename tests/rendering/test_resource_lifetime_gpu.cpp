@@ -777,12 +777,10 @@ TEST_CASE("an interleaved resize reload seek and cut sequence matches fresh refe
     };
     consider("renderer-qa-minimal.scene.json", true);
     consider("renderer-qa-transparency.scene.json", true);
-    // In the sequence, not in the checkpoints: `SYM-TERRAIN-1` (below) means this scene does not
-    // render the same picture twice from the same FrameTime, so a fresh-reference comparison on it
-    // reports that open defect rather than anything about resource reuse. It stays in the rotation
-    // because reloading and swapping *to* and *from* a terrain scene is exactly the resource
-    // lifetime this test is about.
-    consider("renderer-qa-water.scene.json", false);
+    // Checkpointed again since `SYM-TERRAIN-1` was fixed. It was excluded while that stood, because
+    // a fresh-reference comparison on a scene that does not render the same frame twice reports the
+    // open defect rather than anything about resource reuse.
+    consider("renderer-qa-water.scene.json", true);
     if (haveAlien()) {
         consider("renderer-qa-character.scene.json", true);
         consider("renderer-qa.scene.json", false); // in the sequence, not in the checkpoints
@@ -837,32 +835,14 @@ TEST_CASE("an interleaved resize reload seek and cut sequence matches fresh refe
         const FrameTime held = walked.seekTo(std::max(0.0, seekTo));
         const gpu::Image8 once = walked.draw(held, w2, h2);
         const gpu::Image8 twice = walked.draw(held, w2, h2);
-        const bool terrainScene = rotation[current].filename().string().find("water") != std::string::npos;
+
         INFO("repeated frame index " << held.frameIndex << " at " << held.renderTime << " s");
-        if (terrainScene) {
-            // `SYM-TERRAIN-1`, open. On the terrain/water scene the same FrameTime drawn twice does
-            // not give the same picture, by 0.1-0.5% of channels, and it does **not converge**: a
-            // third and fourth draw differ from the second by as much as the second differs from the
-            // first. Reported rather than asserted, because the cause is not found and a red test
-            // that nobody can act on gets muted rather than fixed.
-            //
-            // Ruled out by measurement on *this* scene: ambient occlusion (the difference survives
-            // the `ao` arm being off), particles (none here), and the procedural path in its
-            // entirety -- this scene records zero indirect draws and zero visible instances, so the
-            // empty-level draw skip and the asynchronous cull-stats readback behind it cannot be
-            // running. It is not warm-up either, or it would converge, and it is not contention with
-            // another GPU process: it reproduces on an idle machine.
-            //
-            // On a scene that *does* have scatter the skip is a confirmed contributor -- see
-            // `SYM-TERRAIN-1` in the report -- so what is left here is a second, unidentified source
-            // of the same kind. The family is frame content depending on when an asynchronous
-            // readback landed, which is why the whole thing is build-dependent: release is green and
-            // debug is not.
-            WARN("SYM-TERRAIN-1: " << channelsDiffering(once, twice) << " channels differ between two "
-                 "draws of the same FrameTime on " << rotation[current].filename().string());
-        } else {
-            CHECK(channelsDiffering(once, twice) == 0);
-        }
+        // Exact, on every scene including terrain and water. This was reported rather than asserted
+        // while `SYM-TERRAIN-1` stood: ambient occlusion's history was valid on the first render of
+        // a frame and dropped on the second, so re-rendering a frame produced a different picture
+        // from the one it was re-rendering. Fixed in `AoRenderer::render`, and this is the
+        // assertion that says so.
+        CHECK(channelsDiffering(once, twice) == 0);
         transitions += 2;
 
         // Every third round the composition is replaced: the same file back (a reload) or the next
