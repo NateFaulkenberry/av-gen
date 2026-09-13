@@ -114,6 +114,18 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
     # that measure *time* rather than pixels (the frame timeline's per-pass attribution, and the
     # non-stalling readback ring) fail intermittently while passing alone. That reads as flakiness
     # in the engine when it is contention in the harness. Unit tests still run in parallel alongside.
+    #
+    # What RESOURCE_LOCK does *not* do: it is scoped to this one ctest invocation's own scheduler, so
+    # it only keeps this project's GPU tests from overlapping *each other*. It has no way to see a
+    # second process on the same GPU that ctest did not launch -- another `ctest` run, a render, a
+    # second agent's work in a sibling worktree (tools/gpu-lock.sh exists for exactly that case, and
+    # a plain `ctest -j4` does not go through it). A test whose assertion is a wall-clock magnitude
+    # or ratio is exposed to that no matter how tightly this file locks its own tests against each
+    # other, so those tests are tagged `[.perf]` (Catch2's hidden-tag convention) rather than relied
+    # on to be robust under RESOURCE_LOCK alone -- `[.perf]` tests never reach catch_discover_tests'
+    # `--list-test-names-only` enumeration, so they are absent from `ctest` entirely rather than
+    # present-and-flaky; see test_frame_profiler_gpu.cpp's header for which assertions qualify and
+    # which don't. Run them deliberately and alone: `avgen_render_tests "[.perf]"`.
     catch_discover_tests(avgen_render_tests
         TEST_PREFIX "gpu."
         PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu

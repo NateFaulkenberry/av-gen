@@ -603,8 +603,13 @@ TEST_CASE("the same second produces the same frame however it was reached",
     CHECK(differing == 0);
 }
 
+// `[.perf]`, not the plain `[performance]` this used to carry: `CHECK(hundred.cpuBuildMs < 1.0)`
+// below is a wall-clock threshold, so -- like every other timing test in this repo -- it is hidden
+// from a default `ctest` run rather than left for `RESOURCE_LOCK gpu` to protect, since that lock
+// only keeps this project's own GPU tests from overlapping each other and has no way to see a
+// second process (another agent's render, a concurrent ctest invocation) on the same machine.
 TEST_CASE("a hundred text layers stay one pass and a handful of draws",
-          "[gpu][composition][performance]") {
+          "[gpu][composition][.perf]") {
     Harness h = Harness::make();
     const scene::Scene scene = blackScene();
     // 1080p, because a cost per pixel is the only cost this pass really has, and quoting it at

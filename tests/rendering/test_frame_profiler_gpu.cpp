@@ -15,6 +15,15 @@
 // made relative it was: an absolute "this frame costs under 4 ms" assertion measured 3.7 ms alone
 // and 10.4 ms with another process on the same GPU, so what is compared is two arms of the same
 // run against each other. What is asserted is direction and rough magnitude, never a millisecond.
+//
+// Every case whose assertion is a magnitude or a ratio -- "heavy costs more than light", "the
+// residual is under 2% of the total" -- is tagged `[.perf]` and so hidden from a plain `ctest` run
+// (tests/CMakeLists.txt's `RESOURCE_LOCK gpu` keeps two of *this project's own* GPU tests from
+// running at once, but it cannot see a second process on the same GPU -- another agent's render,
+// another ctest invocation, anything outside this one -- which is exactly the kind of "whatever
+// else it is doing" these tests are written to tolerate rather than rely on not happening). A case
+// that only checks a count, a label's presence, or that a bookkeeping identity holds exactly stays
+// untagged and runs in CI, because nothing about it can be perturbed by the machine's mood.
 
 #include "core/log.hpp"
 #include "core/time.hpp"
@@ -323,7 +332,7 @@ std::string table(const Profile& p) {
 
 } // namespace
 
-TEST_CASE("the frame timeline reports nanoseconds, not an arbitrary counter", "[profiler][gpu]") {
+TEST_CASE("the frame timeline reports nanoseconds, not an arbitrary counter", "[.perf][profiler][gpu]") {
     // Nothing downstream can be sanity-checked against a stopwatch if the unit is wrong, and the
     // unit is an assumption: gpu/timeline_math.cpp multiplies the raw delta by 1e-6 and calls the
     // result milliseconds. renderFrame() submits and waits for the queue, so its wall clock is an
@@ -375,7 +384,7 @@ TEST_CASE("the frame timeline reports nanoseconds, not an arbitrary counter", "[
     CHECK(ctx->errorCount() == 0);
 }
 
-TEST_CASE("the timestamp counter's resolution is small enough to measure a pass", "[profiler][gpu]") {
+TEST_CASE("the timestamp counter's resolution is small enough to measure a pass", "[.perf][profiler][gpu]") {
     // What the per-pass numbers can be trusted to. A tenth-of-a-millisecond pass reported by a
     // counter that ticks every 0.066 ms is one or two ticks of quantisation noise, and no A/B on
     // it means anything. This measures the floor rather than assuming one.
@@ -422,7 +431,7 @@ TEST_CASE("the timestamp counter's resolution is small enough to measure a pass"
     CHECK(ctx->errorCount() == 0);
 }
 
-TEST_CASE("an empty frame is measured as an empty frame", "[profiler][gpu]") {
+TEST_CASE("an empty frame is measured as an empty frame", "[.perf][profiler][gpu]") {
     // The zero end of the scale. If a frame with nothing in it reports the same as a frame with
     // something in it, every number above it is that much too large and the fixed overhead is
     // being charged to whatever pass happened to be first.
@@ -455,7 +464,7 @@ TEST_CASE("an empty frame is measured as an empty frame", "[profiler][gpu]") {
     CHECK(ctx->errorCount() == 0);
 }
 
-TEST_CASE("the scene pass responds to geometry", "[profiler][gpu]") {
+TEST_CASE("the scene pass responds to geometry", "[.perf][profiler][gpu]") {
     // The workload the whole renderer-2.0 brief turns on: Glowmere's scene pass is 85% of its frame
     // and does not move with resolution, so it is being charged for vertices. If the scene label
     // does not move when the vertices do, that conclusion is unsupported.
@@ -486,7 +495,7 @@ TEST_CASE("the scene pass responds to geometry", "[profiler][gpu]") {
     CHECK(t.ratio > 2.0);
 }
 
-TEST_CASE("the scene pass responds to overdraw", "[profiler][gpu]") {
+TEST_CASE("the scene pass responds to overdraw", "[.perf][profiler][gpu]") {
     // The other half of the same question. A pass that moves with vertices and not with fragments
     // is measuring something real; one that moves with neither is measuring nothing.
     auto ctx = makeContext();
@@ -506,7 +515,7 @@ TEST_CASE("the scene pass responds to overdraw", "[profiler][gpu]") {
     CHECK(t.ratio > 3.0);
 }
 
-TEST_CASE("the fullscreen passes respond to resolution", "[profiler][gpu]") {
+TEST_CASE("the fullscreen passes respond to resolution", "[.perf][profiler][gpu]") {
     // The fragment-side check, and the one that decides whether dynamic resolution could ever pay:
     // a pass whose cost is pixels must scale with pixels. The volumetric march is a fullscreen
     // shader at half resolution and is the cleanest pixel-bound pass in the frame; GTAO is the same
@@ -565,7 +574,7 @@ TEST_CASE("the fullscreen passes respond to resolution", "[profiler][gpu]") {
     CHECK(aoRatio > 1.0);
 }
 
-TEST_CASE("the shadow passes respond to shadow workload", "[profiler][gpu]") {
+TEST_CASE("the shadow passes respond to shadow workload", "[.perf][profiler][gpu]") {
     // Cascades are the shadow phase's own workload and nothing else in the frame changes with them:
     // the same casters are drawn into one depth map or into four.
     auto ctx = makeContext();
@@ -656,7 +665,7 @@ TEST_CASE("the shadow passes respond to shadow workload", "[profiler][gpu]") {
     CHECK(median(mapRatios) > 0.0);
 }
 
-TEST_CASE("the volumetric pass responds to its march length", "[profiler][gpu]") {
+TEST_CASE("the volumetric pass responds to its march length", "[.perf][profiler][gpu]") {
     // The pass the brief suspected outright, kept in the battery because leaving it out would make
     // the table of what measures correctly incomplete. test_frame_timeline_gpu.cpp pins the same
     // property as a regression guard against the instrument this one replaced.
@@ -778,7 +787,7 @@ TEST_CASE("submitted geometry is counted apart from the geometry the world conta
     CHECK(ctx->errorCount() == 0);
 }
 
-TEST_CASE("the CPU stages account for the frame they were measured inside", "[profiler][gpu]") {
+TEST_CASE("the CPU stages account for the frame they were measured inside", "[.perf][profiler][gpu]") {
     // A breakdown whose parts do not add up to the whole is not a breakdown. The stages roll
     // across the whole of render(), so the residual is whatever falls after the last mark, and it
     // should be microseconds; a large one means a stage boundary is missing.
