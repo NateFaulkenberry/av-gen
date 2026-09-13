@@ -113,3 +113,5 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [105](ADR-105-the-directed-camera-follows-its-heroes.md) | A directed camera follows its heroes until somebody else takes it | Accepted |
 | [106](ADR-106-a-hero-follows-its-object.md) | A hero follows the object it describes | Accepted |
 | [107](ADR-107-a-hero-is-one-object.md) | A hero is one object | Accepted |
+| [113](ADR-113-a-measurement-carries-its-conditions.md) | A measurement carries its conditions, and a comparison lives in one process | Accepted |
+| [114](ADR-114-cluster-occupancy-is-measured-uncapped.md) | Cluster occupancy is measured before the cap, not after it | Accepted |
