@@ -141,3 +141,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [145](ADR-145-a-scene-declares-its-own-density.md) | A scene declares its own density, and the declaration is what is checked | Accepted |
 | [146](ADR-146-offline-is-only-half-hysteresis-free.md) | Offline is only half hysteresis-free, and the half that is not is measured | Accepted |
 | [147](ADR-147-the-batch-render-path-never-selects-the-offline-tier.md) | The batch render path never selects the offline tier | Accepted |
+| [148](ADR-148-the-noise-floor-is-four-numbers.md) | The noise floor is four numbers, and the one that binds is usually the pairs disagreeing | Accepted |

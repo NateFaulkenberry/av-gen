@@ -14,6 +14,7 @@ the wave.
 | G4 | visual comparison on the canonical frames | `tools/certify.py --capture` | built |
 | G5 | offline parity | `tests/rendering/test_phase_g_certification.cpp` | **two failures, both real** — ADR-146, ADR-147 |
 | G6 | frame-state baselines green | `examples/qa/baselines/*.snapshot.json` | green, 29 assertions, unchanged |
+| — | the A/B harness certified a null as a result | `src/rendering/render_stats.cpp` | fixed — ADR-148; one past claim left in doubt |
 
 ---
 
@@ -33,6 +34,22 @@ The counters are a different matter and are treated differently. A composition i
 `(recipe, library, seed)` and the culling decision is a pure function of that plus the camera and
 the resolution, so a draw count or an instance count is **exact**. Those are checked against a
 declaration and a difference is a finding with no noise floor to argue about (ADR-145).
+
+### 0.1 The harness was certifying nulls, and that is fixed
+
+Reported by the Phase F agent mid-phase and folded in here because `render_stats.cpp` is this
+agent's file: a **null** A/B on Glowmere — both arms the same code — was blessed as "A RESULT" at
+−2.39%. The session floor was derived from the baseline blocks alone, so a tight baseline against a
+loose arm certified the looseness.
+
+The floor is now the largest of four components — the calibrated constant, the baseline's block
+spread, the **arm's** block spread, and the peak-to-peak of the **per-pair deltas** — all four
+reported in the log and in `--bench-json`. Four live nulls on Glowmere confirm the fourth is the one
+that usually binds, and that this machine's Glowmere spread today reaches 12–13.6% against the 1.0%
+§3.3 measured. ADR-148 has the table, the reasoning, and — stated rather than smoothed over — which
+past claims it invalidates: ADR-120 survives and can be shown to from the figures it published;
+§3.5's `--ab shadowmask` −20.9% cannot be recomputed and **needs re-running before it is quoted
+again**.
 
 ---
 

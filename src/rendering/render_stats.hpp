@@ -247,7 +247,26 @@ struct PairedDelta {
     double armMs = 0.0;
     double deltaMs = 0.0;
     double deltaPercent = 0.0;       // of the baseline
-    double noiseFloorPercent = 0.0;  // the floor actually applied, after the session's own spread
+    // The floor actually applied: the largest of the four components below. A difference smaller
+    // than it is reported as no result.
+    double noiseFloorPercent = 0.0;
+    // The components, reported separately so a reader can see which one bound rather than being
+    // handed one number and asked to trust it (ADR-148).
+    //
+    // **All three session components matter, and taking only the first was a defect.** The floor
+    // was originally derived from the baseline blocks alone. In a null A/B the two arms are the same
+    // code and are equally noisy, so a baseline that happened to land tight against an arm that
+    // happened to wobble certified the wobble: a Glowmere null was blessed at -2.39% against the
+    // 2.00% constant, and the agent that hit it withdrew two of its own rows rather than keep
+    // numbers the harness had approved.
+    double calibratedFloorPercent = 0.0; // the constant, from the reference machine
+    double baselineSpreadPercent = 0.0;  // (max-min)/median of the baseline blocks' medians
+    double armSpreadPercent = 0.0;       // the same, of the arm's
+    // The peak-to-peak of the **per-pair deltas**, as a percentage of the baseline median. This is
+    // the variability of the quantity actually being certified, and it is the only component that
+    // can see pairs which disagree with each other while each arm is individually steady. ADR-113
+    // printed the per-pair deltas for exactly that case and then certified their median anyway.
+    double deltaSpreadPercent = 0.0;
     [[nodiscard]] bool isResult() const;
 };
 

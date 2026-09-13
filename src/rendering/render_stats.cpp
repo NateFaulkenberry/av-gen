@@ -258,17 +258,41 @@ PairedDelta pairDeltas(const std::vector<double>& baselineMedians, const std::ve
     // aggregate.
     out.deltaMs = medianOf(blockDeltasOut);
     out.deltaPercent = out.baselineMs > 0.0 ? out.deltaMs / out.baselineMs * 100.0 : 0.0;
-    // What the baseline's own median did across the session. One block cannot show spread, so a
-    // single pair falls back on the calibrated constant and says so by reporting zero spread.
-    if (baseUsed.size() >= 2 && out.baselineMs > 0.0) {
-        const auto [lo, hi] = std::minmax_element(baseUsed.begin(), baseUsed.end());
-        spreadOut = (*hi - *lo) / out.baselineMs * 100.0;
-    } else {
-        spreadOut = 0.0;
-    }
-    // The floor is whichever is larger: the spread measured on the reference machine, or the
-    // spread this session actually showed. A session that wobbled 5% cannot certify a 3% win.
-    out.noiseFloorPercent = std::max(floorPercent, spreadOut);
+    // What this session actually did, measured three ways. One block cannot show spread, so a
+    // single pair reports zero for all three and falls back on the calibrated constant.
+    //
+    // Each is a peak-to-peak over a reference median, in percent. The three are not
+    // interchangeable and each catches a case the others cannot:
+    //
+    //   * the **baseline's** own spread -- the session was noisy (ADR-113 §4's rule, and what
+    //     correctly rejects a Constellation null);
+    //   * the **arm's** own spread -- the session was noisy *on the side the baseline could not
+    //     see*, which is the defect ADR-148 records: in a null A/B both arms are the same code, so
+    //     a tight baseline against a loose arm certified the looseness;
+    //   * the **per-pair deltas'** spread -- the pairs disagree with each other, which neither arm's
+    //     own steadiness can reveal and which is precisely a claim its own evidence contradicts.
+    const auto peakToPeakPercent = [](const std::vector<double>& values, double reference) {
+        if (values.size() < 2 || reference <= 0.0) {
+            return 0.0;
+        }
+        const auto [lo, hi] = std::minmax_element(values.begin(), values.end());
+        return (*hi - *lo) / reference * 100.0;
+    };
+    out.calibratedFloorPercent = floorPercent;
+    out.baselineSpreadPercent = peakToPeakPercent(baseUsed, out.baselineMs);
+    out.armSpreadPercent = peakToPeakPercent(armUsed, out.armMs);
+    // Against the baseline median, so it is on the same scale as `deltaPercent`, which is the number
+    // it is the floor for.
+    out.deltaSpreadPercent = peakToPeakPercent(blockDeltasOut, out.baselineMs);
+    // `spreadOut` stays the *baseline's* spread: it is published as `AbSummary::gpuSpreadPercent`
+    // and documented as that, and quietly changing what a named field means is how a reader ends up
+    // comparing two different quantities.
+    spreadOut = out.baselineSpreadPercent;
+    // The floor is the largest of the four. Never below the constant, because a session that
+    // happened to be quiet is not licence to certify below what the reference machine has been
+    // measured to produce; and never below anything this session actually showed.
+    out.noiseFloorPercent = std::max({floorPercent, out.baselineSpreadPercent, out.armSpreadPercent,
+                                      out.deltaSpreadPercent});
     return out;
 }
 
@@ -417,6 +441,16 @@ nlohmann::ordered_json pairedJson(const PairedDelta& d) {
                                   {"deltaMs", d.deltaMs},
                                   {"deltaPercent", d.deltaPercent},
                                   {"noiseFloorPercent", d.noiseFloorPercent},
+                                  // Which component bound is part of the result, not a detail: a
+                                  // difference rejected by the calibrated constant and one rejected
+                                  // because this session's arm wobbled are different findings and
+                                  // call for different next steps.
+                                  {"noiseFloorComponents",
+                                   nlohmann::ordered_json{
+                                       {"calibratedPercent", d.calibratedFloorPercent},
+                                       {"baselineBlockSpreadPercent", d.baselineSpreadPercent},
+                                       {"armBlockSpreadPercent", d.armSpreadPercent},
+                                       {"perPairDeltaSpreadPercent", d.deltaSpreadPercent}}},
                                   {"clearsNoiseFloor", d.isResult()}};
 }
 

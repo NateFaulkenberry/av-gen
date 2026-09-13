@@ -344,6 +344,79 @@ TEST_CASE("a session noisier than the calibration raises its own noise floor", "
     CHECK(!ab.gpu.isResult()); // real-looking, and this session cannot tell it from drift
 }
 
+TEST_CASE("a null A/B cannot be certified by a quiet baseline and a noisy arm", "[render-stats]") {
+    // Reported by the Phase F agent, which withdrew two of its own Glowmere rows over it: a **null**
+    // A/B -- both arms the same code -- was certified as "A RESULT" at -2.39% against the 2.00%
+    // floor. ADR-113 §5 is explicit that a null reporting a result means a broken harness, whatever
+    // it says about any real arm, so this is the harness's own correctness and not a tuning matter.
+    //
+    // The cause: the session floor was derived from the **baseline blocks only**. In a null A/B the
+    // two arms are the same code and are equally noisy, so whenever the baseline's blocks happen to
+    // land tight and the arm's happen to wobble, the arm's variance never enters the floor and the
+    // wobble is certified as a difference.
+    //
+    // The numbers below are the reported shape: a baseline flat to 0.2% and an arm spanning 3%.
+    const auto block = [](double gpu) {
+        AbBlock b;
+        b.wallMs = describe({gpu * 1.2});
+        b.gpuMs = describe({gpu});
+        return b;
+    };
+    const std::vector<AbBlock> baseline = {block(13.37), block(13.37), block(13.40)};
+    const std::vector<AbBlock> arm = {block(13.70), block(13.68), block(14.10)};
+
+    const AbSummary ab = compareArms("none", baseline, arm);
+    CHECK(ab.gpu.baselineSpreadPercent < 0.5);            // the baseline alone looks pristine
+    CHECK(ab.gpu.armSpreadPercent > 2.5);                 // and the arm does not
+    CHECK(std::abs(ab.gpu.deltaPercent) > kGpuNoiseFloorPercent); // clears the *constant*
+    // ...and must still not be a result, because the floor now knows about the arm.
+    CHECK(!ab.gpu.isResult());
+    CHECK_THAT(ab.gpu.noiseFloorPercent, WithinAbs(ab.gpu.armSpreadPercent, 1e-9));
+}
+
+TEST_CASE("pairs that disagree with each other cannot certify their own median", "[render-stats]") {
+    // The case neither the baseline's spread nor the arm's can see. Both arms are steady block to
+    // block; what is unsteady is the *pairing* -- pair 1 says the arm saved 2 ms, pair 2 says it
+    // cost 1.6 ms. ADR-113 printed the per-pair deltas for exactly this reason and then certified
+    // the median of them anyway.
+    const auto block = [](double gpu) {
+        AbBlock b;
+        b.wallMs = describe({gpu * 1.2});
+        b.gpuMs = describe({gpu});
+        return b;
+    };
+    const std::vector<AbBlock> baseline = {block(18.0), block(18.0), block(18.0)};
+    const std::vector<AbBlock> arm = {block(16.0), block(19.6), block(17.4)};
+
+    const AbSummary ab = compareArms("volume", baseline, arm);
+    CHECK_THAT(ab.gpu.baselineSpreadPercent, WithinAbs(0.0, 1e-9));
+    CHECK(ab.gpu.deltaMs > 0.0);                 // the median pair says the arm is faster
+    // Deltas 2.0 / -1.6 / 0.6: 3.6 ms peak to peak on an 18 ms baseline.
+    CHECK_THAT(ab.gpu.deltaSpreadPercent, WithinAbs(20.0, 1e-6));
+    CHECK(ab.gpu.deltaSpreadPercent > std::abs(ab.gpu.deltaPercent));
+    CHECK(!ab.gpu.isResult());
+}
+
+TEST_CASE("a consistent, large effect is still a result once the floor knows more",
+          "[render-stats]") {
+    // The other half of the change, and the one that says it is not simply a wider veto: three
+    // pairs that agree with each other, on arms that are each steady, still certify.
+    const auto block = [](double gpu) {
+        AbBlock b;
+        b.wallMs = describe({gpu * 1.2});
+        b.gpuMs = describe({gpu});
+        return b;
+    };
+    const std::vector<AbBlock> baseline = {block(18.00), block(18.05), block(18.02)};
+    const std::vector<AbBlock> arm = {block(14.40), block(14.46), block(14.42)};
+
+    const AbSummary ab = compareArms("shadowmask", baseline, arm);
+    CHECK(ab.gpu.isResult());
+    CHECK(ab.gpu.deltaPercent > 19.0);
+    // And the floor is the calibrated constant, because nothing in this session was noisier.
+    CHECK_THAT(ab.gpu.noiseFloorPercent, WithinAbs(kGpuNoiseFloorPercent, 1e-9));
+}
+
 TEST_CASE("an A/B with no completed pair makes no claim", "[render-stats]") {
     AbBlock b;
     b.wallMs = describe({22.0});
