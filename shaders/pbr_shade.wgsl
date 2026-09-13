@@ -193,6 +193,11 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     result.emission = vec3<f32>(0.0);
     result.bloomWeight = max(object.ids.z, 0.0);
     result.flags = 1.0;
+    // ADR-133: this draw's material tier and its local-light budget. Uniform across the draw, so
+    // every branch below that reads `tier` is wave-uniform -- the condition ADR-118 measured a
+    // saving to need. `tier == 0` is byte for byte the pre-ADR-133 shader.
+    let tier = materialTierOf();
+    let tierLocalLights = materialTierLocalLights(tier);
     let texMask = u32(object.flags.w + 0.5);
     let hasBaseColor = (texMask & 1u) != 0u;
     let hasMetalRough = (texMask & 2u) != 0u;
@@ -336,8 +341,12 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         context.rotation = gradientNoise(screenUv * frame.targetSize.xy) * 6.28318531;
         context.jitter = 0.5;
         context.maskable = alphaMode < 1.5; // ADR-087: blended surfaces are not in the depth prepass
+        context.tier = tier;
+        context.localLightBudget = tierLocalLights;
         let lighting = directLighting(context);
-        if (!sampledOcclusion) {
+        // The flat tier's AO budget is zero: it takes the ambient unoccluded. A material program
+        // may already have sampled it, in which case the read is spent whatever this says.
+        if (!sampledOcclusion && tier < 2u) {
             occlusion = sampleAmbientOcclusion(screenUv, viewDepth, n);
         }
         // The styled path's ambient carries most of a night landscape, so screen-space AO applied
@@ -383,7 +392,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     // (reoriented, so the two compose rather than one replacing the other).
     var mapNormal = programNormal;
     var perturb = programNormal.z < 0.99999;
-    if (hasNormal) {
+    if (hasNormal && tier < 2u) {
         var mapN = textureSample(normalTex, materialSampler, uv).xyz * 2.0 - 1.0;
         mapN = vec3<f32>(mapN.xy * object.material.z, mapN.z);
         mapNormal = matReorientNormal(mapNormal, normalize(mapN));
@@ -418,13 +427,15 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     ctx.rotation = noise * 6.28318531;
     ctx.jitter = noise;
     ctx.maskable = alphaMode < 1.5; // ADR-087: blended surfaces are not in the depth prepass
+    ctx.tier = tier;
+    ctx.localLightBudget = tierLocalLights;
     let lit = directLighting(ctx);
     let direct = lit.diffuse + lit.specular;
 
     // ---- ambient occlusion (ADR-034): applied to ambient diffuse, and to specular via the bent normal ----
     // A material program already sampled it above (it can read the visibility); otherwise sample
     // it now, on the lit path only.
-    if (!sampledOcclusion) {
+    if (!sampledOcclusion && tier < 2u) {
         occlusion = sampleAmbientOcclusion(screenUv, viewDepth, n);
     }
     let aoStrength = clamp(frame.aoParams.x, 0.0, 4.0);
@@ -438,7 +449,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     var ambient: vec3<f32>;
     let kS = fresnelSchlickRoughness(nDotV, f0, roughness);
     let kD = (vec3<f32>(1.0) - kS) * (1.0 - metallic);
-    if (frame.envParams.w > 0.5) {
+    if (frame.envParams.w > 0.5 && tier < 2u) {
         let r = reflect(-v, n);
         let irradiance = textureSample(irradianceMap, iblSampler, envRotate(bentNormal)).rgb;
         let maxMip = frame.envParams.y;

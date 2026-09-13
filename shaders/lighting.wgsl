@@ -139,6 +139,12 @@ struct ShadeContext {
     // blended surface, which the depth prepass never drew, so the mask under it describes
     // whatever is behind rather than the surface itself.
     maskable: bool,
+    // ADR-133: this draw's material tier (0 full, 1 reduced lights, 2 flat) and the local-light
+    // budget that goes with it. Both are uniform across the draw -- every branch below that reads
+    // them is therefore wave-uniform, which is the condition ADR-118 found a saving needs in order
+    // to be a saving. `localLightBudget` is 0xffffffff on the Full tier.
+    tier: u32,
+    localLightBudget: u32,
 };
 
 fn distributionGgxL(nDotH: f32, alpha: f32) -> f32 {
@@ -314,7 +320,8 @@ fn evaluateLight(index: u32, ctx: ShadeContext) -> LightSample {
         sample = shadeRepresentative(light, ctx);
     }
 
-    if (light.extra.x > 0.5) {
+    if (light.extra.x > 0.5 || ctx.tier >= 2u) {
+        // §24: the flat tier's shadow and specular budget is zero. Both branches are uniform.
         sample.specular = vec3<f32>(0.0);
     }
     if (light.extra.y > 0.5) {
@@ -323,6 +330,12 @@ fn evaluateLight(index: u32, ctx: ShadeContext) -> LightSample {
     let lit = max(max(sample.diffuse.r + sample.diffuse.g + sample.diffuse.b,
                       sample.specular.r + sample.specular.g + sample.specular.b), 0.0);
     if (lit <= 0.0) {
+        return sample;
+    }
+    // §24, ADR-133: the shadow budget is part of the material tier. The flat tier receives no
+    // shadow term at all -- no mask read, no cascade lookup, no blocker search, no contact march.
+    // The test is on a uniform, so the whole wave takes it together.
+    if (ctx.tier >= 2u) {
         return sample;
     }
 
@@ -354,7 +367,11 @@ fn evaluateLight(index: u32, ctx: ShadeContext) -> LightSample {
     // a map at all, and this is the only shadow it has (ADR-034). Combined by minimum, so whichever
     // says "occluded" wins. It stays at full resolution whether or not the map term was masked --
     // it is the one term that does not survive being computed once per 2x2 (see shadow_mask.wgsl).
-    if (light.tangent.w > 0.5 && light.up.w > 0.0) {
+    // The reduced tier keeps the contact march for the directional lights -- it is what grounds a
+    // plant on the terrain -- and drops it for local ones, which is where the per-fragment count
+    // multiplies. `kind` is per light and the tier is per draw, so this is uniform per iteration.
+    let contactAllowed = ctx.tier < 1u || kind < LIGHT_POINT - 0.5;
+    if (light.tangent.w > 0.5 && light.up.w > 0.0 && contactAllowed) {
         let contact = contactShadow(ctx.worldPos, shadowNormal, toLight, ctx.screenUv, ctx.viewDepth, ctx.jitter);
         visibility = min(visibility, mix(1.0, contact, clamp(light.up.w, 0.0, 1.0)));
     }
@@ -440,7 +457,10 @@ fn directLighting(ctx: ShadeContext) -> LightSample {
         }
         let cluster = clusterIndexFor(ctx.screenUv, ctx.viewDepth);
         let clusterCount = u32(frame.clusterParams.x * frame.clusterParams.y * frame.clusterParams.z);
-        let count = min(clusterLights[cluster], MAX_LIGHTS_PER_CLUSTER);
+        // ADR-133: the tier's local-light budget. The froxel list's order is the light buffer's
+        // order, which is stable for a given scene and frame, so the subset a capped fragment
+        // evaluates is deterministic -- the same frame renders identically twice (§41).
+        let count = min(min(clusterLights[cluster], MAX_LIGHTS_PER_CLUSTER), ctx.localLightBudget);
         let base = clusterCount + cluster * MAX_LIGHTS_PER_CLUSTER;
         for (var i = 0u; i < count; i = i + 1u) {
             let index = directional + clusterLights[base + i];

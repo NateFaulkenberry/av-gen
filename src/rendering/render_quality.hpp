@@ -32,6 +32,34 @@ enum class QualityTier : std::uint8_t { Preview, Realtime, High, Offline };
     return false;
 }
 
+// ---- material tiers (Phase D, ADR-133) ---------------------------------------------------------
+//
+// How expensively one *draw* is shaded, as opposed to how finely the frame's shared passes are
+// sampled. The two are orthogonal on purpose (Deliverable 5 §5.3): an object can be geometrically
+// simplified without being shaded cheaply and the reverse, and conflating them is how quality
+// settings become a single unusable slider.
+//
+// The ladder is monotone -- every rung removes work the rung above it did and adds nothing -- and
+// it is deliberately short. Risk 7 in the plan is shader variant explosion; three rungs selected by
+// a *uniform* value inside one shader is not a variant at all, which is the other reason for this
+// shape. ADR-118 is the reason it must be uniform: a lane-varying branch around a loop with a
+// dependent texture load in it measured 4.4% *slower* than the loop it skipped, so a per-fragment
+// tier would be a pessimisation. A tier is per draw, so the branch is wave-uniform by construction.
+enum class MaterialTier : std::uint8_t {
+    Full = 0,          // every light in the froxel, every shadow term, IBL, normal map, AO
+    ReducedLights = 1, // the local-light loop capped; no contact march on local lights
+    Flat = 2,          // no shadow terms, no specular, no AO, no IBL, the local cap tightened
+};
+
+[[nodiscard]] constexpr const char* materialTierName(MaterialTier tier) {
+    switch (tier) {
+    case MaterialTier::Full: return "full";
+    case MaterialTier::ReducedLights: return "reduced";
+    case MaterialTier::Flat: return "flat";
+    }
+    return "full";
+}
+
 // Everything a tier scales. Resolutions are in texels, counts in samples/steps.
 struct QualitySettings {
     std::uint32_t shadowResolution = 2048; // one cascade / spot map, square
@@ -78,6 +106,42 @@ struct QualitySettings {
     bool clusteredLighting = true;         // false = the 8-light uniform fallback path
     std::uint32_t sdfShadowSteps = 24;     // raymarched SDFs in the depth-only passes
 
+    // ---- material tiers (ADR-133) --------------------------------------------------------------
+    //
+    // `materialTiers` is whether importance-driven *assignment* runs at all; `forcedMaterialTier`
+    // is the tier every draw is at least, whatever importance says, and is what an A/B arm and the
+    // debug UI move. Offline sets `materialTiers = false` and `forcedMaterialTier = Full`, which is
+    // the §5.9 guarantee spelled as data rather than as a special case in the assignment code.
+    bool materialTiers = false;
+    MaterialTier forcedMaterialTier = MaterialTier::Full;
+    // How many *local* (clustered) lights a fragment of each tier evaluates. Directional lights are
+    // never capped: there are at most three of them, they reach every fragment, and dropping one is
+    // a lighting change rather than a cost reduction. `kUnlimitedLocalLights` is the Full tier's
+    // value and means "whatever the froxel holds".
+    static constexpr std::uint32_t kUnlimitedLocalLights = 0xffffffffu;
+    std::uint32_t reducedTierLocalLights = 6;
+    std::uint32_t flatTierLocalLights = 2;
+
+    // ---- §34 fixed render scale ------------------------------------------------------------------
+    //
+    // The fraction of the requested output resolution the scene is rendered at, resolved once when
+    // the targets are sized. Fixed per tier and never adaptive: dynamic resolution is deferred with
+    // its evidence (§5.8), and the evidence is that this renderer's scene pass is only 44%
+    // resolution-dependent -- 640x400 is 0.26x the pixels of 1280x800 and 0.66x the scene time --
+    // so the naive model that makes dynamic resolution attractive is wrong here by a factor of two.
+    float renderScale = 1.0f;
+
+    // The local-light budget of one tier. One place, so the shader's table and the CPU's cannot
+    // drift apart.
+    [[nodiscard]] std::uint32_t localLightBudget(MaterialTier tier) const {
+        switch (tier) {
+        case MaterialTier::Full: return kUnlimitedLocalLights;
+        case MaterialTier::ReducedLights: return reducedTierLocalLights;
+        case MaterialTier::Flat: return flatTierLocalLights;
+        }
+        return kUnlimitedLocalLights;
+    }
+
     [[nodiscard]] static QualitySettings forTier(QualityTier tier) {
         QualitySettings q;
         switch (tier) {
@@ -92,8 +156,12 @@ struct QualitySettings {
             q.aoStepsPerSlice = 4;
             q.aoHistoryFrames = 6;
             q.sdfShadowSteps = 16;
+            q.materialTiers = true;
+            q.reducedTierLocalLights = 4;
+            q.flatTierLocalLights = 1;
             break;
         case QualityTier::Realtime:
+            q.materialTiers = true;
             break;
         case QualityTier::High:
             q.shadowMaskScale = 1.0f; // the reference live picture: the term at full resolution
@@ -106,6 +174,11 @@ struct QualitySettings {
             q.aoStepsPerSlice = 8;
             q.aoHistoryFrames = 12;
             q.sdfShadowSteps = 32;
+            // High keeps assignment on but only ever reaches the middle rung: the flat rung is a
+            // visible reduction and High is the reference *live* picture.
+            q.materialTiers = true;
+            q.reducedTierLocalLights = 12;
+            q.flatTierLocalLights = 12;
             break;
         case QualityTier::Offline:
             q.shadowResolution = 4096;
@@ -119,6 +192,10 @@ struct QualitySettings {
             q.shadowMaskScale = 1.0f;
             q.aoHistoryFrames = 16;
             q.sdfShadowSteps = 48;
+            // §5.9: offline takes no representation or shading shortcut, and says so as data.
+            q.materialTiers = false;
+            q.forcedMaterialTier = MaterialTier::Full;
+            q.renderScale = 1.0f;
             break;
         }
         return q;

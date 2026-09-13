@@ -64,6 +64,9 @@ target_sources(avgen_tests PRIVATE
     # risk lives in the hysteresis and it has to be checkable without rendering anything.
     "${CMAKE_SOURCE_DIR}/src/rendering/importance.cpp"
     "${CMAKE_SOURCE_DIR}/src/rendering/representation.cpp"
+    # Phase D's third selector (ADR-133). Same shape and the same reason: the tier a drawable shades
+    # at is pure arithmetic over an importance record and a policy.
+    "${CMAKE_SOURCE_DIR}/src/rendering/material_tier.cpp"
     # The selected object's transform history (forensics 4.3/9.3): it reads the renderer's published
     # diagnosis, which is names and numbers, so it belongs where it can be checked without a device.
     "${CMAKE_SOURCE_DIR}/src/rendering/transform_history.cpp"
