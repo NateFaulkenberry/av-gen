@@ -704,6 +704,12 @@ private:
     // Grows the object slot buffer (and the staging mirror, and every bind group that names it) to
     // hold at least `objects` slots. Cheap and idempotent when it already does. ADR-128.
     void ensureObjectCapacity(std::uint32_t objects);
+    // Whether this entity can be drawn at all: visible, with a mesh that reached the GPU. It is a
+    // member rather than a lambda inside render() because two places ask -- the entity loop, and
+    // ensureObjectCapacity's count of how many slots the frame needs -- and a second copy of this
+    // predicate drifting from the first is how the buffer ends up one slot short of the loop.
+    // Meaningless before uploadMeshes() has run for the scene in question.
+    [[nodiscard]] bool drawable(const scene::Entity& entity) const;
     wgpu::Buffer tonemapUniforms_;
     wgpu::BindGroup frameBindGroup_;
     // The same group with the shadow atlas and the AO target replaced by placeholders, for the

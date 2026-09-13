@@ -1826,6 +1826,10 @@ void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Sce
 // Growth is doubling with a floor, so a scene that walks its entity count up one at a time does not
 // reallocate once per entity; and it never shrinks, because a camera turn that drops the count is
 // about to raise it again.
+bool SceneRenderer::drawable(const scene::Entity& entity) const {
+    return entity.visible && entity.mesh < meshes_.size() && meshes_[entity.mesh].indexCount != 0;
+}
+
 void SceneRenderer::ensureObjectCapacity(std::uint32_t objects) {
     if (objects > kMaxObjectCapacity) {
         // The one remaining limit, and it is a byte budget rather than a slot count. Logged at the
@@ -1932,9 +1936,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     {
         std::uint32_t drawableEntities = 0;
         for (const auto& entity : scene.entities) {
-            if (entity.visible && entity.mesh < meshes_.size() && meshes_[entity.mesh].indexCount != 0) {
-                ++drawableEntities;
-            }
+            drawableEntities += drawable(entity) ? 1u : 0u;
         }
         ensureObjectCapacity(drawableEntities);
     }
@@ -2381,9 +2383,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         return entity.castsShadow && entity.style != scene::MeshStyle::Grid &&
                entity.style != scene::MeshStyle::Water &&
                entity.material.alphaMode != scene::AlphaMode::Blend;
-    };
-    const auto drawable = [&](const scene::Entity& entity) {
-        return entity.visible && entity.mesh < meshes_.size() && meshes_[entity.mesh].indexCount != 0;
     };
     std::size_t entityIndex = 0;
     for (const auto& entity : scene.entities) {
