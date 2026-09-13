@@ -109,3 +109,36 @@ capture at full size.
 **Assumed:** that folding the source scale into `cullRadius` is the whole fix. The parts/fanout path
 (ADR-108) shares one lead's bound across parts that may have different source transforms, and
 whether the lead's bound still covers every part afterwards is not tested here.
+
+## Correction, 2026-09-13: the prediction in this ADR is wrong
+
+This document states that the defect "does not bite in the shipped Glowmere frame because the
+authored `minScreenRadius` is ~1.5 px". That was an assumption, stated alongside measured claims,
+and it has since been tested. **It is false.**
+
+The fix was implemented as described here — fold `sourceTransform`'s largest column length into
+`cullRadius` and into `groupRadius[lead]` — and the canonical frame captured on both arms, same
+binary, fix stashed and restored, both runs under the GPU lock:
+
+| | before | after |
+|---|---|---|
+| pixels differing by >2/255 | — | **89,019 (8.69%)**, max delta 226 |
+| submitted triangles | 264,305 | **273,819 (+3.6%)** |
+| visible instances | 2,161 | 2,020 |
+| LOD distribution | 343 / 1,318 / 495 / 5 | **304 / 604 / 1,070 / 42** |
+
+Both directions of the error appear at once, exactly as this ADR's per-layer table predicts:
+instances demote to coarser rungs where the ladder had them too large (LOD1 1,318 → 604), while the
+triangle count *rises* because layers it had too small — pebbles 3.0×, beacons 3.2×, elder-crown
+8.2× — stop being culled while several pixels across and return to the frame. Visually the
+foreground gains prominent pink blooms that were specks before: content the scene specifies and the
+renderer was discarding.
+
+**The fix is held on branch `fix/adr-152-cull-radius`, not merged.** It is a correctness fix, and the
+reason for holding it is not doubt about its correctness: it changes the flagship scene's
+appearance, and the scene may have been authored *against* the buggy behaviour — density tuned to
+compensate for over-culling would now read as too dense. That is an art decision about Glowmere's
+look rather than a rendering decision, and it needs the person who owns that look.
+
+The reasoning in the section above for not fixing it inside a measurement task was sound. What was
+unsound was predicting the visual consequence instead of capturing it.
