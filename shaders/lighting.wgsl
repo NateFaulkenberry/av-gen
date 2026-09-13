@@ -354,17 +354,9 @@ fn evaluateLight(index: u32, ctx: ShadeContext) -> LightSample {
     // a map at all, and this is the only shadow it has (ADR-034). Combined by minimum, so whichever
     // says "occluded" wins. It stays at full resolution whether or not the map term was masked --
     // it is the one term that does not survive being computed once per 2x2 (see shadow_mask.wgsl).
-    // ADR-118: and it is skipped where its answer cannot matter. The march is combined by
-    // `min(visibility, mix(1, contact, strength))`, and `mix(1, contact, strength)` is bounded
-    // below by `1 - strength` whatever the march finds. So a fragment the shadow map already
-    // reports at or under `1 - strength` takes the same value either way, and the twelve depth
-    // loads are twelve depth loads spent on a number that is discarded. This is an algebraic
-    // identity on the combine, not a threshold anybody tuned: at full shadow strength it says
-    // "a fully shadowed fragment cannot be shadowed further", and it is exact in both directions.
-    let contactStrength = clamp(light.up.w, 0.0, 1.0);
-    if (light.tangent.w > 0.5 && contactStrength > 0.0 && visibility > 1.0 - contactStrength) {
+    if (light.tangent.w > 0.5 && light.up.w > 0.0) {
         let contact = contactShadow(ctx.worldPos, shadowNormal, toLight, ctx.screenUv, ctx.viewDepth, ctx.jitter);
-        visibility = min(visibility, mix(1.0, contact, contactStrength));
+        visibility = min(visibility, mix(1.0, contact, clamp(light.up.w, 0.0, 1.0)));
     }
     sample.diffuse = sample.diffuse * visibility;
     sample.specular = sample.specular * visibility;
