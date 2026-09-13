@@ -162,7 +162,11 @@ struct CompositionNode {
     world::WorldMap worldMap;      // settings for kind Terrain (ADR-046): the geography
     world::TerrainSettings terrain;// settings for kind Terrain: how it is chopped up and coarsened
     world::WaterFlowSettings waterFlow; // settings for kind Terrain (ADR-099): how fast the water runs
+    // The node's authored `material` block. Named for the kind that has always read it; an Orb
+    // reads it too, and every other kind takes its surface from somewhere the node cannot override
+    // (see the warning in `fromJson`).
     Material terrainMaterial;      // settings for kind Terrain: shared by every chunk
+    bool materialAuthored = false; // the scene wrote a `material` block, rather than this being the default
     world::Ecology ecology;        // settings for kind Terrain (ADR-048): what grows on it
     // Settings for kind City (ADR-100). The node carries the *description*, never the placements:
     // a scatter cloud is a runtime shared_ptr and is not serialised, exactly as a terrain's ecology

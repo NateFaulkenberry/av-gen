@@ -1164,6 +1164,17 @@ Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
     return {};
 }
 
+void SceneRenderer::setPassToggles(const PassToggles& toggles) {
+    // Arming the camera freeze captures nothing here: the *next* frame records the view it is asked
+    // to freeze, and every frame after it reuses that. Capturing at the moment of the click would
+    // freeze whatever the last rendered frame happened to be, which is one frame older than what the
+    // person is looking at when they press it.
+    if (toggles.cameraMotion && !toggles_.cameraMotion) {
+        haveFrozenCamera_ = false;
+    }
+    toggles_ = toggles;
+}
+
 void SceneRenderer::resetTemporalHistory() {
     havePrevViewProj_ = false;
     prevModels_.clear();
@@ -1635,7 +1646,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // ADR-086: this frame's joint palettes. The renderer never *poses* anything -- the scene
     // arrives already posed by scene::updateRigs -- it only moves matrices the scene computed.
     skinning_->resetFrameStats();
-    skinning_->update(scene);
+    // Bind pose when animation is isolated out: the palettes are simply not uploaded, so every
+    // skinned mesh draws from its rest vertices. Not "freeze the clip", which would still be a pose
+    // and still be animation -- this is the arm that removes skinning from the frame.
+    if (toggles_.animation) {
+        skinning_->update(scene);
+    }
     updateEnvironment(scene);
     ensureTonemapBindGroup();
 
@@ -1663,8 +1679,21 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
 
     const auto& queue = context_.queue();
     const float aspect = static_cast<float>(hdr_.width()) / static_cast<float>(hdr_.height());
-    const glm::mat4 view = scene.camera.view();
-    const glm::mat4 proj = scene.camera.projection(aspect);
+    glm::mat4 view = scene.camera.view();
+    glm::mat4 proj = scene.camera.projection(aspect);
+    // A frozen camera keeps the matrices it had while the world goes on moving. Everything
+    // downstream -- culling, shadows, the object uniforms, the diagnostics -- reads these two, so
+    // the freeze reaches all of them from one place rather than each having to know about it.
+    if (!toggles_.cameraMotion) {
+        if (!haveFrozenCamera_) {
+            frozenView_ = view;
+            frozenProjection_ = proj;
+            frozenCameraPosition_ = scene.camera.position;
+            haveFrozenCamera_ = true;
+        }
+        view = frozenView_;
+        proj = frozenProjection_;
+    }
     if (!finiteMatrix(view) || !finiteMatrix(proj)) {
         return fail("scene render: camera produced a non-finite view or projection matrix");
     }
@@ -1975,7 +2004,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-086: a skinned entity only counts as one if its mesh carries influences and the
         // scene posed its rig. Anything short of that draws as the static mesh it is.
         SkinningRenderer::Slice skin;
-        if (entity.rig != scene::kInvalidRig && entity.mesh < meshes_.size() && meshes_[entity.mesh].skin) {
+        if (toggles_.animation && entity.rig != scene::kInvalidRig && entity.mesh < meshes_.size() &&
+            meshes_[entity.mesh].skin) {
             skin = skinning_->slice(entity.rig);
         }
         // x = the ADR-030 `objectId` input; y = material id and z = bloom weight feed the
@@ -2009,7 +2039,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     std::size_t entityIndex = 0;
     for (const auto& entity : scene.entities) {
         const std::size_t thisEntity = entityIndex++;
-        if (!drawable(entity) || entity.cameraCulled) {
+        // A frozen view cannot trust a cull decided against a camera that has since moved: the
+        // verdict on the entity is about a frustum this frame is not drawing. So freezing the view
+        // ignores it, which is what makes the freeze self-consistent rather than a view held over a
+        // set of objects chosen for somewhere else.
+        const bool trustCull = toggles_.culling && toggles_.cameraMotion;
+        if (!drawable(entity) || (entity.cameraCulled && trustCull)) {
             continue;
         }
         const auto item = makeItem(entity, thisEntity);
@@ -2020,6 +2055,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         if (entity.style == scene::MeshStyle::Grid) {
             grid.push_back(*item);
         } else if (entity.style == scene::MeshStyle::Water) {
+            if (!toggles_.water) {
+                continue;
+            }
             DrawItem w = *item;
             w.water = waterSlotFor(entity.material.program);
             // Every water chunk of a terrain shares the node's transform, so `makeItem`'s depth --
@@ -2032,6 +2070,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             w.viewDepth = -(view * glm::vec4(centre, 1.0f)).z;
             water.push_back(w);
         } else if (entity.material.alphaMode == scene::AlphaMode::Blend) {
+            if (!toggles_.transparency) {
+                continue;
+            }
             blended.push_back(*item);
         } else {
             opaque.push_back(*item);
@@ -2177,8 +2218,18 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         particleFrame.linearDepth = needsDepthPrepass ? linearDepth_.view : nullptr;
         particles_->setFrameContext(particleFrame);
     }
-    particles_->update(encoder, scene, time, view, proj, fields_.get(), splines_.get());
-    stats_.particles = particles_->stats();
+    // Off means no simulation either, not merely no draw: a particle system stepped but not drawn
+    // would still advance its state, so switching it back on would show a system that had been
+    // running invisibly rather than one that had been off.
+    if (toggles_.particles) {
+        particles_->update(encoder, scene, time, view, proj, fields_.get(), splines_.get());
+        stats_.particles = particles_->stats();
+    } else {
+        // Nothing simulated and nothing drawn, so the frame reports none. Leaving the renderer's
+        // own counters in place would report last frame's systems as this frame's, which is a
+        // diagnostic saying the opposite of what happened.
+        stats_.particles = {};
+    }
     stage(cpu.particlesMs);
 
     // ---- procedural geometry (ADR-023): mesh/instance uploads, per-frame uniforms, effector pass ----
@@ -2536,9 +2587,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             }
         }
         drawItems(grid, false);
-        particles_->draw(rp, scene);
-        stats_.drawCalls += particles_->stats().systems;
-        if (!blended.empty() && particles_->stats().systems > 0) {
+        if (toggles_.particles) {
+            particles_->draw(rp, scene);
+            stats_.drawCalls += particles_->stats().systems;
+        }
+        if (toggles_.particles && !blended.empty() && particles_->stats().systems > 0) {
             rp.SetBindGroup(0, frameBindGroup_); // the particle pass rebinds group 0 with its own layout
         }
         drawItems(blended, true);
@@ -2887,7 +2940,9 @@ void SceneRenderer::collectFrameTimings() {
     // during update() is made before a single draw exists, so any counter incremented while
     // recording -- indirect draws, empty draws -- was being thrown away and read back as zero.
     stats_.procedural = procedurals_->stats();
-    stats_.particles = particles_->stats();
+    if (toggles_.particles) {
+        stats_.particles = particles_->stats();
+    }
     stats_.sdf = sdfs_->stats();
     stats_.volume = volumes_->stats();
     stats_.simulation = simulation_->stats();

@@ -2820,15 +2820,20 @@ void Composition::rebuild() {
             const MeshId mesh = scene_.addMesh(makeIcosphere(1.0f, 3));
             Entity& orb = scene_.addEntity(node.name, mesh);
             orb.style = MeshStyle::Lit;
+            // The built-in look, and then whatever the node authored over it. The defaults used to
+            // be the whole story and a `material` block on an orb did nothing at all.
             orb.material.baseColor = glm::vec3(0.75f, 0.2f, 0.9f);
             orb.material.emissiveColor = glm::vec3(0.9f, 0.45f, 1.0f);
             orb.material.emissiveIntensity = 0.15f;
             orb.material.roughness = 0.35f;
+            if (node.materialAuthored) {
+                orb.material = node.terrainMaterial;
+            }
             orb.transform = nodeT;
             orb.visible = visible;
             range.restTransforms.emplace_back();
-            range.restEmissive.push_back(0.15f);
-            range.restRoughness.push_back(0.35f);
+            range.restEmissive.push_back(orb.material.emissiveIntensity);
+            range.restRoughness.push_back(orb.material.roughness);
             break;
         }
         case NodeKind::Group:
@@ -5727,6 +5732,77 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     node.cityLibrary = item.at("cityLibrary").get<std::string>();
                 }
             }
+            if (item.contains("material")) {
+                node.materialAuthored = true;
+                const json& m = item.at("material");
+                if (!m.is_object()) {
+                    return fail("node '{}': 'material' must be an object", node.name);
+                }
+                Material& mat = node.terrainMaterial;
+                auto baseColor = readVec<3>(m, "baseColor", mat.baseColor);
+                auto emissiveColor = readVec<3>(m, "emissiveColor", mat.emissiveColor);
+                if (!baseColor) {
+                    return fail("node '{}': material: {}", node.name, baseColor.error().message);
+                }
+                if (!emissiveColor) {
+                    return fail("node '{}': material: {}", node.name, emissiveColor.error().message);
+                }
+                mat.baseColor = *baseColor;
+                mat.emissiveColor = *emissiveColor;
+                struct MatFloat { const char* key; float* target; };
+                for (const MatFloat& f :
+                     {MatFloat{"opacity", &mat.opacity}, MatFloat{"emissiveIntensity", &mat.emissiveIntensity},
+                      MatFloat{"roughness", &mat.roughness}, MatFloat{"metallic", &mat.metallic}}) {
+                    auto v = readFloat(m, f.key, *f.target);
+                    if (!v) {
+                        return fail("node '{}': material: {}", node.name, v.error().message);
+                    }
+                    *f.target = *v;
+                }
+                if (m.contains("program")) {
+                    if (!m.at("program").is_string()) {
+                        return fail("node '{}': material 'program' must be a string", node.name);
+                    }
+                    mat.program = m.at("program").get<std::string>();
+                }
+                if (m.contains("alphaMode")) {
+                    // Parsed here rather than nowhere. A scene that wrote `"alphaMode":
+                    // "blend"` was validated, ignored, and drawn opaque: RendererQA's
+                    // `transparent-orb` has said blend since it was written and has never once
+                    // been transparent, which is also why the QA scene the plan describes as
+                    // covering transparency covers none.
+                    if (!m.at("alphaMode").is_string()) {
+                        return fail("node '{}': material 'alphaMode' must be a string", node.name);
+                    }
+                    const std::string mode = m.at("alphaMode").get<std::string>();
+                    if (mode == "opaque") {
+                        mat.alphaMode = AlphaMode::Opaque;
+                    } else if (mode == "mask") {
+                        mat.alphaMode = AlphaMode::Mask;
+                    } else if (mode == "blend") {
+                        mat.alphaMode = AlphaMode::Blend;
+                    } else {
+                        return fail("node '{}': material alphaMode '{}' is not opaque, mask or blend",
+                                    node.name, mode);
+                    }
+                }
+                // Which kinds actually read it. Terrain always did; an orb draws one mesh of its
+                // own and can honestly wear an authored material. Everything else takes its
+                // surface from somewhere the node cannot override -- a glTF asset's own
+                // materials, a procedural's material block, a particle system's colours -- and
+                // for those the block is dropped. Said out loud, because a material that is
+                // parsed, validated and then ignored is exactly the kind of silent nothing this
+                // scene format has shipped before.
+                if (node.kind != NodeKind::Terrain && node.kind != NodeKind::Orb) {
+                    log::warn("node '{}' ({}): a 'material' block on this kind is not used; "
+                              "its surface comes from {}",
+                              node.name, nodeKindName(node.kind),
+                              node.kind == NodeKind::Gltf      ? "the asset's own materials"
+                              : node.kind == NodeKind::Procedural ? "the procedural's material"
+                              : node.kind == NodeKind::Particles  ? "the particle colours"
+                                                                  : "elsewhere");
+                }
+            }
             if (node.kind == NodeKind::Terrain) {
                 // "world" is the geography and "terrain" is how it is turned into meshes; both are
                 // optional, so `{"kind": "terrain"}` alone gives the shipped world at shipped
@@ -5858,39 +5934,6 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                     clearances.error().message);
                     }
                     node.ecology.clearances = std::move(*clearances);
-                }
-                if (item.contains("material")) {
-                    const json& m = item.at("material");
-                    if (!m.is_object()) {
-                        return fail("node '{}': 'material' must be an object", node.name);
-                    }
-                    Material& mat = node.terrainMaterial;
-                    auto baseColor = readVec<3>(m, "baseColor", mat.baseColor);
-                    auto emissiveColor = readVec<3>(m, "emissiveColor", mat.emissiveColor);
-                    if (!baseColor) {
-                        return fail("node '{}': material: {}", node.name, baseColor.error().message);
-                    }
-                    if (!emissiveColor) {
-                        return fail("node '{}': material: {}", node.name, emissiveColor.error().message);
-                    }
-                    mat.baseColor = *baseColor;
-                    mat.emissiveColor = *emissiveColor;
-                    struct MatFloat { const char* key; float* target; };
-                    for (const MatFloat& f :
-                         {MatFloat{"opacity", &mat.opacity}, MatFloat{"emissiveIntensity", &mat.emissiveIntensity},
-                          MatFloat{"roughness", &mat.roughness}, MatFloat{"metallic", &mat.metallic}}) {
-                        auto v = readFloat(m, f.key, *f.target);
-                        if (!v) {
-                            return fail("node '{}': material: {}", node.name, v.error().message);
-                        }
-                        *f.target = *v;
-                    }
-                    if (m.contains("program")) {
-                        if (!m.at("program").is_string()) {
-                            return fail("node '{}': material 'program' must be a string", node.name);
-                        }
-                        mat.program = m.at("program").get<std::string>();
-                    }
                 }
             }
             if (item.contains("particles")) {

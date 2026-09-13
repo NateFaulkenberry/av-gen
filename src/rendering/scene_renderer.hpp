@@ -373,8 +373,29 @@ public:
         // ADR-087. Off means the lit pass computes the directional shadow term per pixel, which
         // is what it did before the mask pass existed, so this is the A/B arm for it.
         bool shadowMask = true;
+
+        // ---- forensic isolation (renderer-forensics Phase 4.2) ----------------------------------
+        //
+        // Each of these removes one subsystem from the frame so a symptom can be attributed to it or
+        // cleared of it. They are deliberately *arms of an A/B*, not quality settings: a frame with
+        // one of them off is not a frame anybody should ship, and the plan's rule is that every
+        // control here isolates a real path rather than merely existing.
+        //
+        // The list is short on purpose. "Disable terrain" is absent because the renderer cannot
+        // honestly answer it: a terrain chunk arrives as an ordinary lit entity with no flag saying
+        // where it came from, and a name-prefix guess would be a control that lies at the first
+        // scene that names something `chunk`.
+        bool culling = true;      // off: draw everything, whatever the camera cull decided
+        bool water = true;        // off: no water surfaces
+        bool transparency = true; // off: no blended entities
+        bool particles = true;    // off: no particle simulation or draw
+        bool animation = true;    // off: skinned meshes draw in bind pose
+        // Off: hold the view and projection of the frame the freeze began, while everything else
+        // goes on moving. The one control that separates "the object moved" from "the camera moved"
+        // without touching the scene at all.
+        bool cameraMotion = true;
     };
-    void setPassToggles(const PassToggles& toggles) { toggles_ = toggles; }
+    void setPassToggles(const PassToggles& toggles);
     [[nodiscard]] const PassToggles& passToggles() const { return toggles_; }
     [[nodiscard]] ShadowRenderer& shadows() { return *shadows_; }     // ADR-034
     [[nodiscard]] SkinningRenderer& skinning() { return *skinning_; } // ADR-086
@@ -616,6 +637,12 @@ private:
     std::unordered_map<std::string, glm::mat4> prevModels_;
     std::unordered_map<std::string, glm::mat4> prevModelsNext_;
     const scene::Scene* temporalScene_ = nullptr;
+    // The camera the freeze is holding (PassToggles::cameraMotion).
+    glm::mat4 frozenView_{1.0f};
+    glm::mat4 frozenProjection_{1.0f};
+    glm::vec3 frozenCameraPosition_{0.0f};
+    bool haveFrozenCamera_ = false;
+
     std::string diagnosticEntity_;
     RendererDiagnosticFrame diagnosticFrame_;
     std::optional<RenderObjectDiagnostic> previousDiagnosticObject_;

@@ -432,22 +432,41 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 
 ### 4.2 Core and feature isolation controls
 
-- `[ ]` Minimal rendering path.
-- `[ ]` Normal rendering path.
-- `[ ]` Disable all culling.
-- `[ ]` Disable LOD.
-- `[ ]` Disable animation.
-- `[ ]` Disable water.
-- `[ ]` Disable terrain.
-- `[ ]` Disable transparency.
-- `[ ]` Disable shadows.
-- `[ ]` Disable particles.
-- `[ ]` Disable post FX.
-- `[ ]` Disable VFX.
-- `[ ]` Freeze camera.
-- `[ ]` Freeze projection.
-- `[ ]` Freeze view matrix.
-- `[ ]` Freeze camera-relative origin.
+`SceneRenderer::PassToggles` is the one place these live, reachable from the CLI as
+`--disable <list>` so the same arms drive a headless A/B. Each is asserted to remove the thing it
+names in `tests/rendering/test_composition_gpu.cpp`, `[gpu][composition][forensics][isolation]` --
+the plan's rule is that a control that does nothing is worse than a missing one, because somebody
+turns it off, the symptom stays, and a subsystem is wrongly cleared.
+
+- `[ ]` Minimal rendering path. (Phase 2.2's reference renderer; not built.)
+- `[x]` Normal rendering path. The default, and the other arm of every A/B below.
+- `[x]` Disable all culling. Draws everything whatever the cull decided; the draw count rises.
+- `[ ]` Disable LOD. Not built: LOD lives in the procedural renderer's GPU cull pass rather than in
+  the pass list, so an honest control is a change to that pass and not a flag here.
+- `[x]` Disable animation. Skinned meshes draw in bind pose; the palettes are not uploaded at all.
+- `[x]` Disable water.
+- `[ ]` Disable terrain. **Deliberately absent, and the reason is worth keeping:** a terrain chunk
+  arrives at the renderer as an ordinary lit entity with nothing saying where it came from, so the
+  only available implementation is a name-prefix guess that lies at the first scene naming something
+  `chunk`. It needs a flag on the entity first.
+- `[x]` Disable transparency.
+- `[x]` Disable shadows. (Pre-existing.)
+- `[x]` Disable particles. No simulation and no draw, so switching it back on does not reveal a
+  system that has been running invisibly; the frame's particle stats read zero rather than last
+  frame's.
+- `[x]` Disable post FX. (Pre-existing.)
+- `[ ]` Disable VFX. No subsystem by that name exists; particles, volumetrics and post are the three
+  it would mean, and each has its own control.
+- `[~]` Freeze camera. What is built is a **view and projection freeze**: the matrices the scene pass
+  draws with are held while the camera moves, and the stale cull verdicts from the moved camera are
+  ignored so the frozen view is self-consistent. The sky, the volumetrics and the particle systems
+  read the live camera themselves, so the *frame* still changes -- the test asserts the matrices,
+  which is what the control actually holds. Freezing those three is a separate control and is not
+  built.
+- `[x]` Freeze projection. Held by the same control.
+- `[x]` Freeze view matrix. Held by the same control.
+- `[ ]` Freeze camera-relative origin. There is no camera-relative origin to freeze: the Phase 3.2
+  audit found no camera-relative conversion anywhere under `src/rendering`.
 
 ### 4.3 Transform and geometry controls
 

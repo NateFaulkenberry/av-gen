@@ -90,8 +90,10 @@ std::string usageText() {
            "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
            "                      emission|ids|occlusion|depth\n"
            "  --tier <t>          quality tier: preview|realtime|high|offline\n"
-           "  --disable <list>    switch phases off for cost attribution:\n"
-           "                      shadows,ao,volume,post,shadowmask\n"
+           "  --disable <list>    switch phases off for cost attribution, or subsystems off for\n"
+           "                      forensic isolation:\n"
+           "                      shadows,ao,volume,post,shadowmask,\n"
+           "                      culling,water,transparency,particles,animation,cameramotion\n"
            "  --headless          no window: offline mode, fixed-step clock, precomputed analysis\n"
            "  --fps <n>           offline frame rate (default 60)\n"
            "  --size <w>x<h>      window size in points (default: open maximised)\n"
@@ -565,8 +567,22 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                 toggles.post = false;
             } else if (token == "shadowmask") {
                 toggles.shadowMask = false;
+            } else if (token == "culling") {
+                toggles.culling = false;
+            } else if (token == "water") {
+                toggles.water = false;
+            } else if (token == "transparency") {
+                toggles.transparency = false;
+            } else if (token == "particles") {
+                toggles.particles = false;
+            } else if (token == "animation") {
+                toggles.animation = false;
+            } else if (token == "cameramotion") {
+                toggles.cameraMotion = false;
             } else if (!token.empty()) {
-                return fail("--disable: unknown phase '{}' (shadows,ao,volume,post,shadowmask)", token);
+                return fail("--disable: unknown phase '{}' (shadows,ao,volume,post,shadowmask,"
+                            "culling,water,transparency,particles,animation,cameramotion)",
+                            token);
             }
             if (!token.empty()) {
                 off += off.empty() ? token : ", " + token;

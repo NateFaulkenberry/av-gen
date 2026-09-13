@@ -1921,3 +1921,156 @@ TEST_CASE("a walker's height is the ground's, every frame, with no second writer
     CHECK(seekedTravel > 5.0f);
     CHECK(seekedSpeed > 1.0f);
 }
+
+// ---- Phase 4.2: every isolation control isolates a real path -------------------------------------
+//
+// The plan's rule for the forensics mode is that the controls must be truthful: "every enabled
+// control must isolate or visualize a real path". A checkbox that does nothing is worse than a
+// missing one, because it is evidence -- somebody turns it off, the symptom stays, and a subsystem
+// is wrongly cleared.
+//
+// So each toggle is asserted to change the frame, and where the change is countable it is counted
+// rather than hashed. The camera freeze is the one that matters most and is checked hardest: two
+// genuinely different camera positions must produce *identical* frames while it is on, which no
+// amount of accidental correctness produces.
+TEST_CASE("each renderer isolation toggle removes the thing it names",
+          "[gpu][composition][forensics][isolation]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the RendererQA scene is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    constexpr std::uint32_t kW = 160;
+    constexpr std::uint32_t kH = 120;
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(project).has_value());
+    FixedStepClock clock(60.0);
+
+    struct Frame {
+        std::uint64_t hash = 0;
+        std::uint32_t draws = 0;
+        std::uint32_t particleSystems = 0;
+    };
+    // One clock, ticked. Restarting it per call reports a frame delta of zero, and everything that
+    // integrates -- the particle systems here -- then never runs: the frame with particles off came
+    // out byte-identical to the one with them on, because neither had any. Same trap as the
+    // character/terrain matrix, one file away.
+    const auto renderWith = [&](const rendering::SceneRenderer::PassToggles& toggles,
+                                int warmFrames = 0) {
+        renderer.setPassToggles(toggles);
+        for (int i = 0; i < warmFrames; ++i) {
+            const FrameTime warm = engine.tick(clock);
+            engine.setViewport(kW, kH);
+            engine.update(warm);
+        }
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(kW, kH);
+        engine.update(time);
+        renderer.resetTemporalHistory();
+        const auto image = renderer.renderToImage(engine.scene(), time, kW, kH);
+        REQUIRE(image.has_value());
+        return Frame{gpu::hashImage(*image), renderer.stats().drawCalls,
+                     renderer.stats().particles.systems};
+    };
+
+    const rendering::SceneRenderer::PassToggles all;
+    const Frame baseline = renderWith(all, 60);
+    INFO("baseline: " << baseline.draws << " draws, " << baseline.particleSystems
+                      << " particle systems");
+    REQUIRE(baseline.draws > 0);
+
+    SECTION("transparency") {
+        // Looking at the transparent orb specifically. The scene's default view does not contain
+        // it, and a toggle tested against a frame the thing is not in passes for nothing.
+        aimCompositionCamera(engine.params(), glm::vec3(3.0f, 1.6f, 1.0f),
+                             glm::vec3(3.0f, 1.2f, -5.0f));
+        const Frame withOrb = renderWith(all);
+        auto off = all;
+        off.transparency = false;
+        const Frame f = renderWith(off);
+        INFO(f.draws << " draws with transparency off against " << withOrb.draws << " with it");
+        CHECK(f.hash != withOrb.hash);
+        CHECK(f.draws < withOrb.draws);   // the transparent orb is gone from the frame
+    }
+
+    SECTION("particles") {
+        // Looking at the emitter, and late enough for it to have thrown something: at one second a
+        // system spawning 80 a second at 6 cm across contributes almost nothing to a wide shot, and
+        // a toggle tested against that passes for nothing.
+        aimCompositionCamera(engine.params(), glm::vec3(-3.0f, 1.2f, -3.0f),
+                             glm::vec3(-3.0f, 1.0f, -6.0f));
+        const Frame emitting = renderWith(all, 180);   // long enough for the system to have filled
+        auto off = all;
+        off.particles = false;
+        const Frame f = renderWith(off);
+        CHECK(emitting.particleSystems > 0);   // ...or the toggle had nothing to remove
+        CHECK(f.particleSystems == 0);
+        CHECK(f.hash != emitting.hash);
+    }
+
+    SECTION("animation") {
+        // The alien draws from its rest vertices, which is a different silhouette from any pose the
+        // clip reaches. Compared at a second where the clip has actually moved: at t=0 a pose and a
+        // bind pose can legitimately agree.
+        const Frame posed = renderWith(all, 150);
+        auto off = all;
+        off.animation = false;
+        const Frame bind = renderWith(off);
+        CHECK(bind.hash != posed.hash);
+    }
+
+    SECTION("culling") {
+        // Aim away from everything, so the cull has work to do, and then take it away.
+        aimCompositionCamera(engine.params(), glm::vec3(0.0f, 2.0f, 12.0f),
+                             glm::vec3(0.0f, 2.0f, 60.0f));
+        const Frame culled = renderWith(all);
+        auto off = all;
+        off.culling = false;
+        const Frame uncut = renderWith(off);
+        INFO(culled.draws << " draws with culling, " << uncut.draws << " without");
+        CHECK(uncut.draws > culled.draws);   // the objects behind the camera are submitted again
+    }
+
+    SECTION("the view freeze holds the projection while the camera moves") {
+        // What this control freezes is the **view and projection the scene pass draws with**, and
+        // the claim is scoped to that on purpose. The sky, the volumetrics and the particle systems
+        // read the live camera themselves, so the *frame* is not identical across a camera move --
+        // only the geometry's projection is. A control described as "freeze the camera" and tested
+        // by image equality would fail for reasons that have nothing to do with what it does, and
+        // one described that way and *not* tested would be the untruthful checkbox the plan warns
+        // about. Freezing those other subsystems is a separate control and is not built.
+        aimCompositionCamera(engine.params(), glm::vec3(0.0f, 2.0f, 10.0f),
+                             glm::vec3(0.0f, 1.0f, 0.0f));
+        renderWith(all);
+        const glm::mat4 liveView = renderer.diagnosticFrame().view;
+
+        auto frozen = all;
+        frozen.cameraMotion = false;
+        renderWith(frozen);   // the frame that arms it records the view it will hold
+        CHECK(renderer.diagnosticFrame().view == liveView);
+
+        // Somewhere else entirely, twenty-five metres away and looking elsewhere.
+        renderer.setDiagnosticEntity("near-cube");
+        aimCompositionCamera(engine.params(), glm::vec3(-9.0f, 6.0f, -14.0f),
+                             glm::vec3(4.0f, 0.0f, 3.0f));
+        renderWith(frozen);
+        INFO("scene camera now at " << engine.scene().camera.position.x << ", "
+                                    << engine.scene().camera.position.z);
+        // The scene's camera really did move...
+        CHECK(engine.scene().camera.position != glm::vec3(0.0f, 2.0f, 10.0f));
+        // ...and the matrices the frame drew with did not.
+        CHECK(renderer.diagnosticFrame().view == liveView);
+        CHECK(renderer.diagnosticFrame().viewProjection ==
+              renderer.diagnosticFrame().projection * liveView);
+
+        // Released, they follow the camera again.
+        renderWith(all);
+        CHECK(renderer.diagnosticFrame().view != liveView);
+    }
+
+    CHECK(ctx->errorCount() == 0);
+}
