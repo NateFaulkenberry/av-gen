@@ -333,15 +333,20 @@ Result<void> SceneRenderer::init() {
         iblLayout_ = device.CreateBindGroupLayout(&desc);
     }
     {
-        std::array<wgpu::BindGroupLayoutEntry, 2> entries{};
+        // ADR-137: filterable, with a linear sampler, so the tonemap can upscale a scene target
+        // rendered below output resolution. RGBA16Float is filterable on this backend.
+        std::array<wgpu::BindGroupLayoutEntry, 3> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Fragment;
-        entries[0].texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+        entries[0].texture.sampleType = wgpu::TextureSampleType::Float;
         entries[0].texture.viewDimension = wgpu::TextureViewDimension::e2D;
         entries[1].binding = 1;
         entries[1].visibility = wgpu::ShaderStage::Fragment;
         entries[1].buffer.type = wgpu::BufferBindingType::Uniform;
         entries[1].buffer.minBindingSize = sizeof(TonemapUniforms);
+        entries[2].binding = 2;
+        entries[2].visibility = wgpu::ShaderStage::Fragment;
+        entries[2].sampler.type = wgpu::SamplerBindingType::Filtering;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "tonemap-layout";
         desc.entryCount = entries.size();
@@ -415,6 +420,12 @@ Result<void> SceneRenderer::init() {
         desc.label = "sky-equirect-sampler";
         desc.addressModeU = wgpu::AddressMode::Repeat;
         skySampler_ = device.CreateSampler(&desc);
+        // ADR-137: the tonemap's upscale when the scene target is smaller than the output. Clamped
+        // and linear, with no mip filtering -- the HDR target has one level.
+        desc.label = "tonemap-sampler";
+        desc.addressModeU = wgpu::AddressMode::ClampToEdge;
+        desc.mipmapFilter = wgpu::MipmapFilterMode::Nearest;
+        tonemapSampler_ = device.CreateSampler(&desc);
     }
     rebuildIblBindGroup();
 
@@ -1471,12 +1482,14 @@ void SceneRenderer::ensureTonemapBindGroup() {
     if (tonemapBindGroup_ && tonemapBoundView_.Get() == hdr_.colorView().Get()) {
         return;
     }
-    std::array<wgpu::BindGroupEntry, 2> entries{};
+    std::array<wgpu::BindGroupEntry, 3> entries{};
     entries[0].binding = 0;
     entries[0].textureView = hdr_.colorView();
     entries[1].binding = 1;
     entries[1].buffer = tonemapUniforms_;
     entries[1].size = sizeof(TonemapUniforms);
+    entries[2].binding = 2;
+    entries[2].sampler = tonemapSampler_;
     wgpu::BindGroupDescriptor desc{};
     desc.label = "tonemap-bind-group";
     desc.layout = tonemapLayout_;
@@ -1656,12 +1669,14 @@ wgpu::BindGroup SceneRenderer::tonemapBindGroupFor(const wgpu::TextureView& view
     if (it != tonemapGroups_.end()) {
         return it->second;
     }
-    std::array<wgpu::BindGroupEntry, 2> entries{};
+    std::array<wgpu::BindGroupEntry, 3> entries{};
     entries[0].binding = 0;
     entries[0].textureView = view;
     entries[1].binding = 1;
     entries[1].buffer = tonemapUniforms_;
     entries[1].size = sizeof(TonemapUniforms);
+    entries[2].binding = 2;
+    entries[2].sampler = tonemapSampler_;
     wgpu::BindGroupDescriptor desc{};
     desc.label = "tonemap-bind-group";
     desc.layout = tonemapLayout_;

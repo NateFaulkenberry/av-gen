@@ -780,6 +780,7 @@ private:
     gpu::GpuTexture blackLut_;
     wgpu::Sampler iblSampler_;
     wgpu::Sampler skySampler_; // ADR-049: as iblSampler_, but wrapping in longitude
+    wgpu::Sampler tonemapSampler_; // ADR-137: the tonemap's upscale from a scaled scene target
     IblResources ibl_;
 
     std::vector<GpuMesh> meshes_;

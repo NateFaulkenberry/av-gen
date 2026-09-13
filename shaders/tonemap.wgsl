@@ -11,6 +11,12 @@ struct TonemapUniforms {
 };
 
 @group(0) @binding(0) var hdrTexture: texture_2d<f32>;
+// ADR-137: the HDR target may be smaller than the output when `renderScale < 1`, so this samples
+// rather than loads. A `textureLoad` upscale is nearest-neighbour, which is not a quality tier --
+// it is stair-stepped silhouettes and a shimmer under camera motion, and §50 rejects it. At a
+// matched size the bilinear footprint collapses to weight 1 on one texel, so the 1:1 frame is
+// unchanged; that is asserted rather than assumed (byte-identical capture at renderScale = 1).
+@group(0) @binding(2) var hdrSampler: sampler;
 @group(0) @binding(1) var<uniform> tonemap: TonemapUniforms;
 
 struct VertexOut {
@@ -114,9 +120,10 @@ fn hash12(p: vec2<f32>) -> f32 {
 
 @fragment
 fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
+    // Kept for the vignette below, which needs the frame's aspect. It is the *scene* target's size,
+    // which is the right one: the vignette is a property of the framing, not of the output buffer.
     let size = vec2<f32>(textureDimensions(hdrTexture));
-    let coord = vec2<i32>(clamp(in.uv * size, vec2<f32>(0.0), size - vec2<f32>(1.0)));
-    let hdr = textureLoad(hdrTexture, coord, 0).rgb * tonemap.exposure;
+    let hdr = textureSampleLevel(hdrTexture, hdrSampler, in.uv, 0.0).rgb * tonemap.exposure;
     var mapped: vec3<f32>;
     let op = i32(tonemap.operatorId + 0.5);
     if (op == 1) {

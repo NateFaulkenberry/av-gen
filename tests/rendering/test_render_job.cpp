@@ -215,9 +215,17 @@ TEST_CASE("Render job readback ring matches the synchronous path frame for frame
     REQUIRE(ringHashes.size() == 20);
 
     // The classic path: a fresh engine and renderer, one renderToImage (submit + wait) per frame.
+    // The comparison renderer has to be at the job's tier. Until ADR-147 a job never called
+    // setQuality at all, so it ran at the renderer's default and this test passed by comparing two
+    // Realtime frames -- which is precisely the §5.9 violation Phase G measured: the deliverable
+    // was byte-identical to an interactive frame and differed from Offline. What this test is for
+    // is the readback ring matching the synchronous path, not the tier, so it names the tier.
     auto engine = loadOffline(f.project);
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
+    rendering::QualityTier jobTier = rendering::QualityTier::Offline;
+    REQUIRE(rendering::qualityTierFromName(settings.tier, jobTier));
+    renderer.setQuality(jobTier);
     REQUIRE(renderer.resize(settings.width, settings.height).has_value());
     FixedStepClock clock(settings.fps);
     clock.restartAt(settings.startSeconds);
@@ -276,6 +284,10 @@ TEST_CASE("Render job writes a scene-linear EXR sequence deterministically", "[g
         auto engine = loadOffline(f.project);
         rendering::SceneRenderer renderer(*ctx, shaders);
         REQUIRE(renderer.init().has_value());
+        // ADR-147: at the job's tier, for the reason given on the ring test above.
+        rendering::QualityTier jobTier = rendering::QualityTier::Offline;
+        REQUIRE(rendering::qualityTierFromName(settings.tier, jobTier));
+        renderer.setQuality(jobTier);
         FixedStepClock clock(settings.fps);
         clock.restartAt(settings.startSeconds);
         engine->seekSeconds(settings.startSeconds);
