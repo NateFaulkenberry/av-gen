@@ -97,6 +97,19 @@ Result<void> RenderJob::start() {
     if (auto r = renderer_->resize(settings_.width, settings_.height); !r) {
         return r;
     }
+    // ADR-147 / §5.9: the tier the deliverable is rendered at. Without this the job ran at
+    // whatever the renderer defaults to -- Realtime -- and a batch frame came out byte-identical
+    // to an interactive one, so every promise the Offline tier makes (no temporal shortcut, no
+    // representation or shading shortcut, full-resolution auxiliary passes) was stated in the tier
+    // table and not kept by the path that produces the output anyone ships.
+    {
+        rendering::QualityTier tier = rendering::QualityTier::Offline;
+        if (!rendering::qualityTierFromName(settings_.tier, tier)) {
+            return std::unexpected(Error{fmt::format(
+                "render: unknown tier '{}' (preview|realtime|high|offline)", settings_.tier)});
+        }
+        renderer_->setQuality(tier);
+    }
     compositor_ = std::make_unique<rendering::CompositionRenderer>(context_, shaders_);
     if (auto r = compositor_->init(); !r) {
         return r;

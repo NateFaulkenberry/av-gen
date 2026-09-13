@@ -34,6 +34,11 @@ struct RenderSettings {
     int quality = 80;                  // 0..100
     bool muxAudio = true;              // include the project's audio in the video
     int encoderThreads = 0;            // 0 = hardware threads - 1, clamped to [1, 16]
+    // ADR-147 / §5.9: a batch render is the deliverable, so it renders at the offline tier unless
+    // told otherwise. Before this existed `RenderJob` never called `setQuality` at all and a batch
+    // frame came out byte-identical to an interactive Realtime one -- the offline promise was
+    // stated in the tier table and not kept by the path that produces the actual output.
+    std::string tier = "offline";      // preview | realtime | high | offline
 
     // Frame count for a resolved end time (endSeconds >= startSeconds); the last frame is the one
     // whose time is < end (end exclusive), at least 1.

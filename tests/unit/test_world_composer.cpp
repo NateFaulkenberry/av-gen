@@ -587,3 +587,36 @@ TEST_CASE("A knee-high accent does not outrank a tree as the composition's subje
     // And the stand-off follows the subject's real size rather than an accent's.
     CHECK(composed->plan.heroes.front().preferredCameraDistance > 40.0f);
 }
+
+// Phase G put `certification` blocks in the scene recipes, and they disappeared the first time
+// anything loaded and re-saved one: `toJson` rebuilds the document from typed fields, so every
+// top-level key the loader does not model was dropped without a word. The data loss was invisible
+// because nothing compared a recipe to itself after a round-trip.
+TEST_CASE("a recipe round-trip keeps the blocks this build does not model", "[world][recipe]") {
+    const auto doc = nlohmann::json::parse(R"({
+      "world": "valley", "seed": 4242, "extent": 400.0,
+      "composition": {"foreground": 0.9, "midground": 0.7, "background": 0.5},
+      "certification": {"draws": 141, "triangles": 273819, "note": "counters, checked exactly"},
+      "somethingFromALaterBuild": [1, 2, 3]})");
+
+    auto loaded = world::WorldRecipe::fromJson(doc);
+    REQUIRE(loaded.has_value());
+    const nlohmann::json out = loaded->toJson();
+
+    // The unrecognised blocks survive, byte for byte.
+    REQUIRE(out.contains("certification"));
+    CHECK(out.at("certification") == doc.at("certification"));
+    REQUIRE(out.contains("somethingFromALaterBuild"));
+    CHECK(out.at("somethingFromALaterBuild") == doc.at("somethingFromALaterBuild"));
+
+    // And the modelled fields still win: a carried-through copy must never shadow a real one.
+    CHECK(out.at("world") == "valley");
+    CHECK(out.at("seed") == 4242);
+
+    // The control: a recipe with nothing unrecognised carries nothing, so this cannot pass by
+    // stuffing every key into the passthrough.
+    const auto plain = world::WorldRecipe::fromJson(nlohmann::json::parse(
+        R"({"world": "valley", "seed": 1, "extent": 100.0})"));
+    REQUIRE(plain.has_value());
+    CHECK(plain->unknownJson.empty());
+}

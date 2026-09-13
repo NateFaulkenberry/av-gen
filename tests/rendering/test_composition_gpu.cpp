@@ -3025,9 +3025,18 @@ TEST_CASE("each isolation arm removes exactly its own pass", "[gpu][composition]
             // Exactly its own pass, and only its own. `post` is excluded from this table because the
             // post chain is several labelled passes rather than one, which is a fact about the chain
             // and not a violation of the contract.
-            INFO("expected '" << arm.pass << "' to be the only pass removed");
-            CHECK(missing.size() == 1);
-            CHECK(std::find(missing.begin(), missing.end(), arm.pass) != missing.end());
+            // A pass reported as a family counts once: ADR-139 split `volume` into
+            // `volume.march` and `volume.composite`, so an arm that removes the volumetric work
+            // legitimately removes two labels. The property under test is unchanged -- the arm
+            // removes its own pass and nothing else, and a label from another family still fails.
+            std::set<std::string> missingFamilies;
+            for (const std::string& label : missing) {
+                const std::size_t dot = label.find('.');
+                missingFamilies.insert(dot == std::string::npos ? label : label.substr(0, dot));
+            }
+            INFO("expected '" << arm.pass << "' to be the only pass family removed");
+            CHECK(missingFamilies.size() == 1);
+            CHECK(missingFamilies.count(arm.pass) == 1);
         } else {
             // A draw-level arm must not take a pass away with it: the pass still runs, with less in
             // it. A water arm that removed the scene pass would be water owning the pass everything

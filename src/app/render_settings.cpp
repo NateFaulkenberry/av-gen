@@ -146,6 +146,7 @@ nlohmann::json RenderSettings::toJson() const {
                           {"codec", codec},
                           {"backend", backend},
                           {"quality", quality},
+                          {"tier", tier},
                           {"muxAudio", muxAudio},
                           {"encoderThreads", encoderThreads}};
 }
@@ -199,6 +200,7 @@ Result<RenderSettings> RenderSettings::fromJson(const nlohmann::json& j) {
     if (auto r = text("pattern", s.pattern); !r) return std::unexpected(r.error());
     s.normalisePattern(); // a missing pattern follows the output kind
     if (auto r = text("codec", s.codec); !r) return std::unexpected(r.error());
+    if (auto r = text("tier", s.tier); !r) return std::unexpected(r.error());
     if (auto r = text("backend", s.backend); !r) return std::unexpected(r.error());
     if (const auto it = j.find("muxAudio"); it != j.end()) {
         if (!it->is_boolean()) {

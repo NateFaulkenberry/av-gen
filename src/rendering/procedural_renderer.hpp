@@ -312,6 +312,10 @@ public:
     // also does this at the start of the next frame).
     // The shared frame timeline (gpu/frame_timeline.hpp) this renderer's passes mark themselves
     // on. Null leaves them untimed.
+    // ADR-146 / §5.9: when false, the GPU cull ladder's dead zone is forced to zero whatever the
+    // scene authored, so an offline frame does not depend on the camera's history. Set from
+    // `QualitySettings::lodHysteresisAllowed`; the ladder otherwise reads the authored value.
+    void setLodHysteresisAllowed(bool allowed);
     void setTimeline(gpu::FrameTimeline* timeline);
     void collectTimings();
 
@@ -349,6 +353,8 @@ private:
     std::unique_ptr<Impl> impl_;
     ProceduralStats stats_;
     std::size_t cacheFrames_ = 120;
+    // ADR-146: false forces the cull ladder's dead zone to zero whatever the scene authored.
+    bool lodHysteresisAllowed_ = true;
 };
 
 } // namespace avgen::rendering

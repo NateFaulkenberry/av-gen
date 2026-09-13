@@ -136,6 +136,17 @@ struct WorldRecipe {
     // own directory. Empty means "whatever library the caller supplies".
     std::filesystem::path assetLibrary;
 
+    // Top-level keys this build does not model, carried through a round-trip verbatim. `toJson`
+    // rebuilds the document from typed fields, so without this every unrecognised block is silently
+    // dropped -- the certification blocks Phase G added to scene recipes vanished the first time
+    // anything loaded and re-saved one, and nothing said so. A recipe written by a newer build has
+    // to survive an older one reading it.
+    //
+    // Held as serialised text rather than a `json` member on purpose: this header includes
+    // `json_fwd.hpp` deliberately, and a by-value member would force the full parser on every
+    // translation unit that mentions a recipe. Empty means "nothing unrecognised".
+    std::string unknownJson;
+
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] nlohmann::json toJson() const;
     [[nodiscard]] static Result<WorldRecipe> fromJson(const nlohmann::json& j);

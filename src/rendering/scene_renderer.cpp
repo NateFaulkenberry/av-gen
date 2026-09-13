@@ -2686,6 +2686,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const std::vector<glm::mat4> identity(scene.procedurals.size(), glm::mat4(1.0f));
         // Culling and screen-size LOD need this frame's viewport (ADR-029).
         procedurals_->setViewport(hdr_.width(), hdr_.height());
+        // ADR-146 / §5.9: the ladder's dead zone is a temporal shortcut, so the offline tier does
+        // not get one. Applied per frame rather than at setQualitySettings, because the tier can
+        // change between frames and the cull pass reads this on every one.
+        procedurals_->setLodHysteresisAllowed(qualitySettings_.lodHysteresisAllowed);
         procedurals_->update(encoder, scene, identity, time, fields_.get(), splines_.get());
         stats_.procedural = procedurals_->stats();
     }

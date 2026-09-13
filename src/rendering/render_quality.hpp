@@ -141,6 +141,14 @@ struct QualitySettings {
     // the §5.9 guarantee spelled as data rather than as a special case in the assignment code.
     bool materialTiers = false;
     MaterialTier forcedMaterialTier = MaterialTier::Full;
+
+    // ADR-125 / §5.9: hysteresis makes the image depend on the camera's history, so an offline
+    // render may not have it -- two renders of the same frame must agree whatever route the camera
+    // took to get there. That rule was expressed in the CPU representation selector and *not* in
+    // the GPU cull ladder, which read the scene's authored `lodHysteresis` at every tier; ADR-146
+    // measured 30 of 582 instances landing on a different rung by approach at QualityTier::Offline.
+    // Expressed here as policy so both paths read one field rather than each remembering the rule.
+    bool lodHysteresisAllowed = true;
     // How many *local* (clustered) lights a fragment of each tier evaluates. Directional lights are
     // never capped: there are at most three of them, they reach every fragment, and dropping one is
     // a lighting change rather than a cost reduction. `kUnlimitedLocalLights` is the Full tier's
@@ -232,6 +240,9 @@ struct QualitySettings {
             // per pixel at the authored step count, and the composite is then an exact copy.
             q.volumeResolutionScale = 1.0f;
             q.volumeStepScale = 1.0f;
+            // §5.9 / ADR-146: and it carries no history in the LOD ladder either, so the frame
+            // does not depend on which way the camera arrived at it.
+            q.lodHysteresisAllowed = false;
             break;
         }
         return q;

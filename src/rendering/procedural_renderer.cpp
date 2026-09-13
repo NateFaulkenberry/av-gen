@@ -1229,6 +1229,8 @@ void ProceduralRenderer::Impl::pumpStats() {
     }
 }
 
+void ProceduralRenderer::setLodHysteresisAllowed(bool allowed) { lodHysteresisAllowed_ = allowed; }
+
 void ProceduralRenderer::setTimeline(gpu::FrameTimeline* timeline) { impl_->timeline = timeline; }
 
 void ProceduralRenderer::collectTimings() {
@@ -1714,7 +1716,10 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             cull.thresholds = glm::vec4(lodSettings.lodDistances[0], lodSettings.lodDistances[1],
                                         lodSettings.lodDistances[2], 0.0f);
             cull.stability = glm::vec4(std::clamp(lodSettings.lodSpread, 0.0f, 0.5f),
-                                       std::clamp(lodSettings.lodHysteresis, 0.0f, 0.5f), 0.0f, 0.0f);
+                                       lodHysteresisAllowed_
+                                           ? std::clamp(lodSettings.lodHysteresis, 0.0f, 0.5f)
+                                           : 0.0f,
+                                       0.0f, 0.0f);
             const std::uint32_t blocks = std::max((instanceCount + kCullScanBlock - 1) / kCullScanBlock, 1u);
             cull.counts = glm::uvec4(instanceCount, lodCount, state.visibleStride, blocks);
             // ADR-038: the composition's depth bands thin instances and move the LOD ladder.

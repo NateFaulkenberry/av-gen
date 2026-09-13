@@ -227,6 +227,17 @@ Result<WorldRecipe> WorldRecipe::fromJson(const json& j) {
     if (auto ok = r.validate(); !ok) {
         return std::unexpected(ok.error());
     }
+    // Anything this build does not model is carried through untouched (see `unknown`).
+    json unknownKeys = json::object();
+    static constexpr std::string_view kKnown[] = {"world", "description", "seed", "extent", "assetLibrary", "composition", "terrain", "weights", "ecology", "biome", "water", "sky", "city", "artDirection", "heroes", "camera", "lighting"};
+    for (const auto& entry : j.items()) {
+        if (std::find(std::begin(kKnown), std::end(kKnown), entry.key()) == std::end(kKnown)) {
+            unknownKeys[entry.key()] = entry.value();
+        }
+    }
+    if (!unknownKeys.empty()) {
+        r.unknownJson = unknownKeys.dump();
+    }
     return r;
 }
 
@@ -301,6 +312,18 @@ json WorldRecipe::toJson() const {
     t.erase("seed");
     t.erase("extent");
     j["terrain"] = std::move(t);
+    // Whatever the loader did not recognise, written back exactly as it arrived. Last, so a key
+    // this build *does* model always wins over a stale copy carried through.
+    if (!unknownJson.empty()) {
+        const json carried = json::parse(unknownJson, nullptr, false);
+        if (carried.is_object()) {
+            for (const auto& entry : carried.items()) {
+                if (!j.contains(entry.key())) {
+                    j[entry.key()] = entry.value();
+                }
+            }
+        }
+    }
     return j;
 }
 
