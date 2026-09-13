@@ -122,6 +122,38 @@ Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
         ctx->adapter_.HasFeature(wgpu::FeatureName::SharedTextureMemoryIOSurface) &&
         ctx->adapter_.HasFeature(wgpu::FeatureName::SharedFenceMTLSharedEvent);
 
+    // What the adapter will admit to, for the record rather than for the renderer. Three of these
+    // decide whether a whole class of per-pixel optimisation is even expressible here, and the
+    // question has been answered from documentation twice and from the driver zero times:
+    // `TransientAttachments` is Metal's memoryless storage mode (an attachment that never reaches
+    // system memory), `FramebufferFetch` and the `PixelLocalStorage` pair are the two ways a
+    // fragment shader can read what is already in the tile. Debug level: it is a condition of a
+    // measurement, not news.
+    {
+        struct NamedFeature {
+            wgpu::FeatureName feature;
+            const char* name;
+        };
+        static constexpr NamedFeature kInteresting[] = {
+            {wgpu::FeatureName::TransientAttachments, "TransientAttachments"},
+            {wgpu::FeatureName::FramebufferFetch, "FramebufferFetch"},
+            {wgpu::FeatureName::PixelLocalStorageCoherent, "PixelLocalStorageCoherent"},
+            {wgpu::FeatureName::PixelLocalStorageNonCoherent, "PixelLocalStorageNonCoherent"},
+            {wgpu::FeatureName::MSAARenderToSingleSampled, "MSAARenderToSingleSampled"},
+            {wgpu::FeatureName::DualSourceBlending, "DualSourceBlending"},
+            {wgpu::FeatureName::Subgroups, "Subgroups"},
+            {wgpu::FeatureName::ShaderF16, "ShaderF16"},
+        };
+        std::string present;
+        std::string absent;
+        for (const auto& f : kInteresting) {
+            std::string& into = ctx->adapter_.HasFeature(f.feature) ? present : absent;
+            into += into.empty() ? f.name : std::string(", ") + f.name;
+        }
+        log::debug("adapter tile/bandwidth features present: {}", present.empty() ? "(none)" : present);
+        log::debug("adapter tile/bandwidth features absent:  {}", absent.empty() ? "(none)" : absent);
+    }
+
     // Request the adapter's full limits so nothing is capped at WebGPU defaults (ADR-001).
     wgpu::Limits adapterLimits{};
     ctx->adapter_.GetLimits(&adapterLimits);
