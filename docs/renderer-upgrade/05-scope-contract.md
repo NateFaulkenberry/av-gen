@@ -65,7 +65,7 @@ capability AV Gen does not need).
 | 29 | Motion vector audit | foundational and already working; audited when Phase C needs it for transitions |
 | 30 | Particle scalability | Constellation's particles are **flat under resolution change** (0.52 ms at every size) — simulation-bound, not fragment-bound. Not a measured problem. |
 | 32 | Water scalability | removing water changes the scene pass by +0.5 ms, i.e. nothing. Not a measured cost. |
-| 36 | Frame graph | **rejected as an architecture, adopted as a table.** Filament's own document claims exactly three benefits and the only one with value here is deriving load/store actions. Revisit if the Phase B audit finds more than one or two wrong actions. |
+| 36 | Frame graph / pass decomposition | **Deferred, and the trigger has now been tested rather than merely stated.** The condition was "the Phase B audit finds more than one or two wrong load/store actions". The audit ran (ADR-119) and found **none** wrong: discarding 24.6 MB/frame of auxiliary stores moved the frame &minus;0.99%, which is not a result. One target (normal+roughness) is written every fragment and read by nothing on the normal path — measured at zero, recorded so it is not mistaken for free money. |
 | 38 | Pipeline/bind-group cost | the CPU is not the bottleneck; the spec says so itself |
 | 39 | Material/draw sorting | pending a measurement showing sorting state changes costs something here |
 | 52 | Full diagnostics panel | the data lands in wave 1; the panel follows once there is something worth drilling into |
