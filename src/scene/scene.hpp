@@ -23,6 +23,23 @@
 
 namespace avgen::scene {
 
+// ---- scene identity ------------------------------------------------------------------------
+//
+// A process-unique number minted per Scene. The renderer's upload caches key on it (see
+// SceneRenderer::uploadMeshes): they ask "is this the same scene, still at the same version?", and
+// before this existed they asked it with the Scene's *address* and its version alone. Two scenes
+// are never alive at one address, but they are very easily alive at it one after the other -- and
+// every fresh Scene starts its meshVersion at the same value, so a new world at a recycled address
+// with the same number of meshes was indistinguishable from the old one and kept the old one's
+// vertex buffers.
+//
+// The version counters say *when* a scene changed. This says *which* scene it is, and the two must
+// not be confused: a version bump is an edit, a new identity is a different scene. Copying a Scene
+// carries the identity with it -- a copy IS that scene's content -- and the address check is what
+// separates two live copies; `Scene::clear()` mints a fresh one, because a Scene emptied and
+// refilled is a different scene wearing the same object.
+[[nodiscard]] std::uint64_t mintSceneIdentity() noexcept;
+
 // ---- scene ---------------------------------------------------------------------------------
 
 struct Scene {
@@ -50,6 +67,9 @@ struct Scene {
     PostSettings post;                // built-in post-processing (copied in by the Engine)
     std::uint64_t meshVersion = 0;    // incremented when meshes change (renderer re-uploads)
     std::uint64_t textureVersion = 0; // incremented when textures change
+    // Who this scene is, as distinct from where it lives (see mintSceneIdentity above). Never 0:
+    // that is the "no scene yet" value a cache starts at.
+    std::uint64_t identity = mintSceneIdentity();
 
     MeshId addMesh(MeshData mesh);
     // A mesh's world-space-agnostic bounds, computed once per `meshVersion`. MeshData::bounds()

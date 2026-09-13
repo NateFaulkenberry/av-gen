@@ -571,6 +571,7 @@ private:
     std::uint32_t engineReloads_ = 0;
     scene::TextureId environmentTexture_ = scene::kInvalidTexture;
     const scene::Scene* environmentScene_ = nullptr;
+    std::uint64_t environmentIdentity_ = 0;
     std::uint64_t environmentVersion_ = ~0ull;
     // ADR-036: the procedural sky is rebuilt only when its resolved parameters change.
     std::uint64_t skyHash_ = 0;
@@ -661,10 +662,14 @@ private:
     IblResources ibl_;
 
     std::vector<GpuMesh> meshes_;
+    // The scene the uploaded meshes/textures came from: its address AND its identity, because a
+    // recycled address is not the same scene (scene::SceneIdentity).
     const scene::Scene* meshScene_ = nullptr;
+    std::uint64_t meshIdentity_ = 0;
     std::uint64_t meshVersion_ = ~0ull;
     std::vector<gpu::GpuTexture> textures_;
     const scene::Scene* textureScene_ = nullptr;
+    std::uint64_t textureIdentity_ = 0;
     std::uint64_t textureVersion_ = ~0ull;
     std::unordered_map<std::uint64_t, wgpu::BindGroup> materialBindGroups_;
     std::vector<std::uint8_t> objectStaging_;

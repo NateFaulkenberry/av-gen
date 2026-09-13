@@ -546,7 +546,8 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
         skyHash_ = hash;
         return;
     }
-    if (&scene == environmentScene_ && id == environmentTexture_ && scene.textureVersion == environmentVersion_) {
+    if (&scene == environmentScene_ && scene.identity == environmentIdentity_ && id == environmentTexture_ &&
+        scene.textureVersion == environmentVersion_) {
         return;
     }
     auto ibl = environment_->process(scene.textures[id]);
@@ -559,6 +560,7 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
     skyBuilt_ = false;
     skyHash_ = 0;
     environmentScene_ = &scene;
+    environmentIdentity_ = scene.identity;
     environmentTexture_ = id;
     environmentVersion_ = scene.textureVersion;
 }
@@ -1493,7 +1495,12 @@ wgpu::BindGroup SceneRenderer::tonemapBindGroupFor(const wgpu::TextureView& view
 }
 
 void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
-    if (&scene == meshScene_ && scene.meshVersion == meshVersion_ && meshes_.size() == scene.meshes.size()) {
+    // Address, identity and version, all three. The address alone is not an identity: a scene
+    // destroyed and another built in its place lands at the same one, and every fresh Scene starts
+    // its meshVersion at the same value -- so a new world with the same number of meshes was drawn
+    // with the old world's geometry until something happened to bump the counter.
+    if (&scene == meshScene_ && scene.identity == meshIdentity_ && scene.meshVersion == meshVersion_ &&
+        meshes_.size() == scene.meshes.size()) {
         return;
     }
     meshes_.clear();
@@ -1530,12 +1537,13 @@ void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
         meshes_.push_back(std::move(gpuMesh));
     }
     meshScene_ = &scene;
+    meshIdentity_ = scene.identity;
     meshVersion_ = scene.meshVersion;
 }
 
 void SceneRenderer::uploadTextures(const scene::Scene& scene) {
-    if (&scene == textureScene_ && scene.textureVersion == textureVersion_ &&
-        textures_.size() == scene.textures.size()) {
+    if (&scene == textureScene_ && scene.identity == textureIdentity_ &&
+        scene.textureVersion == textureVersion_ && textures_.size() == scene.textures.size()) {
         return;
     }
     textures_.clear();
@@ -1556,6 +1564,7 @@ void SceneRenderer::uploadTextures(const scene::Scene& scene) {
     }
     materialBindGroups_.clear();
     textureScene_ = &scene;
+    textureIdentity_ = scene.identity;
     textureVersion_ = scene.textureVersion;
     stats_.textures = static_cast<std::uint32_t>(textures_.size());
 }
