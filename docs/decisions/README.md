@@ -118,3 +118,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [110](ADR-110-lod0-through-meshoptimizer.md) | LOD0 through meshoptimizer, like every rung below it | Accepted |
 | [113](ADR-113-a-measurement-carries-its-conditions.md) | A measurement carries its conditions, and a comparison lives in one process | Accepted |
 | [114](ADR-114-cluster-occupancy-is-measured-uncapped.md) | Cluster occupancy is measured before the cap, not after it | Accepted |
+| [115](ADR-115-overdraw-is-counted-in-its-own-pass.md) | Overdraw is counted in its own pass, or not at all | Accepted |
