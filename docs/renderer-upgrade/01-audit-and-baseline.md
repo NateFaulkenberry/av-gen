@@ -152,6 +152,11 @@ preconditions nothing else on the GPU  (pgrep -f tests/avgen_render_tests)
 
 ## 3.2 Current measurements
 
+> **Superseded for Glowmere as of the LOD0 merge (2026-09-13).** The numbers below are the
+> *pre-upgrade* baseline and are kept as the reference point every later A/B is measured against.
+> The current figures are in §3.2.1. Nothing in this section is edited in place — a baseline that
+> moves is not a baseline.
+
 **Glowmere** (`examples/world/glowmere-stylized.scene.json`), 1280×800:
 
 | | median | p10 | p90 |
@@ -173,6 +178,30 @@ and culling. Binds: 83 pipeline, 795 bind-group, 453 vb, 451 ib (322 redundant a
 | GPU | 3.60 ms |
 
 Pass split: `volume` 2.29 (64%), `particles` 0.52, `scene` 0.46, rest ≤0.07.
+
+## 3.2.1 Post-LOD0 Glowmere (current)
+
+Measured by me, not accepted from the agent that made the change: five runs under
+`tools/gpu-lock.sh`, same session, at the merge commit.
+
+| | pre-upgrade (§3.2) | post-LOD0 | change |
+|---|---|---|---|
+| GPU median | 18.55–18.74 ms | **14.61–14.81 ms** | **−21%** |
+| scene pass | 15.73 ms | **11.86–12.06 ms** | **−24%** |
+| submitted tris | 430,231 | **264,305** | **−38.6%** |
+
+Within-session spread 1.4% — above the 1.0% floor in §3.3 but far below the 2% A/B threshold, so
+the result stands on its own without needing the threshold argued.
+
+What produced it (ADR-108, ADR-109, ADR-110): `partOf` gives a group one spatial instance instead
+of one per part; `Scene::identity` stops distinct-looking objects from being distinct meshes; and
+LOD0 runs through meshoptimizer. The triangle reduction is the mechanism and the scene pass is where
+it lands — consistent with §4.5's finding that this renderer is fragment-bound and that fragment
+cost tracks *triangle size*, not pixel count.
+
+Accepted on two further gates beyond the timing: the `[baseline]` frame-state test passes unchanged
+(29 assertions — derived state is identical), and the captured frame is visually correct at full
+size, which §50 of the spec requires independently of the measurement.
 
 ## 3.3 Reproducibility — investigated, not assumed
 
