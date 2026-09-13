@@ -108,7 +108,8 @@ std::string usageText() {
            "                      --ab none compares the baseline with itself: the noise floor\n"
            "                      a phase may also be a quality arm (ADR-117), which changes a\n"
            "                      QualitySettings field instead of removing a pass:\n"
-           "                      shadowrange, contact, pcss, maskfull\n"
+           "                      shadowrange, contact, pcss, maskfull,\n"
+           "                      volumefull, volumepreview, volumequarter, volumesteps\n"
            "  --ab-blocks <n>     A/B pairs to run (default 2)\n"
            "  --bench-json <f>    write the run's machine-readable record (percentiles, counters,\n"
            "                      and the conditions that make it comparable) to <f>\n"
@@ -3230,11 +3231,11 @@ int Application::runHeadless() {
                 // The workload each measured phase was actually given. Without these an A/B that edits
                 // a scene cannot prove its two arms differ, and "no effect" reads exactly like a run
                 // whose edit never applied.
-                log::info("             workload: volumeSteps={} cascades={} shadowRes={} aoTarget={}x{} "
+                log::info("             workload: volumeSteps={} volumeTarget={}x{} cascades={} shadowRes={} aoTarget={}x{} "
                           "aoSlices={}x{} shadowMask={}x{}/{}L postPasses={} bloomLevels={} "
                           "sdf={}ray/{}mesh simGrids={} "
                           "transient={} wind={}obj plants={}/{}awake ({} examined, {} slot writes)",
-                          st.volume.steps, st.shadows.cascades, st.shadows.resolution, st.ao.width,
+                          st.volume.steps, st.volume.marchWidth, st.volume.marchHeight, st.shadows.cascades, st.shadows.resolution, st.ao.width,
                           st.ao.height, st.ao.slices, st.ao.steps, st.shadowMask.width, st.shadowMask.height,
                           st.shadowMask.lights, st.post.passes, st.post.bloomLevels,
                           st.sdf.raymarchObjects, st.sdf.meshObjects, st.simulation.grids,

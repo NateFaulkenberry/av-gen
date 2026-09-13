@@ -1367,6 +1367,12 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         {"volumepreview",
          [](QualitySettings& q) { q.volumeResolutionScale = 0.25f; q.volumeStepScale = 0.5f; },
          "volumeResolutionScale=0.25, volumeStepScale=0.5 (the Preview tier's volume)"},
+        // Resolution alone, at the Preview tier's scale, with the step count left where the scene
+        // authored it. `volumepreview` moves both axes at once and so cannot say which one paid;
+        // this arm and `volumesteps` are the two halves of it, and they do not divide evenly --
+        // see ADR-141.
+        {"volumequarter", [](QualitySettings& q) { q.volumeResolutionScale = 0.25f; },
+         "volumeResolutionScale=0.25 (quarter-resolution march, authored step count)"},
         // Resolution held at the default and only the ray sampling halved: the axis that trades
         // banding along the ray, separated from the one that trades detail at silhouettes.
         {"volumesteps", [](QualitySettings& q) { q.volumeStepScale = 0.5f; },
