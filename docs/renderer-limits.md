@@ -26,6 +26,10 @@ otherwise.
 
 ## `kMaxObjects` — 256 simultaneously-drawable entities
 
+> **In-flight (wave 2, ADR 128-130):** the `cap` agent is actively lifting this limit and re-pinning
+> the object-slot contract. Left unedited here deliberately — verify against source again once that
+> work lands.
+
 - **Value:** 256
 - **Source:** `src/rendering/scene_renderer.hpp:478` (`kMaxObjects`), alongside
   `kObjectStride = 512` (`:479`)
@@ -56,7 +60,7 @@ otherwise.
   is the identical pattern — "256-byte slots in one uniform buffer" — for procedural instance
   *sources* (not instances) rather than authored entities, with its own overflow warning
   (`"more than {} visible procedural objects; extra objects skipped"`,
-  `procedural_renderer.cpp:1265`). Lifting one without the other leaves half the entity budget
+  `procedural_renderer.cpp:1369`). Lifting one without the other leaves half the entity budget
   problem in place.
 
 ---
@@ -64,10 +68,10 @@ otherwise.
 ## `kMaxSceneLights` — 256 packed lights per frame
 
 - **Value:** 256
-- **Source:** `src/rendering/light_data.hpp:62`
+- **Source:** `src/rendering/light_data.hpp:63`
 - **Why it exists:** every enabled light (directional first, then local) is packed into a
   `GpuLight` array uploaded as one buffer (`sizeof(GpuLight) * kMaxSceneLights` bytes,
-  `scene_renderer.cpp:586`). This is a **quality-setting-shaped** limit rather than an API
+  `scene_renderer.cpp:588`). This is a **quality-setting-shaped** limit rather than an API
   requirement — 256 is a size chosen for the light buffer's static allocation, not a WebGPU or
   hardware ceiling — but nothing in the renderer currently makes it configurable per quality tier.
 - **User-visible when hit:** **no warning**. `orderLightsForShading` (`light_data.cpp:118`) sorts
@@ -87,11 +91,11 @@ otherwise.
 ## `kMaxLightsPerCluster` — 32 lights per froxel
 
 - **Value:** 32
-- **Source:** `src/rendering/light_data.hpp:61`
+- **Source:** `src/rendering/light_data.hpp:62`
 - **Why it exists:** the clustered forward-lighting pass (ADR-033) builds a froxel grid
   (`kClusterX × kClusterY × kClusterZ` = 16×8×24 = 3,072 froxels) and, for each one, a fixed-length
   index list of the local lights that reach it. The cluster buffer is one contiguous allocation of
-  `kClusterCount * (1 + kMaxLightsPerCluster)` `u32`s (`scene_renderer.cpp:577`) — a count plus a
+  `kClusterCount * (1 + kMaxLightsPerCluster)` `u32`s (`scene_renderer.cpp:579`) — a count plus a
   fixed-width slot per froxel — so the per-froxel list has to have a compile-time bound the same
   way a hash table's open-addressing probe sequence does. This is a **quality-setting-shaped**
   choice (memory for the cluster buffer versus how many overlapping lights a single froxel can
@@ -172,7 +176,7 @@ otherwise.
   raising it means recomputing that stride and matching the shader's hardcoded copy.
 - **User-visible when hit:** **no.** An object's `lodCount` (author-configurable) is silently
   clamped: `std::clamp(lod.lodCount, 1, scene::kMaxLodLevels)`
-  (`procedural_renderer.cpp:162`, also `:913`), with no log call at either clamp site. Authoring a
+  (`procedural_renderer.cpp:162`, also `:935` and `:1381`), with no log call at any clamp site. Authoring a
   5-level LOD ladder simply gets the top 4 levels; the 5th is discarded with no diagnostic at all —
   the quietest limit in this document.
 - **What would be needed to lift it:** widen the constant in both `scene/procedural.hpp` and
@@ -221,8 +225,8 @@ otherwise.
 |---|---|---|---|---|
 | `kMaxObjects` | 256 | `scene_renderer.hpp:478` | Architectural (fixed uniform-buffer slots) | Yes — log warning, entities dropped |
 | `kMaxProceduralObjects` | 256 | `procedural_renderer.cpp:32` | Architectural (same mechanism as above) | Yes — log warning, objects dropped |
-| `kMaxSceneLights` | 256 | `light_data.hpp:62` | Quality setting (fixed light buffer) | No |
-| `kMaxLightsPerCluster` | 32 | `light_data.hpp:61` | Quality setting (fixed froxel index width) | Overflow only, no log |
+| `kMaxSceneLights` | 256 | `light_data.hpp:63` | Quality setting (fixed light buffer) | No |
+| `kMaxLightsPerCluster` | 32 | `light_data.hpp:62` | Quality setting (fixed froxel index width) | Overflow only, no log |
 | `kMaxShadowViews` | 8 | `shadow_math.hpp:17` | Quality setting via fixed uniform array | No |
 | `kMaxRigs` | 64 | `skinning.cpp:23` | Architectural (fixed joint-palette slots) | Yes — log warning, bind pose |
 | `kMaxLodLevels` | 4 | `scene/procedural.hpp:434` | Architectural (shared with a WGSL constant) | No — silent clamp |
