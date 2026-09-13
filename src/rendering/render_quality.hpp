@@ -10,6 +10,7 @@
 
 namespace avgen::rendering {
 
+// Preview is the tier Deliverable 5 SS5.8 calls "editor"; `qualityTierFromName` accepts both.
 enum class QualityTier : std::uint8_t { Preview, Realtime, High, Offline };
 
 [[nodiscard]] constexpr const char* qualityTierName(QualityTier tier) {
@@ -23,6 +24,13 @@ enum class QualityTier : std::uint8_t { Preview, Realtime, High, Offline };
 }
 
 [[nodiscard]] constexpr bool qualityTierFromName(std::string_view name, QualityTier& out) {
+    // "editor" is the name Deliverable 5 §5.8 gives the interactive tier and "preview" is the name
+    // this enum has always had. They are the same tier; accepting both costs one line and means a
+    // reader of the plan can type what the plan says.
+    if (name == "editor") {
+        out = QualityTier::Preview;
+        return true;
+    }
     for (const auto tier : {QualityTier::Preview, QualityTier::Realtime, QualityTier::High, QualityTier::Offline}) {
         if (name == qualityTierName(tier)) {
             out = tier;
