@@ -299,3 +299,33 @@ Three popular first moves are contraindicated **by this engine's own numbers**:
 
 None of these is *wrong* — each is deferred pending evidence, and the evidence that would justify
 each is named in the roadmap.
+
+## 4.5 Two further probes, and what they ruled out
+
+**Geometry density at fixed resolution.** Terrain `viewDistance` swept 520 → 110 m (temporary scene
+variants, since removed):
+
+| viewDistance | Triangles | Scene pass |
+|---|---|---|
+| 520 m | 430,233 | 15.66 ms |
+| 300 m | 458,841 | 15.60 ms |
+| 180 m | 515,577 | 15.99 ms |
+| 110 m | 534,843 | 16.12 ms |
+
+**24% more triangles cost 3% more time.** Terrain triangles are large, so they add coverage without
+adding invocations — which is the behaviour the quad-overdraw model predicts, and which rules out
+"triangle count" as the driver in its naive form. The cost is not triangles; it is *small* triangles
+and per-invocation shader cost.
+
+**Constellation scales differently and must not be merged into the same conclusion:**
+
+| Size | volume | particles | scene |
+|---|---|---|---|
+| 640×400 | 1.31 | 0.52 | 0.39 |
+| 1280×800 | 2.29 | 0.52 | 0.46 |
+| 1810×1131 | 4.00 | 0.52 | 0.46 |
+
+Volumetrics are 64% of that frame and scale sub-linearly (3.05× for 8× pixels — a fixed-size froxel
+grid plus a resolution-scaled composite). Particles are **completely flat**: simulation- and
+geometry-bound, not fragment-bound. Its opaque scene pass is negligible. **Nothing proposed for
+Glowmere's bottleneck will help Constellation, and vice versa.** They need separate budgets.
