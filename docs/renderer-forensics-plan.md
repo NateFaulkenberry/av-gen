@@ -382,9 +382,20 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 
 ### 3.1 Camera matrix forensics
 
-- `[ ]` Instrument camera world position and rotation.
-- `[ ]` Instrument view, projection, view-projection, inverse-view and inverse-projection matrices.
-- `[ ]` Instrument near plane, far plane, aspect ratio, viewport width and viewport height.
+- `[x]` Instrument camera world position and rotation. Position directly; rotation as the view
+  matrix, which is what everything downstream consumes and what a capture can be compared on.
+- `[~]` Instrument view, projection, view-projection, inverse-view and inverse-projection matrices.
+  The first three are in the diagnostic frame and in a capture. The inverses are not recorded: they
+  are derived on demand where they are needed (picking, the shadow fit), and storing a second copy of
+  a value that is computed from a stored one is the duplicate-state pattern this investigation spent
+  Phase 1.3 cataloguing.
+- `[x]` Instrument near plane, far plane, aspect ratio, viewport width and viewport height.
+  Recorded alongside the matrices and carried in a capture, and the *reason* is the difference
+  between a useful diff and a useless one: a projection that changed because the window was resized
+  and one that changed because the lens moved are the same sixteen numbers to a matrix comparison.
+  `compareSnapshots` now names which input moved -- "the projection differs: field of view 0.7330 ->
+  0.3665" -- and the field of view it records is the *effective* one, since the lens decides it
+  unless `camera/lens/useExplicitFov` is set.
 - `[x]` Verify multiplication order, handedness, forward direction, up axis, clip-space range and depth convention.
   Pinned in `tests/unit/test_camera.cpp`, `[scene][camera][forensics]`: handedness, view-space origin,
   0..1 depth in the conventional direction, aspect behaviour, finiteness, and the parallel

@@ -111,6 +111,17 @@ struct RendererDiagnosticFrame {
     glm::mat4 view{1.0f};
     glm::mat4 projection{1.0f};
     glm::mat4 viewProjection{1.0f};
+    // The numbers the projection was built *from* (Phase 3.1). A matrix that is wrong tells you it
+    // is wrong and nothing else; these say which input made it so, and a capture carrying them can
+    // be read by a person rather than only diffed by a machine. `fovY` is the *effective* one --
+    // the lens decides it unless `camera/lens/useExplicitFov` is set -- which is exactly the kind of
+    // indirection a reader should not have to reconstruct from a matrix.
+    float nearPlane = 0.0f;
+    float farPlane = 0.0f;
+    float aspect = 0.0f;
+    float fovY = 0.0f;
+    std::uint32_t viewportWidth = 0;
+    std::uint32_t viewportHeight = 0;
     std::vector<RenderObjectDiagnostic> objects;
 };
 

@@ -1705,6 +1705,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     diagnosticFrame_.view = view;
     diagnosticFrame_.projection = proj;
     diagnosticFrame_.viewProjection = proj * view;
+    diagnosticFrame_.nearPlane = scene.camera.nearPlane;
+    diagnosticFrame_.farPlane = scene.camera.farPlane;
+    diagnosticFrame_.aspect = aspect;
+    diagnosticFrame_.fovY = scene.camera.effectiveFovY();
+    diagnosticFrame_.viewportWidth = hdr_.width();
+    diagnosticFrame_.viewportHeight = hdr_.height();
     const FrustumPlanes diagnosticPlanes = frustumPlanes(diagnosticFrame_.viewProjection);
     diagnosticFrame_.objects.reserve(scene.entities.size());
     for (const scene::Entity& entity : scene.entities) {

@@ -2533,6 +2533,26 @@ TEST_CASE("a captured frame replays, and two of them differ in words",
             other.toggles.shadows = false;
             CHECK(reports(rendering::compareSnapshots(first, other), "isolation differs"));
         }
+        // A projection that changed, named by the input that changed it. "The projection differs"
+        // is true of a resize and of a lens move alike, and they are completely different questions.
+        {
+            rendering::FrameSnapshot resized = first;
+            resized.frame.viewportWidth *= 2;
+            resized.frame.aspect *= 2.0f;
+            resized.frame.projection[0][0] *= 0.5f;
+            const auto diff = rendering::compareSnapshots(first, resized);
+            CHECK(reports(diff, "the projection differs"));
+            CHECK(reports(diff, "aspect"));
+            CHECK(reports(diff, "viewport"));
+        }
+        {
+            rendering::FrameSnapshot zoomed = first;
+            zoomed.frame.fovY *= 0.5f;
+            zoomed.frame.projection[1][1] *= 2.0f;
+            const auto diff = rendering::compareSnapshots(first, zoomed);
+            CHECK(reports(diff, "field of view"));
+            CHECK_FALSE(reports(diff, "viewport"));
+        }
         // The camera, which moves everything and is therefore worth saying once rather than
         // per object.
         {

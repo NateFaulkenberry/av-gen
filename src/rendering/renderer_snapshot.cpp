@@ -109,6 +109,12 @@ json snapshotToJson(const FrameSnapshot& s) {
                 {"frameIndex", s.frame.frameIndex},
                 {"stateHash", s.frame.stateHash},
                 {"cameraPosition", vec3(s.frame.cameraPosition)},
+                {"nearPlane", s.frame.nearPlane},
+                {"farPlane", s.frame.farPlane},
+                {"aspect", s.frame.aspect},
+                {"fovY", s.frame.fovY},
+                {"viewportWidth", s.frame.viewportWidth},
+                {"viewportHeight", s.frame.viewportHeight},
                 {"view", mat4(s.frame.view)},
                 {"projection", mat4(s.frame.projection)},
                 {"objects", std::move(objects)}};
@@ -143,6 +149,12 @@ Result<FrameSnapshot> snapshotFromJson(const json& doc) {
         return std::unexpected(camera.error());
     }
     s.frame.cameraPosition = *camera;
+    s.frame.nearPlane = doc.value("nearPlane", 0.0f);
+    s.frame.farPlane = doc.value("farPlane", 0.0f);
+    s.frame.aspect = doc.value("aspect", 0.0f);
+    s.frame.fovY = doc.value("fovY", 0.0f);
+    s.frame.viewportWidth = doc.value("viewportWidth", 0u);
+    s.frame.viewportHeight = doc.value("viewportHeight", 0u);
     auto view = readMat4(doc, "view");
     if (!view) {
         return std::unexpected(view.error());
@@ -251,7 +263,31 @@ std::vector<std::string> compareSnapshots(const FrameSnapshot& expected, const F
         out.push_back("the view matrix differs");
     }
     if (!near(expected.frame.projection, actual.frame.projection, epsilon)) {
-        out.push_back("the projection differs");
+        // Named by its inputs, not merely reported as different. A projection that changed because
+        // the window was resized and one that changed because the lens moved are the same sixteen
+        // numbers to a matrix comparison and completely different questions to a person.
+        std::string why;
+        const auto note = [&why](const std::string& text) {
+            why += (why.empty() ? "" : ", ") + text;
+        };
+        if (!near(expected.frame.fovY, actual.frame.fovY, epsilon)) {
+            note(fmt::format("field of view {:.4f} -> {:.4f}", expected.frame.fovY, actual.frame.fovY));
+        }
+        if (!near(expected.frame.aspect, actual.frame.aspect, epsilon)) {
+            note(fmt::format("aspect {:.4f} -> {:.4f}", expected.frame.aspect, actual.frame.aspect));
+        }
+        if (!near(expected.frame.nearPlane, actual.frame.nearPlane, epsilon) ||
+            !near(expected.frame.farPlane, actual.frame.farPlane, epsilon)) {
+            note(fmt::format("clip planes {:.4f}..{:.4f} -> {:.4f}..{:.4f}", expected.frame.nearPlane,
+                             expected.frame.farPlane, actual.frame.nearPlane, actual.frame.farPlane));
+        }
+        if (expected.frame.viewportWidth != actual.frame.viewportWidth ||
+            expected.frame.viewportHeight != actual.frame.viewportHeight) {
+            note(fmt::format("viewport {}x{} -> {}x{}", expected.frame.viewportWidth,
+                             expected.frame.viewportHeight, actual.frame.viewportWidth,
+                             actual.frame.viewportHeight));
+        }
+        out.push_back(why.empty() ? "the projection differs" : "the projection differs: " + why);
     }
 
     // By name, so an added or removed object is reported as itself rather than as every object
