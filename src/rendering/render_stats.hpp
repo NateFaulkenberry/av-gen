@@ -331,15 +331,21 @@ struct BenchmarkConditions {
     std::string scene;        // the --composition or --project path, as given
     std::string sceneKind;    // "composition" or "project"
     std::string arm;          // "baseline", or the phase this block switched off
-    std::string camera;       // the scene camera's name, or "" when it has none
+    // The camera, by name *and* by pose. The name alone does not identify the workload -- a
+    // directed camera moves, and "the Glowmere camera" covered three different views on three
+    // days of this investigation. The pose is what decides how much of the valley is on screen.
+    std::string camera;
+    double cameraPosition[3] = {0.0, 0.0, 0.0};
+    double cameraTarget[3] = {0.0, 0.0, 0.0};
+    double fovYDegrees = 0.0;
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     std::string qualityTier;  // the render quality tier this run used
     std::string gitRevision;  // the engine revision, short; "unknown" when the build could not see one
     bool gitDirty = false;    // uncommitted changes were in the tree when the binary was built
     std::string buildType;    // "Release", "Debug", ...
-    std::string backend;      // "Dawn/Metal" and friends
-    std::string platform;
+    std::string backend;      // the WebGPU backend, e.g. "Metal"
+    std::string platform;     // the adapter: two GPUs are two machines, whatever else matches
     // One id per *process*. Two records sharing it were measured in one machine session and may be
     // compared; two that do not, may not. This is the field that makes the rule checkable rather
     // than a convention somebody remembers.
@@ -369,8 +375,12 @@ struct BenchmarkCounters {
     double culledInstances = 0.0;
     double lod[4] = {0.0, 0.0, 0.0, 0.0};
     double shadowCasters = 0.0;
+    // Every enabled light the frame shaded with. Not `RenderStats::lights`, which counts slots in
+    // the 8-long uniform fallback array and reports 8 for a 230-light scene.
     double lights = 0.0;
-    double clusteredLights = 0.0;
+    double directionalLights = 0.0; // evaluated per fragment, never through the grid
+    double clusteredLights = 0.0;   // the local half, routed through the froxel grid
+    double uniformPathLights = 0.0; // the fallback array's occupancy, for what it is worth
     double particleSystems = 0.0;
     double particleCapacity = 0.0;
     double transientTextures = 0.0;

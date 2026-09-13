@@ -123,7 +123,15 @@ struct RenderStats {
     // and `state.computePasses` do not cover them. Non-zero means the pass split is a floor.
     std::uint32_t unclassifiedPasses = 0;
     std::uint32_t entities = 0;
+    // Lights written into the *uniform fallback* array, which is `kMaxLights` = 8 long. It is not
+    // the scene's light count and never was: Glowmere shades with 230 and this field reads 8,
+    // because it is counting slots in an array whose size is the cap. `shadedLights` below is the
+    // number the question "how many lights is this frame paying for" is actually asking about.
     std::uint32_t lights = 0;
+    // Every enabled light the frame shaded with: directional (evaluated per fragment) plus local
+    // (routed through the froxel grid). `clusteredLights` is the local half.
+    std::uint32_t shadedLights = 0;
+    std::uint32_t directionalLights = 0;
     std::uint32_t textures = 0;
     std::uint32_t width = 0;
     std::uint32_t height = 0;
@@ -136,6 +144,12 @@ struct RenderStats {
     AoStats ao;                 // ADR-034; ground-truth ambient occlusion
     ShadowMaskStats shadowMask; // ADR-087; the half-resolution directional shadow mask
     std::uint32_t clusteredLights = 0; // lights that went through the froxel grid (0 = fallback path)
+    // ADR-114. How hard the froxel grid was worked this frame -- only when
+    // `SceneRenderer::setClusterStatsEnabled(true)`, because it is a CPU replica of the cluster
+    // compute pass and running it inside a measured frame perturbs the wall clock. `haveClusters`
+    // is how a reader tells "not measured" from "an empty grid".
+    ClusterOccupancy clusters;
+    bool haveClusters = false;
     SimulationStats simulation; // ADR-032; the simulated grid fields stepped this frame
     SkinningStats skinning;     // ADR-086; the skinned rigs whose palettes reached the GPU
     PostStats post;
@@ -413,6 +427,13 @@ public:
     // Every arm's name, comma separated -- for a message telling somebody what they may write.
     [[nodiscard]] static std::string passArmNames();
 
+    // ADR-114: compute the froxel grid's occupancy on the CPU each frame. Off by default. It is
+    // `kClusterCount * localLights` sphere-against-box tests on the submitting thread, so it
+    // belongs to a diagnostic run and not to a timing one; `RenderStats::haveClusters` records
+    // which kind of run a number came from.
+    void setClusterStatsEnabled(bool on) { clusterStats_ = on; }
+    [[nodiscard]] bool clusterStatsEnabled() const { return clusterStats_; }
+
     void setPassToggles(const PassToggles& toggles);
     [[nodiscard]] const PassToggles& passToggles() const { return toggles_; }
     [[nodiscard]] ShadowRenderer& shadows() { return *shadows_; }     // ADR-034
@@ -559,6 +580,7 @@ private:
     QualityTier tier_ = QualityTier::Realtime;
     QualitySettings qualitySettings_ = QualitySettings::forTier(QualityTier::Realtime);
     PassToggles toggles_;
+    bool clusterStats_ = false; // ADR-114
     // Compute passes this frame's encoding counted for itself (the froxel build). The rest are
     // read off the subsystems in collectFrameTimings(), which runs more than once per frame.
     std::uint32_t clusterDispatches_ = 0;
