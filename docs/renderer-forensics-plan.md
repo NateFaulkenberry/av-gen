@@ -55,6 +55,28 @@ release, Dawn/Metal, `--tier realtime --size 1280x800 --frames 120 --fps 30`:
 | `examples/constellation/constellation.json` | 6.09 ms | 8.40 ms | 6.90 / 13.60 | `volume` 3.93 (64%) | 11 | 3,121 | volumetrics |
 | `examples/qa/renderer-qa.json` | 1.70 ms | 2.75 ms | 2.46 / 3.37 | `scene` 0.72 (42%) | 8 | 7,961 | nothing; it is the control |
 
+**Re-measured 13 September**, same commands, same machine, after the water repair and with nothing
+else running on the GPU:
+
+| Scene | GPU median | Wall median | p10 / p90 | Draws | Triangles | Against 12 Sep |
+|---|---:|---:|---|---:|---:|---|
+| `glowmere-stylized.json` | 18.61 ms | 22.13 ms | 20.93 / 23.57 | 141 | 430,233 | reproduces (-1.4%) |
+| `constellation.json` | 6.62 - 10.75 ms | 9.79 - 14.62 ms | 7.3-8.4 / 15.7-16.4 | 11 | 3,121 | **the median is not a statistic for this scene** |
+| `renderer-qa.json` | 1.77 ms | 2.83 ms | 2.41 / 3.37 | 8 | 7,961 | reproduces (+4%) |
+
+**Constellation's median is unusable as a baseline, and this is a measurement defect rather than a
+regression.** Five runs of the identical command gave GPU medians of 6.62, 9.04, 10.62, 10.68 and
+10.75 ms while `p10` and `p90` stayed put (7.3-8.4 and 15.7-16.4). The scene is *animated*: its
+particle systems fill over the first seconds and its volumetrics vary with what has been emitted, so
+a 120-frame window never reaches a steady state and the median lands wherever the workload happened
+to be. A 400-frame run medians *lower* (9.04, `volume` 5.24) than a 120-frame one (10.75, `volume`
+7.14), which is the giveaway -- a warm-up effect would go the other way.
+
+So the 6.09 ms recorded on 12 September and the 10.7 ms typical today are the same scene measured at
+different points of its own animation. **For this scene compare `p10`/`p90`, or a fixed frame index,
+never the median.** Glowmere and RendererQA reproduce within a few percent and their medians are
+sound.
+
 **Conditions, stated because they change the numbers.** The first 12 frames are discarded as warm-up
 (the harness reports a median over 108 *steady* frames); pipelines are compiled and Metal replaces
 their GPU binaries shortly after creation, so a cold frame is not comparable. Background load matters
@@ -226,7 +248,17 @@ frame in its modulation pass; a composition updated on its own does not, so a te
 ### 1.4 Establish and enforce invariants
 
 - `[x]` Document the invariant that scene world transforms remain authoritative and renderer-derived transforms are temporary.
-- `[ ]` Add development assertions that culling and rendering never mutate authoritative transforms.
+- `[x]` Add development assertions that culling and rendering never mutate authoritative transforms.
+  **Rendering needs no assertion: it cannot.** Every `SceneRenderer` entry point -- `render`,
+  `renderFrame`, `renderToImage` -- takes `const scene::Scene&`, and the only `const_cast` anywhere
+  under `src/rendering` is on the renderer's own LOD bookkeeping
+  (`procedural_renderer.cpp`, `Impl::ObjectState::emptyFrames`), not on scene state. The invariant is
+  held by the type system, which is stronger than a runtime check and free.
+  Culling is the half that does write to the scene, and it is tested rather than asserted:
+  `tests/unit/test_composition.cpp`, `[scene][composition][forensics][culling]` -- across four camera
+  poses including one that rejects everything, every entity's transform and *authored* `visible` flag
+  are unchanged while `cameraCulled` moves. Negative-controlled by making a cull clear `visible`,
+  which fails it.
 - `[ ]` Add finite-value validation for transforms, matrices, bounds, camera state, materials and GPU upload structures.
   - `[x]` Camera/entity matrix and skinning palette validation exists.
   - `[ ]` Complete joint, bounds, material and water validation coverage.
@@ -468,7 +500,9 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 - `[~]` Record world bounds, render bounds, culling bounds, camera position and visibility result for
   each object. World bounds and selected-object state are captured; current-pose culling bounds and
   plane-level rejection evidence remain open.
-- `[ ]` Verify culling never mutates scene transforms or authored visibility.
+- `[x]` Verify culling never mutates scene transforms or authored visibility. See Phase 1.4: the
+  verdict lands in `cameraCulled`, and the authored flag and the transform are untouched in both
+  directions -- a cull cannot turn an object off, and cannot turn an authored-invisible one on.
 - `[x]` Animated entity culling derives bounds from the current joint palette and applies a conservative
   residual pad before frustum testing. The renderer QA record and scene code establish the ownership
   and implementation; a pixel-level limb-crossing regression is still required below.
@@ -726,8 +760,14 @@ For every level, run camera translation, rotation, orbit, dolly, playback, pause
 
 ### 11.2 Correctness and performance validation
 
-- `[ ]` Re-measure CPU/GPU frame time, p90/tail, draw calls, visible/culled renderables, animated vertices, water/shadow/post costs and buffer uploads.
-- `[ ]` Profile Constellation and Glowmere separately; do not generalize one workload to the other.
+- `[~]` Re-measure CPU/GPU frame time, p90/tail, draw calls, visible/culled renderables, animated vertices, water/shadow/post costs and buffer uploads.
+  Frame time, tails, draws and triangles re-measured on all three canonical scenes (Phase 0.1).
+  Per-pass water/shadow/post costs are in the same output; buffer uploads and animated vertex counts
+  are not reported by the harness and remain open.
+- `[x]` Profile Constellation and Glowmere separately; do not generalize one workload to the other.
+  They behave differently enough that one number for both would be meaningless: Glowmere is 84%
+  `scene` and reproduces to 1.4%, while Constellation is volumetrics over an animated particle fill
+  whose median is not a stable statistic at all. Both recorded in Phase 0.1.
 - `[ ]` Run release, debug, ASan/UBSan and TSan suites relevant to changed paths.
 - `[~]` ASan/UBSan focused renderer-forensics coverage passes: 264 assertions across 16 cases with
   no sanitizer findings. The new transport discontinuity contract also passes under TSan (5

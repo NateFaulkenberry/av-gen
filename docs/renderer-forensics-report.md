@@ -63,7 +63,7 @@ Application::runLive / Application::runHeadless
 | Basic opaque geometry | `PASS` | Deterministic cube and full release suite pass. |
 | GPU object state | `PASS` for audited slots/caches | Dynamic slot guards, stable object diagnostics and scene-owned cache fixes pass. Two objects exchanging places for 24 frames, plus a third coming and going, each keep their own matrix and their own slot -- the stale/swapped mechanism, tested directly and negative-controlled. Full buffer generation audit remains open. |
 | Resource lifetime | `PARTIAL` | Timeline ring, target replacement, post transient release and scene swaps pass. Full asynchronous/live lifetime audit remains open. |
-| Culling | `PASS` for the audited path | Terrain/authored/selected diagnostics and plane margins pass. The cull box is now one function (`scene::entityCullBounds`) rather than two copies inside `Composition`, and a rig that reaches past its bind pose proves the box contains the pose; bind-pose bounds fail it. |
+| Culling | `PASS` for the audited path, and it writes nothing it should not | Terrain/authored/selected diagnostics and plane margins pass. The cull box is now one function (`scene::entityCullBounds`) rather than two copies inside `Composition`, and a rig that reaches past its bind pose proves the box contains the pose; bind-pose bounds fail it. Culling's writes are also bounded: across four camera poses the verdict lands in `cameraCulled` while every transform and every authored `visible` flag is untouched, negative-controlled by making a cull clear `visible`. |
 | LOD | `PASS` for transition stability | CPU/GPU threshold, spread and hysteresis tests pass. RendererQA image/performance calibration remains open. |
 | Animation/skinning | `PARTIAL` | Palette validation, scene-owned palette cache, culling-freeze and phase-origin fixes pass; the pose is now a pure function of the timeline across seeks. Full idle/walk/run/terrain/water matrix remains open. |
 | Terrain | `PARTIAL` | Visibility leave/return regression passes. Larger terrain/water boundary QA remains open. |
@@ -74,7 +74,7 @@ Application::runLive / Application::runHeadless
 | Post-processing | `PARTIAL` | Existing effect tests and transient target stress pass. Full pass-state and temporal history inventory remains open. |
 | Sequencer/transport | `PARTIAL` | Seek-only discontinuity reset, repeated-frame determinism and the frame-100/500/100 replay pass. Full application scrub matrix remains open. |
 | Assets | `PARTIAL` | Existing asset/import regressions pass; renderer asset-specific isolation is not complete. |
-| Performance | `PARTIAL` | Release baseline is clean; per-scene forensic remeasurement and diagnostic overhead remain open. |
+| Performance | `PARTIAL` | All three canonical scenes re-measured 13 September. Glowmere and RendererQA reproduce their baselines within a few percent. Constellation's median does not, and the investigation ended at a measurement defect rather than a regression: the scene is animated, so a 120-frame window never reaches steady state and the median lands wherever the workload was -- five identical runs gave 6.62 to 10.75 ms with `p10`/`p90` stable throughout. Compare its tails, not its median. Diagnostic overhead remains unmeasured. |
 
 ## Confirmed root causes and repairs
 
@@ -275,7 +275,8 @@ it has been shown to fail**, which is why the status definitions in the plan req
 - Glowmere UFO close-up matrix and the water canonical regression matrix. (Glowmere's seek replay is
   now covered; the alien's is closed.)
 - Full sanitizer and resource-lifetime suites without environment timeout/benchmark interference.
-- Final CPU/GPU performance remeasurement and diagnostic overhead measurement.
+- Diagnostic overhead measurement. (Frame-time remeasurement is done; see the plan's Phase 0.1 for
+  the numbers and for why Constellation's median cannot be one of them.)
 
 ## Final classification rule
 

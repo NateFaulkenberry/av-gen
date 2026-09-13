@@ -2252,6 +2252,87 @@ TEST_CASE("A procedural resolves to the node that emitted it", "[scene][composit
     CHECK(comp.nodeForProcedural(9999) == nullptr);
 }
 
+// ---- Phase 1.4/5.1: culling writes its own verdict and nothing else -----------------------------
+//
+// Rendering cannot touch authoritative scene state: every `SceneRenderer` entry point takes the
+// scene by const reference and the only `const_cast` under `src/rendering` is on the renderer's own
+// LOD bookkeeping, so the invariant is held by the type system rather than by a runtime assertion.
+//
+// Culling is the half that genuinely does write to the scene, from inside `Composition`. What it is
+// allowed to write is `cameraCulled` -- this frame's verdict. What it must never write is the
+// authored `visible` flag or a transform: a cull that turned an object off would be an object that
+// stayed off after the camera moved away, and one that nudged a transform is `SYM-STATIC-1`.
+TEST_CASE("culling writes its verdict and never authored state",
+          "[scene][composition][forensics][culling]") {
+    Fixture fx;
+    const std::string text = std::string(R"({
+  "format": "avgen-scene", "version": 1, "name": "cull",
+  "camera": {"mode": 1, "position": [0, 1, 8], "target": [0, 1, 0]},
+  "nodes": [
+    {"name": "near", "kind": "gltf", "asset": ")" + fx.glb.filename().string() + R"(",
+     "position": [0, 1, 0]},
+    {"name": "far", "kind": "gltf", "asset": ")" + fx.glb.filename().string() + R"(",
+     "position": [60, 1, 0]},
+    {"name": "hidden", "kind": "gltf", "asset": ")" + fx.glb.filename().string() + R"(",
+     "position": [0, 1, -3], "visible": false}
+  ]})");
+    auto loaded = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    REQUIRE(loaded.has_value());
+    scene::Composition& comp = **loaded;
+    params::ParameterSet params;
+    params::Modulator modulator;
+    comp.attach(params, modulator);
+    comp.setViewport(320, 200);
+
+    const auto aim = [&](glm::vec3 eye, glm::vec3 target, double at) {
+        params.findAs<int>("camera/mode")->setBase(1);
+        params.findAs<glm::vec3>("camera/position")->setBase(eye);
+        params.findAs<glm::vec3>("camera/target")->setBase(target);
+        params.resetFinals();
+        FrameTime time;
+        time.renderTime = at;
+        time.deltaTime = 1.0 / 60.0;
+        comp.update(time);
+    };
+    aim({0.0f, 1.0f, 8.0f}, {0.0f, 1.0f, 0.0f}, 0.0);
+
+    // What the scene authored, taken once.
+    std::vector<std::tuple<std::string, glm::mat4, bool>> authored;
+    for (const scene::Entity& e : comp.scene().entities) {
+        authored.emplace_back(e.name, e.transform.matrix(), e.visible);
+    }
+    REQUIRE(authored.size() >= 3);
+
+    // Look away, so the frustum rejects things it was accepting a moment ago.
+    std::size_t culledAtSomePoint = 0;
+    for (const auto& [eye, target] : {std::pair{glm::vec3(0.0f, 1.0f, 8.0f), glm::vec3(0.0f, 1.0f, 0.0f)},
+                                      {glm::vec3(0.0f, 1.0f, 8.0f), glm::vec3(0.0f, 1.0f, 40.0f)},
+                                      {glm::vec3(0.0f, 60.0f, 0.0f), glm::vec3(0.0f, 61.0f, 0.0f)},
+                                      {glm::vec3(0.0f, 1.0f, 8.0f), glm::vec3(0.0f, 1.0f, 0.0f)}}) {
+        aim(eye, target, 1.0);
+        for (const scene::Entity& e : comp.scene().entities) {
+            culledAtSomePoint += e.cameraCulled ? 1 : 0;
+            for (const auto& [name, matrix, visible] : authored) {
+                if (e.name != name) {
+                    continue;
+                }
+                INFO("entity " << e.name);
+                CHECK(e.transform.matrix() == matrix);   // no transform written by a cull
+                CHECK(e.visible == visible);             // and the authored flag is not a verdict
+            }
+        }
+    }
+    // The camera really did reject something, or none of the above was tested against anything.
+    CHECK(culledAtSomePoint > 0);
+    // The authored-invisible node stays invisible throughout, which is the other direction of the
+    // same rule: a cull cannot turn something *on* either.
+    for (const scene::Entity& e : comp.scene().entities) {
+        if (e.name.find("hidden") != std::string::npos) {
+            CHECK_FALSE(e.visible);
+        }
+    }
+}
+
 // ---- Phase 1.3 of the renderer forensics: the derived-copy rule ---------------------------------
 //
 // Two values were found to be re-derived every frame by accident rather than by search, and both cost
