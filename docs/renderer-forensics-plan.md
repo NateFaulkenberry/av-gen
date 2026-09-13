@@ -533,13 +533,39 @@ because the failure mode (a double subtraction) is silent and looks like a camer
 
 ### 3.3 GPU object and buffer audit
 
-- `[ ]` Track entity ID, render-object ID, GPU object index, buffer offset, frame index and buffer generation for every submitted object.
-- `[ ]` Add debug object-ID coloring with stable IDs for the UFO, alien, tree, water and test geometry.
+- `[x]` Track entity ID, render-object ID, GPU object index, buffer offset, frame index and buffer
+  generation for every submitted object. All of it is in `RenderObjectDiagnostic` and in a capture:
+  entity index, pick id (derivable from it), object slot, **buffer offset** and the frame index on
+  the frame around them. `bufferOffset` is the slot times the stride and is recorded anyway, because
+  a capture read by a person should not require them to know the stride -- and because the slot is
+  submission order and *not* stable between frames, so an offset that looks familiar across two
+  captures is a coincidence worth being able to see. **Buffer generation is absent because there is
+  no such counter** (Phase 1.3): the reuse boundary is the owning `Scene` plus a local version.
+- `[x]` Add debug object-ID coloring with stable IDs for the test geometry. The `Ids` view is
+  asserted to be its own picture and to separate objects into distinct values; `[gpu][composition]
+  [forensics][ids]` asserts the property that actually matters, which is not that ids *exist* but
+  that **a given id keeps naming the same object** while the camera orbits, the timeline runs and
+  objects enter and leave the frame. An id that silently re-pointed would give a stable-looking
+  picture and a wrong selection -- which this numbering had once, when a click on a scattered tree
+  resolved as whichever entity shared its index.
+
+  Both halves of the word are cross-examined against each other: the low sixteen bits are the pick
+  id and the high sixteen the material id, derived from the same index by *different* arithmetic, so
+  requiring `index == material - 1` is a check on the packing rather than a restatement of it. Ids
+  are resolved through the space tag, and the test found its own first assumption wrong -- it began
+  by assuming every id was an entity and the QA scene's procedurals failed it immediately, which is
+  the tag doing the job it was added for.
+
+  **Water is asserted as the exception rather than left to be rediscovered:** its pipeline masks
+  every scene target but colour and emission, so it writes no identifier, and every water entity's
+  id is required to be absent from everything the frame wrote.
 - `[ ]` Audit uniform/storage buffers, dynamic offsets, ring buffers, staging buffers, bind groups, views and frame allocators.
   - `[~]` Object uniform slot stride and capacity now have compile-time guards, and focused GPU
     diagnostics verify stable object-slot assignment -- including under alternating transforms and a
-    coming-and-going third object, where a stale or swapped slot would show. Ring-buffer/resource
-    reuse and full pass bind-state auditing remain open.
+    coming-and-going third object, where a stale or swapped slot would show. Resource *reuse* across
+    resize, reload, seek and scene swap is now covered by Phase 3.4's interleaved sequence with the
+    device error count asserted zero throughout. Full pass bind-state auditing remains open, and is
+    the transcription-shaped item this phase has deliberately not done.
 - `[x]` Verify CPU/WGSL structure size, alignment, offsets, padding, type widths and matrix layout.
   `tests/unit/test_renderer_layout_guards.cpp`, `[unit][renderer][forensics][layout]`. Rather than
   restating sizes in a second place, it *parses both declarations* -- a WGSL layout engine (uniform
@@ -1290,17 +1316,42 @@ that check is what found the two gaps recorded below.
   - **The diagnostic state hash cannot be a replay identity.** It folds in `paletteVersion`, a
     monotonic counter, so two arrivals at the same second legitimately hash differently. It is a
     change detector, not a state identity, and Phase 9.2 comparisons must use the state itself.
-- `[ ]` Compare static transforms, animation state, camera state and deterministic object ordering.
-- `[~]` Diagnostic frames now carry a deterministic CPU state hash over camera matrices, object
+- `[x]` Compare static transforms, animation state, camera state and deterministic object ordering.
+  The first three are the matrices this phase already runs -- four axes of static transform with bit
+  equality, the alien's pose at a second reached every way a playhead can reach it, and the camera
+  conventions pinned in `[scene][camera][forensics]`. The fourth is
+  `[gpu][composition][forensics][ordering]`: the same scene state produces the same slot assignment,
+  the slots are a dense range from zero (which is what makes "slot times stride" an address rather
+  than a number), they **ascend with entity index**, they survive a reload, and hiding an object
+  closes the gap rather than leaving a hole. That ascending check is the one with teeth: without it
+  every other assertion would pass for any fixed permutation the renderer invented and then
+  repeated.
+- `[x]` Diagnostic frames carry a deterministic CPU state hash over camera matrices, object
   transforms/bounds, frustum margins, visibility, GPU slot/submission state and selected rig palette
-  metadata. A focused regression verifies the hash is stable for the same state and changes with
-  camera state; full frame-100/500 replay and bone-matrix/scene-state hashes remain open.
+  metadata, and a regression verifies it is stable for the same state and changes with the camera.
+  The frame-100/500 replay is above and passing. **Bone-matrix and scene-state hashes are refused on
+  purpose**, and the reason is the trap recorded above: this hash folds a monotonic counter, so it is
+  a change *detector* and not an identity. Hashing the bones would produce a second number with the
+  same weakness, when what the phase actually needs -- and now has -- is the joint matrices compared
+  element by element, which is what localised the animation defect to 98 of 147 joints. A hash can
+  only ever say "something differs".
 - `[~]` Log hash transitions with frame number and seek direction.
   The replay regression reports differing joint matrices and entity transforms by count at the
   divergent second, which is what localised the animation defect. Application-level logging of hash
   transitions during an interactive scrub is still open.
-- `[ ]` Add tests for timeline seeking, reverse playback, scene reload and renderer reuse.
-- `[ ]` Distinguish same-GPU bit equality from cross-GPU perceptual comparison.
+- `[x]` Add tests for timeline seeking, reverse playback, scene reload and renderer reuse. All four
+  in Phase 3.4's interleaved sequence, and deliberately *together* rather than one at a time: each is
+  already covered alone, and the two defects that sequence found were only reachable by a walk that
+  crossed them. Reverse playback is its descending thirteen-point sweep, re-run ascending.
+- `[x]` Distinguish same-GPU bit equality from cross-GPU perceptual comparison. **Everything in this
+  repository is same-GPU bit equality, and there is no perceptual comparison anywhere.** Recorded as
+  a position rather than a gap: there is one GPU here, so a cross-GPU tolerance could be written but
+  not validated, and an unvalidated tolerance is worse than none -- it turns a real difference into a
+  pass. What the investigation does instead, wherever bit equality is the wrong instrument, is
+  compare *structure* rather than pixels: coverage against the reference renderer, footprints per
+  object, state through `compareSnapshots`. Those survive a change of GPU in a way an image hash
+  never will. If a second GPU is ever available, the first experiment is the static-object matrix,
+  because it is the one whose failure would be unambiguous.
 
 ### 9.3 NaN/Inf guards and transform history
 

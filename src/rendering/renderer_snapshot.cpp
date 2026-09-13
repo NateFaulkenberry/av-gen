@@ -73,6 +73,7 @@ json snapshotToJson(const FrameSnapshot& s) {
         objects.push_back(json{{"name", o.name},
                                {"entityIndex", o.entityIndex},
                                {"objectSlot", o.objectSlot},
+                               {"bufferOffset", o.bufferOffset},
                                {"mesh", o.mesh},
                                {"materialHash", o.materialHash},
                                {"worldPosition", vec3(o.worldPosition)},
@@ -174,6 +175,7 @@ Result<FrameSnapshot> snapshotFromJson(const json& doc) {
         d.name = o.value("name", std::string());
         d.entityIndex = o.value("entityIndex", std::size_t{0});
         d.objectSlot = o.value("objectSlot", d.objectSlot);
+        d.bufferOffset = o.value("bufferOffset", d.bufferOffset);
         d.mesh = o.value("mesh", d.mesh);
         d.materialHash = o.value("materialHash", std::uint64_t{0});
         auto position = readVec3(o, "worldPosition");

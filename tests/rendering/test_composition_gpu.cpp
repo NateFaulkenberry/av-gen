@@ -3916,3 +3916,240 @@ TEST_CASE("freezing animation holds the pose; disabling it takes the pose away",
     renderer.setPassToggles(rendering::SceneRenderer::PassToggles{});
     CHECK(ctx->errorCount() == 0);
 }
+
+// ---- Phase 3.3: identifiers that stay the same object ------------------------------------------
+//
+// The identifier target is what a click resolves against and what the `Ids` view colours by, so the
+// property that matters is not that ids *exist* but that a given id keeps naming the same thing
+// while the camera moves, the timeline runs and objects come and go from the frame. An id that
+// silently re-pointed would give a stable-looking picture and a wrong selection -- the failure this
+// numbering already had once, when a click on a scattered tree resolved as an entity index.
+//
+// The word is checked whole, and both halves are cross-examined against each other: the low sixteen
+// bits are the pick id and the high sixteen are the material id, which is one-based. Those two are
+// derived from the same entity index by different arithmetic, so requiring them to agree is a real
+// check on the packing rather than a restatement of it.
+TEST_CASE("an object identifier keeps naming the same object", "[gpu][composition][forensics][ids]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the RendererQA scene is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(project).has_value());
+    FixedStepClock clock(60.0);
+    constexpr std::uint32_t kW = 160;
+    constexpr std::uint32_t kH = 120;
+    REQUIRE(engine.play().has_value());
+
+    // id -> the entity name it named, the first time it was seen.
+    std::map<std::uint32_t, std::string> named;
+    std::set<std::uint32_t> everSeen;
+    std::size_t framesWithGeometry = 0;
+
+    for (int frame = 0; frame < 24; ++frame) {
+        // The camera orbits, so objects enter and leave the frame and the submission order changes
+        // with them -- which is exactly the condition under which a slot-derived id would drift.
+        const float angle = static_cast<float>(frame) * 0.26f;
+        aimCompositionCamera(engine.params(),
+                             glm::vec3(std::sin(angle) * 11.0f, 3.0f + std::sin(angle * 0.7f) * 2.0f,
+                                       std::cos(angle) * 11.0f),
+                             glm::vec3(0.0f, 1.0f, -4.0f));
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(kW, kH);
+        engine.update(time);
+        REQUIRE(renderer.renderToImage(engine.scene(), time, kW, kH).has_value());
+
+        auto words = gpu::readTextureR32Uint(*ctx, renderer.identifierTexture(), kW, kH);
+        REQUIRE(words.has_value());
+        const scene::Scene& scene = engine.scene();
+
+        std::set<std::uint32_t> thisFrame;
+        for (const std::uint32_t word : *words) {
+            if (word == 0) {
+                continue; // nothing drawn here; entity zero's own id is 0, which is why the whole
+                          // word is the emptiness test and not the low half
+            }
+            thisFrame.insert(word);
+        }
+        if (!thisFrame.empty()) {
+            ++framesWithGeometry;
+        }
+        for (const std::uint32_t word : thisFrame) {
+            everSeen.insert(word);
+            const std::uint32_t pick = word & 0xFFFFu;
+            const std::uint32_t material = (word >> 16) & 0xFFFFu;
+            INFO("frame " << frame << " word " << word);
+            // The two halves are derived from the same index by different arithmetic -- the low one
+            // through `packPickId`, the high one as `index + 1` -- so requiring them to agree is a
+            // check on the packing rather than a restatement of it. Both the entity and the
+            // procedural writers use that convention, which is itself worth pinning: three
+            // renderers write into this one target and each numbers from zero, which is why the
+            // space tag exists at all.
+            REQUIRE(material > 0); // one-based, which is what keeps index zero's word non-zero
+            const std::uint32_t index = scene::pickIndexOf(pick);
+            CHECK(index == material - 1);
+
+            // Resolved through the space tag. Without it these are the same small numbers, and a
+            // click on a scattered tree used to select whichever entity shared its index.
+            std::string name;
+            switch (scene::pickSpaceOf(pick)) {
+            case scene::PickSpace::Entity:
+                REQUIRE(index < scene.entities.size());
+                name = "entity:" + scene.entities[index].name;
+                break;
+            case scene::PickSpace::Procedural:
+                REQUIRE(index < scene.procedurals.size());
+                name = "procedural:" + scene.procedurals[index].name;
+                break;
+            case scene::PickSpace::Sdf:
+                REQUIRE(index < scene.sdfs.size());
+                name = "sdf:" + std::to_string(index);
+                break;
+            }
+            const auto [it, inserted] = named.emplace(word, name);
+            if (!inserted) {
+                INFO("id " << word << " named '" << it->second << "' before and '" << name << "' now");
+                CHECK(it->second == name);
+            }
+        }
+    }
+
+    INFO(everSeen.size() << " distinct identifiers over " << framesWithGeometry << " frames");
+    // Several objects were actually seen, or the loop above asserted nothing. Three is the floor the
+    // views test uses for this scene: a floor, an alien and an orb.
+    CHECK(framesWithGeometry == 24);
+    CHECK(everSeen.size() >= 3);
+
+    // Water is the documented exception and is asserted as one rather than left to be rediscovered:
+    // its pipeline masks every scene target but colour and emission, so it writes no identifier at
+    // all. Any water entity in this scene is therefore absent from everything above.
+    std::size_t waterEntities = 0;
+    for (std::size_t i = 0; i < engine.scene().entities.size(); ++i) {
+        if (engine.scene().entities[i].style == scene::MeshStyle::Water) {
+            ++waterEntities;
+            const std::uint32_t pick = scene::packPickId(scene::PickSpace::Entity, i);
+            for (const std::uint32_t word : everSeen) {
+                CHECK((word & 0xFFFFu) != pick);
+            }
+        }
+    }
+    INFO(waterEntities << " water entities, none of which wrote an identifier");
+
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- Phase 9.2: object ordering is a property of the scene, not of the frame --------------------
+//
+// The slot an object gets is its submission order, and submission order is what a renderer is free
+// to change for its own reasons -- a sort, a cull, a batch. This asserts that it does not: the same
+// scene state produces the same assignment, and the assignment is the scene's entity order filtered
+// by what is drawable, not an order the renderer invented.
+//
+// It matters because two other things in this investigation rest on it. The object uniform buffer is
+// addressed by slot, so an order that varied between two renders of one state would be a different
+// buffer layout for the same frame; and a capture compares objects by *name* precisely because slot
+// is not an identity, which is only a safe design if slot is at least stable for a given state.
+TEST_CASE("object submission order is a function of the scene", "[gpu][composition][forensics][ordering]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa-minimal.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the minimal QA variant is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(project).has_value());
+    FixedStepClock clock(60.0);
+    constexpr std::uint32_t kW = 128;
+    constexpr std::uint32_t kH = 96;
+    aimCompositionCamera(engine.params(), glm::vec3(0.0f, 2.5f, 9.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    const FrameTime time = engine.tick(clock);
+    engine.setViewport(kW, kH);
+    engine.update(time);
+
+    // name -> slot, from the renderer's own diagnostic.
+    const auto slotsNow = [&] {
+        std::map<std::string, std::uint32_t> slots;
+        for (const auto& object : renderer.diagnosticFrame().objects) {
+            if (object.submitted) {
+                slots.emplace(object.name, object.objectSlot);
+            }
+        }
+        return slots;
+    };
+    const auto draw = [&] {
+        REQUIRE(renderer.renderToImage(engine.scene(), time, kW, kH).has_value());
+        return slotsNow();
+    };
+
+    const std::map<std::string, std::uint32_t> first = draw();
+    REQUIRE(first.size() >= 2);
+
+    // The same state, drawn again: identical assignment.
+    CHECK(draw() == first);
+
+    // No two objects share a slot, and the slots are a dense range from zero -- the property that
+    // makes "slot times stride" a valid address and not merely a number.
+    std::set<std::uint32_t> used;
+    for (const auto& [name, slot] : first) {
+        INFO("'" << name << "' in slot " << slot);
+        CHECK(used.insert(slot).second);
+    }
+    CHECK(*used.begin() == 0);
+    CHECK(*used.rbegin() == used.size() - 1);
+
+    // The order follows the *scene*, not the renderer: slots ascend with entity index among the
+    // objects that were submitted. Without this the checks above would pass for any fixed
+    // permutation the renderer happened to invent and then repeat.
+    std::vector<std::pair<std::size_t, std::uint32_t>> byEntity;
+    for (const auto& object : renderer.diagnosticFrame().objects) {
+        if (object.submitted) {
+            byEntity.emplace_back(object.entityIndex, object.objectSlot);
+        }
+    }
+    std::sort(byEntity.begin(), byEntity.end());
+    for (std::size_t i = 1; i < byEntity.size(); ++i) {
+        INFO("entity " << byEntity[i - 1].first << " -> slot " << byEntity[i - 1].second << ", entity "
+                       << byEntity[i].first << " -> slot " << byEntity[i].second);
+        CHECK(byEntity[i - 1].second < byEntity[i].second);
+    }
+
+    // A reload rebuilds every object; the assignment has to come back the same, or a capture taken
+    // before a reload could not be compared with one taken after.
+    REQUIRE(engine.loadComposition(project).has_value());
+    aimCompositionCamera(engine.params(), glm::vec3(0.0f, 2.5f, 9.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    const FrameTime reloaded = engine.tick(clock);
+    engine.setViewport(kW, kH);
+    engine.update(reloaded);
+    REQUIRE(renderer.renderToImage(engine.scene(), reloaded, kW, kH).has_value());
+    CHECK(slotsNow() == first);
+
+    // ...and hiding an object closes the gap rather than leaving a hole, which is what says the
+    // assignment is a filter over the scene rather than an index into it.
+    scene::Scene& mutableScene = engine.composition()->scene();
+    const std::string hidden = first.begin()->first;
+    for (scene::Entity& entity : mutableScene.entities) {
+        if (entity.name == hidden) {
+            entity.visible = false;
+        }
+    }
+    REQUIRE(renderer.renderToImage(mutableScene, reloaded, kW, kH).has_value());
+    const std::map<std::string, std::uint32_t> without = slotsNow();
+    INFO("hid '" << hidden << "'");
+    CHECK(without.size() == first.size() - 1);
+    std::set<std::uint32_t> stillUsed;
+    for (const auto& [name, slot] : without) {
+        stillUsed.insert(slot);
+    }
+    CHECK(*stillUsed.begin() == 0);
+    CHECK(*stillUsed.rbegin() == stillUsed.size() - 1);
+
+    CHECK(ctx->errorCount() == 0);
+}

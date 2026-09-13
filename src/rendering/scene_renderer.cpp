@@ -2172,6 +2172,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const float depth = -(view * glm::vec4(entity.transform.position, 1.0f)).z;
         RenderObjectDiagnostic& diagnostic = diagnosticFrame_.objects[thisEntity];
         diagnostic.objectSlot = objectIndex;
+        diagnostic.bufferOffset = offset;
         diagnostic.submitted = true;
         diagnostic.cullReason = "submitted";
         ++objectIndex;

@@ -24,6 +24,11 @@ struct RenderObjectDiagnostic {
     std::string name;
     std::size_t entityIndex = 0;
     std::uint32_t objectSlot = std::numeric_limits<std::uint32_t>::max();
+    // Where in the object uniform buffer this frame put it: the slot times the stride. Derivable,
+    // and recorded anyway, because a capture read by a person should not require them to know the
+    // stride -- and because the slot is *not* stable between frames (it is submission order), so an
+    // offset that looks familiar in two captures is a coincidence worth being able to see.
+    std::uint32_t bufferOffset = 0;
     // What this object is *made of*, which the transform cannot say (Phase 2.1). A mesh or material
     // swapped for another produces a wrong picture with every matrix identical, and a capture that
     // carried only the geometry's placement would compare as unchanged. The material is a
