@@ -265,7 +265,13 @@ scene::Scene instanceRing(int visible, int hidden, bool cull) {
     g.source.size = {kObjectHalfExtent * 2.0f, kObjectHalfExtent * 2.0f, kObjectHalfExtent * 2.0f};
     g.source.subdivisions = 1;
     g.meshHash = boxSpecHash();
-    g.structureVersion = 1;
+    // **Not a constant.** `ProceduralRenderer` re-uploads an instance buffer only when
+    // `structureVersion` changes or the instance *count* changes (procedural_renderer.cpp:1473), so
+    // two arms with the same name, the same count and different positions are the same arm: the
+    // second silently renders the first's instances. The visibility sweep below is exactly that
+    // shape -- one population, moved -- and it reported an unculled 8,192 at every arc until this
+    // line existed. The version is derived from the arm's own parameters so it cannot be forgotten.
+    g.structureVersion = static_cast<std::uint64_t>(visible) * 1000003ull + static_cast<std::uint64_t>(hidden);
     g.material.baseColor = {0.55f, 0.5f, 0.45f};
     g.material.roughness = 0.6f;
     g.lod.cull = cull;
@@ -298,7 +304,8 @@ scene::Scene instanceArc(int count, double arcDegrees, bool cull) {
     g.source.size = {kObjectHalfExtent * 2.0f, kObjectHalfExtent * 2.0f, kObjectHalfExtent * 2.0f};
     g.source.subdivisions = 1;
     g.meshHash = boxSpecHash();
-    g.structureVersion = 1;
+    // See instanceRing: the arc *is* the structure here, since the count never moves.
+    g.structureVersion = static_cast<std::uint64_t>(arcDegrees * 1000.0) + 1ull;
     g.material.baseColor = {0.55f, 0.5f, 0.45f};
     g.material.roughness = 0.6f;
     g.lod.cull = cull;
@@ -529,11 +536,13 @@ TEST_CASE("scene-pass cost against instance count at constant visibility",
                 CHECK(point.visibleInstances == static_cast<double>(kVisible));
             }
         } else {
-            // With culling off, "visible" is the whole population: the counter is reporting what was
-            // submitted, and this is the arm that says what that costs.
+            // With culling off there is no cull pass, so `visibleInstances` is never written and
+            // stays zero -- "not measured", not "nothing visible". What proves the whole population
+            // was submitted is the triangle count: twelve per box, every instance, every arm.
             for (const rendering::SweepPoint& point : summary.points) {
                 INFO("arm " << point.arm);
-                CHECK(point.visibleInstances == point.x);
+                CHECK(point.visibleInstances == 0.0);
+                CHECK(point.triangles == point.x * 12.0);
             }
         }
     }
@@ -574,7 +583,12 @@ TEST_CASE("scene-pass cost against the visible fraction of a fixed population",
         INFO("arm " << point.arm);
         CHECK(point.visibleInstances + point.culledInstances == static_cast<double>(kPopulation));
     }
-    CHECK(summary.points.front().visibleInstances > summary.points[arcs.size() - 1].visibleInstances);
+    // The narrowest arc fits inside the frustum, so nothing is culled there; the widest wraps the
+    // camera and most of the population is behind it. If this does not hold, the fixture is not
+    // varying visibility and the curve is measuring nothing -- which is precisely what happened
+    // before `structureVersion` was made a function of the arm (see instanceRing's note).
+    CHECK(summary.points.front().visibleInstances == static_cast<double>(kPopulation));
+    CHECK(summary.points[arcs.size() - 1].visibleInstances < static_cast<double>(kPopulation) / 2.0);
     CHECK(ctx->errorCount() == 0);
 }
 
