@@ -239,6 +239,48 @@ so even the counter change is the two merges together, not the shadow branch alo
 A same-session interleaved A/B on `shadowTexelTarget` (zero restores the old range) is the way to
 settle it, and it is assigned to the Phase B agent, which needs that arm anyway.
 
+## 3.2.3 Wave 2 merged head
+
+Revision `0d1ef85`, clean tree, 1280x800, five locked runs, all four wave-2 branches merged.
+
+| | wave 1 head (S3.2.2) | wave 2 head |
+|---|---|---|
+| GPU median | 13.37 ms | **13.37 ms** |
+| scene pass | 10.88 ms | **10.81 ms** |
+| draws / triangles | 141 / 264,305 | **141 / 264,305** |
+
+**Unchanged, and that is the expected result, not a disappointment.** Wave 2 was a measurement and
+correctness wave: `frag` landed net zero shader change after measuring and reverting two contact-march
+optimisations, `repr`'s work is additive and deliberately unwired pending the Phase B rebase, and
+`cap`'s canonical frame is byte-identical by `cmp`. Nothing in the frame path was asked to get
+faster, so nothing did.
+
+**The run was noisier than the wave 1 batch and the reason is known.** Spread 11.8% across five runs
+-- but run 1 alone was 14.81 ms and runs 2-5 span 13.24-13.70 (3.4%). Run 1 followed a fresh build
+with cold caches. The batch is reported whole rather than trimmed, because a discarded outlier that
+goes unmentioned is how a noise floor quietly becomes whatever the author needs it to be. The
+practical rule for later waves: a measurement batch taken immediately after a build must treat its
+first run as warm-up, the way the per-run harness already discards its first 12 frames.
+
+Visual gate: the canonical Glowmere frame captured at 120 frames and inspected at full size --
+correct, with no missing geometry and no popping.
+
+### What the frame is now known to cost
+
+The attribution below is `frag`'s re-derivation (S4.10, ADR-117 to ADR-121) against the 10.88 ms
+scene pass, replacing Phase A's shares, which were all shares of 15.73 ms:
+
+| item | cost | share of scene pass |
+|---|---|---|
+| contact shadow march | **2.36 ms** | **22%** |
+| shadow mask | 1.12 ms | 10% |
+| mask at full resolution | 1.02 ms | 9% |
+| opaque shading no arm removes | **~8.4 ms** | the remainder |
+
+The contact march is the single largest nameable item in the frame and Phase A could not see it: it
+is a loop inside `evaluateLight`, not a pass, and every arm-based attribution is structurally blind
+to anything that is not a pass. That is a lesson about the instrument, not about shadows.
+
 ## 3.3 Reproducibility — investigated, not assumed
 
 Five consecutive Glowmere runs, same session:
