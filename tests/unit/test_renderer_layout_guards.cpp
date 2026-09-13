@@ -57,6 +57,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <regex>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -1243,5 +1245,97 @@ TEST_CASE("a non-finite field strength is packed into the field block unchanged"
         field.strength = kNaN;
         const spatial::FieldGpu packed = spatial::packField(field, 0.0);
         CHECK_FALSE(finite(packed.strengthInnerOuterTau));
+    }
+}
+
+// ---- shared scalar constants: the other half of the CPU/WGSL pairing -----------------------------
+//
+// The struct guards above check that two *layouts* describe the same bytes. This checks the other
+// thing that is written down twice: a **constant** that C++ and WGSL both hardcode.
+//
+// The existing guard on `kMaxLodLevels` is
+//     static_assert(scene::kMaxLodLevels == 4, "shaders/cull.wgsl hardcodes kMaxLodLevels ...")
+// which fires when the C++ value changes and is silent when the *shader* changes -- and the shader
+// is the copy a person is more likely to edit while looking at shader code. It is also the exact
+// shape this repository's working rules warn against: a transcription of a constant into an
+// assertion passes for as long as both copies are edited together, and fails only when someone
+// edits one.
+//
+// So these read the number out of the WGSL and compare it to the C++ symbol. No third copy is
+// written down here: if the shader says 4 and C++ says 4, the test passes without either number
+// appearing in this file.
+//
+// Found during the renderer upgrade audit: `shaders/spline.wgsl` carries an **unguarded** second
+// copy of `kMaxGpuSplines` as an array extent, with nothing to catch the two drifting apart.
+// Glowmere already logs "22 splines; only the first 16 are available on the GPU", so the limit is
+// user-visible today and a silent mismatch would be a wrong picture rather than a validation error.
+namespace {
+
+// `const NAME: u32 = 4u;` -> 4
+std::optional<std::size_t> wgslConst(const std::string& text, const std::string& name) {
+    const std::regex re("const\\s+" + name + R"(\s*:\s*u32\s*=\s*(\d+)u?\s*;)");
+    std::smatch m;
+    if (!std::regex_search(text, m, re)) {
+        return std::nullopt;
+    }
+    return static_cast<std::size_t>(std::stoul(m[1].str()));
+}
+
+// `field: array<TYPE, 16>,` -> 16. The element type may itself be generic (`vec4<f32>`), so the
+// nesting has to be tolerated -- a plain `[^,>]+` stops at the inner `>` and matches nothing, which
+// is what the control section below caught on the first run.
+std::optional<std::size_t> wgslArrayExtent(const std::string& text, const std::string& field) {
+    const std::regex re(field + R"(\s*:\s*array\s*<(?:[^<>]|<[^<>]*>)*,\s*(\d+)\s*>)");
+    std::smatch m;
+    if (!std::regex_search(text, m, re)) {
+        return std::nullopt;
+    }
+    return static_cast<std::size_t>(std::stoul(m[1].str()));
+}
+
+} // namespace
+
+TEST_CASE("a constant written down in both C++ and WGSL agrees with itself",
+          "[unit][renderer][forensics][layout]") {
+    SECTION("kMaxLodLevels: cull.wgsl strides the shared indirect buffer by it") {
+        const auto text = readFile(shaderDir() / "cull.wgsl");
+        REQUIRE(text.has_value());
+        const auto shader = wgslConst(stripComments(*text), "kMaxLodLevels");
+        INFO("shaders/cull.wgsl must declare `const kMaxLodLevels: u32 = <n>u;`");
+        REQUIRE(shader.has_value());
+        CHECK(*shader == static_cast<std::size_t>(scene::kMaxLodLevels));
+    }
+
+    SECTION("kMaxGpuSplines: spline.wgsl sizes its table by it") {
+        // This pairing had no guard at all until the upgrade audit found it.
+        const auto text = readFile(shaderDir() / "spline.wgsl");
+        REQUIRE(text.has_value());
+        const std::string body = stripComments(*text);
+        const auto info = wgslArrayExtent(body, "info");
+        INFO("shaders/spline.wgsl must declare `info: array<vec4<f32>, <n>>` in SplineTable");
+        REQUIRE(info.has_value());
+
+        // The C++ side is *scraped from the header text*, not included: `spline_buffers.hpp` pulls
+        // in <webgpu/webgpu_cpp.h>, which this deliberately GPU-free binary cannot link. Scraping is
+        // also the more honest comparison -- two declarations read the same way, with no third copy
+        // of the number written down in this file.
+        const auto header = readFile(sourceDir() / "rendering" / "spline_buffers.hpp");
+        REQUIRE(header.has_value());
+        const Constants cpp = parseConstants(stripComments(*header));
+        const auto it = cpp.find("kMaxGpuSplines");
+        INFO("src/rendering/spline_buffers.hpp must declare kMaxGpuSplines");
+        REQUIRE(it != cpp.end());
+        CHECK(static_cast<long long>(*info) == it->second);
+    }
+
+    SECTION("the parsers actually parse, rather than returning nothing and passing") {
+        // Without this, a regex that matched nothing would make both sections above vacuous -- the
+        // REQUIREs would fire, but a future edit that renamed a field would look like a parser
+        // problem rather than a drift. These are the controls for the two readers.
+        const std::string sample = "const kThing: u32 = 7u;\nstruct S { info: array<vec4<f32>, 12>, };";
+        CHECK(wgslConst(sample, "kThing") == std::optional<std::size_t>(7));
+        CHECK(wgslArrayExtent(sample, "info") == std::optional<std::size_t>(12));
+        CHECK_FALSE(wgslConst(sample, "kAbsent").has_value());
+        CHECK_FALSE(wgslArrayExtent(sample, "absent").has_value());
     }
 }
