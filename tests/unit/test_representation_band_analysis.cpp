@@ -132,10 +132,11 @@ struct Slice {
 struct Frame {
     std::array<Slice, 4> band{};
     Slice all;
-    // Scatter instances already resolved to LOD2 (a camera-facing billboard) or LOD3 (a dot) by the
-    // shipped ADR-029 ladder. The count that says how much of C5 is already in the product.
-    std::uint64_t alreadyBillboard = 0;
-    std::uint64_t alreadyDot = 0;
+    // Scatter instances the shipped ADR-029 ladder put on rung 2 or rung 3. Deliberately NOT
+    // called "billboards": whether rung 2 *is* a billboard depends on the source kind, and the
+    // ladder report below is what settles that per layer rather than assuming it.
+    std::uint64_t atRung2 = 0;
+    std::uint64_t atRung3 = 0;
     std::uint64_t scatterDrawables = 0;
 
     void add(Band b, float pixelsPerTriangle, std::uint64_t tris, double cover) {
@@ -214,6 +215,13 @@ TEST_CASE("Where Glowmere's fragment-cost excess lives, by representation band",
 
     Frame frame;
     Frame scatterOnly;
+    // Triangles per rung, per scatter layer. The ladder's *rungs*, not the instances on them: what
+    // a distant instance is actually asked to draw.
+    std::vector<std::pair<std::string, std::array<std::uint32_t, scene::kMaxLodLevels>>> ladder;
+    // Who is actually in the two bands C5 and C6 would serve, by layer. The bands' totals say how
+    // big the prize is; this says which content it would have to be taken from, which is the part
+    // that decides whether one mechanism can reach it or four would be needed.
+    std::map<std::string, Slice> targetByLayer;
 
     scene::MeshMetricsCache cache;
     for (const scene::Entity& e : scn.entities) {
@@ -248,6 +256,14 @@ TEST_CASE("Where Glowmere's fragment-cost excess lives, by representation band",
             rung[static_cast<std::size_t>(level)] = reduced ? scene::meshMetrics(*reduced) : rung[0];
         }
         if (!rung[0].valid()) continue;
+        {
+            std::array<std::uint32_t, scene::kMaxLodLevels> tris{};
+            for (int level = 0; level < scene::kMaxLodLevels; ++level) {
+                tris[static_cast<std::size_t>(level)] =
+                    level < levels ? rung[static_cast<std::size_t>(level)].triangles : 0u;
+            }
+            ladder.emplace_back(object.name, tris);
+        }
         for (const scene::InstanceRecord& record : object.instances) {
             const glm::vec3 center(record.position);
             const glm::vec3 scale = glm::abs(glm::vec3(record.scale));
@@ -269,9 +285,12 @@ TEST_CASE("Where Glowmere's fragment-cost excess lives, by representation band",
             const Band b = bandOf(policy, r.projectedRadius);
             frame.add(b, r.pixelsPerTriangle, m.triangles, coverage);
             scatterOnly.add(b, r.pixelsPerTriangle, m.triangles, coverage);
+            if (b == Band::Proxy || b == Band::Impostor) {
+                targetByLayer[object.name].add(r.pixelsPerTriangle, m.triangles, coverage);
+            }
             scatterOnly.scatterDrawables += 1;
-            if (level == 2) scatterOnly.alreadyBillboard += 1;
-            if (level == 3) scatterOnly.alreadyDot += 1;
+            if (level == 2) scatterOnly.atRung2 += 1;
+            if (level == 3) scatterOnly.atRung3 += 1;
         }
     }
 
@@ -321,17 +340,33 @@ TEST_CASE("Where Glowmere's fragment-cost excess lives, by representation band",
     reportFrame("ALL SUBMITTED GEOMETRY", frame);
     reportFrame("procedural scatter only (the ecology)", scatterOnly);
 
-    std::printf("\n  how much of C5 the shipped ADR-029 ladder already does:\n");
-    std::printf("    scatter instances drawn this frame:            %llu\n",
-                static_cast<unsigned long long>(scatterOnly.scatterDrawables));
-    std::printf("    already a camera-facing billboard (LOD2):      %llu (%.1f%%)\n",
-                static_cast<unsigned long long>(scatterOnly.alreadyBillboard),
-                100.0 * static_cast<double>(scatterOnly.alreadyBillboard) /
-                    static_cast<double>(std::max<std::uint64_t>(scatterOnly.scatterDrawables, 1)));
-    std::printf("    already a dot (LOD3):                          %llu (%.1f%%)\n",
-                static_cast<unsigned long long>(scatterOnly.alreadyDot),
-                100.0 * static_cast<double>(scatterOnly.alreadyDot) /
-                    static_cast<double>(std::max<std::uint64_t>(scatterOnly.scatterDrawables, 1)));
+    std::printf("\n  what the shipped ADR-029 ladder actually hands the far bands:\n");
+    std::printf("    scatter instances drawn this frame: %llu, of which %llu on rung 2 and %llu on rung 3\n",
+                static_cast<unsigned long long>(scatterOnly.scatterDrawables),
+                static_cast<unsigned long long>(scatterOnly.atRung2),
+                static_cast<unsigned long long>(scatterOnly.atRung3));
+    std::printf("    a rung of 2 triangles is the billboard `makeLodMesh` documents. Anything larger\n"
+                "    is a simplified mesh, and the impostor rung is not being reached.\n");
+    std::printf("    %-40s %9s %9s %9s %9s\n", "layer", "rung0", "rung1", "rung2", "rung3");
+    for (const auto& [name, tris] : ladder) {
+        std::printf("    %-40s %9u %9u %9u %9u\n", name.c_str(), tris[0], tris[1], tris[2], tris[3]);
+    }
+    std::printf("\n");
+
+    std::printf("  the C5 + C6 bands by layer, worst first by recoverable weighted cost:\n");
+    std::vector<std::pair<std::string, Slice>> target(targetByLayer.begin(), targetByLayer.end());
+    std::sort(target.begin(), target.end(), [](const auto& a, const auto& b) {
+        return a.second.weightedCost - a.second.coverage > b.second.weightedCost - b.second.coverage;
+    });
+    std::printf("    %-30s %9s %10s %11s %8s %11s\n", "layer", "drawables", "triangles", "coverage",
+                "excess", "recoverable");
+    for (const auto& [name, s2] : target) {
+        if (s2.triangles == 0) continue;
+        std::printf("    %-30s %9llu %10llu %11.0f %7.2fx %11.0f\n", name.c_str(),
+                    static_cast<unsigned long long>(s2.drawables),
+                    static_cast<unsigned long long>(s2.triangles), s2.coverage, s2.excess(),
+                    s2.weightedCost - s2.coverage);
+    }
     std::printf("\n");
 
     // Instrument checks only. §4.5's first run was a convincing null result produced by rendering
