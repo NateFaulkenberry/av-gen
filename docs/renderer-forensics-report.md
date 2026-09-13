@@ -685,17 +685,78 @@ each decision site, not a subsystem to replace.
 
 ### Is the architecture sound enough to keep building on
 
-**Yes, with the reservation that the evidence is about the paths that have been walked.** Across two
-passes the investigation found six defects, five of them in *state ownership at a boundary* -- a
-cache key, a history, a pool, a parameter lifetime, a phase origin -- and one in geometry. None was
-in the transform chain, the camera model or the GPU object path, which were the three the original
-symptoms pointed at and which are now the best-evidenced parts of the renderer.
+**Yes, with the reservation that the evidence is about the paths that have been walked.** Across three
+passes the investigation found eleven defects, **nine of them state ownership at a boundary** -- a
+cache key, a temporal history, a particle pool twice, a parameter lifetime, an animation phase
+origin, a skinning palette across a jump -- one in geometry, and one a pass on the wrong side of the
+tone map. None was in the transform chain, the camera model or the GPU object path, which were the
+three the original symptoms pointed at and are now the best-evidenced parts of the renderer.
 
-The recurring weakness is not in the renderer at all: it is that **a scene can say something the
-engine silently ignores**. The `material` block, `volumeDensity: 0` keeping a pass off, an orb's
-hard-coded surface -- each was authored in good faith and did nothing, and the QA scene meant to
-torture the renderer turned out to contain no transparency and no water. That class costs more than
-any renderer bug found here and is where the next pass should look.
+That distribution is the architectural answer. Subsystems hold their own invariants; **handovers are
+where this engine breaks**, and the repair is always the same shape -- say who owns the value and
+when it is resynchronised. It is also why no rewrite is justified: rewriting a subsystem preserves
+every defect that lives between two.
+
+Two weaknesses are worth carrying forward, and neither is in the renderer.
+
+**A scene can say something the engine silently ignores.** The `material` block, `volumeDensity: 0`
+keeping a pass off, an orb's hard-coded surface -- each authored in good faith and doing nothing, and
+the QA scene meant to torture the renderer contained no transparency and no water. That class cost
+more than any renderer bug found here.
+
+**A measurement can be reassuring and wrong**, which cost this investigation more than both. A frame
+mean that tracked sky coverage rather than depth. A camera move that passed through the surface it
+was measuring. A hue test that read a grey sphere as a blue one. A transparency backstop placed
+between the panes. A "liveness" check that was reading a defect. Six vacuous setups, each caught only
+by asking what the instrument would do in the case it was *not* for -- which is why that is now a
+working rule rather than a habit.
+
+## The completion gate, answered
+
+The plan's nine questions, each with the evidence rather than a verdict.
+
+**Why does a static object move?** In every case examined: *it does not.* The transform path is
+pinned on four axes with bit equality on RendererQA and now on Glowmere with the visitor the report
+was about -- camera motion, seeks and scrubs, resolution changes, reloads -- and compared per object
+against an independent renderer. What produced the appearance of drift, three times over, was the
+*instrument*: a clock restarted per frame reporting a zero delta, an animated procedural turning
+slowly at distance, and a camera moving while the test believed it was parked. `TransformHistory`
+now separates the three cases over time, which no single frame can do.
+
+**Why does the alien flicker?** Animation, and specifically the phase origin: an authored state's
+origin was the engine's first update rather than the timeline's zero, so the same second reached two
+ways gave two poses -- 98 joint matrices apart with every entity transform identical. Repaired by
+ownership, regressed by "the pose at a second is a property of the piece, not of how the playhead
+arrived", and negative-controlled by restoring the defect.
+
+**Why does water leak or intersect terrain incorrectly?** Geometry. `buildChunkWater` emits a quad
+when *any* corner is wet, so the sheet deliberately overhangs the bank by one cell, and a dry corner
+measured its depth against a level borrowed from a wet neighbour, so the fade that hides the overhang
+did not fade it. The depth-space explanation everyone reaches for first is **refuted by measurement**,
+not merely untested.
+
+**Which subsystem causes each problem?** Named for all eleven in the bug table -- and for anything
+new, the bisection answers it mechanically: the minimal set of subsystems a symptom needs, every
+member load-bearing.
+
+**Can each problem be reproduced in a controlled test?** Yes, all eleven, each with a named test tag.
+
+**Can a subsystem be disabled to prove the failure boundary?** For eleven subsystems, yes, and each
+arm is asserted to remove the thing it names. For four -- terrain, LOD, depth test, depth write --
+**no**, and each is recorded as blocked with what unblocks it, because the plan's rule is that a
+control which lies is worse than a missing one.
+
+**Can the subsystem be re-enabled after repair without regression?** Yes: 262,560 render assertions
+and 491,828 unit assertions pass in release, and the arm/pass join asserts that switching an arm back
+on restores exactly its own pass and nothing else.
+
+**Are scene state, frame snapshots and GPU submission ownership explicit?** Yes, and written down
+rather than implied: the derived-copy rule with its table, the renderer-side ownership table, the
+resource inventory with what invalidates each entry, and the five-step frame lifecycle.
+
+**Are remaining unknowns documented instead of implied to be fixed?** Yes. `SYM-TERRAIN-1` is open
+with four suspects eliminated and two sources remaining. The live-path swapchain race is untested.
+GPU capture covers nothing. The full GPU suite under ASan is a five-hour run and was not done.
 
 ## Final classification rule
 

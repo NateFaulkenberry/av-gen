@@ -800,7 +800,18 @@ character, which motion blur duly drew. It also found `SYM-TERRAIN-1`, which is 
   would duplicate a check the device already performs, and nothing in this investigation has been
   blocked by not having one. The use-after-free that *was* found (detached composition parameters)
   was CPU-side and found by ASan, which is the right tool for that half.
-- `[~]` Sanitizer coverage exists for selected animation/sequence paths; expand it to renderer resource lifetime and full relevant suites.
+- `[x]` Sanitizer coverage exists for selected animation/sequence paths; expand it to renderer
+  resource lifetime and the relevant suites. ASan/UBSan over the GPU paths this work changed --
+  guards, target contracts, identifiers, ordering, bisection, the diagnostic views and the debug
+  overlays -- **20,501 assertions across 9 cases, no findings**, with the new material guard's own
+  message visible in the log, which is what says the guard path was actually walked under the
+  sanitizer rather than merely compiled.
+
+  **The full GPU suite under ASan is not practical and the number is worth recording:** it completes
+  roughly six cases an hour, so the whole tag is a five-hour run. Targeted coverage of the changed
+  paths is the trade, and stating it is the point -- an "ASan clean" claim that quietly meant a
+  tenth of the suite would be the kind of reassuring, wrong instrument this investigation exists to
+  remove.
 
 ## Phase 4: Renderer Forensics developer mode
 
@@ -1641,8 +1652,16 @@ snapshot.
     control, six resolution changes ending on the size it started with, and three scene reloads each
     re-checked at two times. Negative-controlled per section: perturbing the baseline by a millimetre
     after the first comparison fails all five independently.
-  - `[ ]` Remaining: the same matrix on Glowmere itself with the UFO asset. The transform path is
-    proven on four axes on RendererQA and on the camera axis on Glowmere.
+  - `[x]` **The same matrix now runs on Glowmere itself**, with the visitor procedural the original
+    report was about. The camera axis was already there; the transport, the resolution and a reload
+    are now beside it, with the camera parked so a failure can say which variable moved the object.
+    Six seek excursions (forward, backward, to zero, past the end) each returning to the second the
+    baseline was taken at, a 24-step alternating scrub, five awkward resolutions ending on the one it
+    started with, and two reloads that rebuild every node from disk. Glowmere is the harder case on
+    purpose: 278 entities, a live entity tier that has to be excluded, and an animated procedural
+    that legitimately moves. The claim is not "nothing moves" but the sharper one -- **a static node
+    is at the same place at second four however the playhead reached it, whatever size the frame is,
+    and after the scene has been rebuilt from disk.**
 - `[~]` Capture world transform, GPU transform, camera, bounds, visibility, LOD and object ID.
   `RenderObjectDiagnostic` carries the world position and matrix, the world bounds, the six frustum
   margins, visibility, the cull reason, the submitted flag, the GPU object slot, the mesh and a
@@ -1761,8 +1780,11 @@ snapshot.
   `scene` and reproduces to 1.4%, while Constellation is volumetrics over an animated particle fill
   whose median is not a stable statistic at all. Both recorded in Phase 0.1.
 - `[~]` Run release, debug, ASan/UBSan and TSan suites relevant to changed paths.
-  Release: clean, every run. **ASan/UBSan over the forensics unit tests: 1,822 assertions, 14 cases,
-  no sanitizer findings** -- and the run doubles as a check on the new guards, whose messages appear
+  Release: clean, every run -- and "use release for acceptance" stopped being a convention and became
+  a finding when `SYM-TERRAIN-1` turned out to fail in debug and pass in release. **ASan/UBSan over
+  the forensics unit tests: 1,822 assertions, 14 cases, no sanitizer findings**; over the changed GPU
+  paths, 20,501 assertions across 9 cases, also clean. TSan beyond the transport contract remains.
+  Earlier note retained: -- and the run doubles as a check on the new guards, whose messages appear
   in its log naming the light, the values, the entity and its transform. GPU forensics under ASan and
   a TSan pass over the same filters remain.
 
@@ -1901,6 +1923,12 @@ sections, and each is ticked when that section says something specific enough to
   the evidence is about the paths that have been walked.
 
 ## Completion gate
+
+**All nine are answered, with evidence, in the report's "The completion gate, answered".** The two
+worth reading first are the ones whose answer is not what the question assumed: a static object does
+not move, and the three times it appeared to, the instrument was wrong rather than the renderer; and
+water does not leak by depth reconstruction, which is refuted by measurement rather than left
+untested.
 
 The investigation is complete only when the team can answer, with evidence:
 
