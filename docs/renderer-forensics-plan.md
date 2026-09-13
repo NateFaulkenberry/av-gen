@@ -652,12 +652,37 @@ outside.
 
 ### 5.3 Character isolation and skinning
 
-- `[ ]` Create a scene with only camera, ground, one character and one light.
-- `[ ]` Run the progression: animation off -> animation on -> culling -> shadows -> transparency -> post FX.
-- `[ ]` Instrument character ID, skeleton ID, clip, animation time/delta, pose version, bone count, skinning buffer and GPU index.
-- `[ ]` Reject or report NaN/Inf bone matrices, invalid quaternions/scales, invalid bone indices and invalid weights.
-- `[ ]` Capture the exact animation/frame/state for invalid pose data.
-- `[ ]` Test bind-pose, idle, walk, run, loop, pause, resume, seek, scrub, reverse, close/far camera and scene reload.
+`tests/rendering/test_character_forensics_gpu.cpp`, `[gpu][composition][forensics][character5_3]`:
+four cases, 2,531 assertions.
+
+- `[x]` Create a scene with only camera, ground, one character and one light.
+  `examples/qa/renderer-qa-character.scene.json`, and the first test case asserts the scene really is
+  that -- two entities, no procedurals, no particles, one light, one rig -- before anything else
+  claims something about it.
+- `[x]` Run the progression: animation off -> animation on -> culling -> shadows -> transparency -> post FX.
+  Every rung renders the *same frame* with different arms, so a change is attributable to the arm
+  rather than to the clip moving on, and each rung is rendered twice and required to reproduce.
+  **The transparency rung is a null arm on this scene** -- identical hash, because a scene with one
+  character has nothing blended in it -- and it is recorded as one and then tested separately against
+  a blended object. That is the same "a level whose subsystem the scene does not contain proves
+  nothing" the progressive matrix ran into.
+- `[x]` Instrument character ID, skeleton ID, clip, animation time/delta, pose version, bone count, skinning buffer and GPU index.
+  Including the skinning slice's alignment and that it is large enough for the current *and*
+  previous palette, and that `paletteVersion` advances by exactly one per frame.
+- `[x]` Reject or report NaN/Inf bone matrices, invalid quaternions/scales, invalid bone indices and invalid weights.
+  420+ frames across Idle, Walk and Run plus a cross-fade: non-finite palette entries, collapsed or
+  mirrored joints (determinant <= 0), runaway translations, non-unit quaternions, non-positive
+  scales, joint indices past the palette, weights out of range or not summing to one.
+- `[x]` Capture the exact animation/frame/state for invalid pose data. Every fault report carries the
+  clip, the state, the frame index, the second, the clip time and the joint.
+- `[x]` Test bind-pose, idle, walk, run, loop, pause, resume, seek, scrub, reverse, close/far camera and scene reload.
+  The pose is asserted to be a pure function of the timeline on all of them -- played-to against
+  seeked-to against a fresh engine -- which is the property the phase-origin repair established.
+
+**Two things this found that are worth carrying.** `PassToggles::animation` does not stop the CPU
+pose; it removes skinning from the *draw*, so the rig statistics keep whatever the last posed frame
+left while the upload goes to zero. And a culled rig is only "not skinned" while shadows are off: with
+a cascade on, a character behind the camera is still skinned for its shadow, which is correct.
 
 ### 5.4 Character terrain ownership
 
