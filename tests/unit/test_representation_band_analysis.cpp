@@ -132,6 +132,11 @@ struct Slice {
 struct Frame {
     std::array<Slice, 4> band{};
     Slice all;
+    // The same drawables, costed at the rung ADR-124's *measured* rule would pick instead of the
+    // one the shipped radius ladder picked. Not a hypothetical mechanism -- this is
+    // RepresentationSelector, which C3/C4 built, calibrated and unit-tested, and which ADR-125
+    // records as deliberately not yet wired to anything.
+    Slice selector;
     // Scatter instances the shipped ADR-029 ladder put on rung 2 or rung 3. Deliberately NOT
     // called "billboards": whether rung 2 *is* a billboard depends on the source kind, and the
     // ladder report below is what settles that per layer rather than assuming it.
@@ -215,6 +220,14 @@ TEST_CASE("Where Glowmere's fragment-cost excess lives, by representation band",
 
     Frame frame;
     Frame scatterOnly;
+    // The rung decision alone. The kind bands are collapsed to zero on purpose: proxies and
+    // impostors do not exist, so asking the selector which *kind* to use would be costing
+    // machinery that is not built. What is being asked is the one question it can answer today --
+    // which rung of the ladder the px/triangle rule picks -- and every drawable stays a mesh.
+    rendering::RepresentationPolicy rungOnly = policy;
+    rungOnly.proxyRadius = 0.0f;
+    rungOnly.impostorRadius = 0.0f;
+    rungOnly.cullRadius = 0.0f;
     // Triangles per rung, per scatter layer. The ladder's *rungs*, not the instances on them: what
     // a distant instance is actually asked to draw.
     std::vector<std::pair<std::string, std::array<std::uint32_t, scene::kMaxLodLevels>>> ladder;
@@ -239,6 +252,9 @@ TEST_CASE("Where Glowmere's fragment-cost excess lives, by representation band",
         if (!r.inFront || r.pixelsPerTriangle <= 0.0f) continue;
         const double coverage = std::min(static_cast<double>(r.projectedArea), frameArea);
         frame.add(bandOf(policy, r.projectedRadius), r.pixelsPerTriangle, m.triangles, coverage);
+        // An authored entity has no ladder here, so there is no other rung to pick: it is carried
+        // into the selector arm unchanged rather than being silently dropped from its denominator.
+        frame.selector.add(r.pixelsPerTriangle, m.triangles, coverage);
     }
 
     for (const scene::ProceduralGeometry& object : scn.procedurals) {
@@ -285,6 +301,32 @@ TEST_CASE("Where Glowmere's fragment-cost excess lives, by representation band",
             const Band b = bandOf(policy, r.projectedRadius);
             frame.add(b, r.pixelsPerTriangle, m.triangles, coverage);
             scatterOnly.add(b, r.pixelsPerTriangle, m.triangles, coverage);
+            // What the px/triangle rule would pick from this object's own ladder, at this
+            // instance's distance. The rungs are the real ones -- the meshes `makeLodMesh` returns
+            // -- so this is not an estimate of a mechanism, it is the mechanism run on the data.
+            {
+                std::array<rendering::LodRung, scene::kMaxLodLevels> rungs{};
+                std::size_t rungCount = 0;
+                for (int lv = 0; lv < levels; ++lv) {
+                    const scene::MeshMetrics& lm = rung[static_cast<std::size_t>(lv)];
+                    if (!lm.valid()) break;
+                    rungs[rungCount++] = rendering::LodRung{
+                        lm.surfaceArea * scene::MeshMetrics::areaScale(scale), lm.triangles};
+                }
+                const auto choice = rendering::RepresentationSelector::decide(
+                    r, std::span<const rendering::LodRung>(rungs.data(), rungCount), rungOnly,
+                    rendering::RepresentationChoice{});
+                const std::size_t picked =
+                    std::min<std::size_t>(choice.lodLevel, rungCount > 0 ? rungCount - 1 : 0);
+                const scene::MeshMetrics& pm = rung[picked];
+                const float ppt = rendering::ImportanceEvaluator::pixelsPerTriangleFor(
+                    r, pm.surfaceArea * scene::MeshMetrics::areaScale(scale), pm.triangles);
+                // Coverage is the silhouette, which a coarser rung of the same object still fills;
+                // charging the *new* rung's projected area instead would credit the arm with
+                // shrinking the object, which is a different and much larger claim.
+                frame.selector.add(ppt, pm.triangles, coverage);
+                scatterOnly.selector.add(ppt, pm.triangles, coverage);
+            }
             if (b == Band::Proxy || b == Band::Impostor) {
                 targetByLayer[object.name].add(r.pixelsPerTriangle, m.triangles, coverage);
             }
@@ -329,6 +371,15 @@ TEST_CASE("Where Glowmere's fragment-cost excess lives, by representation band",
         std::printf("    for scale, the whole-frame excess a perfect system of any kind\n"
                     "      could address is                                       %6.2f%%\n",
                     100.0 * (1.0 - 1.0 / std::max(f.all.excess(), 1e-9)));
+        if (f.selector.coverage > 0.0) {
+            std::printf("    and, for comparison, what the ALREADY BUILT selector would do to the\n"
+                        "      same frame by picking a different rung of the same ladders:\n"
+                        "      excess %.2fx -> %.2fx, triangles %llu -> %llu   (%+6.2f%%)\n",
+                        f.all.excess(), f.selector.excess(),
+                        static_cast<unsigned long long>(f.all.triangles),
+                        static_cast<unsigned long long>(f.selector.triangles),
+                        -100.0 * (1.0 - f.selector.weightedCost / base));
+        }
     };
 
     std::printf("\n=========== Glowmere by representation band, %ux%u, realtime tier ===========\n",
