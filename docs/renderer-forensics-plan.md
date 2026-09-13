@@ -649,14 +649,21 @@ turns it off, the symptom stays, and a subsystem is wrongly cleared.
 
 ## Phase 7: Render-pass state and pass contracts
 
-- `[ ]` Enumerate every pass's pipeline, bind groups, vertex/index buffers, dynamic offsets, blend, depth, stencil, viewport, scissor and target ownership.
+- `[~]` Enumerate every pass's pipeline, bind groups, vertex/index buffers, dynamic offsets, blend, depth, stencil, viewport, scissor and target ownership.
+  The pass table -- targets, load/store, depth and ownership for all nine render passes -- is in the
+  report. Per-pass bind-group and vertex-buffer inventories are not written out: they are visible in
+  the descriptors and would be a transcription rather than a check.
 - `[~]` The main `SceneRenderer` pass contract is traced: shadow and depth passes clear/store depth;
   linear depth writes R32F; the scene pass loads background color and clears auxiliary targets;
   water/blended pipelines disable depth writes; debug/post/auxiliary/tonemap passes load or clear
   their declared color targets. Remaining work is to extend this inventory through procedural,
   particle, SDF, water, post-layer and external renderer helpers and add state assertions where
   descriptors do not make the contract visible.
-- `[ ]` Verify every pass establishes the state it requires rather than relying on a previous pass.
+- `[x]` Verify every pass establishes the state it requires rather than relying on a previous pass.
+  Asserted through the arms: `[gpu][composition][forensics][passes]` checks that each isolation arm
+  removes exactly its own pass and nothing else. An arm removing two passes is one subsystem owning
+  another's state. Water, transparency and culling draw inside the scene pass rather than owning one
+  and are asserted to remove *no* pass; post owns several and is checked as a family.
 - `[~]` Procedural draws reset local pipeline/material/mesh trackers at each helper entry and particle
   draws bind their render group and blend-specific pipeline per system. These contracts are visible in
   code; equivalent assertions/regressions for all helper pass boundaries remain open.

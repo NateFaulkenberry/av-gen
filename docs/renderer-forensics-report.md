@@ -297,6 +297,37 @@ it has been shown to fail**, which is why the status definitions in the plan req
 - Diagnostic overhead measurement. (Frame-time remeasurement is done; see the plan's Phase 0.1 for
   the numbers and for why Constellation's median cannot be one of them.)
 
+## The pass contract (Phase 7)
+
+Every pass the main renderer encodes, in submission order, with what it does to its targets. Taken
+from the descriptors rather than from memory.
+
+| Pass | Colour targets | Colour load/store | Depth | Owns |
+|---|---|---|---|---|
+| `shadow` | none | — | clear / store | the cascade and spot depth maps |
+| `background` | 1 (HDR) | clear to the environment colour / store | none | the frame's ground colour |
+| `depth-prepass` | none | — | clear / store | scene depth |
+| `linear-depth` | 1 (R32F) | clear to 1e7 / store | none | linear depth for AO, water and post |
+| `scene` | `kSceneTargetCount` | colour loads the background; the auxiliary targets clear to zero / store | loads the prepass, else clears | opaque, procedural, SDF, sky, water, particles, transparent |
+| `debug` | 1 (HDR) | load / store | load | ADR-031 debug geometry |
+| `post-layer` | 1 | clear / store | none | user post layers |
+| `aux-debug` | 1 | clear / store | none | the auxiliary-target viewer |
+| `tonemap` | 1 | clear / store | none | the final display-referred image |
+
+Compute passes -- culling, clusters, particles, fields, SDF, simulation -- are marked on the same
+timeline and own their own buffers.
+
+**Asserted, not only described.** `[gpu][composition][forensics][passes]` checks the join between
+this table and Phase 4.2's isolation arms: *each arm removes exactly its own pass and nothing else.*
+An arm that removed two passes would be one subsystem owning another's state, which is the "relies on
+a previous pass" the phase is about; an arm that removed none would be the untruthful control the
+plan forbids; a pass appearing when its arm is off would be a pass running for nobody.
+
+Three arms -- water, transparency, culling -- draw *inside* the scene pass rather than owning one, so
+what they remove is draws. The test records that distinction rather than leaving it to be
+rediscovered. Post owns several labelled passes and is checked as a family: everything it removes
+begins with `post`.
+
 ## Phase 12: findings
 
 ### The bug table

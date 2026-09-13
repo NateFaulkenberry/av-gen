@@ -29,6 +29,7 @@
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <set>
 #include <optional>
 #include <ranges>
 #include <memory>
@@ -2656,5 +2657,148 @@ TEST_CASE("the reference renderer and the production renderer cover the same pix
         ++comparedViews;
     }
     CHECK(comparedViews == std::size(views));
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- Phase 7: the pass contract, asserted rather than described ----------------------------------
+//
+// The plan asks for every pass's inputs, outputs, clears and ownership to be enumerated, and for
+// each pass to "establish the state it requires rather than relying on a previous pass". The
+// enumeration is in the report; what can be *asserted* from outside is the join between the two
+// halves this investigation built: **each isolation arm removes exactly its own pass, and nothing
+// else.**
+//
+// That is a stronger claim than it looks. An arm that removed two passes would mean one subsystem
+// owning another's state, which is precisely the "relies on a previous pass" the phase is about; an
+// arm that removed none would be the untruthful control the plan forbids. And a pass that appears
+// when its arm is off would be a pass running for nobody.
+TEST_CASE("each isolation arm removes exactly its own pass", "[gpu][composition][forensics][passes]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the RendererQA scene is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(project).has_value());
+    // The volumetric march is off at zero density however its arm is set, and RendererQA authors
+    // zero -- so without this the volume arm would be tested against a pass that never ran and
+    // would pass by removing nothing.
+    {
+        auto* density = engine.params().findAs<float>("scene/volumeDensity");
+        REQUIRE(density != nullptr);
+        density->setBase(0.06f);
+        engine.params().resetFinals();
+    }
+    FixedStepClock clock(60.0);
+
+    // The set of pass labels a frame encoded, from the GPU timeline the renderer already keeps.
+    // Several frames, because the timeline resolves asynchronously and an early frame reports
+    // nothing at all.
+    const auto passesWith = [&](const rendering::SceneRenderer::PassToggles& toggles) {
+        renderer.setPassToggles(toggles);
+        std::set<std::string> labels;
+        for (int i = 0; i < 8; ++i) {
+            const FrameTime time = engine.tick(clock);
+            engine.setViewport(160, 120);
+            engine.update(time);
+            const auto image = renderer.renderToImage(engine.scene(), time, 160, 120);
+            REQUIRE(image.has_value());
+            for (const auto& entry : renderer.timeline().passes()) {
+                labels.insert(std::string(entry.label));
+            }
+        }
+        return labels;
+    };
+
+    const rendering::SceneRenderer::PassToggles all;
+    const std::set<std::string> full = passesWith(all);
+    {
+        std::string names;
+        for (const std::string& label : full) {
+            names += (names.empty() ? "" : " ") + label;
+        }
+        INFO("the full frame encodes " << full.size() << " distinct passes: " << names);
+        // Each arm below is tested against a pass that actually runs in this scene; an arm whose
+        // pass is absent would "pass" by removing nothing.
+        for (const char* needed : {"shadow", "ao", "volume", "shadowmask"}) {
+            INFO("needed: " << needed);
+            REQUIRE(full.count(needed) == 1);
+        }
+    }
+    // The timeline has to be reporting at all, or every comparison below is between two empty sets.
+    REQUIRE(full.size() > 4);
+
+    struct Arm {
+        const char* name;
+        bool rendering::SceneRenderer::PassToggles::*field;
+        const char* pass;   // the label that must disappear, or nullptr when the arm removes work
+                            // from inside a pass rather than removing the pass itself
+    };
+    const Arm arms[] = {
+        {"shadows", &rendering::SceneRenderer::PassToggles::shadows, "shadow"},
+        {"ao", &rendering::SceneRenderer::PassToggles::ao, "ao"},
+        {"volume", &rendering::SceneRenderer::PassToggles::volume, "volume"},
+        {"shadow mask", &rendering::SceneRenderer::PassToggles::shadowMask, "shadowmask"},
+        // These three draw inside the scene pass rather than owning one, so what they remove is
+        // draws and not a pass. Named here so the distinction is recorded rather than discovered.
+        {"water", &rendering::SceneRenderer::PassToggles::water, nullptr},
+        {"transparency", &rendering::SceneRenderer::PassToggles::transparency, nullptr},
+        {"culling", &rendering::SceneRenderer::PassToggles::culling, nullptr},
+    };
+
+    for (const Arm& arm : arms) {
+        INFO("arm: " << arm.name);
+        auto off = all;
+        off.*arm.field = false;
+        const std::set<std::string> reduced = passesWith(off);
+
+        std::vector<std::string> missing;
+        std::set_difference(full.begin(), full.end(), reduced.begin(), reduced.end(),
+                            std::back_inserter(missing));
+        std::vector<std::string> extra;
+        std::set_difference(reduced.begin(), reduced.end(), full.begin(), full.end(),
+                            std::back_inserter(extra));
+        std::string report;
+        for (const std::string& m : missing) {
+            report += (report.empty() ? "" : ", ") + m;
+        }
+        INFO("gone: [" << report << "]; unexpectedly added: " << extra.size());
+        // Nothing new may appear because a subsystem was switched off.
+        CHECK(extra.empty());
+        if (arm.pass != nullptr) {
+            // Exactly its own pass, and only its own. `post` is excluded from this table because the
+            // post chain is several labelled passes rather than one, which is a fact about the chain
+            // and not a violation of the contract.
+            INFO("expected '" << arm.pass << "' to be the only pass removed");
+            CHECK(missing.size() == 1);
+            CHECK(std::find(missing.begin(), missing.end(), arm.pass) != missing.end());
+        } else {
+            // A draw-level arm must not take a pass away with it: the pass still runs, with less in
+            // it. A water arm that removed the scene pass would be water owning the pass everything
+            // else draws into.
+            CHECK(missing.empty());
+        }
+    }
+
+    // Post is the exception the table names: it owns several passes, and switching it off must
+    // remove all of them and nothing else.
+    {
+        auto off = all;
+        off.post = false;
+        const std::set<std::string> reduced = passesWith(off);
+        std::vector<std::string> missing;
+        std::set_difference(full.begin(), full.end(), reduced.begin(), reduced.end(),
+                            std::back_inserter(missing));
+        INFO(missing.size() << " passes gone with post off");
+        CHECK(missing.size() >= 1);
+        for (const std::string& gone : missing) {
+            INFO("gone: " << gone);
+            CHECK(gone.rfind("post", 0) == 0);
+        }
+    }
     CHECK(ctx->errorCount() == 0);
 }
