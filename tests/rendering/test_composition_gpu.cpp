@@ -1592,3 +1592,168 @@ TEST_CASE("a composition's static nodes hold their transforms across seeks, relo
     CHECK(checks > 40);
     CHECK(ctx->errorCount() == 0);
 }
+
+// ---- Phase 10.2: the alien matrix ---------------------------------------------------------------
+//
+// `SYM-ANIM-2` ("the alien flickers or disappears near a frustum edge") was not reproduced by a
+// 65-position sweep across the edge, and `SYM-ANIM-1` (a pose jumping under a scrub) was reproduced
+// and fixed. What neither covered is the matrix the plan asks for: the three clips this scene
+// authors, driven through the transport operations an editor actually performs.
+//
+// The claim under test is the one the phase-origin repair established, extended to every clip and
+// every route to a second: **the pose at a given second is a property of the piece, not of how the
+// playhead arrived there.** A character whose walk cycle depends on playback history is a character
+// that flicks to a different pose when you scrub, which is what the report describes.
+//
+// The palettes are compared directly rather than through an image hash. "The pixels differ" is where
+// the last investigation started; "98 joint matrices, no transforms" is where it became a fix.
+TEST_CASE("the alien's pose is the same second whichever way the playhead reached it",
+          "[gpu][composition][forensics][alien][animation]") {
+    const fs::path sceneFile = fs::path(AVGEN_SOURCE_DIR) / "examples" / "characters" / "alien.scene.json";
+    if (!fs::is_regular_file(sceneFile)) {
+        SKIP("the alien composition is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    constexpr std::uint32_t kW = 192;
+    constexpr std::uint32_t kH = 120;
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(sceneFile).has_value());
+
+    // Every rig's palette, which is the whole of what "the pose" means here.
+    const auto poseAt = [&](app::Engine& e, double seconds, bool seek) {
+        if (seek) {
+            e.seekSeconds(seconds);
+        }
+        FixedStepClock clock(60.0);
+        clock.restartAt(seconds);
+        const FrameTime time = e.tick(clock);
+        e.setViewport(kW, kH);
+        e.update(time);
+        std::vector<glm::mat4> palette;
+        for (const scene::SkinnedRig& rig : e.scene().rigs) {
+            palette.insert(palette.end(), rig.palette.begin(), rig.palette.end());
+        }
+        return palette;
+    };
+
+    // The reference: an engine that has been nowhere, seeked straight to the second in question.
+    const auto poseFresh = [&](double seconds) {
+        app::Engine fresh(app::EngineMode::Offline);
+        REQUIRE(fresh.loadComposition(sceneFile).has_value());
+        return poseAt(fresh, seconds, true);
+    };
+
+    const auto differing = [](const std::vector<glm::mat4>& a, const std::vector<glm::mat4>& b) {
+        if (a.size() != b.size()) {
+            return a.size() + b.size();
+        }
+        std::size_t n = 0;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            n += a[i] == b[i] ? 0 : 1;
+        }
+        return n;
+    };
+
+    // The three clips this scene authors are all playing at once on three nodes, so every second
+    // exercises all of them; there is no state to select.
+    REQUIRE_FALSE(engine.scene().rigs.empty());
+    const std::vector<glm::mat4> atStart = poseAt(engine, 0.5, true);
+    REQUIRE(atStart.size() > 20);   // a real skeleton, not an empty palette
+
+    std::size_t comparisons = 0;
+    const auto sameAsFresh = [&](double seconds, const char* how) {
+        const std::vector<glm::mat4> mine = poseAt(engine, seconds, false);
+        const std::vector<glm::mat4> reference = poseFresh(seconds);
+        INFO(how << " at " << seconds << " s: " << differing(mine, reference) << " of "
+                 << reference.size() << " joints differ");
+        CHECK(differing(mine, reference) == 0);
+        ++comparisons;
+    };
+
+    SECTION("playing to a second, and seeking to it") {
+        // Play forwards through a while of the piece, then check the pose against an engine that
+        // seeked straight there.
+        for (int i = 1; i <= 120; ++i) {
+            poseAt(engine, static_cast<double>(i) / 60.0, false);
+        }
+        sameAsFresh(2.0, "played to");
+
+        engine.seekSeconds(7.5);
+        poseAt(engine, 7.5, false);
+        sameAsFresh(7.5, "seeked to");
+    }
+
+    SECTION("scrubbing back and forth reaches the same poses") {
+        double at = 3.0;
+        for (int i = 0; i < 30; ++i) {
+            at += (i % 4 == 0) ? -0.37 : 0.19;
+            at = std::max(0.0, at);
+            engine.seekSeconds(at);
+            poseAt(engine, at, false);
+        }
+        for (const double seconds : {1.0, 4.25, 9.0, 0.0}) {
+            engine.seekSeconds(seconds);
+            sameAsFresh(seconds, "after a scrub, seeked to");
+        }
+    }
+
+    SECTION("pausing and resuming does not move the pose") {
+        engine.seekSeconds(5.0);
+        const std::vector<glm::mat4> paused = poseAt(engine, 5.0, false);
+        // The same second asked for again, repeatedly: a pose that drifts while the playhead is
+        // parked is a pose being integrated rather than evaluated.
+        for (int i = 0; i < 8; ++i) {
+            const std::vector<glm::mat4> again = poseAt(engine, 5.0, false);
+            INFO("held at 5 s, repeat " << i);
+            CHECK(differing(paused, again) == 0);
+            ++comparisons;
+        }
+        sameAsFresh(5.0, "held at");
+    }
+
+    SECTION("a reload returns the same pose") {
+        for (int i = 0; i < 2; ++i) {
+            REQUIRE(engine.loadComposition(sceneFile).has_value());
+            renderer.resetTemporalHistory();
+            engine.seekSeconds(6.25);
+            sameAsFresh(6.25, "after a reload");
+        }
+    }
+
+    SECTION("the character is drawn, near and far, and never culled while on screen") {
+        // The other half of the report: not the pose but whether it is there at all. A rig that is
+        // culled while its posed limbs are on screen is `SYM-ANIM-2`.
+        for (const float distance : {2.5f, 6.0f, 14.0f, 30.0f}) {
+            aimCompositionCamera(engine.params(), glm::vec3(0.0f, 1.4f, distance),
+                                 glm::vec3(0.0f, 1.0f, 0.0f));
+            for (int i = 0; i < 20; ++i) {
+                const double at = 1.0 + static_cast<double>(i) / 30.0;
+                poseAt(engine, at, false);
+                const auto image = renderer.renderToImage(engine.scene(), FrameTime{}, kW, kH);
+                REQUIRE(image.has_value());
+                std::size_t rigged = 0;
+                std::size_t culled = 0;
+                for (const scene::Entity& e : engine.scene().entities) {
+                    if (e.rig == scene::kInvalidRig || !e.visible) {
+                        continue;
+                    }
+                    ++rigged;
+                    culled += e.cameraCulled ? 1 : 0;
+                }
+                INFO("at " << distance << " m, frame " << i << ": " << rigged << " rigs, " << culled
+                           << " culled");
+                REQUIRE(rigged > 0);
+                CHECK(culled == 0);   // all three stand at the origin and the camera is on them
+                ++comparisons;
+            }
+        }
+    }
+
+    INFO(comparisons << " comparisons");
+    CHECK(comparisons > 0);
+    CHECK(ctx->errorCount() == 0);
+}

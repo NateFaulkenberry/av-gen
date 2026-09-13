@@ -751,9 +751,22 @@ For every level, run camera translation, rotation, orbit, dolly, playback, pause
 
 ### 10.2 Alien regression
 
-- `[ ]` Test idle, walk, run, loop, pause, resume, seek, scrub, close/far camera, orbit, terrain crossing, water proximity and reload.
-- `[ ]` Record animation time, pose version, bone matrices, bounds, visibility and GPU skinning state.
-- `[ ]` Run culling-off, animation-off, post-FX-off and depth-off comparisons.
+- `[~]` Test idle, walk, run, loop, pause, resume, seek, scrub, close/far camera, orbit, terrain crossing, water proximity and reload.
+  `tests/rendering/test_composition_gpu.cpp`, `[gpu][composition][forensics][alien][animation]`, 310
+  assertions. The scene authors Idle, Walk and Run on three nodes at once, so every second exercises
+  all three. Covered: playing to a second versus seeking to it, a 30-step scrub followed by four
+  seeks, holding a parked playhead for eight frames, two reloads, and four camera distances. Not
+  covered: terrain crossing and water proximity, which this scene has neither of.
+  The claim is the one the phase-origin repair established, extended to every clip and every route
+  to a second: **the pose at a second is a property of the piece, not of how the playhead arrived.**
+  Negative-controlled by restoring the phase-origin defect, which fails it with the same signature
+  the original experiment found -- 98 of 147 joints.
+- `[~]` Record animation time, pose version, bone matrices, bounds, visibility and GPU skinning state.
+  Bone matrices and visibility are compared directly by the matrix above; palette version and time
+  are in the diagnostic snapshot. Bounds and GPU skinning slices are not compared per frame.
+- `[~]` Run culling-off, animation-off, post-FX-off and depth-off comparisons.
+  The rigged entities are checked never to be culled while the camera is on them, at four distances
+  over twenty frames each. The subsystem-toggle comparisons remain open.
 - `[ ]` Identify the first subsystem that changes flicker behavior and fix its ownership/state flow.
 - `[ ]` Add the regression test and evidence capture.
 
@@ -928,6 +941,53 @@ there would be demanding what ADR-091 declines to promise.
 3. Audit the remaining derived-copy pairs. Two have now been found by accident rather than by search
    -- `CompositionNode::transform` and `scene::Camera` are both re-derived from parameters every
    frame -- and Phase 1.3's table has not actually been built.
+
+## Session log: 13 September 2026 (third pass)
+
+**Closed.** `SYM-WATER-1` (reproduced, root-caused, fixed). The static object's remaining three axes
+(seek, scrub, reload, resize) and Phase 1.3's duplicate search. Phase 1.4's mutation assertions and
+Phase 5.1's "culling never mutates authored state". Phase 3.3's alternating-transform test. Phase
+6.3's transparency isolation. Phase 6.1's shoreline view matrix. Most of Phase 10.2. The Phase
+0.1/11.2 performance remeasurement.
+
+**One defect found and fixed:** water standing over dry ground at a descending shoreline. A dry
+corner of the water sheet borrowed a wet neighbour's *surface level* -- correct, it keeps the sheet
+flat to the bank -- and then computed its depth attribute against that borrowed level, claiming up to
+2.9 m of water over ground the world calls dry. The shader's shore fade, which is the only thing that
+hides the sheet's deliberate one-cell overhang, covers 0.75 m; `smoothstep(0, 0.75, 2.9)` is 1. It
+came out fully opaque.
+
+**One measurement defect found:** the Constellation baseline's GPU median is not a statistic. Five
+runs of the identical command gave 6.62 to 10.75 ms with the tails unmoved. The scene is animated, a
+120-frame window never reaches steady state, and a 400-frame run medians *lower* than a 120-frame one
+-- the opposite of a warm-up. Compare its tails or a fixed frame index.
+
+**Two more hypotheses disproven, recorded so they are not retried:**
+
+1. *Pixels can answer "is there stale GPU object data".* They cannot, when the test moves anything.
+   Two cubes exchanging places is motion, and a running renderer carries previous-frame matrices, an
+   AO history and an adapting exposure that a cold one does not: 22 of 24 frames differed with the
+   object data perfectly correct. Ask the object diagnostics instead.
+2. *`SceneRenderer` needs a runtime assertion that it does not mutate scene state.* It cannot mutate
+   it. All three entry points take `const scene::Scene&` and the only `const_cast` under
+   `src/rendering` is on the renderer's own LOD bookkeeping.
+
+**Two more vacuous tests caught by negative controls**, bringing the total to five. The derived-copy
+contract test, whose `setBase` writes never reached `applyParameters` because nothing refreshed the
+*final* values. And the transparency sorting test, whose opaque backstop sat *between* the two panes
+it was sorting, so one was always occluded and the pair never composited together -- reversing the
+renderer's sort did not disturb it.
+
+**Next smallest falsifiable checks**, in the order I would take them:
+
+1. The alien matrix's two uncovered axes -- terrain crossing and water proximity -- which need a
+   scene that has both before they need a test. Phase 5.4's character/terrain Y-ownership question is
+   the same scene.
+2. The water mask/depth *visualisations* (Phase 4.5, 6.2). The leakage question is answered on two
+   instruments; what is still missing is the ability to look at a shoreline pixel and see which of
+   water depth, terrain depth and the fade produced it.
+3. Phase 2's immutable frame snapshot and reference renderer, which is the largest remaining
+   structural item and the one every "compare reference to production" task below it waits on.
 
 ## Session handoff
 
