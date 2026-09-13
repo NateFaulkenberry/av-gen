@@ -13,6 +13,7 @@
 #include "app/render_job.hpp"
 #include "assets/asset_registry.hpp"
 #include "assets/image.hpp"
+#include "rendering/renderer_snapshot.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
 #include "scene/composition.hpp"
@@ -2377,6 +2378,157 @@ TEST_CASE("the RendererQA variants each contain the subsystem they isolate",
         CHECK(c.blended == 2);
         CHECK(c.objects() >= 3);
         CHECK(c.rigged == 0);
+    }
+
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- Phase 9.1: capture, replay and a difference in words ----------------------------------------
+//
+// The evidence standard this investigation set for itself says a captured frame is *not* an image
+// hash: "an image hash says something differs; it never says what, and the Phase 9.2 defect was
+// localised in one comparison by checking palettes and transforms separately". This is that
+// comparison made portable -- a frame's state written to a file, and two of them diffed into
+// sentences naming the object and the field.
+//
+// Tested the only way a diff can honestly be tested: by making each kind of difference on purpose
+// and checking it is the one reported. A differ that returns "something changed" for everything
+// would pass a test that only ever moved one thing.
+TEST_CASE("a captured frame replays, and two of them differ in words",
+          "[gpu][composition][forensics][snapshot]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the RendererQA scene is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(project).has_value());
+    FixedStepClock clock(60.0);
+    const auto capture = [&](const char* note) {
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(160, 120);
+        engine.update(time);
+        const auto image = renderer.renderToImage(engine.scene(), time, 160, 120);
+        REQUIRE(image.has_value());
+        rendering::FrameSnapshot snap;
+        snap.frame = renderer.diagnosticFrame();
+        snap.toggles = renderer.passToggles();
+        snap.scene = "renderer-qa";
+        snap.note = note;
+        return snap;
+    };
+
+    aimCompositionCamera(engine.params(), glm::vec3(0.0f, 3.0f, 12.0f), glm::vec3(0.0f, 1.0f, -4.0f));
+    const rendering::FrameSnapshot first = capture("the reference frame");
+    // Three: the grid floor, the alien and the orb. The procedural boxes are *not* here -- the
+    // diagnostic frame is built from `Scene::entities`, and a procedural node becomes a
+    // `Scene::procedurals` entry instead. Worth knowing before trusting a per-object diagnostic on a
+    // scene like Glowmere, where most of the geometry is procedural.
+    REQUIRE(first.frame.objects.size() >= 3);
+
+    SECTION("a capture survives a round trip through a file") {
+        const fs::path file = fs::temp_directory_path() /
+                              ("avgen_snapshot_" + std::to_string(::getpid()) + ".json");
+        REQUIRE(rendering::writeSnapshot(first, file).has_value());
+        const auto reloaded = rendering::readSnapshot(file);
+        INFO((reloaded ? std::string() : reloaded.error().message));
+        REQUIRE(reloaded.has_value());
+        // Reading back a capture and comparing it against the frame it came from must report
+        // nothing. Anything it reports here is the serialiser losing state, which would make every
+        // later comparison a comparison with the file format.
+        const auto same = rendering::compareSnapshots(first, *reloaded);
+        for (const std::string& line : same) {
+            INFO(line);
+        }
+        CHECK(same.empty());
+        CHECK(reloaded->frame.objects.size() == first.frame.objects.size());
+        CHECK(reloaded->scene == "renderer-qa");
+        std::error_code ec;
+        fs::remove(file, ec);
+    }
+
+    SECTION("the same state captured twice reports no difference") {
+        const rendering::FrameSnapshot again = capture("the same frame again");
+        const auto diff = rendering::compareSnapshots(first, again);
+        for (const std::string& line : diff) {
+            INFO(line);
+        }
+        CHECK(diff.empty());
+
+        // ...and the monotonic bookkeeping is there when it is asked for, labelled as what it is.
+        // The rig palette version increments on every upload, so it differs between two arrivals at
+        // the same second of the same piece. Phase 9.2 tried to use the state hash as a replay
+        // identity for exactly this reason and could not.
+        const auto withCounters = rendering::compareSnapshots(first, again, 1e-5f, true);
+        CHECK(withCounters.size() > diff.size());
+        CHECK(std::any_of(withCounters.begin(), withCounters.end(), [](const std::string& l) {
+            return l.find("a counter, not a pose") != std::string::npos;
+        }));
+    }
+
+    SECTION("each kind of difference is reported as itself") {
+        const auto reports = [](const std::vector<std::string>& lines, std::string_view needle) {
+            return std::any_of(lines.begin(), lines.end(), [&](const std::string& l) {
+                return l.find(needle) != std::string::npos;
+            });
+        };
+
+        // A moved object.
+        {
+            rendering::FrameSnapshot moved = first;
+            REQUIRE_FALSE(moved.frame.objects.empty());
+            moved.frame.objects.front().worldPosition.y += 0.5f;
+            moved.frame.objects.front().worldMatrix[3][1] += 0.5f;
+            const auto diff = rendering::compareSnapshots(first, moved);
+            REQUIRE_FALSE(diff.empty());
+            INFO(diff.front());
+            CHECK(reports(diff, "moved"));
+            CHECK(reports(diff, first.frame.objects.front().name));
+        }
+        // An object that stopped being submitted, which is what a culling change looks like.
+        {
+            rendering::FrameSnapshot culled = first;
+            culled.frame.objects.front().cameraCulled = !culled.frame.objects.front().cameraCulled;
+            culled.frame.objects.front().submitted = !culled.frame.objects.front().submitted;
+            const auto diff = rendering::compareSnapshots(first, culled);
+            CHECK(reports(diff, "culling"));
+            CHECK(reports(diff, "submission"));
+        }
+        // A swapped GPU slot: the mechanism Phase 3.3 is about.
+        {
+            rendering::FrameSnapshot swapped = first;
+            swapped.frame.objects.front().objectSlot += 1;
+            CHECK(reports(rendering::compareSnapshots(first, swapped), "GPU slot"));
+        }
+        // An object that is gone, and one that is new.
+        {
+            rendering::FrameSnapshot fewer = first;
+            const std::string dropped = fewer.frame.objects.back().name;
+            fewer.frame.objects.pop_back();
+            CHECK(reports(rendering::compareSnapshots(first, fewer), "is gone"));
+            CHECK(reports(rendering::compareSnapshots(fewer, first), "is new"));
+            CHECK(reports(rendering::compareSnapshots(first, fewer), dropped));
+        }
+        // An arm that was set differently, which invalidates the rest of the comparison.
+        {
+            rendering::FrameSnapshot other = first;
+            other.toggles.shadows = false;
+            CHECK(reports(rendering::compareSnapshots(first, other), "isolation differs"));
+        }
+        // The camera, which moves everything and is therefore worth saying once rather than
+        // per object.
+        {
+            rendering::FrameSnapshot elsewhere = first;
+            elsewhere.frame.cameraPosition.x += 3.0f;
+            elsewhere.frame.view[3][0] -= 3.0f;
+            const auto diff = rendering::compareSnapshots(first, elsewhere);
+            CHECK(reports(diff, "camera moved"));
+            CHECK(reports(diff, "view matrix"));
+        }
     }
 
     CHECK(ctx->errorCount() == 0);

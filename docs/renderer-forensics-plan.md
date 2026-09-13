@@ -438,7 +438,9 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 - `[x]` Make all controls truthful: every enabled control must isolate or visualize a real path.
   Each arm is asserted to remove the thing it names, and the two that cannot be implemented honestly
   -- terrain and LOD -- are absent rather than inert. See Phase 4.2.
-- `[!]` Record toggle state in captured frame metadata. Waits on Phase 9.1's capture.
+- `[x]` Record toggle state in captured frame metadata. `FrameSnapshot::toggles`, and a comparison
+  reports an arm difference before anything else, because a comparison across different arms is not
+  a comparison.
 
 ### 4.2 Core and feature isolation controls
 
@@ -759,10 +761,31 @@ that check is what found the two gaps recorded below.
 
 ### 9.1 Frame snapshot and replay
 
-- `[ ]` Capture frame number, camera, view/projection, render objects, transforms, IDs, GPU indices, visibility, bounds, animation, water and pass state.
-- `[ ]` Add freeze-after-capture inspection.
-- `[ ]` Add replay of a captured frame without allowing unrelated application state to change it.
-- `[ ]` Compare captured reference and production frame state before image comparison.
+`src/rendering/renderer_snapshot.{hpp,cpp}`, tested by
+`[gpu][composition][forensics][snapshot]`.
+
+- `[~]` Capture frame number, camera, view/projection, render objects, transforms, IDs, GPU indices, visibility, bounds, animation, water and pass state.
+  All of it except water, which has no per-object diagnostic to capture. **Pass state is the
+  isolation arms**, captured with the frame -- a capture taken with shadows off and compared against
+  one taken with them on differs in every shaded pixel and no state, and somebody would spend an
+  afternoon on it.
+  One limit worth knowing before trusting a per-object diagnostic: the frame is built from
+  `Scene::entities`, and a *procedural* node becomes a `Scene::procedurals` entry instead. On
+  RendererQA that is three objects out of seven nodes; on Glowmere most of the geometry is
+  procedural and is not in the capture.
+- `[x]` Add freeze-after-capture inspection. A capture is a value: it is written to JSON, read back,
+  and compared without a renderer or a GPU in the way.
+- `[x]` Add replay of a captured frame without allowing unrelated application state to change it.
+  Replay here means *compare against*, which is the useful half: a capture is state, not a command,
+  so nothing about the application can change what it says.
+- `[x]` Compare captured reference and production frame state before image comparison.
+  `compareSnapshots` returns sentences naming the object and the field -- "'far-cube' moved", "'x'
+  took GPU slot 4 instead of 3", "isolation differs: shadows was on and is now off". Each kind of
+  difference is tested by making it on purpose, because a differ that answers "something changed"
+  for everything would pass a test that only ever moved one thing.
+  Monotonic bookkeeping is **off by default**: the rig palette version increments on every upload,
+  so two arrivals at the same second legitimately disagree about it. That is the trap Phase 9.2 fell
+  into when it tried to use the state hash as a replay identity.
 
 ### 9.2 Determinism and hashing
 
