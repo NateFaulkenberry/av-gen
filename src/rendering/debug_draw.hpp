@@ -111,6 +111,12 @@ struct DebugViewOptions {
     bool frustum = false;
     float frustumAspect = 16.0f / 9.0f;
     bool transformTrail = false;  // the recorded world path of the selected object (transform_history.hpp)
+    // Renderer forensics, Phase 4.5. Every skinned entity's joints, in world space: a point per
+    // joint and a line to its parent. Drawn from the rig's *model-space* matrices rather than from
+    // the GPU palette, because the palette is `model * inverseBind` and its translation is not
+    // where the joint is -- reading a bone position out of it is the kind of plausible-looking
+    // mistake a skeleton overlay exists to catch, not to make.
+    bool skeletons = false;
     bool depthTest = true;
     float pointSize = 3.0f;
     int maxPoints = 200000;       // safety cap per frame

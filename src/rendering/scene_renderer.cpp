@@ -1232,7 +1232,7 @@ std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
         {"shadowmask", &T::shadowMask},     {"culling", &T::culling},
         {"water", &T::water},               {"transparency", &T::transparency},
         {"particles", &T::particles},       {"animation", &T::animation},
-        {"cameramotion", &T::cameraMotion},
+        {"cameramotion", &T::cameraMotion},  {"animationmotion", &T::animationMotion},
     };
     return kArms;
 }
@@ -1751,6 +1751,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // skinned mesh draws from its rest vertices. Not "freeze the clip", which would still be a pose
     // and still be animation -- this is the arm that removes skinning from the frame.
     if (toggles_.animation) {
+        // ...and `animationMotion` is the other arm: the palettes stay as they are, so a character
+        // stops moving in place. The two together are what separate "the character's pose is wrong"
+        // from "the character's pose is not changing".
+        skinning_->setFrozen(!toggles_.animationMotion);
         skinning_->update(scene);
     }
     updateEnvironment(scene);

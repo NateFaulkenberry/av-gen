@@ -597,6 +597,8 @@ turns it off, the symptom stays, and a subsystem is wrongly cleared.
 - `[x]` Disable post FX. (Pre-existing.)
 - `[ ]` Disable VFX. No subsystem by that name exists; particles, volumetrics and post are the three
   it would mean, and each has its own control.
+- `[x]` Freeze animation. `animationMotion`: the palettes already on the GPU are held, so a character
+  stops moving in place rather than snapping to a bind pose. See Phase 4.5.
 - `[~]` Freeze camera. What is built is a **view and projection freeze**: the matrices the scene pass
   draws with are held while the camera moves, and the stale cull verdicts from the moved camera are
   ignored so the frozen view is self-consistent. The sky, the volumetrics and the particle systems
@@ -722,16 +724,54 @@ unchanged, with the shaded frame's hash changing under the same four stops as it
 
 ### 4.5 Animation and water controls
 
-- `[ ]` Freeze animation.
-- `[ ]` Show skeleton and bones.
-- `[ ]` Show animation time.
-- `[ ]` Show skinning state.
-- `[ ]` Show water mask.
-- `[ ]` Show water depth.
-- `[ ]` Show terrain depth.
-- `[ ]` Show intersection mask.
-- `[ ]` Disable water post effects.
-- `[ ]` Ensure water diagnostics explain pixels only through water geometry, depth and masks.
+- `[x]` Freeze animation. `PassToggles::animationMotion`, and deliberately *not* the same control as
+  `animation`. That one removes skinning from the frame and leaves a bind pose; this one holds the
+  palettes already on the GPU, so a character stops moving **where it is**. "The pose is wrong" and
+  "the pose is not changing" are different questions, and a scene where only one arm changes the
+  picture says which one you are looking at. Implemented as "do not upload" rather than as a copy of
+  the scene's palettes, because the palette on the GPU is already the thing being frozen and a second
+  copy is a second thing to keep true; guarded on the scene, because a slice into another scene's
+  palettes is not a frozen character but a wrong one.
+
+  `[gpu][composition][forensics][isolation][animation]` asserts it three ways -- live, held and bind
+  must all be different pictures -- because checking the freeze alone would pass for an arm that had
+  quietly become the bind-pose one. It also asserts the rig's palette version still advancing while
+  the frame is held, which is what makes the equality the *arm* holding the picture rather than the
+  animation having stopped in the scene. **Two instrument faults had to be fixed first:** the alien
+  scene's camera orbits, so the "animation is moving" precondition passed on camera motion alone, and
+  the AO buffer is temporally jittered, so consecutive frames of a completely static scene do not
+  hash alike. Both made the test report the freeze for a difference the freeze does not own.
+- `[x]` Show skeleton and bones. `DebugViewOptions::skeletons`: a point per joint and a line to its
+  parent, in world space, for every skinned entity. Drawn from the rig's **model-space** matrices and
+  not from the GPU palette, which is `model * inverseBind` and whose translation is not where the
+  joint is -- reading a bone position out of it is exactly the plausible-looking mistake a skeleton
+  overlay exists to catch. The test builds a rig whose two are a metre apart and requires the overlay
+  to use the right one, checks a joint lands at `entityTransform * jointModel`, and requires a rig
+  that has never been evaluated to draw *nothing* rather than a rest pose the frame is not using.
+- `[x]` Show animation time. In the selected object's diagnostic readout (`palette v… time …`), in
+  the capture, and per sample in the transform history.
+- `[x]` Show skinning state. The same readout: rig index, joint count, palette version and palette
+  time, with the version being the thing that says whether the rig re-posed this frame.
+- `[!]` Show water mask. **Cannot exist as an auxiliary view.** `water_renderer.cpp` masks every
+  scene target but colour and emission, deliberately -- a normal or an identifier averaged over a
+  transparency is worse than none -- so no view keyed on the identifier target can show water. The
+  working instrument is the A/B against the same frame with the water arm off, which is what all of
+  Phase 6.2 uses. Blocked on a design change, not on effort.
+- `[x]` Show water depth. `AuxDebugView::LinearDepth` over the water surface, and Phase 6.2's
+  reconstruction of it against the terrain field: mean 0.051 m, worst 0.370 m over 3,977 pixels.
+- `[x]` Show terrain depth. The same view with the water arm off, which is the only way to see the
+  bed -- and the A/B between the two is the water's own thickness.
+- `[!]` Show intersection mask. The shoreline intersection is where water depth crosses zero, so it
+  is derivable from the two views above; a dedicated mask needs the water pass to write one, which is
+  the same design change the water mask is blocked on.
+- `[x]` Disable water post effects. `PassToggles::water` removes the surfaces; `post` removes the
+  chain. There is no separate "water effects" arm and the plan's own Phase 8.2 entry says why: there
+  is no control that separates a surface's effects from the surface.
+- `[x]` Ensure water diagnostics explain pixels only through water geometry, depth and masks. This is
+  what Phase 6.2 does and the reason its every measurement is an A/B: with no identifier to ask, a
+  water pixel is *defined* as one the water arm changes. Nothing in that phase classifies a pixel by
+  its colour, and the one draft that did -- a hue test that read a grey sphere lit by a blue
+  environment as the blue one -- was thrown away for it.
 
 ## Phase 5: Culling, LOD, animation and character isolation
 

@@ -3711,3 +3711,108 @@ TEST_CASE("a seek reseeds the previous skinning palette", "[gpu][composition][fo
     INFO("worst previous-to-current element during ordinary playback " << worstInPlayback);
     CHECK(worstInPlayback > 0.0);
 }
+
+// ---- Phase 4.5: freeze animation, which is not the same control as disabling it -----------------
+//
+// Two arms that a casual reading would merge. `animation` removes skinning from the frame: the
+// palettes are not uploaded at all and every skinned mesh draws from its rest vertices, so the
+// character snaps to its bind pose. `animationMotion` holds the palettes already on the GPU, so the
+// character stops moving *where it is*. "The character's pose is wrong" and "the character's pose is
+// not changing" are different questions, and a scene where only one of the arms changes the picture
+// is what says which one you are looking at.
+//
+// The test is therefore a three-way comparison, not a two-way: bind pose, held pose and live pose
+// must all be different pictures. Checking the freeze alone would pass for an arm that had quietly
+// become the bind-pose one.
+TEST_CASE("freezing animation holds the pose; disabling it takes the pose away",
+          "[gpu][composition][forensics][isolation][animation]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "characters" / "alien.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the alien scene is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(project).has_value());
+    FixedStepClock clock(60.0);
+    constexpr std::uint32_t kW = 160;
+    constexpr std::uint32_t kH = 120;
+    REQUIRE(engine.play().has_value());
+
+    // The camera is parked, and it has to be. This scene's camera orbits, so with it live *every*
+    // frame differs whatever the rig is doing -- the first version of this test passed its
+    // "animation is moving" precondition on camera motion alone and then failed the freeze, which is
+    // the instrument reporting the wrong subsystem rather than the arm being wrong.
+    const auto park = [&] {
+        aimCompositionCamera(engine.params(), glm::vec3(0.0f, 1.2f, 3.2f), glm::vec3(0.0f, 0.9f, 0.0f));
+    };
+    const auto step = [&](const rendering::SceneRenderer::PassToggles& arms) {
+        renderer.setPassToggles(arms);
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(kW, kH);
+        park();
+        engine.update(time);
+        auto image = renderer.renderToImage(engine.scene(), time, kW, kH);
+        REQUIRE(image.has_value());
+        return gpu::hashImage(*image);
+    };
+
+    // Post and ambient occlusion off, for the reason Phase 6.2 established: the AO buffer is
+    // temporally jittered and auto-exposure re-meters on content, so consecutive frames of a
+    // *completely static* scene do not hash alike. With them on, "the frozen frame stopped changing"
+    // is unmeasurable through a frame hash -- which is how the first version of this test failed,
+    // reporting the freeze for a difference the freeze does not own.
+    rendering::SceneRenderer::PassToggles live;
+    live.ao = false;
+    live.post = false;
+    rendering::SceneRenderer::PassToggles held = live;
+    held.animationMotion = false;
+    rendering::SceneRenderer::PassToggles bind = live;
+    bind.animation = false;
+
+    // Walk a few frames so the rig is genuinely mid-clip rather than at its first pose.
+    for (int i = 0; i < 12; ++i) {
+        step(live);
+    }
+    // Live: consecutive frames differ, or there is no motion here to freeze and the rest is empty.
+    const std::uint64_t liveA = step(live);
+    const std::uint64_t liveB = step(live);
+    REQUIRE(liveA != liveB);
+
+    // Held: the picture stops changing, over several frames rather than one, because a single pair
+    // could agree by the clip happening to repeat.
+    const std::uint64_t heldFirst = step(held);
+    for (int i = 0; i < 6; ++i) {
+        INFO("held frame " << i);
+        CHECK(step(held) == heldFirst);
+    }
+
+    // ...and the rig underneath is still being posed, so the equality above is the *arm* holding the
+    // frame and not the animation having stopped in the scene.
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+    REQUIRE(!composition->scene().rigs.empty());
+    const std::uint64_t versionWhileHeld = composition->scene().rigs.front().paletteVersion;
+    step(held);
+    CHECK(composition->scene().rigs.front().paletteVersion > versionWhileHeld);
+
+    // Bind pose: a different picture again. This is what separates the two arms -- if `held` had
+    // merely stopped uploading in the way `animation` does, these two would agree.
+    const std::uint64_t bindFrame = step(bind);
+    CHECK(bindFrame != heldFirst);
+    CHECK(bindFrame != liveA);
+    const std::uint64_t bindAgain = step(bind);
+    CHECK(bindAgain == bindFrame); // the bind pose does not move either
+
+    // Releasing the freeze puts the character back in motion rather than leaving it stuck.
+    step(live);
+    const std::uint64_t resumedA = step(live);
+    const std::uint64_t resumedB = step(live);
+    CHECK(resumedA != resumedB);
+
+    renderer.setPassToggles(rendering::SceneRenderer::PassToggles{});
+    CHECK(ctx->errorCount() == 0);
+}

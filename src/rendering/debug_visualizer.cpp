@@ -20,6 +20,8 @@ constexpr glm::vec4 kSdfColour{0.5f, 1.0f, 0.9f, 0.7f};
 constexpr glm::vec4 kOriginColour{1.0f, 1.0f, 1.0f, 0.9f};
 constexpr glm::vec4 kTrailColour{1.0f, 0.45f, 0.15f, 0.9f};
 constexpr glm::vec4 kFrustumColour{0.85f, 0.85f, 0.4f, 0.7f};
+constexpr glm::vec4 kJointColour{1.0f, 0.85f, 0.3f, 0.95f};
+constexpr glm::vec4 kBoneColour{0.3f, 0.9f, 1.0f, 0.85f};
 
 // Blue to red across a normalised value.
 glm::vec4 heat(float t, float alpha) {
@@ -129,6 +131,23 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
                                                              : kBoundsColour;
         if (options.entityBounds || options.entityIds) {
             draw.box(worldLo, worldHi, boundsColour);
+        }
+        if (options.skeletons && entity.rig < scene.rigs.size()) {
+            const scene::SkinnedRig& rig = scene.rigs[entity.rig];
+            // The model-space matrices the pose produced. Empty until the rig has been evaluated,
+            // which is the honest state to draw nothing for: a skeleton drawn from a rest pose that
+            // the frame is not using would be a second answer to "where are the joints".
+            const std::vector<glm::mat4>& jointModel = rig.scratchModel;
+            const std::size_t joints = std::min(jointModel.size(), rig.skeleton.joints.size());
+            for (std::size_t j = 0; j < joints; ++j) {
+                const glm::vec3 here = glm::vec3(model * jointModel[j][3]);
+                draw.point(here, options.pointSize * 0.6f, kJointColour);
+                const int parent = rig.skeleton.joints[j].parent;
+                if (parent >= 0 && static_cast<std::size_t>(parent) < joints) {
+                    const glm::vec3 up = glm::vec3(model * jointModel[static_cast<std::size_t>(parent)][3]);
+                    draw.line(up, here, kBoneColour);
+                }
+            }
         }
         if (options.entityOrigins && budget > 0) {
             draw.point(glm::vec3(model[3]), options.pointSize * 0.08f,

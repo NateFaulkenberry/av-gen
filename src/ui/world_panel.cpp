@@ -508,6 +508,11 @@ void WorldPanel::drawDebugOptions(app::Engine& engine) {
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("The recorded world path of the selected entity, over the last few seconds.");
     }
+    ImGui::SameLine();
+    ImGui::Checkbox("Skeletons", &debug.skeletons);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Every skinned entity's joints and bones, in world space.");
+    }
     if (ImGui::InputText("Selected entity", selectedEntity, sizeof(selectedEntity))) {
         debug.selectedEntity = selectedEntity;
     }

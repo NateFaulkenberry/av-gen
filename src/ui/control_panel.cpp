@@ -1363,6 +1363,12 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
                                                    "running invisibly");
             arm("no animation", toggles.animation, "skinned meshes draw in bind pose; the palettes "
                                                    "are not uploaded at all");
+            ImGui::SameLine();
+            arm("freeze animation", toggles.animationMotion,
+                "every skinned character holds the pose it has now. Not the same control as 'no "
+                "animation', which takes the pose away and leaves a bind pose: this one stops the "
+                "character moving where it is, so 'the pose is wrong' and 'the pose is not "
+                "changing' can be told apart.");
             arm("freeze the view", toggles.cameraMotion,
                 "holds the view and projection the scene pass draws with, and ignores the cull "
                 "verdicts decided against the camera that has since moved. The sky, the volumetrics "
@@ -1372,10 +1378,14 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
                 renderer->setPassToggles(toggles);
             }
             const rendering::SceneRenderer::PassToggles defaults;
-            const bool anythingOff =
-                !toggles.shadows || !toggles.ao || !toggles.volume || !toggles.post ||
-                !toggles.shadowMask || !toggles.culling || !toggles.water || !toggles.transparency ||
-                !toggles.particles || !toggles.animation || !toggles.cameraMotion;
+            // Asked of the arm table rather than restated here. The hand-written version of this
+            // line had to be edited every time an arm was added, and the failure when it was not is
+            // the worst one this panel has: the warning below goes quiet while an arm is off, so the
+            // frame that is an A/B arm looks like the picture.
+            bool anythingOff = false;
+            for (const auto& entry : rendering::SceneRenderer::passArms()) {
+                anythingOff = anythingOff || !(toggles.*(entry.flag));
+            }
             if (anythingOff) {
                 // Loud, because a frame with an arm switched off is not a frame anybody should
                 // judge the renderer by, and this panel is not always on screen.

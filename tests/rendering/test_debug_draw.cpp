@@ -5,11 +5,13 @@
 #include "gpu/context.hpp"
 #include "gpu/shader_library.hpp"
 #include "scene/mesh_generators.hpp"
+#include "scene/skeleton.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <filesystem>
 
 using namespace avgen;
@@ -241,6 +243,65 @@ TEST_CASE("The forensic geometry controls each draw only their own case", "[debu
         // A degenerate projection draws nothing rather than a box at infinity.
         draw.clear();
         scene.camera.nearPlane = scene.camera.farPlane;
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        CHECK(draw.empty());
+    }
+
+    SECTION("the skeleton is drawn from joint positions, not from the GPU palette") {
+        // A rig with three joints in a chain, posed so the model-space matrices and the skinning
+        // palette have *different* translations. That difference is the whole point: the palette is
+        // `model * inverseBind`, so its translation is not where the joint is, and an overlay that
+        // read bone positions out of it would draw a plausible skeleton in the wrong place.
+        scene::SkinnedRig rig;
+        rig.name = "chain";
+        rig.skeleton.joints = {
+            {"root", -1, {}},
+            {"mid", 0, {}},
+            {"tip", 1, {}},
+        };
+        rig.skeleton.joints[1].rest.position = {0.0f, 1.0f, 0.0f};
+        rig.skeleton.joints[2].rest.position = {0.0f, 1.0f, 0.0f};
+        rig.skeleton.palette = {0, 1, 2};
+        rig.skeleton.inverseBind.assign(3, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -5.0f, 0.0f)));
+        rig.pose = scene::restPose(rig.skeleton);
+        scene::skinningPalette(rig.skeleton, rig.pose, rig.scratchModel, rig.palette);
+        REQUIRE(rig.scratchModel.size() == 3);
+        // The two really do disagree, or this section proves nothing.
+        REQUIRE(std::fabs(rig.scratchModel[2][3][1] - rig.palette[2][3][1]) > 1.0f);
+
+        scene.rigs.push_back(std::move(rig));
+        scene::Entity& skinned = scene.addEntity("skinned", scene.entities[0].mesh);
+        skinned.rig = 0;
+        skinned.transform.position = {10.0f, 0.0f, 0.0f};
+
+        rendering::DebugViewOptions options;
+        options.skeletons = true;
+        options.selectedEntity = "skinned";
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        CHECK(draw.pointVertexCount() == 3); // one per joint
+        CHECK(draw.lineVertexCount() == 4);  // two bones: root-mid and mid-tip
+
+        // Each joint is at the entity's transform times its model-space matrix. The tip is two
+        // units above the root in model space and the entity is ten along x, so this is a claim
+        // about both halves of that product.
+        std::vector<glm::vec3> drawn;
+        for (const rendering::DebugVertex& v : draw.pointVertices()) {
+            drawn.push_back(v.position);
+        }
+        std::sort(drawn.begin(), drawn.end(), [](const glm::vec3& a, const glm::vec3& b) { return a.y < b.y; });
+        CHECK(drawn.front() == glm::vec3(10.0f, 0.0f, 0.0f));
+        CHECK(drawn.back() == glm::vec3(10.0f, 2.0f, 0.0f));
+
+        // Moving the entity moves the skeleton with it: the overlay is in world space.
+        draw.clear();
+        scene.entities.back().transform.position = {-4.0f, 3.0f, 0.0f};
+        rendering::buildDebugGeometry(draw, scene, options, 0.0);
+        CHECK(draw.pointVertices().front().position.x == -4.0f);
+
+        // A rig that has never been evaluated draws nothing rather than a rest pose the frame is
+        // not using -- two answers to "where are the joints" is worse than none.
+        draw.clear();
+        scene.rigs[0].scratchModel.clear();
         rendering::buildDebugGeometry(draw, scene, options, 0.0);
         CHECK(draw.empty());
     }

@@ -391,6 +391,11 @@ public:
         // goes on moving. The one control that separates "the object moved" from "the camera moved"
         // without touching the scene at all.
         bool cameraMotion = true;
+        // Off: every skinned character holds the pose it had when the arm was set, while the rest of
+        // the frame goes on. Deliberately *not* the same control as `animation`, which draws the
+        // bind pose: "stop the character moving" and "take the character's pose away" are different
+        // questions, and a scene where only one of them changes the picture says which.
+        bool animationMotion = true;
     };
 
     // The arms by name, in one place (renderer forensics Phase 8.3). The CLI's `--disable <list>`,

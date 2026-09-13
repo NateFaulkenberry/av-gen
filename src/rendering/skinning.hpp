@@ -62,6 +62,13 @@ public:
     // Sizes the joint buffer for this scene's rigs and uploads the palettes that changed. Cheap and
     // idempotent: a frame in which no rig re-posed writes nothing.
     void update(const scene::Scene& scene);
+    // Holds the palettes the GPU already has (renderer forensics 4.5, "freeze animation"). Distinct
+    // from disabling animation, which draws the *bind* pose: this holds whatever pose was current
+    // when the arm was set, so a character stops moving in place rather than snapping to a T-pose.
+    // Implemented as "do not upload" rather than as a copy of the scene's state, because the palette
+    // on the GPU is already the thing being frozen and a second copy is a second thing to keep true.
+    void setFrozen(bool frozen) { frozen_ = frozen; }
+    [[nodiscard]] bool frozen() const { return frozen_; }
 
     // The slice for `rig`, or a zero slice when the rig has no palette on the GPU.
     [[nodiscard]] Slice slice(scene::RigId rig) const;
@@ -98,6 +105,7 @@ private:
     wgpu::BindGroup objectGroup_;
     std::uint32_t sliceBytes_ = 0;
     std::uint32_t sliceCount_ = 0;
+    bool frozen_ = false;
     wgpu::TextureFormat colorFormat_ = wgpu::TextureFormat::RGBA16Float;
     wgpu::TextureFormat depthFormat_ = wgpu::TextureFormat::Depth24Plus;
     std::vector<Slice> slices_;

@@ -264,6 +264,15 @@ void SkinningRenderer::ensureBuffer(std::uint32_t sliceBytes, std::uint32_t rigC
 }
 
 void SkinningRenderer::update(const scene::Scene& scene) {
+    // Frozen: the slices keep pointing at the palettes already on the GPU and nothing is written,
+    // so every skinned character holds the pose it had. Guarded on the scene, because a freeze must
+    // not outlive the rigs it was holding -- a slice into another scene's palettes is not a frozen
+    // character, it is a wrong one. The counters keep their last values rather than going to zero,
+    // or the panel would read "no rigs" with a frozen character plainly on screen.
+    if (frozen_ && scene_ == &scene && !slices_.empty()) {
+        stats_.uploadBytes = 0;
+        return;
+    }
     const bool sceneChanged = scene_ != &scene;
     scene_ = &scene;
     stats_.rigs = 0;
