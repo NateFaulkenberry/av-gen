@@ -81,8 +81,24 @@ The audit's §3.2.2 can stop saying the contribution is not established.
 
 Already measured at zero overflow, busiest froxel 29 of 32, 56% of the grid empty, build 0.07 ms
 (§3.6, ADR-114). Nothing here re-opens it and nothing here adds a local light. **Do not "optimise"
-it and do not raise the cap.** Re-run `--cluster-stats` after any change that adds local lights to
-Glowmere, because nothing reports an overflow at runtime.
+it and do not raise the cap.**
+
+§3.6 asks for the occupancy to be re-taken after any change that adds local lights, so it was
+re-taken at this baseline rather than assumed to have survived wave 1:
+
+```
+cluster occupancy (3072 froxels, 222 local lights, cap 32): min 0 p50 0 p90 14 p99 24 max 29
+mean 5.70; empty 1720 (56.0%), overflowed 0 (0.00%), lights dropped by the cap 0
+```
+
+Identical to §3.6 in every column. The `clusters` pass is 0.07 ms of a 13.37 ms frame.
+
+The *fragment-side* cost of the clustered light loop is a different question and it has no honest
+arm: `QualitySettings::clusteredLighting = false` selects the 8-light uniform fallback, which on a
+scene with 222 local lights is not the same picture by any stretch, so the difference it reports
+would be "222 lights cost more than 8" and not "the cluster indirection costs anything". Whatever
+that loop spends is inside the 8.4 ms residual in §1 and belongs to Phase C's question about what
+the opaque shading pass is doing, not to a cluster-grid question.
 
 ## 5. Two optimisations implemented, measured, and reverted
 
