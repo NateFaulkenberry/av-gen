@@ -137,6 +137,12 @@ struct Frame {
     // RepresentationSelector, which C3/C4 built, calibrated and unit-tested, and which ADR-125
     // records as deliberately not yet wired to anything.
     Slice selector;
+    // The same drawables again, with rungs 2 and 3 replaced by the billboard and the dot that
+    // `makeLodMesh` already builds for generated primitives and that an imported mesh source never
+    // reaches. Charged at the *quad's* own coverage, not the mesh's: a camera-facing quad
+    // circumscribing the bounding sphere covers 4 x projectedRadius^2 px whatever silhouette the
+    // mesh had, and pretending otherwise would hide the whole risk of the substitution.
+    Slice impostorRung;
     // Scatter instances the shipped ADR-029 ladder put on rung 2 or rung 3. Deliberately NOT
     // called "billboards": whether rung 2 *is* a billboard depends on the source kind, and the
     // ladder report below is what settles that per layer rather than assuming it.
@@ -255,6 +261,7 @@ TEST_CASE("Where Glowmere's fragment-cost excess lives, by representation band",
         // An authored entity has no ladder here, so there is no other rung to pick: it is carried
         // into the selector arm unchanged rather than being silently dropped from its denominator.
         frame.selector.add(r.pixelsPerTriangle, m.triangles, coverage);
+        frame.impostorRung.add(r.pixelsPerTriangle, m.triangles, coverage);
     }
 
     for (const scene::ProceduralGeometry& object : scn.procedurals) {
@@ -279,14 +286,49 @@ TEST_CASE("Where Glowmere's fragment-cost excess lives, by representation band",
                     level < levels ? rung[static_cast<std::size_t>(level)].triangles : 0u;
             }
             ladder.emplace_back(object.name, tris);
+            // The two transforms that scale a procedural, printed because the band this analysis
+            // assigns depends entirely on getting the world-space radius right, and a normalisation
+            // living on `sourceTransform` would not show up in the instance record's scale.
+            std::printf("    [radius] %-28s rung0 r=%8.3f  sourceScale=(%.3f %.3f %.3f)"
+                        "  distScale=(%.3f %.3f %.3f)  instances=%zu\n",
+                        object.name.c_str(), static_cast<double>(rung[0].boundsRadius),
+                        static_cast<double>(object.sourceTransform.scale.x),
+                        static_cast<double>(object.sourceTransform.scale.y),
+                        static_cast<double>(object.sourceTransform.scale.z),
+                        static_cast<double>(object.distributionTransform.scale.x),
+                        static_cast<double>(object.distributionTransform.scale.y),
+                        static_cast<double>(object.distributionTransform.scale.z),
+                        object.instances.size());
         }
+        // The whole transform chain, not just the instance record's own scale.
+        //
+        // `ProceduralGeometry::instanceMatrix` is sourceTransform, then the record, then
+        // distributionTransform, and **the layer's size normalisation lives on sourceTransform** --
+        // composition.cpp puts it there deliberately, because distributionTransform would move the
+        // placements too. Reading only `record.scale` therefore mis-sizes every layer by that
+        // normalisation: valley_ferns by 1.67x too small, valley_grass by 1.9x too large,
+        // valley_pebbles by 3x, elder-crown by 8.2x. Radius decides the band and area decides
+        // px/triangle, so an analysis that omits it is wrong about both, in a different direction
+        // per layer.
+        //
+        // The renderer's cull pass omits it too (see the [radius] note in the report) -- that is a
+        // defect in the renderer, not a licence to reproduce it here. This walk measures the world.
+        const glm::vec3 srcScale = glm::abs(object.sourceTransform.scale);
+        const glm::vec3 distScale = glm::abs(object.distributionTransform.scale);
         for (const scene::InstanceRecord& record : object.instances) {
             const glm::vec3 center(record.position);
-            const glm::vec3 scale = glm::abs(glm::vec3(record.scale));
+            const glm::vec3 scale = glm::abs(glm::vec3(record.scale)) * srcScale * distScale;
             const float maxScale = std::max({scale.x, scale.y, scale.z});
             const float radius = rung[0].boundsRadius * maxScale;
+            // The rung the *renderer* picks, which it picks from the radius it computes -- source
+            // scale omitted. Deliberately the renderer's number and not the true one: this walk is
+            // reporting what is actually drawn, and substituting the corrected radius here would
+            // describe a frame nobody is rendering.
+            const float rendererRadius =
+                rung[0].boundsRadius * std::max({std::abs(record.scale.x), std::abs(record.scale.y),
+                                                 std::abs(record.scale.z)});
             const int level = lodLevelFor(object.lod, planes, view.cameraPosition, view.pixelsPerUnit,
-                                          center, radius);
+                                          center, rendererRadius);
             if (level < 0) continue;
             const scene::MeshMetrics& m = rung[static_cast<std::size_t>(level)];
             if (!m.valid()) continue;
@@ -326,6 +368,21 @@ TEST_CASE("Where Glowmere's fragment-cost excess lives, by representation band",
                 // shrinking the object, which is a different and much larger claim.
                 frame.selector.add(ppt, pm.triangles, coverage);
                 scatterOnly.selector.add(ppt, pm.triangles, coverage);
+            }
+            // Rungs 2 and 3 as the impostor and the dot the engine already knows how to build.
+            {
+                double cover = coverage;
+                std::uint32_t tris = m.triangles;
+                float ppt = r.pixelsPerTriangle;
+                if (level >= 2) {
+                    const float edgePx =
+                        2.0f * r.projectedRadius * (level == 2 ? 1.0f : 0.125f);
+                    cover = std::min(static_cast<double>(edgePx) * edgePx, frameArea);
+                    tris = 2; // makePointQuad
+                    ppt = static_cast<float>(cover) / 2.0f;
+                }
+                frame.impostorRung.add(ppt, tris, cover);
+                scatterOnly.impostorRung.add(ppt, tris, cover);
             }
             if (b == Band::Proxy || b == Band::Impostor) {
                 targetByLayer[object.name].add(r.pixelsPerTriangle, m.triangles, coverage);
@@ -379,6 +436,16 @@ TEST_CASE("Where Glowmere's fragment-cost excess lives, by representation band",
                         static_cast<unsigned long long>(f.all.triangles),
                         static_cast<unsigned long long>(f.selector.triangles),
                         -100.0 * (1.0 - f.selector.weightedCost / base));
+        }
+        if (f.impostorRung.coverage > 0.0) {
+            std::printf("    and what the engine's OWN impostor rung would do, if an imported-mesh\n"
+                        "      source could reach it: excess %.2fx -> %.2fx, triangles %llu -> %llu,\n"
+                        "      coverage %.0f -> %.0f px   (%+6.2f%%)\n",
+                        f.all.excess(), f.impostorRung.excess(),
+                        static_cast<unsigned long long>(f.all.triangles),
+                        static_cast<unsigned long long>(f.impostorRung.triangles), f.all.coverage,
+                        f.impostorRung.coverage,
+                        -100.0 * (1.0 - f.impostorRung.weightedCost / base));
         }
     };
 
