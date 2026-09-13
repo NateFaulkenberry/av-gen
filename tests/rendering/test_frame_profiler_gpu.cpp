@@ -276,6 +276,17 @@ double labelMs(const Profile& p, std::string_view label) {
 
 bool hasLabel(const Profile& p, std::string_view label) { return labelMs(p, label) >= 0.0; }
 
+// ADR-139 split the volumetric pass into `volume.march` and `volume.composite`, because the two are
+// different costs and reporting them as one number hid that the composite is a single timestamp
+// tick. A test asking "did the volume work run" wants the family, not a label that no longer
+// exists: matching the prefix keeps the assertion exactly as strong -- an arm that failed to remove
+// the volume work still fails it -- while surviving a pass being split for a good reason.
+bool hasLabelPrefix(const Profile& p, std::string_view prefix) {
+    return std::any_of(p.passes.begin(), p.passes.end(), [&](const auto& e) {
+        return std::string_view(e.label).substr(0, prefix.size()) == prefix;
+    });
+}
+
 double median(std::vector<double> v) {
     if (v.empty()) {
         return -1.0;
@@ -536,8 +547,8 @@ TEST_CASE("the fullscreen passes respond to resolution", "[.perf][profiler][gpu]
     const Profile small = profile(*renderer, s, 512, 512, 40, 12);
     const Profile large = profile(*renderer, s, 2048, 2048, 40, 12);
     INFO("512x512:" << table(small) << "\n2048x2048:" << table(large));
-    REQUIRE(hasLabel(small, "volume"));
-    REQUIRE(hasLabel(large, "volume"));
+    REQUIRE(hasLabelPrefix(small, "volume"));
+    REQUIRE(hasLabelPrefix(large, "volume"));
 
     // One scene at two sizes, so the arms are the resolutions. Interleaving matters more here
     // than anywhere else: a 2048x2048 arm run after a 512x512 one on a busy GPU is measuring the
@@ -718,8 +729,8 @@ TEST_CASE("removing a phase is attributed across the whole frame, not just to it
     REQUIRE(with.samples > 0);
     REQUIRE(without.samples > 0);
     // The arm really is the arm: no volume label at all, not a volume label reading zero.
-    CHECK(hasLabel(with, "volume"));
-    CHECK_FALSE(hasLabel(without, "volume"));
+    CHECK(hasLabelPrefix(with, "volume"));
+    CHECK_FALSE(hasLabelPrefix(without, "volume"));
 
     const auto attribution = rendering::attributeRemoval(with.passes, without.passes, "volume");
     std::string breakdown;

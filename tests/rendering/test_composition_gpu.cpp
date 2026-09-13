@@ -2967,9 +2967,18 @@ TEST_CASE("each isolation arm removes exactly its own pass", "[gpu][composition]
         INFO("the full frame encodes " << full.size() << " distinct passes: " << names);
         // Each arm below is tested against a pass that actually runs in this scene; an arm whose
         // pass is absent would "pass" by removing nothing.
+        // `volume` is a family since ADR-139 split the march from the composite, so this asks
+        // whether a pass of that name *or* one prefixed by it ran. The check is unchanged in
+        // strength: an arm whose pass is absent still "passes" by removing nothing, which is what
+        // this guards against.
         for (const char* needed : {"shadow", "ao", "volume", "shadowmask"}) {
             INFO("needed: " << needed);
-            REQUIRE(full.count(needed) == 1);
+            const std::string prefix(needed);
+            const bool present =
+                std::any_of(full.begin(), full.end(), [&](const std::string& label) {
+                    return label == prefix || label.compare(0, prefix.size() + 1, prefix + ".") == 0;
+                });
+            REQUIRE(present);
         }
     }
     // The timeline has to be reporting at all, or every comparison below is between two empty sets.

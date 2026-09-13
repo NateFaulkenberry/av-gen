@@ -135,7 +135,21 @@ RemovalAttribution attributeRemoval(const std::vector<gpu::TimelineInterval>& ba
         }
     }
     out.frameDeltaMs = baselineTotal - armTotal;
-    out.removedPassMs = find(baseline, removedLabel);
+    // A pass may be reported as a family -- ADR-139 split the volumetric pass into `volume.march`
+    // and `volume.composite` because they are different costs and one number hid that the composite
+    // is a single timestamp tick. Asking what removing "volume" cost has to mean the family, or the
+    // attribution silently reports zero for a pass that plainly ran and the whole frame delta lands
+    // in `elsewhereMs`. Sum the exact label and anything under it.
+    out.removedPassMs = 0.0;
+    for (const auto& pass : baseline) {
+        const std::string_view label(pass.label);
+        if (label == removedLabel ||
+            (label.size() > removedLabel.size() + 1 &&
+             label.substr(0, removedLabel.size()) == removedLabel &&
+             label[removedLabel.size()] == '.')) {
+            out.removedPassMs += pass.ms;
+        }
+    }
     out.elsewhereMs = out.frameDeltaMs - out.removedPassMs;
     std::stable_sort(out.byLabel.begin(), out.byLabel.end(),
                      [](const auto& a, const auto& b) { return a.ms > b.ms; });
