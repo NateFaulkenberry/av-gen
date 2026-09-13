@@ -81,7 +81,25 @@ endif()
 file(GLOB_RECURSE AVGEN_APP_SOURCES CONFIGURE_DEPENDS app/*.cpp)
 # cinematic.cpp is compiled into avgen_core (above); leaving it here too would define it twice.
 list(REMOVE_ITEM AVGEN_APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app/cinematic.cpp")
+# The engine revision, regenerated on every build so a benchmark record's conditions cannot be
+# stale (ADR-113). Script mode rather than configure time: a revision captured at configure time is
+# whatever it was the last time somebody ran cmake, which is exactly the kind of number that makes
+# two measurements look comparable when they are not.
+set(AVGEN_BUILD_INFO_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+add_custom_target(avgen_build_info ALL
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+        -DTEMPLATE=${CMAKE_SOURCE_DIR}/cmake/build_info.hpp.in
+        -DOUT=${AVGEN_BUILD_INFO_DIR}/avgen_build_info.hpp
+        -DAVGEN_BUILD_TYPE=$<CONFIG>
+        -P ${CMAKE_SOURCE_DIR}/cmake/GitRevision.cmake
+    BYPRODUCTS "${AVGEN_BUILD_INFO_DIR}/avgen_build_info.hpp"
+    COMMENT "Recording the engine revision for benchmark records"
+    VERBATIM)
+
 add_executable(avgen ${AVGEN_APP_SOURCES})
+add_dependencies(avgen avgen_build_info)
+target_include_directories(avgen PRIVATE "${AVGEN_BUILD_INFO_DIR}")
 target_link_libraries(avgen PRIVATE avgen_core)
 if(TARGET avgen_platform)
     target_link_libraries(avgen PRIVATE avgen_platform)

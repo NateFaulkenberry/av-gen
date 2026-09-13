@@ -4,6 +4,7 @@
 // (ADR-033). Everything here is GPU-free and deterministic so the tests can check the packing,
 // the cluster assignment and the LTC fit against a CPU reference without a device.
 
+#include "rendering/render_stats.hpp"
 #include "scene/scene_types.hpp"
 
 #include <glm/glm.hpp>
@@ -97,6 +98,24 @@ struct ClusterGrid {
 [[nodiscard]] std::vector<std::vector<std::uint32_t>> assignClusters(const ClusterGrid& grid,
                                                                      const std::vector<glm::vec3>& viewPositions,
                                                                      const std::vector<float>& radii);
+
+// How many lights actually reach each froxel, and what the 32-light cap does about it (ADR-114).
+//
+// This is `assignClusters` with the cap taken *off* the counting: each cluster's count is every
+// light whose sphere of influence touches it, whether or not the index list had room. A statistic
+// gathered after the cap saturates at the cap, and the question here is exactly whether the cap is
+// being reached -- so it has to be asked before the cap applies. `ClusterOccupancy::dropped` is
+// what the cap costs, and `overflowed` how many clusters pay it.
+//
+// It builds no lists, so it allocates nothing per cluster; the work is `grid.count() * lights`
+// sphere-against-box tests, which is the same test `assignClusters` and `shaders/clusters.wgsl`
+// both make. `cap` is a parameter rather than the constant so a test can drive overflow without
+// the scene needing 33 lights, and so someone can ask "what would a cap of 8 cost" without
+// changing the engine.
+[[nodiscard]] ClusterOccupancy clusterOccupancy(const ClusterGrid& grid,
+                                                const std::vector<glm::vec3>& viewPositions,
+                                                const std::vector<float>& radii,
+                                                std::uint32_t cap = kMaxLightsPerCluster);
 
 // The clamped-cosine irradiance of a quadrilateral emitter of unit radiance at `point` with
 // surface normal `normal` (Heitz et al.'s polygon form factor, which is what `ltcEvaluate` in
