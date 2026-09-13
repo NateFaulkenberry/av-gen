@@ -237,9 +237,9 @@ struct FrameUniforms {
     // ADR-087: x = 1 when the half-resolution shadow mask was built this frame, y = how many
     // leading directional lights it covers (0..3), zw = its size in texels.
     glm::vec4 shadowMaskParams;
-    // ADR-133: material tiers. x = the tier every draw is forced to at least (0 full, 1 reduced
-    // lights, 2 flat); y = tier 1's local-light budget; z = tier 2's; w = 0. The per-draw tier is
-    // ObjectUniforms::ids.w and the effective tier is the larger of the two.
+    // ADR-133: material tiers. x = the tier every draw shades at (0 full, 1 reduced lights,
+    // 2 flat); y = tier 1's local-light budget; z = tier 2's; w = 0. Frame-global rather than per
+    // draw because ObjectUniforms has no free lane -- see ADR-135.
     glm::vec4 materialTier{0.0f};
     // ADR-055: the wind field, packed by wind::packWind. Frame-global because the air is; the
     // shadow views copy the whole block, so a swaying plant and its shadow cannot disagree.
@@ -270,7 +270,8 @@ struct ObjectUniforms {
     glm::vec4 flags;
     glm::vec4 ids; // x = object id (its index in the scene's list; the ADR-030 `objectId` input),
                    // y = material id, z = bloom weight of this object's emission,
-                   // w = this draw's material tier (ADR-133; 0 full, 1 reduced lights, 2 flat)
+                   // w = the skinned joint count. ADR-135: there is no free lane here for a
+                   // per-draw material tier, which is why ADR-133's tier is frame-global.
 };
 static_assert(sizeof(ObjectUniforms) == 272);
 static_assert(offsetof(ObjectUniforms, model) == 0);

@@ -70,13 +70,20 @@ struct ObjectUniforms {
     material: vec4<f32>,       // x = roughness, y = metallic, z = normalScale, w = occlusionStrength
     flags: vec4<f32>,          // x = alpha mode (0 opaque, 1 mask, 2 blend), y = alpha cutoff, z = unlit, w = texture mask
     ids: vec4<f32>,            // x = object id (ADR-030 `objectId`), y = material id, z = bloom weight,
-                               // w = this draw's material tier (ADR-133; 0 full, 1 reduced, 2 flat)
+                               // w = the skinned joint count (pbr_skinned.wgsl)
 };
 
-// The material tier this draw shades at: its own, floored by the frame's forced tier. Uniform
-// across the draw, which is the whole design (ADR-133, and ADR-118 for why it matters).
+// The material tier this draw shades at (ADR-133; 0 full, 1 reduced lights, 2 flat). Uniform across
+// the draw, which is the whole design -- ADR-118 measured a lane-varying branch around a loop with a
+// dependent texture load in it running 4.4% *slower* than the loop it skipped.
+//
+// It comes from the *frame* and not from ObjectUniforms, and that is a limitation rather than a
+// design: ADR-135 records that ObjectUniforms has no free lane for a per-draw tier -- `ids.w` is the
+// skinned joint count and every other lane is live -- and that adding one is the object-layout work
+// Phase E owns. Until then the tier is frame-global, which is exactly what an A/B arm needs and not
+// what importance-driven assignment needs.
 fn materialTierOf() -> u32 {
-    return u32(max(object.ids.w, frame.materialTier.x) + 0.5);
+    return u32(frame.materialTier.x + 0.5);
 }
 
 // How many *local* (clustered) lights a fragment of `tier` may evaluate. The table lives here and
