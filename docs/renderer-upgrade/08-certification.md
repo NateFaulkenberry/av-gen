@@ -242,6 +242,22 @@ an upgrade: this change — did it move the image, and where.
 §50 then requires a person to look. The tool never says a frame is correct; it says whether it
 moved.
 
+**Both subjects captured twice, in two separate processes, are byte-identical.** That is worth
+stating on its own: the capture is reproducible across process boundaries, so a non-zero diff from
+this tool is a change and never a re-roll.
+
+**And they were looked at.** `glowmere-medium` is the dense meadow it is supposed to be — ground
+cover to the horizon, the pale hero tree at mid-depth, the canopy closing at the frame edges.
+
+`open-vista` is a genuinely different shot: sparse ground running out to a distant ridge, a lot of
+sky, wide negative space. It is the profile in the sense that matters for the renderer. It is **not**
+the profile in the sense §45 has in mind, and the recipe now says so rather than claiming it: the
+composer still places a foreground hero, so "almost everything in frame is far away and small" is
+false of the frame. The counters say the same thing from the other side — 304 visible instances
+carrying 277,661 submitted triangles is 914 triangles each, against `glowmere-medium`'s 103. A real
+distant-representation torture case wants the opposite ratio, and reaching it is a composition
+problem rather than a recipe one.
+
 ---
 
 ## 5. G5 — offline parity: two failures, both real
