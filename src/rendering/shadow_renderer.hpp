@@ -44,6 +44,12 @@ struct ShadowStats {
     std::uint32_t spots = 0;
     std::uint32_t points = 0;  // of those, lights given a six-face cube
     std::uint32_t resolution = 0; // one square map
+    // ADR-112: how far the cascades reach, in view depth. Published because it is now derived
+    // rather than fixed -- a test that asserts small objects cast shadows needs to be able to say
+    // *why* they do, and a renderer whose shadows stop halfway down a valley should be able to say
+    // where.
+    float range = 0.0f;
+    float coarsestTexel = 0.0f; // the world size of one texel of the last cascade
     double shadowMs = -1.0;       // GPU time of the depth passes (-1 = unavailable)
     std::uint32_t entityDraws = 0; // entity draws recorded across every cascade this frame
     std::uint32_t entitiesCulled = 0; // casters a cascade's own frustum rejected (ADR-055)

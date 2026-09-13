@@ -150,10 +150,14 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
     }
     stats_.resolution = im.resolution;
 
-    // The shadowed depth range: cascades over the near part of the frustum only, because a
-    // cascade fitted to a 200 m far plane wastes every texel on geometry nobody looks at.
-    const float shadowFar = std::clamp(std::max(sceneRadius * 3.0f, cameraNear * 20.0f), cameraNear * 4.0f,
-                                       std::max(cameraFar, cameraNear * 4.0f));
+    // The shadowed depth range (ADR-112): the world's size, clamped to the camera's, and then
+    // shortened until the coarsest cascade's texel is small enough to resolve something. The
+    // arithmetic and the reasoning live in shadow_math so they can be checked without a device.
+    // `kShadowRangeReference`, deliberately, and not `im.resolution`: how far the shadows reach is
+    // the same in a preview and in the final render, and only how sharp they are differs.
+    const float shadowFar = directionalShadowRange(cameraNear, cameraFar, sceneRadius,
+                                                   kShadowRangeReference, quality.shadowTexelTarget);
+    stats_.range = shadowFar;
     const glm::mat4 invViewProj = glm::inverse(viewProj);
     const std::uint32_t cascades = std::clamp(quality.cascadeCount, 1u, kMaxCascades);
     const std::vector<float> splits = cascadeSplits(cameraNear, shadowFar, cascades);
@@ -199,6 +203,7 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
                     nearDepth = splits[c];
                     continue;
                 }
+                stats_.coarsestTexel = std::max(stats_.coarsestTexel, view.texelWorldSize);
                 views_.push_back(view);
                 nearDepth = splits[c];
             }

@@ -20,6 +20,37 @@ glm::vec3 stableUp(const glm::vec3& direction) {
 
 } // namespace
 
+float directionalShadowRange(float cameraNear, float cameraFar, float sceneRadius,
+                             std::uint32_t resolution, float texelTarget) {
+    const float near = std::max(cameraNear, 1e-3f);
+    // The world's size, clamped to the camera's. Unchanged from before ADR-112.
+    const float world = std::clamp(std::max(sceneRadius * 3.0f, near * 20.0f), near * 4.0f,
+                                   std::max(cameraFar, near * 4.0f));
+    if (!(texelTarget > 0.0f) || resolution == 0) {
+        return world;
+    }
+    // The inverse of `texel = 2 * k * range / resolution`. The k was measured against the real fit
+    // rather than derived: over ranges from 50 m to 1 km and resolutions from 1024 to 4096 it sits
+    // between 1.049 and 1.070 at a 16:9 frame, which is where the 2.12 below comes from.
+    //
+    // It varies with the frame's *aspect*, because a wider frustum has a wider bounding sphere for
+    // the same depth slice -- k is 0.80 at 1:1 and about 1.3 at 2.39:1 -- and the aspect is not
+    // passed here. So the realised texel is within about 25% of the target either way over the
+    // aspects anyone shoots at, which is the accuracy this rule needs: it is choosing how far the
+    // shadows reach, not calibrating an instrument.
+    const float resolvable = texelTarget * static_cast<float>(resolution) / 2.12f;
+    // A floor, so a tiny target or a tiny map cannot collapse the range to nothing. Twenty near
+    // planes is the floor the world rule already uses, and below it there is no shadow worth
+    // fitting either way.
+    //
+    // The floor is itself capped at `world`, which is not decoration. `world` is already clamped to
+    // the camera's far plane, and a bare `max(..., near * 20)` would hand back a range *past* that
+    // plane for a camera whose far plane is closer than twenty near planes -- a macro shot, or
+    // anything with a deliberately shallow depth range. The rule would then be lengthening the
+    // range, which is the one thing it must never do.
+    return std::max(std::min(world, resolvable), std::min(world, near * 20.0f));
+}
+
 std::vector<float> cascadeSplits(float nearPlane, float farPlane, std::uint32_t count, float lambda) {
     const std::uint32_t n = std::clamp(count, 1u, kMaxCascades);
     const float near = std::max(nearPlane, 1e-3f);

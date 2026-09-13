@@ -257,6 +257,19 @@ fn pcss(view: u32, uv: vec2<f32>, depth: f32, softness: f32, taps: u32, rotation
 // How much of a cascade's depth extent is spent fading into the next one.
 const CASCADE_BLEND: f32 = 0.12;
 
+// ADR-112: how much of the *whole* shadowed range is spent fading out at its far end.
+//
+// Past the last cascade there is no shadow map, so `shadowLookup` reports the lookup invalid and
+// the fragment reads as fully lit. That has always been a step, and it has always been there; it
+// was invisible only because the range used to be three scene radii, which put the step somewhere
+// behind the far plane. ADR-112 shortens the range until the coarsest texel can resolve something,
+// which moves the step into the picture -- so the step has to stop being a step.
+//
+// The fade is eased (t * t) rather than linear so that it begins imperceptibly and finishes
+// quickly: a linear ramp is a visible gradient across a large part of the last cascade, which reads
+// as fog that only shadows have.
+const SHADOW_RANGE_FADE: f32 = 0.18;
+
 // The near edge of cascade `index`, in view depth. Cascade 0 starts at the camera.
 //
 // The index is stepped down through a guarded `select` rather than indexed as `index - 1u`,
@@ -324,6 +337,15 @@ fn shadowFactor(light: GpuLight, worldPos: vec3<f32>, normal: vec3<f32>, toLight
             let next = shadowVisibility(base + index + 1u, light, worldPos, normal, toLight, true,
                                         rotation, taps);
             visibility = mix(visibility, next, t);
+        }
+
+        // ADR-112: and fade the whole thing out at the end of the range, where there is no next
+        // cascade to fade into.
+        let lastSplit = shadowBlock.splits[count - 1u];
+        let fadeBand = lastSplit * SHADOW_RANGE_FADE;
+        if (fadeBand > 1e-4 && viewDepth > lastSplit - fadeBand) {
+            let t = clamp((viewDepth - (lastSplit - fadeBand)) / fadeBand, 0.0, 1.0);
+            visibility = mix(visibility, 1.0, t * t);
         }
     } else if ((flags & FLAG_CUBE) != 0u) {
         // A light with no single direction: six views, and the fragment picks the one it is in.
