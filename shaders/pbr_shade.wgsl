@@ -206,6 +206,11 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     if (!frontFacing) {
         n = -n;
     }
+    // ADR-111: kept before anything perturbs `n`. This is the normal of the surface the depth
+    // prepass and the shadow maps actually rasterised, and it is what every shadow term is biased
+    // along; `n` below becomes the shading normal and is what the BRDF uses. See ShadeContext in
+    // lighting.wgsl for why they have to be two different vectors.
+    let geoNormal = n;
     let v = normalize(frame.cameraPos.xyz - worldPos);
 
     // ---- procedural material program (ADR-030, ADR-036) ----
@@ -319,6 +324,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         var context: ShadeContext;
         context.worldPos = worldPos;
         context.normal = n;
+        context.geoNormal = geoNormal;
         context.view = v;
         context.diffuseColor = baseColor.rgb;
         context.f0 = vec3<f32>(0.04);
@@ -397,6 +403,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     var ctx: ShadeContext;
     ctx.worldPos = worldPos;
     ctx.normal = n;
+    ctx.geoNormal = geoNormal;
     ctx.view = v;
     ctx.diffuseColor = diffuseColor;
     ctx.f0 = f0;
