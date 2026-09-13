@@ -1,5 +1,7 @@
 #include "ui/world_edit_panel.hpp"
 
+#include "core/log.hpp"
+
 #include "scene/composition.hpp"
 
 #include <imgui.h>
@@ -616,6 +618,21 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
         ImGui::PushID(node.name.c_str());
 
         if (showSelf) {
+            // A disclosure triangle, as a layer has in an image editor: the row stays one line and
+            // what is behind it is this object's settings. Drawn first so every row's switches line
+            // up whether or not it is open.
+            const bool open = expanded_.contains(node.name);
+            if (ImGui::ArrowButton("##open", open ? ImGuiDir_Down : ImGuiDir_Right)) {
+                if (open) {
+                    expanded_.erase(node.name);
+                } else {
+                    expanded_.insert(node.name);
+                }
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("what this object is worth to the camera director");
+            }
+            ImGui::SameLine();
             const bool visible = node.visibleParam != nullptr ? node.visibleParam->base() : node.visible;
             if (iconToggle("##eye", visible, Icon::Eye,
                            visible ? "Hide (undoable, saved with the scene)" : "Show")) {
@@ -655,8 +672,17 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
             if (node.locked) {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
             }
-            if (ImGui::Selectable(node.name.c_str(), selected) && !node.locked) {
-                if (ImGui::GetIO().KeyShift) {
+            if (ImGui::Selectable(node.name.c_str(), selected, ImGuiSelectableFlags_AllowDoubleClick) &&
+                !node.locked) {
+                if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                    // Go and look at it, the way double-clicking a layer's thumbnail does. The
+                    // selection is replaced rather than added to: a double-click is about *this*
+                    // object, and framing a set that happens to include it would put it in the
+                    // corner of the shot. Same request the Frame button makes, so there is one
+                    // answer to "what does framing mean" and the viewport still owns the camera.
+                    editor.selection.set(node.name);
+                    frameSelectionRequested = true;
+                } else if (ImGui::GetIO().KeyShift) {
                     editor.selection.toggle(node.name);
                 } else {
                     editor.selection.set(node.name);
@@ -668,6 +694,9 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
             if (node.kind == scene::NodeKind::Group && hasKids) {
                 ImGui::SameLine();
                 ImGui::TextDisabled("(%zu)", kids->second.size());
+            }
+            if (open) {
+                drawObjectSettings(engine, editor, node.name);
             }
         }
 
@@ -687,6 +716,104 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
     }
     ImGui::EndChild();
     ImGui::TreePop();
+}
+
+// What a hero is worth and where the camera should look at it.
+//
+// These three numbers decided every directed shot and could only be reached by hand-editing the
+// scene file: importance chooses the subject, the aim offset says where *on* an object the camera
+// points, and the stand-off is how far away it stops -- which is the difference between a shot of a
+// tree and a shot from inside one.
+//
+// The offset is expressed against the object rather than in world space, because that is how it is
+// thought about ("a bit above the base") and because a hero follows its object (ADR-106): storing
+// the absolute position and showing the difference keeps one source of truth and lets the number
+// stay meaningful when the object moves.
+void WorldEditPanel::drawObjectSettings(app::Engine& engine, WorldEditor& editor, const std::string& node) {
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        return;
+    }
+    ImGui::Indent(18.0f);
+    const auto& heroes = composition->heroes();
+    const auto it = std::find_if(heroes.begin(), heroes.end(),
+                                 [&](const world::HeroPoint& h) { return h.name == node; });
+    if (it == heroes.end()) {
+        // Shown rather than hidden: an empty disclosure reads as a broken one, and the sentence is
+        // also the instruction for turning the controls on.
+        ImGui::TextDisabled("not a hero -- star it to aim the camera director at it");
+        ImGui::Unindent(18.0f);
+        return;
+    }
+    world::HeroPoint hero = *it;
+    const scene::CompositionNode* object = composition->findNode(node);
+    const glm::vec3 origin =
+        object != nullptr ? composition->nodeWorldTransform(*object).position : glm::vec3(0.0f);
+
+    // One undo step per drag, not per frame: the same coalescing the gizmo uses.
+    auto beginDrag = [&] {
+        if (ImGui::IsItemActivated()) {
+            heroBeforeDrag_ = *it;
+        }
+    };
+    auto endDrag = [&] {
+        if (ImGui::IsItemDeactivatedAfterEdit() && heroBeforeDrag_) {
+            editor.recordHeroEdit(engine, *heroBeforeDrag_, hero);
+            heroBeforeDrag_.reset();
+        }
+    };
+    bool changed = false;
+
+    ImGui::SetNextItemWidth(-90.0f);
+    changed |= ImGui::SliderFloat("importance", &hero.importance, 0.0f, 1.0f, "%.2f");
+    beginDrag();
+    const bool subject = !heroes.empty() && heroes.front().name == node;
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s\nthe most important hero is the subject: it gets the builds and the "
+                          "drops, and the rest of the cast gets the passages",
+                          subject ? "this is the subject of the film" : "not the subject");
+    }
+    endDrag();
+
+    glm::vec3 offset = hero.position - origin;
+    ImGui::SetNextItemWidth(-90.0f);
+    changed |= ImGui::DragFloat3("aim offset", &offset.x, 0.05f, -1000.0f, 1000.0f, "%.2f m");
+    beginDrag();
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("where on the object the camera looks, relative to its origin. The mark in "
+                          "the viewport is this point; it shows while the object is selected.");
+    }
+    endDrag();
+    hero.position = origin + offset;
+
+    ImGui::SetNextItemWidth(-90.0f);
+    changed |= ImGui::DragFloat("stand-off", &hero.preferredCameraDistance, 0.25f, 0.5f, 5000.0f, "%.1f m");
+    beginDrag();
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("how far the camera stops from it. Raise it if a shot ends up inside the "
+                          "object; shot distances are otherwise in multiples of its own size.");
+    }
+    endDrag();
+    // A hero that activates closer than the camera is meant to stand never activates on the shot
+    // designed for it, and `validate()` refuses it -- so the reach follows the stand-off up rather
+    // than the edit being rejected under the mouse. Three times, the ratio the authored heroes use.
+    hero.activationRadius = std::max(hero.activationRadius, hero.preferredCameraDistance * 3.0f);
+
+    if (changed) {
+        // Straight to the composition while the mouse is down: the mark, the clearance field and
+        // the obstacles all follow immediately, and the directed shot is re-cut once the drag
+        // settles rather than sixty times a second (ADR-106's debounce).
+        if (auto ok = composition->editHero(node, hero); !ok) {
+            avgen::log::warn("hero '{}': {}", node, ok.error().message);
+        }
+    }
+    ImGui::TextDisabled("%.0f m tall, %.0f m across", static_cast<double>(hero.height),
+                        static_cast<double>(hero.radius * 2.0f));
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("measured from the object when it was starred, and used to size every "
+                          "shot. Unstar and star it again to re-measure a scaled object.");
+    }
+    ImGui::Unindent(18.0f);
 }
 
 void WorldEditPanel::drawHistory(app::Engine& engine, WorldEditor& editor) {

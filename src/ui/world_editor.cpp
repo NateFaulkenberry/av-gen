@@ -109,12 +109,22 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
         visuals_.selectionBoxes.push_back(std::move(box));
     }
 
-    // The heroes, always: they are the one piece of authored state with no appearance of its own.
-    // `heroes()` is kept ranked, so the first is the subject a directed shot would be about.
+    // The heroes that are selected, and only those.
+    //
+    // A hero is the one piece of authored state with no appearance of its own, so the mark has to
+    // exist -- but a world with five of them was five rings and five stalks standing over the
+    // scenery at all times, in the viewport and in a take alike. Tying them to the selection makes
+    // them what they actually are: the read-out for the object you are working on, which is also why
+    // playing does not hide them. If you have something selected while the piece plays, you are
+    // still working on it.
+    //
+    // `heroes()` is kept ranked, so index 0 is the subject a directed shot would be about.
     {
         const std::vector<world::HeroPoint>& heroes = composition->heroes();
-        visuals_.heroMarkers.reserve(heroes.size());
         for (std::size_t i = 0; i < heroes.size(); ++i) {
+            if (!selection.contains(heroes[i].name)) {
+                continue;
+            }
             EditorVisuals::HeroMarker marker;
             marker.name = heroes[i].name;
             marker.position = heroes[i].position;
@@ -867,6 +877,28 @@ void WorldEditor::setNodesHero(app::Engine& engine, std::span<const std::string>
         return;   // already in the state asked for, or the set the scene would end up with is invalid
     }
     // Designating something does not select or deselect it, so an undo must not move the selection.
+    command.selectionBefore = selection.nodes();
+    command.selectionAfter = selection.nodes();
+    history().push(std::move(command));
+}
+
+void WorldEditor::recordHeroEdit(app::Engine& engine, const world::HeroPoint& before,
+                                 const world::HeroPoint& after) {
+    if (!hasEdits() || before.name != after.name) {
+        return;
+    }
+    if (engine.composition() == nullptr) {
+        return;
+    }
+    HeroChange change;
+    change.node = before.name;
+    change.before.push_back(before);
+    change.after.push_back(after);
+    EditCommand command(fmt::format("Adjust hero {}", before.name));
+    command.heroes.push_back(std::move(change));
+    // Not applied here: the panel wrote the value live so the world moved under the mouse. Pushing
+    // it applies the same command forward again, which is a no-op against the state it produced and
+    // is what makes the undo exact.
     command.selectionBefore = selection.nodes();
     command.selectionAfter = selection.nodes();
     history().push(std::move(command));

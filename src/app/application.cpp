@@ -2092,8 +2092,7 @@ Result<void> Application::directCameraFromTrack() {
     log::info("direct: {} camera track(s) from {} hero(es)", *installed, heroes.size());
     // From now until the camera is handed back, the shot follows the heroes: starring an object
     // re-cuts it on the next frame rather than waiting to be asked (`refreshDirection`).
-    cameraDirection_.directed = true;
-    cameraDirection_.heroRevision = engine_->composition()->heroRevision();
+    noteDirected(*engine_, cameraDirection_);
     return {};
 }
 

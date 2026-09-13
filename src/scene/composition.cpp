@@ -1303,17 +1303,45 @@ void Composition::syncHeroesToNodes() {
         moved = true;
     }
     if (moved) {
-        // Everything that reads a hero's *position* -- the editor's mark, the clearance field, the
-        // obstacles entities walk around -- is already correct, because it reads `heroes_`. Only the
-        // revision waits, because the one thing that is expensive to redo is the directed shot.
-        heroMotionPending_ = true;
-        heroSettleAt_ = currentTime_ + heroSettleSeconds_;
+        markHeroesMoved();
         return;
     }
+    settleHeroes();
+}
+
+// The two halves of the debounce, shared by "a hero followed its object" and "somebody edited one".
+void Composition::markHeroesMoved() {
+    // Everything that reads a hero's *position* -- the editor's mark, the clearance field, the
+    // obstacles entities walk around -- is already correct, because it reads `heroes_`. Only the
+    // revision waits, because the one thing that is expensive to redo is the directed shot.
+    heroMotionPending_ = true;
+    heroSettleAt_ = currentTime_ + heroSettleSeconds_;
+}
+
+void Composition::settleHeroes() {
     if (heroMotionPending_ && currentTime_ >= heroSettleAt_) {
         heroMotionPending_ = false;
-        ++heroRevision_;
+        ++heroPlacementRevision_;
     }
+}
+
+Result<void> Composition::editHero(const std::string& name, const world::HeroPoint& value) {
+    const auto it = std::find_if(heroes_.begin(), heroes_.end(),
+                                 [&](const world::HeroPoint& h) { return h.name == name; });
+    if (it == heroes_.end()) {
+        return fail("no hero called '{}'", name);
+    }
+    if (value.name != name) {
+        // Renaming is a change to the *set*: it decides which object the hero stands on and whether
+        // two heroes now collide. `setHeroes` is where that is checked.
+        return fail("hero '{}' cannot be renamed here", name);
+    }
+    if (auto ok = value.validate(); !ok) {
+        return ok;
+    }
+    *it = value;
+    markHeroesMoved();
+    return {};
 }
 
 Result<void> Composition::setEntities(std::vector<entity::EntityDesc> entities) {

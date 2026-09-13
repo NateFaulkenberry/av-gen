@@ -62,6 +62,14 @@ const scene::CompositionNode* terrainNodeOf(Engine& engine) {
 
 std::span<const std::string_view> directedCameraTargets() { return kCameraTargets; }
 
+void noteDirected(Engine& engine, DirectorState& state) {
+    const scene::Composition* composition = engine.composition();
+    state.directed = composition != nullptr;
+    state.heroRevision = composition != nullptr ? composition->heroRevision() : 0;
+    state.placementRevision = composition != nullptr ? composition->heroPlacementRevision() : 0;
+    state.wasPlaying = engine.transport().isPlaying();
+}
+
 Result<Redirect> refreshDirection(Engine& engine, DirectorState& state) {
     if (!state.directed) {
         return Redirect::Nothing;
@@ -74,12 +82,22 @@ Result<Redirect> refreshDirection(Engine& engine, DirectorState& state) {
         state = DirectorState{};
         return Redirect::Released;
     }
-    if (composition->heroRevision() == state.heroRevision) {
+    const bool playing = engine.transport().isPlaying();
+    const bool parked = !playing && !state.wasPlaying;
+    state.wasPlaying = playing;
+    const bool castChanged = composition->heroRevision() != state.heroRevision;
+    const bool movedAndParked = composition->heroPlacementRevision() != state.placementRevision && parked;
+    if (!castChanged && !movedAndParked) {
+        // Absorbed rather than queued: a hero that walked around during playback has already been
+        // followed by everything that reads a position, and re-cutting for it the moment somebody
+        // pauses would be answering a question nobody asked.
+        state.placementRevision = composition->heroPlacementRevision();
         return Redirect::Nothing;
     }
     // Recorded before the work, not after: a re-cut that fails must not be retried every frame for
     // the rest of the session, and the failure is the same one until the heroes change again.
     state.heroRevision = composition->heroRevision();
+    state.placementRevision = composition->heroPlacementRevision();
     if (composition->heroes().empty()) {
         auto& tracks = engine.timeline().tracks();
         const auto owned = directedCameraTargets();

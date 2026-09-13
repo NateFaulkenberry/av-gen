@@ -92,6 +92,12 @@ class Engine;
 struct DirectorState {
     bool directed = false;            // the camera's automation is the director's, not somebody's work
     std::uint64_t heroRevision = 0;   // the hero set it was cut from (Composition::heroRevision)
+    std::uint64_t placementRevision = 0;   // ...and where those heroes were
+    // Whether the transport was playing last time this was asked. The settle that moves a hero
+    // lands *inside* the frame's update, after this has run, so the last one of a playing stretch
+    // arrives on the first parked frame -- and re-cutting for it there would be re-cutting for
+    // something that happened while the piece was playing, one frame after somebody pressed pause.
+    bool wasPlaying = false;
     std::uint32_t seed = 1;           // so a re-cut is the same shot minus what actually changed
 };
 
@@ -109,10 +115,23 @@ enum class Redirect : std::uint8_t {
 // project load, an undo, or a hand-deleted track leaves the state correct without every one of
 // those places having to know that a director exists.
 //
+// Changing the *cast* re-cuts at once, wherever the playhead is: that is somebody clicking a star and
+// asking to see the result. A hero merely *moving* re-cuts only while the transport is parked --
+// during playback that is the world moving rather than an edit (Glowmere's wanderer walks), and
+// replacing the whole film every time it stops for breath is what made the director look stuck on
+// one hero. Movement during playback is absorbed, not queued, so pausing does not fire a re-cut for
+// something that happened three minutes ago.
+//
 // An empty hero set hands the camera back instead of failing. A shot with nothing to point at is
 // not a shot, and leaving the last trajectory running would be a camera flying a path towards
 // something the user has just said is not there.
 [[nodiscard]] Result<Redirect> refreshDirection(Engine& engine, DirectorState& state);
+
+// Records that the shot standing on the timeline *now* was cut from the heroes as they are *now*.
+// Call after directing. One function rather than three assignments at every call site: a state that
+// remembers the cast but not where it stood re-cuts on the very next frame, which is a mistake worth
+// making impossible rather than documenting.
+void noteDirected(Engine& engine, DirectorState& state);
 
 // The camera parameters a directed sequence owns. Anything targeting one of these is replaced by
 // `installSequence`; anything else survives.

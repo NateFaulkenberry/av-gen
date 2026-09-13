@@ -423,8 +423,7 @@ TEST_CASE("A directed shot re-cuts itself when the heroes change", "[director][c
     // Cut the shot, the way the menu item does.
     REQUIRE(composition->setHeroes(threeHeroes()).has_value());
     REQUIRE(app::directEngine(engine, composition->heroes()).has_value());
-    state.directed = true;
-    state.heroRevision = composition->heroRevision();
+    app::noteDirected(engine, state);
     const std::vector<float> first = cameraKeys();
     REQUIRE(!first.empty());
 
@@ -691,4 +690,81 @@ TEST_CASE("A film with three heroes is about three heroes", "[director][camera][
         return s.startSeconds >= 55.0 && s.startSeconds < 62.0;
     });
     CHECK(drops == 1);
+}
+
+// Reported as the director getting "stuck on a single hero during playback".
+//
+// Not the casting: heroes follow the objects they describe (ADR-106), Glowmere's wanderer walks, and
+// every time it paused for breath the placement settled, bumped the hero revision and re-cut the
+// entire film under a running playhead. A film re-cut at second fifty-four starts its intro at zero,
+// so whatever section covers *now* decides the subject -- repeatedly, and often the same one.
+//
+// Changing the cast is a decision and still re-cuts at once, wherever the playhead is. A hero
+// merely moving is usually the world moving, and waits until the transport is parked.
+TEST_CASE("A hero walking about during playback does not re-cut the film", "[director][camera][redirect]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path wav =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "glowmere-valley.wav";
+    if (!std::filesystem::exists(wav)) {
+        SKIP("glowmere-valley.wav is generated, not committed: run tools/make_glowmere_score.py");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    REQUIRE(engine.loadAudio(wav).has_value());
+    scene::Composition* composition = engine.composition();
+    composition->setHeroSettleSeconds(0.0);   // settle at once; the debounce has its own test
+    REQUIRE(composition->setHeroes(threeHeroes()).has_value());
+    REQUIRE(app::directEngine(engine, composition->heroes()).has_value());
+
+    app::DirectorState state;
+    app::noteDirected(engine, state);
+
+    auto frame = [&](double at) {
+        auto redirected = app::refreshDirection(engine, state);
+        REQUIRE(redirected.has_value());
+        FrameTime time;
+        time.renderTime = at;
+        time.deltaTime = 1.0 / 60.0;
+        engine.update(time);
+        return *redirected;
+    };
+    // A hero that has walked somewhere new, the way a wandering entity does.
+    auto walk = [&](float metres) {
+        std::vector<world::HeroPoint> moved = composition->heroes();
+        moved.front().position.x += metres;
+        REQUIRE(composition->editHero(moved.front().name, moved.front()).has_value());
+    };
+
+    REQUIRE(frame(0.0) == app::Redirect::Nothing);
+    REQUIRE(engine.play().has_value());
+    REQUIRE(engine.transport().isPlaying());
+
+    for (int i = 1; i <= 10; ++i) {
+        walk(2.0f);
+        INFO("playing frame " << i);
+        CHECK(frame(static_cast<double>(i) / 60.0) == app::Redirect::Nothing);
+    }
+    // ...and pausing does not then fire a re-cut for everything that happened while it played: the
+    // movement was absorbed, not queued.
+    engine.pause();
+    CHECK(frame(1.0) == app::Redirect::Nothing);
+    CHECK(frame(1.1) == app::Redirect::Nothing);
+
+    // Parked, the same movement is an edit and does re-cut: this is somebody placing a hero. One
+    // frame later than the edit, because the settle happens inside the update and `refreshDirection`
+    // runs at the top of the next one -- the same order the application uses.
+    walk(30.0f);
+    CHECK(frame(1.2) == app::Redirect::Nothing);
+    CHECK(frame(1.3) == app::Redirect::Recut);
+    CHECK(frame(1.4) == app::Redirect::Nothing);
+
+    // And a change to the cast re-cuts wherever the playhead is, because that is somebody asking.
+    REQUIRE(engine.play().has_value());
+    std::vector<world::HeroPoint> fewer = composition->heroes();
+    fewer.pop_back();
+    REQUIRE(composition->setHeroes(fewer).has_value());
+    CHECK(frame(2.0) == app::Redirect::Recut);
+#endif
 }

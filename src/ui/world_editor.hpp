@@ -212,6 +212,11 @@ public:
     // Declares objects heroes, or takes the declaration back (ADR-072/074). Undoable, and saved
     // with the scene: a hero is authored state, not a view setting.
     void setNodesHero(app::Engine& engine, std::span<const std::string> names, bool hero);
+    // Puts an edit to one hero -- its importance, its aim, its stand-off -- on the history. The edit
+    // itself has already happened (`Composition::editHero`, live under the mouse); this is the
+    // record of it, taken once when the drag ends.
+    void recordHeroEdit(app::Engine& engine, const world::HeroPoint& before,
+                        const world::HeroPoint& after);
 
     // Drops selected names that no longer exist (after a scene swap or a Generate).
     void reconcile(app::Engine& engine);

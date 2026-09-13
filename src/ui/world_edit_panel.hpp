@@ -15,6 +15,8 @@
 #include "assets/asset_library.hpp"
 #include "ui/world_editor.hpp"
 
+#include <optional>
+#include <set>
 #include <string>
 
 namespace avgen::ui {
@@ -37,11 +39,23 @@ private:
     // one editor panel with contextual contents, and because what you lock is what you are about to
     // stop clicking on, which is a thing you do in the middle of selecting.
     void drawObjects(app::Engine& engine, WorldEditor& editor);
+    // The settings behind an object's disclosure triangle: what it is worth to the camera director,
+    // where on it the camera looks, and how far the camera stands off. All of it is hero state, so
+    // all of it is inert until the object is starred.
+    void drawObjectSettings(app::Engine& engine, WorldEditor& editor, const std::string& node);
     void drawHistory(app::Engine& engine, WorldEditor& editor);
 
     char filter_[64] = {};
     char objectFilter_[64] = {};
     int categoryFilter_ = 0;
+    // Which rows are expanded, by node name. A set rather than a flag on the node: this is how the
+    // panel is being *looked at*, not something about the scene, and it must not make a document
+    // modified or end up in a file.
+    std::set<std::string> expanded_;
+    // The hero as it was when a drag began, so the whole drag is one undo step rather than sixty.
+    // `ImGui::IsItemActivated` opens it and `IsItemDeactivatedAfterEdit` closes it, which is the
+    // same shape as the gizmo's drag coalescing.
+    std::optional<world::HeroPoint> heroBeforeDrag_;
 };
 
 } // namespace avgen::ui

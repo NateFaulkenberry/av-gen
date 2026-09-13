@@ -382,6 +382,20 @@ public:
     // a question about *when*, not about which fields differ -- and because comparing two vectors
     // of heroes every frame to answer "no" is work nobody needs done.
     [[nodiscard]] std::uint64_t heroRevision() const { return heroRevision_; }
+    // Bumped when a hero's *geometry* settles somewhere new -- it followed its object, or somebody
+    // moved its aim or its stand-off -- as opposed to the set of heroes changing.
+    //
+    // Two counters because the two want different answers from the camera director. Changing the
+    // cast is a decision and re-cuts the film at once, wherever the playhead is. A hero moving is
+    // usually the *world* moving: Glowmere's wanderer walks, so following it bumped this several
+    // times a minute, and each bump re-cut the whole film under a running playhead -- which is how
+    // the director ended up apparently stuck on one hero during playback.
+    [[nodiscard]] std::uint64_t heroPlacementRevision() const { return heroPlacementRevision_; }
+    // Replaces one hero, validated on its own. For editing what a hero *is* -- its importance, where
+    // on the object the camera looks, how far it stands off -- without the whole-set semantics of
+    // `setHeroes`: the change lands immediately and the revision waits for the settle, so dragging a
+    // slider does not re-cut the film sixty times a second.
+    Result<void> editHero(const std::string& name, const world::HeroPoint& value);
     // How long a hero's object has to stop moving before the declaration is considered settled and
     // the revision moves. Exposed so a test does not have to sleep.
     void setHeroSettleSeconds(double seconds) { heroSettleSeconds_ = std::max(0.0, seconds); }
@@ -726,6 +740,7 @@ private:
 
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
     std::uint64_t heroRevision_ = 1;
+    std::uint64_t heroPlacementRevision_ = 1;
     // Where each hero's node stood when the hero was last in step with it, so a move can be applied
     // to the hero as a *delta*. A delta rather than a re-measurement, because a hero's position is
     // allowed to be somewhere other than the middle of its object -- Glowmere's elder sits below
@@ -741,6 +756,8 @@ private:
     double heroSettleAt_ = 0.0;
     double heroSettleSeconds_ = 0.25;
     void syncHeroesToNodes();
+    void markHeroesMoved();
+    void settleHeroes();
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
     std::vector<entity::FieldDesc> fieldDescs_;   // ADR-097: authored, round-tripped as "fields"
     std::string profileLibraryPath_;              // ADR-097: "entityProfiles", relative to the scene

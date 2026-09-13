@@ -80,8 +80,17 @@ a row in World ▸ Objects, and every star is one click away from the thing it d
 that should be one hero are a group, and the group is what you star.
 
 **Follow the heroes afterwards.** Star or unstar an object while the camera is directed and the shot
-re-cuts on the next frame with the same seed (ADR-105). Move a hero's object and the shot re-cuts a
-quarter-second after you let go (ADR-106).
+re-cuts on the next frame with the same seed (ADR-105) — wherever the playhead is, because that is
+somebody asking to see the result. Move a hero's object, or change what a hero is worth, and the
+shot re-cuts a quarter-second after you let go (ADR-106) — but only while the transport is parked.
+During playback a hero moving is the *world* moving (Glowmere's wanderer walks), and re-cutting the
+whole film every time it settles is what once made the director look stuck on one hero.
+
+**Be tuned per hero.** Expanding an object's row in World ▸ Objects gives its importance (which hero
+is the subject), its aim offset (where *on* the object the camera looks) and its stand-off (how far
+away a shot stops, which is what to raise when a shot ends up inside something). The controls are
+inert until the object is starred. Each drag is one undo step, and the viewport mark shows the aim
+point while the object is selected.
 
 **Hand the camera back.** Camera ▸ Hand Camera Back to the Viewport removes the director's tracks and
 ends its claim, leaving the scene's own camera and every other piece of automation intact.
@@ -98,10 +107,10 @@ an empty sequence.
 **No heroes, no film.** Directing needs something to point at. Star an object in World ▸ Objects, or
 generate a world.
 
-**Ties cannot be resolved.** The subject — whoever gets the builds and the drops — is the first hero
+**Ties cannot be resolved by default.** The subject — whoever gets the builds and the drops — is the first hero
 by importance, and heroes designated from the editor all take the default 0.5, so among them the tie
-breaks on the order you starred them in. Ranking a film deliberately still means editing importances
-in the scene file.
+breaks on the order you starred them in — until you set them. Expand an object's row in World ▸
+Objects for its importance, its aim offset and its stand-off.
 
 **Shots are not editable.** The director produces the whole sequence or none of it. There is no way
 to keep eight shots and re-cut the ninth, to change one shot's kind, or to nudge a cut — the output

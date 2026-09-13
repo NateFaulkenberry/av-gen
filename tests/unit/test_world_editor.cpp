@@ -1705,6 +1705,12 @@ TEST_CASE("the overlay is told about every hero, and which one is the subject") 
 
     const scene::Camera camera = lookingDown();
     editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{});
+    // Nothing selected, nothing drawn: five heroes in a world used to be five rings standing over
+    // the scenery at all times, in the viewport and in a take alike.
+    CHECK(editor.visuals().heroMarkers.empty());
+
+    editor.selection.set(std::vector<std::string>{a, b});
+    editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{});
     const auto& markers = editor.visuals().heroMarkers;
     REQUIRE(markers.size() == 2);
     CHECK(markers[0].name == b);        // ranked, so the subject is first
@@ -1718,6 +1724,15 @@ TEST_CASE("the overlay is told about every hero, and which one is the subject") 
     editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{});
     REQUIRE(editor.visuals().heroMarkers.size() == 1);
     CHECK(editor.visuals().heroMarkers.front().name == a);
+
+    // Playing does not hide them: something selected while the piece plays is something being
+    // worked on.
+    REQUIRE(f.engine.play().has_value());
+    editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{});
+    CHECK(editor.visuals().heroMarkers.size() == 1);
+    editor.selection.clear();
+    editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{});
+    CHECK(editor.visuals().heroMarkers.empty());
 }
 
 // A hero describes an object that is already placed, so moving the object has to move the
@@ -1804,7 +1819,10 @@ TEST_CASE("a hero's move reaches the director once, when the object stops") {
         f.engine.update(time);
     };
     tick(0.0);
-    const std::uint64_t before = composition->heroRevision();
+    // The *placement* revision: a hero following its object is not a change to the cast, and the two
+    // are counted apart so that a hero walking about during playback does not re-cut the film.
+    const std::uint64_t before = composition->heroPlacementRevision();
+    const std::uint64_t cast = composition->heroRevision();
     const float declaredX = composition->heroes().front().position.x;
 
     // A drag: twenty frames of movement inside the settle window.
@@ -1814,15 +1832,85 @@ TEST_CASE("a hero's move reaches the director once, when the object stops") {
         REQUIRE(ui::setNodePosition(f.engine, a, glm::vec3(static_cast<float>(frame) * 0.5f, 0.0f, 0.0f)));
         tick(now);
         INFO("frame " << frame);
-        CHECK(composition->heroRevision() == before);   // the shot is not re-cut mid-drag
+        CHECK(composition->heroPlacementRevision() == before);   // the shot is not re-cut mid-drag
     }
     // ...but the world already knows where it is, so nothing that reads a hero is stale meanwhile.
     CHECK_THAT(composition->heroes().front().position.x,
                Catch::Matchers::WithinAbs(static_cast<double>(declaredX) + 10.0, 0.5));
 
-    // Let go: one bump, and only one.
+    // Let go: one bump, and only one, and the cast never moved.
     tick(now + 0.3);
-    CHECK(composition->heroRevision() == before + 1);
+    CHECK(composition->heroPlacementRevision() == before + 1);
     tick(now + 0.6);
-    CHECK(composition->heroRevision() == before + 1);
+    CHECK(composition->heroPlacementRevision() == before + 1);
+    CHECK(composition->heroRevision() == cast);
+}
+
+// Importance, where the camera looks and how far it stands off decided every directed shot and
+// could only be reached by hand-editing the scene file. The panel edits them live under the mouse
+// and records one undo step when the drag ends, which is the same shape as a gizmo drag -- so this
+// covers the half that is not pixels: the edit lands, it is undoable, and dragging does not re-cut
+// the film sixty times a second.
+TEST_CASE("a hero's importance, aim and stand-off can be edited and undone") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    const std::string a = f.add("arch", glm::vec3(2.0f, 0.0f, -3.0f));
+    auto* composition = f.engine.composition();
+    composition->setHeroSettleSeconds(0.0);
+    editor.setNodesHero(f.engine, std::vector<std::string>{a}, true);
+    REQUIRE(composition->heroes().size() == 1);
+    const world::HeroPoint before = composition->heroes().front();
+
+    auto tick = [&](double at) {
+        FrameTime time;
+        time.renderTime = at;
+        time.deltaTime = 1.0 / 60.0;
+        f.engine.update(time);
+    };
+
+    // A drag: the value lands immediately, and the *set* revision does not move -- only the
+    // placement one, once the drag settles. That is what keeps a directed shot from being re-cut on
+    // every frame of a slider.
+    const std::uint64_t cast = composition->heroRevision();
+    world::HeroPoint edited = before;
+    for (int frame = 1; frame <= 5; ++frame) {
+        edited.importance = 0.1f * static_cast<float>(frame);
+        edited.position = before.position + glm::vec3(0.0f, 0.4f * static_cast<float>(frame), 0.0f);
+        edited.preferredCameraDistance = before.preferredCameraDistance + static_cast<float>(frame);
+        REQUIRE(composition->editHero(a, edited).has_value());
+        CHECK_THAT(composition->heroes().front().importance,
+                   Catch::Matchers::WithinAbs(static_cast<double>(edited.importance), 1e-6));
+        CHECK(composition->heroRevision() == cast);
+    }
+    tick(1.0);   // the settle
+    CHECK(composition->heroRevision() == cast);
+
+    // One undo step for the whole drag, recorded when it ended.
+    editor.recordHeroEdit(f.engine, before, edited);
+    REQUIRE(edits.history().canUndo());
+    CHECK(edits.history().undoLabel() == "Adjust hero " + a);
+    CHECK(edits.history().undo(f.engine).ok());
+    const world::HeroPoint back = composition->heroes().front();
+    CHECK_THAT(back.importance, Catch::Matchers::WithinAbs(before.importance, 1e-6));
+    CHECK_THAT(back.position.y, Catch::Matchers::WithinAbs(before.position.y, 1e-5));
+    CHECK_THAT(back.preferredCameraDistance,
+               Catch::Matchers::WithinAbs(before.preferredCameraDistance, 1e-5));
+    CHECK(edits.history().redo(f.engine).ok());
+    CHECK_THAT(composition->heroes().front().importance,
+               Catch::Matchers::WithinAbs(0.5, 1e-6));
+
+    // An edit the scene could not hold is refused rather than half-applied: a hero that activates
+    // closer than the camera is meant to stand never activates on its own shot.
+    world::HeroPoint impossible = composition->heroes().front();
+    impossible.preferredCameraDistance = 100.0f;
+    impossible.activationRadius = 10.0f;
+    CHECK_FALSE(composition->editHero(a, impossible).has_value());
+    CHECK_THAT(composition->heroes().front().preferredCameraDistance,
+               Catch::Matchers::WithinAbs(before.preferredCameraDistance + 5.0, 1e-5));
+    // ...and renaming is not an edit to a hero, it is a change to the cast.
+    world::HeroPoint renamed = composition->heroes().front();
+    renamed.name = "something-else";
+    CHECK_FALSE(composition->editHero(a, renamed).has_value());
 }
