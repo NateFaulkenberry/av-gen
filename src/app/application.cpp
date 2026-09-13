@@ -2899,6 +2899,18 @@ int Application::runHeadless() {
         return runQueue(*options_.queue);
     }
     if (options_.render) {
+        // The offline engine builds its own renderer, so a debug view selected on the command line
+        // never reaches it and the sequence comes out as the ordinary shaded frame. That is
+        // defensible for a deliverable and indefensible in silence: a flag that is accepted,
+        // validated, and then ignored is how somebody spends an afternoon studying a debug view
+        // that was never drawn. (This warning lives here rather than beside the flag's own parsing
+        // because that code runs only on the interactive path -- putting it there made it dead code
+        // for precisely the case it is about.)
+        if (!options_.debugTarget.empty()) {
+            log::warn("--debug-target '{}' does not apply to --render: an offline sequence is drawn "
+                      "by its own renderer and comes out shaded. Use --capture for a debug view.",
+                      options_.debugTarget);
+        }
         // The offline engine loads the project itself; without a project file, snapshot the
         // current session into a temporary one.
         std::filesystem::path projectFile = engine_->projectPath();

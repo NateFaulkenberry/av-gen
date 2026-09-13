@@ -655,6 +655,7 @@ private:
     std::uint32_t clusterDispatches_ = 0;
     AuxDebugView auxDebugView_ = AuxDebugView::None;
     float auxDebugScale_ = 0.0f;
+    bool warnedOverdrawScope_ = false; // the overdraw view's partial-coverage warning, once per run
     gpu::RenderTarget post_[2];      // ping-pong HDR colour targets for post layers
     gpu::GpuTexture spectrum_;       // binCount x 1 RGBA16F audio spectrum for user shaders
     std::size_t spectrumBins_ = 0;

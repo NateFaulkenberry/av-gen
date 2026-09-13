@@ -3148,6 +3148,18 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // on (see overdraw_count.wgsl), and a diagnostic that costs the frame it is diagnosing is not a
     // diagnostic worth having on by default.
     if (auxDebugView_ == AuxDebugView::Overdraw || auxDebugView_ == AuxDebugView::FragmentDensity) {
+        // Say what this view cannot see, to whoever is looking at it. The pass covers plain opaque
+        // entities only, so on a scene that is mostly procedural scatter it draws a confident,
+        // detailed, *partial* picture -- which is worse than an empty one, because a blank view
+        // announces its own failure and a partial view does not. An investigation into Glowmere's
+        // quad overdraw selected this view, got the terrain and none of the ecology, and had to
+        // build a CPU instrument instead (ADR-126). Warn once per selection, not per frame.
+        if (!warnedOverdrawScope_ && !scene.procedurals.empty()) {
+            log::warn("overdraw view: {} procedural object(s) are not counted -- this pass covers "
+                      "plain opaque entities only, so the picture is partial",
+                      scene.procedurals.size());
+            warnedOverdrawScope_ = true;
+        }
         encoder.ClearBuffer(overdrawBuffer_);
         if (!overdrawGroup_) {
             wgpu::BindGroupEntry entry{};
