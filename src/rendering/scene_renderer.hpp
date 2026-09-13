@@ -496,10 +496,27 @@ public:
     [[nodiscard]] const gpu::RenderTarget& hdrTarget() const { return hdr_; }
     [[nodiscard]] bool initialised() const { return initialised_; }
 
-    static constexpr std::uint32_t kMaxObjects = 256;
+    // ADR-128: the object slot buffer grows to fit the frame rather than being a 256-slot ceiling.
+    // `kInitialObjects` is only what init() allocates so a small scene pays what it used to;
+    // `ensureObjectCapacity` raises it before the entity loop runs, and `objectCapacity()` reports
+    // what the frame actually has. The one number that is still a limit is the byte budget below.
+    static constexpr std::uint32_t kInitialObjects = 256;
     static constexpr std::uint32_t kObjectStride = 512; // dynamic-offset alignment (256) x 2
+    // The ceiling is a memory budget, not a slot count: 64 MiB of object uniforms. It exists so a
+    // scene that asks for a preposterous number of entities fails loudly at a documented number
+    // instead of asking the driver for a gigabyte. 131,072 slots is ~470x Glowmere's 278 entities,
+    // and eight times the 16,383 distinct entity indices the pick-id encoding can even name
+    // (scene/scene_types.hpp, kPickIndexBits) -- so the identifier target runs out of names long
+    // before this runs out of slots, and that is deliberate: this must never be the binding limit.
+    static constexpr std::uint64_t kObjectBufferByteBudget = 64ull * 1024ull * 1024ull;
+    static constexpr std::uint32_t kMaxObjectCapacity =
+        static_cast<std::uint32_t>(kObjectBufferByteBudget / kObjectStride);
     static_assert(kObjectStride % 256 == 0);
     static_assert(sizeof(ObjectUniforms) <= kObjectStride);
+    static_assert(kMaxObjectCapacity >= kInitialObjects);
+    // Slots the object buffer currently holds. Not a constant: it is what the last
+    // `ensureObjectCapacity` settled on, and tests read it to prove the cap moved.
+    [[nodiscard]] std::uint32_t objectCapacity() const { return objectCapacity_; }
     static constexpr wgpu::TextureFormat kHdrFormat = wgpu::TextureFormat::RGBA16Float;
     static constexpr wgpu::TextureFormat kDepthFormat = wgpu::TextureFormat::Depth24Plus;
     // Auxiliary targets (ADR-035). Normal + roughness packs an octahedral normal in rg, the
@@ -678,6 +695,11 @@ private:
     std::vector<std::uint32_t> clusterStaging_;
     std::vector<const scene::PunctualLight*> lightOrder_;
     wgpu::Buffer objectUniforms_;
+    // Slots in objectUniforms_ / objectStaging_. Zero until init() allocates the first buffer.
+    std::uint32_t objectCapacity_ = 0;
+    // Grows the object slot buffer (and the staging mirror, and every bind group that names it) to
+    // hold at least `objects` slots. Cheap and idempotent when it already does. ADR-128.
+    void ensureObjectCapacity(std::uint32_t objects);
     wgpu::Buffer tonemapUniforms_;
     wgpu::BindGroup frameBindGroup_;
     // The same group with the shadow atlas and the AO target replaced by placeholders, for the
