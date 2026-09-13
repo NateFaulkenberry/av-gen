@@ -1337,6 +1337,7 @@ std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
         {"water", &T::water},               {"transparency", &T::transparency},
         {"particles", &T::particles},       {"animation", &T::animation},
         {"cameramotion", &T::cameraMotion},  {"animationmotion", &T::animationMotion},
+        {"auxstore", &T::auxTargetStores},
     };
     return kArms;
 }
@@ -1349,6 +1350,57 @@ bool SceneRenderer::setPassArm(PassToggles& toggles, std::string_view name, bool
         }
     }
     return false;
+}
+
+std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
+    static constexpr SceneRenderer::QualityArm kArms[] = {
+        // ADR-112's rule, off. Zero restores the pre-ADR-112 range of three scene radii -- which is
+        // what the ADR's own `shadowTexelTarget` comment already promises, so this arm is a reader
+        // of an existing contract rather than a new one.
+        {"shadowrange", [](QualitySettings& q) { q.shadowTexelTarget = 0.0f; },
+         "shadowTexelTarget=0 (the pre-ADR-112 range: three scene radii)"},
+        // The screen-space contact march, off. It is the one shadow term the mask does not cover,
+        // so it is the term that is still evaluated per pixel per directional light.
+        {"contact", [](QualitySettings& q) { q.contactShadows = false; q.contactSteps = 0; },
+         "contactShadows=false (no screen-space contact march)"},
+        // PCSS for the key light, off: plain PCF instead. The blocker search is `pcssBlockerTaps`
+        // uninterpolated textureLoads on top of the filter, and ADR-111 measured it as the largest
+        // single contributor to the mask's residual.
+        {"pcss", [](QualitySettings& q) { q.softShadows = false; },
+         "softShadows=false (PCF instead of PCSS for the key light)"},
+        // The mask at full resolution -- the High and Offline tiers' own setting, not a fabricated
+        // one. Separates "the mask pass costs this" from "the mask's half resolution saves this".
+        {"maskfull", [](QualitySettings& q) { q.shadowMaskScale = 1.0f; },
+         "shadowMaskScale=1.0 (the mask computed per pixel, as High/Offline do)"},
+    };
+    return kArms;
+}
+
+bool SceneRenderer::setQualityArm(QualitySettings& settings, std::string_view name) {
+    for (const QualityArm& arm : qualityArms()) {
+        if (name == arm.name) {
+            arm.apply(settings);
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string SceneRenderer::qualityArmNames() {
+    std::string names;
+    for (const QualityArm& arm : qualityArms()) {
+        names += names.empty() ? arm.name : std::string(",") + arm.name;
+    }
+    return names;
+}
+
+std::string_view SceneRenderer::qualityArmDescription(std::string_view name) {
+    for (const QualityArm& arm : qualityArms()) {
+        if (name == arm.name) {
+            return arm.what;
+        }
+    }
+    return {};
 }
 
 std::string SceneRenderer::passArmNames() {
@@ -2606,6 +2658,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // ---- background pass: the HDR clear and the background user-shader layers ----
     // These are fullscreen quads with a single colour output, so they get their own pass; the
     // geometry pass that follows loads the colour and clears the auxiliary targets.
+    //
+    // ADR-119: the pass is encoded unconditionally, and the alternative was measured rather than
+    // assumed. Eliding it when no layer is staged as Background -- and letting the scene pass clear
+    // target 0 itself -- removes a store and a load of 8 bytes a pixel, which sounds like free
+    // bandwidth and is not: the `auxstore` probe showed that not writing *three times that much*
+    // (the four auxiliary targets, 24 B/px) moves the frame by nothing measurable. See ADR-119.
     {
         wgpu::RenderPassColorAttachment color{};
         color.view = hdr_.colorView();
@@ -2735,7 +2793,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         for (std::uint32_t i = 0; i < kAuxTargetCount; ++i) {
             attachments[i + 1].view = auxViews[i];
             attachments[i + 1].loadOp = wgpu::LoadOp::Clear;
-            attachments[i + 1].storeOp = wgpu::StoreOp::Store;
+            attachments[i + 1].storeOp =
+                toggles_.auxTargetStores ? wgpu::StoreOp::Store : wgpu::StoreOp::Discard;
             attachments[i + 1].clearValue = {0.0, 0.0, 0.0, 0.0};
         }
         wgpu::RenderPassDepthStencilAttachment depth{};

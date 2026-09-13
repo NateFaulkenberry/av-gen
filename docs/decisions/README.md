@@ -122,6 +122,11 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [114](ADR-114-cluster-occupancy-is-measured-uncapped.md) | Cluster occupancy is measured before the cap, not after it | Accepted |
 | [115](ADR-115-overdraw-is-counted-in-its-own-pass.md) | Overdraw is counted in its own pass, or not at all | Accepted |
 | [116](ADR-116-sigpipe-is-ignored-process-wide.md) | SIGPIPE is ignored process-wide, not blocked per thread | Accepted |
+| [117](ADR-117-an-ab-arm-may-be-a-quality-setting.md) | An A/B arm may be a quality setting, not only a missing pass | Accepted |
+| [118](ADR-118-the-contact-march-is-memory-bound.md) | The contact march is the frame's largest fragment item, and it is memory-bound | Accepted |
+| [119](ADR-119-attachment-bandwidth-is-not-the-constraint.md) | Attachment load/store bandwidth is not this frame's constraint | Accepted |
+| [120](ADR-120-what-the-shortened-shadow-range-bought.md) | What the shortened shadow range bought, settled | Accepted |
+| [121](ADR-121-framebuffer-fetch-is-not-available.md) | Framebuffer fetch is not available here, and the reason is the driver | Accepted |
 | [122](ADR-122-importance-is-pixels-per-triangle.md) | A drawable's importance is measured in pixels per triangle | Accepted |
 | [123](ADR-123-representation-is-two-decisions.md) | Representation is two decisions, not one ladder | Accepted |
 | [124](ADR-124-the-band-is-a-band.md) | The target is a band of a few hundred pixels per triangle, not the fewest triangles | Accepted |

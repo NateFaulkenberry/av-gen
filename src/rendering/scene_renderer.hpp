@@ -416,6 +416,13 @@ public:
         // bind pose: "stop the character moving" and "take the character's pose away" are different
         // questions, and a scene where only one of them changes the picture says which.
         bool animationMotion = true;
+        // ADR-119, a probe rather than a setting: off means the scene pass's four *auxiliary*
+        // colour targets are not written back out of tile memory at all (StoreOp::Discard). The
+        // fragment shader still computes and writes them, so this measures exactly one thing --
+        // the cost of storing 24 bytes a pixel to system memory -- and nothing else. The frame it
+        // produces is wrong wherever post reads one of them, which is what makes it an arm and not
+        // a quality setting.
+        bool auxTargetStores = true;
     };
 
     // The arms by name, in one place (renderer forensics Phase 8.3). The CLI's `--disable <list>`,
@@ -432,6 +439,33 @@ public:
     [[nodiscard]] static bool setPassArm(PassToggles& toggles, std::string_view name, bool on);
     // Every arm's name, comma separated -- for a message telling somebody what they may write.
     [[nodiscard]] static std::string passArmNames();
+
+    // ---- quality arms (ADR-117) -------------------------------------------------------------
+    //
+    // A *quality* arm is an A/B arm that changes `QualitySettings` rather than removing a pass.
+    // It exists because the two most decision-relevant questions in Phase B cannot be asked with
+    // a pass toggle: ADR-112's shortened shadow range is a *setting* (`shadowTexelTarget`, zero
+    // restores the pre-ADR-112 rule), and so are the contact march, PCSS and the mask's
+    // resolution. Before this, settling any of them meant a rebuild between the arms, which is
+    // exactly the block-not-interleaved evidence ADR-112 had to flag as weak about itself.
+    //
+    // The distinction from a `PassArm` is deliberate and is not cosmetic: a pass arm removes work
+    // the frame asked for and produces a frame nobody should ship, while a quality arm selects a
+    // configuration that is, by construction, shippable -- every one of these is a value the tier
+    // table already sets somewhere. So a quality arm may also be read as "what would this tier
+    // choice cost", which a pass toggle may not.
+    struct QualityArm {
+        const char* name;
+        void (*apply)(QualitySettings&);
+        const char* what; // what the arm does, for the log line that records the conditions
+    };
+    [[nodiscard]] static std::span<const QualityArm> qualityArms();
+    // Applies one arm by name to `settings`. False when the name is not one of `qualityArms()`.
+    [[nodiscard]] static bool setQualityArm(QualitySettings& settings, std::string_view name);
+    // Every quality arm's name, comma separated.
+    [[nodiscard]] static std::string qualityArmNames();
+    // What an arm does, or an empty view when the name is not an arm.
+    [[nodiscard]] static std::string_view qualityArmDescription(std::string_view name);
 
     // ADR-114: compute the froxel grid's occupancy on the CPU each frame. Off by default. It is
     // `kClusterCount * localLights` sphere-against-box tests on the submitting thread, so it
