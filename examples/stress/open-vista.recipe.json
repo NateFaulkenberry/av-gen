@@ -1,0 +1,72 @@
+{
+ "world": "open-vista",
+ "description": "Open Vista: the second of the four stress profiles docs/renderer-upgrade/05-scope-contract.md \u00a745 schedules, and the one the Glowmere ladder does not cover. Where glowmere-dense and glowmere-extreme are a closed understorey a few metres deep -- a foreground problem, and the reason they load culling and overdraw -- this is the opposite shot: mountainous terrain over 1.4 km with the sightline running to the horizon, thin ground cover, and the composition weight pushed into the background band rather than the foreground. That is what exercises distant representation and the shadow cascades: almost everything in frame is far away and small, most of the world's triangles are behind the mid-band view distance, and the directional cascades have to cover a range no valley scene asks them to. It is the same seed, the same asset library and the same art profile as the Glowmere rungs, so a difference between this and them is a difference in the shot and not in the content.",
+ "seed": 19740211,
+ "extent": 1400.0,
+ "assetLibrary": "../../assets/glowmere.manifest.json",
+ "certification": {
+  "what": "Open Vista: long sightlines, mountainous relief, thin cover -- the distant-representation and shadow-cascade profile of \u00a745",
+  "load": "generate",
+  "atResolution": "1280x800",
+  "tier": "realtime",
+  "fps": 30,
+  "declares": "The counters below are what this scene submits at the resolution, tier and camera named here. Every one of them is a deterministic function of (recipe, library, seed, camera, resolution) -- the composition is hash-addressed rather than stream-addressed, so it does not drift -- which is why they are checked exactly and the frame times are not checked at all. tools/certify.py renders this file and compares. A counter that has moved is a real change in what the renderer draws, and the diff of this block is the statement of it.",
+  "counters": {
+   "draws": 125.0,
+   "shadowDraws": 51.0,
+   "submittedTriangles": 277661.0,
+   "logicalTriangles": 5383538.0,
+   "visibleInstances": 304.0,
+   "culledInstances": 20857.0,
+   "entities": 104.0,
+   "shadowCasters": 45.0,
+   "lights": 2.0
+  },
+  "recordedAt": {
+   "revision": "ccb5d5c723e7",
+   "dirty": true,
+   "resolution": "1280x800"
+  }
+ },
+ "terrain": {
+  "style": "mountainous",
+  "roughness": 0.55,
+  "valleyStrength": 0.25,
+  "ridgeStrength": 0.85,
+  "waterAmount": 0.15,
+  "riverFrequency": 0.2,
+  "pondFrequency": 0.1
+ },
+ "composition": {
+  "foreground": 0.18,
+  "midground": 0.42,
+  "background": 0.9,
+  "negative_space": 0.55,
+  "focalStrength": 0.35
+ },
+ "ecology": {
+  "flora": 0.28,
+  "fungi": 0.12,
+  "rock": 0.6,
+  "crystals": 0.0,
+  "creatures": 0.0,
+  "structure": 0.0
+ },
+ "atmosphere": {
+  "fog": 0.35,
+  "spores": 0.1,
+  "floating_elements": 0.05,
+  "depthHaze": 0.85
+ },
+ "lighting": {
+  "moon": 0.75,
+  "bioluminescence": 0.55,
+  "volumetric": 0.4,
+  "bounce": 0.2
+ },
+ "art": {
+  "profile": "glowmere",
+  "organicMotion": 0.5,
+  "chaos": 0.12
+ }
+}

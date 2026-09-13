@@ -4,6 +4,30 @@
  "seed": 19740211,
  "extent": 1100.0,
  "assetLibrary": "../../assets/glowmere.manifest.json",
+ "certification": {
+  "what": "The top of the ladder, and heavier than the authored Glowmere. The other rung \u00a76 says to judge a regression on.",
+  "load": "generate",
+  "atResolution": "1280x800",
+  "tier": "realtime",
+  "fps": 30,
+  "declares": "The counters below are what this rung submits at the resolution, tier and camera named here, and they are checked exactly by tools/certify.py. They can be: a composition is a pure function of (recipe, library, seed) and the culling decision a pure function of that plus the camera and the resolution, so an unequal count is a real change every time and carries no noise floor to argue about. The frame times are measured in the same run and are deliberately NOT declared -- a millisecond is a property of a session (01-audit-and-baseline.md \u00a73.1), and a declared one would be a cross-session comparison with the other session hidden inside a constant.",
+  "counters": {
+   "draws": 291.0,
+   "shadowDraws": 42.0,
+   "submittedTriangles": 1002666.0,
+   "logicalTriangles": 28769011.0,
+   "visibleInstances": 1145.0,
+   "culledInstances": 171452.0,
+   "entities": 256.0,
+   "shadowCasters": 37.0,
+   "lights": 2.0
+  },
+  "recordedAt": {
+   "revision": "ccb5d5c723e7",
+   "dirty": true,
+   "resolution": "1280x800"
+  }
+ },
  "composition": {
   "foreground": 0.95,
   "midground": 0.8,
