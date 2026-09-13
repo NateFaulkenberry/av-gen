@@ -300,7 +300,60 @@ Three popular first moves are contraindicated **by this engine's own numbers**:
 None of these is *wrong* — each is deferred pending evidence, and the evidence that would justify
 each is named in the roadmap.
 
-## 4.5 Two further probes, and what they ruled out
+## 4.5 The gate measurement — quad overdraw confirmed
+
+Apple's overdraw counter would have answered this in one GPU capture, but this repository does not
+use Xcode tooling. The question is therefore answered **from inside the engine**, which is the better
+instrument anyway: reproducible, committed, and runnable on demand rather than living in a
+screenshot. `tests/rendering/test_fragment_cost_perf.cpp`, `[.perf][fragment]`.
+
+**The experiment.** Hold covered pixels *constant* — one plane filling the viewport — and vary only
+how many triangles cover them. Coverage never changes, so if cost is flat in triangle count then
+invocations track pixels; if it climbs as triangles go sub-pixel, invocations track triangles.
+
+1280×800, 1.02 Mpx, identical shader and identical coverage throughout:
+
+| Triangles | px/triangle | Scene pass | Depth pass (control) |
+|---|---|---|---|
+| 2 | 512,000 | 3.02 ms | 0.13 |
+| 2,048 | 500 | **1.57 ms** | 0.13 |
+| 16,200 | 63 | 2.69 ms | 0.13 |
+| 131,072 | 7.8 | 3.21 ms | 0.07 |
+| 259,200 | 3.95 | 4.13 ms | 0.07 |
+| 524,288 | 1.95 | 6.03 ms | 0.20 |
+| 1,036,800 | 0.99 | 7.14 ms | 0.33 |
+| 2,097,152 | 0.49 | **7.73 ms** | 0.46 |
+
+**Result: 4.9× the scene-pass cost from triangle size alone, at identical coverage.** Subtracting the
+depth control leaves ~4.6× of pure fragment cost, against the **4× a 2×2 quad predicts** for
+sub-pixel triangles. The knee falls between 7.8 and 3.95 px/triangle, exactly where the quad
+threshold sits. The depth column stays flat throughout, so this is fragment work and not vertex or
+binning.
+
+**Quad overdraw on sub-pixel triangles is confirmed as the mechanism behind the
+resolution-independent component.** Glowmere submits 430 k triangles over 1.02 Mpx — an average of
+2.4 px/triangle, and worse than average for the scattered ecology specifically, since terrain
+contributes large triangles that pull the mean up.
+
+**What this does and does not establish.** It establishes the *mechanism* and the *shape* of the
+curve. It does **not** establish Glowmere's exact split, because the sweep's shader is simpler than
+Glowmere's (one directional light, no shadow mask, no procedural material) so absolute milliseconds
+do not transfer. Quantifying Glowmere's own share is the first task of Phase C: measure the scene
+pass before and after a representation change on the ecology alone.
+
+**A caveat worth keeping:** the 2-triangle case (3.02 ms) is *more* expensive than the
+2,048-triangle case (1.57 ms). Two screen-filling triangles are poor for tile parallelism. The
+cheapest point is a few hundred pixels per triangle, not the largest possible triangle — so
+"fewer triangles" is not monotonically better, and a representation system should target a band
+rather than a minimum.
+
+**The instrument caught its own bug.** The first run was perfectly flat at every tessellation, which
+looked like a clean null result for quad overdraw. It was the plane being backface-culled by an
+inverted winding — the scene pass was shading nothing. The tell was the depth pass rising while the
+scene pass stayed at one timestamp quantum. The draw-call and submitted-triangle columns are printed
+now precisely so that failure cannot look like a result.
+
+## 4.6 Two further probes, and what they ruled out
 
 **Geometry density at fixed resolution.** Terrain `viewDistance` swept 520 → 110 m (temporary scene
 variants, since removed):

@@ -35,11 +35,20 @@ What *does* attack a fragment-bound, resolution-independent cost is **representa
 cost**: fewer and larger triangles at distance, and a cheaper shader for pixels that do not deserve
 an expensive one. That is the architecture proposed below.
 
-**And one measurement gates all of it.** The 9 ms fixed cost has two candidate explanations —
-quad overdraw on sub-pixel triangles, or simply an expensive per-invocation shader — and they imply
-*different* architectures. Apple's overdraw counter (fragment-shader invocations ÷ pixels stored)
-distinguishes them in one capture. **Phase A exists to take that measurement, and no Phase B work
-should start before it.**
+**The gate measurement has been taken, and it settles the question.** At constant full-screen
+coverage, sweeping only tessellation, the scene pass costs **4.9× more with sub-pixel triangles than
+with 500-pixel ones** — 1.57 ms at 2,048 triangles against 7.73 ms at 2.1 M, identical pixels and
+identical shader. The depth-pass control stays flat, so it is fragment work. The knee sits between
+7.8 and 3.95 px/triangle, exactly the 2×2-quad threshold, and the ~4.6× ceiling matches the 4× a quad
+predicts. **Quad overdraw is confirmed.** Done in-engine rather than through Xcode, so it is
+reproducible and committed: `[.perf][fragment]`.
+
+Glowmere averages **2.4 px/triangle**, and worse for the scattered ecology specifically.
+
+**This makes representation the main line, not a hypothesis.** One caveat carried forward: two
+screen-filling triangles cost *more* than 2,048 (3.02 vs 1.57 ms), so the cheapest point is a band of
+a few hundred pixels per triangle, not the largest possible triangle. A representation system must
+target that band rather than minimise triangle count.
 
 ---
 
@@ -232,17 +241,17 @@ is silently lower fidelity than the preview it was approved from.
 Ordered by dependency and evidence, **not** by the brief's suggested order, which front-loads
 visibility and GPU-driven work this engine's measurements do not justify.
 
-## Phase A — See the bottleneck (gates everything)
+## Phase A — See the bottleneck ✅ **COMPLETE**
 
-**Purpose.** Distinguish the two candidate causes of the 9 ms resolution-independent cost.
-**Deliverables.** (1) A Metal frame capture of Glowmere at 1280×800 reporting **fragment-shader
-invocations ÷ pixels stored**, fragment vs vertex timeline split, and the limiter/utilization
-counters. (2) A triangle-size histogram at output resolution, per subsystem. (3) A load/store-action
-audit of all five attachments.
-**Exit criteria.** The overdraw ratio is known. If **> ~2.0**, quad overdraw is confirmed and Phase C
-is justified. If **≈ 1.0**, the cost is per-invocation shader work and Phase B becomes the main line
-instead.
-**Risk.** Requires Xcode tooling this repository has never used. **Rollback.** None — measurement only.
+**Purpose.** Distinguish the two candidate causes of the resolution-independent cost.
+**Method.** Originally specified as a Metal frame capture. **Revised: this repository does not use
+Xcode tooling, so the measurement was built in-engine instead** — a tessellation sweep at constant
+coverage (`[.perf][fragment]`). This is a better instrument for the purpose: reproducible, committed,
+with its own control, and it runs without leaving the repository.
+**Result.** Quad overdraw confirmed — 4.9× scene-pass cost from triangle size alone at identical
+coverage, knee at the 2×2-quad threshold, depth control flat.
+**Remaining Phase A items** (none blocking): the triangle-size histogram per subsystem, the
+load/store audit, and p95/p99 in the harness.
 
 ## Phase B — Reduce per-pixel cost (no new systems)
 
@@ -361,10 +370,10 @@ hypothesis.**
 
 ## Implement first
 
-**Phase A, in full, and nothing else.** Seven tasks, no production code, no architectural change.
-It is cheap, it is entirely measurement, and **the two candidate causes of 56% of the frame imply
-different architectures.** Building either before knowing which is true is how a renderer upgrade
-becomes an uncontrolled rewrite.
+**Phase A is complete and its gate is passed.** Quad overdraw is confirmed, so **Phase C
+(representation: importance → LOD / HLOD / impostors) is the justified main line**, with **Phase B**
+(transient attachments, load/store correctness, per-pixel cost) running alongside it as low-risk
+platform hygiene that helps both canonical workloads.
 
 Then **Phase B**, which is low-risk platform hygiene that helps both workloads and adds no systems.
 
@@ -405,9 +414,14 @@ against the frame-state baselines.
    absorbed silently.**
 3. **Accepting that `scene_renderer.cpp` stays large** until Phase D.
 
-## What would change this recommendation
+## What changed this recommendation, and what still could
 
-If Phase A returns an overdraw ratio near 1.0, the diagnosis inverts: the cost is per-invocation
-shader work, Phase C's representation machinery is largely pointless, and the main line becomes
-material tiers, light-evaluation cost and attachment write cost. **The plan is built so that finding
-out costs one phase rather than one quarter.**
+Phase A ran and returned 4.9×, not 1.0. Had it returned ≈1.0 the diagnosis would have inverted and
+material tiers would be the main line instead. It cost one afternoon to find out rather than one
+quarter, which was the point of gating.
+
+**What could still change it:** the sweep establishes the mechanism on a synthetic plane with a
+simpler shader than Glowmere's. If Phase C's first task — measuring Glowmere's scene pass before and
+after a representation change on the ecology alone — shows a small delta, then quad overdraw is real
+but is not where Glowmere's 15.7 ms actually goes, and the per-pixel work of Phase B becomes primary.
+That measurement is the first thing Phase C does, before any system is built.

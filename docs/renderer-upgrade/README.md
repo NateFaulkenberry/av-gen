@@ -31,8 +31,15 @@ Phase A gate in [04](04-target-architecture.md) is satisfied.**
 - I hypothesised that the five-attachment layout was pressuring tile memory. **It is not** — 32 of
   128 bytes per pixel. Corrected in place rather than quietly dropped.
 
-## The one decision that gates everything
+## The gate: passed
 
-The 9 ms resolution-independent cost has two candidate causes — quad overdraw on sub-pixel triangles,
-or an expensive per-invocation shader — and **they imply different architectures.** Apple's overdraw
-counter distinguishes them in a single GPU capture. Phase A takes that measurement and nothing else.
+The 9 ms resolution-independent cost had two candidate causes implying different architectures.
+**Measured in-engine rather than through Xcode** (`[.perf][fragment]`): at constant full-screen
+coverage, the scene pass costs **4.9× more with sub-pixel triangles than with 500-pixel ones**, with
+the knee exactly at the 2×2-quad threshold and the depth-pass control flat throughout.
+
+**Quad overdraw is confirmed.** Representation — LOD, HLOD, impostors — is the justified main line,
+with per-pixel cost work alongside it. Glowmere averages 2.4 px/triangle.
+
+One caveat carried into the design: two screen-filling triangles cost *more* than 2,048 of them, so
+the target is a band of a few hundred pixels per triangle, not the fewest possible triangles.
