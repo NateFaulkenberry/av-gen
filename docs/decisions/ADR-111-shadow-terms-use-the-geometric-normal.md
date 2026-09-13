@@ -112,6 +112,13 @@ radius, which changes the whole penumbra. That is the 1.53pp in the table, and i
 half-resolution cost (2.13pp) and the PCSS cost (1.53pp) are each larger than everything the normal
 was ever responsible for on this scene.
 
+**Postscript, after ADR-112.** Shortening the shadowed range so the coarsest cascade's texel is
+8 cm rather than 2.36 m took the same Glowmere residual from 4.88% to **3.04%** -- a 38% reduction,
+from a change made for an entirely different reason. That is consistent with the diagnosis above
+and is further evidence for it: a coarse cascade texel is what turns a few centimetres of
+position-reconstruction error into a different shadow-map sample, so shrinking the texel shrinks the
+disagreement. The most effective thing anyone has done to this residual so far was not aimed at it.
+
 Closing the position gap would mean the mask consuming an exact world position rather than
 reconstructing one, which means the depth prepass writing a position or normal target. The prepass
 is currently depth-only with no fragment work; giving it an attachment is a real cost against a
