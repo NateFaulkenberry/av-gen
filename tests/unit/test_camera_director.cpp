@@ -768,3 +768,59 @@ TEST_CASE("A hero walking about during playback does not re-cut the film", "[dir
     CHECK(frame(2.0) == app::Redirect::Recut);
 #endif
 }
+
+// Reaching for the camera is asking for it back.
+//
+// A viewport drag under a directed camera used to write `camera/position` and have the timeline
+// replace it on the very next frame: the mouse appeared to do nothing, and the way out was a menu
+// item you had to know was there. Every path that moves the camera by hand now goes through the
+// same release, which is this.
+TEST_CASE("Taking the camera by hand ends the director's claim", "[director][camera][redirect]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path wav =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "glowmere-valley.wav";
+    if (!std::filesystem::exists(wav)) {
+        SKIP("glowmere-valley.wav is generated, not committed: run tools/make_glowmere_score.py");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    REQUIRE(engine.loadAudio(wav).has_value());
+    REQUIRE(engine.composition()->setHeroes(threeHeroes()).has_value());
+
+    // Somebody else's automation, of something that is not the camera.
+    params::Track other;
+    other.target = "post/bloom/intensity";
+    other.addKey(params::Key{0.0, {0.5f, 0.0f, 0.0f, 0.0f}});
+    other.addKey(params::Key{10.0, {1.5f, 0.0f, 0.0f, 0.0f}});
+    engine.timeline().addTrack(std::move(other));
+
+    app::DirectorState state;
+    REQUIRE(app::directEngine(engine, engine.composition()->heroes()).has_value());
+    app::noteDirected(engine, state);
+    REQUIRE(engine.timeline().isAutomated("camera/position"));
+
+    const std::size_t removed = app::releaseDirectedCamera(engine, state);
+    CHECK(removed > 0);
+    CHECK_FALSE(engine.timeline().isAutomated("camera/position"));
+    CHECK_FALSE(engine.timeline().isAutomated("camera/mode"));
+    CHECK_FALSE(state.directed);
+    // The bloom is untouched: handing the camera back is not a reason to stop everything else.
+    CHECK(engine.timeline().isAutomated("post/bloom/intensity"));
+
+    // Having let go, the director stays let go: a hero changing does not quietly take it again.
+    std::vector<world::HeroPoint> fewer = engine.composition()->heroes();
+    fewer.pop_back();
+    REQUIRE(engine.composition()->setHeroes(fewer).has_value());
+    auto after = app::refreshDirection(engine, state);
+    REQUIRE(after.has_value());
+    CHECK(*after == app::Redirect::Nothing);
+    CHECK_FALSE(engine.timeline().isAutomated("camera/position"));
+
+    // Releasing something that was never taken is not an error, and removes nothing of anyone's.
+    app::DirectorState untouched;
+    CHECK(app::releaseDirectedCamera(engine, untouched) == 0);
+    CHECK(engine.timeline().isAutomated("post/bloom/intensity"));
+#endif
+}

@@ -750,19 +750,12 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             }
         };
         panel_->onClearCameraAutomation = [this] {
-            // Handing the camera back also ends the director's claim on it: from here a star is
-            // just a declaration again, and re-cutting is something the user asks for.
-            cameraDirection_ = DirectorState{};
-            // Removing the automation rather than disabling the whole timeline: a project may
-            // automate other things, and handing the camera back is not a reason to stop those.
-            auto& tracks = engine_->timeline().tracks();
-            const std::size_t before = tracks.size();
-            const auto owned = directedCameraTargets();
-            std::erase_if(tracks, [&](const params::Track& t) {
-                return std::find(owned.begin(), owned.end(), t.target) != owned.end();
-            });
-            panel_->setStatus("camera handed back to the viewport (" +
-                              std::to_string(before - tracks.size()) + " track(s) removed)");
+            // Removing the camera's automation rather than disabling the whole timeline: a project
+            // may automate other things, and handing the camera back is not a reason to stop those.
+            // The same call a viewport drag makes, so both mean exactly one thing.
+            const std::size_t removed = releaseDirectedCamera(*engine_, cameraDirection_);
+            panel_->setStatus("camera handed back to the viewport (" + std::to_string(removed) +
+                              " track(s) removed)");
         };
         panel_->onOpenAudio = dialog(platform::Window::DialogKind::Audio);
         panel_->onOpenScene = dialog(platform::Window::DialogKind::Scene);
@@ -1384,6 +1377,22 @@ void Application::ensureFreeCamera() {
     if (engine_ == nullptr) {
         return;
     }
+    // The viewport is about to move the camera by hand, so whoever else was driving it stops now.
+    //
+    // Without this a drag under a directed camera wrote `camera/position` and the timeline replaced
+    // it on the very next frame: the mouse appeared to do nothing, and the way out was a menu item
+    // you had to know was there. Reaching for the camera *is* asking for it back.
+    //
+    // Only the director's own tracks go. Automation somebody authored is their work, and deleting it
+    // because a pointer moved would be a far worse surprise than a camera that does not budge; the
+    // gesture that meets one of those says so instead (see `handleViewportEvent`).
+    if (cameraDirection_.directed) {
+        const std::size_t removed = releaseDirectedCamera(*engine_, cameraDirection_);
+        log::info("viewport: took the camera back from the director ({} track(s) removed)", removed);
+        if (panel_ != nullptr) {
+            panel_->setStatus("camera handed back to the viewport -- Direct to Music re-cuts it");
+        }
+    }
     auto* p = engine_->params().find("camera/mode");
     auto* mode = dynamic_cast<params::Parameter<int>*>(p);
     if (mode == nullptr || mode->value() == 1) {
@@ -1441,15 +1450,28 @@ void Application::handleViewportEvent(const SDL_Event& event) {
             event.button.button == SDL_BUTTON_LEFT, event.button.button == SDL_BUTTON_MIDDLE,
             event.button.button == SDL_BUTTON_RIGHT, (mods & SDL_KMOD_ALT) != 0,
             (mods & SDL_KMOD_SHIFT) != 0);
+        // A camera gesture that is about to be overruled by automation nobody here owns. Said once
+        // per gesture rather than once per frame of it, and said rather than acted on: the tracks
+        // belong to whoever wrote them.
+        const auto announceAutomation = [this] {
+            if (!cameraDirection_.directed && engine_->timeline().isAutomated("camera/position") &&
+                panel_ != nullptr) {
+                panel_->setStatus("the timeline is driving the camera -- Camera > Hand Camera Back "
+                                  "to the Viewport to move it by hand");
+            }
+        };
         switch (intent) {
         case ui::ViewportIntent::CameraPan:
             viewportGesture_ = ViewportGesture::Pan;
+            announceAutomation();
             break;
         case ui::ViewportIntent::CameraLook:
             viewportGesture_ = ViewportGesture::Look;
+            announceAutomation();
             break;
         case ui::ViewportIntent::CameraOrbit:
             viewportGesture_ = ViewportGesture::Orbit;
+            announceAutomation();
             break;
         case ui::ViewportIntent::EditorPointer:
         case ui::ViewportIntent::None:

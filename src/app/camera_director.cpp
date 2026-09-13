@@ -62,6 +62,17 @@ const scene::CompositionNode* terrainNodeOf(Engine& engine) {
 
 std::span<const std::string_view> directedCameraTargets() { return kCameraTargets; }
 
+std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
+    auto& tracks = engine.timeline().tracks();
+    const std::size_t before = tracks.size();
+    const auto owned = directedCameraTargets();
+    std::erase_if(tracks, [&](const params::Track& t) {
+        return std::find(owned.begin(), owned.end(), t.target) != owned.end();
+    });
+    state = DirectorState{};
+    return before - tracks.size();
+}
+
 void noteDirected(Engine& engine, DirectorState& state) {
     const scene::Composition* composition = engine.composition();
     state.directed = composition != nullptr;
@@ -99,12 +110,7 @@ Result<Redirect> refreshDirection(Engine& engine, DirectorState& state) {
     state.heroRevision = composition->heroRevision();
     state.placementRevision = composition->heroPlacementRevision();
     if (composition->heroes().empty()) {
-        auto& tracks = engine.timeline().tracks();
-        const auto owned = directedCameraTargets();
-        std::erase_if(tracks, [&](const params::Track& t) {
-            return std::find(owned.begin(), owned.end(), t.target) != owned.end();
-        });
-        state = DirectorState{};
+        static_cast<void>(releaseDirectedCamera(engine, state));
         return Redirect::HandedBack;
     }
     if (auto installed = directEngine(engine, composition->heroes(), state.seed); !installed) {

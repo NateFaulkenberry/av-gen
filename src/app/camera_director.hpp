@@ -127,6 +127,14 @@ enum class Redirect : std::uint8_t {
 // something the user has just said is not there.
 [[nodiscard]] Result<Redirect> refreshDirection(Engine& engine, DirectorState& state);
 
+// Takes the camera back from the director: removes the tracks it owns and ends its claim. Returns
+// how many tracks went.
+//
+// Everything that hands the camera back goes through here -- the menu item, the last hero being
+// unstarred, and a viewport drag -- so there is one answer to what handing it back means. Tracks
+// driving anything that is not the camera are somebody's work and are left alone.
+std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state);
+
 // Records that the shot standing on the timeline *now* was cut from the heroes as they are *now*.
 // Call after directing. One function rather than three assignments at every call site: a state that
 // remembers the cast but not where it stood re-cuts on the very next frame, which is a mistake worth

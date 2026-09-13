@@ -92,8 +92,12 @@ away a shot stops, which is what to raise when a shot ends up inside something).
 inert until the object is starred. Each drag is one undo step, and the viewport mark shows the aim
 point while the object is selected.
 
-**Hand the camera back.** Camera ▸ Hand Camera Back to the Viewport removes the director's tracks and
-ends its claim, leaving the scene's own camera and every other piece of automation intact.
+**Hand the camera back — or just take it.** Camera ▸ Hand Camera Back to the Viewport removes the
+director's tracks and ends its claim, leaving the scene's own camera and every other piece of
+automation intact. So does moving the camera by hand: an orbit, pan or look drag, the wheel, or
+framing an object. Reaching for the camera is asking for it back, and the status line says it
+happened. Automation you authored yourself is never deleted this way — a gesture that meets it says
+which menu item to use instead.
 
 **Be deterministic.** Same track, same heroes, same seed, same film — which is what makes an offline
 render of a directed camera worth anything.
