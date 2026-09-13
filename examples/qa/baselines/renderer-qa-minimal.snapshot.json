@@ -1,0 +1,244 @@
+{
+ "aspect": 1.600000023841858,
+ "cameraPosition": [
+  0.0,
+  2.5,
+  9.0
+ ],
+ "farPlane": 2000.0,
+ "format": "avgen-frame-snapshot",
+ "fovY": 0.7330383062362671,
+ "frameIndex": 0,
+ "nearPlane": 0.06795109808444977,
+ "note": "pre-upgrade baseline: the state the renderer derives, not the pixels it draws",
+ "objects": [
+  {
+   "boundsMax": [
+    11.680858612060547,
+    2.799999952316284,
+    -18.38756561279297
+   ],
+   "boundsMin": [
+    8.319141387939453,
+    1.2000000476837158,
+    -21.61243438720703
+   ],
+   "bufferOffset": 0,
+   "cameraCulled": false,
+   "cullReason": "submitted",
+   "entityIndex": 0,
+   "finite": true,
+   "frustumMargins": [
+    25.868450164794922,
+    8.826147079467773,
+    15.778226852416992,
+    7.3965959548950195,
+    30.341690063476563,
+    1973.963134765625
+   ],
+   "jointCount": 0,
+   "materialHash": 9878296308061225405,
+   "mesh": 0,
+   "name": "static-object",
+   "objectSlot": 0,
+   "paletteTime": -1.0,
+   "paletteVersion": 0,
+   "rigIndex": 4294967295,
+   "submitted": true,
+   "visible": true,
+   "worldMatrix": [
+    1.1143174171447754,
+    0.0,
+    -0.6695494651794434,
+    0.0,
+    0.0,
+    0.800000011920929,
+    0.0,
+    0.0,
+    0.5665419101715088,
+    0.0,
+    0.9428840279579163,
+    0.0,
+    10.0,
+    2.0,
+    -20.0,
+    1.0
+   ],
+   "worldPosition": [
+    10.0,
+    2.0,
+    -20.0
+   ]
+  },
+  {
+   "boundsMax": [
+    -0.30000007152557373,
+    2.5999999046325684,
+    1.1999999284744263
+   ],
+   "boundsMin": [
+    -2.6999998092651367,
+    -0.5999999046325684,
+    -1.1999999284744263
+   ],
+   "bufferOffset": 512,
+   "cameraCulled": false,
+   "cullReason": "submitted",
+   "entityIndex": 1,
+   "finite": true,
+   "frustumMargins": [
+    5.27666711807251,
+    7.833012580871582,
+    5.257307052612305,
+    5.07748556137085,
+    10.50290584564209,
+    1993.2508544921875
+   ],
+   "jointCount": 0,
+   "materialHash": 14137644270501137473,
+   "mesh": 1,
+   "name": "near-object",
+   "objectSlot": 1,
+   "paletteTime": -1.0,
+   "paletteVersion": 0,
+   "rigIndex": 4294967295,
+   "submitted": true,
+   "visible": true,
+   "worldMatrix": [
+    1.2000000476837158,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.600000023841858,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.2000000476837158,
+    0.0,
+    -1.5,
+    1.0,
+    0.0,
+    1.0
+   ],
+   "worldPosition": [
+    -1.5,
+    1.0,
+    0.0
+   ]
+  },
+  {
+   "boundsMax": [
+    3.4000000953674316,
+    2.1999998092651367,
+    -4.800000190734863
+   ],
+   "boundsMin": [
+    1.0000001192092896,
+    -0.19999992847442627,
+    -7.199999809265137
+   ],
+   "bufferOffset": 1024,
+   "cameraCulled": false,
+   "cullReason": "submitted",
+   "entityIndex": 2,
+   "finite": true,
+   "frustumMargins": [
+    11.492478370666504,
+    7.743171691894531,
+    7.954351902008057,
+    5.885642051696777,
+    16.355510711669922,
+    1987.266845703125
+   ],
+   "jointCount": 0,
+   "materialHash": 1182110129449320552,
+   "mesh": 2,
+   "name": "far-object",
+   "objectSlot": 2,
+   "paletteTime": -1.0,
+   "paletteVersion": 0,
+   "rigIndex": 4294967295,
+   "submitted": true,
+   "visible": true,
+   "worldMatrix": [
+    1.2000000476837158,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.2000000476837158,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.2000000476837158,
+    0.0,
+    2.200000047683716,
+    1.0,
+    -6.0,
+    1.0
+   ],
+   "worldPosition": [
+    2.200000047683716,
+    1.0,
+    -6.0
+   ]
+  }
+ ],
+ "projection": [
+  1.6281806230545044,
+  0.0,
+  0.0,
+  0.0,
+  0.0,
+  2.605088949203491,
+  0.0,
+  0.0,
+  0.0,
+  0.0,
+  -1.000033974647522,
+  -1.0,
+  0.0,
+  0.0,
+  -0.06795340776443481,
+  0.0
+ ],
+ "scene": "renderer-qa-minimal.scene.json",
+ "stateHash": 12449979009934732126,
+ "toggles": {
+  "animation": true,
+  "ao": true,
+  "cameraMotion": true,
+  "culling": true,
+  "particles": true,
+  "post": true,
+  "shadowMask": true,
+  "shadows": true,
+  "transparency": true,
+  "volume": true,
+  "water": true
+ },
+ "version": 1,
+ "view": [
+  1.0,
+  0.0,
+  -0.0,
+  0.0,
+  -0.0,
+  0.9863939881324768,
+  0.16439899802207947,
+  0.0,
+  0.0,
+  -0.16439899802207947,
+  0.9863939881324768,
+  0.0,
+  -0.0,
+  -0.9863940477371216,
+  -9.288543701171875,
+  1.0
+ ],
+ "viewportHeight": 120,
+ "viewportWidth": 192
+}

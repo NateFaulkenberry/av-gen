@@ -4253,3 +4253,112 @@ TEST_CASE("object submission order is a function of the scene", "[gpu][compositi
 
     CHECK(ctx->errorCount() == 0);
 }
+
+// ---- The pre-upgrade baseline ------------------------------------------------------------------
+//
+// Committed captures of what the renderer *derives* from each canonical scene: every object's world
+// transform and matrix, its bounds, its mesh and material fingerprint, its frustum margins, its GPU
+// slot and buffer offset, the camera, and the numbers the projection was built from.
+//
+// **This exists because it cannot be made later.** A renderer upgrade changes pixels by design, so
+// an image baseline would be thrown away on the first day and tell you nothing. What must *not*
+// change is the state the renderer reads out of a scene: an object is in the same place, the same
+// size, made of the same things, and either drawn or not for the same reason. That is the contract a
+// new renderer has to meet, and the only moment it can be recorded is before the old one is gone.
+//
+// `compareSnapshots` reports differences as sentences naming the object and the field, so a failure
+// here is a work item rather than a hash mismatch somebody has to bisect.
+//
+// To adopt a deliberate change: run with `AVGEN_UPDATE_BASELINES=1`, then read the diff in `git`.
+// The diff is the point -- it is the change, stated in JSON, in a review.
+TEST_CASE("the canonical scenes derive the state the baselines recorded",
+          "[gpu][composition][forensics][baseline]") {
+    struct Subject {
+        const char* scene;
+        glm::vec3 eye;
+        glm::vec3 aim;
+    };
+    // Terrain is deliberately absent: `SYM-TERRAIN-1` means that scene does not render the same
+    // frame twice, and a baseline whose subject is unstable is a baseline that teaches people to
+    // ignore failures.
+    const Subject subjects[] = {
+        {"renderer-qa-minimal.scene.json", {0.0f, 2.5f, 9.0f}, {0.0f, 1.0f, 0.0f}},
+        {"renderer-qa.scene.json", {0.0f, 3.0f, 12.0f}, {0.0f, 1.0f, -4.0f}},
+        {"renderer-qa-transparency.scene.json", {0.0f, 2.0f, 8.0f}, {0.0f, 1.0f, 0.0f}},
+    };
+    const bool updating = std::getenv("AVGEN_UPDATE_BASELINES") != nullptr;
+    std::size_t written = 0;
+    const fs::path dir = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "baselines";
+
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    std::size_t compared = 0;
+
+    for (const Subject& subject : subjects) {
+        const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / subject.scene;
+        if (!fs::is_regular_file(project)) {
+            continue;
+        }
+        INFO("scene: " << subject.scene);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadComposition(project).has_value());
+
+        // Fixed everything: second, size, camera, arms. A baseline whose inputs drift is a baseline
+        // that reports the drift instead of the renderer.
+        constexpr std::uint32_t kW = 192;
+        constexpr std::uint32_t kH = 120;
+        constexpr double kSecond = 1.0;
+        engine.seekSeconds(kSecond);
+        FixedStepClock clock(60.0);
+        clock.restartAt(kSecond);
+        const FrameTime time = engine.tick(clock);
+        aimCompositionCamera(engine.params(), subject.eye, subject.aim);
+        engine.setViewport(kW, kH);
+        engine.update(time);
+        REQUIRE(renderer.renderToImage(engine.scene(), time, kW, kH).has_value());
+
+        rendering::FrameSnapshot now;
+        now.frame = renderer.diagnosticFrame();
+        now.toggles = renderer.passToggles();
+        now.scene = subject.scene;
+        now.note = "pre-upgrade baseline: the state the renderer derives, not the pixels it draws";
+        REQUIRE(now.frame.objects.size() >= 2);
+
+        std::string stem = subject.scene;
+        stem = stem.substr(0, stem.find(".scene.json"));
+        const fs::path file = dir / (stem + ".snapshot.json");
+
+        if (updating || !fs::is_regular_file(file)) {
+            fs::create_directories(dir);
+            REQUIRE(rendering::writeSnapshot(now, file).has_value());
+            ++written;
+            WARN("wrote baseline " << file.filename().string()
+                                   << " -- review the diff in git before committing it");
+            continue;
+        }
+
+        const auto baseline = rendering::readSnapshot(file);
+        INFO((baseline ? std::string() : baseline.error().message));
+        REQUIRE(baseline.has_value());
+        // Counters excluded: the rig palette version is monotonic, so two arrivals at the same
+        // second legitimately disagree about it. That is the trap Phase 9.2 fell into, and a
+        // baseline is exactly where it would be fallen into again.
+        const std::vector<std::string> differences = rendering::compareSnapshots(*baseline, now);
+        for (const std::string& line : differences) {
+            INFO(line);
+        }
+        CHECK(differences.empty());
+        ++compared;
+    }
+
+    // A run that had to create the baselines has nothing to compare, and that is not a failure --
+    // it is the first run on a fresh checkout, or a deliberate update. Only a run that found
+    // baselines is required to have used them.
+    INFO(compared << " scenes compared against a committed baseline, " << written << " written");
+    if (!updating && written == 0) {
+        CHECK(compared >= 2);
+    }
+    CHECK(ctx->errorCount() == 0);
+}

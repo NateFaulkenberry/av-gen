@@ -2103,3 +2103,55 @@ At the end of every work session:
 3. Record any new hypothesis that was disproven, so it is not retried without new evidence.
 4. Leave the next smallest falsifiable check in this document.
 5. Do not mark a parent task `[x]` while any required child task remains `[ ]` or `[!]`.
+
+## Carrying this into the rendering engine upgrade
+
+Written 2026-09-13, when the checklist stood at 241 done, 44 partial, 13 blocked, 0 open. The
+remaining items are not a backlog to burn down before the upgrade; sorted against it they fall into
+three groups, and only one of them is worth doing first.
+
+### The 13 blocked items are a design brief, not a backlog
+
+Every one of them is blocked on the same missing thing: **a draw cannot say which subsystem it came
+from.** Disable terrain needs a flag on the entity, because a chunk arrives as an ordinary lit
+entity. Disable LOD needs a change to the GPU cull pass. The water mask and the intersection mask
+need water to write an identifier it deliberately does not write. Matrix levels 2, 3, 13 and 14 are
+blocked *on those four*.
+
+So the single requirement that unblocks nine of the thirteen is: **every draw carries its origin --
+which subsystem submitted it, and at which LOD.** Doing that in the current renderer is speculative
+work on a structure that is about to change. Doing it *as part of* the upgrade is nearly free, and it
+is the difference between a renderer that can be bisected and one that cannot. The remaining four
+(freeze transforms, freeze static transforms, disable depth test, disable depth write) are pipeline
+and ownership questions that the upgrade will answer one way or another anyway.
+
+### Most of the 44 partials will be invalidated, and should not be finished now
+
+The pass contract inventories, the panel, the isolation arms' remaining edges, the per-helper pass
+boundaries, the GPU object index view -- all describe *this* renderer's internal structure. Finishing
+them buys documentation of something about to be replaced. Leave them; the parts worth keeping are
+the rules in "Working rules", which are about method rather than about this implementation.
+
+### What was worth doing before the upgrade, and is now done
+
+Three things, chosen because **none of them can be made afterwards**:
+
+- **Frame-state baselines.** `examples/qa/baselines/*.snapshot.json` and
+  `[gpu][composition][forensics][baseline]`: the state the renderer derives from three canonical
+  scenes, compared field by field, reported as sentences. Not pixels -- an upgrade changes those by
+  design. The terrain scene is deliberately excluded, because `SYM-TERRAIN-1` means its frame is
+  unstable and a baseline whose subject is unstable teaches people to ignore failures.
+- **A cost baseline with its conditions**, in [renderer-pre-upgrade-baseline.md](renderer-pre-upgrade-baseline.md),
+  including the two caveats that stop it being misread: Constellation's median is not a stable
+  statistic, and the two canonical scenes do not generalise to each other.
+- **`SYM-TERRAIN-1` recorded as pre-existing**, with its four eliminated suspects. After the upgrade
+  there is no way to tell an inherited race from an introduced one, and a race is exactly what an
+  upgrade gets blamed for.
+
+### The one thing to decide before starting
+
+Whether to fix `SYM-TERRAIN-1` first or carry it. Carrying it is defensible -- it is documented, it
+is release-green, and its mechanism (a draw decision taken from a non-blocking readback) is a
+discipline the new renderer should adopt anyway. Fixing it first is the safer order, because it is
+the only *known* nondeterminism in the renderer, and every image comparison used to validate the
+upgrade is weaker while it stands.

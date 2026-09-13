@@ -1,0 +1,186 @@
+{
+ "aspect": 1.600000023841858,
+ "cameraPosition": [
+  0.0,
+  2.0,
+  8.0
+ ],
+ "farPlane": 2000.0,
+ "format": "avgen-frame-snapshot",
+ "fovY": 0.7330383062362671,
+ "frameIndex": 0,
+ "nearPlane": 0.025063591077923775,
+ "note": "pre-upgrade baseline: the state the renderer derives, not the pixels it draws",
+ "objects": [
+  {
+   "boundsMax": [
+    0.9999999403953552,
+    2.0,
+    -5.960464477539063e-08
+   ],
+   "boundsMin": [
+    -0.9999999403953552,
+    5.960464477539063e-08,
+    -2.0
+   ],
+   "bufferOffset": 0,
+   "cameraCulled": false,
+   "cullReason": "submitted",
+   "entityIndex": 0,
+   "finite": true,
+   "frustumMargins": [
+    6.175071716308594,
+    6.175071716308594,
+    4.713969707489014,
+    4.339684963226318,
+    10.14578628540039,
+    1998.0850830078125
+   ],
+   "jointCount": 0,
+   "materialHash": 12423052219647435826,
+   "mesh": 0,
+   "name": "glass-far",
+   "objectSlot": 0,
+   "paletteTime": -1.0,
+   "paletteVersion": 0,
+   "rigIndex": 4294967295,
+   "submitted": true,
+   "visible": true,
+   "worldMatrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    -1.0,
+    1.0
+   ],
+   "worldPosition": [
+    0.0,
+    1.0,
+    -1.0
+   ]
+  },
+  {
+   "boundsMax": [
+    0.9999999403953552,
+    2.0,
+    2.0
+   ],
+   "boundsMin": [
+    -0.9999999403953552,
+    5.960464477539063e-08,
+    5.960464477539063e-08
+   ],
+   "bufferOffset": 512,
+   "cameraCulled": false,
+   "cullReason": "submitted",
+   "entityIndex": 1,
+   "finite": true,
+   "frustumMargins": [
+    5.136445999145508,
+    5.136445999145508,
+    3.7711758613586426,
+    3.860076427459717,
+    8.161230087280273,
+    2000.0697021484375
+   ],
+   "jointCount": 0,
+   "materialHash": 6163852273516569436,
+   "mesh": 1,
+   "name": "glass-near",
+   "objectSlot": 1,
+   "paletteTime": -1.0,
+   "paletteVersion": 0,
+   "rigIndex": 4294967295,
+   "submitted": true,
+   "visible": true,
+   "worldMatrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "worldPosition": [
+    0.0,
+    1.0,
+    1.0
+   ]
+  }
+ ],
+ "projection": [
+  1.6281806230545044,
+  0.0,
+  0.0,
+  0.0,
+  0.0,
+  2.605088949203491,
+  0.0,
+  0.0,
+  0.0,
+  0.0,
+  -1.0000125169754028,
+  -1.0,
+  0.0,
+  0.0,
+  -0.025063904002308846,
+  0.0
+ ],
+ "scene": "renderer-qa-transparency.scene.json",
+ "stateHash": 12421875680162716060,
+ "toggles": {
+  "animation": true,
+  "ao": true,
+  "cameraMotion": true,
+  "culling": true,
+  "particles": true,
+  "post": true,
+  "shadowMask": true,
+  "shadows": true,
+  "transparency": true,
+  "volume": true,
+  "water": true
+ },
+ "version": 1,
+ "view": [
+  1.0,
+  0.0,
+  -0.0,
+  0.0,
+  -0.0,
+  0.9922778606414795,
+  0.12403473258018494,
+  0.0,
+  0.0,
+  -0.12403473258018494,
+  0.9922778606414795,
+  0.0,
+  -0.0,
+  -0.9922778606414795,
+  -8.18629264831543,
+  1.0
+ ],
+ "viewportHeight": 120,
+ "viewportWidth": 192
+}

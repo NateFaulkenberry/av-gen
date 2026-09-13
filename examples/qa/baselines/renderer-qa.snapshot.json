@@ -1,0 +1,244 @@
+{
+ "aspect": 1.600000023841858,
+ "cameraPosition": [
+  0.0,
+  3.0,
+  12.0
+ ],
+ "farPlane": 2954.712890625,
+ "format": "avgen-frame-snapshot",
+ "fovY": 0.7330383062362671,
+ "frameIndex": 0,
+ "nearPlane": 0.29547128081321716,
+ "note": "pre-upgrade baseline: the state the renderer derives, not the pixels it draws",
+ "objects": [
+  {
+   "boundsMax": [
+    120.0,
+    0.0,
+    112.0
+   ],
+   "boundsMin": [
+    -120.0,
+    0.0,
+    -128.0
+   ],
+   "bufferOffset": 0,
+   "cameraCulled": false,
+   "cullReason": "submitted",
+   "entityIndex": 0,
+   "finite": true,
+   "frustumMargins": [
+    175.15235900878906,
+    175.15235900878906,
+    63.349815368652344,
+    36.485050201416016,
+    138.9955291748047,
+    3053.44580078125
+   ],
+   "jointCount": 0,
+   "materialHash": 118229050352516979,
+   "mesh": 0,
+   "name": "floor",
+   "objectSlot": 0,
+   "paletteTime": -1.0,
+   "paletteVersion": 0,
+   "rigIndex": 4294967295,
+   "submitted": true,
+   "visible": true,
+   "worldMatrix": [
+    10.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    10.0,
+    0.0,
+    0.0,
+    0.0,
+    -8.0,
+    1.0
+   ],
+   "worldPosition": [
+    0.0,
+    0.0,
+    -8.0
+   ]
+  },
+  {
+   "boundsMax": [
+    0.481360524892807,
+    1.2089734077453613,
+    -4.8124871253967285
+   ],
+   "boundsMin": [
+    -0.48136043548583984,
+    -0.0007807922665961087,
+    -5.256682395935059
+   ],
+   "bufferOffset": 512,
+   "cameraCulled": false,
+   "cullReason": "submitted",
+   "entityIndex": 1,
+   "finite": true,
+   "frustumMargins": [
+    9.566584587097168,
+    9.566583633422852,
+    6.555204391479492,
+    7.051446914672852,
+    17.200153350830078,
+    2937.685302734375
+   ],
+   "jointCount": 49,
+   "materialHash": 8683258059583031415,
+   "mesh": 1,
+   "name": "alien/Alien_Low_Green_Mesh",
+   "objectSlot": 1,
+   "paletteTime": 1.0,
+   "paletteVersion": 1,
+   "rigIndex": 0,
+   "submitted": true,
+   "visible": true,
+   "worldMatrix": [
+    0.009999999776482582,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.009999999776482582,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.009999999776482582,
+    0.0,
+    0.0,
+    0.0,
+    -5.0,
+    1.0
+   ],
+   "worldPosition": [
+    0.0,
+    0.0,
+    -5.0
+   ]
+  },
+  {
+   "boundsMax": [
+    4.0,
+    2.200000047683716,
+    -4.0
+   ],
+   "boundsMin": [
+    2.0,
+    0.2000001072883606,
+    -6.0
+   ],
+   "bufferOffset": 1024,
+   "cameraCulled": false,
+   "cullReason": "submitted",
+   "entityIndex": 2,
+   "finite": true,
+   "frustumMargins": [
+    12.937850952148438,
+    7.825160026550293,
+    7.779609680175781,
+    7.034775257110596,
+    17.91282844543457,
+    2938.614501953125
+   ],
+   "jointCount": 0,
+   "materialHash": 1460536460147809847,
+   "mesh": 2,
+   "name": "transparent-orb",
+   "objectSlot": 2,
+   "paletteTime": -1.0,
+   "paletteVersion": 0,
+   "rigIndex": 4294967295,
+   "submitted": true,
+   "visible": true,
+   "worldMatrix": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    3.0,
+    1.2000000476837158,
+    -5.0,
+    1.0
+   ],
+   "worldPosition": [
+    3.0,
+    1.2000000476837158,
+    -5.0
+   ]
+  }
+ ],
+ "projection": [
+  1.6281806230545044,
+  0.0,
+  0.0,
+  0.0,
+  0.0,
+  2.605088949203491,
+  0.0,
+  0.0,
+  0.0,
+  0.0,
+  -1.000100016593933,
+  -1.0,
+  0.0,
+  0.0,
+  -0.29550081491470337,
+  0.0
+ ],
+ "scene": "renderer-qa.scene.json",
+ "stateHash": 9048487220892778042,
+ "toggles": {
+  "animation": true,
+  "ao": true,
+  "cameraMotion": true,
+  "culling": true,
+  "particles": true,
+  "post": true,
+  "shadowMask": true,
+  "shadows": true,
+  "transparency": true,
+  "volume": true,
+  "water": true
+ },
+ "version": 1,
+ "view": [
+  1.0,
+  0.0,
+  -0.0,
+  0.0,
+  -0.0,
+  0.9922778606414795,
+  0.12403473258018494,
+  0.0,
+  0.0,
+  -0.12403473258018494,
+  0.9922778606414795,
+  0.0,
+  -0.0,
+  -1.4884167909622192,
+  -12.279438972473145,
+  1.0
+ ],
+ "viewportHeight": 120,
+ "viewportWidth": 192
+}
