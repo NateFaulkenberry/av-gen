@@ -104,6 +104,18 @@ struct AppOptions {
     // A/B attribution: comma-separated phases to switch off for this run
     // (shadows, ao, volume, post). Logged at start-up so a run's own output proves which arm it is.
     std::string disablePasses;
+    // ADR-113, the A/B protocol. `abArm` names one phase to compare against the baseline by running
+    // A/B/A/B *in this process* -- interleaved, so a machine that drifts during the session charges
+    // the drift to both arms instead of to the change. Cross-session comparison is not offered:
+    // the audit found two Glowmere figures 28% apart that run-to-run variance cannot explain, so a
+    // number from a previous run of this program is not a baseline.
+    std::string abArm;
+    int abBlocks = 2; // A/B pairs; one pair cannot show whether the difference held
+    // Where to write the machine-readable record of this run. The human log is unchanged.
+    std::optional<std::filesystem::path> benchJson;
+    // ADR-114: compute froxel-grid occupancy every frame. CPU work inside the measured frames, so
+    // it perturbs the wall clock and the record it writes says so.
+    bool clusterStats = false;
     // Offline rendering (1.0): --render <dir|video file>, --range a:b, --codec, --quality, --queue <file>
     std::optional<std::filesystem::path> render;
     std::optional<std::filesystem::path> queue;

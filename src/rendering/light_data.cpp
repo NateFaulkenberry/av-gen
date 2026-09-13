@@ -211,6 +211,57 @@ std::vector<std::vector<std::uint32_t>> assignClusters(const ClusterGrid& grid,
     return out;
 }
 
+ClusterOccupancy clusterOccupancy(const ClusterGrid& grid, const std::vector<glm::vec3>& viewPositions,
+                                  const std::vector<float>& radii, std::uint32_t cap) {
+    ClusterOccupancy out;
+    out.clusters = grid.count();
+    const std::size_t n = std::min(viewPositions.size(), radii.size());
+    out.lights = static_cast<std::uint32_t>(n);
+    out.cap = cap;
+    std::vector<std::uint32_t> counts;
+    counts.reserve(out.clusters);
+    for (std::uint32_t k = 0; k < grid.z; ++k) {
+        for (std::uint32_t j = 0; j < grid.y; ++j) {
+            for (std::uint32_t i = 0; i < grid.x; ++i) {
+                std::uint32_t touching = 0;
+                for (std::uint32_t l = 0; l < n; ++l) {
+                    // A zero-radius light reaches nothing and `assignClusters` skips it; counting
+                    // it here would report demand the pass never had.
+                    if (radii[l] > 0.0f && clusterTouchesSphere(grid, i, j, k, viewPositions[l], radii[l])) {
+                        ++touching;
+                    }
+                }
+                counts.push_back(touching);
+                out.demand += touching;
+                out.dropped += touching > cap ? touching - cap : 0u;
+                if (touching == 0) {
+                    ++out.empty;
+                } else if (touching > cap) {
+                    ++out.overflowed;
+                }
+            }
+        }
+    }
+    if (counts.empty()) {
+        return out;
+    }
+    std::sort(counts.begin(), counts.end());
+    out.min = counts.front();
+    out.max = counts.back();
+    out.mean = static_cast<double>(out.demand) / static_cast<double>(counts.size());
+    // Nearest rank, the same definition rendering::percentileOf uses, so a cluster percentile and a
+    // frame-time percentile mean the same thing in the same report.
+    const auto at = [&](double q) {
+        const auto rank = static_cast<std::size_t>(
+            std::max(1.0, std::ceil(q * static_cast<double>(counts.size()))));
+        return counts[std::min(rank - 1u, counts.size() - 1u)];
+    };
+    out.p50 = at(0.50);
+    out.p90 = at(0.90);
+    out.p99 = at(0.99);
+    return out;
+}
+
 float polygonIrradiance(const glm::vec3& point, const glm::vec3& normal, const glm::vec3& p0,
                         const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3) {
     const glm::vec3 n = safeNormalize(normal, glm::vec3(0.0f, 1.0f, 0.0f));

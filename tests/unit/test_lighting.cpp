@@ -503,3 +503,129 @@ TEST_CASE("The six shadow faces tile every direction around a light", "[shadows]
     }
     CHECK(checked == 400);
 }
+
+// ---- cluster occupancy (ADR-114) ---------------------------------------------------------------
+
+TEST_CASE("cluster occupancy counts the demand, not what the cap let through",
+          "[lighting][clusters]") {
+    // The question the instrumentation exists to answer is whether the 32-light cap is ever
+    // reached. A statistic gathered from the capped lists saturates at the cap and can never say
+    // so, so the counts here are the *uncapped* demand and the cap's effect is separate.
+    rendering::ClusterGrid grid;
+    grid.x = 4;
+    grid.y = 4;
+    grid.z = 4;
+    grid.zNear = 1.0f;
+    grid.zFar = 40.0f;
+    grid.tanHalfFovY = std::tan(0.45f);
+    grid.aspect = 1.0f;
+
+    // Ten lights stacked on the same spot: every cluster they touch, they all touch.
+    std::vector<glm::vec3> positions(10, glm::vec3(0.0f, 0.0f, -8.0f));
+    std::vector<float> radii(10, 3.0f);
+
+    // With a cap of 4, the clusters those ten lights reach are all over it.
+    const auto capped = rendering::clusterOccupancy(grid, positions, radii, 4);
+    CHECK(capped.clusters == grid.count());
+    CHECK(capped.lights == 10);
+    CHECK(capped.cap == 4);
+    CHECK(capped.max == 10); // the demand, not the cap -- this is the whole point
+    CHECK(capped.overflowed > 0);
+    CHECK(capped.dropped == static_cast<std::uint64_t>(capped.overflowed) * (10u - 4u));
+    // Empty plus occupied is every cluster, with nothing unaccounted for.
+    std::uint32_t occupied = capped.clusters - capped.empty;
+    CHECK(occupied > 0);
+    CHECK(capped.demand == static_cast<std::uint64_t>(occupied) * 10u);
+    CHECK(capped.mean == Approx(static_cast<double>(capped.demand) / capped.clusters));
+
+    // The same scene under a cap that fits: identical demand, no overflow, nothing dropped. The
+    // demand statistics must not move when only the cap does, or they are measuring the cap.
+    const auto roomy = rendering::clusterOccupancy(grid, positions, radii, 32);
+    CHECK(roomy.max == capped.max);
+    CHECK(roomy.demand == capped.demand);
+    CHECK(roomy.empty == capped.empty);
+    CHECK(roomy.overflowed == 0);
+    CHECK(roomy.dropped == 0);
+}
+
+TEST_CASE("cluster occupancy agrees with the assignment the compute pass makes",
+          "[lighting][clusters]") {
+    // The occupancy counter and `assignClusters` must be counting the same thing, or the report
+    // describes a grid the renderer does not have. `assignClusters` is the CPU reference the GPU's
+    // own cluster buffer is checked against in tests/rendering/test_shadows_gpu.cpp, so agreeing
+    // with it is agreeing with the pass.
+    rendering::ClusterGrid grid;
+    grid.x = 8;
+    grid.y = 4;
+    grid.z = 6;
+    grid.zNear = 0.5f;
+    grid.zFar = 120.0f;
+    grid.tanHalfFovY = std::tan(0.45f);
+    grid.aspect = 16.0f / 9.0f;
+
+    const std::vector<glm::vec3> positions = {
+        {0.0f, 0.0f, -10.0f}, {6.0f, 2.0f, -30.0f}, {-20.0f, -8.0f, -80.0f}, {0.0f, 0.0f, -0.6f},
+    };
+    // Four lights against a cap of 32: no overflow, so the two must agree exactly.
+    const std::vector<float> radii = {4.0f, 12.0f, 25.0f, 1.0f};
+    const auto lists = rendering::assignClusters(grid, positions, radii);
+    const auto occupancy = rendering::clusterOccupancy(grid, positions, radii);
+
+    std::uint64_t assigned = 0;
+    std::uint32_t empty = 0;
+    std::uint32_t busiest = 0;
+    for (const auto& list : lists) {
+        assigned += list.size();
+        empty += list.empty() ? 1u : 0u;
+        busiest = std::max(busiest, static_cast<std::uint32_t>(list.size()));
+    }
+    CHECK(occupancy.demand == assigned);
+    CHECK(occupancy.empty == empty);
+    CHECK(occupancy.max == busiest);
+    CHECK(occupancy.overflowed == 0);
+    CHECK(occupancy.dropped == 0);
+
+    // A light with no reach is in no cluster, so a grid offered only such lights is entirely
+    // empty -- and reports that, rather than dividing by zero on the way to a mean.
+    const auto dark = rendering::clusterOccupancy(grid, {{0.0f, 0.0f, -10.0f}}, {0.0f});
+    CHECK(dark.empty == grid.count());
+    CHECK(dark.demand == 0);
+    CHECK(dark.max == 0);
+    CHECK(dark.p99 == 0);
+    CHECK(dark.mean == Approx(0.0));
+
+    // A grid with no lights at all: the froxels are still counted, and every one of them is empty.
+    const auto unlit = rendering::clusterOccupancy(grid, {}, {});
+    CHECK(unlit.clusters == grid.count());
+    CHECK(unlit.lights == 0);
+    CHECK(unlit.empty == grid.count());
+}
+
+TEST_CASE("cluster percentiles use the same nearest-rank definition as the frame times",
+          "[lighting][clusters]") {
+    // A report that mixes two percentile definitions is a report nobody can subtract one line of
+    // from another. One light reaching a slice of the grid gives a mostly-empty distribution whose
+    // p50 is zero and whose p99 is not -- which is the shape a real scene has, and the shape that
+    // tells "the grid is busy" from "one corner of it is".
+    rendering::ClusterGrid grid;
+    grid.x = 8;
+    grid.y = 8;
+    grid.z = 8;
+    grid.zNear = 1.0f;
+    grid.zFar = 100.0f;
+    grid.tanHalfFovY = std::tan(0.4f);
+    grid.aspect = 1.0f;
+
+    const auto o = rendering::clusterOccupancy(grid, {{0.0f, 0.0f, -5.0f}}, {2.0f});
+    CHECK(o.clusters == 512);
+    CHECK(o.min == 0);
+    CHECK(o.max == 1);
+    CHECK(o.empty > 256);  // most of the grid is nowhere near this light
+    CHECK(o.p50 == 0);     // so the median cluster has no light in it at all
+    // Nearest rank on 512 sorted counts, ascending: p99 is the 507th. Whether it is 0 or 1 depends
+    // on how much of the grid the light reaches, and either way it must be a count the grid
+    // actually has -- never an interpolated 0.4 lights.
+    CHECK((o.p99 == 0 || o.p99 == 1));
+    CHECK(o.p90 <= o.p99);
+    CHECK(o.p99 <= o.max);
+}

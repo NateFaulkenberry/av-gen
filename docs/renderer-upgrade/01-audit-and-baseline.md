@@ -191,17 +191,91 @@ against a number from a document.
 | Frame distribution (p10/p90/min) | ✅ |
 | Draw / triangle / instance / LOD / culled counts | ✅ `AVGEN_FRAME_COUNTERS=1` |
 | CPU stage breakdown | ✅ `AVGEN_CPU_STAGES=1` |
-| Cluster occupancy / overflow | ⚠️ cluster buffer readable; no occupancy statistic |
+| Cluster occupancy / overflow | ✅ `--cluster-stats` (ADR-114); see §3.5 |
 | Transient/geometry/texture memory | ⚠️ transient texture count only |
 | **Fragment invocations, quad utilisation, occupancy** | ❌ **not available — Xcode/Metal only** |
 | Streaming activity | ❌ no streaming system exists |
-| p95/p99/variance | ❌ harness reports p10/p90/min only |
+| p95/p99/variance, 1% low, machine-readable output | ✅ always on; `--bench-json` (ADR-113); see §3.5 |
 
 **The one missing capability that blocks the central architectural decision is fragment-invocation
 and quad-utilisation counters, which only a Metal frame capture provides.** This was flagged in the
 forensics report as the single unused tool in the repository; it is now decision-relevant.
 
 ---
+
+## 3.5 What the instrument can now do, and what it found out about §3.3
+
+Added 2026-09-13 ([ADR-113](../decisions/ADR-113-a-measurement-carries-its-conditions.md),
+[ADR-114](../decisions/ADR-114-cluster-occupancy-is-measured-uncapped.md)).
+
+**Distribution.** The harness reports p95, p99, max, the 1% low, the 0.1% low and the variance
+alongside the median it always had. "1% low" here means the mean of the slowest 1% of frames and is
+a different number from p99; both are printed and the JSON names carry their definitions.
+
+**`--bench-json <file>`** writes the run as a machine-readable record carrying its conditions —
+scene, camera pose, resolution, tier, engine revision, build, adapter, frame range, warm-up, and a
+per-process session id. Records may only be compared within one session id.
+
+**`--ab <phase>`** runs baseline and arm interleaved, A/B/A/B, in one process and reports the paired
+difference against the noise floor. `--ab none` compares the baseline with itself, which is how the
+floor itself is measured.
+
+**`--cluster-stats`** reports froxel-grid occupancy (§3.6). It is CPU work inside the measured
+frames, so a record taken with it says so and its wall clock is perturbed (23.29 ms against
+22.20 ms on Glowmere; GPU unchanged).
+
+### The Constellation discrepancy of §1.1 is withdrawn
+
+§3.3 measured the within-session spread on **Glowmere** — 1.0% GPU — and §1.1 applied it to
+**Constellation** to conclude that Constellation's 3.60 ms was "materially different" from the
+brief's 6.09 ms and "not noise: five runs, 1% spread".
+
+Constellation's own within-session spread, measured by a null A/B over three interleaved pairs, is
+**36.97% GPU / 26.34% wall**. Eight block medians taken in one session on 2026-09-13: 10.16, 9.04,
+8.00, 7.80, 6.88, 6.55, 6.42, 6.29, 6.16 ms. Inside a single 240-frame block its p50 is 6.29 ms
+against a p90 of 10.81 and a p99 of 12.98 — the per-frame cost varies by a factor of two, so the
+median lands wherever the distribution's mass happens to fall.
+
+**Both 3.60 and 6.09 are inside one scene's own noise.** The 41% "material difference" is not a
+finding. Glowmere's stability does not transfer to Constellation, and neither does its noise floor.
+Anything Constellation is asked to decide needs a stabilised scene or a statistic that is not the
+median.
+
+Glowmere's own stability is confirmed by the same instrument: three interleaved baseline blocks
+varied by 1.71% GPU / 1.63% wall, and a null A/B on it reports +0.34% GPU — correctly, no result.
+The 28% Glowmere gap of §1.1 remains unresolved, and can no longer recur: a record without its
+conditions can no longer be written.
+
+### The A/B mode reproduces §4.1's largest attributed effect
+
+`--ab shadowmask`, two pairs, Glowmere: baseline 19.40 ms GPU, arm 23.79 ms, **−4.06 ms (−20.9%)**,
+per-pair deltas −4.65 and −4.06. §4.1 found removing the shadow mask costs +5.8 ms of scene pass;
+this is the whole-frame figure for the same thing, found without trusting a number from a document.
+
+## 3.6 Cluster occupancy — the §1.5 "measure first" answered
+
+`kMaxLightsPerCluster = 32` was listed as needing measurement before replacement. Measured, 1280×800:
+
+| | Glowmere | Constellation |
+|---|---|---|
+| froxels | 3072 | 3072 |
+| local lights in the grid | 222 | **0** |
+| min / p50 / p90 / p99 / max per cluster | 0 / 0 / 14 / 24 / **29** | 0 / 0 / 0 / 0 / 0 |
+| mean | 5.70 | 0.00 |
+| empty clusters | 1720 (56.0%) | 3072 (100%) |
+| **overflowed clusters** | **0** | **0** |
+| **lights dropped by the cap** | **0** | **0** |
+
+**Overflow is not happening.** Glowmere's busiest froxel wants 29 of a possible 32 — a margin of
+three, which is not comfortable but is not a defect. **Do not raise the cap**: it would enlarge the
+cluster buffer and change nothing drawn. Re-run this after any change that adds local lights to
+Glowmere, because nothing reports an overflow at runtime.
+
+The brief named clustered lighting "a large uninstrumented cost". It is now instrumented: 56% of the
+grid is empty and the `clusters` pass measures 0.07 ms of an 18.5 ms frame. It is not large. And
+Constellation does not use the grid at all — its 3072 clusters are all empty — which is one more
+reason the two scenes need separate budgets.
+
 
 # Deliverable 4 — Scalability gap analysis
 

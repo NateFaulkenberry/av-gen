@@ -35,9 +35,17 @@
 #include <glm/gtx/quaternion.hpp>
 #include <imgui.h>
 
+// Generated at every build (src/CMakeLists.txt): the engine revision a benchmark record carries.
+#include "avgen_build_info.hpp"
+
+#include <unistd.h> // getpid, for the per-process benchmark session id
+
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <ctime>
+#include <functional>
+#include <numbers>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -94,6 +102,14 @@ std::string usageText() {
            "                      forensic isolation:\n"
            "                      shadows,ao,volume,post,shadowmask,\n"
            "                      culling,water,transparency,particles,animation,cameramotion\n"
+           "  --ab <phase>        headless A/B: run baseline and <phase>-disabled interleaved in\n"
+           "                      this one process (A/B/A/B) and report the paired difference.\n"
+           "                      --ab none compares the baseline with itself: the noise floor\n"
+           "  --ab-blocks <n>     A/B pairs to run (default 2)\n"
+           "  --bench-json <f>    write the run's machine-readable record (percentiles, counters,\n"
+           "                      and the conditions that make it comparable) to <f>\n"
+           "  --cluster-stats     report froxel-grid occupancy; CPU work inside the measured\n"
+           "                      frames, so it perturbs the wall clock and the record says so\n"
            "  --headless          no window: offline mode, fixed-step clock, precomputed analysis\n"
            "  --fps <n>           offline frame rate (default 60)\n"
            "  --size <w>x<h>      window size in points (default: open maximised)\n"
@@ -269,6 +285,24 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             options.disablePasses = *v;
             ++i;
+        } else if (arg == "--ab") {
+            auto v = need(i, "--ab");
+            if (!v) return std::unexpected(v.error());
+            options.abArm = *v;
+            options.headless = true;
+            ++i;
+        } else if (arg == "--ab-blocks") {
+            auto v = need(i, "--ab-blocks");
+            if (!v) return std::unexpected(v.error());
+            options.abBlocks = std::max(1, std::atoi(v->c_str()));
+            ++i;
+        } else if (arg == "--bench-json") {
+            auto v = need(i, "--bench-json");
+            if (!v) return std::unexpected(v.error());
+            options.benchJson = *v;
+            ++i;
+        } else if (arg == "--cluster-stats") {
+            options.clusterStats = true;
         } else if (arg == "--stress") {
             auto v = need(i, "--stress");
             if (!v) return std::unexpected(v.error());
@@ -2894,248 +2928,512 @@ int Application::runHeadless() {
         log::error("resize: {}", r.error().message);
         return 2;
     }
-    FrameTime time{};
-    std::uint64_t lastHash = 0;
-    // Per-frame wall clock, reported as a median at the end. The benchmark used to be the whole
-    // process under /usr/bin/time divided by the frame count, which charges the scene build to
-    // the frames: eleven scatter layers take two seconds longer to load than none, and over a
-    // hundred frames that is twenty milliseconds a frame of glTF decode masquerading as draw
-    // cost. A median also ignores the handful of frames a concurrent build steals, which an
-    // average cannot.
-    std::vector<double> frameMs;
-    frameMs.reserve(static_cast<std::size_t>(frames));
-    // Per-pass GPU time, per frame, keyed by the timeline's label. Reported as a median at the
-    // end next to the frame median, because one frame's sample of a 0.066 ms-resolution counter
-    // says very little and a hundred of them say what the pass costs.
-    std::vector<std::pair<std::string, std::vector<double>>> passMs;
-    std::vector<double> gpuFrameMs;
-    gpuFrameMs.reserve(static_cast<std::size_t>(frames));
-    for (int i = 0; i < frames; ++i) {
-        const auto frameStart = std::chrono::steady_clock::now();
-        time = engine_->tick(clock);
-        const std::uint64_t discontinuity = engine_->transport().discontinuityRevision();
-        if (discontinuity != lastTransportDiscontinuity_) {
-            renderer_->resetTemporalHistory();
-            lastTransportDiscontinuity_ = discontinuity;
-        }
-        // The scene rebuild is CPU work that scales with the size of the world rather than with
-        // what is on screen, and nothing measured it: a world scene with the camera turned to
-        // face empty sky spends 12-14 ms on the GPU and 21 ms of wall clock, and the difference
-        // was invisible. See docs/performance.md.
-        const auto updateStart = std::chrono::steady_clock::now();
-        engine_->setViewport(w, h);
-        engine_->update(time);
-        lastEngineUpdateMs_ =
-            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - updateStart).count();
-        // The AI control plane's queue, drained here for the same reason the live loop drains it
-        // (ADR-094): this is the thread that owns engine state, so it is the thread tool bodies
-        // run on. A headless run that never pumped would leave a task submitted during the loop
-        // waiting for a service that never came -- which is the exact shape of the bug this
-        // repository keeps shipping, so it is drained even though nothing in the offline path
-        // submits one today.
-        if (ai_) {
-            ai_->pump();
-        }
-        // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
-        // options; an empty set costs nothing.
-        if (panel_) {
-            const rendering::DebugViewOptions& options = panel_->world.debug;
-            renderer_->setDebugDepthTest(options.depthTest);
-            rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime);
-        }
-        const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
-                                                        engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
-        // Pixels are only pulled back on the frames something reads them: the captured frame, or
-        // every frame when debug logging wants a determinism hash. The rest render and submit and
-        // stop there, as the live path does.
-        const bool wantPixels = options_.logLevel <= log::Level::Debug ||
-                                (options_.capture && i == frames - 1);
-        std::optional<gpu::Image8> image;
-        if (wantPixels) {
-            auto rendered = renderer_->renderToImage(engine_->scene(), time, w, h, &shaderInputs);
-            if (!rendered) {
-                log::error("render: {}", rendered.error().message);
-                return 2;
-            }
-            image = std::move(*rendered);
-        } else if (auto r = renderer_->renderFrame(engine_->scene(), time, w, h, &shaderInputs); !r) {
-            log::error("render: {}", r.error().message);
+    renderer_->setClusterStatsEnabled(options_.clusterStats);
+
+    // ---- the run's schedule (ADR-113) ----------------------------------------------------------
+    //
+    // One block is one arm, measured once. An ordinary run has a single block; an A/B has
+    // 2 * `--ab-blocks` of them, alternating, so that a machine which drifts during the session
+    // charges the drift to both arms instead of to the change. Both arms are in *this process* and
+    // this session, because that is the only comparison the audit found to be valid: two recorded
+    // Glowmere figures differ by 28% with nothing to explain it, so a number from another run --
+    // however carefully taken -- is not a baseline.
+    struct BenchBlock {
+        std::string arm;
+        rendering::SceneRenderer::PassToggles toggles;
+        bool baseline = false;
+    };
+    const rendering::SceneRenderer::PassToggles baseToggles = renderer_->passToggles();
+    std::vector<BenchBlock> schedule;
+    if (!options_.abArm.empty()) {
+        rendering::SceneRenderer::PassToggles armToggles = baseToggles;
+        // `--ab none` is the null A/B: both arms are the baseline, so the difference it reports is
+        // the harness measuring itself. It is the only honest way to state this mode's noise floor
+        // -- the 2%/4% constants were calibrated from five separate *runs*, and a within-process
+        // interleaved block is a different measurement with a different floor. A null A/B that
+        // reports "A RESULT" is a broken harness, whatever it says about any real arm.
+        if (options_.abArm != "none" &&
+            !rendering::SceneRenderer::setPassArm(armToggles, options_.abArm, false)) {
+            log::error("--ab: unknown phase '{}' (one of: none,{})", options_.abArm,
+                       rendering::SceneRenderer::passArmNames());
             return 2;
         }
-        // The determinism hash is a full scan of the frame and scales with its area: at 2880x1800
-        // it was a fifth of the wall time of every headless run, which is a fifth of every
-        // performance measurement taken with one. It exists to diff two runs frame by frame, so it
-        // is computed when someone is actually looking -- debug logging, or the captured frame.
-        if (image) {
-            lastHash = gpu::hashImage(*image);
-            log::debug("offline frame {:4d} hash={:016x}", i, lastHash);
+        for (int b = 0; b < options_.abBlocks; ++b) {
+            schedule.push_back({"baseline", baseToggles, true});
+            schedule.push_back({"no-" + options_.abArm, armToggles, false});
         }
-        frameMs.push_back(
-            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameStart).count());
-        {
-            // Sum this frame's passes by label first: several passes share one (two cascades, a
-            // bloom pyramid), and it is the phase's total that a workload A/B moves.
-            std::vector<std::pair<std::string, double>> frameLabels;
-            for (const auto& entry : renderer_->timeline().passes()) {
-                auto it = std::find_if(frameLabels.begin(), frameLabels.end(),
-                                       [&](const auto& e) { return e.first == entry.label; });
-                if (it == frameLabels.end()) {
-                    frameLabels.emplace_back(entry.label, entry.ms);
-                } else {
-                    it->second += entry.ms;
-                }
-            }
-            for (const auto& [label, ms] : frameLabels) {
-                auto it = std::find_if(passMs.begin(), passMs.end(),
-                                       [&](const auto& e) { return e.first == label; });
-                if (it == passMs.end()) {
-                    passMs.emplace_back(label, std::vector<double>{ms});
-                } else {
-                    it->second.push_back(ms);
-                }
-            }
-            if (renderer_->stats().gpuFrameMs >= 0.0) {
-                gpuFrameMs.push_back(renderer_->stats().gpuFrameMs);
-            }
+        log::info("A/B: {} pair(s) of baseline vs '{}' disabled, interleaved, {} frames each; "
+                  "a difference below {:.0f}% GPU or {:.0f}% wall is not a result",
+                  options_.abBlocks, options_.abArm, frames, rendering::kGpuNoiseFloorPercent,
+                  rendering::kWallNoiseFloorPercent);
+    } else {
+        schedule.push_back({options_.disablePasses.empty() ? "baseline" : "disabled:" + options_.disablePasses,
+                            baseToggles, true});
+    }
+
+    // The conditions every record in this run shares. One session id per process is what makes the
+    // "same session or no comparison" rule checkable by a reader of the file rather than a
+    // convention somebody has to remember.
+    rendering::BenchmarkConditions shared;
+    shared.scene = options_.composition  ? options_.composition->string()
+                   : options_.project    ? options_.project->string()
+                   : options_.scene      ? options_.scene->string()
+                   : options_.example    ? *options_.example
+                                         : "";
+    shared.sceneKind = options_.composition ? "composition" : options_.project ? "project" : "scene";
+    shared.width = w;
+    shared.height = h;
+    shared.qualityTier = options_.qualityTier.empty() ? "default" : options_.qualityTier;
+    shared.gitRevision = AVGEN_GIT_REVISION;
+    shared.gitDirty = AVGEN_GIT_DIRTY != 0;
+    shared.buildType = AVGEN_BUILD_TYPE;
+    shared.backend = context_->capabilities().backendName;
+    // The GPU the numbers were taken on. Two adapters are two machines as far as a frame time is
+    // concerned, whatever else the conditions say.
+    shared.platform = context_->capabilities().adapterName;
+    shared.offlineFps = options_.offlineFps;
+    shared.clusterStats = options_.clusterStats;
+    {
+        const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::tm local{};
+        ::localtime_r(&now, &local);
+        char stamp[32] = {};
+        std::strftime(stamp, sizeof(stamp), "%Y-%m-%dT%H:%M:%S", &local);
+        shared.startedAt = stamp;
+        // Process-unique without needing a UUID library: the start second plus the pid. Two runs
+        // cannot collide; the blocks of one run cannot differ, which is what the rule needs.
+        shared.sessionId = fmt::format("{}-{}", stamp, static_cast<long long>(::getpid()));
+    }
+
+    std::vector<rendering::BenchmarkRecord> records;
+    std::vector<rendering::AbBlock> baselineBlocks;
+    std::vector<rendering::AbBlock> armBlocks;
+    FrameTime time{};
+    std::uint64_t lastHash = 0;
+    for (std::size_t blockIndex = 0; blockIndex < schedule.size(); ++blockIndex) {
+        const BenchBlock& block = schedule[blockIndex];
+        renderer_->setPassToggles(block.toggles);
+        // Every block renders the same frame range from the same start, or the arms are not being
+        // compared on the same work: a scene whose second 2 differs from its second 0 would put
+        // the difference between two blocks into the difference between two arms.
+        clock.restartAt(0.0);
+        renderer_->resetTemporalHistory();
+        if (schedule.size() > 1) {
+            log::info("--- block {}/{}: arm '{}' ---", blockIndex + 1, schedule.size(), block.arm);
         }
-        if (i % 30 == 0 || i == frames - 1) {
-            const auto& f = engine_->latestFrame();
-            // The headline parameters differ per scene kind; a missing one reads as 0.
-            auto valueOf = [&](const char* a, const char* b) {
-                if (const auto* p = engine_->params().find(a)) return p->finalComponent(0);
-                if (const auto* p = engine_->params().find(b)) return p->finalComponent(0);
-                return 0.0f;
-            };
-            log::info("offline frame {:4d} t={:7.3f}s bass={:.2f} mid={:.2f} treble={:.2f} rms={:.2f} onset={} scale={:.3f} "
-                      "emissive={:.2f} gpu={:.2f}ms hash={:016x}",
-                      i, time.renderTime, f.bands[0], f.bands[2], f.bands[4], f.rms, f.onset ? 1 : 0,
-                      valueOf("orb/scale", "root/scale"), valueOf("orb/emissive", "material/emissiveBoost"),
-                      renderer_->stats().gpuFrameMs, lastHash);
-            // Where the frame went. Every pass in the frame marks one GPU timestamp on a single
-            // timeline at its end (gpu/frame_timeline.hpp), so what is printed here is the
-            // interval from the previous pass's end to this one's: the passes partition the
-            // frame and sum to it. The old per-pass begin/end pairs did not -- a pass behind a
-            // heavy one absorbed the drain of everything still in flight, and the volumetric
-            // pass reported 39.4 ms of a 46 ms frame for 5.4 ms of work.
-            const auto& st = renderer_->stats();
+        // Per-frame wall clock, reported as a median at the end. The benchmark used to be the whole
+        // process under /usr/bin/time divided by the frame count, which charges the scene build to
+        // the frames: eleven scatter layers take two seconds longer to load than none, and over a
+        // hundred frames that is twenty milliseconds a frame of glTF decode masquerading as draw
+        // cost. A median also ignores the handful of frames a concurrent build steals, which an
+        // average cannot.
+        std::vector<double> frameMs;
+        frameMs.reserve(static_cast<std::size_t>(frames));
+        // Per-pass GPU time, per frame, keyed by the timeline's label. Reported as a median at the
+        // end next to the frame median, because one frame's sample of a 0.066 ms-resolution counter
+        // says very little and a hundred of them say what the pass costs.
+        std::vector<std::pair<std::string, std::vector<double>>> passMs;
+        std::vector<double> gpuFrameMs;
+        gpuFrameMs.reserve(static_cast<std::size_t>(frames));
+        // The workload each frame was given, kept per frame so the record's counters can be medians
+        // over the same window the timings came from rather than one frame's snapshot of a number
+        // that moves (an indirect draw's instance count lands a frame or three late).
+        std::vector<rendering::RenderStats> frameStats;
+        frameStats.reserve(static_cast<std::size_t>(frames));
+        for (int i = 0; i < frames; ++i) {
+            const auto frameStart = std::chrono::steady_clock::now();
+            time = engine_->tick(clock);
+            const std::uint64_t discontinuity = engine_->transport().discontinuityRevision();
+            if (discontinuity != lastTransportDiscontinuity_) {
+                renderer_->resetTemporalHistory();
+                lastTransportDiscontinuity_ = discontinuity;
+            }
+            // The scene rebuild is CPU work that scales with the size of the world rather than with
+            // what is on screen, and nothing measured it: a world scene with the camera turned to
+            // face empty sky spends 12-14 ms on the GPU and 21 ms of wall clock, and the difference
+            // was invisible. See docs/performance.md.
+            const auto updateStart = std::chrono::steady_clock::now();
+            engine_->setViewport(w, h);
+            engine_->update(time);
+            lastEngineUpdateMs_ =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - updateStart).count();
+            // The AI control plane's queue, drained here for the same reason the live loop drains it
+            // (ADR-094): this is the thread that owns engine state, so it is the thread tool bodies
+            // run on. A headless run that never pumped would leave a task submitted during the loop
+            // waiting for a service that never came -- which is the exact shape of the bug this
+            // repository keeps shipping, so it is drained even though nothing in the offline path
+            // submits one today.
+            if (ai_) {
+                ai_->pump();
+            }
+            // Debug drawing (ADR-031): build this frame's inspection geometry from the World window's
+            // options; an empty set costs nothing.
+            if (panel_) {
+                const rendering::DebugViewOptions& options = panel_->world.debug;
+                renderer_->setDebugDepthTest(options.depthTest);
+                rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime);
+            }
+            const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
+                                                            engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+            // Pixels are only pulled back on the frames something reads them: the captured frame, or
+            // every frame when debug logging wants a determinism hash. The rest render and submit and
+            // stop there, as the live path does.
+            const bool wantPixels = options_.logLevel <= log::Level::Debug ||
+                                    (options_.capture && i == frames - 1);
+            std::optional<gpu::Image8> image;
+            if (wantPixels) {
+                auto rendered = renderer_->renderToImage(engine_->scene(), time, w, h, &shaderInputs);
+                if (!rendered) {
+                    log::error("render: {}", rendered.error().message);
+                    return 2;
+                }
+                image = std::move(*rendered);
+            } else if (auto r = renderer_->renderFrame(engine_->scene(), time, w, h, &shaderInputs); !r) {
+                log::error("render: {}", r.error().message);
+                return 2;
+            }
+            // The determinism hash is a full scan of the frame and scales with its area: at 2880x1800
+            // it was a fifth of the wall time of every headless run, which is a fifth of every
+            // performance measurement taken with one. It exists to diff two runs frame by frame, so it
+            // is computed when someone is actually looking -- debug logging, or the captured frame.
+            if (image) {
+                lastHash = gpu::hashImage(*image);
+                log::debug("offline frame {:4d} hash={:016x}", i, lastHash);
+            }
+            frameMs.push_back(
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameStart).count());
             {
-                // Passes in submission order, summed per label, printed largest first.
-                std::vector<std::pair<std::string, double>> byLabel;
+                // Sum this frame's passes by label first: several passes share one (two cascades, a
+                // bloom pyramid), and it is the phase's total that a workload A/B moves.
+                std::vector<std::pair<std::string, double>> frameLabels;
                 for (const auto& entry : renderer_->timeline().passes()) {
-                    auto it = std::find_if(byLabel.begin(), byLabel.end(),
-                                           [&](const auto& p) { return p.first == entry.label; });
-                    if (it == byLabel.end()) {
-                        byLabel.emplace_back(entry.label, entry.ms);
+                    auto it = std::find_if(frameLabels.begin(), frameLabels.end(),
+                                           [&](const auto& e) { return e.first == entry.label; });
+                    if (it == frameLabels.end()) {
+                        frameLabels.emplace_back(entry.label, entry.ms);
                     } else {
                         it->second += entry.ms;
                     }
                 }
-                std::stable_sort(byLabel.begin(), byLabel.end(),
-                                 [](const auto& a, const auto& b) { return a.second > b.second; });
-                std::string breakdown;
-                double sum = 0.0;
-                for (const auto& [label, ms] : byLabel) {
-                    breakdown += fmt::format(" {}={:.2f}", label, ms);
-                    sum += ms;
+                for (const auto& [label, ms] : frameLabels) {
+                    auto it = std::find_if(passMs.begin(), passMs.end(),
+                                           [&](const auto& e) { return e.first == label; });
+                    if (it == passMs.end()) {
+                        passMs.emplace_back(label, std::vector<double>{ms});
+                    } else {
+                        it->second.push_back(ms);
+                    }
                 }
-                log::info("             gpu {:.2f} ms over {} passes (sum {:.2f}):{}", st.gpuFrameMs,
-                          st.gpuPasses, sum, breakdown);
-                // The same passes in submission order, for when the question is which pass a
-                // bubble landed on rather than which phase is expensive.
-                std::string ordered;
-                for (const auto& entry : renderer_->timeline().passes()) {
-                    ordered += fmt::format(" {}={:.3f}", entry.label, entry.ms);
+                if (renderer_->stats().gpuFrameMs >= 0.0) {
+                    gpuFrameMs.push_back(renderer_->stats().gpuFrameMs);
                 }
-                log::debug("             in order:{}", ordered);
-                if (renderer_->timeline().unwritten() > 0) {
-                    log::debug("             {} pass timestamp(s) the driver did not write (an empty "
-                               "render pass); their cost folds into the pass after them",
-                               renderer_->timeline().unwritten());
+                // The whole counter set, per frame. Copied rather than summarised here so the
+                // record's medians are taken over exactly the window its timings are.
+                frameStats.push_back(renderer_->stats());
+            }
+            if (i % 30 == 0 || i == frames - 1) {
+                const auto& f = engine_->latestFrame();
+                // The headline parameters differ per scene kind; a missing one reads as 0.
+                auto valueOf = [&](const char* a, const char* b) {
+                    if (const auto* p = engine_->params().find(a)) return p->finalComponent(0);
+                    if (const auto* p = engine_->params().find(b)) return p->finalComponent(0);
+                    return 0.0f;
+                };
+                log::info("offline frame {:4d} t={:7.3f}s bass={:.2f} mid={:.2f} treble={:.2f} rms={:.2f} onset={} scale={:.3f} "
+                          "emissive={:.2f} gpu={:.2f}ms hash={:016x}",
+                          i, time.renderTime, f.bands[0], f.bands[2], f.bands[4], f.rms, f.onset ? 1 : 0,
+                          valueOf("orb/scale", "root/scale"), valueOf("orb/emissive", "material/emissiveBoost"),
+                          renderer_->stats().gpuFrameMs, lastHash);
+                // Where the frame went. Every pass in the frame marks one GPU timestamp on a single
+                // timeline at its end (gpu/frame_timeline.hpp), so what is printed here is the
+                // interval from the previous pass's end to this one's: the passes partition the
+                // frame and sum to it. The old per-pass begin/end pairs did not -- a pass behind a
+                // heavy one absorbed the drain of everything still in flight, and the volumetric
+                // pass reported 39.4 ms of a 46 ms frame for 5.4 ms of work.
+                const auto& st = renderer_->stats();
+                {
+                    // Passes in submission order, summed per label, printed largest first.
+                    std::vector<std::pair<std::string, double>> byLabel;
+                    for (const auto& entry : renderer_->timeline().passes()) {
+                        auto it = std::find_if(byLabel.begin(), byLabel.end(),
+                                               [&](const auto& p) { return p.first == entry.label; });
+                        if (it == byLabel.end()) {
+                            byLabel.emplace_back(entry.label, entry.ms);
+                        } else {
+                            it->second += entry.ms;
+                        }
+                    }
+                    std::stable_sort(byLabel.begin(), byLabel.end(),
+                                     [](const auto& a, const auto& b) { return a.second > b.second; });
+                    std::string breakdown;
+                    double sum = 0.0;
+                    for (const auto& [label, ms] : byLabel) {
+                        breakdown += fmt::format(" {}={:.2f}", label, ms);
+                        sum += ms;
+                    }
+                    log::info("             gpu {:.2f} ms over {} passes (sum {:.2f}):{}", st.gpuFrameMs,
+                              st.gpuPasses, sum, breakdown);
+                    // The same passes in submission order, for when the question is which pass a
+                    // bubble landed on rather than which phase is expensive.
+                    std::string ordered;
+                    for (const auto& entry : renderer_->timeline().passes()) {
+                        ordered += fmt::format(" {}={:.3f}", entry.label, entry.ms);
+                    }
+                    log::debug("             in order:{}", ordered);
+                    if (renderer_->timeline().unwritten() > 0) {
+                        log::debug("             {} pass timestamp(s) the driver did not write (an empty "
+                                   "render pass); their cost folds into the pass after them",
+                                   renderer_->timeline().unwritten());
+                    }
+                }
+                // `instances=Av/Bc/T` carries its own total, because A + B is *not* the world: it covers
+                // only the objects whose cull pass ran, and it counts the renderer's instance records
+                // rather than the composer's per-layer placement log, which excludes terrain chunks and
+                // hero nodes. Without the denominator the two invite being compared, and a benchmark
+                // pass duly reported "101,822 culled against 99,515 placed" as a defect when both
+                // numbers were right and measuring different things.
+                log::info("             draws={} (indirect {}, empty {}, skipped {}) shadowDraws={} "
+                          "cascades={}/{} spots={} dispatches={} tris={} instances={}v/{}c/{} lod={}/{}/{}/{} "
+                          "particles={}sys/{}cap/{}emit cpu(proc)={:.2f}ms cpu(scene)={:.2f}ms",
+                          st.drawCalls, st.indirectDraws, st.emptyDraws, st.skippedDraws, st.shadowDraws,
+                          st.shadows.cascades, st.shadows.views, st.shadows.spots, st.computeDispatches,
+                          st.triangles, st.visibleInstances, st.culledInstances,
+                          st.visibleInstances + st.culledInstances, st.lodCounts[0], st.lodCounts[1],
+                          st.lodCounts[2], st.lodCounts[3], st.particles.systems, st.particles.capacity,
+                          st.particles.emittedThisFrame, st.procedural.cpuUpdateMs, lastEngineUpdateMs_);
+                // The workload each measured phase was actually given. Without these an A/B that edits
+                // a scene cannot prove its two arms differ, and "no effect" reads exactly like a run
+                // whose edit never applied.
+                log::info("             workload: volumeSteps={} cascades={} shadowRes={} aoTarget={}x{} "
+                          "aoSlices={}x{} shadowMask={}x{}/{}L postPasses={} bloomLevels={} "
+                          "sdf={}ray/{}mesh simGrids={} "
+                          "transient={} wind={}obj plants={}/{}awake ({} examined, {} slot writes)",
+                          st.volume.steps, st.shadows.cascades, st.shadows.resolution, st.ao.width,
+                          st.ao.height, st.ao.slices, st.ao.steps, st.shadowMask.width, st.shadowMask.height,
+                          st.shadowMask.lights, st.post.passes, st.post.bloomLevels,
+                          st.sdf.raymarchObjects, st.sdf.meshObjects, st.simulation.grids,
+                          st.transientTextures, st.procedural.windObjects, st.procedural.simActive,
+                          st.procedural.simAwake, st.procedural.simExamined, st.procedural.simSlotWrites);
+            }
+            if (options_.capture && i == frames - 1 && image) {
+                if (auto r = writeCapture(*image, *options_.capture); !r) {
+                    log::error("capture: {}", r.error().message);
+                    return 4;
+                }
+                log::info("captured frame {} to {}", i, options_.capture->string());
+            }
+        }
+        // The first frames build pipelines, meshes and shadow maps, and the empty-LOD suppression
+        // has not settled; they are not what a steady frame costs. Drop them when there are enough
+        // left. An A/B block gets the same treatment: switching an arm invalidates pipelines too.
+        const std::size_t warmup = frameMs.size() > 24 ? 12 : 0;
+        const auto steadyOf = [&](const std::vector<double>& v) {
+            return v.size() > warmup
+                       ? std::vector<double>(v.begin() + static_cast<std::ptrdiff_t>(warmup), v.end())
+                       : std::vector<double>{};
+        };
+        rendering::BenchmarkRecord record;
+        record.conditions = shared;
+        record.conditions.arm = block.arm;
+        record.conditions.framesRendered = static_cast<int>(frameMs.size());
+        record.conditions.warmupFrames = static_cast<int>(warmup);
+        record.conditions.measuredFrames = static_cast<int>(steadyOf(frameMs).size());
+        {
+            const scene::Camera& camera = engine_->scene().camera;
+            record.conditions.camera = camera.name;
+            for (int c = 0; c < 3; ++c) {
+                record.conditions.cameraPosition[c] = camera.position[c];
+                record.conditions.cameraTarget[c] = camera.target[c];
+            }
+            record.conditions.fovYDegrees = camera.effectiveFovY() * 180.0 / std::numbers::pi;
+        }
+        record.wallMs = rendering::describe(steadyOf(frameMs));
+        record.gpuMs = rendering::describe(steadyOf(gpuFrameMs));
+        {
+            // The CPU frame, distributed like the other two. Taken from the same per-frame stats
+            // the counters come from, so its window is exactly theirs.
+            std::vector<double> cpuMs;
+            cpuMs.reserve(frameStats.size());
+            for (const auto& fs : frameStats) {
+                cpuMs.push_back(fs.cpu.totalMs);
+            }
+            record.cpuMs = rendering::describe(steadyOf(cpuMs));
+        }
+        // The distribution, in full. The harness used to report median/p10/p90/min, which cannot
+        // see a stutter at all: a hundred 10 ms frames with one 100 ms frame among them has a p99
+        // of 10 ms. The 1% low is the mean of the slowest 1% of frames and is a *different number*
+        // from p99 -- see rendering/render_stats.hpp, where the two definitions are written down.
+        if (record.wallMs.valid()) {
+            const rendering::Distribution& d = record.wallMs;
+            log::info("frame wall clock over {} steady frames: median {:.2f} ms  p10 {:.2f}  p90 {:.2f}  min {:.2f}",
+                      d.count, d.p50, d.p10, d.p90, d.min);
+            log::info("             wall p95 {:.2f}  p99 {:.2f}  max {:.2f}  1%low {:.2f}  0.1%low {:.2f}  "
+                      "var {:.3f} ms^2 (sd {:.2f})",
+                      d.p95, d.p99, d.max, d.low1Percent, d.low01Percent, d.variance, d.stddev);
+        }
+        if (record.cpuMs.valid()) {
+            const rendering::Distribution& d = record.cpuMs;
+            log::info("             cpu  p50 {:.2f}  p90 {:.2f}  p99 {:.2f}  max {:.2f}  1%low {:.2f}",
+                      d.p50, d.p90, d.p99, d.max, d.low1Percent);
+        }
+        if (record.gpuMs.valid()) {
+            const rendering::Distribution& d = record.gpuMs;
+            log::info("             gpu  p50 {:.2f}  p90 {:.2f}  p95 {:.2f}  p99 {:.2f}  max {:.2f}  "
+                      "1%low {:.2f}  0.1%low {:.2f}  var {:.3f} ms^2",
+                      d.p50, d.p90, d.p95, d.p99, d.max, d.low1Percent, d.low01Percent, d.variance);
+        }
+        // The GPU frame's passes, as medians over the same steady window. The passes partition the
+        // frame (each is the interval between two consecutive pass ends on one timeline), so the
+        // medians very nearly sum to the frame median and a phase's number responds to its own
+        // workload. Sorted by cost: the top line is what to attack.
+        {
+            for (const auto& [label, samples] : passMs) {
+                const rendering::Distribution d = rendering::describe(steadyOf(samples));
+                if (d.valid()) {
+                    record.passMedianMs.push_back(gpu::TimelineInterval{label, d.p50});
                 }
             }
-            // `instances=Av/Bc/T` carries its own total, because A + B is *not* the world: it covers
-            // only the objects whose cull pass ran, and it counts the renderer's instance records
-            // rather than the composer's per-layer placement log, which excludes terrain chunks and
-            // hero nodes. Without the denominator the two invite being compared, and a benchmark
-            // pass duly reported "101,822 culled against 99,515 placed" as a defect when both
-            // numbers were right and measuring different things.
-            log::info("             draws={} (indirect {}, empty {}, skipped {}) shadowDraws={} "
-                      "cascades={}/{} spots={} dispatches={} tris={} instances={}v/{}c/{} lod={}/{}/{}/{} "
-                      "particles={}sys/{}cap/{}emit cpu(proc)={:.2f}ms cpu(scene)={:.2f}ms",
-                      st.drawCalls, st.indirectDraws, st.emptyDraws, st.skippedDraws, st.shadowDraws,
-                      st.shadows.cascades, st.shadows.views, st.shadows.spots, st.computeDispatches,
-                      st.triangles, st.visibleInstances, st.culledInstances,
-                      st.visibleInstances + st.culledInstances, st.lodCounts[0], st.lodCounts[1],
-                      st.lodCounts[2], st.lodCounts[3], st.particles.systems, st.particles.capacity,
-                      st.particles.emittedThisFrame, st.procedural.cpuUpdateMs, lastEngineUpdateMs_);
-            // The workload each measured phase was actually given. Without these an A/B that edits
-            // a scene cannot prove its two arms differ, and "no effect" reads exactly like a run
-            // whose edit never applied.
-            log::info("             workload: volumeSteps={} cascades={} shadowRes={} aoTarget={}x{} "
-                      "aoSlices={}x{} shadowMask={}x{}/{}L postPasses={} bloomLevels={} "
-                      "sdf={}ray/{}mesh simGrids={} "
-                      "transient={} wind={}obj plants={}/{}awake ({} examined, {} slot writes)",
-                      st.volume.steps, st.shadows.cascades, st.shadows.resolution, st.ao.width,
-                      st.ao.height, st.ao.slices, st.ao.steps, st.shadowMask.width, st.shadowMask.height,
-                      st.shadowMask.lights, st.post.passes, st.post.bloomLevels,
-                      st.sdf.raymarchObjects, st.sdf.meshObjects, st.simulation.grids,
-                      st.transientTextures, st.procedural.windObjects, st.procedural.simActive,
-                      st.procedural.simAwake, st.procedural.simExamined, st.procedural.simSlotWrites);
-        }
-        if (options_.capture && i == frames - 1 && image) {
-            if (auto r = writeCapture(*image, *options_.capture); !r) {
-                log::error("capture: {}", r.error().message);
-                return 4;
+            std::stable_sort(record.passMedianMs.begin(), record.passMedianMs.end(),
+                             [](const auto& a, const auto& b) { return a.ms > b.ms; });
+            std::string breakdown;
+            double sum = 0.0;
+            for (const auto& pass : record.passMedianMs) {
+                breakdown += fmt::format(" {}={:.2f}", pass.label, pass.ms);
+                sum += pass.ms;
             }
-            log::info("captured frame {} to {}", i, options_.capture->string());
+            log::info("gpu frame median {:.2f} ms; pass medians (sum {:.2f}):{}",
+                      record.gpuMs.valid() ? record.gpuMs.p50 : -1.0, sum, breakdown);
         }
-    }
-    // The first frames build pipelines, meshes and shadow maps, and the empty-LOD suppression has
-    // not settled; they are not what a steady frame costs. Drop them when there are enough left.
-    const std::size_t warmup = frameMs.size() > 24 ? 12 : 0;
-    if (frameMs.size() > warmup) {
-        std::vector<double> steady(frameMs.begin() + static_cast<std::ptrdiff_t>(warmup), frameMs.end());
-        std::sort(steady.begin(), steady.end());
-        const auto at = [&](double q) {
-            return steady[std::min(steady.size() - 1, static_cast<std::size_t>(q * (steady.size() - 1)))];
-        };
-        log::info("frame wall clock over {} steady frames: median {:.2f} ms  p10 {:.2f}  p90 {:.2f}  min {:.2f}",
-                  steady.size(), at(0.5), at(0.1), at(0.9), steady.front());
-    }
-    // The GPU frame and its passes, as medians over the same steady window. The passes partition
-    // the frame (each is the interval between two consecutive pass ends on one timeline), so the
-    // medians very nearly sum to the frame median and a phase's number responds to its own
-    // workload. Sorted by cost: the top line is what to attack.
-    {
-        const auto median = [](std::vector<double> v) {
-            if (v.empty()) {
-                return -1.0;
+        // The workload the timings were taken over, and the CPU stage split, both as medians over
+        // the same window. `varied` says whether any counter moved: when it did not, these are
+        // exact for every measured frame rather than a summary of several values.
+        {
+            const std::size_t first = std::min(warmup, frameStats.size());
+            const auto medianOfStat = [&](auto pick) {
+                std::vector<double> v;
+                v.reserve(frameStats.size() - first);
+                for (std::size_t f = first; f < frameStats.size(); ++f) {
+                    v.push_back(static_cast<double>(pick(frameStats[f])));
+                }
+                if (v.empty()) {
+                    return 0.0;
+                }
+                if (std::adjacent_find(v.begin(), v.end(), std::not_equal_to<>()) != v.end()) {
+                    record.counters.varied = true;
+                }
+                std::sort(v.begin(), v.end());
+                return v[v.size() / 2];
+            };
+            using RS = rendering::RenderStats;
+            record.counters.draws = medianOfStat([](const RS& s) { return s.drawCalls; });
+            record.counters.shadowDraws = medianOfStat([](const RS& s) { return s.shadowDraws; });
+            record.counters.triangles = medianOfStat([](const RS& s) { return s.triangles; });
+            record.counters.logicalTriangles =
+                medianOfStat([](const RS& s) { return s.geometry.logicalTriangles; });
+            record.counters.visibleInstances = medianOfStat([](const RS& s) { return s.visibleInstances; });
+            record.counters.culledInstances = medianOfStat([](const RS& s) { return s.culledInstances; });
+            for (int l = 0; l < 4; ++l) {
+                record.counters.lod[l] = medianOfStat([l](const RS& s) { return s.lodCounts[l]; });
             }
-            std::sort(v.begin(), v.end());
-            return v[v.size() / 2];
-        };
-        const std::size_t drop = gpuFrameMs.size() > 24 ? 12 : 0;
-        const auto trim = [&](const std::vector<double>& v) {
-            return v.size() > drop ? std::vector<double>(v.begin() + static_cast<std::ptrdiff_t>(drop), v.end())
-                                   : v;
-        };
-        std::vector<std::pair<std::string, double>> medians;
-        for (const auto& [label, samples] : passMs) {
-            medians.emplace_back(label, median(trim(samples)));
+            record.counters.shadowCasters = medianOfStat([](const RS& s) { return s.shadowCasters; });
+            record.counters.lights = medianOfStat([](const RS& s) { return s.shadedLights; });
+            record.counters.directionalLights = medianOfStat([](const RS& s) { return s.directionalLights; });
+            record.counters.uniformPathLights = medianOfStat([](const RS& s) { return s.lights; });
+            record.counters.clusteredLights = medianOfStat([](const RS& s) { return s.clusteredLights; });
+            record.counters.particleSystems = medianOfStat([](const RS& s) { return s.particles.systems; });
+            record.counters.particleCapacity = medianOfStat([](const RS& s) { return s.particles.capacity; });
+            record.counters.particlesEmitted =
+                medianOfStat([](const RS& s) { return s.particles.emittedThisFrame; });
+            record.counters.transientTextures = medianOfStat([](const RS& s) { return s.transientTextures; });
+            record.counters.entities = medianOfStat([](const RS& s) { return s.entities; });
+            record.counters.computeDispatches = medianOfStat([](const RS& s) { return s.computeDispatches; });
+            record.counters.gpuPasses = medianOfStat([](const RS& s) { return s.gpuPasses; });
+            record.cpuMedian.uploadsMs = medianOfStat([](const RS& s) { return s.cpu.uploadsMs; });
+            record.cpuMedian.lightsMs = medianOfStat([](const RS& s) { return s.cpu.lightsMs; });
+            record.cpuMedian.objectsMs = medianOfStat([](const RS& s) { return s.cpu.objectsMs; });
+            record.cpuMedian.fieldsMs = medianOfStat([](const RS& s) { return s.cpu.fieldsMs; });
+            record.cpuMedian.simulationMs = medianOfStat([](const RS& s) { return s.cpu.simulationMs; });
+            record.cpuMedian.particlesMs = medianOfStat([](const RS& s) { return s.cpu.particlesMs; });
+            record.cpuMedian.proceduralMs = medianOfStat([](const RS& s) { return s.cpu.proceduralMs; });
+            record.cpuMedian.sdfMs = medianOfStat([](const RS& s) { return s.cpu.sdfMs; });
+            record.cpuMedian.shadowEncodeMs = medianOfStat([](const RS& s) { return s.cpu.shadowEncodeMs; });
+            record.cpuMedian.backgroundEncodeMs =
+                medianOfStat([](const RS& s) { return s.cpu.backgroundEncodeMs; });
+            record.cpuMedian.depthEncodeMs = medianOfStat([](const RS& s) { return s.cpu.depthEncodeMs; });
+            record.cpuMedian.sceneEncodeMs = medianOfStat([](const RS& s) { return s.cpu.sceneEncodeMs; });
+            record.cpuMedian.volumeEncodeMs = medianOfStat([](const RS& s) { return s.cpu.volumeEncodeMs; });
+            record.cpuMedian.postEncodeMs = medianOfStat([](const RS& s) { return s.cpu.postEncodeMs; });
+            record.cpuMedian.tonemapEncodeMs = medianOfStat([](const RS& s) { return s.cpu.tonemapEncodeMs; });
+            record.cpuMedian.finishMs = medianOfStat([](const RS& s) { return s.cpu.finishMs; });
+            record.cpuMedian.submitMs = medianOfStat([](const RS& s) { return s.cpu.submitMs; });
+            // The offline path blocks here waiting for the GPU, so this is usually most of the CPU
+            // frame and is what stops anyone reading a 21 ms CPU frame as CPU-bound work.
+            record.cpuMedian.queueWaitMs = medianOfStat([](const RS& s) { return s.cpu.queueWaitMs; });
+            record.cpuMedian.totalMs = medianOfStat([](const RS& s) { return s.cpu.totalMs; });
+            // Occupancy is a property of one camera position, so the last measured frame's grid is
+            // reported rather than an average over a moving camera, which would describe no camera.
+            if (!frameStats.empty() && frameStats.back().haveClusters) {
+                record.clusters = frameStats.back().clusters;
+                record.haveClusters = true;
+                const rendering::ClusterOccupancy& o = record.clusters;
+                log::info("cluster occupancy ({} froxels, {} local lights, cap {}): "
+                          "min {} p50 {} p90 {} p99 {} max {} mean {:.2f}; empty {} ({:.1f}%), "
+                          "overflowed {} ({:.2f}%), lights dropped by the cap {}",
+                          o.clusters, o.lights, o.cap, o.min, o.p50, o.p90, o.p99, o.max, o.mean,
+                          o.empty, o.clusters > 0 ? 100.0 * o.empty / o.clusters : 0.0, o.overflowed,
+                          o.clusters > 0 ? 100.0 * o.overflowed / o.clusters : 0.0, o.dropped);
+            }
         }
-        std::stable_sort(medians.begin(), medians.end(),
-                         [](const auto& a, const auto& b) { return a.second > b.second; });
-        std::string breakdown;
-        double sum = 0.0;
-        for (const auto& [label, ms] : medians) {
-            breakdown += fmt::format(" {}={:.2f}", label, ms);
-            sum += ms;
-        }
-        log::info("gpu frame median {:.2f} ms; pass medians (sum {:.2f}):{}", median(trim(gpuFrameMs)), sum,
-                  breakdown);
+        rendering::AbBlock abBlock;
+        abBlock.wallMs = record.wallMs;
+        abBlock.gpuMs = record.gpuMs;
+        (block.baseline ? baselineBlocks : armBlocks).push_back(abBlock);
+        records.push_back(std::move(record));
     }
-    log::info("headless run complete: {} frames at {} fps; GPU errors: {}", frames, options_.offlineFps,
-              context_->errorCount());
+    // Restore whatever the run was configured with, so nothing after this point sees an A/B arm.
+    renderer_->setPassToggles(baseToggles);
+
+    // ---- the paired result (ADR-113) -----------------------------------------------------------
+    rendering::AbSummary ab;
+    if (!options_.abArm.empty()) {
+        ab = rendering::compareArms("no-" + options_.abArm, baselineBlocks, armBlocks);
+        const auto report = [&](const char* clock_, const rendering::PairedDelta& d) {
+            log::info("A/B {} : baseline {:.2f} ms, arm {:.2f} ms, delta {:+.2f} ms ({:+.2f}%); "
+                      "noise floor {:.2f}% -> {}",
+                      clock_, d.baselineMs, d.armMs, d.deltaMs, d.deltaPercent, d.noiseFloorPercent,
+                      d.isResult() ? (d.deltaMs > 0.0 ? "A RESULT: the arm is faster"
+                                                      : "A RESULT: the arm is slower")
+                                   : "NOT A RESULT: inside the noise");
+        };
+        if (ab.blocks == 0) {
+            log::warn("A/B: no completed pair, so no comparison");
+        } else {
+            log::info("A/B over {} pair(s) of '{}': baseline blocks varied by {:.2f}% GPU / {:.2f}% wall",
+                      ab.blocks, ab.arm, ab.gpuSpreadPercent, ab.wallSpreadPercent);
+            report("gpu ", ab.gpu);
+            report("wall", ab.wall);
+            std::string perBlock;
+            for (std::size_t b = 0; b < ab.gpuBlockDeltaMs.size(); ++b) {
+                perBlock += fmt::format(" pair{}={:+.2f}", b + 1, ab.gpuBlockDeltaMs[b]);
+            }
+            // Printed because a headline delta that two pairs disagree about is not one result, it
+            // is two measurements of a machine that moved.
+            log::info("A/B per-pair gpu delta ms:{}", perBlock);
+        }
+    }
+    if (options_.benchJson) {
+        const std::string json = rendering::benchmarkJson(records, ab.blocks > 0 ? &ab : nullptr);
+        std::ofstream out(*options_.benchJson, std::ios::binary);
+        if (!out) {
+            log::error("--bench-json: cannot write {}", options_.benchJson->string());
+            return 4;
+        }
+        out << json;
+        log::info("benchmark record written to {} ({} block(s))", options_.benchJson->string(),
+                  records.size());
+    }
+    log::info("headless run complete: {} block(s) of {} frames at {} fps; GPU errors: {}",
+              schedule.size(), frames, options_.offlineFps, context_->errorCount());
     return context_->errorCount() == 0 ? 0 : 5;
 }
 

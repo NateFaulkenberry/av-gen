@@ -1672,6 +1672,9 @@ void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Sce
     frame.clusterDepth = glm::vec4(grid.sliceScale(), grid.sliceBias(), grid.zNear, grid.zFar);
     frame.lightCounts = glm::vec4(static_cast<float>(directional), static_cast<float>(total), 0.0f, 0.0f);
     stats_.clusteredLights = clustered ? total - directional : 0;
+    stats_.shadedLights = total;
+    stats_.directionalLights = directional;
+    stats_.haveClusters = false;
     if (!clustered) {
         return;
     }
@@ -1684,6 +1687,27 @@ void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Sce
         params.lights[i - directional] = glm::vec4(viewPos, lightInfluenceRadius(light));
     }
     context_.queue().WriteBuffer(clusterParams_, 0, &params, sizeof(params));
+    // ADR-114: the grid's occupancy, from the same inputs the compute pass is about to be given.
+    // Reading the cluster buffer back instead would stall the frame being measured, which is the
+    // one frame a performance run must not stall -- so this is a CPU replica of the pass, using
+    // the reference implementation that tests/rendering/test_shadows_gpu.cpp already checks the
+    // pass's own output against index for index. It is off by default: it is real CPU work inside
+    // a measured frame, and a diagnostic that silently taxes the measurement is worse than none.
+    if (clusterStats_) {
+        // Clamped to the uniform's own array: the encode above fills only that much, and a
+        // count read past it would describe lights the pass was never handed.
+        const std::uint32_t localCount = std::min(total - directional, kMaxSceneLights);
+        std::vector<glm::vec3> viewPositions;
+        std::vector<float> radii;
+        viewPositions.reserve(localCount);
+        radii.reserve(localCount);
+        for (std::uint32_t i = 0; i < localCount; ++i) {
+            viewPositions.emplace_back(params.lights[i]);
+            radii.push_back(params.lights[i].w);
+        }
+        stats_.clusters = clusterOccupancy(grid, viewPositions, radii, kMaxLightsPerCluster);
+        stats_.haveClusters = true;
+    }
     wgpu::ComputePassDescriptor desc{};
     desc.label = "cluster-build-pass";
     desc.timestampWrites = timeline_->mark("clusters", gpu::FrameTimeline::PassKind::Compute);
