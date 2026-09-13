@@ -1362,6 +1362,15 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         // importance, so only the small and distant reach it. Forcing the whole frame is how the
         // question "how much of the 8.4 ms residual can this rung reach at all" gets an answer
         // before anything is built on top of it.
+        // The bound on D2: the clustered local-light loop reduced to nothing, with every other term
+        // of the Full tier intact. Not shippable on a scene lit by 222 local lights -- it is the
+        // ceiling the reduced rung is measured against, the way a pass arm is.
+        {"matlights0",
+         [](QualitySettings& q) {
+             q.forcedMaterialTier = MaterialTier::ReducedLights;
+             q.reducedTierLocalLights = 0;
+         },
+         "no local lights at all (the ceiling on what a light budget can save)"},
         {"matreduced",
          [](QualitySettings& q) { q.forcedMaterialTier = MaterialTier::ReducedLights; },
          "every draw at the reduced-lights tier (the ceiling on that rung's saving)"},
