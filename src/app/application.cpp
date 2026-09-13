@@ -3422,7 +3422,10 @@ int Application::runHeadless() {
     // ---- the paired result (ADR-113) -----------------------------------------------------------
     rendering::AbSummary ab;
     if (!options_.abArm.empty()) {
-        ab = rendering::compareArms("no-" + options_.abArm, baselineBlocks, armBlocks);
+        // The arm's own name, not "no-<name>": a quality arm is not a removal, and a summary line
+        // that calls `shadowrange` "no-shadowrange" reads as the opposite of what was measured.
+        ab = rendering::compareArms(schedule.size() > 1 ? schedule[1].arm : options_.abArm, baselineBlocks,
+                                    armBlocks);
         const auto report = [&](const char* clock_, const rendering::PairedDelta& d) {
             log::info("A/B {} : baseline {:.2f} ms, arm {:.2f} ms, delta {:+.2f} ms ({:+.2f}%); "
                       "noise floor {:.2f}% -> {}",
