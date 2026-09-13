@@ -14,8 +14,10 @@ Two facts anchor this document, both checked against the current source rather t
   the *mechanism* it describes is still the one two other caps use.
 - **Glowmere flattens to 278 entities, and the denser rungs of its own benchmark ladder go much
   further:** `glowmere-dense` is 482 entities and `glowmere-extreme` is 840. On the pre-ADR-128
-  binary `glowmere-extreme` logged `extra entities skipped` on 60 of 60 frames and rendered without
-  a hero tree that is in the scene. Glowmere also logs `"22 splines; only the first 16 are
+  binary, three of those four scenes never warned — culling kept the visible set under 256 at the
+  camera each recipe opens on — and `glowmere-extreme` logged `extra entities skipped` on 60 of 60
+  frames and rendered without a hero tree that is in the scene. Whether content worked depended on
+  where the camera was pointing. Glowmere also logs `"22 splines; only the first 16 are
   available on the GPU"` today, so `kMaxGpuSplines` is a limit that is *already* user-visible in
   the wild, not a hypothetical.
 

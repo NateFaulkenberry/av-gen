@@ -21,12 +21,18 @@ say which entities went missing or why, and the frame completed looking plausibl
 frustum culling kept a typical camera's set to about half the cap — "the least controllable
 assumption a renderer can depend on". The measurement below shows that was already optimistic:
 
-| Content | Entities | 256-slot renderer |
+| Content | Entities | Frames warning `extra entities skipped`, pre-change, 60-frame headless run |
 |---|---|---|
-| `examples/recipes/glowmere.recipe.json` | 151 | fits |
-| `examples/world/glowmere-stylized.json` | 278 | fits only while culled |
-| `examples/recipes/glowmere-dense.recipe.json` | 482 | over |
-| `examples/recipes/glowmere-extreme.recipe.json` | 840 | **over, and firing** |
+| `examples/recipes/glowmere.recipe.json` | 151 | 0 / 60 |
+| `examples/world/glowmere-stylized.json` | 278 | 0 / 60 |
+| `examples/recipes/glowmere-dense.recipe.json` | 482 | 0 / 60 |
+| `examples/recipes/glowmere-extreme.recipe.json` | 840 | **60 / 60** |
+
+Read that table carefully, because it is more damning than a column of entity counts would be.
+Three of these four scenes have more entities than slots and three of them were fine — culling kept
+the visible set under 256 at the camera each recipe happens to open on. That is the whole problem
+stated as data: whether content works depends on where the camera is pointing, the cap is crossed
+silently, and the only rung that crossed it is the one nobody would have looked at.
 
 `glowmere-extreme` is not a hypothetical — it is a rung on the density ladder `tools/render_bench.py`
 measures against. On the pre-change binary it logged `extra entities skipped` on **60 of 60 frames**,
