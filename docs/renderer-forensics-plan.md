@@ -523,14 +523,26 @@ turns it off, the symptom stays, and a subsystem is wrongly cleared.
 
 ### 4.4 GPU and depth controls
 
-- `[ ]` Show GPU object index.
-- `[ ]` Show buffer generation.
-- `[ ]` Show frame index.
-- `[ ]` Validate GPU object data.
-- `[ ]` Show raw depth.
-- `[ ]` Show linear depth.
-- `[ ]` Disable depth test.
-- `[ ]` Disable depth write.
+Seven auxiliary views already existed -- normal, roughness, velocity, emission, ids, occlusion, depth
+-- and the plan's truthfulness rule applies to them as much as to the arms. They are now asserted:
+`[gpu][composition][forensics][views]` requires every view to be its own picture (two views that hash
+alike are the same buffer shown twice or two empty frames, and both are a diagnostic that lies), the
+depth view to move when the camera does, and the id view to separate objects into distinct values
+rather than a continuum.
+
+- `[~]` Show GPU object index. The *slot* is in the per-object diagnostic and in a capture; the `Ids`
+  view colours by entity pick id, which is a different number. A view keyed on the slot is not built.
+- `[ ]` Show buffer generation. There is no generation counter to show: the renderer's reuse boundary
+  is the owning `Scene` plus a local version, and that is not a per-frame value.
+- `[ ]` Show frame index. In the capture (`FrameSnapshot::frame.frameIndex`), not on screen.
+- `[~]` Validate GPU object data. Camera, entity matrices and skinning palettes are guarded and
+  refuse a non-finite frame by name; bounds, materials and water are not.
+- `[x]` Show raw depth. The `Depth` auxiliary view, asserted to vary with the camera.
+- `[~]` Show linear depth. The R32F target exists and feeds AO, water and post; there is no view that
+  displays it directly.
+- `[ ]` Disable depth test. Not built: it is a pipeline variant rather than a flag, so an honest
+  control means a second pipeline per material, and nothing in this investigation has needed one.
+- `[ ]` Disable depth write. Same.
 - `[ ]` Show depth discontinuities and object-specific depth.
 
 ### 4.5 Animation and water controls

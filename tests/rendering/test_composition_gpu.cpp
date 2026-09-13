@@ -2802,3 +2802,112 @@ TEST_CASE("each isolation arm removes exactly its own pass", "[gpu][composition]
     }
     CHECK(ctx->errorCount() == 0);
 }
+
+// ---- Phase 4.4: the diagnostic views, checked before any more are built --------------------------
+//
+// Seven auxiliary views already exist -- normal, roughness, velocity, emission, ids, occlusion,
+// depth -- and the plan's rule applies to them exactly as it applies to the isolation arms: a view
+// that shows the same thing as another, or nothing at all, is worse than a missing one, because
+// somebody looks at it and concludes something.
+//
+// Two claims, and the second is the one with teeth. Every view must differ from the shaded frame and
+// from every other view; and the depth view must actually vary with depth, which is checked by
+// moving the camera and requiring the image to follow.
+TEST_CASE("every auxiliary debug view shows something of its own",
+          "[gpu][composition][forensics][views]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the RendererQA scene is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(project).has_value());
+    FixedStepClock clock(60.0);
+    constexpr std::uint32_t kW = 160;
+    constexpr std::uint32_t kH = 120;
+
+    const auto renderView = [&](rendering::AuxDebugView view) {
+        renderer.setAuxDebugView(view);
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(kW, kH);
+        engine.update(time);
+        renderer.resetTemporalHistory();
+        auto image = renderer.renderToImage(engine.scene(), time, kW, kH);
+        REQUIRE(image.has_value());
+        return std::move(*image);
+    };
+
+    aimCompositionCamera(engine.params(), glm::vec3(0.0f, 3.0f, 10.0f), glm::vec3(0.0f, 1.0f, -4.0f));
+
+    const rendering::AuxDebugView views[] = {
+        rendering::AuxDebugView::None,      rendering::AuxDebugView::Normal,
+        rendering::AuxDebugView::Roughness, rendering::AuxDebugView::Velocity,
+        rendering::AuxDebugView::Emission,  rendering::AuxDebugView::Ids,
+        rendering::AuxDebugView::Occlusion, rendering::AuxDebugView::Depth,
+    };
+    std::map<std::uint64_t, std::string> seen;
+    for (const rendering::AuxDebugView view : views) {
+        const gpu::Image8 image = renderView(view);
+        const std::uint64_t hash = gpu::hashImage(image);
+        const std::string name = rendering::auxDebugViewName(view);
+        INFO("view: " << name);
+        const auto clash = seen.find(hash);
+        if (clash != seen.end()) {
+            INFO("identical to '" << clash->second << "'");
+        }
+        // Each view is its own picture. Two views that hash alike are either the same buffer shown
+        // twice or two empty frames, and both of those are a diagnostic that lies.
+        CHECK(clash == seen.end());
+        seen.emplace(hash, name);
+    }
+    CHECK(seen.size() == std::size(views));
+
+    SECTION("the depth view varies with depth") {
+        // A view called depth that does not move when the camera does is showing something else.
+        // The mean of the frame is the instrument: pulling back puts more distant surface in shot,
+        // and the whole image shifts rather than one pixel.
+        const auto meanOf = [](const gpu::Image8& image) {
+            double total = 0.0;
+            for (std::uint32_t y = 0; y < kH; ++y) {
+                for (std::uint32_t x = 0; x < kW; ++x) {
+                    const std::uint8_t* p = image.pixel(x, y);
+                    total += static_cast<double>(p[0] + p[1] + p[2]) / 3.0;
+                }
+            }
+            return total / static_cast<double>(kW * kH);
+        };
+        aimCompositionCamera(engine.params(), glm::vec3(0.0f, 2.0f, 6.0f), glm::vec3(0.0f, 1.0f, -4.0f));
+        const double near = meanOf(renderView(rendering::AuxDebugView::Depth));
+        aimCompositionCamera(engine.params(), glm::vec3(0.0f, 2.0f, 26.0f), glm::vec3(0.0f, 1.0f, -4.0f));
+        const double far = meanOf(renderView(rendering::AuxDebugView::Depth));
+        INFO("depth view mean: " << near << " from 6 m, " << far << " from 26 m");
+        CHECK(std::fabs(far - near) > 1.0);
+    }
+
+    SECTION("the id view separates objects") {
+        // Identifiers are a *palette*, not a gradient: the value of a pixel is which object it is.
+        // So the check is that the view contains several distinct values, where the shaded frame's
+        // colours would be a continuum.
+        aimCompositionCamera(engine.params(), glm::vec3(0.0f, 3.0f, 10.0f), glm::vec3(0.0f, 1.0f, -4.0f));
+        const gpu::Image8 ids = renderView(rendering::AuxDebugView::Ids);
+        std::set<std::uint32_t> distinct;
+        for (std::uint32_t y = 0; y < kH; y += 2) {
+            for (std::uint32_t x = 0; x < kW; x += 2) {
+                const std::uint8_t* p = ids.pixel(x, y);
+                distinct.insert((static_cast<std::uint32_t>(p[0]) << 16) |
+                                (static_cast<std::uint32_t>(p[1]) << 8) | p[2]);
+            }
+        }
+        INFO(distinct.size() << " distinct identifier colours");
+        // Background plus at least two objects. RendererQA has a floor, an alien and an orb in this
+        // view, so anything less than three means the view is not separating them.
+        CHECK(distinct.size() >= 3);
+    }
+
+    renderer.setAuxDebugView(rendering::AuxDebugView::None);
+    CHECK(ctx->errorCount() == 0);
+}
