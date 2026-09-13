@@ -88,7 +88,8 @@ std::string usageText() {
            "  --profile-csv <f>   write one row per frame (every phase) to <f> on exit\n"
            "  --capture <file>    write the last frame as a PPM image\n"
            "  --debug-target <t>  display an auxiliary render target: normal|roughness|velocity|\n"
-           "                      emission|ids|occlusion|depth\n"
+           "                      emission|ids|occlusion|depth|linear depth|depth edges|\n"
+           "                      object depth|overdraw|fragment density\n"
            "  --tier <t>          quality tier: preview|realtime|high|offline\n"
            "  --disable <list>    switch phases off for cost attribution, or subsystems off for\n"
            "                      forensic isolation:\n"
@@ -579,7 +580,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             rendering::AuxDebugView::Emission,  rendering::AuxDebugView::Ids,
             rendering::AuxDebugView::Occlusion, rendering::AuxDebugView::Depth,
             rendering::AuxDebugView::LinearDepth, rendering::AuxDebugView::DepthEdges,
-            rendering::AuxDebugView::ObjectDepth};
+            rendering::AuxDebugView::ObjectDepth, rendering::AuxDebugView::Overdraw,
+            rendering::AuxDebugView::FragmentDensity};
         bool found = false;
         for (const auto view : kViews) {
             if (options_.debugTarget == rendering::auxDebugViewName(view)) {

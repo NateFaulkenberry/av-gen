@@ -36,6 +36,8 @@ const char* auxDebugViewName(AuxDebugView view) {
     case AuxDebugView::LinearDepth: return "linear depth";
     case AuxDebugView::DepthEdges: return "depth edges";
     case AuxDebugView::ObjectDepth: return "object depth";
+    case AuxDebugView::Overdraw: return "overdraw";
+    case AuxDebugView::FragmentDensity: return "fragment density";
     }
     return "none";
 }
@@ -820,6 +822,27 @@ Result<void> SceneRenderer::createAuxTargets(std::uint32_t width, std::uint32_t 
     if (auto r = make(linearDepth_, kLinearDepthFormat, "aux-linear-depth"); !r) return r;
     linearDepthGroup_ = nullptr;
     auxDebugGroup_ = nullptr;
+
+    // ADR-115: the overdraw counter, one atomic<u32> per pixel. Sized here alongside the other
+    // auxiliary targets rather than lazily inside render() so the aux-debug bind group -- built once
+    // and shared across every view -- always has something valid at its storage-buffer binding, even
+    // when the overdraw views are never selected. The counting pass that fills it is still opt-in;
+    // only the allocation is unconditional.
+    {
+        const std::uint64_t bytes = static_cast<std::uint64_t>(width) * height * sizeof(std::uint32_t);
+        if (bytes != overdrawBufferBytes_) {
+            wgpu::BufferDescriptor bufferDesc{};
+            bufferDesc.label = "aux-overdraw-counts";
+            // CopySrc so tests and tools can read the raw counts back (readBuffer(), gpu/readback.hpp)
+            // rather than only judging the view through its rendered colours.
+            bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst |
+                               wgpu::BufferUsage::CopySrc;
+            bufferDesc.size = bytes;
+            overdrawBuffer_ = device.CreateBuffer(&bufferDesc);
+            overdrawBufferBytes_ = bytes;
+            overdrawGroup_ = nullptr;
+        }
+    }
     return {};
 }
 
@@ -845,6 +868,8 @@ Result<void> SceneRenderer::createPipelines() {
     if (!linear) return std::unexpected(linear.error());
     auto auxDebug = shaders_.load("aux_debug.wgsl");
     if (!auxDebug) return std::unexpected(auxDebug.error());
+    auto overdraw = shaders_.load("overdraw_count.wgsl");
+    if (!overdraw) return std::unexpected(overdraw.error());
     pbrModule_ = *pbr;
 
     auto a = createLitPipeline(*pbr, LitVariant::OpaqueCull);
@@ -871,6 +896,13 @@ Result<void> SceneRenderer::createPipelines() {
     if (auto x = createAuxDebugResources(*auxDebug); !x) {
         return std::unexpected(x.error());
     }
+    overdrawModule_ = *overdraw;
+    if (auto x = createOverdrawResources(); !x) {
+        return std::unexpected(x.error());
+    }
+    auto o = createOverdrawCountPipeline(*overdraw);
+    if (!o) return std::unexpected(o.error());
+    overdrawCountPipeline_ = *o;
     return {};
 }
 
@@ -1053,6 +1085,72 @@ Result<wgpu::RenderPipeline> SceneRenderer::createDepthOnlyPipeline(const wgpu::
     return finishPipeline(desc, "depth-only");
 }
 
+// ADR-115: the overdraw / fragment-density counting pass's own bind group layout and pipeline
+// layout -- group 0 frame, group 1 object (both the ordinary ones), group 2 nothing but the
+// counter buffer. It shares no bind group or pipeline with the real opaque pass on purpose: see
+// overdraw_count.wgsl for why writing that buffer from a fragment shader must stay off the normal
+// path.
+Result<void> SceneRenderer::createOverdrawResources() {
+    const auto& device = context_.device();
+    if (!overdrawLayout_) {
+        wgpu::BindGroupLayoutEntry entry{};
+        entry.binding = 0;
+        entry.visibility = wgpu::ShaderStage::Fragment;
+        entry.buffer.type = wgpu::BufferBindingType::Storage;
+        wgpu::BindGroupLayoutDescriptor layoutDesc{};
+        layoutDesc.label = "overdraw-layout";
+        layoutDesc.entryCount = 1;
+        layoutDesc.entries = &entry;
+        overdrawLayout_ = device.CreateBindGroupLayout(&layoutDesc);
+    }
+    std::array<wgpu::BindGroupLayout, 3> layouts = {frameLayout_, objectLayout_, overdrawLayout_};
+    wgpu::PipelineLayoutDescriptor layoutDesc{};
+    layoutDesc.label = "overdraw-pipeline-layout";
+    layoutDesc.bindGroupLayoutCount = layouts.size();
+    layoutDesc.bindGroupLayouts = layouts.data();
+    overdrawPipelineLayout_ = device.CreatePipelineLayout(&layoutDesc);
+    return {};
+}
+
+// Same vertex stage as the depth-only pipeline (so the geometry it counts is transformed exactly
+// as the real opaque pass would), a fragment stage that only touches the counter buffer, no colour
+// target, and `depthCompare = Always` with writes off: the depth attachment is present only because
+// a render pass needs one, and Always means every fragment reaches the shader whatever is already
+// in the buffer -- the disabled hidden-surface removal overdraw_count.wgsl's header explains.
+Result<wgpu::RenderPipeline> SceneRenderer::createOverdrawCountPipeline(const wgpu::ShaderModule& module) {
+    VertexLayoutStorage vertex;
+    wgpu::FragmentState fragment{};
+    fragment.module = module;
+    fragment.entryPoint = "fs_overdraw";
+    fragment.targetCount = 0;
+    fragment.targets = nullptr;
+    wgpu::DepthStencilState depth{};
+    depth.format = kDepthFormat;
+    depth.depthWriteEnabled = wgpu::OptionalBool::False;
+    depth.depthCompare = wgpu::CompareFunction::Always;
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "overdraw-count";
+    desc.layout = overdrawPipelineLayout_;
+    desc.vertex.module = module;
+    desc.vertex.entryPoint = "vs_main";
+    desc.vertex.bufferCount = 1;
+    desc.vertex.buffers = &vertex.layout;
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.frontFace = wgpu::FrontFace::CCW;
+    // Back-face culled, like the real opaque pass (LitVariant::OpaqueCull) -- not None, like the
+    // depth-only pipeline this otherwise mirrors. A closed mesh has a front face and a back face at
+    // every covered pixel; counting both would report two hits for one solid object sitting alone in
+    // the scene, which is not overdraw at all. Two-sided materials are outside this diagnostic's
+    // scope for the same reason the depth prepass's conservative culling doesn't matter here: this
+    // pass estimates depth complexity, not exact renderer cost.
+    desc.primitive.cullMode = wgpu::CullMode::Back;
+    desc.depthStencil = &depth;
+    desc.multisample.count = 1;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    return finishPipeline(desc, "overdraw-count");
+}
+
 Result<wgpu::RenderPipeline> SceneRenderer::createLinearDepthPipeline(const wgpu::ShaderModule& module) {
     const auto& device = context_.device();
     if (!linearDepthLayout_) {
@@ -1104,7 +1202,7 @@ Result<void> SceneRenderer::createAuxDebugResources(const wgpu::ShaderModule& mo
         auxDebugUniforms_ = device.CreateBuffer(&bufferDesc);
     }
     if (!auxDebugLayout_) {
-        std::array<wgpu::BindGroupLayoutEntry, 7> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 8> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -1116,6 +1214,10 @@ Result<void> SceneRenderer::createAuxDebugResources(const wgpu::ShaderModule& mo
                                                    : wgpu::TextureSampleType::UnfilterableFloat;
             entries[i].texture.viewDimension = wgpu::TextureViewDimension::e2D;
         }
+        // ADR-115: the overdraw counter, read-only here -- only the counting pass writes it.
+        entries[7].binding = 7;
+        entries[7].visibility = wgpu::ShaderStage::Fragment;
+        entries[7].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         wgpu::BindGroupLayoutDescriptor layoutDesc{};
         layoutDesc.label = "aux-debug-layout";
         layoutDesc.entryCount = entries.size();
@@ -2884,6 +2986,60 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         ++stats_.state.pipelineBinds;
         ++stats_.state.bindGroupBinds;
     }
+    // ---- overdraw / fragment-density counting (ADR-115): opt-in, and only opt-in ----
+    //
+    // This pass exists only while one of the two views that read it is selected. It is not part of
+    // the normal frame at any quality tier, because the technique it uses -- a fragment shader that
+    // writes a storage buffer -- disables hidden-surface removal on the hardware this engine ships
+    // on (see overdraw_count.wgsl), and a diagnostic that costs the frame it is diagnosing is not a
+    // diagnostic worth having on by default.
+    if (auxDebugView_ == AuxDebugView::Overdraw || auxDebugView_ == AuxDebugView::FragmentDensity) {
+        encoder.ClearBuffer(overdrawBuffer_);
+        if (!overdrawGroup_) {
+            wgpu::BindGroupEntry entry{};
+            entry.binding = 0;
+            entry.buffer = overdrawBuffer_;
+            entry.size = overdrawBufferBytes_;
+            wgpu::BindGroupDescriptor desc{};
+            desc.label = "overdraw-group";
+            desc.layout = overdrawLayout_;
+            desc.entryCount = 1;
+            desc.entries = &entry;
+            overdrawGroup_ = context_.device().CreateBindGroup(&desc);
+        }
+        wgpu::RenderPassDepthStencilAttachment depth{};
+        depth.view = hdr_.depthView();
+        // Load, not clear: this pass must not disturb the real scene depth the rest of the frame
+        // still reads (linear depth, AO, water). `depthCompare = Always` in the pipeline means it
+        // never tests against it anyway -- the attachment is here because a render pass needs one.
+        depth.depthLoadOp = wgpu::LoadOp::Load;
+        depth.depthStoreOp = wgpu::StoreOp::Discard;
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = "overdraw-count-pass";
+        pass.colorAttachmentCount = 0;
+        pass.depthStencilAttachment = &depth;
+        pass.timestampWrites = timeline_->mark("overdraw", gpu::FrameTimeline::PassKind::Render);
+        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        rp.SetBindGroup(0, frameBindGroupAux_);
+        rp.SetBindGroup(2, overdrawGroup_);
+        rp.SetPipeline(overdrawCountPipeline_);
+        // Opaque geometry only (the same list the depth prepass draws), and skinned characters are
+        // skipped: this diagnostic answers "is static geometry overdrawing", the question the
+        // renderer-upgrade audit's quad-overdraw finding was about, not a complete fragment count
+        // for every subsystem. Procedural instances, SDFs, particles and transparency are outside
+        // its scope for now.
+        for (const auto& item : opaque) {
+            if (item.skinned()) {
+                continue;
+            }
+            const GpuMesh& mesh = meshes_[item.entity->mesh];
+            rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
+            rp.SetVertexBuffer(0, mesh.vertices);
+            rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
+            rp.DrawIndexed(mesh.indexCount);
+        }
+        rp.End();
+    }
     // ---- auxiliary-target debug view (ADR-035): one target full-screen, over the finished frame ----
     //
     // **After** the tone map, not before it, and that is a correction rather than a preference
@@ -2900,7 +3056,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             return std::unexpected(auxPipeline.error());
         }
         if (!auxDebugGroup_) {
-            std::array<wgpu::BindGroupEntry, 7> entries{};
+            std::array<wgpu::BindGroupEntry, 8> entries{};
             entries[0].binding = 0;
             entries[0].buffer = auxDebugUniforms_;
             entries[0].size = sizeof(AuxDebugUniforms);
@@ -2916,6 +3072,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             entries[5].textureView = ao_->output();
             entries[6].binding = 6;
             entries[6].textureView = linearDepth_.view;
+            entries[7].binding = 7;
+            entries[7].buffer = overdrawBuffer_;
+            entries[7].size = overdrawBufferBytes_;
             wgpu::BindGroupDescriptor desc{};
             desc.label = "aux-debug-group";
             desc.layout = auxDebugLayout_;

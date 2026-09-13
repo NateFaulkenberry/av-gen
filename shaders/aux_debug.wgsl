@@ -1,13 +1,23 @@
 // Debug display of the auxiliary render targets (ADR-035). A fullscreen pass drawn over the HDR
 // target just before tone mapping, so a target can be inspected in the same frame that produced it.
 // Modes: 1 normal, 2 roughness, 3 velocity, 4 emission, 5 identifiers, 6 occlusion, 7 depth,
-// 8 linear depth, 9 depth edges, 10 the selected object's depth.
+// 8 linear depth, 9 depth edges, 10 the selected object's depth, 11 overdraw, 12 fragment density.
 //
 // Mode 7 is the display this pass has always had: an exponential ramp over linear depth, legible
 // across a whole scene and useless for reading a number off it. Modes 8 to 10 are the readings a
 // forensic question needs, and they are separate views rather than one with a knob because each
 // answers a different question -- how far is that, where are the silhouettes, and is *this* object
 // where I think it is.
+//
+// Modes 11 and 12 (ADR-115) read `overdrawCounts`, a per-pixel atomic counter filled by a separate
+// opt-in pass (overdraw_count.wgsl) that runs only while one of these two views is selected -- see
+// that file for why the count has to come from its own pass rather than from this one. The two
+// modes are deliberately different pictures of the same buffer: 11 is the exact per-pixel count in
+// discrete colour bands (how many times *this* pixel was shaded, unmixed with its neighbours -- the
+// classic overdraw heatmap); 12 is a 3x3 spatial average in grayscale (how dense the shading load is
+// around this pixel). The two read the same data and disagree on purpose: a sub-pixel triangle shows
+// up in 11 as an isolated bright speckle and in 12 as a soft smear over the pixels around it, which
+// is the distinction between "this exact pixel was hit N times" and "this region is expensive".
 
 struct AuxDebugUniforms {
     info: vec4<f32>,  // x = mode, y = scale, zw = target size
@@ -21,6 +31,7 @@ struct AuxDebugUniforms {
 @group(0) @binding(4) var identifiers: texture_2d<u32>;
 @group(0) @binding(5) var occlusion: texture_2d<f32>;
 @group(0) @binding(6) var linear: texture_2d<f32>;
+@group(0) @binding(7) var<storage, read> overdrawCounts: array<u32>;
 
 struct FsIn {
     @builtin(position) clip: vec4<f32>,
@@ -147,6 +158,50 @@ fn fs_aux(in: FsIn) -> @location(0) vec4<f32> {
         let d = textureLoad(linear, texel, 0).r;
         let range = max(aux.depth.y / max(aux.info.y, 1e-3), 1e-3);
         return vec4<f32>(0.2, clamp(d / range, 0.0, 1.0), 0.9, 1.0);
+    }
+    if (mode == 11) {
+        // The overdraw heatmap: a discrete band per count, in the palette overdraw tools have used
+        // for years (RenderDoc, Xcode's GPU frame debugger) -- background black, then blue, cyan,
+        // green, yellow, red as the count climbs. `aux.info.y` (the view's scale knob) divides the
+        // raw count before banding, so a scene that overdraws 40x is legible at scale=8 without
+        // recompiling anything.
+        let width = u32(aux.info.z + 0.5);
+        let count = overdrawCounts[u32(texel.y) * width + u32(texel.x)];
+        if (count == 0u) {
+            return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+        }
+        let n = f32(count) / max(aux.info.y, 1.0);
+        if (n <= 1.0) {
+            return vec4<f32>(mix(vec3<f32>(0.0, 0.0, 0.3), vec3<f32>(0.0, 0.0, 1.0), n), 1.0);
+        }
+        if (n <= 2.0) {
+            return vec4<f32>(mix(vec3<f32>(0.0, 0.0, 1.0), vec3<f32>(0.0, 1.0, 1.0), n - 1.0), 1.0);
+        }
+        if (n <= 3.0) {
+            return vec4<f32>(mix(vec3<f32>(0.0, 1.0, 1.0), vec3<f32>(0.0, 1.0, 0.0), n - 2.0), 1.0);
+        }
+        if (n <= 4.0) {
+            return vec4<f32>(mix(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 1.0, 0.0), n - 3.0), 1.0);
+        }
+        return vec4<f32>(mix(vec3<f32>(1.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), clamp(n - 4.0, 0.0, 1.0)), 1.0);
+    }
+    if (mode == 12) {
+        // Fragment density: the same counter buffer as mode 11, spatially averaged over a 3x3
+        // neighbourhood and shown as grayscale rather than banded, so a field of small triangles
+        // reads as a smooth bright region instead of a scatter of individually-saturated pixels.
+        let width = i32(aux.info.z + 0.5);
+        let height = i32(aux.info.w + 0.5);
+        var sum: u32 = 0u;
+        for (var dy = -1; dy <= 1; dy = dy + 1) {
+            for (var dx = -1; dx <= 1; dx = dx + 1) {
+                let sx = clamp(texel.x + dx, 0, width - 1);
+                let sy = clamp(texel.y + dy, 0, height - 1);
+                sum = sum + overdrawCounts[u32(sy) * u32(width) + u32(sx)];
+            }
+        }
+        let density = f32(sum) / 9.0;
+        let n = clamp(density / max(aux.info.y, 1.0), 0.0, 1.0);
+        return vec4<f32>(vec3<f32>(n), 1.0);
     }
     return vec4<f32>(0.0, 0.0, 0.0, 0.0);
 }
