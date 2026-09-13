@@ -88,16 +88,17 @@ capability AV Gen does not need).
 | 22 | Depth prepass may not justify itself | Apple confirms HSR makes a *performance-only* prepass redundant. **This one is kept**: it feeds the linear-depth target consumed by AO, water and fog, and costs 0.26 ms. |
 | — | Shadow mask as overhead | Removing it makes the scene pass **5.8 ms worse**. It stays. |
 
-## Out of scope for AV Gen
+## Not scheduled — tracked, not removed
 
-Real capabilities that a general-purpose engine needs and this one does not. Not refusals — judgements
-about what AV Gen is.
+**Nothing is removed from the spec.** These stay on the board with their reason, and any of them can
+be scheduled on request. They are real capabilities judged outside what AV Gen needs *today* — a
+statement about sequencing and about what this engine is, not a refusal.
 
-| § | Item | Why not |
+| § | Item | Why not scheduled |
 |---|---|---|
-| 15 | World streaming with residency levels | AV Gen renders *authored cinematic scenes*, not open worlds. No scene exists that does not fit memory. The infrastructure cost is large and the need is hypothetical. **Revisit if a scene ever exceeds memory.** |
+| 15 | World streaming with residency levels | AV Gen renders *authored cinematic scenes*, not open worlds. No scene exists that does not fit memory. The infrastructure cost is large and the need is hypothetical. **Revisit if a scene ever exceeds memory — or on request.** |
 | 16 | Cinematic camera-aware streaming | Rides with streaming — but noted as AV Gen's genuine structural advantage over a game engine, and the first thing to build if §15 is ever justified. The camera path is known in advance, which almost no game engine can say. |
-| 45 | Stress scenes: City, Light Hell, Particle Hell | Game-engine stress profiles. AV Gen's content is organic and cinematic. **Building instead:** Dense Forest (culling, LOD, HLOD, overdraw), Open Vista (distant representation, cascades), Character scene, and the AV Gen Showcase — the four that exercise what this engine actually renders. |
+| 45 | Stress scenes: City, Light Hell, Particle Hell | Game-engine stress profiles. AV Gen's content is organic and cinematic. **Building 4 of the 10 first:** Dense Forest (culling, LOD, HLOD, overdraw), Open Vista (distant representation, cascades), Character, and the AV Gen Showcase — the four that exercise what this engine actually renders. The other three remain on the board. |
 | 46 | Scaling curves to 64× | Curves are being measured; the multiplier is scoped to what the content plausibly reaches. |
 
 ## Governing constraints, carried into every phase
