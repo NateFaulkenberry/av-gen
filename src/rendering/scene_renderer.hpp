@@ -164,6 +164,10 @@ constexpr std::uint32_t kMaxLights = 8; // the uniform fallback path (ADR-033); 
 // an exponential ramp, legible across a whole scene and useless for reading a number off. The three
 // after it are the ones a forensic question needs: metres against the far plane, where the depth
 // buffer has silhouettes, and the selected object's own depth with everything else removed.
+// Overdraw and FragmentDensity (ADR-115) are the fragment-density diagnostics: how many times each
+// pixel was shaded, not what a visible surface looks like. They are backed by their own opt-in
+// counting pass (overdraw_count.wgsl) rather than by a target every frame writes -- see that file's
+// header for why a fragment shader that counts cannot be part of the normal path.
 enum class AuxDebugView : std::uint8_t {
     None,
     Normal,
@@ -176,6 +180,8 @@ enum class AuxDebugView : std::uint8_t {
     LinearDepth,
     DepthEdges,
     ObjectDepth,
+    Overdraw,
+    FragmentDensity,
 };
 [[nodiscard]] const char* auxDebugViewName(AuxDebugView view);
 
@@ -466,6 +472,9 @@ public:
     // holds `kClusterCount` counts followed by `kMaxLightsPerCluster` indices per cluster.
     [[nodiscard]] const wgpu::Buffer& lightBuffer() const { return lightBuffer_; }
     [[nodiscard]] const wgpu::Buffer& clusterBuffer() const { return clusterBuffer_; }
+    // The overdraw counter (ADR-115): one u32 per pixel of the render target, valid after a frame
+    // rendered with AuxDebugView::Overdraw or ::FragmentDensity selected (tools and tests).
+    [[nodiscard]] const wgpu::Buffer& overdrawBuffer() const { return overdrawBuffer_; }
 
     // The 2D composition (ADR-083). The one hook the renderer offers whatever draws over the
     // finished picture: it is called after the tone map has written `target` and before the frame
@@ -530,6 +539,11 @@ private:
     Result<wgpu::RenderPipeline> createLinearDepthPipeline(const wgpu::ShaderModule& module);
     Result<void> createAuxDebugResources(const wgpu::ShaderModule& module);
     [[nodiscard]] Result<wgpu::RenderPipeline> auxDebugPipelineFor(wgpu::TextureFormat format);
+    // ADR-115: the opt-in overdraw / fragment-density counting pass. See overdraw_count.wgsl for why
+    // it is a separate pipeline layout (frame + object + its own storage buffer) rather than a
+    // variant of the ordinary opaque pipelines.
+    Result<void> createOverdrawResources();
+    Result<wgpu::RenderPipeline> createOverdrawCountPipeline(const wgpu::ShaderModule& module);
     void rebuildFrameBindGroups();
     // Packs this frame's lights, uploads them and encodes the cluster build.
     void updateLights(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const glm::mat4& view,
@@ -635,6 +649,17 @@ private:
     wgpu::ShaderModule pbrModule_;
     wgpu::ShaderModule tonemapModule_;
     std::unordered_map<std::uint32_t, wgpu::RenderPipeline> tonemapPipelines_;
+
+    // ADR-115: overdraw / fragment-density counting. `overdrawBuffer_` is a viewport-sized array of
+    // atomic<u32>, one per pixel, resized alongside the other auxiliary targets; the counting pass
+    // that writes it is encoded only while the view is selected (see render()).
+    wgpu::ShaderModule overdrawModule_;
+    wgpu::BindGroupLayout overdrawLayout_;      // group 2: the storage buffer alone
+    wgpu::PipelineLayout overdrawPipelineLayout_;
+    wgpu::RenderPipeline overdrawCountPipeline_;
+    wgpu::Buffer overdrawBuffer_;
+    std::uint64_t overdrawBufferBytes_ = 0;
+    wgpu::BindGroup overdrawGroup_;
 
     wgpu::Buffer frameUniforms_;
     wgpu::Buffer lightBuffer_;        // group 0 binding 1: the packed scene lights

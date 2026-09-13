@@ -215,7 +215,12 @@ TEST_CASE("a phase that does not run is absent from the timeline", "[timeline][g
     CHECK(ctx->errorCount() == 0);
 }
 
-TEST_CASE("a pass's timeline number responds to that pass's own workload", "[timeline][gpu]") {
+// [.perf]: the assertion below is a magnitude comparison (heavy > light * 2), not a structural or
+// bookkeeping check, so it is sensitive to whatever else is on the GPU or the machine at the time --
+// including a second process outside this ctest invocation entirely, which `RESOURCE_LOCK gpu`
+// (tests/CMakeLists.txt) cannot see. Hidden from a plain `ctest` run for the same reason every other
+// magnitude/ratio timing test in this repo is (see test_frame_profiler_gpu.cpp's header).
+TEST_CASE("a pass's timeline number responds to that pass's own workload", "[.perf][timeline][gpu]") {
     auto ctx = makeContext();
     gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
     auto renderer = makeRenderer(*ctx, shaders);

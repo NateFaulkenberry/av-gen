@@ -28,10 +28,13 @@
 
 #include <chrono>
 #include <array>
+#include <algorithm>
 #include <bit>
 #include <functional>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
+#include <numeric>
 #include <set>
 #include <optional>
 #include <ranges>
@@ -600,8 +603,13 @@ TEST_CASE("the same second produces the same frame however it was reached",
     CHECK(differing == 0);
 }
 
+// `[.perf]`, not the plain `[performance]` this used to carry: `CHECK(hundred.cpuBuildMs < 1.0)`
+// below is a wall-clock threshold, so -- like every other timing test in this repo -- it is hidden
+// from a default `ctest` run rather than left for `RESOURCE_LOCK gpu` to protect, since that lock
+// only keeps this project's own GPU tests from overlapping each other and has no way to see a
+// second process (another agent's render, a concurrent ctest invocation) on the same machine.
 TEST_CASE("a hundred text layers stay one pass and a handful of draws",
-          "[gpu][composition][performance]") {
+          "[gpu][composition][.perf]") {
     Harness h = Harness::make();
     const scene::Scene scene = blackScene();
     // 1080p, because a cost per pixel is the only cost this pass really has, and quoting it at
@@ -3078,6 +3086,14 @@ TEST_CASE("every auxiliary debug view shows something of its own",
 
     aimCompositionCamera(engine.params(), glm::vec3(0.0f, 3.0f, 10.0f), glm::vec3(0.0f, 1.0f, -4.0f));
 
+    // Overdraw and FragmentDensity (ADR-115) are deliberately not in this list: their counting pass
+    // only sees plain, non-skinned opaque *entities*, and every visible thing in RendererQA is
+    // either procedural (the floor grid, the two boxes, the sphere), the orb (a blended/SDF surface)
+    // or the alien (a skinned gltf) -- none of which reach it, so the view would legitimately come
+    // back blank here and the blank-view assertion below would fail for a reason that has nothing to
+    // do with the views being broken. They get their own test, built on plain mesh entities that are
+    // inside the diagnostic's documented scope: "overdraw and fragment density count submitted
+    // fragments, not visible ones" below.
     const rendering::AuxDebugView views[] = {
         rendering::AuxDebugView::None,      rendering::AuxDebugView::Normal,
         rendering::AuxDebugView::Roughness, rendering::AuxDebugView::Velocity,
@@ -3339,6 +3355,144 @@ TEST_CASE("every auxiliary debug view shows something of its own",
             CHECK(skyClaimed == 0);
         }
         renderer.setDiagnosticEntity("");
+    }
+
+    renderer.setAuxDebugView(rendering::AuxDebugView::None);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- ADR-115: overdraw and fragment density -------------------------------------------------------
+//
+// The one property that matters for these two views is the one the task brief calls out by name: a
+// view that always shows the same thing is worse than none. So rather than judging the rendered
+// picture alone, this reads the counter buffer the views are built on (gpu::readBuffer, the same
+// technique test_shadows_gpu.cpp uses on the cluster buffer) and checks the actual per-pixel counts
+// against two scenes built to differ in exactly one way: five cubes stacked so every one of them
+// covers the same screen pixels, against the same five cubes spread out so none of them do.
+TEST_CASE("overdraw and fragment density count submitted fragments, not visible ones",
+          "[gpu][composition][forensics][views]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    constexpr std::uint32_t kW = 128;
+    constexpr std::uint32_t kH = 96;
+    const FrameTime time{};
+
+    const auto buildScene = [&](bool overlapping) {
+        scene::Scene scene;
+        const auto mesh = scene.addMesh(scene::makeCube(1.0f));
+        for (int i = 0; i < 5; ++i) {
+            scene::Entity& cube = scene.addEntity("cube" + std::to_string(i), mesh);
+            // Overlapping: every cube sits on the camera's centre ray, at a different depth, so all
+            // five cover the same pixels and a pixel there is shaded five times. Spread: the same
+            // five cubes offset sideways by more than their own width, so none of them share a pixel
+            // with another and every covered pixel is shaded once.
+            cube.transform.position = overlapping ? glm::vec3(0.0f, 0.0f, -static_cast<float>(i) * 0.2f)
+                                                  : glm::vec3(static_cast<float>(i) * 3.0f - 6.0f, 0.0f, 0.0f);
+            cube.material.baseColor = {0.6f, 0.6f, 0.6f};
+        }
+        scene.camera.position = {0.0f, 0.0f, 12.0f};
+        scene.camera.target = {0.0f, 0.0f, 0.0f};
+        scene::PunctualLight& key = scene.lights.emplace_back();
+        key.type = scene::PunctualLight::Type::Directional;
+        key.direction = glm::normalize(glm::vec3(-0.4f, -0.8f, -0.4f));
+        key.intensity = 3.0f;
+        return scene;
+    };
+
+    const auto readCounts = [&](rendering::AuxDebugView view, const scene::Scene& scene) {
+        renderer.setAuxDebugView(view);
+        auto image = renderer.renderToImage(scene, time, kW, kH);
+        REQUIRE(image.has_value());
+        auto raw = gpu::readBuffer(*ctx, renderer.overdrawBuffer(), 0,
+                                   static_cast<std::uint64_t>(kW) * kH * sizeof(std::uint32_t));
+        REQUIRE(raw.has_value());
+        std::vector<std::uint32_t> counts(static_cast<std::size_t>(kW) * kH);
+        std::memcpy(counts.data(), raw->data(), raw->size());
+        return counts;
+    };
+    // The average count *over pixels the geometry actually touched*, not over the whole frame. A
+    // plain sum conflates two different things: how many times a covered pixel was shaded, and how
+    // much of the screen is covered at all -- and the spread scene covers roughly five times the
+    // screen area the stacked scene does, so its sum would win even though every one of its pixels
+    // is shaded exactly once. This is the number overdraw is actually defined by.
+    const auto meanOverCovered = [](const std::vector<std::uint32_t>& counts) {
+        std::uint64_t sum = 0;
+        std::uint64_t covered = 0;
+        for (const std::uint32_t c : counts) {
+            sum += c;
+            covered += c > 0 ? 1 : 0;
+        }
+        return covered > 0 ? static_cast<double>(sum) / static_cast<double>(covered) : 0.0;
+    };
+
+    const scene::Scene overlapping = buildScene(true);
+    const scene::Scene spread = buildScene(false);
+
+    SECTION("the counting pass does not run for an ordinary view") {
+        // The whole point of making this an opt-in pass is that it must not touch the buffer, let
+        // alone the frame, unless one of the two views that read it is selected.
+        renderer.setAuxDebugView(rendering::AuxDebugView::None);
+        auto image = renderer.renderToImage(overlapping, time, kW, kH);
+        REQUIRE(image.has_value());
+        auto raw = gpu::readBuffer(*ctx, renderer.overdrawBuffer(), 0,
+                                   static_cast<std::uint64_t>(kW) * kH * sizeof(std::uint32_t));
+        REQUIRE(raw.has_value());
+        std::vector<std::uint32_t> counts(static_cast<std::size_t>(kW) * kH);
+        std::memcpy(counts.data(), raw->data(), raw->size());
+        const std::uint64_t total = std::accumulate(counts.begin(), counts.end(), std::uint64_t{0});
+        INFO("total count with an ordinary view selected: " << total);
+        CHECK(total == 0);
+    }
+
+    SECTION("overdraw counts more fragments per covered pixel for the overlapping scene") {
+        const auto overlapCounts = readCounts(rendering::AuxDebugView::Overdraw, overlapping);
+        const auto spreadCounts = readCounts(rendering::AuxDebugView::Overdraw, spread);
+        const double overlapMean = meanOverCovered(overlapCounts);
+        const double spreadMean = meanOverCovered(spreadCounts);
+        const std::uint32_t overlapMax = *std::max_element(overlapCounts.begin(), overlapCounts.end());
+        const std::uint32_t spreadMax = *std::max_element(spreadCounts.begin(), spreadCounts.end());
+        INFO("overlapping: mean " << overlapMean << ", max " << overlapMax << "; spread: mean " << spreadMean
+                                   << ", max " << spreadMax);
+        // Both scenes draw the same five cubes covering (as it happens) close to the same total
+        // screen area, so the pixel-count sum alone would not separate them; the average shading
+        // count *per covered pixel* is the number that actually says "these overlap and those don't".
+        CHECK(overlapMean > spreadMean);
+        // The strongest version of the same claim: some pixel was shaded five times (once per cube,
+        // back faces culled so a lone cube contributes exactly one) in the overlapping scene, where
+        // the spread scene -- five cubes that share no pixel with each other -- never shades a pixel
+        // more than once.
+        CHECK(overlapMax >= 5);
+        CHECK(spreadMax == 1);
+    }
+
+    SECTION("fragment density is a different picture of the same data, and it too tracks overlap") {
+        // Mode 12 is a spatial average of the same counter, not a copy of mode 11 -- so the two
+        // rendered images must differ from each other, and the density view must still separate the
+        // two scenes the way the raw counter does.
+        renderer.setAuxDebugScale(1.0f);
+        const gpu::Image8 overdrawImage = [&] {
+            renderer.setAuxDebugView(rendering::AuxDebugView::Overdraw);
+            auto image = renderer.renderToImage(overlapping, time, kW, kH);
+            REQUIRE(image.has_value());
+            return std::move(*image);
+        }();
+        const gpu::Image8 densityImage = [&] {
+            renderer.setAuxDebugView(rendering::AuxDebugView::FragmentDensity);
+            auto image = renderer.renderToImage(overlapping, time, kW, kH);
+            REQUIRE(image.has_value());
+            return std::move(*image);
+        }();
+        CHECK(gpu::hashImage(overdrawImage) != gpu::hashImage(densityImage));
+
+        const auto overlapCounts = readCounts(rendering::AuxDebugView::FragmentDensity, overlapping);
+        const auto spreadCounts = readCounts(rendering::AuxDebugView::FragmentDensity, spread);
+        const double overlapMean = meanOverCovered(overlapCounts);
+        const double spreadMean = meanOverCovered(spreadCounts);
+        INFO("overlapping mean " << overlapMean << ", spread mean " << spreadMean);
+        CHECK(overlapMean > spreadMean);
     }
 
     renderer.setAuxDebugView(rendering::AuxDebugView::None);
