@@ -135,3 +135,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [128](ADR-128-the-object-cap-is-an-allocation-policy.md) | The object cap is an allocation policy, not a constant | Accepted |
 | [129](ADR-129-object-data-stays-a-uniform-buffer.md) | Object data stays a uniform buffer until multi-draw indirect exists | Accepted |
 | [130](ADR-130-the-object-ceiling-is-a-budget-below-the-naming-limit.md) | What remains of the object ceiling is a byte budget, kept below the naming limit | Accepted |
+| [131](ADR-131-the-cheap-half-of-the-curve-is-not-measurable.md) | The cheap half of the fragment curve is not measurable, and the target stays where it is | Accepted |

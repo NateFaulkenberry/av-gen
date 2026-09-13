@@ -195,7 +195,14 @@ TEST_CASE("scene-pass cost against triangle density at constant coverage", "[.pe
 
     // Sides chosen so triangle area crosses the quad-overdraw threshold (4 px) in the middle of the
     // sweep: at 1.02 Mpx, 4 px per triangle is ~256k triangles, i.e. side ~358.
-    for (const std::uint32_t side : {1u, 8u, 32u, 90u, 180u, 256u, 360u, 512u, 720u, 1024u}) {
+    //
+    // Sides 2, 4 and 16 (8, 32 and 512 triangles) fill the sparse region to the RIGHT of the
+    // minimum, which ADR-124 flagged as its weakest evidence: the rise there rested on a single
+    // point, and a ceiling resting on one sample is a guess with a number attached. Note ADR-124
+    // overstates the gap as "no samples at all" between 500 and 512,000 px/triangle -- side 8 sits
+    // inside it at 8,000 -- and its quoted px/triangle for these arms are computed from half the
+    // real pixel count. The gap is real; it was one point wide, not empty.
+    for (const std::uint32_t side : {1u, 2u, 4u, 8u, 16u, 32u, 90u, 180u, 256u, 360u, 512u, 720u, 1024u}) {
         const Sample s = measureAt(*ctx, shaders, side);
         const double perTriangle = pixels / static_cast<double>(s.triangles);
         std::printf("  %10llu  %12.3f  %10.3f  %10.3f  %8u %8llu\n",
