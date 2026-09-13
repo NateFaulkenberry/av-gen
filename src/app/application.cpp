@@ -106,6 +106,9 @@ std::string usageText() {
            "  --ab <phase>        headless A/B: run baseline and <phase>-disabled interleaved in\n"
            "                      this one process (A/B/A/B) and report the paired difference.\n"
            "                      --ab none compares the baseline with itself: the noise floor\n"
+           "                      a phase may also be a quality arm (ADR-117), which changes a\n"
+           "                      QualitySettings field instead of removing a pass:\n"
+           "                      shadowrange, contact, pcss, maskfull\n"
            "  --ab-blocks <n>     A/B pairs to run (default 2)\n"
            "  --bench-json <f>    write the run's machine-readable record (percentiles, counters,\n"
            "                      and the conditions that make it comparable) to <f>\n"
@@ -2943,34 +2946,52 @@ int Application::runHeadless() {
     struct BenchBlock {
         std::string arm;
         rendering::SceneRenderer::PassToggles toggles;
+        // ADR-117: an arm may change a quality *setting* rather than remove a pass. Carried per
+        // block and re-applied at the top of every block, because a setting the renderer keeps is
+        // state and the SYM-TERRAIN-1 investigation produced four wrong attributions from a probe
+        // that measured state it had established only once.
+        rendering::QualitySettings quality;
         bool baseline = false;
     };
     const rendering::SceneRenderer::PassToggles baseToggles = renderer_->passToggles();
+    const rendering::QualitySettings baseQuality = renderer_->qualitySettings();
     std::vector<BenchBlock> schedule;
     if (!options_.abArm.empty()) {
         rendering::SceneRenderer::PassToggles armToggles = baseToggles;
+        rendering::QualitySettings armQuality = baseQuality;
         // `--ab none` is the null A/B: both arms are the baseline, so the difference it reports is
         // the harness measuring itself. It is the only honest way to state this mode's noise floor
         // -- the 2%/4% constants were calibrated from five separate *runs*, and a within-process
         // interleaved block is a different measurement with a different floor. A null A/B that
         // reports "A RESULT" is a broken harness, whatever it says about any real arm.
-        if (options_.abArm != "none" &&
+        const bool isQualityArm = rendering::SceneRenderer::setQualityArm(armQuality, options_.abArm);
+        if (options_.abArm != "none" && !isQualityArm &&
             !rendering::SceneRenderer::setPassArm(armToggles, options_.abArm, false)) {
-            log::error("--ab: unknown phase '{}' (one of: none,{})", options_.abArm,
-                       rendering::SceneRenderer::passArmNames());
+            log::error("--ab: unknown phase '{}' (one of: none,{},{})", options_.abArm,
+                       rendering::SceneRenderer::passArmNames(),
+                       rendering::SceneRenderer::qualityArmNames());
             return 2;
         }
+        const std::string armLabel = isQualityArm ? options_.abArm : "no-" + options_.abArm;
         for (int b = 0; b < options_.abBlocks; ++b) {
-            schedule.push_back({"baseline", baseToggles, true});
-            schedule.push_back({"no-" + options_.abArm, armToggles, false});
+            schedule.push_back({"baseline", baseToggles, baseQuality, true});
+            schedule.push_back({armLabel, armToggles, armQuality, false});
         }
-        log::info("A/B: {} pair(s) of baseline vs '{}' disabled, interleaved, {} frames each; "
-                  "a difference below {:.0f}% GPU or {:.0f}% wall is not a result",
-                  options_.abBlocks, options_.abArm, frames, rendering::kGpuNoiseFloorPercent,
-                  rendering::kWallNoiseFloorPercent);
+        if (isQualityArm) {
+            log::info("A/B: {} pair(s) of baseline vs quality arm '{}' -- {} -- interleaved, {} frames "
+                      "each; a difference below {:.0f}% GPU or {:.0f}% wall is not a result",
+                      options_.abBlocks, options_.abArm,
+                      rendering::SceneRenderer::qualityArmDescription(options_.abArm), frames,
+                      rendering::kGpuNoiseFloorPercent, rendering::kWallNoiseFloorPercent);
+        } else {
+            log::info("A/B: {} pair(s) of baseline vs '{}' disabled, interleaved, {} frames each; "
+                      "a difference below {:.0f}% GPU or {:.0f}% wall is not a result",
+                      options_.abBlocks, options_.abArm, frames, rendering::kGpuNoiseFloorPercent,
+                      rendering::kWallNoiseFloorPercent);
+        }
     } else {
         schedule.push_back({options_.disablePasses.empty() ? "baseline" : "disabled:" + options_.disablePasses,
-                            baseToggles, true});
+                            baseToggles, baseQuality, true});
     }
 
     // The conditions every record in this run shares. One session id per process is what makes the
@@ -3015,6 +3036,9 @@ int Application::runHeadless() {
     for (std::size_t blockIndex = 0; blockIndex < schedule.size(); ++blockIndex) {
         const BenchBlock& block = schedule[blockIndex];
         renderer_->setPassToggles(block.toggles);
+        // Re-established per block, not once: an arm that measures state has to put the state back
+        // before every measurement or it is measuring whatever the previous block left behind.
+        renderer_->setQualitySettings(block.quality);
         // Every block renders the same frame range from the same start, or the arms are not being
         // compared on the same work: a scene whose second 2 differs from its second 0 would put
         // the difference between two blocks into the difference between two arms.

@@ -433,6 +433,33 @@ public:
     // Every arm's name, comma separated -- for a message telling somebody what they may write.
     [[nodiscard]] static std::string passArmNames();
 
+    // ---- quality arms (ADR-117) -------------------------------------------------------------
+    //
+    // A *quality* arm is an A/B arm that changes `QualitySettings` rather than removing a pass.
+    // It exists because the two most decision-relevant questions in Phase B cannot be asked with
+    // a pass toggle: ADR-112's shortened shadow range is a *setting* (`shadowTexelTarget`, zero
+    // restores the pre-ADR-112 rule), and so are the contact march, PCSS and the mask's
+    // resolution. Before this, settling any of them meant a rebuild between the arms, which is
+    // exactly the block-not-interleaved evidence ADR-112 had to flag as weak about itself.
+    //
+    // The distinction from a `PassArm` is deliberate and is not cosmetic: a pass arm removes work
+    // the frame asked for and produces a frame nobody should ship, while a quality arm selects a
+    // configuration that is, by construction, shippable -- every one of these is a value the tier
+    // table already sets somewhere. So a quality arm may also be read as "what would this tier
+    // choice cost", which a pass toggle may not.
+    struct QualityArm {
+        const char* name;
+        void (*apply)(QualitySettings&);
+        const char* what; // what the arm does, for the log line that records the conditions
+    };
+    [[nodiscard]] static std::span<const QualityArm> qualityArms();
+    // Applies one arm by name to `settings`. False when the name is not one of `qualityArms()`.
+    [[nodiscard]] static bool setQualityArm(QualitySettings& settings, std::string_view name);
+    // Every quality arm's name, comma separated.
+    [[nodiscard]] static std::string qualityArmNames();
+    // What an arm does, or an empty view when the name is not an arm.
+    [[nodiscard]] static std::string_view qualityArmDescription(std::string_view name);
+
     // ADR-114: compute the froxel grid's occupancy on the CPU each frame. Off by default. It is
     // `kClusterCount * localLights` sphere-against-box tests on the submitting thread, so it
     // belongs to a diagnostic run and not to a timing one; `RenderStats::haveClusters` records
