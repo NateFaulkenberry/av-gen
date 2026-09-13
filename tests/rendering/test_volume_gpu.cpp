@@ -7,6 +7,7 @@
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
+#include "rendering/render_quality.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
 #include "spatial/field.hpp"
@@ -508,4 +509,104 @@ TEST_CASE("The styled ambient defaults are the constants the shader used to carr
             REQUIRE(luminanceAt(spoken, x, y) == luminanceAt(silent, x, y));
         }
     }
+}
+
+// ---- ADR-139: the march resolution and the step count are tier parameters -------------------
+//
+// Three properties, none of them a timing: the scale reaches the target and the target is the size
+// the scale asked for; the fog the frame renders is still the same fog at every scale (the gate a
+// timer cannot see is checked here as "distant surfaces are still fogged and near ones are not",
+// which is what the pass is *for*); and at 1.0 the composite's bilinear footprint collapses, so the
+// Offline tier's per-pixel march is not silently blurred back to half resolution.
+TEST_CASE("The volumetric march resolution follows the quality tier", "[volume][gpu]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    scene::Scene s = twoBoxScene();
+    enableFog(s, 0.04f);
+
+    struct Case {
+        float scale;
+        std::uint32_t expectedWidth;
+        std::uint32_t expectedHeight;
+        bool belowFull;
+    };
+    // kSize is 128, so these are exact; `scaledOf` rounds up, which is what keeps 0.5 identical to
+    // the historical `(v + 1) / 2` on odd sizes.
+    const Case cases[] = {
+        {1.0f, kSize, kSize, false},
+        {0.5f, kSize / 2, kSize / 2, true},
+        {0.25f, kSize / 4, kSize / 4, true},
+    };
+    for (const Case& c : cases) {
+        INFO("volumeResolutionScale " << c.scale);
+        rendering::QualitySettings q = renderer->qualitySettings();
+        q.volumeResolutionScale = c.scale;
+        renderer->setQualitySettings(q);
+        const gpu::ImageF foggy = renderFloat(*renderer, s);
+
+        // The scale reached the pass, and the record says what it reached it with.
+        CHECK(renderer->stats().volume.marchWidth == c.expectedWidth);
+        CHECK(renderer->stats().volume.marchHeight == c.expectedHeight);
+        CHECK(renderer->stats().volume.halfResolution == c.belowFull);
+        CHECK(renderer->stats().volume.resolutionScale == c.scale);
+
+        // And it is still the same fog: the far box attenuated, the near one nearly untouched.
+        // A scale that broke the march or the upsample would show up here and not in any timer.
+        const float nearFog = luminanceAt(foggy, kNearX, kMidY);
+        const float farFog = luminanceAt(foggy, kFarX, kMidY);
+        INFO("near " << nearFog << " far " << farFog);
+        CHECK(farFog < nearFog * 0.6f);
+        CHECK(nearFog > 0.03f);
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("The quality tier scales the authored march step count", "[volume][gpu]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    scene::Scene s = twoBoxScene();
+    enableFog(s, 0.04f); // volumeSteps = 48
+    rendering::QualitySettings q = renderer->qualitySettings();
+
+    q.volumeStepScale = 1.0f;
+    renderer->setQualitySettings(q);
+    (void)renderFloat(*renderer, s);
+    CHECK(renderer->stats().volume.steps == 48);
+
+    q.volumeStepScale = 0.5f;
+    renderer->setQualitySettings(q);
+    (void)renderFloat(*renderer, s);
+    CHECK(renderer->stats().volume.steps == 24);
+
+    // Clamped, not wrapped or zeroed: a march of no steps renders no fog at all, and a scale that
+    // silently reached zero would look exactly like the pass being switched off.
+    q.volumeStepScale = 0.001f;
+    renderer->setQualitySettings(q);
+    (void)renderFloat(*renderer, s);
+    CHECK(renderer->stats().volume.steps >= 1);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// §5.9: an offline render takes no shortcut. The two tiers that stand for "the reference picture"
+// march per pixel at the authored step count, and Preview -- the tier that is allowed to be cheap
+// -- is the only one that reduces either. Asserted on the tier table rather than on a frame,
+// because this is a statement about policy and a frame cannot distinguish 1.0 from 0.99.
+TEST_CASE("Offline and High march the volume at full resolution", "[volume]") {
+    using rendering::QualitySettings;
+    using rendering::QualityTier;
+    for (const QualityTier tier : {QualityTier::High, QualityTier::Offline}) {
+        const QualitySettings q = QualitySettings::forTier(tier);
+        CHECK(q.volumeResolutionScale == 1.0f);
+        CHECK(q.volumeStepScale == 1.0f);
+    }
+    const QualitySettings realtime = QualitySettings::forTier(QualityTier::Realtime);
+    CHECK(realtime.volumeResolutionScale == 0.5f); // exactly what shipped, and it must not move
+    CHECK(realtime.volumeStepScale == 1.0f);
+    const QualitySettings preview = QualitySettings::forTier(QualityTier::Preview);
+    CHECK(preview.volumeResolutionScale < realtime.volumeResolutionScale);
+    CHECK(preview.volumeStepScale < realtime.volumeStepScale);
 }

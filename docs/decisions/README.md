@@ -137,3 +137,8 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [130](ADR-130-the-object-ceiling-is-a-budget-below-the-naming-limit.md) | What remains of the object ceiling is a byte budget, kept below the naming limit | Accepted |
 | [131](ADR-131-the-cheap-half-of-the-curve-is-not-measurable.md) | The cheap half of the fragment curve is not measurable, and the target stays where it is | Accepted |
 | [132](ADR-132-spread-is-the-transition-mitigation.md) | Spread is the transition mitigation, and temporal AA is not a prerequisite | Accepted |
+| [139](ADR-139-the-volume-has-two-scalability-axes.md) | The volume has two scalability axes, they are tier parameters, and they do not divide evenly | Accepted |
+| [140](ADR-140-the-march-and-the-composite-are-two-costs.md) | The march and the composite are two costs, and one of them is below the instrument | Accepted |
+| [141](ADR-141-half-the-march-is-not-pixel-work.md) | Half the march is not pixel work, and Constellation's noise floor is not one number | Accepted |
+| [142](ADR-142-a-quality-arm-can-be-looked-at.md) | A quality arm can be looked at, not only timed | Accepted |
+| [143](ADR-143-temporal-reprojection-of-the-volume-is-rejected.md) | Temporal reprojection of the volume is rejected, because a policy parameter already reaches its ceiling | Accepted |
