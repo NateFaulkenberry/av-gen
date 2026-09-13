@@ -1757,3 +1757,171 @@ TEST_CASE("the alien's pose is the same second whichever way the playhead reache
     CHECK(comparisons > 0);
     CHECK(ctx->errorCount() == 0);
 }
+
+// ---- Phase 5.4: who writes a character's Y ------------------------------------------------------
+//
+// The plan asks whether more than one system writes a character's height in the same frame, and for
+// a terrain-crossing regression that proves there is no feedback loop and no one-frame
+// disappearance. Both are the same question: a character's Y is either derived from the ground it
+// stands on, once, or it is a value two systems argue about -- and the way that argument looks on
+// screen is a walker sinking, popping or vanishing for a frame as it crosses a slope.
+//
+// Glowmere is the instrument, because it is the only scene with a walker, a terrain and water in it.
+// Its `wanderer` is an `EntityWorld` character on a navigator built from the same `WorldMap` the
+// terrain was meshed from, which is the claim in the code: "a walker can never be above or below the
+// surface it is standing on, and never needs a second description of it kept in step by hand".
+//
+// Continuous playback only. ADR-091 declines to make a live-tier entity reproducible under a *seek*,
+// which is a different question and already recorded as a contract rather than a defect.
+TEST_CASE("a walker's height is the ground's, every frame, with no second writer",
+          "[gpu][composition][forensics][character][terrain]") {
+    const fs::path sceneFile = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-stylized.json";
+    if (!fs::is_regular_file(sceneFile)) {
+        SKIP("the Glowmere project is not present");
+    }
+    // The *project*, not the scene: the wanderer's first behaviour is `interest` on `music.impact`,
+    // so without a track it never picks a subject and never walks anywhere.
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(sceneFile).has_value());
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+
+    // The walkers: entities the EntityWorld drives, which are the ones whose Y is nobody's authored
+    // number. A scene with none would make everything below vacuous.
+    const auto walkers = [&]() {
+        std::vector<std::string> names;
+        for (const auto& e : composition->entityWorld().entities()) {
+            names.push_back(e->name());
+        }
+        return names;
+    }();
+    INFO(walkers.size() << " live entities");
+    REQUIRE_FALSE(walkers.empty());
+
+    struct Track {
+        glm::vec3 last{0.0f};
+        bool seen = false;
+        float worstAboveGround = 0.0f;
+        float worstBelowGround = 0.0f;
+        float worstJump = 0.0f;
+        float worstStepXZ = 0.0f;
+        float travelled = 0.0f;      // total ground distance covered over the run
+        float heightRange = 0.0f;    // how much its own height moved, high water mark to low
+        float lowest = std::numeric_limits<float>::max();
+        float highest = std::numeric_limits<float>::lowest();
+        std::size_t frames = 0;
+    };
+    std::map<std::string, Track> tracks;
+
+    // Playing, not merely advancing frames. `music.impact` is derived from the analysis at the
+    // *transport* position, and a stopped transport holds it at zero however many frames go past.
+    REQUIRE(engine.play().has_value());
+    constexpr int kFrames = 1800;   // thirty seconds at 60
+    for (int i = 0; i < kFrames; ++i) {
+        // Standing next to the walker, because an entity beyond its `cullDistance` from the view
+        // gets no update at all.
+        aimCompositionCamera(engine.params(), glm::vec3(150.0f, 30.0f, 20.0f),
+                             glm::vec3(165.0f, 23.0f, 20.0f));
+        FixedStepClock clock(60.0);
+        clock.restartAt(static_cast<double>(i) / 60.0);
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(192, 120);
+        engine.update(time);
+
+        const world::TerrainQuery query = composition->terrainQuery();
+        REQUIRE(query.map != nullptr);
+        for (const auto& e : composition->entityWorld().entities()) {
+            Track& t = tracks[e->name()];
+            // Anchor plus travel is where the entity actually is: the anchor is where the scene put
+            // it and `travel` is what navigation has written since.
+            const glm::vec3 at = e->state().anchor + e->state().travel;
+            const float ground = query.heightAt(glm::vec2(at.x, at.z));
+            const float above = at.y - ground;
+            t.worstAboveGround = std::max(t.worstAboveGround, above);
+            t.worstBelowGround = std::min(t.worstBelowGround, above);
+            if (t.seen) {
+                // A frame's step, split into the two questions that look identical in a plot: how
+                // far it travelled across the ground, and how far its height moved. A walker on a
+                // slope legitimately changes height, but only in proportion to how far it walked;
+                // a Y written by two systems moves without the walker going anywhere.
+                const float stepXZ = glm::length(glm::vec2(at.x - t.last.x, at.z - t.last.z));
+                t.worstStepXZ = std::max(t.worstStepXZ, stepXZ);
+                t.travelled += stepXZ;
+                const float unexplained = std::fabs(at.y - t.last.y) - stepXZ * 2.0f;
+                t.worstJump = std::max(t.worstJump, unexplained);
+            }
+            t.lowest = std::min(t.lowest, at.y);
+            t.highest = std::max(t.highest, at.y);
+            t.heightRange = t.highest - t.lowest;
+            t.last = at;
+            t.seen = true;
+            ++t.frames;
+        }
+    }
+
+    // The other path to the same second: a seek. `SYM-ENTITY-1` in the register -- the two paths do
+    // not agree about what thirty seconds does to an ambient walker, and this pins the size of the
+    // disagreement so a repair has something to move.
+    float seekedTravel = 0.0f;
+    float seekedSpeed = 0.0f;
+    {
+        app::Engine seeked(app::EngineMode::Offline);
+        REQUIRE(seeked.loadProject(sceneFile).has_value());
+        seeked.seekSeconds(30.0);
+        FixedStepClock clock(60.0);
+        clock.restartAt(30.0);
+        const FrameTime time = seeked.tick(clock);
+        seeked.setViewport(192, 120);
+        seeked.update(time);
+        for (const auto& e : seeked.composition()->entityWorld().entities()) {
+            const glm::vec3 t = e->state().travel;
+            seekedTravel = std::max(seekedTravel, glm::length(glm::vec2(t.x, t.z)));
+            seekedSpeed = std::max(seekedSpeed, e->state().speed);
+        }
+    }
+
+    std::size_t checked = 0;
+    float mostTravelled = 0.0f;
+    float mostHeightChange = 0.0f;
+    for (const auto& [name, t] : tracks) {
+        mostTravelled = std::max(mostTravelled, t.travelled);
+        mostHeightChange = std::max(mostHeightChange, t.heightRange);
+        INFO("entity '" << name << "': " << t.frames << " frames, height above ground in ["
+                        << t.worstBelowGround << ", " << t.worstAboveGround
+                        << "] m, worst unexplained height step " << t.worstJump
+                        << " m against a worst ground step of " << t.worstStepXZ << " m");
+        REQUIRE(t.frames == static_cast<std::size_t>(kFrames));
+        // On the ground it stands on. The band is generous on the upper side because a hovering
+        // craft is a legitimate entity in this scene and its height is *meant* to be above the
+        // terrain; what no entity may do is sink into it.
+        CHECK(t.worstBelowGround > -0.75f);
+        // No unexplained vertical movement. A slope contributes height in proportion to distance
+        // travelled -- a gradient of 2 is a cliff -- so anything past that is a writer that is not
+        // the ground.
+        CHECK(t.worstJump < 0.5f);
+        ++checked;
+    }
+    CHECK(checked > 0);
+    // `SYM-ENTITY-1`, pinned rather than asserted away.
+    //
+    // Nothing walked. Thirty seconds of playback -- with the project's audio loaded, the transport
+    // playing and the camera fifteen metres from the walker -- leaves Glowmere's `wanderer` at
+    // travel 0 and speed 0, activity Idle, while a *seek* to the same second puts it tens of metres
+    // away at exactly the `explore` behaviour's authored 5 m/s.
+    //
+    // Three hypotheses eliminated on the way: it is not the `cullDistance` band (the camera is well
+    // inside `fullDetailDistance`), not a missing track (the project loads one, and the first
+    // behaviour keys on `music.impact`), and not a stopped transport (the signals it reads come from
+    // the analysis at the transport position, and it is playing).
+    //
+    // The test asserts the disagreement it measured rather than the behaviour it wants, because a
+    // test that demanded walking would fail for a reason nobody has established yet. When the cause
+    // is found, this is the case to invert.
+    INFO("playback: furthest walked " << mostTravelled << " m, largest height change "
+                                      << mostHeightChange << " m. A seek to 30 s: " << seekedTravel
+                                      << " m at " << seekedSpeed << " m/s.");
+    CHECK(seekedTravel > 5.0f);           // the seek path does simulate
+    CHECK(seekedSpeed > 1.0f);
+    CHECK(mostTravelled < 0.01f);         // ...and the per-frame path does not. SYM-ENTITY-1.
+    CHECK(mostHeightChange < 0.01f);
+}

@@ -98,6 +98,7 @@ stays quotable.
 | `SYM-ANIM-1` | A character's pose jumps when the playhead is scrubbed | `examples/characters/alien.scene.json` | any seek | **Reproduced and fixed.** Frame 500 reached from frame 100 differed from frame 500 reached directly by 98 joint matrices. Root cause: the authored animation state's phase origin was the engine's first update. See the report. |
 | `SYM-ANIM-2` | The alien flickers or disappears near a frustum edge | Glowmere, alien | camera edge | **Not reproduced.** A 65-position sweep across the edge, each step rendered against a no-cull control, shows culling never removes a pixel the character would draw. Note the alien cannot discriminate bind-pose from posed bounds (a T-pose bind is wider); that property is tested separately against a rig that reaches past its bind pose. |
 | `SYM-WATER-1` | Water leaks past or intersects terrain incorrectly at a shoreline | Glowmere | shoreline, grazing angles | **Reproduced and fixed.** 135 of 3,538 drawn water vertices on `defaultWorld()` stood over dry ground carrying up to 2.94 m of claimed depth against a 0.75 m shore fade -- so the fade that hides the sheet's deliberate one-cell overhang returned fully opaque. A dry corner now reports the depth at itself, which is none. Separately, a six-view GPU shoreline test proves the renderer draws no water on dry land, negative-controlled by disabling water's depth compare. Mask/foam visualisations are still not built. |
+| `SYM-ENTITY-1` | An ambient walker never walks under per-frame updates, while a seek walks it | Glowmere (`wanderer`) | any playback | **Reproduced, cause not established.** 1,800 frames -- project audio loaded, transport playing, camera 15 m away -- leave it at travel 0, speed 0, activity Idle. A seek to the same second puts it tens of metres away at exactly the `explore` behaviour's authored 5 m/s. Eliminated: the `cullDistance` band, a missing track, a stopped transport. This also revises the earlier "live tier is not scrub-reproducible" reading: the divergence is not drift, it is one path simulating and the other standing still. |
 | `SYM-TIME-1` | GPU timing tests fail intermittently | any | `ctest -j4` | **Understood, not fixed.** Contention-sensitive; passes alone and at `-j2`. Same root cause as the reproducibility limitation. |
 
 ### 0.2 Define evidence standards
@@ -546,9 +547,21 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 
 ### 5.4 Character terrain ownership
 
-- `[ ]` Document ownership of character X/Z, terrain height, root motion, visual offset and foot offset.
-- `[ ]` Detect multiple systems writing Y in the same frame.
-- `[ ]` Add a terrain-crossing regression that proves no feedback loop or one-frame disappearance.
+- `[~]` Document ownership of character X/Z, terrain height, root motion, visual offset and foot offset.
+  X/Z is `EntityState::anchor + travel` -- the anchor is where the scene put it and navigation writes
+  the travel. Y comes from the navigator, which is built from the same `WorldMap` the terrain was
+  meshed from, so there is one description of the ground rather than two kept in step. Root motion,
+  visual offset and foot offset are not yet traced.
+- `[x]` Detect multiple systems writing Y in the same frame.
+  `tests/rendering/test_composition_gpu.cpp`, `[gpu][composition][forensics][character][terrain]`:
+  over 1,800 frames, every live entity's height is compared against `TerrainQuery::heightAt` at its
+  own X/Z, and each frame's height change is compared against the ground distance it covered. A
+  second writer shows as height moving without the walker going anywhere. None does.
+- `[!]` Add a terrain-crossing regression that proves no feedback loop or one-frame disappearance.
+  **Blocked by `SYM-ENTITY-1`:** nothing walks under per-frame updates, so there is no crossing to
+  regress. The test above pins the disagreement instead of asserting the behaviour it wants, because
+  a test demanding a walk would fail for a reason nobody has established. Invert it when the cause is
+  found.
 - `[ ]` Record whether animation, terrain, physics and sequencer writes are authoritative or derived.
 
 ## Phase 6: Water, terrain, transparency and depth isolation

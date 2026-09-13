@@ -221,6 +221,18 @@ classifying nothing as live.
 **Residual risk:** the live tier is identified by "driven by `EntityWorld`". If a *baked* actor were
 ever driven through the same path it would be silently excused by this test.
 
+**Revised 13 September, and the revision matters.** The 25 m was read above as the live tier
+*drifting* -- two simulations of the same seconds landing apart. It is not. Measured directly:
+1,800 frames of playback with the project's audio loaded, the transport playing and the camera 15 m
+from the walker leave it at travel 0, speed 0, activity Idle, while a seek to the same second puts it
+tens of metres away at exactly the `explore` behaviour's authored 5 m/s. One path simulates and the
+other stands still.
+
+ADR-091 still covers the *conclusion* -- a live-tier entity is not frame-accurate under a scrub -- but
+not for the reason recorded here, and "the walker never walks" is a defect rather than a contract.
+Registered as `SYM-ENTITY-1`; the cause is not established, with the cull-distance band, a missing
+track and a stopped transport all eliminated.
+
 ## Diagnostics delivered
 
 - Selected-object renderer snapshot with world TRS/matrix, bounds, camera state, cull reason,
