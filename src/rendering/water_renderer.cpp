@@ -1,5 +1,9 @@
 #include "rendering/water_renderer.hpp"
 
+#include "core/log.hpp"
+
+#include <cmath>
+
 #include "gpu/context.hpp"
 #include "gpu/shader_library.hpp"
 #include "rendering/scene_targets.hpp"
@@ -37,6 +41,41 @@ struct VertexLayoutStorage {
 WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, float fastest,
                                 bool linearDepthValid) {
     WaterUniforms u;
+    // The last of the four doors NaN walked through (forensics 9.3). Every `std::max` and
+    // `std::clamp` below is a comparison, and a NaN loses every comparison it takes part in -- so
+    // the floors that look like guards here are not guards at all: `std::max(NaN, 1e-3f)` is NaN.
+    // What arrives on the GPU is a surface whose depth falloff, ripple scale or opacity is not a
+    // number, and water shades a whole region of the frame, so it is the one surface in the engine
+    // where a single bad value can take the picture with it.
+    //
+    // Refused whole rather than field by field: a water surface with one arbitrary field replaced is
+    // a surface nobody authored, and "the water looks wrong" is a harder report to act on than "the
+    // water is missing and the log says why".
+    const auto finite3 = [](const glm::vec3& v) {
+        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+    };
+    const float scalars[] = {s.shallow,   s.clarity,    s.foam,      s.glow,       s.sparkle,
+                             s.reflection, s.fresnel,   s.specular,  s.roughness,  s.maxOpacity,
+                             s.ripple,    s.rippleScale, s.rippleSpeed, s.chop,     s.foamWidth,
+                             s.edgeFade,  s.refraction, s.glowScale, s.glowCoverage, s.glowDepth,
+                             s.swell,     s.emissiveIntensity, flowTime, fastest};
+    bool ok = finite3(s.shallowColor) && finite3(s.deepColor) && finite3(s.foamColor) &&
+              finite3(s.glowColor) && finite3(s.sparkleColor) && finite3(s.reflectionTint) &&
+              finite3(s.emissiveColor);
+    for (const float v : scalars) {
+        ok = ok && std::isfinite(v);
+    }
+    if (!ok) {
+        log::warn("water: a non-finite surface setting; drawing no water this frame rather than "
+                  "shading one nobody authored");
+        u.shallowColor = glm::vec4(0.0f);
+        u.deepColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        u.surface = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f); // maxOpacity 0: the surface contributes nothing
+        u.ripples = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+        u.life = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+        u.params = glm::vec4(0.0f, 1.0f, linearDepthValid ? 1.0f : 0.0f, 0.0f);
+        return u;
+    }
     u.shallowColor = glm::vec4(s.shallowColor, std::max(s.shallow, 1e-3f));
     u.deepColor = glm::vec4(s.deepColor, std::max(s.clarity, 1e-3f));
     u.foamColor = glm::vec4(s.foamColor, s.foam);

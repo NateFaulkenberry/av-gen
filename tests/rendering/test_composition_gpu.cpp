@@ -1386,6 +1386,106 @@ TEST_CASE("Glowmere's static geometry holds still under every camera motion",
     INFO(comparisons << " transform comparisons over " << frame << " frames");
     CHECK(comparisons > 5000);
 
+    // ---- the other three axes, on Glowmere itself -------------------------------------------
+    //
+    // The camera axis is above. This is the same claim with the camera *parked* and the other three
+    // variables moving in turn -- the transport, the resolution and a reload -- which is the matrix
+    // RendererQA already has and which the plan asks for on the real world with the reported object
+    // in it. Glowmere is the harder case on purpose: 278 entities, a live entity tier that has to be
+    // excluded, and the visitor procedural the original report was about.
+    //
+    // The claim is not "nothing ever moves" -- this scene animates -- but the sharper one: **a
+    // static node is at the same place at second four however the playhead reached it, whatever
+    // size the frame is, and after the scene has been rebuilt from disk.**
+    {
+        const glm::vec3 parked{-45.0f, 33.0f, 120.0f};
+        const glm::vec3 at{-45.0f, 31.7f, 185.0f};
+        std::uint32_t width = kW;
+        std::uint32_t height = kH;
+        const auto renderAt = [&](double seconds, bool seek) {
+            if (seek) {
+                engine.seekSeconds(seconds);
+            }
+            FixedStepClock clock(60.0);
+            clock.restartAt(seconds);
+            const FrameTime time = engine.tick(clock);
+            aimCompositionCamera(engine.params(), parked, at);
+            engine.setViewport(width, height);
+            engine.update(time);
+            if (seek) {
+                renderer.resetTemporalHistory();
+            }
+            auto image = renderer.renderToImage(engine.scene(), time, width, height);
+            REQUIRE(image.has_value());
+        };
+
+        std::size_t axisComparisons = 0;
+        const auto compareAll = [&](const char* what) {
+            INFO(what);
+            for (const auto& [name, matrix] : nodeWorld) {
+                const scene::CompositionNode* node = composition->findNode(name);
+                REQUIRE(node != nullptr);
+                INFO("node '" << name << "'");
+                REQUIRE(composition->nodeWorldTransform(*node).matrix() == matrix);
+                ++axisComparisons;
+            }
+            for (const scene::Entity& e : engine.scene().entities) {
+                if (isLive(e.name)) {
+                    continue;
+                }
+                for (const auto& [name, matrix] : entityWorld) {
+                    if (e.name == name) {
+                        INFO("entity '" << name << "'");
+                        REQUIRE(e.transform.matrix() == matrix);
+                        ++axisComparisons;
+                    }
+                }
+            }
+        };
+
+        // Axis one: the transport. Away and back, in both directions, past the end and to zero --
+        // each excursion returning to the second the baseline was taken at.
+        const double excursions[] = {9.0, 0.0, 2.5, 120.0, 4.5, 1.0};
+        for (const double away : excursions) {
+            renderAt(away, true);
+            renderAt(kFixedSecond, true);
+            compareAll("after a seek away and back");
+        }
+
+        // A scrub: many small steps, alternating direction, then back. A seek that leaked state
+        // would accumulate over this where a single jump might not show it.
+        for (int i = 0; i < 24; ++i) {
+            const double target = kFixedSecond + ((i % 2 == 0) ? 0.05 : -0.05) * static_cast<double>(i);
+            renderAt(std::max(0.0, target), true);
+        }
+        renderAt(kFixedSecond, true);
+        compareAll("after a 24-step scrub");
+
+        // Axis two: the resolution. Sizes chosen to be awkward rather than round.
+        const std::pair<std::uint32_t, std::uint32_t> sizes[] = {
+            {97, 61}, {320, 180}, {64, 64}, {193, 121}, {kW, kH}};
+        for (const auto& [w, h] : sizes) {
+            width = w;
+            height = h;
+            renderAt(kFixedSecond, false);
+            compareAll("after a resize");
+        }
+        REQUIRE(width == kW);
+
+        // Axis three: a reload. The composition is rebuilt from disk, so every node, entity and
+        // procedural is a different object in memory that has to land in the same place.
+        for (int i = 0; i < 2; ++i) {
+            REQUIRE(engine.loadComposition(sceneFile).has_value());
+            composition = engine.composition();
+            REQUIRE(composition != nullptr);
+            renderAt(kFixedSecond, true);
+            compareAll("after a reload");
+        }
+
+        INFO(axisComparisons << " transform comparisons across the transport, resize and reload axes");
+        CHECK(axisComparisons > 2000);
+    }
+
     // And the other half of the answer: with the *camera* held still and time advancing, the visitor
     // does change -- it is an animated procedural. Its translation never moves; its orientation does.
     //

@@ -225,7 +225,15 @@ material is now replaced with magenta rather than dropped, because a vanished ob
 report to act on. Nine fields, each poisoned in turn, in
 `[gpu][composition][forensics][guards]`.
 
-**Residual risk:** water state and the diagnostic snapshot are still unguarded.
+A sixth, and the one that looked safest: `waterUniformsFrom`. Its packing is full of
+`std::max(x, 1e-3f)` and `std::clamp(x, 0.02f, 1.0f)` floors that read exactly like guards, and none
+of them were -- `std::max(NaN, 1e-3f)` is NaN. Water is also where a single bad value does the most
+damage, because it shades a region rather than an object. The surface is now refused *whole* rather
+than corrected field by field, because a surface with one arbitrary field replaced is one nobody
+authored.
+
+**Residual risk:** the diagnostic snapshot's own values are still unguarded -- the lowest-stakes of
+the seven, since a bad capture misleads a reader rather than the frame.
 
 ### Every diagnostic view was tone-mapped (`SYM-AUX-1`)
 
@@ -495,6 +503,30 @@ from the descriptors rather than from memory.
 | `tonemap` | 1 | clear / store | none | the final display-referred image |
 | `aux-debug` | 1 (the target) | clear / store | none | the auxiliary-target viewer, **after** the tone map so its values are not exposed and curved (`SYM-AUX-1`) |
 
+**Pipeline state, per draw kind.** The pass table says what each pass does to its targets; this says
+what each *pipeline* does inside one. Taken from the descriptors, and the two columns that carry the
+contract are the last two.
+
+| Draw kind | Blend | Depth write | Depth compare | Auxiliary targets |
+|---|---|---|---|---|
+| opaque lit (culled, two-sided) | none | **yes** | `LessEqual` | written |
+| blended lit | src-alpha over | **no** | `Less` | **masked off** -- a normal or an identifier averaged over a transparency is worse than none (ADR-035) |
+| grid | additive (`One`/`One`) | no | — | written |
+| water | over | **no** | — | masked to colour and emission only, which is why water has no identifier and every water measurement is an A/B |
+| particles | over | **no** | — | masked |
+| depth prepass / shadow | none | yes | — | none |
+| fullscreen (linear depth, aux debug, tonemap) | none | no | — | one target each |
+
+Three things fall out of it that are worth stating rather than leaving in the table. **Every
+transparent kind disables depth write** -- water, particles and blended geometry alike -- so the
+depth buffer is the opaque scene and nothing else, which is what makes the linear-depth target a
+usable input for AO, water and fog. **Masking the auxiliary targets is the rule, not an exception**:
+three of the four transparent kinds do it, and the one consequence people meet is that water cannot
+be identified from the identifier target. And **there is no viewport or scissor call anywhere in the
+renderer** -- every pass draws the full attachment, so a resize is a target recreation rather than a
+state change, which is exactly why the resize regression compares against a renderer born at that
+size rather than checking a rectangle.
+
 Compute passes -- culling, clusters, particles, fields, SDF, simulation -- are marked on the same
 timeline and own their own buffers.
 
@@ -556,6 +588,57 @@ The tolerance is about edges and fog, not about placement: a transform or camera
 percent, it puts the object somewhere else entirely, and that is the class of defect this comparison
 can rule out.
 
+### The RendererQA scenes and the progressive matrix, level by level
+
+Five scene variants, each existing because something could not be isolated without it:
+
+| Variant | Why it exists |
+|---|---|
+| `renderer-qa` | the mixed scene: near/far/behind-camera geometry, a skinned alien, a transparent orb, particles, a floor |
+| `renderer-qa-minimal` | opaque meshes and nothing else -- the only scene the reference renderer can be compared against without it declining half the frame |
+| `renderer-qa-water` | a **real generated shoreline** from the shipped world, camera on the bank at the grazing angle `SYM-WATER-1` was reported from. Two planes would have been easier and would not have contained the defect |
+| `renderer-qa-character` | one rig, isolated, for the skinning forensics |
+| `renderer-qa-transparency` | blended geometry with an opaque backstop *behind* it -- the first version had the backstop between the panes, which is why that test proved nothing until it was reversed |
+
+The matrix runs nine cumulative levels, each an eleven-step script (translate, rotate, dolly, orbit,
+seek forward, seek back, scrub, resize, resize back, reload) twice from two independent engines and
+two independent renderers, comparing step by step. Every rung must also **change the picture** against
+the rung below, which is what found the two gaps below.
+
+| Level | Result |
+|---|---|
+| 0 opaque geometry | pass |
+| 1 camera movement | pass (the script, at every rung) |
+| 2 terrain | **no control exists** -- terrain is present at every rung; see Phase 4.2 |
+| 3 lighting | no control exists; present throughout |
+| 4 shadows | pass, two rungs (cascades, shadow mask) |
+| 5 water | pass in release. **In debug it names this rung on every step** -- that is `SYM-TERRAIN-1`, and the matrix localising an open defect to a rung is the matrix working |
+| 6 water effects | no control separates a surface's effects from the surface |
+| 7 transparent objects | pass -- **reachable only after the material fix**; the scene's "transparent orb" had been opaque since it was written, and the rung found it |
+| 8 characters | present at every rung; no "characters off" control separate from animation |
+| 9 animation | pass |
+| 10 particles | pass |
+| 11 post-processing | pass, three rungs (AO, volumetrics, post). The volumetrics rung supplies its own `scene/volumeDensity`, because RendererQA authors zero and the pass is off at zero however the toggle is set -- another gap the change-the-picture check found |
+| 12 culling | on throughout; switching it off adds objects rather than a subsystem, so it is an arm rather than a rung |
+| 13 LOD | no control (GPU cull pass) |
+| 14 sequencer | no control |
+| 15 seeking and scrubbing | pass (the script, at every rung) |
+
+The instrument itself had to be repaired twice before any of this counted. Re-rendering a state was
+tried first and is wrong twice over: it ticks the clock, so an animated scene is legitimately a
+different pose, and **the particle simulation is stepped inside the render call**, so rendering the
+same frame again steps the world again. Both were reported as "the first misbehaving level" before
+the instrument was fixed.
+
+### Validation coverage, by kind
+
+| Kind | What it covers | Standing |
+|---|---|---|
+| **Automated** | everything that can be stated as a claim -- 262,560 assertions in the render suite, 491,828 in the unit suite, all green in release | the default, and it absorbed several things that looked like they needed eyes |
+| **Sanitizer** | ASan/UBSan over the forensics unit tests (1,822 assertions, no findings) and over the GPU paths this work changed; TSan over the transport discontinuity contract | partial by design: a full GPU suite under ASan runs at roughly six cases an hour, so it is targeted rather than exhaustive, and the targeting is recorded |
+| **Manual visual review** | the QA baseline document | used for one thing, named as such. **No defect in this investigation was found this way**, and no regression depends on it |
+| **GPU capture** | nothing | a real gap rather than a decision. A Metal frame-debugger trace answers "what did the driver actually do", and no finding here needed that question -- it is the first tool to reach for if a symptom ever survives every measurement in this document |
+
 ### Diagnostics and their overhead
 
 Listed under "Diagnostics delivered" above, plus the Phase 4 isolation arms: shadows, shadow mask,
@@ -567,6 +650,38 @@ unconditionally for every entity every frame -- a string copy, world bounds and 
 each. Removing the string copies from Glowmere's 278 entities moved the wall-clock median from
 22.11/21.91 ms to 22.20/22.01 ms across paired runs, which is inside the run-to-run spread. The
 honest claim is therefore "below ~0.3 ms on the heaviest canonical scene", not "free".
+
+### Was a rewrite justified anywhere
+
+**No, and the shape of the evidence is the reason.** Of the eleven defects this investigation fixed,
+**nine were state ownership at a boundary** -- a cache key, a temporal history, a particle pool, a
+parameter lifetime, an animation phase origin, a skinning palette across a jump. One was geometry
+(a quad emitted a cell too wide). One was a render pass on the wrong side of the tone map.
+
+Not one was a subsystem whose internal design could not hold its own invariant. That matters for the
+rewrite question directly: **rewriting any of those subsystems would have preserved every defect**,
+because none of them live *inside* a subsystem -- they live between two, in the handover.
+
+Each candidate area the plan lists, against the evidence actually collected:
+
+| Candidate | Verdict | Why |
+|---|---|---|
+| Transform extraction | no | the most heavily pinned path in the repository -- four axes of bit-equal static matrices, a per-object comparison against an independent renderer, a full world-to-pixel chain -- and it has produced no defects |
+| Render-object extraction | no | object state is already one function shared by the camera and shadow paths, precisely so the two cannot describe an object differently |
+| GPU object buffers | no | 21 structure pairs agree byte for byte with the WGSL; slots are dense, ascending and deterministic |
+| Water pass | no -- **and the evidence changed the answer** | the shoreline looked like a depth-space problem in the water shader, which would have been a rewrite candidate; measurement refuted it (2.8 mm agreement, the wrong space 29.4% away) and the real defect was one line of terrain geometry |
+| Skinning | no | two seek defects, both in *when* state was resynchronised, neither in how skinning works |
+| Culling | no | its bounds rule was duplicated and is now one function: extracting a rule, not rewriting a subsystem |
+
+Nine of eleven repairs were ownership fixes. The two that were not are named rather than glossed: the
+skinning-palette reseed is a flag, because the ownership-shaped alternative (collapsing the previous
+palette at seek time) pins the pose being *left* and reintroduces the jump -- the information does not
+exist until the next evaluation, so something has to carry "a discontinuity happened" across the gap.
+The material NaN check is a guard, and a guard that repaired ownership would not be a guard.
+
+The one place a change is owed and a rewrite is still not the answer is `SYM-TERRAIN-1`: frame content
+must not be decided from whichever asynchronous readback has arrived. That is a discipline to apply at
+each decision site, not a subsystem to replace.
 
 ### Is the architecture sound enough to keep building on
 

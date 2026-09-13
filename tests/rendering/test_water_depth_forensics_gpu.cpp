@@ -1018,3 +1018,103 @@ TEST_CASE("overlapping water surfaces composite by view depth and not by list or
     CHECK(gpu::hashImage(reordered) == gpu::hashImage(ordered));
     CHECK(shore.ctx->errorCount() == 0);
 }
+
+// ---- Phase 9.3: the last of the four doors NaN walked through -----------------------------------
+//
+// `waterUniformsFrom` is full of `std::max` and `std::clamp` floors that read like guards and are
+// not: both are comparisons, and a NaN loses every comparison it takes part in, so `std::max(NaN,
+// 1e-3f)` is NaN. Water is the surface where that matters most -- it shades a whole region rather
+// than one object, so a single non-finite setting takes the picture with it.
+//
+// No device needed: this is the packing function, checked directly.
+TEST_CASE("a non-finite water setting is refused rather than floored",
+          "[gpu][renderer][forensics][water6_2][guards]") {
+    const auto finiteUniforms = [](const rendering::WaterUniforms& u) {
+        const auto* f = reinterpret_cast<const float*>(&u);
+        for (std::size_t i = 0; i < sizeof(u) / sizeof(float); ++i) {
+            if (!std::isfinite(f[i])) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    scene::WaterSettings healthy;
+    const rendering::WaterUniforms good = rendering::waterUniformsFrom(healthy, 1.0f, 2.0f, true);
+    REQUIRE(finiteUniforms(good));
+    // The control: a healthy surface is not refused. Without it, a guard that refused everything
+    // would pass every case below.
+    CHECK(good.surface.w > 0.0f); // maxOpacity survives; the refusal path zeroes it
+
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const float inf = std::numeric_limits<float>::infinity();
+
+    SECTION("the floors that look like guards do not stop one") {
+        // `shallow` goes through `std::max(s.shallow, 1e-3f)` and `clarity` through the same. Both
+        // are the shape that reads as protected and is not.
+        scene::WaterSettings poisoned = healthy;
+        poisoned.shallow = nan;
+        const rendering::WaterUniforms u = rendering::waterUniformsFrom(poisoned, 1.0f, 2.0f, true);
+        CHECK(finiteUniforms(u));
+        CHECK(u.surface.w == 0.0f); // refused: the surface contributes nothing
+
+        // ...and the proof that the floor alone would not have caught it.
+        CHECK_FALSE(std::isfinite(std::max(poisoned.shallow, 1e-3f)));
+    }
+
+    SECTION("every field the packer reads is checked") {
+        // One at a time, because a guard that checks the first six and not the twentieth is a guard
+        // that will be found by the twentieth.
+        struct Poison {
+            const char* what;
+            std::function<void(scene::WaterSettings&)> apply;
+        };
+        const std::vector<Poison> poisons{
+            {"shallowColor", [&](scene::WaterSettings& w) { w.shallowColor.g = nan; }},
+            {"deepColor", [&](scene::WaterSettings& w) { w.deepColor.b = inf; }},
+            {"foamColor", [&](scene::WaterSettings& w) { w.foamColor.r = nan; }},
+            {"glowColor", [&](scene::WaterSettings& w) { w.glowColor.g = nan; }},
+            {"sparkleColor", [&](scene::WaterSettings& w) { w.sparkleColor.b = nan; }},
+            {"reflectionTint", [&](scene::WaterSettings& w) { w.reflectionTint.r = nan; }},
+            {"emissiveColor", [&](scene::WaterSettings& w) { w.emissiveColor.g = nan; }},
+            {"emissiveIntensity", [&](scene::WaterSettings& w) { w.emissiveIntensity = nan; }},
+            {"clarity", [&](scene::WaterSettings& w) { w.clarity = nan; }},
+            {"foam", [&](scene::WaterSettings& w) { w.foam = nan; }},
+            {"glow", [&](scene::WaterSettings& w) { w.glow = inf; }},
+            {"sparkle", [&](scene::WaterSettings& w) { w.sparkle = nan; }},
+            {"reflection", [&](scene::WaterSettings& w) { w.reflection = nan; }},
+            {"fresnel", [&](scene::WaterSettings& w) { w.fresnel = nan; }},
+            {"specular", [&](scene::WaterSettings& w) { w.specular = nan; }},
+            {"roughness", [&](scene::WaterSettings& w) { w.roughness = nan; }},
+            {"maxOpacity", [&](scene::WaterSettings& w) { w.maxOpacity = nan; }},
+            {"ripple", [&](scene::WaterSettings& w) { w.ripple = nan; }},
+            {"rippleScale", [&](scene::WaterSettings& w) { w.rippleScale = nan; }},
+            {"rippleSpeed", [&](scene::WaterSettings& w) { w.rippleSpeed = nan; }},
+            {"chop", [&](scene::WaterSettings& w) { w.chop = nan; }},
+            {"foamWidth", [&](scene::WaterSettings& w) { w.foamWidth = nan; }},
+            {"edgeFade", [&](scene::WaterSettings& w) { w.edgeFade = nan; }},
+            {"refraction", [&](scene::WaterSettings& w) { w.refraction = nan; }},
+            {"glowScale", [&](scene::WaterSettings& w) { w.glowScale = nan; }},
+            {"glowCoverage", [&](scene::WaterSettings& w) { w.glowCoverage = nan; }},
+            {"glowDepth", [&](scene::WaterSettings& w) { w.glowDepth = nan; }},
+            {"swell", [&](scene::WaterSettings& w) { w.swell = nan; }},
+        };
+        for (const Poison& poison : poisons) {
+            scene::WaterSettings poisoned = healthy;
+            poison.apply(poisoned);
+            INFO("poisoned " << poison.what);
+            const rendering::WaterUniforms u = rendering::waterUniformsFrom(poisoned, 1.0f, 2.0f, true);
+            CHECK(finiteUniforms(u));
+            CHECK(u.surface.w == 0.0f);
+        }
+    }
+
+    SECTION("the two frame-supplied values are checked too") {
+        // `flowTime` and `fastest` are not settings; they come from the frame, and a non-finite
+        // timeline second would otherwise walk straight into the uniform.
+        CHECK(finiteUniforms(rendering::waterUniformsFrom(healthy, nan, 2.0f, true)));
+        CHECK(rendering::waterUniformsFrom(healthy, nan, 2.0f, true).surface.w == 0.0f);
+        CHECK(finiteUniforms(rendering::waterUniformsFrom(healthy, 1.0f, inf, true)));
+        CHECK(rendering::waterUniformsFrom(healthy, 1.0f, inf, true).surface.w == 0.0f);
+    }
+}

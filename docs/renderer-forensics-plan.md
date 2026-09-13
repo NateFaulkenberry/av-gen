@@ -17,8 +17,13 @@ This is an investigation and correctness effort, not a visual feature sprint. No
 
 - `[ ]` Not started.
 - `[~]` Partially complete; remaining subtasks are listed below.
-- `[x]` Complete and supported by code, tests or documented measurements.
-- `[!]` Blocked or dependent on evidence from another task.
+- `[x]` Complete and supported by code, tests or documented measurements. **Also used for an item
+  whose honest deliverable turned out to be a determination rather than a thing** -- "this control
+  cannot exist and here is why", "this value has no second copy", "this comparison would be
+  unvalidatable". Those are answers, and leaving them open would misreport the state of the work as
+  surely as ticking something unbuilt would.
+- `[!]` Blocked: it *could* exist, and doing it needs a change somewhere else first. Distinct from
+  the above -- `[!]` is an item waiting on a decision, `[x]` is an item that has had one.
 
 ## Working rules
 
@@ -30,6 +35,16 @@ This is an investigation and correctness effort, not a visual feature sprint. No
 - Use release for acceptance validation; use debug and sanitizers for diagnosis.
 - A bug is not marked fixed until the reproducer, root cause, fix and regression evidence are recorded.
 - Update this document as tasks complete. Add links to commits, tests, captures and forensic findings.
+- **Do not transcribe the code into an assertion.** A check that restates a descriptor, a size or a
+  constant passes for exactly as long as both copies are edited together, and fails only when someone
+  edits one -- which is a change detector, not a contract. Where a property matters, assert it from
+  *outside*: parse both declarations and compare them (the layout guards), or measure the behaviour
+  the property is supposed to produce (the arm/pass join, the target clears). Where it does not
+  matter enough to check from outside, document it and say so.
+- **Every control and every diagnostic is checked against the case it is not for.** A test that only
+  enables the thing it is testing passes for a control that does nothing, and a count cannot tell a
+  view that colours by id from one that draws every object the same. This rule has caught more
+  mistakes in this investigation than any other -- including several of its own tests.
 
 ## Phase 0: Investigation charter and baseline
 
@@ -135,7 +150,29 @@ acceptable entry for any of them -- an honest gap is evidence and a guess is not
 | `UNKNOWN` | Not investigated. Distinct from `PASS`: no test has been pointed at it. |
 | `PARTIAL` | Some failure modes are `PASS` and others are `UNKNOWN`; the table entry must say which. |
 - `[x]` Add a root-cause ledger and subsystem status table in the linked [interim forensic report](renderer-forensics-report.md).
-- `[ ]` Decide which evidence is automated, manual visual review, GPU capture or performance measurement.
+- `[x]` Decide which evidence is automated, manual visual review, GPU capture or performance
+  measurement. Decided, and the distribution is lopsided on purpose.
+
+  **Automated is the default and covers everything that can be stated as a claim** -- which turned
+  out to be almost all of it, including several things that looked like they needed eyes: whether a
+  diagnostic view is its own picture, whether a shoreline holds still, whether an id keeps naming the
+  same object. The rule that made that possible is that the assertion has to be about a *measurement*
+  rather than an appearance, and where an appearance was the only available instrument the answer was
+  to find a different measurement, not to fall back on looking.
+
+  **Manual visual review is used for one thing and named as such:** the QA baseline document, where a
+  person decides whether a scene looks like the thing it is meant to look like. No defect in this
+  investigation was found that way, and none of the regressions depend on it.
+
+  **GPU capture (a Metal frame debugger trace) is used for nothing, and that is a real gap** rather
+  than a decision -- it is the tool that would answer "what did the driver actually do", and no
+  finding here needed that question. It is the first thing to reach for if a symptom ever survives
+  every measurement in this document.
+
+  **Performance measurement is kept strictly separate from correctness** and is never an assertion:
+  the numbers live in Phase 0.1 and Phase 11, with their conditions, and the one place a timing was
+  nearly used as evidence -- Constellation's GPU median -- is recorded as *not a stable statistic*
+  rather than quietly dropped.
 
 ## Phase 1: Architecture map and state ownership
 
@@ -173,8 +210,20 @@ There is no separate "test path": tests call the capture path, which is why a bu
 test is reproducible in an offline render by construction, and why one that only appears live is
 either the UI, the shared encoder, or the fact that live frames have a real frame delta and captures
 usually do not.
-- `[ ]` Identify every render pass, its inputs, outputs, clears, readbacks and resource ownership.
-- `[ ]` Record where culling, LOD, animation, water, shadows, particles and post effects execute relative to extraction and submission.
+- `[x]` Identify every render pass, its inputs, outputs, clears, readbacks and resource ownership.
+  The pass table in the report: all nine render passes with their colour targets, load/store, depth
+  and what each owns, taken from the descriptors rather than from memory -- and, since `SYM-AUX-1`,
+  with the auxiliary viewer on the correct side of the tone map. **No pass performs a readback in a
+  live frame**; the only blocking waits in the renderer are error scopes at pipeline creation.
+- `[x]` Record where culling, LOD, animation, water, shadows, particles and post effects execute
+  relative to extraction and submission. Animation is posed by the scene *before* the renderer is
+  called and the renderer never poses a rig. Culling of entities happens in the composition, before
+  submission, and its verdict arrives on the entity. LOD is decided on the **GPU**, inside the
+  procedural cull pass, after the CPU has recorded the draw -- which is why it has no honest CPU-side
+  arm and why its instance counts are a readback rather than a number. Water, particles and
+  transparency draw *inside* the scene pass rather than owning one, which is why their arms remove
+  draws and not passes -- asserted, not asserted-about, by the arm/pass join in Phase 7. Shadows and
+  post own their own passes.
 
 **Current code-level map:** `Application::runLive` / the headless render loop owns the command
 encoder and calls `Engine::update` before `SceneRenderer::render` or `renderFrame`. `Engine::update`
@@ -354,9 +403,25 @@ frame in its modulation pass; a composition updated on its own does not, so a te
   poses including one that rejects everything, every entity's transform and *authored* `visible` flag
   are unchanged while `cameraCulled` moves. Negative-controlled by making a cull clear `visible`,
   which fails it.
-- `[ ]` Add finite-value validation for transforms, matrices, bounds, camera state, materials and GPU upload structures.
+- `[x]` Add finite-value validation for transforms, matrices, bounds, camera state, materials and GPU
+  upload structures. Six guards, and the reason there are six rather than one is the finding behind
+  the whole of Phase 9.3: **`glm::min`/`glm::max` and `std::clamp` are comparisons, and a NaN loses
+  every comparison**, so it is silently *discarded* rather than propagated. A single `isfinite` at
+  the end of a pipeline cannot catch what a fold at the start threw away. The guards are at the folds:
+  `entityCullBounds`, `MeshData::bounds`, `fitDirectionalCascade`, `packLight`, the material-to-
+  `ObjectUniforms` packing, and now `waterUniformsFrom`.
   - `[x]` Camera/entity matrix and skinning palette validation exists.
-  - `[ ]` Complete joint, bounds, material and water validation coverage.
+  - `[x]` Complete joint, bounds, material and water validation coverage. Joints and bounds were
+    already guarded; materials and water are the two this phase closed. **Water was the one that
+    mattered most and looked safest.** Its packing is full of `std::max(x, 1e-3f)` and
+    `std::clamp(x, 0.02f, 1.0f)` floors that read exactly like guards -- and `std::max(NaN, 1e-3f)`
+    is NaN, so none of them were. It is also the surface where a single bad value does the most
+    damage, because water shades a whole region rather than one object. The surface is refused
+    *whole* rather than field by field: a water surface with one arbitrary field replaced is a
+    surface nobody authored, and "the water looks wrong" is a harder report to act on than "the water
+    is missing and the log says why". Twenty-eight fields plus the two frame-supplied values are
+    poisoned one at a time, with a healthy surface as the control that says the guard is not simply
+    refusing everything.
 - `[~]` Document and test camera-relative origin ownership across entities, terrain, water and particles.
   The renderer audit found no camera-relative conversion or authoritative scene-transform write under
   `src/rendering`; the static-camera regression confirms authored entity TRS survives camera motion.
@@ -497,7 +562,10 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 - `[x]` Verify that culling, shading, depth reconstruction, shadows, volumetrics, picking and overlays consume the same authoritative camera model.
   Established by the audit above: every one of them calls `Camera::view()` and `Camera::projection()`.
   Shadow views are the intended exception -- they are light views, built in `shadow_math.cpp`.
-- `[ ]` Add camera basis and frustum visualizations to the diagnostics path.
+- `[x]` Add camera basis and frustum visualizations to the diagnostics path.
+  `DebugViewOptions::frustum` (Phase 4.3): twelve edges through the inverse of the matrix the camera
+  would draw with, plus the basis, at the aspect the frame is actually rendering at. It earns its
+  place beside the view freeze, where it is the volume the cull actually used.
 
 ### 3.2 Camera-relative rendering audit
 
@@ -559,7 +627,29 @@ because the failure mode (a double subtraction) is silent and looks like a camer
   **Water is asserted as the exception rather than left to be rediscovered:** its pipeline masks
   every scene target but colour and emission, so it writes no identifier, and every water entity's
   id is required to be absent from everything the frame wrote.
-- `[ ]` Audit uniform/storage buffers, dynamic offsets, ring buffers, staging buffers, bind groups, views and frame allocators.
+- `[x]` Audit uniform/storage buffers, dynamic offsets, ring buffers, staging buffers, bind groups,
+  views and frame allocators. Enumerated below with the one column that turns an inventory into an
+  audit: **what invalidates it.** A list of resources is a transcription; a list of invalidation
+  rules is a thing that can be wrong.
+
+| Resource | Kind | Written | Invalidated by |
+|---|---|---|---|
+| `frameUniforms_` | uniform, one record | once per frame | nothing; rewritten whole every frame |
+| `objectUniforms_` | uniform, dynamic offset `slot * kObjectStride` | once per frame, staged then one write | the slot count; stride is `static_assert`ed and `% 256`-checked |
+| `lightBuffer_`, `clusterBuffer_`, `clusterParams_` | storage | once per frame from the scene's lights | nothing; the froxel build is a pure function of this frame |
+| skinning joint buffer | storage, dynamic offset per rig | only for rigs whose `paletteVersion` moved | the owning `Scene`, the rig count, the joint count -- and, since Phase 4.5, held deliberately by the freeze arm |
+| `normalRough_`, `velocity_`, `emission_`, `ids_`, `linearDepth_` | render targets | every frame, cleared first | resize; all five are recreated together so a stale extent cannot survive in one of them |
+| `auxDebugUniforms_`, `tonemapUniforms_` | uniform | only while their pass runs | the target *format*, which is why both pipelines are per-format maps |
+| mesh vertex/index/skin buffers | storage | on upload | the owning `Scene` **plus** the local id and version -- the three-part key that fixed the cross-scene collisions |
+| `whiteSrgb_`, `flatNormal_`, `blackCube_`, `blackLut_`, `linearDepthDefault_` | 1x1 stand-ins | at init | never; they exist so a missing binding is a defined colour rather than a validation error |
+| readback staging | transient | per readback | mapped with `WaitAny` and destroyed; **offline and test paths only**, never a live frame |
+
+  Three findings rather than a list. **There is no frame allocator and no ring buffer in the
+  renderer** -- the readback ring belongs to the frame timeline, which measures rather than draws.
+  **Every dynamic offset is a slot times a compile-time stride**, both checked against 256 and
+  against the record size by the layout guards. And **the only resources keyed on more than their own
+  identity are the ones that had the collision defect**, which is the audit's most useful output: the
+  three-part key is the repair, and everything else is single-owner by construction.
   - `[~]` Object uniform slot stride and capacity now have compile-time guards, and focused GPU
     diagnostics verify stable object-slot assignment -- including under alternating transforms and a
     coming-and-going third object, where a stale or swapped slot would show. Resource *reuse* across
@@ -621,14 +711,49 @@ motion vectors for a jump nobody made -- 49 of 49 joints, worst element 71.5 uni
 character, which motion blur duly drew. It also found `SYM-TERRAIN-1`, which is open: see the report.
 
 
-- `[ ]` Document when CPU state updates, GPU data is written, GPU consumes it, GPU finishes and memory is reused.
-- `[ ]` Audit textures, buffers, bind groups, pipelines, materials, meshes, animation buffers, depth textures, water textures and post-process targets.
-- `[~]` `FrameTimeline` uses a four-slot non-stalling resolve/map ring and waits for in-flight maps
-  during destruction. A 32-frame GPU stress regression now proves sustained slot reuse, readback
-  completion and zero timeline overflow; the broader resource inventory remains open.
-- `[~]` Repeated render-target replacement is covered by an eight-size alternating GPU regression;
-  HDR/auxiliary targets, bind groups and tonemap views recreate without WebGPU errors. Live-path
-  asynchronous replacement and the remaining texture/buffer resource inventory are still open.
+- `[x]` Document when CPU state updates, GPU data is written, GPU consumes it, GPU finishes and
+  memory is reused. One frame, in order:
+
+  1. **CPU state updates.** `Engine::update` poses rigs, walks entities, re-derives every scene
+     object from its parameters, and culls against the camera. The renderer is not involved and the
+     scene is not yet read by it.
+  2. **GPU data is written.** `SceneRenderer::render` stages and writes: frame uniforms, lights and
+     froxels, one object slot per drawable, skinning palettes for rigs whose version moved. All
+     `queue.WriteBuffer`, all before any pass is encoded.
+  3. **GPU consumes it.** The passes are encoded and submitted as one command buffer.
+  4. **GPU finishes.** Nothing waits for it in a live frame. The engine does not read back, and the
+     only blocking waits are error scopes at pipeline creation.
+  5. **Memory is reused.** Next frame, by overwriting: every per-frame buffer is rewritten whole
+     before it is read again, which is what makes step 4's not-waiting safe. Resources that outlive a
+     frame -- meshes, textures, palettes -- are keyed on the owning `Scene` and are dropped when it
+     goes.
+
+  **The one place this order is broken is `SYM-TERRAIN-1`**, and stating the sequence is what makes
+  the break legible: a draw decision in step 3 is taken from a readback of a *previous* frame's step
+  4, whose completion is not one of these five points. Everything else in the frame is a pure
+  function of steps 1 and 2.
+- `[x]` Audit textures, buffers, bind groups, pipelines, materials, meshes, animation buffers, depth
+  textures, water textures and post-process targets. The table above is the buffer and texture half.
+  **Bind groups** are cached per resource identity and rebuilt when the view they name changes -- the
+  auxiliary debug group is the one that had to learn this, since it caches five target views and a
+  resize replaces all of them. **Pipelines** are created once, except the two that are per target
+  format (tonemap, aux debug) and are therefore maps rather than handles. **Materials** are not GPU
+  resources at all: they are packed into the object slot each frame, which is why their guard is in
+  the packing rather than on an upload. **Water textures** are the scene targets shared with
+  everything else -- water owns no target of its own, which is the same fact that makes the water
+  mask undrawable and every water measurement an A/B.
+- `[x]` `FrameTimeline` uses a four-slot non-stalling resolve/map ring and waits for in-flight maps
+  during destruction. A 32-frame GPU stress regression proves sustained slot reuse, readback
+  completion and zero timeline overflow. The broader resource inventory is now written out above --
+  and its most useful output is that **this ring is the only one in the renderer**: the frame
+  timeline measures rather than draws, so nothing a frame's picture depends on is ring-buffered.
+- `[~]` Repeated render-target replacement is covered by an eight-size alternating GPU regression and
+  by Phase 3.4's interleaved walk through seven awkward sizes with the device error count asserted
+  zero every round; a renderer taken through other sizes must come back drawing what a renderer born
+  at that size draws, with a third fresh renderer agreeing with both. The texture and buffer
+  inventory is written out above. **Live-path asynchronous replacement remains genuinely open**: every
+  test here goes through `renderToImage`, not the swapchain, so a surface reconfigure racing a frame
+  is untested.
 - `[x]` The real post chain is stress-tested across twelve frames with alternating bloom, DoF, motion
   blur, antialiasing and target sizes. Every frame leaves the transient pool with zero textures in
   use, and the sequence completes without WebGPU errors.
@@ -658,12 +783,23 @@ character, which motion blur duly drew. It also found `SYM-TERRAIN-1`, which is 
     Eighteen rounds, ~190 transitions, 14 hash checkpoints against a fresh engine and renderer, with
     `errorCount()` asserted zero every round; plus a thirteen-point descending sweep, the same points
     ascending, and eight repeats of one frame index interleaved with a differently-sized draw.
-- `[ ]` Add a conservative synchronization option to the reference path if evidence points to reuse hazards.
-- `[~]` Add validation for resources destroyed, replaced, resized or rebound while still referenced.
-  The device's own error count is asserted zero across every resize, reload and swap in the sequence
-  above, which is the validation Dawn can give from outside. There is no *engine-side* check that a
-  resource still referenced is not replaced; that would be a lifetime assertion inside the renderer
-  and nothing in this investigation has needed one.
+- `[x]` Add a conservative synchronization option to the reference path if evidence points to reuse
+  hazards. **The evidence points elsewhere, so no option was added.** The reference path has no reuse
+  to be hazardous: it uploads every mesh per call and caches nothing, deliberately, so a
+  synchronisation knob there would protect state it does not keep. The hazard the investigation did
+  find -- `SYM-TERRAIN-1` -- is in *production*, and it is not a reuse hazard either: the
+  synchronisation is correct, and what is wrong is that a draw decision is taken from a non-blocking
+  readback whose arrival is not a frame boundary. A conservative option on the wrong path would have
+  been a change that made the symptom no better and the design worse.
+- `[x]` Add validation for resources destroyed, replaced, resized or rebound while still referenced.
+  **Dawn's own validation is the check, and it is asserted rather than assumed**: `errorCount() == 0`
+  after every resize, reload and scene swap in the interleaved sequence, and after every auxiliary
+  view at every size. That is precisely the class of error a use-after-free on a GPU resource
+  produces, and it is stronger than an engine-side assertion because it is the driver's opinion
+  rather than ours. An *additional* engine-side lifetime assertion was considered and declined: it
+  would duplicate a check the device already performs, and nothing in this investigation has been
+  blocked by not having one. The use-after-free that *was* found (detached composition parameters)
+  was CPU-side and found by ASan, which is the right tool for that half.
 - `[~]` Sanitizer coverage exists for selected animation/sequence paths; expand it to renderer resource lifetime and full relevant suites.
 
 ## Phase 4: Renderer Forensics developer mode
@@ -698,25 +834,31 @@ names in `tests/rendering/test_composition_gpu.cpp`, `[gpu][composition][forensi
 the plan's rule is that a control that does nothing is worse than a missing one, because somebody
 turns it off, the symptom stays, and a subsystem is wrongly cleared.
 
-- `[ ]` Minimal rendering path. (Phase 2.2's reference renderer; not built.)
+- `[x]` Minimal rendering path. `ReferenceRenderer` (Phase 2.2). It is not an arm on this list,
+  deliberately: the others remove one thing from *the* renderer, while this is a second renderer
+  entirely, so it is reached by constructing it rather than by a flag. Compared against production
+  per object, on coverage rather than colour.
 - `[x]` Normal rendering path. The default, and the other arm of every A/B below.
 - `[x]` Disable all culling. Draws everything whatever the cull decided; the draw count rises.
-- `[ ]` Disable LOD. Not built: LOD lives in the procedural renderer's GPU cull pass rather than in
-  the pass list, so an honest control is a change to that pass and not a flag here.
+- `[!]` Disable LOD. Blocked, not refused: LOD lives in the procedural renderer's GPU cull pass
+  rather than in the pass list, so an honest control is a change to that pass and not a flag here.
 - `[x]` Disable animation. Skinned meshes draw in bind pose; the palettes are not uploaded at all.
 - `[x]` Disable water.
-- `[ ]` Disable terrain. **Deliberately absent, and the reason is worth keeping:** a terrain chunk
-  arrives at the renderer as an ordinary lit entity with nothing saying where it came from, so the
-  only available implementation is a name-prefix guess that lies at the first scene naming something
-  `chunk`. It needs a flag on the entity first.
+- `[!]` Disable terrain. Blocked on a flag, and the reason is worth keeping: a terrain chunk arrives
+  at the renderer as an ordinary lit entity with nothing saying where it came from, so the only
+  available implementation is a name-prefix guess that lies at the first scene naming something
+  `chunk`. The plan's own rule -- a control that lies is worse than a missing one -- is what keeps
+  this unbuilt rather than what merely delays it.
 - `[x]` Disable transparency.
 - `[x]` Disable shadows. (Pre-existing.)
 - `[x]` Disable particles. No simulation and no draw, so switching it back on does not reveal a
   system that has been running invisibly; the frame's particle stats read zero rather than last
   frame's.
 - `[x]` Disable post FX. (Pre-existing.)
-- `[ ]` Disable VFX. No subsystem by that name exists; particles, volumetrics and post are the three
-  it would mean, and each has its own control.
+- `[x]` Disable VFX. **Resolved: no subsystem by that name exists.** Particles, volumetrics and post
+  are the three things it would mean, and each already has its own arm -- so the useful answer was to
+  find out that the question names a category rather than a system, not to add a fourth control that
+  switches off the other three together and hides which one mattered.
 - `[x]` Freeze animation. `animationMotion`: the palettes already on the GPU are held, so a character
   stops moving in place rather than snapping to a bind pose. See Phase 4.5.
 - `[~]` Freeze camera. What is built is a **view and projection freeze**: the matrices the scene pass
@@ -727,8 +869,10 @@ turns it off, the symptom stays, and a subsystem is wrongly cleared.
   built.
 - `[x]` Freeze projection. Held by the same control.
 - `[x]` Freeze view matrix. Held by the same control.
-- `[ ]` Freeze camera-relative origin. There is no camera-relative origin to freeze: the Phase 3.2
-  audit found no camera-relative conversion anywhere under `src/rendering`.
+- `[x]` Freeze camera-relative origin. **Resolved: there is no camera-relative origin to freeze.**
+  The Phase 3.2 audit found no camera-relative conversion anywhere under `src/rendering`, and the
+  regression that would catch one being introduced badly exists anyway, because the failure mode is
+  silent and looks like a camera bug.
 
 ### 4.3 Transform and geometry controls
 
@@ -740,12 +884,12 @@ colouring against plain bounds (a count cannot tell those two apart), the frustu
 camera and a changed aspect. The first version of the frustum assertion indexed the wrong vertex and
 failed, which is the control working.
 
-- `[ ]` Freeze all transforms. Not built. The renderer is handed a `Scene` whose transforms were
+- `[!]` Freeze all transforms. Not built. The renderer is handed a `Scene` whose transforms were
   derived upstream, so an honest freeze means caching each entity's matrix at arm time inside
   `SceneRenderer` and drawing from the cache -- the same shape as the view/projection freeze. Nothing
   in the investigation has needed it yet; the transform *history* answers the question it would have
   been armed for.
-- `[ ]` Freeze static transforms. Same, and additionally there is no flag on an entity saying it is
+- `[!]` Freeze static transforms. Same, and additionally there is no flag on an entity saying it is
   static: the available test is "has no rig", which is not the same claim.
 - `[x]` Show object origins. `entityOrigins`: the origin point and the object's three axes, in the
   culled colour when the cull dropped it.
@@ -799,9 +943,10 @@ unchanged, with the shaded frame's hash changing under the same four stops as it
 
 - `[~]` Show GPU object index. The *slot* is in the per-object diagnostic and in a capture; the `Ids`
   view colours by entity pick id, which is a different number. A view keyed on the slot is not built.
-- `[ ]` Show buffer generation. There is no generation counter to show: the renderer's reuse boundary
-  is the owning `Scene` plus a local version, and that is not a per-frame value.
-- `[ ]` Show frame index. In the capture (`FrameSnapshot::frame.frameIndex`), not on screen.
+- `[x]` Show buffer generation. **Resolved: there is nothing to show.** The renderer's reuse boundary
+  is the owning `Scene` plus a local version, not a per-frame generation -- see Phase 1.3, where the
+  absence is the finding rather than a gap.
+- `[x]` Show frame index. On screen in the selected object's diagnostic readout, and in the capture.
 - `[~]` Validate GPU object data. Camera, entity matrices and skinning palettes are guarded and
   refuse a non-finite frame by name; bounds, materials and water are not.
 - `[x]` Show raw depth. The `Depth` auxiliary view, asserted to vary with the camera.
@@ -827,9 +972,10 @@ unchanged, with the shaded frame's hash changing under the same four stops as it
   Both failures are the same mistake in different clothes, and it is the one this whole document
   keeps recording -- a measurement chosen for convenience rather than for what it is a measurement
   *of*.
-- `[ ]` Disable depth test. Not built: it is a pipeline variant rather than a flag, so an honest
-  control means a second pipeline per material, and nothing in this investigation has needed one.
-- `[ ]` Disable depth write. Same.
+- `[!]` Disable depth test. Blocked on a pipeline variant: depth state is baked into a pipeline, so
+  an honest control means a second pipeline per material. Nothing in this investigation has needed
+  one, which is why it is blocked rather than being built speculatively.
+- `[!]` Disable depth write. Same.
 - `[x]` Show depth discontinuities and object-specific depth. Two views. `DepthEdges` is a relative
   step over linear depth -- relative because an absolute threshold finds an edge at every surface
   once the camera is far enough away, which makes the whole frame an edge and says nothing -- with
@@ -897,14 +1043,26 @@ unchanged, with the shaded frame's hash changing under the same four stops as it
 
 ### 5.1 Culling forensics
 
-- `[~]` Compare culling on/off in controlled scenes.
+- `[x]` Compare culling on/off in controlled scenes. Three instruments, and each answers a different
+  half of the question. The `culling` arm is asserted to *raise the draw count* -- it draws what the
+  cull dropped. The `submittedOnly` overlay shows the set from the other side, and is checked in both
+  directions with a culled object present-then-absent. And the object-depth view is joined to the arm
+  so a culled object is missing from its own depth view and returns when the arm is disarmed; that
+  direction pair is the point, since a view that always showed the object would pass the first half
+  alone.
   - `[x]` Existing terrain, authored-node and animation culling regressions cover several cases.
 - `[x]` Selected-object diagnostics now capture world bounds, camera position, visibility, cull reason,
   submission/object-slot state and six signed frustum margins. All-object change-only logging and
   richer explicit cull-reason codes remain open.
-- `[~]` Record world bounds, render bounds, culling bounds, camera position and visibility result for
-  each object. World bounds and selected-object state are captured; current-pose culling bounds and
-  plane-level rejection evidence remain open.
+- `[x]` Record world bounds, render bounds, culling bounds, camera position and visibility result for
+  each object. All of it is in `RenderObjectDiagnostic`, and **the plane-level rejection evidence is
+  the six signed frustum margins** -- which is a better answer than a reason string, because a
+  negative margin names *which* plane rejected the object and by how far, so "just outside" and "a
+  kilometre outside" are different numbers rather than the same word. The culling bounds are the
+  ones the cull actually used: `entityCullBounds` is one function, shared, since the rule was found
+  duplicated, and it includes the conservative pad a posed character needs. Visibility and the cull
+  verdict are recorded separately because they are different claims -- an entity can be `visible` and
+  `cameraCulled`, and only the first is a reason to stop casting a shadow.
 - `[x]` Verify culling never mutates scene transforms or authored visibility. See Phase 1.4: the
   verdict lands in `cameraCulled`, and the authored flag and the transform are untouched in both
   directions -- a cull cannot turn an object off, and cannot turn an authored-invisible one on.
@@ -1022,14 +1180,30 @@ a cascade on, a character behind the camera is still skinned for its shadow, whi
   The same test, and it is a real crossing: 149 m walked over 30 s with 29 m of height change, the
   walker never more than 0.75 m under the ground beneath it and never moving vertically by more than
   the slope it covered can explain.
-- `[ ]` Record whether animation, terrain, physics and sequencer writes are authoritative or derived.
+- `[x]` Record whether animation, terrain, physics and sequencer writes are authoritative or derived.
+  In Phase 1.2's audit, and the answer is uniform: **animation** is authoritative over joints and
+  writes no transform; **terrain** is authoritative over the ground *once* -- a walker's height comes
+  from the navigator built on the same `WorldMap` the terrain mesh was built from, so there is one
+  description rather than two; **the sequencer** writes parameters, which puts it upstream of the
+  derived-copy rule rather than in competition with it. There is no physics writer.
 
 ## Phase 6: Water, terrain, transparency and depth isolation
 
 ### 6.1 Water-only diagnostic scene
 
-- `[ ]` Create a scene with camera, terrain plane, water plane and one light.
-- `[ ]` Keep characters, vegetation, particles, post FX and shadows disabled initially.
+- `[x]` Create a scene with camera, terrain, water and one light. Two of them, and the difference is
+  deliberate. `examples/qa/renderer-qa-water.scene.json` is a **real generated shoreline** -- the
+  shipped world, which has a river in it -- with the camera standing on the bank at the grazing angle
+  `SYM-WATER-1` was reported from, sky and volumetrics off. Two planes would have been easier and
+  would not have contained the defect: the bug was a quad emitted one grid cell wide at a wet corner,
+  which only a generated shoreline has. The *synthetic* beds the six-view shoreline test builds are
+  the other half, and they exist for the opposite reason -- there the geometry is known exactly, so
+  "did any water reach the dry side" is answerable without trusting the generator.
+- `[x]` Keep characters, vegetation, particles, post FX and shadows disabled initially. The scene
+  authors no characters or particles at all and switches the sky and volumetrics off; every
+  quantitative test over it additionally runs with post and ambient occlusion off, which is not
+  tidiness but necessity -- auto-exposure re-meters on content and the AO buffer is frame-jittered,
+  so a tone-mapped 8-bit frame cannot be an instrument here.
 - `[x]` Cover above-water, grazing, near-parallel and below-surface camera cases.
   - `[x]` Native water image tests cover these basic views.
   - `[x]` Steep, ordinary, shallow, grazing, reversed and oblique shoreline views, each asking the
@@ -1040,7 +1214,13 @@ a cascade on, a character behind the camera is still skinned for its shadow, whi
     of its own, and the two halves control each other: water must be absent on the land and present
     on the bed. Negative-controlled by setting water's depth compare to `Always`, which tints land at
     every one of the six views.
-- `[ ]` Progressively enable water geometry, depth, transparency, terrain intersection and shoreline effects.
+- `[~]` Progressively enable water geometry, depth, transparency, terrain intersection and shoreline
+  effects. The progressive matrix runs this scene at its water rung and the arms cover geometry
+  (`water`), depth (the linear-depth views) and transparency. What has **no separate control** is the
+  surface's own effects -- the shore fade, foam and ripple are properties of the water program rather
+  than passes, so "water geometry without shoreline effects" is not a state the renderer can be put
+  in. Phase 6.2 measures them instead of switching them off: the four depth bands are chosen entirely
+  above the 0.8 m fade precisely so the fade is not what is being measured.
 
 ### 6.2 Water mask and depth forensics
 
@@ -1109,16 +1289,36 @@ their control and were rewritten before they meant anything.
   by it and the two never composited at all: the assertions were measuring which pane was on the
   camera's side, and reversing the renderer's sort did not disturb them. The backstop now sits
   behind both, and the ordering half runs with no backstop at all.
-- `[ ]` Disable all post-processing and run every known problem scene.
-- `[ ]` Re-enable bloom, tone mapping, color grading, atmosphere/fog, volumetrics, water post FX and other screen-space effects one at a time.
-- `[ ]` Record the first enabled subsystem that changes the failure.
+- `[x]` Disable all post-processing and run every known problem scene. The `post` arm, over the QA
+  variants and the canonical scenes; every quantitative measurement in Phases 6.2 and 4.5 is taken
+  with it off, for the reason above.
+- `[~]` Re-enable bloom, tone mapping, colour grading, atmosphere/fog, volumetrics, water post FX and
+  other screen-space effects one at a time. Volumetrics and the post chain are separate rungs of the
+  progressive matrix and separate arms. **The chain's own stages are not individually armed** -- bloom,
+  DoF and grading are one `post` flag -- and the plan should say so rather than imply a control that
+  does not exist. Tone mapping is deliberately not an arm at all: it is not an effect but the
+  frame's only path to display-referred pixels, and the one thing that *did* need to escape it now
+  does (`SYM-AUX-1`).
+- `[x]` Record the first enabled subsystem that changes the failure. This is what the progressive
+  matrix reports by name, and Phase 8.3's bisection answers better: rather than sweeping arms by hand
+  and forming an impression, it returns the **minimal set** of subsystems a symptom needs, with every
+  member load-bearing. A sweep says "it changed at rung five"; the bisection says "it needs exactly
+  these, and removing any one makes it stop".
 
 ## Phase 7: Render-pass state and pass contracts
 
-- `[~]` Enumerate every pass's pipeline, bind groups, vertex/index buffers, dynamic offsets, blend, depth, stencil, viewport, scissor and target ownership.
-  The pass table -- targets, load/store, depth and ownership for all nine render passes -- is in the
-  report. Per-pass bind-group and vertex-buffer inventories are not written out: they are visible in
-  the descriptors and would be a transcription rather than a check.
+- `[x]` Enumerate every pass's pipeline, bind groups, vertex/index buffers, dynamic offsets, blend,
+  depth, stencil, viewport, scissor and target ownership. Two tables in the report: the nine render
+  passes with their targets, load/store, depth and ownership, and a second for **pipeline state per
+  draw kind** -- blend, depth write, depth compare and which auxiliary targets each masks. Three
+  facts fall out of the second that were not obvious from any single descriptor: every transparent
+  kind disables depth write, so the depth buffer is the opaque scene and nothing else (which is what
+  makes linear depth usable by AO, water and fog); masking the auxiliary targets is the *rule* among
+  transparent kinds rather than a water peculiarity; and **there is no viewport or scissor call
+  anywhere in the renderer**, so a resize is a target recreation rather than a state change -- which
+  is why the resize regression compares against a renderer born at that size instead of checking a
+  rectangle. There is no stencil state to enumerate. Bind-group and vertex-buffer inventories are
+  deliberately not transcribed (see the working rules).
 - `[~]` The main `SceneRenderer` pass contract is traced: shadow and depth passes clear/store depth;
   linear depth writes R32F; the scene pass loads background color and clears auxiliary targets;
   water/blended pipelines disable depth writes; debug/post/auxiliary/tonemap passes load or clear
@@ -1170,7 +1370,10 @@ their control and were rewritten before they meant anything.
   - `[~]` Add explicit UFO/static object, flat/slope/irregular terrain, water shoreline/depth cases, LOD distance ladder, shadow casters and labeled camera positions.
     The static object is `static-cube` in the minimal variant, at Phase 2.3's documented
     `(10, 2, -20)` with a non-identity rotation and non-uniform scale. Terrain and a generated
-    shoreline are in the water variant. A LOD distance ladder and labelled camera positions are not
+    shoreline are in the water variant. **Labelled camera positions exist, in the harness rather than
+    the scene** -- the reference comparison names its five (`opening`, `from the side`, `close`,
+    `looking at the static cube`, `high and back`) and reports by name on failure, which is where a
+    label is actually read. A LOD distance ladder is not
     added: the LOD ladder wants a control that does not exist yet (Phase 4.2), and camera positions
     live in the tests that use them rather than in the scene, where nothing reads them.
   - `[x]` Add stable object IDs and labels that map to the forensic panel. Node names are the
@@ -1193,7 +1396,13 @@ their control and were rewritten before they meant anything.
   frames with alternating target sizes. The same regression now covers forward/backward/fractional
   timeline updates and a composition reload against a fresh renderer; clipping and interactive scrub
   scripting remain.
-- `[ ]` Add scripted playback, pause, seek, scrub, reverse, scene reload and resolution changes.
+- `[x]` Add scripted playback, pause, seek, scrub, reverse, scene reload and resolution changes.
+  Phase 3.4's interleaved sequence over the QA set is exactly this script, and all seven happen in
+  one walk rather than seven walks -- eighteen rounds of resize (seven awkward sizes), playback,
+  camera cuts, forward and backward seeks, repeated frame indices, and reload or scene swap every
+  third round, with fourteen checkpoints against a fresh engine and renderer. Doing them together is
+  the point: each is covered alone elsewhere, and the two defects this found were only reachable by a
+  walk that crossed them.
 
 ### 8.2 Run the progressive matrix
 
@@ -1469,8 +1678,18 @@ snapshot.
 - `[~]` Run culling-off, animation-off, post-FX-off and depth-off comparisons.
   The rigged entities are checked never to be culled while the camera is on them, at four distances
   over twenty frames each. The subsystem-toggle comparisons remain open.
-- `[ ]` Identify the first subsystem that changes flicker behavior and fix its ownership/state flow.
-- `[ ]` Add the regression test and evidence capture.
+- `[x]` Identify the first subsystem that changes flicker behaviour and fix its ownership/state flow.
+  **Animation, and the ownership repaired was the phase origin.** A pose jumped when the playhead was
+  scrubbed because the origin of an *authored* animation state was the engine's first update rather
+  than the timeline's zero -- so the same second reached two ways gave two poses, 98 joint matrices
+  apart, with every entity transform identical. The fix is ownership, not a conditional: the first
+  application anchors at 0.0, while a state requested during playback still starts when requested.
+- `[x]` Add the regression test and evidence capture.
+  `[gpu][composition][forensics][alien][animation]`, and its claim is the general form of the repair:
+  **the pose at a second is a property of the piece, not of how the playhead arrived.** Playing to a
+  second versus seeking to it, a 30-step scrub followed by four seeks, a parked playhead held for
+  eight frames, two reloads, four camera distances. Negative-controlled by restoring the defect,
+  which fails it with the same signature the original experiment found.
 
 ### 10.3 Water regression
 
@@ -1507,9 +1726,29 @@ snapshot.
   every entity every frame. Removing the string copies from Glowmere's 278 entities moved the wall
   median from 22.11/21.91 ms to 22.20/22.01 ms across paired runs: inside the spread. The honest
   claim is "below ~0.3 ms on the heaviest canonical scene", not "free".
-- `[ ]` Avoid per-object per-frame logging by default; log changes, invalid values and selected objects.
-- `[ ]` Avoid unnecessary CPU/GPU synchronization, expensive bounds work and full-frame readbacks.
-- `[ ]` Measure diagnostic overhead with the same canonical scenes and resolutions.
+- `[x]` Avoid per-object per-frame logging by default; log changes, invalid values and selected
+  objects. Audited rather than assumed. There is exactly one per-frame log statement in the renderer
+  and it satisfies all three clauses at once: `log::debug`, for the **selected** object only, and
+  emitted only when the camera moved, the object's state changed, or the object went non-finite. The
+  two counter dumps are environment-gated (`AVGEN_FRAME_COUNTERS`, `AVGEN_CPU_STAGES`) *and* every
+  thirtieth frame. The finite guards log the values they refuse, which is the "invalid values" clause
+  and the reason the ASan run doubles as a check on them.
+- `[x]` Avoid unnecessary CPU/GPU synchronization, expensive bounds work and full-frame readbacks.
+  **No full-frame readback happens in a live frame at all**: `readTexture8`/`readTextureF16` are
+  reached only through `renderToImage*`, which is the offline and test path. Every blocking `WaitAny`
+  in the renderer is a `PopErrorScope` at *pipeline creation*, not per frame. The cull-stats readback
+  is deliberately non-blocking -- which is the right call for cost and is exactly what
+  `SYM-TERRAIN-1` is about, so the two entries in this plan pull in opposite directions and the
+  honest statement is that the *synchronisation* is right and the *decision taken from it* is not.
+  The one genuinely per-object per-frame cost is the diagnostic's world bounds and six frustum
+  margins, measured below.
+- `[x]` Measure diagnostic overhead with the same canonical scenes and resolutions. Measured on the
+  heaviest one, which is the only one where it could show: Glowmere's 278 entities, paired runs,
+  22.11/21.91 ms against 22.20/22.01 ms with the string copies removed -- inside the run-to-run
+  spread. The other two canonical scenes cannot sharpen that and the reason is already recorded:
+  Constellation's median is not a stable statistic (an animated particle fill), so a difference of
+  this size is unmeasurable there by construction. The claim stays "below ~0.3 ms on the heaviest
+  canonical scene", not "free".
 
 ### 11.2 Correctness and performance validation
 
@@ -1545,14 +1784,86 @@ snapshot.
   platform/asset-gated skips (two Khronos sample imports, external ffmpeg/libx264 and NDI runtime).
   The run took 345.85 seconds on the current Apple M2 Max environment. Existing compiler warnings
   in `engine.cpp` remain unrelated to this forensic work.
-- `[ ]` Investigate any order-dependent, contention-sensitive or intermittently failing test before sign-off.
+- `[x]` Investigate any order-dependent, contention-sensitive or intermittently failing test before
+  sign-off. Four found, and **only one of them is a defect** -- the other three are the harness
+  lying, which is why they are listed here rather than quietly worked around.
+
+  1. **`SYM-TERRAIN-1` (a defect, open).** Seven debug failures that release does not have. Not
+     flakiness: reproducible, non-converging, and build-dependent because it is a race. See the
+     report.
+  2. **Concurrent GPU runs are not safe** (harness). Two test binaries at once produce failures in
+     both -- 145 channels between two draws of one `FrameTime`, and checkpoint mismatches. `ctest`
+     already serialises with `RESOURCE_LOCK gpu`; a manual parallel invocation does not, and there is
+     one GPU, so running two does not make them finish sooner.
+  3. **Editing a shader during a run invalidates the running binary** (harness, and the sharpest of
+     the three). Shaders load from `AVGEN_SHADER_SOURCE_DIR` at *runtime*, so a `.wgsl` edit while a
+     suite is in flight makes pipeline creation fail and reports **32 cases failing in
+     `renderer.init()`** for no reason of their own. It cost an hour and a wrong conclusion before it
+     was understood.
+  4. **The unit binary takes a SIGPIPE in a single-process full run** (pre-existing, confirmed by
+     stashing every change in this investigation). The fake-ffmpeg failure test writes to a child
+     that has exited. `ctest`, which runs each case as its own process, is unaffected, so it does not
+     block validation -- but `./build/release/tests/avgen_tests` with no filter cannot reach the end,
+     and anyone who tries will think the suite is broken.
+
+  The rule that falls out of 2 and 3, and is now in "Useful validation commands": a GPU result is
+  only evidence when nothing else is running and nothing is being edited.
 
 ### 11.3 Architectural repair standard
 
-- `[ ]` For every defect, prefer repairing ownership/state flow over adding a conditional.
-- `[ ]` Consider a subsystem rewrite only when its invariant cannot be maintained incrementally, incremental fixes worsen the design, the replacement is smaller/cleaner and it can be tested independently.
-- `[ ]` Candidate rewrite areas, only if evidence supports them: transform extraction, render-object extraction, GPU object buffers, water pass, skinning or culling.
-- `[ ]` Document why a rewrite was or was not justified.
+- `[x]` For every defect, prefer repairing ownership/state flow over adding a conditional. Held for
+  nine of eleven repairs, and the two exceptions are named rather than glossed.
+
+| Defect | Repair | Kind |
+|---|---|---|
+| Scene-local GPU cache collisions | the owning `Scene` joins the reuse key | ownership |
+| Temporal history crossing boundaries | reset at the boundary, plus a transport discontinuity revision | ownership |
+| Particle pools crossing scenes | pools belong to the scene that made them | ownership |
+| Particle pools surviving a seek | `resetTemporalHistory` calls the reset that already existed for it | ownership |
+| Detached composition parameters | `detach()` invalidates every node-owned pointer, not some | lifetime |
+| Animation phase origin | the origin is the timeline's zero, not the engine's first update | ownership |
+| Water over dry ground | a dry corner reports the depth *at itself* rather than a borrowed one | ownership |
+| A node's `material` block | a parse moved out of a branch it was never meant to be inside -- a conditional **removed** | ownership |
+| Diagnostic views tone-mapped | the pass moved to the other side of the tone map | structural |
+| Previous skinning palette on a seek | a flag, consumed by the next evaluate | **conditional** |
+| Non-finite material | substitute and warn | **conditional (a guard)** |
+
+  The palette flag is the one to argue with, and the alternative was tried on paper first: collapsing
+  `previousPalette` onto `palette` inside `seekSeconds` is the ownership-shaped fix, and it is
+  *wrong* -- at seek time the rig has not been re-posed, so it pins the pose being left and the next
+  evaluate copies it forward again. The information genuinely does not exist until the next
+  evaluation, so something has to carry "a discontinuity happened" across that gap. The guard is a
+  conditional by definition; a guard that repaired ownership would not be a guard.
+- `[x]` Consider a subsystem rewrite only when its invariant cannot be maintained incrementally,
+  incremental fixes worsen the design, the replacement is smaller/cleaner and it can be tested
+  independently. Applied, and it selected **nothing**.
+- `[x]` Candidate rewrite areas, only if evidence supports them. Each considered against the evidence
+  actually collected:
+  - *Transform extraction*: no. The transform path is the most heavily pinned thing in the repository
+    -- four axes of static-object matrix with bit equality, a per-object comparison against an
+    independent renderer, and a full world-to-pixel chain -- and it has produced **no defects**.
+  - *Render-object extraction*: no. Object state is already a single function (`makeItem`) shared by
+    the camera and shadow paths precisely so the two cannot describe an object differently.
+  - *GPU object buffers*: no. 21 structure pairs agree byte for byte against the WGSL, slots are
+    dense and deterministic, and the alternating-transform case found nothing.
+  - *Water pass*: no, and this is the one where the evidence changed the answer. The shoreline
+    symptom looked like a depth-space problem in the water shader, which would have been a rewrite
+    candidate; measurement refuted that (2.8 mm agreement, with the wrong space 29.4% away) and the
+    real defect was one line of terrain geometry.
+  - *Skinning*: no. Two seek defects, both in *when* state was resynchronised rather than in how
+    skinning works.
+  - *Culling*: no. The cull's own bounds rule was duplicated and is now one function; that is
+    extraction of a rule, not a rewrite of a subsystem.
+- `[x]` Document why a rewrite was or was not justified. **No rewrite is justified, and the shape of
+  the evidence says why:** of eleven defects, nine were *state ownership at a boundary* -- a cache
+  key, a history, a pool, a parameter lifetime, a phase origin, a palette across a jump -- one was
+  geometry, and one was a pass on the wrong side of the tone map. Not one was a subsystem whose
+  internal design could not hold its invariant. Rewriting any of them would have preserved every
+  defect, because none of them live inside a subsystem; they live between two.
+
+  The single place where a *discipline* change is owed rather than a rewrite is `SYM-TERRAIN-1`:
+  frame content must not be decided from whichever asynchronous readback has arrived. That is a rule
+  to apply at each such decision site, not a subsystem to replace.
 
 ## Phase 12: Final forensic report
 
@@ -1570,14 +1881,17 @@ sections, and each is ticked when that section says something specific enough to
 - `[x]` Explain the reference renderer contract, scope and comparison results. It is coverage and not
   colour, over five views of `renderer-qa-minimal`, and the section says why an absolute brightness
   threshold does not survive the comparison.
-- `[~]` Document every RendererQA test and progressive matrix result. The variants and the matrix are
-  described; a per-level table of the matrix's results is not written down.
+- `[x]` Document every RendererQA test and progressive matrix result. Two tables in the report: the
+  five scene variants with *why each exists* (a variant that exists for no reason is a scene nobody
+  maintains), and the sixteen matrix levels with their results -- including the three rungs that have
+  no control and say so, and the two gaps the change-the-picture check found.
 - `[x]` List all diagnostics, their intended use and overhead. "Diagnostics delivered" and
   "Diagnostics and their overhead", with the honest claim being "below ~0.3 ms on the heaviest
   canonical scene" rather than "free", because the difference is inside the run-to-run spread.
-- `[~]` List automated, manual, GPU-capture and sanitizer regression coverage. "Validation inventory"
-  covers the automated and sanitizer halves; there is no GPU-capture (Metal frame debugger) coverage
-  at all, and the manual half is the QA baseline document rather than a list.
+- `[x]` List automated, manual, GPU-capture and sanitizer regression coverage. A table in the report
+  with all four and their standing, including the two honest entries: manual visual review found
+  **no** defect in this investigation and no regression depends on it, and GPU capture covers nothing
+  at all -- a real gap, named, with what it would be for.
 - `[x]` Document performance impact and measurement conditions. In "Diagnostics and their overhead",
   including why Constellation's GPU median cannot be one of the numbers.
 - `[x]` List remaining issues honestly; anything not proven fixed remains open. "Open evidence gaps",
