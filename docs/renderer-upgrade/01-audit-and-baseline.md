@@ -577,3 +577,40 @@ Volumetrics are 64% of that frame and scale sub-linearly (3.05× for 8× pixels 
 grid plus a resolution-scaled composite). Particles are **completely flat**: simulation- and
 geometry-bound, not fragment-bound. Its opaque scene pass is negligible. **Nothing proposed for
 Glowmere's bottleneck will help Constellation, and vice versa.** They need separate budgets.
+
+## 4.9 Glowmere's own quad-overdraw share, post-LOD0 (task C1)
+
+Full record and every caveat: **ADR-126**. Instrument:
+`tests/unit/test_triangle_size_analysis.cpp`, `[.analysis][triangles]`, committed and re-runnable.
+
+§4.5 confirmed the *mechanism* on a synthetic plane and said it did not establish Glowmere's share.
+This does, from the CPU, because the Overdraw view cannot: ADR-115's counting pass draws plain opaque
+entities only, and Glowmere is overwhelmingly procedural scatter. Captured, the view shows the
+terrain and none of the ecology — confidently partial rather than blank, which is worse.
+
+1280×800, canonical camera, this revision:
+
+| | triangles | coverage | below the 4 px quad threshold | estimated excess |
+|---|---|---|---|---|
+| all submitted geometry | 207,727 | 3.37 Mpx (3.29× the frame) | 45.2% of tris, 2.1% of coverage | **1.52×** |
+| authored entities (terrain, heroes) | 36,286 | 2.59 Mpx | **0.0% / 0.0%** | 1.37× |
+| procedural scatter (the ecology) | 171,441 | 0.77 Mpx | **54.7% / 9.0%** | **2.02×** |
+
+"Estimated excess" is the fragment-cost multiplier over the same coverage drawn in §4.5's cheap band,
+weighting each drawable by its coverage against §4.5's own curve. It is a shape, not milliseconds:
+that sweep's shader is simpler than Glowmere's and its absolute times do not transfer.
+
+**The three things this changes.**
+
+1. **Nearly half of Glowmere's triangles are sub-pixel and they cover 2% of the frame.** Removing all
+   of them recovers about a third of the triangle-size-sensitive fragment cost, and most of that
+   third comes from the 8–64 px band rather than the sub-pixel tail. Phase C is worth doing and is
+   not the whole answer.
+2. **Terrain after LOD0 has no sub-pixel triangles at all.** The remaining quad overdraw is entirely
+   the ecology, which is 23% of frame coverage.
+3. §4.5's closing question — would a small delta make Phase B primary? — answers "not small, not
+   enormous". **Phase B's per-pixel work is at least as valuable as representation for this scene.**
+
+Two defects found in the diagnostics and not fixed here (both outside this work's file ownership):
+the counting pass does not cover procedural instances, and the `FragmentDensity` view's default
+scale is 1.0, so it saturates to a white silhouette at the first fragment and says nothing.

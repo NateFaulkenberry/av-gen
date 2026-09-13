@@ -59,6 +59,11 @@ target_sources(avgen_tests PRIVATE
     # widening, the per-label medians and the removal attribution are where these can be wrong.
     "${CMAKE_SOURCE_DIR}/src/rendering/render_stats.cpp"
     "${CMAKE_SOURCE_DIR}/src/rendering/shadow_math.cpp"
+    # Phase C's two selectors (ADR-122/123). Screen-space importance and the representation choice
+    # are pure arithmetic over a scene and a camera -- no device, and deliberately so: the flicker
+    # risk lives in the hysteresis and it has to be checkable without rendering anything.
+    "${CMAKE_SOURCE_DIR}/src/rendering/importance.cpp"
+    "${CMAKE_SOURCE_DIR}/src/rendering/representation.cpp"
     # The selected object's transform history (forensics 4.3/9.3): it reads the renderer's published
     # diagnosis, which is names and numbers, so it belongs where it can be checked without a device.
     "${CMAKE_SOURCE_DIR}/src/rendering/transform_history.cpp"
