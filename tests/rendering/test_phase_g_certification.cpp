@@ -33,20 +33,26 @@
 // of ADR-125's title, and weakening it to make it pass would be deleting the contract rather than
 // meeting it.
 
+#include "app/engine.hpp"
+#include "app/render_job.hpp"
+#include "assets/image.hpp"
 #include "core/log.hpp"
 #include "core/time.hpp"
 #include "gpu/context.hpp"
 #include "gpu/shader_library.hpp"
 #include "rendering/representation.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "rendering/render_quality.hpp"
 #include "scene/procedural.hpp"
 #include "scene/scene.hpp"
+#include "support/temp_dir.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <vector>
@@ -272,5 +278,134 @@ TEST_CASE("an offline render does not depend on how the camera arrived",
     INFO("from near: " << describe(near));
     INFO("both settled 12 frames at the same camera position, tier = offline, lodHysteresis = 0.3");
     CHECK(far == near);
+    CHECK(ctx->errorCount() == 0);
+}
+
+
+// ---- which tier does an offline render actually run at? --------------------------------------------
+
+namespace {
+namespace fs = std::filesystem;
+
+// How many bytes of two RGBA images differ, and by how much at worst.
+struct Difference {
+    std::size_t bytes = 0;
+    int worst = 0;
+    [[nodiscard]] bool identical() const { return bytes == 0; }
+};
+
+Difference compare(const std::vector<std::uint8_t>& a, const std::vector<std::uint8_t>& b) {
+    Difference d;
+    REQUIRE(a.size() == b.size());
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        const int delta = std::abs(static_cast<int>(a[i]) - static_cast<int>(b[i]));
+        if (delta != 0) {
+            ++d.bytes;
+            d.worst = std::max(d.worst, delta);
+        }
+    }
+    return d;
+}
+
+} // namespace
+
+TEST_CASE("an offline render is rendered at the offline tier", "[gpu][certification][offline][tier]") {
+    // §5.9: an offline render is a deliverable and must not silently inherit a realtime compromise.
+    // `QualityTier::Offline` is what that sentence is implemented as -- 4096-pixel shadow maps
+    // against realtime's default, four cascades, 24 PCF taps, 24 contact steps, six AO slices, and
+    // the ambient-occlusion and shadow-mask terms at full resolution instead of a fraction of it
+    // (`QualitySettings::forTier`, render_quality.hpp).
+    //
+    // The question here is not what that tier does. It is whether the batch render path selects it.
+    // Read on its own the code says no -- `SceneRenderer::setQuality` has exactly one caller,
+    // `Application::setup`, which calls it on the *interactive* renderer, while `app::RenderJob`
+    // constructs a renderer of its own (render_job.cpp:93) and `RenderSettings` has no tier field
+    // for it to be told one through. But reading is how ADR-131's withdrawn result was reached, so
+    // this asks the pixels instead.
+    //
+    // The experiment: render one frame through the real batch path, then render the same second
+    // through the interactive path at each tier, and see which one the batch frame equals.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    const fs::path source = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.scene.json";
+    if (!fs::is_regular_file(source)) {
+        SKIP("the RendererQA scene is not present");
+    }
+    const fs::path dir = testsupport::processTempDir() / "phase_g_offline_tier";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    const fs::path previous = fs::current_path();
+    fs::current_path(dir);
+
+    // A resolution big enough that a shadow map four times the size has somewhere to show up. The
+    // RendererQA scene is the control the performance baselines are measured against and has a
+    // floor, objects standing on it and a directional key -- which is exactly the content the tier
+    // differences are about.
+    constexpr std::uint32_t kW = 480;
+    constexpr std::uint32_t kH = 300;
+    constexpr double kSecond = 1.0;
+    {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadComposition(source).has_value());
+        engine.renderSettings().width = kW;
+        engine.renderSettings().height = kH;
+        engine.renderSettings().fps = 30.0;
+        engine.renderSettings().startSeconds = kSecond;
+        engine.renderSettings().endSeconds = kSecond + 0.01;
+        engine.renderSettings().output = app::RenderOutput::PngSequence;
+        engine.renderSettings().outputPath = "frames";
+        REQUIRE(engine.saveProject("qa.json").has_value());
+    }
+    {
+        auto engine = std::make_unique<app::Engine>(app::EngineMode::Offline);
+        REQUIRE(engine->loadProject("qa.json").has_value());
+        app::RenderSettings settings = engine->renderSettings();
+        app::RenderJob job(*ctx, shaders, std::move(engine), settings, fs::path("."));
+        REQUIRE(job.start().has_value());
+        REQUIRE(job.run().has_value());
+    }
+    const auto batch = assets::loadImage("frames/frame_000000.png", false);
+    REQUIRE(batch.has_value());
+
+    // The same project, the same second, through the interactive path at a named tier.
+    const auto interactiveAt = [&](rendering::QualityTier tier) {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadProject("qa.json").has_value());
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        renderer.setQuality(tier);
+        FixedStepClock clock(30.0);
+        clock.restartAt(kSecond);
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(kW, kH);
+        engine.update(time);
+        auto image = renderer.renderToImage(engine.scene(), time, kW, kH);
+        REQUIRE(image.has_value());
+        return image->rgba;
+    };
+
+    const std::vector<std::uint8_t> realtime = interactiveAt(rendering::QualityTier::Realtime);
+    const std::vector<std::uint8_t> offline = interactiveAt(rendering::QualityTier::Offline);
+
+    // The premise: the two tiers must actually produce different pixels on this scene, or the test
+    // below is comparing a frame against two identical things and cannot distinguish them. If this
+    // fails, the fixture needs content the tier changes, not a weaker assertion.
+    const Difference tiers = compare(realtime, offline);
+    INFO("realtime vs offline, interactive path: " << tiers.bytes << " bytes differ, worst "
+                                                   << tiers.worst);
+    REQUIRE_FALSE(tiers.identical());
+
+    const Difference againstRealtime = compare(batch->data, realtime);
+    const Difference againstOffline = compare(batch->data, offline);
+    INFO("batch vs realtime: " << againstRealtime.bytes << " bytes differ, worst "
+                               << againstRealtime.worst);
+    INFO("batch vs offline:  " << againstOffline.bytes << " bytes differ, worst "
+                               << againstOffline.worst);
+
+    // What §5.9 requires: the frame a batch render delivers is the offline tier's frame.
+    CHECK(againstOffline.bytes <= againstRealtime.bytes);
+
+    fs::current_path(previous);
+    fs::remove_all(dir);
     CHECK(ctx->errorCount() == 0);
 }
