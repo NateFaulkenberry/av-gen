@@ -1357,6 +1357,20 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         // one. Separates "the mask pass costs this" from "the mask's half resolution saves this".
         {"maskfull", [](QualitySettings& q) { q.shadowMaskScale = 1.0f; },
          "shadowMaskScale=1.0 (the mask computed per pixel, as High/Offline do)"},
+        // ADR-139. The volumetric march at the resolution the High and Offline tiers ask for --
+        // their own setting, not a fabricated one -- so the pair says what half resolution buys
+        // rather than what an invented scale would.
+        {"volumefull", [](QualitySettings& q) { q.volumeResolutionScale = 1.0f; },
+         "volumeResolutionScale=1.0 (the march per pixel, as High/Offline do)"},
+        // The Preview tier's volumetric settings, likewise its own: quarter resolution and half
+        // the authored step count. Together with `volumefull` these bracket the shipped default.
+        {"volumepreview",
+         [](QualitySettings& q) { q.volumeResolutionScale = 0.25f; q.volumeStepScale = 0.5f; },
+         "volumeResolutionScale=0.25, volumeStepScale=0.5 (the Preview tier's volume)"},
+        // Resolution held at the default and only the ray sampling halved: the axis that trades
+        // banding along the ray, separated from the one that trades detail at silhouettes.
+        {"volumesteps", [](QualitySettings& q) { q.volumeStepScale = 0.5f; },
+         "volumeStepScale=0.5 (half the authored march steps, resolution unchanged)"},
     };
     return kArms;
 }
@@ -3006,11 +3020,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     }
     stage(cpu.sceneEncodeMs);
 
-    // ---- volumetric atmosphere (ADR-032): half-res raymarch + depth-aware composite ----
+    // ---- volumetric atmosphere (ADR-032): raymarch + depth-aware composite ----
+    // ADR-139: at `QualitySettings::volumeResolutionScale` of the scene's resolution, not a
+    // hard-coded half. ADR-140: the two passes are timed separately as `volume.march` and
+    // `volume.composite`.
     // Skipped entirely when Environment::volumeDensity is 0, so scenes without fog are unchanged.
     if (toggles_.volume) {
         volumes_->update(scene, time, hdr_.width(), hdr_.height(), hdr_.depthView(), fields_.get(),
-                         particles_->glowSystems());
+                         particles_->glowSystems(), qualitySettings_);
         volumes_->encode(encoder, hdr_.colorView(), frameBindGroup_);
     }
     stats_.volume = volumes_->stats();

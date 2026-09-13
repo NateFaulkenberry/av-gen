@@ -1,7 +1,9 @@
 // Volumetric atmosphere (ADR-032). Two passes, both a fullscreen triangle, encoded by
 // rendering::VolumeRenderer right after the lit pass and before the post chain:
 //
-//   fs_volume     half-resolution raymarch into an RGBA16F target: rgb = in-scattered radiance
+//   fs_volume     raymarch into an RGBA16F target at `QualitySettings::volumeResolutionScale` of
+//                 the scene's resolution (ADR-139; 0.5 is the shipped default, 1.0 is per pixel
+//                 and is what Offline renders): rgb = in-scattered radiance
 //                 that reached the eye, a = transmittance along the ray. Reads the scene depth
 //                 so the march stops at the first surface (the fog is occluded correctly).
 //   fs_composite  full resolution, into the HDR target with blending
@@ -32,7 +34,7 @@ struct VolumeUniforms {
     params1: vec4<f32>,   // absorption, anisotropy, emission, maxDistance
     noiseParams: vec4<f32>, // noiseAmount, noiseScale, noiseSpeed, time (seconds)
     info: vec4<f32>,      // steps, density field slot (-1 none), colour field slot (-1 none), frame index
-    sizes: vec4<f32>,     // half width, half height, full width, full height
+    sizes: vec4<f32>,     // march width, march height, full width, full height (ADR-139)
     depthParams: vec4<f32>, // camera near, camera far, 0, 0
     fogColor: vec4<f32>,  // rgb = emission tint when no colour field is named
     glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), yzw = 0
@@ -263,10 +265,14 @@ fn particleGlowAt(p: vec3<f32>) -> vec3<f32> {
 
 @fragment
 fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
-    let halfPx = vec2<i32>(floor(in.pos.xy));
-    // The full-resolution texel this half-res pixel marches (the composite pass uses the same
-    // rule to decide which neighbour saw which surface).
-    let fullPx = vec2<i32>(min(halfPx.x * 2, i32(vol.sizes.z) - 1), min(halfPx.y * 2, i32(vol.sizes.w) - 1));
+    let marchPx = vec2<i32>(floor(in.pos.xy));
+    // The full-resolution texel this march pixel marches (the composite pass uses the same rule
+    // to decide which neighbour saw which surface). `ratio` is 2 at the default half-resolution
+    // scale, where this is exactly the `marchPx * 2` it has always been, and 1 at scale 1.0,
+    // where every march pixel is its own full-res pixel.
+    let ratio = vol.sizes.zw / vol.sizes.xy;
+    let mapped = vec2<i32>(floor(vec2<f32>(marchPx) * ratio));
+    let fullPx = vec2<i32>(min(mapped.x, i32(vol.sizes.z) - 1), min(mapped.y, i32(vol.sizes.w) - 1));
     let ndc = ndcOf((vec2<f32>(fullPx) + vec2<f32>(0.5)) / vol.sizes.zw);
     let origin = worldAt(ndc, 0.0);
     let farPoint = worldAt(ndc, 1.0);
@@ -282,7 +288,7 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
     if (stepLength <= 0.0) {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
-    let jitter = stepJitter(halfPx, u32(vol.info.w));
+    let jitter = stepJitter(marchPx, u32(vol.info.w));
     let screenUv = (vec2<f32>(fullPx) + vec2<f32>(0.5)) / vol.sizes.zw;
     // Froxel depth is measured along the camera axis, not along this pixel's ray, or a sample at
     // the edge of a wide frame lands a slice or two deep and reads the wrong light list.
@@ -327,8 +333,13 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
 fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
     let fullPx = vec2<i32>(floor(in.pos.xy));
     let myDepth = linearDepth(textureLoad(sceneDepth, fullPx, 0));
-    // Bilinear footprint in half-res texel space.
-    let coord = (vec2<f32>(fullPx) + vec2<f32>(0.5)) * 0.5 - vec2<f32>(0.5);
+    // Bilinear footprint in march-texel space. `invRatio` is 0.5 at the default half-resolution
+    // scale and 1.0 when the march ran per pixel -- and at 1.0 `coord` lands exactly on an
+    // integer, so `f` is zero, the (0,0) neighbour takes the whole weight and the filter is a
+    // copy of the pixel's own march rather than a blur of four.
+    let ratio = vol.sizes.zw / vol.sizes.xy;
+    let invRatio = vol.sizes.xy / vol.sizes.zw;
+    let coord = (vec2<f32>(fullPx) + vec2<f32>(0.5)) * invRatio - vec2<f32>(0.5);
     let base = floor(coord);
     let f = coord - base;
     let bx = i32(base.x);
@@ -345,7 +356,8 @@ fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
             let hx = clamp(bx + i, 0, maxX);
             let hy = clamp(by + j, 0, maxY);
             let bilinear = (f32(1 - i) + f32(2 * i - 1) * f.x) * (f32(1 - j) + f32(2 * j - 1) * f.y);
-            let sourcePx = vec2<i32>(min(hx * 2, fullMaxX), min(hy * 2, fullMaxY));
+            let mapped = vec2<i32>(floor(vec2<f32>(f32(hx), f32(hy)) * ratio));
+            let sourcePx = vec2<i32>(min(mapped.x, fullMaxX), min(mapped.y, fullMaxY));
             let theirDepth = linearDepth(textureLoad(sceneDepth, sourcePx, 0));
             let w = bilinear / (1.0 + 8.0 * abs(theirDepth - myDepth) / max(myDepth, 1e-3));
             accum = accum + textureLoad(volumeTex, vec2<i32>(hx, hy), 0) * w;

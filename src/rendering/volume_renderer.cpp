@@ -22,8 +22,13 @@ constexpr std::uint64_t kParticleGlowBytes = kMaxParticleGlowSystems * 32;
 
 namespace {
 
-std::uint32_t halfOf(std::uint32_t v) {
-    return std::max<std::uint32_t>((v + 1) / 2, 1);
+// ADR-139: the march target's size at a given resolution scale. 0.5 reproduces the historical
+// `(v + 1) / 2` exactly for every v, so the shipped half-resolution march is bit-identical to
+// what it was before the scale became a parameter.
+std::uint32_t scaledOf(std::uint32_t v, float scale) {
+    const float s = std::clamp(scale, 0.05f, 1.0f);
+    const auto scaled = static_cast<std::uint32_t>(std::ceil(static_cast<float>(v) * s - 1e-4f));
+    return std::max<std::uint32_t>(scaled, 1);
 }
 
 } // namespace
@@ -33,7 +38,7 @@ struct VolumeRenderer::Impl {
 
     Result<void> createPipelines(const wgpu::ShaderModule& module);
     Result<wgpu::RenderPipeline> finish(const wgpu::RenderPipelineDescriptor& desc, const char* label);
-    Result<void> ensureTarget(std::uint32_t width, std::uint32_t height);
+    Result<void> ensureTarget(std::uint32_t width, std::uint32_t height, float scale);
     void rebuildGroups(const wgpu::TextureView& sceneDepth);
 
     gpu::Context& context;
@@ -55,6 +60,8 @@ struct VolumeRenderer::Impl {
     wgpu::TextureView boundDepth;
     gpu::FrameTimeline* timeline = nullptr;
     double lastMs = -1.0;
+    double lastMarchMs = -1.0;
+    double lastCompositeMs = -1.0;
     bool passThisFrame = false;
     bool activeThisFrame = false;
     bool initialised = false;
@@ -250,9 +257,9 @@ Result<void> VolumeRenderer::Impl::createPipelines(const wgpu::ShaderModule& mod
     return {};
 }
 
-Result<void> VolumeRenderer::Impl::ensureTarget(std::uint32_t width, std::uint32_t height) {
-    const std::uint32_t hw = halfOf(width);
-    const std::uint32_t hh = halfOf(height);
+Result<void> VolumeRenderer::Impl::ensureTarget(std::uint32_t width, std::uint32_t height, float scale) {
+    const std::uint32_t hw = scaledOf(width, scale);
+    const std::uint32_t hh = scaledOf(height, scale);
     if (half.valid() && half.width() == hw && half.height() == hh) {
         return {};
     }
@@ -307,7 +314,7 @@ void VolumeRenderer::Impl::rebuildGroups(const wgpu::TextureView& sceneDepth) {
 
 void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, std::uint32_t width,
                             std::uint32_t height, const wgpu::TextureView& sceneDepth, const FieldUniforms* fields,
-                            std::uint32_t particleGlowSystems) {
+                            std::uint32_t particleGlowSystems, const QualitySettings& quality) {
     Impl& im = *impl_;
     collectTimings();
     im.activeThisFrame = false;
@@ -317,13 +324,18 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     if (!im.initialised || !enabled(env) || width == 0 || height == 0) {
         return;
     }
-    if (auto r = im.ensureTarget(width, height); !r) {
+    // ADR-139: the tier decides how finely the volume is sampled; the scene decides what the
+    // volume *is*. Both axes are clamped to a usable range here rather than trusted.
+    const float resolutionScale = std::clamp(quality.volumeResolutionScale, 0.05f, 1.0f);
+    if (auto r = im.ensureTarget(width, height, resolutionScale); !r) {
         log::warn("volumetrics disabled this frame: {}", r.error().message);
         return;
     }
     im.rebuildGroups(sceneDepth);
 
-    const int steps = std::clamp(env.volumeSteps, 1, 256);
+    const float stepScale = std::clamp(quality.volumeStepScale, 0.05f, 4.0f);
+    const int steps =
+        std::clamp(static_cast<int>(std::lround(static_cast<float>(env.volumeSteps) * stepScale)), 1, 256);
     const int densitySlot = (fields != nullptr && !env.volumeDensityField.empty())
                                 ? fields->slotOf(env.volumeDensityField)
                                 : -1;
@@ -351,7 +363,10 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     im.activeThisFrame = true;
     stats_.steps = static_cast<std::uint32_t>(steps);
     stats_.glowSystems = glowSystems;
-    stats_.halfResolution = true;
+    stats_.halfResolution = im.half.width() < width || im.half.height() < height;
+    stats_.resolutionScale = resolutionScale;
+    stats_.marchWidth = im.half.width();
+    stats_.marchHeight = im.half.height();
     stats_.volumeMs = im.lastMs;
 }
 
@@ -371,7 +386,13 @@ void VolumeRenderer::encode(wgpu::CommandEncoder& encoder, const wgpu::TextureVi
         desc.label = "volume-march-pass";
         desc.colorAttachmentCount = 1;
         desc.colorAttachments = &attachment;
-        desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("volume") : nullptr;
+        // ADR-140: the two passes carry two labels. `FrameTimeline::msForPrefix("volume")` still
+        // sums them, so every existing whole-volume reader is unchanged, but the march and the
+        // composite can now be read apart -- which is the only way to tell what the resolution
+        // scale of ADR-139 actually buys, since it moves one of them and not the other.
+        desc.timestampWrites =
+            im.timeline != nullptr ? im.timeline->mark("volume.march", gpu::FrameTimeline::PassKind::Render)
+                                   : nullptr;
         wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&desc);
         pass.SetPipeline(im.marchPipeline);
         pass.SetBindGroup(0, frameBindGroup);
@@ -388,7 +409,9 @@ void VolumeRenderer::encode(wgpu::CommandEncoder& encoder, const wgpu::TextureVi
         desc.label = "volume-composite-pass";
         desc.colorAttachmentCount = 1;
         desc.colorAttachments = &attachment;
-        desc.timestampWrites = im.timeline != nullptr ? im.timeline->mark("volume") : nullptr;
+        desc.timestampWrites =
+            im.timeline != nullptr ? im.timeline->mark("volume.composite", gpu::FrameTimeline::PassKind::Render)
+                                   : nullptr;
         wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&desc);
         pass.SetPipeline(im.compositePipeline);
         pass.SetBindGroup(0, frameBindGroup);
@@ -398,6 +421,8 @@ void VolumeRenderer::encode(wgpu::CommandEncoder& encoder, const wgpu::TextureVi
     }
     im.passThisFrame = true;
     stats_.volumeMs = im.lastMs;
+    stats_.marchMs = im.lastMarchMs;
+    stats_.compositeMs = im.lastCompositeMs;
 }
 
 void VolumeRenderer::setTimeline(gpu::FrameTimeline* timeline) { impl_->timeline = timeline; }
@@ -405,12 +430,24 @@ void VolumeRenderer::setTimeline(gpu::FrameTimeline* timeline) { impl_->timeline
 void VolumeRenderer::collectTimings() {
     Impl& im = *impl_;
     if (im.timeline != nullptr) {
-        const double ms = im.timeline->msFor("volume");
+        // ADR-140. The prefix keeps the whole-volume number exactly what it was; the two labels
+        // are read separately beside it.
+        const double ms = im.timeline->msForPrefix("volume");
         if (ms >= 0.0) {
             im.lastMs = ms;
         }
+        const double march = im.timeline->msFor("volume.march");
+        if (march >= 0.0) {
+            im.lastMarchMs = march;
+        }
+        const double composite = im.timeline->msFor("volume.composite");
+        if (composite >= 0.0) {
+            im.lastCompositeMs = composite;
+        }
     }
     stats_.volumeMs = im.passThisFrame ? im.lastMs : -1.0;
+    stats_.marchMs = im.passThisFrame ? im.lastMarchMs : -1.0;
+    stats_.compositeMs = im.passThisFrame ? im.lastCompositeMs : -1.0;
 }
 
 } // namespace avgen::rendering

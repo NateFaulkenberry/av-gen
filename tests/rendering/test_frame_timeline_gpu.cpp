@@ -18,6 +18,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -200,17 +201,28 @@ TEST_CASE("a phase that does not run is absent from the timeline", "[timeline][g
     scene::Scene s = boxScene();
 
     // Fog off: no volume label at all, and the stat stays -1 rather than reporting a stale number.
+    // ADR-140 split the one `volume` mark into `volume.march` and `volume.composite`, so both are
+    // checked -- a pass that vanished would otherwise hide behind its surviving sibling.
     const Timings without = run(*renderer, s);
-    CHECK_FALSE(hasLabel(without, "volume"));
+    CHECK_FALSE(hasLabel(without, "volume.march"));
+    CHECK_FALSE(hasLabel(without, "volume.composite"));
     CHECK(renderer->stats().volume.volumeMs < 0.0);
+    CHECK(renderer->stats().volume.marchMs < 0.0);
+    CHECK(renderer->stats().volume.compositeMs < 0.0);
 
     s.environment.volumeDensity = 0.04f;
     s.environment.volumeScattering = 0.6f;
     s.environment.volumeSteps = 48;
     s.environment.volumeMaxDistance = 120.0f;
     const Timings with = run(*renderer, s);
-    CHECK(hasLabel(with, "volume"));
+    CHECK(hasLabel(with, "volume.march"));
+    CHECK(hasLabel(with, "volume.composite"));
     CHECK(renderer->stats().volume.volumeMs >= 0.0);
+    CHECK(renderer->stats().volume.marchMs >= 0.0);
+    CHECK(renderer->stats().volume.compositeMs >= 0.0);
+    // The whole-volume number is the two parts and nothing else.
+    CHECK(renderer->stats().volume.volumeMs ==
+          Catch::Approx(renderer->stats().volume.marchMs + renderer->stats().volume.compositeMs).margin(1e-6));
     CHECK(std::abs(sumOf(with) - with.frameMs) < 1e-6);
     CHECK(ctx->errorCount() == 0);
 }
@@ -240,7 +252,10 @@ TEST_CASE("a pass's timeline number responds to that pass's own workload", "[.pe
         // One run discarded before measuring. The first encode of a given configuration pays
         // pipeline compilation, and that lands inside the measured interval: the 16-step arm, which
         // runs first, reported 40.6 ms for a pass whose real cost is under one.
-        (void)msFor(run(*renderer, s, 20), "volume");
+        // ADR-140: `volume.march` is now the march alone. Before the split this read the march
+        // and the composite together, and the composite does not move with the step count, so the
+        // ratio this test checks was being diluted by a constant.
+        (void)msFor(run(*renderer, s, 20), "volume.march");
         // The *least* of several, not the greatest. Taking the maximum keeps whichever sample was
         // most disturbed -- by compilation, by another process on the GPU, by anything -- which is
         // the opposite of what a cost measurement wants, and it fails in both directions: a spike
@@ -249,7 +264,7 @@ TEST_CASE("a pass's timeline number responds to that pass's own workload", "[.pe
         // estimator the rest of this project's benchmarking uses on a shared machine.
         double best = std::numeric_limits<double>::max();
         for (int attempt = 0; attempt < 3; ++attempt) {
-            best = std::min(best, msFor(run(*renderer, s, 20), "volume"));
+            best = std::min(best, msFor(run(*renderer, s, 20), "volume.march"));
         }
         return best;
     };

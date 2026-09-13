@@ -75,6 +75,25 @@ struct QualitySettings {
     // before the mask existed, which is what keeps offline renders unchanged.
     float shadowMaskScale = 0.5f;
 
+    // ADR-139: the fraction of the scene's resolution the volumetric march (shaders/volume.wgsl
+    // `fs_volume`) runs at, before the depth-aware upsample the composite pass does. 0.5 is the
+    // half-resolution march ADR-032 shipped with and is what every tier below High still uses.
+    // 1.0 means "march per pixel": the composite's bilinear footprint collapses to the one texel
+    // under the pixel with weight 1, so the upsample becomes an exact copy rather than a filter.
+    //
+    // This is the volumetric equivalent of `aoResolutionScale` and `shadowMaskScale`, and it is
+    // here rather than in the scene because it is a *quality* decision and not a compositional
+    // one: the fog a scene authors -- its density, colour, height and extent -- is identical at
+    // every scale, and only how finely it is sampled moves. A scene may not set it (§49: a
+    // scene-specific quality reduction is the thing that rule forbids).
+    float volumeResolutionScale = 0.5f;
+    // ADR-139: multiplier on the scene's authored `Environment::volumeSteps` -- the number of
+    // samples the march takes along each ray. Resolution and step count are the volume's two
+    // independent scalability axes and they buy different things: resolution trades spatial
+    // detail at silhouettes, steps trade depth banding along the ray. 1.0 is the authored count.
+    // Offline never scales either (§5.9).
+    float volumeStepScale = 1.0f;
+
     bool clusteredLighting = true;         // false = the 8-light uniform fallback path
     std::uint32_t sdfShadowSteps = 24;     // raymarched SDFs in the depth-only passes
 
@@ -92,6 +111,8 @@ struct QualitySettings {
             q.aoStepsPerSlice = 4;
             q.aoHistoryFrames = 6;
             q.sdfShadowSteps = 16;
+            q.volumeResolutionScale = 0.25f;
+            q.volumeStepScale = 0.5f;
             break;
         case QualityTier::Realtime:
             break;
@@ -106,6 +127,9 @@ struct QualitySettings {
             q.aoStepsPerSlice = 8;
             q.aoHistoryFrames = 12;
             q.sdfShadowSteps = 32;
+            // The reference live picture, for the same reason `shadowMaskScale` is 1.0 here: the
+            // tier exists to say what the frame looks like with no auxiliary pass downsampled.
+            q.volumeResolutionScale = 1.0f;
             break;
         case QualityTier::Offline:
             q.shadowResolution = 4096;
@@ -119,6 +143,10 @@ struct QualitySettings {
             q.shadowMaskScale = 1.0f;
             q.aoHistoryFrames = 16;
             q.sdfShadowSteps = 48;
+            // §5.9: an offline render takes no temporal or resolution shortcut. The march runs
+            // per pixel at the authored step count, and the composite is then an exact copy.
+            q.volumeResolutionScale = 1.0f;
+            q.volumeStepScale = 1.0f;
             break;
         }
         return q;
