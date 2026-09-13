@@ -1309,6 +1309,19 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     const std::size_t objectCount = scene.procedurals.size();
     std::vector<std::size_t> leadOf(objectCount, kNoLead);
     std::vector<float> groupRadius(objectCount, 0.0f); // the lead's bound must cover every part
+    // A cached mesh's radius is measured on the *uploaded* mesh, which is the source before the
+    // object's own `sourceTransform`. That transform is where a scatter layer's size actually lives
+    // -- composition.cpp puts the "make this 0.45 m tall" normalisation there deliberately, because
+    // `distributionTransform` would scale the placements along with the mesh -- and the draw applies
+    // it (`u.sourceMatrix`). The ladder did not, so it compared a projected radius it was not
+    // actually computing: only three of Glowmere's thirty procedurals have a unit source scale, and
+    // `elder-crown` was sized 8.2x too small (ADR-152). The wind code already travels its bounds
+    // through this same matrix for the same reason.
+    const auto sourceScaleOf = [](const scene::ProceduralGeometry& g) {
+        const glm::mat4 m = g.sourceTransform.matrix();
+        return std::max({glm::length(glm::vec3(m[0])), glm::length(glm::vec3(m[1])),
+                         glm::length(glm::vec3(m[2]))});
+    };
     {
         std::map<std::string, std::size_t> byName;
         bool anyPart = false;
@@ -1349,7 +1362,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             // to be part 0: a trunk's radius would cull a canopy that is still on screen. Resolved
             // here rather than in the loop below because the lead is reached first.
             if (const Impl::CachedMesh* partMesh = im.ensureMesh(part); partMesh != nullptr) {
-                groupRadius[lead] = std::max(groupRadius[lead], partMesh->radius);
+                groupRadius[lead] = std::max(groupRadius[lead], partMesh->radius * sourceScaleOf(part));
             }
         }
     }
@@ -1487,7 +1500,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // excluded because the GPU moves its records after these bounds were taken.
         // ADR-108: the bound has to cover every material part of the asset, or the trunk's radius
         // culls a canopy that is still on screen. `groupRadius` is zero for an object with no parts.
-        const float cullRadius = std::max(mesh->radius, groupRadius[i]);
+        const float cullRadius = std::max(mesh->radius * sourceScaleOf(object), groupRadius[i]);
         const bool fullyCulled = isPart ? fullyCulledOf[leadIndex] != 0
                                         : (cullActive && !usesLive &&
                                            objectFullyCulled(lodSettings, planes, cullCamera, model,
