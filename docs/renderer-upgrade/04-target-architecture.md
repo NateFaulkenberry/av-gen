@@ -335,7 +335,7 @@ verification, and the baseline snapshots green.
 | # | Risk | Severity | Evidence / mitigation |
 |---|---|---|---|
 | 1 | **Phase A's measurement is inconclusive** and the 9 ms stays unexplained | **High** | the whole plan is gated on it; fallback is to A/B a deliberately cheapened fragment shader and infer from the delta |
-| 2 | Representation popping | High | hysteresis; the engine has no TAA, and Nanite's seamlessness *depends* on TAA — so cross-fade or dithered transition is required, not optional |
+| 2 | Representation popping | **Low — measured, ADR-132** | `lodSpread` already smears a simultaneous switch: worst frame 100% → 26% at the shipped default, → 7.5% at the clamp, with the total unchanged. Cross-fade and dither are **not** required, and §28 returns to deferred. |
 | 3 | HLOD proxies become a stale derived copy | **High** | this engine's defect history is nine-of-eleven boundary-ownership bugs; explicit invalidation rule + tests before any proxy is drawn |
 | 4 | Offline silently inherits a realtime compromise | **High** | §5.9; baselines must pass in offline mode; a render is a deliverable |
 | 5 | Occlusion culling false negatives | High | deferred entirely; if adopted, disabled offline, and pixel-diff tested on a fixed camera path |
@@ -397,11 +397,14 @@ against the frame-state baselines.
 
 ## Needs more research
 
-- **Transition quality without TAA.** Nanite's seamless LOD is contingent on temporal AA, which this
-  engine does not have. Cross-fade, dither, and stochastic alpha each need evaluation, and this is
-  the single largest unknown in Phase C.
-- **Whether `framebuffer-fetch` can fold any of this engine's passes.** High potential value on TBDR,
-  entirely unexplored here.
+- **Transition quality without TAA — RESOLVED, ADR-132.** The engine already applies stochastic LOD
+  in space: `cull.wgsl` offsets each instance's thresholds by a per-instance hash. Measured on 400
+  instances at one distance dollied through three thresholds, the worst single frame falls from 400
+  switches (all of them) to 104 at the shipped default and 30 at the clamp, with the total identical
+  — the switches are redistributed, not removed. Cross-fade, dither and stochastic alpha need no
+  evaluation for this reason, and temporal AA is not a prerequisite. What remains unestablished is
+  whether any *individual* switch is visible, which depends on how unlike each other two rungs look
+  and is a question about meshoptimizer's output, not about scheduling.
 
 ## Needs your approval
 

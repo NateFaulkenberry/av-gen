@@ -2692,6 +2692,21 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         if (!j.is_object()) {
             return fail("'lod' must be an object");
         }
+        // An unrecognised key here is silently dropped, and that is how a scene comes to look
+        // configured while doing nothing. Glowmere authored `"lodCount": 2` -- the field is called
+        // `count` -- so its LOD ladder read as a two-rung ladder in the file and was a single rung
+        // in the engine, for as long as anyone had been looking at that file. Name the key rather
+        // than reject it: a scene written by a newer build must still load in an older one.
+        static constexpr std::string_view kLodKeys[] = {
+            "cull",        "maxDistance", "minScreenRadius", "count",     "distance1",
+            "distance2",   "distance3",   "byScreenSize",    "spread",    "hysteresis",
+            "impostorSize"};
+        for (const auto& entry : j.items()) {
+            const std::string& key = entry.key();
+            if (std::find(std::begin(kLodKeys), std::end(kLodKeys), key) == std::end(kLodKeys)) {
+                log::warn("procedural '{}': lod: unknown setting '{}' ignored", g.name, key);
+            }
+        }
         LodSettings& l = g.lod;
         AVGEN_PROC_READ(l.cull, "cull", readBool);
         AVGEN_PROC_READ(l.maxDistance, "maxDistance", readFloat);

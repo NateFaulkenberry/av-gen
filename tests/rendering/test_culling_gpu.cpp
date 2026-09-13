@@ -18,6 +18,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdio>
+#include <numeric>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
@@ -1077,5 +1079,111 @@ TEST_CASE("A part whose placement is not its lead's culls itself", "[gpu][cullin
     CHECK(leadCounts->records == 64u);
     CHECK(partCounts->records == 63u); // its own cull, over its own records
     CHECK(renderer.procedurals().stats().cullObjects == 2u);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// C2 — transition quality without temporal AA.
+//
+// The plan lists "representation popping" as a High risk and records that Nanite's seamless LOD is
+// *contingent* on temporal AA, which this engine does not have; it concludes that cross-fade or
+// dithered transition is "required, not optional". That conclusion was reached from the literature,
+// before anyone measured what `lodSpread` already does.
+//
+// `spread` offsets each instance's ladder thresholds by a per-instance hash, so a stand of ferns
+// does not cross together. This measures popping at its source rather than through pixels: how many
+// instances change level on a single frame. One frame where the whole stand switches is the pop the
+// plan is worried about; the same switches smeared over many frames are individually invisible.
+//
+// A patch of instances at effectively one distance is the worst case on purpose -- naturally spread
+// content staggers on its own and would flatter the result.
+TEST_CASE("LOD spread turns one simultaneous pop into a smear", "[gpu][culling][lod]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    constexpr int kCount = 400;
+    constexpr int kSteps = 130;
+
+    // Returns, for each dolly step, how many instances changed level since the previous step.
+    const auto sweep = [&](float spread) {
+        scene::ProceduralGeometry g = boxGrid(1, 1, 1.0f);
+        g.instances.clear();
+        for (int i = 0; i < kCount; ++i) {
+            // A flat patch at one depth: lateral offsets change distance by <0.1 units at these
+            // ranges, far less than any threshold, so distance is effectively identical.
+            const float x = static_cast<float>(i % 20) * 0.2f - 2.0f;
+            const float y = static_cast<float>(i / 20) * 0.2f - 2.0f;
+            g.instances.push_back(recordAt({x, y, -100.0f}, 1.0f, static_cast<std::uint32_t>(i)));
+        }
+        g.lod.lodCount = 4;
+        g.lod.lodSpread = spread;
+        g.lod.lodHysteresis = 0.0f;
+        g.lod.lodByScreenSize = false;
+        g.lod.lodDistances[0] = 30.0f;
+        g.lod.lodDistances[1] = 60.0f;
+        g.lod.lodDistances[2] = 90.0f;
+        scene::Scene s = sceneWith(std::move(g));
+        s.camera.target = {0.0f, 0.0f, -100.0f};
+
+        std::vector<int> previous(kCount, -1);
+        std::vector<int> changes;
+        changes.reserve(kSteps);
+        for (int step = 0; step < kSteps; ++step) {
+            // Dolly in from 120 units away to 10: every threshold is crossed once.
+            const float distance = 120.0f - static_cast<float>(step) * (110.0f / (kSteps - 1));
+            s.camera.position = {0.0f, 0.0f, -100.0f + distance};
+            (void)renderWith(renderer, s);
+
+            std::vector<int> level(kCount, -1);
+            for (int l = 0; l < 4; ++l) {
+                auto list = renderer.procedurals().readVisibleIndices("grid", l);
+                REQUIRE(list.has_value());
+                for (const std::uint32_t idx : *list) {
+                    REQUIRE(idx < static_cast<std::uint32_t>(kCount));
+                    level[idx] = l;
+                }
+            }
+            int moved = 0;
+            for (int i = 0; i < kCount; ++i) {
+                if (previous[i] >= 0 && level[i] >= 0 && level[i] != previous[i]) { ++moved; }
+            }
+            if (step > 0) { changes.push_back(moved); }
+            previous = level;
+        }
+        return changes;
+    };
+
+    const std::vector<int> without = sweep(0.0f);
+    const std::vector<int> with = sweep(0.12f);
+
+    const auto worst = [](const std::vector<int>& v) { return *std::max_element(v.begin(), v.end()); };
+    const auto frames = [](const std::vector<int>& v) {
+        return static_cast<int>(std::count_if(v.begin(), v.end(), [](int n) { return n > 0; }));
+    };
+    const auto total = [](const std::vector<int>& v) {
+        return std::accumulate(v.begin(), v.end(), 0);
+    };
+
+    std::printf("\n  LOD transitions over a %d-step dolly, %d instances at one distance\n", kSteps, kCount);
+    std::printf("  %-14s %10s %14s %10s\n", "spread", "worst frame", "frames moving", "total");
+    std::printf("  %-14s %10d %14d %10d\n", "0.00 (off)", worst(without), frames(without), total(without));
+    std::printf("  %-14s %10d %14d %10d\n", "0.12 (default)", worst(with), frames(with), total(with));
+    // How far the existing knob goes on its own, which is what decides whether a cross-fade is
+    // needed at all. 0.5 is the shader's clamp.
+    for (const float extra : {0.25f, 0.5f}) {
+        const std::vector<int> v = sweep(extra);
+        std::printf("  %-14.2f %10d %14d %10d\n", static_cast<double>(extra), worst(v), frames(v), total(v));
+        CHECK(total(v) > 0);
+    }
+
+    // Both arms must actually cross the ladder, or the comparison is between two null results.
+    CHECK(total(without) > 0);
+    CHECK(total(with) > 0);
+
+    // The claim: spread converts a simultaneous switch into a staggered one. The worst single frame
+    // is what a viewer perceives as a pop, so that is the number that has to fall.
+    CHECK(worst(with) < worst(without));
+    CHECK(frames(with) > frames(without));
     CHECK(ctx->errorCount() == 0);
 }
