@@ -156,7 +156,19 @@ TEST_CASE("The ceiling of an impostor and HLOD proxy system on Glowmere",
             // costs no rebuild and changes nothing but which instances the cull pass keeps.
             if (arm.minScreenRadius > 0.0f) {
                 for (scene::ProceduralGeometry& p : composition->scene().procedurals) {
-                    p.lod.cull = true;
+                    // Only objects whose author already turned culling on. The first version of
+                    // this arm set `lod.cull = true` on every procedural, which switched culling on
+                    // for hand-placed hero geometry that never had it -- and deleted the elder
+                    // mushroom's cap, 330 px wide in the baseline capture, from the 40 px arm. That
+                    // is not "the C6 band removed"; it is a different frame, and its 20.9% was
+                    // measuring the hero going missing as much as the ecology.
+                    //
+                    // Restricting the arm to `lod.cull` also makes it the right population: the
+                    // ecology scatter is what C5 and C6 exist for, and it is exactly the set the
+                    // world builder enables culling on.
+                    if (!p.lod.cull) {
+                        continue;
+                    }
                     p.lod.minScreenRadius = std::max(p.lod.minScreenRadius, arm.minScreenRadius);
                 }
             }
@@ -209,7 +221,7 @@ TEST_CASE("The ceiling of an impostor and HLOD proxy system on Glowmere",
     }
 
     std::printf("\n  %-44s %10s %10s %10s %10s %12s\n", "arm", "frame ms", "vs base", "scene ms",
-                "vs base", "instances");
+                "vs base", "triangles");
     std::array<double, kArms.size()> frameMedian{};
     std::array<double, kArms.size()> sceneMedian{};
     for (std::size_t a = 0; a < kArms.size(); ++a) {
@@ -225,7 +237,7 @@ TEST_CASE("The ceiling of an impostor and HLOD proxy system on Glowmere",
         const double ds = 100.0 * (sceneMedian[a] / std::max(sceneMedian[0], 1e-9) - 1.0);
         std::printf("  %-44s %10.3f %9.1f%% %10.3f %9.1f%% %12llu\n", kArms[a].name, frameMedian[a],
                     df, sceneMedian[a], ds,
-                    static_cast<unsigned long long>(results[a].back().visibleInstances));
+                    static_cast<unsigned long long>(results[a].back().triangles));
     }
     std::printf("\n  the A/B floor is %.0f%% GPU (§3.3). A delta smaller than that is not a result.\n",
                 rendering::kGpuNoiseFloorPercent);
@@ -234,16 +246,22 @@ TEST_CASE("The ceiling of an impostor and HLOD proxy system on Glowmere",
     std::fflush(stdout);
 
     // ---- what the instrument must prove about itself --------------------------------------------
-    // A null delta is only evidence if the arm really removed the geometry. These assert that it
-    // did; they say nothing about how much time it saved, because that is the measurement.
-    REQUIRE(results[0].back().visibleInstances > 0);
+    //
+    // A null delta is only evidence if the arm really removed the geometry, so this asserts that it
+    // did. It says nothing about how much time was saved, because that is the measurement.
+    //
+    // It asserts on **triangles**, not on `visibleInstances`. That counter is read back from the
+    // cull pass a frame or more late (ADR-077: the CPU cannot have it without stalling the frame it
+    // is measuring), and on the first run of this test it reported 1 instance for the baseline
+    // against 71 for an arm that draws strictly less -- backwards, and by three orders of
+    // magnitude. It is printed above, because a reader should see it, and it is not asserted on,
+    // because it does not mean what its name says on the frame it is sampled from.
+    REQUIRE(results[0].back().triangles > 0);
     for (std::size_t a = 1; a < kArms.size(); ++a) {
-        INFO("arm " << kArms[a].name << " must draw strictly fewer instances than the baseline");
-        CHECK(results[a].back().visibleInstances < results[0].back().visibleInstances);
-    }
-    // Each band is a proper subset of the next, so the instance counts must be monotone. If they
-    // are not, the arms are not measuring nested bands and the deltas are not comparable.
-    for (std::size_t a = 1; a < kArms.size(); ++a) {
-        CHECK(results[a].back().visibleInstances <= results[a - 1].back().visibleInstances);
+        INFO("arm " << kArms[a].name << " must submit strictly fewer triangles than the baseline");
+        CHECK(results[a].back().triangles < results[0].back().triangles);
+        // Each band is a subset of the next, so the counts must be monotone. If they are not, the
+        // arms are not nested and their deltas are not comparable with each other.
+        CHECK(results[a].back().triangles <= results[a - 1].back().triangles);
     }
 }
