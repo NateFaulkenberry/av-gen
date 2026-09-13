@@ -2322,6 +2322,9 @@ glm::mat4 ProceduralGeometry::instanceMatrix(std::uint32_t index) const {
 json ProceduralGeometry::toJson() const {
     json j = json::object();
     j["name"] = name;
+    if (!partOf.empty()) {
+        j["partOf"] = partOf;
+    }
     j["visible"] = visible;
     {
         json s = json::object();
@@ -2510,6 +2513,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
     {
         const json& j = root;
         AVGEN_PROC_READ(g.name, "name", readString);
+        AVGEN_PROC_READ(g.partOf, "partOf", readString);
         AVGEN_PROC_READ(g.visible, "visible", readBool);
         AVGEN_PROC_READ(g.sourceTransform, "sourceTransform", readTransform);
         AVGEN_PROC_READ(g.distributionTransform, "distributionTransform", readTransform);

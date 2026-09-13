@@ -950,3 +950,132 @@ TEST_CASE("Hysteresis holds a level through camera jitter that would otherwise s
     CHECK(held == 0);
     CHECK(ctx->errorCount() == 0);
 }
+
+// ---- ADR-108: the material parts of one asset are one spatial instance ---------------------------
+
+namespace {
+
+// A lead object and one material part of it: the same records, the same ladder, the same matrix --
+// only the mesh differs. The part's mesh is deliberately tiny, so that culling it on its own would
+// reject every instance on screen size while the lead keeps all of them. That is the discriminator:
+// under the shared decision the part draws what the lead draws; without it the part draws nothing.
+std::pair<scene::ProceduralGeometry, scene::ProceduralGeometry> leadAndPart(float minScreenRadius) {
+    scene::ProceduralGeometry lead = boxGrid(8, 8, 2.0f);
+    lead.name = "asset";
+    lead.lod.cull = true;
+    lead.lod.lodCount = 2;
+    lead.lod.lodByScreenSize = false;
+    lead.lod.lodDistances[0] = 26.0f; // splits the grid across both levels
+    lead.lod.minScreenRadius = minScreenRadius;
+
+    scene::ProceduralGeometry part = lead;
+    part.name = "asset_m1";
+    part.partOf = lead.name;
+    part.source.size = {0.02f, 0.02f, 0.02f};
+    part.source.subdivisions = 3; // a different index count, so a swapped slot cannot pass
+    part.meshHash = specHash(part.source);
+    part.material.baseColor = {0.2f, 0.9f, 0.3f};
+    return {std::move(lead), std::move(part)};
+}
+
+scene::Scene assetScene(scene::ProceduralGeometry lead, scene::ProceduralGeometry part) {
+    scene::Scene s = sceneWith(std::move(lead));
+    s.procedurals.push_back(std::move(part));
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("A material part is culled by its lead, once, and drawn from that one decision",
+          "[gpu][culling][lod]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+
+    // The arm under test: the part declares itself part of the lead.
+    rendering::SceneRenderer shared(*ctx, shaders);
+    REQUIRE(shared.init().has_value());
+    auto [lead, part] = leadAndPart(2.0f);
+    const std::uint64_t placements = lead.instances.size();
+    scene::Scene sharedScene = assetScene(lead, part);
+    (void)renderWith(shared, sharedScene);
+
+    auto leadCounts = shared.procedurals().readCullCounts("asset");
+    auto partCounts = shared.procedurals().readCullCounts("asset_m1");
+    REQUIRE(leadCounts.has_value());
+    REQUIRE(partCounts.has_value());
+    CHECK(leadCounts->visible > 0u);
+    CHECK(leadCounts->lod[0] > 0u);
+    CHECK(leadCounts->lod[1] > 0u);
+    // One decision: the part's per-level counts ARE the lead's.
+    CHECK(partCounts->lod == leadCounts->lod);
+    CHECK(partCounts->records == leadCounts->records);
+
+    // The part's draws read its own mesh with the lead's instance counts.
+    std::uint32_t leadIndexCount = 0;
+    for (int level = 0; level < 2; ++level) {
+        INFO("level " << level);
+        auto leadArgs = shared.procedurals().readIndirectArgs("asset", level);
+        auto partArgs = shared.procedurals().readIndirectArgs("asset_m1", level);
+        REQUIRE(leadArgs.has_value());
+        REQUIRE(partArgs.has_value());
+        CHECK((*partArgs)[1] == (*leadArgs)[1]); // instanceCount: the shared decision
+        CHECK((*partArgs)[0] > 0u);              // indexCount: the part's own mesh
+        if (level == 0) {
+            // At full resolution the two meshes are genuinely different (the part is subdivided),
+            // so a draw reading the lead's slot could not pass for reading its own. The reduced
+            // levels are not checked: both boxes decimate to the same index count, which is a fact
+            // about boxes rather than about the slot.
+            CHECK((*partArgs)[0] != (*leadArgs)[0]);
+        }
+        leadIndexCount += (*leadArgs)[0];
+    }
+    CHECK(leadIndexCount > 0u);
+    // The spatial instance is counted once however many materials the asset carries.
+    CHECK(shared.procedurals().stats().instances == placements);
+    // And the classification ran once: two objects, one cull.
+    CHECK(shared.procedurals().stats().cullObjects == 1u);
+    CHECK(ctx->errorCount() == 0);
+
+    // The negative control. The same scene with nothing shared -- the ONLY difference is the
+    // declaration -- and the part now culls itself: its own bounding sphere is a fifth of a pixel
+    // across, so minScreenRadius rejects every instance the lead keeps, and both counters double.
+    rendering::SceneRenderer apart(*ctx, shaders);
+    REQUIRE(apart.init().has_value());
+    auto [lead2, part2] = leadAndPart(2.0f);
+    part2.partOf.clear();
+    scene::Scene apartScene = assetScene(lead2, part2);
+    (void)renderWith(apart, apartScene);
+
+    auto leadAlone = apart.procedurals().readCullCounts("asset");
+    auto partAlone = apart.procedurals().readCullCounts("asset_m1");
+    REQUIRE(leadAlone.has_value());
+    REQUIRE(partAlone.has_value());
+    CHECK(leadAlone->lod == leadCounts->lod); // the lead is unaffected either way
+    CHECK(partAlone->visible == 0u);          // ... and the part has vanished
+    CHECK(apart.procedurals().stats().instances == placements * 2);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("A part whose placement is not its lead's culls itself", "[gpu][culling][lod]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    // The claim that one cull serves both rests entirely on the two being the same placement. Drop
+    // one record from the part and the renderer must refuse the share rather than index a list
+    // built for a different record set.
+    auto [lead, part] = leadAndPart(0.0f);
+    part.instances.pop_back();
+    scene::Scene s = assetScene(lead, part);
+    (void)renderWith(renderer, s);
+
+    auto leadCounts = renderer.procedurals().readCullCounts("asset");
+    auto partCounts = renderer.procedurals().readCullCounts("asset_m1");
+    REQUIRE(leadCounts.has_value());
+    REQUIRE(partCounts.has_value());
+    CHECK(leadCounts->records == 64u);
+    CHECK(partCounts->records == 63u); // its own cull, over its own records
+    CHECK(renderer.procedurals().stats().cullObjects == 2u);
+    CHECK(ctx->errorCount() == 0);
+}

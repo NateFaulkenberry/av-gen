@@ -39,6 +39,15 @@ struct InstanceRecord {
     emissive: vec4<f32>,  // rgb, a = extra lane
 };
 
+// ADR-108: one material part of a multi-material asset, served by another object's cull. The
+// parts of an asset are one spatial instance set drawn several times, so the classification and
+// the compaction happen once on the lead and each part's indirect args are written from the
+// lead's per-level counts with the part's own index count.
+struct CullFanout {
+    indexCounts: vec4<u32>, // index count of each LOD level of THIS part's mesh
+    slot: vec4<u32>,        // x = the part's indirect-args / stats slot
+};
+
 struct CullParams {
     objectToWorld: mat4x4<f32>,
     planes: array<vec4<f32>, 6>, // left, right, bottom, top, near, far; xyz = unit normal, w = d
@@ -51,6 +60,9 @@ struct CullParams {
     stability: vec4<f32>,        // x = per-instance spread, y = hysteresis dead zone (ADR-082)
     // ADR-038 depth layers, as (start, end, density, detail); the count is flags.w.
     depthLayers: array<vec4<f32>, 6>,
+    // ADR-108. x = how many entries of `fanout` are live (0 = this cull serves only itself).
+    fanoutInfo: vec4<u32>,
+    fanout: array<CullFanout, 7>,
 };
 
 @group(0) @binding(0) var<uniform> cullParams: CullParams;
@@ -74,13 +86,35 @@ fn thresholdAt(k: u32) -> f32 {
     return v;
 }
 
-fn indexCountAt(level: u32) -> u32 {
-    let c = cullParams.indexCounts;
+fn componentAt(c: vec4<u32>, level: u32) -> u32 {
     var v = c.x;
     if (level == 1u) { v = c.y; }
     if (level == 2u) { v = c.z; }
     if (level == 3u) { v = c.w; }
     return v;
+}
+
+fn indexCountAt(level: u32) -> u32 {
+    return componentAt(cullParams.indexCounts, level);
+}
+
+const kMaxCullFanout: u32 = 7u; // rendering/procedural_renderer.hpp kMaxCullFanout
+
+// Writes one object slot's args and stats for `level`. The lead writes its own, then one per
+// material part sharing its decision -- same instance count, each part's own index count.
+fn writeLevel(slot: u32, level: u32, indexCount: u32, count: u32, records: u32) {
+    let a = (slot * kMaxLodLevels + level) * 5u; // indexCount, instanceCount, firstIndex, baseVertex, firstInstance
+    indirectArgs[a + 0u] = indexCount;
+    indirectArgs[a + 1u] = count;
+    indirectArgs[a + 2u] = 0u;
+    indirectArgs[a + 3u] = 0u;
+    indirectArgs[a + 4u] = 0u;
+    let statsBase = slot * kStatsStride;
+    cullStats[statsBase + level] = count;
+    if (level == 0u) {
+        cullStats[statsBase + 4u] = records;
+        cullStats[statsBase + 5u] = 1u;
+    }
 }
 
 // ---- depth layers (ADR-038) ---------------------------------------------------------------------
@@ -305,17 +339,15 @@ fn cs_cull_top(@builtin(local_invocation_id) lid: vec3<u32>, @builtin(workgroup_
         let count = min(carry, cullParams.counts.x);
         // One indirect buffer holds every object's args, kMaxLodLevels slots of five u32 each,
         // indexed by the object's slot (flags.z, the same slot it writes its stats to).
-        let a = (cullParams.flags.z * kMaxLodLevels + level) * 5u; // indexCount, instanceCount, firstIndex, baseVertex, firstInstance
-        indirectArgs[a + 0u] = indexCountAt(level);
-        indirectArgs[a + 1u] = count;
-        indirectArgs[a + 2u] = 0u;
-        indirectArgs[a + 3u] = 0u;
-        indirectArgs[a + 4u] = 0u;
-        let statsBase = cullParams.flags.z * kStatsStride;
-        cullStats[statsBase + level] = count;
-        if (level == 0u) {
-            cullStats[statsBase + 4u] = cullParams.counts.x;
-            cullStats[statsBase + 5u] = 1u;
+        writeLevel(cullParams.flags.z, level, indexCountAt(level), count, cullParams.counts.x);
+        // ADR-108: the same decision, emitted for every material part of this asset. One spatial
+        // instance, culled once; the parts differ only in which mesh the draw reads.
+        let fanoutCount = cullParams.fanoutInfo.x;
+        for (var f = 0u; f < kMaxCullFanout; f = f + 1u) {
+            if (f >= fanoutCount) { break; }
+            let part = cullParams.fanout[f];
+            writeLevel(part.slot.x, level, componentAt(part.indexCounts, level), count,
+                       cullParams.counts.x);
         }
     }
 }

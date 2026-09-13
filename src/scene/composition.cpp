@@ -2935,6 +2935,8 @@ void Composition::rebuild() {
                     }
                     ProceduralGeometry sub = pg;
                     sub.name = pg.name + fmt::format("_m{}", part);
+                    // ADR-108: one spatial instance set, shared with part 0.
+                    sub.partOf = pg.name;
                     sub.source.assetPart = static_cast<int>(part);
                     sub.source.assetMesh = parts[part].mesh;
                     if (parts[part].hasMaterial) {
@@ -3143,6 +3145,8 @@ void Composition::rebuild() {
                 for (std::size_t part = 1; part < parts.size(); ++part) {
                     ProceduralGeometry sub = pg;
                     sub.name = pg.name + fmt::format("_m{}", part);
+                    // ADR-108: one spatial instance set, shared with part 0.
+                    sub.partOf = pg.name;
                     sub.source.assetPart = static_cast<int>(part);
                     sub.source.assetMesh = parts[part].mesh;
                     sub.source.meshBudget = partBudget(parts, part, layer.meshBudget);
@@ -3432,6 +3436,10 @@ void Composition::rebuild() {
                 // by construction rather than by luck.
                 for (std::size_t part = 1; part < parts.size(); ++part) {
                     ProceduralGeometry sub = mutableNode.proceduralRest;
+                    // ADR-108: one spatial instance set, shared with part 0. Set on the rest copy
+                    // as well as this frame's, because rest is the authored baseline every later
+                    // frame derives from.
+                    sub.partOf = sanitise(prefix_) + node.name;
                     sub.source.assetPart = static_cast<int>(part);
                     sub.source.assetMesh = parts[part].mesh;
                     sub.source.meshBudget = partBudget(parts, part, node.proceduralRest.source.meshBudget);

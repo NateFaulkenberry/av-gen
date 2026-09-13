@@ -2195,3 +2195,25 @@ TEST_CASE("Decimation cuts triangles while keeping the silhouette", "[procedural
         previous = count;
     }
 }
+
+TEST_CASE("partOf survives a round trip and is absent when unset", "[procedural][json]") {
+    // ADR-108. The field says two objects are one placement drawn with two materials; a scene that
+    // loses it on the way through JSON loses the grouping and quietly culls the asset twice.
+    ProceduralGeometry g;
+    g.name = "tree_m1";
+    g.partOf = "tree";
+    const nlohmann::json j = g.toJson();
+    CHECK(j.at("partOf") == "tree");
+    auto back = ProceduralGeometry::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->partOf == "tree");
+
+    // The control: an object that is nobody's part writes no key, and reads back as one.
+    ProceduralGeometry lone;
+    lone.name = "tree";
+    const nlohmann::json lj = lone.toJson();
+    CHECK_FALSE(lj.contains("partOf"));
+    auto loneBack = ProceduralGeometry::fromJson(lj);
+    REQUIRE(loneBack.has_value());
+    CHECK(loneBack->partOf.empty());
+}

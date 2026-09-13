@@ -444,6 +444,16 @@ struct GenerationContext {
 
 struct ProceduralGeometry {
     std::string name = "procedural";
+    // ADR-108. Non-empty: this object is one material part of the object named here, and the two
+    // share ONE spatial instance set -- the same cloud, the same seed, the same placements. Only
+    // the mesh, the material and the per-instance colour differ. The renderer culls the lead's
+    // records once and emits every part's draw from that one decision, so a spatial instance is
+    // culled once and counted once however many materials the asset carries.
+    //
+    // Not structural: it changes nothing about what this object generates, only how the renderer
+    // groups the work. Set where the parts are created (composition.cpp) and preserved across
+    // applyProceduralParameters, which edits `live` in place rather than copying `rest` wholesale.
+    std::string partOf;
     bool visible = true;
     SourceSpec source;
     Transform sourceTransform;
