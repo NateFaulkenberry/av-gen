@@ -2692,6 +2692,106 @@ TEST_CASE("the reference renderer and the production renderer cover the same pix
         ++comparedViews;
     }
     CHECK(comparedViews == std::size(views));
+
+    // Per *object*, not per frame. Whole-frame coverage agreeing is a weaker claim than it looks:
+    // two objects could swap places, or one could be drawn twice and another not at all, and the
+    // union of the silhouettes would be unchanged. So each entity's own footprint is measured the
+    // only way that does not require the two renderers to agree about shading -- hide it and
+    // difference the two frames -- and the footprints are compared to each other.
+    //
+    // This is what makes the comparison a statement about *transforms*: if production placed an
+    // object somewhere the scene does not say, its footprint moves and the reference's does not.
+    {
+        aimCompositionCamera(engine.params(), glm::vec3(0.0f, 2.5f, 9.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(kW, kH);
+        engine.update(time);
+
+        struct Footprint {
+            std::size_t area = 0;
+            glm::vec2 centroid{0.0f};
+        };
+        const auto footprintOf = [&](const gpu::Image8& with, const gpu::Image8& without) {
+            Footprint f;
+            glm::vec2 sum(0.0f);
+            for (std::uint32_t y = 0; y < kH; ++y) {
+                for (std::uint32_t x = 0; x < kW; ++x) {
+                    const std::uint8_t* a = with.pixel(x, y);
+                    const std::uint8_t* b = without.pixel(x, y);
+                    const int delta = std::max({std::abs(a[0] - b[0]), std::abs(a[1] - b[1]),
+                                                std::abs(a[2] - b[2])});
+                    if (delta > 10) {
+                        ++f.area;
+                        sum += glm::vec2(static_cast<float>(x), static_cast<float>(y));
+                    }
+                }
+            }
+            if (f.area > 0) {
+                f.centroid = sum / static_cast<float>(f.area);
+            }
+            return f;
+        };
+
+        scene::Scene& mutableScene = engine.composition()->scene();
+        std::size_t compared = 0;
+        std::vector<glm::vec2> centroids;
+        for (std::size_t i = 0; i < mutableScene.entities.size(); ++i) {
+            scene::Entity& entity = mutableScene.entities[i];
+            if (!entity.visible || entity.mesh >= mutableScene.meshes.size() ||
+                entity.rig != scene::kInvalidRig ||
+                entity.material.alphaMode == scene::AlphaMode::Blend ||
+                entity.style == scene::MeshStyle::Water) {
+                continue; // the reference path declines these by design; it says so in its counts
+            }
+            INFO("entity '" << entity.name << "'");
+
+            production.resetTemporalHistory();
+            const auto shownProduction = production.renderToImage(mutableScene, time, kW, kH);
+            const auto shownReference = reference.renderToImage(mutableScene, kW, kH);
+            REQUIRE(shownProduction.has_value());
+            REQUIRE(shownReference.has_value());
+            entity.visible = false;
+            production.resetTemporalHistory();
+            const auto hiddenProduction = production.renderToImage(mutableScene, time, kW, kH);
+            const auto hiddenReference = reference.renderToImage(mutableScene, kW, kH);
+            REQUIRE(hiddenProduction.has_value());
+            REQUIRE(hiddenReference.has_value());
+            entity.visible = true;
+
+            const Footprint fp = footprintOf(*shownProduction, *hiddenProduction);
+            const Footprint fr = footprintOf(*shownReference, *hiddenReference);
+            INFO("production " << fp.area << " px at (" << fp.centroid.x << ", " << fp.centroid.y
+                               << "); reference " << fr.area << " px at (" << fr.centroid.x << ", "
+                               << fr.centroid.y << ")");
+            if (fp.area < 60 || fr.area < 60) {
+                continue; // off screen or too small to say anything about; not a failure
+            }
+            ++compared;
+            // Same place. A transform error is not a few pixels -- it puts the object somewhere
+            // else -- so the tolerance is generous and still decisive.
+            CHECK(glm::length(fp.centroid - fr.centroid) < 4.0f);
+            // Same size, within the difference two shading models make at an object's edge.
+            const double ratio = static_cast<double>(fp.area) / static_cast<double>(fr.area);
+            CHECK(ratio > 0.7);
+            CHECK(ratio < 1.4);
+            centroids.push_back(fp.centroid);
+        }
+        INFO(compared << " entities compared object by object");
+        CHECK(compared >= 2);
+
+        // The instrument can tell two objects apart. Without this, a footprint measure that
+        // returned the whole frame for everything would satisfy every check above -- each object
+        // would "agree" with its reference because both were the same meaningless region.
+        float widestSeparation = 0.0f;
+        for (std::size_t a = 0; a < centroids.size(); ++a) {
+            for (std::size_t b = a + 1; b < centroids.size(); ++b) {
+                widestSeparation = std::max(widestSeparation, glm::length(centroids[a] - centroids[b]));
+            }
+        }
+        INFO("widest separation between two object centroids: " << widestSeparation << " px");
+        CHECK(widestSeparation > 10.0f);
+    }
+
     CHECK(ctx->errorCount() == 0);
 }
 

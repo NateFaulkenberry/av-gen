@@ -198,7 +198,17 @@ open in Phase 7.
     regression, and perturbing the parameter did. The authoritative value for an authored node is the
     parameter; the node field is a cache of its base. (`ui::setNodePosition` already writes both, and
     says why.)
-  - `[ ]` Audit the remaining writers: animation, terrain grounding and sequencer evaluation.
+  - `[x]` Audit the remaining writers: animation, terrain grounding and sequencer evaluation.
+    **None of the three writes an entity's world transform, and each has one owner.**
+    *Animation* owns `SkinnedRig::{pose, palette, previousPalette}` and nothing else -- it poses
+    joints, and a skinned glTF node's own transform is ignored on import as the specification
+    requires, so the entity transform places the character and the joint matrices do the rest.
+    *Terrain grounding* does not write a transform either: a walker's height comes from
+    `EntityWorld`'s navigator, built on **the same `WorldMap` and ecology the terrain mesh was built
+    from**, so there is one description of the ground rather than two kept in step -- pinned by
+    `[gpu][composition][forensics]`'s "a walker's height is the ground's, every frame, with no second
+    writer". *Sequencer evaluation* writes **parameters**, never scene objects, which puts it
+    upstream of the derived-copy rule rather than in competition with it.
 - `[x]` Confirm authoritative camera state and matrix generation.
   - `[x]` `Camera::view()` and `glm::perspectiveRH_ZO` are documented.
   - `[x]` Find and compare every competing view/projection construction path.
@@ -220,9 +230,36 @@ open in Phase 7.
       left to the one GPU test that happened to catch it.
 - `[~]` Confirm authoritative animation time and pose ownership.
   - `[x]` Timeline/render-time ownership is documented; renderer does not pose rigs.
-  - `[ ]` Trace seek, reverse, pause, loop and frame-rate paths for duplicate time writes.
-- `[ ]` Confirm authoritative owners for bounds, visibility, material state, object IDs, render IDs, GPU indices and pass state.
-- `[ ]` Record each derived copy, update timing, lifetime, thread, frame boundary and synchronization rule.
+  - `[x]` Trace seek, reverse, pause, loop and frame-rate paths for duplicate time writes.
+    One writer: `Engine::seekSeconds`, which every one of those paths funnels through -- a loop wrap
+    is a seek, a reverse is a seek, `play()` from a parked playhead is a seek to the play start. It
+    takes the position the **transport** decided rather than the one it was asked for (a seek past
+    the end used to leave the two disagreeing), and then resynchronises everything downstream of it
+    in one place: the player, the offline analysis cursor, modulation, sources, the music detector,
+    cues, the entity world, the scheduled event tier, the skinning rigs' previous palettes, and the
+    timeline clock *immediately* rather than on the next frame, so nothing that reads between a seek
+    and the next update sees the second the playhead has left. The two defects Phase 3.4 found were
+    both things missing from that list, not second writers competing with it.
+- `[x]` Confirm authoritative owners for bounds, visibility, material state, object IDs, render IDs,
+  GPU indices and pass state.
+
+| Value | Authoritative owner | Derived copies, and the rule |
+|---|---|---|
+| Mesh bounds | `MeshData::vertices` | `Scene::meshBounds` caches per mesh, invalidated by `meshVersion`. Non-finite vertices are *dropped and counted*, never silently folded away (Phase 9.3) |
+| Cull bounds | the mesh bounds and the entity transform | `scene::entityCullBounds`, one function since two copies of the rule were found drifting; recomputed per update |
+| `Entity::visible` | the node's `visible` flag, through `applyParameters` | the entity copy, re-derived every update like every other derived copy |
+| `Entity::cameraCulled` | whichever pass culled this frame (`cullEntityNodes`, the water path) | runtime only, never serialised, rewritten every update; "off screen" and "not in the scene" are deliberately different claims, and only the second stops a shadow |
+| Material | `material/<program>/*` and `nodes/<name>/material/*` | `Entity::material`, re-derived per update; the renderer refuses a non-finite one by name and substitutes magenta |
+| Object id (picking) | the entity's index | `packPickId(Entity, i)` in the object uniform and the identifier target. **Entity zero's id is `0`, the same as the cleared target** -- what makes it findable is the *material* id beside it being one-based, so the packed word is non-zero. Anything reading that target must test the word, not the low half |
+| GPU object slot | the renderer, per frame | `objectIndex++` in submission order in `makeItem`. **Not stable between frames**: it is where this frame put the object, which is why the diagnostic carries it and the snapshot compares objects by *name* |
+| Pass state | `SceneRenderer::PassToggles` | one owner, and since Phase 8.3 one *enumeration* -- `passArms()` -- that the CLI, the panel and the bisection all read rather than each keeping a list |
+
+- `[x]` Record each derived copy, update timing, lifetime, thread, frame boundary and synchronization
+  rule. The composition table is in 1.3 (every entry: written by `applyParameters`, read by the
+  renderer and by culling, refreshed every update, lifetime one frame, main thread only); the
+  renderer-side table is directly above. The one synchronisation rule worth stating separately is the
+  one `SYM-TERRAIN-1` violates: **a frame's content must not depend on which asynchronous readback
+  has arrived.** That is the open defect, and it is a rule the code does not yet keep.
 
 ### 1.3 Audit duplicated state
 
@@ -238,11 +275,29 @@ open in Phase 7.
     parameter plus the node's authored `*Rest` snapshot on every update. Two members of this family
     were found by accident and each cost an investigation; the rest were found by reading the one
     function that owns them.
-- `[ ]` Search for duplicated material, object ID, render ID, GPU index, buffer offset and generation values.
-- `[~]` Build a table for each duplicate:
+- `[x]` Search for duplicated material, object ID, render ID, GPU index, buffer offset and generation
+  values. The answer is short, and the interesting part is what is *absent*.
+
+  **Material** is duplicated exactly once, by the derived-copy rule, and is additionally fingerprinted
+  (`materialHash`) in the diagnostic -- deliberately a hash rather than a copy of every field, because
+  the question a diff asks is "is this the same surface" and one number answers it without the
+  snapshot growing a second material. **Object id** exists twice by construction and the two are
+  different numbers: the pick id in the identifier target, and the GPU object slot. That is not a
+  duplicate to collapse -- one is identity and the other is location -- but it is a trap, and it is
+  why the `Ids` view and the object-depth view key on different things and had to be reconciled.
+  **Buffer offset** is the slot times a fixed stride, computed in one place. **There is no generation
+  counter anywhere**, which is the finding rather than an omission: the renderer's reuse boundary is
+  the owning `Scene` pointer plus a local version, not a per-frame generation, so there is nothing to
+  duplicate and nothing to keep in step -- and the scene-swap defects this investigation fixed were
+  all cases of that boundary being keyed on too little.
+- `[x]` Build a table for each duplicate:
   `value | authoritative source | derived copies | writer | reader | update timing | lifetime | thread | GPU sync risk`.
-  The composition half is below; the GPU-side columns (buffer offset, generation, sync risk) are
-  Phase 3.3's and remain open.
+  The composition half is below; the renderer half is the table in 1.2. Every row on both is written
+  on the main thread, refreshed every update, and lives one frame. **The GPU sync risk column is one
+  sentence for the whole table:** nothing in it is read by the GPU across a frame boundary, because
+  every value is rewritten before the frame that reads it -- with one exception, which is
+  `SYM-TERRAIN-1`, where a *draw decision* is taken from an asynchronous readback whose arrival is not
+  a frame boundary at all.
 
 **Derived copies on the composition path.** All of them: written by `Composition::applyParameters`,
 read by the renderer and by culling, refreshed every update, lifetime one frame, main thread only.
@@ -269,8 +324,21 @@ removing the re-derivation.
 does not reach `applyParameters`, which reads the *final* value. The engine refreshes finals every
 frame in its modulation pass; a composition updated on its own does not, so a test must call
 `ParameterSet::resetFinals()` or its setup silently does nothing.
-- `[ ]` Explicitly audit the chain `scene transform -> render transform -> GPU transform -> camera-relative transform -> shader transform`.
-- `[ ]` Identify any path where camera-relative conversion can be written back into authoritative scene state.
+- `[x]` Explicitly audit the chain `scene transform -> render transform -> GPU transform ->
+  camera-relative transform -> shader transform`. Walked end to end and asserted, not read:
+  `[gpu][renderer][forensics][lifetime3_4]` follows world → camera-relative → clip → NDC → screen
+  from the renderer's own diagnostic matrices and finishes **at the pixels**, with each object's
+  footprint measured by hiding it and differencing rather than classified by colour. The
+  camera-relative link in that chain is the view matrix's single subtraction and nothing else, which
+  is asserted as such: orthonormal basis, determinant +1, the eye exactly at the view-space origin,
+  and `basis * (world - eye)` equal to `view * world`. Negative-controlled by injecting a second
+  subtraction, which fails exactly that stage, and by a 2 mm-per-frame accumulating creep -- the
+  version that drifts rather than jumps, which a single-frame check cannot see -- which fails all six
+  cases.
+- `[x]` Identify any path where camera-relative conversion can be written back into authoritative
+  scene state. **There is no such path and no such conversion** (Phase 3.2). The renderer takes
+  `const scene::Scene&` throughout, so the type system carries the claim rather than a convention
+  doing it.
 
 ### 1.4 Establish and enforce invariants
 
@@ -337,14 +405,40 @@ it cannot describe a different frame from the one that was drawn.
 
 ### 2.2 Build the minimal reference renderer
 
-- `[ ]` Create a developer-only `ReferenceRenderer` or `MinimalRenderer` path.
-- `[ ]` Support only basic opaque mesh, solid material, depth and explicit camera matrices initially.
-- `[ ]` Keep the path free of culling, LOD, animation, water, transparency, particles, shadows, post FX, batching optimizations and temporal history.
-- `[ ]` Implement the explicit path:
-  `authoritative world transform -> render snapshot -> GPU upload -> model -> view -> projection -> MVP -> basic material -> depth -> draw`.
-- `[ ]` Give the reference path deterministic object ordering and stable resource lifetime.
-- `[ ]` Add a direct comparison harness for the same simple scene through reference and production renderers.
-- `[ ]` Compare transforms, visibility, object IDs, depth, geometry, material inputs and image hashes.
+- `[x]` Create a developer-only `ReferenceRenderer` path. `src/rendering/reference_renderer.{hpp,cpp}`
+  with `shaders/reference.wgsl`. It is not a fallback, a quality tier or a preview, and the header
+  says so: it draws flat colour and will never look like the picture.
+- `[x]` Support only basic opaque mesh, solid material, depth and explicit camera matrices.
+- `[x]` Keep the path free of culling, LOD, animation, water, transparency, particles, shadows, post
+  FX, batching and temporal history. **Nothing it does not have can explain a difference** -- which is
+  the only property that makes it useful as a second opinion. What it declines is *counted* and
+  reported (`Counts`), because a scene of water and particles renders as nothing here, and a caller
+  comparing against an empty frame would conclude the transforms agree.
+- `[x]` Implement the explicit path: authoritative world transform → explicit view and projection →
+  MVP → flat material → depth → draw.
+- `[x]` Give the reference path deterministic object ordering and stable resource lifetime. Objects
+  draw in scene order with no sorting, so the order is a property of the scene and not of a frame;
+  meshes are uploaded per call rather than cached, deliberately -- a second renderer that shared the
+  production caches could not be evidence about them.
+- `[x]` Add a direct comparison harness for the same simple scene through both renderers.
+  `[gpu][composition][forensics][reference]`, five camera views of `renderer-qa-minimal`, production
+  stripped to a comparable arm set.
+- `[~]` Compare transforms, visibility, object IDs, depth, geometry, material inputs and image hashes.
+  **Transforms, visibility and geometry: yes, and per object.** Whole-frame coverage agreeing is a
+  weaker claim than it looks -- two objects could swap places, or one be drawn twice and another not
+  at all, and the union of the silhouettes would be unchanged. So each entity's own footprint is
+  measured the only way that does not require the two renderers to agree about shading (hide it,
+  difference the frames) and the footprints are compared to each other: same centroid to within 4 px,
+  same area to within the difference two shading models make at an edge. A transform error is not a
+  few pixels; it puts the object somewhere else. The instrument is required to tell two objects apart
+  before any of that counts, or a footprint measure returning the whole frame would satisfy every
+  check.
+
+  **Object IDs, depth and material inputs: no, and they cannot be.** The reference path writes no
+  identifier target, no linear depth and no material beyond a flat colour -- by design, since each is
+  a thing that could explain a difference. Comparing them would mean building them, at which point it
+  is no longer a minimal renderer. **Image hashes: deliberately not.** The two shade differently, so
+  a hash comparison compares tone maps; coverage is the comparison that is about geometry.
 
 ### 2.3 Static-object invariant and camera experiments
 
