@@ -2074,3 +2074,197 @@ TEST_CASE("each renderer isolation toggle removes the thing it names",
 
     CHECK(ctx->errorCount() == 0);
 }
+
+// ---- Phase 8.2: the progressive matrix ----------------------------------------------------------
+//
+// Subsystems switched on one at a time, and at every level the same script of camera moves and
+// transport operations. The plan's question is "record the first level where each instability
+// appears", so the value is entirely in the *order*: a failure at level 6 with level 5 clean says
+// which subsystem introduced it, which is the whole reason for building the ladder rather than
+// running the full renderer and looking at it.
+//
+// What each level asks of a frame is the same three things, because they are the three that do not
+// need a human to look: it renders at all, the GPU reports no errors, and the identical inputs
+// render identically. The last one is the one with teeth -- most instabilities in this investigation
+// have shown up first as a frame that would not reproduce.
+//
+// The ladder covers the switchable dimensions and says which of the plan's sixteen levels are not
+// independently reachable rather than pretending. Terrain, lighting, LOD and the sequencer have no
+// isolation control (see Phase 4.2), so they are present at every level here.
+TEST_CASE("the progressive matrix finds the first level that misbehaves",
+          "[gpu][composition][forensics][matrix]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the RendererQA scene is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    using Toggles = rendering::SceneRenderer::PassToggles;
+    const auto bare = [] {
+        Toggles t;
+        t.shadows = false;
+        t.ao = false;
+        t.volume = false;
+        t.post = false;
+        t.shadowMask = false;
+        t.water = false;
+        t.transparency = false;
+        t.particles = false;
+        t.animation = false;
+        return t;
+    };
+
+    // Cumulative, in the plan's order as far as the controls allow.
+    struct Level {
+        const char* name;
+        Toggles toggles;
+        // Some passes need an input before they do anything. RendererQA authors
+        // `volumeDensity: 0`, which keeps the volumetric march off however the toggle is set -- so
+        // that rung supplies the density rather than the shipped scene carrying it. The QA scene is
+        // the *control* for the performance baselines, and changing what it draws to make a test
+        // meaningful would spend a fixed point to buy a variable one.
+        float volumeDensity = 0.0f;
+    };
+    std::vector<Level> levels;
+    Toggles t = bare();
+    levels.push_back({"0 opaque geometry", t});
+    t.shadows = true;
+    levels.push_back({"4 shadows", t});
+    t.shadowMask = true;
+    levels.push_back({"4b shadow mask", t});
+    // Level 5 of the plan's list -- water -- is **absent from this ladder**, because RendererQA has
+    // no water in it. A rung whose subsystem the scene does not contain draws the same frame as the
+    // rung below and localises nothing, and rather than pretend, the water toggle stays on
+    // throughout and water has its own coverage: the six-view shoreline test in `test_gpu.cpp` and
+    // the generator invariant in `test_world.cpp`. Adding a shoreline to RendererQA is Phase 8.1's
+    // job and would change the scene the performance baselines are controlled against.
+    t.water = true;
+    t.transparency = true;
+    levels.push_back({"7 transparency", t});
+    t.animation = true;
+    levels.push_back({"9 animation", t});
+    t.particles = true;
+    levels.push_back({"10 particles", t});
+    t.ao = true;
+    levels.push_back({"11a ambient occlusion", t});
+    t.volume = true;
+    levels.push_back({"11b volumetrics", t, 0.06f});
+    t.post = true;
+    levels.push_back({"11c post", t});
+
+    // The script, run at every level. Levels 1 and 15 of the plan's list are not levels here but
+    // this: the instability being looked for is usually a camera move or a time jump.
+    struct Step {
+        const char* what;
+        glm::vec3 eye;
+        glm::vec3 aim;
+        double seek;        // < 0 to advance rather than jump
+        std::uint32_t width;
+        std::uint32_t height;
+    };
+    static constexpr Step kScript[] = {
+        {"opening", {0.0f, 2.0f, 10.0f}, {0.0f, 1.0f, 0.0f}, 0.0, 160, 120},
+        {"translate", {6.0f, 2.0f, 10.0f}, {0.0f, 1.0f, 0.0f}, -1.0, 160, 120},
+        {"rotate", {6.0f, 2.0f, 10.0f}, {6.0f, 1.6f, -2.0f}, -1.0, 160, 120},
+        {"dolly", {1.5f, 1.6f, 2.5f}, {0.0f, 1.0f, -3.0f}, -1.0, 160, 120},
+        {"orbit", {-8.0f, 4.0f, -8.0f}, {0.0f, 1.0f, -4.0f}, -1.0, 160, 120},
+        {"seek forward", {0.0f, 2.0f, 10.0f}, {0.0f, 1.0f, 0.0f}, 9.0, 160, 120},
+        {"seek back", {0.0f, 2.0f, 10.0f}, {0.0f, 1.0f, 0.0f}, 2.0, 160, 120},
+        {"scrub", {0.0f, 2.0f, 10.0f}, {0.0f, 1.0f, 0.0f}, 2.05, 160, 120},
+        {"resize", {0.0f, 2.0f, 10.0f}, {0.0f, 1.0f, 0.0f}, -1.0, 96, 96},
+        {"resize back", {0.0f, 2.0f, 10.0f}, {0.0f, 1.0f, 0.0f}, -1.0, 160, 120},
+        {"reload", {0.0f, 2.0f, 10.0f}, {0.0f, 1.0f, 0.0f}, 0.0, 160, 120},
+    };
+
+    // One whole run of the script, from nothing: its own engine, its own renderer. Two of these
+    // compared step by step is the determinism claim that survives a *time-stepping* subsystem.
+    //
+    // Re-rendering one state twice was tried first, twice, and is wrong for anything that moves. The
+    // particle simulation is stepped *inside* the render call, so rendering the same frame again
+    // steps the world again -- the matrix reported "first misbehaving level: particles" about the
+    // renderer doing exactly what it is built to do. That is worth knowing on its own: a frame is
+    // not a pure function of the scene state while particles are in it.
+    const auto runScript = [&](const Level& level, std::vector<std::uint64_t>& hashes) {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadComposition(project).has_value());
+        rendering::SceneRenderer own(*ctx, shaders);
+        REQUIRE(own.init().has_value());
+        own.setPassToggles(level.toggles);
+        if (level.volumeDensity > 0.0f) {
+            auto* density = engine.params().findAs<float>("scene/volumeDensity");
+            REQUIRE(density != nullptr);
+            density->setBase(level.volumeDensity);
+            engine.params().resetFinals();
+        }
+        FixedStepClock clock(60.0);
+        for (const Step& step : kScript) {
+            if (std::string_view(step.what) == "reload") {
+                REQUIRE(engine.loadComposition(project).has_value());
+                own.resetTemporalHistory();
+            }
+            if (step.seek >= 0.0) {
+                engine.seekSeconds(step.seek);
+                clock.restartAt(step.seek);
+            }
+            aimCompositionCamera(engine.params(), step.eye, step.aim);
+            const FrameTime time = engine.tick(clock);
+            engine.setViewport(step.width, step.height);
+            engine.update(time);
+            const auto image = own.renderToImage(engine.scene(), time, step.width, step.height);
+            REQUIRE(image.has_value());
+            hashes.push_back(gpu::hashImage(*image));
+        }
+    };
+
+    std::string firstBad;
+    std::size_t steps = 0;
+    std::vector<std::uint64_t> previousLevel;
+    std::string previousName;
+    for (const Level& level : levels) {
+        INFO("level: " << level.name);
+        const std::uint32_t errorsBefore = ctx->errorCount();
+        std::vector<std::uint64_t> first;
+        std::vector<std::uint64_t> second;
+        runScript(level, first);
+        runScript(level, second);
+        REQUIRE(first.size() == std::size(kScript));
+        REQUIRE(second.size() == first.size());
+        for (std::size_t i = 0; i < first.size(); ++i) {
+            INFO("step: " << kScript[i].what);
+            const bool stable = first[i] == second[i];
+            if (!stable && firstBad.empty()) {
+                firstBad = std::string(level.name) + " / " + kScript[i].what;
+            }
+            CHECK(stable);
+            ++steps;
+        }
+        if (ctx->errorCount() != errorsBefore && firstBad.empty()) {
+            firstBad = std::string(level.name) + " / GPU errors";
+        }
+        CHECK(ctx->errorCount() == errorsBefore);
+
+        // Each rung has to change the picture, or the ladder is not a ladder: a level whose
+        // subsystem is invisible in this scene cannot localise anything, and "the symptom appeared
+        // at level 6" would be meaningless if level 6 drew the same frame as level 5. This is the
+        // control on the whole matrix as well as an assertion about the scene.
+        if (!previousLevel.empty()) {
+            bool changedSomething = false;
+            for (std::size_t i = 0; i < first.size() && i < previousLevel.size(); ++i) {
+                changedSomething = changedSomething || first[i] != previousLevel[i];
+            }
+            INFO("'" << level.name << "' against '" << previousName << "'");
+            CHECK(changedSomething);
+        }
+        previousLevel = first;
+        previousName = level.name;
+    }
+
+    INFO(steps << " rendered steps across " << levels.size()
+               << " levels; first misbehaving level: " << (firstBad.empty() ? "none" : firstBad));
+    CHECK(firstBad.empty());
+    CHECK(steps >= levels.size() * 10);
+    CHECK(ctx->errorCount() == 0);
+}

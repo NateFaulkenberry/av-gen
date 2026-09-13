@@ -680,25 +680,49 @@ turns it off, the symptom stays, and a subsystem is wrongly cleared.
 
 ### 8.2 Run the progressive matrix
 
-For every level, run camera translation, rotation, orbit, dolly, playback, pause, seek, scrub, reload, resolution change and viewport resize.
+Built as `tests/rendering/test_composition_gpu.cpp`, `[gpu][composition][forensics][matrix]`: nine
+cumulative levels, each running an eleven-step script -- translate, rotate, dolly, orbit, seek
+forward, seek back, scrub, resize, resize back, reload -- twice, from two independent engines and
+two independent renderers, comparing the frames step by step. 986 assertions. Levels 1 and 15 of the
+list below are not rungs but that script, run at every rung, because a camera move and a time jump
+are where an instability shows rather than a subsystem to switch on.
 
-- `[ ]` Level 0: basic opaque geometry.
-- `[ ]` Level 1: camera movement.
-- `[ ]` Level 2: terrain.
-- `[ ]` Level 3: lighting.
-- `[ ]` Level 4: shadows.
-- `[ ]` Level 5: water geometry.
-- `[ ]` Level 6: water effects.
-- `[ ]` Level 7: transparent objects.
-- `[ ]` Level 8: characters.
-- `[ ]` Level 9: animation.
-- `[ ]` Level 10: particles.
-- `[ ]` Level 11: post-processing.
-- `[ ]` Level 12: culling.
-- `[ ]` Level 13: LOD.
-- `[ ]` Level 14: sequencer.
-- `[ ]` Level 15: timeline seeking and scrubbing.
-- `[ ]` Record the first level where each instability appears.
+The comparison is *two whole runs*, not one frame rendered twice. Re-rendering a state was tried and
+is wrong twice over: it ticks the clock, so an animated scene is legitimately a different pose, and
+the particle simulation is stepped **inside** the render call, so rendering the same frame again
+steps the world again. Both were reported by the matrix as "the first misbehaving level" before the
+instrument was fixed. That second one is worth keeping: **a frame is not a pure function of the
+scene state while particles are in it.**
+
+Every rung is also asserted to *change the picture* against the rung below. A level whose subsystem
+the scene does not contain draws the same frame as the level before it and can localise nothing, and
+that check is what found the two gaps recorded below.
+
+- `[x]` Level 0: basic opaque geometry.
+- `[x]` Level 1: camera movement. (The script, at every level.)
+- `[!]` Level 2: terrain. No isolation control exists (Phase 4.2); terrain is present at every rung.
+- `[!]` Level 3: lighting. Same: no control, present throughout.
+- `[x]` Level 4: shadows. Two rungs, the cascades and the shadow mask.
+- `[!]` Level 5: water geometry. **RendererQA has no water in it**, so the rung drew the frame below
+  it and was removed rather than faked. Water's coverage is the six-view shoreline test and the
+  generator invariant; putting a shoreline in RendererQA is Phase 8.1's job.
+- `[!]` Level 6: water effects. Same reason.
+- `[x]` Level 7: transparent objects. Reachable only after the material fix -- the scene's
+  "transparent orb" had been opaque since it was written.
+- `[~]` Level 8: characters. The alien is in the scene at every rung; there is no "characters off"
+  control separate from animation.
+- `[x]` Level 9: animation.
+- `[x]` Level 10: particles.
+- `[x]` Level 11: post-processing. Three rungs: ambient occlusion, volumetrics, the post chain.
+  The volumetrics rung supplies its own `scene/volumeDensity`, because RendererQA authors zero and
+  the pass is off at zero however the toggle is set.
+- `[~]` Level 12: culling. The control exists and is tested in the isolation case; it is not a rung
+  here because culling is on throughout and switching it off adds objects rather than a subsystem.
+- `[!]` Level 13: LOD. No control (Phase 4.2).
+- `[!]` Level 14: sequencer. No control.
+- `[x]` Level 15: timeline seeking and scrubbing. (The script, at every level.)
+- `[x]` Record the first level where each instability appears. The matrix reports it by name; it
+  currently reports none.
 
 ### 8.3 Automatic subsystem bisection
 
