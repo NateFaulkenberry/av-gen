@@ -2251,3 +2251,127 @@ TEST_CASE("A procedural resolves to the node that emitted it", "[scene][composit
     CHECK(comp.nodeForProcedural(comp.scene().procedurals.size()) == nullptr);
     CHECK(comp.nodeForProcedural(9999) == nullptr);
 }
+
+// ---- Phase 1.3 of the renderer forensics: the derived-copy rule ---------------------------------
+//
+// Two values were found to be re-derived every frame by accident rather than by search, and both cost
+// an investigation: `CompositionNode::transform` (a forensic test perturbed it and nothing failed)
+// and `Scene::camera` (two forensic tests wrote it and moved no camera, so they asserted nothing).
+// The pattern turned out to be uniform rather than two special cases:
+//
+//   **the parameter is authoritative, the node's `*Rest` struct is the authored baseline, and the
+//   object hanging off `Scene` is a per-frame derivation of the two.**
+//
+// `Composition::applyParameters` rebuilds entities, lights, procedurals, splines, SDFs, fields and
+// particle systems from that pair on every update. So writing to any of them directly is a write
+// that does not survive one frame -- which is a perfectly good design and a trap for anybody who has
+// not been told, including a test author.
+//
+// This pins the rule for the kinds that can be built cheaply. It is deliberately a *contract* test:
+// if a future change makes one of these authoritative it should fail here and the documentation
+// should move with it.
+TEST_CASE("scene objects are derived from parameters, not authoritative",
+          "[scene][composition][forensics][derived]") {
+    Fixture fx;
+    const std::string text = std::string(R"({
+  "format": "avgen-scene", "version": 1, "name": "derived",
+  "camera": {"mode": 1, "position": [3, 4, 5], "target": [0, 1, 0]},
+  "nodes": [
+    {"name": "block", "kind": "gltf", "asset": ")" + fx.glb.filename().string() + R"(",
+     "position": [1, 2, 3], "rotation": [0, 30, 0], "scale": [2, 2, 2]},
+    {"name": "sparks", "kind": "particles", "position": [0, 0, 1],
+     "particles": {"capacity": 256, "seed": 3, "spawnRate": 42.0, "extent": [1, 0.5, 1]}}
+  ]})");
+    auto loaded = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    REQUIRE(loaded.has_value());
+    scene::Composition& comp = **loaded;
+
+    params::ParameterSet params;
+    params::Modulator modulator;
+    comp.attach(params, modulator);
+    const auto update = [&](double at) {
+        // The *final* value is what `applyParameters` reads, and a bare `setBase` does not reach it
+        // -- the engine's modulation pass is what normally refreshes finals every frame, and a
+        // composition updated on its own has no such pass. Another way for a test's setup to
+        // silently do nothing, which is the failure mode this whole investigation keeps meeting.
+        params.resetFinals();
+        FrameTime time;
+        time.renderTime = at;
+        time.deltaTime = 1.0 / 60.0;
+        comp.update(time);
+    };
+    update(0.0);
+
+    const auto entityNamed = [&](std::string_view name) -> const scene::Entity* {
+        for (const scene::Entity& e : comp.scene().entities) {
+            if (e.name.find(name) != std::string::npos) {
+                return &e;
+            }
+        }
+        return nullptr;
+    };
+
+    SECTION("a node's transform is a cache of its parameters") {
+        scene::CompositionNode* node = comp.findNode("block");
+        REQUIRE(node != nullptr);
+        const glm::vec3 authored = node->transform.position;
+        node->transform.position += glm::vec3(0.0f, 5.0f, 0.0f);
+        update(1.0 / 60.0);
+        CHECK(node->transform.position == authored);   // overwritten, not honoured
+
+        // ...and the parameter is what does survive.
+        params::IParameter* p = params.find("nodes/block/position");
+        REQUIRE(p != nullptr);
+        p->setBaseComponent(1, 9.0f);
+        update(2.0 / 60.0);
+        CHECK_THAT(static_cast<double>(node->transform.position.y), WithinAbs(9.0, 1e-6));
+    }
+
+    SECTION("the flattened entity's transform is a derivation too") {
+        const scene::Entity* block = entityNamed("block");
+        REQUIRE(block != nullptr);
+        const std::string name = block->name;
+        const glm::vec3 authored = block->transform.position;
+        // Written through the same const_cast a careless caller would reach for.
+        const_cast<scene::Entity*>(block)->transform.position += glm::vec3(3.0f, 0.0f, 0.0f);
+        update(3.0 / 60.0);
+        const scene::Entity* again = entityNamed(name);
+        REQUIRE(again != nullptr);
+        CHECK(again->transform.position == authored);
+    }
+
+    SECTION("the scene camera is a derivation of camera/*") {
+        // This is the one that made two forensic tests vacuous: they wrote `scene().camera` and
+        // asserted nothing moved, while the camera in fact never moved at all.
+        const_cast<scene::Camera&>(comp.scene().camera).position = glm::vec3(100.0f, 100.0f, 100.0f);
+        update(4.0 / 60.0);
+        CHECK(comp.scene().camera.position != glm::vec3(100.0f, 100.0f, 100.0f));
+
+        params::IParameter* mode = params.find("camera/mode");
+        params::IParameter* position = params.find("camera/position");
+        REQUIRE(mode != nullptr);
+        REQUIRE(position != nullptr);
+        mode->setBaseComponent(0, 1.0f);   // free: orbit ignores position entirely
+        position->setBaseComponent(0, 7.0f);
+        position->setBaseComponent(1, 8.0f);
+        position->setBaseComponent(2, 9.0f);
+        update(5.0 / 60.0);
+        CHECK(comp.scene().camera.position == glm::vec3(7.0f, 8.0f, 9.0f));
+    }
+
+    SECTION("a particle system is rebuilt from its rest state and parameters") {
+        REQUIRE_FALSE(comp.scene().particles.empty());
+        const float authored = comp.scene().particles.front().spawnRate;
+        const_cast<scene::ParticleSystem&>(comp.scene().particles.front()).spawnRate = 999.0f;
+        update(6.0 / 60.0);
+        CHECK_THAT(static_cast<double>(comp.scene().particles.front().spawnRate),
+                   WithinAbs(static_cast<double>(authored), 1e-6));
+
+        if (params::IParameter* rate = params.find("nodes/sparks/particles/spawnRate")) {
+            rate->setBaseComponent(0, 7.0f);
+            update(7.0 / 60.0);
+            CHECK_THAT(static_cast<double>(comp.scene().particles.front().spawnRate),
+                       WithinAbs(7.0, 1e-6));
+        }
+    }
+}

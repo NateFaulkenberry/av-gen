@@ -45,6 +45,7 @@ Application::runLive / Application::runHeadless
 |---|---|---|---|
 | Entity world TRS | `scene::Entity::transform` | `ObjectUniforms::model` | Static-object invariant over 680 renderer frames and 4,488 composition comparisons across five camera motions |
 | Authored node TRS | **`nodes/<name>/position\|rotation\|scale`**, not `CompositionNode::transform` | flattened into `Entity::transform` | `applyParameters` re-derives the node field from the parameter every frame; a direct write to it does not survive one update (negative control) |
+| Lights, materials, procedurals, splines, SDFs, fields, particle systems | **the parameter**, over the node's authored `*Rest` snapshot | the object hanging off `Scene` | The same re-derivation, for the whole family: `applyParameters` rebuilds each one every update. Pinned and negative-controlled in `[scene][composition][forensics][derived]`; the table is in the plan's Phase 1.3 |
 | Composition camera | **`camera/mode`, `camera/position`, `camera/target`** (or the orbit block), not `scene::Scene::camera` | `view`, `projection` | Same re-derivation: writing `scene().camera` is overwritten before the frame is drawn, which made two forensic tests vacuous until they were caught |
 | Camera pose | `scene::Camera` | `view`, `projection`, `FrameUniforms` | **No competing construction exists**: `Camera::view()` is the only `glm::lookAt*` outside shadow light-views and `Camera::projection()` the only camera `glm::perspective*`; conventions pinned by test |
 | Animation time/pose | timeline/scene update and `scene::updateRigs` | skinning palette upload | Skinning tests and scene culling audit |
@@ -57,7 +58,7 @@ Application::runLive / Application::runHeadless
 
 | Subsystem | Status | Evidence / remaining risk |
 |---|---|---|
-| Core transforms | `PASS` for renderer and composition paths | Renderer does not mutate authoritative entity TRS, proven over 680 frames of five camera motions with bit equality, and a 240-frame excursion returns byte-identical. Full scene-writer audit remains open. |
+| Core transforms | `PASS` for renderer and composition paths, on all four axes | Renderer does not mutate authoritative entity TRS, proven over 680 frames of five camera motions with bit equality, and a 240-frame excursion returns byte-identical. The composition path holds across camera motion, timeline seeks, a scrub, playback, resolution changes and scene reloads -- 1,733 further comparisons, each axis negative-controlled. Full scene-writer audit remains open. |
 | Camera matrices | `PASS` | RH/WebGPU 0..1 path, finite guards, camera-cut and motion sequences pass. Competing-path audit **closed**: there are none. One deliberate asymmetry recorded -- terrain culls at an aspect floor of 2.5 while entities cull at the exact viewport aspect. |
 | Basic opaque geometry | `PASS` | Deterministic cube and full release suite pass. |
 | GPU object state | `PASS` for audited slots/caches | Dynamic slot guards, stable object diagnostics and scene-owned cache fixes pass. Full buffer generation audit remains open. |
@@ -207,12 +208,15 @@ ever driven through the same path it would be silently excused by this test.
 
 ## A note on vacuous tests
 
-Three tests written during this investigation could not fail, and each was caught by a negative
+Four tests written during this investigation could not fail, and each was caught by a negative
 control rather than by review:
 
 - the alien limb-crossing sweep (a T-pose bind box is wider than every pose it animates into);
 - the RendererQA static-object matrix and the Glowmere one (both wrote `scene().camera`, which the
-  composition overwrites, so the camera never moved).
+  composition overwrites, so the camera never moved);
+- the derived-copy contract test, whose parameter writes did not reach `applyParameters` at all
+  because `setBase` leaves the *final* value alone and a bare `Composition::update` has no
+  modulation pass to refresh it.
 
 The common shape is a test whose *setup* silently did nothing. None of them would have been found by
 reading the assertions, because the assertions were correct. **A forensic test is not evidence until
@@ -220,8 +224,8 @@ it has been shown to fail**, which is why the status definitions in the plan req
 
 ## Open evidence gaps
 
-- Composition-side static-object proof (node flattening, terrain grounding, sequencer writes). The
-  renderer side is closed; the Glowmere UFO matrix in Phase 10.1 is the remaining half.
+- The Glowmere UFO close-up matrix. Everything else about the static object is closed: the renderer
+  path, and the composition path across camera motion, seeks, scrub, playback, resize and reload.
 - Full reference/minimal renderer path and immutable frame snapshot/replay.
 - All-object cull reason history and complete GPU object generation/offset audit.
 - Generic transparency/depth isolation and water mask/depth leakage proof.

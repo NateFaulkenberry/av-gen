@@ -1431,3 +1431,164 @@ TEST_CASE("Glowmere's static geometry holds still under every camera motion",
 
     CHECK(ctx->errorCount() == 0);
 }
+
+// ---- Phase 10.1: the axes the camera matrix does not cross ---------------------------------------
+//
+// The static-object matrix above moves the camera and holds everything else still, which is the
+// symptom as reported ("it moves when the camera moves") and only one axis of four. A transform can
+// also be lost by a *time* jump, by a reload, or by a change of resolution -- and each of those is
+// covered somewhere in the suite for its own sake, with nothing crossing any of them with a static
+// object. A one-frame flicker in a scrub and a permanent shift after a reload look identical to a
+// person and come from completely different code.
+//
+// Same instrument, four different variables: authored node world transform and flattened entity
+// transform, compared with `==` against what the scene said at t=0.
+TEST_CASE("a composition's static nodes hold their transforms across seeks, reloads and resizes",
+          "[gpu][composition][forensics][static][transport]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the RendererQA scene is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(project).has_value());
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+
+    // The camera is parked for the whole test. The camera axis has its own matrix; mixing the two
+    // would leave a failure unable to say which variable moved the object.
+    const glm::vec3 eye{-5.0f, 3.0f, 12.0f};
+    const glm::vec3 aim{-5.0f, 1.0f, -4.0f};
+
+    std::uint32_t width = 192;
+    std::uint32_t height = 120;
+    const auto renderAt = [&](double seconds, bool seek) {
+        if (seek) {
+            engine.seekSeconds(seconds);
+        }
+        FixedStepClock clock(60.0);
+        clock.restartAt(seconds);
+        const FrameTime time = engine.tick(clock);
+        aimCompositionCamera(engine.params(), eye, aim);
+        engine.setViewport(width, height);
+        engine.update(time);
+        if (seek) {
+            renderer.resetTemporalHistory();
+        }
+        auto image = renderer.renderToImage(engine.scene(), time, width, height);
+        REQUIRE(image.has_value());
+        REQUIRE(composition->scene().camera.position == eye);
+    };
+
+    renderAt(0.0, true);
+
+    // What the scene says a static object is, taken once.
+    const std::vector<std::string> staticNodes{"floor", "near-cube", "far-cube", "behind-camera",
+                                               "transparent-orb"};
+    std::vector<std::pair<std::string, glm::mat4>> authored;
+    for (const std::string& name : staticNodes) {
+        if (const scene::CompositionNode* node = composition->findNode(name)) {
+            authored.emplace_back(name, composition->nodeWorldTransform(*node).matrix());
+        }
+    }
+    REQUIRE(authored.size() >= 4);
+    std::vector<std::pair<std::string, glm::mat4>> entities;
+    for (const scene::Entity& e : engine.scene().entities) {
+        if (e.rig == scene::kInvalidRig) {   // skinned characters legitimately move
+            entities.emplace_back(e.name, e.transform.matrix());
+        }
+    }
+    REQUIRE_FALSE(entities.empty());
+
+    std::size_t checks = 0;
+    const auto verify = [&](const char* where) {
+        INFO(where);
+        for (const auto& [name, matrix] : authored) {
+            const scene::CompositionNode* node = composition->findNode(name);
+            REQUIRE(node != nullptr);
+            INFO("node " << name);
+            REQUIRE(composition->nodeWorldTransform(*node).matrix() == matrix);
+            ++checks;
+        }
+        std::size_t compared = 0;
+        for (const scene::Entity& e : engine.scene().entities) {
+            for (const auto& [name, matrix] : entities) {
+                if (e.name != name || e.rig != scene::kInvalidRig) {
+                    continue;
+                }
+                INFO("entity " << e.name);
+                REQUIRE(e.transform.matrix() == matrix);
+                ++compared;
+            }
+        }
+        REQUIRE(compared > 0);
+        checks += compared;
+    };
+    verify("the frame everything is measured against");
+
+    SECTION("seeking about the timeline") {
+        // Forwards, backwards, past the end, to zero, and to a time between frames. A seek is the
+        // operation that makes a time jump reproducible (`Composition::update` integrates across a
+        // gap instead), so it is the one worth crossing with a static object.
+        for (const double seconds : {8.0, 2.0, 20.0, 0.0, 3.5, 19.997, 0.5}) {
+            renderAt(seconds, true);
+            verify("after a seek");
+        }
+    }
+
+    SECTION("scrubbing back and forth") {
+        // What dragging a playhead actually is: many small seeks, alternating direction, some of
+        // them backwards over ground already covered.
+        double at = 4.0;
+        for (int i = 0; i < 40; ++i) {
+            at += (i % 3 == 0) ? -0.21 : 0.13;
+            renderAt(std::max(0.0, at), true);
+            verify("mid-scrub");
+        }
+    }
+
+    SECTION("playing without seeking") {
+        // The control for the two above: the same frames reached by advancing rather than jumping.
+        for (int i = 1; i <= 30; ++i) {
+            renderAt(static_cast<double>(i) / 60.0, false);
+            verify("while playing");
+        }
+    }
+
+    SECTION("changing resolution under a still camera") {
+        // Aspect ratio reaches culling and the projection, not the transform -- which is the claim
+        // being tested rather than assumed. The last size repeats the first, so a transform that
+        // drifted with each resize rather than tracking the size would be caught too.
+        for (const auto [w, h] : {std::pair{192U, 120U}, {320U, 180U}, {96U, 96U}, {64U, 240U},
+                                  {256U, 144U}, {192U, 120U}}) {
+            width = w;
+            height = h;
+            renderAt(1.0, false);
+            verify("after a resize");
+        }
+    }
+
+    SECTION("reloading the scene") {
+        // A reload replaces every node, entity and parameter. The authored numbers have to come back
+        // *identical*, not merely close: this is the axis where a value re-derived through a
+        // different path -- a default applied, a unit converted twice -- would show up.
+        for (int i = 0; i < 3; ++i) {
+            REQUIRE(engine.loadComposition(project).has_value());
+            composition = engine.composition();
+            REQUIRE(composition != nullptr);
+            renderer.resetTemporalHistory();
+            renderAt(0.0, true);
+            verify("after a reload");
+            renderAt(6.0, true);
+            verify("after a reload, seeked");
+        }
+    }
+
+    INFO(checks << " transform comparisons");
+    CHECK(checks > 40);
+    CHECK(ctx->errorCount() == 0);
+}

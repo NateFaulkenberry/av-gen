@@ -72,7 +72,7 @@ stays quotable.
 
 | Id | Symptom | Scene | Where | State |
 |---|---|---|---|---|
-| `SYM-STATIC-1` | A static object appears to move as the camera moves | Glowmere (`visitor`), RendererQA | any camera motion | **Not reproduced**, on both paths and on the scene it was reported against: 680 renderer frames, 4,488 RendererQA comparisons and 75,939 Glowmere comparisons with time held still, all bit-identical, and a 240-frame excursion returning byte-identical. **Likely explanation:** the `visitor` is an animated procedural that turns and hovers ~2.4 cm/1.5 s, which at 190 m with no animation cue reads as drift. Remaining: seek, scrub, reload and resolution-change axes. |
+| `SYM-STATIC-1` | A static object appears to move as the camera moves | Glowmere (`visitor`), RendererQA | any camera motion | **Not reproduced on any of the four axes.** 680 renderer frames, 4,488 RendererQA comparisons and 75,939 Glowmere comparisons under camera motion with time held still; a 240-frame excursion returning byte-identical; and now 1,733 comparisons across timeline seeks, a 40-step scrub, playback, six resolution changes and three scene reloads, all bit-identical. Each axis negative-controlled separately. **Likely explanation:** the `visitor` is an animated procedural that turns and hovers ~2.4 cm/1.5 s, which at 190 m with no animation cue reads as drift. |
 | `SYM-ANIM-1` | A character's pose jumps when the playhead is scrubbed | `examples/characters/alien.scene.json` | any seek | **Reproduced and fixed.** Frame 500 reached from frame 100 differed from frame 500 reached directly by 98 joint matrices. Root cause: the authored animation state's phase origin was the engine's first update. See the report. |
 | `SYM-ANIM-2` | The alien flickers or disappears near a frustum edge | Glowmere, alien | camera edge | **Not reproduced.** A 65-position sweep across the edge, each step rendered against a no-cull control, shows culling never removes a pixel the character would draw. Note the alien cannot discriminate bind-pose from posed bounds (a T-pose bind is wider); that property is tested separately against a rig that reaches past its bind pose. |
 | `SYM-WATER-1` | Water leaks past or intersects terrain incorrectly at a shoreline | Glowmere | shoreline, grazing angles | **Open.** Basic view cases pass; the flat/steep/shallow/deep/angled matrix and the mask/depth visualisations are not built. |
@@ -184,10 +184,42 @@ open in Phase 7.
     places for it to drift, and neither copy was reachable by a test. Extracted to
     `scene::entityCullBounds` (`src/scene/scene.hpp`), both call sites replaced, and the property is
     now unit-tested directly. Full release suite unchanged at 1,681 passing.
-  - `[ ]` Continue the search for the remaining duplicated values.
+  - `[x]` **The search is done for the composition path, and the answer is one rule rather than a
+    list of special cases.** `Composition::applyParameters` rebuilds *every* scene object from a
+    parameter plus the node's authored `*Rest` snapshot on every update. Two members of this family
+    were found by accident and each cost an investigation; the rest were found by reading the one
+    function that owns them.
 - `[ ]` Search for duplicated material, object ID, render ID, GPU index, buffer offset and generation values.
-- `[ ]` Build a table for each duplicate:
+- `[~]` Build a table for each duplicate:
   `value | authoritative source | derived copies | writer | reader | update timing | lifetime | thread | GPU sync risk`.
+  The composition half is below; the GPU-side columns (buffer offset, generation, sync risk) are
+  Phase 3.3's and remain open.
+
+**Derived copies on the composition path.** All of them: written by `Composition::applyParameters`,
+read by the renderer and by culling, refreshed every update, lifetime one frame, main thread only.
+
+| Value | Authoritative source | Derived copy |
+|---|---|---|
+| Node TRS | `nodes/<name>/position\|rotation\|scale` | `CompositionNode::transform`, then `Entity::transform` |
+| Camera pose | `camera/mode`, `camera/position`, `camera/target` (or the orbit block) | `Scene::camera` |
+| Light colour/intensity/range | `nodes/<name>/light/*` | `Scene::lights[i]` |
+| Material tint/emissive/roughness/opacity | `material/<program>/*`, `nodes/<name>/material/*` | `Entity::material`, `ProceduralGeometry::material` |
+| Procedural parameters | `nodes/<name>/procedural/*` + `node.proceduralRest` | `Scene::procedurals[i]` and its sub-objects |
+| Spline parameters | `nodes/<name>/spline/*` + `node.splineRest` | `Scene::splines.splines[i]` |
+| SDF parameters | `nodes/<name>/sdf/*` + `node.sdfRest` | `Scene::sdfs[i]` |
+| Field parameters | `nodes/<name>/field/*` + `node.fieldRest` | `Scene::fields.fields[i]` |
+| Particle system | `nodes/<name>/particles/*` + `node.particleRest` | `Scene::particles[i]` |
+
+**The rule, stated once:** *the parameter is authoritative, the node's `*Rest` struct is the authored
+baseline, and the object hanging off `Scene` is a per-frame derivation of the two.* Writing to a
+`Scene` object directly is a write that does not survive one update. Pinned by
+`tests/unit/test_composition.cpp`, `[scene][composition][forensics][derived]`, negative-controlled by
+removing the re-derivation.
+
+**A second trap in the same area, recorded because it has now caught three tests:** `setBase` alone
+does not reach `applyParameters`, which reads the *final* value. The engine refreshes finals every
+frame in its modulation pass; a composition updated on its own does not, so a test must call
+`ParameterSet::resetFinals()` or its setup silently does nothing.
 - `[ ]` Explicitly audit the chain `scene transform -> render transform -> GPU transform -> camera-relative transform -> shader transform`.
 - `[ ]` Identify any path where camera-relative conversion can be written back into authoritative scene state.
 
@@ -633,9 +665,15 @@ For every level, run camera translation, rotation, orbit, dolly, playback, pause
     -- the same five motions through `Engine` over RendererQA, asserting both the authored node world
     transform *and* the flattened entity transform on every frame. 4,488 comparisons.
     Negative-controlled: a one-millimetre change to `nodes/near-cube/position` fails it.
-  - `[ ]` Remaining: the same matrix on Glowmere itself with the UFO asset, and the seek/scrub/reload/
-    resolution-change axes. The transform path is proven; the asset- and transport-specific axes are
-    not.
+  - `[x]` **The other three axes are covered.** `tests/rendering/test_composition_gpu.cpp`
+    `[gpu][composition][forensics][static][transport]` -- 1,733 comparisons with the camera parked
+    and the *other* variable moving: seven timeline seeks (forward, backward, past the end, to zero,
+    between frames), a 40-step scrub that alternates direction, 30 frames of ordinary playback as the
+    control, six resolution changes ending on the size it started with, and three scene reloads each
+    re-checked at two times. Negative-controlled per section: perturbing the baseline by a millimetre
+    after the first comparison fails all five independently.
+  - `[ ]` Remaining: the same matrix on Glowmere itself with the UFO asset. The transform path is
+    proven on four axes on RendererQA and on the camera axis on Glowmere.
 - `[ ]` Capture world transform, GPU transform, camera, bounds, visibility, LOD and object ID.
 - `[ ]` Classify apparent motion as transform, camera, GPU, culling, LOD, shader or post-processing behavior.
 - `[ ]` Add a permanent regression test for the proven root cause.
