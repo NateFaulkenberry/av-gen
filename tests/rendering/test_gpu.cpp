@@ -488,6 +488,126 @@ TEST_CASE("SceneRenderer resets temporal history across scene swaps", "[gpu][ren
         return out;
     };
 
+    // ---- Phase 3.3: stale or swapped GPU object data --------------------------------------------
+    //
+    // The plan asks for "an alternating-transform two-object test to detect stale or swapped GPU
+    // data", and it is asking about the most plausible remaining mechanism for `SYM-STATIC-1`: the
+    // authored transform can be perfectly still, proven over thousands of frames, and the object
+    // still appear to move if what reaches the GPU is last frame's slot, or the other object's.
+    //
+    // Two objects that exchange places every frame is the shape that catches it, and the comparison
+    // is against the renderer's own per-object diagnostic rather than against pixels.
+    //
+    // Pixels were tried first and are the wrong instrument here: two cubes swapping places is
+    // *motion*, and a renderer that has been running carries previous-frame matrices, an AO history
+    // and an adapting exposure that one rendering the same frame cold does not. 22 of 24 frames
+    // differed for those reasons with the object data perfectly correct, which is the renderer
+    // working. Those subsystems have their own coverage; conflating them with this question would
+    // produce a test that fails for reasons it is not about.
+    TEST_CASE("alternating transforms do not leave stale or swapped GPU object data",
+              "[gpu][renderer][forensics][objects]") {
+        auto ctx = makeContext();
+        auto shaders = makeShaders(*ctx);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        constexpr std::uint32_t kW = 128;
+        constexpr std::uint32_t kH = 96;
+
+        // Two cubes of different sizes, so a swap is a different picture and not only a different
+        // number: equal cubes exchanging places would render identically and prove nothing.
+        const glm::vec3 left{-1.6f, 1.0f, 0.0f};
+        const glm::vec3 right{1.6f, 1.0f, 0.0f};
+        const auto twoCubes = [&](bool swapped) {
+            scene::Scene s;
+            const auto mesh = s.addMesh(cubeMesh(1.0f));
+            auto& a = s.addEntity("cube-a", mesh);
+            a.transform.position = swapped ? right : left;
+            a.material.baseColor = {0.9f, 0.2f, 0.15f};
+            auto& b = s.addEntity("cube-b", mesh);
+            b.transform.position = swapped ? left : right;
+            b.transform.scale = glm::vec3(0.55f);
+            b.material.baseColor = {0.15f, 0.35f, 0.95f};
+            s.camera.position = {0.0f, 1.6f, 6.0f};
+            s.camera.target = {0.0f, 1.0f, 0.0f};
+            scene::PunctualLight key;
+            key.direction = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.6f));
+            key.intensity = 3.0f;
+            s.addLight(key);
+            return s;
+        };
+
+        std::size_t checks = 0;
+        const auto verify = [&](const scene::Scene& scene, const char* where) {
+            std::uint32_t slotA = std::numeric_limits<std::uint32_t>::max();
+            std::uint32_t slotB = slotA;
+            for (const scene::Entity& e : scene.entities) {
+                const rendering::RenderObjectDiagnostic* d = renderer.diagnosticObject(e.name);
+                INFO(where << ", object " << e.name);
+                REQUIRE(d != nullptr);
+                // The matrix that reached the GPU is this object's own, this frame. A stale slot
+                // reproduces the previous frame; a swapped one reproduces the other cube.
+                REQUIRE(d->worldMatrix == e.transform.matrix());
+                REQUIRE(d->worldPosition == e.transform.position);
+                REQUIRE(d->finite);
+                if (e.name == "cube-a") {
+                    slotA = d->objectSlot;
+                } else if (e.name == "cube-b") {
+                    slotB = d->objectSlot;
+                }
+                ++checks;
+            }
+            // Two objects in one frame cannot share a slot; that is the swap, expressed as the
+            // state rather than as its symptom.
+            INFO(where << ", slots " << slotA << " and " << slotB);
+            REQUIRE(slotA != slotB);
+        };
+
+        for (int i = 0; i < 24; ++i) {
+            const bool swapped = i % 2 == 1;
+            auto scene = twoCubes(swapped);
+            renderer.setDiagnosticEntity("cube-a");
+            FrameTime time{};
+            time.renderTime = static_cast<double>(i) / 60.0;
+            const auto image = renderer.renderToImage(scene, time, kW, kH);
+            REQUIRE(image.has_value());
+            verify(scene, swapped ? "swapped" : "straight");
+        }
+
+        // A third object that comes and goes: the slot a departing object held is the one a later
+        // object is most likely to inherit with the old contents still in it.
+        for (int i = 0; i < 12; ++i) {
+            auto scene = twoCubes(false);
+            if (i % 3 != 0) {
+                auto& c = scene.addEntity("cube-c", 0);
+                c.transform.position = {0.0f, 2.4f, -1.0f};
+                c.transform.scale = glm::vec3(0.8f);
+                c.material.baseColor = {0.95f, 0.85f, 0.2f};
+            }
+            FrameTime time{};
+            time.renderTime = static_cast<double>(i) / 60.0;
+            const auto image = renderer.renderToImage(scene, time, kW, kH);
+            REQUIRE(image.has_value());
+            verify(scene, "churn");
+        }
+
+        // ...and the pictures do differ between the two arrangements, or every assertion above was
+        // made about a frame in which nothing happened.
+        rendering::SceneRenderer cold(*ctx, shaders);
+        REQUIRE(cold.init().has_value());
+        auto straight = twoCubes(false);
+        auto swapped = twoCubes(true);
+        const auto one = cold.renderToImage(straight, FrameTime{}, kW, kH);
+        cold.resetTemporalHistory();
+        const auto two = cold.renderToImage(swapped, FrameTime{}, kW, kH);
+        REQUIRE(one.has_value());
+        REQUIRE(two.has_value());
+        CHECK(gpu::hashImage(*one) != gpu::hashImage(*two));
+
+        INFO(checks << " per-object diagnostic comparisons");
+        CHECK(checks > 70);
+        CHECK(ctx->errorCount() == 0);
+    }
+
     TEST_CASE("water never reaches dry land at a shoreline", "[gpu][renderer][water][forensics][shoreline]") {
         auto ctx = makeContext();
         auto shaders = makeShaders(*ctx);

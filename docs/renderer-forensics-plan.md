@@ -327,13 +327,25 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 - `[ ]` Add debug object-ID coloring with stable IDs for the UFO, alien, tree, water and test geometry.
 - `[ ]` Audit uniform/storage buffers, dynamic offsets, ring buffers, staging buffers, bind groups, views and frame allocators.
   - `[~]` Object uniform slot stride and capacity now have compile-time guards, and focused GPU
-    diagnostics verify stable object-slot assignment. Ring-buffer/resource reuse and full pass
-    bind-state auditing remain open.
+    diagnostics verify stable object-slot assignment -- including under alternating transforms and a
+    coming-and-going third object, where a stale or swapped slot would show. Ring-buffer/resource
+    reuse and full pass bind-state auditing remain open.
 - `[~]` Verify CPU/WGSL structure size, alignment, offsets, padding, type widths and matrix layout.
   Frame and object uniform sizes were already asserted; explicit C++ field-offset assertions now
   guard the WGSL field order. Alignment/padding and the remaining GPU-side structures still need
   the same treatment.
-- `[ ]` Add an alternating-transform two-object test to detect stale or swapped GPU data.
+- `[x]` Add an alternating-transform two-object test to detect stale or swapped GPU data.
+  `tests/rendering/test_gpu.cpp`, `[gpu][renderer][forensics][objects]`, 399 assertions: two cubes of
+  different sizes exchange places for 24 frames, then a third comes and goes for 12 more so a
+  departing object's slot is inherited. Every frame asserts each object's *diagnostic* world matrix
+  and position are its own, this frame, and that no two objects share a slot. Negative-controlled by
+  forcing the slot to 0, which fails on the first frame.
+
+  **Recorded because it was tried first and is wrong:** comparing *pixels* against a fresh renderer
+  cannot answer this. Two cubes exchanging places is motion, and a running renderer carries
+  previous-frame matrices, an AO history and an adapting exposure that a cold one does not -- 22 of
+  24 frames differed with the object data perfectly correct. Those subsystems have their own
+  coverage; the question here is answered by the object state, not by the frame.
 - `[x]` Fix mesh, texture and environment/IBL upload identity/version collisions by keying renderer
   caches to the owning `Scene` as well as local IDs/versions. GPU regressions cover distinct
   same-version geometry and HDR data through one renderer, both matching fresh-renderer results.
