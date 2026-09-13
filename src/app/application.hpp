@@ -111,6 +111,11 @@ struct AppOptions {
     // number from a previous run of this program is not a baseline.
     std::string abArm;
     int abBlocks = 2; // A/B pairs; one pair cannot show whether the difference held
+    // ADR-142: quality arms (ADR-117) applied to an *ordinary* run, comma separated, so that a
+    // frame can be captured and looked at under the same arm the A/B timed. Spec 50 requires a
+    // quality reduction be inspected and not only timed, and until this existed an arm could only
+    // be reached inside `--ab`, which captures nothing.
+    std::string qualityArms;
     // Where to write the machine-readable record of this run. The human log is unchanged.
     std::optional<std::filesystem::path> benchJson;
     // ADR-114: compute froxel-grid occupancy every frame. CPU work inside the measured frames, so

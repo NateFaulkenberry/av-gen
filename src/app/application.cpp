@@ -110,6 +110,9 @@ std::string usageText() {
            "                      QualitySettings field instead of removing a pass:\n"
            "                      shadowrange, contact, pcss, maskfull,\n"
            "                      volumefull, volumepreview, volumequarter, volumesteps\n"
+           "  --quality-arm <l>   apply quality arms (the --ab names) to an ordinary run, comma\n"
+           "                      separated, so a frame can be captured under the arm the A/B\n"
+           "                      timed -- a quality reduction has to be looked at, not only timed\n"
            "  --ab-blocks <n>     A/B pairs to run (default 2)\n"
            "  --bench-json <f>    write the run's machine-readable record (percentiles, counters,\n"
            "                      and the conditions that make it comparable) to <f>\n"
@@ -295,6 +298,13 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             options.abArm = *v;
             options.headless = true;
+            ++i;
+        } else if (arg == "--quality-arm") {
+            auto v = need(i, "--quality-arm");
+            if (!v) {
+                return std::unexpected(v.error());
+            }
+            options.qualityArms = *v;
             ++i;
         } else if (arg == "--ab-blocks") {
             auto v = need(i, "--ab-blocks");
@@ -589,6 +599,26 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             return fail("unknown quality tier '{}' (preview|realtime|high|offline)", options_.qualityTier);
         }
         renderer_->setQuality(tier);
+    }
+    // ADR-142. Applied after the tier, so `--tier high --quality-arm volumepreview` reads as
+    // "High, except for this one reduction" -- which is the comparison a visual gate wants.
+    if (!options_.qualityArms.empty()) {
+        rendering::QualitySettings settings = renderer_->qualitySettings();
+        std::string token;
+        std::istringstream stream(options_.qualityArms);
+        std::string applied;
+        while (std::getline(stream, token, ',')) {
+            if (token.empty()) {
+                continue;
+            }
+            if (!rendering::SceneRenderer::setQualityArm(settings, token)) {
+                return fail("unknown quality arm '{}' (one of: {})", token,
+                            rendering::SceneRenderer::qualityArmNames());
+            }
+            applied += applied.empty() ? token : "," + token;
+            log::info("quality arm '{}': {}", token, rendering::SceneRenderer::qualityArmDescription(token));
+        }
+        renderer_->setQualitySettings(settings);
     }
     if (!options_.disablePasses.empty()) {
         rendering::SceneRenderer::PassToggles toggles;
