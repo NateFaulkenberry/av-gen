@@ -132,3 +132,6 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [124](ADR-124-the-band-is-a-band.md) | The target is a band of a few hundred pixels per triangle, not the fewest triangles | Accepted |
 | [125](ADR-125-hysteresis-is-opt-in-and-never-offline.md) | Hysteresis is opt-in, and offline never gets it | Accepted |
 | [126](ADR-126-glowmeres-quad-overdraw-share.md) | Glowmere's quad-overdraw share, and the instrument that had to be built to find it | Accepted |
+| [128](ADR-128-the-object-cap-is-an-allocation-policy.md) | The object cap is an allocation policy, not a constant | Accepted |
+| [129](ADR-129-object-data-stays-a-uniform-buffer.md) | Object data stays a uniform buffer until multi-draw indirect exists | Accepted |
+| [130](ADR-130-the-object-ceiling-is-a-budget-below-the-naming-limit.md) | What remains of the object ceiling is a byte budget, kept below the naming limit | Accepted |

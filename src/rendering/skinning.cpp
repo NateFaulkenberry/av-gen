@@ -229,6 +229,36 @@ const wgpu::RenderPipeline& SkinningRenderer::litPipeline(bool blend, bool doubl
     return doubleSided ? opaqueNoCull_ : opaqueCull_;
 }
 
+void SkinningRenderer::rebuildObjectGroup() {
+    if (!objectUniforms_ || !jointBuffer_) {
+        return;
+    }
+    std::array<wgpu::BindGroupEntry, 2> entries{};
+    entries[0].binding = 0;
+    entries[0].buffer = objectUniforms_;
+    entries[0].size = objectSize_;
+    entries[1].binding = 1;
+    entries[1].buffer = jointBuffer_;
+    // An explicit size, not WHOLE_SIZE: a dynamic offset is added to the bound range, so a
+    // whole-buffer binding would run off the end the moment the offset was non-zero.
+    entries[1].size = sliceBytes_;
+    wgpu::BindGroupDescriptor groupDesc{};
+    groupDesc.label = "skinned-object-bind-group";
+    groupDesc.layout = objectLayout_;
+    groupDesc.entryCount = entries.size();
+    groupDesc.entries = entries.data();
+    objectGroup_ = context_.device().CreateBindGroup(&groupDesc);
+}
+
+void SkinningRenderer::setObjectBuffer(const wgpu::Buffer& objectUniforms, std::uint64_t objectSize) {
+    if (objectUniforms_.Get() == objectUniforms.Get() && objectSize_ == objectSize) {
+        return;
+    }
+    objectUniforms_ = objectUniforms;
+    objectSize_ = objectSize;
+    rebuildObjectGroup();
+}
+
 void SkinningRenderer::ensureBuffer(std::uint32_t sliceBytes, std::uint32_t rigCount) {
     if (jointBuffer_ && sliceBytes == sliceBytes_ && rigCount == sliceCount_) {
         return;
@@ -240,22 +270,7 @@ void SkinningRenderer::ensureBuffer(std::uint32_t sliceBytes, std::uint32_t rigC
     desc.size = static_cast<std::uint64_t>(sliceBytes) * rigCount;
     desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
     jointBuffer_ = context_.device().CreateBuffer(&desc);
-
-    std::array<wgpu::BindGroupEntry, 2> entries{};
-    entries[0].binding = 0;
-    entries[0].buffer = objectUniforms_;
-    entries[0].size = objectSize_;
-    entries[1].binding = 1;
-    entries[1].buffer = jointBuffer_;
-    // An explicit size, not WHOLE_SIZE: a dynamic offset is added to the bound range, so a
-    // whole-buffer binding would run off the end the moment the offset was non-zero.
-    entries[1].size = sliceBytes;
-    wgpu::BindGroupDescriptor groupDesc{};
-    groupDesc.label = "skinned-object-bind-group";
-    groupDesc.layout = objectLayout_;
-    groupDesc.entryCount = entries.size();
-    groupDesc.entries = entries.data();
-    objectGroup_ = context_.device().CreateBindGroup(&groupDesc);
+    rebuildObjectGroup();
     // A sentinel no palette version can hold, so the first frame after a (re)build always uploads:
     // a fresh rig sits at version 0, and "0 == 0, already there" is how a palette silently never
     // reaches the GPU.

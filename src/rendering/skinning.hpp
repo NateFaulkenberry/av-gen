@@ -56,6 +56,11 @@ public:
                                     const wgpu::BindGroupLayout& iblLayout, const wgpu::Buffer& objectUniforms,
                                     std::uint64_t objectSize, wgpu::TextureFormat colorFormat,
                                     wgpu::TextureFormat depthFormat);
+    // ADR-128: the scene renderer's object buffer grows with the frame, and when it is replaced
+    // this group's binding 0 still names the old one. Called by whoever replaced it, so the skinned
+    // path cannot be left reading a buffer nobody is writing any more.
+    void setObjectBuffer(const wgpu::Buffer& objectUniforms, std::uint64_t objectSize);
+
     // Recompiles pbr_skinned.wgsl and rebuilds the pipelines; the previous ones are kept on failure.
     [[nodiscard]] Result<void> reload();
 
@@ -89,6 +94,7 @@ public:
 private:
     Result<void> createPipelines(const wgpu::ShaderModule& module);
     void ensureBuffer(std::uint32_t sliceBytes, std::uint32_t rigCount);
+    void rebuildObjectGroup();
 
     gpu::Context& context_;
     gpu::ShaderLibrary& shaders_;

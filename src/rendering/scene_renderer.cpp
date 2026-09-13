@@ -193,7 +193,6 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       shadowMask_(std::make_unique<ShadowMaskRenderer>(context, shaders)),
       water_(std::make_unique<WaterRenderer>()),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
-    objectStaging_.resize(static_cast<std::size_t>(kMaxObjects) * kObjectStride);
 }
 
 SceneRenderer::~SceneRenderer() = default;
@@ -372,27 +371,13 @@ Result<void> SceneRenderer::init() {
         desc.label = "frame-uniforms";
         desc.size = sizeof(FrameUniforms);
         frameUniforms_ = device.CreateBuffer(&desc);
-        desc.label = "object-uniforms";
-        desc.size = static_cast<std::uint64_t>(kMaxObjects) * kObjectStride;
-        objectUniforms_ = device.CreateBuffer(&desc);
         desc.label = "tonemap-uniforms";
         desc.size = sizeof(TonemapUniforms);
         tonemapUniforms_ = device.CreateBuffer(&desc);
     }
-    auto bufferGroup = [&](const char* label, const wgpu::BindGroupLayout& layout, const wgpu::Buffer& buffer,
-                           std::uint64_t size) {
-        wgpu::BindGroupEntry entry{};
-        entry.binding = 0;
-        entry.buffer = buffer;
-        entry.size = size;
-        wgpu::BindGroupDescriptor desc{};
-        desc.label = label;
-        desc.layout = layout;
-        desc.entryCount = 1;
-        desc.entries = &entry;
-        return device.CreateBindGroup(&desc);
-    };
-    objectBindGroup_ = bufferGroup("object-bind-group", objectLayout_, objectUniforms_, sizeof(ObjectUniforms));
+    // ADR-128: the object buffer and its bind group are made by the same routine that later grows
+    // them, so the allocation path has exactly one implementation and the first one is not special.
+    ensureObjectCapacity(kInitialObjects);
 
     // ---- default textures ----
     whiteSrgb_ = gpu::solidTexture(context_, 255, 255, 255, 255, true, "default-white-srgb");
@@ -1882,6 +1867,72 @@ void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Sce
     pass.End();
 }
 
+// ADR-128. The object cap used to be `kMaxObjects = 256`, a number that fell out of allocating one
+// 128 KB uniform buffer at init() and never touching it again -- and Glowmere already flattens to
+// 278 entities, so the only thing holding the scene together was that the camera never framed all
+// of it. The fix is not a bigger number; it is that the allocation is a per-frame decision. The
+// ABI is deliberately unchanged: still one uniform buffer of 512-byte slots addressed by dynamic
+// offset, so every shader, every pipeline layout and every CPU/WGSL layout guard reads exactly as
+// it did. What changed is that the buffer's *size* stopped being a compile-time constant.
+//
+// Growth is doubling with a floor, so a scene that walks its entity count up one at a time does not
+// reallocate once per entity; and it never shrinks, because a camera turn that drops the count is
+// about to raise it again.
+bool SceneRenderer::drawable(const scene::Entity& entity) const {
+    return entity.visible && entity.mesh < meshes_.size() && meshes_[entity.mesh].indexCount != 0;
+}
+
+void SceneRenderer::ensureObjectCapacity(std::uint32_t objects) {
+    if (objects > kMaxObjectCapacity) {
+        // The one remaining limit, and it is a byte budget rather than a slot count. Logged at the
+        // moment of clamping with both numbers, because the failure this replaces -- entities that
+        // silently stop drawing -- is precisely the one nobody could diagnose.
+        log::warn("scene wants {} object slots; the object-uniform budget ({} MiB) allows {}",
+                  objects, kObjectBufferByteBudget / (1024 * 1024), kMaxObjectCapacity);
+        objects = kMaxObjectCapacity;
+    }
+    if (objectUniforms_ && objects <= objectCapacity_) {
+        return;
+    }
+    std::uint32_t capacity = std::max(objectCapacity_, kInitialObjects);
+    while (capacity < objects) {
+        capacity = capacity <= kMaxObjectCapacity / 2 ? capacity * 2 : kMaxObjectCapacity;
+    }
+    if (objectUniforms_ && capacity == objectCapacity_) {
+        return;
+    }
+    objectCapacity_ = capacity;
+    objectStaging_.assign(static_cast<std::size_t>(capacity) * kObjectStride, 0);
+
+    const auto& device = context_.device();
+    wgpu::BufferDescriptor desc{};
+    desc.label = "object-uniforms";
+    desc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+    desc.size = static_cast<std::uint64_t>(capacity) * kObjectStride;
+    objectUniforms_ = device.CreateBuffer(&desc);
+
+    // The binding stays `sizeof(ObjectUniforms)` wide whatever the buffer's size: a dynamic offset
+    // is added to the bound range, so a whole-buffer binding would run off the end on the first
+    // non-zero offset. This is the same reasoning skinning.cpp records for its palette slices.
+    wgpu::BindGroupEntry entry{};
+    entry.binding = 0;
+    entry.buffer = objectUniforms_;
+    entry.size = sizeof(ObjectUniforms);
+    wgpu::BindGroupDescriptor groupDesc{};
+    groupDesc.label = "object-bind-group";
+    groupDesc.layout = objectLayout_;
+    groupDesc.entryCount = 1;
+    groupDesc.entries = &entry;
+    objectBindGroup_ = device.CreateBindGroup(&groupDesc);
+
+    // The skinned path binds the same slots from the same buffer (ADR-086), so its group 1 names
+    // this buffer too and goes stale the instant it is replaced. A skinned character rendering from
+    // a freed buffer is the exact bug this hand-off exists to prevent.
+    if (skinning_) {
+        skinning_->setObjectBuffer(objectUniforms_, sizeof(ObjectUniforms));
+    }
+}
+
 Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
                                    const gpu::TargetView& target, const ShaderFrameInputs* shaderInputs) {
     if (!initialised_) {
@@ -1930,6 +1981,17 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     stats_.state = StateChangeCounters{};
     stats_.shadowCasters = 0;
     uploadMeshes(scene);
+    // ADR-128: size the object buffer for this frame before anything binds it. The bound is the
+    // number of *drawable* entities, which is the most slots the two entity loops below can
+    // between them consume -- each entity is offered a slot at most once across both. It is
+    // computed after uploadMeshes() because `drawable` asks whether the mesh reached the GPU.
+    {
+        std::uint32_t drawableEntities = 0;
+        for (const auto& entity : scene.entities) {
+            drawableEntities += drawable(entity) ? 1u : 0u;
+        }
+        ensureObjectCapacity(drawableEntities);
+    }
     uploadTextures(scene);
     // ADR-086: this frame's joint palettes. The renderer never *poses* anything -- the scene
     // arrives already posed by scene::updateRigs -- it only moves matrices the scene computed.
@@ -2297,7 +2359,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // spent. Shared by the camera pass and the shadow-only pass so the two cannot describe the
     // same entity differently.
     const auto makeItem = [&](const scene::Entity& entity, std::size_t thisEntity) -> std::optional<DrawItem> {
-        if (objectIndex >= kMaxObjects) {
+        // A backstop, not the budget: ensureObjectCapacity() above sized the buffer for every
+        // drawable entity in the scene, so this only fires if that arithmetic and this loop
+        // disagree -- and then it drops a draw rather than writing past the staging mirror.
+        if (objectIndex >= objectCapacity_) {
             return std::nullopt;
         }
         const scene::Material* material = &entity.material;
@@ -2371,9 +2436,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                entity.style != scene::MeshStyle::Water &&
                entity.material.alphaMode != scene::AlphaMode::Blend;
     };
-    const auto drawable = [&](const scene::Entity& entity) {
-        return entity.visible && entity.mesh < meshes_.size() && meshes_[entity.mesh].indexCount != 0;
-    };
     std::size_t entityIndex = 0;
     for (const auto& entity : scene.entities) {
         const std::size_t thisEntity = entityIndex++;
@@ -2387,7 +2449,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
         const auto item = makeItem(entity, thisEntity);
         if (!item) {
-            log::warn("more than {} visible entities; extra entities skipped", kMaxObjects);
+            log::warn("more than {} visible entities; extra entities skipped", objectCapacity_);
             break;
         }
         if (entity.style == scene::MeshStyle::Grid) {

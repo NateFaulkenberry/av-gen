@@ -8,14 +8,16 @@ placed in the scene stops showing up.
 
 Two facts anchor this document, both checked against the current source rather than assumed:
 
-- **`kMaxObjects = 256` comes from 512-byte dynamic-offset slots in a 128 KB uniform buffer**
-  (256 × 512 = 131,072 bytes). It is not a round number chosen for its own sake; it is what falls
-  out of the buffer-size choice below.
-- **Glowmere flattens to 278 entities — already over that cap.** It only works today because
-  view-frustum culling submits roughly 136 of them in a typical frame; a camera positioned to see
-  the whole scene at once would run into `kMaxObjects` with no error, just entities that silently
-  stop drawing (`log::warn("more than {} visible entities; extra entities skipped", kMaxObjects)`,
-  `src/rendering/scene_renderer.cpp:2305`). Glowmere also logs `"22 splines; only the first 16 are
+- **`kMaxObjects = 256` is gone (ADR-128).** It came from 512-byte dynamic-offset slots in a 128 KB
+  uniform buffer allocated once at `init()`. The buffer now grows with the frame, and what remains
+  is a 64 MiB byte budget — see the section below, which is kept here rather than deleted because
+  the *mechanism* it describes is still the one two other caps use.
+- **Glowmere flattens to 278 entities, and the denser rungs of its own benchmark ladder go much
+  further:** `glowmere-dense` is 482 entities and `glowmere-extreme` is 840. On the pre-ADR-128
+  binary, three of those four scenes never warned — culling kept the visible set under 256 at the
+  camera each recipe opens on — and `glowmere-extreme` logged `extra entities skipped` on 60 of 60
+  frames and rendered without a hero tree that is in the scene. Whether content worked depended on
+  where the camera was pointing. Glowmere also logs `"22 splines; only the first 16 are
   available on the GPU"` today, so `kMaxGpuSplines` is a limit that is *already* user-visible in
   the wild, not a hypothetical.
 
@@ -24,44 +26,40 @@ otherwise.
 
 ---
 
-## `kMaxObjects` — 256 simultaneously-drawable entities
+## `kMaxObjects` — **lifted** (ADR-128); what replaced it
 
-> **In-flight (wave 2, ADR 128-130):** the `cap` agent is actively lifting this limit and re-pinning
-> the object-slot contract. Left unedited here deliberately — verify against source again once that
-> work lands.
-
-- **Value:** 256
-- **Source:** `src/rendering/scene_renderer.hpp:478` (`kMaxObjects`), alongside
-  `kObjectStride = 512` (`:479`)
-- **Why it exists:** every drawn entity gets one slice of a single uniform buffer, addressed by a
-  dynamic offset. WebGPU requires dynamic offsets to be aligned to 256 bytes, `ObjectUniforms` is
-  272 bytes, so each object's slot is rounded up to 512 bytes (`kObjectStride % 256 == 0`, and a
-  `static_assert` pins `sizeof(ObjectUniforms) <= kObjectStride`). The buffer is allocated as
-  `kMaxObjects * kObjectStride` bytes — 256 × 512 = 128 KB — once, at init. This is an
-  **architectural limitation**: the buffer's size is fixed at construction, not a per-frame
-  decision, so it is a hard ceiling on *distinct entities the camera can see in one frame*, not on
-  how many exist in the scene.
-- **User-visible when hit:** **yes**, but only as a log line, not an error: `"more than {} visible
-  entities; extra entities skipped"` (`scene_renderer.cpp:2305`). The extra entities are dropped
-  from the draw list; nothing on screen indicates which ones or why, and the render completes
-  without any other sign of trouble. A scene that quietly loses objects as the camera moves is the
-  practical symptom.
-- **Already over budget:** Glowmere's flattened scene graph has 278 entities. It has not visibly
-  broken because culling keeps the camera-visible set to roughly half the cap (~136 draws/frame
-  per the renderer-upgrade audit baseline), but that margin depends entirely on the camera never
-  framing the whole scene at once — the least controllable assumption a renderer can depend on.
-- **What would be needed to lift it:** stop addressing objects by a slot in one fixed-size uniform
-  buffer at all. The renderer-upgrade plan's replacement direction is a `storage` buffer of object
-  data indexed by `@builtin(instance_index)` or a per-draw push constant, which has no compile-time
-  object count baked into a buffer size — the buffer would grow with a `resize`-on-demand policy
-  instead of being sized once at `init()`. This is flagged in the audit as **highest priority**
-  precisely because it is already exceeded by production content.
-- **Related, same mechanism:** `kMaxProceduralObjects = 256` (`src/rendering/procedural_renderer.cpp:32`)
-  is the identical pattern — "256-byte slots in one uniform buffer" — for procedural instance
-  *sources* (not instances) rather than authored entities, with its own overflow warning
-  (`"more than {} visible procedural objects; extra objects skipped"`,
-  `procedural_renderer.cpp:1369`). Lifting one without the other leaves half the entity budget
-  problem in place.
+- **Value:** none. The cap was deleted in ADR-128 and replaced by an allocation policy.
+- **Source:** `src/rendering/scene_renderer.hpp` — `kInitialObjects = 256` (what `init()`
+  allocates, so a small scene pays exactly the 128 KB it always did), `kObjectStride = 512`,
+  `kObjectBufferBudgetMiB = 64`, and `kMaxObjectCapacity = 64 MiB / kObjectStride` = **131,072
+  slots**. `SceneRenderer::ensureObjectCapacity` (`scene_renderer.cpp`) grows the buffer, the
+  staging mirror, the object bind group and the skinned path's group 1 to fit the frame's drawable
+  entity count, doubling and never shrinking.
+- **Why anything is left:** a scene must not be able to ask the driver for a gigabyte. 64 MiB is a
+  memory budget rather than a slot count, and it is deliberately **eight times** the 16,383 distinct
+  entity indices the identifier target can even name (`kPickIndexBits = 14`,
+  `scene/scene_types.hpp`), so the object buffer can never be the binding limit again. ADR-130
+  records that relation and `tests/unit/test_renderer_layout_guards.cpp` holds it, scraped from the
+  headers rather than retyped.
+- **User-visible when hit:** the clamp logs both numbers — what was asked for and what the budget
+  allows. The old silent-drop symptom is gone: `ensureObjectCapacity` sizes the buffer *before* the
+  entity loop runs, so the `"more than {} visible entities"` warning in `render()` is now a backstop
+  for an arithmetic disagreement rather than a budget anyone reaches.
+- **The real ceiling now:** 16,383 entities, from the pick-id encoding, not from an allocation.
+  `packPickId` saturates rather than wrapping, so past it two entities share a name in the
+  identifier target and a click resolves the wrong one — a quieter failure than a dropped draw, and
+  the reason the budget is kept above it.
+- **Proof:** `tests/rendering/test_object_capacity_gpu.cpp` renders `testing::denseEntityGrid` — 361
+  boxes, all visible, no floor — and checks the identifier target texel by texel: every entity
+  claims at least one pixel, every claim names its own entity with a one-based material id, the sky
+  is claimed by nobody, and entity zero is claimed by entity zero.
+- **Related, same mechanism, NOT lifted:** `kMaxProceduralObjects = 256`
+  (`src/rendering/procedural_renderer.cpp:32`) for procedural instance *sources*, and
+  `SdfRenderer::kMaxObjects = 256` (`src/rendering/sdf_renderer.hpp:131`) for SDF objects. Both are
+  the identical "256-byte-aligned slots in one fixed uniform buffer" pattern with their own silent
+  overflow warnings, and ADR-128's `ensureObjectCapacity` is the shape the fix takes in both. Glowmere
+  has 16–30 procedurals and no SDFs, so neither is firing today; they are listed so that "the object
+  cap was lifted" is not read as "every 256-slot buffer was lifted".
 
 ---
 
@@ -149,16 +147,19 @@ otherwise.
   `skinning.cpp:19`). The comment at the definition is explicit about the intended failure mode:
   *"a ceiling on how many rigs a frame may draw. Beyond it the extra rigs simply do not get a
   palette, and their entities render in the bind pose rather than the frame failing."* This is an
-  **architectural limitation** in the same family as `kMaxObjects` — a fixed-size buffer of
+  **architectural limitation** in the same family as `kMaxObjects` *was* — a fixed-size buffer of
   per-rig slices — chosen smaller because skinned characters are rarer than static entities in
   practice.
 - **User-visible when hit:** **yes** — `log::warn("{} skinned rigs in the scene; only the first {}
   get a joint palette", scene.rigs.size(), kMaxRigs)` (`skinning.cpp:295-297`). Rigs beyond the
   64th are not an error and not invisible: they draw in their bind pose (T-pose or similar), which
   reads as "this character stopped animating" rather than "this character disappeared."
-- **What would be needed to lift it:** the same fix as `kMaxObjects` — move rig palette addressing
-  off a fixed-count dynamic-offset buffer and onto a storage buffer indexed per-draw, sized to the
-  scene's actual rig count rather than a compile-time ceiling.
+- **What would be needed to lift it:** the same fix `kMaxObjects` got in ADR-128 — the joint buffer
+  is already reallocated per scene by `SkinningRenderer::ensureBuffer`, so the change is to size it
+  from `scene.rigs.size()` instead of clamping that to 64, and to let the bind group follow. Note
+  that ADR-129 declined the *storage buffer indexed per-draw* framing this line originally proposed,
+  for reasons that apply here too: the joint palette is already a storage buffer, and what is fixed
+  about it is the slice count, not the binding kind.
 
 ---
 
@@ -223,7 +224,8 @@ otherwise.
 
 | Limit | Value | Source | Kind | User-visible when hit? |
 |---|---|---|---|---|
-| `kMaxObjects` | 256 | `scene_renderer.hpp:478` | Architectural (fixed uniform-buffer slots) | Yes — log warning, entities dropped |
+| `kMaxObjects` | **lifted (ADR-128)** | `scene_renderer.hpp` | Allocation policy; 64 MiB budget = 131,072 slots | Yes — clamp logs both numbers |
+| entity naming | 16,383 | `scene_types.hpp` (`kPickIndexBits`) | Encoding (identifier target) | No — `packPickId` saturates |
 | `kMaxProceduralObjects` | 256 | `procedural_renderer.cpp:32` | Architectural (same mechanism as above) | Yes — log warning, objects dropped |
 | `kMaxSceneLights` | 256 | `light_data.hpp:63` | Quality setting (fixed light buffer) | No |
 | `kMaxLightsPerCluster` | 32 | `light_data.hpp:62` | Quality setting (fixed froxel index width) | Overflow only, no log |
@@ -242,4 +244,5 @@ This document does not lift any limit. Where "what would be needed to lift it" i
 that is the scope of the change, not a proposal to make it — several of these are flagged in
 `docs/renderer-upgrade/01-audit-and-baseline.md` §1.5 as needing a real architectural replacement
 (object addressing moving off fixed uniform-buffer slots being the highest-priority one), and
-that work is out of scope here.
+that work is out of scope here. **Exception:** the object-addressing item was subsequently done —
+ADR-128/129/130, recorded above.
