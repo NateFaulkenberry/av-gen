@@ -7,6 +7,10 @@
 // target with a depth-aware upsample and `src One, dst SrcAlpha` blending
 // (`hdr = scatter + hdr * transmittance`).
 //
+// ADR-139: the march resolution is `QualitySettings::volumeResolutionScale`, not a constant. 0.5
+// is the half-resolution march this pass shipped with; 1.0 makes the composite an exact copy of
+// a per-pixel march, which is what the Offline tier renders (§5.9).
+//
 // Off is free: `Environment::volumeDensity <= 0` means `enabled()` is false, `update()` allocates
 // nothing and no pass is encoded, so a scene without volumetrics renders exactly as before.
 //
@@ -18,6 +22,7 @@
 #include "core/error.hpp"
 #include "core/time.hpp"
 #include "gpu/render_target.hpp"
+#include "rendering/render_quality.hpp"
 #include "scene/scene.hpp"
 
 #include <glm/glm.hpp>
@@ -39,7 +44,17 @@ class FieldUniforms;
 struct VolumeStats {
     std::uint32_t steps = 0;            // raymarch samples per pixel this frame (0 = fog off)
     std::uint32_t glowSystems = 0;      // emissive particle systems lighting the fog (ADR-040)
-    bool halfResolution = true;         // the march always runs at half resolution
+    bool halfResolution = true;         // true when the march runs below the scene's resolution
+    // ADR-139: what the tier actually asked for and what it produced, so a reader of a record
+    // can tell a scale that was applied from one that was clamped away by a small viewport.
+    float resolutionScale = 0.5f;       // QualitySettings::volumeResolutionScale as applied
+    std::uint32_t marchWidth = 0;       // the march target's size in texels (0 = fog off)
+    std::uint32_t marchHeight = 0;
+    // ADR-140: the march and the composite are two different costs and were one number. The
+    // march is O(pixels * steps) and scales with `resolutionScale`; the composite is O(full-res
+    // pixels) and does not. Only splitting them makes any volumetric trade decidable.
+    double marchMs = -1.0;              // GPU time of the raymarch pass alone (-1 = none)
+    double compositeMs = -1.0;          // GPU time of the upsample/composite pass alone
     double volumeMs = -1.0;             // GPU time of the march + composite passes (-1 = none)
 };
 
@@ -82,7 +97,8 @@ public:
     // names to slots and writes the uniforms. Does nothing (and clears the stats) when off.
     void update(const scene::Scene& scene, const FrameTime& time, std::uint32_t width, std::uint32_t height,
                 const wgpu::TextureView& sceneDepth, const FieldUniforms* fields = nullptr,
-                std::uint32_t particleGlowSystems = 0);
+                std::uint32_t particleGlowSystems = 0,
+                const QualitySettings& quality = QualitySettings{});
     // Encodes the march pass and the composite pass onto `color` (loaded and stored). Call right
     // after the lit pass. No-op when the last update() found the fog off.
     void encode(wgpu::CommandEncoder& encoder, const wgpu::TextureView& color,
