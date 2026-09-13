@@ -1357,6 +1357,25 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         // one. Separates "the mask pass costs this" from "the mask's half resolution saves this".
         {"maskfull", [](QualitySettings& q) { q.shadowMaskScale = 1.0f; },
          "shadowMaskScale=1.0 (the mask computed per pixel, as High/Offline do)"},
+        // ADR-133: the two material tiers, forced on every draw. These are *ceilings on the
+        // saving*, not shippable configurations -- a shipping frame assigns the tier per draw from
+        // importance, so only the small and distant reach it. Forcing the whole frame is how the
+        // question "how much of the 8.4 ms residual can this rung reach at all" gets an answer
+        // before anything is built on top of it.
+        // The bound on D2: the clustered local-light loop reduced to nothing, with every other term
+        // of the Full tier intact. Not shippable on a scene lit by 222 local lights -- it is the
+        // ceiling the reduced rung is measured against, the way a pass arm is.
+        {"matlights0",
+         [](QualitySettings& q) {
+             q.forcedMaterialTier = MaterialTier::ReducedLights;
+             q.reducedTierLocalLights = 0;
+         },
+         "no local lights at all (the ceiling on what a light budget can save)"},
+        {"matreduced",
+         [](QualitySettings& q) { q.forcedMaterialTier = MaterialTier::ReducedLights; },
+         "every draw at the reduced-lights tier (the ceiling on that rung's saving)"},
+        {"matflat", [](QualitySettings& q) { q.forcedMaterialTier = MaterialTier::Flat; },
+         "every draw at the flat tier (the ceiling on that rung's saving)"},
     };
     return kArms;
 }
@@ -2209,6 +2228,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // ADR-055: the wind, packed once per frame. Wavenumbers are pre-divided here so no vertex ever
     // spends a divide on them, and the shadow views inherit the block verbatim.
     frame.wind = wind::packWind(scene.environment.wind);
+    // ADR-133: the material tier table, as the shader reads it. A budget of kUnlimitedLocalLights
+    // is written as the froxel cap rather than as 4 billion, so the float lane stays exact.
+    const auto tierBudgetLane = [](std::uint32_t budget) {
+        return static_cast<float>(std::min<std::uint32_t>(budget, kMaxLightsPerCluster));
+    };
+    frame.materialTier =
+        glm::vec4(static_cast<float>(static_cast<std::uint8_t>(qualitySettings_.forcedMaterialTier)),
+                  tierBudgetLane(qualitySettings_.reducedTierLocalLights),
+                  tierBudgetLane(qualitySettings_.flatTierLocalLights), 0.0f);
     // ---- lights, shadow views and the froxel grid (ADR-033/034) ----
     updateLights(encoder, scene, view, aspect, frame);
     frame.lightCounts.z = scene.environment.stylized ? 1.0f : 0.0f;

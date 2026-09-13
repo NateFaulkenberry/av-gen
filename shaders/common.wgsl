@@ -44,6 +44,11 @@ struct FrameUniforms {
     // ADR-087: the half-resolution screen-space shadow mask. x = 1 when it was built this frame,
     // y = how many leading directional lights it covers (0..3), zw = its texture size in texels.
     shadowMaskParams: vec4<f32>,
+    // Phase D material tiers (ADR-133). x = the tier every draw is forced to at least (0 full,
+    // 1 reduced lights, 2 flat); y = the local-light budget of tier 1; z = the local-light budget
+    // of tier 2; w = 0. The per-draw tier is object.ids.w and the effective tier is the larger of
+    // the two, so a forced tier is a floor and never silently un-reduces a draw.
+    materialTier: vec4<f32>,
     // ADR-055 the wind field. Frame-global because the air is: the same four vectors drive every
     // shader that wants to know what is blowing, and the shadow views inherit them with the rest of
     // the block so a swaying plant and its shadow cannot disagree. See shaders/wind.wgsl.
@@ -64,8 +69,30 @@ struct ObjectUniforms {
     emissive: vec4<f32>,       // rgb = colour, w = intensity
     material: vec4<f32>,       // x = roughness, y = metallic, z = normalScale, w = occlusionStrength
     flags: vec4<f32>,          // x = alpha mode (0 opaque, 1 mask, 2 blend), y = alpha cutoff, z = unlit, w = texture mask
-    ids: vec4<f32>,            // x = object id (ADR-030 `objectId`), y = material id, z = bloom weight, w = 0
+    ids: vec4<f32>,            // x = object id (ADR-030 `objectId`), y = material id, z = bloom weight,
+                               // w = the skinned joint count (pbr_skinned.wgsl)
 };
+
+// The material tier this draw shades at (ADR-133; 0 full, 1 reduced lights, 2 flat). Uniform across
+// the draw, which is the whole design -- ADR-118 measured a lane-varying branch around a loop with a
+// dependent texture load in it running 4.4% *slower* than the loop it skipped.
+//
+// It comes from the *frame* and not from ObjectUniforms, and that is a limitation rather than a
+// design: ADR-135 records that ObjectUniforms has no free lane for a per-draw tier -- `ids.w` is the
+// skinned joint count and every other lane is live -- and that adding one is the object-layout work
+// Phase E owns. Until then the tier is frame-global, which is exactly what an A/B arm needs and not
+// what importance-driven assignment needs.
+fn materialTierOf() -> u32 {
+    return u32(frame.materialTier.x + 0.5);
+}
+
+// How many *local* (clustered) lights a fragment of `tier` may evaluate. The table lives here and
+// in QualitySettings::localLightBudget and nowhere else.
+fn materialTierLocalLights(tier: u32) -> u32 {
+    if (tier >= 2u) { return u32(frame.materialTier.z + 0.5); }
+    if (tier >= 1u) { return u32(frame.materialTier.y + 0.5); }
+    return 0xffffffffu;
+}
 
 @group(0) @binding(0) var<uniform> frame: FrameUniforms;
 @group(1) @binding(0) var<uniform> object: ObjectUniforms;

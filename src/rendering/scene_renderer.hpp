@@ -237,6 +237,10 @@ struct FrameUniforms {
     // ADR-087: x = 1 when the half-resolution shadow mask was built this frame, y = how many
     // leading directional lights it covers (0..3), zw = its size in texels.
     glm::vec4 shadowMaskParams;
+    // ADR-133: material tiers. x = the tier every draw shades at (0 full, 1 reduced lights,
+    // 2 flat); y = tier 1's local-light budget; z = tier 2's; w = 0. Frame-global rather than per
+    // draw because ObjectUniforms has no free lane -- see ADR-135.
+    glm::vec4 materialTier{0.0f};
     // ADR-055: the wind field, packed by wind::packWind. Frame-global because the air is; the
     // shadow views copy the whole block, so a swaying plant and its shadow cannot disagree.
     wind::WindUniforms wind;
@@ -245,15 +249,16 @@ struct FrameUniforms {
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights. The middle term grew by one vec4 when
 // `skySun` was added; this assert is what caught the WGSL side needing the same field in the same
 // place, which is the whole reason it is written as a sum rather than a number.
-static_assert(sizeof(FrameUniforms) == 192 + 368 + 64 + 512);
+static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512);
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);
 static_assert(offsetof(FrameUniforms, cameraPos) == 192);
 static_assert(offsetof(FrameUniforms, params) == 256);
 static_assert(offsetof(FrameUniforms, shadowMaskParams) == 544);
-static_assert(offsetof(FrameUniforms, wind) == 560);
-static_assert(offsetof(FrameUniforms, lights) == 624);
+static_assert(offsetof(FrameUniforms, materialTier) == 560);
+static_assert(offsetof(FrameUniforms, wind) == 576);
+static_assert(offsetof(FrameUniforms, lights) == 640);
 
 struct ObjectUniforms {
     glm::mat4 model;
@@ -264,7 +269,9 @@ struct ObjectUniforms {
     glm::vec4 material;
     glm::vec4 flags;
     glm::vec4 ids; // x = object id (its index in the scene's list; the ADR-030 `objectId` input),
-                   // y = material id, z = bloom weight of this object's emission, w = 0
+                   // y = material id, z = bloom weight of this object's emission,
+                   // w = the skinned joint count. ADR-135: there is no free lane here for a
+                   // per-draw material tier, which is why ADR-133's tier is frame-global.
 };
 static_assert(sizeof(ObjectUniforms) == 272);
 static_assert(offsetof(ObjectUniforms, model) == 0);

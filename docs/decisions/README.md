@@ -137,6 +137,12 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [130](ADR-130-the-object-ceiling-is-a-budget-below-the-naming-limit.md) | What remains of the object ceiling is a byte budget, kept below the naming limit | Accepted |
 | [131](ADR-131-the-cheap-half-of-the-curve-is-not-measurable.md) | The cheap half of the fragment curve is not measurable, and the target stays where it is | Accepted |
 | [132](ADR-132-spread-is-the-transition-mitigation.md) | Spread is the transition mitigation, and temporal AA is not a prerequisite | Accepted |
+| [133](ADR-133-material-tiers-are-three-rungs-selected-by-a-uniform.md) | A material tier is three rungs selected by a per-draw uniform | Accepted |
+| [134](ADR-134-one-quality-policy-object.md) | A mode is one policy object, not four independently-set structs | Accepted |
+| [135](ADR-135-object-uniforms-has-no-free-lane-for-a-tier.md) | `ObjectUniforms` has no free lane, so the material tier is frame-global for now | Accepted |
+| [136](ADR-136-what-the-shading-tiers-are-worth-and-what-that-says-about-the-residual.md) | What the shading tiers are worth, and what that says about the 8.4 ms residual | Accepted |
+| [137](ADR-137-render-scale-is-a-tier-parameter-and-is-not-applied-yet.md) | Render scale is a tier parameter, and the tonemap binding is what stops it being applied | Accepted |
+| [138](ADR-138-what-tier-assignment-can-realize-on-glowmere.md) | What tier assignment can realize on Glowmere is bounded by terrain coverage | Accepted |
 | [150](ADR-150-the-ceiling-is-measured-on-the-frame.md) | The ceiling of a representation system is measured on the frame, not on the curve | Accepted |
 | [151](ADR-151-impostors-and-hlod-proxies-are-not-justified-on-this-content.md) | Impostors and HLOD proxies are not justified on this content, and the reason is measured | Accepted |
 | [152](ADR-152-the-cull-ladder-omits-the-source-transform.md) | The GPU cull ladder sizes a procedural by its raw mesh, not by the object | Accepted |
