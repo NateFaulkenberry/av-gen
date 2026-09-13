@@ -781,6 +781,10 @@ private:
     wgpu::Sampler iblSampler_;
     wgpu::Sampler skySampler_; // ADR-049: as iblSampler_, but wrapping in longitude
     wgpu::Sampler tonemapSampler_; // ADR-137: the tonemap's upscale from a scaled scene target
+    // ADR-137: what the caller asked for, which is what the tonemap writes into. The scene target
+    // may be smaller; `stats_` reports the scene's size, not this one.
+    std::uint32_t outputWidth_ = 0;
+    std::uint32_t outputHeight_ = 0;
     IblResources ibl_;
 
     std::vector<GpuMesh> meshes_;

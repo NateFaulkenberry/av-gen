@@ -1295,6 +1295,22 @@ Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
     if (width == 0 || height == 0) {
         return fail("resize to zero size ({}x{})", width, height);
     }
+    // ADR-137 step 2: the caller's size is the *output* size; the scene renders at `renderScale` of
+    // it and the tonemap upscales (step 1 gave it a filtered sampler for exactly this). Offline
+    // forces 1.0, so a deliverable is never scaled. Rounded to even and floored at 16 px: an odd
+    // width maps a column differently under a non-integer ratio, and a target small enough to lose
+    // a froxel is not a quality setting.
+    outputWidth_ = width;
+    outputHeight_ = height;
+    const float scale = std::clamp(qualitySettings_.renderScale, 0.25f, 2.0f);
+    if (scale != 1.0f) {
+        const auto scaled = [scale](std::uint32_t v) {
+            const auto n = static_cast<std::uint32_t>(std::lround(static_cast<float>(v) * scale));
+            return std::max<std::uint32_t>(16u, n & ~1u);
+        };
+        width = scaled(width);
+        height = scaled(height);
+    }
     if (hdr_.valid() && hdr_.width() == width && hdr_.height() == height) {
         return {};
     }
@@ -1318,9 +1334,18 @@ Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
     tonemapBindGroup_ = nullptr;
     tonemapBoundView_ = nullptr;
     tonemapGroups_.clear();
+    // The *scene* resolution, deliberately: every per-pixel number in the harness -- fragment cost,
+    // overdraw, px/triangle -- is a number about the pixels the scene pass actually shaded, not
+    // about the buffer they were later stretched onto.
     stats_.width = width;
     stats_.height = height;
-    log::debug("HDR target resized to {}x{}", width, height);
+    if (width != outputWidth_ || height != outputHeight_) {
+        log::info("render scale {:.2f}: scene target {}x{} -> output {}x{}",
+                  static_cast<double>(qualitySettings_.renderScale), width, height, outputWidth_,
+                  outputHeight_);
+    } else {
+        log::debug("HDR target resized to {}x{}", width, height);
+    }
     return {};
 }
 

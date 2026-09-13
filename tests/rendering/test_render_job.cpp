@@ -322,3 +322,72 @@ TEST_CASE("Render job writes a scene-linear EXR sequence deterministically", "[g
     CHECK(sa == sb);
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-137 step 2/3: the scene renders below the output resolution and the tonemap upscales into it.
+// No tier sets `renderScale` below 1 yet -- turning it on for a tier is an image decision with a
+// §50 gate, separate from the mechanism existing -- so nothing else in the suite exercises this
+// path. A mechanism no test drives is a mechanism nobody has run.
+TEST_CASE("a scaled scene target still fills the output the caller asked for", "[gpu][render][scale]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    ProjectFixture f;
+    auto engine = loadOffline(f.project);
+
+    constexpr std::uint32_t kW = 320;
+    constexpr std::uint32_t kH = 200;
+
+    const auto renderAt = [&](float scale) {
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        rendering::QualitySettings q =
+            rendering::QualitySettings::forTier(rendering::QualityTier::Realtime);
+        q.renderScale = scale;
+        renderer.setQualitySettings(q);
+        REQUIRE(renderer.resize(kW, kH).has_value());
+        FixedStepClock clock(30.0);
+        clock.restartAt(0.0);
+        engine->seekSeconds(0.0);
+        const FrameTime time = engine->tick(clock);
+        engine->update(time);
+        const rendering::ShaderFrameInputs inputs{&engine->shaderLayers(),
+                                                  engine->hasFrame() ? &engine->latestFrame() : nullptr};
+        auto image = renderer.renderToImage(engine->scene(), time, kW, kH, &inputs);
+        REQUIRE(image.has_value());
+        return std::pair{std::move(*image), renderer.stats()};
+    };
+
+    const auto [full, fullStats] = renderAt(1.0f);
+    const auto [half, halfStats] = renderAt(0.5f);
+
+    // The output is what the caller asked for, whatever the scene rendered at. If this were the
+    // scene size instead, every consumer downstream would silently get a smaller picture.
+    CHECK(full.width == kW);
+    CHECK(full.height == kH);
+    CHECK(half.width == kW);
+    CHECK(half.height == kH);
+
+    // The stats report the *scene* resolution, because that is what every per-pixel number in the
+    // harness is a number about.
+    CHECK(fullStats.width == kW);
+    CHECK(halfStats.width == kW / 2);
+    CHECK(halfStats.height == kH / 2);
+
+    // The scaled frame is a real picture, not a blank or a garbage read: it differs from the full
+    // one (or the scale did nothing) while still resembling it (or the upscale is broken). Checked
+    // as mean absolute difference over the luma channel, in 0..255.
+    REQUIRE(full.rgba.size() == half.rgba.size());
+    double sum = 0.0;
+    std::size_t lit = 0;
+    for (std::size_t i = 0; i + 3 < full.rgba.size(); i += 4) {
+        sum += std::abs(static_cast<double>(full.rgba[i]) - static_cast<double>(half.rgba[i]));
+        if (full.rgba[i] > 8) {
+            ++lit;
+        }
+    }
+    const double meanDelta = sum / static_cast<double>(full.rgba.size() / 4);
+    INFO("mean |full - half| = " << meanDelta << " over " << lit << " lit pixels");
+    CHECK(lit > (kW * kH) / 20);  // the fixture actually drew something
+    CHECK(meanDelta > 0.0);       // half resolution changed the image
+    CHECK(meanDelta < 40.0);      // and it is still the same picture, not noise
+    CHECK(ctx->errorCount() == 0);
+}
