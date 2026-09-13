@@ -13,6 +13,7 @@
 #include "app/render_job.hpp"
 #include "assets/asset_registry.hpp"
 #include "assets/image.hpp"
+#include "rendering/reference_renderer.hpp"
 #include "rendering/renderer_snapshot.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
@@ -2351,7 +2352,7 @@ TEST_CASE("the RendererQA variants each contain the subsystem they isolate",
 
     SECTION("minimal is opaque geometry and nothing else") {
         const Counts c = inspect("renderer-qa-minimal.scene.json", 2);
-        CHECK(c.objects() >= 3);
+        CHECK(c.entities >= 3);   // plain mesh entities, not procedurals: see the scene's note
         CHECK(c.rigged == 0);
         CHECK(c.blended == 0);
         CHECK(c.water == 0);
@@ -2531,5 +2532,129 @@ TEST_CASE("a captured frame replays, and two of them differ in words",
         }
     }
 
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- Phase 2.2: the reference renderer, and comparing the two ------------------------------------
+//
+// A second renderer earns its keep only if the comparison against it is one the production path
+// could fail. Colour is not that comparison: the reference path shades flat and will never look like
+// the picture. **Coverage** is -- which pixels contain geometry -- because that is decided entirely
+// by the transform chain and the camera, and by nothing the reference path lacks.
+//
+// The production side runs with its isolation arms off (Phase 4.2), so the two are asked the same
+// question: no shadows, no AO, no volumetrics, no post, no particles, no transparency, no animation.
+// What remains on both sides is opaque geometry projected through `Camera::view()` and
+// `Camera::projection()`.
+TEST_CASE("the reference renderer and the production renderer cover the same pixels",
+          "[gpu][composition][forensics][reference]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa-minimal.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the minimal QA variant is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer production(*ctx, shaders);
+    REQUIRE(production.init().has_value());
+    rendering::ReferenceRenderer reference(*ctx, shaders);
+    REQUIRE(reference.init().has_value());
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(project).has_value());
+    constexpr std::uint32_t kW = 192;
+    constexpr std::uint32_t kH = 144;
+
+    rendering::SceneRenderer::PassToggles bare;
+    bare.shadows = false;
+    bare.ao = false;
+    bare.volume = false;
+    bare.post = false;
+    bare.shadowMask = false;
+    bare.particles = false;
+    bare.transparency = false;
+    bare.animation = false;
+    production.setPassToggles(bare);
+
+    FixedStepClock clock(60.0);
+    // Coverage against each image's *own* background, not an absolute threshold.
+    //
+    // An absolute one does not survive the comparison: production tone-maps and auto-exposes, so on
+    // a dark scene it lifts the empty background well clear of any fixed cut-off and the mask comes
+    // out as "the whole frame". The corner pixel is background in every view here, and a pixel
+    // counts as geometry when it is meaningfully brighter than it.
+    const auto coverage = [](const gpu::Image8& image) {
+        const std::uint8_t* corner = image.pixel(0, 0);
+        const glm::ivec3 background(corner[0], corner[1], corner[2]);
+        std::vector<bool> mask(static_cast<std::size_t>(kW) * kH, false);
+        for (std::uint32_t y = 0; y < kH; ++y) {
+            for (std::uint32_t x = 0; x < kW; ++x) {
+                const std::uint8_t* p = image.pixel(x, y);
+                const int delta = std::max({std::abs(p[0] - background.r), std::abs(p[1] - background.g),
+                                            std::abs(p[2] - background.b)});
+                mask[static_cast<std::size_t>(y) * kW + x] = delta > 14;
+            }
+        }
+        return mask;
+    };
+
+    struct View {
+        const char* name;
+        glm::vec3 eye;
+        glm::vec3 aim;
+    };
+    const View views[] = {
+        {"opening", {0.0f, 2.5f, 9.0f}, {0.0f, 1.0f, 0.0f}},
+        {"from the side", {9.0f, 3.0f, 2.0f}, {0.0f, 1.0f, -2.0f}},
+        {"close", {-1.0f, 1.4f, 2.4f}, {-1.5f, 1.0f, 0.0f}},
+        {"looking at the static cube", {10.0f, 4.0f, -8.0f}, {10.0f, 2.0f, -20.0f}},
+        {"high and back", {-6.0f, 12.0f, 14.0f}, {0.0f, 0.0f, -6.0f}},
+    };
+
+    std::size_t comparedViews = 0;
+    for (const View& view : views) {
+        INFO("view: " << view.name);
+        aimCompositionCamera(engine.params(), view.eye, view.aim);
+        const FrameTime time = engine.tick(clock);
+        engine.setViewport(kW, kH);
+        engine.update(time);
+        production.resetTemporalHistory();
+
+        const auto shipped = production.renderToImage(engine.scene(), time, kW, kH);
+        REQUIRE(shipped.has_value());
+        const auto minimal = reference.renderToImage(engine.scene(), kW, kH);
+        REQUIRE(minimal.has_value());
+
+        // The reference path has to have drawn the scene, and to say what it declined.
+        const auto& counts = reference.counts();
+        INFO(counts.drawn << " drawn, " << counts.skippedSkinned << " skinned, "
+                          << counts.skippedBlended << " blended, " << counts.skippedWater
+                          << " water, " << counts.skippedNoMesh << " without a mesh");
+        REQUIRE(counts.drawn > 0);
+
+        const std::vector<bool> a = coverage(*shipped);
+        const std::vector<bool> b = coverage(*minimal);
+        std::size_t onlyProduction = 0;
+        std::size_t onlyReference = 0;
+        std::size_t both = 0;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            both += a[i] && b[i] ? 1 : 0;
+            onlyProduction += a[i] && !b[i] ? 1 : 0;
+            onlyReference += !a[i] && b[i] ? 1 : 0;
+        }
+        const auto disagreement = static_cast<double>(onlyProduction + onlyReference) /
+                                  static_cast<double>(std::max<std::size_t>(both, 1));
+        INFO(both << " pixels covered by both, " << onlyProduction << " only by production, "
+                  << onlyReference << " only by the reference, disagreement "
+                  << disagreement * 100.0 << "%");
+        // The geometry is on screen in both.
+        REQUIRE(both > 500);
+        // ...and the silhouettes agree. Not exactly: the two paths shade differently, so a pixel on
+        // the very edge of a triangle can fall either side of the threshold, and production applies
+        // a fog the reference path does not. A transform or camera error is not a percent -- it puts
+        // the object somewhere else entirely.
+        CHECK(disagreement < 0.08);
+        ++comparedViews;
+    }
+    CHECK(comparedViews == std::size(views));
     CHECK(ctx->errorCount() == 0);
 }
