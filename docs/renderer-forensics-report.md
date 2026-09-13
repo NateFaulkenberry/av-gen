@@ -218,8 +218,43 @@ object draws in the wrong place instead of vanishing -- a thing in the wrong pla
 `packLight` drops the light rather than correcting it: a missing light is something to look for; a
 light that quietly became a different light is a wrong picture nobody can explain.
 
-**Residual risk:** water state, the diagnostic snapshot and the material-to-object packing are all
-inside the GPU-linked code and were not reachable from the unit binary; they are untested.
+A fifth door, the widest of them, was shut later with a device: the material-to-`ObjectUniforms`
+packing. A NaN base colour becomes a NaN pixel, and a NaN pixel spreads through bloom's downsample
+to a whole tile and then to the frame -- a bright region with no object near it to blame. The
+material is now replaced with magenta rather than dropped, because a vanished object is the hardest
+report to act on. Nine fields, each poisoned in turn, in
+`[gpu][composition][forensics][guards]`.
+
+**Residual risk:** water state and the diagnostic snapshot are still unguarded.
+
+### Every diagnostic view was tone-mapped (`SYM-AUX-1`)
+
+**Symptom:** none reported, and that is the point -- the instrument was wrong, so nothing it said
+could be trusted enough to report. Found while building a linear-depth view and discovering that a
+shader writing 1.0 arrived on the screen as 202.
+
+**Evidence:** the auxiliary debug pass drew into the **HDR** target, ahead of the tone map, which
+then applied auto-exposure and a filmic curve to it. Every one of the seven views had been going
+through that since ADR-035. Three consequences, in increasing order of how badly they mislead:
+
+| View | What it actually showed |
+|---|---|
+| normal, roughness, velocity, emission, occlusion | the encoded value through a filmic curve: 0.5 did not arrive as 0.5, and no number could be read off it |
+| depth | a compression on top of a compression |
+| ids | a palette **that moved with the scene's brightness** -- the same object could be two different colours in two frames of the same scene |
+
+**Repair:** the pass draws after the tone map, straight onto the target, one pipeline per target
+format (the same reason the tone map itself is a per-format map). The byte on the screen is now the
+value the shader wrote, up to the hardware's own encode on an sRGB target.
+
+**Regression:** `[gpu][composition][forensics][views]` compares the linear-depth view against a
+readback of the linear-depth target **per pixel**, to within one step of 8-bit quantisation -- an
+identity rather than a trend, which is only expressible because the view is no longer a function of
+the frame's exposure. The direct guard is four stops of exposure compensation leaving a view's hash
+unchanged, with the shaded frame's hash changing under the same four stops as its control.
+
+**Residual risk:** the overlay (ADR-083) still draws over the view, so a composition layer covers a
+diagnostic. That is the same ordering as before and is visible rather than silent.
 
 ### Detached composition parameter use-after-free
 
@@ -233,6 +268,116 @@ the old `ParameterSet` had been cleared.
 transform/material fields.
 
 **Regression:** The exact lifecycle case passes 466 assertions under ASan/UBSan.
+
+### The water depth spaces agree (`SYM-WATER-2`, refuted)
+
+**Hypothesis:** the shoreline artefacts came from a depth-space mismatch -- `water.wgsl` differencing
+a ray length against a forward-axis distance, or a Y-flipped reprojection.
+
+**Evidence against it, measured rather than read.** 988 taps on a synthetic quad, each compared
+against a CPU ray/plane intersection: the linear-depth target is a forward-axis distance to within
+2.8 mm, 0.007%. The test is known to be able to tell the two apart, because across the same taps the
+two candidate spaces are 29.4% apart -- and swapping the shader to `length(p - eye)` fails three
+separate tests with a 13.27 m error. `fs_water` computes its view depth on the same axis from the
+same origin in the same units; the refraction reprojection's screen UV matches the linear-depth
+pass's own Y convention; `uv.x` is vertical and is only ever used for the shore fade and the
+ray-thickness cap, never differenced against a ray depth.
+
+**Consequence for the rule.** No seam was reproduced, so no depth offset was added. That is the
+plan's "do not solve seams with arbitrary offsets without a reproduced cause" doing its job, and it
+is worth recording as a refutation rather than leaving the hypothesis open: the water defect that did
+exist (`SYM-WATER-1`) was geometric, and this rules out the depth-space explanation people reach for
+first.
+
+### Water cannot be identified from the identifier target
+
+`water_renderer.cpp:150` masks every scene target but colour and emission, deliberately -- a normal
+or an identifier averaged over a transparency is worse than none. The consequence is worth stating
+because it constrains what diagnostics are *possible*, not merely what is built: **no auxiliary view
+keyed on the identifier target can show water, and no test can classify a water pixel from it.** The
+water forensics therefore find water pixels by rendering the same frame twice, once with the water
+arm off, and differencing. Every water measurement in this report rests on that A/B.
+
+### Entity zero's pick id is zero, and only the material id makes it findable
+
+**Symptom:** none in production, and the reason is a detail that could easily have been dropped.
+
+**Evidence:** `packPickId(PickSpace::Entity, 0)` is `(0 << 14) | 0` = **0**, which is exactly the
+value the identifier target clears to. So the object id alone cannot distinguish "this is entity
+zero" from "nothing was drawn here". What saves it is that the packed word carries the *material* id
+in its high sixteen bits and that number is deliberately one-based (`thisEntity + 1`), so entity
+zero's word is `0x00010000` -- non-zero, and distinguishable. The picker reads the whole word and is
+correct. `aux_debug.wgsl`'s identifier view tests the whole word and is correct.
+
+**Where it bit:** the new object-depth view compared only the low sixteen bits against a pick id, so
+selecting the first entity matched every empty pixel and painted the whole sky as that object. Found
+because a *culled* object's depth view came back showing the object everywhere -- the one framing
+where the wrong answer is obviously wrong. The view now tests the whole word for emptiness before
+matching the low half.
+
+**Why it is in this report rather than only in a commit:** the one-based material id is load-bearing
+and nothing said so. Anything new that reads this target must test `word != 0` and not
+`objectId != 0`, and the test that guards it cannot be a pixel count -- a large floor legitimately
+covers two thirds of the frame, so "not the whole frame" passes for a view that is almost entirely
+wrong. The assertion that works asks whether a *particular region* -- the sky -- is claimed by
+anybody.
+
+### A terrain scene does not render the same frame twice (`SYM-TERRAIN-1`, open)
+
+**Symptom:** on `renderer-qa-water.scene.json` -- terrain with water, and nothing else -- the same
+`FrameTime` drawn twice through the same renderer gives two different pictures, by 0.1% to 0.5% of
+channels (measured 571, 215 and 9 of 108,160 at three checkpoints).
+
+**It does not converge.** A third and fourth draw differ from the second by as much as the second
+differs from the first (571 / 127 / 135). So it is not warm-up, not a cache filling, and not a
+temporal filter settling -- it is a persistent per-call non-determinism.
+
+**It is build-dependent, and that is the sharpest clue.** The same source, the same GPU, the same
+idle machine: `[gpu][renderer][forensics][water6_2]` passes all eight cases in **release** and fails
+four in **debug**. A renderer whose picture depends on the optimisation level, at a held timeline, is
+not doing arithmetic differently -- it is racing, and debug's slower CPU changes which side wins.
+
+**Confirmed contributor: the procedural empty-level draw skip.** `procedural_renderer.cpp` decides
+whether to record an indirect draw from `emptyFrames[]`, which is driven by "the latest *completed*
+stats readback" of a non-blocking async map. So what a frame draws depends on when a callback landed.
+Raising `kEmptyLevelFrames` out of reach on the shoreline scene takes the drift from 426.7 to 122.8
+and the failures from four to three -- a contributor, and not the whole of it.
+
+**A correction worth keeping.** That same suspect was written up here as *exonerated*, on the grounds
+that `renderer-qa-water.scene.json` records zero indirect draws and zero visible instances. That
+measurement was right and the conclusion was too broad: it exonerates the skip **on that scene**,
+which has no scatter, and says nothing about a scene that has some. Two scenes, two different
+subsets of the same mechanism. The general claim needed a general measurement and did not have one.
+
+**Ruled out, each by measurement:**
+
+| Suspect | How it was eliminated |
+|---|---|
+| Ambient occlusion's temporal history | the difference survives the `ao` arm being off (136 / 195 / 9) |
+| The particle simulation, which *is* stepped inside `render` | `renderer-qa-water` contains no particles |
+| A stale readback returning last frame's pixels | `readTextureRaw` maps with `WaitAny`; the read is synchronous and exact |
+| The procedural path, **on `renderer-qa-water` only** | that scene records zero indirect draws and zero visible instances |
+| Contention between concurrent GPU test runs | it was first seen that way and attributed to load; it reproduces on an idle machine |
+
+So at least two sources remain: the skip on scatter scenes, and something else on a scene where the
+procedural path does not run at all.
+
+**Consequence for the suite.** `renderer-qa-water.scene.json` stays in the resource-lifetime rotation
+-- reloading and swapping to and from a terrain scene is exactly the lifetime under test -- but is
+excluded from the fresh-reference checkpoints, and the repeated-frame comparison reports on it rather
+than asserting. A red test nobody can act on gets muted rather than fixed, and the measurement is
+more use in the report than in a failure nobody reads.
+
+**Where to look next.** The family is *frame content decided from a non-blocking readback*, so the
+experiment is to enumerate every such decision on the camera path and make each one a pure function
+of the frame index -- consulting a snapshot at a fixed latency, and waiting for it, rather than
+whichever one has arrived. The empty-level skip is the known instance; the unidentified second source
+is on a scene with no procedural path at all, so it is elsewhere. The draw count on that scene also
+grows across rounds (11 → 50 → 113), so chunk residency is changing, and whether that is the
+renderer's lazy upload or the scene's streaming was not separated.
+
+**Consequence for every image test in this repository:** run the GPU suite in **release**. Debug's
+seven failures are this one defect with two faces, not seven problems.
 
 ## Established as contract, not defect
 
@@ -347,8 +492,8 @@ from the descriptors rather than from memory.
 | `scene` | `kSceneTargetCount` | colour loads the background; the auxiliary targets clear to zero / store | loads the prepass, else clears | opaque, procedural, SDF, sky, water, particles, transparent |
 | `debug` | 1 (HDR) | load / store | load | ADR-031 debug geometry |
 | `post-layer` | 1 | clear / store | none | user post layers |
-| `aux-debug` | 1 | clear / store | none | the auxiliary-target viewer |
 | `tonemap` | 1 | clear / store | none | the final display-referred image |
+| `aux-debug` | 1 (the target) | clear / store | none | the auxiliary-target viewer, **after** the tone map so its values are not exposed and curved (`SYM-AUX-1`) |
 
 Compute passes -- culling, clusters, particles, fields, SDF, simulation -- are marked on the same
 timeline and own their own buffers.
@@ -376,6 +521,9 @@ begins with `post`.
 | Temporal history crossing boundaries | history from another scene, size, cut or seek | reused-versus-fresh comparisons | no reset at the boundaries | temporal | `resetTemporalHistory` plus a transport discontinuity revision | resize/seek/replay cases | — |
 | Particle pools crossing scenes | alive lists and trails retained across a scene change | reused-versus-fresh swap | pools outlived their scene | particles | pools reset on scene change | particle swap case | — |
 | Detached composition parameters | use-after-free in `applyParameters` | ASan on the detach lifecycle test | `detach()` nulled only the common node fields | composition lifetime | every node-owned pointer is nulled | the lifecycle case under ASan | — |
+| Particle pools survive a seek | a seeked renderer does not match a fresh one | 40 frames then a seek back to 0.5 s, compared to a fresh engine and renderer; 63 of 102,400 channels | `resetTemporalHistory` reset the AO history and not the particle pools -- `ParticleRenderer::resetAll` said in its own comment it was "used on seek/offline restarts" and had no caller but the scene-pointer change | particles / temporal | `resetTemporalHistory` resets the pools | `[gpu][renderer][forensics][lifetime3_4]`, asserted exactly, with the particles-off comparison as the control that says they were the whole difference | — |
+| Previous skinning palette survives a seek | the first frame after every scrub smears | motion blur on, seek to 1.0 s: the current palette matches a fresh engine joint for joint, 49 of 49 *previous* joints hold the pre-jump pose, worst element 71.5 units on a ~100-unit character | `previousPalette` means "a frame ago", which is false across a discontinuity; `SkinnedRig::evaluate` copies it forward before re-posing, right for playback and wrong for a jump | animation | a seek flags each rig; the next `evaluate` takes its previous from the pose it lands on | `[gpu][composition][forensics][lifetime][seek]`, exact, with ordinary playback still reporting motion as the control | — |
+| Diagnostic views tone-mapped (`SYM-AUX-1`) | none reported; the instrument was wrong, so nothing it said was trustworthy | a shader writing 1.0 reaches the screen as 202 | the auxiliary view pass drew into the HDR target, ahead of exposure and the filmic curve | renderer diagnostics | the pass draws after the tone map, one pipeline per target format | `[gpu][composition][forensics][views]`: the linear-depth view checked per pixel against a readback of the buffer, and four stops of exposure leaving it unchanged | the composition overlay still draws over a view -- visible, not silent |
 | A node's `material` block | authored material silently ignored on every kind but terrain; `alphaMode` never parsed at all | RendererQA's `transparent-orb` draws opaque | the parse sat inside `if (kind == Terrain)` | scene format | parsed for every kind, applied on orbs, warned where unused | `[gpu][composition][forensics][isolation]`, which needs a transparent object to exist | kinds other than orb and terrain still do not *use* it -- they now say so |
 
 ### Subsystem isolation results
@@ -387,13 +535,26 @@ its remaining risk named. Nothing is `FAILED` and nothing is `NOT ISOLATED`.
 
 ### The reference renderer
 
-**Not built.** Phase 2 asks for a minimal path to compare against production, and the honest position
-is that its purpose was served by other means: the questions it was to answer -- does the renderer
-move a static object, does it mutate scene state, does it swap or stale GPU object data -- are
-answered by the static-object matrices (four axes, bit equality), by the type system (`const
-scene::Scene&` throughout), and by the alternating-transform case. A second renderer is a second
-thing to keep correct, and building one now would be building it to answer questions that already
-have answers. It remains the right tool if a future symptom survives all three.
+**Built, and deliberately small.** `rendering::ReferenceRenderer` (`reference_renderer.cpp`,
+`shaders/reference.wgsl`) draws opaque lit entities and nothing else: no shadows, no AO, no
+volumetrics, no post, no skinning, no transparency, no water, no procedural or SDF path. It uploads
+each mesh per call rather than caching, which is the point -- a second renderer that shared the
+production caches could not be evidence about them.
+
+**The contract is coverage, not colour.** The two paths shade differently by construction, so
+comparing pixels would compare tone maps. What is compared is *where the geometry is*: each image's
+own background is measured from a corner pixel, a pixel counts as geometry when it is meaningfully
+brighter than that background, and the two masks are required to agree. An absolute threshold was
+tried first and does not survive -- production tone-maps and auto-exposes, so on a dark scene it
+lifts the empty background clear of any fixed cut-off and the mask comes out as "the whole frame".
+
+**Results.** `[gpu][composition][forensics][reference]` over `renderer-qa-minimal`, five camera
+views (opening, from the side, close, on the static cube, high and back), production stripped to a
+comparable pass set. Every view agrees to within 8% of the covered area, with at least 500 pixels
+covered by both, and the reference path reports what it declined rather than silently drawing less.
+The tolerance is about edges and fog, not about placement: a transform or camera error is not a
+percent, it puts the object somewhere else entirely, and that is the class of defect this comparison
+can rule out.
 
 ### Diagnostics and their overhead
 

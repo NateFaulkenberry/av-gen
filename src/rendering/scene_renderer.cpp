@@ -11,7 +11,6 @@
 
 #include "gpu/texture.hpp"
 
-#include <map> // AVGEN_NC
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -34,6 +33,9 @@ const char* auxDebugViewName(AuxDebugView view) {
     case AuxDebugView::Ids: return "ids";
     case AuxDebugView::Occlusion: return "occlusion";
     case AuxDebugView::Depth: return "depth";
+    case AuxDebugView::LinearDepth: return "linear depth";
+    case AuxDebugView::DepthEdges: return "depth edges";
+    case AuxDebugView::ObjectDepth: return "object depth";
     }
     return "none";
 }
@@ -53,6 +55,48 @@ std::uint64_t materialKey(const scene::Material& m) {
     mix(static_cast<std::uint64_t>(m.baseColorTexture.wrapU) | (static_cast<std::uint64_t>(m.baseColorTexture.wrapV) << 4) |
         (m.baseColorTexture.linearFilter ? 1ull << 8 : 0ull));
     return h;
+}
+
+// The material's numbers, checked before they are packed into an object slot (forensics 9.3).
+//
+// A non-finite material is not a small error. A NaN in `baseColor` or `emissive` becomes a NaN
+// pixel, and a NaN pixel spreads: bloom's downsample averages it across a whole tile, the tone map
+// carries it to the frame, and what arrives is a white or black region with no object anywhere near
+// it that could be blamed. The clamps the material already has cannot help, for the reason the
+// bounds folds could not -- `std::clamp` is comparisons, and a NaN loses every one of them.
+//
+// So a bad material is *replaced*, loudly, rather than dropped or passed on: magenta at full
+// roughness is unmistakably wrong on screen and stays where the object is, which is a thing somebody
+// can chase. Dropping the draw would make the object vanish, which is the report that is hardest to
+// act on -- this investigation has already spent time on one of those.
+struct MaterialCheck {
+    bool ok = true;
+    const char* field = "";
+    float value = 0.0f; // the offending number, so the report says what arrived and not only where
+};
+
+MaterialCheck checkMaterial(const scene::Material& m) {
+    const auto bad3 = [](const glm::vec3& v, const char* name) -> std::optional<MaterialCheck> {
+        for (int i = 0; i < 3; ++i) {
+            if (!std::isfinite(v[i])) {
+                return MaterialCheck{false, name, v[i]};
+            }
+        }
+        return std::nullopt;
+    };
+    const auto bad1 = [](float v, const char* name) -> std::optional<MaterialCheck> {
+        return std::isfinite(v) ? std::nullopt : std::optional<MaterialCheck>{MaterialCheck{false, name, v}};
+    };
+    if (auto c = bad3(m.baseColor, "baseColor")) return *c;
+    if (auto c = bad1(m.opacity, "opacity")) return *c;
+    if (auto c = bad3(m.emissiveColor, "emissiveColor")) return *c;
+    if (auto c = bad1(m.emissiveIntensity, "emissiveIntensity")) return *c;
+    if (auto c = bad1(m.roughness, "roughness")) return *c;
+    if (auto c = bad1(m.metallic, "metallic")) return *c;
+    if (auto c = bad1(m.normalScale, "normalScale")) return *c;
+    if (auto c = bad1(m.occlusionStrength, "occlusionStrength")) return *c;
+    if (auto c = bad1(m.alphaCutoff, "alphaCutoff")) return *c;
+    return {};
 }
 
 bool finiteMatrix(const glm::mat4& matrix) {
@@ -824,9 +868,9 @@ Result<void> SceneRenderer::createPipelines() {
     auto l = createLinearDepthPipeline(*linear);
     if (!l) return std::unexpected(l.error());
     linearDepthPipeline_ = *l;
-    auto x = createAuxDebugPipeline(*auxDebug);
-    if (!x) return std::unexpected(x.error());
-    auxDebugPipeline_ = *x;
+    if (auto x = createAuxDebugResources(*auxDebug); !x) {
+        return std::unexpected(x.error());
+    }
     return {};
 }
 
@@ -1050,13 +1094,13 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLinearDepthPipeline(const wgpu
     return finishPipeline(desc, "linear-depth");
 }
 
-Result<wgpu::RenderPipeline> SceneRenderer::createAuxDebugPipeline(const wgpu::ShaderModule& module) {
+Result<void> SceneRenderer::createAuxDebugResources(const wgpu::ShaderModule& module) {
     const auto& device = context_.device();
     if (!auxDebugUniforms_) {
         wgpu::BufferDescriptor bufferDesc{};
         bufferDesc.label = "aux-debug-uniforms";
         bufferDesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
-        bufferDesc.size = sizeof(glm::vec4);
+        bufferDesc.size = sizeof(AuxDebugUniforms);
         auxDebugUniforms_ = device.CreateBuffer(&bufferDesc);
     }
     if (!auxDebugLayout_) {
@@ -1064,7 +1108,7 @@ Result<wgpu::RenderPipeline> SceneRenderer::createAuxDebugPipeline(const wgpu::S
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
-        entries[0].buffer.minBindingSize = sizeof(glm::vec4);
+        entries[0].buffer.minBindingSize = sizeof(AuxDebugUniforms);
         for (std::uint32_t i = 1; i < 7; ++i) {
             entries[i].binding = i;
             entries[i].visibility = wgpu::ShaderStage::Fragment;
@@ -1082,26 +1126,39 @@ Result<wgpu::RenderPipeline> SceneRenderer::createAuxDebugPipeline(const wgpu::S
     layoutDesc.label = "aux-debug-pipeline-layout";
     layoutDesc.bindGroupLayoutCount = 1;
     layoutDesc.bindGroupLayouts = &auxDebugLayout_;
-    wgpu::PipelineLayout layout = device.CreatePipelineLayout(&layoutDesc);
+    auxDebugPipelineLayout_ = device.CreatePipelineLayout(&layoutDesc);
+    auxDebugModule_ = module;
+    return {};
+}
+
+Result<wgpu::RenderPipeline> SceneRenderer::auxDebugPipelineFor(wgpu::TextureFormat format) {
+    const auto key = static_cast<std::uint32_t>(format);
+    if (auto it = auxDebugPipelines_.find(key); it != auxDebugPipelines_.end()) {
+        return it->second;
+    }
     wgpu::ColorTargetState colorTarget{};
-    colorTarget.format = kHdrFormat;
+    colorTarget.format = format;
     colorTarget.writeMask = wgpu::ColorWriteMask::All;
     wgpu::FragmentState fragment{};
-    fragment.module = module;
+    fragment.module = auxDebugModule_;
     fragment.entryPoint = "fs_aux";
     fragment.targetCount = 1;
     fragment.targets = &colorTarget;
     wgpu::RenderPipelineDescriptor desc{};
     desc.label = "aux-debug";
-    desc.layout = layout;
-    desc.vertex.module = module;
+    desc.layout = auxDebugPipelineLayout_;
+    desc.vertex.module = auxDebugModule_;
     desc.vertex.entryPoint = "vs_aux";
     desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
     desc.primitive.cullMode = wgpu::CullMode::None;
     desc.multisample.count = 1;
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
-    return finishPipeline(desc, "aux-debug");
+    auto pipeline = finishPipeline(desc, "aux-debug");
+    if (pipeline) {
+        auxDebugPipelines_[key] = *pipeline;
+    }
+    return pipeline;
 }
 
 Result<wgpu::RenderPipeline> SceneRenderer::tonemapPipelineFor(wgpu::TextureFormat format) {
@@ -1167,6 +1224,37 @@ Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
     return {};
 }
 
+std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
+    using T = SceneRenderer::PassToggles;
+    static constexpr SceneRenderer::PassArm kArms[] = {
+        {"shadows", &T::shadows},           {"ao", &T::ao},
+        {"volume", &T::volume},             {"post", &T::post},
+        {"shadowmask", &T::shadowMask},     {"culling", &T::culling},
+        {"water", &T::water},               {"transparency", &T::transparency},
+        {"particles", &T::particles},       {"animation", &T::animation},
+        {"cameramotion", &T::cameraMotion},
+    };
+    return kArms;
+}
+
+bool SceneRenderer::setPassArm(PassToggles& toggles, std::string_view name, bool on) {
+    for (const PassArm& arm : passArms()) {
+        if (name == arm.name) {
+            toggles.*(arm.flag) = on;
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string SceneRenderer::passArmNames() {
+    std::string names;
+    for (const PassArm& arm : passArms()) {
+        names += names.empty() ? arm.name : std::string(",") + arm.name;
+    }
+    return names;
+}
+
 void SceneRenderer::setPassToggles(const PassToggles& toggles) {
     // Arming the camera freeze captures nothing here: the *next* frame records the view it is asked
     // to freeze, and every frame after it reuses that. Capturing at the moment of the click would
@@ -1186,6 +1274,16 @@ void SceneRenderer::resetTemporalHistory() {
     temporalScene_ = nullptr;
     if (ao_ != nullptr) {
         ao_->resetHistory();
+    }
+    // The particle pools are temporal history too, and they were the one kind this call did not
+    // reset. A pool carries alive lists, emit carry and trail rings across frames, so a renderer
+    // that had played forty frames and then seeked back to half a second did not agree with a fresh
+    // one -- 63 channels of a hundred thousand, which is the size of difference that reads as noise
+    // and is not. `ParticleRenderer::resetAll` has said in its own comment since it was written that
+    // it is "used on seek/offline restarts"; nothing was calling it except the scene-pointer change,
+    // so a seek that kept the same scene kept the simulation.
+    if (particles_ != nullptr) {
+        particles_->resetAll();
     }
 }
 
@@ -1683,8 +1781,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     const auto& queue = context_.queue();
     const float aspect = static_cast<float>(hdr_.width()) / static_cast<float>(hdr_.height());
     glm::mat4 view = scene.camera.view();
-    { static std::map<const void*, int> ctlFrames; // AVGEN_NEGATIVE_CONTROL
-      view = glm::translate(glm::mat4(1.0f), glm::vec3(2.0e-3f * static_cast<float>(++ctlFrames[this]), 0.0f, 0.0f)) * view; } // AVGEN_NEGATIVE_CONTROL
     glm::mat4 proj = scene.camera.projection(aspect);
     // A frozen camera keeps the matrices it had while the world goes on moving. Everything
     // downstream -- culling, shadows, the object uniforms, the diagnostics -- reads these two, so
@@ -2013,7 +2109,21 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         if (objectIndex >= kMaxObjects) {
             return std::nullopt;
         }
-        const auto& m = entity.material;
+        const scene::Material* material = &entity.material;
+        scene::Material substitute;
+        if (const MaterialCheck check = checkMaterial(entity.material); !check.ok) {
+            // Named, with the value, and once per entity per frame rather than per draw: a guard
+            // that floods the log is a guard people turn off.
+            log::warn("scene render: entity '{}' has a non-finite material ({} = {}); drawing it in "
+                      "magenta instead",
+                      entity.name, check.field, check.value);
+            substitute.baseColor = glm::vec3(1.0f, 0.0f, 1.0f);
+            substitute.roughness = 1.0f;
+            substitute.metallic = 0.0f;
+            substitute.alphaMode = scene::AlphaMode::Opaque;
+            material = &substitute;
+        }
+        const auto& m = *material;
         ObjectUniforms obj{};
         obj.model = entity.transform.matrix();
         obj.normalMatrix = glm::transpose(glm::inverse(obj.model));
@@ -2743,56 +2853,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     havePrevViewProj_ = true;
     stage(cpu.postEncodeMs);
 
-    // ---- auxiliary-target debug view (ADR-035): one target full-screen, before tone mapping ----
-    if (auxDebugView_ != AuxDebugView::None) {
-        if (!auxDebugGroup_) {
-            std::array<wgpu::BindGroupEntry, 7> entries{};
-            entries[0].binding = 0;
-            entries[0].buffer = auxDebugUniforms_;
-            entries[0].size = sizeof(glm::vec4);
-            entries[1].binding = 1;
-            entries[1].textureView = normalRough_.view;
-            entries[2].binding = 2;
-            entries[2].textureView = velocity_.view;
-            entries[3].binding = 3;
-            entries[3].textureView = emission_.view;
-            entries[4].binding = 4;
-            entries[4].textureView = ids_.view;
-            entries[5].binding = 5;
-            entries[5].textureView = ao_->output();
-            entries[6].binding = 6;
-            entries[6].textureView = linearDepth_.view;
-            wgpu::BindGroupDescriptor desc{};
-            desc.label = "aux-debug-group";
-            desc.layout = auxDebugLayout_;
-            desc.entryCount = entries.size();
-            desc.entries = entries.data();
-            auxDebugGroup_ = context_.device().CreateBindGroup(&desc);
-        }
-        const glm::vec4 info(static_cast<float>(auxDebugView_),
-                             auxDebugView_ == AuxDebugView::Velocity ? 40.0f : 1.0f,
-                             static_cast<float>(hdr_.width()), static_cast<float>(hdr_.height()));
-        queue.WriteBuffer(auxDebugUniforms_, 0, &info, sizeof(info));
-        wgpu::RenderPassColorAttachment colour{};
-        colour.view = finalHdr;
-        colour.loadOp = wgpu::LoadOp::Clear;
-        colour.storeOp = wgpu::StoreOp::Store;
-        colour.clearValue = {0.0, 0.0, 0.0, 1.0};
-        wgpu::RenderPassDescriptor pass{};
-        pass.label = "aux-debug-pass";
-        pass.colorAttachmentCount = 1;
-        pass.colorAttachments = &colour;
-        pass.timestampWrites = timeline_->mark("auxdebug", gpu::FrameTimeline::PassKind::Render);
-        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
-        rp.SetPipeline(auxDebugPipeline_);
-        rp.SetBindGroup(0, auxDebugGroup_);
-        rp.Draw(3);
-        rp.End();
-        ++stats_.drawCalls;
-        ++stats_.state.pipelineBinds;
-        ++stats_.state.bindGroupBinds;
-    }
-
     // ---- pass 2: tonemap -> target ----
     {
         auto pipeline = tonemapPipelineFor(target.format);
@@ -2819,6 +2879,82 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         ++stats_.state.pipelineBinds;
         ++stats_.state.bindGroupBinds;
     }
+    // ---- auxiliary-target debug view (ADR-035): one target full-screen, over the finished frame ----
+    //
+    // **After** the tone map, not before it, and that is a correction rather than a preference
+    // (forensics Phase 4.4). Drawn into the HDR target, which is where this pass used to live, every
+    // diagnostic went through auto-exposure and a filmic curve on its way to the screen: a normal
+    // encoded as 0.5 did not arrive as 0.5, an identifier's palette shifted with how bright the
+    // scene happened to be, and a linear depth could not be read as a number at all -- 1.0 landed on
+    // the screen as 202. A diagnostic whose values are a function of the picture it is diagnosing is
+    // the kind of instrument this investigation exists to remove. Here the byte on the screen is the
+    // value the shader wrote, up to the hardware's own encode on an sRGB target.
+    if (auxDebugView_ != AuxDebugView::None) {
+        auto auxPipeline = auxDebugPipelineFor(target.format);
+        if (!auxPipeline) {
+            return std::unexpected(auxPipeline.error());
+        }
+        if (!auxDebugGroup_) {
+            std::array<wgpu::BindGroupEntry, 7> entries{};
+            entries[0].binding = 0;
+            entries[0].buffer = auxDebugUniforms_;
+            entries[0].size = sizeof(AuxDebugUniforms);
+            entries[1].binding = 1;
+            entries[1].textureView = normalRough_.view;
+            entries[2].binding = 2;
+            entries[2].textureView = velocity_.view;
+            entries[3].binding = 3;
+            entries[3].textureView = emission_.view;
+            entries[4].binding = 4;
+            entries[4].textureView = ids_.view;
+            entries[5].binding = 5;
+            entries[5].textureView = ao_->output();
+            entries[6].binding = 6;
+            entries[6].textureView = linearDepth_.view;
+            wgpu::BindGroupDescriptor desc{};
+            desc.label = "aux-debug-group";
+            desc.layout = auxDebugLayout_;
+            desc.entryCount = entries.size();
+            desc.entries = entries.data();
+            auxDebugGroup_ = context_.device().CreateBindGroup(&desc);
+        }
+        AuxDebugUniforms aux{};
+        const float defaultScale = auxDebugView_ == AuxDebugView::Velocity ? 40.0f : 1.0f;
+        aux.info = glm::vec4(static_cast<float>(auxDebugView_),
+                             auxDebugScale_ > 0.0f ? auxDebugScale_ : defaultScale,
+                             static_cast<float>(hdr_.width()), static_cast<float>(hdr_.height()));
+        // The near and far planes the frame was actually built with, so a linear-depth display is
+        // in metres against this camera rather than against a constant somebody has to remember.
+        // The selected object's pick id is here for the object-depth view: -1 means "nothing
+        // selected", which the shader shows as an empty frame rather than as object zero.
+        float selectedId = -1.0f;
+        if (!diagnosticEntity_.empty()) {
+            if (const RenderObjectDiagnostic* selected = diagnosticObject(diagnosticEntity_); selected != nullptr) {
+                selectedId = static_cast<float>(scene::packPickId(scene::PickSpace::Entity, selected->entityIndex));
+            }
+        }
+        aux.depth = glm::vec4(diagnosticFrame_.nearPlane, diagnosticFrame_.farPlane, selectedId, 0.0f);
+        queue.WriteBuffer(auxDebugUniforms_, 0, &aux, sizeof(aux));
+        wgpu::RenderPassColorAttachment colour{};
+        colour.view = target.view;
+        colour.loadOp = wgpu::LoadOp::Clear;
+        colour.storeOp = wgpu::StoreOp::Store;
+        colour.clearValue = {0.0, 0.0, 0.0, 1.0};
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = "aux-debug-pass";
+        pass.colorAttachmentCount = 1;
+        pass.colorAttachments = &colour;
+        pass.timestampWrites = timeline_->mark("auxdebug", gpu::FrameTimeline::PassKind::Render);
+        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        rp.SetPipeline(*auxPipeline);
+        rp.SetBindGroup(0, auxDebugGroup_);
+        rp.Draw(3);
+        rp.End();
+        ++stats_.drawCalls;
+        ++stats_.state.pipelineBinds;
+        ++stats_.state.bindGroupBinds;
+    }
+
     // ---- pass 3: the 2D composition over the finished picture (ADR-083) ----
     // Display-referred, after the tone map, loading the target rather than clearing it. Nothing
     // here knows what the scene was; that is the point.

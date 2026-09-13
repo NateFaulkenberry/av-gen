@@ -1878,6 +1878,14 @@ void Engine::seekSeconds(double seconds) {
     if (scene::Composition* composition = this->composition()) {
         composition->entityWorld().seek(seconds, &params_, nullptr,
                                         composition->scene().camera.position);
+        // Skinning has its own "a frame ago", and a seek makes that sentence false: the joints were
+        // not anywhere a frame ago. Left alone, the first frame after every scrub carries joint
+        // motion vectors for a jump nobody made and the character smears. Told here rather than
+        // collapsed here, because the rigs have not been re-posed at this point -- see
+        // `SkinnedRig::reseedPrevious`.
+        for (scene::SkinnedRig& rig : composition->scene().rigs) {
+            rig.reseedAfterDiscontinuity();
+        }
     }
     // A live event belongs to the moment it happened and the moment is gone; the scheduled tier is
     // rebased rather than cleared, so the next frame restores the standing intents at the new

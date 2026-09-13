@@ -557,36 +557,16 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         std::string token;
         std::istringstream stream(options_.disablePasses);
         while (std::getline(stream, token, ',')) {
-            if (token == "shadows") {
-                toggles.shadows = false;
-            } else if (token == "ao") {
-                toggles.ao = false;
-            } else if (token == "volume") {
-                toggles.volume = false;
-            } else if (token == "post") {
-                toggles.post = false;
-            } else if (token == "shadowmask") {
-                toggles.shadowMask = false;
-            } else if (token == "culling") {
-                toggles.culling = false;
-            } else if (token == "water") {
-                toggles.water = false;
-            } else if (token == "transparency") {
-                toggles.transparency = false;
-            } else if (token == "particles") {
-                toggles.particles = false;
-            } else if (token == "animation") {
-                toggles.animation = false;
-            } else if (token == "cameramotion") {
-                toggles.cameraMotion = false;
-            } else if (!token.empty()) {
-                return fail("--disable: unknown phase '{}' (shadows,ao,volume,post,shadowmask,"
-                            "culling,water,transparency,particles,animation,cameramotion)",
-                            token);
+            if (token.empty()) {
+                continue;
             }
-            if (!token.empty()) {
-                off += off.empty() ? token : ", " + token;
+            // One table, shared with the panel and with the automatic bisection: a private
+            // if-chain here is how an arm ends up reachable from the renderer and not the CLI.
+            if (!rendering::SceneRenderer::setPassArm(toggles, token, false)) {
+                return fail("--disable: unknown phase '{}' ({})", token,
+                            rendering::SceneRenderer::passArmNames());
             }
+            off += off.empty() ? token : ", " + token;
         }
         renderer_->setPassToggles(toggles);
         // Printed so the two arms of an A/B can never be confused for each other after the fact.
@@ -597,7 +577,9 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             rendering::AuxDebugView::None,      rendering::AuxDebugView::Normal,
             rendering::AuxDebugView::Roughness, rendering::AuxDebugView::Velocity,
             rendering::AuxDebugView::Emission,  rendering::AuxDebugView::Ids,
-            rendering::AuxDebugView::Occlusion, rendering::AuxDebugView::Depth};
+            rendering::AuxDebugView::Occlusion, rendering::AuxDebugView::Depth,
+            rendering::AuxDebugView::LinearDepth, rendering::AuxDebugView::DepthEdges,
+            rendering::AuxDebugView::ObjectDepth};
         bool found = false;
         for (const auto view : kViews) {
             if (options_.debugTarget == rendering::auxDebugViewName(view)) {

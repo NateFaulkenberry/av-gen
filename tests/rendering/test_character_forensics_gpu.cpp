@@ -927,9 +927,30 @@ TEST_CASE("the character's pose is a pure function of the timeline",
             CHECK(jointsDiffering(parked, h.rig().palette) == 0);
         }
         // A pose that is *re-evaluated* every frame while the playhead is parked is still correct;
-        // one that is *integrated* would drift. The version moving proves the first happened, so the
-        // equality above is a real result and not a rig that was simply never touched.
-        CHECK(h.rig().paletteVersion > parkedVersion);
+        // one that is *integrated* would drift. What is needed here is a witness that the rig is
+        // live rather than frozen, so the equality above is a real result and not a rig nobody
+        // touched.
+        //
+        // `paletteVersion` used to be that witness, and it stopped being one when a genuine defect
+        // was fixed. `hold()` bumps the version only when `previousPalette != palette` -- its job is
+        // to push the now-equal previous palette to the GPU once. Before the repair, a seek left the
+        // previous palette holding the pre-jump pose, so every parked frame found them unequal and
+        // bumped. Now a seek reseeds it, they are equal on arrival, and there is correctly nothing
+        // to re-upload. The old check was reading the defect as liveness.
+        //
+        // The witness that does not depend on it: the rig is sampled at the second it was asked
+        // for, and moving that second moves the pose and the version. A frozen rig fails both.
+        CHECK(h.rig().paletteTime == Approx(5.0).margin(1e-9));
+        {
+            const std::uint64_t heldVersion = h.rig().paletteVersion;
+            const std::vector<glm::mat4> heldPose = h.rig().palette;
+            h.jumpTo(5.5);
+            CHECK(h.rig().paletteVersion > heldVersion);
+            CHECK(jointsDiffering(heldPose, h.rig().palette) > 0);
+            h.jumpTo(5.0);
+            CHECK(jointsDiffering(parked, h.rig().palette) == 0);
+        }
+        static_cast<void>(parkedVersion);
         CHECK(jointsDiffering(parked, fresh("Walk", 5.0)) == 0);
 
         REQUIRE(h.engine.play().has_value());

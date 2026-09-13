@@ -188,6 +188,20 @@ struct SkinnedRig {
     std::vector<glm::mat4> previousPalette; // the palette this rig was drawn with last frame
     double paletteTime = -1.0;              // the timeline second `palette` was evaluated at
     std::uint64_t paletteVersion = 0;       // bumped whenever `palette` changes
+    // Set by a transport discontinuity, consumed by the next `evaluate`.
+    //
+    // `previousPalette` means "where these joints were a frame ago", and the velocity target and
+    // motion blur believe it. Across a seek that sentence is false: the joints were not anywhere a
+    // frame ago, because there was no previous frame at this position. Without this flag a scrub to
+    // a new second left all 49 joints holding the pose from before the jump -- measured at 71.5
+    // model units on a 100-unit character -- and `pbr_skinned.wgsl` dutifully drew a motion vector
+    // for a movement nobody made, smearing the first frame after every scrub.
+    //
+    // A flag rather than a collapse at seek time, because at seek time the rig has not been re-posed
+    // yet: setting `previousPalette = palette` there would pin the *old* pose, and the next evaluate
+    // would copy it forward and reintroduce exactly the jump. The next evaluate has to take its
+    // "previous" from the pose it lands on rather than the one it left.
+    bool reseedPrevious = false;
 
     // Scratch, kept so a per-frame evaluation allocates nothing.
     Pose scratchPose;
@@ -205,6 +219,9 @@ struct SkinnedRig {
     // always ends up holding what the rig was last drawn with, so a rig that did not move this
     // frame reports no motion rather than a stale frame of it. Returns true when it re-posed.
     bool evaluate(double now, float hz = 0.0f);
+    // Declares a transport discontinuity: the next `evaluate` reports no motion rather than motion
+    // across the jump. Idempotent, and cheap enough to call on every rig at every seek.
+    void reseedAfterDiscontinuity() { reseedPrevious = true; }
     // Keeps the palette exactly as it is and marks it unmoved. What a culled rig gets.
     void hold();
     // The timeline second the player is sampled at for frame time `now` at rate `hz`: a fixed grid,

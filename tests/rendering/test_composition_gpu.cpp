@@ -16,6 +16,7 @@
 #include "rendering/reference_renderer.hpp"
 #include "rendering/renderer_snapshot.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 #include "scene/composition.hpp"
 #include "support/temp_dir.hpp"
@@ -27,6 +28,8 @@
 
 #include <chrono>
 #include <array>
+#include <bit>
+#include <functional>
 #include <cmath>
 #include <filesystem>
 #include <set>
@@ -2880,6 +2883,7 @@ TEST_CASE("every auxiliary debug view shows something of its own",
         rendering::AuxDebugView::Roughness, rendering::AuxDebugView::Velocity,
         rendering::AuxDebugView::Emission,  rendering::AuxDebugView::Ids,
         rendering::AuxDebugView::Occlusion, rendering::AuxDebugView::Depth,
+        rendering::AuxDebugView::LinearDepth, rendering::AuxDebugView::DepthEdges,
     };
     std::map<std::uint64_t, std::string> seen;
     for (const rendering::AuxDebugView view : views) {
@@ -2940,6 +2944,770 @@ TEST_CASE("every auxiliary debug view shows something of its own",
         CHECK(distinct.size() >= 3);
     }
 
+    SECTION("linear depth is the buffer it claims to show, and the exponential view is not") {
+        // The two depth views are deliberately different pictures of the same buffer, and the
+        // difference is the whole reason the second exists: `depth` compresses so a three-kilometre
+        // view is legible at all, `linear depth` does not, so a distance can be read off it.
+        //
+        // The instrument took three tries, and the two that failed are worth keeping. The frame's
+        // mean measured the wrong thing entirely -- pulling the camera back put less sky in shot, so
+        // the average *fell* while every surface got further away. Moving the camera along its view
+        // axis so the centre ray stayed on one surface was better arithmetic and still wrong: this
+        // scene has an object right in front of the camera, so the move passed *through* the
+        // surface being measured and the distance jumped the other way.
+        //
+        // What finally works is not a proxy at all. The view claims to show the linear-depth target;
+        // that target can be read back; so every pixel of the picture is checked against the number
+        // it is supposed to be a picture of. No camera arithmetic, no assumption about the scene,
+        // and it fails for any wrong constant rather than only for a wrong trend.
+        const float range = 40.0f;
+        renderer.setAuxDebugScale(renderer.diagnosticFrame().farPlane / range);
+        aimCompositionCamera(engine.params(), glm::vec3(0.0f, 3.0f, 10.0f), glm::vec3(0.0f, 1.0f, -4.0f));
+        const gpu::Image8 shown = renderView(rendering::AuxDebugView::LinearDepth);
+        auto bits = gpu::readTextureR32Uint(*ctx, renderer.linearDepthTexture(), kW, kH);
+        REQUIRE(bits.has_value());
+        REQUIRE(bits->size() == static_cast<std::size_t>(kW) * kH);
+
+        std::size_t surfaces = 0;
+        std::size_t sky = 0;
+        double worst = 0.0;
+        for (std::uint32_t y = 0; y < kH; ++y) {
+            for (std::uint32_t x = 0; x < kW; ++x) {
+                const float depth = std::bit_cast<float>((*bits)[static_cast<std::size_t>(y) * kW + x]);
+                const int byte = shown.pixel(x, y)[0];
+                if (depth > 1.0e6f) {
+                    // The linear target's own "nothing was drawn" sentinel. Full white, and its own
+                    // value: an empty sky and a surface at the far plane are not the same picture.
+                    ++sky;
+                    CHECK(byte == 255);
+                    continue;
+                }
+                ++surfaces;
+                const double expected = std::clamp(static_cast<double>(depth) / static_cast<double>(range), 0.0, 1.0) * 255.0;
+                worst = std::max(worst, std::fabs(expected - static_cast<double>(byte)));
+            }
+        }
+        INFO(surfaces << " surface pixels and " << sky << " sky, worst error " << worst << " of 255");
+        // Both populations are present, or one of the two claims above is being asserted over an
+        // empty set.
+        REQUIRE(surfaces > 100);
+        REQUIRE(sky > 100);
+        // One step of 8-bit quantisation, and nothing else.
+        CHECK(worst <= 1.5);
+
+        // The control, and the reason two views exist. The same comparison against the same buffer,
+        // with the exponential view in the frame: it is a *different* function of the same numbers,
+        // so it must fail this check by a wide margin. Without this, a linear view that had quietly
+        // become the exponential one would still pass everything above.
+        renderer.setAuxDebugScale(0.0f);
+        const gpu::Image8 compressed = renderView(rendering::AuxDebugView::Depth);
+        double worstExponential = 0.0;
+        for (std::uint32_t y = 0; y < kH; ++y) {
+            for (std::uint32_t x = 0; x < kW; ++x) {
+                const float depth = std::bit_cast<float>((*bits)[static_cast<std::size_t>(y) * kW + x]);
+                if (depth > 1.0e6f) {
+                    continue;
+                }
+                const double expected = std::clamp(static_cast<double>(depth) / static_cast<double>(range), 0.0, 1.0) * 255.0;
+                worstExponential = std::max(worstExponential, std::fabs(expected - compressed.pixel(x, y)[0]));
+            }
+        }
+        INFO("the exponential view differs from the linear reading by up to " << worstExponential);
+        CHECK(worstExponential > 16.0);
+
+        // And the regression guard for what made all of the above possible. This pass used to draw
+        // into the HDR target, so every diagnostic went through auto-exposure and a filmic curve on
+        // its way to the screen -- a linear 1.0 arrived as 202, an identifier's palette moved with
+        // how bright the scene happened to be, and none of the comparisons above could have been
+        // written. Four stops of exposure compensation must change nothing here.
+        auto* compensation = engine.params().findAs<float>("camera/exposure/compensation");
+        REQUIRE(compensation != nullptr);
+        renderer.setAuxDebugScale(renderer.diagnosticFrame().farPlane / range);
+        const std::uint64_t before = gpu::hashImage(renderView(rendering::AuxDebugView::LinearDepth));
+        compensation->setBase(4.0f);
+        engine.params().resetFinals();
+        const std::uint64_t after = gpu::hashImage(renderView(rendering::AuxDebugView::LinearDepth));
+        CHECK(before == after);
+        // The control: the same four stops are plainly visible in the shaded frame, so the equality
+        // above is the view being independent of exposure rather than exposure doing nothing.
+        const std::uint64_t litBright = gpu::hashImage(renderView(rendering::AuxDebugView::None));
+        compensation->setBase(0.0f);
+        engine.params().resetFinals();
+        const std::uint64_t litNormal = gpu::hashImage(renderView(rendering::AuxDebugView::None));
+        CHECK(litBright != litNormal);
+        renderer.setAuxDebugScale(0.0f);
+    }
+
+    SECTION("depth edges are edges, not surfaces") {
+        // A relative threshold is what makes this a silhouette finder rather than a brightness map.
+        // The assertion is the shape of the histogram: most of the frame is flat (near zero) and a
+        // small minority is lit. A view that marked every surface would have no dark majority, and
+        // one that marked nothing would have no lit minority at all -- both are checked.
+        aimCompositionCamera(engine.params(), glm::vec3(0.0f, 3.0f, 10.0f), glm::vec3(0.0f, 1.0f, -4.0f));
+        const gpu::Image8 edges = renderView(rendering::AuxDebugView::DepthEdges);
+        std::size_t dark = 0;
+        std::size_t lit = 0;
+        for (std::uint32_t y = 0; y < kH; ++y) {
+            for (std::uint32_t x = 0; x < kW; ++x) {
+                const std::uint8_t* p = edges.pixel(x, y);
+                if (p[0] < 24) {
+                    ++dark;
+                } else if (p[0] > 96) {
+                    ++lit;
+                }
+            }
+        }
+        const double total = static_cast<double>(kW * kH);
+        INFO(dark << " flat pixels and " << lit << " edge pixels of " << total);
+        CHECK(static_cast<double>(dark) / total > 0.5);
+        CHECK(lit > 0);
+    }
+
+    SECTION("object depth shows the named object and nothing else") {
+        // The view that is easiest to get silently wrong: with nothing selected it must be empty
+        // rather than object zero, and with something selected the lit region must be that object's
+        // and must move when the selection changes. All three are checked, because a view that
+        // showed *an* object whatever you asked for would look right in a screenshot.
+        aimCompositionCamera(engine.params(), glm::vec3(0.0f, 3.0f, 10.0f), glm::vec3(0.0f, 1.0f, -4.0f));
+        const auto litPixels = [](const gpu::Image8& image) {
+            std::size_t count = 0;
+            for (std::uint32_t y = 0; y < kH; ++y) {
+                for (std::uint32_t x = 0; x < kW; ++x) {
+                    const std::uint8_t* p = image.pixel(x, y);
+                    if (p[2] > 128) { // the object is drawn blue-dominant; the rest is near black
+                        ++count;
+                    }
+                }
+            }
+            return count;
+        };
+
+        renderer.setDiagnosticEntity("");
+        CHECK(litPixels(renderView(rendering::AuxDebugView::ObjectDepth)) == 0);
+
+        // Two entities the QA scene is known to contain, selected in turn.
+        std::vector<std::string> names;
+        for (const scene::Entity& entity : engine.scene().entities) {
+            if (entity.visible) {
+                names.push_back(entity.name);
+            }
+        }
+        REQUIRE(names.size() >= 2);
+        std::size_t bestCount = 0;
+        std::string bestName;
+        std::size_t secondCount = 0;
+        std::string secondName;
+        for (const std::string& name : names) {
+            renderer.setDiagnosticEntity(name);
+            const std::size_t count = litPixels(renderView(rendering::AuxDebugView::ObjectDepth));
+            if (count > bestCount) {
+                secondCount = bestCount;
+                secondName = bestName;
+                bestCount = count;
+                bestName = name;
+            } else if (count > secondCount) {
+                secondCount = count;
+                secondName = name;
+            }
+        }
+        INFO("'" << bestName << "' covers " << bestCount << " px, '" << secondName << "' covers " << secondCount);
+        // Something is on screen, it is not the whole frame, and a different selection is a
+        // different picture rather than the same one relabelled.
+        CHECK(bestCount > 0);
+        CHECK(bestCount < static_cast<std::size_t>(kW * kH));
+        CHECK(secondCount != bestCount);
+
+        // And the sky belongs to nobody. This is the assertion with teeth, and it exists because
+        // the section first passed against a shader that matched only the low sixteen bits of the
+        // identifier word -- where entity zero's pick id and an empty pixel are *both* 0 -- so
+        // selecting the first entity painted the entire sky as that object. Every bound above was
+        // satisfied by the handful of pixels belonging to other objects, and the test agreed with a
+        // view that was almost entirely wrong. A count cannot catch that; asking whether a
+        // *particular region* is claimed can. The top rows of this framing are empty in every
+        // selection, so no selection may own them. (A large floor legitimately covers two thirds of
+        // this frame, which is why the bound cannot simply be "a minority".)
+        for (const std::string& name : names) {
+            renderer.setDiagnosticEntity(name);
+            const gpu::Image8 image = renderView(rendering::AuxDebugView::ObjectDepth);
+            std::size_t skyClaimed = 0;
+            for (std::uint32_t y = 0; y < 8; ++y) {
+                for (std::uint32_t x = 0; x < kW; ++x) {
+                    skyClaimed += image.pixel(x, y)[2] > 128 ? 1 : 0;
+                }
+            }
+            INFO("'" << name << "' claims " << skyClaimed << " sky pixels");
+            CHECK(skyClaimed == 0);
+        }
+        renderer.setDiagnosticEntity("");
+    }
+
     renderer.setAuxDebugView(rendering::AuxDebugView::None);
     CHECK(ctx->errorCount() == 0);
+}
+
+// ---- Phase 9.3: the guards that need a device ---------------------------------------------------
+//
+// The unit binary shut four doors NaN was walking through (`test_renderer_layout_guards.cpp`). The
+// material-to-`ObjectUniforms` packing was the one it could not reach, because it lives inside
+// `SceneRenderer::render` behind a device -- and it is the door with the widest blast radius. A NaN
+// in a base colour does not stay in its object: bloom's downsample averages it across a tile, the
+// tone map carries the tile to the frame, and what arrives is a bright or black region nowhere near
+// anything that could be blamed for it.
+//
+// So the test is in two halves, and the first is the one that gives the second its meaning: prove
+// the spread is real by measuring it with the guard's substitution *accepted*, then prove the frame
+// is otherwise unchanged.
+TEST_CASE("a non-finite material is replaced rather than shaded", "[gpu][composition][forensics][guards]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    constexpr std::uint32_t kW = 96;
+    constexpr std::uint32_t kH = 96;
+    scene::Scene scene;
+    const auto mesh = scene.addMesh(scene::makeCube(1.0f));
+    scene::Entity& cube = scene.addEntity("cube", mesh);
+    cube.transform.position = {0.0f, 0.0f, 0.0f};
+    cube.material.baseColor = {0.1f, 0.7f, 0.3f};
+    cube.material.roughness = 0.6f;
+    scene.camera.position = {0.0f, 0.0f, 4.0f};
+    scene.camera.target = {0.0f, 0.0f, 0.0f};
+    scene::PunctualLight& key = scene.lights.emplace_back();
+    key.type = scene::PunctualLight::Type::Directional;
+    key.direction = glm::normalize(glm::vec3(-0.4f, -0.8f, -0.4f));
+    key.intensity = 3.0f;
+
+    const FrameTime time{};
+    const auto shoot = [&] {
+        auto image = renderer.renderToImage(scene, time, kW, kH);
+        REQUIRE(image.has_value());
+        return std::move(*image);
+    };
+    // Against the frame's *own* background, taken from a corner, rather than an absolute
+    // threshold. The environment lights the whole frame, so "brighter than 24" counts the sky and
+    // reports every pixel as the object -- which is what the first version of this did, and it made
+    // the upper bound below unsatisfiable.
+    const auto litPixels = [&](const gpu::Image8& image) {
+        const std::uint8_t* corner = image.pixel(0, 0);
+        const glm::ivec3 background(corner[0], corner[1], corner[2]);
+        std::size_t count = 0;
+        for (std::uint32_t y = 0; y < kH; ++y) {
+            for (std::uint32_t x = 0; x < kW; ++x) {
+                const std::uint8_t* p = image.pixel(x, y);
+                const int delta = std::max({std::abs(p[0] - background.r), std::abs(p[1] - background.g),
+                                            std::abs(p[2] - background.b)});
+                if (delta > 14) {
+                    ++count;
+                }
+            }
+        }
+        return count;
+    };
+
+    const gpu::Image8 healthy = shoot();
+    const std::size_t healthyLit = litPixels(healthy);
+    INFO(healthyLit << " lit pixels with a finite material");
+    REQUIRE(healthyLit > 100);
+    REQUIRE(healthyLit < static_cast<std::size_t>(kW * kH));
+
+    SECTION("each non-finite field is caught, and the object stays where it is") {
+        // Every field the packer reads, one at a time, because a guard that checks the first three
+        // and not the ninth is a guard that will be found by the ninth.
+        struct Poison {
+            const char* what;
+            std::function<void(scene::Material&)> apply;
+        };
+        const float nan = std::numeric_limits<float>::quiet_NaN();
+        const float inf = std::numeric_limits<float>::infinity();
+        const std::vector<Poison> poisons{
+            {"baseColor", [&](scene::Material& m) { m.baseColor.g = nan; }},
+            {"opacity", [&](scene::Material& m) { m.opacity = nan; }},
+            {"emissiveColor", [&](scene::Material& m) { m.emissiveColor.b = inf; }},
+            {"emissiveIntensity", [&](scene::Material& m) { m.emissiveIntensity = nan; }},
+            {"roughness", [&](scene::Material& m) { m.roughness = nan; }},
+            {"metallic", [&](scene::Material& m) { m.metallic = inf; }},
+            {"normalScale", [&](scene::Material& m) { m.normalScale = nan; }},
+            {"occlusionStrength", [&](scene::Material& m) { m.occlusionStrength = nan; }},
+            {"alphaCutoff", [&](scene::Material& m) { m.alphaCutoff = nan; }},
+        };
+        const scene::Material pristine = cube.material;
+        for (const Poison& poison : poisons) {
+            cube.material = pristine;
+            poison.apply(cube.material);
+            const gpu::Image8 image = shoot();
+            const std::size_t lit = litPixels(image);
+            INFO("poisoned " << poison.what << ": " << lit << " lit pixels");
+            // The object is still drawn, in roughly the same place, and the frame is not a NaN
+            // wash. Both bounds matter: dropping the draw would make the object vanish, which is
+            // the single hardest report to act on, and a NaN reaching the shader would take the
+            // whole frame with it through bloom.
+            CHECK(lit > healthyLit / 3);
+            CHECK(lit < static_cast<std::size_t>(kW * kH));
+            // Every pixel is a number. This is the assertion the guard exists for -- a NaN that
+            // reached the tone map would show up here as a channel that is neither dark nor bright
+            // but arbitrary, and in practice as a saturated frame.
+            std::size_t saturated = 0;
+            for (std::uint32_t y = 0; y < kH; ++y) {
+                for (std::uint32_t x = 0; x < kW; ++x) {
+                    const std::uint8_t* p = image.pixel(x, y);
+                    if (p[0] == 255 && p[1] == 255 && p[2] == 255) {
+                        ++saturated;
+                    }
+                }
+            }
+            INFO(saturated << " fully saturated pixels");
+            CHECK(saturated < static_cast<std::size_t>(kW * kH) / 4);
+        }
+        cube.material = pristine;
+    }
+
+    SECTION("the substitution is visible, and a healthy frame is untouched") {
+        // The control for the whole test: the guard must not be firing on the healthy material.
+        // Without this, a `checkMaterial` that returned "bad" for everything would pass every
+        // assertion above -- the object would be drawn, in place, unsaturated, in magenta.
+        const gpu::Image8 again = shoot();
+        CHECK(gpu::hashImage(again) == gpu::hashImage(healthy));
+
+        cube.material.baseColor.r = std::numeric_limits<float>::quiet_NaN();
+        const gpu::Image8 substituted = shoot();
+        CHECK(gpu::hashImage(substituted) != gpu::hashImage(healthy));
+        // Magenta: red and blue present, green suppressed, over the object's own pixels.
+        std::size_t magenta = 0;
+        for (std::uint32_t y = 0; y < kH; ++y) {
+            for (std::uint32_t x = 0; x < kW; ++x) {
+                const std::uint8_t* p = substituted.pixel(x, y);
+                if (p[0] > 40 && p[2] > 40 && p[1] * 2 < p[0] && p[1] * 2 < p[2]) {
+                    ++magenta;
+                }
+            }
+        }
+        INFO(magenta << " magenta pixels");
+        CHECK(magenta > healthyLit / 4);
+    }
+
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- Phase 7: target load/store, resize and the depth views in the pass matrix -------------------
+//
+// The pass table in the report says what each pass does to its targets. A table is a description,
+// and a description of a clear is exactly the kind of claim that is true when it is written and
+// quietly stops being true later. These are the three parts of it that can be checked from outside
+// the renderer without transcribing descriptors back into assertions.
+TEST_CASE("the passes establish their targets rather than inheriting them",
+          "[gpu][composition][forensics][passes][targets]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    constexpr std::uint32_t kW = 128;
+    constexpr std::uint32_t kH = 96;
+    scene::Scene scene;
+    const auto mesh = scene.addMesh(scene::makeCube(1.0f));
+    scene::Entity& cube = scene.addEntity("cube", mesh);
+    cube.material.baseColor = {0.8f, 0.2f, 0.2f};
+    cube.material.emissiveColor = {1.0f, 0.4f, 0.1f};
+    cube.material.emissiveIntensity = 4.0f;
+    scene.camera.position = {0.0f, 0.0f, 4.0f};
+    scene.camera.target = {0.0f, 0.0f, 0.0f};
+    scene::PunctualLight& key = scene.lights.emplace_back();
+    key.type = scene::PunctualLight::Type::Directional;
+    key.direction = glm::normalize(glm::vec3(-0.4f, -0.8f, -0.4f));
+    key.intensity = 3.0f;
+
+    const FrameTime time{};
+    const auto shoot = [&] {
+        auto image = renderer.renderToImage(scene, time, kW, kH);
+        REQUIRE(image.has_value());
+        return std::move(*image);
+    };
+
+    SECTION("the identifier target is cleared each frame, not carried over") {
+        // The one auxiliary target whose contents are unambiguous: a non-zero identifier means an
+        // object was written there. Draw the cube, then hide it, and the target must be empty. If
+        // the scene pass loaded instead of clearing, the previous frame's identifiers would still
+        // be sitting in it -- and the picker reads this target, so a stale id is a click that
+        // selects an object that is no longer on screen.
+        shoot();
+        auto withCube = gpu::readTextureR32Uint(*ctx, renderer.identifierTexture(), kW, kH);
+        REQUIRE(withCube.has_value());
+        std::size_t written = 0;
+        for (const std::uint32_t id : *withCube) {
+            written += id != 0 ? 1 : 0;
+        }
+        INFO(written << " identifier texels written with the cube visible");
+        REQUIRE(written > 100);
+
+        cube.visible = false;
+        shoot();
+        auto withoutCube = gpu::readTextureR32Uint(*ctx, renderer.identifierTexture(), kW, kH);
+        REQUIRE(withoutCube.has_value());
+        std::size_t stale = 0;
+        for (const std::uint32_t id : *withoutCube) {
+            stale += id != 0 ? 1 : 0;
+        }
+        INFO(stale << " identifier texels still set with nothing to draw");
+        CHECK(stale == 0);
+        cube.visible = true;
+    }
+
+    SECTION("the linear-depth target is cleared to its sentinel, not to zero") {
+        // The clear value is 1e7, the "nothing was drawn" sentinel, and it has to be that rather
+        // than zero: a cleared-to-zero linear depth reads as a surface *at the camera*, which is
+        // the worst possible default for AO, water and the fog the particle pass does against it.
+        cube.visible = false;
+        shoot();
+        auto bits = gpu::readTextureR32Uint(*ctx, renderer.linearDepthTexture(), kW, kH);
+        REQUIRE(bits.has_value());
+        std::size_t sentinel = 0;
+        std::size_t atTheCamera = 0;
+        for (const std::uint32_t word : *bits) {
+            const float d = std::bit_cast<float>(word);
+            sentinel += d > 1.0e6f ? 1 : 0;
+            atTheCamera += d < 1.0f ? 1 : 0;
+        }
+        INFO(sentinel << " texels at the sentinel and " << atTheCamera << " within a metre of the camera");
+        CHECK(sentinel == static_cast<std::size_t>(kW) * kH);
+        CHECK(atTheCamera == 0);
+        cube.visible = true;
+    }
+
+    SECTION("a resized renderer draws what a renderer born at that size draws") {
+        // Target recreation. A renderer that has been through other sizes must arrive back at a
+        // size with the same picture as one that has only ever known it -- otherwise something
+        // survived the recreation, and the thing that survives a resize is exactly the class of
+        // state this investigation keeps finding at boundaries.
+        renderer.resetTemporalHistory();
+        const std::uint64_t born = gpu::hashImage(shoot());
+
+        REQUIRE(renderer.renderToImage(scene, time, 320, 240).has_value());
+        REQUIRE(renderer.renderToImage(scene, time, 64, 64).has_value());
+        REQUIRE(renderer.renderToImage(scene, time, 257, 129).has_value()); // deliberately not a round size
+        renderer.resetTemporalHistory();
+        const std::uint64_t returned = gpu::hashImage(shoot());
+        CHECK(born == returned);
+
+        // And a genuinely fresh renderer agrees with both, which is what makes the equality above
+        // about the targets rather than about one renderer being self-consistently wrong.
+        rendering::SceneRenderer fresh(*ctx, shaders);
+        REQUIRE(fresh.init().has_value());
+        auto first = fresh.renderToImage(scene, time, kW, kH);
+        REQUIRE(first.has_value());
+        CHECK(gpu::hashImage(*first) == born);
+    }
+
+    SECTION("every auxiliary view survives a resize and a selection change") {
+        // Auxiliary debug target selection through all passes, at sizes that are not multiples of
+        // anything convenient -- a readback or a bind group sized from a stale extent shows up here
+        // as a device error rather than as a picture somebody has to notice.
+        const rendering::AuxDebugView views[] = {
+            rendering::AuxDebugView::Normal,     rendering::AuxDebugView::Roughness,
+            rendering::AuxDebugView::Velocity,   rendering::AuxDebugView::Emission,
+            rendering::AuxDebugView::Ids,        rendering::AuxDebugView::Occlusion,
+            rendering::AuxDebugView::Depth,      rendering::AuxDebugView::LinearDepth,
+            rendering::AuxDebugView::DepthEdges, rendering::AuxDebugView::ObjectDepth,
+        };
+        const std::pair<std::uint32_t, std::uint32_t> sizes[] = {{97, 61}, {320, 180}, {64, 64}};
+        renderer.setDiagnosticEntity("cube");
+        std::size_t rendered = 0;
+        for (const rendering::AuxDebugView view : views) {
+            renderer.setAuxDebugView(view);
+            for (const auto& [w, h] : sizes) {
+                INFO("view " << rendering::auxDebugViewName(view) << " at " << w << "x" << h);
+                auto image = renderer.renderToImage(scene, time, w, h);
+                REQUIRE(image.has_value());
+                CHECK(image->width == w);
+                CHECK(image->height == h);
+                ++rendered;
+            }
+        }
+        CHECK(rendered == std::size(views) * std::size(sizes));
+        renderer.setAuxDebugView(rendering::AuxDebugView::None);
+        renderer.setDiagnosticEntity("");
+    }
+
+    SECTION("the object-depth view follows the culling arm") {
+        // The depth diagnostics joined to the pass matrix, which is the last of Phase 7's asks. The
+        // selected object's depth is a picture of what the frame *submitted*, so an object the cull
+        // dropped must be absent from it -- and must come back when the cull is disarmed. Both
+        // directions, because a view that always showed the object would pass the first alone.
+        const auto litPixels = [&](const gpu::Image8& image, std::uint32_t w, std::uint32_t h) {
+            std::size_t count = 0;
+            for (std::uint32_t y = 0; y < h; ++y) {
+                for (std::uint32_t x = 0; x < w; ++x) {
+                    count += image.pixel(x, y)[2] > 128 ? 1 : 0;
+                }
+            }
+            return count;
+        };
+        renderer.setDiagnosticEntity("cube");
+        renderer.setAuxDebugView(rendering::AuxDebugView::ObjectDepth);
+        const std::size_t drawn = litPixels(shoot(), kW, kH);
+        INFO(drawn << " pixels of the cube's own depth");
+        REQUIRE(drawn > 100);
+
+        cube.cameraCulled = true;
+        CHECK(litPixels(shoot(), kW, kH) == 0);
+
+        rendering::SceneRenderer::PassToggles noCulling;
+        noCulling.culling = false;
+        renderer.setPassToggles(noCulling);
+        const std::size_t uncull = litPixels(shoot(), kW, kH);
+        INFO(uncull << " pixels once the cull is disarmed");
+        CHECK(uncull > 100);
+
+        renderer.setPassToggles(rendering::SceneRenderer::PassToggles{});
+        cube.cameraCulled = false;
+        renderer.setAuxDebugView(rendering::AuxDebugView::None);
+        renderer.setDiagnosticEntity("");
+    }
+
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- Phase 8.3: automatic subsystem bisection ---------------------------------------------------
+//
+// The progressive matrix answers "at which rung does this appear". Bisection answers the sharper
+// question: *which subsystems does the symptom actually need?* Given a predicate over a frame, it
+// finds a **minimal** set of arms that must stay on for the predicate to hold -- minimal in the
+// delta-debugging sense, that turning any one of them off makes the symptom go away.
+//
+// It is written here rather than in the renderer because it is a search over renders, and the thing
+// that owns a render loop is the thing that should own it. The search is over `passArms()`, so an
+// arm added to the renderer is automatically in the search; an arm the search could not see would
+// silently clear the subsystem behind it, which is the failure mode this whole plan is about.
+namespace {
+
+// The arms that must remain on. `reproduces(toggles)` renders and says whether the symptom is there.
+std::vector<std::string> bisectArms(const std::function<bool(const rendering::SceneRenderer::PassToggles&)>& reproduces) {
+    std::vector<std::string> candidates;
+    for (const auto& arm : rendering::SceneRenderer::passArms()) {
+        candidates.emplace_back(arm.name);
+    }
+    const auto togglesWith = [](const std::vector<std::string>& on) {
+        rendering::SceneRenderer::PassToggles toggles;
+        for (const auto& arm : rendering::SceneRenderer::passArms()) {
+            REQUIRE(rendering::SceneRenderer::setPassArm(toggles, arm.name, false));
+        }
+        for (const std::string& name : on) {
+            REQUIRE(rendering::SceneRenderer::setPassArm(toggles, name, true));
+        }
+        return toggles;
+    };
+
+    // With everything on the symptom must be there, or there is nothing to bisect. With everything
+    // off it may still be there -- that is the empty answer, and it is a real one: the symptom is in
+    // the part of the frame no arm removes.
+    if (!reproduces(togglesWith(candidates))) {
+        return {};
+    }
+    if (reproduces(togglesWith({}))) {
+        return {};
+    }
+
+    // Greedy minimisation: drop one arm at a time and keep the drop when the symptom survives.
+    // Linear in the number of arms times a render, which for eleven arms is cheaper than a proper
+    // ddmin and gives the same one-minimal answer.
+    std::vector<std::string> needed = candidates;
+    for (const auto& arm : rendering::SceneRenderer::passArms()) {
+        std::vector<std::string> without;
+        for (const std::string& name : needed) {
+            if (name != arm.name) {
+                without.push_back(name);
+            }
+        }
+        if (without.size() != needed.size() && reproduces(togglesWith(without))) {
+            needed = without;
+        }
+    }
+    return needed;
+}
+
+} // namespace
+
+TEST_CASE("bisection finds the smallest set of subsystems a symptom needs",
+          "[gpu][composition][forensics][bisect]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the RendererQA scene is not present");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(project).has_value());
+    FixedStepClock clock(60.0);
+    constexpr std::uint32_t kW = 160;
+    constexpr std::uint32_t kH = 120;
+    aimCompositionCamera(engine.params(), glm::vec3(0.0f, 3.0f, 10.0f), glm::vec3(0.0f, 1.0f, -4.0f));
+    const FrameTime time = engine.tick(clock);
+    engine.setViewport(kW, kH);
+    engine.update(time);
+
+    std::size_t renders = 0;
+    const auto frameWith = [&](const rendering::SceneRenderer::PassToggles& toggles) {
+        renderer.setPassToggles(toggles);
+        renderer.resetTemporalHistory();
+        auto image = renderer.renderToImage(engine.scene(), time, kW, kH);
+        REQUIRE(image.has_value());
+        ++renders;
+        return std::move(*image);
+    };
+    const auto stats = [&] { return renderer.stats(); };
+
+    SECTION("a symptom that is one subsystem is attributed to that subsystem alone") {
+        // The symptom: the frame simulated particles. Its true cause is known, so the answer is
+        // checkable -- which is the only way to test a search whose output is a claim about cause.
+        const std::vector<std::string> needed = bisectArms([&](const auto& toggles) {
+            frameWith(toggles);
+            return stats().particles.dispatches > 0;
+        });
+        INFO("bisection over " << renders << " renders returned " << needed.size() << " arms");
+        for (const std::string& name : needed) {
+            INFO("needed: " << name);
+        }
+        REQUIRE(needed.size() == 1);
+        CHECK(needed.front() == "particles");
+    }
+
+    SECTION("a symptom no arm can remove is reported as needing none") {
+        // The honest empty answer, and the control for the section above. Opaque geometry has no
+        // arm, so a symptom that rests on it survives every arm being off -- and the search must
+        // say "none of these" rather than picking whichever arm it happened to test last.
+        renders = 0;
+        const std::vector<std::string> needed = bisectArms([&](const auto& toggles) {
+            frameWith(toggles);
+            return stats().drawCalls > 0;
+        });
+        INFO("bisection over " << renders << " renders returned " << needed.size() << " arms");
+        CHECK(needed.empty());
+    }
+
+    SECTION("a symptom nothing produces is reported as needing none") {
+        // The other end: a predicate that is false even with everything on. The search must not
+        // return an arbitrary set for a symptom that does not exist.
+        renders = 0;
+        const std::vector<std::string> needed = bisectArms([&](const auto& toggles) {
+            frameWith(toggles);
+            return stats().drawCalls > 100000;
+        });
+        CHECK(needed.empty());
+        CHECK(renders == 1); // it gives up on the first render rather than searching
+    }
+
+    SECTION("every arm in an answer is load-bearing") {
+        // The property that makes an answer a claim about *cause* rather than a list of what
+        // happened to be on. Whatever set comes back for "the frame recorded shadow draws", it must
+        // contain the shadow arm, and removing any single member must make the symptom go away.
+        // The second half is the real assertion: a search that returned a superset would pass the
+        // first half and fail this.
+        renders = 0;
+        const std::vector<std::string> needed = bisectArms([&](const auto& toggles) {
+            frameWith(toggles);
+            return stats().shadowDraws > 0;
+        });
+        INFO("bisection over " << renders << " renders returned " << needed.size() << " arms");
+        for (const std::string& name : needed) {
+            INFO("needed: " << name);
+        }
+        REQUIRE(!needed.empty());
+        CHECK(std::find(needed.begin(), needed.end(), "shadows") != needed.end());
+        for (const std::string& name : needed) {
+            rendering::SceneRenderer::PassToggles toggles;
+            for (const auto& arm : rendering::SceneRenderer::passArms()) {
+                REQUIRE(rendering::SceneRenderer::setPassArm(toggles, arm.name, false));
+            }
+            for (const std::string& on : needed) {
+                if (on != name) {
+                    REQUIRE(rendering::SceneRenderer::setPassArm(toggles, on, true));
+                }
+            }
+            frameWith(toggles);
+            INFO("without '" << name << "' the symptom should be gone");
+            CHECK(stats().shadowDraws == 0);
+        }
+    }
+
+    renderer.setPassToggles(rendering::SceneRenderer::PassToggles{});
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ---- The second of the two seek defects Phase 3.4 found -----------------------------------------
+//
+// Both are "a frame ago" meaning something false after a jump, and both were invisible until
+// somebody compared a seeked renderer against a fresh one channel by channel. The particle-pool one
+// is asserted where it was found, in `test_resource_lifetime_gpu.cpp`, whose harness controls for
+// frame index; the whole-frame version of that comparison written here was withdrawn because it did
+// not -- a renderer forty frames along and a fresh one are at different frame indices, so the
+// jittered passes differ for a reason that has nothing to do with the seek.
+TEST_CASE("a seek reseeds the previous skinning palette", "[gpu][composition][forensics][lifetime][seek]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "characters" / "alien.scene.json";
+    if (!fs::is_regular_file(project)) {
+        SKIP("the alien scene is not present");
+    }
+    // The defect at the level it lives at, with no renderer in the way: after a jump, a rig's
+    // "previous" palette must be the pose it landed on, not the one it left. Measured in model
+    // units, because that is what the vertex stage differences to build a motion vector.
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(project).has_value());
+    FixedStepClock clock(60.0);
+    engine.setViewport(160, 120);
+    for (int i = 0; i < 40; ++i) {
+        const FrameTime t = engine.tick(clock);
+        engine.update(t);
+    }
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+    REQUIRE(!composition->scene().rigs.empty());
+
+    // Before the repair this measured 71.5 on a ~100-unit character. The control is below: ordinary
+    // playback must still report motion, or the fix has simply switched motion blur off for rigs.
+    engine.seekSeconds(1.0);
+    {
+        const FrameTime t = engine.tick(clock);
+        engine.update(t);
+    }
+    double worstAcrossSeek = 0.0;
+    std::size_t joints = 0;
+    for (const scene::SkinnedRig& rig : composition->scene().rigs) {
+        REQUIRE(rig.palette.size() == rig.previousPalette.size());
+        for (std::size_t j = 0; j < rig.palette.size(); ++j) {
+            ++joints;
+            for (int c = 0; c < 4; ++c) {
+                for (int r = 0; r < 4; ++r) {
+                    worstAcrossSeek = std::max(worstAcrossSeek,
+                                               std::fabs(static_cast<double>(rig.palette[j][c][r]) -
+                                                         rig.previousPalette[j][c][r]));
+                }
+            }
+        }
+    }
+    INFO(joints << " joints, worst previous-to-current element across the seek " << worstAcrossSeek);
+    REQUIRE(joints > 0);
+    CHECK(worstAcrossSeek == 0.0);
+
+    // The control. A rig that is simply playing must still report joint motion, or a test that only
+    // checked the line above would be satisfied by a renderer that had stopped animating.
+    double worstInPlayback = 0.0;
+    for (int i = 0; i < 10; ++i) {
+        const FrameTime t = engine.tick(clock);
+        engine.update(t);
+        for (const scene::SkinnedRig& rig : composition->scene().rigs) {
+            for (std::size_t j = 0; j < rig.palette.size(); ++j) {
+                for (int c = 0; c < 4; ++c) {
+                    for (int r = 0; r < 4; ++r) {
+                        worstInPlayback = std::max(worstInPlayback,
+                                                   std::fabs(static_cast<double>(rig.palette[j][c][r]) -
+                                                             rig.previousPalette[j][c][r]));
+                    }
+                }
+            }
+        }
+    }
+    INFO("worst previous-to-current element during ordinary playback " << worstInPlayback);
+    CHECK(worstInPlayback > 0.0);
 }

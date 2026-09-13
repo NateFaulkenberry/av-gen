@@ -59,7 +59,9 @@
 #include <cstdint>
 #include <memory>
 #include <limits>
+#include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -143,7 +145,24 @@ struct RenderStats {
 constexpr std::uint32_t kMaxLights = 8; // the uniform fallback path (ADR-033); clustered has no such limit
 
 // Which auxiliary target the debug view displays over the frame (ADR-035).
-enum class AuxDebugView : std::uint8_t { None, Normal, Roughness, Velocity, Emission, Ids, Occlusion, Depth };
+// The auxiliary targets, shown one at a time full-screen before tone mapping (ADR-035), plus the
+// depth readings Phase 4.4 asks for. `Depth` is the compressed display the engine has always had --
+// an exponential ramp, legible across a whole scene and useless for reading a number off. The three
+// after it are the ones a forensic question needs: metres against the far plane, where the depth
+// buffer has silhouettes, and the selected object's own depth with everything else removed.
+enum class AuxDebugView : std::uint8_t {
+    None,
+    Normal,
+    Roughness,
+    Velocity,
+    Emission,
+    Ids,
+    Occlusion,
+    Depth,
+    LinearDepth,
+    DepthEdges,
+    ObjectDepth,
+};
 [[nodiscard]] const char* auxDebugViewName(AuxDebugView view);
 
 // GPU-side mirrors of the WGSL uniform structs in shaders/common.wgsl and tonemap.wgsl.
@@ -154,6 +173,13 @@ struct LightUniform {
     glm::vec4 cone; // x = cos(outer), y = 1/(cos(inner)-cos(outer)), z = volumetric strength, w = 0
 };
 static_assert(sizeof(LightUniform) == 64);
+
+// Mirrors `AuxDebugUniforms` in shaders/aux_debug.wgsl.
+struct AuxDebugUniforms {
+    glm::vec4 info;  // x = mode, y = scale, zw = target size
+    glm::vec4 depth; // x = near, y = far, z = selected pick id (-1 for none), w = 0
+};
+static_assert(sizeof(AuxDebugUniforms) == 32);
 
 struct FrameUniforms {
     glm::mat4 viewProj;
@@ -366,6 +392,22 @@ public:
         // without touching the scene at all.
         bool cameraMotion = true;
     };
+
+    // The arms by name, in one place (renderer forensics Phase 8.3). The CLI's `--disable <list>`,
+    // the panel and the automatic bisection all read this table rather than each keeping a private
+    // if-chain -- three enumerations of the same set is how an arm ends up reachable from one of
+    // them and not the others, and a bisection that cannot see an arm silently clears the subsystem
+    // behind it.
+    struct PassArm {
+        const char* name;
+        bool PassToggles::*flag;
+    };
+    [[nodiscard]] static std::span<const PassArm> passArms();
+    // Sets one arm by name. False when the name is not one of `passArms()`.
+    [[nodiscard]] static bool setPassArm(PassToggles& toggles, std::string_view name, bool on);
+    // Every arm's name, comma separated -- for a message telling somebody what they may write.
+    [[nodiscard]] static std::string passArmNames();
+
     void setPassToggles(const PassToggles& toggles);
     [[nodiscard]] const PassToggles& passToggles() const { return toggles_; }
     [[nodiscard]] ShadowRenderer& shadows() { return *shadows_; }     // ADR-034
@@ -375,6 +417,14 @@ public:
     // Displays one auxiliary target full-screen instead of the shaded frame (ADR-035).
     void setAuxDebugView(AuxDebugView view) { auxDebugView_ = view; }
     [[nodiscard]] AuxDebugView auxDebugView() const { return auxDebugView_; }
+    // How hard the view's own ramp is driven; zero means the view's default. It exists because a
+    // far plane is not a scene: RendererQA's camera sees three kilometres and its geometry is
+    // thirty metres away, so a linear depth ramped over the far plane puts every surface in the
+    // scene inside one of 256 steps. The knob says "show me the first N metres" without the view
+    // having to lie about what it is showing -- the displayed value stays proportional to distance,
+    // and the constant it is proportional to is in the uniform rather than in somebody's head.
+    void setAuxDebugScale(float scale) { auxDebugScale_ = scale; }
+    [[nodiscard]] float auxDebugScale() const { return auxDebugScale_; }
     // The auxiliary targets of the last frame (debug tools and tests).
     [[nodiscard]] const wgpu::TextureView& normalRoughnessView() const { return normalRough_.view; }
     [[nodiscard]] const wgpu::TextureView& velocityView() const { return velocity_.view; }
@@ -452,7 +502,8 @@ private:
     Result<void> createLightResources();
     Result<wgpu::RenderPipeline> createDepthOnlyPipeline(const wgpu::ShaderModule& module);
     Result<wgpu::RenderPipeline> createLinearDepthPipeline(const wgpu::ShaderModule& module);
-    Result<wgpu::RenderPipeline> createAuxDebugPipeline(const wgpu::ShaderModule& module);
+    Result<void> createAuxDebugResources(const wgpu::ShaderModule& module);
+    [[nodiscard]] Result<wgpu::RenderPipeline> auxDebugPipelineFor(wgpu::TextureFormat format);
     void rebuildFrameBindGroups();
     // Packs this frame's lights, uploads them and encodes the cluster build.
     void updateLights(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const glm::mat4& view,
@@ -507,6 +558,7 @@ private:
     // read off the subsystems in collectFrameTimings(), which runs more than once per frame.
     std::uint32_t clusterDispatches_ = 0;
     AuxDebugView auxDebugView_ = AuxDebugView::None;
+    float auxDebugScale_ = 0.0f;
     gpu::RenderTarget post_[2];      // ping-pong HDR colour targets for post layers
     gpu::GpuTexture spectrum_;       // binCount x 1 RGBA16F audio spectrum for user shaders
     std::size_t spectrumBins_ = 0;
@@ -541,7 +593,15 @@ private:
     wgpu::RenderPipeline skyboxPipeline_;
     wgpu::RenderPipeline depthOnlyPipeline_;   // entities and meshed SDFs, depth prepass and shadows
     wgpu::RenderPipeline linearDepthPipeline_; // Depth24Plus -> R32Float view-space distance
-    wgpu::RenderPipeline auxDebugPipeline_;
+    // The auxiliary view is drawn *after* the tone map, straight onto the target, so one pipeline
+    // per target format -- the same reason the tone map itself is a map rather than a pipeline.
+    // Drawing it before the tone map, which is where it used to live, meant every diagnostic went
+    // through exposure and a filmic curve on its way to the screen: a normal encoded as 0.5 arrived
+    // as something else, an identifier's palette moved with the scene's brightness, and a depth
+    // could not be read as a number at all. See the pass in `render`.
+    wgpu::ShaderModule auxDebugModule_;
+    wgpu::PipelineLayout auxDebugPipelineLayout_;
+    std::unordered_map<std::uint32_t, wgpu::RenderPipeline> auxDebugPipelines_;
     wgpu::BindGroupLayout auxDebugLayout_;
     wgpu::BindGroup auxDebugGroup_;
     wgpu::Buffer auxDebugUniforms_;

@@ -410,11 +410,16 @@ bool SkinnedRig::evaluate(double now, float hz) {
         hold();
         return false; // the grid has not moved on: the same pose, and therefore no motion
     }
-    previousPalette = palette;
+    const bool reseed = reseedPrevious;
+    reseedPrevious = false;
+    if (!reseed) {
+        previousPalette = palette;
+    }
     player.evaluate(clips, skeleton, t, pose, scratchPose);
     skinningPalette(skeleton, pose, scratchModel, palette);
-    if (previousPalette.size() != palette.size()) {
-        previousPalette = palette; // first evaluation: nothing moved yet
+    if (reseed || previousPalette.size() != palette.size()) {
+        // A discontinuity, or the first evaluation: nothing moved to get here.
+        previousPalette = palette;
     }
     paletteTime = t;
     ++paletteVersion;

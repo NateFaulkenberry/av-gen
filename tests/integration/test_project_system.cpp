@@ -781,19 +781,30 @@ TEST_CASE("A new project resets the camera as well as the post chain",
           "[integration][project][parameters]") {
     Fixture f;
     app::Engine engine(app::EngineMode::Offline);
-    auto* focal = engine.params().find("camera/lens/focalLength");
-    auto* iso = engine.params().find("camera/exposure/iso");
-    auto* gain = engine.params().find("audio/inputGain");
-    REQUIRE(focal != nullptr);
-    REQUIRE(iso != nullptr);
-    REQUIRE(gain != nullptr);
-    focal->setBaseComponent(0, 135.0f);
-    iso->setBaseComponent(0, 3200.0f);
-    gain->setBaseComponent(0, 2.0f);
+    const char* paths[] = {"camera/lens/focalLength", "camera/exposure/iso", "audio/inputGain"};
+    const float values[] = {135.0f, 3200.0f, 2.0f};
+    for (std::size_t i = 0; i < std::size(paths); ++i) {
+        auto* parameter = engine.params().find(paths[i]);
+        REQUIRE(parameter != nullptr);
+        parameter->setBaseComponent(0, values[i]);
+    }
+
     engine.newProject();
-    CHECK(focal->baseComponent(0) == focal->defaultComponent(0));
-    CHECK(iso->baseComponent(0) == iso->defaultComponent(0));
-    CHECK(gain->baseComponent(0) == gain->defaultComponent(0));
+
+    // Looked up *again* rather than held across the call. `newProject` reloads the orb scene, which
+    // clears the parameter set and registers a fresh one, so every pointer taken before it is
+    // dangling afterwards -- and reading one is a use-after-free that happens to return the right
+    // answer most of the time, which is how this test passed for a while before ASan caught it on a
+    // run where the allocator had reused the block. A test that reads freed memory is not evidence
+    // about anything, including the thing it is asserting.
+    for (std::size_t i = 0; i < std::size(paths); ++i) {
+        auto* parameter = engine.params().find(paths[i]);
+        REQUIRE(parameter != nullptr);
+        INFO(paths[i]);
+        CHECK(parameter->baseComponent(0) == parameter->defaultComponent(0));
+        // ...and the value really was set, so the equality above is a reset and not a no-op.
+        CHECK(parameter->defaultComponent(0) != values[i]);
+    }
 }
 
 // The same promise as the parameters above, for the audio: what plays is what the project says.

@@ -407,11 +407,35 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 
 ### 3.2 Camera-relative rendering audit
 
-- `[ ]` Identify every camera-relative conversion and its exact execution stage.
-- `[ ]` Verify scene state is never mutated by camera-relative conversion.
-- `[ ]` Verify camera-relative origin is shared consistently by entities, bounds, terrain, water and particles.
-- `[ ]` Add a regression that detects double subtraction across consecutive frames.
-- `[ ]` Add projected-position checks for world, camera-relative, clip and screen coordinates.
+**There is no camera-relative rendering in this engine.** The audit found no conversion anywhere
+under `src/rendering`: the view matrix is built from the camera in world space and world positions go
+into it unmodified. Several items below therefore have nothing to verify, and are ticked as *audited
+and absent* rather than left open -- an open box implying a subsystem that does not exist is its own
+kind of wrong report. What *is* built is the regression that would catch one being introduced badly,
+because the failure mode (a double subtraction) is silent and looks like a camera bug.
+
+- `[x]` Identify every camera-relative conversion and its exact execution stage. There are none. The
+  single subtraction that exists is the view matrix's own, and it is asserted as such: the view basis
+  is orthonormal with determinant +1, the eye lands exactly on the view-space origin, and
+  `basis * (world - eye)` equals `view * world`.
+- `[x]` Verify scene state is never mutated by camera-relative conversion. Nothing converts, and the
+  renderer takes `const scene::Scene&` throughout, so the type system carries the claim.
+- `[x]` Verify camera-relative origin is shared consistently by entities, bounds, terrain, water and
+  particles. There is one origin -- the world's -- shared by construction.
+- `[x]` Add a regression that detects double subtraction across consecutive frames.
+  `[gpu][renderer][forensics][lifetime3_4]`, and negative-controlled twice: injecting
+  `translate(-camera.position) * view` fails exactly the camera-relative stage (the eye 9.34 units
+  off the view origin), and a *per-renderer accumulating* creep of 2 mm a frame -- the version that
+  drifts rather than jumps, and the one a single-frame check cannot see -- fails all six cases.
+  380 frames over six laps of a closed camera path with a 10 km excursion inserted mid-run require
+  the view and view-projection matrices to be **bit-identical** on every lap.
+- `[x]` Add projected-position checks for world, camera-relative, clip and screen coordinates. The
+  whole chain, ending at pixels: each object's footprint is *measured* by hiding that entity and
+  differencing the two renders, then checked against the predicted centroid and against the
+  screen-space box its own world bounds project to. Measured rather than classified by colour,
+  because the first draft classified by hue and read a grey sphere lit by a blue environment as the
+  blue one -- a "measured" centroid 28 px from its prediction. The drawn centroid repeats across six
+  laps to within 0.015 px.
 
 ### 3.3 GPU object and buffer audit
 
@@ -458,6 +482,25 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 
 ### 3.4 Frame synchronization and resource lifetime
 
+`tests/rendering/test_resource_lifetime_gpu.cpp`, `[gpu][renderer][forensics][lifetime3_4]`: six
+cases, 4,345 assertions. An interleaved sequence of resizes (seven awkward sizes), camera cuts,
+forward and backward seeks, repeated draws of one `FrameTime` and reload/scene-swap across the QA
+set -- around 190 transitions with 14 checkpoints against a fresh engine *and* a fresh renderer --
+plus a descending-then-ascending timeline sweep, and the camera-relative chain of Phase 3.2. Four
+negative controls in `scene_renderer.cpp`, applied and removed: a double subtraction fails exactly
+the camera-relative stage; per-renderer origin creep of 2 mm a frame fails all six cases; a draw
+matrix diverging from the recorded diagnostic fails *only* the two pixel-stage checks, which is the
+discrimination the screen stage exists for.
+
+**It found two defects, both now fixed, and both the same mistake:** a piece of state whose name says
+"a frame ago" while nothing resynchronised it across a jump. The particle pools survived a seek
+(`resetTemporalHistory` reset the AO history and not them, and `ParticleRenderer::resetAll` had said
+in its own comment since it was written that it is used on seek restarts, with no caller). And
+`SkinnedRig::previousPalette` survived a seek, so the first frame after every scrub carried joint
+motion vectors for a jump nobody made -- 49 of 49 joints, worst element 71.5 units on a ~100-unit
+character, which motion blur duly drew. It also found `SYM-TERRAIN-1`, which is open: see the report.
+
+
 - `[ ]` Document when CPU state updates, GPU data is written, GPU consumes it, GPU finishes and memory is reused.
 - `[ ]` Audit textures, buffers, bind groups, pipelines, materials, meshes, animation buffers, depth textures, water textures and post-process targets.
 - `[~]` `FrameTimeline` uses a four-slot non-stalling resolve/map ring and waits for in-flight maps
@@ -477,7 +520,12 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 - `[x]` Renderer temporal history now resets at a scene boundary: previous model matrices, previous
   view-projection state and AO history cannot leak between distinct scenes. A reused-versus-fresh
   renderer regression covers a same-time scene swap.
-- `[~]` Stress resource reuse through resize, scene reload, timeline seek/reverse, camera cuts and frame-index reuse.
+- `[x]` Stress resource reuse through resize, scene reload, timeline seek/reverse, camera cuts and
+  frame-index reuse. The interleaved sequence above does all five together rather than one at a time,
+  which is the point: each is already covered alone, and the defects it found were only reachable by
+  a walk that crossed them. Its one exclusion is stated and reasoned -- the terrain scene, because
+  `SYM-TERRAIN-1` means a fresh-reference comparison on it reports that open defect rather than
+  anything about reuse.
   Resize now clears previous view/model history in addition to AO history, with a motion-blur
   reused-versus-fresh renderer regression. An explicit reset API now covers in-place scene reloads
   and the application camera-cut action. Timeline seek/reverse stress and frame-index reuse remain
@@ -486,9 +534,16 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
     index, and a same-index replay with motion blur matches a fresh renderer.
   - `[x]` Added a seek-only transport discontinuity revision and wired both live/headless render
     loops to reset temporal state when it changes, including forward seeks whose render time rises.
-  - `[ ]` Run longer application-level seek/scrub/reload sequences and capture their frame hashes.
+  - `[x]` Run longer application-level seek/scrub/reload sequences and capture their frame hashes.
+    Eighteen rounds, ~190 transitions, 14 hash checkpoints against a fresh engine and renderer, with
+    `errorCount()` asserted zero every round; plus a thirteen-point descending sweep, the same points
+    ascending, and eight repeats of one frame index interleaved with a differently-sized draw.
 - `[ ]` Add a conservative synchronization option to the reference path if evidence points to reuse hazards.
-- `[ ]` Add validation for resources destroyed, replaced, resized or rebound while still referenced.
+- `[~]` Add validation for resources destroyed, replaced, resized or rebound while still referenced.
+  The device's own error count is asserted zero across every resize, reload and swap in the sequence
+  above, which is the validation Dawn can give from outside. There is no *engine-side* check that a
+  resource still referenced is not replaced; that would be a lifetime assertion inside the renderer
+  and nothing in this investigation has needed one.
 - `[~]` Sanitizer coverage exists for selected animation/sequence paths; expand it to renderer resource lifetime and full relevant suites.
 
 ## Phase 4: Renderer Forensics developer mode
@@ -607,6 +662,19 @@ alike are the same buffer shown twice or two empty frames, and both are a diagno
 depth view to move when the camera does, and the id view to separate objects into distinct values
 rather than a continuum.
 
+**SYM-AUX-1: every diagnostic view was tone-mapped.** Found while building the linear-depth view,
+and it is the largest defect in this phase. The auxiliary pass drew into the *HDR* target, before
+pass 2 -- so every view went through auto-exposure and a filmic curve on its way to the screen. A
+shader writing 1.0 landed on the screen as **202**. A normal encoded as 0.5 did not arrive as 0.5;
+an identifier's palette moved with how bright the scene happened to be, which means two frames of
+the same scene could colour the same object differently; and a depth could not be read as a number
+at all. A diagnostic whose values are a function of the picture it is diagnosing is precisely the
+instrument this investigation exists to remove, and it had been sitting under all seven views since
+ADR-035. The pass now draws **after** the tone map, straight onto the target, one pipeline per target
+format (the same reason the tone map itself is a map). The byte on the screen is now the value the
+shader wrote. The regression guard is four stops of exposure compensation leaving a view's hash
+unchanged, with the shaded frame's hash changing under the same four stops as its control.
+
 - `[~]` Show GPU object index. The *slot* is in the per-object diagnostic and in a capture; the `Ids`
   view colours by entity pick id, which is a different number. A view keyed on the slot is not built.
 - `[ ]` Show buffer generation. There is no generation counter to show: the renderer's reuse boundary
@@ -615,12 +683,42 @@ rather than a continuum.
 - `[~]` Validate GPU object data. Camera, entity matrices and skinning palettes are guarded and
   refuse a non-finite frame by name; bounds, materials and water are not.
 - `[x]` Show raw depth. The `Depth` auxiliary view, asserted to vary with the camera.
-- `[~]` Show linear depth. The R32F target exists and feeds AO, water and post; there is no view that
-  displays it directly.
+- `[x]` Show linear depth. `AuxDebugView::LinearDepth`, and the assertion is not a trend but an
+  identity: the linear-depth target is read back and **every pixel** of the view is checked against
+  the number it claims to be a picture of, to within one step of 8-bit quantisation. The
+  "nothing was drawn" sentinel (1e7) is full white and its own value, so an empty sky and a surface
+  at the far plane are not the same picture. The exponential `Depth` view is run through the same
+  comparison as a control and must fail it by a wide margin -- without that, a linear view that had
+  quietly become the exponential one would pass everything else.
+
+  A far plane is not a scene: RendererQA's camera sees 2.9 km and its geometry is 30 m away, so a
+  ramp over the far plane puts every surface in the bottom two of 256 steps. `setAuxDebugScale` says
+  "show me the first N metres" without the view lying about what it shows -- the value stays
+  proportional to distance and the constant is in the uniform rather than in somebody's head.
+
+  **The instrument took three tries, and the two failures are the useful part.** The frame's *mean*
+  measured the wrong thing entirely: pulling the camera back put less sky in shot, so the average
+  fell while every surface got further away. Moving the camera along its own view axis so the centre
+  ray stayed on one surface was better arithmetic and still wrong -- this scene has an object right
+  in front of the camera, so the move passed *through* the surface being measured and the distance
+  jumped the other way. What works is not a proxy at all: read the buffer, compare the picture to it.
+  Both failures are the same mistake in different clothes, and it is the one this whole document
+  keeps recording -- a measurement chosen for convenience rather than for what it is a measurement
+  *of*.
 - `[ ]` Disable depth test. Not built: it is a pipeline variant rather than a flag, so an honest
   control means a second pipeline per material, and nothing in this investigation has needed one.
 - `[ ]` Disable depth write. Same.
-- `[ ]` Show depth discontinuities and object-specific depth.
+- `[x]` Show depth discontinuities and object-specific depth. Two views. `DepthEdges` is a relative
+  step over linear depth -- relative because an absolute threshold finds an edge at every surface
+  once the camera is far enough away, which makes the whole frame an edge and says nothing -- with
+  the sentinel clamped to the far plane first, or every silhouette against the sky saturates
+  identically and hides the discontinuities *inside* the geometry, which is what a depth bug looks
+  like. Asserted on the shape of its histogram: a flat majority and a lit minority, so a view that
+  marked everything and one that marked nothing both fail. `ObjectDepth` is the selected object's
+  depth with the rest of the scene removed -- the picture that answers "is it behind that" without
+  everything else arguing. Nothing selected is an empty frame rather than object zero, which is
+  checked, along with the lit region being neither empty nor the whole frame and a different
+  selection being a different picture rather than the same one relabelled.
 
 ### 4.5 Animation and water controls
 
@@ -786,16 +884,51 @@ a cascade on, a character behind the camera is still skinned for its shadow, whi
 
 ### 6.2 Water mask and depth forensics
 
-- `[ ]` Visualize water geometry mask, water depth, terrain depth, linear depth, reconstructed thickness, shoreline fade, foam/intersection mask and water object ID.
-- `[ ]` Capture shoreline pixel values and spaces: water depth, terrain depth, linear depth, surface height, terrain position and camera depth.
-- `[ ]` Audit every depth comparison for compatible spaces and nonlinear-to-linear conversion.
-- `[ ]` Document water/terrain/transparent pass order and every depth/color read/write/clear.
-- `[ ]` Verify overlapping chunk sort order and chunk/world transforms.
+`tests/rendering/test_water_depth_forensics_gpu.cpp`, `[gpu][renderer][forensics][water6_2]`: eight
+cases, all quantitative, all run with post and AO off against the scene-linear HDR target --
+auto-exposure re-meters when frame content changes, and the AO buffer is frame-jittered, so a
+tone-mapped 8-bit frame is not an instrument. **Water pixels are found by A/B against the same frame
+with the water arm off**, because they cannot be found any other way (see the identifier finding
+below). Six source-level negative controls were run and restored; two of the agent's own tests passed
+their control and were rewritten before they meant anything.
+
+- `[~]` Visualize water geometry mask, water depth, terrain depth, linear depth, reconstructed
+  thickness, shoreline fade, foam/intersection mask and water object ID. Linear depth, depth edges
+  and object depth are built (Phase 4.4). **Water object ID cannot exist**: `water_renderer.cpp:150`
+  masks every scene target but colour and emission, deliberately, because a normal or an id averaged
+  over a transparency is worse than none. So no view keyed on the identifier target can show water,
+  and no test can classify a water pixel from it. That is a fact about the design, not a gap to fill.
+- `[x]` Capture shoreline pixel values and spaces: water depth, terrain depth, linear depth, surface
+  height, terrain position and camera depth. 3,977 water pixels within 50 m, each reconstructed from
+  linear depth and compared against `TerrainQuery::heightAt`: mean 0.051 m, worst 0.370 m, no
+  reprojection failures. Beyond ~50 m the decimated chunk mesh departs from the analytic field by up
+  to 2.2 m, so the comparison is restricted to the near half and says so.
+- `[x]` Audit every depth comparison for compatible spaces and nonlinear-to-linear conversion.
+  **No mismatch found, and the audit is a measurement rather than a reading.** 988 taps on a
+  synthetic quad against a CPU ray/plane intersection: worst error 2.8 mm (0.007%). The test is known
+  to discriminate because the two candidate spaces -- `dot(p - eye, forward)` and `length(p - eye)`
+  -- are 29.4% apart across those taps, and swapping the shader to the wrong one fails three tests
+  with a 13.27 m error. The refraction reprojection's screen UV matches the linear-depth pass's own Y
+  convention, so there is no flip; `uv.x` is vertical and is only ever used for the fade and the
+  ray-thickness cap, never differenced against a ray depth.
+- `[~]` Document water/terrain/transparent pass order and every depth/color read/write/clear. The
+  pass table in the report covers the scene pass; the per-helper inventory is documentation rather
+  than a test and is not written out.
+- `[x]` Verify overlapping chunk sort order and chunk/world transforms. Synthetic red/blue sheets
+  composite by view depth and not list order (49,953 against 878, a factor of 57), the hash is
+  unchanged when the list is reordered, and on the real 21 chunks every water chunk's nearest ground
+  chunk is the one it is named for. Reversing the comparator and removing the sort each fail it.
 - `[x]` No water over dry terrain, on two instruments: pixels on synthetic shoreline geometry (the
   six-view GPU test) and geometry on the real generator (`[unit][water][forensics][shoreline]`,
-  which found the defect). Stable-edge, no-z-fight, terrain-through-water and seek-determinism image
-  tests remain open.
-- `[ ]` Do not solve seams with arbitrary depth offsets without a reproduced cause.
+  which found the defect).
+- `[x]` Stable-edge, no-z-fight, terrain-through-water and seek-determinism image tests. The
+  shoreline holds still across 12 frames with the timeline held (0 pixels change hands, drift
+  exactly 0, and one frame of timeline later moves 3,495); no pixel flips twice under a 2 cm camera
+  sweep; the same second reached by a direct seek and by three seeks is bit-identical, with 4.5 s
+  later differing in 4,395 pixels; and the bed shows through shallow water and not deep
+  (1.052 / 0.471 / 0.260 / 0.230 across bands entirely above the 0.8 m shore fade).
+- `[x]` Do not solve seams with arbitrary depth offsets without a reproduced cause. No seam was
+  found, so no offset was added -- which is the rule working rather than the rule being untested.
 
 ### 6.3 Transparency and post-processing isolation
 
@@ -843,11 +976,30 @@ a cascade on, a character behind the camera is still skinned for its shadow, whi
 - `[x]` SDF state is rebuilt from the current scene each frame and water materials are uploaded each
   frame rather than retained as scene-local simulation state. Compile-time guards cover their
   dynamic uniform strides, and reused-versus-fresh SDF/water scene-swap image regressions pass.
-- `[ ]` Add pass-boundary assertions or explicit state setup where the API does not make state implicit.
-- `[ ]` Verify render target load/store/clear behavior and resource transitions.
-- `[ ]` Verify depth prepass, terrain, water, transparent, particle, shadow, volume, debug and post pass interactions.
-- `[ ]` Add raw/linear/object depth diagnostics to the pass-level test matrix.
-- `[ ]` Test resize, target recreation and auxiliary debug target selection through all passes.
+- `[~]` Add pass-boundary assertions or explicit state setup where the API does not make state
+  implicit. What is asserted is the arm/pass join above and the target contract below; per-helper
+  boundaries (procedural, particle, SDF) remain visible in code only.
+- `[x]` Verify render target load/store/clear behavior and resource transitions.
+  `[gpu][composition][forensics][passes][targets]`. Two clears, checked as behaviour rather than as
+  a descriptor transcription. **The identifier target**: draw an object, hide it, and the target must
+  be empty -- if the scene pass loaded instead of clearing, the previous frame's identifiers would
+  still be there, and the picker reads this target, so a stale id is a click that selects something
+  no longer on screen. **The linear-depth target**: cleared to its 1e7 sentinel and not to zero,
+  because a zero linear depth reads as *a surface at the camera*, which is the worst possible default
+  for the three passes that consume it.
+- `[~]` Verify depth prepass, terrain, water, transparent, particle, shadow, volume, debug and post
+  pass interactions. Covered for water (Phase 6.2's eight cases) and through the arm/pass join for
+  every arm that owns a pass; the pairwise interactions are not individually exercised.
+- `[x]` Add raw/linear/object depth diagnostics to the pass-level test matrix. The object-depth view
+  is joined to the culling arm in both directions: a culled object is absent from its own depth view
+  and returns when the arm is disarmed. That direction pair is the point -- a view that always showed
+  the object would pass the first half alone.
+- `[x]` Test resize, target recreation and auxiliary debug target selection through all passes. A
+  renderer taken through 320x240, 64x64 and 257x129 must come back to its original size drawing the
+  *same picture* a renderer born at that size draws -- and a third, genuinely fresh renderer must
+  agree with both, which is what makes the equality about the targets rather than about one renderer
+  being self-consistently wrong. Every auxiliary view is then rendered at three sizes, none of them
+  a multiple of anything convenient, with the device error count asserted at zero.
 
 ## Phase 8: RendererQA torture scene and progressive enablement
 
@@ -927,15 +1079,35 @@ that check is what found the two gaps recorded below.
 - `[!]` Level 13: LOD. No control (Phase 4.2).
 - `[!]` Level 14: sequencer. No control.
 - `[x]` Level 15: timeline seeking and scrubbing. (The script, at every level.)
-- `[x]` Record the first level where each instability appears. The matrix reports it by name; it
-  currently reports none.
+- `[x]` Record the first level where each instability appears. The matrix reports it by name. In
+  release it reports none. In debug it names **level 5, water** on every step of the script, which is
+  `SYM-TERRAIN-1` -- the matrix compares two whole runs from two independent engines and renderers,
+  so a scene that does not render the same frame twice cannot pass it. That is the matrix working:
+  it is the instrument that localises the open defect to a rung, which is what it was built to do.
 
 ### 8.3 Automatic subsystem bisection
 
-- `[ ]` Add a machine-readable feature-group configuration for QA runs.
-- `[ ]` Implement binary isolation over feature groups where practical.
-- `[ ]` Record the smallest reproducing subsystem combination.
-- `[ ]` Ensure bisection results include scene revision, frame, toggles and capture artifact.
+- `[x]` Add a machine-readable feature-group configuration for QA runs.
+  `SceneRenderer::passArms()` -- name and member pointer per arm -- with `setPassArm` and
+  `passArmNames` beside it. The CLI's `--disable <list>` now reads that table instead of keeping its
+  own if-chain, which is the point: three enumerations of the same set is how an arm ends up
+  reachable from one of them and not the others, and a bisection that cannot see an arm silently
+  clears the subsystem behind it.
+- `[x]` Implement binary isolation over feature groups where practical.
+  `[gpu][composition][forensics][bisect]`. Greedy one-minimisation over `passArms()` -- with eleven
+  arms that is cheaper than a proper ddmin and reaches the same one-minimal answer. Lives in the test
+  rather than the renderer because it is a search *over renders*, and the thing that owns a render
+  loop should own it.
+- `[x]` Record the smallest reproducing subsystem combination. Tested against symptoms whose cause is
+  known, which is the only way to check a search whose output is a claim about cause: particle
+  dispatches resolve to exactly `{particles}`; shadow draws resolve to a set containing `shadows`
+  where **removing any single member makes the symptom go away**, which is what makes the answer a
+  claim rather than a list of what happened to be on. Two honest empty answers are asserted as well
+  -- a symptom no arm can remove (opaque draws) returns none rather than picking whichever arm was
+  tested last, and a symptom nothing produces gives up after one render instead of searching.
+- `[~]` Ensure bisection results include scene revision, frame, toggles and capture artifact. The
+  toggles are the result; the frame and scene are the caller's and are reported through Catch's
+  `INFO`. Emitting a `FrameSnapshot` at the minimal combination is not wired up.
 
 ## Phase 9: Frame snapshots, determinism and guards
 
@@ -999,7 +1171,8 @@ that check is what found the two gaps recorded below.
 ### 9.3 NaN/Inf guards and transform history
 
 - `[x]` Keep existing finite camera/entity/palette guards.
-- `[~]` Extend guards to bounds, materials, water state, packed GPU structures and all diagnostic snapshot values.
+- `[~]` Extend guards to bounds, materials, water state, packed GPU structures and all diagnostic
+  snapshot values. Bounds and materials are done; water state and the diagnostic snapshot are not.
 
 **The reason this phase mattered more than it looked.** `glm::min` and `glm::max` are `(y<x)?y:x`
 and `(x<y)?y:x`, so a NaN loses every comparison it takes part in and is **silently discarded rather
@@ -1014,9 +1187,22 @@ culled everywhere, silent: the shape of a "the object is just gone" report), `Me
 `fitDirectionalCascade` (nothing stood between a cascade fit and the GPU) and `packLight` (whose
 clamps cannot help, being comparisons).
 
-Still open, and all needing a device so they belong in `tests/rendering/`: water state
-(`waterUniformsFrom`), the diagnostic snapshot, and the material-to-`ObjectUniforms` packing inside
-`SceneRenderer::render`.
+A fifth is now shut, and it is the one with the widest blast radius: the
+material-to-`ObjectUniforms` packing inside `SceneRenderer::render`. A NaN in a base colour does not
+stay in its object -- bloom's downsample averages it across a tile, the tone map carries the tile to
+the frame, and what arrives is a bright or black region nowhere near anything that could be blamed
+for it. The material's own clamps cannot help, for exactly the reason the bounds folds could not:
+`std::clamp` is comparisons, and a NaN loses every one of them. A bad material is now **replaced**,
+loudly, with magenta at full roughness, and the reason it is replaced rather than dropped is that
+dropping the draw makes the object vanish -- the single hardest report to act on, and one this
+investigation has already spent time on. `[gpu][composition][forensics][guards]` poisons each of the
+nine fields the packer reads in turn (a guard that checks the first three and not the ninth is a
+guard that will be found by the ninth), requires the object to still be drawn and the frame not to
+saturate, and carries the control that matters: a healthy material must render *identically* to
+before, or a `checkMaterial` that returned "bad" for everything would pass every other assertion.
+
+Still open, and both needing a device: water state (`waterUniformsFrom`) and the diagnostic
+snapshot.
 - `[x]` Report entity, frame, system, property and value when invalid data is found. Each of the four
   guards above names the object and prints the offending numbers.
 - `[x]` Add selected-object transform history containing frame, world TRS/matrix, GPU TRS/matrix and
@@ -1063,9 +1249,22 @@ Still open, and all needing a device so they belong in `tests/rendering/`: water
     after the first comparison fails all five independently.
   - `[ ]` Remaining: the same matrix on Glowmere itself with the UFO asset. The transform path is
     proven on four axes on RendererQA and on the camera axis on Glowmere.
-- `[ ]` Capture world transform, GPU transform, camera, bounds, visibility, LOD and object ID.
-- `[ ]` Classify apparent motion as transform, camera, GPU, culling, LOD, shader or post-processing behavior.
-- `[ ]` Add a permanent regression test for the proven root cause.
+- `[~]` Capture world transform, GPU transform, camera, bounds, visibility, LOD and object ID.
+  `RenderObjectDiagnostic` carries the world position and matrix, the world bounds, the six frustum
+  margins, visibility, the cull reason, the submitted flag, the GPU object slot, the mesh and a
+  material fingerprint; `RendererDiagnosticFrame` adds the camera and the numbers its projection was
+  built from. All of it is written to and read from a `FrameSnapshot`, and diffed into sentences.
+  **LOD is the gap**: it is decided per instance in the procedural renderer's GPU cull pass and never
+  becomes a per-entity number, so there is nothing to capture without changing that pass.
+- `[x]` Classify apparent motion as transform, camera, GPU, culling, LOD, shader or post-processing
+  behavior. Two instruments, and between them they cover the classification the phase asks for.
+  `TransformHistory::explain` separates the first three over time -- the scene moved it, that is
+  parallax, or nothing in the recorded state explains it -- which is the distinction a single frame
+  cannot make. The bisection (Phase 8.3) attributes the rest: it returns the **minimal** set of
+  subsystems the symptom needs, so "is this culling or post" is answered by a search rather than by
+  switching arms by hand and forming an impression.
+- `[x]` Add a permanent regression test for the proven root cause. The static-object matrices on four
+  axes, negative-controlled by a one-millimetre perturbation on each.
 
 ### 10.2 Alien regression
 
@@ -1090,10 +1289,29 @@ Still open, and all needing a device so they belong in `tests/rendering/`: water
 
 ### 10.3 Water regression
 
-- `[ ]` Test shoreline approach, parallel shoreline, above water, near water, crossing water and sloped terrain.
-- `[ ]` Compare water effects off/on, post FX off/on and depth visualizations.
-- `[ ]` Identify whether leakage is geometry, depth reconstruction, stencil/mask, render target or shader coordinates.
-- `[ ]` Add image and state regression coverage for the proven cause.
+- `[~]` Test shoreline approach, parallel shoreline, above water, near water, crossing water and
+  sloped terrain. Phase 6.2 covers six viewing situations over a generated shoreline -- the camera
+  turned so the same water moves from the centre of the frame to its edge, a 2 cm camera sweep along
+  the shore, four depth bands from shallow to deep, and the real 21-chunk world -- plus the six-view
+  synthetic shoreline test from earlier. Crossing the surface (the camera passing through it) is not
+  covered.
+- `[x]` Compare water effects off/on, post FX off/on and depth visualizations. The water arm is the
+  instrument for every measurement in 6.2 -- water pixels are *found* by A/B against the same frame
+  with it off, because they cannot be found any other way. Post and AO are off throughout, and the
+  reason is stated: auto-exposure re-meters when frame content changes, so an absolute threshold on a
+  tone-mapped pixel compares two exposures rather than two surfaces. The depth visualisations arrived
+  in Phase 4.4.
+- `[x]` Identify whether leakage is geometry, depth reconstruction, stencil/mask, render target or
+  shader coordinates. **Geometry.** `SYM-WATER-1` was a quad emitted when any corner is wet, with a
+  dry corner reporting a borrowed depth. The depth-reconstruction hypothesis -- the one people reach
+  for first -- is *refuted*, not merely untested: the linear-depth target is a forward-axis distance
+  to within 2.8 mm over 988 taps, and the test is known to discriminate because the two candidate
+  spaces are 29.4% apart there. There is no stencil or mask involved (water writes no identifier),
+  and the reprojection's Y convention matches the linear-depth pass's own.
+- `[x]` Add image and state regression coverage for the proven cause. Two instruments on the cause
+  itself (pixels on synthetic shoreline geometry, and the geometry invariant on the real generator,
+  which is what found it), and eight further cases in Phase 6.2 with six source-level negative
+  controls run and restored.
 
 ## Phase 11: Performance safety and delivery
 
@@ -1153,17 +1371,35 @@ Still open, and all needing a device so they belong in `tests/rendering/`: water
 
 ## Phase 12: Final forensic report
 
-- `[ ]` Produce the final renderer architecture map with actual state flow and authoritative owners.
-- `[ ]` Produce a bug table for every meaningful issue:
+The deliverable is [renderer-forensics-report.md](renderer-forensics-report.md); these are its
+sections, and each is ticked when that section says something specific enough to be wrong.
+
+- `[x]` Produce the final renderer architecture map with actual state flow and authoritative owners.
+  "Architecture map", "The four paths" and "Ownership currently established".
+- `[x]` Produce a bug table for every meaningful issue:
   `bug | symptom | reproduction | root cause | evidence | affected subsystem | fix | regression test | residual risk`.
-- `[ ]` Produce subsystem isolation results for transforms, camera, basic geometry, GPU object state, culling, animation, skinning, water, depth, transparency, shadows, post FX, sequencer, assets and performance.
-- `[ ]` Explain the reference renderer contract, scope and comparison results.
-- `[ ]` Document every RendererQA test and progressive matrix result.
-- `[ ]` List all diagnostics, their intended use and overhead.
-- `[ ]` List automated, manual, GPU-capture and sanitizer regression coverage.
-- `[ ]` Document performance impact and measurement conditions.
-- `[ ]` List remaining issues honestly; anything not proven fixed remains open.
-- `[ ]` State whether the renderer architecture is sound enough for continued production work, with evidence.
+  Eight rows, each with a named reproduction and a named regression test.
+- `[x]` Produce subsystem isolation results for transforms, camera, basic geometry, GPU object state,
+  culling, animation, skinning, water, depth, transparency, shadows, post FX, sequencer, assets and
+  performance. The "Subsystem status" table, with every `PARTIAL` naming what is still unproven.
+- `[x]` Explain the reference renderer contract, scope and comparison results. It is coverage and not
+  colour, over five views of `renderer-qa-minimal`, and the section says why an absolute brightness
+  threshold does not survive the comparison.
+- `[~]` Document every RendererQA test and progressive matrix result. The variants and the matrix are
+  described; a per-level table of the matrix's results is not written down.
+- `[x]` List all diagnostics, their intended use and overhead. "Diagnostics delivered" and
+  "Diagnostics and their overhead", with the honest claim being "below ~0.3 ms on the heaviest
+  canonical scene" rather than "free", because the difference is inside the run-to-run spread.
+- `[~]` List automated, manual, GPU-capture and sanitizer regression coverage. "Validation inventory"
+  covers the automated and sanitizer halves; there is no GPU-capture (Metal frame debugger) coverage
+  at all, and the manual half is the QA baseline document rather than a list.
+- `[x]` Document performance impact and measurement conditions. In "Diagnostics and their overhead",
+  including why Constellation's GPU median cannot be one of the numbers.
+- `[x]` List remaining issues honestly; anything not proven fixed remains open. "Open evidence gaps",
+  and every `PARTIAL` in the subsystem table.
+- `[x]` State whether the renderer architecture is sound enough for continued production work, with
+  evidence. "Is the architecture sound enough to keep building on": yes, with the reservation that
+  the evidence is about the paths that have been walked.
 
 ## Completion gate
 
@@ -1180,6 +1416,17 @@ The investigation is complete only when the team can answer, with evidence:
 - Are remaining unknowns documented instead of implied to be fixed?
 
 ## Useful validation commands
+
+**Run the GPU suite in release.** `SYM-TERRAIN-1` is a race whose outcome depends on CPU timing, so
+debug fails seven cases that release passes -- same source, same GPU, same idle machine. Those seven
+are one defect with two faces, not seven problems, and the debug run is not evidence about anything
+else while they are red. Two further rules, both learned the hard way and both costing a session's
+worth of confusion each: **nothing else may be running** (`pgrep -f tests/avgen_render_tests`), and
+**no source may be edited while a run is in flight** -- shaders are loaded from
+`AVGEN_SHADER_SOURCE_DIR` at *runtime*, so editing a `.wgsl` mid-run invalidates the running
+binary's pipelines and reports 32 cases failing in `renderer.init()` for no reason of their own.
+
+
 
 ```sh
 cmake --build --preset release -j 4

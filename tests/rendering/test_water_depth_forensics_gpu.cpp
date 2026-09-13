@@ -56,6 +56,7 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -220,6 +221,16 @@ struct Shore {
         // directly would have done nothing. This is the line that says the pose was actually taken.
         REQUIRE(scene().camera.position == position);
         REQUIRE(scene().camera.target == target);
+    }
+
+    // Pins the timeline. Every test that varies the camera calls this after each move, so the
+    // ripples are in the same place in every frame of the comparison and the only thing that
+    // changed is the thing being changed.
+    void hold(double seconds) {
+        time.renderTime = seconds;
+        time.deltaTime = 1.0 / 60.0;
+        time.frameIndex = 0;
+        engine->update(time);
     }
 
     scene::Scene& scene() { return engine->composition()->scene(); }
@@ -466,6 +477,7 @@ TEST_CASE("water thickness does not depend on where in the frame the water lande
     // Where the water is, found from the frame rather than guessed: the surface over the bed under
     // the pixels the water owns when it is in the middle of the frame.
     shore.aim(eye, centreTarget);
+    shore.hold(2.0);
     const gpu::ImageF centred = shore.render();
     const rendering::RendererDiagnosticFrame centreFrame = shore.renderer->diagnosticFrame();
     const std::vector<float> centreDepth = readLinearDepth(*shore.ctx, shore.renderer->linearDepthTexture());
@@ -505,6 +517,7 @@ TEST_CASE("water thickness does not depend on where in the frame the water lande
     const glm::vec3 corneredTarget =
         eye + glm::normalize(glm::normalize(axis) + glm::vec3(-0.34f, 0.16f, 0.26f)) * glm::length(axis);
     shore.aim(eye, corneredTarget);
+    shore.hold(2.0);
     const gpu::ImageF cornered = shore.render();
     const rendering::RendererDiagnosticFrame cornerFrame = shore.renderer->diagnosticFrame();
     const gpu::ImageF corneredLit = shore.renderLitBed();
@@ -571,6 +584,7 @@ TEST_CASE("the bed shows through shallow water and not through deep water",
     }
     Shore shore = Shore::make();
     shore.aim(glm::vec3(20.0f, 34.0f, -96.0f), glm::vec3(14.0f, 0.0f, -110.0f));
+    shore.hold(2.0);
 
     const gpu::ImageF wet = shore.render();
     const rendering::RendererDiagnosticFrame frame = shore.renderer->diagnosticFrame();
@@ -584,10 +598,14 @@ TEST_CASE("the bed shows through shallow water and not through deep water",
     const world::TerrainQuery query = shore.query();
     REQUIRE(query.map != nullptr);
 
-    double shallowSum = 0.0;
-    double deepSum = 0.0;
-    std::size_t shallow = 0;
-    std::size_t deep = 0;
+    // Bands of CPU water depth, all of them past this scene's 0.8 m `edgeFade`, so the shore fade is
+    // saturated across every one of them and the only thing that can separate them is the thickness
+    // the ray crosses. Below the fade the two effects are confounded -- and a control that replaced
+    // the Beer-Lambert term with a constant still passed a version of this test that used a 0.3 m
+    // band, because the fade alone reproduced the gradient.
+    constexpr std::array<float, 5> kEdges{0.9f, 1.5f, 2.5f, 4.0f, 1.0e9f};
+    std::array<double, 4> bandSum{};
+    std::array<std::size_t, 4> bandCount{};
     for (std::uint32_t y = 0; y < kH; ++y) {
         for (std::uint32_t x = 0; x < kW; ++x) {
             const std::size_t p = static_cast<std::size_t>(y) * kW + x;
@@ -596,29 +614,38 @@ TEST_CASE("the bed shows through shallow water and not through deep water",
             }
             const glm::vec3 bed = app::worldPositionAt(view, {x, y}, depth[p]);
             const float waterDepth = query.waterDepthAt(glm::vec2(bed.x, bed.z));
-            const double bedThrough = channelDifference(litBed.pixel(x, y), wet.pixel(x, y));
-            // The very edge is left out on purpose. Under about a third of a metre the shore fade,
-            // not the transmission, is what sets the opacity, and the sheet's deliberate one-cell
-            // overhang puts some of those pixels over ground that is dry.
-            if (waterDepth > 0.3f && waterDepth < 1.0f) {
-                shallowSum += bedThrough;
-                ++shallow;
-            } else if (waterDepth > 1.8f) {
-                deepSum += bedThrough;
-                ++deep;
+            for (std::size_t band = 0; band + 1 < kEdges.size(); ++band) {
+                if (waterDepth >= kEdges[band] && waterDepth < kEdges[band + 1]) {
+                    bandSum[band] += channelDifference(litBed.pixel(x, y), wet.pixel(x, y));
+                    ++bandCount[band];
+                    break;
+                }
             }
         }
     }
-    const double shallowMean = shallow > 0 ? shallowSum / static_cast<double>(shallow) : 0.0;
-    const double deepMean = deep > 0 ? deepSum / static_cast<double>(deep) : 0.0;
-    INFO(shallow << " pixels over 0.3-1.0 m of water passing " << shallowMean << " of the bed, against "
-                 << deep << " over more than 1.8 m passing " << deepMean);
-    REQUIRE(shallow > 30);
-    REQUIRE(deep > 30);
-    // The bed reaches the eye through shallow water...
-    CHECK(shallowMean > 0.5);
-    // ...and the channel is a volume rather than a tint on one.
-    CHECK(deepMean < shallowMean * 0.5);
+    std::array<double, 4> bandMean{};
+    std::string profile;
+    for (std::size_t band = 0; band < bandMean.size(); ++band) {
+        bandMean[band] = bandCount[band] > 0 ? bandSum[band] / static_cast<double>(bandCount[band]) : 0.0;
+        profile += band + 2 < kEdges.size()
+                       ? fmt::format("{:.1f}-{:.1f} m: {} px passing {:.3f} of the bed\n", kEdges[band],
+                                     kEdges[band + 1], bandCount[band], bandMean[band])
+                       : fmt::format("{:.1f} m and deeper: {} px passing {:.3f} of the bed\n",
+                                     kEdges[band], bandCount[band], bandMean[band]);
+    }
+    INFO("bed through water, by the depth of the water over it:\n" << profile);
+    for (std::size_t band = 0; band < bandMean.size(); ++band) {
+        REQUIRE(bandCount[band] > 30);
+    }
+    // The bed reaches the eye through a metre of water...
+    CHECK(bandMean[0] > 0.3);
+    // ...and less of it through each deeper band. The deepest two are not separated from each
+    // other: past about three metres the transmission has already fallen to nothing and what is
+    // left between them is the surface's own shading, not the bed.
+    CHECK(bandMean[1] < bandMean[0]);
+    CHECK(bandMean[2] < bandMean[1]);
+    // The channel is a volume rather than a tint on one.
+    CHECK(bandMean[3] < bandMean[0] * 0.4);
     CHECK(shore.ctx->errorCount() == 0);
 }
 
@@ -682,9 +709,15 @@ TEST_CASE("the shoreline holds still while the timeline does", "[gpu][renderer][
 // ---- the surface and its bed do not trade pixels --------------------------------------------------
 //
 // Z-fighting between a water surface and the bed under it shows as pixels flipping ownership when
-// the camera moves a centimetre, and it shows *inside* the sheet rather than at its edge -- an edge
-// legitimately moves under any camera move at all. So this walks the camera in two-centimetre steps
-// and looks only at flips that are nowhere near a boundary.
+// the camera moves a centimetre. Separating that from the waterline legitimately sweeping past is
+// the whole difficulty, and the discriminator is *how many times* a pixel flips: the camera walks
+// one way in equal steps, so an edge reaches a pixel once, and a pixel that changes hands twice
+// changed for a reason that is not the edge.
+//
+// A first version of this test counted flips whose 5x5 neighbourhood was solid water, on the theory
+// that a fight shows up away from the silhouette. It did not fail its control: coincident surfaces
+// speckle, a speckled region has no solid neighbourhood anywhere in it, and every flip was
+// classified as an edge. Counting transitions per pixel catches the same control eleven times over.
 //
 // Water is drawn with `depthCompare = Less` and no depth write, so the surface and the bed are held
 // apart by real geometry and not by a bias. That is the property under test: a seam here would be a
@@ -701,6 +734,7 @@ TEST_CASE("the water surface and its bed keep their pixels under a small camera 
     std::vector<std::vector<char>> masks;
     for (int step = 0; step < 8; ++step) {
         shore.aim(eye + glm::vec3(0.02f * static_cast<float>(step), 0.0f, 0.0f), target);
+        shore.hold(2.0);
         const gpu::ImageF wet = shore.render();
         const gpu::ImageF dry = shore.renderDry();
         const std::vector<float> contribution = waterContribution(wet, dry);
@@ -712,47 +746,32 @@ TEST_CASE("the water surface and its bed keep their pixels under a small camera 
         masks.push_back(std::move(mask));
     }
 
-    // Deep inside the sheet: every pixel of a 5x5 neighbourhood is water, in both frames of the
-    // step. A silhouette moving a fraction of a pixel cannot flip a pixel that far from its own
-    // edge; two surfaces arguing over the depth test can, and they do it in speckles.
-    const auto surrounded = [](const std::vector<char>& mask, std::uint32_t x, std::uint32_t y) {
-        if (x < 2 || y < 2 || x + 2 >= kW || y + 2 >= kH) {
-            return false;
+    // The camera sweeps one way, in equal steps, so a pixel near the waterline crosses the edge
+    // once and never comes back: over fourteen centimetres at twenty to forty metres the image
+    // shifts by less than a pixel, and a pixel cannot cross two different shorelines in that. A
+    // pixel that changes hands more than once is therefore not the edge arriving -- it is the
+    // surface and the bed taking turns, which is what z-fighting looks like from outside.
+    std::size_t strobingPixels = 0;
+    std::size_t singleFlips = 0;
+    std::size_t worstTransitions = 0;
+    for (std::size_t p = 0; p < masks.front().size(); ++p) {
+        std::size_t transitions = 0;
+        for (std::size_t step = 1; step < masks.size(); ++step) {
+            transitions += masks[step][p] != masks[step - 1][p] ? 1 : 0;
         }
-        for (std::uint32_t j = y - 2; j <= y + 2; ++j) {
-            for (std::uint32_t i = x - 2; i <= x + 2; ++i) {
-                if (mask[static_cast<std::size_t>(j) * kW + i] == 0) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    };
-
-    std::size_t interiorFlips = 0;
-    std::size_t edgeFlips = 0;
-    for (std::size_t step = 1; step < masks.size(); ++step) {
-        const std::vector<char>& before = masks[step - 1];
-        const std::vector<char>& after = masks[step];
-        for (std::uint32_t y = 0; y < kH; ++y) {
-            for (std::uint32_t x = 0; x < kW; ++x) {
-                const std::size_t p = static_cast<std::size_t>(y) * kW + x;
-                if (before[p] == after[p]) {
-                    continue;
-                }
-                // A pixel that lost or gained water while its whole neighbourhood stayed water on
-                // the other side of the step is the surface and the bed swapping; a pixel whose
-                // neighbourhood is mixed is the waterline sweeping past it.
-                if (surrounded(before, x, y) || surrounded(after, x, y)) {
-                    ++interiorFlips;
-                } else {
-                    ++edgeFlips;
-                }
-            }
+        worstTransitions = std::max(worstTransitions, transitions);
+        if (transitions > 1) {
+            ++strobingPixels;
+        } else if (transitions == 1) {
+            ++singleFlips;
         }
     }
-    INFO(interiorFlips << " interior flips and " << edgeFlips << " edge flips over seven 2 cm steps");
-    CHECK(interiorFlips == 0);
+    INFO(strobingPixels << " pixels changed hands more than once over seven 2 cm steps, " << singleFlips
+                        << " changed once, worst " << worstTransitions << " changes at one pixel");
+    // The waterline did move, or this is seven renders of the same picture and nothing about
+    // ownership was put to the test.
+    REQUIRE(singleFlips > 10);
+    CHECK(strobingPixels == 0);
     CHECK(shore.ctx->errorCount() == 0);
 }
 
@@ -827,6 +846,9 @@ TEST_CASE("the same second reached two ways gives the same shoreline",
 // chunks happen to sit in the entity list must not reach the picture.
 TEST_CASE("overlapping water surfaces composite by view depth and not by list order",
           "[gpu][renderer][forensics][water6_2]") {
+    if (!fs::is_regular_file(Shore::scenePath())) {
+        SKIP("the water QA scene is not present");
+    }
     auto ctx = makeContext();
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
 
@@ -907,7 +929,9 @@ TEST_CASE("overlapping water surfaces composite by view depth and not by list or
         REQUIRE(blueHighRed > 0.0);
         REQUIRE(blueHighBlue > 0.0);
         // The near surface is applied last and wins the composite, and which surface that is comes
-        // from the geometry rather than from the order the two entities were added.
+        // from the geometry rather than from the order the two entities were added. These two lines
+        // are each other's control: `red` is added to the scene first in both arrangements, so a
+        // renderer compositing in list order would put blue last in both and could not satisfy both.
         CHECK(redHighRed > redHighBlue * 1.5);
         CHECK(blueHighBlue > blueHighRed * 1.5);
 
@@ -922,9 +946,6 @@ TEST_CASE("overlapping water surfaces composite by view depth and not by list or
     }
 
     // ---- the real chunks ----
-    if (!fs::is_regular_file(Shore::scenePath())) {
-        SKIP("the water QA scene is not present");
-    }
     Shore shore = Shore::make();
 
     std::vector<std::size_t> waterEntities;
@@ -946,27 +967,36 @@ TEST_CASE("overlapping water surfaces composite by view depth and not by list or
     }
 
     // ...and each water chunk covers the ground chunk it was named for. The names carry the chunk
-    // index, which is the one place the two halves of a chunk can be matched up from outside.
+    // index, which is the one place the two halves of a chunk can be matched up from outside. The
+    // test is not "within some radius" but "nearer than every other ground chunk": a radius is
+    // satisfied by any sheet roughly in the right district, and chunks are only forty metres apart.
+    const auto centreOf = [&](std::size_t entity) {
+        const auto& [lo, hi] = shore.scene().meshBounds(shore.scene().entities[entity].mesh);
+        return glm::vec2((lo.x + hi.x) * 0.5f, (lo.z + hi.z) * 0.5f);
+    };
     std::size_t pairsChecked = 0;
     for (const std::size_t w : waterEntities) {
         const std::string& name = shore.scene().entities[w].name;
         const std::string suffix = name.substr(name.rfind("water") + 5);
+        std::size_t named = shore.scene().entities.size();
+        std::size_t nearest = shore.scene().entities.size();
+        float nearestDistance = std::numeric_limits<float>::max();
         for (const std::size_t g : groundEntities) {
             const std::string& groundName = shore.scene().entities[g].name;
-            if (groundName.substr(groundName.rfind("chunk") + 5) != suffix) {
-                continue;
+            if (groundName.substr(groundName.rfind("chunk") + 5) == suffix) {
+                named = g;
             }
-            const auto& [waterLo, waterHi] = shore.scene().meshBounds(shore.scene().entities[w].mesh);
-            const auto& [groundLo, groundHi] = shore.scene().meshBounds(shore.scene().entities[g].mesh);
-            const glm::vec2 waterCentre((waterLo.x + waterHi.x) * 0.5f, (waterLo.z + waterHi.z) * 0.5f);
-            const glm::vec2 groundCentre((groundLo.x + groundHi.x) * 0.5f, (groundLo.z + groundHi.z) * 0.5f);
-            INFO("'" << name << "' against '" << groundName << "'");
-            // A chunk is 40 m across and the ground mesh carries a skirt, so the two centres are not
-            // identical; a sheet over the wrong chunk would be a whole chunk away.
-            CHECK(glm::length(waterCentre - groundCentre) < 20.0f);
-            ++pairsChecked;
-            break;
+            const float distance = glm::length(centreOf(w) - centreOf(g));
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearest = g;
+            }
         }
+        INFO("'" << name << "' names chunk " << suffix << "; the nearest ground chunk is '"
+                 << shore.scene().entities[nearest].name << "' at " << nearestDistance << " m");
+        REQUIRE(named < shore.scene().entities.size());
+        CHECK(nearest == named);
+        ++pairsChecked;
     }
     INFO(pairsChecked << " water chunks matched to their ground chunk");
     CHECK(pairsChecked == waterEntities.size());
