@@ -1,5 +1,7 @@
 #include "rendering/light_data.hpp"
 
+#include "core/log.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -54,6 +56,27 @@ float lightInfluenceRadius(const scene::PunctualLight& light, float cutoff) {
 
 GpuLight packLight(const scene::PunctualLight& light, int shadowView, bool cascaded, bool cube) {
     GpuLight g{};
+    // The clamps below cannot do this. `std::max(x, 0.0f)` is a comparison, and a NaN loses every
+    // comparison it takes part in, so a NaN intensity comes out of `std::max(intensity, 0)` as a
+    // NaN -- and a light whose position, colour or range is not finite reaches the shader as one.
+    // What it does there is a whole frame of NaN wherever it reaches, which is a black or white
+    // screen and no explanation.
+    //
+    // Dropped rather than corrected, and said out loud with the value in it: a light nobody can see
+    // is a missing light, which somebody can look for; a light that quietly became a different light
+    // is a wrong picture nobody can explain.
+    const auto finite3 = [](const glm::vec3& v) {
+        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+    };
+    if (!finite3(light.position) || !finite3(light.color) || !std::isfinite(light.intensity) ||
+        !std::isfinite(light.range)) {
+        log::warn("light '{}': non-finite state -- position ({}, {}, {}) colour ({}, {}, {}) "
+                  "intensity {} range {}; it is not uploaded",
+                  light.name, light.position.x, light.position.y, light.position.z, light.color.r,
+                  light.color.g, light.color.b, light.intensity, light.range);
+        g.colorIntensity = glm::vec4(0.0f);   // black, zero influence: the shader skips it
+        return g;
+    }
     const glm::vec3 dir = safeNormalize(light.direction, glm::vec3(0.0f, -1.0f, 0.0f));
     glm::vec3 right;
     glm::vec3 up;

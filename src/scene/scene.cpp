@@ -1,14 +1,26 @@
 #include "scene/scene.hpp"
 
+#include "core/log.hpp"
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <utility>
 
 namespace avgen::scene {
+namespace {
+
+// glm has no `isfinite` for vectors in this build, and the component-wise question is the only one
+// worth asking here.
+[[nodiscard]] bool finite(const glm::vec3& v) {
+    return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+}
+
+} // namespace
 
 glm::mat4 Transform::matrix() const {
     return glm::translate(glm::mat4(1.0f), position) * glm::mat4_cast(rotation) *
@@ -66,9 +78,27 @@ std::pair<glm::vec3, glm::vec3> MeshData::bounds() const {
     }
     glm::vec3 lo(std::numeric_limits<float>::max());
     glm::vec3 hi(std::numeric_limits<float>::lowest());
+    std::size_t dropped = 0;
     for (const auto& v : vertices) {
+        // Counted, because the fold cannot report it. `glm::min`/`glm::max` are `(y<x)?y:x`, and a
+        // NaN loses every comparison -- so a non-finite vertex is silently *discarded* and the box
+        // comes out finite and too small. A mesh with a corrupt vertex then looks like a mesh with
+        // a modelling mistake, and the number that would have said otherwise never existed.
+        if (!finite(v.position)) {
+            ++dropped;
+            continue;
+        }
         lo = glm::min(lo, v.position);
         hi = glm::max(hi, v.position);
+    }
+    if (dropped > 0) {
+        log::warn("mesh '{}': {} of {} vertices are not finite and are not in its bounds", name,
+                  dropped, vertices.size());
+    }
+    if (!glm::all(glm::lessThanEqual(lo, hi))) {
+        // Every vertex was refused. Zero rather than the inverted seed: a caller testing a box it
+        // was handed should see an empty one, not `FLT_MAX .. lowest()` masquerading as finite.
+        return {glm::vec3(0.0f), glm::vec3(0.0f)};
     }
     return {lo, hi};
 }
@@ -243,6 +273,32 @@ CullBounds entityCullBounds(const Scene& scene, const Entity& entity, float padF
         const glm::vec3 world = glm::vec3(model * glm::vec4(local, 1.0f));
         worldLo = glm::min(worldLo, world);
         worldHi = glm::max(worldHi, world);
+    }
+    // A box that contains nothing, reported as one.
+    //
+    // The fold above is `glm::min`/`glm::max`, which are `(y<x)?y:x` -- so a NaN corner loses every
+    // comparison and is *discarded* rather than propagated. A transform carrying an infinity makes
+    // `glm::scale` compute `0 * inf`, every corner comes out NaN, every fold is refused, and the
+    // result is the untouched seed: `min = FLT_MAX`, `max = lowest()`. That box is **finite**, so a
+    // `isfinite` guard downstream can never fire, and it is inverted, so every frustum test rejects
+    // it: the object vanishes and nothing anywhere says why. It is the exact shape of the reports
+    // this investigation started from.
+    //
+    // The repair is to fail visibly and safely: say which entity and what its transform was, and
+    // hand back the *unposed* world position as a minimal box so the object is drawn rather than
+    // silently culled. A thing in the wrong place can be seen and chased; a thing that is not there
+    // cannot.
+    if (!glm::all(glm::lessThanEqual(worldLo, worldHi))) {
+        log::warn("cull bounds: entity '{}' (mesh {}) produced no valid box -- position ({}, {}, {}) "
+                  "scale ({}, {}, {}); drawing it unculled",
+                  entity.name, entity.mesh, entity.transform.position.x, entity.transform.position.y,
+                  entity.transform.position.z, entity.transform.scale.x, entity.transform.scale.y,
+                  entity.transform.scale.z);
+        const glm::vec3 at = entity.transform.position;
+        const glm::vec3 fallback = finite(at) ? at : glm::vec3(0.0f);
+        out.min = fallback - glm::vec3(padAbsolute);
+        out.max = fallback + glm::vec3(padAbsolute);
+        return out;
     }
     out.min = worldLo;
     out.max = worldHi;

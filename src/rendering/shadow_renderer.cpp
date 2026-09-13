@@ -176,6 +176,29 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
                                                         splits[c], light.direction, im.resolution,
                                                         std::max(sceneRadius, 1.0f));
                 view.lightIndex = static_cast<int>(i);
+                // Nothing else stands between a cascade fit and the GPU. The renderer guards the
+                // camera and the entity matrices; a shadow view is built from the camera's *inverse*
+                // view-projection and a scene radius, and either can arrive non-finite from a scene
+                // whose bounds went wrong. What reaches the shader then is a projection that maps
+                // everything to NaN -- a shadow map of nothing, or of everything, with no error
+                // anywhere.
+                const bool finiteView = [&] {
+                    for (int col = 0; col < 4; ++col) {
+                        for (int row = 0; row < 4; ++row) {
+                            if (!std::isfinite(view.viewProj[col][row])) {
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                }();
+                if (!finiteView) {
+                    log::warn("shadows: cascade {} of light '{}' fitted a non-finite view "
+                              "(scene radius {}, split {}); it is not rendered",
+                              c, light.name, sceneRadius, splits[c]);
+                    nearDepth = splits[c];
+                    continue;
+                }
                 views_.push_back(view);
                 nearDepth = splits[c];
             }
