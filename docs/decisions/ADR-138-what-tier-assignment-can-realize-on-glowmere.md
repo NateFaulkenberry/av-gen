@@ -65,3 +65,37 @@ the assignment machinery, not after — the same ordering that produced ADR-136.
 **Assignment is not wired, and the reason is a number rather than a schedule.** `MaterialTierSelector`
 and `QualityPolicy` ship complete and tested; the arms ship; the tier bands in the tier table are
 placeholders that nothing reads. Turning any of it on waits on the procedural-only arm above.
+
+## The arm has been built and run once — under conditions that do not transfer
+
+The arm this ADR named exists: `--ab matflatproc`, the flat tier on procedural draws only with
+entities at Full, carried in the frame uniform's free `.w` lane. `pbr_shade.wgsl` is included by
+three shaders, so which draws are procedural is a compile-time constant each includer defines; a
+missing definition is a compile error rather than a silently wrong tier.
+
+First run, interleaved, two pairs, under the corrected noise floor (ADR-148):
+
+```
+baseline 60.95 ms GPU, arm 53.87 ms, delta +7.08 ms (+11.61%)
+floor 3.01% -> A RESULT; components: calibrated 2.00, baseline 3.01, arm 2.43, per-pair 0.86
+per-pair gpu delta: +7.08, +6.55
+```
+
+**This is not yet the answer, and the reason is in the first number.** The baseline is 60.95 ms
+against this scene's documented 13.37 ms at the same size — 4.6x. A plain bench run immediately
+afterwards read 62.72 ms, and the machine's load average was 11–19 with nothing of this project's
+running. The measurement is internally consistent (interleaved, both arms equally loaded, per-pair
+deltas agreeing) but its conditions are not the conditions every other figure in these documents was
+taken under.
+
+What can and cannot be said:
+
+- **Cannot:** that the assignable share is 7.08 ms, or that the fraction transfers. At 4.6x the
+  frame time the bottleneck may have moved — a frame waiting on a starved GPU distributes its cost
+  differently, and this project has already withdrawn one claim for exactly this class of error.
+- **Can:** the arm works, it produces a result that clears its own floor, and the direction is the
+  one the coverage model predicts. 11.61% of an idle 13.37 ms frame would be ~1.55 ms against this
+  ADR's ~1.4 ms estimate, which is suggestive and nothing more.
+
+**Re-run required on an idle machine before this number is quoted or acted on.** Until then
+`MaterialTierSelector` stays unwired, which is the same position this ADR already took.
