@@ -135,6 +135,24 @@ test that assumes independence would report significance from a correlated sampl
 block-median approach makes no distributional assumption, and the observed block spread is a direct
 measurement of the quantity a test would be estimating.
 
+**Use the minimum instead of the median, as `docs/performance.md` concluded in September.** That
+conclusion is right about what it was measuring and is not superseded: over 300 frames under
+contention the medians of identical runs differed by 3x while the minima agreed to a tenth of a
+millisecond, because contention is never negative. The minimum is kept, in every record. It is not
+the A/B statistic for two reasons. It discards the tail entirely, and the tail is the thing the 1%
+low was added to see -- a change that leaves the fast frames alone and doubles the slow ones is
+invisible to a minimum and is exactly what a viewer notices. And under *this* protocol the problem
+the minimum solves is addressed differently: pairing removes drift that a minimum would also
+remove, and the session-spread floor refuses to certify a session where contention moved the
+blocks at all. A record carrying min, p50, p90, p95, p99, max and both lows lets a reader who
+prefers the minimum use it.
+
+**Extend `tools/bench_ab.sh` (ADR-051) instead of building a mode into the binary.** That script
+interleaves *processes* and remains the right tool for comparing two binaries or two shader trees,
+which a single process cannot do. It cannot compare two pass arms of one binary within one session,
+which is what most of the upgrade's questions look like, and its rounds each pay process start-up
+and scene load. The two are complementary and neither replaces the other.
+
 **Fix Constellation instead of reporting its instability.** Deferred, and deliberately: the
 instrument's job was to find out whether the scene is stable. It found that it is not. Changing the
 scene in the same change that discovered this would leave nothing to check the finding against.

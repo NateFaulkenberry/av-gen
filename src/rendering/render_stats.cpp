@@ -361,6 +361,7 @@ nlohmann::ordered_json countersJson(const BenchmarkCounters& c) {
         {"uniformFallbackPathLights", c.uniformPathLights},
         {"particleSystems", c.particleSystems},
         {"particleCapacity", c.particleCapacity},
+        {"particlesEmittedPerFrame", c.particlesEmitted},
         {"transientTextures", c.transientTextures},
         {"entities", c.entities},
         {"computeDispatches", c.computeDispatches},
@@ -401,6 +402,9 @@ nlohmann::ordered_json cpuJson(const CpuFrameBreakdown& c) {
                                   {"volumeEncode", c.volumeEncodeMs},
                                   {"postEncode", c.postEncodeMs},
                                   {"tonemapEncode", c.tonemapEncodeMs},
+                                  {"finish", c.finishMs},
+                                  {"submit", c.submitMs},
+                                  {"queueWait", c.queueWaitMs},
                                   {"total", c.totalMs},
                                   {"unattributed", c.unattributedMs()}};
 }
@@ -424,6 +428,9 @@ std::string benchmarkJson(const std::vector<BenchmarkRecord>& records, const AbS
         {"low1Percent", "the MEAN of the slowest ceil(n/100) frames -- not p99, which is a single frame"},
         {"low01Percent", "the mean of the slowest ceil(n/1000) frames; with ~108 measured frames this is one frame and equals max"},
         {"deltaMs", "baseline minus arm: positive means the arm was faster"},
+        {"cpuFrameMs", "SceneRenderer::render() plus, on the offline path, Finish/Submit and the "
+                       "block on the queue -- so it includes waiting for the GPU; see "
+                       "cpuStageMedianMs.queueWait before calling a frame CPU-bound"},
         {"comparability", "records may only be compared when their conditions.sessionId is the same"}};
     nlohmann::ordered_json list = nlohmann::ordered_json::array();
     for (const auto& r : records) {
@@ -431,6 +438,7 @@ std::string benchmarkJson(const std::vector<BenchmarkRecord>& records, const AbS
         entry["conditions"] = conditionsJson(r.conditions);
         entry["wallMs"] = distributionJson(r.wallMs);
         entry["gpuMs"] = distributionJson(r.gpuMs);
+        entry["cpuFrameMs"] = distributionJson(r.cpuMs);
         nlohmann::ordered_json passes = nlohmann::ordered_json::array();
         for (const auto& pass : r.passMedianMs) {
             passes.push_back(nlohmann::ordered_json{{"label", pass.label}, {"medianMs", pass.ms}});

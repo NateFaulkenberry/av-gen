@@ -3249,6 +3249,16 @@ int Application::runHeadless() {
         }
         record.wallMs = rendering::describe(steadyOf(frameMs));
         record.gpuMs = rendering::describe(steadyOf(gpuFrameMs));
+        {
+            // The CPU frame, distributed like the other two. Taken from the same per-frame stats
+            // the counters come from, so its window is exactly theirs.
+            std::vector<double> cpuMs;
+            cpuMs.reserve(frameStats.size());
+            for (const auto& fs : frameStats) {
+                cpuMs.push_back(fs.cpu.totalMs);
+            }
+            record.cpuMs = rendering::describe(steadyOf(cpuMs));
+        }
         // The distribution, in full. The harness used to report median/p10/p90/min, which cannot
         // see a stutter at all: a hundred 10 ms frames with one 100 ms frame among them has a p99
         // of 10 ms. The 1% low is the mean of the slowest 1% of frames and is a *different number*
@@ -3260,6 +3270,11 @@ int Application::runHeadless() {
             log::info("             wall p95 {:.2f}  p99 {:.2f}  max {:.2f}  1%low {:.2f}  0.1%low {:.2f}  "
                       "var {:.3f} ms^2 (sd {:.2f})",
                       d.p95, d.p99, d.max, d.low1Percent, d.low01Percent, d.variance, d.stddev);
+        }
+        if (record.cpuMs.valid()) {
+            const rendering::Distribution& d = record.cpuMs;
+            log::info("             cpu  p50 {:.2f}  p90 {:.2f}  p99 {:.2f}  max {:.2f}  1%low {:.2f}",
+                      d.p50, d.p90, d.p99, d.max, d.low1Percent);
         }
         if (record.gpuMs.valid()) {
             const rendering::Distribution& d = record.gpuMs;
@@ -3327,6 +3342,8 @@ int Application::runHeadless() {
             record.counters.clusteredLights = medianOfStat([](const RS& s) { return s.clusteredLights; });
             record.counters.particleSystems = medianOfStat([](const RS& s) { return s.particles.systems; });
             record.counters.particleCapacity = medianOfStat([](const RS& s) { return s.particles.capacity; });
+            record.counters.particlesEmitted =
+                medianOfStat([](const RS& s) { return s.particles.emittedThisFrame; });
             record.counters.transientTextures = medianOfStat([](const RS& s) { return s.transientTextures; });
             record.counters.entities = medianOfStat([](const RS& s) { return s.entities; });
             record.counters.computeDispatches = medianOfStat([](const RS& s) { return s.computeDispatches; });
@@ -3347,6 +3364,11 @@ int Application::runHeadless() {
             record.cpuMedian.volumeEncodeMs = medianOfStat([](const RS& s) { return s.cpu.volumeEncodeMs; });
             record.cpuMedian.postEncodeMs = medianOfStat([](const RS& s) { return s.cpu.postEncodeMs; });
             record.cpuMedian.tonemapEncodeMs = medianOfStat([](const RS& s) { return s.cpu.tonemapEncodeMs; });
+            record.cpuMedian.finishMs = medianOfStat([](const RS& s) { return s.cpu.finishMs; });
+            record.cpuMedian.submitMs = medianOfStat([](const RS& s) { return s.cpu.submitMs; });
+            // The offline path blocks here waiting for the GPU, so this is usually most of the CPU
+            // frame and is what stops anyone reading a 21 ms CPU frame as CPU-bound work.
+            record.cpuMedian.queueWaitMs = medianOfStat([](const RS& s) { return s.cpu.queueWaitMs; });
             record.cpuMedian.totalMs = medianOfStat([](const RS& s) { return s.cpu.totalMs; });
             // Occupancy is a property of one camera position, so the last measured frame's grid is
             // reported rather than an average over a moving camera, which would describe no camera.

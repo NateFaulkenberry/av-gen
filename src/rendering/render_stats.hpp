@@ -382,7 +382,8 @@ struct BenchmarkCounters {
     double clusteredLights = 0.0;   // the local half, routed through the froxel grid
     double uniformPathLights = 0.0; // the fallback array's occupancy, for what it is worth
     double particleSystems = 0.0;
-    double particleCapacity = 0.0;
+    double particleCapacity = 0.0;   // sum of the pools; not how many are alive
+    double particlesEmitted = 0.0;   // spawns requested this frame (the GPU clamps to free slots)
     double transientTextures = 0.0;
     double entities = 0.0;
     double computeDispatches = 0.0;
@@ -396,6 +397,15 @@ struct BenchmarkRecord {
     BenchmarkConditions conditions;
     Distribution wallMs;
     Distribution gpuMs;
+    // The CPU frame: `CpuFrameBreakdown::totalMs` per frame, distributed. Distinct from `wallMs`,
+    // which is the whole headless iteration -- engine update, scene rebuild, encode, submit and
+    // whatever the loop does around them. A change that moves one and not the other says which.
+    //
+    // **On the offline path this includes `queueWaitMs`, which is the CPU blocking on the GPU.**
+    // So a Glowmere record showing a 21 ms CPU frame against an 18.5 ms GPU frame is not a
+    // CPU-bound frame: it is 0.7 ms of encode and the rest spent waiting. `cpuStageMedianMs`
+    // splits it, and `queueWait` is the line that says how much of it was waiting.
+    Distribution cpuMs;
     std::vector<gpu::TimelineInterval> passMedianMs; // per label, largest first
     BenchmarkCounters counters;
     CpuFrameBreakdown cpuMedian; // the CPU stage split, each stage's median over the window
