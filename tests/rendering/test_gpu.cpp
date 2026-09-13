@@ -488,6 +488,172 @@ TEST_CASE("SceneRenderer resets temporal history across scene swaps", "[gpu][ren
         return out;
     };
 
+    // ---- Phase 6.3: transparency isolation ------------------------------------------------------
+    //
+    // Two transparent surfaces in front of an opaque one, which is the smallest arrangement where
+    // sorting is a question with a wrong answer. Blending is not commutative: the same two layers
+    // composited in the other order give a different pixel, so "which one dominates" is a
+    // measurement of the sort and not an impression of it.
+    //
+    // Three separable claims, each of which fails differently:
+    //   1. a transparent surface does not write depth -- the opaque object behind it still shows;
+    //   2. layers composite back to front, so the nearest one dominates;
+    //   3. the order follows the camera, so crossing to the other side swaps which one dominates.
+    // A renderer that sorted front-to-back would fail (2) and (3); one that sorted by a fixed index
+    // would pass (2) from one side and fail it from the other, which is why the camera crosses.
+    TEST_CASE("transparent layers composite back to front from either side",
+              "[gpu][renderer][forensics][transparency]") {
+        auto ctx = makeContext();
+        auto shaders = makeShaders(*ctx);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        constexpr std::uint32_t kW = 96;
+        constexpr std::uint32_t kH = 96;
+
+        const auto layered = [&](bool withGlass, bool withWall = true) {
+            scene::Scene s;
+            s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+            s.environment.showSkybox = false;
+            s.environment.sky.enabled = false;
+            s.environment.environmentIntensity = 0.0f;
+            const auto mesh = s.addMesh(cubeMesh(1.0f));
+            // The opaque backstop, deliberately dim: it has to be *visible through* the glass, and a
+            // bright one would swamp the very tints being measured.
+            // Behind both panes, not between them.
+            //
+            // It sat at the origin first, which put it *between* the two panes -- so from either
+            // side one pane was occluded by it and the two never composited together at all. The
+            // ordering assertions below passed by measuring which pane was on the camera's side,
+            // and reversing the renderer's sort did not disturb them. Caught by that negative
+            // control; it is the fourth test in this investigation whose setup quietly did nothing.
+            if (withWall) {
+                auto& wall = s.addEntity("wall", mesh);
+                wall.transform.position = {0.0f, 0.0f, -3.2f};
+                wall.transform.scale = {2.0f, 2.0f, 0.2f};
+                wall.material.baseColor = {0.30f, 0.30f, 0.30f};
+                wall.material.roughness = 1.0f;
+                wall.material.metallic = 0.0f;
+            }
+            if (withGlass) {
+                // Green nearer -z, blue nearer +z. Whichever the camera is behind is the one that
+                // must be composited last.
+                auto& green = s.addEntity("glass-green", mesh);
+                green.transform.position = {0.0f, 0.0f, -1.0f};
+                green.transform.scale = {1.4f, 1.4f, 0.05f};
+                green.material.baseColor = {0.0f, 0.85f, 0.0f};
+                green.material.roughness = 1.0f;
+                green.material.opacity = 0.6f;
+                green.material.alphaMode = scene::AlphaMode::Blend;
+                auto& blue = s.addEntity("glass-blue", mesh);
+                blue.transform.position = {0.0f, 0.0f, 1.0f};
+                blue.transform.scale = {1.4f, 1.4f, 0.05f};
+                blue.material.baseColor = {0.0f, 0.0f, 0.85f};
+                blue.material.roughness = 1.0f;
+                blue.material.opacity = 0.6f;
+                blue.material.alphaMode = scene::AlphaMode::Blend;
+            }
+            s.camera.target = {0.0f, 0.0f, 0.0f};
+            scene::PunctualLight key;
+            key.direction = glm::normalize(glm::vec3(-0.3f, -0.6f, -1.0f));
+            key.intensity = 1.2f;
+            s.addLight(key);
+            return s;
+        };
+
+        // The middle of the frame, where all three surfaces overlap.
+        const auto centre = [](const gpu::Image8& image) {
+            const std::uint8_t* p = image.pixel(kW / 2, kH / 2);
+            return glm::ivec3(p[0], p[1], p[2]);
+        };
+
+        // From +z the blue pane is nearest; from -z the green one is. No wall in these two: an
+        // opaque surface anywhere between the panes hides one of them from one side, and then the
+        // order of the pair is not what is being measured.
+        auto fromBlue = layered(true, false);
+        fromBlue.camera.position = {0.0f, 0.0f, 5.0f};
+        auto fromGreen = layered(true, false);
+        fromGreen.camera.position = {0.0f, 0.0f, -5.0f};
+        auto bareBlue = layered(false, true);
+        bareBlue.camera.position = {0.0f, 0.0f, 5.0f};
+
+        const auto blueSide = renderer.renderToImage(fromBlue, FrameTime{}, kW, kH);
+        renderer.resetTemporalHistory();
+        const auto greenSide = renderer.renderToImage(fromGreen, FrameTime{}, kW, kH);
+        renderer.resetTemporalHistory();
+        const auto noGlass = renderer.renderToImage(bareBlue, FrameTime{}, kW, kH);
+        REQUIRE(blueSide.has_value());
+        REQUIRE(greenSide.has_value());
+        REQUIRE(noGlass.has_value());
+
+        const glm::ivec3 blueView = centre(*blueSide);
+        const glm::ivec3 greenView = centre(*greenSide);
+        const glm::ivec3 wallOnly = centre(*noGlass);
+        INFO("wall only rgb " << wallOnly.r << "," << wallOnly.g << "," << wallOnly.b
+                              << "; from the blue side " << blueView.r << "," << blueView.g << ","
+                              << blueView.b << "; from the green side " << greenView.r << ","
+                              << greenView.g << "," << greenView.b);
+
+        // The backstop has to be on screen at all, or the depth-write half below proves nothing.
+        REQUIRE(wallOnly.r > 20);
+        // 1. The glass does not write depth over the wall: taking the wall away changes the pixel,
+        //    so the wall was reaching the eye through both panes.
+        //
+        //    Not "the red channel survives", which was tried and is the wrong instrument -- two
+        //    coloured panes at 0.6 extinguish red almost completely (4 of 104 from the green side)
+        //    and that is the glass being coloured, not the wall being occluded.
+        {
+            auto both = layered(true, true);
+            both.camera.position = {0.0f, 0.0f, 5.0f};
+            renderer.resetTemporalHistory();
+            const auto withWall = renderer.renderToImage(both, FrameTime{}, kW, kH);
+            REQUIRE(withWall.has_value());
+            const glm::ivec3 through = centre(*withWall);
+            INFO("through both panes onto the wall: " << through.r << "," << through.g << ","
+                                                      << through.b << "; the same panes over the "
+                                                      << "background: " << blueView.r << ","
+                                                      << blueView.g << "," << blueView.b);
+            CHECK(through != blueView);
+        }
+        // ...and the glass is doing something at all.
+        CHECK(blueView != wallOnly);
+        CHECK(greenView != wallOnly);
+        // 2. and 3. The nearest pane is composited last and dominates, and which one that is
+        //    follows the camera. Front-to-back sorting, or a fixed order, breaks one of these.
+        CHECK(blueView.b > blueView.g);
+        CHECK(greenView.g > greenView.b);
+
+        // The two sides are not the same picture, which is the non-commutativity the claim rests on.
+        CHECK(gpu::hashImage(*blueSide) != gpu::hashImage(*greenSide));
+
+        // Crossing the panes is where a sort that only updates on a change of sign fails: the order
+        // has to be right at every step, not only at the ends.
+        int sawBlue = 0;
+        int sawGreen = 0;
+        for (int i = 0; i <= 12; ++i) {
+            const float z = 5.0f - static_cast<float>(i) * (10.0f / 12.0f);
+            if (std::fabs(z) < 1.4f) {
+                continue; // inside the panes: what "nearest" means is no longer a question
+            }
+            auto scene = layered(true, false);
+            scene.camera.position = {0.0f, 0.0f, z};
+            renderer.resetTemporalHistory();
+            const auto image = renderer.renderToImage(scene, FrameTime{}, kW, kH);
+            REQUIRE(image.has_value());
+            const glm::ivec3 c = centre(*image);
+            INFO("camera z " << z << " rgb " << c.r << "," << c.g << "," << c.b);
+            if (z > 0.0f) {
+                CHECK(c.b > c.g);
+                ++sawBlue;
+            } else {
+                CHECK(c.g > c.b);
+                ++sawGreen;
+            }
+        }
+        CHECK(sawBlue >= 3);
+        CHECK(sawGreen >= 3);
+        CHECK(ctx->errorCount() == 0);
+    }
+
     // ---- Phase 3.3: stale or swapped GPU object data --------------------------------------------
     //
     // The plan asks for "an alternating-transform two-object test to detect stale or swapped GPU

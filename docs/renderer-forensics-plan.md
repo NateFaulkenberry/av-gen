@@ -584,8 +584,23 @@ static-camera regression; the Glowmere UFO matrix in Phase 10.1 remains open.
 
 ### 6.3 Transparency and post-processing isolation
 
-- `[ ]` Create opaque cube, transparent cube, terrain and water test scene.
-- `[ ]` Test depth test, depth write, sorting, camera movement and intersections.
+- `[x]` Create opaque cube, transparent cube, terrain and water test scene.
+  An opaque backstop and two transparent panes, which is the smallest arrangement in which sorting
+  is a question with a wrong answer. `tests/rendering/test_gpu.cpp`,
+  `[gpu][renderer][forensics][transparency]`.
+- `[x]` Test depth test, depth write, sorting, camera movement and intersections.
+  Three separable claims, each failing differently: a transparent surface does not write depth (the
+  backstop behind two panes still changes the pixel); layers composite back to front (the nearest
+  pane dominates, measurably -- blending is not commutative); and the order follows the camera, so
+  crossing to the other side swaps which one dominates, checked at every step of a traverse rather
+  than only at the ends. Negative-controlled by reversing the blended sort, which makes the far pane
+  dominate and fails at every step.
+
+  **A vacuous version of this test was caught by that control**, and it is the fourth of this shape.
+  The backstop sat at the origin, *between* the two panes, so from either side one pane was occluded
+  by it and the two never composited at all: the assertions were measuring which pane was on the
+  camera's side, and reversing the renderer's sort did not disturb them. The backstop now sits
+  behind both, and the ordering half runs with no backstop at all.
 - `[ ]` Disable all post-processing and run every known problem scene.
 - `[ ]` Re-enable bloom, tone mapping, color grading, atmosphere/fog, volumetrics, water post FX and other screen-space effects one at a time.
 - `[ ]` Record the first enabled subsystem that changes the failure.

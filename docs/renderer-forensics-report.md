@@ -68,7 +68,7 @@ Application::runLive / Application::runHeadless
 | Animation/skinning | `PARTIAL` | Palette validation, scene-owned palette cache, culling-freeze and phase-origin fixes pass; the pose is now a pure function of the timeline across seeks. Full idle/walk/run/terrain/water matrix remains open. |
 | Terrain | `PARTIAL` | Visibility leave/return regression passes. Larger terrain/water boundary QA remains open. |
 | Water | `FAILED -> FIXED` for shoreline leakage; `PARTIAL` overall | `SYM-WATER-1` reproduced, root-caused and repaired: a dry corner of the water sheet claimed the depth of the level it borrowed from its neighbour, so the shore fade that hides the deliberate overhang did not fade it. Six-view GPU shoreline test proves the renderer draws no water on dry land and is negative-controlled by disabling water's depth compare, which tints land at every angle. Mask/foam visualisation and the real-world GPU shoreline case remain open. |
-| Transparency/depth | `PARTIAL` | Main pass contract and water compositing tests pass. Dedicated generic transparency isolation remains open. |
+| Transparency/depth | `PASS` for sorting and depth-write; `PARTIAL` overall | Two transparent panes over an opaque backstop: the backstop shows through both, the nearest pane dominates the composite, and which one that is follows the camera across a traverse. Negative-controlled by reversing the blended sort, which fails at every step. Intersecting transparent geometry and per-pixel order-independent cases remain open. |
 | Shadows | `PARTIAL` | Existing shadow regressions and full release suite pass. Workload timing can be contention-sensitive. |
 | Particles | `PARTIAL` | Deterministic compaction, scene-owned pools and post/helper stress pass. Full camera/depth isolation remains open. |
 | Post-processing | `PARTIAL` | Existing effect tests and transient target stress pass. Full pass-state and temporal history inventory remains open. |
@@ -248,7 +248,7 @@ ever driven through the same path it would be silently excused by this test.
 
 ## A note on vacuous tests
 
-Four tests written during this investigation could not fail, and each was caught by a negative
+Five tests written during this investigation could not fail, and each was caught by a negative
 control rather than by review:
 
 - the alien limb-crossing sweep (a T-pose bind box is wider than every pose it animates into);
@@ -256,7 +256,9 @@ control rather than by review:
   composition overwrites, so the camera never moved);
 - the derived-copy contract test, whose parameter writes did not reach `applyParameters` at all
   because `setBase` leaves the *final* value alone and a bare `Composition::update` has no
-  modulation pass to refresh it.
+  modulation pass to refresh it;
+- the transparency sorting test, whose opaque backstop sat *between* the two panes it was sorting,
+  so one of them was occluded from either side and the pair never composited together.
 
 The common shape is a test whose *setup* silently did nothing. None of them would have been found by
 reading the assertions, because the assertions were correct. **A forensic test is not evidence until
