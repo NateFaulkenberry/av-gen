@@ -1337,6 +1337,7 @@ std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
         {"water", &T::water},               {"transparency", &T::transparency},
         {"particles", &T::particles},       {"animation", &T::animation},
         {"cameramotion", &T::cameraMotion},  {"animationmotion", &T::animationMotion},
+        {"auxstore", &T::auxTargetStores},
     };
     return kArms;
 }
@@ -2657,6 +2658,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // ---- background pass: the HDR clear and the background user-shader layers ----
     // These are fullscreen quads with a single colour output, so they get their own pass; the
     // geometry pass that follows loads the colour and clears the auxiliary targets.
+    //
+    // ADR-119: the pass is encoded unconditionally, and the alternative was measured rather than
+    // assumed. Eliding it when no layer is staged as Background -- and letting the scene pass clear
+    // target 0 itself -- removes a store and a load of 8 bytes a pixel, which sounds like free
+    // bandwidth and is not: the `auxstore` probe showed that not writing *three times that much*
+    // (the four auxiliary targets, 24 B/px) moves the frame by nothing measurable. See ADR-119.
     {
         wgpu::RenderPassColorAttachment color{};
         color.view = hdr_.colorView();
@@ -2786,7 +2793,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         for (std::uint32_t i = 0; i < kAuxTargetCount; ++i) {
             attachments[i + 1].view = auxViews[i];
             attachments[i + 1].loadOp = wgpu::LoadOp::Clear;
-            attachments[i + 1].storeOp = wgpu::StoreOp::Store;
+            attachments[i + 1].storeOp =
+                toggles_.auxTargetStores ? wgpu::StoreOp::Store : wgpu::StoreOp::Discard;
             attachments[i + 1].clearValue = {0.0, 0.0, 0.0, 0.0};
         }
         wgpu::RenderPassDepthStencilAttachment depth{};

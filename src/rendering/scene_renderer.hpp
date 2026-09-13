@@ -416,6 +416,13 @@ public:
         // bind pose: "stop the character moving" and "take the character's pose away" are different
         // questions, and a scene where only one of them changes the picture says which.
         bool animationMotion = true;
+        // ADR-119, a probe rather than a setting: off means the scene pass's four *auxiliary*
+        // colour targets are not written back out of tile memory at all (StoreOp::Discard). The
+        // fragment shader still computes and writes them, so this measures exactly one thing --
+        // the cost of storing 24 bytes a pixel to system memory -- and nothing else. The frame it
+        // produces is wrong wherever post reads one of them, which is what makes it an arm and not
+        // a quality setting.
+        bool auxTargetStores = true;
     };
 
     // The arms by name, in one place (renderer forensics Phase 8.3). The CLI's `--disable <list>`,
