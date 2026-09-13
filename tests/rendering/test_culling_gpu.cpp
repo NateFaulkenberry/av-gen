@@ -1136,14 +1136,22 @@ TEST_CASE("LOD spread turns one simultaneous pop into a smear", "[gpu][culling][
             (void)renderWith(renderer, s);
 
             std::vector<int> level(kCount, -1);
+            // One assertion per level, not one per instance: the inner loop runs 400 x 130 x 4
+            // times, and a REQUIRE in it inflated this single test to 210,000 assertions and a
+            // sizeable share of the GPU suite's runtime. Bad indices are collected and checked once.
+            bool indicesInRange = true;
             for (int l = 0; l < 4; ++l) {
                 auto list = renderer.procedurals().readVisibleIndices("grid", l);
                 REQUIRE(list.has_value());
                 for (const std::uint32_t idx : *list) {
-                    REQUIRE(idx < static_cast<std::uint32_t>(kCount));
+                    if (idx >= static_cast<std::uint32_t>(kCount)) {
+                        indicesInRange = false;
+                        continue;
+                    }
                     level[idx] = l;
                 }
             }
+            REQUIRE(indicesInRange);
             int moved = 0;
             for (int i = 0; i < kCount; ++i) {
                 if (previous[i] >= 0 && level[i] >= 0 && level[i] != previous[i]) { ++moved; }
