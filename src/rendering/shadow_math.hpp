@@ -50,6 +50,38 @@ struct ShadowUniforms {
 };
 static_assert(sizeof(ShadowUniforms) == 672);
 
+// ADR-112: the shadow-map resolution the shadowed range is sized against, whatever resolution the
+// tier actually renders it at.
+//
+// The range decides *where the shadows stop*, which is composition, not quality. A preview that
+// showed shadows to 40 m and a final that showed them to 150 m would not be the same shot, and a
+// preview that does not predict the final is worse than no preview. So every tier gets the same
+// range and they differ in how sharp it is: preview's 1024 gets twice the texel this reference
+// implies, offline's 4096 gets half. This is the one place a tier is deliberately not allowed to
+// scale something.
+constexpr std::uint32_t kShadowRangeReference = 2048;
+
+// ADR-112: how far the directional cascades should reach, in view depth.
+//
+// Two rules, and the smaller wins. The first is the old one: three scene radii, clamped to the
+// camera's own planes -- enough to cover the world, never more than the camera can see. The second
+// is new, and it is the one that makes a wide scene of small objects cast anything: the range at
+// which the *coarsest* cascade's texel is still no larger than `texelTarget` metres.
+//
+// The second rule exists because the coarsest texel has exactly one lever. A camera frustum widens
+// linearly with distance, so the last cascade's bounding sphere is close to `k * range` -- k is
+// about 0.8 whatever the split scheme -- and its texel is `2 * k * range / resolution`. The split
+// lambda and the cascade count redistribute texels among the *near* cascades and leave that
+// unmoved: measured on the real fit, the range that yields an 8 cm coarsest texel is 101 m at two
+// cascades, 105 m at three and 108 m at four. Shortening the range is the only thing that shortens
+// the texel, and raising the resolution is the move this is here to avoid.
+//
+// `resolution` is `kShadowRangeReference`, not the tier's own map size -- see above.
+// `texelTarget <= 0` disables the second rule and returns the first, which is the pre-ADR-112
+// behaviour.
+[[nodiscard]] float directionalShadowRange(float cameraNear, float cameraFar, float sceneRadius,
+                                           std::uint32_t resolution, float texelTarget);
+
 // Practical split scheme (Zhang et al. 2006): a blend of the logarithmic and uniform splits by
 // `lambda` (0 = uniform, 1 = logarithmic). Returns `count` far distances, the last being `far`.
 [[nodiscard]] std::vector<float> cascadeSplits(float nearPlane, float farPlane, std::uint32_t count,

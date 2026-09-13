@@ -114,6 +114,27 @@ struct ShadeContext {
     viewDepth: f32,
     rotation: f32,         // per-pixel PCF rotation
     jitter: f32,           // per-pixel contact-shadow offset
+    // ADR-111: the *geometric* normal -- the interpolated vertex normal, front-facing corrected,
+    // before the material program's perturbation and before the material's normal map. `normal`
+    // above is the shading normal and is what every BRDF term here uses; this one is what the
+    // shadow terms use, and the two are deliberately different vectors.
+    //
+    // A shadow map holds the depth of *rasterised geometry*, and the screen-space contact march
+    // reads the depth buffer, which holds the same thing. Neither has ever heard of a normal map.
+    // The normal offset and the slope-scaled bias exist to move a sample point off the surface the
+    // shadow map recorded, so they have to be computed from the normal of that surface: offsetting
+    // along a normal-mapped normal slides the lookup sideways across the surface by an amount that
+    // tracks the texture rather than the geometry, which is acne in the troughs and detachment on
+    // the peaks. Holbert's normal-offset shadows (2011) uses the vertex normal for exactly this
+    // reason.
+    //
+    // It is also the only normal the half-resolution shadow mask can have. That pass runs before
+    // the scene pass, over the linear depth of the prepass, so it reconstructs a geometric normal
+    // from the depth buffer and has no way to learn about a material's normal map. Handing the
+    // full-resolution path a shading normal here made the two paths compute different shadows for
+    // the same fragment, so the frame changed when the mask was switched on -- which is the defect
+    // ADR-111 is about.
+    geoNormal: vec3<f32>,
     // ADR-087: whether this fragment may read the half-resolution shadow mask. False for a
     // blended surface, which the depth prepass never drew, so the mask under it describes
     // whatever is behind rather than the surface itself.
@@ -311,6 +332,13 @@ fn evaluateLight(index: u32, ctx: ShadeContext) -> LightSample {
     // mask is consulted only where it has something to say about *this* surface -- everywhere else
     // the full computation runs unchanged, which is what keeps blended geometry (never drawn into
     // the depth prepass), disocclusions and every local light correct.
+    // The normal every shadow term below is biased along. Guarded rather than used raw: a
+    // ShadeContext is zero-initialised, so a future construction site that forgets to fill
+    // `geoNormal` would otherwise silently bias along the zero vector -- an offset of nothing and a
+    // slope scale pinned at its maximum, which reads as a scene-wide shadow bias bug with no
+    // obvious cause. Falling back to the shading normal restores the old behaviour instead.
+    let shadowNormal = select(ctx.normal, ctx.geoNormal, dot(ctx.geoNormal, ctx.geoNormal) > 0.5);
+
     var visibility = -1.0;
     if (ctx.maskable && index < u32(frame.shadowMaskParams.y + 0.5)) {
         let masked = shadowMaskLookup(ctx.screenUv, ctx.viewDepth, index);
@@ -319,7 +347,7 @@ fn evaluateLight(index: u32, ctx: ShadeContext) -> LightSample {
         }
     }
     if (visibility < 0.0) {
-        visibility = shadowFactor(light, ctx.worldPos, ctx.normal, toLight, ctx.viewDepth, ctx.rotation,
+        visibility = shadowFactor(light, ctx.worldPos, shadowNormal, toLight, ctx.viewDepth, ctx.rotation,
                                   shadowTaps());
     }
     // The contact march is per-light and independent of the map: a point or area light never gets
@@ -327,7 +355,7 @@ fn evaluateLight(index: u32, ctx: ShadeContext) -> LightSample {
     // says "occluded" wins. It stays at full resolution whether or not the map term was masked --
     // it is the one term that does not survive being computed once per 2x2 (see shadow_mask.wgsl).
     if (light.tangent.w > 0.5 && light.up.w > 0.0) {
-        let contact = contactShadow(ctx.worldPos, ctx.normal, toLight, ctx.screenUv, ctx.viewDepth, ctx.jitter);
+        let contact = contactShadow(ctx.worldPos, shadowNormal, toLight, ctx.screenUv, ctx.viewDepth, ctx.jitter);
         visibility = min(visibility, mix(1.0, contact, clamp(light.up.w, 0.0, 1.0)));
     }
     sample.diffuse = sample.diffuse * visibility;

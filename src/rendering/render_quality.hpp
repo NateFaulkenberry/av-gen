@@ -37,6 +37,28 @@ struct QualitySettings {
     std::uint32_t shadowResolution = 2048; // one cascade / spot map, square
     std::uint32_t cascadeCount = 3;
 
+    // ADR-112: the largest world size one shadow-map texel of the *coarsest* cascade may cover, in
+    // metres, at the reference resolution `kShadowRangeReference` (2048). The shadowed range is
+    // chosen to honour it -- see `directionalShadowRange`.
+    //
+    // Read it as "how small a thing may be and still cast": a caster has to be a few texels across
+    // to survive the PCF filter, so 8 cm is about a 30 cm object at the far end of the range, which
+    // is a rock or a fence post. Raising it lengthens the range and coarsens the far shadows;
+    // lowering it does the reverse.
+    //
+    // A tier with a smaller or larger map keeps the same shadowed *range* and gets a proportionally
+    // coarser or finer texel. Where the shadows stop is composition, and it must not move between a
+    // preview and a final.
+    //
+    // The range is the only lever on the coarsest texel there is. A camera frustum widens linearly
+    // with distance, so the last cascade's world width is proportional to how far it reaches
+    // whatever the split scheme does, and its texel is that width over the resolution. Measured on
+    // the real fit at a fixed range, the coarsest texel moves by under 15% as the split lambda
+    // sweeps 0.5 to 1.0, and by under 15% between two, three and four cascades.
+    //
+    // Zero switches the rule off and restores the pre-ADR-112 range, which was three scene radii.
+    float shadowTexelTarget = 0.08f;
+
     std::uint32_t shadowPcfTaps = 12;
     std::uint32_t pcssBlockerTaps = 12;
     bool softShadows = true;               // percentage-closer soft shadows for the key light
