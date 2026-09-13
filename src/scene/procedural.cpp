@@ -1392,7 +1392,12 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
         if (!spec.assetMesh) {
             return fail("mesh source '{}' has not been resolved", spec.asset);
         }
-        return spec.meshBudget > 0 ? decimateMesh(*spec.assetMesh, spec.meshBudget) : *spec.assetMesh;
+        // ADR-110: LOD0 through meshoptimizer, like every rung below it. The budget is reached by
+        // simplification rather than by a grid clustering that cannot reach a triangle count, and
+        // the mesh the near field draws is welded, vertex-cache ordered and vertex-fetch ordered --
+        // which, before this, was true of every level except the one that carries most of the
+        // triangles.
+        return assets::sourceLodMesh(*spec.assetMesh, spec.meshBudget, assets::lod0Settings());
     case PrimitiveKind::Point:
         return makePointQuad(spec.pointSize);
     case PrimitiveKind::Procedural:
@@ -2322,6 +2327,9 @@ glm::mat4 ProceduralGeometry::instanceMatrix(std::uint32_t index) const {
 json ProceduralGeometry::toJson() const {
     json j = json::object();
     j["name"] = name;
+    if (!partOf.empty()) {
+        j["partOf"] = partOf;
+    }
     j["visible"] = visible;
     {
         json s = json::object();
@@ -2510,6 +2518,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
     {
         const json& j = root;
         AVGEN_PROC_READ(g.name, "name", readString);
+        AVGEN_PROC_READ(g.partOf, "partOf", readString);
         AVGEN_PROC_READ(g.visible, "visible", readBool);
         AVGEN_PROC_READ(g.sourceTransform, "sourceTransform", readTransform);
         AVGEN_PROC_READ(g.distributionTransform, "distributionTransform", readTransform);

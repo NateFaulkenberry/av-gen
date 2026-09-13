@@ -1352,3 +1352,59 @@ TEST_CASE("returning the camera to a pose reproduces the frame exactly", "[gpu][
     CHECK(differing == 0);
     CHECK(ctx->errorCount() == 0);
 }
+
+// The test above puts the two scenes side by side, so they are at different addresses and the
+// upload path's pointer check separates them. This one reuses ONE Scene object, which is how a
+// project actually replaces a world: the address is identical, every fresh Scene starts its
+// meshVersion at the same value, and the mesh count is the same -- so before scene::SceneIdentity
+// the second world was drawn with the first world's vertex buffers.
+TEST_CASE("SceneRenderer does not reuse same-version meshes when one Scene object is refilled",
+          "[gpu][renderer][forensics]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FrameTime time{};
+
+    scene::Scene world = cubeScene();
+    const scene::Scene* address = &world;
+    auto largeImage = renderer.renderToImage(world, time, 96, 64);
+    REQUIRE(largeImage.has_value());
+
+    // The control first: the same object refilled with the *same* world. Identity is minted afresh
+    // and the meshes are re-uploaded, so if reassignment alone could change the picture, it would
+    // change here -- and it must not.
+    world = cubeScene();
+    REQUIRE(&world == address);
+    auto sameImage = renderer.renderToImage(world, time, 96, 64);
+    REQUIRE(sameImage.has_value());
+    CHECK(gpu::hashImage(*sameImage) == gpu::hashImage(*largeImage));
+
+    // Now a genuinely different world in the same object, with the counters saying nothing changed.
+    {
+        scene::Scene replacement = cubeScene();
+        replacement.meshes[0] = cubeMesh(0.25f);
+        REQUIRE(replacement.meshVersion == world.meshVersion);
+        REQUIRE(replacement.meshes.size() == world.meshes.size());
+        world = replacement;
+    }
+    REQUIRE(&world == address);
+    auto smallImage = renderer.renderToImage(world, time, 96, 64);
+    REQUIRE(smallImage.has_value());
+    CHECK(gpu::hashImage(*smallImage) != gpu::hashImage(*largeImage));
+
+    // And the other way a Scene is reused in place: emptied and rebuilt. clear() renews the
+    // identity for exactly this reason.
+    world.clear();
+    scene::Scene rebuilt = cubeScene();
+    world.meshes = rebuilt.meshes;
+    world.entities = rebuilt.entities;
+    world.lights = rebuilt.lights;
+    world.camera = rebuilt.camera;
+    world.environment = rebuilt.environment;
+    world.meshVersion = rebuilt.meshVersion;
+    auto rebuiltImage = renderer.renderToImage(world, time, 96, 64);
+    REQUIRE(rebuiltImage.has_value());
+    CHECK(gpu::hashImage(*rebuiltImage) == gpu::hashImage(*largeImage));
+    CHECK(ctx->errorCount() == 0);
+}

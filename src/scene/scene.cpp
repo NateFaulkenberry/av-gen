@@ -1,5 +1,7 @@
 #include "scene/scene.hpp"
 
+#include <atomic>
+
 #include "core/log.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -200,6 +202,13 @@ std::pair<glm::vec3, glm::vec3> Scene::bounds() const {
     return {lo, hi};
 }
 
+std::uint64_t mintSceneIdentity() noexcept {
+    // Free-running and never reused, starting at 1 so that 0 stays available as "no scene yet".
+    // 2^64 scenes is not a number this process reaches.
+    static std::atomic<std::uint64_t> next{1};
+    return next.fetch_add(1, std::memory_order_relaxed);
+}
+
 void Scene::clear() {
     cameras.clear();
     lights.clear();
@@ -212,6 +221,10 @@ void Scene::clear() {
     waters.clear();
     ++meshVersion;
     ++textureVersion;
+    // Emptied and about to be refilled: a different scene in the same object, and anything keyed
+    // on this one's identity must be told so rather than inferring it from a counter that also
+    // moves for an ordinary edit.
+    identity = mintSceneIdentity();
 }
 
 CullBounds entityCullBounds(const Scene& scene, const Entity& entity, float padFraction,

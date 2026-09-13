@@ -225,6 +225,20 @@ static_assert(sizeof(EffectorPassUniforms) == 128 + 16 + 48 * spatial::kMaxEffec
 // The cull pass parameters (shaders/cull.wgsl `CullParams`, 256 bytes).
 inline constexpr std::uint32_t kMaxCullDepthLayers = 6; // shaders/cull.wgsl CullParams
 
+// ADR-108: how many *extra* material parts one cull decision may serve. A multi-material asset is
+// one spatial instance set drawn several times, so its parts are culled once and each part's
+// indirect args are written from that one decision. Each entry costs 32 bytes of the cull uniform;
+// an asset with more parts than this culls the extras on their own, which is what every part did
+// before this existed.
+inline constexpr std::uint32_t kMaxCullFanout = 7;
+
+// One material part served by another object's cull (shaders/cull.wgsl `CullFanout`).
+struct CullFanout {
+    glm::uvec4 indexCounts; // index count of each LOD level of THIS part's mesh
+    glm::uvec4 slot;        // x = the part's indirect-args / stats slot; yzw unused
+};
+static_assert(sizeof(CullFanout) == 32);
+
 struct CullPassUniforms {
     glm::mat4 objectToWorld;
     glm::vec4 planes[6];      // frustum planes (left, right, bottom, top, near, far)
@@ -241,8 +255,12 @@ struct CullPassUniforms {
     // ADR-038 depth layers, as (start, end, density, detail). `flags.w` holds the count, so a
     // scene with no layers classifies exactly as it did before they existed.
     glm::vec4 depthLayers[kMaxCullDepthLayers];
+    // ADR-108. x = how many entries of `fanout` are live; zero means this object's cull serves
+    // only itself, which is the state every object was in before material parts shared one.
+    glm::uvec4 fanoutInfo;
+    CullFanout fanout[kMaxCullFanout];
 };
-static_assert(sizeof(CullPassUniforms) == 272 + 16 * kMaxCullDepthLayers);
+static_assert(sizeof(CullPassUniforms) == 288 + 16 * kMaxCullDepthLayers + 32 * kMaxCullFanout);
 
 class ProceduralRenderer {
 public:

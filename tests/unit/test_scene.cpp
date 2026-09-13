@@ -329,3 +329,31 @@ TEST_CASE("OrbScene writes parameters into the scene", "[scene][orb]") {
     CHECK(orb.scene().entities[0].transform.scale.x > 2.5f);
     CHECK(orb.scale().base() == 2.0f);
 }
+
+TEST_CASE("a scene's identity is its own, and a refilled scene is a new one", "[scene]") {
+    // The upload caches key on this (SceneRenderer::uploadMeshes). The invariant they need is not
+    // "unique per address" -- addresses are recycled -- but that a Scene reused in place, by
+    // assignment or by clear(), no longer looks like the scene that was there before.
+    scene::Scene a;
+    scene::Scene b;
+    CHECK(a.identity != 0u);
+    CHECK(a.identity != b.identity);
+
+    const std::uint64_t before = a.identity;
+    a = b;
+    CHECK(a.identity == b.identity); // assignment brings b's identity with b's content
+    CHECK(a.identity != before);
+
+    const std::uint64_t emptied = a.identity;
+    a.clear();
+    CHECK(a.identity != emptied); // a Scene emptied and refilled is a different scene
+
+    // The control: nothing else about a scene renames it. A version bump is "this scene changed",
+    // which is a different claim from "this is a different scene", and confusing the two is the
+    // whole of the defect.
+    scene::Scene c;
+    const std::uint64_t named = c.identity;
+    c.addMesh(scene::makeCube(1.0f));
+    CHECK(c.meshVersion != 0u);
+    CHECK(c.identity == named);
+}

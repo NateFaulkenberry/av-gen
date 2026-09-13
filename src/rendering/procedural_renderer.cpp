@@ -302,6 +302,14 @@ struct ProceduralRenderer::Impl {
         std::uint32_t cullLodCount = 0;         // levels the cull buffers are sized for
         std::uint32_t visibleStride = 0;        // elements per level in `visible`
         std::uint32_t statsSlot = 0;            // slot in the shared stats buffer
+        // ADR-108. The visible lists the draw groups were built against: this object's own, or the
+        // lead's when it is a material part sharing one cull. Recorded rather than assumed,
+        // because both can change under it -- the lead's buffers are grow-only and are replaced
+        // when its record set does, and a part can stop being one between frames. A mismatch here
+        // is the invalidation rule: the draw groups are rebuilt, and nothing else has to notice.
+        wgpu::Buffer groupVisible;
+        std::uint32_t groupVisibleStride = 0;
+        std::uint32_t groupVisibleLevels = 0;
         glm::mat4 prevModel{1.0f};              // last frame's object matrix (ADR-035 velocity)
         bool hasPrevModel = false;
         std::uint64_t lastUsed = 0;
@@ -385,9 +393,13 @@ struct ProceduralRenderer::Impl {
     const CachedMesh* ensureLodMesh(const scene::ProceduralGeometry& object, int level);
     // Everything the object needs this frame, in dependency order: record/uniform buffers, the
     // cull buffers (when culling is on) and then every bind group that references them.
+    // `sharedVisible` (ADR-108): non-null when this object is a material part whose cull is done
+    // by another object -- its draws read that object's visible lists, and it allocates no cull
+    // buffers of its own.
     void ensureObjectBuffers(ObjectState& state, std::uint64_t instanceBytes, bool needsLive, std::uint32_t lodCount,
                              bool cullActive, std::uint32_t count, std::uint32_t simRecords,
-                             std::uint32_t simSlots);
+                             std::uint32_t simSlots, const wgpu::Buffer& sharedVisible = nullptr,
+                             std::uint32_t sharedStride = 0, std::uint32_t sharedLevels = 0);
     // Allocates (grow-only) the cull buffers; returns true when a buffer was replaced.
     bool ensureCullBuffers(ObjectState& state, std::uint32_t count, std::uint32_t lodCount);
     void pumpStats();
@@ -434,6 +446,14 @@ struct ProceduralRenderer::Impl {
     std::vector<DrawItem> items;
     std::vector<ComputeItem> computeItems;
     std::vector<CullItem> cullItems;
+    // Parallel to cullItems. The uniforms are staged rather than written as they are built because
+    // a material part reached later in the object loop appends itself to its lead's fanout list
+    // (ADR-108); they all go up in one sweep after the loop, before the pass is encoded.
+    std::vector<CullPassUniforms> cullUniformStaging;
+    // Every object whose per-level counts the cull pass writes this frame -- leads and the parts
+    // their decision serves. Only the leads are in `cullItems`, so this is what advances the
+    // empty-level counters for a part without its instances being added up twice.
+    std::vector<ObjectState*> cullStatsWatch;
     std::array<StatsSlot, 3> statsSlots{};
     std::vector<std::uint32_t> statsSnapshot; // latest completed stats readback
     int pendingStatsSlot = -1;
@@ -908,7 +928,9 @@ const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureLodM
 
 void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint64_t instanceBytes, bool needsLive,
                                                   std::uint32_t lodCount, bool cullActive, std::uint32_t count,
-                                                  std::uint32_t simRecords, std::uint32_t simSlots) {
+                                                  std::uint32_t simRecords, std::uint32_t simSlots,
+                                                  const wgpu::Buffer& sharedVisible, std::uint32_t sharedStride,
+                                                  std::uint32_t sharedLevels) {
     const auto& device = context.device();
     const std::uint32_t levels = std::clamp(lodCount, 1u, static_cast<std::uint32_t>(scene::kMaxLodLevels));
     // Missing group for the top level this frame needs (a fresh object, or lodCount grew).
@@ -949,8 +971,19 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
         state.effectorUniforms = device.CreateBuffer(&desc);
         rebuildGroup = true;
     }
-    if (cullActive && ensureCullBuffers(state, count, lodCount)) {
+    const bool ownsCull = cullActive && !sharedVisible;
+    if (ownsCull && ensureCullBuffers(state, count, lodCount)) {
         rebuildGroup = true; // the draw groups slice `visible`
+    }
+    // ADR-108: whose visible lists the draws read. `state.visible` for an object that culls itself,
+    // the lead's for a material part. Either can be replaced under this object between frames, so
+    // the groups carry what they were built from and are rebuilt when it no longer matches.
+    const wgpu::Buffer& visibleBuffer = sharedVisible ? sharedVisible : state.visible;
+    const std::uint32_t visibleStride = sharedVisible ? sharedStride : state.visibleStride;
+    const std::uint32_t visibleLevels = sharedVisible ? sharedLevels : state.cullLodCount;
+    if (visibleBuffer.Get() != state.groupVisible.Get() || visibleStride != state.groupVisibleStride ||
+        visibleLevels != state.groupVisibleLevels) {
+        rebuildGroup = true;
     }
     // ADR-056: one grow-only buffer holding the slot map and the bend array. Allocated only for a
     // layer that asked to be simulated, so a world without Tier 1 has the buffers it always had.
@@ -993,10 +1026,10 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
             entries[4].buffer = splineTable;
             entries[4].size = SplineBuffers::kBufferSize;
             entries[5].binding = 5;
-            if (cullActive && state.visible && level < state.cullLodCount) {
-                entries[5].buffer = state.visible;
-                entries[5].offset = static_cast<std::uint64_t>(level) * state.visibleStride * sizeof(std::uint32_t);
-                entries[5].size = static_cast<std::uint64_t>(state.visibleStride) * sizeof(std::uint32_t);
+            if (cullActive && visibleBuffer && level < visibleLevels) {
+                entries[5].buffer = visibleBuffer;
+                entries[5].offset = static_cast<std::uint64_t>(level) * visibleStride * sizeof(std::uint32_t);
+                entries[5].size = static_cast<std::uint64_t>(visibleStride) * sizeof(std::uint32_t);
             } else {
                 entries[5].buffer = emptyVisible;
                 entries[5].size = 256;
@@ -1056,11 +1089,14 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
             desc.entries = entries.data();
             state.computeGroup = device.CreateBindGroup(&desc);
         }
+        state.groupVisible = visibleBuffer;
+        state.groupVisibleStride = visibleStride;
+        state.groupVisibleLevels = visibleLevels;
         // The cull groups reference the record buffers, so they are rebuilt with them.
         state.cullGroup = nullptr;
         state.cullGroupLive = nullptr;
     }
-    if (!cullActive) {
+    if (!ownsCull) {
         return;
     }
     auto cullGroup = [&](const wgpu::Buffer& records, std::uint64_t bytes, const char* label) {
@@ -1221,6 +1257,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     im.items.clear();
     im.computeItems.clear();
     im.cullItems.clear();
+    im.cullUniformStaging.clear();
+    im.cullStatsWatch.clear();
     im.passThisFrame = false;
     im.cullPassThisFrame = false;
     if (!im.initialised) {
@@ -1254,6 +1292,72 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     im.lastCameraPosition = scene.camera.position;
     im.hasLastCamera = true;
     im.simRemaining = std::max(scene.environment.wind.simBudget, 0);
+
+    // ---- ADR-108: the material parts of one asset are ONE spatial instance set ----------------
+    // A multi-material glTF arrives here as several objects over the same cloud, the same seed and
+    // the same placements, differing only in mesh, material and per-instance colour. Culling each
+    // of them separately does the same arithmetic several times and counts one tree as two.
+    // `leadOf[i]` names the object whose cull decision object i takes; the rest of this function
+    // then culls the lead once and writes every part's indirect args from that one result.
+    //
+    // A part only joins its lead when the two really are the same placement, because the whole
+    // claim rests on that: the same record count, the same object matrix, the same LOD ladder, and
+    // neither moving its records on the GPU (an effector pass rewrites positions after the CPU has
+    // stopped looking, so a lead's decision would be about records the part does not have).
+    // Anything that fails a check culls itself, exactly as it did before this existed.
+    constexpr std::size_t kNoLead = static_cast<std::size_t>(-1);
+    const std::size_t objectCount = scene.procedurals.size();
+    std::vector<std::size_t> leadOf(objectCount, kNoLead);
+    std::vector<float> groupRadius(objectCount, 0.0f); // the lead's bound must cover every part
+    {
+        std::map<std::string, std::size_t> byName;
+        bool anyPart = false;
+        for (std::size_t i = 0; i < objectCount; ++i) {
+            byName.emplace(scene.procedurals[i].name, i);
+            anyPart = anyPart || !scene.procedurals[i].partOf.empty();
+        }
+        std::vector<std::uint32_t> fanoutUsed(objectCount, 0);
+        for (std::size_t i = 0; anyPart && i < objectCount; ++i) {
+            const auto& part = scene.procedurals[i];
+            if (part.partOf.empty()) {
+                continue;
+            }
+            const auto found = byName.find(part.partOf);
+            if (found == byName.end() || found->second == i) {
+                continue;
+            }
+            const std::size_t lead = found->second;
+            const auto& head = scene.procedurals[lead];
+            const glm::mat4 partModel = i < objectMatrices.size() ? objectMatrices[i] : glm::mat4(1.0f);
+            const glm::mat4 headModel = lead < objectMatrices.size() ? objectMatrices[lead] : glm::mat4(1.0f);
+            if (!head.partOf.empty() || head.instances.size() != part.instances.size() ||
+                part.instances.empty() || partModel != headModel || !head.effectors.empty() ||
+                !part.effectors.empty() || head.lod.lodCount != part.lod.lodCount ||
+                head.lod.cull != part.lod.cull || head.lod.lodByScreenSize != part.lod.lodByScreenSize ||
+                head.lod.maxDistance != part.lod.maxDistance ||
+                head.lod.minScreenRadius != part.lod.minScreenRadius ||
+                !std::equal(std::begin(head.lod.lodDistances), std::end(head.lod.lodDistances),
+                            std::begin(part.lod.lodDistances)) ||
+                head.lod.lodSpread != part.lod.lodSpread ||
+                head.lod.lodHysteresis != part.lod.lodHysteresis ||
+                fanoutUsed[lead] >= kMaxCullFanout) {
+                continue;
+            }
+            ++fanoutUsed[lead];
+            leadOf[i] = lead;
+            // The shared bounding sphere has to contain every part, not just the one that happens
+            // to be part 0: a trunk's radius would cull a canopy that is still on screen. Resolved
+            // here rather than in the loop below because the lead is reached first.
+            if (const Impl::CachedMesh* partMesh = im.ensureMesh(part); partMesh != nullptr) {
+                groupRadius[lead] = std::max(groupRadius[lead], partMesh->radius);
+            }
+        }
+    }
+    // Per-object bookkeeping for the pass below, by index into scene.procedurals.
+    std::vector<Impl::ObjectState*> stateOf(objectCount, nullptr);
+    std::vector<std::size_t> cullItemOf(objectCount, kNoLead);
+    std::vector<char> fullyCulledOf(objectCount, 0);
+
     std::uint32_t slot = 0;
     for (std::size_t i = 0; i < scene.procedurals.size(); ++i) {
         const auto& object = scene.procedurals[i];
@@ -1277,6 +1381,14 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             static_cast<std::uint32_t>(std::clamp(lodSettings.lodCount, 1, scene::kMaxLodLevels));
         const std::uint32_t instanceCount = static_cast<std::uint32_t>(object.instances.size());
         const bool cullActive = lodSettings.cull || lodCount > 1;
+        // ADR-108. Resolved here rather than in the pre-pass because it needs the lead's GPU state,
+        // which exists only once the lead has been through this loop -- and a part whose lead was
+        // skipped this frame (invisible, no mesh, past the object limit) must fall back to culling
+        // itself rather than read buffers nobody filled.
+        const std::size_t leadIndex = leadOf[i];
+        const bool isPart = leadIndex != kNoLead && stateOf[leadIndex] != nullptr;
+        const bool sharesCull = isPart && cullActive && cullItemOf[leadIndex] != kNoLead;
+        const Impl::ObjectState* leadState = sharesCull ? stateOf[leadIndex] : nullptr;
         std::array<const Impl::CachedMesh*, scene::kMaxLodLevels> lodMeshes{};
         lodMeshes[0] = mesh;
         for (std::uint32_t level = 1; level < lodCount; ++level) {
@@ -1352,7 +1464,10 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         const bool simWanted = simLod.enabled && windActive && !usesLive && simShare > 0;
         im.ensureObjectBuffers(state, instanceBytes, usesLive, lodCount, cullActive, instanceCount,
                                simWanted ? instanceCount : 0u,
-                               simWanted ? static_cast<std::uint32_t>(simShare) : 0u);
+                               simWanted ? static_cast<std::uint32_t>(simShare) : 0u,
+                               leadState != nullptr ? leadState->visible : wgpu::Buffer(nullptr),
+                               leadState != nullptr ? leadState->visibleStride : 0u,
+                               leadState != nullptr ? leadState->cullLodCount : 0u);
         state.usesLive = usesLive;
         state.statsSlot = slot;
         if (state.structureVersion != object.structureVersion || state.uploadedCount != object.instances.size()) {
@@ -1370,9 +1485,13 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // count would come back zero. Its four cull dispatches and its indirect draws in every
         // pass -- prepass, lit, each shadow cascade -- are skipped. An object with effectors is
         // excluded because the GPU moves its records after these bounds were taken.
-        const bool fullyCulled = cullActive && !usesLive &&
-                                 objectFullyCulled(lodSettings, planes, cullCamera, model, state.bounds,
-                                                   mesh->radius);
+        // ADR-108: the bound has to cover every material part of the asset, or the trunk's radius
+        // culls a canopy that is still on screen. `groupRadius` is zero for an object with no parts.
+        const float cullRadius = std::max(mesh->radius, groupRadius[i]);
+        const bool fullyCulled = isPart ? fullyCulledOf[leadIndex] != 0
+                                        : (cullActive && !usesLive &&
+                                           objectFullyCulled(lodSettings, planes, cullCamera, model,
+                                                             state.bounds, cullRadius));
         if (fullyCulled) {
             ++stats_.culledObjects;
         }
@@ -1546,7 +1665,24 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             ++stats_.pointObjects;
         }
 
-        if (cullActive && !fullyCulled) {
+        if (cullActive && !fullyCulled && sharesCull) {
+            // The lead classifies these records; this part needs only its own indirect args
+            // written from the lead's per-level counts, with its own mesh's index counts. It is
+            // appended to the lead's uniform, which is uploaded after this loop precisely so a
+            // part reached later can still get into it.
+            CullPassUniforms& lead = im.cullUniformStaging[cullItemOf[leadIndex]];
+            const std::uint32_t used = lead.fanoutInfo.x;
+            if (used < kMaxCullFanout) {
+                CullFanout& entry = lead.fanout[used];
+                entry.slot = glm::uvec4(slot, 0u, 0u, 0u);
+                entry.indexCounts = glm::uvec4(0u);
+                for (std::uint32_t level = 0; level < lodCount; ++level) {
+                    entry.indexCounts[static_cast<int>(level)] = lodMeshes[level]->indexCount;
+                }
+                lead.fanoutInfo.x = used + 1;
+            }
+            im.cullStatsWatch.push_back(&state);
+        } else if (cullActive && !fullyCulled) {
             CullPassUniforms cull{};
             cull.objectToWorld = model;
             for (std::size_t k = 0; k < planes.size(); ++k) {
@@ -1560,7 +1696,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                 objectScale = std::max(objectScale, glm::length(glm::vec3(model[c])));
             }
             cull.limits = glm::vec4(std::max(lodSettings.maxDistance, 0.0f),
-                                    std::max(lodSettings.minScreenRadius, 0.0f), mesh->radius,
+                                    std::max(lodSettings.minScreenRadius, 0.0f), cullRadius,
                                     std::max(objectScale, 1e-6f));
             cull.thresholds = glm::vec4(lodSettings.lodDistances[0], lodSettings.lodDistances[1],
                                         lodSettings.lodDistances[2], 0.0f);
@@ -1582,8 +1718,10 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             for (std::uint32_t level = 0; level < lodCount; ++level) {
                 cull.indexCounts[static_cast<int>(level)] = lodMeshes[level]->indexCount;
             }
-            queue.WriteBuffer(state.cullUniforms, 0, &cull, sizeof(cull));
+            cullItemOf[i] = im.cullItems.size();
+            im.cullUniformStaging.push_back(cull);
             im.cullItems.push_back(Impl::CullItem{&state, instanceCount, lodCount, blocks, usesLive});
+            im.cullStatsWatch.push_back(&state);
             ++stats_.cullObjects;
         }
 
@@ -1625,11 +1763,24 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         ++stats_.objects;
         stats_.sourceVertices += mesh->vertexCount;
         stats_.sourceTriangles += mesh->indexCount / 3;
-        stats_.instances += object.instances.size();
+        // ADR-108: a spatial instance, counted once. The parts of a multi-material asset are one
+        // placement drawn several times; adding their record sets up reported one tree as two.
+        // `logicalTriangles` below is deliberately NOT deduplicated -- it is the geometry the
+        // object contains, and each part contains its own.
+        if (!isPart) {
+            stats_.instances += object.instances.size();
+        }
         stats_.logicalTriangles += static_cast<std::uint64_t>(mesh->indexCount / 3) * object.instances.size();
         stats_.instanceBufferBytes += state.instanceBytes + (usesLive ? state.liveBytes : 0);
         stats_.deformers += enabled;
+        stateOf[i] = &state;
+        fullyCulledOf[i] = fullyCulled ? 1 : 0;
         ++slot;
+    }
+    // ADR-108: the cull uniforms, once every material part that joins a lead has been seen.
+    for (std::size_t c = 0; c < im.cullItems.size(); ++c) {
+        queue.WriteBuffer(im.cullItems[c].state->cullUniforms, 0, &im.cullUniformStaging[c],
+                          sizeof(CullPassUniforms));
     }
     if (slot > 0) {
         queue.WriteBuffer(im.objectUniforms, 0, im.staging.data(), static_cast<std::size_t>(slot) * kObjectStride);
@@ -1695,7 +1846,24 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             }
         }
     }
-    // Aggregate whatever the latest completed readback holds for the objects culling this frame.
+    // How long each LOD level of each object has had nothing in it. The instance count is written
+    // by the GPU, so the CPU cannot know a level is empty when it records the draw -- but it can
+    // know that the level has been empty for a while, which for the far LOD levels of a scatter is
+    // almost always true and almost never about to stop being true. Every object the cull pass
+    // writes counts for is here, including the material parts served by another object's decision
+    // (ADR-108), because each of those records its own draws and can skip its own empty levels.
+    for (Impl::ObjectState* watched : im.cullStatsWatch) {
+        const std::size_t base = static_cast<std::size_t>(watched->statsSlot) * kCullStatsStride;
+        if (base + kCullStatsStride > im.statsSnapshot.size() || im.statsSnapshot[base + 5] == 0) {
+            continue;
+        }
+        for (std::size_t level = 0; level < 4; ++level) {
+            const std::uint32_t count = im.statsSnapshot[base + level];
+            watched->emptyFrames[level] = count == 0 ? watched->emptyFrames[level] + 1 : 0;
+        }
+    }
+    // Aggregate whatever the latest completed readback holds. Over the *leads* only: a part shares
+    // its lead's spatial instances, so adding its counts here would report one culled tree twice.
     for (const auto& item : im.cullItems) {
         const std::size_t base = static_cast<std::size_t>(item.state->statsSlot) * kCullStatsStride;
         if (base + kCullStatsStride > im.statsSnapshot.size() || im.statsSnapshot[base + 5] == 0) {
@@ -1706,12 +1874,6 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             const std::uint32_t count = im.statsSnapshot[base + level];
             stats_.lodCounts[level] += count;
             visible += count;
-            // How long this level has had nothing in it. The instance count is written by the GPU,
-            // so the CPU cannot know a level is empty when it records the draw -- but it can know
-            // that the level has been empty for a while, which for the far LOD levels of a scatter
-            // is almost always true and almost never about to stop being true.
-            auto& mutableState = const_cast<Impl::ObjectState&>(*item.state);
-            mutableState.emptyFrames[level] = count == 0 ? mutableState.emptyFrames[level] + 1 : 0;
         }
         const std::uint64_t records = im.statsSnapshot[base + 4];
         stats_.visibleInstances += visible;
@@ -1902,7 +2064,9 @@ Result<std::vector<scene::InstanceRecord>> ProceduralRenderer::readInstanceRecor
 Result<CullCounts> ProceduralRenderer::readCullCounts(const std::string& name) {
     Impl& im = *impl_;
     const auto it = im.objects.find(name);
-    if (it == im.objects.end() || !it->second.visible) {
+    // `groupVisible` rather than `visible`: a material part served by another object's cull owns no
+    // visible list, but the fanout writes its stats slot like any other (ADR-108).
+    if (it == im.objects.end() || !it->second.groupVisible) {
         return fail("procedural object '{}' has no cull state", name);
     }
     const std::uint64_t offset = static_cast<std::uint64_t>(it->second.statsSlot) * kCullStatsStride * sizeof(std::uint32_t);
@@ -1925,11 +2089,13 @@ Result<CullCounts> ProceduralRenderer::readCullCounts(const std::string& name) {
 Result<std::array<std::uint32_t, 5>> ProceduralRenderer::readIndirectArgs(const std::string& name, int level) {
     Impl& im = *impl_;
     const auto it = im.objects.find(name);
-    if (it == im.objects.end() || !it->second.visible) {
+    // A material part has its own args slot -- written by its lead's cull (ADR-108) -- but no
+    // visible list of its own, so the draws' list is what says whether it has cull state at all.
+    if (it == im.objects.end() || !it->second.groupVisible) {
         return fail("procedural object '{}' has no cull state", name);
     }
     const Impl::ObjectState& state = it->second;
-    if (level < 0 || static_cast<std::uint32_t>(level) >= state.cullLodCount) {
+    if (level < 0 || static_cast<std::uint32_t>(level) >= state.groupVisibleLevels) {
         return fail("procedural object '{}' has no LOD level {}", name, level);
     }
     const std::uint64_t offset =
@@ -1947,11 +2113,12 @@ Result<std::array<std::uint32_t, 5>> ProceduralRenderer::readIndirectArgs(const 
 Result<std::vector<std::uint32_t>> ProceduralRenderer::readVisibleIndices(const std::string& name, int level) {
     Impl& im = *impl_;
     const auto it = im.objects.find(name);
-    if (it == im.objects.end() || !it->second.visible) {
+    // The list the object's draws read: its own, or its lead's when it is a material part.
+    if (it == im.objects.end() || !it->second.groupVisible) {
         return fail("procedural object '{}' has no cull state", name);
     }
     const Impl::ObjectState& state = it->second;
-    if (level < 0 || static_cast<std::uint32_t>(level) >= state.cullLodCount) {
+    if (level < 0 || static_cast<std::uint32_t>(level) >= state.groupVisibleLevels) {
         return fail("procedural object '{}' has no LOD level {}", name, level);
     }
     auto counts = readCullCounts(name);
@@ -1962,8 +2129,9 @@ Result<std::vector<std::uint32_t>> ProceduralRenderer::readVisibleIndices(const 
     if (count == 0) {
         return std::vector<std::uint32_t>{};
     }
-    const std::uint64_t offset = static_cast<std::uint64_t>(level) * state.visibleStride * sizeof(std::uint32_t);
-    auto data = gpu::readBuffer(im.context, state.visible, offset, static_cast<std::uint64_t>(count) * sizeof(std::uint32_t));
+    const std::uint64_t offset = static_cast<std::uint64_t>(level) * state.groupVisibleStride * sizeof(std::uint32_t);
+    auto data = gpu::readBuffer(im.context, state.groupVisible, offset,
+                                static_cast<std::uint64_t>(count) * sizeof(std::uint32_t));
     if (!data) {
         return std::unexpected(data.error());
     }
