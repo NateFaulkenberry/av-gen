@@ -7,6 +7,14 @@
 
 **Interim evidence report:** [renderer-forensics-report.md](renderer-forensics-report.md)
 
+> **Note (added 2026-09-13, wave 2 chore sweep):** the Glowmere GPU/scene-pass/triangle/draw figures
+> throughout this investigation (18.6-18.87 ms GPU, ~15.7-15.8 ms scene pass, 430,231-430,233 tris,
+> 141 draws, 189 shadow draws) are dated measurements (12-13 September) central to the investigation
+> narrative above and are left as recorded. Wave 1's LOD0 and shadow work have since moved the
+> renderer's measured behaviour; current figures are GPU 13.37 ms, scene pass 10.88 ms, 264,305 tris,
+> 141 draws, 34 shadow draws (revision `cbeeea3`) — see
+> [01-audit-and-baseline.md §3.2.2](renderer-upgrade/01-audit-and-baseline.md).
+
 ## Mission
 
 Determine, with reproducible evidence, which subsystem introduces each remaining rendering failure. The investigation must distinguish transforms, camera mathematics, render-object state, GPU buffers, render-pass state, depth, culling, LOD, animation/skinning, terrain, water, transparency, shadows, particles, post-processing, sequencer state and asset-specific behavior.

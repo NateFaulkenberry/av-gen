@@ -10,6 +10,12 @@ Phase A gate in [04](04-target-architecture.md) is satisfied.**
 | [03 — Research: GPU-driven, WebGPU envelope, frame graphs, Apple TBDR](03-research-platform-and-submission.md) | D2b |
 | [04 — Target architecture](04-target-architecture.md) | D5 architecture, D6 roadmap, D7 risks, D8 backlog, D9 go/no-go |
 
+> **Note (added 2026-09-13, wave 2 chore sweep):** the figures below (18.6 ms GPU, 15.73 ms scene
+> pass, 430k tris) are the pre-upgrade numbers this preparation phase measured and diagnosed against.
+> Wave 1's LOD0 and shadow work moved them; current figures are GPU 13.37 ms, scene pass 10.88 ms,
+> 264,305 tris, 34 shadow draws — see [01 §3.2.2](01-audit-and-baseline.md). The *findings*
+> (fragment-bound, quad overdraw, no multi-draw indirect, etc.) still hold; only the numbers moved.
+
 ## The five findings that matter
 
 1. **The scene pass is fragment-bound; geometry work is 1.7% of it.** The same 430 k triangles cost

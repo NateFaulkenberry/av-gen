@@ -9,6 +9,10 @@ M2 Max, Dawn on Metal, release build, idle machine, nothing else running.
 
 ## 1.1 The supplied baseline, verified against source
 
+> **These figures are a historical record of the audit-time verification (pre-LOD0, pre-shadow-work)
+> and are not edited in place, for the same reason §3.2 is not.** For the renderer's current
+> measured behaviour, see §3.2.2.
+
 Rule B requires the brief's figures be checked rather than adopted. Six of them are wrong, and two
 of the discrepancies matter.
 
@@ -247,6 +251,9 @@ Five consecutive Glowmere runs, same session:
 | 4 | 21.92 | 18.55 |
 | 5 | 21.97 | 18.61 |
 
+> Figures below are the pre-LOD0, pre-shadow-work session referenced by §1.1; current figures are in
+> §3.2.2.
+
 **Within-session spread: GPU 1.0%, wall 3.0%.** So the session-to-session gap the brief asks about
 (23.79 ms in the QA doc vs 18.6 ms today, 28%) **cannot** be run-to-run variance, GPU contention or
 thermal drift at this magnitude. Candidate causes, none yet eliminated: a different build
@@ -352,6 +359,12 @@ reason the two scenes need separate budgets.
 
 ## 4.1 The central measurement: what is the scene pass actually doing?
 
+> This section's tables record the pre-LOD0, pre-shadow-work session (same as §1.1/§3.2) that
+> produced the fragment-bound diagnosis; the numbers are not updated because the experiment was not
+> re-run. Current whole-frame/scene-pass figures are in §3.2.2. The *conclusion* (fragment-bound,
+> quad overdraw on sub-pixel triangles) is unaffected by the later triangle-count reduction — it is
+> the mechanism LOD0 exploited.
+
 The brief warns against inferring a fragment bottleneck from triangle counts. So it was measured
 three ways.
 
@@ -447,6 +460,11 @@ each is named in the roadmap.
 
 ## 4.5 The gate measurement — quad overdraw confirmed
 
+> This sweep is a synthetic-scene experiment (a single plane at fixed coverage), independent of
+> Glowmere's own triangle count, so its numbers are not superseded by the LOD0 change. Where it
+> quotes Glowmere's own 430 k tris / 2.4 px-per-triangle average, that is the pre-LOD0 figure — see
+> §3.2.2 for current.
+
 Apple's overdraw counter would have answered this in one GPU capture, but this repository does not
 use Xcode tooling. The question is therefore answered **from inside the engine**, which is the better
 instrument anyway: reproducible, committed, and runnable on demand rather than living in a
@@ -528,6 +546,9 @@ empty; Constellation never touches the grid at all.
   record warns about it — otherwise every future reader draws the same wrong conclusion.
 
 ## 4.6 Two further probes, and what they ruled out
+
+> `viewDistance` sweep below is the pre-LOD0 session (temporary scene variants, since removed, so it
+> cannot be re-run); current baseline figures are in §3.2.2.
 
 **Geometry density at fixed resolution.** Terrain `viewDistance` swept 520 → 110 m (temporary scene
 variants, since removed):

@@ -177,6 +177,11 @@ it pays full re-render every frame while looking almost static.
 
 ## What this research says, tested against this engine's measurements
 
+> The "18.6" total and the technique-vs-bottleneck calls below are from the pre-LOD0/pre-shadow-work
+> baseline audited in [01 §1.1/§3.2](01-audit-and-baseline.md); current figures are in 01 §3.2.2
+> (GPU 13.37 ms, scene pass 10.88 ms, shadow pass 0.33 ms). The feasibility/attacks-bottleneck
+> verdicts are architectural and unaffected by the later numbers moving.
+
 | Technique | WebGPU feasible? | Attacks *this engine's* measured bottleneck? |
 |---|---|---|
 | Nanite software rasterizer | **No** — 64-bit texture atomics | — |
