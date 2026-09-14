@@ -4,7 +4,7 @@ A successor showcase scene: a valley and river that traverse the whole map, ecol
 vegetation, six procedurally searched hero mushrooms, and an Auto-director that can hold one
 continuous shot.
 
-**Status: Phase 3 complete, Phase 4 (hero mushrooms) next.** The scene exists, is listed, its
+**Status: Phase 4 complete.** The scene exists, is listed, its
 geography and its habitat field are tested, and it renders at **13.44 ms** against a 16 ms ceiling —
 parity with the scene it succeeds, on four times the readable ground. The shared candidate-search
 framework is published with its generic half implemented.
@@ -18,6 +18,7 @@ framework is published with its generic half implemented.
 | [05-candidate-search-interface.md](05-candidate-search-interface.md) | **The shared candidate-search framework.** Read this if you are writing a searched procedural generator — mushrooms or trees |
 | [06-phase-2.md](06-phase-2.md) | Phase 2: the geography — three authoring errors worth reading, and a defect that turned out to be the measurement |
 | [07-phase-3.md](07-phase-3.md) | Phase 3: the vegetation — the riparian ladder, and why negative space *is* the performance budget |
+| [08-phase-4.md](08-phase-4.md) | Phase 4: the hero mushrooms — the generator, the search, and the five defects the contact sheet found |
 
 ## The five findings worth reading first
 
