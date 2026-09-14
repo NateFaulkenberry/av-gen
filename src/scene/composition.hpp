@@ -419,6 +419,27 @@ public:
     }
     [[nodiscard]] float navCellSize() const { return navCellSize_; }
 
+    // How wide the body the navigation graph is built for is, in metres (ADR-199).
+    //
+    // The grid already inflates every solid by a body radius when it decides which cells are
+    // blocked -- it just used the *world's* default of 0.45 m, a person. Glowmere Valley 2's
+    // inhabitants are six metres tall with a 2.4 m radius, so every path was planned through gaps
+    // they do not fit in, and the per-frame penetration resolve then fought the walk: measured,
+    // `sage` spent one unbroken stretch of 62 seconds playing a walk cycle and going nowhere, and
+    // `rook` and `ember` were under a centimetre a frame for more than half of theirs.
+    //
+    // Scene-level rather than per-character, because there is one grid per world -- see ADR-195 and
+    // ADR-196, which both record the same limitation. Set it to the widest body that has to route.
+    void setNavBodyRadius(float metres) {
+        const float clamped = std::clamp(metres, 0.0f, 40.0f);
+        if (clamped == navBodyRadius_) {
+            return;
+        }
+        navBodyRadius_ = clamped;
+        dirty_ = true;
+    }
+    [[nodiscard]] float navBodyRadius() const { return navBodyRadius_; }
+
     // How deep a walker will wade, in metres. 0 -- the default -- is a walkable set that stops at
     // the waterline, which is what every scene written before this key existed was authored
     // against; see `world::WalkRules::wadeDepth` for why the default is not a plausible ankle
@@ -875,6 +896,9 @@ private:
     // How coarse the navigation graph is, in metres. 0 disables pathfinding, which leaves the
     // straight-line steering that was here before ADR-093 -- correct, and unable to route.
     float navCellSize_ = 4.0f;
+    // 0 keeps the navigator's own default (0.45 m, a person), which is what every scene written
+    // before ADR-199 gets.
+    float navBodyRadius_ = 0.0f;
     float navWadeDepth_ = 0.0f;
     std::optional<graph::Graph> graph_;
     bool graphDirty_ = false;

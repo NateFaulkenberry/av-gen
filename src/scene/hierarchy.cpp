@@ -282,6 +282,21 @@ glm::vec3 sourceHalfExtent(const ProceduralGeometry& g, const GenerationContext&
     return ref != nullptr ? sourceHalfExtent(*ref, deeper(ctx)) : glm::vec3(0.0f);
 }
 
+void sourceBox(const ProceduralGeometry& g, const GenerationContext& ctx, glm::vec3& centre,
+               glm::vec3& half) {
+    if (g.source.kind != PrimitiveKind::Procedural) {
+        primitiveBox(g.source, centre, half);
+        return;
+    }
+    const ProceduralGeometry* ref = findReference(g, ctx);
+    if (ref != nullptr) {
+        sourceBox(*ref, deeper(ctx), centre, half);
+    } else {
+        centre = glm::vec3(0.0f);
+        half = glm::vec3(0.0f);
+    }
+}
+
 std::uint64_t resolvedSourceHash(const ProceduralGeometry& g, const GenerationContext& ctx) {
     if (g.source.kind != PrimitiveKind::Procedural) {
         return g.source.structuralHash();

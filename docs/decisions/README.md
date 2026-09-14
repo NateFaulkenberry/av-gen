@@ -194,3 +194,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [196](ADR-196-a-solid-says-what-getting-past-it-takes.md) | A solid says what getting past it takes; the body says what it can do about that | Accepted |
 | [197](ADR-197-the-navigation-layer-gets-an-appearance.md) | The navigation layer gets an appearance, and the overlay gets a camera pointed at it | Accepted |
 | [198](ADR-198-secondary-motion-and-four-inhabitants.md) | Secondary motion, and four inhabitants instead of one placeholder | Accepted |
+| [199](ADR-199-two-bugs-from-one-assumption.md) | Two bugs from one assumption -- that a thing is centred on its origin | Accepted |

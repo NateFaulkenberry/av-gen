@@ -22,6 +22,8 @@ constexpr int kMaxCloudInstances = 1048576;
 [[nodiscard]] glm::vec3 hueMultiplier(const glm::vec3& base, float turns);
 // Half-extent of a primitive source (Procedural kind: zero; resolve through sourceHalfExtent).
 [[nodiscard]] glm::vec3 primitiveHalfExtent(const SourceSpec& s);
+// ADR-199: the primitive's real box rather than a half-extent measured from its origin.
+void primitiveBox(const SourceSpec& s, glm::vec3& centre, glm::vec3& half);
 
 // ---- defined in hierarchy.cpp -------------------------------------------------------------------
 
@@ -31,6 +33,11 @@ constexpr int kMaxCloudInstances = 1048576;
 // The half-extent of the mesh the object draws: its primitive's, or the referenced object's
 // (recursively, times that object's |sourceTransform.scale|).
 [[nodiscard]] glm::vec3 sourceHalfExtent(const ProceduralGeometry& g, const GenerationContext& ctx);
+// ADR-199: the source's real box -- centre offset from its own origin, and true half-extent. Unlike
+// `sourceHalfExtent`, correct for geometry that is not centred on its origin. For what a person is
+// shown; culling keeps the symmetric version, where too big is safe.
+void sourceBox(const ProceduralGeometry& g, const GenerationContext& ctx, glm::vec3& centre,
+               glm::vec3& half);
 // Structural hash of the resolved SourceSpec (the renderer's mesh cache key).
 [[nodiscard]] std::uint64_t resolvedSourceHash(const ProceduralGeometry& g, const GenerationContext& ctx);
 // The cloud of an object with hierarchy.recursionDepth > 0 and/or a Procedural source (see

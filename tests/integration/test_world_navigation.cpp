@@ -804,3 +804,83 @@ TEST_CASE("Glowmere's four aliens behave as four different creatures",
     }
     CHECK(frames > 0);
 }
+
+// Reported: "they're often getting stuck on objects and playing a walking animation whilst stuck,
+// rocks in particular" and "ember was not playing animations all the time - sliding across the world".
+//
+// Measures both, because both are the same question asked twice: what is the body's activity, and
+// is it actually going anywhere? A body in Walk that covers no ground is the first report. A body
+// covering ground while airborne is the second.
+TEST_CASE("how often do Glowmere's aliens walk without going anywhere",
+          "[.probe][integration][glowmere][stuck]") {
+    const fs::path root = AVGEN_SOURCE_DIR;
+    if (!fs::exists(root / "assets/aliens/alien-scout.glb")) {
+        SKIP("the alien pack is not installed");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(root / "examples/world/glowmere-valley-2.scene.json").has_value());
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+
+    const std::array<const char*, 4> cast{{"rook", "tide", "sage", "ember"}};
+    struct Trace {
+        glm::vec3 last{0.0f};
+        int walking = 0;      // frames the animation layer is showing a walk or a run
+        int walkingStill = 0; // ...of which the body moved less than a centimetre
+        int airborne = 0;
+        int frames = 0;
+        double travelled = 0.0;
+        int longestStall = 0;
+        int stall = 0;
+    };
+    std::map<std::string, Trace> t;
+    for (const char* n : cast) {
+        t[n].last = composition->entityWorld().find(n)->locomotion().position;
+    }
+
+    constexpr double kStepSeconds = 1.0 / 60.0;
+    const auto frames = static_cast<std::uint64_t>(180.0 / kStepSeconds);
+    for (std::uint64_t i = 1; i <= frames; ++i) {
+        FrameTime time;
+        time.renderTime = static_cast<double>(i) * kStepSeconds;
+        time.deltaTime = kStepSeconds;
+        time.frameIndex = i;
+        engine.update(time);
+        for (const char* n : cast) {
+            const entity::Entity* e = composition->entityWorld().find(n);
+            Trace& x = t[n];
+            const glm::vec3 now = e->locomotion().position;
+            const float step = glm::length(glm::vec2(now.x - x.last.x, now.z - x.last.z));
+            x.last = now;
+            x.travelled += step;
+            ++x.frames;
+            const entity::Activity a = e->locomotion().activity;
+            if (a == entity::Activity::Jump || a == entity::Activity::Fall ||
+                a == entity::Activity::Land) {
+                ++x.airborne;
+            }
+            if (a == entity::Activity::Walk || a == entity::Activity::Run) {
+                ++x.walking;
+                if (step < 0.01f) {
+                    ++x.walkingStill;
+                    ++x.stall;
+                    x.longestStall = std::max(x.longestStall, x.stall);
+                } else {
+                    x.stall = 0;
+                }
+            } else {
+                x.stall = 0;
+            }
+        }
+    }
+    for (const char* n : cast) {
+        const Trace& x = t.at(n);
+        UNSCOPED_INFO(fmt::format(
+            "{:6} {:5.1f} m | walk/run {:5} frames, of which STILL {:5} ({:4.1f}%), longest stall "
+            "{:4} frames ({:.1f} s) | airborne {:5} ({:4.1f}%)",
+            n, x.travelled, x.walking, x.walkingStill,
+            x.walking > 0 ? 100.0 * x.walkingStill / x.walking : 0.0, x.longestStall,
+            x.longestStall / 60.0, x.airborne, 100.0 * x.airborne / x.frames));
+    }
+    CHECK(frames > 0);
+}

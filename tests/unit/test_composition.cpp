@@ -2695,6 +2695,60 @@ TEST_CASE("A procedural node is as big as what it placed, not a box at its root"
     CHECK(bounds.size().z < 3.0f);
 }
 
+// ADR-199. Reported twice, with screenshots: a selection box the size of the valley, sitting on the
+// ground under a mushroom cap fifteen metres above it.
+//
+// The tight bounds took the source's half-extent from `sourceHalfExtent`, which returns
+// `max(|vertex|)` -- the distance from the *origin* to the furthest vertex. That is a half-extent
+// only when the geometry is centred on its own origin. A cap authored up its own stem is not: the
+// number comes back as the full height, so the box is twice as tall as the cap AND centred on the
+// ground rather than on the cap. Both symptoms, one cause.
+TEST_CASE("a source that is not centred on its origin still gets a box around itself",
+          "[scene][composition][bounds]") {
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(tempDir());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "offcentre");
+    comp.attach(params, modulator);
+
+    // A tube whose curve runs ten metres above its own origin, with nothing at the origin at all.
+    // `max(|vertex|)` for this is about 10.5, so the broken version produced a 21 m box centred on
+    // zero -- exactly the screenshot: twice too tall, and sitting on the ground under the thing.
+    scene::CompositionNode node;
+    node.name = "cap";
+    node.kind = scene::NodeKind::Procedural;
+    node.procedural.name = "cap";
+    node.procedural.source.kind = scene::PrimitiveKind::Tube;
+    node.procedural.source.radius = 0.4f;
+    node.procedural.source.curve.points = {
+        spatial::SplinePoint{{-1.0f, 10.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, 0.0f, 1.0f},
+        spatial::SplinePoint{{0.0f, 10.2f, 0.0f}, {1.0f, 0.0f, 0.0f}, 0.0f, 1.0f},
+        spatial::SplinePoint{{1.0f, 10.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, 0.0f, 1.0f}};
+    node.procedural.distribution.kind = scene::DistributionKind::Single;
+    const auto added = comp.addNode(std::move(node));
+    if (!added.has_value()) {
+        INFO(added.error().message);
+        FAIL("addNode refused the mesh source");
+    }
+
+    FrameTime time{};
+    params.resetFinals();
+    comp.update(time);
+
+    const scene::WorldBounds bounds = comp.nodeBounds("cap");
+    REQUIRE(bounds.valid);
+    INFO("box " << bounds.min.y << " .. " << bounds.max.y);
+
+    // Around the geometry, not around the origin. The cap lives between y = 10 and y = 10.5.
+    CHECK(bounds.min.y > 9.0f);
+    CHECK(bounds.max.y < 11.5f);
+    // And the right size: about a metre tall, not twenty-one.
+    CHECK(bounds.size().y < 3.0f);
+    // The centre is what the gizmo sits on, and it must be on the cap.
+    CHECK_THAT(bounds.centre().y, Catch::Matchers::WithinAbs(10.1, 1.5));
+}
+
 // Found by measurement, not by reading: setting `groundGlow` to 5.0 on Glowmere's valley produced a
 // byte-identical frame, as did turning `groundMottle` off. The generated ground material carries all
 // five of those settings and is built only for a terrain that names no program of its own -- so a

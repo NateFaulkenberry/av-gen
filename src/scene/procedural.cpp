@@ -484,6 +484,55 @@ glm::vec3 hueRotationMultiplier(const glm::vec3& base, float turns) {
     return glm::clamp(rotated / safe, glm::vec3(0.0f), glm::vec3(8.0f));
 }
 
+glm::vec3 sourceHalfExtent(const SourceSpec& s);
+
+// The source's actual box, centre and half-extent, rather than a half-extent measured from the
+// origin (ADR-199).
+//
+// `sourceHalfExtent` below returns `max(|vertex|)`, which is only the object's half-extent when the
+// geometry is centred on its own origin. A mushroom cap authored fifteen metres up its own stem is
+// not: that returns about fifteen for Y, so the box came out twice as tall as the cap and centred
+// on the ground. Reported twice, with a screenshot of a selection box the size of the valley sitting
+// under a cap that was nowhere near it.
+//
+// The conservative version stays for culling, where a symmetric bound that is too big is safe and a
+// centre nobody uses would be waste. This is for the things a person looks at.
+void primitiveBoxImpl(const SourceSpec& s, glm::vec3& centre, glm::vec3& half) {
+    centre = glm::vec3(0.0f);
+    half = sourceHalfExtent(s);
+    const auto fromPoints = [&](auto&& points) {
+        glm::vec3 lo(std::numeric_limits<float>::max());
+        glm::vec3 hi(std::numeric_limits<float>::lowest());
+        bool any = false;
+        for (const glm::vec3& p : points) {
+            lo = glm::min(lo, p);
+            hi = glm::max(hi, p);
+            any = true;
+        }
+        if (any) {
+            centre = (lo + hi) * 0.5f;
+            half = (hi - lo) * 0.5f;
+        }
+    };
+    if (s.kind == PrimitiveKind::Mesh && s.assetMesh && !s.assetMesh->vertices.empty()) {
+        std::vector<glm::vec3> ps;
+        ps.reserve(s.assetMesh->vertices.size());
+        for (const Vertex& v : s.assetMesh->vertices) {
+            ps.push_back(v.position);
+        }
+        fromPoints(ps);
+    } else if (s.kind == PrimitiveKind::Tube) {
+        std::vector<glm::vec3> ps;
+        for (const spatial::SplineSample& sample : s.curve.samples(16)) {
+            ps.push_back(sample.position);
+        }
+        fromPoints(ps);
+    } else if (s.kind == PrimitiveKind::Cylinder) {
+        // Authored from its base, not its middle, which is the other asymmetric primitive.
+        centre = glm::vec3(0.0f, 0.0f, 0.0f);
+    }
+}
+
 glm::vec3 sourceHalfExtent(const SourceSpec& s) {
     switch (s.kind) {
     case PrimitiveKind::Box:
@@ -536,6 +585,10 @@ glm::vec3 detail::hueMultiplier(const glm::vec3& base, float turns) {
 
 glm::vec3 detail::primitiveHalfExtent(const SourceSpec& s) {
     return scene::sourceHalfExtent(s); // the file-local one, not detail::sourceHalfExtent
+}
+
+void detail::primitiveBox(const SourceSpec& s, glm::vec3& centre, glm::vec3& half) {
+    scene::primitiveBoxImpl(s, centre, half);
 }
 
 // ================================================================================================
@@ -2381,6 +2434,16 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
     // (leaf) primitive; every intermediate scale is already in the point scales.
     const glm::vec3 sourceExtent = detail::sourceHalfExtent(*this, ctx) * glm::abs(sourceTransform.scale);
     const float sourceRadius = glm::length(sourceExtent);
+    // ADR-199: the source's *real* box for the tight pair. `sourceHalfExtent` measures from the
+    // origin and is therefore only a half-extent when the geometry is centred on it -- a cap
+    // authored fifteen metres up its stem is not, and the box came out twice too tall and sitting
+    // on the ground. The conservative pair above keeps using the symmetric number, where being too
+    // big is safe.
+    glm::vec3 srcCentre(0.0f);
+    glm::vec3 srcHalf = sourceExtent;
+    detail::sourceBox(*this, ctx, srcCentre, srcHalf);
+    srcCentre *= sourceTransform.scale;
+    srcHalf *= glm::abs(sourceTransform.scale);
     glm::vec3 lo(std::numeric_limits<float>::max());
     glm::vec3 hi(std::numeric_limits<float>::lowest());
     // The tight pair, built in the same pass. `lo`/`hi` put a *sphere* of the source's diagonal
@@ -2403,16 +2466,18 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
         const float radius = sourceRadius * std::max({std::abs(scales[i].x), std::abs(scales[i].y), std::abs(scales[i].z)});
         lo = glm::min(lo, centre - glm::vec3(radius));
         hi = glm::max(hi, centre + glm::vec3(radius));
-        // |R * S| applied to the half-extent: the standard AABB-of-an-OBB, one row at a time.
+        // |R * S| applied to the half-extent: the standard AABB-of-an-OBB, one row at a time. The
+        // box's own centre rides through the same rotation, which is the half that was missing.
         const glm::mat3 basis = glm::mat3_cast(rotation);
-        const glm::vec3 scaled = sourceExtent * glm::abs(scales[i]);
+        const glm::vec3 scaled = srcHalf * glm::abs(scales[i]);
+        const glm::vec3 boxCentre = centre + rotation * (srcCentre * scales[i]);
         glm::vec3 extent(0.0f);
         for (int axis = 0; axis < 3; ++axis) {
             extent[axis] = std::abs(basis[0][axis]) * scaled.x + std::abs(basis[1][axis]) * scaled.y +
                            std::abs(basis[2][axis]) * scaled.z;
         }
-        tlo = glm::min(tlo, centre - extent);
-        thi = glm::max(thi, centre + extent);
+        tlo = glm::min(tlo, boxCentre - extent);
+        thi = glm::max(thi, boxCentre + extent);
     }
     if (built.count() == 0) {
         lo = hi = glm::vec3(0.0f);

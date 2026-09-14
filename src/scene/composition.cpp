@@ -1588,9 +1588,20 @@ entity::Navigator Composition::buildNavigator() const {
         // Before the grid is built, because the wade band decides what the grid calls walkable.
         // Setting it afterwards would bake a graph that stops at the waterline and then hand it to
         // a walker that does not, which is the two halves of the same question disagreeing.
-        if (navWadeDepth_ > 0.0f) {
+        // ADR-199: and the body's own width, for the same reason. The grid already inflates every
+        // solid by a body radius before deciding which cells are blocked -- it just used the
+        // *world's* default of 0.45 m, a person. Glowmere's inhabitants are six metres tall with a
+        // 2.4 m radius, so every path was planned through gaps they do not fit in and the per-frame
+        // penetration resolve then fought the walk: `sage` spent one unbroken stretch of 62 seconds
+        // playing a walk cycle and going nowhere.
+        if (navWadeDepth_ > 0.0f || navBodyRadius_ > 0.0f) {
             entity::NavSettings settings = nav.settings();
-            settings.wadeDepth = navWadeDepth_;
+            if (navWadeDepth_ > 0.0f) {
+                settings.wadeDepth = navWadeDepth_;
+            }
+            if (navBodyRadius_ > 0.0f) {
+                settings.bodyRadius = navBodyRadius_;
+            }
             nav.setSettings(settings);
         }
         nav.setObstacles(obstacles_, obstacles_ != nullptr ? &obstacleBridge_ : nullptr);
@@ -5145,6 +5156,9 @@ nlohmann::json Composition::toJson() const {
     if (navCellSize_ != 4.0f) {
         j["navCellSize"] = navCellSize_;
     }
+    if (navBodyRadius_ > 0.0f) {
+        j["navBodyRadius"] = navBodyRadius_;
+    }
     if (navWadeDepth_ != 0.0f) {
         j["navWadeDepth"] = navWadeDepth_;
     }
@@ -5485,6 +5499,19 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
     // straight-line steering, which is correct and cannot route. Validated here rather than clamped
     // silently: a scene asking for a 0.1 m grid over a kilometre of world is asking for a hundred
     // million cells, and finding that out as a warning beats finding it as a stall.
+    // ADR-199: the widest body the graph has to serve. 0 keeps the navigator's own person-sized
+    // default, which is what every scene written before this gets.
+    if (j.contains("navBodyRadius")) {
+        if (!j.at("navBodyRadius").is_number()) {
+            return fail("'navBodyRadius' must be a number of metres");
+        }
+        const auto metres = j.at("navBodyRadius").get<float>();
+        if (metres < 0.0f || metres > 40.0f) {
+            return fail("'navBodyRadius' {} is out of range; use 0 for the default or 0..40 metres",
+                        metres);
+        }
+        comp->setNavBodyRadius(metres);
+    }
     if (j.contains("navCellSize")) {
         if (!j.at("navCellSize").is_number()) {
             return fail("'navCellSize' must be a number of metres (0 disables pathfinding)");

@@ -7045,5 +7045,6 @@
    ]
   }
  ],
- "navWadeDepth": 1.6
+ "navWadeDepth": 1.6,
+ "navBodyRadius": 2.4
 }
