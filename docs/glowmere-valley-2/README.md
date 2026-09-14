@@ -4,8 +4,9 @@ A successor showcase scene: a valley and river that traverse the whole map, ecol
 vegetation, six procedurally searched hero mushrooms, and an Auto-director that can hold one
 continuous shot.
 
-**Status: Phase 2 in progress.** Phase 1 (research and architecture) complete; the shared
-candidate-search framework is published and its generic half is implemented and tested.
+**Status: Phase 2 complete, Phase 3 next.** The scene exists, is listed, and its geography is
+tested; the shared candidate-search framework is published with its generic half implemented. One
+visual defect is open ([06-phase-2.md](06-phase-2.md) §5).
 
 | | |
 |---|---|
@@ -14,6 +15,7 @@ candidate-search framework is published and its generic half is implemented and 
 | [03-baseline.md](03-baseline.md) | Build, test and render baseline for the original — and why its timings are not evidence |
 | [04-plan.md](04-plan.md) | Phased plan, risk register, and the eight questions Phase 2 needs answered |
 | [05-candidate-search-interface.md](05-candidate-search-interface.md) | **The shared candidate-search framework.** Read this if you are writing a searched procedural generator — mushrooms or trees |
+| [06-phase-2.md](06-phase-2.md) | Phase 2: the geography — what was built, three authoring errors worth reading, and the one open defect |
 
 ## The five findings worth reading first
 

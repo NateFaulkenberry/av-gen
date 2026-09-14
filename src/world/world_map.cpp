@@ -291,6 +291,26 @@ float WorldMap::waterSurface(glm::vec2 p) const {
     return surface > kNegInf ? surface : kNegInf;
 }
 
+float WorldMap::waterTable(glm::vec2 p) const {
+    // The nearest water feature wins, rather than the highest or the sum. A point between two
+    // courses belongs to the one it is closer to; taking the max would make a high tributary flood
+    // the ecology of a low valley across the ridge between them.
+    float best = std::numeric_limits<float>::max();
+    float surface = seaLevel;
+    for (const Feature& f : features) {
+        if (!f.water) {
+            continue;
+        }
+        // No `reaches` gate, unlike `waterSurface`: the whole purpose is to answer outside the bank.
+        const PathHit hit = closestOnPath(f.samplePath(), p, f.blocks);
+        if (hit.distance < best) {
+            best = hit.distance;
+            surface = hit.level + f.waterDepth;
+        }
+    }
+    return surface;
+}
+
 float WorldMap::moisture(glm::vec2 p, float altitude01) const {
     // Distance to the nearest water feature's bank, faded over `moistureReach`. The bounding boxes
     // features carry are grown by their width, not by the reach, so the search is over every water

@@ -163,6 +163,28 @@ struct WorldMap {
     // 0 dry .. 1 at the water's edge: the larger of a falloff from the nearest water feature and a
     // term that makes the bottom of the map damper than the top.
     [[nodiscard]] float moisture(glm::vec2 p, float altitude01) const;
+    // The water surface that *governs* this point, extrapolated beyond the bank of the nearest water
+    // feature -- and the ground's height above it.
+    //
+    // This is not `waterSurface()` and the difference is the whole point of it existing.
+    // `waterSurface` answers "is there water here", so outside a feature's own bank it drops to
+    // `seaLevel` and the gradient stops. That is correct for deciding what is submerged and useless
+    // for deciding what grows: a riverbank two metres above the water and forty metres from it is
+    // wet, and a shelf two metres above the water and ten metres from it is wet in the same way.
+    //
+    // So `waterTable` takes the *nearest* water feature -- whether or not its influence reaches --
+    // and returns its surface at the closest point on its course. `heightAboveWater` is the ground
+    // minus that, which the riparian-ecology literature calls height above river and uses as a
+    // groundwater proxy, and which is the one habitat field a valley's vegetation actually organises
+    // itself along. A map with no water feature answers from `seaLevel`, so a world with no sea
+    // reports a large positive height everywhere: dry, which is true.
+    //
+    // Both are deliberately separate calls rather than fields of `Sample`. They cost a distance
+    // query against every water feature, and `Sample` is evaluated for every terrain vertex and
+    // every scatter candidate in the world -- so the cost belongs to the callers that want it and
+    // not to the original scene, whose output must not move.
+    [[nodiscard]] float waterTable(glm::vec2 p) const;
+    [[nodiscard]] float heightAboveWater(glm::vec2 p) const { return height(p) - waterTable(p); }
     [[nodiscard]] glm::vec2 min() const { return -size * 0.5f; }
     [[nodiscard]] glm::vec2 max() const { return size * 0.5f; }
 
