@@ -357,7 +357,7 @@ const std::vector<TreeBand>& treeBands() {
          "Silhouette width over height. Banded for the monumental target -- appreciably taller than "
          "it is wide, but not a pole. A 32 m tree with a 21 m crown is 0.66.",
          0.08f,
-         {0.42f, 0.55f, 0.85f, 1.10f}},
+         {0.55f, 0.72f, 1.05f, 1.30f}},
         {"balance",
          "Absolute left/right mass difference. Banded away from ZERO as well as from large values: "
          "a perfectly symmetric tree reads as manufactured, which is the controlled-asymmetry "
@@ -443,13 +443,13 @@ search::GeneratorSchema treeSchema() {
     schema.generatorName = "tree";
     schema.generatorVersion = 1;
     schema.parameters = search::ParameterSchema({
-        {"height", 28.0f, 36.0f, false, "Total height in metres. The monumental axis."},
-        {"crownRadius", 8.5f, 11.5f, false, "Horizontal semi-axis of the crown envelope."},
+        {"height", 26.0f, 33.0f, false, "Total height in metres. The monumental axis."},
+        {"crownRadius", 9.5f, 13.0f, false, "Horizontal semi-axis of the crown envelope."},
         {"boleFraction", 0.30f, 0.46f, false, "Clear trunk as a fraction of height, before the crown begins."},
-        {"foliageFraction", 0.35f, 1.00f, false,
+        {"foliageFraction", 0.30f, 0.75f, false,
          "Fraction of eligible tips carrying a foliage cluster. Half of the openness control: this "
          "decides whether the limbs are readable through the crown."},
-        {"foliageClusterScale", 0.75f, 1.80f, false,
+        {"foliageClusterScale", 0.70f, 1.40f, false,
          "Size of each foliage cluster. The other half: thinning opens holes, enlarging closes the "
          "canopy without moving the clusters, and a crown needs both to land between a solid mass "
          "and branches with tufts on them."},
@@ -457,10 +457,10 @@ search::GeneratorSchema treeSchema() {
         {"lambdaOld", 0.34f, 0.48f, false, "Apical control late: how far the crown spreads."},
         {"branchDrop", -0.70f, -0.15f, false,
          "Downward tropism on branches. With a strong pull toward light this is what gnarls them."},
-        {"outwardBias", 0.18f, 0.55f, false, "How hard limbs are pushed away from the trunk axis."},
+        {"outwardBias", 0.28f, 0.70f, false, "How hard limbs are pushed away from the trunk axis."},
         {"branchAngle", 0.60f, 1.05f, false, "Radians a lateral bud leaves its parent internode at."},
-        {"shoulder", 0.15f, 0.75f, false, "Crown profile: 0 is an ellipsoid, high lifts the widest point."},
-        {"lumpiness", 0.25f, 0.80f, false, "Low-frequency density variation in the crown. The asymmetry knob."},
+        {"shoulder", 0.30f, 0.95f, false, "Crown profile: 0 is an ellipsoid, high lifts the widest point."},
+        {"lumpiness", 0.45f, 0.95f, false, "Low-frequency density variation in the crown. The asymmetry knob."},
         {"shedThreshold", 0.06f, 0.22f, false, "Self-pruning, relative to the crown's own mean."},
         {"alpha", 2.9f, 4.0f, false, "Resource scale. Controls how fast the marker cloud is consumed."},
         {"rootCanopyCoupling", 0.35f, 0.90f, false, "How far root directions follow the canopy's mass."},
@@ -509,6 +509,10 @@ Result<TreeParams> treeParamsFrom(std::span<const float> v) {
     p.crown.halfHeight = std::max((height - p.crown.baseHeight) * 0.5f, 1.0f);
     p.crown.centreHeight = p.crown.baseHeight + p.crown.halfHeight;
     p.crown.trunkCorridorRadius = std::max(p.crown.radius * 0.13f, 0.6f);
+    // A substantial hollow. Fewer, larger clusters hung on the outside of a hollow crown is what
+    // turns one continuous canopy volume into distinct masses on distinct limbs -- the difference
+    // between a hedge and an architectural tree, and the reference's defining quality.
+    p.crown.coreHollow = 0.45f;
     p.rootSpread = p.crown.radius * 0.78f;
     p.flareHeight = std::max(p.crown.baseHeight * 0.26f, 1.2f);
     if (auto ok = p.validate(); !ok) {

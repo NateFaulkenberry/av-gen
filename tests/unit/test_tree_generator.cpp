@@ -133,7 +133,8 @@ TEST_CASE("the tree generator satisfies the shared contract", "[tree][search]") 
         INFO("role " << role);
     }
     CHECK(roles.count("trunk") == 1);
-    CHECK(roles.count("foliage") == 1);
+    CHECK(roles.count("foliage0") == 1);
+    CHECK(roles.count("foliage2") == 1);
 
     const auto features = generator.features(*subject, params);
     CHECK(features.size() == generator.schema().featureNames.size());

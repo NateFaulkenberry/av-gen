@@ -31,8 +31,12 @@ namespace avgen::scene {
 // The showcase camera, as the evaluator needs it: a matrix and a viewport. Deliberately not
 // `scene::Camera`, so evaluation runs with no scene, no device and no composition.
 struct TreeCameraView {
-    glm::vec3 eye{9.0f, 9.0f, 41.0f};
-    glm::vec3 target{0.0f, 16.0f, 0.0f};
+    // Closer and lower than the geometric fit. A camera that merely contains the tree puts it in
+    // the middle of a lot of sky and it reads as a model of a tree; dropping the eye to a third of
+    // the tree's height and pushing in makes the viewer look UP at it, which is most of what
+    // "monumental" is.
+    glm::vec3 eye{8.0f, 6.5f, 37.0f};
+    glm::vec3 target{0.0f, 14.5f, 0.0f};
     glm::vec3 up{0.0f, 1.0f, 0.0f};
     float fovYRadians = 0.7679f; // 44 degrees, matching the shipped world scenes
     int width = 480;

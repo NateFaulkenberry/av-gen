@@ -233,7 +233,24 @@ TEST_CASE("animation weights increase outward through the hierarchy", "[tree][an
     CHECK(mean[0] < mean[1]);
     CHECK(mean[1] < mean[2]);
     CHECK(mean[2] < mean[3]);
-    CHECK(mean[0] < 0.12);
+
+    // "The trunk must feel massive and must NOT visibly bend like grass" is a claim about the
+    // MASSIVE PART of the trunk, not about the trunk tier's mean. The trunk axis is the leader and
+    // it runs on up into the canopy as a thin shoot, and those thin high nodes are correctly
+    // compliant -- averaging them in made this assertion fail the moment the trunk was slimmed to a
+    // realistic thickness, which was a real change to the tree and not a regression in the weights.
+    double heavySum = 0.0;
+    int heavyCount = 0;
+    for (const TreeNode& node : tree->nodes) {
+        if (node.radius >= tree->stats.trunkBaseRadius * 0.5f) {
+            heavySum += node.animationWeight;
+            ++heavyCount;
+        }
+    }
+    REQUIRE(heavyCount > 0);
+    const double heavyMean = heavySum / heavyCount;
+    INFO("mean weight over nodes at least half the base radius: " << heavyMean << " (" << heavyCount << " nodes)");
+    CHECK(heavyMean < 0.12);
 }
 
 TEST_CASE("tree probe: showcase-scale generation", "[.tree-probe]") {

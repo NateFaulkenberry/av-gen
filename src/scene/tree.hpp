@@ -89,7 +89,10 @@ struct CrownEnvelope {
     float lumpiness = 0.55f;
     float lumpScale = 0.13f;
     // A hollow at the centre of the crown keeps the interior readable instead of a solid mass.
-    float coreHollow = 0.0f;
+    // A hollow at the centre of the crown. Not cosmetic: without it the foliage fills the volume the
+    // primary limbs occupy and buries them, and the readable branching the reference is chosen for
+    // is invisible however good the skeleton underneath is.
+    float coreHollow = 0.30f;
     // The corridor of colonisable space running from the ground up to the crown.
     //
     // This is what makes the bole a *generated* structure rather than a prepended stick. Without
@@ -161,8 +164,12 @@ struct TreeParams {
     // --- Diameter ------------------------------------------------------------------------------
     float pipeExponent = 2.3f;          // n in d^n = d1^n + d2^n (Macdonald 1983: 2 to 3)
     float tipRadius = 0.028f;
-    float radiusScale = 1.0f;
-    float trunkFlare = 0.85f;           // extra radius at the very base, as a fraction
+    // 0.55, not 1. The pipe model with shed memory is faithful but it produces a trunk about twice
+    // as thick as a real tree of this height: 30 m with a 4.8 m diameter bole read as a stump rather
+    // than as a monument, because what makes a trunk monumental is its height-to-width ratio and a
+    // real 30 m tree is nearer 10:1 than 5:1.
+    float radiusScale = 0.55f;
+    float trunkFlare = 0.55f;           // extra radius at the very base, as a fraction
     float flareHeight = 3.0f;           // the height it decays over
 
     // --- Foliage attachment --------------------------------------------------------------------

@@ -19,6 +19,7 @@ enum Channel : std::uint32_t {
     kCardPitch = 402,
     kCardSize = 403,
     kCardRoll = 404,
+    kFoliageTint = 405,
 };
 
 constexpr float kEpsilon = 1e-6f;
@@ -183,8 +184,9 @@ void appendMesh(MeshData& into, const MeshData& src) {
 
 std::vector<std::pair<std::string, const MeshData*>> TreeMeshes::parts() const {
     // Order is the order the nodes appear in the outliner, so it runs base to tip.
-    return {{"roots", &roots},         {"trunk", &trunk},     {"primary", &primary},
-            {"secondary", &secondary}, {"tertiary", &tertiary}, {"foliage", &foliage}};
+    return {{"roots", &roots},           {"trunk", &trunk},         {"primary", &primary},
+            {"secondary", &secondary},   {"tertiary", &tertiary},   {"foliage0", &foliage[0]},
+            {"foliage1", &foliage[1]},   {"foliage2", &foliage[2]}};
 }
 
 Result<TreeMeshes> buildTreeMeshes(const TreeGraph& graph, const TreeMeshSettings& settings) {
@@ -197,7 +199,9 @@ Result<TreeMeshes> buildTreeMeshes(const TreeGraph& graph, const TreeMeshSetting
     out.primary.name = "tree.primary";
     out.secondary.name = "tree.secondary";
     out.tertiary.name = "tree.tertiary";
-    out.foliage.name = "tree.foliage";
+    for (int i = 0; i < kFoliageTints; ++i) {
+        out.foliage[static_cast<std::size_t>(i)].name = "tree.foliage" + std::to_string(i);
+    }
     out.roots.name = "tree.roots";
 
     std::vector<glm::vec3> axisPoints;
@@ -246,7 +250,15 @@ Result<TreeMeshes> buildTreeMeshes(const TreeGraph& graph, const TreeMeshSetting
     }
 
     for (const FoliageSite& site : graph.foliage) {
-        buildCluster(out.foliage, site, settings, graph.params.seed ^ 0xF01Au);
+        const float u = noise::hashIndex(graph.params.seed, site.node, kFoliageTint);
+        std::size_t tint = kFoliageTints - 1;
+        for (std::size_t k = 0; k < settings.tintSplit.size(); ++k) {
+            if (u < settings.tintSplit[k]) {
+                tint = k;
+                break;
+            }
+        }
+        buildCluster(out.foliage[tint], site, settings, graph.params.seed ^ 0xF01Au);
     }
 
     for (const auto& [name, mesh] : out.parts()) {

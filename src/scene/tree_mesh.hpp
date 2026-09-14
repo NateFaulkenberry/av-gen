@@ -29,11 +29,22 @@
 #include "scene/scene_types.hpp"
 #include "scene/tree.hpp"
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 namespace avgen::scene {
+
+// The canopy is split into this many meshes, each of which takes its own material.
+//
+// A canopy is not one colour. The palette brief asks for controlled variation across deep emerald,
+// teal, blue-green and the occasional gold, and a single merged mesh cannot express that: the
+// vertex format has no colour channel and per-instance variation is for instanced objects, not for
+// a merged one. Splitting the clusters into three meshes by a hash of their attachment node gives
+// real colour variation for two extra draws and no new vertex attribute. It also keeps the
+// variation spatially incoherent, which is what stops it reading as three stripes.
+inline constexpr int kFoliageTints = 3;
 
 struct TreeMeshSettings {
     // Radial resolution per tier. The trunk is the only thing in frame big enough for a silhouette
@@ -62,14 +73,23 @@ struct TreeMeshSettings {
 
     // Foliage. A cluster is an oriented ellipsoid of cards; the card is the unit of geometry and the
     // cluster is the unit of animation.
-    int cardsPerCluster = 7;
-    float leafSize = 0.42f;
+    // Sixteen small cards, not seven big ones. At 0.42 m the cards read as paper snowflakes on the
+    // silhouette edge -- individually visible polygons rather than foliage -- because a 0.42 m card
+    // on a 21 m crown is a fifth of a cluster.
+    int cardsPerCluster = 22;
+    float leafSize = 0.150f;
     float clusterScale = 1.0f;
+    // How the canopy divides between the three tints. NOT a third each: at equal shares the gold
+    // read as autumn confetti across the whole crown rather than as the occasional accent the
+    // palette asks for. Cumulative thresholds, so {0.58, 0.90} means 58% deep emerald, 32%
+    // turquoise, 10% gold.
+    std::array<float, kFoliageTints - 1> tintSplit{0.58f, 0.90f};
     // Cards are given normals pointing out of the cluster centre rather than off their own plane.
     // A flat card lit by its own normal reads as a flat card; lit by the volume's normal a cluster
     // of them reads as one soft mass, which is the standard foliage trick and costs nothing.
     float cardNormalBlend = 0.85f;
 };
+
 
 // One mesh per tier, each destined for its own `CompositionNode`.
 struct TreeMeshes {
@@ -77,7 +97,7 @@ struct TreeMeshes {
     MeshData primary;
     MeshData secondary;
     MeshData tertiary;
-    MeshData foliage;
+    std::array<MeshData, kFoliageTints> foliage;
     MeshData roots;
     std::uint32_t triangles = 0;
     double buildMs = 0.0;
