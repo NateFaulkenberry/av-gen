@@ -61,6 +61,11 @@ struct PostFrameInputs {
     // ADR-038: the scene's depth layers grade contrast and saturation by distance (atmospheric
     // perspective). Null, or a scene with no layers, leaves the grade uniform across the frame.
     const scene::CompositionData* composition = nullptr;
+    // Forensic isolation (ADR-187): false skips the FXAA output stage whatever the scene authored.
+    // An arm rather than a quality setting -- the scene's `post/output/antialias` is where the
+    // amount is chosen, and this is how a person asks "is the crawl I am looking at this stage?"
+    // without editing the scene and having to put it back.
+    bool antialias = true;
 };
 
 struct PostStats {

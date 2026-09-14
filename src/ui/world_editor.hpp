@@ -106,6 +106,21 @@ struct EditorVisuals {
         bool subject = false;   // the most important one: what a directed shot is about
     };
     std::vector<HeroMarker> heroMarkers;
+
+    // A selected node's tie to its parent (ADR-188).
+    //
+    // Parenting is invisible. A spore emitter parented to the cap it falls from looks exactly like
+    // one dropped at the same world position, and the difference only shows up when the cap moves
+    // -- which is how "the snow is misaligned with the caps" arrived twice, and why the fix for it
+    // could not be seen to have worked. So the tie gets an appearance: a line from the child to the
+    // parent's origin, and a tick at each end.
+    struct ParentLink {
+        std::string child;
+        std::string parent;
+        glm::vec3 childPosition{0.0f};  // world
+        glm::vec3 parentPosition{0.0f}; // world
+    };
+    std::vector<ParentLink> parentLinks;
 };
 
 class WorldEditor : public app::EditContext {

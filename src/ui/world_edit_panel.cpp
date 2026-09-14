@@ -729,12 +729,82 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
 // thought about ("a bit above the base") and because a hero follows its object (ADR-106): storing
 // the absolute position and showing the difference keeps one source of truth and lets the number
 // stay meaningful when the object moves.
+// Where a child sits relative to the thing it is attached to (ADR-188).
+//
+// Shown for any node with a parent, and silent for one without -- a root node has no offset, and a
+// control reading "0, 0, 0 from nothing" would be worse than no control.
+//
+// It writes the node's local position through `setNodePosition`, which is the same path the gizmo
+// and the arrow keys use: parameter base and authored transform together, so the edit is undoable,
+// saveable and survives a rebuild. Writing the world position instead would be the derived-copy
+// mistake this project has made repeatedly -- the flattener recomputes world from parent x local on
+// the next update and the edit would last exactly one frame.
+void WorldEditPanel::drawParentOffset(app::Engine& engine, WorldEditor& editor, const std::string& node) {
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        return;
+    }
+    const scene::CompositionNode* child = composition->findNode(node);
+    if (child == nullptr || child->parent.empty()) {
+        return;
+    }
+    const bool parentExists = composition->findNode(child->parent) != nullptr;
+
+    ImGui::TextColored(ImVec4(0.75f, 0.51f, 0.92f, 1.0f), "attached to %s", child->parent.c_str());
+    if (!parentExists) {
+        // Said plainly rather than shown as a working control: a child whose parent is missing is
+        // drawn at its local transform, so the number below would be an offset from nothing.
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.4f, 1.0f), "(missing)");
+    }
+
+    glm::vec3 local = child->transform.position;
+    ImGui::SetNextItemWidth(-90.0f);
+    const bool edited = ImGui::DragFloat3("offset", &local.x, 0.01f, -1000.0f, 1000.0f, "%.3f m");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("where this sits relative to %s, in the parent's own frame.\n\n"
+                          "This is the offset parenting exists for: move the parent and this stays "
+                          "put against it. The line and cross in the viewport are the same tie -- "
+                          "the cross marks the point these numbers are measured from.",
+                          child->parent.c_str());
+    }
+    // One undo step per drag, not per frame. The same `beginDrag` / `commitDrag` the gizmo uses,
+    // rather than a second mechanism beside it: the drag opens a command, writes through it for as
+    // long as the mouse is down, and closes it once on release.
+    if (ImGui::IsItemActivated()) {
+        editor.history().beginDrag(engine, fmt::format("Offset {}", node),
+                                   ui::transformParamPaths(std::array<std::string, 1>{node}),
+                                   std::vector<std::string>{node});
+    }
+    if (edited) {
+        ui::setNodePosition(engine, node, local);
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit() && editor.history().dragging()) {
+        editor.history().commitDrag(engine);
+    }
+    ImGui::Separator();
+}
+
 void WorldEditPanel::drawObjectSettings(app::Engine& engine, WorldEditor& editor, const std::string& node) {
     scene::Composition* composition = engine.composition();
     if (composition == nullptr) {
         return;
     }
     ImGui::Indent(18.0f);
+
+    // ---- the tie to a parent (ADR-188) ---------------------------------------------------------
+    //
+    // Drawn before the hero controls and outside their gate, because it applies to a different and
+    // much larger set of objects. A spore emitter parented to the cap it falls from is not a hero
+    // and never will be, and its offset from that cap was the one number about it that mattered and
+    // the one number no panel showed -- reported as "I have no way to change the offset position of
+    // spores to their parent in the UI", after two rounds of the same emitter being misaligned.
+    //
+    // The number edited is the node's *local* position, which is exactly what parenting means: the
+    // world position is the parent's transform times this. So an offset typed here survives the
+    // parent moving, which is the whole reason the emitter was parented rather than placed.
+    drawParentOffset(engine, editor, node);
+
     const auto& heroes = composition->heroes();
     const auto it = std::find_if(heroes.begin(), heroes.end(),
                                  [&](const world::HeroPoint& h) { return h.name == node; });

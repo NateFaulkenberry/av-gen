@@ -558,6 +558,14 @@ struct ProceduralGeometry {
     std::uint64_t meshHash = 0;           // hash of the last generated source (renderer cache key)
     std::uint64_t builtHash = 0;          // structuralHash() at the last rebuild() (internal bookkeeping)
     glm::vec3 boundsMin{0.0f}, boundsMax{0.0f}; // of instance origins + source extent (world of the object)
+    // The same cloud, bounded tightly: the source's box transformed by each instance's rotation and
+    // scale rather than a sphere of its diagonal. `boundsMin/Max` above is deliberately conservative
+    // because a cull test may never drop something visible; this pair is what a *person* is shown --
+    // the selection box, the move gizmo's centre, and the hero a camera is aimed at.
+    //
+    // They differ by a lot on anything that is not roughly cubic. A 0.6 x 8 x 0.6 stem has a
+    // diagonal of about 4, so the conservative pair is an 8 m cube around it.
+    glm::vec3 tightMin{0.0f}, tightMax{0.0f};
 
     [[nodiscard]] Result<void> validate() const;
     // Scene-level check: references resolve and do not cycle (depth <= kMaxHierarchyDepth).

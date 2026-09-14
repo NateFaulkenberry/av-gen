@@ -182,3 +182,5 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [184](ADR-184-the-riverbank-work-is-carried-forward.md) | The riverbank work is carried forward; only the shimmer chase was reverted | Accepted |
 | [185](ADR-185-a-continuous-shot-carries-its-aim-across-the-cut.md) | A continuous shot carries its aim across the cut, not just its eye | Accepted |
 | [186](ADR-186-an-offline-render-lifts-the-limits-playback-needs.md) | An offline render lifts the distance limits playback needs | Accepted |
+| [187](ADR-187-fxaa-gets-its-own-arm.md) | FXAA gets its own isolation arm | Accepted |
+| [188](ADR-188-parenting-gets-an-appearance.md) | Parenting gets an appearance, and an offset you can type | Accepted |

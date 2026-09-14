@@ -136,6 +136,26 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
         }
     }
 
+    // The tie to a parent, for every selected node that has one (ADR-188). Drawn from the selection
+    // rather than always, for the same reason the hero markers are: a world of parented emitters
+    // would be a cat's cradle over the scenery at all times.
+    for (const std::string& name : selection.nodes()) {
+        const scene::CompositionNode* node = composition->findNode(name);
+        if (node == nullptr || node->parent.empty()) {
+            continue;
+        }
+        const scene::CompositionNode* parent = composition->findNode(node->parent);
+        if (parent == nullptr) {
+            continue; // a dangling parent is the composition's problem to report, not a line to draw
+        }
+        EditorVisuals::ParentLink link;
+        link.child = name;
+        link.parent = node->parent;
+        link.childPosition = composition->nodeWorldTransform(*node).position;
+        link.parentPosition = composition->nodeWorldTransform(*parent).position;
+        visuals_.parentLinks.push_back(std::move(link));
+    }
+
     // The status line. Whatever else is true, it says what the next click does.
     if (mode == EditorMode::Place) {
         status_ = previewSummary(preview_);

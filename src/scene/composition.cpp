@@ -2002,10 +2002,12 @@ WorldBounds Composition::nodeBounds(const std::string& name) {
             for (std::size_t p = first; p <= first + range.proceduralSubCount && p < scene_.procedurals.size();
                  ++p) {
                 const ProceduralGeometry& pg = scene_.procedurals[p];
-                if (glm::all(glm::lessThanEqual(pg.boundsMin, pg.boundsMax)) &&
-                    pg.boundsMin != pg.boundsMax) {
-                    out.include(pg.boundsMin);
-                    out.include(pg.boundsMax);
+                // The *tight* pair, not the cull pair. `boundsMin/Max` puts a sphere of the
+                // source's diagonal around every instance so a cull test can never drop something
+                // visible; used here it draws an eight-metre cube around a stem.
+                if (glm::all(glm::lessThanEqual(pg.tightMin, pg.tightMax)) && pg.tightMin != pg.tightMax) {
+                    out.include(pg.tightMin);
+                    out.include(pg.tightMax);
                 }
             }
         }

@@ -527,6 +527,7 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
         ImGui::Separator();
         drawPerformance(engine, stats);
     });
+    panel("Performance", ImVec2(560, 700), [&] { drawPerformanceDashboard(engine, stats); });
     panel("Analysis", ImVec2(520, 620), [&] { drawAnalysis(engine); });
     panel("Modulation", ImVec2(560, 420), [&] { drawModulation(engine); });
     panel("Graph", ImVec2(900, 560), [&] { drawGraphWindow(engine); });
@@ -1298,6 +1299,256 @@ void ControlPanel::drawAnalysis(app::Engine& engine) {
     }
 }
 
+void ControlPanel::drawForensicArms() {
+    // §13 / renderer-forensics Phase 4.2. Drawn from one function into two panels -- Control's
+    // compact section and the Performance dashboard -- so the two cannot come to offer different
+    // arms. An arm that exists in one surface and not the other is how somebody clears a subsystem
+    // that was never actually switched off.
+    if (renderer == nullptr) {
+        return;
+    }
+        rendering::SceneRenderer::PassToggles toggles = renderer->passToggles();
+        bool changed = false;
+        const auto arm = [&](const char* label, bool& value, const char* tip) {
+            // Shown as "off" switches: the question being asked is always "does the symptom
+            // survive without this", so the box that is *ticked* is the one taking something
+            // away.
+            bool disabled = !value;
+            if (ImGui::Checkbox(label, &disabled)) {
+                value = !disabled;
+                changed = true;
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s", tip);
+            }
+        };
+        arm("no shadows", toggles.shadows, "the cascade and spot depth passes");
+        ImGui::SameLine();
+        arm("no shadow mask", toggles.shadowMask, "ADR-087's screen-space mask; the lit pass "
+                                                  "computes the term per pixel instead");
+        arm("no AO", toggles.ao, "GTAO and its temporal resolve");
+        ImGui::SameLine();
+        arm("no volumetrics", toggles.volume, "the volumetric march and composite");
+        ImGui::SameLine();
+        arm("no post", toggles.post, "the built-in post chain");
+        ImGui::SameLine();
+        arm("no FXAA", toggles.antialias,
+            "the edge antialiasing at the end of the post chain (ADR-059), on its own.\n\n"
+            "Its own arm rather than part of 'no post', which also removes the tone map and\n"
+            "changes the whole frame's brightness. This removes one filter and nothing else,\n"
+            "so 'are these crawling edges FXAA?' has a direct answer: tick it and look.\n\n"
+            "Measured as the largest single source of temporal instability in Glowmere --\n"
+            "about 20% of the flickering area. How much antialiasing there is at all is\n"
+            "post/output/antialias in the Parameters panel; this is the on/off for looking.");
+        arm("no culling", toggles.culling, "submit everything, whatever the camera cull decided");
+        ImGui::SameLine();
+        arm("no water", toggles.water, "water surfaces are not drawn");
+        arm("no transparency", toggles.transparency, "blended entities are not drawn");
+        ImGui::SameLine();
+        arm("no particles", toggles.particles, "no simulation and no draw, so switching it back "
+                                               "on does not reveal a system that has been "
+                                               "running invisibly");
+        arm("no animation", toggles.animation, "skinned meshes draw in bind pose; the palettes "
+                                               "are not uploaded at all");
+        ImGui::SameLine();
+        arm("freeze animation", toggles.animationMotion,
+            "every skinned character holds the pose it has now. Not the same control as 'no "
+            "animation', which takes the pose away and leaves a bind pose: this one stops the "
+            "character moving where it is, so 'the pose is wrong' and 'the pose is not "
+            "changing' can be told apart.");
+        arm("freeze the view", toggles.cameraMotion,
+            "holds the view and projection the scene pass draws with, and ignores the cull "
+            "verdicts decided against the camera that has since moved. The sky, the volumetrics "
+            "and the particles read the live camera themselves, so the frame still changes -- "
+            "what is frozen is the projection of the geometry.");
+        if (changed) {
+            renderer->setPassToggles(toggles);
+        }
+        const rendering::SceneRenderer::PassToggles defaults;
+        // Asked of the arm table rather than restated here. The hand-written version of this
+        // line had to be edited every time an arm was added, and the failure when it was not is
+        // the worst one this panel has: the warning below goes quiet while an arm is off, so the
+        // frame that is an A/B arm looks like the picture.
+        bool anythingOff = false;
+        for (const auto& entry : rendering::SceneRenderer::passArms()) {
+            anythingOff = anythingOff || !(toggles.*(entry.flag));
+        }
+        if (anythingOff) {
+            // Loud, because a frame with an arm switched off is not a frame anybody should
+            // judge the renderer by, and this panel is not always on screen.
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f),
+                               "isolation active: this frame is an A/B arm, not the picture");
+            ImGui::SameLine();
+            if (ImGui::SmallButton("restore all")) {
+                renderer->setPassToggles(defaults);
+            }
+        }
+}
+
+// §13. "Why is this frame expensive?" answered without reading a log.
+//
+// The data has been machine-readable since ADR-148 -- `--bench-json` carries percentiles, counters
+// and conditions -- and had no surface at all, which is the one gap in this area the assessment says
+// genuinely needs a person rather than an agent. This is that surface.
+//
+// Three things it deliberately does and one it deliberately does not. It shows a *window* rather
+// than this frame, because a single sample of a frame time on this machine says very little -- the
+// same unmodified scene has measured 10.9 ms and 13.7 ms in consecutive runs. It sorts the phases
+// by cost, because the question is always "what is the biggest thing" and a fixed order makes that
+// a reading exercise. It puts the isolation arms in the same panel, because the next question after
+// "the scene pass is 11 ms" is "of what", and that is an arm away.
+//
+// What it does not do is present any of these numbers as a measurement. Timings taken while an
+// editor is drawing are not evidence (ADR-170), and the panel says so rather than letting a figure
+// read off it be quoted later.
+void ControlPanel::drawPerformanceDashboard(app::Engine& engine, const FrameStats& stats) {
+    helpHeader("performance/diagnosis");
+
+    // ---- the window -----------------------------------------------------------------------------
+    frameMsHistory_[perfCursor_] = static_cast<float>(stats.frameIntervalMs);
+    gpuMsHistory_[perfCursor_] = static_cast<float>(stats.gpuFrameMs >= 0.0 ? stats.gpuFrameMs : 0.0);
+    perfCursor_ = (perfCursor_ + 1) % kPerfHistory;
+    ++perfSamples_;
+    const std::size_t filled = std::min<std::size_t>(perfSamples_, kPerfHistory);
+
+    // Median and the tail, not the mean: one 40 ms hitch moves a mean and is exactly the thing a
+    // person is usually looking for, so it gets its own number instead of being averaged away.
+    std::vector<float> sorted(frameMsHistory_.begin(), frameMsHistory_.begin() + static_cast<long>(filled));
+    std::sort(sorted.begin(), sorted.end());
+    const auto at = [&](double q) {
+        if (sorted.empty()) {
+            return 0.0f;
+        }
+        const auto i = static_cast<std::size_t>(q * static_cast<double>(sorted.size() - 1));
+        return sorted[i];
+    };
+    ImGui::Text("%.1f fps   frame %.2f ms median, %.2f ms p95, %.2f ms worst   over %zu frames",
+                stats.fps, at(0.5), at(0.95), sorted.empty() ? 0.0f : sorted.back(), filled);
+    ImGui::Text("cpu work %.2f ms   gpu %s   %ux%u", stats.cpuFrameMs,
+                stats.gpuFrameMs >= 0.0 ? fmt::format("{:.2f} ms", stats.gpuFrameMs).c_str() : "n/a",
+                stats.width, stats.height);
+    if (filled > 2) {
+        const float ceiling = std::max(sorted.back() * 1.1f, 20.0f);
+        ImGui::PlotLines("##frame", frameMsHistory_.data(), static_cast<int>(kPerfHistory),
+                         static_cast<int>(perfCursor_), "frame ms", 0.0f, ceiling, ImVec2(-1, 48));
+        if (stats.gpuFrameMs >= 0.0) {
+            ImGui::PlotLines("##gpu", gpuMsHistory_.data(), static_cast<int>(kPerfHistory),
+                             static_cast<int>(perfCursor_), "gpu ms", 0.0f, ceiling, ImVec2(-1, 48));
+        }
+    }
+    ImGui::TextColored(ImVec4(0.65f, 0.65f, 0.7f, 1.0f),
+                       "a timing taken while the editor is drawing is not a measurement");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("ADR-170: tools/gpu-lock.sh serialises agents, not the device. Anything\n"
+                          "else using the GPU -- including this window -- is invisible to it, and a\n"
+                          "17%% confounder survives it. For a number worth quoting use\n"
+                          "--headless --bench-json, or --ab to compare two arms interleaved inside\n"
+                          "one process. These figures are for finding the big thing, not for\n"
+                          "reporting it.");
+    }
+
+    // ---- where the GPU time goes ----------------------------------------------------------------
+    //
+    // Summed per label, because several passes share one by design (two cascades, a bloom pyramid,
+    // a scene pass split around the SDF raymarch) and it is the phase's total that an arm moves.
+    if (renderer != nullptr) {
+        const std::vector<gpu::TimelineInterval> byLabel =
+            rendering::sumByLabel(renderer->timeline().passes());
+        if (!byLabel.empty()) {
+            ImGui::SeparatorText("GPU passes, this frame");
+            std::vector<gpu::TimelineInterval> rows = byLabel;
+            std::sort(rows.begin(), rows.end(),
+                      [](const gpu::TimelineInterval& a, const gpu::TimelineInterval& b) { return a.ms > b.ms; });
+            double total = 0.0;
+            for (const auto& r : rows) {
+                total += r.ms;
+            }
+            const double widest = rows.empty() ? 1.0 : std::max(rows.front().ms, 1e-6);
+            for (const auto& r : rows) {
+                // A bar rather than a column of numbers: the shape of the answer is "one of these is
+                // most of it", and a bar says that at a glance where eleven decimals do not.
+                ImGui::ProgressBar(static_cast<float>(r.ms / widest), ImVec2(-190, 0), "");
+                ImGui::SameLine();
+                ImGui::Text("%6.3f ms  %4.1f%%  %s", r.ms, total > 0.0 ? 100.0 * r.ms / total : 0.0,
+                            r.label.c_str());
+            }
+            ImGui::TextDisabled("%zu labels, %.3f ms attributed", rows.size(), total);
+        }
+    }
+
+    // ---- where the CPU time goes ----------------------------------------------------------------
+    if (renderer != nullptr) {
+        const rendering::CpuFrameBreakdown& cpu = renderer->stats().cpu;
+        ImGui::SeparatorText("CPU phases, this frame");
+        struct Row {
+            const char* name;
+            double ms;
+        };
+        std::array<Row, 15> rows{{
+            {"uploads", cpu.uploadsMs},         {"lights", cpu.lightsMs},
+            {"objects", cpu.objectsMs},         {"fields", cpu.fieldsMs},
+            {"simulation", cpu.simulationMs},   {"particles", cpu.particlesMs},
+            {"procedural", cpu.proceduralMs},   {"sdf", cpu.sdfMs},
+            {"shadow encode", cpu.shadowEncodeMs}, {"background encode", cpu.backgroundEncodeMs},
+            {"depth encode", cpu.depthEncodeMs}, {"scene encode", cpu.sceneEncodeMs},
+            {"volume encode", cpu.volumeEncodeMs}, {"post encode", cpu.postEncodeMs},
+            {"tonemap encode", cpu.tonemapEncodeMs},
+        }};
+        std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.ms > b.ms; });
+        const double widest = std::max(rows.front().ms, 1e-6);
+        for (const Row& r : rows) {
+            if (r.ms < 0.005) {
+                continue; // below the clock's own resolution; a row of zeroes is noise, not data
+            }
+            ImGui::ProgressBar(static_cast<float>(r.ms / widest), ImVec2(-190, 0), "");
+            ImGui::SameLine();
+            ImGui::Text("%6.3f ms  %s", r.ms, r.name);
+        }
+        // Stated rather than hidden: the phases are a partition of `render()`, so anything they do
+        // not account for is real time spent somewhere nobody has labelled.
+        ImGui::TextDisabled("total %.3f ms, of which %.3f ms unattributed", cpu.totalMs,
+                            cpu.unattributedMs());
+    }
+
+    // ---- what the frame contains ----------------------------------------------------------------
+    ImGui::SeparatorText("What the frame contains");
+    ImGui::Text("%u draws   %u triangles   %u entities", stats.drawCalls, stats.triangles,
+                renderer != nullptr ? renderer->stats().entities : 0u);
+    if (renderer != nullptr) {
+        const auto& rs = renderer->stats();
+        ImGui::Text("%u shadow casters   %u lights shaded", rs.shadowCasters, rs.shadedLights);
+    }
+    if (stats.procedural.objects > 0) {
+        const auto& pr = stats.procedural;
+        ImGui::Text("procedural: %u objects, %llu instances (%llu visible, %llu culled)", pr.objects,
+                    static_cast<unsigned long long>(pr.instances),
+                    static_cast<unsigned long long>(pr.visibleInstances),
+                    static_cast<unsigned long long>(pr.culledInstances));
+        ImGui::Text("  lod rungs %llu / %llu / %llu / %llu", static_cast<unsigned long long>(pr.lodCounts[0]),
+                    static_cast<unsigned long long>(pr.lodCounts[1]),
+                    static_cast<unsigned long long>(pr.lodCounts[2]),
+                    static_cast<unsigned long long>(pr.lodCounts[3]));
+    }
+    if (stats.particles.systems > 0) {
+        ImGui::Text("particles: %u systems, %u capacity, %u emitted this frame", stats.particles.systems,
+                    stats.particles.capacity, stats.particles.emittedThisFrame);
+    }
+    if (stats.sdf.objects > 0) {
+        ImGui::Text("sdf: %u objects (%u raymarched, %u meshed)", stats.sdf.objects, stats.sdf.raymarchObjects,
+                    stats.sdf.meshObjects);
+    }
+    ImGui::TextDisabled("%s / %s", stats.adapter.c_str(), stats.backend.c_str());
+
+    // ---- the arms -------------------------------------------------------------------------------
+    //
+    // In this panel because the next question after "the scene pass is most of it" is "of what",
+    // and the answer is one tick away. The same function draws them in Control, so the two surfaces
+    // cannot come to offer different arms.
+    ImGui::SeparatorText("Take a subsystem away");
+    drawForensicArms();
+    static_cast<void>(engine);
+}
+
 void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats) {
     helpHeader("performance/diagnosis");
 
@@ -1349,77 +1600,9 @@ void ControlPanel::drawPerformance(app::Engine& engine, const FrameStats& stats)
     // terrain" and "disable LOD" are absent because the renderer cannot honestly implement them
     // today, and an inert checkbox is worse than a missing one -- somebody switches it off, the
     // symptom stays, and a subsystem is wrongly cleared.
-    if (renderer != nullptr) {
-        if (ImGui::TreeNode("Renderer forensics")) {
-            rendering::SceneRenderer::PassToggles toggles = renderer->passToggles();
-            bool changed = false;
-            const auto arm = [&](const char* label, bool& value, const char* tip) {
-                // Shown as "off" switches: the question being asked is always "does the symptom
-                // survive without this", so the box that is *ticked* is the one taking something
-                // away.
-                bool disabled = !value;
-                if (ImGui::Checkbox(label, &disabled)) {
-                    value = !disabled;
-                    changed = true;
-                }
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("%s", tip);
-                }
-            };
-            arm("no shadows", toggles.shadows, "the cascade and spot depth passes");
-            ImGui::SameLine();
-            arm("no shadow mask", toggles.shadowMask, "ADR-087's screen-space mask; the lit pass "
-                                                      "computes the term per pixel instead");
-            arm("no AO", toggles.ao, "GTAO and its temporal resolve");
-            ImGui::SameLine();
-            arm("no volumetrics", toggles.volume, "the volumetric march and composite");
-            ImGui::SameLine();
-            arm("no post", toggles.post, "the built-in post chain");
-            arm("no culling", toggles.culling, "submit everything, whatever the camera cull decided");
-            ImGui::SameLine();
-            arm("no water", toggles.water, "water surfaces are not drawn");
-            arm("no transparency", toggles.transparency, "blended entities are not drawn");
-            ImGui::SameLine();
-            arm("no particles", toggles.particles, "no simulation and no draw, so switching it back "
-                                                   "on does not reveal a system that has been "
-                                                   "running invisibly");
-            arm("no animation", toggles.animation, "skinned meshes draw in bind pose; the palettes "
-                                                   "are not uploaded at all");
-            ImGui::SameLine();
-            arm("freeze animation", toggles.animationMotion,
-                "every skinned character holds the pose it has now. Not the same control as 'no "
-                "animation', which takes the pose away and leaves a bind pose: this one stops the "
-                "character moving where it is, so 'the pose is wrong' and 'the pose is not "
-                "changing' can be told apart.");
-            arm("freeze the view", toggles.cameraMotion,
-                "holds the view and projection the scene pass draws with, and ignores the cull "
-                "verdicts decided against the camera that has since moved. The sky, the volumetrics "
-                "and the particles read the live camera themselves, so the frame still changes -- "
-                "what is frozen is the projection of the geometry.");
-            if (changed) {
-                renderer->setPassToggles(toggles);
-            }
-            const rendering::SceneRenderer::PassToggles defaults;
-            // Asked of the arm table rather than restated here. The hand-written version of this
-            // line had to be edited every time an arm was added, and the failure when it was not is
-            // the worst one this panel has: the warning below goes quiet while an arm is off, so the
-            // frame that is an A/B arm looks like the picture.
-            bool anythingOff = false;
-            for (const auto& entry : rendering::SceneRenderer::passArms()) {
-                anythingOff = anythingOff || !(toggles.*(entry.flag));
-            }
-            if (anythingOff) {
-                // Loud, because a frame with an arm switched off is not a frame anybody should
-                // judge the renderer by, and this panel is not always on screen.
-                ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f),
-                                   "isolation active: this frame is an A/B arm, not the picture");
-                ImGui::SameLine();
-                if (ImGui::SmallButton("restore all")) {
-                    renderer->setPassToggles(defaults);
-                }
-            }
-            ImGui::TreePop();
-        }
+    if (ImGui::TreeNode("Renderer forensics")) {
+        drawForensicArms();
+        ImGui::TreePop();
     }
     if (renderer != nullptr && !world.debug.selectedEntity.empty()) {
         if (const auto* object = renderer->diagnosticObject(world.debug.selectedEntity); object != nullptr) {

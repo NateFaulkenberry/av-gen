@@ -2685,6 +2685,14 @@ TEST_CASE("A procedural node is as big as what it placed, not a box at its root"
     CHECK_THAT(bounds.centre().y, Catch::Matchers::WithinAbs(6.0f, 1.0f));
     CHECK(bounds.size().x >= 10.0f);      // it covers the run
     CHECK(bounds.min.x > 5.0f);           // and does not reach back to the root
+
+    // And it is *tight*. Reported: selecting a mushroom stem drew a box many times the stem, because
+    // this read the procedural's cull bound -- a sphere of the source's diagonal around every
+    // instance, which is right for a test that may never drop something visible and badly wrong for
+    // a box a person is shown. The run is along x with no rotation, so the cross-section is the
+    // source's own extent and nothing like its diagonal.
+    CHECK(bounds.size().y < 3.0f);
+    CHECK(bounds.size().z < 3.0f);
 }
 
 // Found by measurement, not by reading: setting `groundGlow` to 5.0 on Glowmere's valley produced a

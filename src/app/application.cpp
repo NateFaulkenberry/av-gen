@@ -103,7 +103,7 @@ std::string usageText() {
            "  --disable <list>    switch phases off for cost attribution, or subsystems off for\n"
            "                      forensic isolation:\n"
            "                      shadows,ao,volume,post,shadowmask,\n"
-           "                      culling,water,transparency,particles,animation,cameramotion\n"
+           "                      culling,water,transparency,particles,animation,cameramotion,fxaa\n"
            "  --ab <phase>        headless A/B: run baseline and <phase>-disabled interleaved in\n"
            "                      this one process (A/B/A/B) and report the paired difference.\n"
            "                      --ab none compares the baseline with itself: the noise floor\n"

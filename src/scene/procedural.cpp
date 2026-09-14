@@ -2383,6 +2383,17 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
     const float sourceRadius = glm::length(sourceExtent);
     glm::vec3 lo(std::numeric_limits<float>::max());
     glm::vec3 hi(std::numeric_limits<float>::lowest());
+    // The tight pair, built in the same pass. `lo`/`hi` put a *sphere* of the source's diagonal
+    // around every instance, which is what a cull test wants -- it may never exclude something
+    // visible, and a sphere is rotation-invariant so it costs nothing to be conservative. It is the
+    // wrong answer for anything a person looks at: a stem whose source box is 0.6 x 8 x 0.6 has a
+    // diagonal of about 4, so the sphere is an 8 m cube around a 0.6 m stem. Shown as a selection
+    // box that reads as a bug, because it is one -- the box does not describe the object.
+    //
+    // This pair transforms the source's box by each instance's rotation and per-axis scale instead,
+    // and takes the axis-aligned extent of the result. Same loop, no second pass over the cloud.
+    glm::vec3 tlo(std::numeric_limits<float>::max());
+    glm::vec3 thi(std::numeric_limits<float>::lowest());
     const auto positions = built.positions();
     const auto rotations = built.rotations();
     const auto scales = built.scales();
@@ -2392,9 +2403,20 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
         const float radius = sourceRadius * std::max({std::abs(scales[i].x), std::abs(scales[i].y), std::abs(scales[i].z)});
         lo = glm::min(lo, centre - glm::vec3(radius));
         hi = glm::max(hi, centre + glm::vec3(radius));
+        // |R * S| applied to the half-extent: the standard AABB-of-an-OBB, one row at a time.
+        const glm::mat3 basis = glm::mat3_cast(rotation);
+        const glm::vec3 scaled = sourceExtent * glm::abs(scales[i]);
+        glm::vec3 extent(0.0f);
+        for (int axis = 0; axis < 3; ++axis) {
+            extent[axis] = std::abs(basis[0][axis]) * scaled.x + std::abs(basis[1][axis]) * scaled.y +
+                           std::abs(basis[2][axis]) * scaled.z;
+        }
+        tlo = glm::min(tlo, centre - extent);
+        thi = glm::max(thi, centre + extent);
     }
     if (built.count() == 0) {
         lo = hi = glm::vec3(0.0f);
+        tlo = thi = glm::vec3(0.0f);
     }
     float padding = 0.0f;
     for (const spatial::Effector& e : effectors) {
@@ -2404,6 +2426,11 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
     }
     boundsMin = lo - glm::vec3(padding);
     boundsMax = hi + glm::vec3(padding);
+    // The tight pair gets the same effector padding: an instance a position effector pushed outward
+    // really is outside the box the cloud describes, and a selection box that does not contain the
+    // object is as wrong as one that dwarfs it.
+    tightMin = tlo - glm::vec3(padding);
+    tightMax = thi + glm::vec3(padding);
 
     if (built.count() <= kKeepCloudMax) {
         cloud = std::move(built);

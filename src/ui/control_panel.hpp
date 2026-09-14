@@ -9,6 +9,7 @@
 // themselves are unchanged -- they are docked instead of floating, and nothing else about them
 // moved.
 
+#include <array>
 #include "app/camera_director.hpp"
 #include "app/engine.hpp"
 #include "assets/asset_catalog.hpp"
@@ -119,6 +120,14 @@ public:
     // drew into (a WGPUTextureView, in this backend). Zero before the first frame exists.
     std::uint64_t canvasTexture = 0;
     rendering::SceneRenderer* renderer = nullptr; // selected-object diagnostics, developer-only
+    // §13: a rolling window of recent frames, so the dashboard shows a distribution rather than
+    // whatever this frame happened to be. A single sample of a frame time says very little on this
+    // machine -- the same scene reads 10.9 ms and 13.7 ms in consecutive runs.
+    static constexpr std::size_t kPerfHistory = 180;
+    std::array<float, kPerfHistory> frameMsHistory_{};
+    std::array<float, kPerfHistory> gpuMsHistory_{};
+    std::size_t perfCursor_ = 0;
+    std::uint64_t perfSamples_ = 0;
 
     void draw(app::Engine& engine, const FrameStats& stats);
 
@@ -195,6 +204,12 @@ private:
     void drawParameters(app::Engine& engine);
     void drawAnalysis(app::Engine& engine);
     void drawPerformance(app::Engine& engine, const FrameStats& stats);
+    // §13. The dashboard: where the frame's time goes, what it contains, and the arms that take a
+    // subsystem away. Separate from `drawPerformance`, which is Control's compact summary line.
+    void drawPerformanceDashboard(app::Engine& engine, const FrameStats& stats);
+    // The forensic isolation arms, drawn in both Control and Performance. One function, so the two
+    // surfaces cannot come to offer different arms -- which is how an inert checkbox appears.
+    void drawForensicArms();
     void drawModulation(app::Engine& engine);
     void drawRoutesTab(app::Engine& engine);
     void drawSourcesTab(app::Engine& engine);

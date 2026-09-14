@@ -28,6 +28,10 @@ constexpr ImU32 kFootprintBad = IM_COL32(240, 110, 100, 130);
 // the subject reads a little brighter than the rest so the ranking is visible without a number.
 constexpr ImU32 kHero = IM_COL32(150, 190, 255, 130);
 constexpr ImU32 kHeroSubject = IM_COL32(190, 216, 255, 210);
+// ADR-188. A distinct hue from the selection amber and the hero blue, because the question it
+// answers is a third one: not "what is selected" or "what is the camera about", but "what does this
+// thing move with".
+constexpr ImU32 kParentLink = IM_COL32(190, 130, 235, 200);
 
 // NDC -> the canvas's own pixels, in ImGui's screen space. The one conversion in the file; every
 // world point goes through here and nowhere else.
@@ -222,6 +226,28 @@ void drawViewportOverlay(const WorldEditor& editor, const scene::Camera& camera,
         std::snprintf(text, sizeof(text), "%s hero %s  %.2f", hero.subject ? "*" : " ",
                       hero.name.c_str(), static_cast<double>(hero.importance));
         painter.label(glm::vec3(base.x, base.y + hero.height, base.z), text, colour);
+    }
+
+    // ---- the tie to a parent (ADR-188) ----
+    // Parenting has no appearance of its own: an emitter parented to the cap it falls from looks
+    // exactly like one dropped at the same world position, and the difference only shows when the
+    // cap moves. That is how a misaligned spore fall was reported twice and why the fix could not
+    // be seen to have worked. The line is the tie; the tick at the parent end says which way it
+    // runs, so "this is attached to that" rather than "these two are related somehow".
+    for (const EditorVisuals::ParentLink& link : visuals.parentLinks) {
+        painter.line(link.childPosition, link.parentPosition, kParentLink, 1.4f);
+        // A small cross at the parent's origin: the point the child's offset is measured from, which
+        // is the number the inspector edits.
+        const float tick = 0.35f;
+        painter.line(link.parentPosition - glm::vec3(tick, 0.0f, 0.0f),
+                     link.parentPosition + glm::vec3(tick, 0.0f, 0.0f), kParentLink, 1.4f);
+        painter.line(link.parentPosition - glm::vec3(0.0f, tick, 0.0f),
+                     link.parentPosition + glm::vec3(0.0f, tick, 0.0f), kParentLink, 1.4f);
+        painter.line(link.parentPosition - glm::vec3(0.0f, 0.0f, tick),
+                     link.parentPosition + glm::vec3(0.0f, 0.0f, tick), kParentLink, 1.4f);
+        char text[192];
+        std::snprintf(text, sizeof(text), "parent: %s", link.parent.c_str());
+        painter.label(link.parentPosition, text, kParentLink);
     }
 
     // ---- the ghost ----

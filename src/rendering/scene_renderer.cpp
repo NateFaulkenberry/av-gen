@@ -1358,7 +1358,7 @@ std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
         {"water", &T::water},               {"transparency", &T::transparency},
         {"particles", &T::particles},       {"animation", &T::animation},
         {"cameramotion", &T::cameraMotion},  {"animationmotion", &T::animationMotion},
-        {"auxstore", &T::auxTargetStores},
+        {"auxstore", &T::auxTargetStores},   {"fxaa", &T::antialias},
     };
     return kArms;
 }
@@ -3224,6 +3224,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         scene::PostSettings postSettings = scene.post;
         postSettings.lens.shutterAngle = scene.camera.lens.shutterAngle;
         postIn.settings = &postSettings;
+        postIn.antialias = toggles_.antialias; // ADR-187
         postIn.composition = &scene.composition; // ADR-038 depth layers grade the composite
         if (toggles_.post) {
             finalHdr = postProcessor_->run(encoder, postIn, *pool_);

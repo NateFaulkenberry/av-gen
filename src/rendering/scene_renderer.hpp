@@ -409,6 +409,12 @@ public:
         // honestly answer it: a terrain chunk arrives as an ordinary lit entity with no flag saying
         // where it came from, and a name-prefix guess would be a control that lies at the first
         // scene that names something `chunk`.
+        // ADR-187. Off: the FXAA output stage does not run, whatever `post/output/antialias` says.
+        // Its own arm rather than part of `post`, because the whole-post arm removes the tone map
+        // too -- the frame's transfer function moves with it and every threshold in a measurement
+        // moves along, which is how the first flicker inventory attributed a stage it had not
+        // isolated. This one removes exactly one filter.
+        bool antialias = true;
         bool culling = true;      // off: draw everything, whatever the camera cull decided
         bool water = true;        // off: no water surfaces
         bool transparency = true; // off: no blended entities

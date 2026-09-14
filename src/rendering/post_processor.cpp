@@ -748,7 +748,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
     // ---- 7. output: edge antialiasing (ADR-059) ---------------------------------------------------
     // Before sharpening, because sharpening an aliased edge fixes the contrast and keeps the stair
     // step; and inside the HDR chain, where the pass can still be skipped without a target copy.
-    if (s.antialias > 1e-4f) {
+    if (in.antialias && s.antialias > 1e-4f) {
         auto target = pool.acquire(in.width, in.height, kHdrFormat);
         Uniforms u = base;
         u.params0 = glm::vec4(std::clamp(s.antialias, 0.0f, 1.0f), 0.0f, 0.0f, 0.0f);

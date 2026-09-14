@@ -43,6 +43,9 @@ private:
     // where on it the camera looks, and how far the camera stands off. All of it is hero state, so
     // all of it is inert until the object is starred.
     void drawObjectSettings(app::Engine& engine, WorldEditor& editor, const std::string& node);
+    // ADR-188: where a child sits relative to the thing it is attached to. Shown for any node with
+    // a parent, which is a much larger set than the heroes the rest of that panel is about.
+    void drawParentOffset(app::Engine& engine, WorldEditor& editor, const std::string& node);
     void drawHistory(app::Engine& engine, WorldEditor& editor);
 
     char filter_[64] = {};
