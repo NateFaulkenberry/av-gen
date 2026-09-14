@@ -219,7 +219,27 @@ target and a weak one on a finished frame; the prominence is the discriminating 
 Cost, same protocol both sides with the first run discarded as warm-up: the anamorphic tier goes
 from 0.107 to 0.116 ms at 1080p and from 0.214 to 0.502 ms at 4K.
 
-## 9. What is not fixed, and what stayed inconclusive
+## 9. Regression coverage
+
+`tests/rendering/test_post_artifact_forensics_gpu.cpp`, tag `[waterfx]`, nine cases, about four
+seconds. It does not assert that the renderer completed; it asserts the artifact's own metrics:
+
+- the comb's **prominence at the lag the defect predicts** (`4 * stretch` pixels, `stretch` wide
+  texels), across the whole stretch sweep, against a threshold of 0.02 that sits in the middle of a
+  two-order-of-magnitude gap between the before and after distributions;
+- the **isolated-peak count** in the `wide` target, over an impulse, a sparse grid and the real
+  water frame — 420 before on the water arm, 0 now;
+- the **elongation** of the impulse response, so a comb cannot be traded for a blob;
+- the **mean** of the `wide` target, so the streak cannot be quietened away instead of fixed.
+
+The synthetic arms are bit-deterministic run to run. The water arms are too, on this machine; they
+depend on the QA scene being present and skip cleanly when it is not. `[.probe]` is Catch2-hidden and
+is a measurement, not a test: it reports where the sparkle band pass puts a live field.
+
+`tools/post_artifact_stats.py ON.png OFF.png` is the same measurement from outside the renderer, for
+checking a shipped frame without a device.
+
+## 10. What is not fixed, and what stayed inconclusive
 
 - **The ghosts still undersample.** `fs_wide`'s two flare taps minify the half-resolution source into
   the quarter-resolution target by a further 0.75× and 0.40× — an effective 2.7× and 5× minification

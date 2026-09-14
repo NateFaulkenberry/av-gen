@@ -1,29 +1,42 @@
-// Forensics for the Glowmere water artifact: the lattice of dots and the banded streaks that
-// appear once `post/anamorphic/enabled` is on over sparkling water.
+// Forensics, and then regression coverage, for the Glowmere water artifact: the lattice of dots and
+// the dotted bands that appeared once `post/anamorphic/enabled` was on over sparkling water.
 //
-// Three fixes for this were shipped and reverted without anyone knowing which stage produced the
+// Three fixes for it were shipped and reverted without anyone knowing which stage produced the
 // pattern, because every one of them was judged on the final frame. The final frame is the worst
 // possible evidence here: bloom, the wide tier and the grade all land on it, and a change anywhere
 // upstream moves it. So this file does the opposite -- it feeds the *production* post chain inputs
 // the CPU knows exactly, captures every intermediate target it renders (PostProcessor::armCapture),
-// and measures each one against the one before it.
+// and measures each one against the one before it. ADR-159 has the answer and
+// docs/post-artifact-forensics.md has the whole investigation; what is here is the measurement that
+// found it, kept so that it fails again if the defect returns.
 //
 // Two halves:
 //
-//   1. Synthetic inputs (docs/post-artifact-forensics.md §8). A single bright texel, a sparse grid,
-//      a line, a rectangle and a checkerboard go into the chain in place of a rendered scene. No
-//      camera, no clock, no noise, no water: if the chain prints a lattice from an input that has
-//      none, the mechanism is the chain's and the water shader is not on trial. This is the only
-//      arrangement in which "the post pipeline creates the pattern" is falsifiable.
+//   1. Synthetic inputs. A single bright texel, a sparse grid and a compact rectangle go into the
+//      chain in place of a rendered scene. No camera, no clock, no noise, no water: if the chain
+//      prints a lattice from an input that provably has none, the mechanism is the chain's and the
+//      water shader is not on trial. This is the only arrangement in which "the post pipeline
+//      creates the pattern" is falsifiable -- and an impulse is the honest test of a filter anyway,
+//      because a filter's response to an impulse is the filter.
 //
-//   2. The water matrix. The QA water scene, top-down, with the clock pinned, driven through the
-//      same parameters the Glowmere UI drives (`post/bloom/enabled`, `post/anamorphic/enabled`,
-//      `post/anamorphic/ghosts`, `nodes/.../water/sparkle`) -- no diagnostic toggles of its own,
-//      because a second control path is a second thing that can disagree with the application.
+//   2. The water matrix. The QA water scene with the camera placed and the clock pinned, driven
+//      through the same parameters the Glowmere UI drives (`post/bloom/enabled`,
+//      `post/anamorphic/enabled`, `post/anamorphic/ghosts`, `nodes/<node>/water/sparkle`) -- no
+//      diagnostic toggles of its own, because a second control path is a second thing that can
+//      disagree with the application.
 //
-// The detector is in `artifact.hpp`-free local code below: out-of-region energy against a measured
-// water mask, an autocorrelation lag for periodic structure, and an isolated-peak count. None of
-// them compares a render against a second render of the same code path.
+// The detector is the local code below: out-of-region energy against a *measured* sparkle mask, the
+// prominence of an autocorrelation tooth at the lag the defect predicts, an isolated-peak count, and
+// an elongation ratio that stops a comb being traded for a blob. None of them compares a render
+// against a second render of the same code path.
+//
+// The numbers each test guards, before the fix and after, are in the test that guards them. The
+// short version, on an impulse's `wide` target across the stretch sweep:
+//
+//   comb prominence   before  +0.617 +0.826 +0.928 +0.520 +0.935 +0.819
+//                     after   +0.007 +0.010 +0.012 +0.008 -0.002 -0.090
+//
+// which is why the threshold is 0.02: it sits in the middle of a two-order-of-magnitude gap.
 
 #include "app/engine.hpp"
 #include "core/log.hpp"
@@ -484,7 +497,7 @@ constexpr std::uint32_t kSynthH = 288;
 // Everything the chain does to it is a *filter*, and a filter's response to an impulse is the
 // filter. If the output is one blob the chain is a blur; if it is a row of blobs the chain is a
 // comb, and a comb over a field of sparkles is a lattice whatever the sparkles look like.
-TEST_CASE("an impulse through the anamorphic chain comes out as a comb, not a streak",
+TEST_CASE("an impulse through the anamorphic chain comes out as a streak, not a comb",
           "[gpu][post][forensics][waterfx]") {
     PostBench bench = PostBench::make();
     Canvas canvas(kSynthW, kSynthH);
@@ -535,7 +548,7 @@ TEST_CASE("an impulse through the anamorphic chain comes out as a comb, not a st
 // The same impulse, with the *only* difference being the ghost strength. If the lattice were the
 // ghosts', it would appear here and not before; if the comb is the streak's, the ghosts change the
 // count of copies and not their spacing.
-TEST_CASE("the streak's comb spacing is set by the source-to-output texel mismatch, not by ghosts",
+TEST_CASE("the ghosts were never what turned an impulse into a row of copies",
           "[gpu][post][forensics][waterfx]") {
     PostBench bench = PostBench::make();
     Canvas canvas(kSynthW, kSynthH);
@@ -570,7 +583,7 @@ TEST_CASE("the streak's comb spacing is set by the source-to-output texel mismat
 // The same chain over a *sparse grid* of bright points, which is the shape the water's sparkle
 // field actually has. If the chain's comb response is the mechanism, a sparse input must come out
 // with structure at the comb's lag and not at the input's own spacing.
-TEST_CASE("a sparse point field acquires the chain's own spacing, not its own",
+TEST_CASE("a sparse point field keeps its own spacing and acquires none from the chain",
           "[gpu][post][forensics][waterfx]") {
     PostBench bench = PostBench::make();
     constexpr std::uint32_t kInputSpacing = 23; // deliberately not a divisor of anything downstream
@@ -948,6 +961,21 @@ TEST_CASE("the water matrix: which post stage the pattern first appears in",
         fmt::print("  periodicity lag {} score {:.3f}\n", p.lag, p.score);
         for (const auto& [name, field] : on.stages) {
             fmt::print("    {}\n", describe(name.c_str(), field));
+        }
+        // The arms that run the wide tier are the ones with something to assert. Before the fix
+        // this target came back with 420 isolated peaks over this river (442 with the ghosts on);
+        // its mean was 0.001595 then and is 0.001588 now, which is the number that says the streak
+        // still carries its light rather than having been quietened away.
+        if (arm.anamorphic) {
+            const Field& wide = stage(on.stages, "wide");
+            INFO(describe("wide", wide));
+            CHECK(isolatedPeaks(wide, 4.0f, 1e-6f) == 0);
+            CHECK(mean(wide) > 1.0e-3);
+            // Elongation is deliberately *not* checked here. It is a second moment about the
+            // field's own centroid, which means something for one isolated impulse response and
+            // nothing for a whole frame's worth of streaks spread across it -- this target measures
+            // 1.28 either side of the fix, below even the 1.78 a uniform field would give at this
+            // aspect. The anisotropy check belongs on the impulse, and that is where it is.
         }
     }
     CHECK(bench.ctx->errorCount() == 0);
