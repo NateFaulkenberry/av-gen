@@ -291,6 +291,38 @@ not being run yet: editing that shader on a hypothesis is exactly what cost thre
 anamorphic comb, and the discipline that eventually worked there was an impulse through the
 production chain rather than a plausible change.
 
+## Priority 2: the emissive path is not the gap the mandate expects
+
+The mandate's worry is that *"a glowing mushroom should actually look luminous, not merely have a
+bright-coloured surface"*, and asks for the whole HDR path to be verified rather than assumed. It
+was, and it holds:
+
+* **Float targets throughout.** Scene colour, normal+roughness and every post target are
+  `RGBA16Float`. There is **no clamp on emission anywhere in the shaders** — grepped, not assumed.
+* **The ladder is authored as absolute rungs, not fractions**, precisely so a later "brightness"
+  control cannot flatten it: `inert` 0, `silhouette` 0.035, `groundCover` 0.0615, `noticeable` 0.295,
+  then a deliberate gap to `special` 3.94 and up to `brightest` 6.89. The 13x gap between the
+  brightest ordinary vegetation and the first rung across the gap is **validated in code**, because a
+  profile edited toward "a bit more glow everywhere" closes it without anybody noticing the effect
+  has been removed.
+* **Emissive content becomes actual illumination.** Glowmere's ecology light field turns emissive
+  scatter into local lights, and the visual contribution is large: shading the same frame with the
+  local-light count forced to zero changes **28.96% of pixels**, mean delta 7.62/255, peak 233.
+
+Set against the renderer upgrade's measurement that removing *every* local light is worth 1.4 ms of
+an 11.4 ms scene pass, the emissive strategy costs about **12% of the scene pass and pays for 29% of
+the frame**. That is a good trade by any standard, and it is the mandate's own proposed hierarchy —
+hero emissives to local lighting, distant ones to emission and bloom — already implemented via a
+field rather than per-object lights.
+
+**So this is an "already production-grade" answer, not a gap.** The remaining Priority 2 work is
+lighting *quality* — §7's cinematic evaluation of depth, separation and focal hierarchy — rather than
+the HDR/emissive plumbing, which is sound.
+
+One caveat carried from the scene work: Glowmere Valley 2 recorded that mask-modulated emission on
+its hero mushrooms reads *less punchy* than the flat version it replaced, even at intensity 6.0. That
+is a material-authoring trade rather than a path defect, and it is the kind of thing §7 is for.
+
 ## What Phase 1 still owes
 
 - The temporal artifact inventory (§4), which needs the representative suite rendered and looked at.

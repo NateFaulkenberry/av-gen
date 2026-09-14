@@ -112,6 +112,30 @@ Result<void> RenderJob::start() {
         }
         renderer_->setQuality(tier);
     }
+    // Quality arms, applied before the pass toggles because an arm sets a policy field and a
+    // toggle removes a pass from whatever policy chose.
+    if (!settings_.qualityArms.empty()) {
+        rendering::QualitySettings quality = renderer_->qualitySettings();
+        std::istringstream stream(settings_.qualityArms);
+        std::string name;
+        std::string applied;
+        while (std::getline(stream, name, ',')) {
+            const auto begin = name.find_first_not_of(" \t");
+            const auto end = name.find_last_not_of(" \t");
+            if (begin == std::string::npos) {
+                continue;
+            }
+            name = name.substr(begin, end - begin + 1);
+            if (!rendering::SceneRenderer::setQualityArm(quality, name)) {
+                return std::unexpected(Error{fmt::format(
+                    "render: unknown quality arm '{}' (one of: {})", name,
+                    rendering::SceneRenderer::qualityArmNames())});
+            }
+            applied += applied.empty() ? name : ", " + name;
+        }
+        renderer_->setQualitySettings(quality);
+        log::warn("render: this is a DIAGNOSTIC render -- quality arm(s): {}", applied);
+    }
     // The diagnostic arms, which used to stop at the interactive renderer (ADR-182). Applied after
     // the tier, because a tier is a policy and this is a removal from whatever policy chose.
     if (!settings_.disablePasses.empty()) {

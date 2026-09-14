@@ -2807,6 +2807,7 @@ RenderSettings Application::renderSettingsFromOptions() const {
     // ADR-182: the diagnostic arms reach the offline renderer too. Without this `--disable water`
     // on a `--render` produced a byte-identical sequence -- an attribution arm that cannot fail.
     s.disablePasses = options_.disablePasses;
+    s.qualityArms = options_.qualityArms;
     if (options_.renderWidth) s.width = *options_.renderWidth;
     if (options_.renderHeight) s.height = *options_.renderHeight;
     if (options_.offlineFps > 0.0 && options_.fpsGiven) s.fps = options_.offlineFps;

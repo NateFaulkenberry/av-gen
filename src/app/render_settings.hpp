@@ -51,6 +51,10 @@ struct RenderSettings {
     // Not a deliverable feature: a render with a pass switched off is a diagnostic, and the job
     // says so in the log rather than letting a disabled frame be mistaken for a finished one.
     std::string disablePasses;
+    // Quality arms applied to this render, comma-separated, in `--quality-arm`'s vocabulary. Same
+    // reason and same defect as `disablePasses`: it was applied to the interactive renderer only,
+    // so a quality arm on a `--render` was a third flag that validated and then did nothing.
+    std::string qualityArms;
 
     // Frame count for a resolved end time (endSeconds >= startSeconds); the last frame is the one
     // whose time is < end (end exclusive), at least 1.
