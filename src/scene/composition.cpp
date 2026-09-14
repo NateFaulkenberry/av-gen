@@ -2749,6 +2749,30 @@ void Composition::rebuild() {
     // in the node loop is the whole of that fix.
     for (const auto& nodePtr : nodes_) {
         const CompositionNode& node = *nodePtr;
+        // The generated ground program is a *fallback*: it is built only for a terrain that names
+        // no program of its own, and the chunks take it only on the same condition. So a terrain
+        // that authors both a material program and a ground glow gets the program and silently
+        // loses the glow -- `groundGlow`, `groundGlowScale`, `groundGlowCoverage`,
+        // `groundGlowColor` and `groundMottle` all live in the generated program, which for this
+        // terrain is never built and would not be evaluated if it were.
+        //
+        // Found by measurement rather than by reading: setting `groundGlow` to 5.0 on Glowmere's
+        // valley produced a byte-identical frame, as did turning `groundMottle` off. Five authored
+        // settings that parse, validate, and reach nothing.
+        //
+        // A diagnostic rather than a mechanism, which is what ADR-160 and ADR-161 both concluded
+        // about this exact shape: name the two things that disagree, rather than inventing a
+        // composition rule between an authored program and a generated one.
+        if (node.kind == NodeKind::Terrain && !node.terrainMaterial.program.empty() &&
+            node.terrain.groundGlow > 0.0f && !node.terrainGroundWarned) {
+            nodePtr->terrainGroundWarned = true;
+            log::warn("terrain '{}': groundGlow {:.3g} is carried by the generated ground material, "
+                      "and this terrain draws with the authored program '{}' instead -- so the glow, "
+                      "its scale, its coverage, its colour and groundMottle all do nothing. Clear "
+                      "the program to use the generated material, or author the glow into '{}'.",
+                      node.name, node.terrain.groundGlow, node.terrainMaterial.program,
+                      node.terrainMaterial.program);
+        }
         if (node.kind != NodeKind::Terrain || !node.terrainMaterial.program.empty() || node.worldMap.biomes.empty()) {
             continue;
         }

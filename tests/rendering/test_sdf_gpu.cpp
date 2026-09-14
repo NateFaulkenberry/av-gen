@@ -907,3 +907,118 @@ TEST_CASE("SDF raymarch throughput", "[.perf][sdf]") {
                     << " ms, packed nodes " << renderer.stats().sdf.packedNodes);
     }
 }
+
+// A probe, not an assertion, because what it found is a defect that is not fixed here.
+//
+// The §15/§16 parity audit went looking for a reader of `QualitySettings::sdfShadowSteps`, found
+// none (the march derived its own budget as `maxSteps / 4`), and wired it. This was meant to be the
+// test that the wiring reaches the picture. It does not -- and the reason is one layer down.
+//
+// `SdfRenderer::update` computes each raymarched object's screen-space quad, `sdf.rect`, from the
+// *camera's* view-projection, and `drawRaymarchDepth(..., reducedSteps = true)` reuses that same
+// rect when the shadow pass draws the object into a shadow map whose projection is the *light's*.
+// The ray the shader reconstructs is the light's (the frame block is), but the quad it reconstructs
+// it over is the camera's, so the march happens over the wrong region of the shadow map. Measured
+// here: switching the key light's shadow off with the SDF in place changes the frame by **zero**
+// bytes, so this object casts no shadow at all.
+//
+// ADR-034 says raymarched SDFs "appear in the depth prepass and in the shadow maps". The prepass
+// half is true -- that pass shares the camera's projection, which is exactly why the defect hides.
+//
+// The fix is a per-view rect (or the full-screen fallback the shader already has) in the shadow
+// pass, and it has a cost nobody has measured: a full shadow-map quad per SDF per cascade. That is
+// a decision with a number attached, so it is recorded rather than guessed at here.
+//
+// This probe passes when the defect is gone. Run it with `avgen_render_tests "[.probe][sdf]"`.
+TEST_CASE("A raymarched SDF does not reach the shadow map", "[.probe][gpu][sdf][quality]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    // A caster, a receiver and a light that casts. Without all three there is no shadow map read
+    // anywhere in the frame, and a test of the shadow march would pass whatever the march did --
+    // which is how the first version of this test reported "0 pixels differ" and meant nothing.
+    scene::Scene s = baseScene();
+    const scene::MeshId ground = s.addMesh(scene::makePlane(20.0f, 4));
+    {
+        auto& e = s.addEntity("ground", ground);
+        e.transform.position = {0.0f, -4.0f, 0.0f};
+        e.material.baseColor = glm::vec3(0.85f);
+        e.material.roughness = 0.9f;
+    }
+    scene::PunctualLight key;
+    key.name = "key";
+    key.type = scene::PunctualLight::Type::Directional;
+    key.direction = glm::normalize(glm::vec3(0.6f, -0.55f, -0.2f));
+    key.intensity = 4.0f;
+    key.castsShadow = true;
+    key.contactShadow = false;
+    s.addLight(key);
+    s.camera.position = {0.0f, 6.0f, 14.0f};
+    s.camera.target = {0.0f, -2.0f, 0.0f};
+
+    scene::SdfObject o;
+    o.name = "caster";
+    o.tree = treeOf(complexTree());
+    o.material.baseColor = {0.8f, 0.6f, 0.4f};
+    o.boundsMin = glm::vec3(-3.5f);
+    o.boundsMax = glm::vec3(3.5f);
+    // A long march, so a budget below it actually bites. Under the old `maxSteps / 4` rule this
+    // object marched 48 shadow steps whatever the tier said.
+    o.maxSteps = 192;
+    s.sdfs.push_back(o);
+
+    // Everything except the SDF shadow budget held at one tier's values, so a difference cannot be
+    // some other field of the tier moving. Without this the test would pass whatever
+    // `sdfShadowSteps` did, which is the trap it exists to avoid.
+    const auto renderAtSteps = [&](std::uint32_t steps) {
+        rendering::QualitySettings held = rendering::QualitySettings::forTier(rendering::QualityTier::Realtime);
+        held.sdfShadowSteps = steps;
+        renderer.setQualitySettings(held);
+        return renderWith(renderer, s, 0.5, 256, 256);
+    };
+
+    // The extremes of what the field can express rather than two adjacent tiers. The tier values
+    // (16 to 48) turn out to produce the *same* shadow on this object -- the march is bounded by
+    // the object's box and converges well inside sixteen steps -- so a test on those two would read
+    // "no difference" and could not tell that from "the field is not wired". The floor and the cap
+    // can: if the shader reads `info.w` at all, eight steps across a seven-unit box at a loose
+    // epsilon cannot resolve what a thousand can.
+    const auto coarse = renderAtSteps(8);
+    const auto fine = renderAtSteps(1024);
+    CHECK(ctx->errorCount() == 0);
+
+    // The state the measurement assumes, established rather than hoped for: this SDF is actually in
+    // the shadow map. Removing the *caster* would not show that -- taking the object away also
+    // takes its own pixels, and the frame changes either way. Switching the light's shadow off
+    // with the object still there isolates the shadow, and nothing else in this scene casts one
+    // worth counting (a flat plane lit from above self-shadows negligibly).
+    scene::Scene unlitShadow = s;
+    unlitShadow.lights.back().castsShadow = false;
+    const auto noShadow = renderWith(renderer, unlitShadow, 0.5, 256, 256);
+    long shadowlessSum = 0;
+    long shadowedSum = 0;
+    for (std::uint32_t y = 0; y < 256; ++y) {
+        for (std::uint32_t x = 0; x < 256; ++x) {
+            shadowlessSum += noShadow.pixel(x, y)[1];
+            shadowedSum += fine.pixel(x, y)[1];
+        }
+    }
+    INFO("green sum with shadows off " << shadowlessSum << ", on " << shadowedSum);
+    REQUIRE(shadowlessSum > shadowedSum);
+
+    long differing = 0;
+    for (std::uint32_t y = 0; y < coarse.height; ++y) {
+        for (std::uint32_t x = 0; x < coarse.width; ++x) {
+            const auto* a = coarse.pixel(x, y);
+            const auto* b = fine.pixel(x, y);
+            if (std::abs(int(a[0]) - int(b[0])) > 1 || std::abs(int(a[1]) - int(b[1])) > 1 ||
+                std::abs(int(a[2]) - int(b[2])) > 1) {
+                ++differing;
+            }
+        }
+    }
+    INFO("pixels differing between an 8-step and a 1024-step SDF shadow march: " << differing);
+    CHECK(differing > 0);
+}

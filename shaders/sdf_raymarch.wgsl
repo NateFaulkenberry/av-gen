@@ -32,7 +32,7 @@ struct SdfObjectUniforms {
     worldToLocal: mat4x4<f32>,
     boundsMin: vec4<f32>,   // xyz = local AABB min
     boundsMax: vec4<f32>,   // xyz = local AABB max
-    info: vec4<u32>,        // x = node offset, y = node count, z = max steps, w = 0
+    info: vec4<u32>,        // x = node offset, y = node count, z = max steps, w = shadow steps
     march: vec4<f32>,       // x = epsilon, y = step scale, z = normal epsilon, w = time
     rect: vec4<f32>,        // NDC rect of the projected bounds: xmin, ymin, xmax, ymax
 };
@@ -166,7 +166,10 @@ fn fs_sdf_depth(in: SdfVertexOut) -> SdfDepthOut {
 
 @fragment
 fn fs_sdf_shadow(in: SdfVertexOut) -> SdfDepthOut {
-    return sdfDepthOnly(in, max(sdf.info.z / 4u, 8u), sdf.march.x * 3.0);
+    // `info.w` is the tier's `sdfShadowSteps`, capped by the object's own march so a cheap object
+    // does not get an expensive shadow. It used to be a bare `info.z / 4`, and the tier field was
+    // read by nothing at all -- four numbers in the tier table that no path evaluated.
+    return sdfDepthOnly(in, clamp(min(sdf.info.w, sdf.info.z), 8u, 1024u), sdf.march.x * 3.0);
 }
 
 fn sdfDepthOnly(in: SdfVertexOut, maxSteps: u32, epsilon: f32) -> SdfDepthOut {

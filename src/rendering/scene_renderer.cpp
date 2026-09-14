@@ -2762,6 +2762,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     stage(cpu.proceduralMs);
 
     // ---- SDF objects (ADR-027): node packing, mesh uploads, per-object uniforms ----
+    // §16 / ADR-034: the shadow march's step budget, which the tier table has always set and
+    // nothing has ever read. Per frame, for the same reason the cull ladder's hysteresis is.
+    sdfs_->setSdfShadowSteps(qualitySettings_.sdfShadowSteps);
     sdfs_->update(scene, time, frame.viewProj, fields_.get());
     stats_.sdf = sdfs_->stats();
     stage(cpu.sdfMs);

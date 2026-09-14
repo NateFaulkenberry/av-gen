@@ -508,6 +508,51 @@ Two things this says about the audit that remains:
   rendered at offline. Three of the four parity defects found so far are "a policy set on the
   interactive side only". That is now a search pattern, not an anecdote.
 
+## The §15/§16 audit, run: three more fields that no path reads
+
+The search pattern above says to enumerate every subsystem that reduces work and ask which policy
+object it reads, rather than reading the tier table and assuming coverage. Run against
+`QualitySettings` — grep every field for a reader outside its own header — it produced two hits
+immediately, and chasing the second produced a third finding that is larger than either.
+
+**`sdfShadowSteps` was read by nothing.** All four tiers set it (16, 24, 32, 48) and the shadow
+march derived its own budget as `maxSteps / 4` in `shaders/sdf_raymarch.wgsl`. Now wired through the
+free `info.w` lane, capped by the object's own march so a cheap object cannot get an expensive
+shadow.
+
+**`pcssBlockerTaps` is read by nothing, and is still not wired.** The blocker search takes the same
+tap count as the PCF filter — `shadowPcfTaps`, through `ShadowUniforms::info.z` — and every lane of
+`info` and `splits` is already taken, so wiring it is a uniform-layout change rather than a line.
+Left in place with the truth attached at its declaration rather than deleted, because the tiers do
+want a separate budget for it: ADR-111 measured the blocker search as the largest single contributor
+to the shadow mask's residual. Only the High tier sets the two differently today (20 PCF, 16
+blocker), so wiring it moves one tier's picture and no other.
+
+### And the reason the first fix could not be tested: a raymarched SDF casts no shadow
+
+The test written to prove `sdfShadowSteps` reaches the picture failed, and kept failing as the arms
+got more extreme — 8 steps against 1024 produced a byte-identical frame. The probe that settles it
+is one layer down: **switching the key light's shadow off, with the SDF still in the scene, changes
+the frame by zero bytes.** The object casts no shadow at all, so no step budget could have shown up.
+
+`SdfRenderer::update` computes each raymarched object's screen-space quad — `sdf.rect`, in NDC —
+from the **camera's** view-projection. `drawRaymarchDepth(..., reducedSteps = true)` then reuses that
+rect when the shadow pass draws the object into a shadow map whose projection is the **light's**. The
+ray the shader reconstructs is the light's, because the frame block is; the quad it reconstructs the
+ray over is the camera's. So the march runs over the wrong region of the shadow map.
+
+ADR-034 says raymarched SDFs "appear in the depth prepass and in the shadow maps". The prepass half
+is true, and that is exactly why this hid for so long: the prepass shares the camera's projection, so
+the one pass that works is the one that cannot expose the bug.
+
+The fix is a per-view rect, or the full-screen fallback the shader already has, in the shadow pass —
+and it carries an unmeasured cost: a full shadow-map quad marched per SDF per cascade. That is a
+decision with a number attached, so it is recorded here rather than guessed at. Kept as a probe,
+`avgen_render_tests "[.probe][sdf]"`, which passes when the defect is gone.
+
+Worth noting what this does *not* affect: no shipped example scene uses a raymarched SDF, which is
+why nothing looked wrong. It is a defect in a feature nothing currently leans on.
+
 ## What Phase 1 still owes
 
 Ordered by what blocks the most.
@@ -537,9 +582,14 @@ Ordered by what blocks the most.
 8. **The performance dashboard (§13)** — the one item that genuinely needs a human to certify.
 9. **AOV export (§B)**, and the debug views the mandate lists that do not exist — neither should be
    built without saying what question each answers.
-10. **The rest of the realtime/offline parity audit (§15)**, per the search pattern above.
-11. **Scene authoring ergonomics (§17, §G).**
-12. **Maintainability (§18)** — flagged, still not a recommendation; the thing to look for when the
+10. **Wire `pcssBlockerTaps`**, which needs a lane in `ShadowUniforms`, and **fix the raymarched
+    SDF's shadow-map quad** — both found by the §15 audit above, both left recorded rather than
+    rushed. The SDF one wants its cost measured first.
+11. **The rest of the realtime/offline parity audit (§15)** beyond `QualitySettings` — the same
+    enumeration against the scene's own reduction policies, the particle budgets and the terrain's
+    view distances.
+12. **Scene authoring ergonomics (§17, §G).**
+13. **Maintainability (§18)** — flagged, still not a recommendation; the thing to look for when the
     C/D/F measurements start touching `SceneRenderer::render`.
 
 Also outstanding and not blocked by any of the above: the counterbalanced A/B for ten heroes and ten

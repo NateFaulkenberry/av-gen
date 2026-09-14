@@ -133,10 +133,17 @@ public:
     static_assert(kObjectStride % 256 == 0);
     static_assert(sizeof(SdfObjectUniforms) <= kObjectStride);
 
+    // §16: the step budget the shadow-map march gets, from `QualitySettings::sdfShadowSteps`.
+    // Applied per frame rather than at construction, because the tier can change between frames --
+    // the same reason `setLodHysteresisAllowed` is called that way. Capped by the object's own
+    // `maxSteps` in the shader, so a cheap object never gets an expensive shadow.
+    void setSdfShadowSteps(std::uint32_t steps) { sdfShadowSteps_ = steps; }
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
     SdfStats stats_;
+    std::uint32_t sdfShadowSteps_ = 24; // the QualitySettings default
 };
 
 } // namespace avgen::rendering

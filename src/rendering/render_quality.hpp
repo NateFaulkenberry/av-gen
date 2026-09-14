@@ -96,6 +96,16 @@ struct QualitySettings {
     float shadowTexelTarget = 0.08f;
 
     std::uint32_t shadowPcfTaps = 12;
+    // NOT READ. The §15 parity audit grepped every field here for a reader and found none: the
+    // PCSS blocker search in shaders/shadows.wgsl takes the same tap count as the PCF filter, which
+    // is `shadowPcfTaps` through `ShadowUniforms::info.z`. Wiring it needs a lane in that block and
+    // every lane of `info` and `splits` is taken, so it is a uniform-layout change rather than a
+    // line. Left in place with the truth attached rather than deleted, because the tiers do want a
+    // separate budget for it: the search is uninterpolated `textureLoad`s on top of the filter and
+    // ADR-111 measured it as the largest single contributor to the shadow mask's residual.
+    //
+    // Only the High tier sets the two differently today (20 PCF, 16 blocker), so wiring it changes
+    // one tier's picture and no other.
     std::uint32_t pcssBlockerTaps = 12;
     bool softShadows = true;               // percentage-closer soft shadows for the key light
     std::uint32_t contactSteps = 12;       // screen-space contact-shadow march
@@ -131,7 +141,9 @@ struct QualitySettings {
     float volumeStepScale = 1.0f;
 
     bool clusteredLighting = true;         // false = the 8-light uniform fallback path
-    std::uint32_t sdfShadowSteps = 24;     // raymarched SDFs in the depth-only passes
+    // Raymarched SDFs in the shadow-map pass. Was also unread until the same audit: the shader
+    // derived its own budget as `maxSteps / 4` and these four numbers evaluated to nothing.
+    std::uint32_t sdfShadowSteps = 24;
 
     // ---- material tiers (ADR-133) --------------------------------------------------------------
     //

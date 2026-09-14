@@ -261,6 +261,9 @@ struct CompositionNode {
         }
     };
     TerrainProducts terrainProducts;
+    // Said once per node, not once per rebuild: a terrain flattens every frame and a warning on
+    // every frame is a warning nobody reads.
+    bool terrainGroundWarned = false;
     std::vector<world::TerrainChunk> chunks;  // Terrain: built at rebuild, indexed by entity offset
     // Terrain (ADR-099): the water bodies derived from this node's map, built at rebuild. The
     // surface mesh's flow lanes come from it, and so does every floating thing on it.

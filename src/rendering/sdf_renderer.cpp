@@ -451,8 +451,13 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
             u.worldToLocal = glm::inverse(obj.model);
             u.boundsMin = glm::vec4(object.boundsMin, 0.0f);
             u.boundsMax = glm::vec4(object.boundsMax, 0.0f);
+            // w is the shadow march's step budget (ADR-034 / §16). It was 0 and the shader derived
+            // the count as `maxSteps / 4`, so `QualitySettings::sdfShadowSteps` -- which the tier
+            // table sets to 16, 24, 32 and 48 -- was read by nothing. Found by the §15 parity audit
+            // grepping every quality field for a reader.
             u.info = glm::uvec4(static_cast<std::uint32_t>(im.nodeStaging.size()), static_cast<std::uint32_t>(count),
-                                static_cast<std::uint32_t>(std::clamp(object.maxSteps, 1, 1024)), 0u);
+                                static_cast<std::uint32_t>(std::clamp(object.maxSteps, 1, 1024)),
+                                std::clamp(sdfShadowSteps_, 8u, 1024u));
             u.march = glm::vec4(object.epsilon, object.stepScale, object.normalEpsilon, static_cast<float>(time.renderTime));
             u.rect = rect;
             im.nodeStaging.insert(im.nodeStaging.end(), im.packScratch.begin(), im.packScratch.end());

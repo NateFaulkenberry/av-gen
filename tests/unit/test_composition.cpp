@@ -2686,3 +2686,80 @@ TEST_CASE("A procedural node is as big as what it placed, not a box at its root"
     CHECK(bounds.size().x >= 10.0f);      // it covers the run
     CHECK(bounds.min.x > 5.0f);           // and does not reach back to the root
 }
+
+// Found by measurement, not by reading: setting `groundGlow` to 5.0 on Glowmere's valley produced a
+// byte-identical frame, as did turning `groundMottle` off. The generated ground material carries all
+// five of those settings and is built only for a terrain that names no program of its own -- so a
+// terrain that authors both gets the program and silently loses the glow.
+//
+// The engine cannot compose the two (which surface wins is an authoring decision, not an engine
+// one), so what it owes is to say so. This asserts the saying: an authored program plus a glow is
+// the case that must be reported, and either one alone is not.
+TEST_CASE("A terrain that authors a program is told its ground glow does nothing",
+          "[composition][terrain][diagnostics]") {
+    const auto sceneText = [](const char* program, double glow) {
+        return fmt::format(R"({{
+          "format": "avgen-scene", "version": 1, "name": "terra",
+          "camera": {{ "mode": 1, "position": [0, 30, 60], "target": [0, 0, -60], "fov": 50.0 }},
+          "nodes": [
+            {{ "name": "ground", "kind": "terrain",
+              "world": {{ "name": "small", "size": [160, 160] }},
+              "terrain": {{ "chunkSize": 40.0, "resolution": 8, "lodLevels": 2,
+                           "lodDistance": 50.0, "viewDistance": 400.0, "groundGlow": {} }},
+              "material": {{ "baseColor": [0.2, 0.4, 0.3], "roughness": 0.9{}{}{} }} }}
+          ]
+        }})", glow, program[0] != '\0' ? ", \"program\": \"" : "", program,
+             program[0] != '\0' ? "\"" : "");
+    };
+
+    // What the composition *itself* reports, rather than what a log line says: a node that names a
+    // program keeps it, and the generated ground material is not installed for it at all. That is
+    // the mechanism the warning describes, so it is what the test pins.
+    const auto build = [&](const char* program, double glow, Fixture& fx) {
+        const auto path = writeJson("terrain-glow", sceneText(program, glow));
+        fx.files.push_back(path);
+        auto comp = scene::Composition::loadFile(path.filename(), fx.registry);
+        REQUIRE(comp.has_value());
+        return std::move(*comp);
+    };
+
+    SECTION("with no program authored, the generated ground material exists and carries the glow") {
+        Fixture fx;
+        params::ParameterSet params;
+        params::Modulator modulator;
+        auto comp = build("", 0.5, fx);
+        comp->attach(params, modulator);
+        comp->update(FrameTime{});
+        const auto& programs = comp->scene().materialPrograms;
+        const bool generated = std::ranges::any_of(programs, [](const scene::MaterialProgram& p) {
+            return p.name.find("ground_ground") != std::string::npos;
+        });
+        CHECK(generated);
+        // And every chunk draws with it, which is the half that makes the glow visible.
+        const auto* node = comp->findNode("ground");
+        REQUIRE(node != nullptr);
+        const auto chunks = std::ranges::count_if(comp->scene().entities, [](const scene::Entity& e) {
+            return e.material.program.find("ground_ground") != std::string::npos;
+        });
+        CHECK(chunks > 0);
+    }
+
+    SECTION("with a program authored, the generated material is never built -- so the glow is inert") {
+        Fixture fx;
+        params::ParameterSet params;
+        params::Modulator modulator;
+        auto comp = build("paintedGround", 0.5, fx);
+        comp->attach(params, modulator);
+        comp->update(FrameTime{});
+        const auto& programs = comp->scene().materialPrograms;
+        const bool generated = std::ranges::any_of(programs, [](const scene::MaterialProgram& p) {
+            return p.name.find("ground_ground") != std::string::npos;
+        });
+        CHECK_FALSE(generated);
+        // The chunks draw with what the author named, which is why the glow reaches nothing.
+        const auto chunks = std::ranges::count_if(comp->scene().entities, [](const scene::Entity& e) {
+            return e.material.program == "paintedGround";
+        });
+        CHECK(chunks > 0);
+    }
+}
