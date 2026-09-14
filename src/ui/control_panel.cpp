@@ -1820,7 +1820,12 @@ void ControlPanel::drawRender(app::Engine& engine) {
                 tier = i;
             }
         }
-        if (ImGui::Combo("quality", &tier, kTierNames, 4)) {
+        // "tier", not "quality": the video section a few lines below already has a `quality`
+        // slider for the encoder, and two visible items with the same label are the same ImGui ID.
+        // They also mean different things -- this is how much work the renderer does, that is how
+        // many bits the encoder spends -- so sharing a name would have been wrong even if ImGui
+        // had allowed it.
+        if (ImGui::Combo("tier", &tier, kTierNames, 4)) {
             s.tier = kTierNames[tier];
         }
         if (ImGui::IsItemHovered()) {
@@ -1889,7 +1894,11 @@ void ControlPanel::drawRender(app::Engine& engine) {
         if (ImGui::Combo("backend", &backend, backends, 3)) {
             s.backend = backends[backend];
         }
-        ImGui::SliderInt("quality", &s.quality, 0, 100);
+        ImGui::SliderInt("encoder quality", &s.quality, 0, 100);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("How many bits the video encoder spends. Unrelated to the render tier\n"
+                              "above, which is how much work the renderer does per frame.");
+        }
         ImGui::Checkbox("mux audio", &s.muxAudio);
         if (!videoBackends.empty()) {
             ImGui::TextWrapped("%s", videoBackends.c_str());
