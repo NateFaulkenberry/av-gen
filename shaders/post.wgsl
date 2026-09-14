@@ -244,12 +244,30 @@ fn fs_wide(in: FsIn) -> @location(0) vec4<f32> {
         out += textureSampleLevel(second, linearSampler, in.uv, 0.0).rgb * post.tintA.rgb;
     }
     if (anamorphicOn > 0.5) {
-        // A horizontal gaussian whose reach is `stretch` times the source texel size.
-        let step = post.texelSize.x * stretch;
+        // A horizontal gaussian whose reach is `stretch` times this pass's texel size.
+        //
+        // The tap *count* is derived from the reach rather than fixed, and that is the whole of the
+        // lattice bug. Eight taps a side spanning `texelSize.x * stretch * 8` puts them 4.6% of the
+        // screen apart at stretch 10 -- hundreds of times the source texel. Each tap then point
+        // samples the bloom texture and a compact bright feature is *copied* once per tap, so a
+        // sparkling river printed a row of evenly spaced dots across the frame. The spacing of the
+        // artefact was the spacing of the taps, which is why lowering `ghosts` never touched it:
+        // this is the streak, and the ghosts were innocent.
+        //
+        // Consecutive taps have to overlap in the source for the gaussian to be a blur instead of a
+        // comb, so the step is capped at one source texel and the count grows to keep the reach.
+        // Capped at 48 a side: past that the streak is wider than any authored `stretch` reaches and
+        // the cost stops being worth it, and the residual under-sampling is then at a spacing too
+        // fine to read as a lattice.
+        let srcTexel = 1.0 / f32(textureDimensions(source, 0).x);
+        let reach = post.texelSize.x * stretch * 8.0;
+        let taps = clamp(i32(ceil(reach / max(srcTexel, 1e-6))), 8, 48);
+        let step = reach / f32(taps);
+        let sigma = f32(taps) / 2.5;
         var streak = textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb * 0.20;
         var weightSum = 0.20;
-        for (var i = 1; i <= 8; i = i + 1) {
-            let w = exp(-0.5 * pow(f32(i) / 3.2, 2.0));
+        for (var i = 1; i <= taps; i = i + 1) {
+            let w = exp(-0.5 * pow(f32(i) / sigma, 2.0));
             let o = vec2<f32>(step * f32(i), 0.0);
             streak += textureSampleLevel(source, linearSampler, clamp(in.uv + o, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).rgb * w;
             streak += textureSampleLevel(source, linearSampler, clamp(in.uv - o, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).rgb * w;
@@ -258,9 +276,37 @@ fn fs_wide(in: FsIn) -> @location(0) vec4<f32> {
         streak /= weightSum;
         if (ghosts > 0.0) {
             // Two flare ghosts mirrored through the frame centre, as an anamorphic lens gives.
+            //
+            // Each is a *magnified* read of a coarse bloom level -- 1/0.75 and 1/0.40, so 1.33x and
+            // 2.5x. A single bilinear tap into a magnified coarse texture puts that texture's own
+            // texel grid on the screen, and over a sparkling river that is a regular lattice of
+            // bright dots printed across unrelated parts of the frame. Lowering `ghosts` only made
+            // it dimmer, because the structure is in the source rather than in the strength.
+            //
+            // So integrate over the source texel instead of point-sampling it. The step is the
+            // *source's* texel scaled by the magnification, which is why it is asked of the texture
+            // rather than taken from `post.texelSize` -- that is the output's, and using it spreads
+            // the taps by a fraction of a source texel and does nothing at all.
+            let srcTexel = 1.0 / vec2<f32>(textureDimensions(source, 0));
             let mirrored = vec2<f32>(1.0) - in.uv;
-            let g1 = textureSampleLevel(source, linearSampler, mix(vec2<f32>(0.5), mirrored, 0.75), 0.0).rgb;
-            let g2 = textureSampleLevel(source, linearSampler, mix(vec2<f32>(0.5), mirrored, 0.40), 0.0).rgb;
+            let uv1 = mix(vec2<f32>(0.5), mirrored, 0.75);
+            let uv2 = mix(vec2<f32>(0.5), mirrored, 0.40);
+            let step1 = srcTexel / 0.75;
+            let step2 = srcTexel / 0.40;
+            var g1 = vec3<f32>(0.0);
+            var g2 = vec3<f32>(0.0);
+            // A 3x3 of half-texel offsets: nine taps spanning one source texel in each direction,
+            // which is the period of the lattice being removed. Averaging over the period is what
+            // removes a lattice; more resolution is not available here and would not help.
+            for (var y = -1; y <= 1; y = y + 1) {
+                for (var x = -1; x <= 1; x = x + 1) {
+                    let o = vec2<f32>(f32(x), f32(y));
+                    g1 += textureSampleLevel(source, linearSampler, uv1 + o * step1, 0.0).rgb;
+                    g2 += textureSampleLevel(source, linearSampler, uv2 + o * step2, 0.0).rgb;
+                }
+            }
+            g1 *= 1.0 / 9.0;
+            g2 *= 1.0 / 9.0;
             streak += (g1 * 0.6 + g2 * 0.35) * ghosts;
         }
         out += streak * post.tintB.rgb;
