@@ -318,6 +318,138 @@ not being run yet: editing that shader on a hypothesis is exactly what cost thre
 anamorphic comb, and the discipline that eventually worked there was an impulse through the
 production chain rather than a plausible change.
 
+## Priority 1, re-measured: the harness is now in the repository, and the answer changed
+
+The re-measurement the particle correction owed has been done, and the first thing it produced is
+not a number. It is `tools/flicker_bench.py` — a harness that renders every arm through `--render`
+(the path that produces deliverables, so a subsystem inert in it is a defect and not an artifact),
+discards a warm-up so a filling particle pool is not counted as instability, **proves every arm
+changes the analysed frames before reporting its number**, and writes the camera it used to a file.
+
+That last point is why the original figures cannot be reproduced rather than merely disagreed with:
+**the camera was never written down.** "A static camera over the river bank" does not name a view,
+and water's contribution is a function of how much of the frame it occupies. Every number below
+names its view, and the view ships with the result.
+
+### The answer is different, and the largest source was not on the list
+
+Glowmere, 960x540, 24 frames analysed after a 2 s warm-up, flicker threshold 6/255, offline tier.
+Two views: **river** `4,1.6,6 → -1,-1.6,-38` fov 50, and **graze** `2,-1.2,2 → -1,-1.7,-45` fov 50.
+
+| arm | river | graze |
+|---|---:|---:|
+| baseline | 4.453% | 4.158% |
+| **post-process FXAA off** (`post.antialias = 0`) | **−21%** | **−19%** |
+| **water ripple normals off** | **−14%** | **−19%** |
+| particles off | −3% | — |
+| bloom off | 0% | −0% |
+| water specular off | −2% | — |
+| water sparkle off | *vacuous* | — |
+| water reflection off | +4% | — |
+
+**The post-process antialiasing is the single largest identified source of temporal instability**, and
+it was on nobody's candidate list. It is Lottes's FXAA (ADR-059), and this is its textbook failure:
+a spatial filter that makes an independent per-frame edge decision flips that decision on pixels
+near its threshold, and a flipping decision is exactly what a second difference is large for.
+
+A strength sweep at the river view makes the causality hard to argue with, and also says what kind
+of problem it is:
+
+| `post.antialias` | 0 | 0.25 | 0.5 | **0.75 (authored)** | 1.0 |
+|---|---:|---:|---:|---:|---:|
+| share vs baseline | **−21%** | −5% | −5% | — | +5% |
+
+Monotone in strength, but **most of the cost is incurred by switching the pass on at all** — the step
+from 0 to 0.25 is four times the step from 0.25 to 1.0. So this is not a strength-tuning problem. It
+is the pass's frame-independence, and tuning the dial will not reach it.
+
+### Two arms that turned out to be badly formed, and what they cost
+
+Both were in the original inventory, and both are the reason its numbers moved so far.
+
+**`--disable water` does not remove flicker; it changes what is on screen.** Taking the surface away
+reveals the riverbed, which has its own aliasing. At the river view the whole-water arm attributes
+−5% while the *ripple normals* arm inside it attributes −14% — an arm cannot attribute less than a
+term it contains, so the discrepancy is the riverbed arriving. The per-term arms are sound and the
+subsystem arm is not, which is why the table above leads with terms.
+
+**`--disable post` is not a per-stage arm either.** It removes the tone map with everything else, so
+the frame's transfer function moves and every threshold in the detector moves with it. Its −21% at
+the river view happens to equal the FXAA arm's, and that agreement is the only reason it is readable
+at all; a per-stage arm was needed to know which stage it was.
+
+This is ADR-182's rule one turn further: an arm can be *non-vacuous* — it demonstrably changes the
+frames — and still attribute nothing, because what it changed was not one thing.
+
+### What this does and does not overturn
+
+It does not overturn "water is a significant source": ripple normals are 14–19% at both views, the
+second-largest identified term, and the old finding named them too. What it overturns is the
+*share*: at no view measured here does water reach anything like 57%, and the arm that produced that
+number is now known to be confounded.
+
+It also contradicts "bloom amplifies rather than originates". Bloom attributes **0%** at both views,
+measured with the stage turned off in the scene rather than with the chain removed. The likeliest
+explanation is that the old figure was the whole-post arm under another name.
+
+Sparkle is confirmed exactly: **vacuous**, byte-identical frames, at both this view and the original.
+Two independent harnesses agreeing on a null is worth more than either alone.
+
+### The offline tier's lifted detail limits cost temporal stability
+
+Same view, same arms, three configurations — this is a direct consequence of ADR-186 and it is a cost
+rather than a benefit:
+
+| configuration | baseline flicker | water arm | post arm |
+|---|---:|---:|---:|
+| realtime tier | 2.420% | −12% | −20% |
+| offline tier, `--render-limits live` | 2.842% | −8% | −21% |
+| **offline tier, limits lifted (the new default)** | **4.453%** | −5% | −21% |
+
+**Lifting the distance limits increases flickering area by 57%** (2.842 → 4.453). That is what a
+sharper far field costs: scatter held at rung 0 is high-frequency geometry where the ladder used to
+substitute something smoother, and high-frequency geometry aliases. The offline shading tier alone
+adds a further 17% over realtime (2.420 → 2.842) for the same reason — auxiliary passes at full
+resolution resolve more detail to alias.
+
+Neither is an argument for putting the limits back; both are an argument that **the far field needs
+to be resolved, not simplified**, and they move a temporal-AA or supersampling question from "refused
+on measurement" (ADR-132, which refused TAA as a *prerequisite for LOD stability*) to a different
+question it was never asked: what resolves an offline far field that is now drawing its real
+geometry. Worth noting the earlier refutation still stands on its own terms — supersampling made
+flicker *worse* at 1920x1080 in the original inventory, and that experiment should be re-run on this
+harness before anybody leans on either result.
+
+### Resolution still does not average it away
+
+The original inventory refuted supersampling by finding that 1920x1080 *raised* the flickering
+fraction rather than lowering it, and that experiment predated both the particle fix and the
+per-term arms. Re-run on this harness, same river view, same arms:
+
+| | 960x540 | 1920x1080 |
+|---|---:|---:|
+| baseline | 4.453% | 4.717% |
+| FXAA off | −21% | −16% |
+| ripple normals off | −14% | −20% |
+
+**Four times the pixels gave a slightly *larger* flickering fraction**, not a smaller one. The
+direction of the original refutation holds; its magnitude does not — it recorded 3.116% → 4.274%
+(+37%) where this measures +6%. The conclusion that matters is unchanged and now rests on a harness
+anybody can re-run: whatever this is, more samples of it do not cancel.
+
+It is also consistent with the FXAA finding. A per-frame edge decision does not become stable
+because the edge is sampled more finely; there are simply more edges near the threshold.
+
+### How to re-run any of it
+
+    tools/gpu-lock.sh python3 tools/flicker_bench.py \
+      --scene examples/world/glowmere-stylized.scene.json \
+      --camera "4,1.6,6:-1,-1.6,-38:50" \
+      --arms particles,volume \
+      --scene-arm "aa=post.antialias=0" \
+      --scene-arm "ripple=valley.terrain.water.ripple=0" \
+      --out /tmp/flicker
+
 ## Priority 2: the emissive path is not the gap the mandate expects
 
 The mandate's worry is that *"a glowing mushroom should actually look luminous, not merely have a
@@ -380,25 +512,34 @@ Two things this says about the audit that remains:
 
 Ordered by what blocks the most.
 
-1. **Re-measure the Priority 1 attribution.** Every number in it was taken on frames with no
-   particles, because particles never simulated (three harness bugs, corrected above). The flicker
-   baseline moves **27x** at a hero camera once they do. The ranking may survive; the percentages are
-   not comparable with anything measured after the fix. Owed, not optional.
-2. **The ~34 unattributed points of water flicker.** No authored parameter reaches them; the
-   candidates are the moon glint, the sky reflection and the depth-derived shoreline, and separating
-   them needs arms inside `water.wgsl`. Deliberately not started: editing that shader on a hypothesis
-   is what cost three rounds on the anamorphic comb.
-3. **The variance protocol**, which needs a quiet machine.
-4. **The temporal artifact inventory (§4)**, which needs the representative suite rendered and
+1. ~~Re-measure the Priority 1 attribution.~~ **Done** — see above. The harness is
+   `tools/flicker_bench.py` and the answer changed: FXAA is the largest identified source at 19-21%,
+   water's ripple normals second at 14-19%, bloom zero, and the old 57% came from a confounded arm.
+2. **What FXAA's 20% should be done about.** It is not a strength-tuning problem — the dose-response
+   says most of the cost arrives when the pass is switched on at all. The options are a temporal
+   term, a threshold hysteresis, or not running FXAA at the offline tier at all and resolving the
+   edge some other way. None of them should be chosen before §4's inventory says whether the
+   *artifact* a viewer sees is edge crawl; a 20% share of a detector's metric is not by itself a
+   reason to change a shipping picture.
+3. **The remaining unattributed flicker.** The identified terms sum to roughly 40% at the river view;
+   the rest is not reached by any authored parameter. The candidates are the moon glint, the sky
+   reflection and the depth-derived shoreline, and separating them needs arms inside `water.wgsl`.
+   Still deliberately not started: editing that shader on a hypothesis is what cost three rounds on
+   the anamorphic comb, and the per-term scene arms are not exhausted yet.
+4. ~~Re-run the supersampling refutation on this harness.~~ **Done** — the direction holds (4.453% →
+   4.717% for four times the pixels), the magnitude was much smaller than recorded. The refusal
+   stands and now rests on something re-runnable.
+5. **The variance protocol**, which needs a quiet machine.
+6. **The temporal artifact inventory (§4)**, which needs the representative suite rendered and
    *looked at*.
-5. **§7's cinematic lighting evaluation** — depth, separation, focal hierarchy. This is what remains
+7. **§7's cinematic lighting evaluation** — depth, separation, focal hierarchy. This is what remains
    of Priority 2 now that the HDR/emissive plumbing has been verified sound, and it requires looking.
-6. **The performance dashboard (§13)** — the one item that genuinely needs a human to certify.
-7. **AOV export (§B)**, and the debug views the mandate lists that do not exist — neither should be
+8. **The performance dashboard (§13)** — the one item that genuinely needs a human to certify.
+9. **AOV export (§B)**, and the debug views the mandate lists that do not exist — neither should be
    built without saying what question each answers.
-8. **The rest of the realtime/offline parity audit (§15)**, per the search pattern above.
-9. **Scene authoring ergonomics (§17, §G).**
-10. **Maintainability (§18)** — flagged, still not a recommendation; the thing to look for when the
+10. **The rest of the realtime/offline parity audit (§15)**, per the search pattern above.
+11. **Scene authoring ergonomics (§17, §G).**
+12. **Maintainability (§18)** — flagged, still not a recommendation; the thing to look for when the
     C/D/F measurements start touching `SceneRenderer::render`.
 
 Also outstanding and not blocked by any of the above: the counterbalanced A/B for ten heroes and ten

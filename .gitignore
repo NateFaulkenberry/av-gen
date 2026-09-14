@@ -33,3 +33,4 @@ cmake-build-*/
 /assets/quaternius/street/
 /assets/imported/concert/
 /assets/imported/instruments/
+/examples/world/_flicker_*.scene.json
