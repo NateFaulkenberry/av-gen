@@ -100,6 +100,16 @@ fn proceduralMaterialTierOf() -> u32 {
     return u32(override_ + 0.5);
 }
 
+// ADR-155: per-rung assignment. The frame-wide override above is an *arm* -- it demotes every
+// procedural draw at once, which measured 5.64 ms and failed §50 by flattening the foreground. This
+// is the shipping form: the tier comes from the rung's own uniform slot, and rung tracks projected
+// size, so the near ferns stay Full while the distant scatter does not. `tier` is uniform across
+// the draw either way, which is the condition ADR-118 measured a saving to need.
+fn proceduralRungTierOf(rungTier: f32) -> u32 {
+    let frameTier = proceduralMaterialTierOf();
+    return max(frameTier, u32(rungTier + 0.5));
+}
+
 // How many *local* (clustered) lights a fragment of `tier` may evaluate. The table lives here and
 // in QualitySettings::localLightBudget and nowhere else.
 fn materialTierLocalLights(tier: u32) -> u32 {

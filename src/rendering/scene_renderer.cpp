@@ -1421,6 +1421,16 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
              q.proceduralMaterialTier = static_cast<int>(MaterialTier::Flat);
          },
          "the flat tier on procedural draws only (the assignable share, measured)"},
+        // ADR-155: the shipping form of the same idea. `matflatproc` demotes every procedural draw
+        // and fails §50 by flattening the foreground; these demote from a rung down, and rung
+        // tracks projected size. The sweep is what says how much of that 5.64 ms survives sparing
+        // what the camera is actually looking at.
+        {"matrung1",
+         [](QualitySettings& q) { q.materialTiers = true; q.flatTierFromRung = 1; },
+         "flat from LOD rung 1 down (the foreground stays Full)"},
+        {"matrung2",
+         [](QualitySettings& q) { q.materialTiers = true; q.flatTierFromRung = 2; },
+         "flat from LOD rung 2 down (only the far scatter is demoted)"},
         // ADR-139. The volumetric march at the resolution the High and Offline tiers ask for --
         // their own setting, not a fabricated one -- so the pair says what half resolution buys
         // rather than what an invented scale would.
@@ -2742,6 +2752,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // not get one. Applied per frame rather than at setQualitySettings, because the tier can
         // change between frames and the cull pass reads this on every one.
         procedurals_->setLodHysteresisAllowed(qualitySettings_.lodHysteresisAllowed);
+        // ADR-155: per-rung material tier for the scatter. Distant rungs shade flat; the foreground
+        // is rung 0 and is untouched.
+        procedurals_->setFlatTierFromRung(qualitySettings_.materialTiers ? qualitySettings_.flatTierFromRung
+                                                                        : -1);
         procedurals_->update(encoder, scene, identity, time, fields_.get(), splines_.get());
         stats_.procedural = procedurals_->stats();
     }

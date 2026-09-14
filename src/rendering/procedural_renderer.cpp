@@ -1229,6 +1229,13 @@ void ProceduralRenderer::Impl::pumpStats() {
     }
 }
 
+// The tier value the shader compares against, mirrored in the header so it need not include
+// render_quality.hpp. Pinned here, where both are visible.
+static_assert(ProceduralRenderer::MaterialTierFlatValue == static_cast<int>(MaterialTier::Flat),
+              "the mirrored flat-tier value drifted from the enum");
+
+void ProceduralRenderer::setFlatTierFromRung(int rung) { flatTierFromRung_ = rung; }
+
 void ProceduralRenderer::setLodHysteresisAllowed(bool allowed) { lodHysteresisAllowed_ = allowed; }
 
 void ProceduralRenderer::setTimeline(gpu::FrameTimeline* timeline) { impl_->timeline = timeline; }
@@ -1672,6 +1679,14 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             const bool billboard = isPoint || level >= 2;
             u.fieldInfo = glm::vec4(static_cast<float>(emissiveSlot), object.emissiveFieldAmount,
                                     billboard ? 1.0f : 0.0f, cullActive ? 1.0f : 0.0f);
+            // ADR-155: this rung's tier. Rung tracks projected size, so demoting from rung N
+            // down leaves everything nearer the camera at Full. No hero check is needed and none
+            // is possible here -- heroes live on the Composition, not the Scene the renderer sees
+            // -- but a hero is by definition large on screen and therefore already at rung 0.
+            // `elder-crown` measures ~330 px across in the canonical frame.
+            const bool demote =
+                flatTierFromRung_ >= 0 && static_cast<int>(level) >= flatTierFromRung_;
+            u.prevInfo.z = demote ? static_cast<float>(MaterialTierFlatValue) : 0.0f;
             std::memcpy(im.deformerStaging.data() + static_cast<std::size_t>(level) * kDeformerSlotStride, &u,
                         sizeof(u));
         }

@@ -196,7 +196,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     // ADR-133: this draw's material tier and its local-light budget. Uniform across the draw, so
     // every branch below that reads `tier` is wave-uniform -- the condition ADR-118 measured a
     // saving to need. `tier == 0` is byte for byte the pre-ADR-133 shader.
-    let tier = select(materialTierOf(), proceduralMaterialTierOf(), kProceduralDraw);
+    let tier = select(materialTierOf(), proceduralRungTierOf(proceduralRungTier()), kProceduralDraw);
     let tierLocalLights = materialTierLocalLights(tier);
     let texMask = u32(object.flags.w + 0.5);
     let hasBaseColor = (texMask & 1u) != 0u;

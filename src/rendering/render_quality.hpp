@@ -146,6 +146,13 @@ struct QualitySettings {
     // on this content the assignable geometry is the scatter. Not a shipping setting -- an arm.
     int proceduralMaterialTier = -1;
 
+    // ADR-155: the first LOD rung that shades at the flat tier, or < 0 for "no rung does". Rung
+    // tracks projected size, so this demotes distant scatter and leaves the foreground alone --
+    // measured at 5.64 ms for *every* procedural draw (ADR-138), of which this recovers the part
+    // that is not in front of the camera. Explicit, general, and exposed through the tier table
+    // rather than being a property of any one scene (§49).
+    int flatTierFromRung = -1;
+
     // ADR-125 / §5.9: hysteresis makes the image depend on the camera's history, so an offline
     // render may not have it -- two renders of the same frame must agree whatever route the camera
     // took to get there. That rule was expressed in the CPU representation selector and *not* in
@@ -198,11 +205,16 @@ struct QualitySettings {
             q.materialTiers = true;
             q.reducedTierLocalLights = 4;
             q.flatTierLocalLights = 1;
+            q.flatTierFromRung = 1; // ADR-155
             q.volumeResolutionScale = 0.25f;
             q.volumeStepScale = 0.5f;
             break;
         case QualityTier::Realtime:
             q.materialTiers = true;
+            // ADR-155: procedural draws below the foreground rung shade flat. Measured at +1.11 ms
+            // (7.46%) on Glowmere with 3.07% of pixels differing and no visible change at full
+            // size -- against 39.47% and an obviously flattened scene for demoting every rung.
+            q.flatTierFromRung = 1;
             break;
         case QualityTier::High:
             q.shadowMaskScale = 1.0f; // the reference live picture: the term at full resolution
@@ -216,7 +228,8 @@ struct QualitySettings {
             q.aoHistoryFrames = 12;
             q.sdfShadowSteps = 32;
             // High keeps assignment on but only ever reaches the middle rung: the flat rung is a
-            // visible reduction and High is the reference *live* picture.
+            // visible reduction and High is the reference *live* picture. ADR-155: and it demotes
+            // no LOD rung, for the same reason.
             q.materialTiers = true;
             q.reducedTierLocalLights = 12;
             q.flatTierLocalLights = 12;

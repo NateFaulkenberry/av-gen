@@ -158,3 +158,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [152](ADR-152-the-cull-ladder-omits-the-source-transform.md) | The GPU cull ladder sizes a procedural by its raw mesh, not by the object | Accepted |
 | [153](ADR-153-the-impostor-rung-is-unreachable-and-would-cost-more.md) | The impostor rung exists, imported meshes cannot reach it, and reaching it would cost more | Accepted |
 | [154](ADR-154-hlod-has-nothing-to-merge-here-and-the-invalidation-rule-is-recorded-anyway.md) | HLOD has nothing left to merge on instanced content, and the invalidation rule is recorded anyway | Accepted |
+| [155](ADR-155-the-tier-follows-the-rung.md) | The material tier follows the LOD rung, and the ceiling is not reachable | Accepted |

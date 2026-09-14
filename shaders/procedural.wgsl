@@ -44,6 +44,9 @@
 // terrain can never be demoted). `pbr_shade.wgsl` reads it to pick which tier applies. Every
 // includer must define it -- a missing one is a compile error rather than a silent wrong tier.
 const kProceduralDraw: bool = true;
+// ADR-155: this draw's rung tier, or 0 (Full) for a path that has no rungs. Defined by
+// every includer of pbr_shade.wgsl, so a missing one is a compile error.
+fn proceduralRungTier() -> f32 { return proc.prevInfo.z; }
 #include "pbr_shade.wgsl"
 #include "fields.wgsl"
 #include "spline.wgsl"

@@ -191,7 +191,15 @@ static_assert(sizeof(DeformerUniform) == 64);
 struct ProceduralUniforms {
     glm::vec4 timeInfo;      // x = render time, y = deformer count, z = epsilon for normals, w = instance count
     glm::vec4 fieldInfo;     // x = emissive field slot (-1 none), y = emissive field amount, z = point source (1/0), w = 0
-    glm::vec4 prevInfo;      // x = last frame's render time (ADR-035 velocity: deformation motion), yzw = 0
+    // x = last frame's render time (ADR-035 velocity: deformation motion).
+    // y = the Tier 1 wind lookup gate (simActive), uniform across the draw.
+    // z = ADR-155: this rung's material tier. The scatter path issues one indirect draw per
+    //     (layer, rung) and each rung already has its own uniform slot, so a tier written here is
+    //     per-rung assignment with no new plumbing -- and rung tracks projected size, so the
+    //     foreground stays at the finest rung and is never demoted. That is the distinction the
+    //     frame-global arm could not make, and the reason it failed §50 while saving 5.64 ms.
+    // w = 0.
+    glm::vec4 prevInfo;
     // ADR-055 Tier 0 vegetation motion: the species response, resolved on the CPU by
     // wind::motionResponse so the vertex stage evaluates no physics at all. windSway.w gates the
     // whole path, and is uniform across a draw, so a boulder pays nothing.
@@ -315,6 +323,12 @@ public:
     // ADR-146 / §5.9: when false, the GPU cull ladder's dead zone is forced to zero whatever the
     // scene authored, so an offline frame does not depend on the camera's history. Set from
     // `QualitySettings::lodHysteresisAllowed`; the ladder otherwise reads the authored value.
+    // ADR-155: the first LOD rung that shades flat, or < 0 for none. Set from
+    // `QualitySettings::flatTierFromRung`.
+    void setFlatTierFromRung(int rung);
+    // The flat tier's enum value, mirrored so this header need not include render_quality.hpp.
+    // A static_assert in the .cpp pins it to `MaterialTier::Flat`.
+    static constexpr int MaterialTierFlatValue = 2;
     void setLodHysteresisAllowed(bool allowed);
     void setTimeline(gpu::FrameTimeline* timeline);
     void collectTimings();
@@ -355,6 +369,7 @@ private:
     std::size_t cacheFrames_ = 120;
     // ADR-146: false forces the cull ladder's dead zone to zero whatever the scene authored.
     bool lodHysteresisAllowed_ = true;
+    int flatTierFromRung_ = -1; // ADR-155
 };
 
 } // namespace avgen::rendering
