@@ -1309,6 +1309,49 @@ void Composition::syncHeroesToNodes() {
     settleHeroes();
 }
 
+void Composition::setAimFollow(std::vector<AimFollow> shots) { aimFollow_ = std::move(shots); }
+
+// The aim, and only the aim.
+//
+// Not the position: the camera's path is the bake, and moving it would be re-cutting the shot one
+// frame at a time -- the distance to the subject, the framing, the clearance the path was lifted to
+// keep, all of it is in those keys. What a walking hero breaks is which way the camera is pointed,
+// and that is one vector.
+//
+// An offset from where the hero stood at the cut, rather than the hero's position outright. Two
+// reasons, both of them things that would otherwise be lost: the shot may not have been aimed at the
+// hero's centre (a look mode can aim ahead of it, or hold a direction), and the bake lifts keys
+// clear of terrain and canopy. Adding the hero's *movement* to whatever the keys say keeps both.
+void Composition::applyDirectedAim() {
+    if (aimFollow_.empty() || heroes_.empty()) {
+        return;
+    }
+    // Free mode only. The other two place the camera themselves -- an orbit around the root, a
+    // spline the author drew -- and a directed sequence always writes mode 1, so this is asking
+    // whether the shot on the timeline is still the one driving the camera.
+    if ((cameraMode_ != nullptr ? cameraMode_->value() : cameraModeSetting_) != 1) {
+        return;
+    }
+    const AimFollow* active = nullptr;
+    for (const AimFollow& shot : aimFollow_) {
+        if (currentTime_ >= shot.startSeconds && currentTime_ < shot.endSeconds) {
+            active = &shot;
+            break;
+        }
+    }
+    if (active == nullptr) {
+        return;
+    }
+    const auto hero = std::find_if(heroes_.begin(), heroes_.end(),
+                                   [&](const world::HeroPoint& h) { return h.name == active->hero; });
+    if (hero == heroes_.end()) {
+        // The hero was unstarred or renamed since the cut. The shot keeps the aim it was baked
+        // with, which is the last place that hero was known to be -- a stale table is inert.
+        return;
+    }
+    scene_.camera.target += hero->position - active->heroAtCut;
+}
+
 // The two halves of the debounce, shared by "a hero followed its object" and "somebody edited one".
 void Composition::markHeroesMoved() {
     // Everything that reads a hero's *position* -- the editor's mark, the clearance field, the
@@ -3722,6 +3765,10 @@ void Composition::update(const FrameTime& time) {
     // After the parameters, because a node's position is one of them: a hero follows the object it
     // describes, and where that object is has only just been decided for this frame.
     syncHeroesToNodes();
+    // And after *that*, because the aim follows where the hero is now. Putting it inside
+    // `applyParameters` would have aimed at last frame's position, which is a lag nobody would ever
+    // see and a wrongness anybody could later trip over.
+    applyDirectedAim();
     // ADR-099 §13. After the parameters, because a floating layer's node transform is one of them,
     // and before the culling, so a drifting layer's bounds are this frame's rather than last
     // frame's -- a raft that has moved out of frame must be culled on where it is now.

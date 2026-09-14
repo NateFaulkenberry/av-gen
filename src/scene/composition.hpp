@@ -283,6 +283,26 @@ struct CompositionNode {
 // added to. If a duplicate ever comes back missing something, this is the function that forgot it.
 [[nodiscard]] CompositionNode cloneNodeSpec(const CompositionNode& node);
 
+// One shot of a directed sequence, remembered so its aim can follow the hero it was cut for
+// (ADR-158).
+//
+// Directing is a bake and stays one: the cuts, the camera's path and its lens are keyframes, which
+// is what makes a directed camera scrubbable, renderable offline and identical every time. What a
+// bake cannot express is a subject that *moves* after the bake -- Glowmere's wanderer walks out of
+// its own close-up -- and re-cutting for that would replace the whole film every time somebody's
+// hero took a step.
+//
+// So only the aim follows, inside the shot the director already chose. `heroAtCut` is where the
+// hero stood when the keys were written, so the offset is zero at the moment of the cut and grows
+// only as far as the hero actually walks: a shot of something standing still is bit-identical to
+// what it was before this existed.
+struct AimFollow {
+    double startSeconds = 0.0;
+    double endSeconds = 0.0;
+    std::string hero;            // names a hero in `Composition::heroes()`
+    glm::vec3 heroAtCut{0.0f};   // where that hero stood when the shot was cut
+};
+
 class Composition final : public SceneController {
 public:
     Composition(assets::AssetRegistry& registry, std::string name = "composition");
@@ -403,6 +423,20 @@ public:
     // How long a hero's object has to stop moving before the declaration is considered settled and
     // the revision moves. Exposed so a test does not have to sleep.
     void setHeroSettleSeconds(double seconds) { heroSettleSeconds_ = std::max(0.0, seconds); }
+
+    // The shots a directed sequence baked, so the camera's aim can follow their heroes (ADR-158).
+    //
+    // Set by `app::installSequence` and cleared when the camera is handed back. Entries whose hero
+    // is not in `heroes()`, or whose shot is not the one the playhead is in, do nothing -- so a
+    // stale table is inert rather than wrong, which matters because the table outlives the heroes
+    // it names whenever somebody unstars one.
+    //
+    // Round-trips with the project, next to the timeline tracks it accompanies, because an offline
+    // render reloads the project before drawing it: a table that only lived in memory would make a
+    // rendered file differ from the window that asked for it, which is the one thing a deterministic
+    // engine may not do.
+    void setAimFollow(std::vector<AimFollow> shots);
+    [[nodiscard]] const std::vector<AimFollow>& aimFollow() const { return aimFollow_; }
 
     // ---- the ground (§3, ADR-090) --------------------------------------------------------------
     //
@@ -580,6 +614,10 @@ private:
     void rebuild();          // flattens nodes into scene_ (meshes/textures/entities/particles)
     void ensureBuilt();      // rebuild() when dirty
     void applyParameters(); // node finals -> transforms/materials/particles; camera; environment
+    // Nudges the camera's aim onto the hero the active directed shot was cut for (ADR-158).
+    // After `syncHeroesToNodes`, not inside `applyParameters`, so it reads where the hero is
+    // *this* frame rather than where it was last one.
+    void applyDirectedAim();
     // Aims the camera so the composition's focal point lands at its requested screen position.
     void applyFraming();
     // Per frame, after the camera is known: picks each terrain chunk's LOD mesh and culls the ones
@@ -753,6 +791,8 @@ private:
     // Parallel to `heroes_`. An empty optional means "no node of that name", which is a legitimate
     // state: a hero may name an assembly of several nodes rather than one object.
     std::vector<std::optional<glm::vec3>> heroAnchors_;
+    std::vector<AimFollow> aimFollow_;  // ADR-158; empty unless a director cut this camera
+
     // A hero moved and the world has not settled yet. Moving an object is a *drag* -- sixty
     // positions a second -- and each one that reached `heroRevision_` would re-cut the directed
     // shot, which is a fold of the whole track. The revision moves once, when the motion stops.

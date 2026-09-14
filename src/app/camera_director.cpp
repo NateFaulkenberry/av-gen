@@ -69,6 +69,12 @@ std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
     std::erase_if(tracks, [&](const params::Track& t) {
         return std::find(owned.begin(), owned.end(), t.target) != owned.end();
     });
+    // The follow table goes with the keys it belongs to. Left behind it would keep nudging a camera
+    // the viewport has just been handed back, which is the sort of thing that gets reported as
+    // "the camera fights me".
+    if (scene::Composition* composition = engine.composition()) {
+        composition->setAimFollow({});
+    }
     state = DirectorState{};
     return before - tracks.size();
 }
@@ -341,6 +347,29 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
         // A target that does not resolve is worth naming rather than swallowing: it means the
         // director is shooting at a parameter this scene does not have.
         log::warn("camera director: {}", bound.error().message);
+    }
+    // ADR-158: which hero each shot was cut for, so its aim can follow that hero as it walks.
+    //
+    // Only shots that *hold* a subject. The other look modes are about somewhere the camera is
+    // going rather than something it is watching: `Ahead` aims down the move, `Parallel` freezes a
+    // direction so the parallax is the shot, `Fixed` holds a place, and `Handoff` leaves one subject
+    // for another halfway through -- following the first through that swing would drag the very
+    // thing the shot is trying to leave. A shot that is not about a subject does not follow one.
+    if (scene::Composition* composition = engine.composition()) {
+        std::vector<scene::AimFollow> follow;
+        follow.reserve(sequence.shots.size());
+        for (const Shot& shot : sequence.shots) {
+            if (shot.lookMode() != LookMode::Subject || shot.subject.name.empty()) {
+                continue;
+            }
+            follow.push_back(scene::AimFollow{.startSeconds = shot.startSeconds,
+                                              .endSeconds = shot.endSeconds(),
+                                              .hero = shot.subject.name,
+                                              .heroAtCut = shot.subject.position});
+        }
+        log::info("camera director: {} of {} shot(s) hold a subject and will follow it",
+                  follow.size(), sequence.shots.size());
+        composition->setAimFollow(std::move(follow));
     }
     log::info("camera director: {} shot(s), {} track(s) installed, {} replaced",
               sequence.shots.size(), added, removed);

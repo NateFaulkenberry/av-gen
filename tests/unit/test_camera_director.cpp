@@ -7,6 +7,7 @@
 
 #include "app/camera_director.hpp"
 #include "app/engine.hpp"
+#include "core/time.hpp"
 #include "params/timeline.hpp"
 #include "scene/composition.hpp"
 
@@ -896,5 +897,178 @@ TEST_CASE("a project that arrives with a directed camera is recognised as direct
         REQUIRE(app::refreshDirection(mine, state).has_value());
         CHECK_FALSE(state.directed);
     }
+#endif
+}
+
+// ---- the aim follows the hero (ADR-158) ---------------------------------------------------------
+//
+// The gap this closes: directing bakes, so a hero that walks after the cut walks out of its own
+// close-up and the only remedy was to cut the film again. Re-cutting for a moving hero is wrong --
+// it replaces the whole film every time somebody's subject takes a step -- so what follows is the
+// aim, inside the shot the director already chose.
+TEST_CASE("A directed shot's aim follows the hero it was cut for", "[director][camera][follow]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path wav =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "glowmere-valley.wav";
+    if (!std::filesystem::exists(wav)) {
+        SKIP("glowmere-valley.wav is generated, not committed: run tools/make_glowmere_score.py");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    REQUIRE(engine.loadAudio(wav).has_value());
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+    REQUIRE(composition->setHeroes(threeHeroes()).has_value());
+    REQUIRE(app::directEngine(engine, composition->heroes()).has_value());
+
+    const std::vector<scene::AimFollow> follow = composition->aimFollow();
+    INFO("shots that hold a subject: " << follow.size());
+    REQUIRE(!follow.empty());
+    // Every entry names a hero that exists and covers real time, or it can never do anything.
+    for (const scene::AimFollow& shot : follow) {
+        CHECK(shot.endSeconds > shot.startSeconds);
+        CHECK(std::any_of(composition->heroes().begin(), composition->heroes().end(),
+                          [&](const world::HeroPoint& h) { return h.name == shot.hero; }));
+    }
+
+    const scene::AimFollow shot = follow.front();
+    const auto heroNamed = [&](const std::string& name) {
+        const auto it = std::find_if(composition->heroes().begin(), composition->heroes().end(),
+                                     [&](const world::HeroPoint& h) { return h.name == name; });
+        REQUIRE(it != composition->heroes().end());
+        return *it;
+    };
+    const world::HeroPoint subject = heroNamed(shot.hero);
+
+    FixedStepClock clock(60.0);
+    const auto aimAt = [&](double seconds) {
+        engine.seekSeconds(seconds);
+        clock.seek(seconds);
+        engine.update(engine.tick(clock));
+        return engine.composition()->scene().camera.target;
+    };
+
+    const double inside = (shot.startSeconds + shot.endSeconds) * 0.5;
+    const glm::vec3 before = aimAt(inside);
+    // The bake aims a subject-holding shot at the subject, so this is the claim the follow is built
+    // on: at the moment of the cut the offset is zero and the aim is already the hero.
+    CHECK(glm::length(before - subject.position) < 0.5f);
+
+    // The hero walks. Nothing else changes -- no re-cut, no new keys.
+    const std::vector<float> keysBefore = [&] {
+        std::vector<float> out;
+        for (const params::Track& t : engine.timeline().tracks()) {
+            if (t.target != "camera/target") {
+                continue;
+            }
+            for (const params::Key& key : t.keys) {
+                out.insert(out.end(), key.value.begin(), key.value.end());
+            }
+        }
+        return out;
+    }();
+    REQUIRE(!keysBefore.empty());
+
+    const glm::vec3 walk(17.0f, 0.0f, -9.0f);
+    std::vector<world::HeroPoint> moved = composition->heroes();
+    for (world::HeroPoint& h : moved) {
+        if (h.name == shot.hero) {
+            h.position += walk;
+        }
+    }
+    REQUIRE(composition->setHeroes(std::move(moved)).has_value());
+
+    const glm::vec3 after = aimAt(inside);
+    INFO("aim before (" << before.x << ", " << before.z << ") after (" << after.x << ", " << after.z << ")");
+    CHECK(glm::length((after - before) - walk) < 0.01f);
+    // The keys did not move. That is the whole point: the cut is still a bake, still scrubbable,
+    // still the same film -- only where it is pointed has been nudged.
+    std::vector<float> keysAfter;
+    for (const params::Track& t : engine.timeline().tracks()) {
+        if (t.target != "camera/target") {
+            continue;
+        }
+        for (const params::Key& key : t.keys) {
+            keysAfter.insert(keysAfter.end(), key.value.begin(), key.value.end());
+        }
+    }
+    CHECK(keysAfter == keysBefore);
+
+    // Outside every shot's window the aim is the bake's, untouched. Without this the table would be
+    // a global offset on the camera rather than a property of one shot.
+    double lastEnd = 0.0;
+    for (const scene::AimFollow& s : follow) {
+        lastEnd = std::max(lastEnd, s.endSeconds);
+    }
+    const glm::vec3 past = aimAt(lastEnd + 5.0);
+    REQUIRE(composition->aimFollow().size() == follow.size());
+    const glm::vec3 pastAgain = aimAt(lastEnd + 5.0);
+    CHECK(glm::length(past - pastAgain) < 1e-4f);
+
+    // Handing the camera back takes the table with it, or a camera the viewport owns would still be
+    // nudged by a film nobody is running.
+    app::DirectorState state;
+    app::noteDirected(engine, state);
+    static_cast<void>(app::releaseDirectedCamera(engine, state));
+    CHECK(composition->aimFollow().empty());
+#endif
+}
+
+// The table travels with the project, because an offline render reloads the project before drawing
+// it: a follow that only lived in memory would make the rendered file differ from the window that
+// asked for it.
+TEST_CASE("The aim-follow table round-trips with the project", "[director][camera][follow]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+    REQUIRE(composition->setHeroes(threeHeroes()).has_value());
+    composition->setAimFollow({scene::AimFollow{.startSeconds = 2.0,
+                                                .endSeconds = 9.5,
+                                                .hero = "elder",
+                                                .heroAtCut = glm::vec3(1.0f, 2.0f, 3.0f)},
+                               scene::AimFollow{.startSeconds = 9.5,
+                                                .endSeconds = 14.0,
+                                                .hero = "spire",
+                                                .heroAtCut = glm::vec3(-4.0f, 0.5f, 6.0f)}});
+
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / "avgen-aim-follow-roundtrip.json";
+    REQUIRE(engine.saveProject(path).has_value());
+
+    app::Engine reopened(app::EngineMode::Offline);
+    auto loaded = reopened.loadProject(path);
+    INFO((loaded ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+    REQUIRE(reopened.composition() != nullptr);
+    const std::vector<scene::AimFollow>& back = reopened.composition()->aimFollow();
+    REQUIRE(back.size() == 2);
+    CHECK(back[0].hero == "elder");
+    CHECK(back[1].hero == "spire");
+    CHECK(back[0].startSeconds == 2.0);
+    CHECK(back[1].endSeconds == 14.0);
+    CHECK(glm::length(back[0].heroAtCut - glm::vec3(1.0f, 2.0f, 3.0f)) < 1e-5f);
+    CHECK(glm::length(back[1].heroAtCut - glm::vec3(-4.0f, 0.5f, 6.0f)) < 1e-5f);
+
+    // A project that was never directed does not inherit the last one's cut.
+    app::Engine plain(app::EngineMode::Offline);
+    plain.newComposition();
+    plain.composition()->setAimFollow({scene::AimFollow{
+        .startSeconds = 0.0, .endSeconds = 1.0, .hero = "elder", .heroAtCut = glm::vec3(0.0f)}});
+    const std::filesystem::path bare =
+        std::filesystem::temp_directory_path() / "avgen-aim-follow-bare.json";
+    app::Engine undirected(app::EngineMode::Offline);
+    undirected.newComposition();
+    REQUIRE(undirected.saveProject(bare).has_value());
+    REQUIRE(plain.loadProject(bare).has_value());
+    CHECK(plain.composition()->aimFollow().empty());
+
+    std::filesystem::remove(path);
+    std::filesystem::remove(bare);
 #endif
 }

@@ -709,6 +709,22 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
             doc["timeline"] = std::move(timeline);
         }
     }
+    // ADR-158: which hero each directed shot was cut for, beside the tracks it accompanies.
+    //
+    // A sibling of `timeline` rather than part of the scene, because that is what it belongs to: the
+    // shots are camera automation, and a scene shared between two projects must not carry one
+    // project's cut. Written only when there is a cut, so a project that was never directed keeps
+    // the file it had.
+    if (const auto* comp = composition(); comp != nullptr && !comp->aimFollow().empty()) {
+        nlohmann::json shots = nlohmann::json::array();
+        for (const scene::AimFollow& shot : comp->aimFollow()) {
+            shots.push_back(nlohmann::json{{"start", shot.startSeconds},
+                                           {"end", shot.endSeconds},
+                                           {"hero", shot.hero},
+                                           {"heroAtCut", {shot.heroAtCut.x, shot.heroAtCut.y, shot.heroAtCut.z}}});
+        }
+        doc["cameraAimFollow"] = std::move(shots);
+    }
     if (!states_.empty()) {
         doc["states"] = states_.toJson();
     }
@@ -1099,6 +1115,32 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         }
     } else {
         timeline_.clear();
+    }
+    // ADR-158. Cleared when absent, like the timeline above: a project without a cut must not
+    // inherit the last one's, or the camera would chase a hero this scene has never heard of.
+    if (auto* comp = composition()) {
+        std::vector<scene::AimFollow> shots;
+        if (doc.contains("cameraAimFollow") && doc["cameraAimFollow"].is_array()) {
+            for (const auto& entry : doc["cameraAimFollow"]) {
+                if (!entry.is_object() || !entry.contains("heroAtCut") || !entry["heroAtCut"].is_array() ||
+                    entry["heroAtCut"].size() != 3) {
+                    warn("cameraAimFollow: a shot without a 'heroAtCut' position was skipped");
+                    continue;
+                }
+                scene::AimFollow shot;
+                shot.startSeconds = entry.value("start", 0.0);
+                shot.endSeconds = entry.value("end", 0.0);
+                shot.hero = entry.value("hero", std::string{});
+                const auto& at = entry["heroAtCut"];
+                shot.heroAtCut = glm::vec3(at[0].get<float>(), at[1].get<float>(), at[2].get<float>());
+                if (shot.hero.empty() || !(shot.endSeconds > shot.startSeconds)) {
+                    warn("cameraAimFollow: a shot with no hero or no duration was skipped");
+                    continue;
+                }
+                shots.push_back(std::move(shot));
+            }
+        }
+        comp->setAimFollow(std::move(shots));
     }
     cueState_ = {};
     cueApplied_ = false;
