@@ -68,10 +68,13 @@ MeshData makeDistantTree(float height, float lean, std::uint32_t seed) {
     return mesh;
 }
 
-void addDistantTrees(Scene& scene, const TreeLook& look, std::uint32_t seed) {
-    if (look.distantTrees <= 0) {
-        return;
-    }
+} // namespace
+
+MeshData makeTreeGround(const TreeLook& look) {
+    return makeGroundDisc(look.groundRadius, 96);
+}
+
+MeshData makeTreeDistantTrees(const TreeLook& look, std::uint32_t seed) {
     MeshData all;
     all.name = "tree.distant";
     for (int i = 0; i < look.distantTrees; ++i) {
@@ -102,6 +105,19 @@ void addDistantTrees(Scene& scene, const TreeLook& look, std::uint32_t seed) {
             v.normal = glm::normalize(glm::vec3(xform * glm::vec4(v.normal, 0.0f)));
         }
         appendMesh(all, one);
+    }
+    return all;
+}
+
+namespace {
+
+void addDistantTrees(Scene& scene, const TreeLook& look, std::uint32_t seed) {
+    if (look.distantTrees <= 0) {
+        return;
+    }
+    MeshData all = makeTreeDistantTrees(look, seed);
+    if (all.vertices.empty()) {
+        return;
     }
     Material m;
     m.baseColor = look.barkColor * 0.6f;
@@ -216,7 +232,7 @@ Result<Scene> buildTreeScene(const TreeGraph& graph, const TreeMeshes& meshes, c
         Material ground;
         ground.baseColor = look.groundColor;
         ground.roughness = 0.92f;
-        addPart(scene, makeGroundDisc(look.groundRadius, 96), "tree.ground", ground);
+        addPart(scene, makeTreeGround(look), "tree.ground", ground);
     }
 
     // ---- lighting. Rim-led: the brief asks for atmospheric separation and for the tree to stay

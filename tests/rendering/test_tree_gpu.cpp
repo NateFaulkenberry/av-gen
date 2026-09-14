@@ -434,16 +434,23 @@ TEST_CASE("The hero's record says why it was chosen and what was not ranked", "[
     }
 
     const std::string note =
-        "Selected by score: highest of 96 candidates (0.9871) under treeBands() as of 2026-09-14, "
-        "after the foliage primitive became alpha-cut leaf sprays and six bands were re-measured. "
-        "WHAT THIS RANKING DOES NOT COVER: canopy density as rendered. The evaluator's rasteriser "
-        "stamps each foliage cluster as a solid disc, so everything between the leaves is erased "
-        "before any metric sees it -- replacing the whole foliage primitive changed no band's "
-        "variance at all. boxFill, the axis that ought to separate 'reads as volume' from 'reads as "
-        "scattered leaves', reports this candidate as the densest of the top six (0.433) when by eye "
-        "it is among the airiest. So the crown's ARCHITECTURE is ranked and its DENSITY is not. A "
-        "person preferring a fuller crown off the contact sheet is overriding nothing that was "
-        "measured; write why here and change kHeroCandidate.";
+        "HUMAN SELECTION, not the top-scoring candidate. The user reviewed the contact sheet, named "
+        "#4 and #12 as contenders and asked for wider trunks on both; #4 was taken after rendering "
+        "both at the showcase camera at three trunk widths. The score-ranked winner was #87 "
+        "(0.9871); this candidate scored lower. "
+        "WHY THAT IS NOT AN OVERRULING: the evaluator ranks crown ARCHITECTURE and cannot judge "
+        "canopy DENSITY as rendered -- its rasteriser stamps each foliage cluster as a solid disc, "
+        "so replacing the whole foliage primitive changed no band's variance at all, and boxFill "
+        "reported #87 as the densest of the top six when by eye it was among the airiest. Density "
+        "is precisely the axis these cells differed on. A search honestly characterised as unable "
+        "to rank an axis is not overruled when a person decides that axis. "
+        "TRUNK WIDTH IS NOT AUTHORED ABOVE THE MODEL -- it is the model. `radiusScale` went back to "
+        "1.0, restoring the pipe model with shed memory to its own output. It had been cut to 0.55 "
+        "when the tree was 23 m under a near-orthographic lens with a solid-shell canopy, where a "
+        "thick trunk had nothing to carry; at 30 m, a low 55-degree lens and an open canopy the "
+        "unscaled model reads correctly at 7.3:1 height to diameter and the reduced one reads as "
+        "spindly at 12.9:1. "
+        "To override this in turn: change kHeroCandidate and write why here.";
 
     const nlohmann::json record = search::candidateToJson(generator.schema(), hero, note);
     // It has to survive the round trip, or it is a report rather than a record.
@@ -458,4 +465,63 @@ TEST_CASE("The hero's record says why it was chosen and what was not ranked", "[
         file << record.dump(2);
     }
     WARN("hero record written to " << out.string());
+}
+
+TEST_CASE("The two contenders, at three trunk widths", "[.tree-choose]") {
+    // The user picked #4 and #12 off the contact sheet and asked for wider trunks on both. A
+    // contact-sheet cell and a hero render are different judgements -- the camera has changed what
+    // a crown looks like twice on this project -- so this renders both at the showcase camera, at
+    // three trunk widths, in one image.
+    //
+    // Hidden, because it answers a question once rather than guarding anything.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    const scene::TreeGenerator generator;
+    const std::array<std::uint32_t, 2> contenders{4, 12};
+    // 0.55 is what the pipe model was scaled to after it produced a stump at the OLD proportions.
+    const std::array<float, 3> widths{0.55f, 0.78f, 1.00f};
+
+    constexpr std::uint32_t kCell = 448;
+    constexpr std::uint32_t kCellH = 252;
+    gpu::Image8 sheet;
+    sheet.width = kCell * static_cast<std::uint32_t>(widths.size());
+    sheet.height = kCellH * static_cast<std::uint32_t>(contenders.size());
+    sheet.rgba.assign(static_cast<std::size_t>(sheet.width) * sheet.height * 4, 0);
+    for (std::size_t i = 3; i < sheet.rgba.size(); i += 4) {
+        sheet.rgba[i] = 255;
+    }
+
+    scene::TreeCameraView cell = generator.camera();
+    cell.width = static_cast<int>(kCell);
+    cell.height = static_cast<int>(kCellH);
+
+    for (std::size_t r = 0; r < contenders.size(); ++r) {
+        for (std::size_t c = 0; c < widths.size(); ++c) {
+            auto params = scene::treeParamsFrom(search::sampleAt(generator.schema().parameters, contenders[r]));
+            REQUIRE(params.has_value());
+            params->radiusScale = widths[c];
+            const auto built = scene::buildTreeScene(*params, cell);
+            REQUIRE(built.has_value());
+            const auto image = renderer.renderToImage(*built, FrameTime{0.0, 0.0, 0}, kCell, kCellH);
+            REQUIRE(image.has_value());
+            blit(sheet, *image, static_cast<int>(c * kCell), static_cast<int>(r * kCellH));
+            drawText(sheet, static_cast<int>(c * kCell) + 6, static_cast<int>(r * kCellH) + 6,
+                     fmt::format("#{}", contenders[r]), 2);
+            drawText(sheet, static_cast<int>(c * kCell) + 6, static_cast<int>(r * kCellH) + 22,
+                     fmt::format("{:.2f}", widths[c]), 2);
+            // The number a person actually reads is the trunk's width against its height, not the
+            // scale factor that produced it.
+            const auto graph = scene::generateTree(*params);
+            REQUIRE(graph.has_value());
+            WARN(fmt::format("#{} radiusScale {:.2f}: base radius {:.2f} m, height {:.1f} m, slenderness {:.1f}:1",
+                             contenders[r], widths[c], graph->stats.trunkBaseRadius, graph->stats.height,
+                             graph->stats.height / std::max(graph->stats.trunkBaseRadius * 2.0f, 0.01f)));
+        }
+    }
+    const fs::path out = outputDir() / "tree-contenders.png";
+    REQUIRE(assets::writePng(out, sheet.width, sheet.height, sheet.rgba).has_value());
+    WARN("contenders written to " << out.string());
 }

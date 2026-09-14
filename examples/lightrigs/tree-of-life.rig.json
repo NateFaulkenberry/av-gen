@@ -1,0 +1,79 @@
+{
+  "ambientColor": [
+    0.1599999964237213,
+    0.30000001192092896,
+    0.46000000834465027
+  ],
+  "ambientIntensity": 0.03,
+  "ambientTemperature": 9000,
+  "description": "A moon key for the silhouette, a violet rim for separation, almost no fill, and a wide weak disk under the crown so its underside has layers rather than being flat.",
+  "format": "avgen-lightrig",
+  "keyIntensity": 0.6800000071525574,
+  "lights": [
+    {
+      "aspect": 1.0,
+      "azimuth": 34.99201965332031,
+      "castsShadow": true,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "distance": 3.0,
+      "elevation": 42.87556838989258,
+      "followCamera": false,
+      "intensity": 1.0,
+      "name": "moon",
+      "role": "key",
+      "size": 1.0,
+      "temperature": 8200.0,
+      "tint": 0.0,
+      "type": "directional",
+      "volumetric": 0.2199999988079071
+    },
+    {
+      "aspect": 1.0,
+      "azimuth": -144.81124877929688,
+      "castsShadow": false,
+      "color": [
+        0.7200000286102295,
+        0.5799999833106995,
+        1.0
+      ],
+      "distance": 3.0,
+      "elevation": 12.980443000793457,
+      "followCamera": false,
+      "intensity": 0.9117646813392639,
+      "name": "rim",
+      "role": "rim",
+      "size": 1.0,
+      "temperature": 7400.0,
+      "tint": 0.0,
+      "type": "directional",
+      "volumetric": 0.0
+    },
+    {
+      "aspect": 1.0,
+      "azimuth": -123.69007110595703,
+      "castsShadow": false,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "distance": 3.0,
+      "elevation": 79.78063201904297,
+      "followCamera": false,
+      "intensity": 0.0882352888584137,
+      "name": "skyfill",
+      "role": "fill",
+      "size": 1.0,
+      "temperature": 11000.0,
+      "tint": 0.0,
+      "type": "directional",
+      "volumetric": 0.0
+    }
+  ],
+  "name": "TreeOfLife",
+  "version": 1
+}

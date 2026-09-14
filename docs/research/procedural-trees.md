@@ -498,16 +498,37 @@ Showcase parameters, one machine, no cross-session comparison:
 - Total frame cost: **not quoted.** The absolute above is unreadable across sessions by its own
   evidence, and this scene has never been run through the real headless path with `--bench-json`.
 
-### 7.5 The hero, and why it moved twice
+### 7.5 The hero, and why it moved four times and then was chosen by a person
 
-`scene::kHeroCandidate` is 39, from 96 candidates with none rejected. It has been **11**, then
-**49**, then **39**, and each move was forced rather than chosen: the bands were re-banded after the
-camera moved for the monumental framing, and then again after the camera was pulled back far enough
-for the design space's tallest tree to fit.
+`scene::kHeroCandidate` is **4**, and it is a **human selection rather than the top-scoring
+candidate**. The user reviewed the contact sheet, named #4 and #12 as contenders and asked for wider
+trunks on both; #4 was taken after rendering both at the showcase camera at three trunk widths. The
+score-ranked winner was #87.
 
-That chain is the point. The hero is an artefact of the scoring; the scoring is an artefact of the
-camera. Keeping a stale hero would have meant anyone judging the result was judging the system that
-picked it rather than the tree.
+Before that it had been 11, then 49, then 39, then 87 — each move forced rather than chosen, because
+the bands were re-measured after the camera moved, after it moved again, and after the foliage
+primitive changed. The hero is an artefact of the scoring; the scoring is an artefact of the camera
+and of what the rasteriser can see.
+
+**The override is the pipeline working, not failing.** §7.6 records that the evaluator cannot judge
+canopy density as rendered, and density is precisely the axis the contending cells differed on. A
+search honestly characterised as unable to rank an axis is not overruled when a person decides that
+axis; `selectionNote` on the written record says all of this, so the next person to disagree knows
+what they are disagreeing with.
+
+**The trunk width went back to where it started, and that is a finding rather than indecision.**
+`radiusScale` was 1.0, was cut to 0.55 because the pipe model with shed memory produced a bole that
+read as a stump, and is 1.0 again. The earlier judgement was correct about a tree that no longer
+exists: 23 m tall, a near-orthographic 44-degree lens at 37 m, and a solid-shell canopy, where a
+thick trunk had nothing to carry and everything to compete with. At 30 m, a low 55-degree lens and an
+open canopy, the unscaled model reads as a trunk carrying a crown — 7.3:1 height to diameter against
+12.9:1 at 0.55. **The pipe model was faithful all along; what was wrong was the proportions around
+it.**
+
+One knock-on was corrected without being asked for, and is named because it was not the user's
+choice: roots are sized *from* the trunk, so widening it widened them by the same factor and they
+came out heavier than anything shown on the sheet the user judged. `rootRadiusScale` was reduced to
+hold their absolute thickness where it was.
 
 ### 7.6 The evaluator cannot judge canopy density, and this is structural
 

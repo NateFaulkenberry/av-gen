@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Tree of Life"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "tree.scene.json"
+    }
+  },
+  "format": "avgen-project",
+  "routes": [
+    {
+      "amount": 0.10000000149011612,
+      "chain": {
+        "attackMs": 900.0,
+        "decayMs": 3000.0
+      },
+      "op": "add",
+      "source": "audio.bass",
+      "target": "scene/windSpeed"
+    },
+    {
+      "amount": 0.05999999865889549,
+      "chain": {
+        "attackMs": 400.0,
+        "decayMs": 1600.0
+      },
+      "op": "add",
+      "source": "audio.lowMid",
+      "target": "scene/windSpeed"
+    },
+    {
+      "amount": 0.1599999964237213,
+      "chain": {
+        "attackMs": 2500.0,
+        "decayMs": 4000.0
+      },
+      "op": "add",
+      "source": "music.build",
+      "target": "scene/windSpeed"
+    },
+    {
+      "amount": -0.12999999523162842,
+      "chain": {
+        "attackMs": 2000.0,
+        "decayMs": 3500.0
+      },
+      "op": "add",
+      "source": "music.break",
+      "target": "scene/windSpeed"
+    },
+    {
+      "amount": 0.2199999988079071,
+      "chain": {
+        "attackMs": 700.0,
+        "decayMs": 2400.0
+      },
+      "op": "add",
+      "source": "audio.rms",
+      "target": "procedural/tree-foliage0/material/emissive"
+    },
+    {
+      "amount": 0.2199999988079071,
+      "chain": {
+        "attackMs": 700.0,
+        "decayMs": 2400.0
+      },
+      "op": "add",
+      "source": "audio.rms",
+      "target": "procedural/tree-foliage1/material/emissive"
+    },
+    {
+      "amount": 0.2199999988079071,
+      "chain": {
+        "attackMs": 700.0,
+        "decayMs": 2400.0
+      },
+      "op": "add",
+      "source": "audio.rms",
+      "target": "procedural/tree-foliage2/material/emissive"
+    }
+  ],
+  "version": 4
+}
