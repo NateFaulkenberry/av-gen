@@ -2,6 +2,7 @@
 // asks for -- a river that traverses the whole map and a valley you can recognise -- rather than
 // about numbers that happen to be true today.
 
+#include "scene/scene.hpp"
 #include "world/world_map.hpp"
 #include "world/terrain.hpp"
 
@@ -14,6 +15,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 
 using namespace avgen;
 namespace fs = std::filesystem;
@@ -380,4 +382,101 @@ TEST_CASE("probe: Glowmere Valley 2 ground heights", "[.probe][glowmere2]") {
                     smp.submerged ? "SUBMERGED" : "");
     }
     std::fflush(stdout);
+}
+
+// ---- the dangling material-program rule (ADR-176, adopted) ------------------------------------
+//
+// A program a surface names and the scene does not carry is skipped, and the surface renders with
+// its authored material as though nothing were wrong. That is the exact shape of the regression that
+// put green gills on a mushroom whose material said amber -- enforced correctly where anyone was
+// looking, lost where nobody was.
+
+TEST_CASE("a material program nothing carries is reported, not skipped quietly", "[unit][glowmere2][materials]") {
+    scene::Scene s;
+    scene::MaterialProgram carried;
+    carried.name = "present";
+    s.materialPrograms.push_back(carried);
+
+    scene::Entity ok;
+    ok.material.program = "present";
+    s.entities.push_back(ok);
+    REQUIRE(scene::danglingMaterialPrograms(s).empty());
+
+    SECTION("an entity naming an absent program is named") {
+        scene::Entity bad;
+        bad.material.program = "glowmere2TissueWarm";
+        s.entities.push_back(bad);
+        const std::vector<std::string> dangling = scene::danglingMaterialPrograms(s);
+        REQUIRE(dangling.size() == 1);
+        REQUIRE(dangling[0] == "glowmere2TissueWarm");
+    }
+
+    SECTION("a procedural naming an absent program is named too") {
+        scene::ProceduralGeometry p;
+        p.name = "elder-2-gills";
+        p.material.program = "typoTissue";
+        s.procedurals.push_back(p);
+        REQUIRE(scene::danglingMaterialPrograms(s) == std::vector<std::string>{"typoTissue"});
+    }
+
+    SECTION("a water program is doing its job, not dangling") {
+        // ADR-099: a water surface finds its settings by material-program name, so a name that
+        // matches a water is resolved even though no MaterialProgram carries it. The negative
+        // control for this rule's own false positive.
+        scene::WaterSurface w;
+        w.program = "riverWater";
+        s.waters.push_back(w);
+        scene::Entity river;
+        river.material.program = "riverWater";
+        s.entities.push_back(river);
+        REQUIRE(scene::danglingMaterialPrograms(s).empty());
+    }
+
+    SECTION("it deduplicates and sorts, so the message is readable") {
+        for (const char* n : {"zeta", "alpha", "zeta"}) {
+            scene::Entity e;
+            e.material.program = n;
+            s.entities.push_back(e);
+        }
+        REQUIRE(scene::danglingMaterialPrograms(s) == std::vector<std::string>{"alpha", "zeta"});
+    }
+}
+
+TEST_CASE("Glowmere Valley 2 names no material program it does not carry", "[unit][glowmere2][materials]") {
+    // The regression guard on the real scene. Every hero part names a program; seven are carried.
+    std::ifstream in(sceneFile());
+    REQUIRE(in.good());
+    const nlohmann::json doc = nlohmann::json::parse(in);
+    std::vector<std::string> carried;
+    for (const nlohmann::json& path : doc.at("materialPrograms")) {
+        const std::string p = path.get<std::string>();
+        const auto slash = p.find_last_of('/');
+        std::ifstream mat(sceneFile().parent_path() / p);
+        REQUIRE(mat.good());
+        carried.push_back(nlohmann::json::parse(mat).at("name").get<std::string>());
+        (void)slash;
+    }
+    std::vector<std::string> named;
+    const std::function<void(const nlohmann::json&)> walk = [&](const nlohmann::json& j) {
+        if (j.is_object()) {
+            if (j.contains("material") && j.at("material").is_object() &&
+                j.at("material").contains("program")) {
+                named.push_back(j.at("material").at("program").get<std::string>());
+            }
+            for (const auto& [k, v] : j.items()) {
+                walk(v);
+            }
+        } else if (j.is_array()) {
+            for (const nlohmann::json& e : j) {
+                walk(e);
+            }
+        }
+    };
+    walk(doc);
+    REQUIRE_FALSE(named.empty());
+    for (const std::string& n : named) {
+        if (n.empty()) continue;
+        INFO("program '" << n << "' is named by a surface");
+        REQUIRE(std::find(carried.begin(), carried.end(), n) != carried.end());
+    }
 }

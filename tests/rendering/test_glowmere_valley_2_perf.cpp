@@ -42,7 +42,7 @@ constexpr std::uint32_t kWidth = 1280;
 constexpr std::uint32_t kHeight = 800; // pinned to match the original's baseline exactly
 constexpr int kWarmup = 12;
 constexpr int kMeasured = 30;
-constexpr int kRuns = 3;
+constexpr int kRuns = 4; // even, so the counterbalancing is exact rather than nearly
 
 std::unique_ptr<gpu::Context> makeContext() {
     static bool logInit = false;
@@ -168,7 +168,14 @@ TEST_CASE("Glowmere Valley 2 frame cost", "[.perf][glowmere2]") {
     std::array<std::vector<Sample>, views.size() * 2> results;
     for (int run = 0; run < kRuns; ++run) {
         for (std::size_t i = 0; i < views.size(); ++i) {
-            for (int arm = 0; arm < 2; ++arm) {
+            for (int slot = 0; slot < 2; ++slot) {
+                // **Counterbalanced.** Co-locating the arms in one process is not enough: if the
+                // machine drifts during a run, an arm that always goes second always pays for it.
+                // The first version had "no heroes" second every time and reported that hiding six
+                // mushrooms made the frame 2.3 ms *slower* -- the same impossible result as the
+                // two-invocation version, from a bias rather than from noise. Alternating by run
+                // parity makes each arm go first half the time.
+                const int arm = (run % 2 == 0) ? slot : 1 - slot;
                 const Sample s = measure(views[i], arm == 1);
                 results[i * 2 + static_cast<std::size_t>(arm)].push_back(s);
                 std::printf("  run %d  %-14s %-12s frame %7.3f ms  scene %7.3f ms  tris %8llu  draws %4u\n",

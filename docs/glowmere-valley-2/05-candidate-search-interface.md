@@ -215,6 +215,35 @@ thing that was skipped; it is a thing the identifier encoding cannot express.
 
 ---
 
+## 5a. Measurement conventions
+
+These are not about candidate search. They are here because this is where this project's measurement
+conventions ended up being written down, and both were bought with a wrong conclusion.
+
+**Every frame time reads with a ±3 ms band unless it says it was interleaved.** Measured on this
+machine: three invocations of one perf binary over one byte-identical scene gave 10.945 / 11.272 /
+13.697 ms with the triangle count constant at 252,996. Every run held the GPU lock and passed
+`pgrep avgen` on both sides. A cross-invocation comparison below about 3 ms is not evidence, and
+quoting an absolute frame time to three significant figures implies a precision that does not exist.
+The protocol that does work is ADR-150's and it is not optional: **arms interleaved inside one
+process**, medians over a steady window, three runs.
+
+**A causally impossible result is a free diagnostic.** A hero-cost A/B run as two invocations reported
+that *hiding six mushrooms made the frame slower*. Hiding geometry cannot do that, so the arm indicted
+the method instantly and at no cost — where a merely surprising result would have been argued with.
+
+The transferable half is the converse: **an arm whose sign is known in advance is worth running
+deliberately, as a test of the method rather than of the scene.** Delete something and the frame must
+not get slower; add something and it must not get faster. If it does, stop measuring and fix the
+harness.
+
+And the corollary, which is what actually saves time: **when an arm's sign is known, the delta is
+often not the question.** Adding vegetation can only cost, so the useful measurement is not the A/B
+but whether the absolute still fits the budget — one interleaved run instead of two scenes and a
+harness to alternate them.
+
+---
+
 ## 6. Status
 
 | part | state |

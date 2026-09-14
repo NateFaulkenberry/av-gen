@@ -596,8 +596,8 @@
      "chromaDriftScale": 50.0,
      "chromaDriftSpeed": 0.035,
      "minHeightAboveWater": 1.5,
-     "maxHeightAboveWater": 24.0,
-     "heightAboveWaterFeather": 3.5
+     "maxHeightAboveWater": 38.0,
+     "heightAboveWaterFeather": 5.0
     },
     {
      "name": "ferns",
@@ -724,8 +724,8 @@
      "chromaDriftScale": 55.0,
      "chromaDriftSpeed": 0.04,
      "minHeightAboveWater": 0.2,
-     "maxHeightAboveWater": 11.0,
-     "heightAboveWaterFeather": 2.5
+     "maxHeightAboveWater": 17.0,
+     "heightAboveWaterFeather": 3.2
     },
     {
      "name": "fan-plants",

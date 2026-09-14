@@ -311,13 +311,17 @@ terrain.setdefault("material", collections.OrderedDict())["program"] = "paintedG
 #
 # (min, max, feather). A layer absent from this table is unconstrained on purpose: rock is rock.
 HAR_BANDS = {
-    "grass":       (0.2, 11.0, 2.5),   # the valley floor's carpet, gone from the upper walls
+    "grass":       (0.2, 17.0, 3.2),   # the valley floor's carpet, thinning out up the lower slopes
     "ferns":       (0.4,  8.5, 1.8),   # moist, low, near the corridor
     "flowers":     (0.3,  5.0, 1.2),   # a riparian accent and nothing else
     "fungi":       (0.1,  6.0, 1.2),   # damp and shaded
     "shelf-fungi": (0.8, 11.0, 2.0),
     "fan-plants":  (0.4,  7.5, 1.6),   # the big fronds: foreground framing, floor only
-    "bushes":      (1.5, 24.0, 3.5),   # the transitional band, deliberately the widest
+    # Widened from 24 m in Phase 7. The ladder did its job too well: with groundcover banded off the
+    # upper slopes the east wall carried pines and nothing else, and wide shots read bare on that side
+    # now that the heroes draw the eye west. Bushes are the right species to carry an upland -- small,
+    # sparse, silhouette-forming -- and 38 m reaches the wall's shoulder without reaching its crest.
+    "bushes":      (1.5, 38.0, 5.0),   # the transitional band, deliberately the widest
     "canopy":      (2.5, 42.0, 5.0),   # woodland on the slopes, not standing in the river
     "deadwood":    (4.0, 46.0, 5.0),
     "pines":       (11.0, 95.0, 7.0),  # the upland silhouette, and the reason the walls read
