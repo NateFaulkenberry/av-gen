@@ -20,6 +20,7 @@
 #include "core/error.hpp"
 #include "scene/scene.hpp"
 #include "scene/tree.hpp"
+#include "scene/tree_foliage.hpp"
 #include "scene/tree_generator.hpp"
 #include "scene/tree_mesh.hpp"
 #include "scene/tree_rig.hpp"
@@ -80,6 +81,11 @@ struct TreeLook {
     // the canopy glowing. Every previous reduction here made the picture better.
     float foliageEmissiveIntensity = 0.62f;
     float foliageRoughness = 0.78f;
+    LeafSpraySettings leafSpray{};
+    // The cutoff. High enough that the mask's soft edge does not leave a halo of half-leaves, low
+    // enough that the mip chain does not erode the spray to nothing at distance -- the renderer's
+    // alpha-coverage preservation is what makes the second half of that true.
+    float foliageAlphaCutoff = 0.42f;
 
     // --- The environment, and the only job it has --------------------------------------------
     //

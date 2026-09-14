@@ -394,7 +394,13 @@ TEST_CASE("tree probe: re-run the selection", "[.tree-probe]") {
     }
     for (std::size_t rank = 0; rank < std::min<std::size_t>(6, result->selected.size()); ++rank) {
         const search::Candidate& c = result->candidates[result->selected[rank]];
-        WARN(fmt::format("rank {}  index {:<4} score {:.4f}  tris {}", rank, c.index, c.score.overall(),
-                         c.triangles));
+        const auto* box = c.score.find("boxFill");
+        const auto* open = c.score.find("openness");
+        const auto* str = c.score.find("structureVisible");
+        WARN(fmt::format("rank {} index {:<4} score {:.4f} boxFill {:.3f}({:.2f}) openness {:.3f}({:.2f}) "
+                         "structure {:.3f}({:.2f})",
+                         rank, c.index, c.score.overall(), box ? box->raw : 0.0f, box ? box->score : 0.0f,
+                         open ? open->raw : 0.0f, open ? open->score : 0.0f, str ? str->raw : 0.0f,
+                         str ? str->score : 0.0f));
     }
 }

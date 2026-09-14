@@ -1,6 +1,8 @@
 #include "scene/tree_generator.hpp"
 
 #include "core/noise.hpp"
+#include "scene/tree_foliage.hpp"
+#include "scene/tree_scene.hpp"
 #include "search/candidate_search.hpp"
 
 #include <glm/gtc/constants.hpp>
@@ -99,7 +101,7 @@ float TreeCameraView::aspect() const {
     return height > 0 ? static_cast<float>(width) / static_cast<float>(height) : 1.0f;
 }
 
-TreeSilhouette rasteriseTree(const TreeGraph& graph, const TreeCameraView& camera) {
+TreeSilhouette rasteriseTree(const TreeGraph& graph, const TreeCameraView& camera, float foliageCoverage) {
     TreeSilhouette out;
     out.width = std::max(camera.width, 8);
     out.height = std::max(camera.height, 8);
@@ -133,11 +135,14 @@ TreeSilhouette rasteriseTree(const TreeGraph& graph, const TreeCameraView& camer
                          project(vp, root.points[i], root.radii[i], out.width, out.height, projScale), 1);
         }
     }
+    const float coverage = std::clamp(foliageCoverage, 0.02f, 1.0f);
+    const float coverRadius = std::sqrt(coverage);
     for (const FoliageSite& site : graph.foliage) {
         const Projected p = project(vp, site.position, site.radius, out.width, out.height, projScale);
         if (p.visible) {
-            out.foliageArea += glm::pi<double>() * static_cast<double>(p.radiusPixels) * p.radiusPixels;
-            stampDisc(out, p.pixel, p.radiusPixels, 2);
+            const float r = p.radiusPixels * coverRadius;
+            out.foliageArea += glm::pi<double>() * static_cast<double>(r) * r;
+            stampDisc(out, p.pixel, r, 2);
         }
     }
 
@@ -365,13 +370,16 @@ const std::vector<TreeBand>& treeBands() {
          "definition -- every silhouette number here is measured through it -- so moving it "
          "invalidates the bands, and only the variance probe says which ones.",
          0.08f,
-         {0.13f, 0.19f, 0.26f, 0.34f}},
+         {0.085f, 0.115f, 0.170f, 0.225f}},
         {"boxFill",
          "Silhouette area over its own bounding box. This is the skinny/blob axis: below the band "
          "the tree is a wispy stick figure, above it the canopy has merged into one indistinct mass "
-         "and no branch is individually readable.",
-         0.10f,
-         {0.14f, 0.24f, 0.42f, 0.58f}},
+         "and no branch is individually readable. THE DENSITY AXIS, and carrying the weight that "
+         "came off `openness`: it is what actually separates a crown that reads as volume from one "
+         "that reads as scattered leaves, which is the distinction the foliage rework was funded to "
+         "make and the one the contact sheet shows a person making immediately.",
+         0.15f,
+         {0.240f, 0.310f, 0.420f, 0.520f}},
         {"aspect",
          "Silhouette width over height. Banded for the monumental target -- appreciably taller than "
          "it is wide, but not a pole. A 32 m tree with a 21 m crown is 0.66.",
@@ -392,14 +400,19 @@ const std::vector<TreeBand>& treeBands() {
          "components doing the work. A criterion has to have variance across the population or it "
          "is not a criterion.",
          0.06f,
-         {0.46f, 0.52f, 0.62f, 0.72f}},
+         {0.500f, 0.550f, 0.620f, 0.690f}},
         {"openness",
          "Fraction of the silhouette's interior that is empty. Meaningful negative space as a "
-         "number: too little is the indistinguishable mass, too much is the dead central void. "
-         "Re-banded twice, both times because something else moved underneath it: the foliage rework "
-         "raised the whole population's openness, and then the camera pull-back raised it again.",
-         0.09f,
-         {0.22f, 0.29f, 0.40f, 0.50f}},
+         "number. DEMOTED TO A GUARD, like depthSpread, and for a reason the contact sheet made "
+         "plain: it has been re-banded four times and each time it settles back to scoring near 1.0 "
+         "for almost the whole population. It does not separate the trees a person can tell apart -- "
+         "a dense crown with real gaps and a sparse crown of scattered leaves have almost the same "
+         "column-wise interior emptiness, and on the sheet the sparsest candidate scored 0.42 and "
+         "one of the fullest scored 0.43. What separates them is `boxFill`, which is why the weight "
+         "moved there. Kept at a low weight because the two ends it guards against are still real "
+         "failures; it is simply not the axis this design space varies along.",
+         0.04f,
+         {0.300f, 0.360f, 0.480f, 0.600f}},
         {"structureVisible",
          "Projected branch area over total projected area. The chosen reference's defining property "
          "-- readable radial branching through the crown -- and banded at both ends because a tree "
@@ -409,7 +422,7 @@ const std::vector<TreeBand>& treeBands() {
          "in the upper-middle of that, favouring visible structure. Whether a person agrees is what "
          "the contact sheet is for.",
          0.11f,
-         {0.05f, 0.14f, 0.30f, 0.45f}},
+         {0.400f, 0.500f, 0.680f, 0.820f}},
         {"depthSpread",
          "Canopy depth along the camera's forward axis over canopy spread across it. 1.0 is a crown "
          "as deep as it is wide. The lower bound stops a tree that has flattened itself toward the "
@@ -451,9 +464,13 @@ const std::vector<TreeBand>& treeBands() {
         {"silhouetteComplexity",
          "Isoperimetric quotient, perimeter squared over 4 pi area. A disc scores 1. The "
          "blob-to-spaghetti axis in one number, and the component most directly aimed at the "
-         "noodle-tree failure.",
+         "noodle-tree failure. The numbers moved by more than an order of magnitude when the "
+         "evaluator was told the canopy's true coverage -- a mask of sparse alpha-cut sprays has an "
+         "enormous perimeter for its area where a mask of solid discs had very little -- which is "
+         "the clearest illustration here that a band is a statement about an INSTRUMENT as much as "
+         "about a tree.",
          0.04f,
-         {1.8f, 4.0f, 18.0f, 34.0f}},
+         {35.0f, 60.0f, 150.0f, 240.0f}},
         {"rootSpreadRatio",
          "Root reach over crown half-width. Anchors the tree visually; the upper bound stops the "
          "roots becoming a second crown lying on the ground. Re-banded after the roots were rebuilt "
@@ -574,7 +591,13 @@ Result<TreeParams> treeParamsFrom(std::span<const float> v) {
 }
 
 TreeGenerator::TreeGenerator(TreeCameraView camera, TreeMeshSettings mesh)
-    : schema_(treeSchema()), camera_(camera), mesh_(mesh) {}
+    : schema_(treeSchema()), camera_(camera), mesh_(mesh) {
+    // Measured once from the shipped spray, because it is a property of the primitive rather than
+    // of any candidate. The look's cutoff is the scene's, not the generator's, so the default is
+    // used here and the two are kept in step by `TreeLook::foliageAlphaCutoff` having the same
+    // default -- stated because it is the kind of coupling that drifts silently.
+    foliageCoverage_ = leafSprayCoverage(LeafSpraySettings{}, TreeLook{}.foliageAlphaCutoff);
+}
 
 const TreeGraph* TreeGenerator::ensureGraph(const search::Parameters& params) const {
     if (cache_ && cache_->key == params) {
@@ -598,7 +621,7 @@ const TreeMeasurements* TreeGenerator::ensureMeasured(const search::Parameters& 
         return nullptr;
     }
     if (!cache_->measuredValid) {
-        cache_->measured = measureTree(*graph, rasteriseTree(*graph, camera_), camera_);
+        cache_->measured = measureTree(*graph, rasteriseTree(*graph, camera_, foliageCoverage_), camera_);
         cache_->measuredValid = true;
     }
     return &cache_->measured;

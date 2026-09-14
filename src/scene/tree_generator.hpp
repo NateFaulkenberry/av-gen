@@ -79,7 +79,12 @@ struct TreeSilhouette {
     [[nodiscard]] bool empty() const { return filled == 0; }
 };
 
-[[nodiscard]] TreeSilhouette rasteriseTree(const TreeGraph& graph, const TreeCameraView& camera);
+// `foliageCoverage` is the fraction of a foliage card that survives the alpha cutoff, from
+// `leafSprayCoverage`. A cluster is stamped as a disc shrunk by its square root and contributes its
+// true covered area, because a spray card is mostly empty and a solid disc over-reports the canopy
+// by about three times. Defaulted to 1 so a caller with opaque foliage need not care.
+[[nodiscard]] TreeSilhouette rasteriseTree(const TreeGraph& graph, const TreeCameraView& camera,
+                                           float foliageCoverage = 1.0f);
 
 struct TreeMeasurements {
     float frameFill = 0.0f;
@@ -121,16 +126,30 @@ struct TreeBand {
 // Identity is the index (the shared interface's rule), so `sampleAt(treeSchema().parameters, 49)`
 // reproduces this tree exactly and no mesh or parameter dump is stored. The provenance:
 //
-//   96 candidates, none rejected, scored by `treeBands()` as of 2026-09-14, after the camera was
-//   pulled back far enough for the design space's tallest tree to fit and `openness` was re-banded
-//   for the framing that resulted. Top three: 39 at 0.9311, 74 at 0.9279, 52 at 0.9155.
+//   96 candidates, none rejected, scored by `treeBands()` as of 2026-09-14, after the foliage
+//   primitive became alpha-cut leaf sprays and six bands were re-measured because the evaluator was
+//   finally told the canopy's true coverage. Top three: 87 at 0.9894, 49 at 0.9810, 86 at 0.9782.
+//
+// A KNOWN LIMIT ON THIS CHOICE. The evaluator ranks crown ARCHITECTURE competently and cannot judge
+// canopy DENSITY as rendered. Its rasteriser stamps each foliage cluster as a disc, so everything
+// that happens between the leaves is erased before any metric sees it -- and `boxFill`, the axis
+// that ought to separate "reads as volume" from "reads as scattered leaves", reports this hero as
+// the DENSEST of the top six (0.433) when by eye it is among the airiest. Feeding the rasteriser the
+// spray's true coverage fixed the overall scale and cannot fix this, because coverage is a property
+// of the primitive and is identical for every candidate.
+//
+// So a person looking at the contact sheet may reasonably disagree with this ranking on density, and
+// the shared record has `selectionNote` for exactly that: a human override is a supported outcome,
+// not a failure. Closing the gap properly means rasterising real foliage geometry rather than a
+// proxy, which is a real piece of work and is not done.
 //
 // This number is an artefact of the scoring that produced it, and the scoring is an artefact of the
 // camera. **If either changes, re-run the selection.** It has already moved twice for exactly that
-// reason -- 11 under the pre-move bands, then 49, then 39 once the camera was far enough back for
-// the whole design space to fit -- and keeping a stale one would mean anyone judging the result was
-// judging the system that picked it rather than the tree.
-inline constexpr std::uint32_t kHeroCandidate = 39;
+// reason -- 11, then 49, then 39 once the camera was far enough back for the whole design space to
+// fit, then 87 once the evaluator could see how sparse the new foliage actually is -- and keeping a
+// stale one would mean anyone judging the result was judging the system that picked it rather than
+// the tree.
+inline constexpr std::uint32_t kHeroCandidate = 87;
 
 // The human-defined design space (brief section 34): what kinds of tree are allowed to exist. The
 // search decides where to look inside it; it does not get to leave it.
@@ -177,6 +196,7 @@ private:
     search::GeneratorSchema schema_;
     TreeCameraView camera_;
     TreeMeshSettings mesh_;
+    float foliageCoverage_ = 1.0f;
     mutable std::optional<Cache> cache_;
 };
 static_assert(search::CandidateGenerator<TreeGenerator>);
