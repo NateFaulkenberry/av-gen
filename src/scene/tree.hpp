@@ -183,11 +183,21 @@ struct TreeParams {
     // --- Diameter ------------------------------------------------------------------------------
     float pipeExponent = 2.3f;          // n in d^n = d1^n + d2^n (Macdonald 1983: 2 to 3)
     float tipRadius = 0.028f;
-    // 0.55, not 1. The pipe model with shed memory is faithful but it produces a trunk about twice
-    // as thick as a real tree of this height: 30 m with a 4.8 m diameter bole read as a stump rather
-    // than as a monument, because what makes a trunk monumental is its height-to-width ratio and a
-    // real 30 m tree is nearer 10:1 than 5:1.
-    float radiusScale = 0.55f;
+    // BACK TO 1.0, AND THE ROUND TRIP IS THE POINT.
+    //
+    // This was 1.0, was cut to 0.55 because the pipe model with shed memory produced a 4.8 m bole on
+    // a 30 m tree that read as a stump, and is now 1.0 again. That is not indecision: the earlier
+    // judgement was correct about a tree that no longer exists. It was 23 m tall, the camera was
+    // 44 degrees from 37 m -- nearly orthographic -- and the crown was a solid shell, so a thick
+    // trunk had nothing to carry and everything to compete with.
+    //
+    // The tree is now 30 to 32 m, the camera is 55 degrees from 34 m and low, and the canopy is
+    // alpha-cut sprays with air in it. Rendered side by side at 0.55, 0.78 and 1.0, the unscaled
+    // model reads as a trunk carrying a crown and the reduced one reads as spindly: 12.9:1 height
+    // to diameter at 0.55, 7.3:1 at 1.0, and a monumental broadleaf is nearer the second.
+    //
+    // The pipe model was faithful all along. What was wrong was the proportions around it.
+    float radiusScale = 1.0f;
     float trunkFlare = 0.55f;           // extra radius at the very base, as a fraction
     float flareHeight = 3.0f;           // the height it decays over
 
@@ -270,7 +280,12 @@ struct TreeParams {
     // anchored.
     float rootDepth = 1.0f;
     float rootCurvature = 0.55f;
-    float rootRadiusScale = 0.85f;      // fraction of the trunk base radius the largest root starts at
+    // Fraction of the trunk base radius the largest root starts at. Reduced from 0.85 when the
+    // trunk went back to the unscaled pipe model: the roots are sized FROM the trunk, so widening
+    // it widened them by the same factor, and they came out heavier than anything the user was
+    // shown when they chose this candidate. 0.52 against a 2.12 m base is 1.10 m, which is where
+    // the roots sat at 0.85 against the 1.17 m base of the contact sheet they judged.
+    float rootRadiusScale = 0.52f;
     int rootSegments = 16;
     float rootSplit = 0.45f;            // probability a root forks once
     // How far root directions follow the canopy's own mass distribution (brief section 38: the

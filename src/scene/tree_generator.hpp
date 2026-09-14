@@ -126,22 +126,14 @@ struct TreeBand {
 // Identity is the index (the shared interface's rule), so `sampleAt(treeSchema().parameters, 49)`
 // reproduces this tree exactly and no mesh or parameter dump is stored. The provenance:
 //
-//   96 candidates, none rejected, scored by `treeBands()` as of 2026-09-14, after the foliage
-//   primitive became alpha-cut leaf sprays and six bands were re-measured because the evaluator was
-//   finally told the canopy's true coverage. Top three: 87 at 0.9894, 49 at 0.9810, 86 at 0.9782.
+//   **A HUMAN SELECTION, not the top-scoring candidate.** The user reviewed the contact sheet,
+//   named #4 and #12 as contenders, and asked for wider trunks on both; #4 was taken after
+//   rendering both at the showcase camera at three trunk widths. The score-ranked winner was #87.
 //
-// A KNOWN LIMIT ON THIS CHOICE. The evaluator ranks crown ARCHITECTURE competently and cannot judge
-// canopy DENSITY as rendered. Its rasteriser stamps each foliage cluster as a disc, so everything
-// that happens between the leaves is erased before any metric sees it -- and `boxFill`, the axis
-// that ought to separate "reads as volume" from "reads as scattered leaves", reports this hero as
-// the DENSEST of the top six (0.433) when by eye it is among the airiest. Feeding the rasteriser the
-// spray's true coverage fixed the overall scale and cannot fix this, because coverage is a property
-// of the primitive and is identical for every candidate.
-//
-// So a person looking at the contact sheet may reasonably disagree with this ranking on density, and
-// the shared record has `selectionNote` for exactly that: a human override is a supported outcome,
-// not a failure. Closing the gap properly means rasterising real foliage geometry rather than a
-// proxy, which is a real piece of work and is not done.
+//   This is the pipeline working as designed rather than failing. The evaluator ranks crown
+//   architecture and cannot judge canopy density as rendered (see below), and density is precisely
+//   what separated the cells the user was choosing between. A search honestly characterised as
+//   unable to rank an axis is not overruled when a person decides that axis.
 //
 // This number is an artefact of the scoring that produced it, and the scoring is an artefact of the
 // camera. **If either changes, re-run the selection.** It has already moved twice for exactly that
@@ -149,7 +141,7 @@ struct TreeBand {
 // fit, then 87 once the evaluator could see how sparse the new foliage actually is -- and keeping a
 // stale one would mean anyone judging the result was judging the system that picked it rather than
 // the tree.
-inline constexpr std::uint32_t kHeroCandidate = 87;
+inline constexpr std::uint32_t kHeroCandidate = 4;
 
 // The human-defined design space (brief section 34): what kinds of tree are allowed to exist. The
 // search decides where to look inside it; it does not get to leave it.
