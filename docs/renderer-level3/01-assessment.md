@@ -251,6 +251,46 @@ after ADR-182, and every number above was re-measured afterwards. And the flicke
 is a choice, not a constant; the ranking is stable across plausible thresholds but the percentages
 are not.
 
+### Inside the water: what is and is not the cause
+
+Arms on the water's own authored parameters, same camera and sequence, each checked for
+non-vacuity first:
+
+| arm | flickering pixels | attributable |
+|---|---:|---:|
+| baseline | 3.116% | — |
+| ripple normals off | 2.429% | **22 points of the 57** |
+| foam off | 3.081% | ~1 point |
+| glow off | 3.115% | **none** |
+| sparkle off | 3.116% | **none — the arm is vacuous here** |
+
+The tile map localises it beyond doubt. The tiles peaking near **300** are the river; with water off
+they fall to 50-130, while tiles containing no water are unchanged to the decimal — which is also the
+cleanest evidence that the arm perturbs only what it claims to.
+
+Three things this refutes, each on the mandate's own candidate list for water shimmer:
+
+* **Insufficient resolution is not the cause and supersampling is not the fix.** Rendering the same
+  sequence at 1920x1080 instead of 960x540 *raised* the flickering fraction from 3.116% to **4.274%**
+  — four times the pixels produced 5.5 times the flickering area. Whatever this is, more samples do
+  not average it away.
+* **The sparkle is innocent here.** Zeroing it produces a byte-identical frame at *both* resolutions,
+  because it is band-passed in screen space and contributes nothing at this camera distance. Worth
+  stating loudly, because it is the term whose name most invites the blame — and the term a previous
+  investigation spent three attempts on.
+* **The subsurface glow contributes nothing**, despite changing the image.
+
+**Ripple normals are the largest identified single cause at about 22 of the 57 points**, which is the
+classic specular-aliasing story: high-frequency procedural normals under a tight specular lobe. It is
+also only a third of water's share.
+
+**About 34 points remain unattributed**, and no authored parameter reaches them. The candidates are
+the moon glint, the sky reflection, and the depth-derived shoreline — and separating those needs arms
+inside `water.wgsl` rather than in the scene file. That is the next experiment and it is deliberately
+not being run yet: editing that shader on a hypothesis is exactly what cost three rounds on the
+anamorphic comb, and the discipline that eventually worked there was an impulse through the
+production chain rather than a plausible change.
+
 ## What Phase 1 still owes
 
 - The temporal artifact inventory (§4), which needs the representative suite rendered and looked at.
