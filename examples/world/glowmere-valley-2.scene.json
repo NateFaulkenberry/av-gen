@@ -5620,10 +5620,11 @@
   {
    "name": "elder-2-spores",
    "kind": "particles",
+   "parent": "elder-2-cap",
    "position": [
-    -14.473,
-    14.551,
-    52.706
+    2.248,
+    11.011,
+    1.25
    ],
    "visible": true,
    "particles": {
@@ -5701,10 +5702,11 @@
   {
    "name": "lantern-spores",
    "kind": "particles",
+   "parent": "lantern-cap",
    "position": [
-    -44.813,
-    12.736,
-    -25.622
+    2.52,
+    4.926,
+    0.843
    ],
    "visible": true,
    "particles": {
@@ -5782,10 +5784,11 @@
   {
    "name": "spire-spores",
    "kind": "particles",
+   "parent": "spire-cap",
    "position": [
-    67.651,
-    15.045,
-    -103.675
+    0.477,
+    3.075,
+    0.018
    ],
    "visible": true,
    "particles": {
@@ -5863,10 +5866,11 @@
   {
    "name": "bloom-spores",
    "kind": "particles",
+   "parent": "bloom-cap",
    "position": [
-    -59.294,
-    10.697,
-    117.749
+    2.679,
+    6.517,
+    0.459
    ],
    "visible": true,
    "particles": {
@@ -5944,10 +5948,11 @@
   {
    "name": "veil-spores",
    "kind": "particles",
+   "parent": "veil-cap",
    "position": [
-    77.546,
-    2.679,
-    198.733
+    0.826,
+    2.639,
+    0.248
    ],
    "visible": true,
    "particles": {
@@ -6025,10 +6030,11 @@
   {
    "name": "umbra-spores",
    "kind": "particles",
+   "parent": "umbra-cap",
    "position": [
-    -64.212,
-    8.052,
-    166.744
+    1.788,
+    3.922,
+    0.744
    ],
    "visible": true,
    "particles": {
@@ -6106,10 +6112,11 @@
   {
    "name": "cairn-spores",
    "kind": "particles",
+   "parent": "cairn-cap",
    "position": [
-    -150.217,
-    36.701,
-    -59.207
+    0.71,
+    5.491,
+    0.415
    ],
    "visible": true,
    "particles": {
@@ -6187,10 +6194,11 @@
   {
    "name": "ridge-spores",
    "kind": "particles",
+   "parent": "ridge-cap",
    "position": [
-    130.471,
-    24.639,
-    -189.44
+    1.477,
+    3.829,
+    0.685
    ],
    "visible": true,
    "particles": {
@@ -6268,10 +6276,11 @@
   {
    "name": "scree-spores",
    "kind": "particles",
+   "parent": "scree-cap",
    "position": [
-    -175.835,
-    25.921,
-    95.554
+    2.098,
+    4.801,
+    0.696
    ],
    "visible": true,
    "particles": {
@@ -6349,10 +6358,11 @@
   {
    "name": "ember-spores",
    "kind": "particles",
+   "parent": "ember-cap",
    "position": [
-    175.683,
-    14.924,
-    149.757
+    0.369,
+    3.074,
+    0.153
    ],
    "visible": true,
    "particles": {

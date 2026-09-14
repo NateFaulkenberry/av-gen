@@ -60,8 +60,20 @@ TEST_CASE("Glowmere Valley 2 from several viewpoints", "[.capture][glowmere2]") 
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
 
+    // **Load the project, not the scene.** These captures are meant to be what the user sees, and
+    // what the user opens is the project -- whose parameter block overrides the scene's transforms
+    // and is where the hand edits live. Loading the scene alone renders a world with none of them:
+    // the heroes stood at the headings the script authored rather than the ones the user turned them
+    // to, so a spore-fall that had come adrift from its cap under those rotations looked perfectly
+    // aligned here. A capture that cannot show the defect is not evidence that there isn't one.
+    const fs::path projectFile =
+        fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2.json";
     app::Engine engine(app::EngineMode::Offline);
-    REQUIRE(engine.loadComposition(over ? fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / over : sceneFile).has_value());
+    if (over != nullptr) {
+        REQUIRE(engine.loadComposition(fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / over).has_value());
+    } else {
+        REQUIRE(engine.loadProject(projectFile).has_value());
+    }
     REQUIRE(engine.composition() != nullptr);
 
     constexpr std::uint32_t kWidth = 1920;
@@ -183,7 +195,22 @@ TEST_CASE("Glowmere Valley 2 from several viewpoints", "[.capture][glowmere2]") 
         // this fails instead of producing a plausible frame culled for somebody else's viewpoint.
         REQUIRE(glm::distance(scene.camera.position, v.eye) < 0.01f);
         REQUIRE(glm::distance(scene.camera.target, v.target) < 0.01f);
-        auto image = renderer.renderToImage(scene, time, kWidth, kHeight);
+        // **Let the camera settle before capturing.** Each view is a teleport, and the project the
+        // user saved turns motion blur up to 0.80, so the first frame at a new viewpoint integrates
+        // the jump and smears the whole world into streaks. Motion blur reads per-pixel velocity
+        // from the previous frame, so a few frames standing still bring it to zero. This did not
+        // arise while these captures loaded the bare scene, because the scene's own motion blur is
+        // off -- the setting only exists in the project, which is exactly why the captures had to
+        // start loading the project.
+        FrameTime settled = time;
+        for (int w = 0; w < 4; ++w) {
+            settled = engine.tick(clock);
+            engine.update(settled);
+            scene::Scene& ss = engine.composition()->scene();
+            ss.camera.farPlane = 1400.0f;
+            (void)renderer.renderToImage(ss, settled, kWidth, kHeight);
+        }
+        auto image = renderer.renderToImage(scene, settled, kWidth, kHeight);
         REQUIRE(image.has_value());
         REQUIRE(assets::writePng(outDir / (std::string(v.name) + ".png"), image->width, image->height,
                                  image->rgba)
