@@ -56,6 +56,37 @@ Two consequences, adopted:
 Thermal state remains uninstrumented and may still contribute. It is no longer the leading
 explanation, and no work is scheduled against it.
 
+### Second refinement: interleaving is necessary and not sufficient
+
+The same rule caught the same person again, one phase later, and the second failure is more
+instructive than the first. An interleaved A/B that co-locates its arms but runs them in **fixed
+order** — "no heroes" always second — reported that hiding six mushrooms made the frame **2.3 ms
+slower**. Same impossible sign as the two-invocation version, but from **bias rather than noise**: an
+arm that always runs second always pays for whatever drift accumulates during the run.
+
+> **Interleaving must be counterbalanced.** Alternate arm order over an even number of runs.
+
+Counterbalanced over four runs, the valley axis gives +0.85 ms, consistent with the +0.66 ms measured
+independently. **The opening view still returns an impossible −3.5 ms.** So the honest statement is
+not a delta at all: *the six heroes cost less than this method can resolve.* Plausible readings
+cluster at +0.2 to +0.9 ms and the implausible ones put the noise above that. **A number below the
+instrument's floor is not a number.**
+
+### The first implementation task, now specified
+
+Counterbalancing *averages over* drift. It does not detect it, which is why a counterbalanced run can
+still return an impossible sign and give no warning that it has.
+
+**A control arm, re-measured at the end of the run.** Measure arm A, run every arm, measure A again.
+If the two measurements of A differ by more than the effect being claimed, **the run is void** — the
+machine moved under the experiment and nothing measured during it can be trusted at that resolution.
+This is a drift *detector* rather than a drift *averager*, and it converts "the sign came out
+impossible" from a lucky catch into a routine check that fires before anyone reads the result.
+
+This is the first thing this effort should build. It changes no rendering behaviour — §1 permits
+diagnostic instrumentation — and every subsequent priority is judged on numbers it would certify.
+It needs a quiet machine to validate, which is the only reason it is not built yet.
+
 ## The finding that gates everything else — as originally written, now corrected above
 
 **This project cannot currently certify a single-run timing, and two independent measurements this
