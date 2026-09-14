@@ -803,6 +803,58 @@ TEST_CASE("scatter proximity rules reject malformed habitat ranges", "[unit][eco
     }
 }
 
+TEST_CASE("a scatter layer can declare what it is for navigation", "[unit][ecology][navigation]") {
+    // ADR-196. The heuristic classifies by asset filename, so an author whose tree is called
+    // `Plant_7` needs a way to say so. The key is the way.
+    const nlohmann::json base = {{"name", "thicket"}, {"asset", "Plant_7.gltf"},
+                                 {"densities", {{"forest", 0.2}}}};
+
+    SECTION("it parses the three words and nothing else") {
+        for (const auto& [word, expected] :
+             {std::pair{"auto", world::ScatterNavigation::Auto},
+              std::pair{"blocks", world::ScatterNavigation::Blocks},
+              std::pair{"passable", world::ScatterNavigation::Passable}}) {
+            auto j = base;
+            j["navigation"] = word;
+            const auto parsed = world::ecologyFromJson(nlohmann::json::array({j}));
+            REQUIRE(parsed.has_value());
+            CHECK(parsed->layers.front().navigation == expected);
+        }
+    }
+
+    SECTION("a typo is an error rather than a silent default") {
+        // The failure this project keeps finding: a policy field an author set and nothing read.
+        for (const auto& bad : {nlohmann::json("block"), nlohmann::json("solid"),
+                                nlohmann::json(true), nlohmann::json(1)}) {
+            auto j = base;
+            j["navigation"] = bad;
+            CHECK_FALSE(world::ecologyFromJson(nlohmann::json::array({j})).has_value());
+        }
+    }
+
+    SECTION("the default is auto and is not written back out") {
+        world::Ecology ecology;
+        ecology.layers.push_back(testLayer("ferns", {{"forest", 0.2f}}));
+        REQUIRE(ecology.layers.front().navigation == world::ScatterNavigation::Auto);
+        const nlohmann::json written = world::ecologyToJson(ecology);
+        CHECK_FALSE(written.at(0).contains("navigation"));
+        ecology.layers.front().navigation = world::ScatterNavigation::Blocks;
+        CHECK(world::ecologyToJson(ecology).at(0).at("navigation") == "blocks");
+    }
+
+    SECTION("a declaration survives the round trip") {
+        world::Ecology ecology;
+        ecology.layers.push_back(testLayer("boulders", {{"scree", 0.2f}}));
+        ecology.layers.front().navigation = world::ScatterNavigation::Passable;
+        const auto parsed = world::ecologyFromJson(world::ecologyToJson(ecology));
+        REQUIRE(parsed.has_value());
+        CHECK(parsed->layers.front().navigation == world::ScatterNavigation::Passable);
+        // And it does not move the structural hash: it changes what the placements *mean*, not
+        // where a single one of them is, and that hash seeds every instance's variation.
+        CHECK(parsed->structuralHash() == ecology.structuralHash());
+    }
+}
+
 TEST_CASE("an ecology round-trips through json", "[unit][ecology]") {
     world::Ecology original;
     world::ScatterLayer layer = testLayer("fungi", {{"marsh", 0.03f}, {"forest", 0.008f}});

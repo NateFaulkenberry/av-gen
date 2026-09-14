@@ -96,6 +96,7 @@ spatial::ObstacleFilter Navigator::filter(float footY) const {
     spatial::ObstacleFilter f;
     f.bodyRadius = settings_.bodyRadius;
     f.stepOver = settings_.stepOver;
+    f.jumpOver = settings_.jumpOver;
     f.footY = footY;
     f.headHeight = settings_.headroom;
     return f;

@@ -61,9 +61,17 @@ struct NavCell {
     std::uint8_t slope = 0;       // 0..255 over the navigator's 0..1 slope range
     std::uint8_t obstruction = 0; // 0..255: how much of the cell blocking solids cover
     // 0..255 over the navigator's wade band: 0 is dry ground (and every cell of every world whose
-    // walker does not wade), 255 is water at the deepest this body will enter. This was the pad
-    // byte, so the cell is still eight bytes and A* still walks two of them per cache line.
+    // walker does not wade), 255 is water at the deepest this body will enter (ADR-195).
     std::uint8_t wade = 0;
+    // 0..255: how much of the cell is covered by solids this world's walker gets past only by
+    // vaulting (ADR-196). Its own number rather than a share of `obstruction`, because a vault is
+    // neither open ground nor a wall and A* has to price it as a third thing. Zero everywhere for a
+    // body that cannot jump, so the cost term it feeds is exactly zero and no existing path moves.
+    std::uint8_t vault = 0;
+    // Two features arriving at once wanted the same spare byte, so the cell grew from eight to
+    // twelve rather than one of them being packed into nibbles. On Glowmere's 23,716-cell grid that
+    // is 95 KB, against a build that already costs 170 ms and a search that is bounded by
+    // `maxExpansions` rather than by memory. Precision in a cost term is worth more than the byte.
 };
 
 struct NavGridStats {
@@ -128,6 +136,16 @@ struct PathResult {
 // reads as a robot.
 struct NavPathCost {
     float obstructionPenalty = 3.0f; // multiplies distance through a fully obstructed cell
+    // What a vault costs, over a cell entirely covered by solids this body clears by jumping
+    // (ADR-196). Lower than `obstructionPenalty` because the cell *is* passable -- the route
+    // exists and the character takes it -- and above zero because clearing a boulder is not the
+    // same as walking round nothing: a path that priced it at zero would send a character
+    // hurdling a field of rocks to save two metres.
+    //
+    // Half of `obstructionPenalty` is a starting point and not a measurement. It cannot be
+    // measured on this project's content yet, because nothing in it can jump; what it is worth
+    // will be settled the first time something can, against a route a viewer watches.
+    float vaultPenalty = 1.5f;
     float slopePenalty = 1.6f;       // multiplies distance up a maximally steep walkable cell
     // Multiplies distance through water at the full wade depth. Wading is navigable, not free: a
     // ford is worth crossing when it is genuinely shorter and not when it merely cuts a corner.

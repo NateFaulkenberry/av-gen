@@ -85,6 +85,21 @@ struct ObstaclePolicy {
     float vegetationMinHeight = 4.0f;  // a shrub is waded through; a tree fern is not
     float structureMinHeight = 0.6f;
 
+    // Where the traversal classes fall, in metres of solid (ADR-196). These describe the *thing*,
+    // which is the point of the class: a solid no taller than `stepOverHeight` is stepped over and
+    // one no taller than `jumpOverHeight` is vaulted, and that is true of it whoever is asking.
+    // What a *particular* body can do about the class is `spatial::ObstacleFilter`'s half of the
+    // question and is asked at query time -- so a nominal `StepOver` still blocks a body whose own
+    // step is lower than the thing is tall, and a `Jumpable` blocks everything that cannot jump.
+    //
+    // `stepOverHeight` matches `NavSettings::stepOver`'s default on purpose, so the class an
+    // obstacle is born with and the answer the default walker gives about it agree. They are
+    // allowed to disagree -- a cart and a deer both read the same field -- and nothing breaks when
+    // they do; having them agree for the ordinary case just means a diagnostic and a query say the
+    // same word.
+    float stepOverHeight = 0.4f;
+    float jumpOverHeight = 1.2f;  // about what a person vaults; above it, go round
+
     // How much of an instance's footprint to actually claim. Vegetation is mostly air, and a
     // bounding cylinder that claims all of it makes a wide plant into a bollard.
     float footprintScale = 0.8f;
@@ -100,6 +115,16 @@ struct ObstaclePolicy {
 // The same judgement from the two strings alone, so a test can pin it without an ecology.
 [[nodiscard]] spatial::ObstacleType classifyAsset(std::string_view category, std::string_view assetPath);
 
+// What getting past a solid of this identity and this height takes (ADR-196). Identity still only
+// identifies; the single thing it decides here is that a `Creature` is never `Jumpable`, because a
+// solid that walks away mid-vault is not one to commit to.
+//
+// This is the seam between the two halves of navigation policy. *This* file decides what a world's
+// instances are, because it is the file that already knows a boulder from a bush; `spatial` stores
+// the answer and honours it, and the body asking decides what it can do with it.
+[[nodiscard]] spatial::Traversal traversalClass(spatial::ObstacleType type, float height,
+                                                const ObstaclePolicy& policy);
+
 // How tall an instance of `layer` at `instanceScale` stands, in metres. `assetHeight` is the
 // asset's own height in its own units, used only when the layer did not normalise to a height.
 [[nodiscard]] float instanceHeight(const world::ScatterLayer& layer, float instanceScale,
@@ -107,6 +132,12 @@ struct ObstaclePolicy {
 
 // Appends one obstacle for every instance of `cloud` the policy considers solid, and returns how
 // many it added.
+//
+// `layer.navigation` overrules the policy's height thresholds but not the physics: `Passable`
+// contributes nothing however tall the layer is, and `Blocks` contributes every instance however
+// short -- classed `Blocking`, which is what the author asserted. It still does not make a
+// ten-centimetre kerb into a wall, because whether a *body* has to do anything about a solid is
+// decided by that body's own step height at query time and not by the scene file.
 //
 // `footprintAspect` is the asset's horizontal radius divided by its own height -- unit-free, so the
 // caller may pass the raw glTF bounds without knowing what the layer normalised them to. Pass 0
