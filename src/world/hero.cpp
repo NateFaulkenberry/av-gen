@@ -1,5 +1,7 @@
 #include "world/hero.hpp"
 
+#include "world/world_map.hpp"
+
 #include "core/log.hpp"
 
 #include <nlohmann/json.hpp>
@@ -273,6 +275,40 @@ const HeroReactionProfile* findHeroReactionProfile(std::string_view name) {
         }
     }
     return nullptr;
+}
+
+
+float preferredApproachAzimuth(const WorldMap& map, glm::vec2 p, float standOff) {
+    const float reach = std::max(standOff, 1.0f);
+    const float here = map.height(p);
+    const glm::vec2 lo = map.min();
+    const glm::vec2 hi = map.max();
+
+    float bestScore = -1.0e9f;
+    float bestAzimuth = 0.0f;
+    bool any = false;
+    constexpr int kBearings = 24;
+    for (int i = 0; i < kBearings; ++i) {
+        const float a = 6.2831853f * static_cast<float>(i) / static_cast<float>(kBearings);
+        const glm::vec2 dir(std::cos(a), std::sin(a));
+        const glm::vec2 far = p + dir * reach;
+        // Outside the map is not an approach: a camera there sees the edge of the world.
+        if (far.x < lo.x || far.x > hi.x || far.y < lo.y || far.y > hi.y) {
+            continue;
+        }
+        const glm::vec2 mid = p + dir * (reach * 0.5f);
+        const float descentFar = here - map.height(far);
+        const float descentMid = here - map.height(mid);
+        // The near sample is weighted more heavily than the far one. A bearing that is open at forty
+        // metres and blocked at twenty is not open, and averaging the two would call it so.
+        const float score = descentFar * 0.4f + descentMid * 1.0f;
+        if (score > bestScore) {
+            bestScore = score;
+            bestAzimuth = a;
+            any = true;
+        }
+    }
+    return any ? bestAzimuth : 0.0f;
 }
 
 } // namespace avgen::world

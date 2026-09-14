@@ -1,6 +1,6 @@
 {
- "_note": "Glowmere Valley 2's WARM hero tissue -- the elder's, and only the elder's. The same graph as `glowmereTissue` with the emission constant changed from cyan-green to the palette's reserved accent. The first attempt made that constant white so the hue could come from `instanceEmissive` and the material could decide; it came back white, because a `distribution: single` procedural's instance emissive is not the material's emissive colour. So the program asserts the hue after all -- which is the thing that caused the original bug -- and the mitigation is that there are now exactly two of these, one per colour family, rather than one that is wrong for five of six heroes. The five cool heroes use the scene's own `glowmereTissue`, whose cyan-green is already their colour. Emission intensity is the ladder's beacon rung (6.15) rather than a free number: world::EmissionLadder validates a 4x minimum gap in code so that a 'bit more glow everywhere' edit cannot quietly close it, and a landmark organism is what a beacon rung is for. The mask's floor is lifted from 0 to 0.45 so the whole underside carries light with the grazing term on top of it -- 'more ambient' is a change to the mask's shape, because a program asserts emission and turning the material up does nothing (ADR-179).",
- "name": "glowmere2TissueWarm",
+ "_note": "Glowmere Valley 2 hero tissue, cool. The warm variant with the accent swapped for the palette primary. Two programs rather than one because a program ASSERTS emission (ADR-179) -- the material intensity lane is discarded -- so the hue has to be carried by the program, and one program cannot be two hues. The five cool heroes used the scene shared  until the gills needed more ambient presence, which is a change to the program emission and could not be made to a program three scatter layers also draw with. Emission intensity is the ladder's beacon rung (6.15) rather than a free number: world::EmissionLadder validates a 4x minimum gap in code so that a 'bit more glow everywhere' edit cannot quietly close it, and a landmark organism is what a beacon rung is for. The mask's floor is lifted from 0 to 0.45 so the whole underside carries light with the grazing term on top of it -- 'more ambient' is a change to the mask's shape, because a program asserts emission and turning the material up does nothing (ADR-179).",
+ "name": "glowmere2TissueCool",
  "ops": [
   {
    "kind": "input",
@@ -96,9 +96,9 @@
    "kind": "constant",
    "dst": 6,
    "constant": [
+    0.06,
+    0.82,
     1.0,
-    0.47,
-    0.15,
     1.0
    ]
   },

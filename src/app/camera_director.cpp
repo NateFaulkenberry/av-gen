@@ -177,6 +177,9 @@ Result<DirectionBrief> briefFromHeroes(std::span<const world::HeroPoint> heroes)
         // dropped, because "look up at this one and down into that one" is a real thing a hero has an
         // opinion about and there was already a field for it.
         t.preferredElevationDegrees = h.preferredCameraElevationDegrees;
+        // `HeroPoint::yaw` carries the bearing the world says this hero is best approached from. It
+        // was previously written by the composer and read by nobody in the director.
+        t.preferredAzimuth = h.yaw;
         return t;
     };
 

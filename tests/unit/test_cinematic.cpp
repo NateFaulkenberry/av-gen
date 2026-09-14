@@ -1009,3 +1009,40 @@ TEST_CASE("a subject's preferred elevation biases the shot without flattening it
         }
     }
 }
+
+TEST_CASE("a subject's approach bearing moves the whole film around it",
+          "[app][cinematic][autodirector]") {
+    // The part of per-hero cinematic regions that has to exist: a camera offset that comes from where
+    // the hero actually stands rather than from a global default that suits one of them.
+    const auto structure = referenceStructure();
+    app::DirectionBrief north = referenceBrief();
+    app::DirectionBrief east = north;
+    east.hero.preferredAzimuth = 1.5708f; // a quarter turn
+    for (app::FocalTarget& t : east.supporting) {
+        t.preferredAzimuth = 1.5708f;
+    }
+
+    const auto a = app::directFromStructure(structure, north);
+    const auto b = app::directFromStructure(structure, east);
+    REQUIRE(a.has_value());
+    REQUIRE(b.has_value());
+    REQUIRE(a->shots.size() == b->shots.size());
+
+    SECTION("every shot is rotated by the bearing") {
+        for (std::size_t i = 0; i < a->shots.size(); ++i) {
+            INFO("shot " << i);
+            REQUIRE_THAT(static_cast<double>(b->shots[i].startAzimuth - a->shots[i].startAzimuth),
+                         Catch::Matchers::WithinAbs(1.5708, 1e-4));
+        }
+    }
+
+    SECTION("the golden-angle spread between shots survives, because it is applied around it") {
+        // The spread is what stops a film being nine views down one axis; the bearing decides which
+        // axis they are spread around, and must not collapse them onto it.
+        for (std::size_t i = 1; i < a->shots.size(); ++i) {
+            const float spreadA = a->shots[i].startAzimuth - a->shots[i - 1].startAzimuth;
+            const float spreadB = b->shots[i].startAzimuth - b->shots[i - 1].startAzimuth;
+            REQUIRE_THAT(static_cast<double>(spreadA - spreadB), Catch::Matchers::WithinAbs(0.0, 1e-4));
+        }
+    }
+}

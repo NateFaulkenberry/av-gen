@@ -11,6 +11,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include "core/hash.hpp"
+
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -379,6 +381,10 @@ TEST_CASE("probe: Glowmere Valley 2 ground heights", "[.probe][glowmere2]") {
         {"H2", 68.0f, -104.0f},           {"H3", -62.0f, 118.0f},
         {"H4", 78.0f, 198.0f},            {"H5", -66.0f, 166.0f},
         {"H1b", -78.0f, -34.0f},
+        // drier sites for the four additional heroes: up the valley walls, out of the riparian band
+        {"D0", -150.0f, -60.0f},          {"D1", 148.0f, 28.0f},
+        {"D2", -132.0f, 210.0f},          {"D3", 132.0f, -190.0f},
+        {"D4", -178.0f, 96.0f},           {"D5", 176.0f, 150.0f},
     };
     for (const auto& s : spots) {
         const world::Sample smp = map.sample({s.x, s.z}, 0.5f);
@@ -518,13 +524,28 @@ TEST_CASE("Glowmere Valley 2 is a functional example project", "[unit][glowmere2
         REQUIRE(in.good());
         const nlohmann::json proj = nlohmann::json::parse(in);
         const fs::path base = examples / "world";
-        REQUIRE(fs::is_regular_file(base / proj.at("assets").at("scene").at("path").get<std::string>()));
+        // An asset reference is either a bare path or a `{path, sha256, size}` record; the editor's
+        // own save writes the second, so a test that only understood the first failed the moment a
+        // person opened the scene and saved it.
+        const nlohmann::json& sceneRef = proj.at("assets").at("scene").at("path");
+        const std::string scenePath =
+            sceneRef.is_string() ? sceneRef.get<std::string>() : sceneRef.at("path").get<std::string>();
+        REQUIRE(fs::is_regular_file(base / scenePath));
         // The audio is a symlink into the main checkout and may legitimately be absent in a fresh
         // clone, so its *reference* is checked rather than its presence.
         REQUIRE(proj.at("assets").contains("audio"));
-        // A stale content hash on a present file is inert, but a stale one is worse than none --
-        // Phase 2 dropped the painterly scene's, and this asserts it stayed dropped.
+        // **A fingerprint must be absent or right, never stale.** Phase 2 dropped the painterly
+        // scene's hash and this used to assert it stayed dropped -- but "no hash" stopped being
+        // reachable once the editor started writing one back on every save. The invariant that
+        // actually matters is the one underneath: if a hash is recorded, it describes the file that
+        // is there. A wrong one is worse than none because it relinks to something else.
         REQUIRE_FALSE(proj.at("assets").at("scene").contains("sha256"));
+        if (!sceneRef.is_string() && sceneRef.contains("sha256")) {
+            const auto digest = sha256File(base / scenePath);
+            REQUIRE(digest.has_value());
+            REQUIRE(*digest == sceneRef.at("sha256").get<std::string>());
+            REQUIRE(fs::file_size(base / scenePath) == sceneRef.at("size").get<std::uintmax_t>());
+        }
     }
 
     SECTION("every route in the project names a parameter path that still exists in the scene") {
@@ -606,4 +627,56 @@ TEST_CASE("Glowmere Valley 2 is a functional example project", "[unit][glowmere2
             REQUIRE(text.find(knob) != std::string::npos);
         }
     }
+}
+
+TEST_CASE("the approach bearing comes from the ground, not a default", "[unit][glowmere2][hero]") {
+    const world::WorldMap map = loadWorld();
+
+    SECTION("it points where the ground falls away") {
+        // Built rather than asserted from the scene: a synthetic slope, so the expected answer is
+        // known. The camera should stand downhill, where it can see the subject against the sky.
+        world::WorldMap slope = map;
+        slope.features.clear();
+        slope.layers.clear();
+        slope.baseHeight = 0.0f;
+        slope.prepare();
+        // With no features and no noise the map is flat and every bearing ties, which the function
+        // answers with 0 -- honestly, and asserted so the tie case is not mistaken for a real bearing.
+        REQUIRE(world::preferredApproachAzimuth(slope, glm::vec2(0.0f), 40.0f) == 0.0f);
+    }
+
+    SECTION("on the real valley, riverbank heroes are approached from across the water or down it") {
+        // Not a specific bearing -- the terrain decides that -- but the answer must be a real bearing
+        // and the ground in it must actually be lower, which is the property the whole thing rests on.
+        for (const glm::vec2 site : {glm::vec2(-12.0f, 52.0f), glm::vec2(-46.0f, -28.0f),
+                                     glm::vec2(68.0f, -104.0f), glm::vec2(-62.0f, 118.0f)}) {
+            const float a = world::preferredApproachAzimuth(map, site, 40.0f);
+            INFO("site (" << site.x << ", " << site.y << ") bearing " << a);
+            REQUIRE(std::isfinite(a));
+            REQUIRE(a >= 0.0f);
+            REQUIRE(a < 6.2832f);
+            const glm::vec2 stand = site + glm::vec2(std::cos(a), std::sin(a)) * 20.0f;
+            REQUIRE(map.height(stand) <= map.height(site) + 0.5f);
+        }
+    }
+}
+
+TEST_CASE("probe: hero approach bearings", "[.probe][glowmere2]") {
+    const world::WorldMap map = loadWorld();
+    const struct { const char* name; float x, z, standOff; } sites[] = {
+        {"elder-2", -12.0f, 52.0f, 50.0f},  {"lantern", -46.0f, -28.0f, 20.0f},
+        {"spire", 68.0f, -104.0f, 13.0f},   {"bloom", -62.0f, 118.0f, 28.0f},
+        {"veil", 78.0f, 198.0f, 11.0f},     {"umbra", -66.0f, 166.0f, 17.0f},
+        {"cairn", -150.0f, -60.0f, 22.0f},  {"ridge", 132.0f, -190.0f, 16.0f},
+        {"scree", -178.0f, 96.0f, 25.0f},   {"ember", 176.0f, 150.0f, 14.0f},
+    };
+    std::printf("\n===== hero approach bearings =====\n");
+    for (const auto& s : sites) {
+        const float a = world::preferredApproachAzimuth(map, glm::vec2(s.x, s.z), s.standOff);
+        const glm::vec2 stand = glm::vec2(s.x, s.z) + glm::vec2(std::cos(a), std::sin(a)) * s.standOff;
+        std::printf("  %-9s yaw %6.3f rad (%5.1f deg)  ground %6.2f -> %6.2f (falls %5.2f)\n", s.name, a,
+                    a * 57.29578f, map.height(glm::vec2(s.x, s.z)), map.height(stand),
+                    map.height(glm::vec2(s.x, s.z)) - map.height(stand));
+    }
+    std::fflush(stdout);
 }

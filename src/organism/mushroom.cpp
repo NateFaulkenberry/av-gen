@@ -93,7 +93,8 @@ struct RadialModulation {
 // facing surface. Normals are computed from the surface afterwards rather than analytically,
 // because the modulation makes the analytic form long and the mesh is built once.
 scene::MeshData lathe(const Profile& profile, const RadialModulation& mod, int segments, int spokes,
-                      bool flip, float tiltRadians, float pivotY, float innerU = 0.0f) {
+                      bool flip, float tiltRadians, float pivotY, glm::vec2 origin,
+                      float innerU = 0.0f) {
     scene::MeshData mesh;
     mesh.vertices.reserve(static_cast<std::size_t>(segments + 1) * static_cast<std::size_t>(spokes + 1));
     const float cosT = std::cos(tiltRadians);
@@ -121,6 +122,13 @@ scene::MeshData lathe(const Profile& profile, const RadialModulation& mod, int s
             p.y -= pivotY;
             p = glm::vec3(p.x, p.y * cosT - p.z * sinT, p.y * sinT + p.z * cosT);
             p.y += pivotY;
+            // ...and then onto the stem. The cap is lathed about the origin and the stem *leans*, so
+            // without this the cap sits where a straight stem's top would have been. Measured over
+            // the generator's own population: 260 of 660 plausible candidates had their cap off their
+            // stem, the worst by 17.7 stem radii. It was invisible in a parameter-space check, which
+            // is why the alignment invariant reads its anchors off the meshes.
+            p.x += origin.x;
+            p.z += origin.y;
             scene::Vertex v;
             v.position = p;
             v.normal = glm::vec3(0.0f, flip ? -1.0f : 1.0f, 0.0f);
@@ -147,7 +155,7 @@ scene::MeshData lathe(const Profile& profile, const RadialModulation& mod, int s
         const auto apex = static_cast<std::uint32_t>(mesh.vertices.size());
         scene::Vertex tip;
         const float ty = profile.at(0.0f);
-        tip.position = glm::vec3(0.0f, (ty - pivotY) * cosT + pivotY, (ty - pivotY) * sinT);
+        tip.position = glm::vec3(origin.x, (ty - pivotY) * cosT + pivotY, (ty - pivotY) * sinT + origin.y);
         tip.normal = glm::vec3(0.0f, flip ? -1.0f : 1.0f, 0.0f);
         tip.uv = glm::vec2(0.5f, 0.0f);
         mesh.vertices.push_back(tip);
@@ -228,7 +236,7 @@ scene::MeshData sweepStem(float height, float baseRadius, float taper, float bul
 // a glowing organism that read as biology was the one where the light came out of sixty-four hanging
 // filaments rather than off a smooth dome.
 scene::MeshData buildGills(const Profile& under, const RadialModulation& mod, int count, float depth,
-                           float innerU, float tiltRadians, float pivotY, float blade) {
+                           float innerU, float tiltRadians, float pivotY, glm::vec2 origin, float blade) {
     scene::MeshData mesh;
     constexpr int kSpan = 7; // samples from the stem outward along one blade
     const float cosT = std::cos(tiltRadians);
@@ -262,6 +270,8 @@ scene::MeshData buildGills(const Profile& under, const RadialModulation& mod, in
                     p.y -= pivotY;
                     p = glm::vec3(p.x, p.y * cosT - p.z * sinT, p.y * sinT + p.z * cosT);
                     p.y += pivotY;
+                    p.x += origin.x;
+                    p.z += origin.y;
                     scene::Vertex v;
                     v.position = p;
                     v.normal = tangential * sign;
@@ -343,6 +353,11 @@ Result<search::Subject> buildMushroom(const search::Parameters& v) {
                                        param(v, MushroomParam::StemBulgeWidth));
     const float innerU = attachmentU(topRadius, capRadius);
     const float tilt = glm::radians(param(v, MushroomParam::CapTiltDeg));
+    // Where the stem actually ends, which is not the origin: `stemAxis` leans by `curvature * t^2`,
+    // so a stem at full curvature finishes almost half its own height to one side.
+    const glm::vec3 stemEnd =
+        stemAxis(1.0f, param(v, MushroomParam::StemCurvature)) * glm::vec3(1.0f, kStemHeight, 1.0f);
+    const glm::vec2 attachXZ(stemEnd.x, stemEnd.z);
 
     // Rim height relative to the cap's underside centre. A negative rim tangent droops the edge; the
     // rim's own height follows from the profile rather than being a separate parameter, which is the
@@ -359,6 +374,13 @@ Result<search::Subject> buildMushroom(const search::Parameters& v) {
                                      param(v, MushroomParam::CentreTangentDeg) * 0.4f,
                                      param(v, MushroomParam::RimTangentDeg) * 0.8f,
                                      capRadius * 0.965f);
+
+    // The cap rotates about the ring it is *attached by*, which is the underside profile's value at
+    // the attachment radius -- not the nominal stem height. Those differ by however much the
+    // underside has curved by `innerU`, and tilting about the wrong one swings the attachment ring
+    // sideways by sin(tilt) times that difference. It was the residual left after the lean fix: five
+    // candidates still over tolerance, the worst at 1.37 stem radii.
+    const float capPivotY = under.at(innerU);
 
     RadialModulation mod;
     mod.lobes = static_cast<int>(std::lround(param(v, MushroomParam::LobeCount)));
@@ -393,12 +415,12 @@ Result<search::Subject> buildMushroom(const search::Parameters& v) {
     }();
     const float emission = param(v, MushroomParam::EmissionIntensity);
 
-    subject.parts[0].mesh = lathe(upper, mod, kRings, kSpokes, false, tilt, kStemHeight, 0.0f);
+    subject.parts[0].mesh = lathe(upper, mod, kRings, kSpokes, false, tilt, capPivotY, attachXZ, 0.0f);
     subject.parts[0].role = "cap";
     subject.parts[0].baseColor = art.palette.secondary * 0.5f;
     subject.parts[0].roughness = 0.44f;
 
-    subject.parts[1].mesh = lathe(under, mod, kRings, kSpokes, true, tilt, kStemHeight, innerU);
+    subject.parts[1].mesh = lathe(under, mod, kRings, kSpokes, true, tilt, capPivotY, attachXZ, innerU);
     subject.parts[1].role = "under";
     subject.parts[1].baseColor = art.palette.secondary * 0.3f;
     subject.parts[1].roughness = 0.52f;
@@ -412,7 +434,7 @@ Result<search::Subject> buildMushroom(const search::Parameters& v) {
     subject.parts[2].roughness = 0.62f;
 
     subject.parts[3].mesh =
-        buildGills(under, mod, gills, param(v, MushroomParam::GillDepth) * thickness, innerU, tilt, kStemHeight,
+        buildGills(under, mod, gills, param(v, MushroomParam::GillDepth) * thickness, innerU, tilt, capPivotY, attachXZ,
                    // Blade thickness: a fraction of the arc between blades, so a dense gill set stays
                    // a set of blades rather than becoming a solid ring.
                    std::max(0.004f, 0.30f * 2.0f * kPi * capRadius * innerU / static_cast<float>(gills)));
@@ -469,6 +491,195 @@ Result<scene::MeshData> buildMushroomPart(const scene::GeneratedSource& source, 
 
 void registerMushroomGenerator() {
     scene::registerGenerator("mushroom", &buildMushroomPart);
+}
+
+namespace {
+
+// The centroid of the vertices at one extreme of a mesh, and their spread about it. `pick` scores a
+// vertex; the top `fraction` by that score are the ring.
+struct Ring {
+    glm::vec3 centre{0.0f};
+    float radius = 0.0f;
+    bool valid = false;
+};
+
+template <typename Score>
+Ring extremeRing(const scene::MeshData& mesh, Score score, float fraction) {
+    Ring out;
+    if (mesh.vertices.size() < 8) {
+        return out;
+    }
+    std::vector<std::pair<float, glm::vec3>> scored;
+    scored.reserve(mesh.vertices.size());
+    for (const scene::Vertex& v : mesh.vertices) {
+        scored.emplace_back(score(v.position), v.position);
+    }
+    const auto take = std::max<std::size_t>(
+        4, static_cast<std::size_t>(static_cast<float>(scored.size()) * fraction));
+    std::nth_element(scored.begin(), scored.begin() + static_cast<std::ptrdiff_t>(take), scored.end(),
+                     [](const auto& a, const auto& b) { return a.first > b.first; });
+    glm::vec3 sum(0.0f);
+    for (std::size_t i = 0; i < take; ++i) {
+        sum += scored[i].second;
+    }
+    out.centre = sum / static_cast<float>(take);
+    float spread = 0.0f;
+    for (std::size_t i = 0; i < take; ++i) {
+        spread = std::max(spread, glm::distance(scored[i].second, out.centre));
+    }
+    out.radius = spread;
+    out.valid = true;
+    return out;
+}
+
+} // namespace
+
+MushroomAnchors mushroomAnchors(const search::Subject& subject) {
+    MushroomAnchors out;
+    if (subject.parts.size() < 4) {
+        return out;
+    }
+    const scene::MeshData& under = subject.parts[1].mesh;
+    const scene::MeshData& stem = subject.parts[2].mesh;
+    const scene::MeshData& gills = subject.parts[3].mesh;
+    if (!under.valid() || !stem.valid()) {
+        return out;
+    }
+
+    // The stem's top: the vertices **furthest from its base**, not the highest ones.
+    //
+    // A swept tube's rings are perpendicular to its own tangent, so a leaning stem's top ring is
+    // tilted -- and "the highest vertices" then samples only its upper arc, putting the centroid off
+    // to one side. That is a bias in the *measurement*, and it showed up as one candidate over
+    // tolerance after the geometry was already correct. Distance from the base is tilt-invariant.
+    glm::vec3 base(0.0f);
+    {
+        const Ring low = extremeRing(stem, [](const glm::vec3& p) { return -p.y; }, 1.0f / 22.0f);
+        base = low.valid ? low.centre : glm::vec3(0.0f);
+    }
+    const Ring top =
+        extremeRing(stem, [&](const glm::vec3& p) { return glm::distance(p, base); }, 1.0f / 22.0f);
+
+    // The cap underside's attachment: the ring nearest its own axis. Scored by *negative* horizontal
+    // distance from the underside's centroid, so the innermost vertices win -- which is the
+    // attachment ring whatever the cap is doing, because a lathe's innermost ring is its inner edge
+    // however the surface above it is shaped or tilted.
+    glm::vec3 centroid(0.0f);
+    for (const scene::Vertex& v : under.vertices) {
+        centroid += v.position;
+    }
+    centroid /= static_cast<float>(under.vertices.size());
+    const Ring attach = extremeRing(
+        under,
+        [&](const glm::vec3& p) {
+            return -glm::length(glm::vec2(p.x - centroid.x, p.z - centroid.z));
+        },
+        1.0f / 22.0f);
+
+    if (!top.valid || !attach.valid) {
+        return out;
+    }
+    out.stemTop = top.centre;
+    out.stemTopRadius = std::max(top.radius, 1e-4f);
+    out.capAttach = attach.centre;
+    // Where spores fall from: the lowest point of the gill set, which is the underside's own lowest
+    // structure. Falls back to the attachment when a mushroom has no gills to speak of.
+    out.gillLow = attach.centre;
+    if (gills.valid()) {
+        float lowest = 1e9f;
+        for (const scene::Vertex& v : gills.vertices) {
+            if (v.position.y < lowest) {
+                lowest = v.position.y;
+                out.gillLow = v.position;
+            }
+        }
+        // The *centre* under the cap rather than the single lowest vertex, which is on the rim: the
+        // emitter wants the middle of the underside, at the depth the gills reach.
+        out.gillLow = glm::vec3(attach.centre.x, lowest, attach.centre.z);
+        // And how far out they reach. Spores fall from the whole underside, so an emitter sized by
+        // anything other than the gills' own span is a guess: sized by the organism's *height* it
+        // was 0.88 m under a cap six metres across, and the fall read as a thin dribble down the
+        // stem rather than as snow off a canopy. This is the same mesh-derived quantity as the
+        // anchor, one measurement serving the position and the extent both.
+        float reach = 0.0f;
+        for (const scene::Vertex& v : gills.vertices) {
+            reach = std::max(reach, glm::length(glm::vec2(v.position.x - attach.centre.x,
+                                                          v.position.z - attach.centre.z)));
+        }
+        out.gillRadius = reach;
+    }
+    if (out.gillRadius <= 0.0f) {
+        out.gillRadius = std::max(attach.radius, out.stemTopRadius);
+    }
+    out.valid = true;
+    return out;
+}
+
+std::vector<AlignmentDefect> checkMushroomAlignment(const search::Subject& subject) {
+    std::vector<AlignmentDefect> out;
+    const MushroomAnchors a = mushroomAnchors(subject);
+    if (!a.valid) {
+        out.push_back({"anchors", 0.0f, "the parts do not yield an attachment"});
+        return out;
+    }
+    // Scaled to the stem's own radius: a 4 m mushroom and a 40 cm one do not want the same absolute
+    // tolerance, and the stem's top ring is the natural unit -- the cap is attached *to* it.
+    const float tolerance = a.stemTopRadius * 1.25f;
+
+    const float planar =
+        glm::length(glm::vec2(a.capAttach.x - a.stemTop.x, a.capAttach.z - a.stemTop.z));
+    if (planar > tolerance) {
+        out.push_back({"cap-off-stem", planar,
+                       fmt::format("cap attachment is {:.4f} m from the stem's top centre, tolerance "
+                                   "{:.4f} m (stem top radius {:.4f} m)",
+                                   planar, tolerance, a.stemTopRadius)});
+    }
+    // Vertically the cap must meet the stem, not float above it or sink through it. A generous band
+    // downward, because a cap whose underside dips below the stem's top is a cap sitting *on* it.
+    const float vertical = a.capAttach.y - a.stemTop.y;
+    if (vertical > tolerance) {
+        out.push_back({"cap-floats", vertical,
+                       fmt::format("cap attachment is {:.4f} m above the stem's top", vertical)});
+    }
+    if (vertical < -tolerance * 4.0f) {
+        out.push_back({"cap-sunk", -vertical,
+                       fmt::format("cap attachment is {:.4f} m below the stem's top", -vertical)});
+    }
+
+    // The gills hang under the cap rather than through it. Checked against the *upper* surface,
+    // because that is the one they would come through.
+    if (subject.parts[3].mesh.valid() && subject.parts[0].mesh.valid()) {
+        const auto cap = subject.parts[0].mesh.bounds();
+        float highest = -1e9f;
+        for (const scene::Vertex& v : subject.parts[3].mesh.vertices) {
+            highest = std::max(highest, v.position.y);
+        }
+        if (highest > cap.second.y + tolerance) {
+            out.push_back({"gills-through-cap", highest - cap.second.y,
+                           fmt::format("gills reach {:.4f} m above the cap's highest point",
+                                       highest - cap.second.y)});
+        }
+        // And they hang *within* the cap's rim, not out past it. The radial half of the same rule,
+        // added because the spore emitter is now sized by `gillRadius`: a quantity a scene depends
+        // on has to be one an invariant covers, or the next transform bug arrives as a cloud of
+        // snow falling out of thin air beside the mushroom rather than as a test failure.
+        float gillReach = 0.0f;
+        for (const scene::Vertex& v : subject.parts[3].mesh.vertices) {
+            gillReach = std::max(gillReach, glm::length(glm::vec2(v.position.x - a.capAttach.x,
+                                                                  v.position.z - a.capAttach.z)));
+        }
+        float capReach = 0.0f;
+        for (const scene::Vertex& v : subject.parts[0].mesh.vertices) {
+            capReach = std::max(capReach, glm::length(glm::vec2(v.position.x - a.capAttach.x,
+                                                                v.position.z - a.capAttach.z)));
+        }
+        if (gillReach > capReach + tolerance) {
+            out.push_back({"gills-past-rim", gillReach - capReach,
+                           fmt::format("gills reach {:.4f} m beyond the cap's rim",
+                                       gillReach - capReach)});
+        }
+    }
+    return out;
 }
 
 std::optional<search::Rejection> mushroomPlausibility(const search::Subject& subject,

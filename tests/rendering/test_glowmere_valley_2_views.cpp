@@ -79,7 +79,7 @@ TEST_CASE("Glowmere Valley 2 from several viewpoints", "[.capture][glowmere2]") 
     // Chosen to answer the acceptance criteria rather than to flatter the scene: two of these look
     // straight down the valley's axis from opposite ends, which is where a river that did not
     // traverse would be obvious, and one is a high oblique that shows the whole corridor at once.
-    const std::array<View, 8> views{{
+    const std::array<View, 12> views{{
         {"01-opening", {-118.0f, 32.1f, -96.0f}, {-20.0f, 4.0f, 40.0f}, 40.0f},
         {"02-upstream-axis", {10.0f, 22.0f, 268.0f}, {-10.0f, 6.0f, -160.0f}, 38.0f},
         {"03-downstream-axis", {-30.0f, 30.0f, -232.0f}, {10.0f, -4.0f, 200.0f}, 38.0f},
@@ -91,12 +91,62 @@ TEST_CASE("Glowmere Valley 2 from several viewpoints", "[.capture][glowmere2]") 
         {"07-elder-closeup", {-27.0f, 6.6f, 63.0f}, {-12.0f, 15.5f, 52.0f}, 40.0f},
         // And a second hero at the other end of the valley, so the handover shows more than one.
         {"08-bloom-closeup", {-74.0f, 7.0f, 130.0f}, {-62.0f, 10.5f, 118.0f}, 42.0f},
+        // The four drier-band heroes. Each eye stands on the bearing `preferredApproachAzimuth`
+        // chose for that site -- eye = site + standOff * (cos a, sin a) in XZ -- rather than on a
+        // bearing picked to flatter the mushroom, so these images show what the Auto-director's
+        // default approach actually sees. The eye sits below the cap so the underside, the gills and
+        // the spore-fall read; that is the half of the organism the new work changed.
+        {"09-cairn-closeup", {-145.1f, 35.5f, -41.7f}, {-150.0f, 37.2f, -60.0f}, 42.0f},
+        {"10-ridge-closeup", {122.8f, 23.7f, -180.8f}, {132.0f, 24.8f, -190.0f}, 42.0f},
+        {"11-scree-closeup", {-164.1f, 24.7f, 88.0f}, {-178.0f, 26.1f, 96.0f}, 42.0f},
+        {"12-ember-closeup", {165.4f, 14.2f, 147.2f}, {176.0f, 15.1f, 150.0f}, 42.0f},
     }};
 
     std::printf("\n===== Glowmere Valley 2, %ux%u =====\n", kWidth, kHeight);
+
+    // **One clock, one resolution, and a warm-up, because particles are simulated and not placed.**
+    //
+    // Three things had to be true before a single spore appeared, and each was worth a render to
+    // find:
+    //
+    //   1. *The clock has to advance.* A `FixedStepClock` constructed inside the loop makes every
+    //      frame the first frame, so `deltaTime` is zero; the particle pass integrates by exactly
+    //      that dt, so nothing is emitted and nothing moves. Every capture this test had ever
+    //      written was a frame with **no particles at all** -- not only the new spore-fall, but the
+    //      river motes and the visitor's beam that have been in the scene since the first handover.
+    //      An empty emitter renders as clean sky, which is why it went unnoticed.
+    //   2. *The resolution must not change.* Resizing the render target calls
+    //      `resetTemporalHistory`, which calls `ParticleRenderer::resetAll`. Warming at 320x180 and
+    //      then capturing at 1920x1080 threw the whole simulation away between the two. So the
+    //      warm-up runs at the capture size; 240 full-size frames costs a few seconds.
+    //   3. *Time must not go backwards.* `renderTime < previousRenderTime_` is a seek, and a seek
+    //      resets the same history. Warming to 24 s and then restarting the capture clock at 6 s
+    //      wiped the pools a second time. So the captures continue the warm-up's own clock.
+    //
+    // While any of those held, each view rendered only the handful of particles born in its own
+    // single frame, sitting on the emitter disc where they spawned. That is why raising `emissive`
+    // and `sizeStart` visibly changed the frame and lowering `drag` did not: nothing had lived long
+    // enough to fall. A diagnostic that moves under one parameter and not under another is saying
+    // which stage is broken.
+    //
+    // 240 frames at 0.1 s -- the ceiling `render` clamps dt to, so the cheapest legal way to buy
+    // simulated time -- is 24 s, slightly more than the longest spore lifetime (22 s), which is what
+    // steady state means for an emitter: deaths balancing births. Nothing is culled out of the
+    // simulation, so warming once populates all thirteen systems.
+    FixedStepClock clock(10.0);
+    clock.restartAt(0.0);
+    engine.setViewport(kWidth, kHeight);
+    for (int f = 0; f < 240; ++f) {
+        const FrameTime t = engine.tick(clock);
+        engine.update(t);
+        scene::Scene& ws = engine.composition()->scene();
+        ws.camera.farPlane = 1400.0f;
+        (void)renderer.renderToImage(ws, t, kWidth, kHeight);
+    }
+    std::printf("  warmed the particle simulation to 24.0 s of steady state\n");
+    std::fflush(stdout);
+
     for (const View& v : views) {
-        FixedStepClock clock(60.0);
-        clock.restartAt(6.0);
         const FrameTime time = engine.tick(clock);
         engine.setViewport(kWidth, kHeight);
         // The camera must be set *before* `engine.update`, and through the parameters rather than

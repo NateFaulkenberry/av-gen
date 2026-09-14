@@ -31,6 +31,9 @@
 
 namespace avgen::world {
 
+struct WorldMap; // world/world_map.hpp -- only the approach bearing needs it, and only by reference
+
+
 // How a hero answers the music. Deliberately a small vocabulary of *authored* behaviours rather
 // than a general modulation graph: the point is that not every hero does everything, and a system
 // that made it easy to make everything react to everything would be used that way.
@@ -137,6 +140,25 @@ struct HeroBehaviourTarget {
 
 // How much a hero wants to outrank the population around it, given the world's focal strength.
 // Exposed because it is the one judgement in hero placement worth testing directly.
+// The compass bearing a camera should approach this hero from, derived from the ground it stands on
+// rather than authored per hero.
+//
+// The Auto-director spreads consecutive shots by the golden angle so a film is not nine views down one
+// axis, and that spread has to be *around* something. A global zero suits whichever hero happens to
+// have open ground to its north and puts every other one's establishing shot into a hillside.
+//
+// What the world can say cheaply, which is all this uses: sample the ground at `standOff` in each of
+// 24 bearings and prefer the one where it **falls away**. A camera standing on ground lower than its
+// subject sees the subject against the sky, has room to pull back, and is not inside the hill behind
+// it -- and "where does the terrain fall away" is a question `WorldMap::height` answers in closed form.
+//
+// A mid-range sample guards against the near case: a bearing that is open at forty metres and blocked
+// at twenty is not open. Bearings whose stand-off leaves the map are refused outright, because a
+// camera outside the world sees the edge of it.
+//
+// Returns radians. Falls back to 0 when no bearing qualifies, which is a flat map answering honestly.
+[[nodiscard]] float preferredApproachAzimuth(const WorldMap& map, glm::vec2 p, float standOff);
+
 [[nodiscard]] float heroClearanceRadius(const HeroPoint& hero);
 
 // The built-in reaction profiles. Authored, not generated: each says what one *kind* of thing does,
