@@ -117,13 +117,31 @@ fn thresholdWeight(lum: f32, threshold: f32, kneeFraction: f32) -> f32 {
 
 @fragment
 fn fs_prefilter(in: FsIn) -> @location(0) vec4<f32> {
-    // 4-tap box of the full-res exposed scene, then the soft-knee threshold.
+    // 4-tap box of the full-res exposed scene, weighted by luminance rather than evenly, then the
+    // soft-knee threshold.
+    //
+    // The weighting (Karis) is what stops a sub-pixel highlight from becoming a light source. Water
+    // sparkle is a dense field of near-pixel-sized speculars; each one entered the pyramid as a
+    // firefly, and the flare stage then reads that pyramid *magnified* -- `mix(0.5, mirrored, 0.75)`
+    // and `0.40`, so 1.33x and 2.5x -- and mirrored through the frame centre. A sparkling river
+    // therefore printed a lattice of bright dots across unrelated parts of the image, at any ghost
+    // strength, because the structure was already in the pyramid before the ghosts read it.
+    //
+    // Measured on the reported case: the lattice is visibly dimmer with this and unchanged
+    // elsewhere. It does not remove it. The rest is the pyramid's own texel grid being magnified,
+    // and integrating that away needs the *source's* texel size, which this pass is not given --
+    // `post.texelSize` here is the output's. Tried with the output's and measured a 2% change for
+    // eight extra samples, so it is not in.
     let t = post.texelSize;
-    var c = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(-0.5, -0.5) * t, 0.0).rgb;
-    c += textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(0.5, -0.5) * t, 0.0).rgb;
-    c += textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(-0.5, 0.5) * t, 0.0).rgb;
-    c += textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(0.5, 0.5) * t, 0.0).rgb;
-    c *= 0.25;
+    let s0 = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(-0.5, -0.5) * t, 0.0).rgb;
+    let s1 = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(0.5, -0.5) * t, 0.0).rgb;
+    let s2 = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(-0.5, 0.5) * t, 0.0).rgb;
+    let s3 = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(0.5, 0.5) * t, 0.0).rgb;
+    let w0 = 1.0 / (1.0 + luminance(s0));
+    let w1 = 1.0 / (1.0 + luminance(s1));
+    let w2 = 1.0 / (1.0 + luminance(s2));
+    let w3 = 1.0 / (1.0 + luminance(s3));
+    let c = (s0 * w0 + s1 * w1 + s2 * w2 + s3 * w3) / max(w0 + w1 + w2 + w3, 1e-4);
     let threshold = post.params0.x;
     let knee = post.params0.y;
     let emissionWeight = post.params0.z;
