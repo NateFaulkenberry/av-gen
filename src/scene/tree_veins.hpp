@@ -41,23 +41,45 @@
 namespace avgen::scene {
 
 struct VeinSettings {
-    // The pattern. Veins run ALONG the branch, so the noise is sampled with a high frequency around
-    // the tube's u and a low one along its v: fast variation around, slow along, which is a streak.
-    float aroundFrequency = 9.0f;
-    // Not near-zero. At 0.42 a vein at a given u persisted the whole length of the trunk and read
-    // as a painted stripe rather than as something grown; the pattern has to meander along the
-    // branch as well as vary around it.
-    float alongFrequency = 1.15f;
+    // The vein field is sampled in WORLD SPACE, triplanar, not in the tube's uv.
+    //
+    // uv was the obvious choice and it is wrong, and the contact sheet is what showed it: a trunk
+    // got veins and a twig got a solid glowing rod. uv is normalised per branch, so the pattern's
+    // wavelength shrinks with the branch -- and a tertiary tube has four radial sides and a short
+    // run, so the noise is very nearly constant across the whole of it and the twig is uniformly on
+    // or off. Eight of twelve candidates had limbs reading as bright cyan wires.
+    //
+    // In world space the wavelength is a fixed distance, so a trunk four metres around carries
+    // several veins and a twig a fifth of a metre around carries at most one. Twigs then differ
+    // from each other rather than all glowing, which is section 23's "selected secondary branches"
+    // arriving as a consequence rather than as a rule.
+    // 2.6 cycles per metre, not 0.85. At the longer wavelength the mask made blotches the size of
+    // the trunk's own width and the result read as birch bark -- patches, not veins. A vein is thin
+    // relative to what carries it, which means a wavelength well under the trunk's circumference
+    // and a narrow cut.
+    float veinScale = 2.6f;       // cycles per metre, horizontally
+    // THE FIELD HAS TO BE ANISOTROPIC OR IT MAKES BLOTCHES, NOT VEINS.
+    //
+    // fbm is isotropic, so thresholding it gives blobs at every frequency -- at a long wavelength
+    // the trunk read as birch bark, and shortening it only made the patches smaller. That was two
+    // renders spent on the wrong parameter: the problem was never the scale, it was the shape.
+    // Compressing the vertical axis before sampling stretches every feature along the trunk, which
+    // is what turns a blob field into a streak field, and it keeps the world-space property that
+    // made the switch away from uv worth making.
+    float verticalStretch = 6.0f;
+    float triplanarSharpness = 4.0f;
     // Where the noise is cut. A narrow window gives thin bright veins; a wide one washes back into
     // the tint this exists to avoid.
-    float threshold = 0.465f;
-    float edge = 0.075f;
-    // The travelling pulse: energy moving up the tree, as a cosine in v displaced by time.
-    float pulseSpeed = 0.085f;
-    float pulseDepth = 0.55f;   // 0 = a static vein, 1 = it blinks out between pulses
-    float pulseWavelength = 0.7f;
+    float threshold = 0.565f;
+    float edge = 0.035f;
+    // The travelling pulse, in world height: energy rising through the whole tree at once rather
+    // than each branch pulsing in its own parameterisation, which is what "a travelling wave"
+    // means when the thing it travels through is one organism.
+    float pulseSpeed = 0.55f;     // metres per second
+    float pulseDepth = 0.55f;
+    float pulseWavelength = 9.0f; // metres
     glm::vec3 color{0.18f, 0.86f, 0.95f};
-    float intensity = 1.6f;
+    float intensity = 1.9f;
     std::uint32_t seed = 1;
 };
 

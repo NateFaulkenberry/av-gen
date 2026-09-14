@@ -78,14 +78,40 @@ struct TreeLook {
     float foliageEmissiveIntensity = 0.85f;
     float foliageRoughness = 0.78f;
 
+    // --- The environment, and the only job it has --------------------------------------------
+    //
+    // A referent, not furniture. The hero has read as an eight-metre tree in every render so far,
+    // and nothing in the frame has ever disagreed: an empty ground plane has no size. A handful of
+    // ordinary trees at a distance, each a few metres tall, is what makes thirty metres legible --
+    // it is the cue the reference images all use and the cheapest one there is. Everything past
+    // that is Glowmere Valley, which the brief rules out.
+    int distantTrees = 14;
+    float distantNear = 46.0f;
+    float distantFar = 135.0f;
+    float distantHeightMin = 5.0f;
+    float distantHeightMax = 11.0f;
+    // Kept out of a wedge behind the hero so they never crowd its silhouette.
+    float distantClearAngle = 0.55f;
+
     // Ground and sky.
-    glm::vec3 groundColor{0.022f, 0.030f, 0.035f};
+    // Darker than the sky it meets. The ground was rendering brighter than the horizon and drew a
+    // pale band across the frame, which is the same mistake the bioluminescence cookbook records
+    // for fog: anything behind the subject that is brighter than the background works against the
+    // silhouette rather than for it.
+    glm::vec3 groundColor{0.009f, 0.012f, 0.015f};
     float groundRadius = 260.0f;
     glm::vec3 zenith{0.006f, 0.013f, 0.038f};
     glm::vec3 horizon{0.030f, 0.058f, 0.120f};
-    glm::vec3 fogColor{0.008f, 0.018f, 0.032f};
+    // Cool. The mist was reading warm-brown against a teal tree because the ground's albedo came
+    // through it; the fog's own colour is what decides that, and a warm haze under a cyan canopy
+    // fights the palette everywhere the two meet.
+    glm::vec3 fogColor{0.006f, 0.016f, 0.034f};
     float fogDensity = 0.0075f;
-    float volumeDensity = 0.005f;
+    float volumeDensity = 0.024f;
+    // The mist sits low and thick enough to swallow the far trees' feet, which is what turns a row
+    // of silhouettes into distance rather than a row of silhouettes.
+    float fogHeight = 4.5f;
+    float fogHeightFalloff = 0.17f;
 
     // Lighting. A moon key for the silhouette, a violet rim for separation, and almost no fill:
     // the tree is meant to be readable when emission is switched off, but only just.

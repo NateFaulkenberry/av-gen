@@ -41,8 +41,12 @@ struct TreeCameraView {
     // widening to 55 degrees puts the viewer at the foot of it looking up, so the trunk converges
     // and the crown overhangs -- which is most of what "monumental" is, and none of it is in the
     // geometry.
-    glm::vec3 eye{5.5f, 2.6f, 30.0f};
-    glm::vec3 target{0.0f, 15.5f, 0.0f};
+    // OFF-CENTRE. The tree stood dead centre in every frame so far with equal dead sky either
+    // side, which is the composition of a specimen photograph. Aiming a little to one side of the
+    // trunk puts the hero off the middle and gives the crown somewhere to lean into, and dropping
+    // the aim lets the base and the roots stay in frame instead of being cropped for headroom.
+    glm::vec3 eye{5.5f, 2.8f, 33.5f};
+    glm::vec3 target{2.6f, 15.0f, 0.0f};
     glm::vec3 up{0.0f, 1.0f, 0.0f};
     float fovYRadians = 0.9599f; // 55 degrees
     int width = 480;

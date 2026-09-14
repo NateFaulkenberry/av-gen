@@ -8,6 +8,10 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <fmt/format.h>
 
+#include <algorithm>
+#include <string>
+#include <vector>
+
 using namespace avgen;
 using namespace avgen::scene;
 using Catch::Matchers::WithinAbs;
@@ -256,15 +260,24 @@ TEST_CASE("an animated tree assembles into a scene with one rig", "[tree][rig][s
     CHECK(built->scene.rigs[0].palette.size() == built->rig.size());
 
     int skinned = 0;
-    int unskinned = 0;
+    std::vector<std::string> unskinned;
     for (const Entity& entity : built->scene.entities) {
-        (entity.rig == kInvalidRig ? unskinned : skinned) += 1;
-        if (entity.rig != kInvalidRig) {
-            INFO("entity " << entity.name);
-            CHECK(built->scene.meshes[entity.mesh].skinned());
+        if (entity.rig == kInvalidRig) {
+            unskinned.push_back(entity.name);
+            continue;
         }
+        ++skinned;
+        INFO("entity " << entity.name);
+        CHECK(built->scene.meshes[entity.mesh].skinned());
     }
-    INFO(skinned << " skinned entities, " << unskinned << " not");
+    for (const std::string& name : unskinned) {
+        INFO("unskinned: " << name);
+    }
     CHECK(skinned >= 5);
-    CHECK(unskinned == 1); // the ground, which is not part of the tree
+    // The environment is not part of the tree and must not be skinned to it: naming them rather
+    // than counting them means adding a third silently passes instead of silently failing.
+    const std::vector<std::string> expected{"tree.distant", "tree.ground"};
+    std::vector<std::string> sorted = unskinned;
+    std::sort(sorted.begin(), sorted.end());
+    CHECK(sorted == expected);
 }

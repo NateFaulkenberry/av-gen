@@ -89,8 +89,8 @@ spatial::Spline axisCurve(const TreeGraph& graph, const TreeAxis& axis, const Tr
 // spline's scale is what keeps it *around* the trunk as well as along it -- a scale perturbation can
 // only make the whole ring fatter, which reads as a bulge, not as bark.
 void applyBark(MeshData& mesh, std::size_t firstVertex, const std::vector<glm::vec3>& axisPoints, float amount,
-               float scale, std::uint32_t seed) {
-    if (amount <= 0.0f || axisPoints.empty()) {
+               float scale, float swell, float swellScale, std::uint32_t seed) {
+    if ((amount <= 0.0f && swell <= 0.0f) || axisPoints.empty()) {
         return;
     }
     for (std::size_t i = firstVertex; i < mesh.vertices.size(); ++i) {
@@ -111,8 +111,11 @@ void applyBark(MeshData& mesh, std::size_t firstVertex, const std::vector<glm::v
         if (radius < kEpsilon) {
             continue;
         }
-        const float field = noise::fbm3(v.position * scale, seed) * 2.0f - 1.0f;
-        v.position += (radial / radius) * field * amount * radius;
+        // Two octaves with very different wavelengths, and they do different jobs: the short one is
+        // grain, the long one is the swelling and irregular taper that reads as age.
+        const float grain = noise::fbm3(v.position * scale, seed) * 2.0f - 1.0f;
+        const float shape = noise::fbm3(v.position * swellScale, seed ^ 0x51u) * 2.0f - 1.0f;
+        v.position += (radial / radius) * (grain * amount + shape * swell) * radius;
     }
 }
 
@@ -246,7 +249,8 @@ Result<TreeMeshes> buildTreeMeshes(const TreeGraph& graph, const TreeMeshSetting
             for (const spatial::SplinePoint& p : curve.points) {
                 axisPoints.push_back(p.position);
             }
-            applyBark(tube, 0, axisPoints, settings.barkAmount, settings.barkScale, graph.params.seed ^ 0xBA2Cu);
+            applyBark(tube, 0, axisPoints, settings.barkAmount, settings.barkScale, settings.swellAmount,
+                      settings.swellScale, graph.params.seed ^ 0xBA2Cu);
         }
         MeshData* target = meshForTier(out, axis.tier);
         const std::size_t slot = static_cast<std::size_t>(axis.tier) + 1;

@@ -63,8 +63,16 @@ struct TreeMeshSettings {
 
     // Analytic bark: a low-frequency radius perturbation swept along the trunk and primaries. This
     // is what stops the trunk reading as a smooth lathe-turned cone without a normal map.
-    float barkAmount = 0.055f;
-    float barkScale = 1.35f;
+    // 0.14, not 0.055. At the showcase camera the trunk is about sixty pixels wide, which is far
+    // too small for surface bark to read at all -- what reads at that size is the SILHOUETTE being
+    // irregular. A perturbation large enough to break the outline is doing the work a normal map
+    // would do up close, and it costs nothing because the sweep is already there.
+    float barkAmount = 0.14f;
+    float barkScale = 0.85f;
+    // A second, much longer wavelength: the swelling and taper irregularity that says "old". Bark
+    // grain alone gives a rough cylinder, which is not the same thing as a gnarled one.
+    float swellAmount = 0.16f;
+    float swellScale = 0.16f;
     int barkMinSides = 8; // below this the perturbation only adds noise to the silhouette
 
     // The socket: a child tube starts this far back inside its parent, as a fraction of the parent's

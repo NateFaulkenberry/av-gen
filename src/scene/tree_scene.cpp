@@ -1,6 +1,11 @@
+#include "scene/mesh_generators.hpp"
+#include "scene/tree_mesh.hpp"
 #include "scene/tree_scene.hpp"
 
+#include "core/noise.hpp"
+
 #include <glm/gtc/constants.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <array>
 #include <cmath>
@@ -24,6 +29,90 @@ MeshData makeGroundDisc(float radius, int segments) {
                             {0u, static_cast<std::uint32_t>(i + 2), static_cast<std::uint32_t>(i + 1)});
     }
     return mesh;
+}
+
+// A distant tree: a tapered trunk and two overlapping blobs. Forty triangles, seen at sixty metres
+// through mist, and it only has to read as "a tree of ordinary size".
+MeshData makeDistantTree(float height, float lean, std::uint32_t seed) {
+    MeshData mesh;
+    const float trunkH = height * 0.42f;
+    const float r = height * 0.022f;
+    constexpr int kSides = 5;
+    for (int ring = 0; ring < 2; ++ring) {
+        const float y = ring == 0 ? 0.0f : trunkH;
+        const float rr = ring == 0 ? r : r * 0.55f;
+        const float x = ring == 0 ? 0.0f : lean;
+        for (int i = 0; i < kSides; ++i) {
+            const float a = static_cast<float>(i) / kSides * glm::two_pi<float>();
+            const glm::vec3 n(std::cos(a), 0.0f, std::sin(a));
+            mesh.vertices.push_back(Vertex{glm::vec3(x, y, 0.0f) + n * rr, n,
+                                           {static_cast<float>(i) / kSides, static_cast<float>(ring)}});
+        }
+    }
+    for (int i = 0; i < kSides; ++i) {
+        const auto a = static_cast<std::uint32_t>(i);
+        const auto b = static_cast<std::uint32_t>((i + 1) % kSides);
+        mesh.indices.insert(mesh.indices.end(), {a, b, b + kSides, a, b + kSides, a + kSides});
+    }
+    for (int blob = 0; blob < 2; ++blob) {
+        const float br = height * (blob == 0 ? 0.26f : 0.19f);
+        const glm::vec3 c(lean * (blob == 0 ? 1.0f : 1.6f), trunkH + height * (blob == 0 ? 0.22f : 0.40f),
+                          height * 0.05f * (blob == 0 ? 1.0f : -1.0f) *
+                              (noise::hashIndex(seed, static_cast<std::uint32_t>(blob), 7u) * 2.0f - 1.0f));
+        MeshData sphere = makeIcosphere(br, 1);
+        for (Vertex& v : sphere.vertices) {
+            v.position = c + v.position * glm::vec3(1.0f, 0.78f, 1.0f);
+        }
+        appendMesh(mesh, sphere);
+    }
+    return mesh;
+}
+
+void addDistantTrees(Scene& scene, const TreeLook& look, std::uint32_t seed) {
+    if (look.distantTrees <= 0) {
+        return;
+    }
+    MeshData all;
+    all.name = "tree.distant";
+    for (int i = 0; i < look.distantTrees; ++i) {
+        const auto index = static_cast<std::uint32_t>(i);
+        // Stratified in angle so they ring the hero instead of clumping, then jittered so the ring
+        // is not a ring.
+        float angle = (static_cast<float>(i) + noise::hashIndex(seed, index, 11u)) /
+                      static_cast<float>(look.distantTrees) * glm::two_pi<float>();
+        // Keep them out of the wedge directly behind the hero, where they would read as growing out
+        // of its crown.
+        const float toCamera = glm::half_pi<float>();
+        if (std::abs(std::remainder(angle - toCamera, glm::two_pi<float>())) < look.distantClearAngle) {
+            angle += look.distantClearAngle * 2.0f;
+        }
+        const float t = noise::hashIndex(seed, index, 12u);
+        const float distance = look.distantNear + t * t * (look.distantFar - look.distantNear);
+        const float height = look.distantHeightMin +
+                             noise::hashIndex(seed, index, 13u) * (look.distantHeightMax - look.distantHeightMin);
+        const float lean = (noise::hashIndex(seed, index, 14u) * 2.0f - 1.0f) * height * 0.06f;
+
+        MeshData one = makeDistantTree(height, lean, seed ^ (index * 977u));
+        const glm::mat4 xform =
+            glm::translate(glm::mat4(1.0f), glm::vec3(std::cos(angle) * distance, 0.0f, std::sin(angle) * distance)) *
+            glm::rotate(glm::mat4(1.0f), noise::hashIndex(seed, index, 15u) * glm::two_pi<float>(),
+                        glm::vec3(0.0f, 1.0f, 0.0f));
+        for (Vertex& v : one.vertices) {
+            v.position = glm::vec3(xform * glm::vec4(v.position, 1.0f));
+            v.normal = glm::normalize(glm::vec3(xform * glm::vec4(v.normal, 0.0f)));
+        }
+        appendMesh(all, one);
+    }
+    Material m;
+    m.baseColor = look.barkColor * 0.6f;
+    m.roughness = 0.95f;
+    const MeshId id = scene.addMesh(std::move(all));
+    Entity& e = scene.addEntity("tree.distant", id);
+    e.material = m;
+    e.materialName = "tree.distant";
+    // They must not cast: the hero owns the one cascaded shadow light, and a ring of distant trees
+    // in the cascade fit pushes its far plane out and coarsens every shadow on the hero itself.
+    e.castsShadow = false;
 }
 
 void addPart(Scene& scene, const MeshData& mesh, const std::string& name, const Material& material) {
@@ -108,6 +197,8 @@ Result<Scene> buildTreeScene(const TreeGraph& graph, const TreeMeshes& meshes, c
         addPart(scene, meshes.foliage[t], "tree.foliage" + std::to_string(i), m);
     }
 
+    addDistantTrees(scene, look, graph.params.seed ^ 0xD157u);
+
     if (look.includeGround) {
         Material ground;
         ground.baseColor = look.groundColor;
@@ -129,7 +220,7 @@ Result<Scene> buildTreeScene(const TreeGraph& graph, const TreeMeshes& meshes, c
     key.castsShadow = true;
     key.shadowStrength = 0.82f;
     key.softness = 2.4f;
-    key.volumetricStrength = 0.10f;
+    key.volumetricStrength = 0.40f;
     scene.addLight(key);
 
     PunctualLight rim;
@@ -171,10 +262,12 @@ Result<Scene> buildTreeScene(const TreeGraph& graph, const TreeMeshes& meshes, c
     scene.environment.fogColor = look.fogColor;
     scene.environment.fogDensity = look.fogDensity;
     scene.environment.volumeDensity = look.volumeDensity;
-    scene.environment.fogHeight = 6.0f;
-    scene.environment.fogHeightFalloff = 0.09f;
-    scene.environment.volumeAnisotropy = 0.14f;
-    scene.environment.volumeSteps = 16;
+    scene.environment.fogHeight = look.fogHeight;
+    scene.environment.fogHeightFalloff = look.fogHeightFalloff;
+    // Nearly isotropic, following Glowmere. A high anisotropy with a bright source near the view
+    // axis turns the whole shot into glare, and this scene has a glowing canopy in the middle of it.
+    scene.environment.volumeAnisotropy = 0.12f;
+    scene.environment.volumeSteps = 24;
     scene.environment.volumeMaxDistance = 180.0f;
     scene.environment.environmentIntensity = 0.30f;
     scene.environment.skyIntensity = 0.55f;
@@ -239,10 +332,11 @@ Result<TreeSceneBuild> buildAnimatedTree(const TreeParams& params, const TreeCam
     out.scene = std::move(*scene);
     out.scene.rigs.push_back(makeSkinnedRig(out.rig));
     for (Entity& entity : out.scene.entities) {
-        // The ground is not part of the tree and must not be skinned to it.
-        if (entity.name != "tree.ground") {
-            entity.rig = 0;
-        }
+        // The condition is whether the MESH carries skin data, not what the entity is called. The
+        // name test this replaced ("anything but the ground") bound the distant trees to the hero's
+        // rig the moment they were added -- they share the `tree.` prefix, they are environment, and
+        // an entity naming a rig its mesh has no weights for is undefined at best.
+        entity.rig = out.scene.meshes[entity.mesh].skinned() ? 0 : kInvalidRig;
     }
     out.triangles = out.meshes.triangles;
     return out;
