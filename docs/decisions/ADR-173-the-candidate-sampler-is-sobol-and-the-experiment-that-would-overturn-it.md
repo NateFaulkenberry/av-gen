@@ -1,6 +1,6 @@
 # ADR-173: The mushroom candidate sampler is a Sobol sequence, and the experiment that would replace it with MAP-Elites is named
 
-**Status:** Accepted (provisional — see "the experiment")
+**Status:** Accepted (provisional status lifted 2026-09-14 — see "the experiment, run")
 **Date:** 2026-09-14
 **Scope:** `docs/glowmere-valley-2/02-research.md` §4.4
 
@@ -88,6 +88,50 @@ coverage — the fraction of *reachable* cells occupied.**
 "Reachable" carries the weight. An empty cell that no parameter set can reach is a fact about the
 mushroom, not a failure of the sampler, and counting it against Sobol would manufacture a case for
 replacing it.
+
+## The experiment, run
+
+Run on 2026-09-14 against the mushroom generator's own population. Four behaviour dimensions —
+aspect ratio, cap-to-stem, asymmetry, curvature — at three bins each, 81 cells, which is the largest
+grid a few hundred samples can speak to. A finer grid would report low coverage as a property of the
+sample size rather than of the sampler.
+
+| valid candidates | cells occupied of 81 |
+|---:|---|
+| 165 | 59 (72.8%) |
+| 330 | 61 (75.3%) |
+| 660 | **73 (90.1%)** |
+| 1,322 | **80 (98.8%)** |
+
+**The decision stands, and the reason is the shape of that column rather than any single row.**
+
+At 165 samples, coverage is 72.8% — *below* what uniformly distributed samples in uniform bins would
+give (~87%), which on its own reads as a case against the sampler. It is not one: the behaviour
+descriptors are products and ratios of the parameters, so their distribution is not uniform even when
+the parameters are, and a histogram binned over the observed range will always leave corner cells
+thin.
+
+The question ADR-173 actually posed was whether the empty cells are **reachable**, and coverage
+climbing monotonically to 98.8% answers it directly: **they are reachable by sampling, they are
+merely rare.** Sobol does reach them; it needs more points. MAP-Elites would reach them with fewer
+evaluations, which is a different and much weaker claim than the one that would have justified it —
+"cells are more likely to be filled by mutating a nearby cell than by sampling the genotype space"
+is false here, because sampling fills them.
+
+Assumption 2 — that the genotype-to-behaviour map is near-monotone — **holds**, and it was the
+load-bearing one.
+
+### What the experiment changed
+
+**The population, not the sampler.** At 200 candidates a quarter of behaviour space is never
+sampled, and a diversity selection can only choose from what it was shown. The default is now **800**,
+where coverage is 90.1%. This is the useful result and it would not have come from any amount of
+arguing about samplers: the parameter that mattered was `N`.
+
+This is also the property Sobol was chosen for paying off directly — extending 200 → 400 → 800 →
+1600 cost nothing and invalidated nothing, because every earlier candidate keeps its identity. Under
+Latin hypercube each row of that table would have been a different sample and the comparison could
+not have been made.
 
 ## Why the upgrade path is cheap, and why that is the reason to build it in this order
 

@@ -1,5 +1,7 @@
 #include "app/engine.hpp"
 
+#include "organism/mushroom.hpp"
+
 #include "seq/layer_sink.hpp"
 
 #include "core/phase_profiler.hpp"
@@ -39,6 +41,11 @@ std::optional<TempoSource> tempoSourceFromName(std::string_view name) {
 }
 
 Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
+    // Generators that scenes can name (ADR-175). Registering here rather than from a static
+    // initialiser keeps the order explicit and keeps `scene` free of any knowledge of what a
+    // mushroom is; re-registering a name is defined to replace it, so calling this per Engine is
+    // harmless.
+    organism::registerMushroomGenerator();
     ensureControlSource();
     audioSignals_ = signals::AudioSignals::declare(bus_);
     timeSignals_.seconds = bus_.declare("time.seconds", 0.0f, 3600.0f);

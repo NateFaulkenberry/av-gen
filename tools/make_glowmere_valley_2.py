@@ -422,9 +422,6 @@ def setpos(name, xyz):
             return True
     return False
 
-setpos("elder-stem", ELDER)
-setpos("elder-crown", (ELDER[0], ELDER[1] + STEM_TO_CROWN, ELDER[2]))
-setpos("elder-filaments", (ELDER[0], ELDER[1] + STEM_TO_CROWN, ELDER[2]))
 setpos("foreground-leaves", FGLEAF)
 setpos("wanderer", WANDER)
 setpos("visitor", UFO)
@@ -435,8 +432,6 @@ for n in d["nodes"]:
         n.setdefault("particles", {})["position"] = [-20.0, 8.0, 20.0]
 
 for h in d["heroes"]:
-    if h["name"] == "elder-crown":
-        h["position"] = [ELDER[0], ELDER[1], ELDER[2]]
     if h["name"] == "visitor":
         h["position"] = [UFO[0], UFO[1] - 1.45, UFO[2]]
 
@@ -447,6 +442,159 @@ d["camera"] = collections.OrderedDict([
 
 json.dump(d, open(DST, 'w'), indent=1)
 print("staged; camera", CAM_EYE, "->", CAM_TGT)
+
+# ---- Phase 5: the hero mushrooms ----------------------------------------------------------------
+#
+# The six winners of the Phase 4 candidate search, placed in habitat pockets on the riverbank. Each is
+# four nodes -- cap, underside, stem, gills -- because each part carries its own material and because
+# four named nodes are four things an artist can click, where one merged mesh is none.
+#
+# The geometry is `PrimitiveKind::Generated` (ADR-175): the scene stores the 18 parameter values and
+# the generator builds from them, so a hero can be nudged in the editor and regenerate rather than
+# being a frozen mesh. `index` rides along as provenance -- which candidate of the search it was.
+HERO_RECORD = 'examples/organisms/glowmere2-heroes.json'
+heroes_doc = json.load(open(HERO_RECORD))
+
+PALETTE = {
+    "shadow":    [0.008, 0.016, 0.048],
+    "secondary": [0.3085, 0.1208, 1.0],
+    "primary":   [0.06, 0.82, 1.0],
+    "foliage":   [0.02, 1.0, 0.58],
+    "accent":    [1.0, 0.47, 0.15],
+}
+
+def mul(c, k):
+    return [round(v * k, 5) for v in c]
+
+# (name, x, ground y, z, height in metres, yaw). Heights probed with
+# `avgen_tests "[.probe][glowmere2]"`; every one sits in the mesic riverbank band, HAR 2.5-6.3 m,
+# on near-flat ground. They are spread down the whole course rather than clustered, so the river is
+# a route past a series of them rather than a single set piece -- the brief's 7 asks for habitat
+# pockets, not a mushroom field.
+HERO_SITES = [
+    ("elder-2", -12.0,  3.66,  52.0, 16.0,  0.35),   # the pool's east bank: the dominant hero
+    ("lantern", -46.0,  7.93, -28.0,  6.5,  1.90),
+    ("spire",    68.0, 12.09,-104.0,  4.2, -0.80),
+    ("bloom",   -62.0,  4.30, 118.0,  9.0,  2.60),
+    ("veil",     78.0,  0.16, 198.0,  3.4,  0.95),
+    ("umbra",   -66.0,  4.25, 166.0,  5.5, -2.10),
+]
+
+# One warm hero, and it is the elder. Glowmere's reserve-accent rule -- "the hero is the only warm
+# light in the world ... that is why the eye goes to it from anywhere in the frame, and it costs
+# nothing" -- does not survive six warm mushrooms. So the search's chosen emission structure is kept
+# for the elder and the other five are recoloured to the cool half of the palette.
+#
+# **This is an art-direction override of the search's own output, and it is recorded as one.** The
+# pipeline had no way to know that the sixth-best mushroom's warm gills would compete with the first's;
+# a scorer sees one candidate at a time and this is a property of the set.
+def hero_materials(index, structure, emission):
+    warm = index == 0
+    glow = PALETTE["accent"] if warm else (PALETTE["primary"] if structure % 2 == 0 else PALETTE["foliage"])
+    cap = {"program": "paintedCrown", "baseColor": mul(PALETTE["secondary"], 0.30),
+           "roughness": 0.44, "emissiveColor": mul(glow, 0.12), "emissiveIntensity": 0.35}
+    # No material program on the emitting parts. `glowmereTissue` writes its own cyan-green emission
+    # constant, so a warm hero wearing it comes out green -- which is exactly the reserve-accent rule
+    # broken by a material, and the first render of the placed elder showed it. The program's fresnel
+    # translucency is a real loss and is noted as one; colour control is worth more, because "one warm
+    # light in a cool world" is the reason the eye finds the hero at all.
+    under = {"baseColor": mul(PALETTE["secondary"], 0.18),
+             "roughness": 0.52, "emissiveColor": glow, "emissiveIntensity": 0.0}
+    stem = {"baseColor": [0.24, 0.12, 0.25], "roughness": 0.62,
+            "emissiveColor": mul(glow, 0.25), "emissiveIntensity": 0.06}
+    gills = {"baseColor": mul(PALETTE["shadow"], 1.0),
+             "roughness": 0.40, "emissiveColor": glow, "emissiveIntensity": emission}
+    # Where the light comes out, mirroring the generator's own structure choice. The gills carry it in
+    # every case except "rim", because a glowing surface reads as paint and a glowing structure reads
+    # as biology -- and the gills are the structure.
+    if structure == 1:
+        under["emissiveIntensity"] = emission * 0.8
+        gills["emissiveIntensity"] = emission * 0.25
+    elif structure == 2:
+        cap["emissiveIntensity"] = emission * 0.45
+        cap["emissiveColor"] = mul(glow, 0.5)
+    return [cap, under, stem, gills]
+
+PART_ROLES = ["cap", "under", "stem", "gills"]
+hero_nodes = []
+hero_points = []
+for hi, (hname, hx, hy, hz, hheight, hyaw) in enumerate(HERO_SITES):
+    rec = heroes_doc["heroes"][hi]
+    values = [rec["parameters"][spec] for spec in
+              [k for k in rec["parameters"]]]  # placeholder, replaced below
+    # The schema's order is load-bearing (ADR-173), and a JSON object does not preserve it. The order
+    # is taken from the record's own index into the sampler rather than from dict iteration.
+    order = ["aspect", "rimTangentDeg", "centreTangentDeg", "capThickness", "stemCurvature",
+             "stemTaper", "stemBulgePosition", "stemBulgeWidth", "lobeCount", "lobeDepth",
+             "capTiltDeg", "edgeWaviness", "surfaceNoiseAmp", "surfaceNoiseScale", "gillCount",
+             "gillDepth", "emissionStructure", "emissionIntensity"]
+    values = [float(rec["parameters"][k]) for k in order]
+    structure = int(round(values[16]))
+    emission = float(values[17])
+    mats = hero_materials(hi, structure, emission)
+    # Unit height of the generated organism is about 1.2 (stem 1 plus cap thickness and rim), so the
+    # scale that reaches a target height in metres is that ratio.
+    scale = round(hheight / 1.2, 4)
+    for part in range(4):
+        hero_nodes.append(collections.OrderedDict([
+            ("name", "%s-%s" % (hname, PART_ROLES[part])),
+            ("kind", "procedural"),
+            ("position", [hx, round(hy - 0.12, 3), hz]),
+            ("rotation", [0.0, round(hyaw * 57.29578, 2), 0.0]),
+            ("procedural", collections.OrderedDict([
+                ("source", collections.OrderedDict([
+                    ("kind", "generated"),
+                    ("generated", collections.OrderedDict([
+                        ("generator", heroes_doc["generator"]),
+                        ("generatorVersion", heroes_doc["generatorVersion"]),
+                        ("schemaHash", heroes_doc["schemaHash"]),
+                        ("index", rec["index"]),
+                        ("values", values),
+                    ])),
+                    ("generatedPart", part),
+                ])),
+                ("sourceTransform", {"scale": [scale, scale, scale]}),
+                ("distribution", {"kind": "single"}),
+                ("material", mats[part]),
+                # The gills are light and floppy, the cap is heavy and barely moves -- the same split
+                # the original elder used, and the reason its filaments read as alive.
+                ("motion", {"stiffness": 18.0 if part != 3 else 0.8,
+                            "mass": 120.0 if part != 3 else 0.5,
+                            "damping": 0.95,
+                            "windSensitivity": 0.16 if part != 3 else 0.5,
+                            "bendLimit": 0.015 if part != 3 else 0.09,
+                            "tipAmplitude": 0.01 if part != 3 else 0.06}),
+            ])),
+        ]))
+    hero_points.append(collections.OrderedDict([
+        ("name", "%s-cap" % hname),
+        ("position", [hx, round(hy, 3), hz]),
+        ("yaw", round(hyaw, 3)), ("scale", 1.0),
+        ("radius", round(hheight * 0.42, 2)), ("height", round(hheight, 2)),
+        ("importance", round(0.95 - hi * 0.07, 3)),
+        ("focalWeight", round(0.9 - hi * 0.08, 3)),
+        ("preferredCameraDistance", round(hheight * 3.1, 1)),
+        ("preferredCameraElevation", 5.0),
+        ("activationRadius", round(hheight * 9.0, 1)),
+        ("colorAccent", PALETTE["accent"] if hi == 0 else PALETTE["primary"]),
+        ("reactionProfile", "organism"),
+    ]))
+
+# The original elder leaves: a squashed sphere with two displacement deformers is what the brief's 7
+# exists to replace, and `docs/stylized-glowmere.md` already listed "an overly regular hero" as an
+# open defect.
+ELDER = {"elder-crown", "elder-stem", "elder-filaments"}
+d["nodes"] = [n for n in d["nodes"] if n.get("name") not in ELDER]
+d["nodes"].extend(hero_nodes)
+d["heroes"] = [h for h in d["heroes"] if h.get("name") not in ELDER] + hero_points
+
+for e in d.get("entities", []):
+    for b in e.get("behaviors", []):
+        if b.get("kind") == "interest":
+            b["subjects"] = ["visitor", "elder-2-cap", "bloom-cap"]
+
+json.dump(d, open(DST, 'w'), indent=1)
+print("heroes placed: %d nodes, %d hero points" % (len(hero_nodes), len(hero_points)))
 
 # ---- the project ------------------------------------------------------------------------------
 PSRC = 'examples/world/glowmere-stylized.json'
@@ -469,14 +617,34 @@ for name in DROP:
 # The project's parameter block is authoritative over the scene's transforms -- `applyParameters`
 # rewrites them every frame -- so a staged scene whose project still carried the old positions would
 # put every hero back where it was. This is the half of staging that is easy to forget.
-params["nodes/elder-stem/position"] = list(ELDER)
-params["nodes/elder-crown/position"] = [ELDER[0], ELDER[1] + STEM_TO_CROWN, ELDER[2]]
-params["nodes/elder-filaments/position"] = [ELDER[0], ELDER[1] + STEM_TO_CROWN, ELDER[2]]
 params["nodes/foreground-leaves/position"] = list(FGLEAF)
 params["nodes/spores/position"] = [-20.0, 8.0, 20.0]
 params["camera/position"] = list(CAM_EYE)
 params["camera/target"] = list(CAM_TGT)
 params["camera/mode"] = 1
+
+# The music reached the old elder through four routes. Repointed rather than dropped: the cap is what
+# the section-scale swell belongs on and the gills are what a downbeat should answer, which is the same
+# split the original had between its crown and its filaments.
+REPOINT = {
+    "nodes/elder-crown/emissiveBoost": "nodes/elder-2-cap/emissiveBoost",
+    "nodes/elder-filaments/emissiveBoost": "nodes/elder-2-gills/emissiveBoost",
+}
+kept = []
+for r in proj["routes"]:
+    t = r.get("target", "")
+    if t in REPOINT:
+        r["target"] = REPOINT[t]
+    elif t.startswith("procedural/elder-filaments/"):
+        # `distribution/radius` drove the filament ring's spread on a drop. A generated mushroom's
+        # gills are not a radial distribution, so there is no equivalent parameter and inventing one
+        # would be a control with no effect.
+        continue
+    kept.append(r)
+proj["routes"] = kept
+for k in [k for k in params if k.startswith("nodes/elder-crown/") or k.startswith("nodes/elder-stem/")
+          or k.startswith("nodes/elder-filaments/") or k.startswith("procedural/elder-")]:
+    params.pop(k)
 
 # Routes that named a removed node would bind to nothing. Unresolved routes stay enabled but inert
 # by design, so this is tidiness rather than a fix -- but an inert route is a lie in the UI.

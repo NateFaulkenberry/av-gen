@@ -62,6 +62,15 @@ asymmetry and tessellation are three of the failure modes this pipeline exists t
 Penalties are a separate field and are correctly monotone: there is no such thing as too little of an
 artifact.
 
+**A component with no variance across the population is not a criterion.** This is the sharpest
+practical form of the rule and it was learned the expensive way: two of Glowmere Valley 2's nine
+components scored *exactly* 0.00 for five of six winners, because their bands were guessed and the
+real distribution sat entirely outside them. A component that returns the same value for every
+candidate contributes a constant to every total — it changes no ranking, selects nothing, and looks
+exactly like a working criterion in the code. **Before trusting a band, plot its raw values over the
+population and check they span it.** If the scores cluster at 0 or at 1, the band is wrong, not the
+candidates.
+
 **Store components, never just a total.** When the pipeline proposes something ugly, the breakdown is
 what says which band lied. That is the only mechanism by which the bands ever improve.
 

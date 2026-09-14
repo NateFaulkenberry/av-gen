@@ -22,6 +22,8 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <array>
+#include <cstdlib>
 #include <map>
 #include <memory>
 #include <string>
@@ -128,7 +130,13 @@ TEST_CASE("the hero mushroom search", "[.search][mushroom]") {
     const search::GeneratorSchema& schema = generator.schema();
     REQUIRE(schema.validate().has_value());
 
-    constexpr std::uint32_t kPopulation = 200;
+    // Sobol is extensible -- any prefix is well distributed and every earlier candidate keeps its
+    // identity (ADR-173) -- so growing the population to probe coverage costs nothing and invalidates
+    // nothing. That property is exactly what is being used here.
+    const std::uint32_t kPopulation =
+        std::getenv("MUSHROOM_POPULATION")
+            ? static_cast<std::uint32_t>(std::strtoul(std::getenv("MUSHROOM_POPULATION"), nullptr, 10))
+            : 800u;
     constexpr std::size_t kWinners = 6;
     // The quality/diversity trade, explicit because hiding it inside an algorithm is how a pipeline
     // ends up with six excellent near-identical mushrooms and no knob to say so (ADR-172 / 4.8).
@@ -184,6 +192,58 @@ TEST_CASE("the hero mushroom search", "[.search][mushroom]") {
         std::printf("    %-16s %4d  (%.1f%%)\n", rule.c_str(), n, 100.0 * n / kPopulation);
     }
     REQUIRE(valid > 0);
+
+    // ---- ADR-173's falsifying experiment ------------------------------------------------------
+    //
+    // The sampler decision was provisional and named the test that would overturn it: bin the valid
+    // candidates into the behaviour grid and report **cell coverage**. If a Sobol run covers the
+    // reachable grid well, MAP-Elites has nothing to add. If coverage is poor *and the empty cells
+    // are reachable*, the genotype-to-behaviour map is not near-monotone, the ADR's load-bearing
+    // assumption is false, and MAP-Elites is correct.
+    //
+    // Four behaviour dimensions at three bins each: 81 cells against 165 valid candidates, which is
+    // the largest grid this population can speak to. A finer grid would report low coverage as a
+    // property of the sample size rather than of the sampler.
+    {
+        constexpr int kBins = 3;
+        constexpr std::size_t kDims = 4;
+        // aspectRatio (11), capAsymmetry (6), stemCurvature (5), capThickness (2) -- indices into
+        // the feature vector, chosen as ADR-173 names them: aspect, cap-to-stem, asymmetry, curvature.
+        const std::array<std::size_t, kDims> axes{11, 6, 5, 2};
+        std::array<float, kDims> lo{};
+        std::array<float, kDims> hi{};
+        lo.fill(1e9f);
+        hi.fill(-1e9f);
+        for (const search::Candidate& c : population) {
+            if (c.rejected || c.features.empty()) continue;
+            for (std::size_t a = 0; a < kDims; ++a) {
+                lo[a] = std::min(lo[a], c.features[axes[a]]);
+                hi[a] = std::max(hi[a], c.features[axes[a]]);
+            }
+        }
+        std::map<int, int> cells;
+        for (const search::Candidate& c : population) {
+            if (c.rejected || c.features.empty()) continue;
+            int cell = 0;
+            for (std::size_t a = 0; a < kDims; ++a) {
+                const float t = (c.features[axes[a]] - lo[a]) / std::max(hi[a] - lo[a], 1e-6f);
+                cell = cell * kBins + std::min(kBins - 1, static_cast<int>(t * kBins));
+            }
+            cells[cell]++;
+        }
+        int total = 1;
+        for (std::size_t a = 0; a < kDims; ++a) total *= kBins;
+        std::printf("\n  ADR-173 coverage: %zu of %d behaviour cells occupied (%.1f%%), %d valid samples\n",
+                    cells.size(), total, 100.0 * static_cast<double>(cells.size()) / total, valid);
+        int singles = 0;
+        int crowded = 0;
+        for (const auto& [cell, n] : cells) {
+            if (n == 1) ++singles;
+            if (n > 8) ++crowded;
+        }
+        std::printf("    %d cells hold exactly one candidate, %d hold more than eight\n", singles, crowded);
+        std::fflush(stdout);
+    }
 
     const std::vector<std::size_t> winners = search::selectDiverse(population, kWinners, kAlpha);
     REQUIRE(winners.size() == kWinners);

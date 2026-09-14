@@ -367,6 +367,11 @@ TEST_CASE("probe: Glowmere Valley 2 ground heights", "[.probe][glowmere2]") {
         {"V02eye", 14.0f, 286.0f},        {"V03eye", -40.0f, -290.0f},
         {"V05eye", -58.0f, 86.0f},        {"V06eye", 236.0f, 60.0f},
         {"V03alt", -30.0f, -232.0f},      {"V02alt", 10.0f, 268.0f},
+        // hero mushroom habitat pockets, near the water
+        {"H0", -12.0f, 52.0f},            {"H1", -46.0f, -28.0f},
+        {"H2", 68.0f, -104.0f},           {"H3", -62.0f, 118.0f},
+        {"H4", 78.0f, 198.0f},            {"H5", -66.0f, 166.0f},
+        {"H1b", -78.0f, -34.0f},
     };
     for (const auto& s : spots) {
         const world::Sample smp = map.sample({s.x, s.z}, 0.5f);
