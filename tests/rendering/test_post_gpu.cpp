@@ -319,3 +319,81 @@ TEST_CASE("post chain releases transient targets across feature changes", "[gpu]
     CHECK(renderer.transientPool().allocations() > 0);
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-189. The FXAA stage fades in over a band above its edge threshold instead of switching on at
+// it, because the switch was the crawl: `range < threshold` is a binary decision taken per pixel per
+// frame, and a pixel whose contrast sits near the threshold flips between filtered and unfiltered as
+// a blade of grass sways past it.
+//
+// Two properties, and the second is the one that makes the change safe to ship. FXAA must still
+// antialias -- a fade that faded everything out would score beautifully on flicker and be a filter
+// that does nothing. And it must still be a *pure function of the frame*: an offline render of frame
+// N may not depend on frame N-1, so the same scene rendered twice from fresh renderers has to come
+// out identical. That is what rules out the obvious alternative, a temporal hysteresis on the edge
+// decision, and it is worth asserting rather than assuming.
+TEST_CASE("FXAA antialiases, and does so without looking at the previous frame", "[gpu][post][fxaa]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    // A hard, high-contrast diagonal: the case FXAA exists for, and one whose contrast is far above
+    // any plausible threshold, so the ramp is at full confidence and must not weaken it.
+    scene::Scene s;
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.environment.showSkybox = false;
+    s.post.bloomEnabled = false;
+    s.post.tonemap = scene::TonemapOperator::Clamp;
+    s.camera.position = {0.0f, 0.0f, 6.0f};
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    const auto mesh = s.addMesh(scene::makeCube(1.2f));
+    auto& e = s.addEntity("edge", mesh);
+    e.material.baseColor = {0.0f, 0.0f, 0.0f};
+    e.material.emissiveColor = {1.0f, 1.0f, 1.0f};
+    e.material.emissiveIntensity = 4.0f;
+    e.material.unlit = true;
+    // Turned off-axis so the silhouette is a diagonal rather than an axis-aligned rectangle, which
+    // would be antialiased by nothing because it needs no antialiasing.
+    e.transform.rotation = glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 22.0f)));
+
+    const auto render = [&](float antialias) {
+        s.post.antialias = antialias;
+        FrameTime t{};
+        auto img = renderer.renderToImage(s, t, 256, 256);
+        REQUIRE(img.has_value());
+        return *img;
+    };
+
+    const auto off = render(0.0f);
+    const auto on = render(0.75f);
+    CHECK(ctx->errorCount() == 0);
+
+    // It filters. Summed over the rows the silhouette crosses rather than required of each one:
+    // `edgeSharpness` is the single steepest step in a row, and FXAA blends *along* an edge, so on a
+    // row crossing a near-vertical part of the silhouette it barely moves that maximum. The total is
+    // what the filter is claimed to reduce, and the total is what is asserted.
+    long sharpOff = 0;
+    long sharpOn = 0;
+    int rows = 0;
+    for (std::uint32_t y = 40; y < 216; y += 4) {
+        const int a = edgeSharpness(off, y);
+        if (a < 30) {
+            continue; // this row does not cross the silhouette
+        }
+        ++rows;
+        sharpOff += a;
+        sharpOn += edgeSharpness(on, y);
+    }
+    INFO("rows crossing the silhouette: " << rows << ", edge energy off " << sharpOff << " on " << sharpOn);
+    REQUIRE(rows >= 8);          // the scene the measurement assumes, established
+    CHECK(sharpOn < sharpOff);   // and the filter softens the silhouette overall
+
+    // And it carries nothing between frames. A fresh renderer has no history of any kind, so if the
+    // edge decision depended on a previous frame these two would differ.
+    rendering::SceneRenderer second(*ctx, shaders);
+    REQUIRE(second.init().has_value());
+    FrameTime t{};
+    auto again = second.renderToImage(s, t, 256, 256);
+    REQUIRE(again.has_value());
+    CHECK(again->rgba == on.rgba);
+}

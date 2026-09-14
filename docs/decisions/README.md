@@ -184,3 +184,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [186](ADR-186-an-offline-render-lifts-the-limits-playback-needs.md) | An offline render lifts the distance limits playback needs | Accepted |
 | [187](ADR-187-fxaa-gets-its-own-arm.md) | FXAA gets its own isolation arm | Accepted |
 | [188](ADR-188-parenting-gets-an-appearance.md) | Parenting gets an appearance, and an offset you can type | Accepted |
+| [189](ADR-189-fxaa-fades-in-rather-than-switching-on.md) | FXAA fades in rather than switching on | Accepted |

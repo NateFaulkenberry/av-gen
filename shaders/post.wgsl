@@ -684,6 +684,24 @@ fn fs_motion_blur(in: FsIn) -> @location(0) vec4<f32> {
 const kFxaaAbsolute: f32 = 0.0312;   // below this local contrast, leave the pixel alone
 const kFxaaRelative: f32 = 0.125;    // ...or below this fraction of the neighbourhood's maximum
 const kFxaaSearchSteps: i32 = 12;
+// How wide a band above the edge threshold the filter fades in over, as a fraction of the threshold
+// (ADR-189). 0 restores the hard cut-off this shader shipped with.
+//
+// The cut-off is the crawl. `range < threshold` is a *binary* decision taken per pixel per frame,
+// and the filtered result differs from the unfiltered one by a lot -- so a pixel whose local
+// contrast sits near the threshold flips between the two as a blade of grass sways past it, and a
+// row of such pixels flipping is exactly what "crawling edges" describes. Measured at a grass
+// close-up: switching the whole pass off removed 25% of the flickering area.
+//
+// Fading the blend in across a band removes the discontinuity without removing the filter. A pixel
+// well above the threshold is antialiased exactly as before -- the ramp is 1 there -- and a pixel
+// below it is still untouched, so nothing that was sharp becomes soft. Only the pixels that were
+// flipping change behaviour, which is the point.
+//
+// It is a pure function of this frame. No history, no previous-frame decision, nothing that makes
+// the image depend on how the camera got here -- so an offline render is as deterministic as it was
+// (§5.9), which a temporal hysteresis would not have been.
+const kFxaaRamp: f32 = 1.0;
 
 // Reinhard, so the thresholds above are in display terms rather than in scene radiance. Monotone,
 // so it cannot invert an edge, and two taps cheaper than an actual tone map.
@@ -714,7 +732,8 @@ fn fs_fxaa(in: FsIn) -> @location(0) vec4<f32> {
     // Flat enough to leave alone. The absolute floor is what keeps the filter out of the deep
     // shadows, which on a night landscape is most of the frame and is where a luminance-relative
     // test alone would happily smear sensor-grade noise.
-    if (range < max(kFxaaAbsolute, lumaMax * kFxaaRelative)) {
+    let edgeThreshold = max(kFxaaAbsolute, lumaMax * kFxaaRelative);
+    if (range < edgeThreshold) {
         return vec4<f32>(rgbM, 1.0);
     }
 
@@ -802,7 +821,13 @@ fn fs_fxaa(in: FsIn) -> @location(0) vec4<f32> {
     let subPixel2 = (-2.0 * subPixel1 + 3.0) * subPixel1 * subPixel1; // smoothstep
     let subPixelOffset = subPixel2 * subPixel2 * post.params0.x;
 
-    let finalOffset = max(pixelOffset, subPixelOffset);
+    // ADR-189: fade the filter in over a band above the threshold rather than switching it on. The
+    // offset is what the filter *is* -- the output is a resample at `uv + offset` -- so scaling it
+    // by the confidence is the blend, and at confidence 0 the sample is the unfiltered pixel
+    // exactly. Continuous in `range`, therefore continuous in time.
+    let confidence = select(
+        smoothstep(edgeThreshold, edgeThreshold * (1.0 + kFxaaRamp), range), 1.0, kFxaaRamp <= 0.0);
+    let finalOffset = max(pixelOffset, subPixelOffset) * confidence;
     var finalUv = uv;
     if (horizontal) { finalUv.y += finalOffset * stepLength; } else { finalUv.x += finalOffset * stepLength; }
     return vec4<f32>(textureSampleLevel(source, linearSampler, finalUv, 0.0).rgb, 1.0);
