@@ -1136,6 +1136,52 @@ TEST_CASE("Auto-director settings reach the film, and refuse what they cannot me
         REQUIRE(castDiffers);
     }
 
+    SECTION("the mode reaches the baked timeline through directEngine, not just directHeroes") {
+        // The layer the panel actually drives. `directHeroes` honouring the mode was already
+        // covered, and the defect was one level up: `directCameraFromTrack` called `directEngine`
+        // and omitted the settings, so every control was bound to a struct the cut never read.
+        // A test at the `directHeroes` level cannot see that, which is why this one exists here.
+        app::AutoDirectorSettings take;
+        take.mode = app::DirectorMode::ContinuousShot;
+        app::AutoDirectorSettings cut = take;
+        cut.mode = app::DirectorMode::EditedSequence;
+
+#ifndef AVGEN_SOURCE_DIR
+        SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+        const std::filesystem::path wav =
+            std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "glowmere-valley.wav";
+        if (!std::filesystem::exists(wav)) {
+            SKIP("glowmere-valley.wav is generated, not committed");
+        }
+        app::Engine engine(app::EngineMode::Offline);
+        engine.newComposition();
+        REQUIRE(engine.loadAudio(wav).has_value());
+        REQUIRE(engine.composition()->setHeroes(heroes).has_value());
+
+        const auto keysFor = [&](const app::AutoDirectorSettings& settings) {
+            REQUIRE(app::directEngine(engine, heroes, settings).has_value());
+            std::vector<float> out;
+            for (const params::Track& t : engine.timeline().tracks()) {
+                if (t.target != "camera/position") {
+                    continue;
+                }
+                for (const params::Key& key : t.keys) {
+                    out.insert(out.end(), key.value.begin(), key.value.end());
+                }
+            }
+            return out;
+        };
+        const std::vector<float> continuousKeys = keysFor(take);
+        const std::vector<float> editedKeys = keysFor(cut);
+        REQUIRE_FALSE(continuousKeys.empty());
+        REQUIRE_FALSE(editedKeys.empty());
+        // Two different films. A continuous take pins each shot's start to the last one's end, so
+        // the camera path is not the one an edited sequence bakes.
+        CHECK(continuousKeys != editedKeys);
+#endif
+    }
+
     SECTION("the wide lens reaches the baked keys") {
         app::AutoDirectorSettings wide;
         wide.wideFocalLength = 14.0f;
