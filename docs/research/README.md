@@ -16,6 +16,7 @@ relevance, confidence) and ends with a Sources list. `references.md` consolidate
 | [offline-rendering.md](offline-rendering.md) | Deterministic frame rendering: injected clock, seeded RNG, timeline-indexed analysis, readback, image/video output, visual regression | FrameClock + AudioFeatures::at(time) + render-job struct from day one |
 | [audiovisual-systems.md](audiovisual-systems.md) | Notch, TouchDesigner, Unreal, Unity, Resolume, Processing, Hydra, Max/vvvv, Synesthesia, Milkdrop, Cables, Godot, ECS/reflection, Blender drivers, DAW modulation, OSC | 14 design lessons and a conceptual parameter/modulation data model |
 | [tooling.md](tooling.md) | Dependency management, UI, windowing, testing, logging, math, JSON, reflection/ECS, file watching, profiling, sanitizers, C++ standard, Apple specifics | CPM.cmake, SDL3, ImGui+ImPlot, Catch2, spdlog/fmt, GLM, nlohmann/json, C++23 allow-list |
+| [procedural-trees.md](procedural-trees.md) | Procedural tree generation: repository audit, comparison of space colonization / L-systems / recursive branching / self-organising models, and the architecture proposal for the Tree of Life | **Palubicki et al. self-organising model with a space-colonization environment**; Runions for *where*, apical control for *how much* |
 | [references.md](references.md) | Consolidated source lists from every document | |
 
 ## How decisions flow from research
