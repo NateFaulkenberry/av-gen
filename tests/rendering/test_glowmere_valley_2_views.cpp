@@ -13,6 +13,8 @@
 #include "gpu/shader_library.hpp"
 #include "rendering/render_stats.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "params/parameter.hpp"
+#include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -92,18 +94,40 @@ TEST_CASE("Glowmere Valley 2 from several viewpoints", "[.capture][glowmere2]") 
         clock.restartAt(6.0);
         const FrameTime time = engine.tick(clock);
         engine.setViewport(kWidth, kHeight);
+        // The camera must be set *before* `engine.update`, and through the parameters rather than
+        // onto the scene. Two reasons, and the first cost a whole forensic investigation:
+        //
+        //   * `Composition::update` computes the terrain's frustum planes and its per-chunk LOD from
+        //     `scene_.camera`, so a camera written afterwards renders a frame that was **culled for
+        //     somebody else's viewpoint**. That is what produced the "dark valley floor": the floor
+        //     was not dark, it was absent, because those chunks are not visible from the scene's
+        //     authored camera and the cull had already run.
+        //   * `applyParameters` rebuilds the scene's camera from the parameters every frame, so a
+        //     value written onto the scene before update is overwritten by update.
+        const auto setVec = [&](const char* path, glm::vec3 v) {
+            params::IParameter* p = engine.params().find(path);
+            REQUIRE(p != nullptr);
+            for (std::size_t i = 0; i < 3; ++i) {
+                p->setBaseComponent(i, v[static_cast<glm::length_t>(i)]);
+            }
+        };
+        const auto setFloat = [&](const char* path, float v) {
+            if (params::IParameter* p = engine.params().find(path)) {
+                p->setBaseComponent(0, v);
+            }
+        };
+        setVec("camera/position", v.eye);
+        setVec("camera/target", v.target);
+        setFloat("camera/fov", v.fov);
         engine.update(time);
-        // After update: `applyParameters` rebuilds the scene's camera from the project's parameters
-        // every frame, so a camera written before it would be overwritten by the authored one.
         scene::Scene& scene = engine.composition()->scene();
-        scene.camera.position = v.eye;
-        scene.camera.target = v.target;
-        scene.camera.lens.useExplicitFov = true;
-        scene.camera.fovYRadians = glm::radians(v.fov);
-        // The default far plane is 200 m and this map is 640 m across its diagonal-and-a-half. A
-        // view down the valley's axis with the authored default would end in a hard clip at the
-        // exact distance the acceptance criterion is about.
+        // The far plane is not a parameter and the default is 200 m; this map is 640 m across. It is
+        // set after update because nothing in update derives from it.
         scene.camera.farPlane = 1400.0f;
+        // The guard for the defect that never was: if the camera is ever set after `update` again,
+        // this fails instead of producing a plausible frame culled for somebody else's viewpoint.
+        REQUIRE(glm::distance(scene.camera.position, v.eye) < 0.01f);
+        REQUIRE(glm::distance(scene.camera.target, v.target) < 0.01f);
         auto image = renderer.renderToImage(scene, time, kWidth, kHeight);
         REQUIRE(image.has_value());
         REQUIRE(assets::writePng(outDir / (std::string(v.name) + ".png"), image->width, image->height,

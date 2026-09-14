@@ -53,7 +53,7 @@ traversal is guaranteed by construction rather than by luck. It descends 26 m mo
 | not arbitrary noise | cross-valley height spread > 3× the spread over a 40 m patch | pass |
 | HAR usable | finite everywhere; rises away from the channel; **no dry ground below the water table** | pass |
 | the original still works | `defaultWorld()` unchanged: 15 features, `glowmere-run` still 7 m wide, 625-sample fingerprint | pass |
-| recognisable from multiple viewpoints | six captures, looked at | **partly — see §5** |
+| recognisable from multiple viewpoints | six captures, looked at | pass (after §5) |
 
 `avgen_tests "[glowmere2]"`: 5 cases, 10,370 assertions, 0 failures. Whole suite: below.
 
@@ -108,32 +108,42 @@ to values derived from something — 20 m, and 8 m because the local relief of t
 3 m so a rise larger than the noise is the actual claim. The underlying properties both hold; the
 thresholds were decoration.
 
-## 5. The open defect: the valley floor renders very dark in wide views
+## 5. The "dark valley floor" was a defect in the measurement, not in the scene
 
-**Reproducible, and not explained.** In views looking along or across the valley, the near and
-mid-ground terrain renders near-black while the vegetation, rocks and water standing on it are
-correctly lit, with a smooth boundary at roughly constant distance from the camera. Close views
-(`05-elder-and-pool`) and the across-valley opening shot (`01-opening`) do not show it.
+**Resolved, and the resolution is worth more than the bug.** There was never a shading defect. The
+valley floor was not dark — **it was absent**, and it was absent because the capture harness set the
+camera *after* `engine.update()`.
 
-**Falsified, each by a render:**
+`Composition::update` computes the terrain's frustum planes and its per-chunk LOD from
+`scene_.camera` (`composition.cpp:4607`). A camera written after that renders a frame **culled for a
+different viewpoint**: the chunks kept are the ones the scene's *authored* camera can see. That is
+why the opening shot was always fine — its camera is the authored one — and why every other view
+lost its near ground.
 
-1. **The ground material's dark ramp stop.** Replaced with a lighter program (§4.3). *No change at
-   all* — which is itself informative, and is what ruled the material out rather than merely making
-   it less likely.
-2. **The stylized shading path's floored ambient.** Rendered the same scene with
-   `environment.stylized: false`. The defect survives on the PBR path, so it is not the stylized
-   hemisphere ambient or its AO floor.
-3. **The shadow range.** ADR-112's texel rule made 260 m over 3 cascades look like the culprit;
-   restoring 150 m (the painterly scene's own value) changed nothing.
+Three earlier hypotheses were falsified by renders and all three were innocent, which in hindsight
+was the signal: the ground material's ramp, the stylized shading path, and the shadow range. When
+three independent shading explanations all fail to move a picture, the picture is not being shaded.
 
-**Not yet tried, in the order I would try them:** the aux-target debug views
-(`rendering::DebugViewOptions`) to see whether the dark region is terrain at all rather than water or
-an overdraw artifact; terrain chunk LOD, since the boundary's shape follows distance; and the biome
-axis, since the terrain's `uv.x` *is* the biome axis and a floor pinned at axis 0 would look exactly
-like this even through a lighter ramp if the ramp is not the thing being sampled.
+**What actually found it** was an arm that forced the ground to `unlit = true` with a white albedo —
+a surface that ignores every light, shadow and ambient term. It came back with a hard, straight,
+chunk-aligned edge and nothing beyond it. A surface that is missing rather than dark cannot be a
+lighting bug, and the edge's shape named the system.
 
-It does not block Phase 3 — the geography is correct and tested, and Phase 3's work is placement —
-but it should be fixed before anyone judges this scene by eye.
+Two lessons, both already written down in this repo and both re-learned anyway:
+
+- **"A probe must prove it established the state it claims to measure."** The harness believed it was
+  rendering from six viewpoints; it was rendering one scene's culling from six projections.
+- **A diagnostic arm must re-establish its state.** The forensic run that found this also leaked:
+  arm 1 cleared the ground's material program and arms 2–6 then reported "0 ground entities" and
+  measured arm 1 four more times. Exactly ADR-151's recorded failure, reproduced within a day of
+  quoting it.
+
+The fix is three lines: set `camera/position` and `camera/target` through `engine.params()` *before*
+`update`. `tests/rendering/test_glowmere_valley_2_views.cpp` now asserts after update that the
+camera is the one the view asked for, so the ordering cannot silently regress.
+
+Corrected draw counts, which are the evidence the fix worked: 190 → 221, 223, 245, 151, 210 across
+the six views, where before every view reported the authored camera's 190.
 
 ## 6. Performance
 
