@@ -8,7 +8,10 @@
 // test has a collapsed-band partner that must flicker; the equip test has a missing-socket partner
 // that must change nothing.
 
+#include "app/engine.hpp"
+#include "core/time.hpp"
 #include "entity/action.hpp"
+#include "scene/composition.hpp"
 #include "entity/entity.hpp"
 #include "params/parameter_set.hpp"
 #include "signals/signal_bus.hpp"
@@ -20,6 +23,7 @@
 #include <nlohmann/json.hpp>
 
 #include <chrono>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -1165,4 +1169,85 @@ TEST_CASE("foot slip measures the clip against the ground it crosses", "[entity]
     INFO("saturated slip " << saturated);
     CHECK(saturated > 1.9f);
     CHECK(saturated < 2.1f);
+}
+
+// ADR-162. Reported as "he does have a tendency to get stuck places in the map in different spots
+// and will stay there". This walks the real Glowmere wanderer for twenty simulated minutes and
+// measures the longest stall, because a bug described as "sometimes, somewhere" cannot be confirmed
+// or refuted by looking at one frame.
+//
+// Tagged [.probe]: twenty minutes of simulation is seconds of wall clock but not something the
+// default suite should pay for on every run. Run it with `avgen_tests "[stall]"`.
+TEST_CASE("the wanderer does not strand itself over a long walk", "[.probe][entity][nav][stall]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path scene =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-stylized.scene.json";
+    if (!std::filesystem::exists(scene)) {
+        SKIP("the Glowmere scene is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(scene).has_value());
+    scene::Composition* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+
+    // The camera follows the wanderer, and that is not a nicety.
+    //
+    // The entity carries a behaviour LOD: past `fullDetailDistance` (90 m) it is simulated on a
+    // coarse interval, and past `cullDistance` (320 m) it is not simulated at all. A probe that
+    // leaves the camera wherever the scene put it measures *culling*, not navigation, and a culled
+    // entity's position is frozen to the decimal -- which is indistinguishable from being stranded
+    // and is exactly what this probe reported on its first three runs, identically, across three
+    // different attempted fixes. A probe must prove it established the state it claims to measure.
+    params::Parameter<int>* cameraMode = engine.params().findAs<int>("camera/mode");
+    params::Parameter<glm::vec3>* cameraPos = engine.params().findAs<glm::vec3>("camera/position");
+    params::Parameter<glm::vec3>* cameraTarget = engine.params().findAs<glm::vec3>("camera/target");
+    REQUIRE(cameraMode != nullptr);
+    REQUIRE(cameraPos != nullptr);
+    REQUIRE(cameraTarget != nullptr);
+    cameraMode->setBase(1);
+
+    FixedStepClock clock(60.0);
+    const auto positionOf = [&](const char* name) -> glm::vec3 {
+        const scene::CompositionNode* node = comp->findNode(name);
+        return node != nullptr ? comp->nodeWorldTransform(*node).position : glm::vec3(0.0f);
+    };
+
+    // A stall is distance, not activity: a character legitimately stands still to observe, and the
+    // complaint was not "he pauses" but "he stops for ever". One metre over a rolling window is far
+    // below what a walk covers and far above grounding jitter.
+    constexpr double kMinutes = 20.0;
+    constexpr int kSteps = static_cast<int>(kMinutes * 60.0 * 60.0);
+    glm::vec3 anchor = positionOf("wanderer");
+    double stalled = 0.0;
+    double worstStall = 0.0;
+    glm::vec3 worstAt = anchor;
+    for (int i = 0; i < kSteps; ++i) {
+        const glm::vec3 follow = positionOf("wanderer");
+        cameraPos->setBase(follow + glm::vec3(0.0f, 12.0f, 24.0f));
+        cameraTarget->setBase(follow);
+        engine.update(engine.tick(clock));
+        if ((i % 30) != 0) {
+            continue; // sample twice a second; the sim still runs every step
+        }
+        const glm::vec3 now = positionOf("wanderer");
+        if (glm::length(glm::vec2(now.x - anchor.x, now.z - anchor.z)) > 1.0f) {
+            anchor = now;
+            stalled = 0.0;
+            continue;
+        }
+        stalled += 0.5;
+        if (stalled > worstStall) {
+            worstStall = stalled;
+            worstAt = now;
+        }
+    }
+    INFO("longest stall " << worstStall << " s at (" << worstAt.x << ", " << worstAt.z << ") over "
+                          << kMinutes << " simulated minutes");
+    // Generous, deliberately. The explore behaviour idles, observes and dwells by design, and the
+    // longest of those is measured in seconds; a character that has not moved a metre in two minutes
+    // is not resting, it is stranded.
+    CHECK(worstStall < 120.0);
+#endif
 }

@@ -164,3 +164,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [159](ADR-159-no-tap-may-step-further-than-the-texel-it-reads.md) | No tap may step further than the texel of the texture it reads | Accepted |
 | [160](ADR-160-the-distance-ladder-is-authored-and-there-are-two-of-them.md) | The distance ladder is authored, all four rungs of it — and there are two ladders | Accepted |
 | [161](ADR-161-root-motion-is-not-in-this-content-and-foot-slip-is-what-was-missing.md) | Root motion is not in this content, and foot slip is the thing that was missing | Accepted |
+| [162](ADR-162-a-walker-off-the-navigable-set-cannot-be-steered-back-onto-it.md) | A walker that steps off the navigable set cannot be steered back onto it | Accepted |

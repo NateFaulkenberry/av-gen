@@ -1048,6 +1048,64 @@ private:
                 // Every local way out is blocked. Re-plan rather than grinding, and count it: a
                 // character that cannot make progress must eventually choose somewhere else.
                 stuckFor_ += dt;
+                // Standing on ground the navigator does not consider navigable at all.
+                //
+                // This is how the wanderer was stranding itself, and every part of it is a system
+                // behaving correctly. A walker ends up just outside the navigable set -- a step
+                // down, the edge of the water, a slope that tipped over the limit as it came down
+                // it. From there `pathClear` fails in *every* direction, because it samples
+                // navigability from the body's own position outward, so the steering fan finds
+                // nothing however wide it reaches or however short a step it settles for. The
+                // watchdog re-plans, and the planner snaps an unwalkable start to the nearest
+                // walkable cell and returns a perfectly good route *from a place the body is not*.
+                // Status ok, failures zero, and the body has not moved for ten minutes.
+                //
+                // The missing piece is that nobody ever told the body where the planner snapped to.
+                // The planner already knows: `NavGrid::nearestWalkable` is what it uses on the
+                // start cell. Walking the body there is the same guarantee the penetration resolve
+                // makes for solids -- a body may not end a frame inside a rock -- extended to the
+                // case that actually occurs, which is a body ending a frame off the map's walkable
+                // set entirely. Penetration resolve cannot do it: measured at the wedge point it
+                // returns 0.097 m and then nothing, because the body is not inside anything.
+                const glm::vec3 wedged = state.position();
+                const glm::vec2 here2(wedged.x, wedged.z);
+                // The target is a point the *navigator* calls navigable, not a cell the grid calls
+                // walkable. The two disagree here, and that difference is the second half of this
+                // bug: walking to the nearest grid-walkable cell centre moved the body one metre
+                // onto (-14, -242) -- a cell centre, exactly -- where `navigable` is still false,
+                // so it re-stalled there instead. The grid is baked once from a sample per cell and
+                // the obstacle set moves afterwards, so grid-walkable is a claim about build time
+                // and `navigable` is a claim about now. The escape has to satisfy the predicate
+                // that gates steering, or it escapes to somewhere it is still stuck.
+                glm::vec2 refuge(0.0f);
+                bool found = false;
+                if (navigator != nullptr && !navigator->navigable(here2)) {
+                    for (float radius = 2.0f; radius <= 24.0f && !found; radius += 2.0f) {
+                        for (int k = 0; k < 12 && !found; ++k) {
+                            const float a = static_cast<float>(k) * 0.5235987756f;
+                            const glm::vec2 candidate =
+                                here2 + glm::vec2(std::sin(a), std::cos(a)) * radius;
+                            if (navigator->navigable(candidate)) {
+                                refuge = candidate;
+                                found = true;
+                            }
+                        }
+                    }
+                }
+                if (found) {
+                    const glm::vec2 away = refuge - here2;
+                    const float span = glm::length(away);
+                    if (span > 1e-4f) {
+                        // Clamped to a walking step, so the recovery reads as the character picking
+                        // its way back onto the path rather than as a teleport.
+                        const float limit = std::min(span, std::max(speed, 1.0f) * dt);
+                        state.travel.x += away.x / span * limit;
+                        state.travel.z += away.y / span * limit;
+                        state.speed = limit / std::max(dt, 1e-4f);
+                        state.activity = Activity::Walk;
+                        return false;
+                    }
+                }
                 if (stuckFor_ > stuckSeconds_) {
                     stuckFor_ = 0.0f;
                     phase_ = Phase::Navigate;
