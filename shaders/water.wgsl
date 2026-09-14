@@ -175,9 +175,30 @@ fn bedDepthAt(uv: vec2<f32>) -> f32 {
     if (water.params.z < 0.5) {
         return 1.0e7;
     }
+    // Bilinear, by hand, because the linear depth target is r32float and not filterable.
+    //
+    // Nearest was adequate while this number only tinted the water. It is not adequate now that the
+    // shoreline, the foam and the depth colour are all derived from it: the bed under a river bank
+    // drops fast, so one texel of quantisation is tens of centimetres of water depth, and at a
+    // clarity of about a metre that is a visible step in how much bed shows through. The same
+    // quantisation is what makes the number move when the camera turns -- the point lands on a
+    // different texel and reports a different depth -- which is a property a depth ought not have.
+    //
+    // Bleeding across a silhouette is the usual objection to filtering a depth buffer. It does not
+    // bite here: what is being read is the bed *under* the water, a continuous surface, and the
+    // half-texel of bleed at its far edge is behind the water's own shore fade.
     let size = vec2<f32>(textureDimensions(sceneLinearDepth, 0));
-    let texel = vec2<i32>(clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0)) * size);
-    return textureLoad(sceneLinearDepth, texel, 0).r;
+    let at = clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0)) * size - vec2<f32>(0.5);
+    let base = floor(at);
+    let f = at - base;
+    let hi = vec2<i32>(size) - vec2<i32>(1);
+    let i0 = clamp(vec2<i32>(base), vec2<i32>(0), hi);
+    let i1 = clamp(vec2<i32>(base) + vec2<i32>(1), vec2<i32>(0), hi);
+    let d00 = textureLoad(sceneLinearDepth, vec2<i32>(i0.x, i0.y), 0).r;
+    let d10 = textureLoad(sceneLinearDepth, vec2<i32>(i1.x, i0.y), 0).r;
+    let d01 = textureLoad(sceneLinearDepth, vec2<i32>(i0.x, i1.y), 0).r;
+    let d11 = textureLoad(sceneLinearDepth, vec2<i32>(i1.x, i1.y), 0).r;
+    return mix(mix(d00, d10, f.x), mix(d01, d11, f.x), f.y);
 }
 
 @fragment
@@ -229,10 +250,42 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     let bed = bedDepthAt(distorted);
     // Thickness along the ray, floored at zero: where the bed is nearer than the surface the water
     // is behind something and contributes nothing, which the depth test has already handled.
-    var thickness = max(bed - viewDepth, 0.0);
-    let vertical = max(in.uv.x, 0.0);
+    //
+    // Both depths are measured along the camera's *axis* (`viewDepth` is a dot with
+    // `cameraForward`, and the linear depth target is written the same way), so their difference is
+    // an axis interval and not a ray length. The two are equal only down the middle of the frame:
+    // at the corner of a 60-degree frame the ray is a sixth longer than the interval. Dividing by
+    // the cosine is what makes this number mean the same thing everywhere in the frame -- without
+    // it the same patch of river is a different colour when the camera turns, which is a bug that
+    // only shows up when something moves.
+    let cosAxis = max(dot(frame.cameraForward.xyz, -v), 1e-3);
+    var thickness = max(bed - viewDepth, 0.0) / cosAxis;
+    // The vertical depth of the water under this pixel, which is what the shoreline, the foam and
+    // the depth colour are all made of.
+    //
+    // It comes from the scene's depth, not from the vertex. The thickness above already did; this
+    // did not, and that was the whole of the jagged waterline: `in.uv.x` is a per-vertex baked
+    // depth, so every shoreline effect was quantised to the water mesh's own tessellation and a
+    // river drawn on a coarse grid got a stair-stepped bank. The comment further down this file
+    // says all three read the scene's depth "so they are smooth across a quad boundary the geometry
+    // is not" -- it describes the intent, and until now only one of the three did it.
+    //
+    // The conversion is the inverse of the fallback's: thickness is measured along the view ray, so
+    // the vertical drop is that times the ray's vertical component.
+    //
+    // No floor on `v.y` here, which is the difference between this and the fallback's division. The
+    // product is self-correcting: a shallower ray travels proportionally further before it reaches
+    // the bed, so `thickness * abs(v.y)` recovers the same depth at any angle -- which is the whole
+    // point of measuring it this way. Flooring the multiplier breaks exactly that, overstating the
+    // depth by the ratio at a grazing view, and it also makes the grazing-angle cap below inert,
+    // because that cap is `6 * vertical` and a floor of 0.15 keeps `6 * vertical` above
+    // `thickness` whatever the angle. One floor in the wrong place disabled a guard three lines
+    // down without touching it.
+    var vertical = thickness * abs(v.y);
     if (water.params.z < 0.5) {
-        // No prepass: the best available thickness is the vertical depth along the view ray.
+        // No prepass: the vertex depth is the only thickness available, and the surface degrades to
+        // what it was before ADR-099 -- a waterline on the mesh's edge -- rather than to garbage.
+        vertical = max(in.uv.x, 0.0);
         thickness = vertical / max(abs(v.y), 0.15);
     }
     // A surface seen from a very grazing angle over a shallow bed reports a long thickness and goes
@@ -343,7 +396,8 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // ---- the shoreline (§10) -------------------------------------------------------------------
     // Three things happen at the bank, and the reason it works is that all three read the *scene's*
     // depth rather than the mesh's edge, so they are smooth across a quad boundary the geometry
-    // is not.
+    // is not. (They read it through `vertical`, which is derived from the depth buffer above. It
+    // was a vertex attribute until the bank turned out to be stair-stepped on a coarse channel.)
     //   1. the surface fades out as the water thins, over `edgeFade` metres of vertical depth
     //   2. a foam band sits on the waterline, broken up by the ripple field so it is a line of
     //      surf and not a contour

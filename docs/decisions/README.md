@@ -179,3 +179,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [181](ADR-181-counterbalance-the-arms-and-detect-the-drift.md) | Counterbalance the arms, and detect the drift the counterbalancing hides | Accepted |
 | [182](ADR-182-a-diagnostic-arm-that-cannot-fail.md) | A diagnostic arm that cannot fail is worse than no arm | Accepted |
 | [183](ADR-183-the-waterline-work-is-reverted-pending-a-different-approach.md) | The waterline work is reverted, pending a different approach | Accepted |
+| [184](ADR-184-the-riverbank-work-is-carried-forward.md) | The riverbank work is carried forward; only the shimmer chase was reverted | Accepted |
