@@ -9,7 +9,10 @@
 
 #include <set>
 #include "app/engine.hpp"
+#include "entity/nav_grid.hpp"
+#include "entity/navigation.hpp"
 #include "support/gltf_fixture.hpp"
+#include "world/world_map.hpp"
 #include "ui/brush.hpp"
 #include "app/edit_system.hpp"
 #include "ui/edit_history.hpp"
@@ -1913,4 +1916,164 @@ TEST_CASE("a hero's importance, aim and stand-off can be edited and undone") {
     world::HeroPoint renamed = composition->heroes().front();
     renamed.name = "something-else";
     CHECK_FALSE(composition->editHero(a, renamed).has_value());
+}
+
+// ---- the navigation overlay (ADR-194) ----------------------------------------------------------
+//
+// `explore` has published a route, a leg, a destination and a path status since ADR-093 and nothing
+// drew any of it. These pin the collection half -- what ends up in `EditorVisuals` given a
+// selection -- for the same reason every other decision in this file is pinned here: the drawing
+// itself is looked at with tools/overlay_shot.cpp, and the decision about *what* to draw must not
+// need a window.
+
+TEST_CASE("a route is collected for the selected walker and for nothing else",
+          "[ui][editor][navigation]") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    const std::string walker = f.add("wanderer", glm::vec3(0.0f, 0.0f, 0.0f));
+    const std::string rock = f.add("rock", glm::vec3(8.0f, 0.0f, 0.0f));
+
+    entity::EntityDesc explorer;
+    explorer.name = "wanderer";
+    explorer.node = walker;
+    explorer.behaviors.push_back({.kind = "explore", .name = "explore", .settings = {}});
+    // A second entity that navigates nothing. It is the control: an overlay that drew a route for
+    // a hovering craft would be inventing one, and a count alone could not tell the two apart.
+    entity::EntityDesc hoverer;
+    hoverer.name = "rock";
+    hoverer.node = rock;
+    hoverer.behaviors.push_back({.kind = "hover", .name = "hover", .settings = {}});
+    REQUIRE(f.engine.composition()->setEntities({explorer, hoverer}).has_value());
+    f.engine.rebind();
+
+    const scene::Camera camera = lookingDown();
+    const auto step = [&] { editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{}); };
+
+    // Nothing selected, nothing drawn. The hero markers and the parent link work this way for the
+    // stated reason -- a world of always-on annotations is a cat's cradle over the scenery -- and a
+    // route, which is a polyline that moves every few seconds, is the worst offender of the three.
+    step();
+    CHECK(editor.visuals().navRoutes.empty());
+
+    editor.selection.set(std::vector<std::string>{walker});
+    step();
+    REQUIRE(editor.visuals().navRoutes.size() == 1);
+    const ui::EditorVisuals::NavRoute& route = editor.visuals().navRoutes.front();
+    CHECK(route.entity == "wanderer");
+    CHECK(route.node == walker);
+    // The label is the whole point when there is no route to draw: a phase, so a character standing
+    // still says which of the six things it is doing.
+    CHECK(route.label.find("wanderer") != std::string::npos);
+    CHECK(route.label.find("no navigation") == std::string::npos);
+
+    // Selecting something that is not an entity is silent, rather than a route belonging to
+    // whatever entity happened to be first.
+    editor.selection.set(std::vector<std::string>{rock});
+    step();
+    REQUIRE(editor.visuals().navRoutes.size() == 1);
+    CHECK(editor.visuals().navRoutes.front().entity == "rock");
+    CHECK(editor.visuals().navRoutes.front().label.find("no navigation") != std::string::npos);
+
+    // The toggle is wired to the collection, not only to the drawing: turning it off has to stop
+    // the work, not just hide the result.
+    editor.selection.set(std::vector<std::string>{walker});
+    editor.showNavRoute = false;
+    step();
+    CHECK(editor.visuals().navRoutes.empty());
+    CHECK(editor.navStatus().find("no route is drawn") == std::string::npos);
+}
+
+TEST_CASE("the navigation overlay says why it is drawing nothing", "[ui][editor][navigation]") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    f.add("rock", glm::vec3(0.0f, 0.0f, 0.0f));
+    const scene::Camera camera = lookingDown();
+
+    editor.showNavGrid = true;
+    editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{});
+    // Three switches are on and three of them draw nothing, because this scene has no terrain and
+    // therefore no navigation graph. Every one of those states is said out loud: a checkbox whose
+    // effect cannot be seen is indistinguishable from a checkbox wired to nothing, and shipping the
+    // second one is this project's recurring failure.
+    CHECK(editor.visuals().navCells.empty());
+    CHECK(editor.navStatus().find("no entities in this scene") != std::string::npos);
+    CHECK(editor.navStatus().find("no entity selected") != std::string::npos);
+}
+
+TEST_CASE("the nav grid overlay collects the cells near the view and counts what it capped",
+          "[ui][editor][navigation]") {
+    Fixture f;
+    app::EditSystem edits;
+    ui::WorldEditor editor;
+    editor.attachEdits(edits);
+    f.add("rock", glm::vec3(0.0f, 0.0f, 0.0f));
+
+    // A flat two hundred metre square with nothing on it. Installed directly on the entity world
+    // rather than built from a terrain node, because what is under test is the *collection* -- the
+    // radius, the cap and the flags -- and generating a quarter of a million triangles to check a
+    // radius would be measuring the terrain generator.
+    //
+    // Safe only because this composition has no entities: `rebuild()` re-installs the navigator
+    // when there is somebody to walk (ADR-193), and would otherwise replace this one.
+    world::WorldMap map;
+    map.name = "flat";
+    map.size = glm::vec2(200.0f, 200.0f);
+    map.baseHeight = 0.0f;
+    map.prepare();
+    world::Ecology ecology;
+    world::ClearanceField clearance;
+    clearance.map = &map;
+    clearance.ecology = &ecology;
+    clearance.cameraRadius = 0.6f;
+    clearance.groundClearance = 0.0f;
+    entity::Navigator nav(&map, clearance);
+    nav.buildGrid(4.0f);
+    REQUIRE(nav.grid() != nullptr);
+    REQUIRE(nav.grid()->valid());
+    f.engine.composition()->entityWorld().setNavigator(nav);
+
+    scene::Camera camera = lookingDown();
+    camera.position = glm::vec3(0.0f, 60.0f, 60.0f);
+    camera.target = glm::vec3(0.0f, 0.0f, 0.0f);
+
+    editor.showNavGrid = true;
+    editor.navGridRadius = 20.0f;
+    editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{});
+    const std::size_t near = editor.visuals().navCells.size();
+    // A disc of radius 20 at four-metre cells is about pi*400/16 ~= 78 cells. Bounded rather than
+    // pinned to a number, because the exact count depends on where the cell lattice falls.
+    CHECK(near > 50);
+    CHECK(near < 120);
+    CHECK_THAT(editor.visuals().navCellSize, Catch::Matchers::WithinAbs(4.0, 1e-6));
+    // Every collected cell really is near the view, and not merely in the same grid.
+    for (const ui::EditorVisuals::NavCellMark& cell : editor.visuals().navCells) {
+        const float dx = cell.centre.x - camera.target.x;
+        const float dz = cell.centre.z - camera.target.z;
+        CHECK(std::sqrt(dx * dx + dz * dz) <= 20.0f + 1e-3f);
+        CHECK((cell.flags & entity::NavWalkable) != 0); // flat ground with nothing on it
+    }
+
+    // The radius is the cost knob, so it has to actually change the cost.
+    editor.navGridRadius = 60.0f;
+    editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{});
+    CHECK(editor.visuals().navCells.size() > near * 5);
+    CHECK(editor.navStatus().find("drawing") != std::string::npos);
+
+    // Off means off, and the status stops claiming a count it is not producing.
+    editor.showNavGrid = false;
+    editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{});
+    CHECK(editor.visuals().navCells.empty());
+    CHECK(editor.navStatus().find("drawing") == std::string::npos);
+
+    // The interest points the grid extracted, which nothing in this project has ever read. A flat
+    // square with no water has no shore; it does have walkable local maxima, so `vista` is the arm
+    // that can fail here and `shore` is the arm that says the two are not the same list.
+    editor.showNavPoints = true;
+    editor.update(f.engine, nullptr, camera, 16.0f / 9.0f, ui::EditorInput{});
+    CHECK(editor.visuals().navShore.size() == nav.grid()->shorePoints().size());
+    CHECK(editor.visuals().navVistas.size() == nav.grid()->vistaPoints().size());
 }

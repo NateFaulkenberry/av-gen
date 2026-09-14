@@ -705,7 +705,7 @@ void ControlPanel::drawWorldWindow(app::Engine& engine) {
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Debug")) {
-            world.drawDebugOptions(engine);
+            world.drawDebugOptions(engine, &editor);
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();

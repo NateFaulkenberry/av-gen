@@ -121,6 +121,47 @@ struct EditorVisuals {
         glm::vec3 parentPosition{0.0f}; // world
     };
     std::vector<ParentLink> parentLinks;
+
+    // ---- navigation (ADR-194) ------------------------------------------------------------------
+    //
+    // The navigation layer had no appearance at all. `explore` has published a route, a leg, a
+    // destination and a path status since ADR-093 and nothing drew any of it, so the two questions
+    // a character raises -- "why is it going that way" and "why is it not going anywhere" -- were
+    // both unanswerable from the screen. The second is the worse one: a walker whose goal came back
+    // `Unreachable` stands exactly as still as one that is idling.
+
+    // One selected walker's plan, resolved onto the ground. `waypoints` is the route *after* the
+    // walker, so `position` -> `waypoints[0]` is the leg it is on when `leg` is 0.
+    struct NavRoute {
+        std::string entity;
+        std::string node;                  // the composition node it drives: what was selected
+        glm::vec3 position{0.0f};          // where the walker is now
+        std::vector<glm::vec3> waypoints;  // the plan ahead of it, on the ground
+        std::size_t leg = 0;               // index into `waypoints` of the one being walked to
+        bool hasDestination = false;
+        glm::vec3 destination{0.0f};
+        // What it is doing and how the last plan came back, as one line over its head. Always
+        // present when the route is: a phase and a `PathStatus` are the whole of the answer when
+        // there are no waypoints to draw, which is precisely the case worth seeing.
+        std::string label;
+        bool failed = false;  // the last path request did not produce a route; colour says so
+    };
+    std::vector<NavRoute> navRoutes;
+
+    // The navigation grid near the camera, as cell centres. Cells rather than a mesh because the
+    // grid *is* cells -- what a walker is refused by is one cell being unwalkable, and a smoothed
+    // surface would hide exactly the resolution that decides the route.
+    struct NavCellMark {
+        glm::vec3 centre{0.0f};
+        std::uint8_t flags = 0;    // NavWalkable / NavWater / NavSteep / NavBlocked / NavEdge
+        std::uint16_t region = 0;  // the connected component; 0 is the unwalkable set
+    };
+    std::vector<NavCellMark> navCells;
+    float navCellSize = 0.0f;
+    bool navRegionColours = false;   // colour walkable cells by region rather than by flag
+    // What the grid found for free while it was being built and nothing has ever looked at.
+    std::vector<glm::vec3> navShore;
+    std::vector<glm::vec3> navVistas;
 };
 
 class WorldEditor : public app::EditContext {
@@ -134,6 +175,26 @@ public:
     std::string brushAssetId;
     // A brush stroke becomes one group, so a thicket painted in one gesture is one thing to move.
     bool groupStrokes = false;
+
+    // ---- navigation overlay (ADR-194) ------------------------------------------------------------
+    //
+    // Two toggles, deliberately different in kind.
+    //
+    // The route is **per selection** and therefore on by default: it costs nothing until something
+    // that walks is selected, and the reason the hero markers and the parent link are tied to the
+    // selection applies here with more force -- a world of always-drawn routes would be a cat's
+    // cradle over the scenery that moved every frame.
+    //
+    // The grid is **the world**, so it is off by default and bounded by a radius around the camera.
+    // Drawing a 640 m world at four-metre cells is 25,600 quads, every one of them projected on the
+    // CPU; the radius is what makes it a thing you can leave on. `navStatus()` says what it is
+    // actually drawing and why it is drawing nothing, because a toggle that silently does nothing
+    // in some state is this project's recurring failure.
+    bool showNavRoute = true;
+    bool showNavGrid = false;
+    bool navGridRegions = false;   // colour walkable cells by connected region rather than by flag
+    bool showNavPoints = false;    // the shore and vista points the grid extracts while it builds
+    float navGridRadius = 80.0f;   // metres around the camera; the whole cost knob
 
     Selection selection;
 
@@ -177,6 +238,9 @@ public:
     [[nodiscard]] bool wantsMouse() const { return wantsMouse_; }
     // One line for the status bar. Always says what the next click will do.
     [[nodiscard]] const std::string& status() const { return status_; }
+    // One line about the navigation layer, for the panel that owns its toggles: what the grid is,
+    // how much of it is being drawn, or which of the several reasons there is nothing to draw.
+    [[nodiscard]] const std::string& navStatus() const { return navStatus_; }
 
     // ---- what a click on the scene resolved to ------------------------------------------------
     // Called by the application after the GPU picker answers, which remains the authority for a
@@ -251,6 +315,8 @@ private:
                      const EditorInput& input);
     void updateBox(app::Engine& engine, const scene::Camera& camera, float aspect,
                    const EditorInput& input);
+    // Collects the navigation visuals from the selection and the camera (ADR-194).
+    void updateNavigation(app::Engine& engine, const scene::Camera& camera);
     void commitStroke(app::Engine& engine);
     [[nodiscard]] bool buildGizmoFrame(app::Engine& engine, const scene::Camera& camera);
 
@@ -258,6 +324,7 @@ private:
     EditorVisuals visuals_;
     bool wantsMouse_ = false;
     std::string status_;
+    std::string navStatus_;
 
     // The gizmo drag. `startTransforms_` are the transforms the selection had at the press, so each
     // frame re-applies the whole delta from them rather than accumulating frame by frame.

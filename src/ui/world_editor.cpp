@@ -2,6 +2,8 @@
 
 #include "app/engine.hpp"
 #include "core/log.hpp"
+#include "entity/entity.hpp"
+#include "entity/nav_grid.hpp"
 
 #include <fmt/format.h>
 
@@ -156,6 +158,9 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
         visuals_.parentLinks.push_back(std::move(link));
     }
 
+    // The navigation layer (ADR-194): the selected walker's route, and the grid it was planned on.
+    updateNavigation(engine, camera);
+
     // The status line. Whatever else is true, it says what the next click does.
     if (mode == EditorMode::Place) {
         status_ = previewSummary(preview_);
@@ -169,6 +174,218 @@ void WorldEditor::update(app::Engine& engine, const assets::AssetLibrary* librar
     } else {
         status_ = fmt::format("{} objects  |  {} in {} space", selection.size(), gizmoModeName(gizmoMode),
                               localSpace ? "local" : "world");
+    }
+}
+
+// ---- navigation (ADR-194) -----------------------------------------------------------------------
+
+namespace {
+
+// How many grid cells the overlay will draw before it stops and says so. Each one is four world
+// points projected on the CPU and one filled quad in the ImGui draw list, and the radius knob is
+// the thing an author turns -- this is the backstop that keeps a 0.5 m grid over a kilometre of
+// world from turning a viewport into a slideshow without warning. Measured in the report: 4,700
+// cells is about 0.9 ms of the UI pass on this machine.
+constexpr std::size_t kNavCellCap = 12000;
+
+// A metre and a half of clearance, so a route over sloping ground reads as lying on it rather than
+// disappearing into it. The overlay is drawn after the frame with no depth test at all, so this is
+// legibility rather than z-fighting: without it a polyline on a hillside reads as flat.
+constexpr float kNavLift = 0.15f;
+
+} // namespace
+
+void WorldEditor::updateNavigation(app::Engine& engine, const scene::Camera& camera) {
+    navStatus_.clear();
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        return;
+    }
+    const entity::EntityWorld& world = composition->entityWorld();
+    const entity::Navigator& navigator = world.navigator();
+    const entity::NavGrid* grid = navigator.grid();
+    const auto onGround = [&](glm::vec2 p) {
+        return glm::vec3(p.x, navigator.groundHeight(p) + kNavLift, p.y);
+    };
+
+    // ---- the selected walkers' routes ----
+    //
+    // From the selection, never always-on. The comment on the hero markers above is the reason and
+    // it applies harder here: a route is a polyline that changes every few seconds, and a world of
+    // them would be a cat's cradle that also moved.
+    std::size_t walkers = 0;
+    if (showNavRoute) {
+        for (const std::unique_ptr<entity::Entity>& entity : world.entities()) {
+            const std::string& node = entity->desc().driven();
+            if (!selection.contains(node) && !selection.contains(entity->name())) {
+                continue;
+            }
+            ++walkers;
+            // Which of two authorities is moving this body decides whose route is the real one.
+            // An action or a director override preempts the behaviour (ADR-091/096) and the
+            // behaviour keeps its plan while it yields -- so drawing the behaviour's route while an
+            // action is walking the body somewhere else would draw a line nothing is following.
+            std::span<const glm::vec2> route = entity->actions().route();
+            std::size_t leg = entity->actions().routeLeg();
+            std::string phase;
+            std::string status;
+            bool failed = false;
+            bool hasDestination = false;
+            glm::vec3 destination{0.0f};
+            if (!route.empty()) {
+                phase = "action";
+                const entity::ActionDesc* action = entity->actions().current();
+                if (action != nullptr && !action->target.empty()) {
+                    // The target's *name* when it has one -- an entity or a node -- and its kind
+                    // otherwise, because a `move` to a bare world point has nothing else to say.
+                    phase = fmt::format("action -> {}", action->target.name.empty()
+                                                            ? entity::targetKindName(action->target.kind)
+                                                            : action->target.name);
+                }
+                hasDestination = true;
+                destination = onGround(route.back());
+            } else {
+                for (const std::unique_ptr<entity::IBehavior>& behavior : entity->behaviors()) {
+                    entity::NavDebug nav;
+                    if (!behavior->navDebug(nav)) {
+                        continue;
+                    }
+                    route = nav.route;
+                    leg = nav.leg;
+                    phase = std::string(nav.phase);
+                    if (!nav.goalName.empty()) {
+                        phase += fmt::format(" -> {} {}", nav.goalKind, nav.goalName);
+                    } else if (nav.hasDestination) {
+                        phase += fmt::format(" -> {}", nav.goalKind);
+                    }
+                    status = entity::pathStatusName(nav.status);
+                    // Every status but these two means the last request produced no route, which is
+                    // the case this overlay exists for: a character standing still because its goal
+                    // is on the other side of a lake looks exactly like one that is idling.
+                    failed = nav.status != entity::PathStatus::Ok &&
+                             nav.status != entity::PathStatus::AlreadyThere;
+                    hasDestination = nav.hasDestination;
+                    destination = nav.destination;
+                    break;
+                }
+            }
+            if (phase.empty()) {
+                // Selected, an entity, and navigating nothing. Said out loud rather than skipped:
+                // "this thing has no route" and "the overlay is not working" are the same picture
+                // otherwise, and telling them apart is most of what a diagnostic is for.
+                phase = "no navigation";
+            }
+
+            EditorVisuals::NavRoute out;
+            out.entity = entity->name();
+            out.node = node;
+            out.position = entity->state().position();
+            out.leg = leg;
+            out.waypoints.reserve(route.size());
+            for (const glm::vec2& waypoint : route) {
+                out.waypoints.push_back(onGround(waypoint));
+            }
+            out.hasDestination = hasDestination;
+            out.destination = hasDestination
+                                  ? glm::vec3(destination.x, destination.y + kNavLift, destination.z)
+                                  : glm::vec3(0.0f);
+            out.failed = failed;
+            out.label = out.entity + "  " + phase;
+            if (!status.empty()) {
+                out.label += fmt::format("  [{}]", status);
+            }
+            if (!out.waypoints.empty()) {
+                out.label += fmt::format("  leg {}/{}", std::min(leg + 1, out.waypoints.size()),
+                                         out.waypoints.size());
+            }
+            visuals_.navRoutes.push_back(std::move(out));
+        }
+    }
+
+    // ---- the grid, and the points it found while it was being built ----
+    visuals_.navRegionColours = navGridRegions;
+    std::size_t drawn = 0;
+    std::size_t inRange = 0;
+    if ((showNavGrid || showNavPoints) && grid != nullptr && grid->valid()) {
+        const entity::NavGridStats& stats = grid->stats();
+        visuals_.navCellSize = stats.cellSize;
+        if (showNavGrid && stats.cellSize > 0.0f) {
+            // Centred on what the view is *about*, not on where the eye is: an editor camera
+            // two hundred metres up looking at a valley would otherwise paint the grid under
+            // itself and leave the valley bare.
+            const glm::vec2 centre(camera.target.x, camera.target.z);
+            const float radius = std::max(navGridRadius, stats.cellSize);
+            const int reach = static_cast<int>(std::ceil(radius / stats.cellSize));
+            const glm::ivec2 middle = grid->cellOf(centre);
+            const float radiusSquared = radius * radius;
+            for (int z = middle.y - reach; z <= middle.y + reach; ++z) {
+                for (int x = middle.x - reach; x <= middle.x + reach; ++x) {
+                    const glm::ivec2 cell(x, z);
+                    if (!grid->inside(cell)) {
+                        continue;
+                    }
+                    const glm::vec2 at = grid->centerOf(cell);
+                    const glm::vec2 delta = at - centre;
+                    if (glm::dot(delta, delta) > radiusSquared) {
+                        continue;
+                    }
+                    ++inRange;
+                    if (drawn >= kNavCellCap) {
+                        continue; // counted, not drawn: the status line reports both
+                    }
+                    const entity::NavCell& contents = grid->at(cell);
+                    EditorVisuals::NavCellMark mark;
+                    mark.centre = glm::vec3(at.x, contents.ground + kNavLift, at.y);
+                    mark.flags = contents.flags;
+                    mark.region = grid->regionAt(at);
+                    visuals_.navCells.push_back(mark);
+                    ++drawn;
+                }
+            }
+        }
+        if (showNavPoints) {
+            for (const glm::vec3& point : grid->shorePoints()) {
+                visuals_.navShore.push_back(point);
+            }
+            for (const glm::vec3& point : grid->vistaPoints()) {
+                visuals_.navVistas.push_back(point);
+            }
+        }
+    }
+
+    // ---- what the panel says about all of that ----
+    //
+    // Every state that draws nothing has to say why it draws nothing. A checkbox wired to a
+    // condition that is false is indistinguishable from a checkbox wired to nothing, and this
+    // project has shipped the second one more than once.
+    if (grid == nullptr || !grid->valid()) {
+        navStatus_ = world.empty()
+                         ? "no entities in this scene, so no navigation graph was built"
+                         : "this scene has no navigation graph (navCellSize 0 disables it)";
+    } else {
+        const entity::NavGridStats& stats = grid->stats();
+        navStatus_ = fmt::format("grid {}x{} at {:.1f} m  {} walkable / {} water / {} blocked  "
+                                 "{} region(s), largest {}  built in {:.0f} ms",
+                                 stats.width, stats.height, stats.cellSize, stats.walkable,
+                                 stats.water, stats.blocked, stats.regions, stats.largestRegion,
+                                 stats.buildMs);
+        if (showNavGrid) {
+            navStatus_ += fmt::format("\ndrawing {} cell(s) within {:.0f} m of the view", drawn,
+                                      navGridRadius);
+            if (inRange > drawn) {
+                navStatus_ += fmt::format("; {} more are in range and capped off at {}",
+                                          inRange - drawn, kNavCellCap);
+            }
+        }
+        if (showNavPoints) {
+            navStatus_ += fmt::format("\n{} shore point(s), {} vista point(s)",
+                                      visuals_.navShore.size(), visuals_.navVistas.size());
+        }
+    }
+    if (showNavRoute) {
+        navStatus_ += walkers == 0
+                          ? "\nno entity selected, so no route is drawn"
+                          : fmt::format("\n{} selected entity/entities", walkers);
     }
 }
 

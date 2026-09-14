@@ -1,6 +1,7 @@
 #include "ui/world_panel.hpp"
 
 #include "params/preset.hpp"
+#include "ui/world_editor.hpp"
 
 #include <fmt/format.h>
 #include <imgui.h>
@@ -460,7 +461,7 @@ void WorldPanel::drawDirector(app::Engine& engine) {
     }
 }
 
-void WorldPanel::drawDebugOptions(app::Engine& engine) {
+void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
     (void)engine;
     static char selectedEntity[128] = {};
     if (std::string(selectedEntity) != debug.selectedEntity) {
@@ -516,12 +517,75 @@ void WorldPanel::drawDebugOptions(app::Engine& engine) {
     if (ImGui::InputText("Selected entity", selectedEntity, sizeof(selectedEntity))) {
         debug.selectedEntity = selectedEntity;
     }
+    drawNavigationOptions(editor);
     ImGui::Checkbox("SDF slice", &debug.sdfSlice);
     ImGui::SameLine();
     ImGui::SliderFloat("slice y", &debug.sliceHeight, -20.0f, 20.0f);
     ImGui::SliderInt("field grid", &debug.fieldGrid, 2, 24);
     ImGui::SliderFloat("point size", &debug.pointSize, 1.0f, 12.0f);
     ImGui::Checkbox("Depth test", &debug.depthTest);
+}
+
+// The navigation overlay's switches (ADR-194).
+//
+// Here, and not in the Performance panel, for one reason: the questions this answers -- "why is my
+// character going that way", "why is it not going anywhere", "can it even get across the river" --
+// are asked while looking at a character in the world, and this is the tab a person is already in
+// when they are looking at entity bounds, the transform trail and the skeletons. Performance is
+// where you go when a frame is too slow; nothing here is about frame time, and filing it there
+// would be filing it by what it is made of rather than by what it is for.
+//
+// The line under the switches is not decoration. Every one of these can legitimately draw nothing
+// -- no entities, no navigation graph, nothing selected, the camera pointing off the grid -- and a
+// checkbox whose effect cannot be seen is indistinguishable from a checkbox wired to nothing, which
+// is the defect this project keeps shipping. So the editor publishes why, and it is printed.
+void WorldPanel::drawNavigationOptions(WorldEditor* editor) {
+    ImGui::SeparatorText("Navigation");
+    if (editor == nullptr) {
+        ImGui::TextDisabled("This session has no world editor, so there is no navigation overlay.");
+        return;
+    }
+    ImGui::Checkbox("Route", &editor->showNavRoute);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("The selected entity's planned waypoints, the leg it is walking, its\n"
+                          "destination, and its phase and path status as a label. Drawn from the\n"
+                          "selection: select the node an entity drives to see its route.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Nav grid", &editor->showNavGrid);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Walkable / water / steep / blocked cells near the view.\n"
+                          "Green is standable, brighter green is a walkable cell against an edge.");
+    }
+    ImGui::SameLine();
+    // Greyed rather than merely labelled when the grid is off. Both of these are settings *of* the
+    // grid: leaving them live while nothing draws is a control that responds and does nothing,
+    // which is the same defect as one wired to nothing and harder to notice.
+    ImGui::BeginDisabled(!editor->showNavGrid);
+    ImGui::Checkbox("Regions", &editor->navGridRegions);
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Colour walkable cells by connected region instead of by flag. Two cells\n"
+                          "the same colour are reachable from each other; two different colours are\n"
+                          "not, whatever the distance between them. Needs 'Nav grid'.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Shore / vista", &editor->showNavPoints);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("The interest points the grid extracts while it builds: rings where\n"
+                          "walkable ground meets water, stalks on walkable local maxima. These are\n"
+                          "what `explore` picks destinations from.");
+    }
+    ImGui::SetNextItemWidth(200.0f);
+    ImGui::BeginDisabled(!editor->showNavGrid);
+    ImGui::SliderFloat("grid radius", &editor->navGridRadius, 10.0f, 400.0f, "%.0f m");
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("How far around the point the view is aimed at the grid is drawn.\n"
+                          "Every cell is four world points projected on the CPU, so this is the\n"
+                          "whole cost of the overlay -- see the line below for what it is drawing.");
+    }
+    ImGui::TextWrapped("%s", editor->navStatus().c_str());
 }
 
 } // namespace avgen::ui

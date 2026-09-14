@@ -774,6 +774,21 @@ public:
         return "idle";
     }
 
+    // The same six facts through the interface, so a caller that holds an IBehavior and cannot
+    // name this class gets them (ADR-194). The accessors above stay: they are what a diagnostic
+    // inside this file reads, and they are the definition this is a view of.
+    [[nodiscard]] bool navDebug(NavDebug& out) const override {
+        out.route = path_;
+        out.leg = leg_;
+        out.destination = goal_;
+        out.hasDestination = hasGoal_;
+        out.status = lastStatus_;
+        out.phase = phaseName();
+        out.goalName = goalName_;
+        out.goalKind = interestKindName(goalKind_);
+        return true;
+    }
+
     void registerParameters(params::ParameterSet& params, const std::string& prefix) override {
         speed_ = &params.add(floatDesc(prefix + "speed", speedDefault_, 0.0f, 40.0f));
         runSpeed_ = &params.add(floatDesc(prefix + "runSpeed", runSpeedDefault_, 0.0f, 60.0f));

@@ -14,6 +14,7 @@
 
 #include "core/rng.hpp"
 #include "entity/locomotion.hpp"
+#include "entity/nav_grid.hpp"
 #include "entity/navigation.hpp"
 #include "params/parameter_set.hpp"
 #include "signals/signal_bus.hpp"
@@ -23,6 +24,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -89,6 +91,30 @@ struct BehaviorContext {
     [[nodiscard]] bool event(std::string_view name) const;
 };
 
+// What a navigating behaviour is doing, in the terms an overlay draws (ADR-093 §6, ADR-194).
+//
+// `explore` has published every one of these since ADR-093 -- `route()`, `routeLeg()`,
+// `destination()`, `lastPathStatus()`, `phaseName()` -- with a comment saying the editor owns the
+// drawing and navigation owes it the data. Nothing ever read them, so the data was true and
+// invisible for as long as it existed, which is the same as not having it: "why is it going that
+// way" had no answer, and a character standing still because its goal came back `Unreachable`
+// looked exactly like one that was idling.
+//
+// A virtual on IBehavior rather than a dynamic_cast, because the behaviour classes are defined
+// inside behaviors.cpp and nothing outside that file can name their types. Defaulting to false is
+// what makes the other fourteen behaviours cost nothing and say nothing: `hover` has no route, and
+// an overlay that drew one for it would be inventing a fact.
+struct NavDebug {
+    std::span<const glm::vec2> route;  // the planned waypoints after the walker, world XZ
+    std::size_t leg = 0;               // index into `route` of the one it is walking to
+    glm::vec3 destination{0.0f};       // where it settled on going; world
+    bool hasDestination = false;
+    PathStatus status = PathStatus::Ok; // why the last plan came back as it did
+    std::string_view phase;             // idle / select / navigate / walk / arrive / observe
+    std::string_view goalName;          // what it is going to, when the destination has a name
+    std::string_view goalKind;          // landmark / character / glow / water / vista
+};
+
 class IBehavior {
 public:
     virtual ~IBehavior() = default;
@@ -102,6 +128,14 @@ public:
     // did not reset here would make a scrubbed frame depend on how the playhead got there.
     virtual void reset(Rng& rng) = 0;
     virtual void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) = 0;
+
+    // Fills `out` and returns true when this behaviour navigates. The spans point into the
+    // behaviour and are valid until its next update, which is enough for a UI pass that runs in
+    // the same frame and is why nothing is copied here.
+    [[nodiscard]] virtual bool navDebug(NavDebug& out) const {
+        (void)out;
+        return false;
+    }
 };
 
 // How a behaviour is declared in a scene file:
