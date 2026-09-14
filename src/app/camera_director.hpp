@@ -1,11 +1,11 @@
 #pragma once
 
-// The camera director, connected (ADR-075).
+// The Auto-director, connected (ADR-075).
 //
 // ADR-062 and ADR-071 built a shot vocabulary, a fold from musical moments into sections, and a
 // director that turns sections into a `Sequence` which bakes down to ordinary timeline keys. All of
 // it was tested and none of it was reachable: before this file, `cinematic.hpp` was included by
-// exactly one other file in the repository, its own test. A camera director nothing calls is a
+// exactly one other file in the repository, its own test. A Auto-director nothing calls is a
 // camera that never moves.
 //
 // This is the join, and it is deliberately three small steps rather than one function, because each
@@ -41,9 +41,42 @@ class Engine;
 [[nodiscard]] Result<DirectionBrief> briefFromHeroes(std::span<const world::HeroPoint> heroes);
 
 // The whole path: heroes plus a track's structure into a validated sequence.
+// What the Auto-director panel can set, and **only what it can set**.
+//
+// Every field here changes the film. Three that a panel would obviously want are deliberately
+// absent, because a knob wired to nothing spends the user's trust:
+//
+//   * `CompositionProfile::framing` and `headroom` -- stored, serialised, and read by no geometry
+//     function. They look like framing controls and are dead.
+//   * `HeroPoint::preferredCameraElevationDegrees` -- authored per hero and never read by the
+//     director.
+//   * `Shot::speed` -- real, but only through `Sequence::retime()`, which the director never calls;
+//     exposing it as "camera speed" would move nothing.
+//
+// Those are documented as future extensions rather than shipped as inert sliders.
+struct AutoDirectorSettings {
+    DirectorMode mode = DirectorMode::ContinuousShot;
+    // Shot timing, in seconds. A passage longer than `maxShotSeconds` becomes several shots inside
+    // one section; below `minShotSeconds` a section is chopped rather than cut; a build is exempt
+    // down to `minBuildShotSeconds` because a build exists to end.
+    double minShotSeconds = 5.0;
+    double minBuildShotSeconds = 2.0;
+    double maxShotSeconds = 12.0;
+    // The two lenses the film is shot on, in millimetres: the wide for establishing and drifting,
+    // the long for a hero. Baked into `camera/lens/focalLength` keys.
+    float wideFocalLength = 24.0f;
+    float heroFocalLength = 50.0f;
+    // Same seed, same heroes, same structure, same film. Exposed because re-cutting with a different
+    // seed is the one way to ask for a different edit of the same piece.
+    std::uint32_t seed = 1;
+
+    [[nodiscard]] Result<void> validate() const;
+    void applyTo(DirectionBrief& brief) const;
+};
+
 [[nodiscard]] Result<Sequence> directHeroes(std::span<const world::HeroPoint> heroes,
                                             const signals::MusicalStructure& structure,
-                                            std::uint32_t seed = 1);
+                                            const AutoDirectorSettings& settings = {});
 
 // Installs a sequence's baked tracks on the engine's timeline, replacing any tracks that drive the
 // same camera parameters and leaving every other track alone.
@@ -75,7 +108,7 @@ class Engine;
 // Main thread only, and offline-analysed audio only: a live input has no future to fold.
 [[nodiscard]] Result<std::size_t> directEngine(Engine& engine,
                                                std::span<const world::HeroPoint> heroes,
-                                               std::uint32_t seed = 1);
+                                               const AutoDirectorSettings& settings = {});
 
 // ---- keeping a directed camera in step with the heroes -----------------------------------------
 //
@@ -98,7 +131,8 @@ struct DirectorState {
     // arrives on the first parked frame -- and re-cutting for it there would be re-cutting for
     // something that happened while the piece was playing, one frame after somebody pressed pause.
     bool wasPlaying = false;
-    std::uint32_t seed = 1;           // so a re-cut is the same shot minus what actually changed
+    // The panel's settings, carried on the state so a re-cut uses what the user last chose.
+    AutoDirectorSettings settings;
 };
 
 enum class Redirect : std::uint8_t {
@@ -141,7 +175,7 @@ std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state);
 // making impossible rather than documenting.
 void noteDirected(Engine& engine, DirectorState& state);
 
-// Whether the timeline carries the camera director's own signature: automation on `camera/mode`
+// Whether the timeline carries the Auto-director's own signature: automation on `camera/mode`
 // together with `camera/position` and `camera/target`. Read from the tracks, so it is true for a
 // project saved long before anything recorded who wrote them. `refreshDirection` uses it to take up
 // the claim on a project that arrives already directed.

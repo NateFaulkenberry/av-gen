@@ -9,6 +9,7 @@
 // themselves are unchanged -- they are docked instead of floating, and nothing else about them
 // moved.
 
+#include "app/camera_director.hpp"
 #include "app/engine.hpp"
 #include "assets/asset_catalog.hpp"
 #include "app/asset_browser.hpp"
@@ -63,6 +64,10 @@ public:
     std::function<void()> onDirectCamera;
     // Clears whatever the director installed, handing the camera back to the viewport.
     std::function<void()> onClearCameraAutomation;
+    // The Auto-director's settings (section 9). Held here rather than inside the panel so the host
+    // owns them and a re-cut uses what the user last chose; the panel edits them in place and calls
+    // `onDirectCamera` when one changes while the camera is already directed.
+    app::AutoDirectorSettings* autoDirector = nullptr;
     // The application's edit system (ADR-101). The menu is a consumer of it, never an owner: an
     // item asks `canExecute` to decide whether to grey itself and calls `execute` to act, so the
     // menu and the keyboard cannot come to disagree about what is available or what it does.

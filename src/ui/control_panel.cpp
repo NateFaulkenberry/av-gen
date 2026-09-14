@@ -1,5 +1,7 @@
 #include "ui/control_panel.hpp"
 
+#include <cstring>
+
 #include "app/transport.hpp"
 
 #include "ui/editor_shell.hpp"
@@ -217,6 +219,98 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
         if (ImGui::MenuItem("Export Bundle...") && onExportBundle) {
             onExportBundle();
         }
+        // ---- Auto-director settings ---------------------------------------------------------
+        //
+        // Only controls with an implemented effect. Three a panel would obviously want are absent on
+        // purpose and are listed in `AutoDirectorSettings`' own comment: framing and headroom are
+        // dead fields, a hero's preferred elevation is never read by the director, and `Shot::speed`
+        // only works through a retime the director does not call. A knob wired to nothing is worse
+        // than a missing knob.
+        if (autoDirector != nullptr) {
+            ImGui::Separator();
+            if (ImGui::BeginMenu("Auto-director settings")) {
+                app::AutoDirectorSettings& s = *autoDirector;
+                const app::AutoDirectorSettings before = s;
+
+                int mode = s.mode == app::DirectorMode::ContinuousShot ? 0 : 1;
+                ImGui::TextUnformatted("Shot mode");
+                if (ImGui::RadioButton("Continuous shot", &mode, 0)) {
+                    s.mode = app::DirectorMode::ContinuousShot;
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("One uninterrupted take. The camera travels through the world "
+                                      "and around its subjects without editorial cuts: each move "
+                                      "begins where the last ended and at the speed it ended with.");
+                }
+                if (ImGui::RadioButton("Edited sequence", &mode, 1)) {
+                    s.mode = app::DirectorMode::EditedSequence;
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("A cut list. Each shot is composed independently and the "
+                                      "camera cuts between compositions and subjects, which is what "
+                                      "a piece with distinct sections wants.");
+                }
+
+                ImGui::Separator();
+                ImGui::TextUnformatted("Shot timing");
+                auto seconds = [](const char* label, double& v, double lo, double hi, const char* tip) {
+                    auto f = static_cast<float>(v);
+                    if (ImGui::SliderFloat(label, &f, static_cast<float>(lo), static_cast<float>(hi),
+                                           "%.1f s")) {
+                        v = static_cast<double>(f);
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("%s", tip);
+                    }
+                };
+                seconds("shortest shot", s.minShotSeconds, 1.0, 30.0,
+                        "Below this a musical section is folded into its neighbour rather than "
+                        "given a cut of its own: a one-second shot reads as a glitch.");
+                seconds("shortest build", s.minBuildShotSeconds, 0.5, 10.0,
+                        "A build is exempt from the minimum, because a build exists to end. This is "
+                        "how short it may get.");
+                seconds("longest shot", s.maxShotSeconds, 4.0, 60.0,
+                        "A passage longer than this becomes several shots inside one section, each "
+                        "cast separately -- so a thirty-second verse is the camera travelling "
+                        "between subjects rather than holding one for a third of the piece.");
+
+                ImGui::Separator();
+                ImGui::TextUnformatted("Lenses");
+                ImGui::SliderFloat("wide", &s.wideFocalLength, 10.0f, 50.0f, "%.0f mm");
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("The establishing lens: what wide and drifting shots are shot "
+                                      "on.");
+                }
+                ImGui::SliderFloat("hero", &s.heroFocalLength, 24.0f, 135.0f, "%.0f mm");
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("The lens a subject is shot on. Left at its default the "
+                                      "director picks 35 or 50 mm from the subject's own "
+                                      "proportions; move it and your value is used instead.");
+                }
+
+                ImGui::Separator();
+                auto seed = static_cast<int>(s.seed);
+                if (ImGui::InputInt("seed", &seed)) {
+                    s.seed = static_cast<std::uint32_t>(std::max(0, seed));
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("Same seed, same heroes, same track, same film. Change it to "
+                                      "ask for a different edit of the same piece -- it picks which "
+                                      "supporting subject each section gets, and nothing else.");
+                }
+
+                // Refuse rather than clamp, and say why in the panel rather than in a log.
+                if (const auto ok = s.validate(); !ok) {
+                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.35f, 1.0f), "%s", ok.error().message.c_str());
+                } else if (std::memcmp(&before, &s, sizeof(s)) != 0 && onDirectCamera &&
+                           engine.timeline().isAutomated("camera/position")) {
+                    // Already directed: a setting that changes the film should change the film,
+                    // rather than waiting for somebody to find the menu item again.
+                    onDirectCamera();
+                }
+                ImGui::EndMenu();
+            }
+        }
         ImGui::EndMenu();
     }
     drawEditMenu(engine);
@@ -234,7 +328,7 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
             (composition != nullptr && !composition->heroes().empty()) ||
             (worldBuilder.lastWorld && !worldBuilder.lastWorld->composed.plan.heroes.empty());
         ImGui::BeginDisabled(!haveAudio || !haveHeroes || !onDirectCamera);
-        if (ImGui::MenuItem("Direct to Music")) {
+        if (ImGui::MenuItem("Enable Auto-director")) {
             onDirectCamera();
         }
         ImGui::EndDisabled();
@@ -249,7 +343,7 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
                                     "between this world's heroes, landing a reveal on the drop");
         }
         ImGui::BeginDisabled(!onClearCameraAutomation || !engine.timeline().isAutomated("camera/position"));
-        if (ImGui::MenuItem("Hand Camera Back to the Viewport")) {
+        if (ImGui::MenuItem("Disable Auto-director")) {
             onClearCameraAutomation();
         }
         ImGui::EndDisabled();

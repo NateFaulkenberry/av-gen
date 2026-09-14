@@ -75,7 +75,7 @@ momentary, all 0 to 1:
 | `music.impact` | a large onset |
 
 These are what to reach for when you want the *shape* of a piece rather than its texture. They are
-also what the camera director folds a track into — see
+also what the Auto-director folds a track into — see
 [Directing the camera to music](help://sequencer/camera-direction).
 
 The detector is fed one frame per *analysis* frame, never per render frame, so a 30 fps offline

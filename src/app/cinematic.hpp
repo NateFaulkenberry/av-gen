@@ -237,6 +237,24 @@ struct Sequence {
 // on the reveal, and a breakdown gets a slow close shot that a loud section could not hold.
 
 // What the world offers the director. It is a list of things worth pointing at plus one thing the
+// How the Auto-director cuts.
+//
+// **Continuous shot** -- one uninterrupted take. The camera travels through the world and around its
+// subjects without editorial cuts: each move starts where the last one ended *and at the speed it
+// ended with*, so the sequence reads as one operator's move whose intent changes rather than as a cut
+// list played without fades.
+//
+// **Edited sequence** -- a cut list. Each shot is composed independently and the camera cuts between
+// them, which is what a piece with distinct sections and distinct subjects wants.
+//
+// The distinction is not cosmetic and it is not new: the flag existed and defaulted to continuous
+// from the start, but it was invisible, and what it did was pin positions without doing anything
+// about velocity. A camera that arrives at a section boundary, stops dead, and accelerates away
+// again has cut -- it has just done it without a frame of black.
+enum class DirectorMode : std::uint8_t { ContinuousShot, EditedSequence };
+[[nodiscard]] const char* directorModeName(DirectorMode mode);
+[[nodiscard]] std::optional<DirectorMode> directorModeFromName(std::string_view name);
+
 // film is about; everything else is a preference with a defensible default.
 struct DirectionBrief {
     FocalTarget hero;                     // the one object the film is for
@@ -251,11 +269,15 @@ struct DirectionBrief {
     double maxShotSeconds = 12.0;
     float wideFocalLength = 24.0f;
     float heroFocalLength = 50.0f;
-    // The reference camera "never orbits, never zooms, and holds its final pose" (audit 1.4), and
-    // section 8 lists that restraint among the things not to change. Continuity is therefore the
-    // default: each shot starts where the last one ended, so the sequence is one unbroken move with
-    // its intent changing rather than a cut list. Turn it off to get actual cuts.
-    bool continuous = true;
+    // How the film is cut. The reference camera "never orbits, never zooms, and holds its final
+    // pose" (audit 1.4), and section 8 lists that restraint among the things not to change, so a
+    // continuous take is the default.
+    //
+    // `ContinuousShot` is one uninterrupted move whose *intent* changes at the section boundaries:
+    // each shot starts where the last one ended, and -- since this became a user-facing mode -- the
+    // camera no longer decelerates to a stop at each of those boundaries either. See `DirectorMode`.
+    DirectorMode mode = DirectorMode::ContinuousShot;
+    [[nodiscard]] bool continuous() const { return mode == DirectorMode::ContinuousShot; }
     std::uint32_t seed = 1; // picks which supporting subject a section gets; nothing else is random
 };
 

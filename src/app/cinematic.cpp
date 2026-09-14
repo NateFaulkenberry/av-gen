@@ -196,6 +196,26 @@ glm::vec3 bowOffset(const Shot& s, const glm::vec3& from, const glm::vec3& to, f
 }
 } // namespace
 
+const char* directorModeName(DirectorMode mode) {
+    switch (mode) {
+    case DirectorMode::ContinuousShot:
+        return "continuous";
+    case DirectorMode::EditedSequence:
+        return "edited";
+    }
+    return "continuous";
+}
+
+std::optional<DirectorMode> directorModeFromName(std::string_view name) {
+    if (name == "continuous" || name == "continuous-shot") {
+        return DirectorMode::ContinuousShot;
+    }
+    if (name == "edited" || name == "edited-sequence") {
+        return DirectorMode::EditedSequence;
+    }
+    return std::nullopt;
+}
+
 const char* shotKindName(ShotKind k) {
     for (const auto& [kind, name] : kShotNames) {
         if (kind == k) {
@@ -1136,7 +1156,7 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
         // happened, as well as forcing the quiet shot to sprint in from wherever the last loud one
         // finished. Slow and close cannot be reached at a run.
         const bool carryOn = sectionKind != MusicalSection::Breakdown;
-        if (brief.continuous && carryOn && !seq.shots.empty()) {
+        if (brief.continuous() && carryOn && !seq.shots.empty()) {
             // The reference camera "never orbits, never zooms, and holds its final pose" (audit
             // 1.4), and section 8 lists that restraint among the things not to change. Pinning each
             // shot's start to the last one's end makes the sequence one unbroken move whose
@@ -1150,6 +1170,14 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
                 shot.curve = MovementCurve::Arc;
                 shot.curveBow = 0.10f;
             }
+            // And the part pinning the position never did. `ease` is a smoothstep on whichever ends
+            // ask for it, and both ends ask by default -- so every shot arrived at its boundary at
+            // zero velocity and left the next one from zero. The camera stopped dead at every
+            // section boundary and accelerated away again, which is a cut performed without a frame
+            // of black. In a continuous take the interior joins do not ease: this shot does not ramp
+            // in and the one it continues from does not ramp out.
+            shot.easeIn = false;
+            seq.shots.back().easeOut = false;
         }
         seq.shots.push_back(std::move(shot));
     }

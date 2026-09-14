@@ -120,7 +120,7 @@ Result<Redirect> refreshDirection(Engine& engine, DirectorState& state) {
     const scene::Composition* composition = engine.composition();
     // No composition, or nothing driving the camera any more: a project was loaded, the camera was
     // handed back, an undo took the tracks, somebody deleted them by hand. Whatever happened, this
-    // is no longer our camera and the next Direct to Music starts the relationship again.
+    // is no longer our camera and the next Enable Auto-director starts the relationship again.
     if (composition == nullptr || !engine.timeline().isAutomated("camera/position")) {
         state = DirectorState{};
         return Redirect::Released;
@@ -145,7 +145,7 @@ Result<Redirect> refreshDirection(Engine& engine, DirectorState& state) {
         static_cast<void>(releaseDirectedCamera(engine, state));
         return Redirect::HandedBack;
     }
-    if (auto installed = directEngine(engine, composition->heroes(), state.seed); !installed) {
+    if (auto installed = directEngine(engine, composition->heroes(), state.settings); !installed) {
         return std::unexpected(installed.error());
     }
     return Redirect::Recut;
@@ -153,7 +153,7 @@ Result<Redirect> refreshDirection(Engine& engine, DirectorState& state) {
 
 Result<DirectionBrief> briefFromHeroes(std::span<const world::HeroPoint> heroes) {
     if (heroes.empty()) {
-        return fail("the camera director needs something to point at: this world has no heroes");
+        return fail("the Auto-director needs something to point at: this world has no heroes");
     }
     const auto toTarget = [](const world::HeroPoint& h) {
         FocalTarget t;
@@ -182,12 +182,13 @@ Result<DirectionBrief> briefFromHeroes(std::span<const world::HeroPoint> heroes)
 }
 
 Result<Sequence> directHeroes(std::span<const world::HeroPoint> heroes,
-                              const signals::MusicalStructure& structure, std::uint32_t seed) {
+                              const signals::MusicalStructure& structure,
+                              const AutoDirectorSettings& settings) {
     auto brief = briefFromHeroes(heroes);
     if (!brief) {
         return std::unexpected(brief.error());
     }
-    brief->seed = seed;
+    settings.applyTo(*brief);
     auto sequence = directFromStructure(structure, *brief);
     if (!sequence) {
         return std::unexpected(sequence.error());
@@ -199,7 +200,7 @@ Result<signals::MusicalStructure> structureOfTrack(const analysis::AnalysisTrack
                                                    int phraseBars, int sectionPhrases) {
     const auto& frames = track.frames();
     if (frames.empty()) {
-        return fail("the camera director needs an analysed track: this one has no frames");
+        return fail("the Auto-director needs an analysed track: this one has no frames");
     }
     // A detector of its own, walked over every frame in order. Reusing the engine's would fold from
     // whatever state playback had reached, so the same track would produce a different structure
@@ -226,21 +227,62 @@ Result<signals::MusicalStructure> structureOfTrack(const analysis::AnalysisTrack
     return structure;
 }
 
+Result<void> AutoDirectorSettings::validate() const {
+    if (!(minShotSeconds > 0.0) || minShotSeconds > 120.0) {
+        return fail("auto-director: minimum shot length must be in (0, 120] s");
+    }
+    if (!(minBuildShotSeconds > 0.0) || minBuildShotSeconds > minShotSeconds) {
+        return fail("auto-director: a build's minimum ({} s) must be positive and no longer than the "
+                    "ordinary minimum ({} s)",
+                    minBuildShotSeconds, minShotSeconds);
+    }
+    if (maxShotSeconds < minShotSeconds || maxShotSeconds > 600.0) {
+        return fail("auto-director: maximum shot length must be between the minimum and 600 s");
+    }
+    for (const float mm : {wideFocalLength, heroFocalLength}) {
+        if (!(mm >= 8.0f) || mm > 400.0f) {
+            return fail("auto-director: focal lengths must be in [8, 400] mm");
+        }
+    }
+    if (wideFocalLength > heroFocalLength) {
+        return fail("auto-director: the wide lens ({} mm) is longer than the hero lens ({} mm)",
+                    wideFocalLength, heroFocalLength);
+    }
+    return {};
+}
+
+void AutoDirectorSettings::applyTo(DirectionBrief& brief) const {
+    brief.mode = mode;
+    brief.minShotSeconds = minShotSeconds;
+    brief.minBuildShotSeconds = minBuildShotSeconds;
+    brief.maxShotSeconds = maxShotSeconds;
+    brief.wideFocalLength = wideFocalLength;
+    // `briefFromHeroes` picks 50 or 35 mm from the subject's own proportions, and a user who has not
+    // touched the control should keep that. The panel's value wins only when it is not the default.
+    if (heroFocalLength != AutoDirectorSettings{}.heroFocalLength) {
+        brief.heroFocalLength = heroFocalLength;
+    }
+    brief.seed = seed;
+}
+
 Result<std::size_t> directEngine(Engine& engine, std::span<const world::HeroPoint> heroes,
-                                 std::uint32_t seed) {
+                                 const AutoDirectorSettings& settings) {
     const analysis::AnalysisTrack* track = engine.track();
     if (track == nullptr) {
-        return fail("the camera director needs analysed audio; load a track first");
+        return fail("the Auto-director needs analysed audio; load a track first");
     }
     auto structure = structureOfTrack(*track);
     if (!structure) {
         return std::unexpected(structure.error());
     }
-    auto sequence = directHeroes(heroes, *structure, seed);
+    if (auto ok = settings.validate(); !ok) {
+        return std::unexpected(ok.error());
+    }
+    auto sequence = directHeroes(heroes, *structure, settings);
     if (!sequence) {
         return std::unexpected(sequence.error());
     }
-    log::info("camera director: {:.0f}s of audio folded into {} section(s)",
+    log::info("auto-director: {:.0f}s of audio folded into {} section(s)",
               structure->durationSeconds(), structure->sections.size());
     return installSequence(engine, *sequence);
 }
@@ -295,7 +337,7 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
         }
     }
     if (liftedKeys > 0) {
-        log::info("camera director: lifted {} camera key(s) clear of the terrain, canopy or a hero",
+        log::info("auto-director: lifted {} camera key(s) clear of the terrain, canopy or a hero",
                   liftedKeys);
     }
 
@@ -340,13 +382,13 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
         for (const std::string& t : unknown) {
             names += names.empty() ? t : ", " + t;
         }
-        log::info("camera director: {} baked track(s) name parameters this build does not have and "
+        log::info("auto-director: {} baked track(s) name parameters this build does not have and "
                   "were left out: {}", unknown.size(), names);
     }
     if (auto bound = timeline.bind(engine.params()); !bound) {
         // A target that does not resolve is worth naming rather than swallowing: it means the
         // director is shooting at a parameter this scene does not have.
-        log::warn("camera director: {}", bound.error().message);
+        log::warn("auto-director: {}", bound.error().message);
     }
     // ADR-158: which hero each shot was cut for, so its aim can follow that hero as it walks.
     //
@@ -367,11 +409,11 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
                                               .hero = shot.subject.name,
                                               .heroAtCut = shot.subject.position});
         }
-        log::info("camera director: {} of {} shot(s) hold a subject and will follow it",
+        log::info("auto-director: {} of {} shot(s) hold a subject and will follow it",
                   follow.size(), sequence.shots.size());
         composition->setAimFollow(std::move(follow));
     }
-    log::info("camera director: {} shot(s), {} track(s) installed, {} replaced",
+    log::info("auto-director: {} shot(s), {} track(s) installed, {} replaced",
               sequence.shots.size(), added, removed);
     return added;
 }

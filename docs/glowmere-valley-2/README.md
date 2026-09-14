@@ -4,7 +4,7 @@ A successor showcase scene: a valley and river that traverse the whole map, ecol
 vegetation, six procedurally searched hero mushrooms, and an Auto-director that can hold one
 continuous shot.
 
-**Status: Phase 7 complete.** The scene exists, is listed, its
+**Status: Phase 8 complete.** The scene exists, is listed, its
 geography and its habitat field are tested, and it renders at **13.44 ms** against a 16 ms ceiling —
 parity with the scene it succeeds, on four times the readable ground. The shared candidate-search
 framework is published with its generic half implemented.
@@ -22,6 +22,7 @@ framework is published with its generic half implemented.
 | [09-phase-5.md](09-phase-5.md) | Phase 5: the heroes placed, two art-direction overrides, and ADR-173's falsifier run |
 | [10-phase-6.md](10-phase-6.md) | Phase 6: hero materials, and a 25% between-invocation variance that made an earlier A/B meaningless |
 | [11-phase-7.md](11-phase-7.md) | Phase 7: the dangling-name check, the upland, and why interleaving must also be counterbalanced |
+| [12-phase-8.md](12-phase-8.md) | Phase 8: the Auto-director — the rename, shot modes, the settings panel, and why the camera used to stop at every cut |
 
 ## The five findings worth reading first
 

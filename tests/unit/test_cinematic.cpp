@@ -740,7 +740,7 @@ TEST_CASE("The directed camera is one unbroken move by default", "[app][cinemati
     CHECK(joins >= 3);
 
     auto brief = referenceBrief();
-    brief.continuous = false;
+    brief.mode = app::DirectorMode::EditedSequence;
     auto cut = app::directFromStructure(structure, brief);
     REQUIRE(cut.has_value());
     REQUIRE(cut->shots.size() == continuous->shots.size());
@@ -821,4 +821,111 @@ TEST_CASE("A film with no supporting cast is still a film", "[app][cinematic][di
         CHECK(s.subject.name == "elder");
         CHECK(s.kind != app::ShotKind::Transition);
     }
+}
+
+// ---- the Auto-director's shot modes (section 9) ------------------------------------------------
+
+namespace {
+// Camera speed in world units per second, from finite differences of the shot's own evaluator.
+float speedAt(const app::Shot& shot, float t) {
+    constexpr float kDt = 1.0e-3f;
+    const float a = std::clamp(t - kDt, 0.0f, 1.0f);
+    const float b = std::clamp(t + kDt, 0.0f, 1.0f);
+    const float dt = static_cast<float>(shot.durationSeconds) * (b - a);
+    if (dt <= 0.0f) {
+        return 0.0f;
+    }
+    return glm::distance(shot.cameraAt(b), shot.cameraAt(a)) / dt;
+}
+} // namespace
+
+TEST_CASE("a continuous shot does not stop at every section boundary", "[app][cinematic][autodirector]") {
+    const auto structure = referenceStructure();
+
+    app::DirectionBrief continuous = referenceBrief();
+    continuous.mode = app::DirectorMode::ContinuousShot;
+    const auto take = app::directFromStructure(structure, continuous);
+    REQUIRE(take.has_value());
+    REQUIRE(take->shots.size() >= 3);
+
+    SECTION("the camera is still moving at the joins it carries through") {
+        // The defect this mode existed to fix and did not: `ease` smoothsteps whichever ends ask for
+        // it and both ends asked, so every shot arrived at a boundary at zero velocity and left the
+        // next from zero. Pinning the *position* made that look continuous in a still and read as a
+        // cut in motion.
+        int carried = 0;
+        for (std::size_t i = 1; i < take->shots.size(); ++i) {
+            if (!take->shots[i].startPosition.has_value()) {
+                continue; // a deliberate cut -- a breakdown never carries through
+            }
+            ++carried;
+            const float arriving = speedAt(take->shots[i - 1], 1.0f);
+            const float leaving = speedAt(take->shots[i], 0.0f);
+            INFO("join " << i << ": arriving " << arriving << " leaving " << leaving);
+            REQUIRE(arriving > 0.05f);
+            REQUIRE(leaving > 0.05f);
+        }
+        REQUIRE(carried >= 2);
+    }
+
+    SECTION("the film still starts and ends at rest") {
+        // Only the *interior* joins lose their easing. A take that begins mid-move and ends mid-move
+        // is a clip, not a film.
+        REQUIRE(take->shots.front().easeIn);
+        REQUIRE(take->shots.back().easeOut);
+    }
+
+    SECTION("position is still continuous across those joins") {
+        for (std::size_t i = 1; i < take->shots.size(); ++i) {
+            if (!take->shots[i].startPosition.has_value()) {
+                continue;
+            }
+            REQUIRE(glm::distance(take->shots[i - 1].cameraAt(1.0f), take->shots[i].cameraAt(0.0f)) < 0.01f);
+        }
+    }
+}
+
+TEST_CASE("an edited sequence cuts, and that is the difference", "[app][cinematic][autodirector]") {
+    const auto structure = referenceStructure();
+    app::DirectionBrief edited = referenceBrief();
+    edited.mode = app::DirectorMode::EditedSequence;
+    const auto cutList = app::directFromStructure(structure, edited);
+    REQUIRE(cutList.has_value());
+
+    SECTION("no shot is pinned to the one before it") {
+        for (const app::Shot& s : cutList->shots) {
+            REQUIRE_FALSE(s.startPosition.has_value());
+        }
+    }
+
+    SECTION("every shot eases at both ends, because every shot is its own move") {
+        for (const app::Shot& s : cutList->shots) {
+            REQUIRE(s.easeIn);
+            REQUIRE(s.easeOut);
+        }
+    }
+
+    SECTION("the two modes are genuinely different films from one structure") {
+        app::DirectionBrief continuous = referenceBrief();
+        continuous.mode = app::DirectorMode::ContinuousShot;
+        const auto take = app::directFromStructure(structure, continuous);
+        REQUIRE(take.has_value());
+        // Same cuts -- the music decides those -- and different camera paths.
+        REQUIRE(take->shots.size() == cutList->shots.size());
+        bool anyDifferent = false;
+        for (std::size_t i = 0; i < take->shots.size(); ++i) {
+            if (glm::distance(take->shots[i].cameraAt(0.0f), cutList->shots[i].cameraAt(0.0f)) > 0.01f) {
+                anyDifferent = true;
+            }
+        }
+        REQUIRE(anyDifferent);
+    }
+}
+
+TEST_CASE("the director mode round-trips by name", "[app][cinematic][autodirector]") {
+    REQUIRE(std::string(app::directorModeName(app::DirectorMode::ContinuousShot)) == "continuous");
+    REQUIRE(std::string(app::directorModeName(app::DirectorMode::EditedSequence)) == "edited");
+    REQUIRE(app::directorModeFromName("continuous") == app::DirectorMode::ContinuousShot);
+    REQUIRE(app::directorModeFromName("edited-sequence") == app::DirectorMode::EditedSequence);
+    REQUIRE_FALSE(app::directorModeFromName("cinematic").has_value());
 }

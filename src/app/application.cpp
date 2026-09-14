@@ -817,6 +817,9 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                 panel_->setStatus("camera cut to the track -- it re-cuts as you star and unstar");
             }
         };
+        // The panel edits the Auto-director's settings in place; the host owns them so a re-cut uses
+        // what the user last chose (section 9).
+        panel_->autoDirector = &cameraDirection_.settings;
         panel_->onClearCameraAutomation = [this] {
             // Removing the camera's automation rather than disabling the whole timeline: a project
             // may automate other things, and handing the camera back is not a reason to stop those.
@@ -1458,7 +1461,7 @@ void Application::ensureFreeCamera() {
         const std::size_t removed = releaseDirectedCamera(*engine_, cameraDirection_);
         log::info("viewport: took the camera back from the director ({} track(s) removed)", removed);
         if (panel_ != nullptr) {
-            panel_->setStatus("camera handed back to the viewport -- Direct to Music re-cuts it");
+            panel_->setStatus("camera handed back to the viewport -- Enable Auto-director re-cuts it");
         }
     }
     auto* p = engine_->params().find("camera/mode");

@@ -562,7 +562,7 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
     if (const std::size_t heroCount = composition->heroes().size(); heroCount > 0) {
         if (ImGui::TreeNodeEx("##heroes", ImGuiTreeNodeFlags_DefaultOpen, "Heroes (%zu)", heroCount)) {
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("What Camera > Direct to Music travels between, in the order it "
+                ImGui::SetTooltip("What Camera > Enable Auto-director travels between, in the order it "
                                   "ranks them. Starring an object here or in the list below only "
                                   "changes the *next* shot the director cuts -- it does not move a "
                                   "camera that has already been directed or hand-placed.");
@@ -573,7 +573,7 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
                 const world::HeroPoint& hero = heroes[i];
                 ImGui::PushID(static_cast<int>(i));
                 if (iconToggle("##declared", true, Icon::Star,
-                               "Not a hero -- the director stops travelling to it")) {
+                               "Not a hero -- the Auto-director stops travelling to it")) {
                     const std::vector<std::string> one{hero.name};
                     editor.setNodesHero(engine, one, false);
                 }
@@ -630,7 +630,7 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
                 }
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("what this object is worth to the camera director");
+                ImGui::SetTooltip("what this object is worth to the Auto-director");
             }
             ImGui::SameLine();
             const bool visible = node.visibleParam != nullptr ? node.visibleParam->base() : node.visible;
@@ -647,14 +647,14 @@ void WorldEditPanel::drawObjects(app::Engine& engine, WorldEditor& editor) {
                 editor.setNodesLocked(engine, one, !node.locked);
             }
             ImGui::SameLine();
-            // A hero is what the camera director travels towards and what a reaction profile answers
+            // A hero is what the Auto-director travels towards and what a reaction profile answers
             // the music through (ADR-072/074). Declaring one describes an object that is already
             // placed -- nothing moves, resizes or relights -- and what it is worth is measured from
             // the object itself.
             const bool hero = nodeIsHero(*composition, node.name);
             if (iconToggle("##hero", hero, Icon::Star,
-                           hero ? "Not a hero -- the director stops travelling to it"
-                                : "Make it a hero -- somewhere the camera director travels to, and "
+                           hero ? "Not a hero -- the Auto-director stops travelling to it"
+                                : "Make it a hero -- somewhere the Auto-director travels to, and "
                                   "something a reaction profile can answer the music through")) {
                 const std::vector<std::string> one{node.name};
                 editor.setNodesHero(engine, one, !hero);
@@ -741,7 +741,7 @@ void WorldEditPanel::drawObjectSettings(app::Engine& engine, WorldEditor& editor
     if (it == heroes.end()) {
         // Shown rather than hidden: an empty disclosure reads as a broken one, and the sentence is
         // also the instruction for turning the controls on.
-        ImGui::TextDisabled("not a hero -- star it to aim the camera director at it");
+        ImGui::TextDisabled("not a hero -- star it to aim the Auto-director at it");
         ImGui::Unindent(18.0f);
         return;
     }
