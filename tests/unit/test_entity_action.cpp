@@ -1138,6 +1138,79 @@ TEST_CASE("an interaction with no verb name is refused", "[entity][diagnostics]"
     CHECK_THAT(badTarget.error().message, ContainsSubstring("interaction"));
 }
 
+// The alien has no backwards walk clip, so any frame in which it travels against its own facing is
+// a frame where the animation and the motion disagree. This measures how often that happens over a
+// long walk, before anything is changed to prevent it: "he sometimes looks like he is walking
+// forwards while moving backwards" is a report about a rate, and a rate is a thing to measure.
+TEST_CASE("the wanderer's travel agrees with its facing", "[.probe][entity][nav][facing]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path scene =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-stylized.scene.json";
+    if (!std::filesystem::exists(scene)) {
+        SKIP("the Glowmere scene is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(scene).has_value());
+    scene::Composition* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+
+    params::Parameter<int>* cameraMode = engine.params().findAs<int>("camera/mode");
+    params::Parameter<glm::vec3>* cameraPos = engine.params().findAs<glm::vec3>("camera/position");
+    params::Parameter<glm::vec3>* cameraTarget = engine.params().findAs<glm::vec3>("camera/target");
+    REQUIRE(cameraMode != nullptr);
+    cameraMode->setBase(1);
+
+    FixedStepClock clock(60.0);
+    const auto positionOf = [&] {
+        const scene::CompositionNode* node = comp->findNode("wanderer");
+        return node != nullptr ? comp->nodeWorldTransform(*node).position : glm::vec3(0.0f);
+    };
+    const auto yawOf = [&] {
+        const scene::CompositionNode* node = comp->findNode("wanderer");
+        if (node == nullptr) {
+            return 0.0f;
+        }
+        const glm::quat q = comp->nodeWorldTransform(*node).rotation;
+        const glm::vec3 fwd = q * glm::vec3(0.0f, 0.0f, 1.0f);
+        return std::atan2(fwd.x, fwd.z);
+    };
+
+    glm::vec3 last = positionOf();
+    int moving = 0;
+    int backwards = 0;
+    float worstMetres = 0.0f;
+    constexpr int kSteps = 10 * 60 * 60; // ten simulated minutes
+    for (int i = 0; i < kSteps; ++i) {
+        const glm::vec3 follow = positionOf();
+        cameraPos->setBase(follow + glm::vec3(0.0f, 12.0f, 24.0f));
+        cameraTarget->setBase(follow);
+        engine.update(engine.tick(clock));
+        const glm::vec3 now = positionOf();
+        const glm::vec2 step(now.x - last.x, now.z - last.z);
+        last = now;
+        const float len = glm::length(step);
+        if (len < 1e-4f) {
+            continue; // standing still is not a disagreement
+        }
+        ++moving;
+        const float yaw = yawOf();
+        const glm::vec2 facing(std::sin(yaw), std::cos(yaw));
+        // Negative dot means the body moved against the direction it is pointing.
+        if (glm::dot(facing, step / len) < -0.2f) {
+            ++backwards;
+            worstMetres = std::max(worstMetres, len);
+        }
+    }
+    const double rate = moving > 0 ? 100.0 * backwards / moving : 0.0;
+    INFO("moving frames " << moving << ", backwards " << backwards << " (" << rate
+                          << "%), worst single step " << worstMetres << " m");
+    // Reported, not yet enforced: this run establishes the rate so a fix can be judged against it.
+    CHECK(moving > 0);
+#endif
+}
+
 // ADR-161. Foot slip is the ratio between the ground a body covers and the stride its clip was
 // authored for. It exists because the two numbers live in different files, are set by different
 // people, and were never compared: Glowmere's wanderer ran at 2.5 m/s against a run clip authored

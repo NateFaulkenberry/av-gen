@@ -1091,6 +1091,113 @@ TEST_CASE("The aim-follow table round-trips with the project", "[director][camer
 
 // ---- the Auto-director's settings (section 9) --------------------------------------------------
 
+// Reported: choosing Continuous shot on Glowmere Valley 2 still does not give a continuous shot.
+// The mechanism is covered elsewhere; this asks the question about the *real* project, because how
+// continuous a take comes out is a property of the music as much as the setting -- a breakdown
+// section always cuts, by design.
+TEST_CASE("how continuous a continuous take of the real project actually is", "[.probe][director][continuity]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path project =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2.json";
+    if (!std::filesystem::exists(project)) {
+        SKIP("Glowmere Valley 2 is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    auto loaded = engine.loadProject(project);
+    INFO((loaded ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+    if (engine.track() == nullptr) {
+        SKIP("the project's audio is not available here");
+    }
+    REQUIRE(engine.composition() != nullptr);
+
+    auto structure = app::structureOfTrack(*engine.track());
+    REQUIRE(structure.has_value());
+    app::AutoDirectorSettings take;
+    take.mode = app::DirectorMode::ContinuousShot;
+    const auto seq = app::directHeroes(engine.composition()->heroes(), *structure, take);
+    REQUIRE(seq.has_value());
+
+    std::size_t pinned = 0;
+    std::size_t cut = 0;
+    for (std::size_t i = 1; i < seq->shots.size(); ++i) {
+        (seq->shots[i].startPosition.has_value() ? pinned : cut)++;
+    }
+    std::string kinds;
+    for (const auto& section : structure->sections) {
+        kinds += std::string(kinds.empty() ? "" : ",") + signals::musicalSectionName(section.kind);
+    }
+    INFO("shots " << seq->shots.size() << ", joins pinned " << pinned << ", joins cut " << cut
+                  << "; sections: " << kinds);
+    CHECK(seq->shots.size() > 1);
+#endif
+}
+
+// Does the *previewed* camera move continuously, as opposed to the baked keys being pinned? The
+// bake pins 16 of 17 joins on the real project, so if playback still reads as cut the discontinuity
+// is downstream of the keys. ADR-158's aim-follow is the obvious suspect: it adds a per-shot offset
+// chosen by which shot the playhead is in, and a quantity that changes with the shot is a quantity
+// that steps at a shot boundary.
+TEST_CASE("the previewed camera does not step at a shot boundary", "[.probe][director][continuity]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path project =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2.json";
+    if (!std::filesystem::exists(project)) {
+        SKIP("Glowmere Valley 2 is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project).has_value());
+    if (engine.track() == nullptr) {
+        SKIP("the project's audio is not available here");
+    }
+    scene::Composition* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+    app::AutoDirectorSettings take;
+    take.mode = app::DirectorMode::ContinuousShot;
+    REQUIRE(app::directEngine(engine, comp->heroes(), take).has_value());
+
+    const std::vector<scene::AimFollow> follow = comp->aimFollow();
+    INFO("aim-follow entries: " << follow.size());
+
+    // Walk the whole film at 60 Hz and record the largest single-frame change in the camera's
+    // position and in its aim. A continuous take should have neither stepping.
+    FixedStepClock clock(60.0);
+    glm::vec3 lastEye(0.0f);
+    glm::vec3 lastAim(0.0f);
+    float worstEye = 0.0f;
+    float worstAim = 0.0f;
+    double worstAimAt = 0.0;
+    const double duration = std::min(engine.durationSeconds(), 180.0);
+    const int steps = static_cast<int>(duration * 60.0);
+    for (int i = 0; i < steps; ++i) {
+        engine.seekSeconds(static_cast<double>(i) / 60.0);
+        clock.seek(static_cast<double>(i) / 60.0);
+        engine.update(engine.tick(clock));
+        const scene::Camera& cam = comp->scene().camera;
+        if (i > 0) {
+            const float dEye = glm::length(cam.position - lastEye);
+            const float dAim = glm::length(cam.target - lastAim);
+            if (dEye > worstEye) {
+                worstEye = dEye;
+            }
+            if (dAim > worstAim) {
+                worstAim = dAim;
+                worstAimAt = static_cast<double>(i) / 60.0;
+            }
+        }
+        lastEye = cam.position;
+        lastAim = cam.target;
+    }
+    INFO("over " << duration << " s: worst single-frame eye step " << worstEye
+                 << " m, worst aim step " << worstAim << " m at t=" << worstAimAt);
+    CHECK(steps > 0);
+#endif
+}
+
 TEST_CASE("Auto-director settings reach the film, and refuse what they cannot mean", "[director][autodirector]") {
     const auto heroes = threeHeroes();
     const auto structure = sevenSections();
