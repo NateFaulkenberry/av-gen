@@ -64,8 +64,8 @@ TEST_CASE("Glowmere Valley 2 from several viewpoints", "[.capture][glowmere2]") 
     REQUIRE(engine.loadComposition(over ? fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / over : sceneFile).has_value());
     REQUIRE(engine.composition() != nullptr);
 
-    constexpr std::uint32_t kWidth = 1280;
-    constexpr std::uint32_t kHeight = 720;
+    constexpr std::uint32_t kWidth = 1920;
+    constexpr std::uint32_t kHeight = 1080;
     const fs::path outDir = fs::path(AVGEN_SOURCE_DIR) / "build" / "glowmere-valley-2";
     std::error_code ec;
     fs::create_directories(outDir, ec);
@@ -79,13 +79,18 @@ TEST_CASE("Glowmere Valley 2 from several viewpoints", "[.capture][glowmere2]") 
     // Chosen to answer the acceptance criteria rather than to flatter the scene: two of these look
     // straight down the valley's axis from opposite ends, which is where a river that did not
     // traverse would be obvious, and one is a high oblique that shows the whole corridor at once.
-    const std::array<View, 6> views{{
+    const std::array<View, 8> views{{
         {"01-opening", {-118.0f, 32.1f, -96.0f}, {-20.0f, 4.0f, 40.0f}, 40.0f},
         {"02-upstream-axis", {10.0f, 22.0f, 268.0f}, {-10.0f, 6.0f, -160.0f}, 38.0f},
         {"03-downstream-axis", {-30.0f, 30.0f, -232.0f}, {10.0f, -4.0f, 200.0f}, 38.0f},
         {"04-high-oblique", {-250.0f, 132.0f, -230.0f}, {20.0f, -4.0f, 130.0f}, 46.0f},
         {"05-elder-and-pool", {-58.0f, 9.0f, 86.0f}, {-12.0f, 10.0f, 52.0f}, 42.0f},
         {"06-east-wall", {236.0f, 52.0f, 60.0f}, {-30.0f, 0.0f, 30.0f}, 44.0f},
+        // A hero close-up: the elder from below and to one side, the angle its underside reads from
+        // and the one the search's own winners' sheet was shot at.
+        {"07-elder-closeup", {-27.0f, 6.6f, 63.0f}, {-12.0f, 15.5f, 52.0f}, 40.0f},
+        // And a second hero at the other end of the valley, so the handover shows more than one.
+        {"08-bloom-closeup", {-74.0f, 7.0f, 130.0f}, {-62.0f, 10.5f, 118.0f}, 42.0f},
     }};
 
     std::printf("\n===== Glowmere Valley 2, %ux%u =====\n", kWidth, kHeight);

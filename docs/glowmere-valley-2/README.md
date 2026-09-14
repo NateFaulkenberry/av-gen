@@ -4,13 +4,14 @@ A successor showcase scene: a valley and river that traverse the whole map, ecol
 vegetation, six procedurally searched hero mushrooms, and an Auto-director that can hold one
 continuous shot.
 
-**Status: Phase 10 complete.** The scene exists, is listed, its
+**Status: complete and handed over — see [00-handover.md](00-handover.md).** The scene exists, is listed, its
 geography and its habitat field are tested, and it renders at **13.44 ms** against a 16 ms ceiling —
 parity with the scene it succeeds, on four times the readable ground. The shared candidate-search
 framework is published with its generic half implemented.
 
 | | |
 |---|---|
+| [**00-handover.md**](00-handover.md) | **Start here.** What it is, what is done, what is open, and what needs a human |
 | [01-audit.md](01-audit.md) | What Glowmere Valley actually is, file by file, and the reuse matrix |
 | [02-research.md](02-research.md) | The research, the selected methods and why, the candidate-search architecture |
 | [03-baseline.md](03-baseline.md) | Build, test and render baseline for the original — and why its timings are not evidence |

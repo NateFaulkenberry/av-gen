@@ -52,6 +52,15 @@ namespace avgen::scene {
 // typed rather than the one the program would have produced.
 //
 // Returned sorted and deduplicated, so a caller can log it or a test can assert on it.
+//
+// **This catches a name that does not resolve. It does not catch a name that resolves to nothing
+// anybody draws with** -- and that is a sharper failure, because every check passes. A material
+// program can be carried by the scene, bound by a modulation route, and named by no surface at all:
+// the route binds, modulates a real program, and reaches nothing. Glowmere Valley 2 shipped one for
+// two phases (`audio.bass -> material/paintedCrown/emissionIntensity`, after the heroes moved to
+// their own cap program). **Resolving is not the same as reaching anything**, and the only way to see
+// the second case is to ask which programs a surface actually names, which is a question about the
+// scene rather than about the reference.
 [[nodiscard]] std::vector<std::string> danglingMaterialPrograms(const Scene& scene);
 
 struct Scene {
