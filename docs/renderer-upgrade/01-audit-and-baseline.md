@@ -366,11 +366,28 @@ varied by 1.71% GPU / 1.63% wall, and a null A/B on it reports +0.34% GPU — co
 The 28% Glowmere gap of §1.1 remains unresolved, and can no longer recur: a record without its
 conditions can no longer be written.
 
-### The A/B mode reproduces §4.1's largest attributed effect
+### The A/B mode's first headline, withdrawn
 
-`--ab shadowmask`, two pairs, Glowmere: baseline 19.40 ms GPU, arm 23.79 ms, **−4.06 ms (−20.9%)**,
-per-pair deltas −4.65 and −4.06. §4.1 found removing the shadow mask costs +5.8 ms of scene pass;
-this is the whole-frame figure for the same thing, found without trusting a number from a document.
+**WITHDRAWN.** This section reported `--ab shadowmask` at **−4.06 ms (−20.9%)** on two pairs, and
+that number does not survive. ADR-148 found the A/B noise floor was taking its session spread from
+the baseline blocks alone while certifying a difference between two arms; corrected, the floor is
+the max of four components, and this measurement could not be recomputed from what it published.
+
+Re-run on an idle machine under the corrected floor:
+
+```
+baseline 14.88 ms GPU, arm 15.34 ms, delta -0.39 ms (-2.64%)
+floor 3.52%; components: calibrated 2.00, baseline 3.08, arm 0.43, per-pair 3.52
+-> NOT A RESULT: inside the noise
+```
+
+So the whole-frame effect of removing the shadow mask is **not measurable**, where this section
+claimed 20.9%. The per-pass picture still holds and is the one to quote: ADR-118's re-derivation
+puts the mask at 1.12 ms of the scene pass, and §4.1's original +5.8 ms is stale by 5× because it
+was a share of a scene pass a third larger than today's.
+
+The lesson is the floor, not the mask. Two pairs against a fixed 2% constant certified a number that
+four components and an idle machine reduce to noise.
 
 ## 3.6 Cluster occupancy — the §1.5 "measure first" answered
 
