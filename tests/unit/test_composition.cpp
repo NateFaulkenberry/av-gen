@@ -2456,3 +2456,66 @@ TEST_CASE("scene objects are derived from parameters, not authoritative",
         }
     }
 }
+
+// `cloneNodeSpec` is a hand-written field list, and its own header says so: "the list of fields here
+// is the list a new authored field has to be added to. If a duplicate ever comes back missing
+// something, this is the function that forgot it." It had forgotten five -- `waterFlow`,
+// `materialAuthored`, `city`, `cityLibrary` and `floats` -- so duplicating a City node silently
+// produced default settings, exactly the failure the header warns about.
+//
+// Checking the five by hand would only pin the five. The serialiser is the better oracle: it *is*
+// the definition of what is authored about a node, because it is what the scene file writes. So a
+// clone is correct precisely when it serialises to the same object as its source, and a field added
+// to `toJson` but forgotten here fails this without anybody editing the test.
+TEST_CASE("A duplicated node carries every field the scene file writes", "[scene][composition][clone]") {
+    Fixture fx;
+    scene::Composition comp(fx.registry, "clone");
+
+    // A terrain, because it is the node kind carrying the most authored state that is not geometry:
+    // the water's flow, a city's settings and tiling manifest, a floating layer, and the flag
+    // recording that a material block was authored rather than defaulted.
+    auto node = makeNode(scene::NodeKind::Terrain, "ground");
+    node.transform.position = glm::vec3(3.0f, -1.5f, 7.25f);
+    node.visible = false;
+    node.locked = true;
+    node.emissiveBoost = 2.75f;
+    node.roughnessScale = 0.4f;
+    node.materialAuthored = true;
+    node.waterFlow.speedScale = 1.875f;
+    node.waterFlow.speedOverride = 0.625f;
+    node.cityLibrary = "kits/tiles.manifest.json";
+    scene::FloatSpec floats;
+    floats.water = "ground";
+    floats.count = 37;
+    floats.seed = 4242;
+    node.floats = floats;
+
+    REQUIRE(comp.addNode(std::move(node)).has_value());
+    const scene::CompositionNode* source = comp.findNode("ground");
+    REQUIRE(source != nullptr);
+
+    scene::CompositionNode copy = scene::cloneNodeSpec(*source);
+    copy.name = "ground-copy";
+    REQUIRE(comp.addNode(std::move(copy)).has_value());
+
+    const nlohmann::json document = comp.toJson();
+    REQUIRE(document.contains("nodes"));
+    const auto findNodeJson = [&](const std::string& name) {
+        for (const auto& entry : document.at("nodes")) {
+            if (entry.value("name", std::string()) == name) {
+                return entry;
+            }
+        }
+        return nlohmann::json();
+    };
+    nlohmann::json original = findNodeJson("ground");
+    nlohmann::json duplicate = findNodeJson("ground-copy");
+    REQUIRE_FALSE(original.is_null());
+    REQUIRE_FALSE(duplicate.is_null());
+    // The name is the one thing a duplicate must *not* carry over.
+    original.erase("name");
+    duplicate.erase("name");
+    INFO("original:  " << original.dump(2));
+    INFO("duplicate: " << duplicate.dump(2));
+    CHECK(original == duplicate);
+}

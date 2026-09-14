@@ -1543,7 +1543,10 @@ void ControlPanel::drawSceneTab(app::Engine& engine) {
     ImGui::Separator();
     static const char* kinds[] = {"gltf", "orb", "grid", "particles", "scene", "procedural", "field", "spline", "sdf"};
     ImGui::SetNextItemWidth(110);
-    ImGui::Combo("##nodekind", &newNodeKind_, kinds, 6);
+    // IM_ARRAYSIZE, not a literal: the count said 6 against a nine-entry list, so `field`,
+    // `spline` and `sdf` could not be added from this menu at all -- three node kinds the rest
+    // of the editor supports fully, unreachable because a number did not move when the list grew.
+    ImGui::Combo("##nodekind", &newNodeKind_, kinds, IM_ARRAYSIZE(kinds));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(140);
     ImGui::InputText("##nodename", nodeName_, sizeof(nodeName_));
