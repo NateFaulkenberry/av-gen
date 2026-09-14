@@ -1,0 +1,101 @@
+{
+ "_note": "A hero mushroom's cap. Three things the flat colour it replaces did not have: mottling that varies over the cap rather than one violet, roughness that follows the mottle so the surface catches light unevenly, and an edge term from `fresnel` so the rim carries a little of the organism's own light -- which is what stops a cap reading as a painted disc at a grazing angle. The emission is deliberately faint: the structure the light comes OUT of is the gills, and a cap that glows as brightly as its own gills is a lamp again. The rim's edge colour is a constant for the same reason the tissue's is: a single-instance procedural's `instanceEmissive` is not its material's emissive colour, so a program that wants a hue has to carry one. It is a muted violet rather than either accent, so the cap's edge reads as the organism's own flesh catching light and never competes with the gills it sits above.",
+ "name": "glowmere2Cap",
+ "ops": [
+  {
+   "kind": "input",
+   "dst": 0,
+   "input": "localPosition"
+  },
+  {
+   "kind": "noise",
+   "dst": 1,
+   "srcA": 0,
+   "value": 2.6,
+   "seed": 3121
+  },
+  {
+   "kind": "ramp",
+   "dst": 2,
+   "srcA": 1,
+   "constant": [
+    0.055,
+    0.022,
+    0.115,
+    1.0
+   ],
+   "constant2": [
+    0.145,
+    0.055,
+    0.26,
+    1.0
+   ],
+   "constant3": [
+    0.27,
+    0.13,
+    0.4,
+    1.0
+   ]
+  },
+  {
+   "kind": "noise",
+   "dst": 3,
+   "srcA": 0,
+   "value": 11.0,
+   "seed": 907
+  },
+  {
+   "kind": "remap",
+   "dst": 3,
+   "srcA": 3,
+   "constant": [
+    0.0,
+    1.0,
+    0.86,
+    1.12
+   ]
+  },
+  {
+   "kind": "multiply",
+   "dst": 2,
+   "srcA": 2,
+   "srcB": 3
+  },
+  {
+   "kind": "remap",
+   "dst": 5,
+   "srcA": 1,
+   "constant": [
+    0.0,
+    1.0,
+    0.33,
+    0.62
+   ]
+  },
+  {
+   "kind": "fresnel",
+   "dst": 4,
+   "value": 4.2
+  },
+  {
+   "kind": "constant",
+   "dst": 6,
+   "constant": [
+    0.45,
+    0.3,
+    0.62,
+    1.0
+   ]
+  },
+  {
+   "kind": "multiply",
+   "dst": 4,
+   "srcA": 4,
+   "srcB": 6
+  }
+ ],
+ "baseColor": 2,
+ "roughness": 5,
+ "emission": 4,
+ "emissionIntensity": 1.0
+}

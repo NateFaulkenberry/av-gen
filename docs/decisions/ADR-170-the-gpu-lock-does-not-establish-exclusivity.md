@@ -72,6 +72,34 @@ That is also how the contamination was diagnosed rather than believed: **the str
 moved 3.6% and the timings moved 280%.** Two numbers from one run disagreeing about how much changed
 is what said the machine was the variable.
 
+## The clause is necessary and not sufficient, and here is the number
+
+Measured 2026-09-14, after this ADR had been in force for a day. Three invocations of one perf test
+over one scene, GPU lock held, `pgrep avgen` clean on both sides of each, nothing else running:
+
+| run | frame ms | triangles |
+|---|---:|---:|
+| 1 | 10.945 | 252,996 |
+| 2 | 11.272 | 252,996 |
+| 3 | 13.697 | 252,996 |
+
+**A 25% spread with the scene held byte-identical.** Every run passed every rule this ADR states.
+
+So the rule above is a floor, not a protocol, and the protocol is the one ADR-150 already used and
+this ADR did not restate:
+
+> **Arms must be interleaved inside one process.** A comparison between two invocations of the same
+> binary has a noise floor of about 3 ms on this machine, which is larger than most effects worth
+> measuring.
+
+This was learned the way everything here is learned. A hero-cost A/B was run as two invocations —
+one with the heroes, one with them hidden — and reported that **hiding six mushrooms made the frame
+slower**. Interleaved inside one process, the same question answers cleanly: +0.20 ms and +0.66 ms.
+The first version was not a noisy measurement of a real effect; it was not a measurement.
+
+The confounder itself is still uninstrumented. Thermal state is the obvious candidate and nothing
+records it.
+
 ## Consequence
 
 **Glowmere Valley has no current frame-time baseline**, and the first task of its successor's Phase 2

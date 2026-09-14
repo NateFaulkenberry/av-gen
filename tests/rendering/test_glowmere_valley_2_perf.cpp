@@ -28,6 +28,8 @@
 #include <cstdio>
 #include <filesystem>
 #include <memory>
+#include <cstdlib>
+#include <string>
 #include <vector>
 
 #include <glm/trigonometric.hpp>
@@ -96,7 +98,13 @@ TEST_CASE("Glowmere Valley 2 frame cost", "[.perf][glowmere2]") {
         std::uint32_t draws = 0;
     };
 
-    const auto measure = [&](const View& v) {
+    // The arms are interleaved **inside one process**, which is the whole of ADR-150's protocol and
+    // not a nicety. Measured on this machine on 2026-09-14: three identical runs of the identical
+    // scene, triangle count byte-identical at 252,996, gave 10.945 / 11.272 / 13.697 ms -- a 25%
+    // spread between invocations. A two-process A/B below about 3 ms is therefore not evidence, and
+    // the first version of this arm ran the two halves as separate invocations and reported that
+    // hiding the heroes made the frame *slower*.
+    const auto measure = [&](const View& v, bool hideHeroes) {
         std::vector<double> frames;
         std::vector<double> scenes;
         Sample last;
@@ -120,7 +128,20 @@ TEST_CASE("Glowmere Valley 2 frame cost", "[.perf][glowmere2]") {
                 p->setBaseComponent(0, v.fov);
             }
             engine.update(time);
-            engine.composition()->scene().camera.farPlane = 1400.0f;
+            scene::Scene& sc = engine.composition()->scene();
+            sc.camera.farPlane = 1400.0f;
+            // The A/B that answers where the heroes' cost goes. Hiding them after `update` is safe
+            // *for this question* -- it changes what is drawn, not what was culled -- and the thing
+            // being measured is exactly the pixels they cover.
+            if (hideHeroes) {
+                for (scene::ProceduralGeometry& p : sc.procedurals) {
+                    if (p.name.find("elder-2") != std::string::npos || p.name.find("lantern") != std::string::npos ||
+                        p.name.find("spire") != std::string::npos || p.name.find("bloom") != std::string::npos ||
+                        p.name.find("veil") != std::string::npos || p.name.find("umbra") != std::string::npos) {
+                        p.visible = false;
+                    }
+                }
+            }
             auto image = renderer.renderToImage(engine.composition()->scene(), time, kWidth, kHeight);
             REQUIRE(image.has_value());
             const rendering::RenderStats& stats = renderer.stats();
@@ -144,28 +165,38 @@ TEST_CASE("Glowmere Valley 2 frame cost", "[.perf][glowmere2]") {
     };
 
     std::printf("\n===== Glowmere Valley 2 frame cost, %ux%u, fixed t=6.0s =====\n", kWidth, kHeight);
-    std::array<std::vector<Sample>, views.size()> results;
+    std::array<std::vector<Sample>, views.size() * 2> results;
     for (int run = 0; run < kRuns; ++run) {
         for (std::size_t i = 0; i < views.size(); ++i) {
-            const Sample s = measure(views[i]);
-            results[i].push_back(s);
-            std::printf("  run %d  %-14s frame %7.3f ms  scene %7.3f ms  tris %8llu  vis %6llu  draws %4u\n",
-                        run, views[i].name, s.frameMs, s.sceneMs,
-                        static_cast<unsigned long long>(s.triangles),
-                        static_cast<unsigned long long>(s.visible), s.draws);
-            std::fflush(stdout);
+            for (int arm = 0; arm < 2; ++arm) {
+                const Sample s = measure(views[i], arm == 1);
+                results[i * 2 + static_cast<std::size_t>(arm)].push_back(s);
+                std::printf("  run %d  %-14s %-12s frame %7.3f ms  scene %7.3f ms  tris %8llu  draws %4u\n",
+                            run, views[i].name, arm == 1 ? "no heroes" : "with heroes", s.frameMs,
+                            s.sceneMs, static_cast<unsigned long long>(s.triangles), s.draws);
+                std::fflush(stdout);
+            }
         }
     }
-    std::printf("\n  %-14s %10s %10s %10s\n", "view", "frame ms", "scene ms", "triangles");
+    std::printf("\n  %-14s %-12s %10s %10s %10s\n", "view", "arm", "frame ms", "scene ms", "triangles");
     for (std::size_t i = 0; i < views.size(); ++i) {
-        std::vector<double> f, sc;
-        for (const Sample& s : results[i]) {
-            f.push_back(s.frameMs);
-            sc.push_back(s.sceneMs);
+        double withHeroes = 0.0;
+        for (int arm = 0; arm < 2; ++arm) {
+            const std::vector<Sample>& rows = results[i * 2 + static_cast<std::size_t>(arm)];
+            std::vector<double> f, sc;
+            for (const Sample& s : rows) {
+                f.push_back(s.frameMs);
+                sc.push_back(s.sceneMs);
+            }
+            const double m = median(std::move(f));
+            if (arm == 0) withHeroes = m;
+            std::printf("  %-14s %-12s %10.3f %10.3f %10llu\n", views[i].name,
+                        arm == 1 ? "no heroes" : "with heroes", m, median(std::move(sc)),
+                        static_cast<unsigned long long>(rows.back().triangles));
+            if (arm == 1) {
+                std::printf("  %-14s %-12s %10.3f  (the six heroes)\n", "", "delta", withHeroes - m);
+            }
         }
-        std::printf("  %-14s %10.3f %10.3f %10llu\n", views[i].name, median(std::move(f)),
-                    median(std::move(sc)),
-                    static_cast<unsigned long long>(results[i].back().triangles));
     }
     std::printf("\n  the ceiling is 16 ms and the target 13-14; the original Glowmere is 15.93 ms median\n");
     std::fflush(stdout);

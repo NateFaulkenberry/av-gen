@@ -285,9 +285,15 @@ ts["shadowDistance"] = 150.0
 # shared one being edited: `paintedGround` belongs to the scene this one succeeds, and changing it
 # would change that scene's ground too.
 progs = d.setdefault("materialPrograms", [])
-GROUND2 = "../materials/glowmere2-painted-ground.material.json"
-if GROUND2 not in progs:
-    progs.append(GROUND2)
+# `paintedGround` is no longer named by anything in this scene -- `paintedGround2` replaced it -- and
+# there are only eight program slots, so carrying an unreferenced one costs a slot the heroes need.
+progs = [p for p in progs if "glowmere-painted-ground" not in p]
+for extra in ("../materials/glowmere2-painted-ground.material.json",
+              "../materials/glowmere2-tissue.material.json",
+              "../materials/glowmere2-cap.material.json"):
+    if extra not in progs:
+        progs.append(extra)
+d["materialPrograms"] = progs
 terrain.setdefault("material", collections.OrderedDict())["program"] = "paintedGround2"
 
 # ---- Phase 3: the riparian ladder ---------------------------------------------------------------
@@ -491,18 +497,19 @@ HERO_SITES = [
 def hero_materials(index, structure, emission):
     warm = index == 0
     glow = PALETTE["accent"] if warm else (PALETTE["primary"] if structure % 2 == 0 else PALETTE["foliage"])
-    cap = {"program": "paintedCrown", "baseColor": mul(PALETTE["secondary"], 0.30),
-           "roughness": 0.44, "emissiveColor": mul(glow, 0.12), "emissiveIntensity": 0.35}
+    cap = {"program": "glowmere2Cap", "baseColor": mul(PALETTE["secondary"], 0.30),
+           "roughness": 0.44, "emissiveColor": mul(glow, 0.10), "emissiveIntensity": 0.30}
     # No material program on the emitting parts. `glowmereTissue` writes its own cyan-green emission
     # constant, so a warm hero wearing it comes out green -- which is exactly the reserve-accent rule
     # broken by a material, and the first render of the placed elder showed it. The program's fresnel
     # translucency is a real loss and is noted as one; colour control is worth more, because "one warm
     # light in a cool world" is the reason the eye finds the hero at all.
-    under = {"baseColor": mul(PALETTE["secondary"], 0.18),
-             "roughness": 0.52, "emissiveColor": glow, "emissiveIntensity": 0.0}
+    tissue = "glowmere2TissueWarm" if warm else "glowmereTissue"
+    under = {"program": tissue, "baseColor": mul(PALETTE["secondary"], 0.18),
+             "roughness": 0.52, "emissiveColor": glow, "emissiveIntensity": 0.18}
     stem = {"baseColor": [0.24, 0.12, 0.25], "roughness": 0.62,
             "emissiveColor": mul(glow, 0.25), "emissiveIntensity": 0.06}
-    gills = {"baseColor": mul(PALETTE["shadow"], 1.0),
+    gills = {"program": tissue, "baseColor": mul(PALETTE["shadow"], 1.0),
              "roughness": 0.40, "emissiveColor": glow, "emissiveIntensity": emission}
     # Where the light comes out, mirroring the generator's own structure choice. The gills carry it in
     # every case except "rim", because a glowing surface reads as paint and a glowing structure reads

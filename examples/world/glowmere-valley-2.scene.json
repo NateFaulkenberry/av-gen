@@ -2428,7 +2428,7 @@
      "kind": "single"
     },
     "material": {
-     "program": "paintedCrown",
+     "program": "glowmere2Cap",
      "baseColor": [
       0.09255,
       0.03624,
@@ -2436,11 +2436,11 @@
      ],
      "roughness": 0.44,
      "emissiveColor": [
-      0.12,
-      0.0564,
-      0.018
+      0.1,
+      0.047,
+      0.015
      ],
-     "emissiveIntensity": 0.35
+     "emissiveIntensity": 0.3
     },
     "motion": {
      "stiffness": 18.0,
@@ -2507,6 +2507,7 @@
      "kind": "single"
     },
     "material": {
+     "program": "glowmere2TissueWarm",
      "baseColor": [
       0.05553,
       0.02174,
@@ -2518,7 +2519,7 @@
       0.47,
       0.15
      ],
-     "emissiveIntensity": 0.0
+     "emissiveIntensity": 0.18
     },
     "motion": {
      "stiffness": 18.0,
@@ -2663,6 +2664,7 @@
      "kind": "single"
     },
     "material": {
+     "program": "glowmere2TissueWarm",
      "baseColor": [
       0.008,
       0.016,
@@ -2741,7 +2743,7 @@
      "kind": "single"
     },
     "material": {
-     "program": "paintedCrown",
+     "program": "glowmere2Cap",
      "baseColor": [
       0.09255,
       0.03624,
@@ -2820,6 +2822,7 @@
      "kind": "single"
     },
     "material": {
+     "program": "glowmereTissue",
      "baseColor": [
       0.05553,
       0.02174,
@@ -2831,7 +2834,7 @@
       0.82,
       1.0
      ],
-     "emissiveIntensity": 0.0
+     "emissiveIntensity": 0.18
     },
     "motion": {
      "stiffness": 18.0,
@@ -2976,6 +2979,7 @@
      "kind": "single"
     },
     "material": {
+     "program": "glowmereTissue",
      "baseColor": [
       0.008,
       0.016,
@@ -3054,7 +3058,7 @@
      "kind": "single"
     },
     "material": {
-     "program": "paintedCrown",
+     "program": "glowmere2Cap",
      "baseColor": [
       0.09255,
       0.03624,
@@ -3062,11 +3066,11 @@
      ],
      "roughness": 0.44,
      "emissiveColor": [
-      0.0072,
-      0.0984,
-      0.12
+      0.006,
+      0.082,
+      0.1
      ],
-     "emissiveIntensity": 0.35
+     "emissiveIntensity": 0.3
     },
     "motion": {
      "stiffness": 18.0,
@@ -3133,6 +3137,7 @@
      "kind": "single"
     },
     "material": {
+     "program": "glowmereTissue",
      "baseColor": [
       0.05553,
       0.02174,
@@ -3144,7 +3149,7 @@
       0.82,
       1.0
      ],
-     "emissiveIntensity": 0.0
+     "emissiveIntensity": 0.18
     },
     "motion": {
      "stiffness": 18.0,
@@ -3289,6 +3294,7 @@
      "kind": "single"
     },
     "material": {
+     "program": "glowmereTissue",
      "baseColor": [
       0.008,
       0.016,
@@ -3367,7 +3373,7 @@
      "kind": "single"
     },
     "material": {
-     "program": "paintedCrown",
+     "program": "glowmere2Cap",
      "baseColor": [
       0.09255,
       0.03624,
@@ -3375,11 +3381,11 @@
      ],
      "roughness": 0.44,
      "emissiveColor": [
-      0.0072,
-      0.0984,
-      0.12
+      0.006,
+      0.082,
+      0.1
      ],
-     "emissiveIntensity": 0.35
+     "emissiveIntensity": 0.3
     },
     "motion": {
      "stiffness": 18.0,
@@ -3446,6 +3452,7 @@
      "kind": "single"
     },
     "material": {
+     "program": "glowmereTissue",
      "baseColor": [
       0.05553,
       0.02174,
@@ -3457,7 +3464,7 @@
       0.82,
       1.0
      ],
-     "emissiveIntensity": 0.0
+     "emissiveIntensity": 0.18
     },
     "motion": {
      "stiffness": 18.0,
@@ -3602,6 +3609,7 @@
      "kind": "single"
     },
     "material": {
+     "program": "glowmereTissue",
      "baseColor": [
       0.008,
       0.016,
@@ -3680,7 +3688,7 @@
      "kind": "single"
     },
     "material": {
-     "program": "paintedCrown",
+     "program": "glowmere2Cap",
      "baseColor": [
       0.09255,
       0.03624,
@@ -3688,11 +3696,11 @@
      ],
      "roughness": 0.44,
      "emissiveColor": [
-      0.0024,
-      0.12,
-      0.0696
+      0.002,
+      0.1,
+      0.058
      ],
-     "emissiveIntensity": 0.35
+     "emissiveIntensity": 0.3
     },
     "motion": {
      "stiffness": 18.0,
@@ -3759,6 +3767,7 @@
      "kind": "single"
     },
     "material": {
+     "program": "glowmereTissue",
      "baseColor": [
       0.05553,
       0.02174,
@@ -3915,6 +3924,7 @@
      "kind": "single"
     },
     "material": {
+     "program": "glowmereTissue",
      "baseColor": [
       0.008,
       0.016,
@@ -3993,7 +4003,7 @@
      "kind": "single"
     },
     "material": {
-     "program": "paintedCrown",
+     "program": "glowmere2Cap",
      "baseColor": [
       0.09255,
       0.03624,
@@ -4001,11 +4011,11 @@
      ],
      "roughness": 0.44,
      "emissiveColor": [
-      0.0024,
-      0.12,
-      0.0696
+      0.002,
+      0.1,
+      0.058
      ],
-     "emissiveIntensity": 0.35
+     "emissiveIntensity": 0.3
     },
     "motion": {
      "stiffness": 18.0,
@@ -4072,6 +4082,7 @@
      "kind": "single"
     },
     "material": {
+     "program": "glowmereTissue",
      "baseColor": [
       0.05553,
       0.02174,
@@ -4228,6 +4239,7 @@
      "kind": "single"
     },
     "material": {
+     "program": "glowmereTissue",
      "baseColor": [
       0.008,
       0.016,
@@ -4268,9 +4280,10 @@
   "../materials/glowmere-painted-frond.material.json",
   "../materials/bush-glow.material.json",
   "../materials/glowmere-tissue.material.json",
-  "../materials/glowmere-painted-ground.material.json",
   "../materials/glowmere-painted-crown.material.json",
-  "../materials/glowmere2-painted-ground.material.json"
+  "../materials/glowmere2-painted-ground.material.json",
+  "../materials/glowmere2-tissue.material.json",
+  "../materials/glowmere2-cap.material.json"
  ],
  "wind": {
   "enabled": true,

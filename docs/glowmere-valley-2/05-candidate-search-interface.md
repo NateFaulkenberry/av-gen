@@ -62,6 +62,19 @@ asymmetry and tessellation are three of the failure modes this pipeline exists t
 Penalties are a separate field and are correctly monotone: there is no such thing as too little of an
 artifact.
 
+**A selector that scores candidates independently cannot enforce a constraint on the selection.**
+This is the one that will bite you, because it looks like a scoring problem and is not. Glowmere's
+art direction reserves one warm colour for the hero — *"the hero is the only warm light in the world
+... that is why the eye goes to it from anywhere in the frame"* — and the search happily returned six
+excellent mushrooms of which four were warm. Nothing was wrong with any of them. "Is this the second
+warm thing in the frame" is a property of the **set**, and a scorer that sees one candidate at a time
+structurally cannot answer it.
+
+So: a constraint on the chosen collection belongs in the **diversity stage**, where the set exists,
+not in the scoring stage, where it does not. `selectDiverse` is where a rule like "at most one of
+these may be warm" can be expressed. Anything you find yourself wanting to score *relative to the
+other winners* is this mistake.
+
 **A component with no variance across the population is not a criterion.** This is the sharpest
 practical form of the rule and it was learned the expensive way: two of Glowmere Valley 2's nine
 components scored *exactly* 0.00 for five of six winners, because their bands were guessed and the

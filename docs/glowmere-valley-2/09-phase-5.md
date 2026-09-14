@@ -89,10 +89,11 @@ Three interleaved runs, GPU lock held, `pgrep avgen` clean either side, 1280×80
 | Phase 3 valley axis | 12.78 ms | 9.63 ms |
 | **Phase 5 valley axis** | **14.55 ms** | 11.21 ms |
 
-**Six hero mushrooms cost +0.26 ms on the opening and +1.77 ms on the valley axis.** Both are inside
-the 16 ms ceiling; the opening is inside the 13–14 target and the valley axis is half a millisecond
-over it. The asymmetry is the expected one — the valley axis sees three heroes at once where the
-opening sees two — and it is the first thing to look at if the budget tightens again.
+**These two rows are not comparable and the deltas below were withdrawn in Phase 6.** They come from
+separate process invocations, and `10-phase-6.md` §3 measures a 25% spread between invocations of one
+binary over one byte-identical scene. Interleaved properly, the six heroes cost **+0.20 ms** on the
+opening and **+0.66 ms** on the valley axis — a third of what this table implies. Every reading is
+inside the 16 ms ceiling either way, which is why the conclusion survived a measurement that did not.
 
 ## 5. What Phase 5 did not do
 
