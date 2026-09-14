@@ -141,18 +141,11 @@ std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state);
 // making impossible rather than documenting.
 void noteDirected(Engine& engine, DirectorState& state);
 
-// The value `params::Track::source` carries for a track the camera director wrote.
-inline constexpr std::string_view kDirectorTrackSource = "director";
-
-// Whether the timeline currently holds the director's own camera tracks. Asked of the tracks rather
-// than of a flag, so it is true after a project is loaded as well as after Direct to Music runs.
-[[nodiscard]] bool cameraIsDirected(const Engine& engine);
-
-// Takes up the director's claim when the loaded timeline holds its tracks. Without this a directed
-// project reopens with the tracks driving the camera and nothing knowing the director owns them:
-// reaching for the camera does not hand it back, and the menu item is the only way out. Call after
-// anything that replaces the timeline wholesale.
-void adoptDirectedCamera(Engine& engine, DirectorState& state);
+// Whether the timeline carries the camera director's own signature: automation on `camera/mode`
+// together with `camera/position` and `camera/target`. Read from the tracks, so it is true for a
+// project saved long before anything recorded who wrote them. `refreshDirection` uses it to take up
+// the claim on a project that arrives already directed.
+[[nodiscard]] bool cameraLooksDirected(const Engine& engine);
 
 // The camera parameters a directed sequence owns. Anything targeting one of these is replaced by
 // `installSequence`; anything else survives.

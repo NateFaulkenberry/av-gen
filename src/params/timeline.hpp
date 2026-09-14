@@ -80,17 +80,6 @@ struct Track {
     TrackMode mode = TrackMode::Replace;
     double loopLength = 0.0;    // > 0: time wraps modulo this length (e.g. a 4-beat pattern)
     bool enabled = true;
-    // Who wrote this track. Empty means a person did, which is the case for everything the editor
-    // and the sequencer produce and is why it is the default.
-    //
-    // It exists because ownership could not otherwise survive a save. The camera director's tracks
-    // were identified purely by *target path*, and the fact that the director owned them lived in
-    // one runtime bool set when Direct to Music ran. Load a directed project and that bool is
-    // false: reaching for the camera no longer hands it back, and the only way out is the menu
-    // item -- which is exactly the reported bug. Worse, while the bool *was* true, handing back
-    // erased every track on those targets, including camera automation somebody had authored by
-    // hand. A marker that travels with the track answers both.
-    std::string source;         // "" = authored by hand; "director" = the camera director's
     std::vector<Key> keys;      // sorted by time (addKey keeps it so; sortKeys after manual edits)
 
     // Runtime (not serialised)

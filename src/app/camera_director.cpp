@@ -66,33 +66,11 @@ std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
     auto& tracks = engine.timeline().tracks();
     const std::size_t before = tracks.size();
     const auto owned = directedCameraTargets();
-    // Target *and* source. Target alone was enough while the director was the only thing that could
-    // have written these, but it meant handing the camera back deleted camera automation somebody
-    // had authored by hand on the same parameter -- work the doc promises is never taken this way.
     std::erase_if(tracks, [&](const params::Track& t) {
-        return t.source == kDirectorTrackSource &&
-               std::find(owned.begin(), owned.end(), t.target) != owned.end();
+        return std::find(owned.begin(), owned.end(), t.target) != owned.end();
     });
     state = DirectorState{};
     return before - tracks.size();
-}
-
-bool cameraIsDirected(const Engine& engine) {
-    const auto owned = directedCameraTargets();
-    for (const params::Track& t : engine.timeline().tracks()) {
-        if (t.source == kDirectorTrackSource &&
-            std::find(owned.begin(), owned.end(), t.target) != owned.end()) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void adoptDirectedCamera(Engine& engine, DirectorState& state) {
-    if (!cameraIsDirected(engine)) {
-        return;
-    }
-    noteDirected(engine, state);
 }
 
 void noteDirected(Engine& engine, DirectorState& state) {
@@ -103,7 +81,33 @@ void noteDirected(Engine& engine, DirectorState& state) {
     state.wasPlaying = engine.transport().isPlaying();
 }
 
+bool cameraLooksDirected(const Engine& engine) {
+    // The director's signature, read off the timeline rather than remembered.
+    //
+    // `camera/mode` is the tell, and it is the one this file already explains: the mode belongs to
+    // the director for as long as the director owns the camera, because it is what makes the other
+    // six targets readable at all -- a composition ignores `camera/position` and `camera/target`
+    // unless it is in free mode. Somebody hand-animating a camera keys position and target; they do
+    // not key the mode, because in free mode it is already what they want and in orbit mode the
+    // other two do nothing.
+    //
+    // Asking the tracks rather than a saved flag is what makes this work on a project written
+    // before any of this existed -- which is every project that has the problem.
+    const params::Timeline& timeline = engine.timeline();
+    return timeline.isAutomated("camera/mode") && timeline.isAutomated("camera/position") &&
+           timeline.isAutomated("camera/target");
+}
+
 Result<Redirect> refreshDirection(Engine& engine, DirectorState& state) {
+    // A project can arrive with the camera already directed: the tracks are saved, the claim was
+    // not. Without this the viewport's own hand-back never fires on a freshly opened project -- a
+    // drag wrote `camera/position`, the timeline replaced it on the next frame, the camera appeared
+    // to ignore the mouse, and the menu item was the only way out. Taking the claim up here rather
+    // than on load means it does not matter *how* the timeline came to hold these tracks.
+    if (!state.directed && engine.composition() != nullptr && cameraLooksDirected(engine)) {
+        noteDirected(engine, state);
+        log::info("camera: this project's camera is directed; reaching for it hands it back");
+    }
     if (!state.directed) {
         return Redirect::Nothing;
     }
@@ -311,9 +315,6 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
             return fail("directed track: {}", ok.error().message);
         }
         for (params::Track& parsed : scratch.tracks()) {
-            // Stamped so ownership survives a save. Without it the only record that the director
-            // owns this camera is a runtime bool, and a loaded project has no way to know.
-            parsed.source = kDirectorTrackSource;
             timeline.addTrack(std::move(parsed));
             ++added;
         }

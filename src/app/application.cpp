@@ -1235,17 +1235,6 @@ void Application::loadAny(const std::filesystem::path& path) {
     if (panel_) {
         panel_->setStatus({});
     }
-    // A loaded project may already have a directed camera. The tracks come back with it, but the
-    // claim did not: `directed` was set only by Direct to Music, so on a freshly-opened project a
-    // viewport drag wrote `camera/position` and the timeline overwrote it on the next frame -- the
-    // camera did not budge and the only way out was the menu item. The tracks now say who owns
-    // them, so the claim can be taken up from the file. Every load path funnels through here.
-    const bool wasDirected = cameraDirection_.directed;
-    cameraDirection_ = DirectorState{};
-    adoptDirectedCamera(*engine_, cameraDirection_);
-    if (cameraDirection_.directed && !wasDirected) {
-        log::info("camera: this project's camera is directed; reaching for it hands it back");
-    }
     if (!engine_->projectPath().empty() && std::filesystem::absolute(engine_->projectPath()) == std::filesystem::absolute(path)) {
         rememberProject(path);
     } else if (window_) {
