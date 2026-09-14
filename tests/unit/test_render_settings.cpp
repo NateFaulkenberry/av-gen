@@ -2,6 +2,8 @@
 
 #include "app/render_settings.hpp"
 
+#include "rendering/render_quality.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <nlohmann/json.hpp>
@@ -164,4 +166,45 @@ TEST_CASE("A chosen path never silently changes the output kind", "[render][sett
     CHECK(isSequence(RenderOutput::PngSequence));
     CHECK(isSequence(RenderOutput::ExrSequence));
     CHECK_FALSE(isSequence(RenderOutput::Video));
+}
+
+// ADR-147 gave a render its own tier and defaulted it to offline; the editor then gained a control
+// for it. The control itself is ImGui and cannot be asserted here, so what is pinned is everything
+// underneath it: the default, the round-trip, and the names the combo offers.
+//
+// This matters more than a normal round-trip test. A batch render spent a long time coming out
+// byte-identical to an interactive Realtime frame because nothing asked for a tier, and the way
+// that stayed invisible was that no test compared a deliverable against the tier it claimed.
+TEST_CASE("a render carries its quality tier", "[render][settings][tier]") {
+    SECTION("the default is offline, because a render is a deliverable") {
+        const avgen::app::RenderSettings fresh;
+        CHECK(fresh.tier == "offline");
+    }
+
+    SECTION("every name the editor's combo offers is one the renderer accepts") {
+        // The combo in control_panel.cpp lists exactly these. If a name here stopped resolving,
+        // the control would silently select a tier the render then refuses.
+        for (const char* name : {"preview", "realtime", "high", "offline"}) {
+            avgen::rendering::QualityTier tier = avgen::rendering::QualityTier::Realtime;
+            INFO("tier name: " << name);
+            CHECK(avgen::rendering::qualityTierFromName(name, tier));
+            CHECK(std::string(avgen::rendering::qualityTierName(tier)) == name);
+        }
+    }
+
+    SECTION("it survives a round trip, and an older file without one still loads") {
+        avgen::app::RenderSettings s;
+        s.tier = "high";
+        const auto parsed = avgen::app::RenderSettings::fromJson(s.toJson());
+        REQUIRE(parsed.has_value());
+        CHECK(parsed->tier == "high");
+
+        // A project written before the field existed: the reader must not reject it, and must not
+        // silently downgrade the render either.
+        nlohmann::json older = s.toJson();
+        older.erase("tier");
+        const auto legacy = avgen::app::RenderSettings::fromJson(older);
+        REQUIRE(legacy.has_value());
+        CHECK(legacy->tier == "offline");
+    }
 }

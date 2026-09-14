@@ -66,11 +66,33 @@ std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
     auto& tracks = engine.timeline().tracks();
     const std::size_t before = tracks.size();
     const auto owned = directedCameraTargets();
+    // Target *and* source. Target alone was enough while the director was the only thing that could
+    // have written these, but it meant handing the camera back deleted camera automation somebody
+    // had authored by hand on the same parameter -- work the doc promises is never taken this way.
     std::erase_if(tracks, [&](const params::Track& t) {
-        return std::find(owned.begin(), owned.end(), t.target) != owned.end();
+        return t.source == kDirectorTrackSource &&
+               std::find(owned.begin(), owned.end(), t.target) != owned.end();
     });
     state = DirectorState{};
     return before - tracks.size();
+}
+
+bool cameraIsDirected(const Engine& engine) {
+    const auto owned = directedCameraTargets();
+    for (const params::Track& t : engine.timeline().tracks()) {
+        if (t.source == kDirectorTrackSource &&
+            std::find(owned.begin(), owned.end(), t.target) != owned.end()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void adoptDirectedCamera(Engine& engine, DirectorState& state) {
+    if (!cameraIsDirected(engine)) {
+        return;
+    }
+    noteDirected(engine, state);
 }
 
 void noteDirected(Engine& engine, DirectorState& state) {
@@ -289,6 +311,9 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence) {
             return fail("directed track: {}", ok.error().message);
         }
         for (params::Track& parsed : scratch.tracks()) {
+            // Stamped so ownership survives a save. Without it the only record that the director
+            // owns this camera is a runtime bool, and a loaded project has no way to know.
+            parsed.source = kDirectorTrackSource;
             timeline.addTrack(std::move(parsed));
             ++added;
         }

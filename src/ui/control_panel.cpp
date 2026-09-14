@@ -1807,6 +1807,37 @@ void ControlPanel::drawRender(app::Engine& engine) {
     if (ImGui::InputFloat("fps", &fps, 1.0f, 10.0f, "%.3f")) {
         s.fps = static_cast<double>(std::clamp(fps, 1.0f, 240.0f));
     }
+    // ADR-147: the tier the deliverable is rendered at. This existed as a field and as a command
+    // line flag and had no control, which is how a batch render spent a long time coming out
+    // byte-identical to an interactive Realtime frame without anybody being told. Offline is the
+    // default and is what a deliverable should almost always be; the others are here because a
+    // preview render of a long sequence is a real thing to want.
+    {
+        static constexpr const char* kTierNames[] = {"preview", "realtime", "high", "offline"};
+        int tier = 3;
+        for (int i = 0; i < 4; ++i) {
+            if (s.tier == kTierNames[i]) {
+                tier = i;
+            }
+        }
+        if (ImGui::Combo("quality", &tier, kTierNames, 4)) {
+            s.tier = kTierNames[tier];
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "The quality tier this render is made at -- not the viewport's.\n\n"
+                "offline  every shadow tap, AO and the shadow mask at full resolution,\n"
+                "         volumetrics per pixel, no LOD or material demotion, no\n"
+                "         temporal shortcut. Slower, and what a deliverable wants.\n"
+                "high     the reference live picture.\n"
+                "realtime what the viewport draws.\n"
+                "preview  fastest; for checking timing on a long sequence.");
+        }
+        if (s.tier != "offline") {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.90f, 0.72f, 0.25f, 1.0f), "(not final quality)");
+        }
+    }
     float range[2] = {static_cast<float>(s.startSeconds), static_cast<float>(s.endSeconds)};
     if (ImGui::InputFloat2("range (s, end<0 = auto)", range, "%.2f")) {
         s.startSeconds = static_cast<double>(std::max(0.0f, range[0]));

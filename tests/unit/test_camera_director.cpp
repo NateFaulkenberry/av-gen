@@ -824,3 +824,99 @@ TEST_CASE("Taking the camera by hand ends the director's claim", "[director][cam
     CHECK(engine.timeline().isAutomated("post/bloom/intensity"));
 #endif
 }
+
+// The reported bug: open a project whose camera is directed, drag in the viewport, and the camera
+// does not budge -- the only way to get it back is Camera > Hand Camera Back. It worked in the
+// session that ran Direct to Music and failed in every session afterwards.
+//
+// The cause was that "the director owns this camera" lived in one runtime bool set by Direct to
+// Music, while the tracks it describes were saved to the project. A load restored the tracks and
+// not the bool, so the drag handler saw an undirected camera, wrote `camera/position`, and the
+// timeline overwrote it on the next frame.
+TEST_CASE("a directed camera is still directed after the project is reopened",
+          "[director][camera][redirect][persistence]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path wav =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "glowmere-valley.wav";
+    if (!std::filesystem::exists(wav)) {
+        SKIP("glowmere-valley.wav is generated, not committed: run tools/make_glowmere_score.py");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    REQUIRE(engine.loadAudio(wav).has_value());
+    REQUIRE(engine.composition()->setHeroes(threeHeroes()).has_value());
+
+    app::DirectorState live;
+    REQUIRE(app::directEngine(engine, engine.composition()->heroes()).has_value());
+
+    // Camera automation a person wrote *after* directing, on a parameter the director also owns.
+    // Directing replaces what is already on its own targets (documented, and not what this is
+    // about); what must survive is work authored afterwards. Before tracks carried an owner,
+    // handing the camera back erased this too, because it matched only on the target path.
+    params::Track authored;
+    authored.target = "camera/lens/focalLength";
+    authored.addKey(params::Key{0.0, {35.0f, 0.0f, 0.0f, 0.0f}});
+    authored.addKey(params::Key{8.0, {85.0f, 0.0f, 0.0f, 0.0f}});
+    REQUIRE(authored.source.empty()); // a hand-authored track carries no owner
+    engine.timeline().addTrack(std::move(authored));
+    app::noteDirected(engine, live);
+    REQUIRE(live.directed);
+    REQUIRE(app::cameraIsDirected(engine));
+
+    // Round-trip the timeline exactly as saving and reopening a project does.
+    const nlohmann::json saved = engine.timeline().toJson();
+    params::Timeline reloaded;
+    REQUIRE(reloaded.fromJson(saved).has_value());
+    engine.timeline() = std::move(reloaded);
+
+    SECTION("the claim is taken up from the file, so a drag hands the camera back") {
+        app::DirectorState fresh; // what a newly-started session has
+        CHECK_FALSE(fresh.directed);
+        app::adoptDirectedCamera(engine, fresh);
+        CHECK(fresh.directed);
+
+        // And the hand-back that a viewport drag performs now does something.
+        const std::size_t removed = app::releaseDirectedCamera(engine, fresh);
+        CHECK(removed > 0);
+        CHECK_FALSE(fresh.directed);
+        CHECK_FALSE(app::cameraIsDirected(engine));
+    }
+
+    SECTION("handing back takes the director's tracks and leaves authored ones alone") {
+        app::DirectorState fresh;
+        app::adoptDirectedCamera(engine, fresh);
+        REQUIRE(fresh.directed);
+        app::releaseDirectedCamera(engine, fresh);
+
+        const auto& tracks = engine.timeline().tracks();
+        const bool keptAuthored =
+            std::any_of(tracks.begin(), tracks.end(), [](const params::Track& t) {
+                return t.target == "camera/lens/focalLength" && t.source.empty();
+            });
+        INFO("tracks left: " << tracks.size());
+        CHECK(keptAuthored);
+        for (const params::Track& t : tracks) {
+            INFO("track " << t.target);
+            CHECK(t.source != app::kDirectorTrackSource);
+        }
+    }
+
+    SECTION("a project with no directed camera does not acquire a claim") {
+        // The control. Without it this would pass by adopting unconditionally, and every project
+        // with hand-authored camera automation would have it deleted by the first drag.
+        app::Engine plain(app::EngineMode::Offline);
+        plain.newComposition();
+        params::Track mine;
+        mine.target = "camera/position";
+        mine.addKey(params::Key{0.0, {1.0f, 2.0f, 3.0f, 0.0f}});
+        plain.timeline().addTrack(std::move(mine));
+
+        CHECK_FALSE(app::cameraIsDirected(plain));
+        app::DirectorState state;
+        app::adoptDirectedCamera(plain, state);
+        CHECK_FALSE(state.directed);
+    }
+#endif
+}

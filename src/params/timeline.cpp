@@ -296,6 +296,11 @@ Result<Track> trackFromJson(const json& j) {
         readEnum(j, "mode", kModeNames, track.mode), readNumber(j, "loopLength", track.loopLength),
         readBool(j, "enabled", track.enabled),
     };
+    // Absent in every project written before tracks carried ownership, and absent for every
+    // hand-authored track since: "" is the right answer in both cases.
+    if (auto r = readString(j, "source", track.source); !r) {
+        return fail(std::move(r.error().message));
+    }
     for (auto& r : results) {
         if (!r) {
             return fail(std::move(r.error().message));
@@ -694,6 +699,9 @@ json Timeline::toJson() const {
         t["mode"] = trackModeName(track.mode);
         t["loopLength"] = track.loopLength;
         t["enabled"] = track.enabled;
+        if (!track.source.empty()) {
+            t["source"] = track.source; // omitted for hand-authored tracks, which are most of them
+        }
         t["keys"] = std::move(keys);
         tracks.push_back(std::move(t));
     }
