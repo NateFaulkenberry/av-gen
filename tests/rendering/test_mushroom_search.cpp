@@ -137,7 +137,11 @@ TEST_CASE("the hero mushroom search", "[.search][mushroom]") {
         std::getenv("MUSHROOM_POPULATION")
             ? static_cast<std::uint32_t>(std::strtoul(std::getenv("MUSHROOM_POPULATION"), nullptr, 10))
             : 800u;
-    constexpr std::size_t kWinners = 6;
+    // Ten, not six. Farthest-point selection is greedy and deterministic, so the first six picks of a
+    // ten-pick run are byte-identical to a six-pick run: the four extra are genuinely *additional*
+    // morphologies, chosen to be as far from the existing six as the population allows, rather than a
+    // re-run that shuffles the set.
+    constexpr std::size_t kWinners = 10;
     // The quality/diversity trade, explicit because hiding it inside an algorithm is how a pipeline
     // ends up with six excellent near-identical mushrooms and no knob to say so (ADR-172 / 4.8).
     constexpr float kAlpha = 0.45f;
@@ -262,7 +266,7 @@ TEST_CASE("the hero mushroom search", "[.search][mushroom]") {
 
     // ---- the contact sheet: the winners large, under Glowmere's own light --------------------
     constexpr std::uint32_t kTile = 420;
-    const std::uint32_t cols = 3;
+    const std::uint32_t cols = 5;
     const std::uint32_t rows = 2;
     std::vector<std::uint8_t> sheet(static_cast<std::size_t>(kTile * cols) * (kTile * rows) * 4, 0);
     const std::uint32_t sheetW = kTile * cols;

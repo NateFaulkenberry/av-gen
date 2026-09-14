@@ -105,6 +105,45 @@ public:
                                                                    const search::Parameters& values) const;
 };
 
+// Where the parts of a mushroom are supposed to meet, **derived from the generated meshes rather
+// than from the parameters**.
+//
+// That distinction is the whole point. A parameter-space check agrees with itself: it would recompute
+// the attachment from `aspect` and `capThickness` and find it exactly where the builder put it, and a
+// transform applied to the wrong pivot would sail straight past. Reading the anchors back off the
+// vertices is what makes the check able to catch a bug in the transform -- which is not hypothetical
+// here, because "the cap tilted about the world origin and swung itself off the stem" was one of the
+// five defects the first contact sheet caught.
+//
+// It is also the emitter position for spore-fall, which is the same quantity and should not be
+// authored twice: if the anchor is right the spores leave from the right place on every mushroom the
+// generator can produce, and if it is wrong the alignment check and the spores say so together.
+struct MushroomAnchors {
+    glm::vec3 stemTop{0.0f};          // centroid of the stem's topmost ring
+    float stemTopRadius = 0.0f;       // that ring's spread, which sets the tolerance
+    glm::vec3 capAttach{0.0f};        // centroid of the cap underside's innermost ring
+    glm::vec3 gillLow{0.0f};          // the lowest point of the gill set: where spores fall from
+    float gillRadius = 0.0f;          // how far the gills reach out: how wide spores fall from
+    bool valid = false;
+};
+
+[[nodiscard]] MushroomAnchors mushroomAnchors(const search::Subject& subject);
+
+// What is wrong with a mushroom's assembly, in metres. Empty means nothing is.
+//
+// Checked across a whole candidate population rather than the selected few: "the six we shipped line
+// up" is a much weaker statement than "every mushroom this generator can produce lines up", and
+// ADR-180 is about exactly that difference -- a search finds only what its parameterisation
+// expresses, and an invariant that has only been checked on the winners has only been checked on the
+// region the scorer liked.
+struct AlignmentDefect {
+    std::string rule;
+    float metres = 0.0f;
+    std::string detail;
+};
+
+[[nodiscard]] std::vector<AlignmentDefect> checkMushroomAlignment(const search::Subject& subject);
+
 // Organic plausibility, as distinct from mesh hygiene (which `search::meshHygiene` does). The rule
 // is that this rejects things that are *incoherent*, never things that are merely strange: a cap
 // lobed into six drooping petals passes, a cap floating half a metre above a stem it never touches
