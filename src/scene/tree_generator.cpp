@@ -368,9 +368,14 @@ const std::vector<TreeBand>& treeBands() {
          {0.0f, 0.035f, 0.17f, 0.32f}},
         {"verticalCentroid",
          "Height of the centre of mass within the silhouette. The upper bound is the top-heavy "
-         "failure; the lower bound is a canopy that has slumped into the roots.",
+         "failure; the lower bound is a canopy that has slumped into the roots. RE-BANDED from the "
+         "measured population: the guessed range contained the whole distribution (0.49 to 0.74), "
+         "so it scored 0.74 to 1.00 with a standard deviation of 0.07 -- a component contributing a "
+         "constant to every total and selecting nothing, while still taking weight away from the "
+         "components doing the work. A criterion has to have variance across the population or it "
+         "is not a criterion.",
          0.06f,
-         {0.40f, 0.52f, 0.70f, 0.82f}},
+         {0.46f, 0.52f, 0.62f, 0.72f}},
         {"openness",
          "Fraction of the silhouette's interior that is empty. Meaningful negative space as a "
          "number: too little is the indistinguishable mass, too much is the dead central void.",
@@ -407,9 +412,12 @@ const std::vector<TreeBand>& treeBands() {
          {3.0f, 6.0f, 18.0f, 30.0f}},
         {"tertiaryPerSecondary",
          "Tertiary axes per secondary. Same argument one level down: this is where canopy "
-         "subdivision and foliage attachment come from.",
+         "subdivision and foliage attachment come from. Re-banded after the tier reclassification "
+         "moved the ratio: with tiers assigned by substance rather than by graph order, the measured "
+         "population runs from 0 to 42 and the old 4-to-12 ideal put four candidates in five at or "
+         "near zero.",
          0.04f,
-         {2.0f, 4.0f, 12.0f, 20.0f}},
+         {1.0f, 3.0f, 18.0f, 34.0f}},
         {"boleFraction",
          "Clear trunk height over total height. The lower bound is a tree that branches at the "
          "ground; the upper bound is a lollipop on a pole. Raised for the monumental target: the "

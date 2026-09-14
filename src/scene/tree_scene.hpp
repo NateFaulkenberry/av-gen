@@ -22,6 +22,7 @@
 #include "scene/tree.hpp"
 #include "scene/tree_generator.hpp"
 #include "scene/tree_mesh.hpp"
+#include "scene/tree_rig.hpp"
 
 #include <glm/glm.hpp>
 
@@ -87,6 +88,17 @@ struct TreeLook {
     bool includeGround = true;
 };
 
+// Everything the runtime needs to draw and animate one tree: the scene, plus the rig and the graph
+// the animator reads. Returned together because they are only valid as a set -- the scene's meshes
+// are skinned against this rig's joint indices and nothing else's.
+struct TreeSceneBuild {
+    Scene scene;
+    TreeGraph graph;
+    TreeRig rig;
+    TreeMeshes meshes;
+    std::uint32_t triangles = 0;
+};
+
 // The scene, ready to render. `camera` decides the framing; pass the same `TreeCameraView` the
 // candidate search evaluated with, or the tree will have been chosen for a shot nobody takes.
 [[nodiscard]] Result<Scene> buildTreeScene(const TreeGraph& graph, const TreeMeshes& meshes,
@@ -95,5 +107,13 @@ struct TreeLook {
 // Convenience: generate, mesh and assemble in one call.
 [[nodiscard]] Result<Scene> buildTreeScene(const TreeParams& params, const TreeCameraView& camera = {},
                                            const TreeLook& look = {}, const TreeMeshSettings& mesh = {});
+
+// The animatable form: generates, meshes, rigs, skins and assembles. Use this when the tree has to
+// move; `buildTreeScene` above is the still.
+[[nodiscard]] Result<TreeSceneBuild> buildAnimatedTree(const TreeParams& params,
+                                                       const TreeCameraView& camera = {},
+                                                       const TreeLook& look = {},
+                                                       const TreeMeshSettings& mesh = {},
+                                                       const TreeRigSettings& rigSettings = {});
 
 } // namespace avgen::scene

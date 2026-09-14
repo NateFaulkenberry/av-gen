@@ -171,6 +171,12 @@ void buildCluster(MeshData& mesh, const FoliageSite& site, const TreeMeshSetting
 
 } // namespace
 
+namespace {
+void recordAxis(std::vector<std::uint32_t>& into, std::size_t count, std::uint32_t axis) {
+    into.insert(into.end(), count, axis);
+}
+} // namespace
+
 void appendMesh(MeshData& into, const MeshData& src) {
     if (src.vertices.empty()) {
         return;
@@ -181,6 +187,18 @@ void appendMesh(MeshData& into, const MeshData& src) {
     for (std::uint32_t index : src.indices) {
         into.indices.push_back(index + offset);
     }
+}
+
+MeshData* TreeMeshes::meshFor(const std::string& role) {
+    if (role == "roots") return &roots;
+    if (role == "trunk") return &trunk;
+    if (role == "primary") return &primary;
+    if (role == "secondary") return &secondary;
+    if (role == "tertiary") return &tertiary;
+    if (role == "foliage0") return &foliage[0];
+    if (role == "foliage1") return &foliage[1];
+    if (role == "foliage2") return &foliage[2];
+    return nullptr;
 }
 
 std::vector<std::pair<std::string, const MeshData*>> TreeMeshes::parts() const {
@@ -230,7 +248,13 @@ Result<TreeMeshes> buildTreeMeshes(const TreeGraph& graph, const TreeMeshSetting
             }
             applyBark(tube, 0, axisPoints, settings.barkAmount, settings.barkScale, graph.params.seed ^ 0xBA2Cu);
         }
-        appendMesh(*meshForTier(out, axis.tier), tube);
+        MeshData* target = meshForTier(out, axis.tier);
+        const std::size_t slot = static_cast<std::size_t>(axis.tier) + 1;
+        recordAxis(out.vertexAxis[slot], tube.vertices.size(), axis.id);
+        for (const Vertex& v : tube.vertices) {
+            out.vertexBind[slot].push_back(v.position);
+        }
+        appendMesh(*target, tube);
     }
 
     for (const RootStrand& root : graph.roots) {
@@ -247,13 +271,22 @@ Result<TreeMeshes> buildTreeMeshes(const TreeGraph& graph, const TreeMeshSetting
             curve.points.push_back(p);
         }
         const int rows = std::clamp(static_cast<int>(root.length * settings.rowsPerUnit) + 2, 2, 96);
-        appendMesh(out.roots, makeTube(curve, 1.0f, 1.0f, std::clamp(settings.rootSides, 3, 64), rows, 0.0f, false));
+        MeshData tube = makeTube(curve, 1.0f, 1.0f, std::clamp(settings.rootSides, 3, 64), rows, 0.0f, false);
+        // Roots bind to the trunk's base joint: they do not move, and saying so explicitly is
+        // cheaper than a special case in the animator.
+        recordAxis(out.vertexAxis[0], tube.vertices.size(), 0u);
+        out.vertexBind[0].insert(out.vertexBind[0].end(), tube.vertices.size(), glm::vec3(0.0f));
+        appendMesh(out.roots, tube);
     }
 
     for (const FoliageSite& site : graph.foliage) {
         // The tint is decided by the generator, from a spatial field, so an accent has a location.
         const auto tint = std::min<std::size_t>(site.tint, kFoliageTints - 1);
+        const std::size_t before = out.foliage[tint].vertices.size();
         buildCluster(out.foliage[tint], site, settings, graph.params.seed ^ 0xF01Au);
+        const std::size_t added = out.foliage[tint].vertices.size() - before;
+        recordAxis(out.vertexAxis[5 + tint], added, site.axis);
+        out.vertexBind[5 + tint].insert(out.vertexBind[5 + tint].end(), added, site.position);
     }
 
     for (const auto& [name, mesh] : out.parts()) {

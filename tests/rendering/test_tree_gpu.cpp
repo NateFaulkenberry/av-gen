@@ -120,27 +120,42 @@ void blit(gpu::Image8& dst, const gpu::Image8& src, int x, int y) {
     }
 }
 
-// Mean luminance and the fraction of non-background pixels. A frame that renders but shows nothing
-// is the failure this catches, and it is the one a "did it return a value" check misses.
+// Mean luminance, and the fraction of pixels brighter than this frame's own background. A frame
+// that renders but shows nothing is the failure this catches, and it is the one a "did it return a
+// value" check misses.
+//
+// The background is SAMPLED, not assumed. A fixed luminance threshold counted the sky -- which is
+// legitimately lit in a night scene with a sky gradient -- and reported three quarters of every
+// frame as subject, which made the bound meaningless in both directions.
 struct FrameStats {
     double meanLuma = 0.0;
-    double litFraction = 0.0;
+    double subjectFraction = 0.0;
+    double background = 0.0;
 };
+
+double lumaAt(const gpu::Image8& image, std::uint32_t x, std::uint32_t y) {
+    const std::size_t o = (static_cast<std::size_t>(y) * image.width + x) * 4;
+    return 0.2126 * image.rgba[o] + 0.7152 * image.rgba[o + 1] + 0.0722 * image.rgba[o + 2];
+}
 
 FrameStats frameStats(const gpu::Image8& image) {
     FrameStats out;
+    // The brightest of the two top corners: the sky gradient is brightest near the horizon, so a
+    // single corner would under-read it and count the upper sky as subject.
+    out.background = std::max(lumaAt(image, 2, 2), lumaAt(image, image.width - 3, 2));
+    const double threshold = out.background + 14.0;
     double sum = 0.0;
-    std::size_t lit = 0;
+    std::size_t subject = 0;
     const std::size_t pixels = static_cast<std::size_t>(image.width) * image.height;
     for (std::size_t i = 0; i < pixels; ++i) {
         const double l = 0.2126 * image.rgba[i * 4] + 0.7152 * image.rgba[i * 4 + 1] + 0.0722 * image.rgba[i * 4 + 2];
         sum += l;
-        if (l > 18.0) {
-            ++lit;
+        if (l > threshold) {
+            ++subject;
         }
     }
     out.meanLuma = sum / static_cast<double>(pixels);
-    out.litFraction = static_cast<double>(lit) / static_cast<double>(pixels);
+    out.subjectFraction = static_cast<double>(subject) / static_cast<double>(pixels);
     return out;
 }
 
@@ -172,11 +187,11 @@ TEST_CASE("A generated tree renders, and renders the same way twice", "[gpu][tre
     REQUIRE(second.has_value());
 
     const FrameStats stats = frameStats(*first);
-    INFO(fmt::format("mean luma {:.2f}, lit fraction {:.3f}", stats.meanLuma, stats.litFraction));
+    INFO(fmt::format("mean luma {:.2f}, lit fraction {:.3f}", stats.meanLuma, stats.subjectFraction));
     // Not blank, and not a white-out. Both are ways for the pipeline to "succeed" while showing
     // nothing, and neither is caught by checking that render returned a value.
-    CHECK(stats.litFraction > 0.02);
-    CHECK(stats.litFraction < 0.995);
+    CHECK(stats.subjectFraction > 0.04);
+    CHECK(stats.subjectFraction < 0.60);
     CHECK(stats.meanLuma > 1.0);
 
     // The same scene, the same time, the same renderer: identical pixels. This is the offline
@@ -242,8 +257,8 @@ TEST_CASE("The candidate contact sheet renders", "[gpu][tree][contact]") {
         const FrameStats stats = frameStats(*image);
         // Every cell must show a tree. A blank cell in a contact sheet is worse than a missing one:
         // it reads as "this candidate is empty" when it may mean "this candidate did not render".
-        INFO("candidate " << candidate.index << " lit " << stats.litFraction);
-        CHECK(stats.litFraction > 0.01);
+        INFO("candidate " << candidate.index << " subject " << stats.subjectFraction);
+        CHECK(stats.subjectFraction > 0.03);
 
         const int col = i % kCols;
         const int row = i / kCols;
@@ -271,4 +286,61 @@ TEST_CASE("The candidate contact sheet renders", "[gpu][tree][contact]") {
     }
     WARN("contact sheet written to " << sheetPath.string() << " (" << rendered << " cells)");
     WARN("scores written to " << manifestPath.string());
+}
+
+TEST_CASE("The tree moves, and stays in one piece while it does", "[gpu][tree][animation]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    const scene::TreeGenerator generator;
+    const search::Parameters params = search::sampleAt(generator.schema().parameters, 11);
+    const auto treeParams = scene::treeParamsFrom(params);
+    REQUIRE(treeParams.has_value());
+    auto built = scene::buildAnimatedTree(*treeParams, generator.camera());
+    REQUIRE(built.has_value());
+    WARN(fmt::format("{} joints, {} triangles", built->rig.size(), built->triangles));
+
+    scene::TreeAnimator animator;
+    scene::TreeMotionInputs inputs;
+    inputs.windSpeed = 0.8f;
+    inputs.gust = 0.35f;
+    inputs.flutter = 0.5f;
+    // Settle first, so frame zero is the wind's steady state rather than a tree standing perfectly
+    // still and then lurching into motion.
+    animator.settle(built->rig, inputs, 6.0f);
+
+    std::vector<std::uint64_t> hashes;
+    std::vector<double> luma;
+    for (int frame = 0; frame < 3; ++frame) {
+        // Two seconds between samples: far enough apart that a slow limb has visibly travelled.
+        for (int sub = 0; sub < 120; ++sub) {
+            inputs.time = frame * 2.0 + sub / 60.0;
+            animator.step(built->rig, inputs, 1.0f / 60.0f);
+        }
+        scene::applyTreePose(built->rig, animator, built->scene.rigs[0]);
+        const auto image = renderer.renderToImage(built->scene, FrameTime{inputs.time, 1.0 / 60.0, 0}, 960, 540);
+        REQUIRE(image.has_value());
+        const FrameStats stats = frameStats(*image);
+        INFO("frame " << frame << " subject " << stats.subjectFraction);
+        // Still a tree. A skinned mesh whose weights or palette are wrong does not render blank --
+        // it renders as an explosion of triangles reaching to the horizon, which shows up here as
+        // the lit fraction going through the roof.
+        CHECK(stats.subjectFraction > 0.04);
+        CHECK(stats.subjectFraction < 0.65);
+        hashes.push_back(gpu::hashImage(*image));
+        luma.push_back(stats.meanLuma);
+        REQUIRE(assets::writePng(outputDir() / fmt::format("tree-motion-{}.png", frame), image->width,
+                                 image->height, image->rgba)
+                    .has_value());
+    }
+    // It moved. Identical hashes would mean the pose never reached the palette, which is the
+    // failure mode a disabled rig invites and the reason this is asserted rather than assumed.
+    CHECK(hashes[0] != hashes[1]);
+    CHECK(hashes[1] != hashes[2]);
+    // But it did not wander off: a tree whose mean brightness swings wildly between samples is one
+    // whose geometry is coming apart, not one that is swaying.
+    CHECK(std::abs(luma[0] - luma[1]) < 4.0);
+    WARN("motion frames written to " << outputDir().string());
 }

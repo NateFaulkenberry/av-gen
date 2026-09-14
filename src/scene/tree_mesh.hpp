@@ -29,6 +29,8 @@
 #include "scene/scene_types.hpp"
 #include "scene/tree.hpp"
 
+#include <glm/glm.hpp>
+
 #include <array>
 #include <cstdint>
 #include <string>
@@ -103,6 +105,17 @@ struct TreeMeshes {
     MeshData tertiary;
     std::array<MeshData, kFoliageTints> foliage;
     MeshData roots;
+    // Which axis each vertex came from, parallel to that mesh's `vertices`. Kept because a skin
+    // bind by position alone attaches a twig hanging beside an unrelated limb to that limb: the
+    // nearest joint in space is frequently not the nearest joint along the tree.
+    MeshData* meshFor(const std::string& role);
+    std::array<std::vector<std::uint32_t>, 8> vertexAxis; // in `parts()` order
+    // The position a vertex should be BOUND at, which is not always the position it sits at. A leaf
+    // card is rigid: all four of its corners must take the same joint influence, or the card shears
+    // as the joints diverge and the canopy renders as a cloud of torn quads. So every vertex of a
+    // cluster binds at the cluster's centre. A branch vertex binds at itself, because a branch is
+    // supposed to deform along its length.
+    std::array<std::vector<glm::vec3>, 8> vertexBind;
     std::uint32_t triangles = 0;
     double buildMs = 0.0;
     [[nodiscard]] std::vector<std::pair<std::string, const MeshData*>> parts() const;

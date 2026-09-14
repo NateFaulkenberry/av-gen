@@ -191,4 +191,45 @@ Result<Scene> buildTreeScene(const TreeParams& params, const TreeCameraView& cam
     return buildTreeScene(*graph, *meshes, camera, look);
 }
 
+
+Result<TreeSceneBuild> buildAnimatedTree(const TreeParams& params, const TreeCameraView& camera,
+                                         const TreeLook& look, const TreeMeshSettings& mesh,
+                                         const TreeRigSettings& rigSettings) {
+    TreeSceneBuild out;
+    auto graph = generateTree(params);
+    if (!graph) {
+        return std::unexpected(graph.error());
+    }
+    out.graph = std::move(*graph);
+    auto meshes = buildTreeMeshes(out.graph, mesh);
+    if (!meshes) {
+        return std::unexpected(meshes.error());
+    }
+    out.meshes = std::move(*meshes);
+    auto rig = buildTreeRig(out.graph, rigSettings);
+    if (!rig) {
+        return std::unexpected(rig.error());
+    }
+    out.rig = std::move(*rig);
+    // Skinning happens BEFORE the scene is assembled, because `addPart` copies each mesh into the
+    // scene and a skin attached afterwards would land on the copy nobody draws.
+    if (auto ok = skinTreeMeshes(out.graph, out.rig, out.meshes); !ok) {
+        return std::unexpected(ok.error());
+    }
+    auto scene = buildTreeScene(out.graph, out.meshes, camera, look);
+    if (!scene) {
+        return std::unexpected(scene.error());
+    }
+    out.scene = std::move(*scene);
+    out.scene.rigs.push_back(makeSkinnedRig(out.rig));
+    for (Entity& entity : out.scene.entities) {
+        // The ground is not part of the tree and must not be skinned to it.
+        if (entity.name != "tree.ground") {
+            entity.rig = 0;
+        }
+    }
+    out.triangles = out.meshes.triangles;
+    return out;
+}
+
 } // namespace avgen::scene

@@ -284,3 +284,47 @@ TEST_CASE("tree probe: showcase geometry and a candidate search", "[.tree-probe]
         WARN(line);
     }
 }
+
+TEST_CASE("tree probe: which bands actually discriminate", "[.tree-probe]") {
+    // A COMPONENT WITH NO VARIANCE ACROSS THE POPULATION IS NOT A CRITERION, IT IS A CONSTANT.
+    //
+    // A band whose ideal interval sits entirely outside the distribution the generator actually
+    // produces scores the same for everything -- 1.0 if the population is inside it, its floor if
+    // outside -- and contributes a constant to every candidate's total while selecting nothing. The
+    // weight it carries is then weight taken away from the components that are doing the work.
+    // This prints the raw range and the score's standard deviation per component so a band can be
+    // set from the measured distribution instead of guessed.
+    const TreeGenerator generator;
+    constexpr int kPopulation = 32;
+    std::vector<std::vector<search::ScoreComponent>> population;
+    for (int i = 0; i < kPopulation; ++i) {
+        const search::Parameters params = search::sampleAt(generator.schema().parameters, static_cast<std::uint32_t>(i));
+        const auto subject = generator.build(params);
+        if (!subject) {
+            continue;
+        }
+        population.push_back(generator.domainScores(*subject, params));
+    }
+    REQUIRE(population.size() > 8);
+
+    const std::size_t count = population.front().size();
+    for (std::size_t c = 0; c < count; ++c) {
+        double rawMin = 1e30, rawMax = -1e30, scoreSum = 0.0, scoreSq = 0.0, scoreMin = 1e30, scoreMax = -1e30;
+        for (const auto& row : population) {
+            const double raw = row[c].raw;
+            const double score = row[c].score;
+            rawMin = std::min(rawMin, raw);
+            rawMax = std::max(rawMax, raw);
+            scoreMin = std::min(scoreMin, score);
+            scoreMax = std::max(scoreMax, score);
+            scoreSum += score;
+            scoreSq += score * score;
+        }
+        const auto n = static_cast<double>(population.size());
+        const double mean = scoreSum / n;
+        const double sd = std::sqrt(std::max(scoreSq / n - mean * mean, 0.0));
+        WARN(fmt::format("{:<21} raw [{:8.3f} .. {:8.3f}]  score [{:.2f} .. {:.2f}] mean {:.2f} sd {:.3f}{}",
+                         population.front()[c].name, rawMin, rawMax, scoreMin, scoreMax, mean, sd,
+                         sd < 0.05 ? "   <-- CONSTANT, not a criterion" : ""));
+    }
+}
