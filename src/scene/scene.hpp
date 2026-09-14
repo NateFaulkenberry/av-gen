@@ -42,6 +42,27 @@ namespace avgen::scene {
 
 // ---- scene ---------------------------------------------------------------------------------
 
+// Material-program names that something in the scene references and the scene does not carry
+// (ADR-176's dangling-name rule, adopted from the Tree of Life's emission-ownership work).
+//
+// The failure this exists to catch is silent by construction: `MaterialProgramTable::slotOf` returns
+// -1 for a name it does not have, the program is skipped, and the surface renders with its *authored*
+// material as though nothing were wrong. A material that was supposed to write emission simply does
+// not, and the only way to find out is to look at a render and notice the colour is the one you
+// typed rather than the one the program would have produced.
+//
+// Returned sorted and deduplicated, so a caller can log it or a test can assert on it.
+//
+// **This catches a name that does not resolve. It does not catch a name that resolves to nothing
+// anybody draws with** -- and that is a sharper failure, because every check passes. A material
+// program can be carried by the scene, bound by a modulation route, and named by no surface at all:
+// the route binds, modulates a real program, and reaches nothing. Glowmere Valley 2 shipped one for
+// two phases (`audio.bass -> material/paintedCrown/emissionIntensity`, after the heroes moved to
+// their own cap program). **Resolving is not the same as reaching anything**, and the only way to see
+// the second case is to ask which programs a surface actually names, which is a question about the
+// scene rather than about the reference.
+[[nodiscard]] std::vector<std::string> danglingMaterialPrograms(const Scene& scene);
+
 struct Scene {
     Camera camera;                      // the active camera
     std::vector<Camera> cameras;        // imported cameras (the first becomes active on import)

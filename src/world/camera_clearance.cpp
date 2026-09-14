@@ -83,24 +83,57 @@ float ClearanceField::heroPenetration(glm::vec3 p) const {
     return std::max(deepest, 0.0f);
 }
 
+glm::vec2 ClearanceField::heroPushOut(glm::vec3 p) const {
+    glm::vec2 best(0.0f);
+    float deepest = 0.0f;
+    for (const HeroPoint& h : heroes) {
+        const float above = p.y - h.position.y;
+        if (above < -h.radius || above > h.height + h.radius) {
+            continue;
+        }
+        const glm::vec2 away = glm::vec2(p.x, p.z) - glm::vec2(h.position.x, h.position.z);
+        const float planar = glm::length(away);
+        const float clearance = h.radius + cameraRadius;
+        const float inside = clearance - planar;
+        if (inside <= 0.0f || inside <= deepest) {
+            continue;
+        }
+        deepest = inside;
+        // On the axis there is no direction; +X, deterministically. See the header.
+        best = planar > 1e-4f ? (away / planar) * inside : glm::vec2(inside, 0.0f);
+    }
+    return best;
+}
+
 ClearanceAdjustment clearPoint(const ClearanceField& field, glm::vec3 p) {
     ClearanceAdjustment out;
     out.position = p;
 
-    const float floorY = field.minimumHeight(glm::vec2(p.x, p.z));
-    if (p.y < floorY) {
-        out.lifted = floorY - p.y;
+    // Heroes first, and sideways. This used to lift, which is right for a cut-based film and exactly
+    // wrong for a continuous take: the camera was carried *over* the subject it was circling.
+    const glm::vec2 push = field.heroPushOut(out.position);
+    if (glm::dot(push, push) > 0.0f) {
+        out.insideHero = true;
+        out.pushed = glm::length(push);
+        out.position.x += push.x;
+        out.position.z += push.y;
+    }
+
+    // Then the floor, at wherever the push left it.
+    const float floorY = field.minimumHeight(glm::vec2(out.position.x, out.position.z));
+    if (out.position.y < floorY) {
+        out.lifted = floorY - out.position.y;
         out.position.y = floorY;
     }
 
-    // Heroes last, and also by lifting. A hero is a thing the shot is *about*, so being inside one
-    // usually means the camera has come too close on its way past rather than that it wants to be
-    // somewhere else; rising over it keeps the subject in frame, where sliding around it does not.
-    const float inside = field.heroPenetration(out.position);
-    if (inside > 0.0f) {
+    // One more hero check: a push out of one hero can land inside another, and the lift can raise a
+    // point into a hero's capsule that it had been under.
+    const glm::vec2 again = field.heroPushOut(out.position);
+    if (glm::dot(again, again) > 0.0f) {
         out.insideHero = true;
-        out.position.y += inside;
-        out.lifted += inside;
+        out.pushed += glm::length(again);
+        out.position.x += again.x;
+        out.position.z += again.y;
     }
     return out;
 }
@@ -110,16 +143,25 @@ std::size_t clearPath(const ClearanceField& field, std::vector<glm::vec3>& path,
         return 0;
     }
     std::vector<float> floors(path.size(), 0.0f);
-    std::size_t raised = 0;
+    // The lateral *offset* each point needed, not its corrected position. Smoothing the offset is
+    // what keeps a point that was never pushed exactly where it was authored -- including the two
+    // endpoints, which a positional average pulls inward because their own neighbour is themselves.
+    // The first version smoothed positions and moved the far end of a forty-metre dolly by 0.9 m
+    // when the only thing in the way was at the middle.
+    std::vector<glm::vec2> offsets(path.size(), glm::vec2(0.0f));
+    std::size_t moved = 0;
+    bool anyPushed = false;
     for (std::size_t i = 0; i < path.size(); ++i) {
         const ClearanceAdjustment adjusted = clearPoint(field, path[i]);
         floors[i] = adjusted.position.y;
-        if (adjusted.lifted > 1e-4f) {
-            ++raised;
+        offsets[i] = glm::vec2(adjusted.position.x - path[i].x, adjusted.position.z - path[i].z);
+        if (adjusted.lifted > 1e-4f || adjusted.pushed > 1e-4f) {
+            ++moved;
         }
+        anyPushed = anyPushed || adjusted.pushed > 1e-4f;
         path[i] = adjusted.position;
     }
-    if (raised == 0) {
+    if (moved == 0) {
         return 0;   // nothing was in the way; leave the authored path byte for byte
     }
 
@@ -136,8 +178,34 @@ std::size_t clearPath(const ClearanceField& field, std::vector<glm::vec3>& path,
         for (std::size_t i = 0; i < path.size(); ++i) {
             path[i].y = std::max(smoothed[i], floors[i]);
         }
+
+        // The lateral half. It cannot use the vertical trick -- "never below the floor" has no
+        // meaning when neighbouring points were pushed in different directions -- so it smooths
+        // freely and then re-asserts clearance, which is the only way to be sure the average did not
+        // put a point back inside the hero it was moved out of. Skipped entirely when nothing was
+        // pushed, so a path that only cleared terrain is bit-identical to what it was before lateral
+        // clearance existed.
+        if (!anyPushed) {
+            continue;
+        }
+        std::vector<glm::vec2> smoothedOffsets(path.size());
+        for (std::size_t i = 0; i < path.size(); ++i) {
+            const std::size_t a = i == 0 ? i : i - 1;
+            const std::size_t b = i + 1 < path.size() ? i + 1 : i;
+            smoothedOffsets[i] = (offsets[a] + offsets[i] * 2.0f + offsets[b]) * 0.25f;
+        }
+        for (std::size_t i = 0; i < path.size(); ++i) {
+            // Back to the authored position, then the smoothed offset, then re-assert -- the only
+            // way to be sure the average did not put a point back inside what it was moved out of.
+            path[i].x += smoothedOffsets[i].x - offsets[i].x;
+            path[i].z += smoothedOffsets[i].y - offsets[i].y;
+            const glm::vec2 again = field.heroPushOut(path[i]);
+            path[i].x += again.x;
+            path[i].z += again.y;
+            offsets[i] = smoothedOffsets[i] + again;
+        }
     }
-    return raised;
+    return moved;
 }
 
 } // namespace avgen::world

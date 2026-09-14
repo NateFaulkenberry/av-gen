@@ -27,6 +27,10 @@ constexpr std::uint32_t kJitterXChannel = 12;
 constexpr std::uint32_t kJitterZChannel = 13;
 constexpr std::uint32_t kScaleChannel = 14;
 constexpr std::uint32_t kYawChannel = 15;
+// The budget thinning pass (ADR-174). A new channel rather than a reuse: thinning must be
+// independent of whether a cell was accepted, or the survivors are the low-hash half of the
+// population and every other per-instance property skews with them.
+constexpr std::uint32_t kThinChannel = 16;
 
 float random01(std::uint32_t seed, std::uint32_t cell, std::uint32_t channel) {
     return noise::hashIndex(seed, cell, channel);
@@ -128,6 +132,13 @@ Result<void> ScatterLayer::validate() const {
     if (!(maxSlope >= minSlope) || !(maxAltitude >= minAltitude)) {
         return fail("scatter '{}': a filter range is inverted", name);
     }
+    if (!(maxHeightAboveWater >= minHeightAboveWater)) {
+        return fail("scatter '{}': heightAboveWater range is inverted ({} .. {})", name,
+                    minHeightAboveWater, maxHeightAboveWater);
+    }
+    if (heightAboveWaterFeather < 0.0f || heightAboveWaterFeather > 500.0f) {
+        return fail("scatter '{}': heightAboveWaterFeather must be in [0, 500] metres", name);
+    }
     if (height < 0.0f || height > 1000.0f) {
         return fail("scatter '{}': height must be in [0, 1000] metres", name);
     }
@@ -186,7 +197,8 @@ std::uint64_t ScatterLayer::structuralHash() const {
     }
     for (const float v : {minSlope, maxSlope, minAltitude, maxAltitude, shoreOffset, height, minScale, maxScale, sink,
                           minScreenRadius, viewDistance,
-                          alignToGround, randomYaw, clusterScale, clustering}) {
+                          alignToGround, randomYaw, clusterScale, clustering,
+                          minHeightAboveWater, maxHeightAboveWater, heightAboveWaterFeather}) {
         h.f32(v);
     }
     h.v3(tint);
@@ -342,11 +354,23 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
     positions.reserve(1024);
 
     const float cellArea = cell * cell;
+    // `maxInstances` used to be enforced with a `break` on the inner loop, which truncates the
+    // population row by row from -Z instead of thinning it: on a small map the ceiling was never
+    // reached and it did not show, and on a larger one it draws a straight edge across the world
+    // where a layer ran out of budget. So the cap is a *thinning* now. The first pass runs
+    // unthinned; if it overflows, `keep` is the measured overflow ratio and the pass runs again,
+    // rejecting on a channel of its own so the survivors are a uniform sample of the same
+    // population rather than its first N rows.
+    //
+    // Two passes only ever happen to a layer that actually overflows, and the second is the same
+    // pure function of the same inputs, so the result stays deterministic and order-independent.
+    float keep = 1.0f;
+    for (int pass = 0; pass < 2; ++pass) {
+    positions.clear();
+    rotations.clear();
+    scales.clear();
     for (int j = 0; j < nz; ++j) {
         for (int i = 0; i < nx; ++i) {
-            if (static_cast<int>(positions.size()) >= layer.maxInstances) {
-                break;
-            }
             const auto cellId = static_cast<std::uint32_t>(j * nx + i);
             const glm::vec2 base = map.min() + glm::vec2(static_cast<float>(i), static_cast<float>(j)) * cell;
             const glm::vec2 p = base + glm::vec2(random01(layer.seed, cellId, kJitterXChannel),
@@ -408,8 +432,28 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
                                                 layer.seed ^ 0x5bf03635u);
                 density *= glm::mix(1.0f, glm::clamp(patch * 2.0f, 0.0f, 1.6f), layer.clustering);
             }
+            if (layer.constrainsHeightAboveWater()) {
+                // The riparian axis (ADR-174). Evaluated here, after every cheaper rejection, and
+                // only for layers that ask for it: it costs a distance query against every water
+                // feature, and most layers do not care.
+                const float har = s.height - map.waterTable(p);
+                const float feather = std::max(layer.heightAboveWaterFeather, 1e-3f);
+                // Feathered on both edges. A hard band on this axis draws a contour line across the
+                // hillside in plants, which is the one thing a habitat rule must not look like.
+                const float lo = glm::smoothstep(layer.minHeightAboveWater - feather,
+                                                 layer.minHeightAboveWater + feather, har);
+                const float hi = 1.0f - glm::smoothstep(layer.maxHeightAboveWater - feather,
+                                                        layer.maxHeightAboveWater + feather, har);
+                density *= lo * hi;
+                if (density <= 0.0f) {
+                    continue;
+                }
+            }
             const float expected = density * cellArea * habitatWeight * clearing;
             if (random01(layer.seed, cellId, kAcceptChannel) >= expected) {
+                continue;
+            }
+            if (keep < 1.0f && random01(layer.seed, cellId, kThinChannel) >= keep) {
                 continue;
             }
 
@@ -432,6 +476,13 @@ spatial::PointCloud scatter(const WorldMap& map, const ScatterLayer& layer,
             rotations.emplace_back(rotation.x, rotation.y, rotation.z, rotation.w);
             scales.emplace_back(scale);
         }
+    }
+    const auto placed = static_cast<int>(positions.size());
+    if (pass == 0 && layer.maxInstances > 0 && placed > layer.maxInstances) {
+        keep = static_cast<float>(layer.maxInstances) / static_cast<float>(placed);
+        continue; // run the thinned pass
+    }
+    break;
     }
 
     out.resize(positions.size());
@@ -537,6 +588,9 @@ Result<Ecology> ecologyFromJson(const json& j) {
                                Field{"clusterScale", &l.clusterScale}, Field{"clustering", &l.clustering},
                                Field{"minScreenRadius", &l.minScreenRadius},
                                Field{"viewDistance", &l.viewDistance},
+                               Field{"minHeightAboveWater", &l.minHeightAboveWater},
+                               Field{"maxHeightAboveWater", &l.maxHeightAboveWater},
+                               Field{"heightAboveWaterFeather", &l.heightAboveWaterFeather},
                                Field{"hueField", &l.hueField},
                                Field{"hueFieldScale", &l.hueFieldScale},
                                Field{"hueRandom", &l.hueRandom},
@@ -679,6 +733,13 @@ json ecologyToJson(const Ecology& ecology) {
                            {"seed", l.seed},
                            {"maxInstances", l.maxInstances},
                            {"meshBudget", l.meshBudget}});
+        // Written only when the layer actually constrains it, so every scene authored before this
+        // field existed round-trips byte-identically rather than growing three defaults per layer.
+        if (l.constrainsHeightAboveWater()) {
+            out.back()["minHeightAboveWater"] = l.minHeightAboveWater;
+            out.back()["maxHeightAboveWater"] = l.maxHeightAboveWater;
+            out.back()["heightAboveWaterFeather"] = l.heightAboveWaterFeather;
+        }
         if (l.proximity) {
             out.back()["proximity"] = {{"layer", l.proximity->layer},
                                         {"minDistance", l.proximity->minDistance},

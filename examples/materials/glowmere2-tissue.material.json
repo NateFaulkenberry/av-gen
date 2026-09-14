@@ -1,0 +1,140 @@
+{
+ "_note": "Glowmere Valley 2's WARM hero tissue -- the elder's, and only the elder's. The same graph as `glowmereTissue` with the emission constant changed from cyan-green to the palette's reserved accent. The first attempt made that constant white so the hue could come from `instanceEmissive` and the material could decide; it came back white, because a `distribution: single` procedural's instance emissive is not the material's emissive colour. So the program asserts the hue after all -- which is the thing that caused the original bug -- and the mitigation is that there are now exactly two of these, one per colour family, rather than one that is wrong for five of six heroes. The five cool heroes use the scene's own `glowmereTissue`, whose cyan-green is already their colour.",
+ "name": "glowmere2TissueWarm",
+ "ops": [
+  {
+   "kind": "input",
+   "dst": 0,
+   "input": "normal"
+  },
+  {
+   "kind": "gradient",
+   "dst": 1,
+   "srcA": 0,
+   "constant": [
+    0.0,
+    -0.85,
+    0.0,
+    0.9
+   ]
+  },
+  {
+   "kind": "fresnel",
+   "dst": 2,
+   "value": 3.5
+  },
+  {
+   "kind": "mix",
+   "dst": 1,
+   "srcA": 1,
+   "srcB": 2,
+   "value": 0.45
+  },
+  {
+   "kind": "input",
+   "dst": 0,
+   "input": "localPosition"
+  },
+  {
+   "kind": "noise",
+   "dst": 2,
+   "srcA": 0,
+   "value": 6.0,
+   "seed": 617
+  },
+  {
+   "kind": "ramp",
+   "dst": 3,
+   "srcA": 2,
+   "constant": [
+    0.012,
+    0.065,
+    0.046,
+    1.0
+   ],
+   "constant2": [
+    0.05,
+    0.16,
+    0.11,
+    1.0
+   ],
+   "constant3": [
+    0.14,
+    0.3,
+    0.2,
+    1.0
+   ]
+  },
+  {
+   "kind": "remap",
+   "dst": 5,
+   "srcA": 2,
+   "constant": [
+    0.0,
+    1.0,
+    0.3,
+    0.65
+   ]
+  },
+  {
+   "kind": "input",
+   "dst": 4,
+   "input": "instanceEmissive"
+  },
+  {
+   "kind": "constant",
+   "dst": 6,
+   "constant": [
+    1.0,
+    0.47,
+    0.15,
+    1.0
+   ]
+  },
+  {
+   "kind": "multiply",
+   "dst": 4,
+   "srcA": 4,
+   "srcB": 6
+  },
+  {
+   "kind": "multiply",
+   "dst": 4,
+   "srcA": 4,
+   "srcB": 1
+  },
+  {
+   "kind": "ramp",
+   "dst": 6,
+   "srcA": 2,
+   "constant": [
+    0.35,
+    0.35,
+    0.35,
+    1.0
+   ],
+   "constant2": [
+    0.8,
+    0.8,
+    0.8,
+    1.0
+   ],
+   "constant3": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "kind": "multiply",
+   "dst": 4,
+   "srcA": 4,
+   "srcB": 6
+  }
+ ],
+ "baseColor": 3,
+ "roughness": 5,
+ "emission": 4,
+ "emissionIntensity": 6.0
+}

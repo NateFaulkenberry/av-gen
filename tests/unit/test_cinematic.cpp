@@ -63,13 +63,49 @@ TEST_CASE("Distances are in subject radii, so a shot works at any scale", "[app]
                Catch::Matchers::WithinRel(30.0, 1e-4));
 }
 
+
+// Where `p` lands on screen when the shot's camera aims where `targetAt` says, in normalised offsets
+// from centre. This replaces a family of `targetAt(t) == subject.position` checks that asserted the
+// aim was dead centre -- which was true only because `CompositionProfile::framing` and `headroom`
+// were read by nothing. The projection is the stronger claim: it says the subject is *where the
+// composition asked for it*, which is what those fields were authored to mean.
+glm::vec2 screenOffsetOf(const app::Shot& shot, float t, glm::vec3 p) {
+    const glm::vec3 eye = shot.cameraAt(t);
+    const glm::vec3 aim = shot.targetAt(t);
+    glm::vec3 forward = aim - eye;
+    const float d = glm::length(forward);
+    if (d < 1e-5f) {
+        return glm::vec2(0.0f);
+    }
+    forward /= d;
+    glm::vec3 right = glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f));
+    right = glm::dot(right, right) < 1e-8f ? glm::vec3(1.0f, 0.0f, 0.0f) : glm::normalize(right);
+    const glm::vec3 up = glm::normalize(glm::cross(right, forward));
+    const glm::vec3 v = p - eye;
+    const float z = glm::dot(v, forward);
+    if (z < 1e-5f) {
+        return glm::vec2(1e9f);
+    }
+    const float f = std::max(shot.composition.focalLength, 1e-3f);
+    return glm::vec2(glm::dot(v, right) / z * (f / 18.0f), glm::dot(v, up) / z * (f / 12.0f));
+}
+
+// The offset the shot asked for: framing, with headroom sitting the subject lower.
+glm::vec2 requestedOffset(const app::Shot& shot) {
+    return glm::vec2(shot.composition.framing.x, shot.composition.framing.y - shot.composition.headroom);
+}
+
 TEST_CASE("Every kind aims at its subject, except the one that is going somewhere",
           "[app][cinematic]") {
     for (const auto kind : {app::ShotKind::Establish, app::ShotKind::Approach, app::ShotKind::Reveal,
                             app::ShotKind::Orbit, app::ShotKind::Track, app::ShotKind::Descent}) {
         const auto s = shotOf(kind);
         INFO(app::shotKindName(kind));
-        CHECK(glm::length(s.targetAt(0.5f) - s.subject.position) < 1e-4f);
+        // The subject lands where the composition asked, which since `framing` and `headroom` were
+        // wired is not dead centre. Asserting the aim equalled the subject asserted that those two
+        // fields did nothing.
+        const glm::vec2 where = screenOffsetOf(s, 0.5f, s.subject.position);
+        CHECK(glm::length(where - requestedOffset(s)) < 1e-3f);
     }
     // Passage looks where it is going: aiming back at what you are flying through reads as an error.
     const auto passage = shotOf(app::ShotKind::Passage);
@@ -248,7 +284,7 @@ TEST_CASE("A flyby passes the subject and comes out the far side, without going 
     // The bow is not decoration: it is what keeps the camera outside the thing it is flying past.
     CHECK(closestApproach(s) > s.subject.radius);
     // ...and unlike a passage, a flyby holds the subject in frame. That is the whole distinction.
-    CHECK(glm::length(s.targetAt(0.5f) - s.subject.position) < 1e-4f);
+    CHECK(glm::length(screenOffsetOf(s, 0.5f, s.subject.position) - requestedOffset(s)) < 1e-3f);
     CHECK(glm::length(parseOne(R"({"name":"p","kind":"passage","duration":4.0,
         "subject":{"position":[0,0,0],"radius":10}})").targetAt(0.5f)) > 1.0f);
 }
@@ -277,10 +313,10 @@ TEST_CASE("A transition leaves one subject and finds another", "[app][cinematic]
         "handoff":{"name":"second","position":[80,0,-40],"radius":6}})");
     // It holds the first subject at the start rather than drifting off it from frame one: a target
     // already moving on the opening frame means the first subject is never actually held.
-    CHECK(glm::length(s.targetAt(0.0f) - s.subject.position) < 1e-4f);
-    CHECK(glm::length(s.targetAt(0.15f) - s.subject.position) < 1e-4f);
+    CHECK(glm::length(screenOffsetOf(s, 0.0f, s.subject.position) - requestedOffset(s)) < 1e-3f);
+    CHECK(glm::length(screenOffsetOf(s, 0.15f, s.subject.position) - requestedOffset(s)) < 1e-3f);
     REQUIRE(s.handoff.has_value());
-    CHECK(glm::length(s.targetAt(1.0f) - s.handoff->position) < 1e-4f);
+    CHECK(glm::length(screenOffsetOf(s, 1.0f, s.handoff->position) - requestedOffset(s)) < 1e-3f);
     CHECK(glm::length(s.targetAt(0.5f) - s.subject.position) > 1.0f);
     // And it ends near the thing it went to, not the thing it left.
     CHECK(glm::length(s.cameraAt(1.0f) - s.handoff->position) <
@@ -740,7 +776,7 @@ TEST_CASE("The directed camera is one unbroken move by default", "[app][cinemati
     CHECK(joins >= 3);
 
     auto brief = referenceBrief();
-    brief.continuous = false;
+    brief.mode = app::DirectorMode::EditedSequence;
     auto cut = app::directFromStructure(structure, brief);
     REQUIRE(cut.has_value());
     REQUIRE(cut->shots.size() == continuous->shots.size());
@@ -820,5 +856,156 @@ TEST_CASE("A film with no supporting cast is still a film", "[app][cinematic][di
     for (const auto& s : seq->shots) {
         CHECK(s.subject.name == "elder");
         CHECK(s.kind != app::ShotKind::Transition);
+    }
+}
+
+// ---- the Auto-director's shot modes (section 9) ------------------------------------------------
+
+namespace {
+// Camera speed in world units per second, from finite differences of the shot's own evaluator.
+float speedAt(const app::Shot& shot, float t) {
+    constexpr float kDt = 1.0e-3f;
+    const float a = std::clamp(t - kDt, 0.0f, 1.0f);
+    const float b = std::clamp(t + kDt, 0.0f, 1.0f);
+    const float dt = static_cast<float>(shot.durationSeconds) * (b - a);
+    if (dt <= 0.0f) {
+        return 0.0f;
+    }
+    return glm::distance(shot.cameraAt(b), shot.cameraAt(a)) / dt;
+}
+} // namespace
+
+TEST_CASE("a continuous shot does not stop at every section boundary", "[app][cinematic][autodirector]") {
+    const auto structure = referenceStructure();
+
+    app::DirectionBrief continuous = referenceBrief();
+    continuous.mode = app::DirectorMode::ContinuousShot;
+    const auto take = app::directFromStructure(structure, continuous);
+    REQUIRE(take.has_value());
+    REQUIRE(take->shots.size() >= 3);
+
+    SECTION("the camera is still moving at the joins it carries through") {
+        // The defect this mode existed to fix and did not: `ease` smoothsteps whichever ends ask for
+        // it and both ends asked, so every shot arrived at a boundary at zero velocity and left the
+        // next from zero. Pinning the *position* made that look continuous in a still and read as a
+        // cut in motion.
+        int carried = 0;
+        for (std::size_t i = 1; i < take->shots.size(); ++i) {
+            if (!take->shots[i].startPosition.has_value()) {
+                continue; // a deliberate cut -- a breakdown never carries through
+            }
+            ++carried;
+            const float arriving = speedAt(take->shots[i - 1], 1.0f);
+            const float leaving = speedAt(take->shots[i], 0.0f);
+            INFO("join " << i << ": arriving " << arriving << " leaving " << leaving);
+            REQUIRE(arriving > 0.05f);
+            REQUIRE(leaving > 0.05f);
+        }
+        REQUIRE(carried >= 2);
+    }
+
+    SECTION("the film still starts and ends at rest") {
+        // Only the *interior* joins lose their easing. A take that begins mid-move and ends mid-move
+        // is a clip, not a film.
+        REQUIRE(take->shots.front().easeIn);
+        REQUIRE(take->shots.back().easeOut);
+    }
+
+    SECTION("position is still continuous across those joins") {
+        for (std::size_t i = 1; i < take->shots.size(); ++i) {
+            if (!take->shots[i].startPosition.has_value()) {
+                continue;
+            }
+            REQUIRE(glm::distance(take->shots[i - 1].cameraAt(1.0f), take->shots[i].cameraAt(0.0f)) < 0.01f);
+        }
+    }
+}
+
+TEST_CASE("an edited sequence cuts, and that is the difference", "[app][cinematic][autodirector]") {
+    const auto structure = referenceStructure();
+    app::DirectionBrief edited = referenceBrief();
+    edited.mode = app::DirectorMode::EditedSequence;
+    const auto cutList = app::directFromStructure(structure, edited);
+    REQUIRE(cutList.has_value());
+
+    SECTION("no shot is pinned to the one before it") {
+        for (const app::Shot& s : cutList->shots) {
+            REQUIRE_FALSE(s.startPosition.has_value());
+        }
+    }
+
+    SECTION("every shot eases at both ends, because every shot is its own move") {
+        for (const app::Shot& s : cutList->shots) {
+            REQUIRE(s.easeIn);
+            REQUIRE(s.easeOut);
+        }
+    }
+
+    SECTION("the two modes are genuinely different films from one structure") {
+        app::DirectionBrief continuous = referenceBrief();
+        continuous.mode = app::DirectorMode::ContinuousShot;
+        const auto take = app::directFromStructure(structure, continuous);
+        REQUIRE(take.has_value());
+        // Same cuts -- the music decides those -- and different camera paths.
+        REQUIRE(take->shots.size() == cutList->shots.size());
+        bool anyDifferent = false;
+        for (std::size_t i = 0; i < take->shots.size(); ++i) {
+            if (glm::distance(take->shots[i].cameraAt(0.0f), cutList->shots[i].cameraAt(0.0f)) > 0.01f) {
+                anyDifferent = true;
+            }
+        }
+        REQUIRE(anyDifferent);
+    }
+}
+
+TEST_CASE("the director mode round-trips by name", "[app][cinematic][autodirector]") {
+    REQUIRE(std::string(app::directorModeName(app::DirectorMode::ContinuousShot)) == "continuous");
+    REQUIRE(std::string(app::directorModeName(app::DirectorMode::EditedSequence)) == "edited");
+    REQUIRE(app::directorModeFromName("continuous") == app::DirectorMode::ContinuousShot);
+    REQUIRE(app::directorModeFromName("edited-sequence") == app::DirectorMode::EditedSequence);
+    REQUIRE_FALSE(app::directorModeFromName("cinematic").has_value());
+}
+
+TEST_CASE("a subject's preferred elevation biases the shot without flattening it",
+          "[app][cinematic][autodirector]") {
+    // The third dead authored property, wired. `HeroPoint::preferredCameraElevationDegrees` was
+    // serialised per hero and read by nothing; "look up at this one, down into that one" is a real
+    // opinion a subject has, so it is honoured as a bias rather than dropped from the format.
+    const auto structure = referenceStructure();
+    app::DirectionBrief low = referenceBrief();
+    app::DirectionBrief high = low;
+    high.hero.preferredElevationDegrees = 26.0f;
+    for (app::FocalTarget& t : high.supporting) {
+        t.preferredElevationDegrees = 26.0f;
+    }
+
+    const auto flat = app::directFromStructure(structure, low);
+    const auto lifted = app::directFromStructure(structure, high);
+    REQUIRE(flat.has_value());
+    REQUIRE(lifted.has_value());
+    REQUIRE(flat->shots.size() == lifted->shots.size());
+
+    SECTION("every shot is raised") {
+        for (std::size_t i = 0; i < flat->shots.size(); ++i) {
+            INFO("shot " << i);
+            REQUIRE(lifted->shots[i].startElevation > flat->shots[i].startElevation);
+        }
+    }
+
+    SECTION("the kind's own sweep survives, because both ends shift together") {
+        for (std::size_t i = 0; i < flat->shots.size(); ++i) {
+            const float a = flat->shots[i].endElevation - flat->shots[i].startElevation;
+            const float b = lifted->shots[i].endElevation - lifted->shots[i].startElevation;
+            INFO("shot " << i << " sweep " << a << " vs " << b);
+            REQUIRE(std::fabs(a - b) < 1e-3f);
+        }
+    }
+
+    SECTION("a subject with no opinion changes nothing") {
+        const auto again = app::directFromStructure(structure, low);
+        REQUIRE(again.has_value());
+        for (std::size_t i = 0; i < flat->shots.size(); ++i) {
+            REQUIRE(again->shots[i].startElevation == flat->shots[i].startElevation);
+        }
     }
 }

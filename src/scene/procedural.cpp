@@ -114,6 +114,7 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <map>
 #include <cstring>
 #include <limits>
 #include <unordered_map>
@@ -541,6 +542,67 @@ glm::vec3 detail::primitiveHalfExtent(const SourceSpec& s) {
 // Enum names
 // ================================================================================================
 
+// ---- the generator registry (ADR-175) --------------------------------------------------------
+namespace {
+std::map<std::string, GeneratedMeshBuilder, std::less<>>& generatorRegistry() {
+    static std::map<std::string, GeneratedMeshBuilder, std::less<>> registry;
+    return registry;
+}
+} // namespace
+
+void registerGenerator(std::string name, GeneratedMeshBuilder builder) {
+    generatorRegistry()[std::move(name)] = std::move(builder);
+}
+bool hasGenerator(std::string_view name) { return generatorRegistry().find(name) != generatorRegistry().end(); }
+std::vector<std::string> registeredGenerators() {
+    std::vector<std::string> out;
+    out.reserve(generatorRegistry().size());
+    for (const auto& [name, _] : generatorRegistry()) {
+        out.push_back(name);
+    }
+    return out;
+}
+void clearGenerators() { generatorRegistry().clear(); }
+
+Result<void> GeneratedSource::validate() const {
+    if (generator.empty()) {
+        return fail("generated source has no generator name");
+    }
+    if (generatorVersion == 0) {
+        return fail("generated source '{}': version must be >= 1", generator);
+    }
+    if (values.empty()) {
+        return fail("generated source '{}': no parameter values", generator);
+    }
+    if (values.size() > 64) {
+        return fail("generated source '{}': {} values is more than any schema should have",
+                    generator, values.size());
+    }
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        if (!std::isfinite(values[i])) {
+            return fail("generated source '{}': value {} is not finite", generator, i);
+        }
+    }
+    return {};
+}
+
+std::uint64_t GeneratedSource::structuralHash() const {
+    StructHash h;
+    h.u64(generator.size());
+    for (const char c : generator) {
+        h.u32(static_cast<std::uint8_t>(c));
+    }
+    h.u32(generatorVersion);
+    h.u64(schemaHash);
+    // The index is provenance, not geometry: two sources with the same values build the same mesh
+    // whichever candidate they started as, and hashing it would rebuild a mesh that did not change.
+    h.u64(values.size());
+    for (const float v : values) {
+        h.f32(v);
+    }
+    return h.value();
+}
+
 const char* primitiveKindName(PrimitiveKind kind) {
     switch (kind) {
     case PrimitiveKind::Box:
@@ -559,6 +621,8 @@ const char* primitiveKindName(PrimitiveKind kind) {
         return "tube";
     case PrimitiveKind::Mesh:
         return "mesh";
+    case PrimitiveKind::Generated:
+        return "generated";
     }
     return "cylinder";
 }
@@ -566,7 +630,7 @@ const char* primitiveKindName(PrimitiveKind kind) {
 std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name) {
     for (const auto kind : {PrimitiveKind::Box, PrimitiveKind::Cylinder, PrimitiveKind::Sphere, PrimitiveKind::Torus,
                             PrimitiveKind::Point, PrimitiveKind::Procedural, PrimitiveKind::Tube,
-                            PrimitiveKind::Mesh}) {
+                            PrimitiveKind::Mesh, PrimitiveKind::Generated}) {
         if (name == primitiveKindName(kind)) {
             return kind;
         }
@@ -702,6 +766,15 @@ std::optional<DeformSpace> deformSpaceFromName(std::string_view name) {
 Result<void> SourceSpec::validate() const {
     const auto inRange = [](int v, int lo, int hi) { return v >= lo && v <= hi; };
     switch (kind) {
+    case PrimitiveKind::Generated:
+        if (auto ok = generated.validate(); !ok) {
+            return ok;
+        }
+        if (generatedPart < 0 || generatedPart > 15) {
+            return fail("generated source '{}': part must be in 0..15 (got {})", generated.generator,
+                        generatedPart);
+        }
+        break;
     case PrimitiveKind::Box:
         if (!(size.x > 0.0f && size.y > 0.0f && size.z > 0.0f)) {
             return fail("box size must be positive on every axis");
@@ -789,6 +862,14 @@ std::uint64_t SourceSpec::structuralHash() const {
     StructHash h;
     h.u32(static_cast<std::uint32_t>(kind));
     switch (kind) {
+    case PrimitiveKind::Generated:
+        h.u64(generated.structuralHash());
+        // The part is hashed for the same reason `assetPart` is: two objects naming one parameter
+        // set and differing only in their part are two different meshes, and the renderer caches
+        // meshes by this hash. Without it a mushroom's gills would be drawn with the cap's geometry
+        // out of the cache.
+        h.i32(generatedPart);
+        break;
     case PrimitiveKind::Box:
         h.v3(size);
         h.i32(subdivisions);
@@ -1388,6 +1469,19 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
     case PrimitiveKind::Tube:
         return makeTube(spec.curve, spec.tubeRadius, spec.tubeTaper, spec.tubeSides, spec.tubeSegments,
                         spec.tubeTwist, spec.tubeCaps);
+    case PrimitiveKind::Generated: {
+        const auto& registry = generatorRegistry();
+        const auto it = registry.find(spec.generated.generator);
+        if (it == registry.end()) {
+            std::string have;
+            for (const std::string& n : registeredGenerators()) {
+                have += have.empty() ? n : ", " + n;
+            }
+            return fail("no generator named '{}' is registered (have: {})", spec.generated.generator,
+                        have.empty() ? std::string("none") : have);
+        }
+        return it->second(spec.generated, spec.generatedPart);
+    }
     case PrimitiveKind::Mesh:
         if (!spec.assetMesh) {
             return fail("mesh source '{}' has not been resolved", spec.asset);
@@ -2339,6 +2433,18 @@ json ProceduralGeometry::toJson() const {
         s["bevel"] = source.bevel;
         s["asset"] = source.asset;
         s["meshBudget"] = source.meshBudget;
+        // Written only for the kind that uses it, so every scene authored before this existed
+        // round-trips byte-identically.
+        if (source.kind == PrimitiveKind::Generated || !source.generated.empty()) {
+            json g = json::object();
+            g["generator"] = source.generated.generator;
+            g["generatorVersion"] = source.generated.generatorVersion;
+            g["schemaHash"] = source.generated.schemaHash;
+            g["index"] = source.generated.index;
+            g["values"] = source.generated.values;
+            s["generated"] = std::move(g);
+            s["generatedPart"] = source.generatedPart;
+        }
         s["tubeRadius"] = source.tubeRadius;
         s["tubeTaper"] = source.tubeTaper;
         s["tubeSides"] = source.tubeSides;
@@ -2553,6 +2659,37 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
             }
             s.curve = std::move(*curve);
         }
+        if (j.contains("generated")) {
+            const json& g = j.at("generated");
+            if (!g.is_object()) {
+                return fail("source 'generated' must be an object");
+            }
+            if (!g.contains("generator") || !g.at("generator").is_string()) {
+                return fail("generated source needs a string 'generator'");
+            }
+            s.generated.generator = g.at("generator").get<std::string>();
+            if (g.contains("generatorVersion")) {
+                s.generated.generatorVersion = g.at("generatorVersion").get<std::uint32_t>();
+            }
+            if (g.contains("schemaHash")) {
+                s.generated.schemaHash = g.at("schemaHash").get<std::uint64_t>();
+            }
+            if (g.contains("index")) {
+                s.generated.index = g.at("index").get<std::uint32_t>();
+            }
+            if (!g.contains("values") || !g.at("values").is_array()) {
+                return fail("generated source '{}' needs a 'values' array", s.generated.generator);
+            }
+            s.generated.values.clear();
+            for (const json& v : g.at("values")) {
+                if (!v.is_number()) {
+                    return fail("generated source '{}': every value must be a number",
+                                s.generated.generator);
+                }
+                s.generated.values.push_back(v.get<float>());
+            }
+        }
+        AVGEN_PROC_READ(s.generatedPart, "generatedPart", readInt);
         AVGEN_PROC_READ(s.bevelSegments, "bevelSegments", readInt);
         AVGEN_PROC_READ(s.radius, "radius", readFloat);
         AVGEN_PROC_READ(s.height, "height", readFloat);
@@ -2890,7 +3027,7 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
 
     // Source
     const SourceSpec& s = rest.source;
-    r.i("source/kind", static_cast<int>(s.kind), 0, 7, 0, 7);
+    r.i("source/kind", static_cast<int>(s.kind), 0, 8, 0, 8);
     p.sourceSize = r.v3("source/size", s.size, 0.001f, 1000.0f, 0.01f, 10.0f);
     r.i("source/subdivisions", s.subdivisions, 1, 64, 1, 16);
     r.f("source/bevel", s.bevel, 0.0f, 1e3f, 0.0f, 1.0f);
@@ -3108,7 +3245,7 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
     }
     // Source
     SourceSpec& s = live.source;
-    copyEnum(p, "source/kind", s.kind, 7);
+    copyEnum(p, "source/kind", s.kind, 8);
     copyValue(p, "source/size", s.size);
     copyValue(p, "source/subdivisions", s.subdivisions);
     copyValue(p, "source/bevel", s.bevel);

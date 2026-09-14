@@ -318,4 +318,34 @@ CullBounds entityCullBounds(const Scene& scene, const Entity& entity, float padF
     return out;
 }
 
+
+std::vector<std::string> danglingMaterialPrograms(const Scene& scene) {
+    const auto carried = [&](const std::string& name) {
+        return std::any_of(scene.materialPrograms.begin(), scene.materialPrograms.end(),
+                           [&](const MaterialProgram& p) { return p.name == name; });
+    };
+    std::vector<std::string> out;
+    const auto note = [&](const std::string& name) {
+        if (name.empty() || carried(name)) {
+            return;
+        }
+        // Water surfaces find their settings by program name (ADR-099), so a name that matches a
+        // water is doing its job and is not dangling.
+        if (std::any_of(scene.waters.begin(), scene.waters.end(),
+                        [&](const WaterSurface& w) { return w.program == name; })) {
+            return;
+        }
+        out.push_back(name);
+    };
+    for (const Entity& e : scene.entities) {
+        note(e.material.program);
+    }
+    for (const ProceduralGeometry& p : scene.procedurals) {
+        note(p.material.program);
+    }
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    return out;
+}
+
 } // namespace avgen::scene

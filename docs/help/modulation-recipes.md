@@ -52,9 +52,9 @@ For a kick on the beat rather than a continuous sweep, use `beat.pulse` with `en
 `linear fall` and `fall/s` around 4.
 
 > [!NOTE]
-> If the camera is being driven by the timeline — after **Camera ▸ Direct to Music**, or from a
+> If the camera is being driven by the timeline — after **Camera ▸ Enable Auto-director**, or from a
 > sequence — your route writes a value the timeline replaces on the next frame and the camera will
-> not move. Use **Camera ▸ Hand Camera Back to the Viewport** first.
+> not move. Use **Camera ▸ Disable Auto-director** first.
 
 ## 3. A kick, not every hit
 

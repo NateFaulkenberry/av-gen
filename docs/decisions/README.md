@@ -165,3 +165,9 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [160](ADR-160-the-distance-ladder-is-authored-and-there-are-two-of-them.md) | The distance ladder is authored, all four rungs of it — and there are two ladders | Accepted |
 | [161](ADR-161-root-motion-is-not-in-this-content-and-foot-slip-is-what-was-missing.md) | Root motion is not in this content, and foot slip is the thing that was missing | Accepted |
 | [162](ADR-162-a-walker-off-the-navigable-set-cannot-be-steered-back-onto-it.md) | A walker that steps off the navigable set cannot be steered back onto it | Accepted |
+| [170](ADR-170-the-gpu-lock-does-not-establish-exclusivity.md) | The GPU lock serialises agents, not the device, and a timing taken beside an open window is not evidence | Accepted |
+| [171](ADR-171-glowmere-valley-is-two-scenes-and-the-named-one-is-the-wrong-one.md) | "Glowmere Valley" names two scenes, and the successor is built on the one that is not called that | Accepted |
+| [172](ADR-172-an-aesthetic-score-component-is-a-band-not-a-maximum.md) | An aesthetic score component is a band, never a maximum | Accepted |
+| [173](ADR-173-the-candidate-sampler-is-sobol-and-the-experiment-that-would-overturn-it.md) | The mushroom candidate sampler is a Sobol sequence, and the experiment that would overturn it is named | Accepted |
+| [174](ADR-174-vegetation-is-banded-on-height-above-water.md) | Vegetation is banded on height above the water table, and the cap thins instead of truncating | Accepted |
+| [175](ADR-175-a-searched-organism-is-a-parameter-vector-the-scene-owns.md) | A searched organism is a parameter vector the scene owns, not geometry the generator kept | Accepted |

@@ -38,8 +38,8 @@ Three menus. Everything else in AV Gen is a panel control.
 
 | Entry | Does | Disabled when |
 |---|---|---|
-| Direct to Music | fold the track into sections and cut the camera between the world's heroes | there is no analysed audio |
-| Hand Camera Back to the Viewport | remove the camera's automation | the camera is not automated |
+| Enable Auto-director | fold the track into sections and cut the camera between the world's heroes | there is no analysed audio |
+| Disable Auto-director | remove the camera's automation | the camera is not automated |
 
 Both are explained in [Directing the camera](help://sequencer/camera-direction). Each shows its
 reason in a tooltip while disabled, rather than being hidden — a menu item that is absent looks like

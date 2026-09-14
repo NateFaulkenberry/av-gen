@@ -128,8 +128,8 @@ TEST_CASE("Heroes and a structure make a valid sequence", "[director][camera]") 
 TEST_CASE("Directing is deterministic", "[director][camera]") {
     const auto heroes = threeHeroes();
     const auto structure = sevenSections();
-    auto a = app::directHeroes(heroes, structure, 7u);
-    auto b = app::directHeroes(heroes, structure, 7u);
+    auto a = app::directHeroes(heroes, structure, app::AutoDirectorSettings{.seed = 7u});
+    auto b = app::directHeroes(heroes, structure, app::AutoDirectorSettings{.seed = 7u});
     REQUIRE(a.has_value());
     REQUIRE(b.has_value());
     REQUIRE(a->shots.size() == b->shots.size());
@@ -952,9 +952,25 @@ TEST_CASE("A directed shot's aim follows the hero it was cut for", "[director][c
 
     const double inside = (shot.startSeconds + shot.endSeconds) * 0.5;
     const glm::vec3 before = aimAt(inside);
-    // The bake aims a subject-holding shot at the subject, so this is the claim the follow is built
-    // on: at the moment of the cut the offset is zero and the aim is already the hero.
-    CHECK(glm::length(before - subject.position) < 0.5f);
+    // The bake aims a subject-holding shot so the subject lands where the composition asked, which
+    // since `CompositionProfile::framing` and `headroom` were wired is deliberately not dead centre.
+    // This used to check the aim *equalled* the subject, which was true only while those two fields
+    // were read by nothing.
+    //
+    // What the follow is actually built on is that the offset is a *framing* offset: it lies in the
+    // image plane, so it is perpendicular to the line from the eye to the subject, and it is small
+    // compared to the stand-off. Both still hold, and neither depends on the aim being centred.
+    const glm::vec3 eye = engine.composition()->scene().camera.position;
+    const glm::vec3 toSubject = subject.position - eye;
+    const glm::vec3 offset = before - subject.position;
+    CHECK(glm::length(offset) < glm::length(toSubject) * 0.35f);
+    // Not exactly perpendicular, and the reason is the bake rather than the framing: the aim is
+    // sampled eight times per shot and linearly interpolated, and the eye read here comes from the
+    // same interpolation at a slightly different point on its own curve. Measured at 0.163 -- about
+    // nine degrees off the image plane, which is interpolation between samples and not a framing
+    // that has drifted along the view axis. Bounded rather than pinned, because pinning it would be
+    // asserting the sample count.
+    CHECK(std::fabs(glm::dot(glm::normalize(offset), glm::normalize(toSubject))) < 0.30f);
 
     // The hero walks. Nothing else changes -- no re-cut, no new keys.
     const std::vector<float> keysBefore = [&] {
@@ -1071,4 +1087,79 @@ TEST_CASE("The aim-follow table round-trips with the project", "[director][camer
     std::filesystem::remove(path);
     std::filesystem::remove(bare);
 #endif
+}
+
+// ---- the Auto-director's settings (section 9) --------------------------------------------------
+
+TEST_CASE("Auto-director settings reach the film, and refuse what they cannot mean", "[director][autodirector]") {
+    const auto heroes = threeHeroes();
+    const auto structure = sevenSections();
+
+    SECTION("shot-length bounds change the cut") {
+        app::AutoDirectorSettings shortShots;
+        shortShots.maxShotSeconds = 6.0;
+        shortShots.minShotSeconds = 2.0;
+        shortShots.minBuildShotSeconds = 1.0;
+        app::AutoDirectorSettings longShots;
+        longShots.maxShotSeconds = 60.0;
+        const auto many = app::directHeroes(heroes, structure, shortShots);
+        const auto few = app::directHeroes(heroes, structure, longShots);
+        REQUIRE(many.has_value());
+        REQUIRE(few.has_value());
+        // A shorter ceiling splits long passages into more shots. If this ever stops being true the
+        // control has stopped doing anything, which is the failure the brief forbids.
+        REQUIRE(many->shots.size() > few->shots.size());
+    }
+
+    SECTION("the mode changes the film and the seed changes the edit") {
+        app::AutoDirectorSettings take;
+        take.mode = app::DirectorMode::ContinuousShot;
+        app::AutoDirectorSettings cut = take;
+        cut.mode = app::DirectorMode::EditedSequence;
+        const auto a = app::directHeroes(heroes, structure, take);
+        const auto b = app::directHeroes(heroes, structure, cut);
+        REQUIRE(a.has_value());
+        REQUIRE(b.has_value());
+        REQUIRE(a->shots[1].startPosition.has_value());
+        REQUIRE_FALSE(b->shots[1].startPosition.has_value());
+
+        app::AutoDirectorSettings other = take;
+        other.seed = 99u;
+        const auto c = app::directHeroes(heroes, structure, other);
+        REQUIRE(c.has_value());
+        bool castDiffers = false;
+        for (std::size_t i = 0; i < a->shots.size() && i < c->shots.size(); ++i) {
+            if (a->shots[i].subject.name != c->shots[i].subject.name) {
+                castDiffers = true;
+            }
+        }
+        REQUIRE(castDiffers);
+    }
+
+    SECTION("the wide lens reaches the baked keys") {
+        app::AutoDirectorSettings wide;
+        wide.wideFocalLength = 14.0f;
+        const auto seq = app::directHeroes(heroes, structure, wide);
+        REQUIRE(seq.has_value());
+        bool sawIt = false;
+        for (const app::Shot& s : seq->shots) {
+            if (std::fabs(s.composition.focalLength - 14.0f) < 0.01f) {
+                sawIt = true;
+            }
+        }
+        REQUIRE(sawIt);
+    }
+
+    SECTION("settings that cannot mean anything are refused rather than clamped") {
+        REQUIRE(app::AutoDirectorSettings{}.validate().has_value());
+        app::AutoDirectorSettings bad;
+        bad.maxShotSeconds = 1.0; // shorter than the minimum
+        REQUIRE_FALSE(bad.validate().has_value());
+        app::AutoDirectorSettings lens;
+        lens.wideFocalLength = 90.0f; // a "wide" longer than the hero lens
+        REQUIRE_FALSE(lens.validate().has_value());
+        app::AutoDirectorSettings zero;
+        zero.minShotSeconds = 0.0;
+        REQUIRE_FALSE(zero.validate().has_value());
+    }
 }

@@ -62,6 +62,70 @@ constexpr float kSensorHalfHeightMm = 12.0f;
 // "the hero is a speck", not "the hero could be bigger".
 constexpr float kMinHeroCoverage = 0.06f;
 
+// The sensor the shot's framing is reckoned against. `kSensorHalfHeightMm` already existed for
+// coverage; the width is its partner, and 36x24 is the same full-frame sensor the engine's own lens
+// defaults to.
+constexpr float kSensorHalfWidthMm = 18.0f;
+
+// Where the camera must aim so the subject lands where the composition asked for it.
+//
+// `CompositionProfile::framing` and `headroom` were authored, serialised and read by nothing for as
+// long as they have existed -- a pair of controls that looked like composition and were dead. This is
+// what they mean: `framing` is the subject's normalised offset from centre, and `headroom` is extra
+// space *above* it, which is the same thing as sitting it lower in frame.
+//
+// Aiming at the subject puts it dead centre, so to put it somewhere else the aim moves the *other*
+// way by the screen offset projected back out to the subject's distance. Dead centre is the
+// composition nobody chose, which is why the default is off it.
+glm::vec3 framedAim(const Shot& shot, glm::vec3 camera, glm::vec3 subject) {
+    const float nx = shot.composition.framing.x;
+    const float ny = shot.composition.framing.y - shot.composition.headroom;
+    if (std::fabs(nx) < 1e-5f && std::fabs(ny) < 1e-5f) {
+        return subject; // asked for dead centre, and a shot may
+    }
+    if (glm::length(subject - camera) < 1e-4f) {
+        return subject;
+    }
+    const float f = std::max(shot.composition.focalLength, 1e-3f);
+    const float tanX = nx * (kSensorHalfWidthMm / f);
+    const float tanY = ny * (kSensorHalfHeightMm / f);
+
+    // Six steps. `Composition::applyFraming` takes three and says three converge well inside a pixel,
+    // which is true for its geometry; this offset is larger (0.22 of frame width plus headroom) and
+    // converges more slowly. Measured: one step leaves 0.0065 of frame height, three leaves 0.0014 --
+    // about 1.5 px at 1080 -- and six leaves it below a tenth of that. The step count was raised
+    // because the test asked for it, rather than the tolerance being loosened to accept three.
+    glm::vec3 aim = subject;
+    for (int step = 0; step < 6; ++step) {
+        glm::vec3 forward = aim - camera;
+        if (glm::dot(forward, forward) < 1e-8f) {
+            break;
+        }
+        forward = glm::normalize(forward);
+        glm::vec3 right = glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f));
+        if (glm::dot(right, right) < 1e-8f) {
+            // Looking straight up or down: no horizon to reckon a horizontal against, so the offset
+            // is applied in world X/Z. Deterministic rather than correct, for the same reason the
+            // clearance field's on-axis fallback is.
+            right = glm::vec3(1.0f, 0.0f, 0.0f);
+        } else {
+            right = glm::normalize(right);
+        }
+        const glm::vec3 up = glm::normalize(glm::cross(right, forward));
+        // Scaled by the subject's *depth along the view axis*, not by its straight-line distance.
+        // A perspective divide is by z, so using the distance overstates the offset by 1/cos of the
+        // off-axis angle -- which is a fixed point the iteration converges to and never leaves. Six
+        // steps of the wrong formula gave the same 0.00143 residual as three, which is what said the
+        // problem was the formula rather than the convergence.
+        const float z = glm::dot(subject - camera, forward);
+        if (z < 1e-4f) {
+            break;
+        }
+        aim = subject - right * (tanX * z) - up * (tanY * z);
+    }
+    return aim;
+}
+
 // Smoothstep on whichever ends asked for it. A move that eases at both ends is the default because
 // constant velocity between two points is the one thing that always reads as a machine.
 float ease(float t, bool in, bool out) {
@@ -196,6 +260,26 @@ glm::vec3 bowOffset(const Shot& s, const glm::vec3& from, const glm::vec3& to, f
 }
 } // namespace
 
+const char* directorModeName(DirectorMode mode) {
+    switch (mode) {
+    case DirectorMode::ContinuousShot:
+        return "continuous";
+    case DirectorMode::EditedSequence:
+        return "edited";
+    }
+    return "continuous";
+}
+
+std::optional<DirectorMode> directorModeFromName(std::string_view name) {
+    if (name == "continuous" || name == "continuous-shot") {
+        return DirectorMode::ContinuousShot;
+    }
+    if (name == "edited" || name == "edited-sequence") {
+        return DirectorMode::EditedSequence;
+    }
+    return std::nullopt;
+}
+
 const char* shotKindName(ShotKind k) {
     for (const auto& [kind, name] : kShotNames) {
         if (kind == k) {
@@ -295,9 +379,9 @@ glm::vec3 Shot::targetAt(float t) const {
     const float e = ease(t, easeIn, easeOut);
     switch (lookMode()) {
     case LookMode::Subject:
-        return subject.position;
+        return framedAim(*this, cameraAt(t), subject.position);
     case LookMode::Fixed:
-        return lookAt;
+        return framedAim(*this, cameraAt(t), lookAt);
     case LookMode::Parallel: {
         // The aim direction is frozen at whatever it was on the first frame, so the camera
         // translates and the world slides across it. Panning to hold something during a lateral
@@ -310,7 +394,8 @@ glm::vec3 Shot::targetAt(float t) const {
         // already drifting on the first frame means the first subject is never actually held, and
         // the shot reads as an error instead of as leaving one thing to find another.
         const float s = std::clamp((e - 0.25f) / 0.5f, 0.0f, 1.0f);
-        return subject.position + (to - subject.position) * (s * s * (3.0f - 2.0f * s));
+        const glm::vec3 held = subject.position + (to - subject.position) * (s * s * (3.0f - 2.0f * s));
+        return framedAim(*this, cameraAt(t), held);
     }
     case LookMode::Ahead:
         break;
@@ -1100,6 +1185,22 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
         shot.endDistance = d.endDistance;
         shot.startElevation = d.startElevation;
         shot.endElevation = d.endElevation;
+        // A subject with an opinion about the angle it reads from shifts both ends by the same
+        // amount, so the kind's own sweep survives: a reveal that rises through its shot still
+        // rises, it just does so around the angle the subject asked for. Same shape as
+        // `preferredDistance` being a bound on the radii rather than a replacement for them.
+        if (shot.subject.preferredElevationDegrees != 0.0f) {
+            // Degrees in, ratio out. `startElevation` is a height as a multiple of the orbit radius,
+            // so the subject's angle becomes its tangent -- and is clamped well short of vertical,
+            // where the tangent runs away and a camera directly overhead has no horizon to compose
+            // against.
+            const float wanted =
+                std::tan(glm::radians(std::clamp(shot.subject.preferredElevationDegrees, -60.0f, 60.0f)));
+            const float mid = (shot.startElevation + shot.endElevation) * 0.5f;
+            const float shift = wanted - mid;
+            shot.startElevation += shift;
+            shot.endElevation += shift;
+        }
         // The golden angle, so consecutive shots approach from unrelated directions and the film is
         // not nine views down the same axis. A multiple of a right angle would have every third
         // shot repeat the first one's geometry, which reads as the camera going back on itself.
@@ -1136,7 +1237,7 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
         // happened, as well as forcing the quiet shot to sprint in from wherever the last loud one
         // finished. Slow and close cannot be reached at a run.
         const bool carryOn = sectionKind != MusicalSection::Breakdown;
-        if (brief.continuous && carryOn && !seq.shots.empty()) {
+        if (brief.continuous() && carryOn && !seq.shots.empty()) {
             // The reference camera "never orbits, never zooms, and holds its final pose" (audit
             // 1.4), and section 8 lists that restraint among the things not to change. Pinning each
             // shot's start to the last one's end makes the sequence one unbroken move whose
@@ -1150,6 +1251,14 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
                 shot.curve = MovementCurve::Arc;
                 shot.curveBow = 0.10f;
             }
+            // And the part pinning the position never did. `ease` is a smoothstep on whichever ends
+            // ask for it, and both ends ask by default -- so every shot arrived at its boundary at
+            // zero velocity and left the next one from zero. The camera stopped dead at every
+            // section boundary and accelerated away again, which is a cut performed without a frame
+            // of black. In a continuous take the interior joins do not ease: this shot does not ramp
+            // in and the one it continues from does not ramp out.
+            shot.easeIn = false;
+            seq.shots.back().easeOut = false;
         }
         seq.shots.push_back(std::move(shot));
     }

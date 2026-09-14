@@ -1,0 +1,2593 @@
+{
+ "app": {
+  "name": "avgen",
+  "version": "0.1.0"
+ },
+ "assets": {
+  "audio": {
+   "path": "../../assets/audio/glowmere-valley.wav",
+   "sha256": "8270e5247ccb30578d5383580cf1e960640a46a578173a986df5e9bf33c01f64",
+   "size": 17280044
+  },
+  "scene": {
+   "kind": "composition",
+   "path": "glowmere-valley-2.scene.json"
+  }
+ },
+ "control": {
+  "midi": {
+   "bindings": [],
+   "enabled": true,
+   "filter": "*"
+  },
+  "osc": {
+   "bind": "0.0.0.0",
+   "bindings": [],
+   "direct": true,
+   "enabled": true,
+   "feedback": false,
+   "feedbackHost": "",
+   "feedbackPort": 9001,
+   "port": 9000,
+   "prefix": "/avgen"
+  },
+  "phraseBars": 4,
+  "sectionPhrases": 4,
+  "tempoSource": "analysis"
+ },
+ "format": "avgen-project",
+ "parameters": {
+  "audio/inputGain": 1.0,
+  "camera/distance": 1000.0,
+  "camera/exposure/aperture": 5.599999904632568,
+  "camera/exposure/compensation": -1.2999999523162842,
+  "camera/exposure/iso": 400.0,
+  "camera/exposure/maxEv": 16.0,
+  "camera/exposure/meterCenterWeight": 0.6000000238418579,
+  "camera/exposure/minEv": -4.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/shutterSeconds": 0.019999999552965164,
+  "camera/exposure/speedDown": 1.0,
+  "camera/exposure/speedUp": 3.0,
+  "camera/focus/mode": 0,
+  "camera/focus/point": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "camera/focus/speed": 0.0,
+  "camera/fov": 40.0,
+  "camera/height": 211.62457275390625,
+  "camera/lens/aperture": 4.0,
+  "camera/lens/focalLength": 30.0,
+  "camera/lens/focusDistance": 38.0,
+  "camera/lens/sensorHeight": 24.0,
+  "camera/lens/sensorWidth": 36.0,
+  "camera/lens/shutterAngle": 172.0,
+  "camera/lens/useExplicitFov": true,
+  "camera/lookAhead": 2.0,
+  "camera/mode": 1,
+  "camera/orbitSpeed": 0.0,
+  "camera/position": [
+   -118.0,
+   32.1,
+   -96.0
+  ],
+  "camera/splineOffset": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "camera/splineT": 0.0,
+  "camera/target": [
+   -20.0,
+   4.0,
+   40.0
+  ],
+  "env/intensity": 2.4149999618530273,
+  "env/rotation": -0.5680000185966492,
+  "env/sky/background": true,
+  "env/sky/enabled": true,
+  "env/sky/groundColor": [
+   0.0012000000569969416,
+   0.002099999925121665,
+   0.005799999926239252
+  ],
+  "env/sky/haze": 0.23999999463558197,
+  "env/sky/horizonColor": [
+   0.03999999910593033,
+   0.07999999821186066,
+   0.17000000178813934
+  ],
+  "env/sky/intensity": 1.0,
+  "env/sky/sunColor": [
+   0.6499999761581421,
+   0.800000011920929,
+   1.0
+  ],
+  "env/sky/sunGlow": 0.07999999821186066,
+  "env/sky/sunIntensity": 6.0,
+  "env/sky/sunSize": 0.01600000075995922,
+  "env/sky/zenithColor": [
+   0.00800000037997961,
+   0.01600000075995922,
+   0.04800000041723251
+  ],
+  "lightrig/GlowmereValley/ambientColor": [
+   0.3799999952316284,
+   0.5,
+   0.6399999856948853
+  ],
+  "lightrig/GlowmereValley/ambientIntensity": 0.6000000238418579,
+  "lightrig/GlowmereValley/ambientTemperature": 8200.0,
+  "lightrig/GlowmereValley/elder-practical/azimuth": 0.0,
+  "lightrig/GlowmereValley/elder-practical/distance": 0.20000000298023224,
+  "lightrig/GlowmereValley/elder-practical/elevation": -90.0,
+  "lightrig/GlowmereValley/elder-practical/intensity": 3.0,
+  "lightrig/GlowmereValley/elder-practical/shadowStrength": 1.0,
+  "lightrig/GlowmereValley/elder-practical/size": 0.5,
+  "lightrig/GlowmereValley/elder-practical/temperature": 6500.0,
+  "lightrig/GlowmereValley/keyIntensity": 4.5,
+  "lightrig/GlowmereValley/moon/azimuth": 64.0,
+  "lightrig/GlowmereValley/moon/distance": 2.5,
+  "lightrig/GlowmereValley/moon/elevation": 22.0,
+  "lightrig/GlowmereValley/moon/intensity": 1.0,
+  "lightrig/GlowmereValley/moon/shadowStrength": 0.8500000238418579,
+  "lightrig/GlowmereValley/moon/size": 0.5,
+  "lightrig/GlowmereValley/moon/temperature": 7800.0,
+  "lightrig/GlowmereValley/skyfill/azimuth": -108.0,
+  "lightrig/GlowmereValley/skyfill/distance": 2.5,
+  "lightrig/GlowmereValley/skyfill/elevation": 34.0,
+  "lightrig/GlowmereValley/skyfill/intensity": 0.3499999940395355,
+  "lightrig/GlowmereValley/skyfill/shadowStrength": 1.0,
+  "lightrig/GlowmereValley/skyfill/size": 0.5,
+  "lightrig/GlowmereValley/skyfill/temperature": 9500.0,
+  "material/bushGlow/emissionIntensity": 1.0,
+  "material/bushGlow/op/1/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/1/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/1/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/1/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/1/enabled": true,
+  "material/bushGlow/op/1/value": 1.0,
+  "material/bushGlow/op/10/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/10/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/10/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/10/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/10/enabled": true,
+  "material/bushGlow/op/10/value": 1.0,
+  "material/bushGlow/op/11/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/11/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/11/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/11/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/11/enabled": true,
+  "material/bushGlow/op/11/value": 1.0,
+  "material/bushGlow/op/12/constant": [
+   0.550000011920929,
+   0.14000000059604645,
+   1.0,
+   1.0
+  ],
+  "material/bushGlow/op/12/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/12/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/12/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/12/enabled": true,
+  "material/bushGlow/op/12/value": 1.0,
+  "material/bushGlow/op/13/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/13/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/13/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/13/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/13/enabled": true,
+  "material/bushGlow/op/13/value": 1.0,
+  "material/bushGlow/op/14/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/14/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/14/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/14/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/14/enabled": true,
+  "material/bushGlow/op/14/value": 1.0,
+  "material/bushGlow/op/2/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/2/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/2/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/2/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/2/enabled": true,
+  "material/bushGlow/op/2/value": 1.0,
+  "material/bushGlow/op/3/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/3/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/3/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/3/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/3/enabled": true,
+  "material/bushGlow/op/3/value": 1.0,
+  "material/bushGlow/op/4/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/4/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/4/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/4/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/4/enabled": true,
+  "material/bushGlow/op/4/value": 1.0,
+  "material/bushGlow/op/5/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/5/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/5/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/5/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/5/enabled": true,
+  "material/bushGlow/op/5/value": 11.0,
+  "material/bushGlow/op/6/constant": [
+   0.2199999988079071,
+   0.019999999552965164,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/6/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/6/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/6/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/6/enabled": true,
+  "material/bushGlow/op/6/value": 1.0,
+  "material/bushGlow/op/7/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/7/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/7/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/7/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/7/enabled": true,
+  "material/bushGlow/op/7/value": 1.0,
+  "material/bushGlow/op/8/constant": [
+   90.0,
+   220.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/8/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/8/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/8/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/8/enabled": true,
+  "material/bushGlow/op/8/value": 1.0,
+  "material/bushGlow/op/9/constant": [
+   0.03500000014901161,
+   0.03500000014901161,
+   0.03500000014901161,
+   0.03500000014901161
+  ],
+  "material/bushGlow/op/9/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/9/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/9/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/bushGlow/op/9/enabled": true,
+  "material/bushGlow/op/9/value": 1.0,
+  "material/glowmereTissue/emissionIntensity": 2.0,
+  "material/glowmereTissue/op/1/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/1/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/1/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/1/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/1/enabled": true,
+  "material/glowmereTissue/op/1/value": 1.0,
+  "material/glowmereTissue/op/10/constant": [
+   0.07999999821186066,
+   0.949999988079071,
+   0.5299999713897705,
+   1.0
+  ],
+  "material/glowmereTissue/op/10/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/10/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/10/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/10/enabled": true,
+  "material/glowmereTissue/op/10/value": 1.0,
+  "material/glowmereTissue/op/11/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/11/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/11/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/11/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/11/enabled": true,
+  "material/glowmereTissue/op/11/value": 1.0,
+  "material/glowmereTissue/op/12/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/12/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/12/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/12/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/12/enabled": true,
+  "material/glowmereTissue/op/12/value": 1.0,
+  "material/glowmereTissue/op/13/constant": [
+   0.019999999552965164,
+   0.05000000074505806,
+   0.029999999329447746,
+   1.0
+  ],
+  "material/glowmereTissue/op/13/constant2": [
+   0.2199999988079071,
+   0.44999998807907104,
+   0.1599999964237213,
+   1.0
+  ],
+  "material/glowmereTissue/op/13/constant3": [
+   0.8999999761581421,
+   1.0,
+   0.6499999761581421,
+   1.0
+  ],
+  "material/glowmereTissue/op/13/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/13/enabled": true,
+  "material/glowmereTissue/op/13/value": 1.0,
+  "material/glowmereTissue/op/14/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/14/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/14/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/14/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/14/enabled": true,
+  "material/glowmereTissue/op/14/value": 1.0,
+  "material/glowmereTissue/op/2/constant": [
+   0.0,
+   -0.8500000238418579,
+   0.0,
+   0.11999999731779099
+  ],
+  "material/glowmereTissue/op/2/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/2/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/2/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/2/enabled": true,
+  "material/glowmereTissue/op/2/value": 1.0,
+  "material/glowmereTissue/op/3/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/3/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/3/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/3/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/3/enabled": true,
+  "material/glowmereTissue/op/3/value": 3.5,
+  "material/glowmereTissue/op/4/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/4/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/4/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/4/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/4/enabled": true,
+  "material/glowmereTissue/op/4/value": 0.1599999964237213,
+  "material/glowmereTissue/op/5/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/5/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/5/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/5/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/5/enabled": true,
+  "material/glowmereTissue/op/5/value": 1.0,
+  "material/glowmereTissue/op/6/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/6/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/6/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/6/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/6/enabled": true,
+  "material/glowmereTissue/op/6/value": 6.0,
+  "material/glowmereTissue/op/7/constant": [
+   0.012000000104308128,
+   0.06499999761581421,
+   0.04600000008940697,
+   1.0
+  ],
+  "material/glowmereTissue/op/7/constant2": [
+   0.07999999821186066,
+   0.2199999988079071,
+   0.15000000596046448,
+   1.0
+  ],
+  "material/glowmereTissue/op/7/constant3": [
+   0.23999999463558197,
+   0.3400000035762787,
+   0.20000000298023224,
+   1.0
+  ],
+  "material/glowmereTissue/op/7/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/7/enabled": true,
+  "material/glowmereTissue/op/7/value": 1.0,
+  "material/glowmereTissue/op/8/constant": [
+   0.0,
+   1.0,
+   0.30000001192092896,
+   0.6499999761581421
+  ],
+  "material/glowmereTissue/op/8/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/8/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/8/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/8/enabled": true,
+  "material/glowmereTissue/op/8/value": 1.0,
+  "material/glowmereTissue/op/9/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/9/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/9/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/9/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/glowmereTissue/op/9/enabled": true,
+  "material/glowmereTissue/op/9/value": 1.0,
+  "material/paintedCrown/emissionIntensity": 1.7000000476837158,
+  "material/paintedCrown/op/1/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/1/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/1/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/1/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/1/enabled": true,
+  "material/paintedCrown/op/1/value": 1.0,
+  "material/paintedCrown/op/10/constant": [
+   0.5,
+   0.5,
+   0.5,
+   1.0
+  ],
+  "material/paintedCrown/op/10/constant2": [
+   0.5,
+   0.5,
+   0.5,
+   0.0
+  ],
+  "material/paintedCrown/op/10/constant3": [
+   38.0,
+   38.0,
+   38.0,
+   0.0
+  ],
+  "material/paintedCrown/op/10/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/10/enabled": true,
+  "material/paintedCrown/op/10/value": 1.0,
+  "material/paintedCrown/op/11/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/11/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/11/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/11/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/11/enabled": true,
+  "material/paintedCrown/op/11/value": 3.0,
+  "material/paintedCrown/op/12/constant": [
+   0.0,
+   1.0,
+   0.10000000149011612,
+   1.0
+  ],
+  "material/paintedCrown/op/12/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/12/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/12/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/12/enabled": true,
+  "material/paintedCrown/op/12/value": 1.0,
+  "material/paintedCrown/op/13/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/13/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/13/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/13/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/13/enabled": true,
+  "material/paintedCrown/op/13/value": 1.0,
+  "material/paintedCrown/op/14/constant": [
+   0.0,
+   1.0,
+   0.25,
+   1.0
+  ],
+  "material/paintedCrown/op/14/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/14/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/14/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/14/enabled": true,
+  "material/paintedCrown/op/14/value": 1.0,
+  "material/paintedCrown/op/15/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/15/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/15/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/15/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/15/enabled": true,
+  "material/paintedCrown/op/15/value": 1.0,
+  "material/paintedCrown/op/16/constant": [
+   1.0,
+   0.3799999952316284,
+   0.10000000149011612,
+   1.0
+  ],
+  "material/paintedCrown/op/16/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/16/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/16/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/16/enabled": true,
+  "material/paintedCrown/op/16/value": 1.0,
+  "material/paintedCrown/op/17/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/17/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/17/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/17/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/17/enabled": true,
+  "material/paintedCrown/op/17/value": 1.0,
+  "material/paintedCrown/op/2/constant": [
+   0.0,
+   -0.8500000238418579,
+   0.0,
+   0.14000000059604645
+  ],
+  "material/paintedCrown/op/2/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/2/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/2/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/2/enabled": true,
+  "material/paintedCrown/op/2/value": 1.0,
+  "material/paintedCrown/op/3/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/3/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/3/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/3/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/3/enabled": true,
+  "material/paintedCrown/op/3/value": 1.0,
+  "material/paintedCrown/op/4/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/4/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/4/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/4/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/4/enabled": true,
+  "material/paintedCrown/op/4/value": 1.399999976158142,
+  "material/paintedCrown/op/5/constant": [
+   0.10000000149011612,
+   0.03500000014901161,
+   0.1899999976158142,
+   1.0
+  ],
+  "material/paintedCrown/op/5/constant2": [
+   0.3100000023841858,
+   0.09000000357627869,
+   0.36000001430511475,
+   1.0
+  ],
+  "material/paintedCrown/op/5/constant3": [
+   0.5600000023841858,
+   0.20000000298023224,
+   0.41999998688697815,
+   1.0
+  ],
+  "material/paintedCrown/op/5/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/5/enabled": true,
+  "material/paintedCrown/op/5/value": 1.0,
+  "material/paintedCrown/op/6/constant": [
+   0.0,
+   1.0,
+   0.3799999952316284,
+   0.6800000071525574
+  ],
+  "material/paintedCrown/op/6/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/6/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/6/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/6/enabled": true,
+  "material/paintedCrown/op/6/value": 1.0,
+  "material/paintedCrown/op/7/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/7/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/7/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/7/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/7/enabled": true,
+  "material/paintedCrown/op/7/value": 1.0,
+  "material/paintedCrown/op/8/constant": [
+   0.0,
+   1.0,
+   -0.017999999225139618,
+   0.017999999225139618
+  ],
+  "material/paintedCrown/op/8/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/8/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/8/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/8/enabled": true,
+  "material/paintedCrown/op/8/value": 1.0,
+  "material/paintedCrown/op/9/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/9/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/9/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/9/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedCrown/op/9/enabled": true,
+  "material/paintedCrown/op/9/value": 1.0,
+  "material/paintedFrond/emissionIntensity": 0.15000000596046448,
+  "material/paintedFrond/op/1/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/1/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/1/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/1/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/1/enabled": true,
+  "material/paintedFrond/op/1/value": 1.0,
+  "material/paintedFrond/op/2/constant": [
+   0.0,
+   1.2000000476837158,
+   0.0,
+   0.10000000149011612
+  ],
+  "material/paintedFrond/op/2/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/2/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/2/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/2/enabled": true,
+  "material/paintedFrond/op/2/value": 1.0,
+  "material/paintedFrond/op/3/constant": [
+   0.03500000014901161,
+   0.17000000178813934,
+   0.1899999976158142,
+   1.0
+  ],
+  "material/paintedFrond/op/3/constant2": [
+   0.07999999821186066,
+   0.41999998688697815,
+   0.3799999952316284,
+   1.0
+  ],
+  "material/paintedFrond/op/3/constant3": [
+   0.3499999940395355,
+   0.75,
+   0.5899999737739563,
+   1.0
+  ],
+  "material/paintedFrond/op/3/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/3/enabled": true,
+  "material/paintedFrond/op/3/value": 1.0,
+  "material/paintedFrond/op/4/constant": [
+   0.03999999910593033,
+   0.2800000011920929,
+   0.2199999988079071,
+   1.0
+  ],
+  "material/paintedFrond/op/4/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/4/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/4/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/4/enabled": true,
+  "material/paintedFrond/op/4/value": 1.0,
+  "material/paintedFrond/op/5/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/5/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/5/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/5/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedFrond/op/5/enabled": true,
+  "material/paintedFrond/op/5/value": 1.0,
+  "material/paintedGround/emissionIntensity": 1.0,
+  "material/paintedGround/op/1/constant": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedGround/op/1/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedGround/op/1/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedGround/op/1/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedGround/op/1/enabled": true,
+  "material/paintedGround/op/1/value": 1.0,
+  "material/paintedGround/op/2/constant": [
+   0.020999999716877937,
+   0.06300000101327896,
+   0.07559999823570251,
+   1.0
+  ],
+  "material/paintedGround/op/2/constant2": [
+   0.04619999974966049,
+   0.09239999949932098,
+   0.10499999672174454,
+   1.0
+  ],
+  "material/paintedGround/op/2/constant3": [
+   0.08820000290870667,
+   0.10499999672174454,
+   0.15119999647140503,
+   1.0
+  ],
+  "material/paintedGround/op/2/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedGround/op/2/enabled": true,
+  "material/paintedGround/op/2/value": 1.0,
+  "material/paintedGround/op/3/constant": [
+   0.949999988079071,
+   0.949999988079071,
+   0.949999988079071,
+   1.0
+  ],
+  "material/paintedGround/op/3/constant2": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedGround/op/3/constant3": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedGround/op/3/constant4": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "material/paintedGround/op/3/enabled": true,
+  "material/paintedGround/op/3/value": 1.0,
+  "nodes/foreground-leaves/emissiveBoost": 1.0,
+  "nodes/foreground-leaves/position": [
+   -92.0,
+   18.3,
+   -58.0
+  ],
+  "nodes/foreground-leaves/rotation": [
+   0.0,
+   -0.0,
+   0.0
+  ],
+  "nodes/foreground-leaves/roughnessScale": 1.0,
+  "nodes/foreground-leaves/scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "nodes/foreground-leaves/visible": true,
+  "nodes/spores/emissiveBoost": 1.0,
+  "nodes/spores/position": [
+   -20.0,
+   8.0,
+   20.0
+  ],
+  "nodes/spores/rotation": [
+   0.0,
+   -0.0,
+   0.0
+  ],
+  "nodes/spores/roughnessScale": 1.0,
+  "nodes/spores/scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "nodes/spores/visible": true,
+  "nodes/valley/emissiveBoost": 1.0,
+  "nodes/valley/position": [
+   0,
+   0,
+   0
+  ],
+  "nodes/valley/rotation": [
+   0.0,
+   -0.0,
+   0.0
+  ],
+  "nodes/valley/roughnessScale": 1.0,
+  "nodes/valley/scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "nodes/valley/terrainCull": true,
+  "nodes/valley/terrainLod": true,
+  "nodes/valley/terrainLodDistance": 70.0,
+  "nodes/valley/terrainViewDistance": 520.0,
+  "nodes/valley/visible": true,
+  "particles/spores/attractorPosition": [
+   0.0,
+   1.0,
+   0.0
+  ],
+  "particles/spores/attractorStrength": 0.0,
+  "particles/spores/burst": 0.0,
+  "particles/spores/colorEnd": [
+   1.0,
+   1.0,
+   1.0,
+   0.0
+  ],
+  "particles/spores/colorStart": [
+   1.0,
+   1.0,
+   1.0,
+   0.550000011920929
+  ],
+  "particles/spores/drag": 0.20000000298023224,
+  "particles/spores/emissive": 1.7999999523162842,
+  "particles/spores/enabled": true,
+  "particles/spores/extent": 1.0,
+  "particles/spores/gravity": [
+   0.019999999552965164,
+   0.012000000104308128,
+   0.0
+  ],
+  "particles/spores/lifetime": 1.0,
+  "particles/spores/orbit": 0.0,
+  "particles/spores/position": [
+   4.0,
+   1.0,
+   -42.0
+  ],
+  "particles/spores/size": 1.0,
+  "particles/spores/spawnRate": 300.0,
+  "particles/spores/speed": 1.0,
+  "particles/spores/spread": 1.0,
+  "particles/spores/stretch": 0.0,
+  "particles/spores/trailWidth": 1.0,
+  "particles/spores/turbulence": 0.800000011920929,
+  "particles/spores/turbulenceScale": 1.0,
+  "particles/spores/turbulenceSpeed": 0.30000001192092896,
+  "post/anamorphic/enabled": true,
+  "post/anamorphic/ghosts": 0.22300000488758087,
+  "post/anamorphic/intensity": 0.4699999988079071,
+  "post/anamorphic/stretch": 10.38599967956543,
+  "post/anamorphic/tint": [
+   0.3499999940395355,
+   0.550000011920929,
+   1.0
+  ],
+  "post/bloom/emissionWeight": 0.75,
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.18000000715255737,
+  "post/bloom/knee": 0.5,
+  "post/bloom/radius": 1.149999976158142,
+  "post/bloom/threshold": 1.0,
+  "post/dof/enabled": false,
+  "post/dof/focusDistance": 6.0,
+  "post/dof/focusRange": 2.0,
+  "post/dof/maxRadius": 8.0,
+  "post/dof/physical": false,
+  "post/grade/contrast": 1.3960000276565552,
+  "post/grade/gain": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "post/grade/gamma": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "post/grade/hueShift": 0.0,
+  "post/grade/lift": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "post/grade/saturation": 1.11899995803833,
+  "post/grade/temperature": 0.0,
+  "post/grade/tint": 0.0,
+  "post/halation/enabled": false,
+  "post/halation/intensity": 0.5,
+  "post/halation/radius": 2.0,
+  "post/halation/threshold": 2.0,
+  "post/halation/tint": [
+   1.0,
+   0.30000001192092896,
+   0.11999999731779099
+  ],
+  "post/halation/warmth": 0.6000000238418579,
+  "post/lens/chromaticAberration": 0.0,
+  "post/lens/distortion": 0.0,
+  "post/motionBlur/amount": 0.0,
+  "post/output/antialias": 0.75,
+  "post/output/grain": 0.0,
+  "post/output/sharpen": 0.0,
+  "post/output/sharpenId": 0,
+  "post/output/vignette": 0.18000000715255737,
+  "post/tonemap/chroma-retention": 0.6000000238418579,
+  "post/tonemap/operator": 1,
+  "procedural/foreground-leaves/distribution/alignToSpline": true,
+  "procedural/foreground-leaves/distribution/center": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/distribution/count": 32,
+  "procedural/foreground-leaves/distribution/end": [
+   5.0,
+   0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/distribution/endAngle": 6.2831854820251465,
+  "procedural/foreground-leaves/distribution/gridCountX": 4,
+  "procedural/foreground-leaves/distribution/gridCountY": 1,
+  "procedural/foreground-leaves/distribution/gridCountZ": 4,
+  "procedural/foreground-leaves/distribution/gridSpacing": [
+   2.0,
+   2.0,
+   2.0
+  ],
+  "procedural/foreground-leaves/distribution/kind": 0,
+  "procedural/foreground-leaves/distribution/orientAlong": false,
+  "procedural/foreground-leaves/distribution/orientation": 1,
+  "procedural/foreground-leaves/distribution/plane": 0,
+  "procedural/foreground-leaves/distribution/radius": 6.0,
+  "procedural/foreground-leaves/distribution/radiusGrowth": 0.0,
+  "procedural/foreground-leaves/distribution/roll": 0.0,
+  "procedural/foreground-leaves/distribution/spacing": 0.0,
+  "procedural/foreground-leaves/distribution/spiralAngle": 0.0,
+  "procedural/foreground-leaves/distribution/spiralHeight": 8.0,
+  "procedural/foreground-leaves/distribution/splineEnd": 1.0,
+  "procedural/foreground-leaves/distribution/splineOffset": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/distribution/splineStart": 0.0,
+  "procedural/foreground-leaves/distribution/start": [
+   -5.0,
+   0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/distribution/startAngle": 0.0,
+  "procedural/foreground-leaves/distribution/turns": 3.0,
+  "procedural/foreground-leaves/emissiveFieldAmount": 0.0,
+  "procedural/foreground-leaves/hierarchy/depth": 0,
+  "procedural/foreground-leaves/hierarchy/offsetPerLevel": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/hierarchy/rotationPerLevel": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/hierarchy/scalePerLevel": 0.5,
+  "procedural/foreground-leaves/lod/distance1": 0.0,
+  "procedural/foreground-leaves/lod/distance2": 0.0,
+  "procedural/foreground-leaves/lod/distance3": 0.0,
+  "procedural/foreground-leaves/lod/enabled": false,
+  "procedural/foreground-leaves/lod/maxDistance": 0.0,
+  "procedural/foreground-leaves/lod/minScreenRadius": 0.0,
+  "procedural/foreground-leaves/material/baseColor": [
+   0.3499999940395355,
+   0.6499999761581421,
+   0.550000011920929
+  ],
+  "procedural/foreground-leaves/material/emissive": 0.03999999910593033,
+  "procedural/foreground-leaves/material/emissiveColor": [
+   0.03999999910593033,
+   0.2199999988079071,
+   0.11999999731779099
+  ],
+  "procedural/foreground-leaves/material/metallic": 0.0,
+  "procedural/foreground-leaves/material/roughness": 0.47999998927116394,
+  "procedural/foreground-leaves/materialVariation/emissiveGradient": 0.0,
+  "procedural/foreground-leaves/materialVariation/emissiveRandom": 0.0,
+  "procedural/foreground-leaves/materialVariation/hueGradient": 0.0,
+  "procedural/foreground-leaves/materialVariation/hueShift": 0.0,
+  "procedural/foreground-leaves/materialVariation/valueRandom": 0.0,
+  "procedural/foreground-leaves/source/bevel": 0.0,
+  "procedural/foreground-leaves/source/bevelSegments": 3,
+  "procedural/foreground-leaves/source/caps": true,
+  "procedural/foreground-leaves/source/height": 2.0,
+  "procedural/foreground-leaves/source/heightSegments": 1,
+  "procedural/foreground-leaves/source/kind": 7,
+  "procedural/foreground-leaves/source/majorRadius": 1.0,
+  "procedural/foreground-leaves/source/majorSegments": 48,
+  "procedural/foreground-leaves/source/minorRadius": 0.25,
+  "procedural/foreground-leaves/source/minorSegments": 16,
+  "procedural/foreground-leaves/source/pointSize": 0.05000000074505806,
+  "procedural/foreground-leaves/source/position": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/source/radialSegments": 24,
+  "procedural/foreground-leaves/source/radius": 0.5,
+  "procedural/foreground-leaves/source/rings": 16,
+  "procedural/foreground-leaves/source/rotation": [
+   0.0,
+   -0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/source/scale": [
+   2.0,
+   2.4000000953674316,
+   2.0
+  ],
+  "procedural/foreground-leaves/source/segments": 32,
+  "procedural/foreground-leaves/source/size": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "procedural/foreground-leaves/source/subdivisions": 1,
+  "procedural/foreground-leaves/transform/position": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/transform/rotation": [
+   0.0,
+   -0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/transform/scale": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "procedural/foreground-leaves/variation/position": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/variation/rotation": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/variation/scale": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "procedural/foreground-leaves/variation/seed": 12345,
+  "procedural/foreground-leaves/variation/uniformScale": 0.0,
+  "procedural/foreground-leaves/visible": true,
+  "procedural/visitor/parts/0/roughnessScale": 1.0,
+  "procedural/visitor/parts/0/tint": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "procedural/visitor/parts/1/emissiveColor": [
+   0.45,
+   1.0,
+   1.55
+  ],
+  "procedural/visitor/parts/1/emissiveGain": 0.8,
+  "procedural/visitor/parts/1/roughnessScale": 1.25,
+  "procedural/visitor/parts/2/roughnessScale": 1.45,
+  "procedural/visitor/parts/2/tint": [
+   0.5,
+   0.52,
+   0.6
+  ],
+  "procedural/visitor/parts/3/emissiveColor": [
+   0.12,
+   0.45,
+   1.85
+  ],
+  "procedural/visitor/parts/3/emissiveGain": 0.65,
+  "procedural/visitor/parts/3/roughnessScale": 0.7,
+  "root/impulse": 0.0,
+  "root/rotationSpeed": 0.0,
+  "root/scale": 1.0,
+  "scene/brightness": 1.0,
+  "scene/fogColor": [
+   0.10000000149011612,
+   0.18000000715255737,
+   0.3199999928474426
+  ],
+  "scene/fogDensity": 0.005499999970197678,
+  "scene/fogHeight": 4.0,
+  "scene/fogHeightFalloff": 0.10000000149011612,
+  "scene/gridIntensity": 0.6000000238418579,
+  "scene/keyLight": 1.0,
+  "scene/styledGroundAmbient": [
+   0.00800000037997961,
+   0.010999999940395355,
+   0.024000000208616257
+  ],
+  "scene/styledSkyAmbient": [
+   0.10000000149011612,
+   0.1599999964237213,
+   0.20999999344348907
+  ],
+  "scene/stylized": true,
+  "scene/volumeAbsorption": 0.4000000059604645,
+  "scene/volumeAnisotropy": 0.11999999731779099,
+  "scene/volumeDensity": 0.006000000052154064,
+  "scene/volumeEmission": 0.0,
+  "scene/volumeNoise": 0.0,
+  "scene/volumeNoiseScale": 0.019999999552965164,
+  "scene/volumeNoiseSpeed": 0.10000000149011612,
+  "scene/volumeScattering": 0.5,
+  "scene/volumeSteps": 12,
+  "scene/windDirection": 0.6200000047683716,
+  "scene/windSpeed": 0.7400000095367432
+ },
+ "presets": [],
+ "render": {
+  "backend": "auto",
+  "codec": "h264",
+  "encoderThreads": 0,
+  "end": -1.0,
+  "fps": 30.0,
+  "height": 1080,
+  "muxAudio": true,
+  "output": "sequence",
+  "path": "renders/glowmere",
+  "pattern": "frame_{:06d}.png",
+  "quality": 80,
+  "start": 0.0,
+  "width": 1920
+ },
+ "routes": [
+  {
+   "amount": 0.1599999964237213,
+   "chain": {
+    "attackMs": 1200.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 3000.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "audio.bass",
+   "target": "material/glowmere2Cap/emissionIntensity"
+  },
+  {
+   "amount": 24.0,
+   "chain": {
+    "attackMs": 600.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 2000.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "audio.treble",
+   "target": "particles/spores/spawnRate"
+  },
+  {
+   "amount": 0.09000000357627869,
+   "chain": {
+    "attackMs": 25.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 240.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.beat",
+   "target": "material/glowmereTissue/emissionIntensity"
+  },
+  {
+   "amount": 0.2199999988079071,
+   "chain": {
+    "attackMs": 12.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 900.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.impact",
+   "target": "material/glowmereTissue/emissionIntensity"
+  },
+  {
+   "amount": 0.10000000149011612,
+   "chain": {
+    "attackMs": 45.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 620.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.downbeat",
+   "target": "nodes/elder-2-gills/emissiveBoost"
+  },
+  {
+   "amount": 0.30000001192092896,
+   "chain": {
+    "attackMs": 60.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 900.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.downbeat",
+   "target": "lightrig/GlowmereValley/elder-practical/intensity"
+  },
+  {
+   "amount": 0.18000000715255737,
+   "chain": {
+    "attackMs": 1400.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 3600.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.phrase",
+   "target": "particles/spores/turbulence"
+  },
+  {
+   "amount": 0.05999999865889549,
+   "chain": {
+    "attackMs": 2200.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 6000.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.section",
+   "target": "nodes/elder-2-cap/emissiveBoost"
+  },
+  {
+   "amount": 0.18000000715255737,
+   "chain": {
+    "attackMs": 2400.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 2800.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.build",
+   "target": "scene/windSpeed"
+  },
+  {
+   "amount": 70.0,
+   "chain": {
+    "attackMs": 2600.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 2400.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.build",
+   "target": "particles/spores/spawnRate"
+  },
+  {
+   "amount": -0.20000000298023224,
+   "chain": {
+    "attackMs": 1500.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 3000.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.break",
+   "target": "scene/windSpeed"
+  },
+  {
+   "amount": -80.0,
+   "chain": {
+    "attackMs": 1400.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 3000.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.break",
+   "target": "particles/spores/spawnRate"
+  },
+  {
+   "amount": 0.18000000715255737,
+   "chain": {
+    "attackMs": 70.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 2200.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.drop",
+   "target": "nodes/elder-2-gills/emissiveBoost"
+  },
+  {
+   "amount": 220.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.drop",
+   "target": "particles/spores/burst"
+  },
+  {
+   "amount": 0.09000000357627869,
+   "chain": {
+    "attackMs": 250.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 1800.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.drop",
+   "target": "scene/volumeScattering"
+  },
+  {
+   "amount": 1.3,
+   "chain": {
+    "attackMs": 90.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 900.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "audio.bass",
+   "target": "nodes/valley/water/glow"
+  },
+  {
+   "amount": 0.3,
+   "chain": {
+    "attackMs": 120.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 1100.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "audio.bass",
+   "target": "nodes/valley/water/ripple"
+  },
+  {
+   "amount": 0.055,
+   "chain": {
+    "attackMs": 18.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 420.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "music.beat",
+   "target": "nodes/valley/water/swell"
+  },
+  {
+   "amount": 0.85,
+   "chain": {
+    "attackMs": 14.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "audio.treble",
+   "target": "nodes/valley/water/sparkle"
+  },
+  {
+   "amount": 0.45,
+   "chain": {
+    "attackMs": 450.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 1800.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "audio.rms",
+   "target": "nodes/valley/water/foam"
+  },
+  {
+   "amount": 70.0,
+   "chain": {
+    "attackMs": 140.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 1400.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "audio.bass",
+   "target": "particles/river-motes/spawnRate"
+  },
+  {
+   "amount": 1.6,
+   "chain": {
+    "attackMs": 30.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 420.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "audio.treble",
+   "target": "particles/river-motes/emissive"
+  }
+ ],
+ "shaders": [],
+ "sources": [
+  {
+   "kind": "control",
+   "name": "control",
+   "settings": {
+    "channels": []
+   }
+  }
+ ],
+ "version": 4
+}

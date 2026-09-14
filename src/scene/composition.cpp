@@ -3761,6 +3761,19 @@ void Composition::rebuild() {
               scene_.procedurals.size(),
               std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - rebuildStart)
                   .count());
+    // A material program that nothing carries is skipped silently and the surface keeps its authored
+    // material, which is indistinguishable from a program that ran and did nothing. Said out loud
+    // once per rebuild (ADR-176's dangling-name rule): it costs a string compare per material and it
+    // is the difference between finding a typo now and finding it in a render.
+    if (const std::vector<std::string> dangling = danglingMaterialPrograms(scene_); !dangling.empty()) {
+        std::string names;
+        for (const std::string& n : dangling) {
+            names += names.empty() ? n : ", " + n;
+        }
+        log::warn("composition '{}': {} material program(s) named by a surface and not carried by the "
+                  "scene: {} -- those surfaces keep their authored material and no program runs",
+                  name_, dangling.size(), names);
+    }
     dirty_ = false;
 }
 

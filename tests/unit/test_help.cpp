@@ -458,7 +458,7 @@ TEST_CASE("The source scan finds the application's real panels, commands and key
         return c.menuPath == "File > Open Audio...";
     }));
     CHECK(std::ranges::any_of(surface.commands, [](const help::AppCommand& c) {
-        return c.menuPath == "Camera > Direct to Music";
+        return c.menuPath == "Camera > Enable Auto-director";
     }));
     // The View menu is generated from the panel registry, so its entries are collected from there.
     CHECK(std::ranges::any_of(surface.commands, [](const help::AppCommand& c) {

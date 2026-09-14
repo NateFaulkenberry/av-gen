@@ -1,6 +1,12 @@
-# The camera director
+# The Auto-director
 
-What "Direct to Music" does, what it can be relied on for, and where it stops. Written against the
+(Renamed from "the camera director" and "Direct to Music" in the Glowmere Valley 2 work,
+`docs/glowmere-valley-2/12-phase-8.md`. The internal identifiers -- `app::DirectorState`,
+`camera_director.cpp` -- deliberately keep their names: three unrelated things in this codebase are
+called a director, and a rename that reached into `app::WorldDirector`, `seq::Director` and
+`entity::Authority::Director` would be a worse outcome than the old name.)
+
+What "Enable Auto-director" does, what it can be relied on for, and where it stops. Written against the
 code as of 2026-09-12; the decisions behind it are ADR-062, ADR-071, ADR-072, ADR-075, ADR-080 and
 ADR-104 to ADR-107.
 

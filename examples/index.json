@@ -1,11 +1,11 @@
 {
  "examples": [
-    {
-     "name": "Renderer QA",
-     "category": "Lab",
-     "description": "A deliberately difficult renderer test scene with near/far/behind-camera geometry, a skinned alien, transparency and particles.",
-     "project": "qa/renderer-qa.json"
-    },
+  {
+   "name": "Renderer QA",
+   "category": "Lab",
+   "description": "A deliberately difficult renderer test scene with near/far/behind-camera geometry, a skinned alien, transparency and particles.",
+   "project": "qa/renderer-qa.json"
+  },
   {
    "name": "Night Shift",
    "category": "Showcase",
@@ -17,6 +17,12 @@
    "category": "Showcase",
    "description": "A particle sculpture that performs its own score. Three logarithmic spiral arms authored as splines, carried by a differentially rotating field around a hot core; an onset launches a radial wave that crosses the sculpture at 19 m/s, so a beat reaches the rim a second and a half after the centre. 190,000 particles, no C++.",
    "project": "constellation/constellation.json"
+  },
+  {
+   "name": "Glowmere Valley 2",
+   "category": "Showcase",
+   "description": "The successor valley: a river that enters at one edge of the map, meanders 700 m down a descending course and leaves at the opposite edge, with the terrain shaped against it rather than around it. Same palette, same moon, same emission ladder as the painterly scene; new geography, and the three heroes that were a torus, a tube and nine spheres are gone.",
+   "project": "world/glowmere-valley-2.json"
   },
   {
    "name": "Glowmere Valley - Painterly",

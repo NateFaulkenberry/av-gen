@@ -2,7 +2,7 @@
 id: sequencer/camera-direction
 title: Directing the Camera to Music
 category: Sequencer
-summary: What "Direct to Music" does, the shot vocabulary it draws on, and how to get the camera back.
+summary: What "Enable Auto-director" does, the shot vocabulary it draws on, and how to get the camera back.
 order: 45
 tags: camera, director, shots, music, structure, drop
 keywords: direct to music; automatic camera; camera wont move; hand camera back; cinematic camera; camera automation
@@ -12,7 +12,7 @@ features: command.camera.direct, command.camera.hand-back
 
 # Directing the Camera to Music
 
-**Camera ▸ Direct to Music** folds the loaded track into musical sections and cuts the camera
+**Camera ▸ Enable Auto-director** folds the loaded track into musical sections and cuts the camera
 between the world's heroes, landing a reveal on the drop.
 
 It is disabled without analysed audio — the camera is cut to the track's structure, so there has to
@@ -73,7 +73,7 @@ There is no camera shake anywhere in AV Gen, deliberately.
 
 ## Getting the camera back
 
-**Camera ▸ Hand Camera Back to the Viewport** removes the camera's automation.
+**Camera ▸ Disable Auto-director** removes the camera's automation.
 
 This exists because of what automation does. While the timeline drives the camera, a viewport drag
 writes a value the timeline replaces on the next frame — so the mouse appears to do nothing. The

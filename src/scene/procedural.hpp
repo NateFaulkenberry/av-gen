@@ -26,6 +26,7 @@
 #include "spatial/field.hpp"
 #include "spatial/spline.hpp"
 
+#include <functional>
 #include <memory>
 #include "spatial/point_cloud.hpp"
 #include "spatial/spatial_ops.hpp"
@@ -54,9 +55,57 @@ namespace avgen::scene {
 // source mesh is used and its cloud is composed under each of this object's placements
 // (hierarchical instancing, ADR-029). The referenced object may itself reference another
 // (depth <= kMaxHierarchyDepth; cycles are rejected by validate through the scene).
-enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point, Procedural, Tube, Mesh };
+// Appended only, never reordered: the enum's integer value is written into `structuralHash` and its
+// name into every scene file.
+enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point, Procedural, Tube, Mesh, Generated };
 [[nodiscard]] const char* primitiveKindName(PrimitiveKind kind);
 [[nodiscard]] std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name);
+
+// What a scene stores for one procedurally *searched* organism -- a hero mushroom, a tree -- and what
+// the world editor edits (ADR-175).
+//
+// The unit is a parameter vector with provenance, not geometry, and the ordering is the point:
+// `values` is authoritative because this engine's rule is that a parameter is authoritative and
+// `Scene` is a per-frame derivation rebuilt by `applyParameters`. An organism whose morphology lived
+// in a mesh would not survive one update, could not be keyed, modulated, undone or saved, and would
+// be a mesh blob wearing a procedural label.
+//
+// `index` is provenance rather than identity-of-record: it says which candidate of a search these
+// numbers started life as. For an untouched winner `values == search::sampleAt(schema, index)`
+// exactly; the moment an artist moves a slider the two diverge, and that is correct.
+//
+// `schemaHash` is what keeps it honest. Widen a parameter's range or reorder the schema and the hash
+// moves, so a stale record announces itself instead of silently regenerating a *different* organism
+// under the same name -- the values are positional, so a reordered schema makes every one of them
+// mean something else.
+//
+// Deliberately generic: a tree and a mushroom differ in their generator's name and schema, not in how
+// a scene stores them.
+struct GeneratedSource {
+    std::string generator;              // names a builder in the generator registry below
+    std::uint32_t generatorVersion = 1; // bumped when `build` changes what a parameter set means
+    std::uint64_t schemaHash = 0;       // 0 = unchecked (hand-authored); non-zero is enforced
+    std::uint32_t index = 0;            // provenance: the candidate these values came from
+    std::vector<float> values;          // authoritative
+
+    [[nodiscard]] Result<void> validate() const;
+    [[nodiscard]] std::uint64_t structuralHash() const;
+    [[nodiscard]] bool empty() const { return generator.empty(); }
+};
+
+// How a generated source becomes geometry. One builder per generator name, returning the mesh for
+// one part -- a mushroom's cap, stem and gills are three parts of one parameter set, the same way an
+// imported asset's materials are three parts of one file (`SourceSpec::assetPart`).
+//
+// A registry rather than a switch because the generators live above this layer: `scene` cannot know
+// about mushrooms, and a data-driven scene format has to reach code somehow. It is process-global and
+// that is a real cost -- registration order must not matter, and it does not: names are unique and a
+// second registration of the same name replaces the first, which is what a hot reload needs.
+using GeneratedMeshBuilder = std::function<Result<MeshData>(const GeneratedSource&, int part)>;
+void registerGenerator(std::string name, GeneratedMeshBuilder builder);
+[[nodiscard]] bool hasGenerator(std::string_view name);
+[[nodiscard]] std::vector<std::string> registeredGenerators();
+void clearGenerators(); // tests, and only tests
 
 struct SourceSpec {
     PrimitiveKind kind = PrimitiveKind::Cylinder;
@@ -120,6 +169,11 @@ struct SourceSpec {
     // Runtime, filled by the Composition when it resolves `asset`; never serialised, and part of
     // no hash except through `asset` and `assetPart`.
     std::shared_ptr<const MeshData> assetMesh;
+    // Generated (ADR-175). `generatedPart` selects which part of the organism this object draws, and
+    // is the exact analogue of `assetPart`: one parameter set, several meshes, one node each, so that
+    // every part is separately selectable and separately materialled in the editor.
+    GeneratedSource generated;
+    int generatedPart = 0;
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const; // changes whenever the mesh would change
