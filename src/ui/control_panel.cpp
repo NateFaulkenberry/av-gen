@@ -1100,7 +1100,12 @@ void ControlPanel::drawParameters(app::Engine& engine) {
     const bool explicitFov = readInt("camera/lens/useExplicitFov", 1) != 0;
 
     for (const std::string& group : order) {
-      const bool groupOpen = ImGui::TreeNodeEx(group.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+      // Closed by default. This panel lists every exposed parameter in the project -- Glowmere
+      // Valley 2 registers over three thousand -- and opening all of them at once gives somebody a
+      // wall to scroll rather than a set of groups to choose between. ImGui remembers each node's
+      // state per window, so a group somebody opens stays open across sessions; this only decides
+      // what an untouched group does the first time the panel is seen.
+      const bool groupOpen = ImGui::TreeNodeEx(group.c_str());
       if (!groupOpen) {
           continue;
       }
