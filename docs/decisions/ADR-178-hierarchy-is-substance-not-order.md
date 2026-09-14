@@ -1,4 +1,4 @@
-# ADR-175: A branch's tier is its substance, not its depth in the graph
+# ADR-178: A branch's tier is its substance, not its depth in the graph
 
 **Status:** Accepted
 **Date:** 2026-09-14

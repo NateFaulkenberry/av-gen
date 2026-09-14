@@ -1,4 +1,4 @@
-# ADR-174: The tree is skinned to a branch skeleton, because a per-tier wind uniform cannot hold its joints together
+# ADR-177: The tree is skinned to a branch skeleton, because a per-tier wind uniform cannot hold its joints together
 
 **Status:** Accepted
 **Date:** 2026-09-14
@@ -46,7 +46,7 @@ A skeleton has neither problem:
 - `poseToModel` composes a child's local transform onto its parent's model matrix. That **is**
   transform inheritance — §40's requirement directly, rather than an amplitude ladder that resembles
   it from a distance.
-- Inertia is a spring per joint with the audio moving its *target* (ADR-176), so §41 is the
+- Inertia is a spring per joint with the audio moving its *target* (ADR-179), so §41 is the
   integrator rather than an easing curve.
 
 ## What the budget buys, and what it does not

@@ -1,4 +1,4 @@
-# ADR-177: A search can only find what its parameterisation can express
+# ADR-180: A search can only find what its parameterisation can express
 
 **Status:** Accepted
 **Date:** 2026-09-14
@@ -67,7 +67,7 @@ it found, which reads as a survey of what is possible. It is a survey of what is
 
 Nothing in a search can detect this from the inside. The only instrument that found it was a rendered
 contact sheet and a person looking at twelve cells and noticing they were all the same shape, which
-is the standing conclusion of ADR-175 arriving from a different direction.
+is the standing conclusion of ADR-178 arriving from a different direction.
 
 ## Consequences
 

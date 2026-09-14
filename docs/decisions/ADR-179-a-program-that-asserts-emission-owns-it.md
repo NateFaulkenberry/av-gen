@@ -1,4 +1,4 @@
-# ADR-176: A material program that asserts emission owns the whole emission contract
+# ADR-179: A material program that asserts emission owns the whole emission contract
 
 **Status:** Accepted
 **Date:** 2026-09-14

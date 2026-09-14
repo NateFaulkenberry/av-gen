@@ -162,8 +162,8 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [157](ADR-157-a-depth-derived-quantity-needs-the-axis-and-the-filter.md) | A number derived from the depth buffer needs the axis correction and the filter | Accepted |
 | [158](ADR-158-a-directed-shot-aims-at-its-hero-and-nothing-else-follows.md) | A directed shot's aim follows its hero, and nothing else follows | Accepted |
 | [159](ADR-159-no-tap-may-step-further-than-the-texel-it-reads.md) | No tap may step further than the texel of the texture it reads | Accepted |
-| [170](ADR-170-a-tree-needs-an-internal-economy.md) | Space colonization decides where a tree grows; apical control decides how much | Accepted |
-| [174](ADR-174-the-tree-is-skinned-not-bent.md) | The tree is skinned to a branch skeleton, because a per-tier wind uniform cannot hold its joints together | Accepted |
-| [175](ADR-175-hierarchy-is-substance-not-order.md) | A branch's tier is its substance, not its depth in the graph | Accepted |
-| [176](ADR-176-a-program-that-asserts-emission-owns-it.md) | A material program that asserts emission owns the whole emission contract | Accepted |
-| [177](ADR-177-a-search-finds-only-what-its-parameterisation-expresses.md) | A search can only find what its parameterisation can express | Accepted |
+| [176](ADR-176-a-tree-needs-an-internal-economy.md) | Space colonization decides where a tree grows; apical control decides how much | Accepted |
+| [177](ADR-177-the-tree-is-skinned-not-bent.md) | The tree is skinned to a branch skeleton, because a per-tier wind uniform cannot hold its joints together | Accepted |
+| [178](ADR-178-hierarchy-is-substance-not-order.md) | A branch's tier is its substance, not its depth in the graph | Accepted |
+| [179](ADR-179-a-program-that-asserts-emission-owns-it.md) | A material program that asserts emission owns the whole emission contract | Accepted |
+| [180](ADR-180-a-search-finds-only-what-its-parameterisation-expresses.md) | A search can only find what its parameterisation can express | Accepted |

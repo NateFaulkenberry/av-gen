@@ -1,4 +1,4 @@
-# ADR-170: Space colonization decides where a tree grows; apical control decides how much
+# ADR-176: Space colonization decides where a tree grows; apical control decides how much
 
 **Status:** Accepted
 **Date:** 2026-09-14

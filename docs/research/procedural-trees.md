@@ -2,8 +2,9 @@
 
 Status: **sections 1 to 3 are the original proposal, kept as written.** Phases 4 to 10 are built;
 §7 below records where the proposal was right, where it was wrong, and what the build found that no
-amount of proposing would have. Decision ADRs are 170, 174, 175, 176 and 177 — numbered clear of two
-concurrent agents, and 174 is known to collide with a different ADR-174 on the Glowmere branch.
+amount of proposing would have. Decision ADRs are 176 through 180. They were written as 170, 174,
+175, 176 and 177 while this ran alongside two other agents, and renumbered on merge: the Glowmere
+Valley 2 work had taken 170-175, including its own ADR-174 about vegetation banding.
 
 The proposal is deliberately not edited to match the outcome. A design document rewritten after the
 fact to look prescient is worth nothing to the next person, and three of the most useful findings
@@ -446,13 +447,13 @@ Not known, and not roundable:
 
 - **`wind::VegetationMotion` was named as the animation system and cannot be used.** Six meshes each
   bent about their own base separate at every joint between them. The tree is skinned to a 239-joint
-  branch skeleton instead. ADR-174.
+  branch skeleton instead. ADR-177.
 - **Axis order was assumed to be the semantic tier.** It is not: a tree whose trunk forks early
   reported `primaryCount = 2` for a crown showing a dozen radial limbs, and the evaluator ranked the
   best-looking tree in the population eleventh of twelve. Tier is now substance relative to the
-  trunk. ADR-175.
+  trunk. ADR-178.
 - **The crown envelope was a surface of revolution**, so no search inside it could produce an
-  asymmetric crown at any population size. ADR-177, and the most generalisable finding here.
+  asymmetric crown at any population size. ADR-180, and the most generalisable finding here.
 - **"Foliage clusters at terminal branch tips"** (§2.7) makes a shell with limbs poking through it.
   Clumps hang at the ends of *axes*, with a Poisson-disc spacing rule.
 
@@ -472,7 +473,7 @@ one, not beside it.
 
 And one suspicion that was **tested and refuted**: `silhouetteComplexity` was not blind to limb
 structure. Measured over 24 candidates, the full silhouette's quotient varies *more* relatively
-(sd/mean 0.651) than the branch-only one (0.342). Recorded in ADR-175 as a worked negative, because a
+(sd/mean 0.651) than the branch-only one (0.342). Recorded in ADR-178 as a worked negative, because a
 pattern with a name gets over-applied.
 
 ### 7.4 Measured, as built
