@@ -952,9 +952,25 @@ TEST_CASE("A directed shot's aim follows the hero it was cut for", "[director][c
 
     const double inside = (shot.startSeconds + shot.endSeconds) * 0.5;
     const glm::vec3 before = aimAt(inside);
-    // The bake aims a subject-holding shot at the subject, so this is the claim the follow is built
-    // on: at the moment of the cut the offset is zero and the aim is already the hero.
-    CHECK(glm::length(before - subject.position) < 0.5f);
+    // The bake aims a subject-holding shot so the subject lands where the composition asked, which
+    // since `CompositionProfile::framing` and `headroom` were wired is deliberately not dead centre.
+    // This used to check the aim *equalled* the subject, which was true only while those two fields
+    // were read by nothing.
+    //
+    // What the follow is actually built on is that the offset is a *framing* offset: it lies in the
+    // image plane, so it is perpendicular to the line from the eye to the subject, and it is small
+    // compared to the stand-off. Both still hold, and neither depends on the aim being centred.
+    const glm::vec3 eye = engine.composition()->scene().camera.position;
+    const glm::vec3 toSubject = subject.position - eye;
+    const glm::vec3 offset = before - subject.position;
+    CHECK(glm::length(offset) < glm::length(toSubject) * 0.35f);
+    // Not exactly perpendicular, and the reason is the bake rather than the framing: the aim is
+    // sampled eight times per shot and linearly interpolated, and the eye read here comes from the
+    // same interpolation at a slightly different point on its own curve. Measured at 0.163 -- about
+    // nine degrees off the image plane, which is interpolation between samples and not a framing
+    // that has drifted along the view axis. Bounded rather than pinned, because pinning it would be
+    // asserting the sample count.
+    CHECK(std::fabs(glm::dot(glm::normalize(offset), glm::normalize(toSubject))) < 0.30f);
 
     // The hero walks. Nothing else changes -- no re-cut, no new keys.
     const std::vector<float> keysBefore = [&] {

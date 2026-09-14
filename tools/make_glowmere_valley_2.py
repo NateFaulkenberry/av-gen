@@ -287,7 +287,12 @@ ts["shadowDistance"] = 150.0
 progs = d.setdefault("materialPrograms", [])
 # `paintedGround` is no longer named by anything in this scene -- `paintedGround2` replaced it -- and
 # there are only eight program slots, so carrying an unreferenced one costs a slot the heroes need.
-progs = [p for p in progs if "glowmere-painted-ground" not in p]
+# Carried and used by nothing: `paintedGround` was replaced in Phase 2, and `paintedCrown` and
+# `bushGlow` lost their last surface when the old elder left and the heroes got their own programs.
+# There are eight program slots and an unused one costs a slot the heroes need.
+progs = [p for p in progs
+         if not any(dead in p for dead in ("glowmere-painted-ground", "glowmere-painted-crown",
+                                           "bush-glow"))]
 for extra in ("../materials/glowmere2-painted-ground.material.json",
               "../materials/glowmere2-tissue.material.json",
               "../materials/glowmere2-cap.material.json"):
@@ -597,7 +602,13 @@ for hi, (hname, hx, hy, hz, hheight, hyaw) in enumerate(HERO_SITES):
 ELDER = {"elder-crown", "elder-stem", "elder-filaments"}
 d["nodes"] = [n for n in d["nodes"] if n.get("name") not in ELDER]
 d["nodes"].extend(hero_nodes)
-d["heroes"] = [h for h in d["heroes"] if h.get("name") not in ELDER] + hero_points
+# Sorted by importance, descending. ADR-072's contract is that heroes arrive pre-ranked and
+# `briefFromHeroes` takes the first as the film's *subject* -- the one that gets the builds and the
+# drops. Appending the new heroes after the survivors left the UFO (0.68) ahead of the elder (0.95),
+# which would have made the Auto-director cut a film about the spacecraft. Caught by a test asserting
+# the contract rather than by watching a film with the wrong subject.
+d["heroes"] = sorted([h for h in d["heroes"] if h.get("name") not in ELDER] + hero_points,
+                     key=lambda h: -h["importance"])
 
 for e in d.get("entities", []):
     for b in e.get("behaviors", []):
@@ -640,6 +651,11 @@ params["camera/mode"] = 1
 REPOINT = {
     "nodes/elder-crown/emissiveBoost": "nodes/elder-2-cap/emissiveBoost",
     "nodes/elder-filaments/emissiveBoost": "nodes/elder-2-gills/emissiveBoost",
+    # The bass route drove `paintedCrown`, which was the old elder's cap program. The heroes use
+    # `glowmere2Cap` now and nothing in this scene draws with `paintedCrown` at all -- so the route
+    # bound successfully (the program is still *carried*) and modulated a program no surface uses.
+    # Inert, and invisibly so: the dangling-name check cannot see this, because the name resolves.
+    "material/paintedCrown/emissionIntensity": "material/glowmere2Cap/emissionIntensity",
 }
 kept = []
 for r in proj["routes"]:

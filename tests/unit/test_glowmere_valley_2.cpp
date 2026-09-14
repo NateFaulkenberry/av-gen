@@ -2,7 +2,10 @@
 // asks for -- a river that traverses the whole map and a valley you can recognise -- rather than
 // about numbers that happen to be true today.
 
+#include "app/camera_director.hpp"
+#include "app/examples.hpp"
 #include "scene/scene.hpp"
+#include "world/hero.hpp"
 #include "world/world_map.hpp"
 #include "world/terrain.hpp"
 
@@ -15,7 +18,9 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <cstring>
 #include <functional>
+#include <iterator>
 
 using namespace avgen;
 namespace fs = std::filesystem;
@@ -478,5 +483,127 @@ TEST_CASE("Glowmere Valley 2 names no material program it does not carry", "[uni
         if (n.empty()) continue;
         INFO("program '" << n << "' is named by a surface");
         REQUIRE(std::find(carried.begin(), carried.end(), n) != carried.end());
+    }
+}
+
+// ---- section 11: the example project, verified rather than assumed -----------------------------
+//
+// Phase 2 registered it. Eight phases of change later, "it is still registered" is a claim and not a
+// fact, so each clause of the brief's section 11 is checked here against the shipped files.
+
+TEST_CASE("Glowmere Valley 2 is a functional example project", "[unit][glowmere2][integration]") {
+    const fs::path examples = fs::path(AVGEN_SOURCE_DIR) / "examples";
+
+    SECTION("it appears in the examples list, through the loader the menu uses") {
+        const auto loaded = app::loadExampleIndex(examples / "index.json");
+        REQUIRE(loaded.has_value());
+        const auto it = std::find_if(loaded->begin(), loaded->end(),
+                                     [](const app::ExampleInfo& e) { return e.name == "Glowmere Valley 2"; });
+        REQUIRE(it != loaded->end());
+        REQUIRE(fs::is_regular_file(it->file));
+        REQUIRE_FALSE(it->description.empty());
+        REQUIRE(it->category == "Showcase");
+
+        // ...and it did not displace the scene it succeeds. The brief's standing requirement.
+        for (const char* kept : {"Glowmere Valley", "Glowmere Valley - Painterly",
+                                 "Glowmere Valley - Lyrics", "Glowmere Valley - Matched PBR"}) {
+            INFO(kept);
+            REQUIRE(std::any_of(loaded->begin(), loaded->end(),
+                                [&](const app::ExampleInfo& e) { return e.name == kept; }));
+        }
+    }
+
+    SECTION("its project resolves its scene, its audio and its material programs") {
+        std::ifstream in(examples / "world" / "glowmere-valley-2.json");
+        REQUIRE(in.good());
+        const nlohmann::json proj = nlohmann::json::parse(in);
+        const fs::path base = examples / "world";
+        REQUIRE(fs::is_regular_file(base / proj.at("assets").at("scene").at("path").get<std::string>()));
+        // The audio is a symlink into the main checkout and may legitimately be absent in a fresh
+        // clone, so its *reference* is checked rather than its presence.
+        REQUIRE(proj.at("assets").contains("audio"));
+        // A stale content hash on a present file is inert, but a stale one is worse than none --
+        // Phase 2 dropped the painterly scene's, and this asserts it stayed dropped.
+        REQUIRE_FALSE(proj.at("assets").at("scene").contains("sha256"));
+    }
+
+    SECTION("every route in the project names a parameter path that still exists in the scene") {
+        // The failure this catches is the one Phase 5 created and fixed by hand: a route that names a
+        // node the scene no longer has stays enabled and inert, which looks like a working
+        // modulation in the UI and does nothing.
+        std::ifstream sin(sceneFile());
+        REQUIRE(sin.good());
+        const nlohmann::json scene = nlohmann::json::parse(sin);
+        std::vector<std::string> nodes;
+        for (const nlohmann::json& n : scene.at("nodes")) {
+            nodes.push_back(n.at("name").get<std::string>());
+        }
+        std::ifstream pin(examples / "world" / "glowmere-valley-2.json");
+        const nlohmann::json proj = nlohmann::json::parse(pin);
+        int checked = 0;
+        for (const nlohmann::json& r : proj.at("routes")) {
+            const std::string target = r.at("target").get<std::string>();
+            for (const char* prefix : {"nodes/", "procedural/", "particles/"}) {
+                if (!target.starts_with(prefix)) {
+                    continue;
+                }
+                const std::string rest = target.substr(std::strlen(prefix));
+                const std::string node = rest.substr(0, rest.find('/'));
+                INFO("route target '" << target << "' names node '" << node << "'");
+                REQUIRE(std::find(nodes.begin(), nodes.end(), node) != nodes.end());
+                ++checked;
+            }
+        }
+        REQUIRE(checked > 0);
+    }
+
+    SECTION("it gives the Auto-director something to direct") {
+        std::ifstream in(sceneFile());
+        REQUIRE(in.good());
+        const nlohmann::json scene = nlohmann::json::parse(in);
+        std::vector<world::HeroPoint> heroes;
+        for (const nlohmann::json& h : scene.at("heroes")) {
+            world::HeroPoint p;
+            p.name = h.at("name").get<std::string>();
+            p.radius = h.at("radius").get<float>();
+            p.height = h.at("height").get<float>();
+            p.importance = h.at("importance").get<float>();
+            p.preferredCameraDistance = h.at("preferredCameraDistance").get<float>();
+            heroes.push_back(p);
+        }
+        // Rank order is the director's contract (ADR-072): strictly descending importance.
+        REQUIRE(heroes.size() >= 6);
+        for (std::size_t i = 1; i < heroes.size(); ++i) {
+            INFO(heroes[i - 1].name << " then " << heroes[i].name);
+            REQUIRE(heroes[i].importance < heroes[i - 1].importance);
+        }
+        const auto brief = app::briefFromHeroes(heroes);
+        REQUIRE(brief.has_value());
+        REQUIRE(brief->hero.radius > 0.0f);
+        REQUIRE_FALSE(brief->supporting.empty());
+        // And every hero names a node that exists, or the director aims at nothing.
+        std::vector<std::string> nodes;
+        for (const nlohmann::json& n : scene.at("nodes")) {
+            nodes.push_back(n.at("name").get<std::string>());
+        }
+        for (const world::HeroPoint& h : heroes) {
+            INFO("hero '" << h.name << "'");
+            REQUIRE(std::find(nodes.begin(), nodes.end(), h.name) != nodes.end());
+        }
+    }
+
+    SECTION("its configuration is one authored file, not magic numbers in the scene") {
+        // The brief's section 11 asks for documented configuration rather than numbers scattered
+        // through 45 kB of generated JSON. The generator is that file, and this asserts it is present
+        // and names the things the brief lists.
+        const fs::path tool = fs::path(AVGEN_SOURCE_DIR) / "tools" / "make_glowmere_valley_2.py";
+        REQUIRE(fs::is_regular_file(tool));
+        std::ifstream in(tool);
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        for (const char* knob : {"world[\"seed\"]", "RIVER", "HAR_BANDS", "BUDGET", "HERO_SITES",
+                                 "clearings", "CAM_EYE"}) {
+            INFO("configuration '" << knob << "'");
+            REQUIRE(text.find(knob) != std::string::npos);
+        }
     }
 }

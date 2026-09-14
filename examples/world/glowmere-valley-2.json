@@ -1946,7 +1946,7 @@
    "op": "add",
    "polarity": "unipolar",
    "source": "audio.bass",
-   "target": "material/paintedCrown/emissionIntensity"
+   "target": "material/glowmere2Cap/emissionIntensity"
   },
   {
    "amount": 24.0,

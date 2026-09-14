@@ -33,29 +33,6 @@
  },
  "heroes": [
   {
-   "name": "visitor",
-   "position": [
-    20.0,
-    28.05,
-    150.0
-   ],
-   "yaw": 0.0,
-   "scale": 1.0,
-   "radius": 8.2,
-   "height": 7.1,
-   "importance": 0.68,
-   "focalWeight": 0.5,
-   "preferredCameraDistance": 34.0,
-   "preferredCameraElevation": -4.0,
-   "activationRadius": 260.0,
-   "colorAccent": [
-    0.16,
-    0.66,
-    1.0
-   ],
-   "reactionProfile": ""
-  },
-  {
    "name": "elder-2-cap",
    "position": [
     -12.0,
@@ -146,6 +123,29 @@
     1.0
    ],
    "reactionProfile": "organism"
+  },
+  {
+   "name": "visitor",
+   "position": [
+    20.0,
+    28.05,
+    150.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 8.2,
+   "height": 7.1,
+   "importance": 0.68,
+   "focalWeight": 0.5,
+   "preferredCameraDistance": 34.0,
+   "preferredCameraElevation": -4.0,
+   "activationRadius": 260.0,
+   "colorAccent": [
+    0.16,
+    0.66,
+    1.0
+   ],
+   "reactionProfile": ""
   },
   {
    "name": "veil-cap",
@@ -4278,9 +4278,7 @@
  },
  "materialPrograms": [
   "../materials/glowmere-painted-frond.material.json",
-  "../materials/bush-glow.material.json",
   "../materials/glowmere-tissue.material.json",
-  "../materials/glowmere-painted-crown.material.json",
   "../materials/glowmere2-painted-ground.material.json",
   "../materials/glowmere2-tissue.material.json",
   "../materials/glowmere2-cap.material.json"

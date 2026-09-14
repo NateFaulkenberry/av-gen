@@ -165,6 +165,11 @@ Result<DirectionBrief> briefFromHeroes(std::span<const world::HeroPoint> heroes)
         // so the larger of the two is what a camera has to fit in frame.
         t.radius = std::max(h.radius, h.height * 0.5f);
         t.preferredDistance = h.preferredCameraDistance;
+        // `HeroPoint::preferredCameraElevationDegrees` was authored per hero and read by nothing --
+        // the third of three dead properties the panel work turned up. It is wired here rather than
+        // dropped, because "look up at this one and down into that one" is a real thing a hero has an
+        // opinion about and there was already a field for it.
+        t.preferredElevationDegrees = h.preferredCameraElevationDegrees;
         return t;
     };
 

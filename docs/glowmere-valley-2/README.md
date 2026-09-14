@@ -4,7 +4,7 @@ A successor showcase scene: a valley and river that traverse the whole map, ecol
 vegetation, six procedurally searched hero mushrooms, and an Auto-director that can hold one
 continuous shot.
 
-**Status: Phase 9 complete.** The scene exists, is listed, its
+**Status: Phase 10 complete.** The scene exists, is listed, its
 geography and its habitat field are tested, and it renders at **13.44 ms** against a 16 ms ceiling —
 parity with the scene it succeeds, on four times the readable ground. The shared candidate-search
 framework is published with its generic half implemented.
@@ -24,6 +24,7 @@ framework is published with its generic half implemented.
 | [11-phase-7.md](11-phase-7.md) | Phase 7: the dangling-name check, the upland, and why interleaving must also be counterbalanced |
 | [12-phase-8.md](12-phase-8.md) | Phase 8: the Auto-director — the rename, shot modes, the settings panel, and why the camera used to stop at every cut |
 | [13-phase-9.md](13-phase-9.md) | Phase 9: lateral clearance — an orbit that stays an orbit, and a fixture that lied |
+| [14-phase-10.md](14-phase-10.md) | Phase 10: three dead properties wired, §11 verified (and a wrong-subject bug caught), §10 audited |
 
 ## The five findings worth reading first
 

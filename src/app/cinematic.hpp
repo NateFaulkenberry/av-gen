@@ -106,6 +106,20 @@ struct FocalTarget {
     // radii rather than replacing them, so the difference between a wide shot and a close one
     // survives.
     float preferredDistance = 0.0f;
+    // The elevation this subject reads best from, in **degrees** above the horizontal. A 16 m
+    // mushroom wants to be looked up at; a pool wants to be looked down into.
+    //
+    // Note the unit, because it is a trap that was waiting inside this field the whole time it was
+    // dead: `Shot::startElevation` is **not an angle**, it is a height as a multiple of the orbit
+    // radius (`orbitPoint` computes `elevation * |r|`). Wiring the hero's degrees straight into the
+    // shot's ratio put the camera thirty-four radii in the air and the sequence failed its own
+    // "the hero is a speck" check, which is the check doing exactly its job.
+    //
+    // Honoured the way `preferredDistance` is -- as a *bias* on the kind's own elevations rather than
+    // as a replacement -- so a reveal that rises through its shot still rises, it just does so around
+    // the angle the subject asked for. 0 means the subject has no opinion, which is the same
+    // convention `preferredDistance` uses.
+    float preferredElevationDegrees = 0.0f;
 };
 
 // Where the subject sits in the frame and how the lens treats it. Thirds are the default because
