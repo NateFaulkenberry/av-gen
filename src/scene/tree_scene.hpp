@@ -23,6 +23,7 @@
 #include "scene/tree_generator.hpp"
 #include "scene/tree_mesh.hpp"
 #include "scene/tree_rig.hpp"
+#include "scene/tree_veins.hpp"
 
 #include <glm/glm.hpp>
 
@@ -42,6 +43,12 @@ struct TreeLook {
     // The life force. Teal running up the trunk, cooling and brightening outward, so the energy
     // reads as flowing toward the canopy rather than as paint.
     glm::vec3 veinColor{0.16f, 0.78f, 0.88f};
+    // The veins are a MaterialProgram now, so these are gains on ITS output: the program asserts
+    // emission and the material's own lane is discarded by the shader. See tree_veins.hpp for why
+    // that is a decision rather than an accident. The values below are only reached when the veins
+    // are switched off.
+    VeinSettings veins{};
+    bool veinsEnabled = true;
     // Very low. At 0.20 against a near-black base colour the emissive term dominated completely and
     // the whole tree -- trunk, limbs and canopy -- came out one flat teal: the bark stopped being
     // bark. A vein has to be a PATTERN on a dark surface, not a tint over the whole of it, so until

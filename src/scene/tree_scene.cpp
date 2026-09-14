@@ -58,13 +58,29 @@ Result<Scene> buildTreeScene(const TreeGraph& graph, const TreeMeshes& meshes, c
     scene.camera.lens.useExplicitFov = true;
 
     // ---- materials, one per tier.
-    const auto branchMaterial = [&look](float emissive) {
+    // The vein program, shared by every branch tier: they differ in gain, not in pattern.
+    if (look.veinsEnabled) {
+        VeinSettings veins = look.veins;
+        veins.seed = graph.params.seed;
+        veins.color = look.veinColor;
+        scene.materialPrograms.push_back(makeVeinProgram("tree.veins", veins));
+    }
+    const auto branchMaterial = [&look](float gain) {
         Material m;
         m.baseColor = look.barkColor;
         m.roughness = look.barkRoughness;
         m.metallic = 0.0f;
-        m.emissiveColor = look.veinColor;
-        m.emissiveIntensity = emissive;
+        if (look.veinsEnabled) {
+            m.program = "tree.veins";
+            // ZERO, deliberately. The program asserts emission, so anything written here is
+            // discarded by the shader -- and a value that looks authored but is never read is how
+            // an art-direction rule passes review and then does nothing.
+            m.emissiveIntensity = 0.0f;
+            m.emissiveColor = look.veinColor;
+        } else {
+            m.emissiveColor = look.veinColor;
+            m.emissiveIntensity = gain;
+        }
         return m;
     };
     addPart(scene, meshes.roots, "tree.roots", [&look] {

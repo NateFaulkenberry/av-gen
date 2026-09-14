@@ -122,6 +122,15 @@ void applyTreeLook(const TreeParameters& parameters, const TreeLook& look, Scene
     }
     const float foliage = parameters.foliageEmissive->value();
     const float veins = parameters.veinEmissive->value();
+    // The vein gain goes to the PROGRAM's intensity, not to a material's. A program that asserts
+    // emission owns the whole contract, so this is where the audio has to land for the branches --
+    // writing it to `Material::emissiveIntensity` instead would be a route that resolves, applies,
+    // and changes nothing, which is the hardest kind of dead wiring to notice.
+    for (MaterialProgram& program : scene.materialPrograms) {
+        if (program.name == "tree.veins") {
+            program.emissionIntensity = look.veins.intensity * veins;
+        }
+    }
     const float drift = parameters.foliageHueDrift->value();
     for (Entity& entity : scene.entities) {
         if (entity.name.rfind("tree.foliage", 0) == 0) {
@@ -137,7 +146,11 @@ void applyTreeLook(const TreeParameters& parameters, const TreeLook& look, Scene
             glm::vec3 c = look.foliageEmissiveTint[t];
             const float shift = drift * 0.30f;
             entity.material.emissiveColor = glm::vec3(c.r, c.g * (1.0f - shift), c.b * (1.0f + shift));
-        } else if (entity.name.rfind("tree.", 0) == 0 && entity.name != "tree.ground") {
+        } else if (entity.name.rfind("tree.", 0) == 0 && entity.name != "tree.ground" &&
+                   entity.material.program.empty()) {
+            // Only reached when the veins are switched off. With a program present the branch's
+            // emission is the program's to assert, and this must not write a value the shader will
+            // silently drop.
             const float base = entity.name == "tree.trunk"       ? look.trunkEmissive
                                : entity.name == "tree.primary"   ? look.primaryEmissive
                                : entity.name == "tree.secondary" ? look.secondaryEmissive

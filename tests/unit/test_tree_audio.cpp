@@ -3,6 +3,7 @@
 #include "scene/tree_audio.hpp"
 #include "scene/tree_generator.hpp"
 #include "scene/tree_scene.hpp"
+#include "scene/tree_veins.hpp"
 #include "search/candidate_search.hpp"
 #include "signals/signal_bus.hpp"
 
@@ -234,4 +235,94 @@ TEST_CASE("the look responds to audio without leaving the palette", "[tree][audi
         CHECK(glm::length(delta) < 0.35f);
     }
     CHECK(anyBrighter);
+}
+
+TEST_CASE("a program that asserts emission owns the whole contract", "[tree][veins]") {
+    // The rule from tree_veins.hpp, checked rather than trusted. In this engine a material program
+    // REPLACES emission (`matEmissive = vec4(program.emission, 1.0)`), so a part carrying both a
+    // program and a material emissive has an authored value nothing will ever read -- which is how
+    // an art-direction rule passes review and then quietly does nothing.
+    const search::Parameters params = search::sampleAt(treeSchema().parameters, 11);
+    const auto treeParams = treeParamsFrom(params);
+    REQUIRE(treeParams.has_value());
+    auto built = buildAnimatedTree(*treeParams);
+    REQUIRE(built.has_value());
+
+    const auto ok = verifyEmissionOwnership(built->scene);
+    INFO((ok.has_value() ? std::string{} : ok.error().message));
+    CHECK(ok.has_value());
+
+    // And the branches really are on the program while the foliage really is not: the split is what
+    // keeps phase 9's routes onto `Material::emissiveIntensity` meaningful for the canopy.
+    int branchesOnProgram = 0;
+    int foliageOffProgram = 0;
+    for (const Entity& e : built->scene.entities) {
+        if (e.name == "tree.trunk" || e.name == "tree.primary" || e.name == "tree.secondary") {
+            CHECK(e.material.program == "tree.veins");
+            ++branchesOnProgram;
+        }
+        if (e.name.rfind("tree.foliage", 0) == 0) {
+            CHECK(e.material.program.empty());
+            CHECK(e.material.emissiveIntensity > 0.0f);
+            ++foliageOffProgram;
+        }
+    }
+    CHECK(branchesOnProgram == 3);
+    CHECK(foliageOffProgram == kFoliageTints);
+}
+
+TEST_CASE("the check catches the regression it exists for", "[tree][veins]") {
+    // A negative test, because a guard nobody has seen fail is a guard nobody knows works.
+    Scene scene;
+    scene.materialPrograms.push_back(makeVeinProgram("veins", VeinSettings{}));
+    MeshData mesh;
+    mesh.vertices = {Vertex{{0, 0, 0}, {0, 1, 0}, {0, 0}}, Vertex{{1, 0, 0}, {0, 1, 0}, {1, 0}},
+                     Vertex{{0, 0, 1}, {0, 1, 0}, {0, 1}}};
+    mesh.indices = {0, 1, 2};
+    Entity& e = scene.addEntity("branch", scene.addMesh(std::move(mesh)));
+    e.material.program = "veins";
+    e.material.emissiveIntensity = 0.3f; // the mistake
+    CHECK_FALSE(verifyEmissionOwnership(scene).has_value());
+
+    e.material.emissiveIntensity = 0.0f;
+    CHECK(verifyEmissionOwnership(scene).has_value());
+
+    // A program the scene does not carry is also a failure, and for the same reason: it resolves to
+    // nothing and the surface silently keeps its authored material.
+    e.material.program = "nope";
+    CHECK_FALSE(verifyEmissionOwnership(scene).has_value());
+}
+
+TEST_CASE("audio reaches the vein program, not a dead material lane", "[tree][veins][audio]") {
+    const search::Parameters params = search::sampleAt(treeSchema().parameters, 11);
+    const auto treeParams = treeParamsFrom(params);
+    REQUIRE(treeParams.has_value());
+    auto built = buildAnimatedTree(*treeParams);
+    REQUIRE(built.has_value());
+    REQUIRE_FALSE(built->scene.materialPrograms.empty());
+
+    Harness h;
+    REQUIRE(h.modulator.bind(h.bus, h.params).has_value());
+    for (int i = 0; i < 30; ++i) {
+        h.frame();
+    }
+    applyTreeLook(h.tree, h.look, built->scene);
+    const float rest = built->scene.materialPrograms[0].emissionIntensity;
+    CHECK(rest > 0.0f);
+
+    const auto beat = h.bus.find("music.beat");
+    REQUIRE(beat.has_value());
+    h.bus.setEvent(*beat, true, 1.0f);
+    h.frame();
+    applyTreeLook(h.tree, h.look, built->scene);
+    const float pulsed = built->scene.materialPrograms[0].emissionIntensity;
+    INFO(fmt::format("vein gain rest {:.4f}, on a beat {:.4f}", rest, pulsed));
+    CHECK(pulsed > rest);
+    // And the branch materials stayed at zero throughout: the route moved the program, not a lane
+    // the shader discards.
+    for (const Entity& e : built->scene.entities) {
+        if (!e.material.program.empty()) {
+            CHECK(e.material.emissiveIntensity == 0.0f);
+        }
+    }
 }
