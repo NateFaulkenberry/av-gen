@@ -218,6 +218,39 @@ the repo already tags `[.perf]`, and neither is a defect in the code under test.
 identifies them and either tags them or makes them robust, because a suite that occasionally fails
 for environmental reasons trains people to re-run rather than read.
 
+## Priority 1: the temporal inventory, first measurements
+
+The detector is `tools/temporal_stats.py`, and its whole design is one choice. A sequence taken from
+a **static camera** needs no motion vectors and no reprojection: with the view held still, every
+frame-to-frame difference is the scene. What remains is separating animation from instability, and
+that is the **second difference in time**, `|x(t+1) - 2x(t) + x(t-1)|`. A pixel that animates moves
+smoothly and has a near-zero second difference however *fast* it moves; a pixel that shimmers
+alternates, and alternation is exactly what a second difference is large for. First differences
+cannot tell them apart — which is why "the frame changed" has never been evidence of instability.
+
+Glowmere, static camera over the river bank, 24 frames at 960x540, flicker threshold 6/255:
+
+| arm | pixels that ever flicker | share of baseline |
+|---|---:|---:|
+| everything on | 3.116% | — |
+| bloom off | 2.595% | −17% |
+| **water off** | **1.332%** | **−57%** |
+| volumetrics off | 3.218% | +3% |
+
+**Water is the dominant source of temporal instability in this view**, by a wide margin. Bloom
+amplifies rather than originates — it spreads flicker across more pixels while capping the peak.
+Volumetrics contribute nothing measurable, which is a useful negative given how often fog is blamed.
+
+Peak second difference is **315 of 255** — a pixel swinging past the full display range and back
+between adjacent frames. That is not a subtle artifact.
+
+Three caveats that the numbers do not carry. This is one camera on one scene, and the water's own
+sparkle is *band-passed in screen space*, so its contribution is a function of camera distance and
+resolution together — a different view is a different experiment. The arms became trustworthy only
+after ADR-182, and every number above was re-measured afterwards. And the flicker threshold of 6/255
+is a choice, not a constant; the ranking is stable across plausible thresholds but the percentages
+are not.
+
 ## What Phase 1 still owes
 
 - The temporal artifact inventory (§4), which needs the representative suite rendered and looked at.
