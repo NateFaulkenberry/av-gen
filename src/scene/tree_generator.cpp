@@ -359,9 +359,13 @@ const std::vector<TreeBand>& treeBands() {
     static const std::vector<TreeBand> bands = {
         {"frameFill",
          "How much of the frame the tree occupies. Too little and the hero does not dominate the "
-         "shot; too much and it is cropped and unreadable.",
+         "shot; too much and it is cropped and unreadable. Re-banded after the camera moved closer "
+         "for the monumental framing: the whole population landed inside the old band and scored "
+         "0.98 to 1.00 with a standard deviation of 0.003. The camera is part of this metric's "
+         "definition -- every silhouette number here is measured through it -- so moving it "
+         "invalidates the bands, and only the variance probe says which ones.",
          0.08f,
-         {0.07f, 0.14f, 0.30f, 0.44f}},
+         {0.13f, 0.19f, 0.26f, 0.34f}},
         {"boxFill",
          "Silhouette area over its own bounding box. This is the skinny/blob axis: below the band "
          "the tree is a wispy stick figure, above it the canopy has merged into one indistinct mass "
@@ -372,7 +376,7 @@ const std::vector<TreeBand>& treeBands() {
          "Silhouette width over height. Banded for the monumental target -- appreciably taller than "
          "it is wide, but not a pole. A 32 m tree with a 21 m crown is 0.66.",
          0.08f,
-         {0.55f, 0.72f, 1.05f, 1.30f}},
+         {0.60f, 0.72f, 0.92f, 1.12f}},
         {"balance",
          "Absolute left/right mass difference. Banded away from ZERO as well as from large values: "
          "a perfectly symmetric tree reads as manufactured, which is the controlled-asymmetry "
@@ -450,9 +454,13 @@ const std::vector<TreeBand>& treeBands() {
          {1.8f, 4.0f, 18.0f, 34.0f}},
         {"rootSpreadRatio",
          "Root reach over crown half-width. Anchors the tree visually; the upper bound stops the "
-         "roots becoming a second crown lying on the ground.",
+         "roots becoming a second crown lying on the ground. Re-banded after the roots were rebuilt "
+         "as buttresses: they now run a long way at the surface before sinking, so the whole "
+         "population sits between 1.18 and 1.70 and the old band scored every candidate ZERO -- "
+         "worse than a constant, because it dragged every total down by the same amount while "
+         "distinguishing nothing.",
          0.02f,
-         {0.22f, 0.40f, 0.80f, 1.10f}},
+         {1.00f, 1.20f, 1.50f, 1.85f}},
     };
     return bands;
 }
@@ -555,7 +563,7 @@ Result<TreeParams> treeParamsFrom(std::span<const float> v) {
     // turns one continuous canopy volume into distinct masses on distinct limbs -- the difference
     // between a hedge and an architectural tree, and the reference's defining quality.
     p.crown.coreHollow = 0.45f;
-    p.rootSpread = p.crown.radius * 0.78f;
+    p.rootSpread = p.crown.radius * 1.20f;
     p.flareHeight = std::max(p.crown.baseHeight * 0.26f, 1.2f);
     if (auto ok = p.validate(); !ok) {
         return std::unexpected(ok.error());

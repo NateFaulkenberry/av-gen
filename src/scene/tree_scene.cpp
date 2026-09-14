@@ -238,6 +238,26 @@ Result<Scene> buildTreeScene(const TreeGraph& graph, const TreeMeshes& meshes, c
     rim.volumetricStrength = 0.0f;
     scene.addLight(rim);
 
+    if (look.underIntensity > 0.0f) {
+        PunctualLight under;
+        under.name = "under";
+        under.type = PunctualLight::Type::Disk;
+        under.role = PunctualLight::Role::Practical;
+        // Under the crown, pointing up into it. Positioned from the crown's own geometry so it
+        // follows a taller or shorter tree without being re-authored.
+        under.position = glm::vec3(0.0f, graph.params.crown.baseHeight * 0.72f, 0.0f);
+        under.direction = glm::vec3(0.0f, 1.0f, 0.0f);
+        under.color = look.underColor;
+        under.intensity = look.underIntensity;
+        under.temperature = 5600.0f;
+        under.radius = graph.params.crown.radius * 0.55f;
+        under.range = graph.params.crown.radius * 3.2f;
+        under.castsShadow = false;
+        under.contactShadow = false;
+        under.volumetricStrength = 0.25f;
+        scene.addLight(under);
+    }
+
     PunctualLight fill;
     fill.name = "skyfill";
     fill.type = PunctualLight::Type::Directional;

@@ -35,6 +35,7 @@ enum Channel : std::uint32_t {
     kRootLength = 321,
     kRootWander = 322,
     kRootSplit = 323,
+    kRootAttach = 324,
 };
 
 constexpr float kEpsilon = 1e-6f;
@@ -311,34 +312,46 @@ std::vector<RootStrand> growRoots(const TreeGraph& graph) {
     const float baseRadius = graph.nodes[0].radius;
     const float sectorWidth = glm::two_pi<float>() / kSectors;
 
-    const auto march = [&](std::uint32_t id, std::uint32_t parent, glm::vec3 origin, glm::vec3 dir,
-                           float length, float radius, std::uint32_t hashBase) {
+    const auto march = [&](std::uint32_t id, std::uint32_t parent, glm::vec3 origin, glm::vec3 outward,
+                           float length, float radius, float attach, std::uint32_t hashBase) {
         RootStrand strand;
         strand.id = id;
         strand.parent = parent;
-        const int segments = std::max(params.rootSegments, 2);
-        const float step = length / static_cast<float>(segments);
-        glm::vec3 p = origin;
-        glm::vec3 d = dir;
-        strand.points.push_back(p);
-        strand.radii.push_back(radius);
-        for (int s = 0; s < segments; ++s) {
-            const float u = static_cast<float>(s + 1) / static_cast<float>(segments);
-            // A root leaves the trunk almost horizontally, dives, then flattens out again as it
-            // runs away under the surface. Marching with a curvature term rather than sampling a
-            // shape keeps the wander and the dive in the same place.
-            const glm::vec3 wander =
-                noise::fbm3Vec(p * 0.45f + glm::vec3(static_cast<float>(hashBase) * 0.37f), params.seed ^ 0x9A1u);
-            const float dive = -params.rootCurvature * (1.0f - u) * (1.0f - u);
-            d = safeNormalize(d + glm::vec3(0.0f, dive, 0.0f) * 0.5f + wander * 0.22f, d);
-            p += d * step;
-            // The ground is the y = 0 plane in the generator's own frame. A scene that sits the
-            // tree on terrain re-projects these points; doing it here would bake one terrain into
-            // a graph that is otherwise placement-independent.
-            p.y = std::min(p.y, -params.rootDepth * u * u + 0.35f * std::exp(-u * 6.0f) * radius);
-            strand.length += step;
-            strand.points.push_back(p);
-            strand.radii.push_back(radius * (1.0f - 0.86f * u));
+        const int segments = std::max(params.rootSegments, 4);
+        const float phase = noise::hashIndex(params.seed, hashBase, kRootWander) * glm::two_pi<float>();
+        const glm::vec2 flat(origin.x, origin.z);
+        const glm::vec2 out2(outward.x, outward.z);
+        const glm::vec2 side(-outward.z, outward.x);
+
+        for (int s = 0; s <= segments; ++s) {
+            const float u = static_cast<float>(s) / static_cast<float>(segments);
+            // Horizontal travel is eased so the buttress is steep where it leaves the trunk and the
+            // root flattens as it runs away: a constant step makes a ramp, not a buttress.
+            const float reach = length * (u * u * 0.35f + u * 0.65f);
+            const glm::vec3 wander = noise::fbm3Vec(
+                glm::vec3(reach * 0.30f, 0.0f, static_cast<float>(hashBase) * 0.41f), params.seed ^ 0x9A1u);
+            const glm::vec2 lateral = side * (wander.x * params.rootCurvature * reach * 0.28f);
+            const glm::vec2 here = flat + out2 * reach + lateral;
+
+            // The buttress descent, then an undulation about the surface whose amplitude decays, so
+            // the root surfaces and dips several times before finally sinking.
+            const float descent = attach * std::pow(std::max(1.0f - u, 0.0f), 2.3f);
+            const float wave = std::sin(u * params.rootWaves * glm::two_pi<float>() + phase) *
+                               params.rootUndulation * (1.0f - u) * (1.0f - u);
+            const float sink = params.rootDepth * u * u;
+            const float y = descent + wave - sink;
+
+            // Thick where it meets the trunk and tapering hard: a buttress is a fin at the trunk
+            // and a rope by the time it is a few metres out.
+            const float taper = std::pow(std::max(1.0f - u, 0.0f), 1.35f);
+            const float r = radius * (0.18f + 0.82f * taper);
+
+            const glm::vec3 point(here.x, y, here.y);
+            if (s > 0) {
+                strand.length += glm::distance(point, strand.points.back());
+            }
+            strand.points.push_back(point);
+            strand.radii.push_back(r);
         }
         return strand;
     };
@@ -357,25 +370,29 @@ std::vector<RootStrand> growRoots(const TreeGraph& graph) {
         const float angle = (static_cast<float>(bin) + jitter) * sectorWidth;
         const glm::vec3 outward(std::cos(angle), 0.0f, std::sin(angle));
 
-        const float lengthScale = 0.55f + 0.9f * noise::hashIndex(params.seed, index, kRootLength);
+        const float lengthScale = 0.45f + 1.05f * noise::hashIndex(params.seed, index, kRootLength);
         const float length = params.rootSpread * lengthScale;
-        const float radius = baseRadius * params.rootRadiusScale * (0.45f + 0.75f * lengthScale);
-        const glm::vec3 origin = outward * (baseRadius * 0.55f) + glm::vec3(0.0f, 0.18f * baseRadius, 0.0f);
-        const glm::vec3 dir = safeNormalize(outward + glm::vec3(0.0f, -0.18f, 0.0f), outward);
+        const float radius = baseRadius * params.rootRadiusScale * (0.35f + 0.85f * lengthScale);
+        // Buttresses meet the trunk at different heights, which is most of what stops a ring of
+        // roots reading as a collar.
+        const float attach = params.rootAttachHeight *
+                             (0.35f + 0.65f * noise::hashIndex(params.seed, index, kRootAttach));
+        const glm::vec3 origin = outward * (baseRadius * 0.45f);
 
-        RootStrand strand = march(nextId, kNoNode, origin, dir, length, radius, index);
+        RootStrand strand = march(nextId, kNoNode, origin, outward, length, radius, attach, index);
         const std::uint32_t parentId = nextId++;
         roots.push_back(std::move(strand));
 
         if (noise::hashIndex(params.seed, index, kRootSplit) < params.rootSplit) {
             const RootStrand& parentStrand = roots.back();
-            const std::size_t forkAt = parentStrand.points.size() / 2;
-            const float side = noise::hashIndex(params.seed, index, kRootWander) * 2.0f - 1.0f;
-            const glm::vec3 forkDir = safeNormalize(
-                outward + glm::vec3(-outward.z, 0.0f, outward.x) * side * 0.9f + glm::vec3(0.0f, -0.1f, 0.0f),
-                outward);
-            roots.push_back(march(nextId++, parentId, parentStrand.points[forkAt], forkDir, length * 0.55f,
-                                  parentStrand.radii[forkAt] * 0.7f, index + 977u));
+            const std::size_t forkAt = parentStrand.points.size() / 3;
+            const float side = noise::hashIndex(params.seed, index, kRootSplit) * 2.0f - 1.0f;
+            const glm::vec3 forkDir =
+                safeNormalize(outward + glm::vec3(-outward.z, 0.0f, outward.x) * side * 0.8f, outward);
+            const glm::vec3 forkFrom = parentStrand.points[forkAt];
+            roots.push_back(march(nextId++, parentId, forkFrom, forkDir, length * 0.5f,
+                                  parentStrand.radii[forkAt] * 0.62f, std::max(forkFrom.y, 0.0f),
+                                  index + 977u));
         }
     }
     return roots;
@@ -1176,6 +1193,9 @@ nlohmann::json TreeParams::toJson() const {
     j["turquoiseShare"] = turquoiseShare;
     j["rootCount"] = rootCount;
     j["rootSpread"] = rootSpread;
+    j["rootAttachHeight"] = rootAttachHeight;
+    j["rootUndulation"] = rootUndulation;
+    j["rootWaves"] = rootWaves;
     j["rootDepth"] = rootDepth;
     j["rootCurvature"] = rootCurvature;
     j["rootRadiusScale"] = rootRadiusScale;
@@ -1254,6 +1274,9 @@ Result<TreeParams> TreeParams::fromJson(const nlohmann::json& j) {
     p.turquoiseShare = j.value("turquoiseShare", p.turquoiseShare);
     p.rootCount = j.value("rootCount", p.rootCount);
     p.rootSpread = j.value("rootSpread", p.rootSpread);
+    p.rootAttachHeight = j.value("rootAttachHeight", p.rootAttachHeight);
+    p.rootUndulation = j.value("rootUndulation", p.rootUndulation);
+    p.rootWaves = j.value("rootWaves", p.rootWaves);
     p.rootDepth = j.value("rootDepth", p.rootDepth);
     p.rootCurvature = j.value("rootCurvature", p.rootCurvature);
     p.rootRadiusScale = j.value("rootRadiusScale", p.rootRadiusScale);

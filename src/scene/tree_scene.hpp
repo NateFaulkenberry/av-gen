@@ -128,6 +128,14 @@ struct TreeLook {
     float keyIntensity = 0.68f;
     float rimIntensity = 0.62f;
     float fillIntensity = 0.06f;
+    // UNDER-LIGHT. A crown is not one shell, it is layers with light falling between them, and a
+    // rig lit only from above and behind gives the underside nothing at all -- so the canopy's
+    // lower half goes flat and the layering the foliage volume now has is invisible from below.
+    // A wide, weak disk under the crown separates those layers. Glowmere's bioluminescent rig does
+    // the same thing with a disk at elevation -40 and it is the single cue that reads as "lit from
+    // within the foliage" rather than "lit from the sky".
+    float underIntensity = 1.7f;
+    glm::vec3 underColor{0.30f, 0.92f, 0.72f};
     bool includeGround = true;
 };
 

@@ -237,12 +237,29 @@ struct TreeParams {
     float turquoiseShare = 0.30f;
 
     // --- Roots ---------------------------------------------------------------------------------
-    int rootCount = 9;
+    // BUTTRESSES, NOT PIPES. The first design ran each root out from ground level and dived it
+    // immediately, so the base of the tree was a small cone and the roots were buried within a
+    // metre. That is the least developed part of the picture and it is also the part of a
+    // monumental tree that says "old" most directly, and the only place where geometry at the
+    // showcase camera is large enough to read at all.
+    //
+    // A buttress is a FIN: it meets the trunk high up, descends steeply, and only then runs out
+    // along the ground. The centreline then undulates about the surface with a decaying amplitude,
+    // so a root is alternately visible and buried along its length -- which is section 8's
+    // "partially disappear into the ground" and is also what carves the negative space it asks for.
+    int rootCount = 13;
+    float rootAttachHeight = 2.6f;  // how far up the trunk the highest buttress meets it
+    float rootUndulation = 0.78f;   // how far the centreline rises and falls about the surface
+    float rootWaves = 2.4f;         // undulations over a root's length
     float rootSpread = 9.5f;
-    float rootDepth = 1.9f;
+    // Shallow. At 1.9 m the sink term buried every root within a couple of metres of the trunk and
+    // the base read as a ring of stubs; a buttress root runs a long way at or just under the
+    // surface before it finally goes down, and that run is the whole of what makes a tree look
+    // anchored.
+    float rootDepth = 1.0f;
     float rootCurvature = 0.55f;
-    float rootRadiusScale = 0.55f;      // fraction of the trunk base radius the largest root starts at
-    int rootSegments = 9;
+    float rootRadiusScale = 0.85f;      // fraction of the trunk base radius the largest root starts at
+    int rootSegments = 16;
     float rootSplit = 0.45f;            // probability a root forks once
     // How far root directions follow the canopy's own mass distribution (brief section 38: the
     // tree should read as one organism). 0 spreads roots evenly, 1 puts them entirely under the
