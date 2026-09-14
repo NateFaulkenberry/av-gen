@@ -66,6 +66,9 @@ NavSample Navigator::sample(glm::vec2 p) const {
     out.slope = t.slope;
     out.normal = t.normal;
     out.waterSurface = t.waterSurface;
+    // From the same `TerrainPoint` as everything above it: `TerrainQuery::at` derives depth from
+    // the one `WorldMap::sample` it already took, so this line adds no evaluation of the world.
+    out.waterDepth = t.waterDepth;
     out.canopy = t.canopy;
     switch (t.reject) {
     case world::TerrainReject::None: break;

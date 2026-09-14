@@ -45,6 +45,23 @@ namespace avgen::world {
 struct WalkRules {
     float maxSlope = 0.55f;          // 0 flat .. 1 vertical (1 - normal.y); above this is a cliff
     float waterMargin = 0.35f;       // metres of dry land required above any water surface
+    // The deepest water this body will walk into, in metres. Water is otherwise binary -- a point
+    // is dry land or it is `Submerged` -- and to anything that walks, a river and a puddle are the
+    // same wall. This is the band in between: water no deeper than this is standable, and anything
+    // past it is still a refusal.
+    //
+    // **The default is 0, and that is a decision rather than an omission.** Zero reproduces the old
+    // rule exactly, including the `waterMargin` freeboard, so every scene authored before this knob
+    // existed has the walkable set it was authored against -- and a scene's water is not
+    // automatically wadeable just because it is shallow, because whether a body wades is a property
+    // of the body, not of the water. A duck, a person and a nine-metre elder disagree about the
+    // same ford. The alternative, defaulting to something like 0.4 m, would have silently opened
+    // every shoreline in every existing scene to a walker that was routed around it yesterday.
+    //
+    // Above 0, `waterMargin` stops applying and this replaces it: a body that can cross a
+    // half-metre ford but refuses to stand on a bank 0.3 m above the water is not modelling
+    // anything. See the rule in `TerrainQuery::at`.
+    float wadeDepth = 0.0f;
     float headroom = 2.2f;           // metres needed under whatever grows here
     // Vegetation up to this height is walked *through*, not around -- see ADR-088. Without it the
     // statistical canopy rejects every square metre of a meadow, because grass grows there.

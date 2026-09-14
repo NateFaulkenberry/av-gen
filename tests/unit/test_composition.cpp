@@ -2814,3 +2814,43 @@ TEST_CASE("the navigation cell size is authorable and takes effect", "[scene][co
     const auto refused = scene::Composition::fromJson(bad, registry);
     CHECK_FALSE(refused.has_value());
 }
+
+// ADR-195: how deep a walker wades is the one thing a scene has to say to turn water from a wall
+// into a depth, so it is the one thing that has to be reachable from a scene file.
+TEST_CASE("the wade depth is authorable and defaults to the old rule", "[scene][composition][nav]") {
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(tempDir());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "wade");
+    comp.attach(params, modulator);
+
+    // 0 is "a body that stops at the waterline", which is every walker this engine had before.
+    CHECK(comp.navWadeDepth() == 0.0f);
+
+    comp.setNavWadeDepth(0.6f);
+    CHECK(comp.navWadeDepth() == 0.6f);
+    comp.setNavWadeDepth(-1.0f);
+    CHECK(comp.navWadeDepth() == 0.0f);
+
+    comp.setNavWadeDepth(0.6f);
+    const nlohmann::json saved = comp.toJson();
+    REQUIRE(saved.contains("navWadeDepth"));
+    CHECK(saved.at("navWadeDepth").get<float>() == 0.6f);
+    const auto reloaded = scene::Composition::fromJson(saved, registry);
+    REQUIRE(reloaded.has_value());
+    CHECK((*reloaded)->navWadeDepth() == 0.6f);
+
+    // An untouched scene does not grow the key, so every scene written before this reloads
+    // byte-identical and keeps the walkable set it was authored against.
+    scene::Composition plain(registry, "plain");
+    plain.attach(params, modulator);
+    CHECK_FALSE(plain.toJson().contains("navWadeDepth"));
+
+    // Refused rather than clamped: a four-metre wade band is a character walking along the bed of
+    // the river, and a number quietly pulled back to something sensible is a scene that does not do
+    // what it says.
+    nlohmann::json bad = saved;
+    bad["navWadeDepth"] = 40.0;
+    CHECK_FALSE(scene::Composition::fromJson(bad, registry).has_value());
+}
