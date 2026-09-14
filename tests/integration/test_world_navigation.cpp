@@ -744,3 +744,63 @@ TEST_CASE("a walker given a jump finds something to jump over",
     INFO("hops " << hops << ", airborne frames " << airborne << ", landing frames " << landings);
     CHECK(frames > 0);
 }
+
+// ADR-198: Glowmere's four inhabitants. The point of four is that they are four -- if they all
+// covered the same ground at the same speed doing the same thing, one would have done.
+TEST_CASE("Glowmere's four aliens behave as four different creatures",
+          "[.probe][integration][glowmere][navigation][aliens]") {
+    const fs::path root = AVGEN_SOURCE_DIR;
+    if (!fs::exists(root / "examples/world/glowmere-valley-2.scene.json") ||
+        !fs::exists(root / "assets/aliens/alien-scout.glb")) {
+        SKIP("Glowmere Valley 2 or the alien pack is not installed");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(root / "examples/world/glowmere-valley-2.scene.json").has_value());
+    scene::Composition* composition = engine.composition();
+    REQUIRE(composition != nullptr);
+
+    const std::array<const char*, 4> cast{{"rook", "tide", "sage", "ember"}};
+    struct Trace {
+        double travelled = 0.0;
+        glm::vec3 last{0.0f};
+        std::map<int, int> activities;
+        double maxY = -1e9, minY = 1e9;
+    };
+    std::map<std::string, Trace> traces;
+    for (const char* name : cast) {
+        const entity::Entity* e = composition->entityWorld().find(name);
+        REQUIRE(e != nullptr);
+        traces[name].last = e->locomotion().position;
+    }
+
+    constexpr double kStepSeconds = 1.0 / 60.0;
+    const auto frames = static_cast<std::uint64_t>(120.0 / kStepSeconds);
+    for (std::uint64_t i = 1; i <= frames; ++i) {
+        FrameTime time;
+        time.renderTime = static_cast<double>(i) * kStepSeconds;
+        time.deltaTime = kStepSeconds;
+        time.frameIndex = i;
+        engine.update(time);
+        for (const char* name : cast) {
+            const entity::Entity* e = composition->entityWorld().find(name);
+            Trace& t = traces[name];
+            const glm::vec3 now = e->locomotion().position;
+            t.travelled += glm::length(glm::vec2(now.x - t.last.x, now.z - t.last.z));
+            t.last = now;
+            t.activities[static_cast<int>(e->locomotion().activity)]++;
+            t.maxY = std::max(t.maxY, static_cast<double>(now.y));
+            t.minY = std::min(t.minY, static_cast<double>(now.y));
+        }
+    }
+    for (const char* name : cast) {
+        const Trace& t = traces.at(name);
+        std::string acts;
+        for (const auto& [a, n] : t.activities) {
+            acts += fmt::format("{}={} ", entity::activityName(static_cast<entity::Activity>(a)), n);
+        }
+        INFO(name);
+        UNSCOPED_INFO(fmt::format("{:6} travelled {:7.1f} m over 120 s, y {:.1f}..{:.1f}, {}", name,
+                                  t.travelled, t.minY, t.maxY, acts));
+    }
+    CHECK(frames > 0);
+}

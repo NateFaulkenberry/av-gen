@@ -2020,31 +2020,6 @@
    "visible": true
   },
   {
-   "name": "wanderer",
-   "kind": "gltf",
-   "asset": "../../assets/imported/alien.gltf",
-   "position": [
-    -74.0,
-    7.62,
-    -18.0
-   ],
-   "scale": [
-    0.08,
-    0.08,
-    0.08
-   ],
-   "animation": {
-    "state": "Idle",
-    "blend": 0.35,
-    "speed": 1.0,
-    "updateHz": 30,
-    "nearDistance": 25.0,
-    "farHz": 20.0,
-    "cullDistance": 320.0
-   },
-   "visible": true
-  },
-  {
    "name": "visitor",
    "kind": "procedural",
    "position": [
@@ -6436,6 +6411,106 @@
     "softness": 0.18,
     "fogCoupling": 1.0
    }
+  },
+  {
+   "name": "rook",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-scout.glb",
+   "position": [
+    -74.0,
+    7.62,
+    -18.0
+   ],
+   "scale": [
+    3.61,
+    3.61,
+    3.61
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.35,
+    "speed": 1.0,
+    "updateHz": 30,
+    "nearDistance": 25.0,
+    "farHz": 20.0,
+    "cullDistance": 320.0
+   },
+   "visible": true
+  },
+  {
+   "name": "tide",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-diver.glb",
+   "position": [
+    -28.0,
+    7.62,
+    -46.0
+   ],
+   "scale": [
+    3.601,
+    3.601,
+    3.601
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.35,
+    "speed": 1.0,
+    "updateHz": 30,
+    "nearDistance": 25.0,
+    "farHz": 20.0,
+    "cullDistance": 320.0
+   },
+   "visible": true
+  },
+  {
+   "name": "sage",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-elder.glb",
+   "position": [
+    -112.0,
+    7.62,
+    16.0
+   ],
+   "scale": [
+    3.576,
+    3.576,
+    3.576
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.35,
+    "speed": 1.0,
+    "updateHz": 30,
+    "nearDistance": 25.0,
+    "farHz": 20.0,
+    "cullDistance": 320.0
+   },
+   "visible": true
+  },
+  {
+   "name": "ember",
+   "kind": "gltf",
+   "asset": "../../assets/aliens/alien-ranger.glb",
+   "position": [
+    -56.0,
+    7.62,
+    34.0
+   ],
+   "scale": [
+    3.344,
+    3.344,
+    3.344
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.35,
+    "speed": 1.0,
+    "updateHz": 30,
+    "nearDistance": 25.0,
+    "farHz": 20.0,
+    "cullDistance": 320.0
+   },
+   "visible": true
   }
  ],
  "post": {
@@ -6588,68 +6663,71 @@
    ]
   },
   {
-   "name": "wanderer",
-   "node": "wanderer",
+   "name": "rook",
+   "node": "rook",
+   "seed": 11235813,
    "gait": {
     "matchRate": true,
-    "rateMin": 0.55,
-    "rateMax": 1.9
+    "walkSpeed": 5.6,
+    "runSpeed": 13.5,
+    "rateMin": 0.35,
+    "rateMax": 1.6,
+    "runEnter": 9.55,
+    "runExit": 6.44,
+    "moveEnter": 1.68,
+    "moveExit": 0.84,
+    "accel": 8.96,
+    "decel": 12.32
    },
-   "seed": 11235813,
-   "fullDetailDistance": 90.0,
+   "fullDetailDistance": 120.0,
    "coarseInterval": 0.1,
-   "cullDistance": 320.0,
+   "cullDistance": 340.0,
    "clips": {
     "idle": "Idle",
-    "walk": "Walk",
-    "run": "Run",
-    "turn": "Walk",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
     "observe": "Idle",
-    "react": "Idle"
+    "react": "Crazy",
+    "jump": "Jumping",
+    "fall": "Fall_loop",
+    "land": "Landing"
    },
    "behaviors": [
     {
-     "kind": "interest",
-     "signal": "music.impact",
-     "subjects": [
-      "visitor",
-      "elder-2-cap",
-      "bloom-cap"
-     ],
-     "observeChance": 0.0,
-     "minDwell": 1.0,
-     "maxDwell": 2.8,
-     "alertThreshold": 0.32,
-     "reactionDecay": 1.2
-    },
-    {
      "kind": "explore",
-     "speed": 5.0,
-     "runSpeed": 11.0,
-     "turnRate": 150.0,
      "arrive": 3.0,
-     "bodyRadius": 1.6,
-     "headroom": 11.0,
-     "footprint": 2.2,
-     "idleMin": 0.8,
-     "idleMax": 3.2,
-     "observeChance": 0.5,
-     "observeMin": 2.5,
-     "observeMax": 7.0,
-     "minRange": 18.0,
-     "maxRange": 220.0,
-     "homeRadius": 0.0,
-     "runChance": 0.22,
+     "bodyRadius": 2.4,
+     "headroom": 9.0,
+     "footprint": 2.6,
      "slopeAlign": 0.5,
-     "strollChance": 0.3,
-     "landmarkAffinity": 1.0,
-     "characterAffinity": 1.25,
-     "glowAffinity": 1.35,
-     "waterAffinity": 1.0,
-     "vistaAffinity": 0.8,
      "waypointRadius": 3.5,
      "repathSeconds": 7.0,
-     "noveltyRadius": 28.0
+     "noveltyRadius": 28.0,
+     "minRange": 18.0,
+     "maxRange": 220.0,
+     "speed": 5.6,
+     "runSpeed": 13.5,
+     "turnRate": 150.0,
+     "runChance": 0.34,
+     "strollChance": 0.18,
+     "idleMin": 0.6,
+     "idleMax": 2.2,
+     "observeChance": 0.25,
+     "observeMin": 1.5,
+     "observeMax": 4.0,
+     "landmarkAffinity": 1.2,
+     "characterAffinity": 0.9,
+     "glowAffinity": 1.0,
+     "waterAffinity": 0.8,
+     "vistaAffinity": 1.5
+    },
+    {
+     "kind": "liveliness",
+     "bounce": 0.22,
+     "stride": 5.78,
+     "sway": 3.0,
+     "nod": 2.0
     },
     {
      "kind": "lookAt",
@@ -6661,20 +6739,307 @@
     {
      "signal": "audio.rms",
      "target": "explore/speed",
-     "depth": 3.4,
+     "depth": 3.0,
      "chain": {
       "attackMs": 520.0,
       "decayMs": 1800.0
      }
+    }
+   ]
+  },
+  {
+   "name": "tide",
+   "node": "tide",
+   "seed": 31415926,
+   "gait": {
+    "matchRate": true,
+    "walkSpeed": 3.2,
+    "runSpeed": 8.0,
+    "rateMin": 0.35,
+    "rateMax": 1.6,
+    "runEnter": 5.6,
+    "runExit": 3.68,
+    "moveEnter": 0.96,
+    "moveExit": 0.48,
+    "accel": 5.12,
+    "decel": 7.04
+   },
+   "fullDetailDistance": 120.0,
+   "coarseInterval": 0.1,
+   "cullDistance": 340.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Take_from_floor",
+    "jump": "Jumping",
+    "fall": "Fall_loop",
+    "land": "Landing"
+   },
+   "behaviors": [
+    {
+     "kind": "explore",
+     "arrive": 3.0,
+     "bodyRadius": 2.4,
+     "headroom": 9.0,
+     "footprint": 2.6,
+     "slopeAlign": 0.5,
+     "waypointRadius": 3.5,
+     "repathSeconds": 7.0,
+     "noveltyRadius": 28.0,
+     "minRange": 18.0,
+     "maxRange": 220.0,
+     "speed": 3.2,
+     "runSpeed": 8.0,
+     "turnRate": 110.0,
+     "runChance": 0.06,
+     "strollChance": 0.55,
+     "idleMin": 2.0,
+     "idleMax": 6.0,
+     "observeChance": 0.7,
+     "observeMin": 3.5,
+     "observeMax": 9.0,
+     "landmarkAffinity": 0.8,
+     "characterAffinity": 1.0,
+     "glowAffinity": 1.8,
+     "waterAffinity": 1.9,
+     "vistaAffinity": 0.5
     },
+    {
+     "kind": "liveliness",
+     "bounce": 0.14,
+     "stride": 5.76,
+     "sway": 7.0,
+     "swayRate": 0.1,
+     "nod": 4.0
+    },
+    {
+     "kind": "lookAt",
+     "turnRate": 60.0,
+     "weight": 1.0
+    }
+   ],
+   "reactions": [
+    {
+     "signal": "audio.lowMid",
+     "target": "liveliness/sway",
+     "depth": 6.0,
+     "chain": {
+      "attackMs": 400.0,
+      "decayMs": 2200.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "sage",
+   "node": "sage",
+   "seed": 27182818,
+   "gait": {
+    "matchRate": true,
+    "walkSpeed": 4.0,
+    "runSpeed": 9.5,
+    "rateMin": 0.35,
+    "rateMax": 1.6,
+    "runEnter": 6.75,
+    "runExit": 4.6,
+    "moveEnter": 1.2,
+    "moveExit": 0.6,
+    "accel": 6.4,
+    "decel": 8.8
+   },
+   "fullDetailDistance": 120.0,
+   "coarseInterval": 0.1,
+   "cullDistance": 340.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Fight_idle",
+    "jump": "Jumping",
+    "fall": "Fall_loop",
+    "land": "Landing"
+   },
+   "behaviors": [
+    {
+     "kind": "explore",
+     "arrive": 3.0,
+     "bodyRadius": 2.4,
+     "headroom": 9.0,
+     "footprint": 2.6,
+     "slopeAlign": 0.5,
+     "waypointRadius": 3.5,
+     "repathSeconds": 7.0,
+     "noveltyRadius": 28.0,
+     "minRange": 18.0,
+     "maxRange": 220.0,
+     "speed": 4.0,
+     "runSpeed": 9.5,
+     "turnRate": 130.0,
+     "runChance": 0.12,
+     "strollChance": 0.4,
+     "idleMin": 1.4,
+     "idleMax": 4.5,
+     "observeChance": 0.6,
+     "observeMin": 3.0,
+     "observeMax": 8.0,
+     "landmarkAffinity": 1.6,
+     "characterAffinity": 1.8,
+     "glowAffinity": 1.1,
+     "waterAffinity": 0.7,
+     "vistaAffinity": 0.9
+    },
+    {
+     "kind": "liveliness",
+     "bounce": 0.18,
+     "stride": 5.72,
+     "sway": 4.5,
+     "nod": 3.5
+    },
+    {
+     "kind": "lookAt",
+     "turnRate": 110.0,
+     "weight": 1.0
+    },
+    {
+     "kind": "interest",
+     "signal": "music.impact",
+     "subjects": [
+      "visitor",
+      "elder-2-cap",
+      "rook",
+      "ember"
+     ],
+     "observeChance": 0.55,
+     "minDwell": 1.2,
+     "maxDwell": 3.4,
+     "alertThreshold": 0.3,
+     "reactionDecay": 1.2
+    }
+   ],
+   "reactions": [
     {
      "signal": "music.drop",
      "target": "explore/observeChance",
-     "depth": 0.3,
+     "depth": 0.35,
      "chain": {
       "envelope": "peakhold",
       "envelopeFallPerSecond": 0.3,
       "envelopeHoldMs": 1100.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "ember",
+   "node": "ember",
+   "seed": 16180339,
+   "gait": {
+    "matchRate": true,
+    "walkSpeed": 4.6,
+    "runSpeed": 12.0,
+    "rateMin": 0.35,
+    "rateMax": 1.6,
+    "runEnter": 8.3,
+    "runExit": 5.29,
+    "moveEnter": 1.38,
+    "moveExit": 0.69,
+    "accel": 7.36,
+    "decel": 10.12
+   },
+   "fullDetailDistance": 120.0,
+   "coarseInterval": 0.1,
+   "cullDistance": 340.0,
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Crazy",
+    "jump": "Jumping",
+    "fall": "Fall_loop",
+    "land": "Landing"
+   },
+   "behaviors": [
+    {
+     "kind": "explore",
+     "arrive": 3.0,
+     "bodyRadius": 2.4,
+     "headroom": 9.0,
+     "footprint": 2.6,
+     "slopeAlign": 0.5,
+     "waypointRadius": 3.5,
+     "repathSeconds": 7.0,
+     "noveltyRadius": 28.0,
+     "minRange": 18.0,
+     "maxRange": 220.0,
+     "speed": 4.6,
+     "runSpeed": 12.0,
+     "turnRate": 170.0,
+     "runChance": 0.28,
+     "strollChance": 0.2,
+     "idleMin": 0.5,
+     "idleMax": 2.0,
+     "observeChance": 0.3,
+     "observeMin": 1.2,
+     "observeMax": 3.5,
+     "landmarkAffinity": 1.0,
+     "characterAffinity": 1.5,
+     "glowAffinity": 1.4,
+     "waterAffinity": 0.9,
+     "vistaAffinity": 0.8,
+     "jumpRange": 7.0,
+     "jumpApex": 2.6,
+     "jumpSignal": "audio.beat",
+     "landSeconds": 0.35
+    },
+    {
+     "kind": "liveliness",
+     "bounce": 0.32,
+     "stride": 5.35,
+     "sway": 5.0,
+     "nod": 3.0
+    },
+    {
+     "kind": "lookAt",
+     "turnRate": 140.0,
+     "weight": 1.0
+    }
+   ],
+   "reactions": [
+    {
+     "signal": "audio.bass",
+     "target": "liveliness/bounce",
+     "depth": 0.45,
+     "chain": {
+      "attackMs": 60.0,
+      "curve": "power",
+      "curveAmount": 1.5,
+      "decayMs": 380.0
+     }
+    },
+    {
+     "signal": "audio.rms",
+     "target": "explore/speed",
+     "depth": 4.2,
+     "chain": {
+      "attackMs": 420.0,
+      "decayMs": 1500.0
+     }
+    },
+    {
+     "signal": "music.drop",
+     "target": "explore/runChance",
+     "depth": 0.5,
+     "chain": {
+      "envelope": "peakhold",
+      "envelopeFallPerSecond": 0.4,
+      "envelopeHoldMs": 1400.0
      }
     }
    ]

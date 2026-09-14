@@ -131,6 +131,108 @@ private:
     std::uint32_t seed_ = 1u;
 };
 
+// ---- liveliness ------------------------------------------------------------------------------
+//
+// Secondary motion: the small movement a body has that its animation clips do not (ADR-198).
+//
+// The alien pack's clips are good and they are also *finite* -- one walk cycle, played identically
+// every stride, on four characters at once. What makes a crowd read as alive is not more clips, it
+// is that no two bodies are doing exactly the same thing at exactly the same moment. This adds that
+// without touching the skeleton: it writes `MotionOffset`, the additive channel the entity layer
+// already composes on top of the authored pose, so the underlying animation is untouched and an
+// author's own rotation still survives.
+//
+// **What it deliberately does not do.** Lean into a turn is `bank`, which already exists and does it
+// properly with a response time. A second knob for the same thing on the same body would fight it.
+// And "head movement" is not here, because nothing can address a head: `ISkeletonQuery` is declared,
+// stored, and never implemented, so every socket resolves against the entity origin. A whole-body
+// nod is what is honestly available, and that is what `nod` is.
+//
+// **The bounce is the interesting one.** Its rate follows the body's own speed rather than a fixed
+// frequency, so a running character bobs faster than a walking one without anybody authoring the
+// relationship -- and because `explore/speed` is a registered parameter that a scene already drives
+// from `audio.rms`, the bounce becomes music-reactive through the chain that exists rather than
+// through a second one. That is the whole audio story here: no signal is read in this file.
+class Liveliness final : public IBehavior {
+public:
+    explicit Liveliness(const nlohmann::json* s)
+        : bounceDefault_(readFloat(s, "bounce", 0.0f)),
+          bounceRateDefault_(readFloat(s, "bounceRate", 0.9f)),
+          swayDefault_(readFloat(s, "sway", 0.0f)),
+          swayRateDefault_(readFloat(s, "swayRate", 0.15f)),
+          nodDefault_(readFloat(s, "nod", 0.0f)),
+          strideDefault_(readFloat(s, "stride", 1.6f)) {}
+
+    [[nodiscard]] std::string_view kind() const override { return "liveliness"; }
+
+    void registerParameters(params::ParameterSet& params, const std::string& prefix) override {
+        // Every one registered: these are exactly the knobs an author wants under a signal. The
+        // amount of life a character has is a performance decision, not a property of the model.
+        bounce_ = &params.add(floatDesc(prefix + "bounce", bounceDefault_, 0.0f, 20.0f));
+        bounceRate_ = &params.add(floatDesc(prefix + "bounceRate", bounceRateDefault_, 0.0f, 8.0f));
+        sway_ = &params.add(floatDesc(prefix + "sway", swayDefault_, 0.0f, 45.0f));
+        swayRate_ = &params.add(floatDesc(prefix + "swayRate", swayRateDefault_, 0.0f, 4.0f));
+        nod_ = &params.add(floatDesc(prefix + "nod", nodDefault_, 0.0f, 45.0f));
+        paths_ = {prefix + "bounce", prefix + "bounceRate", prefix + "sway", prefix + "swayRate",
+                  prefix + "nod"};
+    }
+    void collectParameterPaths(std::vector<std::string>& out) const override {
+        out.insert(out.end(), paths_.begin(), paths_.end());
+    }
+    void reset(Rng& rng) override {
+        seed_ = rng.nextU32();
+        // The stride's own phase, per body. Four characters walking at the same speed with the same
+        // bounce would rise and fall together, which reads as one animation on four puppets rather
+        // than as four creatures. This is the entire difference and it costs one number.
+        phase_ = rng.range(0.0f, 6.2831853f);
+    }
+
+    void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
+        const float bounce = param(bounce_, bounceDefault_);
+        const float sway = param(sway_, swayDefault_);
+        const float nod = param(nod_, nodDefault_);
+
+        // The stride bob. Twice a stride, because a body rises on each foot rather than once a
+        // cycle, and scaled by how fast it is actually going -- a standing body does not bob, which
+        // is what stops this fighting the idle clip.
+        if (bounce > 0.0f && strideDefault_ > 0.0f) {
+            const float travel = std::max(state.speed, 0.0f);
+            const float cycles = travel / strideDefault_;
+            phase_ += static_cast<float>(ctx.dt) * cycles * param(bounceRate_, bounceRateDefault_) *
+                      6.2831853f;
+            // Normalised against the clip's own authored speed, so `bounce` is "how much at a
+            // normal walk" rather than a number that means something different per character.
+            const float strength = std::min(travel / strideDefault_, 2.0f);
+            motion.position.y += std::sin(phase_ * 2.0f) * bounce * strength;
+        }
+
+        // The idle drift, on noise rather than a sine for the reason `slowNoise` gives: a sine lands
+        // on the same value at the same phase every cycle, and a body that does that is a metronome.
+        // Strongest when standing, because a walking body already has motion of its own.
+        if (sway > 0.0f || nod > 0.0f) {
+            const float still = 1.0f - std::min(std::max(state.speed, 0.0f) / std::max(strideDefault_, 0.1f), 1.0f);
+            const glm::vec3 n = slowNoise(ctx.time, param(swayRate_, swayRateDefault_), seed_, 3.0f);
+            motion.rotation.y += n.x * sway * (0.35f + 0.65f * still);
+            motion.rotation.x += n.y * nod * (0.35f + 0.65f * still);
+        }
+    }
+
+private:
+    [[nodiscard]] static float param(const params::Parameter<float>* p, float fallback) {
+        return p != nullptr ? p->value() : fallback;
+    }
+
+    float bounceDefault_, bounceRateDefault_, swayDefault_, swayRateDefault_, nodDefault_, strideDefault_;
+    params::Parameter<float>* bounce_ = nullptr;
+    params::Parameter<float>* bounceRate_ = nullptr;
+    params::Parameter<float>* sway_ = nullptr;
+    params::Parameter<float>* swayRate_ = nullptr;
+    params::Parameter<float>* nod_ = nullptr;
+    std::vector<std::string> paths_;
+    std::uint32_t seed_ = 1u;
+    float phase_ = 0.0f;
+};
+
 // ---- drift -----------------------------------------------------------------------------------
 //
 // Lateral wander inside a radius, on its own noise field. Separate from `hover` because vertical
@@ -1755,7 +1857,8 @@ bool BehaviorContext::event(std::string_view name) const {
 }
 
 std::vector<std::string_view> behaviorKinds() {
-    return {"hover", "drift", "bank", "spin", "wander", "explore", "ground", "lookAt", "interest", "orbit"};
+    return {"hover",  "drift",  "bank",     "spin",  "wander",
+            "explore", "ground", "liveliness", "lookAt", "interest", "orbit"};
 }
 
 std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::json* settings) {
@@ -1788,6 +1891,9 @@ std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::j
     }
     if (kind == "orbit") {
         return std::make_unique<Orbit>(settings);
+    }
+    if (kind == "liveliness") {
+        return std::make_unique<Liveliness>(settings);
     }
     return nullptr;
 }

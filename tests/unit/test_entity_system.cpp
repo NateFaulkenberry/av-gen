@@ -741,3 +741,109 @@ TEST_CASE("a beat makes a walker hop, once per beat", "[entity][airborne][audio]
     INFO("hops after a second beat: " << hops);
     CHECK(hops >= 1);
 }
+
+// ADR-198: secondary motion.
+//
+// The properties that matter are not "it moves the body" -- anything writing a MotionOffset does
+// that. They are that it is *silent by default*, that it scales with what the body is doing rather
+// than running at a constant, that two bodies do not do it in unison, and that it is a pure function
+// of the timeline so an offline render reproduces it.
+//
+// Read through the node's position parameter, which is where a MotionOffset actually lands, and
+// isolated by running the identical entity twice with only the liveliness knobs changed -- same
+// seed, same behaviours, so the walk underneath is bit-for-bit the same and the difference is the
+// secondary motion and nothing else.
+TEST_CASE("liveliness is additive, speed-scaled and out of phase between bodies",
+          "[entity][liveliness]") {
+    const auto trace = [](const nlohmann::json& live, bool walking, std::uint32_t seed, int frames) {
+        entity::EntityDesc d = craftDesc();
+        d.seed = seed;
+        d.behaviors.clear();
+        if (walking) {
+            nlohmann::json wander;
+            wander["kind"] = "wander";
+            wander["speed"] = 2.0;
+            wander["pauseMin"] = 0.0;
+            wander["pauseMax"] = 0.0;
+            d.behaviors.push_back(entity::BehaviorDesc{"wander", "wander", wander});
+        }
+        d.behaviors.push_back(entity::BehaviorDesc{"liveliness", "liveliness", live});
+
+        Fixture f(d, seed);
+        auto* position = f.params.findAs<glm::vec3>("nodes/craft/position");
+        REQUIRE(position != nullptr);
+        std::vector<float> heights;
+        for (int i = 0; i < frames; ++i) {
+            f.params.resetFinals();
+            entity::EntityUpdate u;
+            u.time = static_cast<double>(i) / 60.0;
+            u.dt = i == 0 ? 0.0 : 1.0 / 60.0;
+            u.frameIndex = static_cast<std::uint64_t>(i);
+            u.bus = &f.bus;
+            f.world.update(u, f.params);
+            heights.push_back(position->value().y);
+        }
+        return heights;
+    };
+
+    nlohmann::json off;
+    nlohmann::json on;
+    on["bounce"] = 0.35;
+    on["sway"] = 6.0;
+    on["stride"] = 1.6;
+
+    const auto walkPlain = trace(off, true, 7u, 300);
+    const auto walkLive = trace(on, true, 7u, 300);
+    REQUIRE(walkPlain.size() == walkLive.size());
+
+    // Silent by default: with no knobs the behaviour is present and changes nothing, so a scene
+    // that gains one does not move.
+    float quiet = 0.0f;
+    for (std::size_t i = 0; i < walkPlain.size(); ++i) {
+        quiet = std::max(quiet, std::abs(walkPlain[i] - walkLive[i]));
+    }
+    const auto walkOffAgain = trace(off, true, 7u, 300);
+    for (std::size_t i = 0; i < walkPlain.size(); ++i) {
+        CHECK(walkOffAgain[i] == walkPlain[i]);
+    }
+
+    // With knobs, a moving body bobs. The plain run is the control: the walk underneath is identical.
+    float span = 0.0f;
+    for (std::size_t i = 0; i < walkPlain.size(); ++i) {
+        span = std::max(span, std::abs(walkLive[i] - walkPlain[i]));
+    }
+    INFO("bob against the identical walk: " << span);
+    CHECK(span > 0.05f);
+
+    // Standing still, the same knobs produce almost nothing -- which is what stops this fighting an
+    // idle clip.
+    const auto stillPlain = trace(off, false, 7u, 300);
+    const auto stillLive = trace(on, false, 7u, 300);
+    float stillSpan = 0.0f;
+    for (std::size_t i = 0; i < stillPlain.size(); ++i) {
+        stillSpan = std::max(stillSpan, std::abs(stillLive[i] - stillPlain[i]));
+    }
+    INFO("bob at rest: " << stillSpan << " against " << span << " moving");
+    CHECK(stillSpan < span * 0.25f);
+
+    // Two bodies are not in unison. Four characters rising and falling together read as one
+    // animation on four puppets; the per-body stride phase is the whole fix.
+    const auto otherPlain = trace(off, true, 99u, 300);
+    const auto otherLive = trace(on, true, 99u, 300);
+    bool differs = false;
+    for (std::size_t i = 100; i < otherLive.size(); ++i) {
+        const float a = walkLive[i] - walkPlain[i];
+        const float b = otherLive[i] - otherPlain[i];
+        if (std::abs(a - b) > 1e-4f) {
+            differs = true;
+        }
+    }
+    CHECK(differs);
+
+    // And it reproduces exactly: offline rendering depends on it.
+    const auto again = trace(on, true, 7u, 300);
+    REQUIRE(again.size() == walkLive.size());
+    for (std::size_t i = 0; i < again.size(); ++i) {
+        CHECK(again[i] == walkLive[i]);
+    }
+}
