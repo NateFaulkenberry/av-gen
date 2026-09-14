@@ -2178,7 +2178,12 @@ Result<void> Application::directCameraFromTrack() {
                     "in its Objects list to make it a hero, declare them in the scene's \"heroes\" "
                     "block, or generate a world");
     }
-    auto installed = directEngine(*engine_, heroes);
+    // The panel's settings, not the defaults. Omitting this argument is how "select Continuous shot
+    // and nothing changes" happened: `refreshDirection` passed `state.settings` on an automatic
+    // re-cut, and the *first* cut -- the one the Enable button makes, and the one a settings change
+    // re-triggers -- silently took `AutoDirectorSettings{}`. Every control in the panel was bound to
+    // a struct nothing on this path read.
+    auto installed = directEngine(*engine_, heroes, cameraDirection_.settings);
     if (!installed) {
         return std::unexpected(installed.error());
     }

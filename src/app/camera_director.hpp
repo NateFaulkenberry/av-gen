@@ -106,9 +106,13 @@ struct AutoDirectorSettings {
 // moves to the music. Returns how many tracks were installed.
 //
 // Main thread only, and offline-analysed audio only: a live input has no future to fold.
+// `settings` has no default, on purpose. It used to, and the Enable button omitted it -- so every
+// control in the panel was bound to a struct the first cut never read, and choosing Continuous shot
+// did nothing at all. A defaulted argument that silently means "ignore what the user chose" is worth
+// a compile error at every call site instead of a test that has to remember to exist.
 [[nodiscard]] Result<std::size_t> directEngine(Engine& engine,
                                                std::span<const world::HeroPoint> heroes,
-                                               const AutoDirectorSettings& settings = {});
+                                               const AutoDirectorSettings& settings);
 
 // ---- keeping a directed camera in step with the heroes -----------------------------------------
 //

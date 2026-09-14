@@ -75,7 +75,12 @@ std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
     if (scene::Composition* composition = engine.composition()) {
         composition->setAimFollow({});
     }
+    // Everything except the settings, which are the user's preferences rather than this cut's state.
+    // Resetting the whole struct wiped the panel's choices every time the camera went back to the
+    // viewport, so a shot mode chosen once survived until the first hand-back and no longer.
+    const AutoDirectorSettings keep = state.settings;
     state = DirectorState{};
+    state.settings = keep;
     return before - tracks.size();
 }
 
@@ -122,7 +127,9 @@ Result<Redirect> refreshDirection(Engine& engine, DirectorState& state) {
     // handed back, an undo took the tracks, somebody deleted them by hand. Whatever happened, this
     // is no longer our camera and the next Enable Auto-director starts the relationship again.
     if (composition == nullptr || !engine.timeline().isAutomated("camera/position")) {
+        const AutoDirectorSettings keep = state.settings; // a preference, not this cut's state
         state = DirectorState{};
+        state.settings = keep;
         return Redirect::Released;
     }
     const bool playing = engine.transport().isPlaying();
