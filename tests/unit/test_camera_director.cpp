@@ -1171,11 +1171,13 @@ TEST_CASE("the previewed camera does not step at a shot boundary", "[.probe][dir
     float worstEye = 0.0f;
     float worstAim = 0.0f;
     double worstAimAt = 0.0;
-    const double duration = std::min(engine.durationSeconds(), 180.0);
+    // Stepped, not seeked. Seeking every frame is both far slower and a different experiment: a
+    // seek is a transport discontinuity, and the engine deliberately reseeds motion across one. What
+    // is being asked about is playback, so the probe plays.
+    const double duration = std::min(engine.durationSeconds(), 60.0);
     const int steps = static_cast<int>(duration * 60.0);
+    engine.seekSeconds(0.0);
     for (int i = 0; i < steps; ++i) {
-        engine.seekSeconds(static_cast<double>(i) / 60.0);
-        clock.seek(static_cast<double>(i) / 60.0);
         engine.update(engine.tick(clock));
         const scene::Camera& cam = comp->scene().camera;
         if (i > 0) {
@@ -1192,8 +1194,26 @@ TEST_CASE("the previewed camera does not step at a shot boundary", "[.probe][dir
         lastEye = cam.position;
         lastAim = cam.target;
     }
+    // Which of the two candidates is it? The aim-follow adds a per-shot offset and so can step at a
+    // boundary; the baked `camera/target` track can also step if two shots put keys at the same
+    // second. Clearing the follow table and replaying separates them: whatever remains is the bake.
+    comp->setAimFollow({});
+    engine.seekSeconds(0.0);
+    clock.seek(0.0);
+    float bareAim = 0.0f;
+    glm::vec3 prevAim(0.0f);
+    for (int i = 0; i < steps; ++i) {
+        engine.update(engine.tick(clock));
+        const scene::Camera& cam = comp->scene().camera;
+        if (i > 0) {
+            bareAim = std::max(bareAim, glm::length(cam.target - prevAim));
+        }
+        prevAim = cam.target;
+    }
+
     INFO("over " << duration << " s: worst single-frame eye step " << worstEye
-                 << " m, worst aim step " << worstAim << " m at t=" << worstAimAt);
+                 << " m, worst aim step " << worstAim << " m at t=" << worstAimAt
+                 << "; with aim-follow cleared, worst aim step " << bareAim << " m");
     CHECK(steps > 0);
 #endif
 }

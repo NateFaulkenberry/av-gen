@@ -2641,3 +2641,48 @@ TEST_CASE("a node's animation ladder reaches the rig and round-trips", "[scene][
     }
     CHECK(found);
 }
+
+// Reported against the world editor: selecting a tree's foliage put the move gizmo metres away from
+// the foliage, down at the trunk's base. The gizmo sits at the centre of `nodeBounds`, so the fault
+// was in the bounds: a procedural node fell back to a one-metre box at the node's own origin, and
+// generated geometry is built in a local frame with the node at its base.
+//
+// Heroes are measured from the same box (`heroFromNode`), so the same defect aimed the camera
+// director at the ground under an object rather than at the object.
+TEST_CASE("A procedural node is as big as what it placed, not a box at its root",
+          "[scene][composition][bounds]") {
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(tempDir());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "composition");
+    comp.attach(params, modulator);
+
+    // Instances well away from the node's origin, and along one axis only, so a bounds that is
+    // really the origin box cannot pass by accident: the centre is somewhere the root is not.
+    scene::CompositionNode node;
+    node.name = "canopy";
+    node.kind = scene::NodeKind::Procedural;
+    node.procedural.name = "canopy";
+    node.procedural.source.kind = scene::PrimitiveKind::Box;
+    node.procedural.distribution.kind = scene::DistributionKind::Linear;
+    node.procedural.distribution.count = 5;
+    node.procedural.distribution.start = glm::vec3(10.0f, 6.0f, 0.0f);
+    node.procedural.distribution.end = glm::vec3(20.0f, 6.0f, 0.0f);
+    REQUIRE(comp.addNode(std::move(node)));
+
+    FrameTime time{};
+    params.resetFinals();
+    comp.update(time);
+    REQUIRE(comp.scene().procedurals.size() == 1);
+
+    const scene::WorldBounds bounds = comp.nodeBounds("canopy");
+    REQUIRE(bounds.valid);
+
+    // The middle of the run, not the root. The instances span x = 10..20, so the old one-metre box
+    // at the origin was fifteen metres from where the geometry actually is.
+    CHECK_THAT(bounds.centre().x, Catch::Matchers::WithinAbs(15.0f, 1.0f));
+    CHECK_THAT(bounds.centre().y, Catch::Matchers::WithinAbs(6.0f, 1.0f));
+    CHECK(bounds.size().x >= 10.0f);      // it covers the run
+    CHECK(bounds.min.x > 5.0f);           // and does not reach back to the root
+}

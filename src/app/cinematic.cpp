@@ -377,6 +377,22 @@ glm::vec3 Shot::cameraAt(float t) const {
 
 glm::vec3 Shot::targetAt(float t) const {
     const float e = ease(t, easeIn, easeOut);
+    // A shot continuing another starts its aim where that one finished and pans from there. Done
+    // here rather than at each look mode so every mode inherits it -- an Ahead or a Parallel shot
+    // following a Subject one has exactly the same discontinuity to answer for.
+    if (startTarget) {
+        const glm::vec3 wanted = targetWithoutStart(t);
+        // Across the first half, on the same smoothstep the handoff swing uses. A pan that is over
+        // before the shot settles reads as the camera finding its subject; one that lasts the whole
+        // shot reads as never arriving.
+        const float s = std::clamp(e / 0.5f, 0.0f, 1.0f);
+        return glm::mix(*startTarget, wanted, s * s * (3.0f - 2.0f * s));
+    }
+    return targetWithoutStart(t);
+}
+
+glm::vec3 Shot::targetWithoutStart(float t) const {
+    const float e = ease(t, easeIn, easeOut);
     switch (lookMode()) {
     case LookMode::Subject:
         return framedAim(*this, cameraAt(t), subject.position);
@@ -1262,6 +1278,11 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
             // in and the one it continues from does not ramp out.
             shot.easeIn = false;
             seq.shots.back().easeOut = false;
+            // And the aim, which pinning the position never touched. Shots are contiguous, so this
+            // shot's first key and the last one's sit at the same second; without this they hold
+            // different subjects and the look target teleports between them in one frame. Starting
+            // here and panning across the first half is what a continuous take actually does.
+            shot.startTarget = seq.shots.back().targetAt(1.0f);
         }
         seq.shots.push_back(std::move(shot));
     }

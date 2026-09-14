@@ -167,6 +167,16 @@ struct Shot {
     // count in. Any of these, when set, replace the derived value; unset, nothing changes.
     std::optional<glm::vec3> startPosition;
     std::optional<glm::vec3> endPosition;
+    // Where the aim begins, for a shot continuing another (ADR-185). The mirror of `startPosition`,
+    // and needed for the same reason: shots are contiguous, so the last key of one and the first key
+    // of the next sit at the *same second*. A continuous take pins the position so those coincident
+    // keys agree; nothing pinned the aim, so the look target stepped from one subject to the other
+    // in a single frame -- measured at 278 m on the shipped project, while the eye moved 0.58 m.
+    //
+    // Set, the aim eases from here to whatever the look mode wants across the first part of the
+    // shot, which is what a camera operator does: the body keeps moving and the head *pans*. Unset,
+    // nothing changes, so a cut is still a cut.
+    std::optional<glm::vec3> startTarget;
     std::optional<glm::vec2> heightRange; // absolute world Y at each end, as a pair or not at all
 
     // Unset means "whatever this kind does", which is what keeps `kind` a kind rather than a label:
@@ -188,6 +198,8 @@ struct Shot {
     // The camera's position and aim at a normalised time through the shot, 0..1.
     [[nodiscard]] glm::vec3 cameraAt(float t) const;
     [[nodiscard]] glm::vec3 targetAt(float t) const;
+    // The aim the look mode alone asks for, before `startTarget`'s pan is applied.
+    [[nodiscard]] glm::vec3 targetWithoutStart(float t) const;
     [[nodiscard]] LookMode lookMode() const;
     [[nodiscard]] MovementCurve movementCurve() const;
     [[nodiscard]] float bowAmount() const;

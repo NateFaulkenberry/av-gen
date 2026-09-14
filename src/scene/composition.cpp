@@ -1984,9 +1984,33 @@ WorldBounds Composition::nodeBounds(const std::string& name) {
         // rather than through entities. Its instances are not enumerated here; the node's own
         // world position stands in, which is enough to find and grab it.
         if (!out.valid && range.proceduralIndex >= 0) {
-            // A box, not a point. A zero-volume AABB is one no ray ever enters, so a single
-            // `include` would leave a procedural object visible in a box selection and impossible to
-            // click -- which is the opposite of "enough to find and grab it".
+            // The instances' own extent, which the procedural already memoised at rebuild time --
+            // `boundsMin`/`boundsMax`, computed from the placed instance positions and the source's
+            // radius, in the same world the rest of this function reports.
+            //
+            // This used to stand the node's origin in for them, with a one-metre box around it, on
+            // the grounds that it was "enough to find and grab it". It is enough to *select*, and it
+            // is not enough to *place a gizmo*: generated geometry is built in a local frame with
+            // the node at its base, so the handles appeared metres away from the thing they move --
+            // selecting a tree's foliage put the gizmo on the ground below it.
+            //
+            // Reading the cached pair rather than enumerating instances keeps this cheap enough for
+            // the brush, which calls it for every node on every frame it shows a ghost.
+            const auto first = static_cast<std::size_t>(range.proceduralIndex);
+            for (std::size_t p = first; p <= first + range.proceduralSubCount && p < scene_.procedurals.size();
+                 ++p) {
+                const ProceduralGeometry& pg = scene_.procedurals[p];
+                if (glm::all(glm::lessThanEqual(pg.boundsMin, pg.boundsMax)) &&
+                    pg.boundsMin != pg.boundsMax) {
+                    out.include(pg.boundsMin);
+                    out.include(pg.boundsMax);
+                }
+            }
+        }
+        if (!out.valid && range.proceduralIndex >= 0) {
+            // Nothing placed, or a procedural whose bounds are degenerate. A box rather than a
+            // point: a zero-volume AABB is one no ray ever enters, so a single `include` would
+            // leave the object visible in a box selection and impossible to click.
             const glm::vec3 p = nodeWorldTransform(**it).position;
             out.include(p - glm::vec3(0.5f));
             out.include(p + glm::vec3(0.5f));
