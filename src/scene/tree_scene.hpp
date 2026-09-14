@@ -75,7 +75,10 @@ struct TreeLook {
     // 0.55, not 1.65. At 1.65 the canopy clipped to near-white and the palette disappeared -- the
     // cookbook's "a glowing surface reads as paint" failure, arrived at independently. Below the
     // bloom threshold of 1.0 the foliage keeps its colour and the bloom is left for the veins.
-    float foliageEmissiveIntensity = 0.85f;
+    // Lowered again, and the reason is section 28: the tree has to stay readable with emission
+    // disabled, which means the FORM has to come from light falling on the canopy rather than from
+    // the canopy glowing. Every previous reduction here made the picture better.
+    float foliageEmissiveIntensity = 0.62f;
     float foliageRoughness = 0.78f;
 
     // --- The environment, and the only job it has --------------------------------------------
@@ -115,9 +118,16 @@ struct TreeLook {
 
     // Lighting. A moon key for the silhouette, a violet rim for separation, and almost no fill:
     // the tree is meant to be readable when emission is switched off, but only just.
-    float keyIntensity = 0.55f;
+    // Raised with the emission lowered: the canopy now has to be lit rather than lit-from-within,
+    // and a rim-led rig with almost no key gives a glowing shell no internal gradient.
+    // 0.68. At 0.95 the key lit the atmosphere as well as the tree: the sky and mist came up, the
+    // contrast between a dark tree and a dark ground collapsed, and the bark's veins stopped
+    // reading because the bark itself was no longer dark. The canopy does need more key than a
+    // rim-led rig gives it, but the amount that helps the canopy is well below the amount that
+    // starts lighting the air between the camera and everything else.
+    float keyIntensity = 0.68f;
     float rimIntensity = 0.62f;
-    float fillIntensity = 0.09f;
+    float fillIntensity = 0.06f;
     bool includeGround = true;
 };
 

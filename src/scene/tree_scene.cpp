@@ -220,7 +220,7 @@ Result<Scene> buildTreeScene(const TreeGraph& graph, const TreeMeshes& meshes, c
     key.castsShadow = true;
     key.shadowStrength = 0.82f;
     key.softness = 2.4f;
-    key.volumetricStrength = 0.40f;
+    key.volumetricStrength = 0.22f;
     scene.addLight(key);
 
     PunctualLight rim;

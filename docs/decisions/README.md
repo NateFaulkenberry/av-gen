@@ -166,3 +166,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [174](ADR-174-the-tree-is-skinned-not-bent.md) | The tree is skinned to a branch skeleton, because a per-tier wind uniform cannot hold its joints together | Accepted |
 | [175](ADR-175-hierarchy-is-substance-not-order.md) | A branch's tier is its substance, not its depth in the graph | Accepted |
 | [176](ADR-176-a-program-that-asserts-emission-owns-it.md) | A material program that asserts emission owns the whole emission contract | Accepted |
+| [177](ADR-177-a-search-finds-only-what-its-parameterisation-expresses.md) | A search can only find what its parameterisation can express | Accepted |

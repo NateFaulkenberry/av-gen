@@ -98,6 +98,16 @@ struct TreeMeshSettings {
     // A flat card lit by its own normal reads as a flat card; lit by the volume's normal a cluster
     // of them reads as one soft mass, which is the standard foliage trick and costs nothing.
     float cardNormalBlend = 0.85f;
+    // AND THEN BLENDED AGAIN, TOWARD THE WHOLE CROWN'S OUTWARD DIRECTION.
+    //
+    // Cluster-outward normals make each clump read as a soft ball, and a canopy of soft balls is an
+    // even mass -- which is what it looked like. The reference's crown is large soft MASSES with
+    // strong internal falloff, and that is a property of the whole canopy shading as one volume:
+    // the lit side bright, the interior dark, a gradient between. Blending the card's normal toward
+    // "away from the crown's centre" is what buys that, and it costs nothing because the normal is
+    // already being computed. The cluster term stays, because without it the crown has no local
+    // form at all and reads as one enormous sphere.
+    float crownNormalBlend = 0.45f;
     // Clumps are stretched along their branch. A spherical clump reads as a ball stuck on a stick;
     // foliage grows along the twig that carries it, and the elongation is most of what separates
     // the two at a glance.

@@ -119,7 +119,8 @@ void applyBark(MeshData& mesh, std::size_t firstVertex, const std::vector<glm::v
     }
 }
 
-void buildCluster(MeshData& mesh, const FoliageSite& site, const TreeMeshSettings& settings, std::uint32_t seed) {
+void buildCluster(MeshData& mesh, const FoliageSite& site, const TreeMeshSettings& settings,
+                  const glm::vec3& crownCentre, std::uint32_t seed) {
     const float r = site.radius * settings.clusterScale;
     if (r <= kEpsilon || settings.cardsPerCluster < 1) {
         return;
@@ -159,7 +160,11 @@ void buildCluster(MeshData& mesh, const FoliageSite& site, const TreeMeshSetting
         // its own normal reads as a flat card; a cluster of cards lit by the volume's normal reads
         // as one soft mass.
         const glm::vec3 flat = safeNormalize(glm::cross(ru, rv), outward);
-        const glm::vec3 normal = safeNormalize(glm::mix(flat, outward, settings.cardNormalBlend), outward);
+        const glm::vec3 local = safeNormalize(glm::mix(flat, outward, settings.cardNormalBlend), outward);
+        // Away from the crown's centre, not the cluster's: this is the term that makes the canopy
+        // shade as one volume instead of as a heap of separately-lit balls.
+        const glm::vec3 crownOut = safeNormalize(centre - crownCentre, local);
+        const glm::vec3 normal = safeNormalize(glm::mix(local, crownOut, settings.crownNormalBlend), local);
 
         const auto base = static_cast<std::uint32_t>(mesh.vertices.size());
         const glm::vec3 corners[4] = {centre - ru * size - rv * size, centre + ru * size - rv * size,
@@ -226,6 +231,7 @@ Result<TreeMeshes> buildTreeMeshes(const TreeGraph& graph, const TreeMeshSetting
     }
     out.roots.name = "tree.roots";
 
+    const glm::vec3 crownCentre(0.0f, graph.params.crown.centreHeight, 0.0f);
     std::vector<glm::vec3> axisPoints;
     for (const TreeAxis& axis : graph.axes) {
         if (axis.nodes.empty()) {
@@ -287,7 +293,7 @@ Result<TreeMeshes> buildTreeMeshes(const TreeGraph& graph, const TreeMeshSetting
         // The tint is decided by the generator, from a spatial field, so an accent has a location.
         const auto tint = std::min<std::size_t>(site.tint, kFoliageTints - 1);
         const std::size_t before = out.foliage[tint].vertices.size();
-        buildCluster(out.foliage[tint], site, settings, graph.params.seed ^ 0xF01Au);
+        buildCluster(out.foliage[tint], site, settings, crownCentre, graph.params.seed ^ 0xF01Au);
         const std::size_t added = out.foliage[tint].vertices.size() - before;
         recordAxis(out.vertexAxis[5 + tint], added, site.axis);
         out.vertexBind[5 + tint].insert(out.vertexBind[5 + tint].end(), added, site.position);

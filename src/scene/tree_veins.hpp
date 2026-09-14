@@ -66,12 +66,12 @@ struct VeinSettings {
     // Compressing the vertical axis before sampling stretches every feature along the trunk, which
     // is what turns a blob field into a streak field, and it keeps the world-space property that
     // made the switch away from uv worth making.
-    float verticalStretch = 6.0f;
+    float verticalStretch = 13.0f;
     float triplanarSharpness = 4.0f;
     // Where the noise is cut. A narrow window gives thin bright veins; a wide one washes back into
     // the tint this exists to avoid.
-    float threshold = 0.565f;
-    float edge = 0.035f;
+    float threshold = 0.600f;
+    float edge = 0.022f;
     // The travelling pulse, in world height: energy rising through the whole tree at once rather
     // than each branch pulsing in its own parameterisation, which is what "a travelling wave"
     // means when the thing it travels through is one organism.
