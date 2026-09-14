@@ -117,31 +117,13 @@ fn thresholdWeight(lum: f32, threshold: f32, kneeFraction: f32) -> f32 {
 
 @fragment
 fn fs_prefilter(in: FsIn) -> @location(0) vec4<f32> {
-    // 4-tap box of the full-res exposed scene, weighted by luminance rather than evenly, then the
-    // soft-knee threshold.
-    //
-    // The weighting (Karis) is what stops a sub-pixel highlight from becoming a light source. Water
-    // sparkle is a dense field of near-pixel-sized speculars; each one entered the pyramid as a
-    // firefly, and the flare stage then reads that pyramid *magnified* -- `mix(0.5, mirrored, 0.75)`
-    // and `0.40`, so 1.33x and 2.5x -- and mirrored through the frame centre. A sparkling river
-    // therefore printed a lattice of bright dots across unrelated parts of the image, at any ghost
-    // strength, because the structure was already in the pyramid before the ghosts read it.
-    //
-    // Measured on the reported case: the lattice is visibly dimmer with this and unchanged
-    // elsewhere. It does not remove it. The rest is the pyramid's own texel grid being magnified,
-    // and integrating that away needs the *source's* texel size, which this pass is not given --
-    // `post.texelSize` here is the output's. Tried with the output's and measured a 2% change for
-    // eight extra samples, so it is not in.
+    // 4-tap box of the full-res exposed scene, then the soft-knee threshold.
     let t = post.texelSize;
-    let s0 = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(-0.5, -0.5) * t, 0.0).rgb;
-    let s1 = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(0.5, -0.5) * t, 0.0).rgb;
-    let s2 = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(-0.5, 0.5) * t, 0.0).rgb;
-    let s3 = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(0.5, 0.5) * t, 0.0).rgb;
-    let w0 = 1.0 / (1.0 + luminance(s0));
-    let w1 = 1.0 / (1.0 + luminance(s1));
-    let w2 = 1.0 / (1.0 + luminance(s2));
-    let w3 = 1.0 / (1.0 + luminance(s3));
-    let c = (s0 * w0 + s1 * w1 + s2 * w2 + s3 * w3) / max(w0 + w1 + w2 + w3, 1e-4);
+    var c = textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(-0.5, -0.5) * t, 0.0).rgb;
+    c += textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(0.5, -0.5) * t, 0.0).rgb;
+    c += textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(-0.5, 0.5) * t, 0.0).rgb;
+    c += textureSampleLevel(source, linearSampler, in.uv + vec2<f32>(0.5, 0.5) * t, 0.0).rgb;
+    c *= 0.25;
     let threshold = post.params0.x;
     let knee = post.params0.y;
     let emissionWeight = post.params0.z;
@@ -244,30 +226,12 @@ fn fs_wide(in: FsIn) -> @location(0) vec4<f32> {
         out += textureSampleLevel(second, linearSampler, in.uv, 0.0).rgb * post.tintA.rgb;
     }
     if (anamorphicOn > 0.5) {
-        // A horizontal gaussian whose reach is `stretch` times this pass's texel size.
-        //
-        // Consecutive taps have to overlap in the source or the gaussian is a comb rather than a
-        // blur: each tap *copies* a compact bright feature, so a river of thresholded sparkle
-        // prints one dot per tap and the frame gets evenly spaced dotted bands. The spacing of the
-        // artefact is the spacing of the taps, which is why lowering `ghosts` never touched it --
-        // this is the streak, and the ghosts were innocent.
-        //
-        // Two knobs close that gap and only one of them is affordable. Raising the tap count until
-        // it covers a seventh of the frame at full resolution costs hundreds of taps a pixel, for
-        // detail a blur that wide discards anyway. So the host lowers the *source's* frequency
-        // instead, handing this pass a bloom level whose texel is at least one step wide (see
-        // `PostProcessor::run`). The count is still derived from the reach and the source it was
-        // actually given, so the two cannot silently disagree: if a coarser level were unavailable
-        // the count would rise to meet it, up to the 48 a side the host assumes.
-        let srcTexel = 1.0 / f32(textureDimensions(source, 0).x);
-        let reach = post.texelSize.x * stretch * 8.0;
-        let taps = clamp(i32(ceil(reach / max(srcTexel, 1e-6))), 8, 48);
-        let step = reach / f32(taps);
-        let sigma = f32(taps) / 2.5;
+        // A horizontal gaussian whose reach is `stretch` times the source texel size.
+        let step = post.texelSize.x * stretch;
         var streak = textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb * 0.20;
         var weightSum = 0.20;
-        for (var i = 1; i <= taps; i = i + 1) {
-            let w = exp(-0.5 * pow(f32(i) / sigma, 2.0));
+        for (var i = 1; i <= 8; i = i + 1) {
+            let w = exp(-0.5 * pow(f32(i) / 3.2, 2.0));
             let o = vec2<f32>(step * f32(i), 0.0);
             streak += textureSampleLevel(source, linearSampler, clamp(in.uv + o, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).rgb * w;
             streak += textureSampleLevel(source, linearSampler, clamp(in.uv - o, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).rgb * w;
@@ -276,44 +240,9 @@ fn fs_wide(in: FsIn) -> @location(0) vec4<f32> {
         streak /= weightSum;
         if (ghosts > 0.0) {
             // Two flare ghosts mirrored through the frame centre, as an anamorphic lens gives.
-            //
-            // Each is a *magnified* read of the streak's source -- 1/0.75 and 1/0.40, so 1.33x and
-            // 2.5x. Magnification is what makes a ghost dangerous: whatever structure the source
-            // still holds is enlarged and printed across an unrelated part of the frame, and over a
-            // sparkling river that structure is a regular lattice of bright points. Lowering
-            // `ghosts` only made the lattice dimmer, because it is in the source rather than in the
-            // strength.
-            //
-            // The source being a coarse level is most of the answer -- a defocused copy is what a
-            // lens ghost is. The 3x3 below is the rest: it integrates over one source texel in each
-            // direction so the magnified texel grid itself does not read as an edge. The step is
-            // asked of the texture rather than taken from `post.texelSize`, which is the *output's*
-            // texel and would spread the taps by a fraction of a source texel, doing nothing.
-            let srcTexel = 1.0 / vec2<f32>(textureDimensions(source, 0));
             let mirrored = vec2<f32>(1.0) - in.uv;
-            let uv1 = mix(vec2<f32>(0.5), mirrored, 0.75);
-            let uv2 = mix(vec2<f32>(0.5), mirrored, 0.40);
-            let step1 = srcTexel / 0.75;
-            let step2 = srcTexel / 0.40;
-            var g1 = vec3<f32>(0.0);
-            var g2 = vec3<f32>(0.0);
-            // Nine taps spanning one source texel in each direction, weighted 1-2-1 per axis.
-            //
-            // The weights are not decoration. A flat 1/9 box over three taps a texel apart has a
-            // flat top and an abrupt edge, so a magnified point source comes out as a *square* --
-            // which is what the first version of this printed, trading a lattice of dots for a
-            // lattice of little blocks. A separable tent over the same taps has no flat top and the
-            // blob is round.
-            for (var y = -1; y <= 1; y = y + 1) {
-                for (var x = -1; x <= 1; x = x + 1) {
-                    let o = vec2<f32>(f32(x), f32(y));
-                    let w = (2.0 - abs(o.x)) * (2.0 - abs(o.y)); // 4,2,1 outer product, sums to 16
-                    g1 += textureSampleLevel(source, linearSampler, uv1 + o * step1, 0.0).rgb * w;
-                    g2 += textureSampleLevel(source, linearSampler, uv2 + o * step2, 0.0).rgb * w;
-                }
-            }
-            g1 *= 1.0 / 16.0;
-            g2 *= 1.0 / 16.0;
+            let g1 = textureSampleLevel(source, linearSampler, mix(vec2<f32>(0.5), mirrored, 0.75), 0.0).rgb;
+            let g2 = textureSampleLevel(source, linearSampler, mix(vec2<f32>(0.5), mirrored, 0.40), 0.0).rgb;
             streak += (g1 * 0.6 + g2 * 0.35) * ghosts;
         }
         out += streak * post.tintB.rgb;
