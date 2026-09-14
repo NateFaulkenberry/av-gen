@@ -196,6 +196,28 @@ shape as the defect the Glowmere agent hit in its own forensics harness this wee
 cleared a material program and the next five silently re-measured the first. **Not yet a
 recommendation** — it is the thing to look for when C/D/F measurements start touching this function.
 
+## Two instrument gaps found by using the instrument
+
+**`--ab` cannot measure a scene that is not a project file.** It takes a project path and quality
+arms, so a scene assembled in C++ — which is how both new showcase scenes are built during
+development — cannot be measured by the one harness whose method is trusted. The Tree of Life work
+had to hand-roll a counterbalanced ABBA loop inside a `[.perf]` test to measure its atmosphere at
+all. That measurement was sound and its result is the best available argument for the method: across
+two invocations the **absolute** frame time moved 1.8 ms (6.94 → 5.10) while the **difference between
+the arms moved 0.07 ms**. Anyone quoting the absolute from one run would have been quoting noise
+nearly three times the size of the effect.
+
+The gap is that the trustworthy method is reachable only through a file format. Either `--ab` should
+accept a scene the way `--composition` does, or the counterbalanced loop should be a helper rather
+than something each investigation rebuilds.
+
+**Timing-sensitive tests fail under contention and nobody can say which.** Two separate flakes today:
+a MIDI hotplug test that polls two seconds for a virtual source, and one unidentified CPU assertion
+that failed once after a GPU A/B and did not reproduce in five subsequent runs. Both are the class
+the repo already tags `[.perf]`, and neither is a defect in the code under test. Worth a pass that
+identifies them and either tags them or makes them robust, because a suite that occasionally fails
+for environmental reasons trains people to re-run rather than read.
+
 ## What Phase 1 still owes
 
 - The temporal artifact inventory (§4), which needs the representative suite rendered and looked at.
