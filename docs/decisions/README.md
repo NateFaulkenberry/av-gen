@@ -171,3 +171,8 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [173](ADR-173-the-candidate-sampler-is-sobol-and-the-experiment-that-would-overturn-it.md) | The mushroom candidate sampler is a Sobol sequence, and the experiment that would overturn it is named | Accepted |
 | [174](ADR-174-vegetation-is-banded-on-height-above-water.md) | Vegetation is banded on height above the water table, and the cap thins instead of truncating | Accepted |
 | [175](ADR-175-a-searched-organism-is-a-parameter-vector-the-scene-owns.md) | A searched organism is a parameter vector the scene owns, not geometry the generator kept | Accepted |
+| [176](ADR-176-a-tree-needs-an-internal-economy.md) | Space colonization decides where a tree grows; apical control decides how much | Accepted |
+| [177](ADR-177-the-tree-is-skinned-not-bent.md) | The tree is skinned to a branch skeleton, because a per-tier wind uniform cannot hold its joints together | Accepted |
+| [178](ADR-178-hierarchy-is-substance-not-order.md) | A branch's tier is its substance, not its depth in the graph | Accepted |
+| [179](ADR-179-a-program-that-asserts-emission-owns-it.md) | A material program that asserts emission owns the whole emission contract | Accepted |
+| [180](ADR-180-a-search-finds-only-what-its-parameterisation-expresses.md) | A search can only find what its parameterisation can express | Accepted |

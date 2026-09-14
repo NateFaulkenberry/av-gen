@@ -341,4 +341,104 @@ concept CandidateGenerator = requires(const G& g, const Parameters& params, cons
                                              std::string_view selectionNote = {});
 [[nodiscard]] Result<Candidate> candidateFromJson(const GeneratorSchema& schema, const nlohmann::json& j);
 
+// ---------------------------------------------------------------------------------------------
+// The search driver
+//
+// Promoted here from the Tree of Life generator, which is where it was written: it reads no field
+// of any particular generator, only the `CandidateGenerator` concept above, so leaving it beside
+// one consumer would have guaranteed a second copy. Sampling, hygiene, scoring and diversity were
+// already shared; this is the loop that runs them.
+
+struct SearchSettings {
+    std::uint32_t firstIndex = 0;
+    int population = 64;
+    int select = 12;
+    // The quality/diversity trade, explicit because hiding it is how a search ends up returning
+    // either N excellent near-identical individuals or N diverse ugly ones with no knob to say
+    // which way it went wrong.
+    float diversityAlpha = 0.62f;
+    HygieneLimits hygiene{};
+};
+
+struct SearchResult {
+    std::vector<Candidate> candidates;                   // every index tried, in order, rejections included
+    std::vector<std::size_t> selected;                   // into `candidates`, in selection order
+    std::vector<std::pair<std::string, int>> rejections; // rule -> count, the diagnostic histogram
+    int built = 0;
+    double totalMs = 0.0;
+    double buildMs = 0.0;
+};
+
+// Shared by the template below; defined in the .cpp so the header carries no bodies it need not.
+namespace detail {
+void countRejection(std::vector<std::pair<std::string, int>>& into, const std::string& rule);
+[[nodiscard]] float meshArea(const scene::MeshData& mesh);
+[[nodiscard]] double nowMs();
+} // namespace detail
+
+template <CandidateGenerator G>
+[[nodiscard]] Result<SearchResult> runSearch(const G& generator, const SearchSettings& settings) {
+    if (settings.population < 1) {
+        return fail("candidate search: population {} must be at least 1", settings.population);
+    }
+    if (auto ok = generator.schema().validate(); !ok) {
+        return std::unexpected(ok.error());
+    }
+    const double started = detail::nowMs();
+    SearchResult result;
+    result.candidates.reserve(static_cast<std::size_t>(settings.population));
+
+    for (int i = 0; i < settings.population; ++i) {
+        const std::uint32_t index = settings.firstIndex + static_cast<std::uint32_t>(i);
+        Candidate candidate;
+        candidate.index = index;
+        // Identity is the index, so the parameters come from the sampler and are never stored as
+        // the source of truth for a candidate nobody has edited.
+        candidate.parameters = sampleAt(generator.schema().parameters, index);
+
+        const double buildStart = detail::nowMs();
+        auto subject = generator.build(candidate.parameters);
+        result.buildMs += detail::nowMs() - buildStart;
+        if (!subject) {
+            candidate.rejected = Rejection{"build", subject.error().message};
+            detail::countRejection(result.rejections, "build");
+            result.candidates.push_back(std::move(candidate));
+            continue;
+        }
+
+        std::optional<Rejection> bad;
+        for (const SubjectPart& part : subject->parts) {
+            if (auto reject = meshHygiene(part.mesh, settings.hygiene)) {
+                // Name the part in the detail. A hygiene histogram that says "degenerate triangles"
+                // without saying which part is a diagnostic that still needs a debugger.
+                reject->detail = part.role + ": " + reject->detail;
+                bad = *reject;
+                break;
+            }
+            candidate.triangles += static_cast<std::uint32_t>(part.mesh.indices.size() / 3);
+            candidate.surfaceArea += detail::meshArea(part.mesh);
+        }
+        if (bad) {
+            candidate.rejected = *bad;
+            detail::countRejection(result.rejections, bad->rule);
+            result.candidates.push_back(std::move(candidate));
+            continue;
+        }
+
+        candidate.score.components = generator.domainScores(*subject, candidate.parameters);
+        candidate.features = generator.features(*subject, candidate.parameters);
+        ++result.built;
+        result.candidates.push_back(std::move(candidate));
+    }
+
+    if (result.built == 0) {
+        return fail("candidate search: all {} candidates were rejected", settings.population);
+    }
+    result.selected =
+        selectDiverse(result.candidates, static_cast<std::size_t>(settings.select > 0 ? settings.select : 1),
+                      settings.diversityAlpha);
+    result.totalMs = detail::nowMs() - started;
+    return result;
+}
+
 } // namespace avgen::search

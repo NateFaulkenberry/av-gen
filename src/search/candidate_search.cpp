@@ -566,4 +566,34 @@ Result<Candidate> candidateFromJson(const GeneratorSchema& schema, const json& j
     return c;
 }
 
+// Helpers for the `runSearch` template in the header.
+namespace detail {
+
+void countRejection(std::vector<std::pair<std::string, int>>& into, const std::string& rule) {
+    for (auto& [name, count] : into) {
+        if (name == rule) {
+            ++count;
+            return;
+        }
+    }
+    into.emplace_back(rule, 1);
+}
+
+float meshArea(const scene::MeshData& mesh) {
+    double total = 0.0;
+    for (std::size_t i = 0; i + 2 < mesh.indices.size(); i += 3) {
+        const glm::vec3& a = mesh.vertices[mesh.indices[i]].position;
+        const glm::vec3& b = mesh.vertices[mesh.indices[i + 1]].position;
+        const glm::vec3& c = mesh.vertices[mesh.indices[i + 2]].position;
+        total += 0.5 * static_cast<double>(glm::length(glm::cross(b - a, c - a)));
+    }
+    return static_cast<float>(total);
+}
+
+double nowMs() {
+    return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+} // namespace detail
+
 } // namespace avgen::search

@@ -89,6 +89,7 @@ writes a scene file. `--help` lists every flag.
   characters, lyrics and markers, and how a piece becomes ordinary timeline tracks
 - [docs/composition.md](docs/composition.md): the 2D layers over the frame
 - [docs/art-direction.md](docs/art-direction.md): the World Director, looks, composition and phrasing
+- [docs/visual-cookbook/scale-and-silhouette.md](docs/visual-cookbook/scale-and-silhouette.md): why a hero cannot supply its own scale, and three things behind it that fight its silhouette
 - The procedural world: [docs/procedural-geometry.md](docs/procedural-geometry.md),
   [docs/spatial-data.md](docs/spatial-data.md), [docs/gpu-fields.md](docs/gpu-fields.md),
   [docs/splines.md](docs/splines.md), [docs/grammar-and-hierarchy.md](docs/grammar-and-hierarchy.md),
