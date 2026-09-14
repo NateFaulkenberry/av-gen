@@ -1,4 +1,5 @@
 #include "app/cinematic.hpp"
+#include "core/log.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -1108,6 +1109,16 @@ std::vector<ShotSpan> groupSections(const signals::MusicalStructure& structure,
     split.reserve(spans.size());
     for (const ShotSpan& span : spans) {
         const double length = span.end - span.start;
+        // A build, a drop and a breakdown are single deliberate moves and cutting into one destroys
+        // what it is for, so they are exempt however long they run.
+        //
+        // That exemption has a cost, and it is unresolved rather than accepted. Glowmere's analyser
+        // folded one track into a *thirty-four second* drop, and the exemption then held the camera
+        // on one hero for half a minute -- which is most of what "it spins around a single hero for
+        // about a minute" was reporting. Capping the exemption fixes that and contradicts two tests
+        // that assert the present contract in as many words ("the drop is one shot from 41 s to the
+        // end"), so it is a decision about what a drop *is* rather than a defect, and it is left to
+        // be made rather than made here. See ADR-190.
         if (!mayBeSplit(span.opener->kind) || length <= brief.maxShotSeconds) {
             split.push_back(span);
             continue;
@@ -1167,6 +1178,28 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
     const std::size_t offset = cast.empty() ? 0 : (h >> 8) % cast.size();
     std::size_t supportingIndex = 0;
 
+    // Where the camera actually *is*, as opposed to what the last shot was about.
+    //
+    // They are not the same thing, and reading the second for the first is how a run of transitions
+    // never advanced. A transition takes the previous subject and puts the one it is going to in
+    // `handoff` -- so its `subject` names where it *started*. The next transition then read that,
+    // found the object it had just left, and transitioned away from it again. Six verses in a row
+    // came out on one hero, for ever, because the chain kept asking the wrong end.
+    FocalTarget currentTarget = brief.hero;
+    bool haveCurrent = false;
+
+    // How many shots in a row the hero has held. The hero owns every build and drop by design --
+    // that is the arc the film is about -- and the design assumes a structure with a few of them.
+    // Glowmere's analyser folded one track into *nineteen consecutive drops*, and the rule then put
+    // the entire middle of the film on one object: reported as "it will continue to spin around a
+    // single hero for about a minute before moving on".
+    //
+    // So the ownership is a preference rather than a right. After this many in a row the next
+    // section goes to the cast even if the hero owns its kind, which changes nothing on a structure
+    // that alternates and everything on one that does not.
+    constexpr std::size_t kMaxHeroRun = 4;
+    std::size_t heroRun = 0;
+
     for (std::size_t i = 0; i < spans.size(); ++i) {
         const auto& span = spans[i];
         const auto sectionKind = span.opener->kind;
@@ -1177,24 +1210,32 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
         shot.startSeconds = span.start;
         shot.durationSeconds = span.end - span.start;
 
-        const bool hero = heroOwns(sectionKind) || cast.empty();
+        const bool wantsHero = heroOwns(sectionKind) || cast.empty();
+        const bool hero = wantsHero && (cast.empty() || heroRun < kMaxHeroRun);
         shot.subject = hero ? brief.hero : cast[(offset + supportingIndex) % cast.size()];
         if (!hero) {
             ++supportingIndex;
         }
+        heroRun = hero ? heroRun + 1 : 0;
 
         if (shot.kind == ShotKind::Transition) {
             // A transition needs somewhere to come from. With no previous shot, or no supporting
             // cast to have left, there is nothing to transition out of, so it becomes the follow
             // shot it would have ended as. Resolved before the defaults are taken, so the shot gets
             // the defaults of the kind it actually is.
-            if (i > 0 && seq.shots.back().subject.name != shot.subject.name) {
+            if (haveCurrent && currentTarget.name != shot.subject.name) { // ADR-190
                 shot.handoff = shot.subject;
-                shot.subject = seq.shots.back().subject;
+                shot.subject = currentTarget;
             } else {
                 shot.kind = ShotKind::Track;
             }
         }
+
+        // Every shot, its span and who it is of. At debug level because a long piece is twenty-odd
+        // lines, and reached for whenever the question is "why does the film stay on one object" --
+        // which cannot be answered from the summary count, and was not.
+        log::debug("auto-director: shot {:>2} {:<22} {:7.2f}s +{:5.2f}s  {}", i + 1, shot.name,
+                   shot.startSeconds, shot.durationSeconds, shot.subject.name);
 
         const KindDefaults d = defaultsFor(shot.kind);
         shot.startDistance = d.startDistance;
@@ -1284,6 +1325,10 @@ Result<Sequence> directFromStructure(const signals::MusicalStructure& structure,
             // here and panning across the first half is what a continuous take actually does.
             shot.startTarget = seq.shots.back().targetAt(1.0f);
         }
+        // Where the camera ends up, which is what the next transition has to come *from*. A
+        // transition arrives at its handoff; everything else ends on its own subject.
+        currentTarget = shot.handoff.has_value() ? *shot.handoff : shot.subject;
+        haveCurrent = true;
         seq.shots.push_back(std::move(shot));
     }
 

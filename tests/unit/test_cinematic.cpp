@@ -8,6 +8,9 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <nlohmann/json.hpp>
 
+#include <map>
+#include <set>
+
 using namespace avgen;
 
 namespace {
@@ -1045,4 +1048,92 @@ TEST_CASE("a subject's approach bearing moves the whole film around it",
             REQUIRE_THAT(static_cast<double>(spreadA - spreadB), Catch::Matchers::WithinAbs(0.0, 1e-4));
         }
     }
+}
+
+// Reported against Glowmere Valley 2: "the auto director seems to get stuck focusing only on one
+// hero during the middle of any song... around the 45 second mark, it will continue to spin around
+// a single hero for about a minute before moving on", seen across several tracks of different
+// lengths, always at about the same point.
+//
+// Measured on the real project, it was worse than the report: **25 of 26 shots were on
+// `elder-2-cap`** in a world declaring eleven heroes. Two faults compound.
+//
+// The structure of this test is the structure of the complaint: a long run of sections the hero
+// owns, then a run of sections it does not. Both halves failed, for different reasons.
+TEST_CASE("The film does not settle on one hero and stay there", "[app][cinematic][director][cast]") {
+    avgen::signals::MusicalStructure structure;
+    const auto add = [&](MusicalSection kind, double start, double end) {
+        avgen::signals::StructureSection section;
+        section.kind = kind;
+        section.startSeconds = start;
+        section.durationSeconds = end - start;
+        section.intensity = 0.7f;
+        structure.sections.push_back(section);
+    };
+    // The analyser really does produce this: 183 s of Glowmere folded into a run of nineteen
+    // consecutive drops. Whether that is a good reading of the music is the analyser's business --
+    // the director has to stay watchable when it gets one.
+    add(MusicalSection::Intro, 0.0, 4.0);
+    double t = 4.0;
+    for (int i = 0; i < 16; ++i) {
+        add(MusicalSection::Drop, t, t + 5.0);
+        t += 5.0;
+    }
+    // ...and then a run of verses, which are transitions.
+    for (int i = 0; i < 6; ++i) {
+        add(MusicalSection::Verse, t, t + 10.0);
+        t += 10.0;
+    }
+
+    auto seq = app::directFromStructure(structure, referenceBrief());
+    INFO((seq ? std::string() : seq.error().message));
+    REQUIRE(seq.has_value());
+    REQUIRE(seq->shots.size() > 10);
+
+    // Fault 1: a run of transitions never advanced. A transition takes the previous shot's subject
+    // and puts the intended new one in `handoff` -- so the *next* transition read the subject the
+    // last one had left, not the one it had arrived at, and the chain never moved off the first
+    // object. Six verses in a row all came out on the hero.
+    //
+    // Asserted as "the transitions are not all about the same thing", which is the property, rather
+    // than as a specific expected cast order, which is a policy that may reasonably change.
+    std::set<std::string> transitionSubjects;
+    int transitions = 0;
+    for (const app::Shot& s : seq->shots) {
+        if (s.kind == app::ShotKind::Transition) {
+            ++transitions;
+            transitionSubjects.insert(s.subject.name);
+        }
+    }
+    INFO("transition shots: " << transitions << ", distinct subjects: " << transitionSubjects.size());
+    REQUIRE(transitions >= 4);            // the state the measurement assumes
+    CHECK(transitionSubjects.size() > 1); // and they are not all the same object
+
+    // Fault 2: the hero owns every build and drop, which is right when a structure has a few of
+    // them and ruinous when it has nineteen. Nothing bounded how long the film could stay on one
+    // subject, so the whole middle was one object.
+    std::size_t longestRun = 0;
+    std::size_t run = 0;
+    std::string previous;
+    for (const app::Shot& s : seq->shots) {
+        run = s.subject.name == previous ? run + 1 : 1;
+        previous = s.subject.name;
+        longestRun = std::max(longestRun, run);
+    }
+    INFO("longest run of consecutive shots on one subject: " << longestRun << " of " << seq->shots.size());
+    CHECK(longestRun <= 6);
+
+    // And the film as a whole is about more than one thing. The hero should still dominate -- it is
+    // the hero -- but a world with four declared targets that shows one is not a film.
+    std::map<std::string, double> screenTime;
+    double total = 0.0;
+    for (const app::Shot& s : seq->shots) {
+        screenTime[s.subject.name] += s.durationSeconds;
+        total += s.durationSeconds;
+    }
+    REQUIRE(total > 0.0);
+    const double heroShare = screenTime["elder"] / total;
+    INFO("hero screen time " << 100.0 * heroShare << "%, subjects " << screenTime.size());
+    CHECK(screenTime.size() >= 3);
+    CHECK(heroShare < 0.85);
 }
