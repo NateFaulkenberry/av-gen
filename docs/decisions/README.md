@@ -176,3 +176,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [178](ADR-178-hierarchy-is-substance-not-order.md) | A branch's tier is its substance, not its depth in the graph | Accepted |
 | [179](ADR-179-a-program-that-asserts-emission-owns-it.md) | A material program that asserts emission owns the whole emission contract | Accepted |
 | [180](ADR-180-a-search-finds-only-what-its-parameterisation-expresses.md) | A search can only find what its parameterisation can express | Accepted |
+| [181](ADR-181-counterbalance-the-arms-and-detect-the-drift.md) | Counterbalance the arms, and detect the drift the counterbalancing hides | Accepted |

@@ -312,12 +312,45 @@ PairedDelta pairDeltas(const std::vector<double>& baselineMedians, const std::ve
 
 } // namespace
 
+DriftCheck driftOf(const std::vector<AbBlock>& baselineBlocks, bool gpuClock) {
+    DriftCheck out;
+    out.samples = static_cast<int>(baselineBlocks.size());
+    if (out.samples < 2) {
+        return out; // one baseline cannot disagree with itself
+    }
+    // Split in *run order*, which is the only thing that makes this a drift measurement rather than
+    // a second noise estimate. An odd count gives the extra block to the second half, so the halves
+    // straddle the middle of the run rather than the first block being weighted twice.
+    const std::size_t half = baselineBlocks.size() / 2;
+    const auto medianOf = [&](std::size_t from, std::size_t to) {
+        std::vector<double> values;
+        values.reserve(to - from);
+        for (std::size_t i = from; i < to; ++i) {
+            const Distribution& d = gpuClock ? baselineBlocks[i].gpuMs : baselineBlocks[i].wallMs;
+            values.push_back(d.p50);
+        }
+        std::sort(values.begin(), values.end());
+        if (values.empty()) {
+            return 0.0;
+        }
+        return values.size() % 2 == 1 ? values[values.size() / 2]
+                                      : 0.5 * (values[values.size() / 2 - 1] + values[values.size() / 2]);
+    };
+    out.firstHalfMs = medianOf(0, half);
+    out.secondHalfMs = medianOf(half, baselineBlocks.size());
+    out.driftMs = out.secondHalfMs - out.firstHalfMs;
+    out.driftPercent = out.firstHalfMs > 1e-9 ? 100.0 * out.driftMs / out.firstHalfMs : 0.0;
+    return out;
+}
+
 AbSummary compareArms(std::string_view arm, const std::vector<AbBlock>& baseline,
                       const std::vector<AbBlock>& armBlocks) {
     AbSummary out;
     out.arm = std::string(arm);
     const std::size_t pairs = std::min(baseline.size(), armBlocks.size());
     out.blocks = static_cast<int>(pairs);
+    out.gpuDrift = driftOf(baseline, true);
+    out.wallDrift = driftOf(baseline, false);
     if (pairs == 0) {
         return out;
     }

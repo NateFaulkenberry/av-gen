@@ -471,3 +471,72 @@ TEST_CASE("the benchmark JSON carries the conditions that make a number comparab
     noGpu.gpuMs = describe({});
     CHECK(benchmarkJson({noGpu}, nullptr).find("\"gpuMs\": null") != std::string::npos);
 }
+
+// ADR-181. Counterbalancing removes drift's *bias*; only this detects its *size*. The baseline arm
+// is measured throughout the run, so its own first half against its own second half reads how far
+// the machine moved while the experiment was happening -- at no extra cost, because those blocks
+// were measured anyway.
+TEST_CASE("a run whose machine drifted further than the effect is void", "[render-stats][drift]") {
+    using namespace avgen::rendering;
+    const auto block = [](double wall, double gpu) {
+        AbBlock b;
+        b.wallMs = describe({wall, wall, wall});
+        b.gpuMs = describe({gpu, gpu, gpu});
+        return b;
+    };
+
+    SECTION("a machine that held still does not void anything") {
+        const std::vector<AbBlock> steady = {block(22.0, 18.0), block(22.0, 18.0),
+                                             block(22.0, 18.0), block(22.0, 18.0)};
+        const DriftCheck d = driftOf(steady, true);
+        REQUIRE(d.measurable());
+        CHECK_THAT(d.driftMs, WithinAbs(0.0, 1e-9));
+        CHECK_FALSE(d.voids(0.2)); // a fifth of a millisecond still stands clear of nothing
+    }
+
+    SECTION("a machine that drifted past the effect voids the run") {
+        // The baseline climbs 3 ms across the run. An arm claiming 1 ms is claiming less than the
+        // machine moved underneath it, and that delta is a difference between two machines.
+        const std::vector<AbBlock> warming = {block(20.0, 16.0), block(20.0, 16.0),
+                                              block(23.0, 19.0), block(23.0, 19.0)};
+        const DriftCheck d = driftOf(warming, true);
+        REQUIRE(d.measurable());
+        CHECK_THAT(d.driftMs, WithinAbs(3.0, 1e-9));
+        CHECK(d.driftPercent > 18.0);
+        CHECK(d.voids(1.0));
+        CHECK(d.voids(-1.0)); // sign of the effect is irrelevant; magnitude is what competes
+        // ...and an effect comfortably larger than the drift survives it. A drifting machine does
+        // not invalidate every measurement, only the ones it could account for.
+        CHECK_FALSE(d.voids(9.0));
+    }
+
+    SECTION("equality voids, because an effect the size of the drift is indistinguishable from it") {
+        const std::vector<AbBlock> warming = {block(20.0, 16.0), block(22.0, 18.0)};
+        const DriftCheck d = driftOf(warming, true);
+        CHECK_THAT(d.driftMs, WithinAbs(2.0, 1e-9));
+        CHECK(d.voids(2.0));
+    }
+
+    SECTION("one baseline block cannot disagree with itself, and says so rather than reporting zero") {
+        const DriftCheck d = driftOf({block(22.0, 18.0)}, true);
+        CHECK_FALSE(d.measurable());
+        CHECK(d.samples == 1);
+        // The important half: an unmeasurable check must not void, or every short run would be
+        // void; and it must not silently pass either, which is why `measurable()` is separate.
+        CHECK_FALSE(d.voids(0.001));
+    }
+
+    SECTION("the summary carries the check for both clocks") {
+        const std::vector<AbBlock> baseline = {block(20.0, 16.0), block(23.0, 19.0)};
+        const std::vector<AbBlock> arm = {block(19.0, 15.0), block(22.0, 18.0)};
+        const AbSummary ab = compareArms("volume", baseline, arm);
+        CHECK(ab.gpuDrift.measurable());
+        CHECK(ab.wallDrift.measurable());
+        CHECK_THAT(ab.gpuDrift.driftMs, WithinAbs(3.0, 1e-9));
+        CHECK_THAT(ab.wallDrift.driftMs, WithinAbs(3.0, 1e-9));
+        // The arm saves 1 ms on both clocks and the machine moved 3: this run is void, and the
+        // paired delta being correct is exactly why that has to be said separately.
+        CHECK_THAT(ab.gpu.deltaMs, WithinAbs(1.0, 1e-9));
+        CHECK(ab.gpuDrift.voids(ab.gpu.deltaMs));
+    }
+}
