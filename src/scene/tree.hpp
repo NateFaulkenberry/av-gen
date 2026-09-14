@@ -233,8 +233,20 @@ struct TreeParams {
     // clump's position clusters each tint into regions a few limbs across, which is what an accent
     // looks like.
     float tintFieldScale = 0.17f;  // period ~6 m: a few limbs' worth per region, not one big blob
-    float goldShare = 0.12f;            // fraction of the canopy in the warm accent
-    float turquoiseShare = 0.30f;
+    // SHARE AND PLACEMENT TOGETHER, NOT SHARE ALONE. Twelve per cent with a location was still an
+    // accent nobody could see at the showcase distance -- it read as speckle, which is the same
+    // failure as the uniform sprinkle it replaced, arrived at from the other side. The reference's
+    // power comes substantially from warm against cool dark, so the warm has to occupy enough area
+    // to register as a colour rather than as noise.
+    float goldShare = 0.30f;
+    float turquoiseShare = 0.26f;
+    // And it goes where the light is. Biasing the tint field along the key's incoming direction
+    // puts the warm mass in the lit half of the crown, which is both where the composition wants
+    // the eye and where warm light would actually fall. This couples the generator to the light
+    // rig, deliberately: an accent's placement is a composition decision, and composition knows
+    // which way the key points.
+    glm::vec3 tintLitDirection{0.42f, 0.0f, 0.60f};
+    float tintLitBias = 0.50f;
 
     // --- Roots ---------------------------------------------------------------------------------
     // BUTTRESSES, NOT PIPES. The first design ran each root out from ground level and dived it

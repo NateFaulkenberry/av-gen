@@ -45,8 +45,13 @@ struct TreeCameraView {
     // side, which is the composition of a specimen photograph. Aiming a little to one side of the
     // trunk puts the hero off the middle and gives the crown somewhere to lean into, and dropping
     // the aim lets the base and the roots stay in frame instead of being cropped for headroom.
-    glm::vec3 eye{4.6f, 2.4f, 29.5f};
-    glm::vec3 target{2.2f, 13.8f, 0.0f};
+    // Far enough back that the TALLEST tree the design space can produce fits with margin, not
+    // just the current hero. The rasteriser clips to the frame, so an overflowing candidate is
+    // measured as a smaller one -- its lost silhouette simply does not count -- and the evaluator
+    // therefore cannot penalise a tree for not fitting. Fixing that in the camera is cheaper and
+    // more honest than adding a monotone "how much fits" term the band rule forbids.
+    glm::vec3 eye{4.6f, 2.5f, 34.0f};
+    glm::vec3 target{2.2f, 15.2f, 0.0f};
     glm::vec3 up{0.0f, 1.0f, 0.0f};
     float fovYRadians = 0.9599f; // 55 degrees
     int width = 480;
@@ -110,6 +115,22 @@ struct TreeBand {
     search::ScoreBand band{};
 };
 [[nodiscard]] const std::vector<TreeBand>& treeBands();
+
+// THE HERO. The winning candidate index, and the only place it is written down.
+//
+// Identity is the index (the shared interface's rule), so `sampleAt(treeSchema().parameters, 49)`
+// reproduces this tree exactly and no mesh or parameter dump is stored. The provenance:
+//
+//   96 candidates, none rejected, scored by `treeBands()` as of 2026-09-14, after the camera was
+//   pulled back far enough for the design space's tallest tree to fit and `openness` was re-banded
+//   for the framing that resulted. Top three: 39 at 0.9311, 74 at 0.9279, 52 at 0.9155.
+//
+// This number is an artefact of the scoring that produced it, and the scoring is an artefact of the
+// camera. **If either changes, re-run the selection.** It has already moved twice for exactly that
+// reason -- 11 under the pre-move bands, then 49, then 39 once the camera was far enough back for
+// the whole design space to fit -- and keeping a stale one would mean anyone judging the result was
+// judging the system that picked it rather than the tree.
+inline constexpr std::uint32_t kHeroCandidate = 39;
 
 // The human-defined design space (brief section 34): what kinds of tree are allowed to exist. The
 // search decides where to look inside it; it does not get to leave it.

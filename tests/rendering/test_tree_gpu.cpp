@@ -175,7 +175,7 @@ TEST_CASE("A generated tree renders, and renders the same way twice", "[gpu][tre
     REQUIRE(renderer.init().has_value());
 
     const scene::TreeGenerator generator;
-    const search::Parameters params = search::sampleAt(generator.schema().parameters, 11);
+    const search::Parameters params = search::sampleAt(generator.schema().parameters, scene::kHeroCandidate);
     const auto treeParams = scene::treeParamsFrom(params);
     REQUIRE(treeParams.has_value());
     const auto sceneResult = scene::buildTreeScene(*treeParams, generator.camera());
@@ -296,7 +296,7 @@ TEST_CASE("The tree moves, and stays in one piece while it does", "[gpu][tree][a
     REQUIRE(renderer.init().has_value());
 
     const scene::TreeGenerator generator;
-    const search::Parameters params = search::sampleAt(generator.schema().parameters, 11);
+    const search::Parameters params = search::sampleAt(generator.schema().parameters, scene::kHeroCandidate);
     const auto treeParams = scene::treeParamsFrom(params);
     REQUIRE(treeParams.has_value());
     auto built = scene::buildAnimatedTree(*treeParams, generator.camera());
@@ -356,7 +356,7 @@ TEST_CASE("tree probe: what the atmosphere costs", "[.perf][tree]") {
     REQUIRE(renderer.init().has_value());
 
     const scene::TreeGenerator generator;
-    const auto treeParams = scene::treeParamsFrom(search::sampleAt(generator.schema().parameters, 11));
+    const auto treeParams = scene::treeParamsFrom(search::sampleAt(generator.schema().parameters, scene::kHeroCandidate));
     REQUIRE(treeParams.has_value());
 
     scene::TreeLook lit = scene::TreeLook{};

@@ -395,9 +395,11 @@ const std::vector<TreeBand>& treeBands() {
          {0.46f, 0.52f, 0.62f, 0.72f}},
         {"openness",
          "Fraction of the silhouette's interior that is empty. Meaningful negative space as a "
-         "number: too little is the indistinguishable mass, too much is the dead central void.",
+         "number: too little is the indistinguishable mass, too much is the dead central void. "
+         "Re-banded twice, both times because something else moved underneath it: the foliage rework "
+         "raised the whole population's openness, and then the camera pull-back raised it again.",
          0.09f,
-         {0.10f, 0.20f, 0.40f, 0.58f}},
+         {0.22f, 0.29f, 0.40f, 0.50f}},
         {"structureVisible",
          "Projected branch area over total projected area. The chosen reference's defining property "
          "-- readable radial branching through the crown -- and banded at both ends because a tree "

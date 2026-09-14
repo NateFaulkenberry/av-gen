@@ -152,7 +152,7 @@ TEST_CASE("audio moves the wind, and the wind moves the tree with inertia", "[tr
     // The architectural claim, end to end: the signal never touches a transform. It moves the
     // spring's target, and the spring decides how the joint gets there -- so a step change in the
     // audio produces a ramp in the geometry, not a step.
-    const search::Parameters params = search::sampleAt(treeSchema().parameters, 11);
+    const search::Parameters params = search::sampleAt(treeSchema().parameters, kHeroCandidate);
     const auto treeParams = treeParamsFrom(params);
     REQUIRE(treeParams.has_value());
     const auto built = buildAnimatedTree(*treeParams);
@@ -199,7 +199,7 @@ TEST_CASE("audio moves the wind, and the wind moves the tree with inertia", "[tr
 }
 
 TEST_CASE("the look responds to audio without leaving the palette", "[tree][audio]") {
-    const search::Parameters params = search::sampleAt(treeSchema().parameters, 11);
+    const search::Parameters params = search::sampleAt(treeSchema().parameters, kHeroCandidate);
     const auto treeParams = treeParamsFrom(params);
     REQUIRE(treeParams.has_value());
     auto built = buildAnimatedTree(*treeParams);
@@ -242,7 +242,7 @@ TEST_CASE("a program that asserts emission owns the whole contract", "[tree][vei
     // REPLACES emission (`matEmissive = vec4(program.emission, 1.0)`), so a part carrying both a
     // program and a material emissive has an authored value nothing will ever read -- which is how
     // an art-direction rule passes review and then quietly does nothing.
-    const search::Parameters params = search::sampleAt(treeSchema().parameters, 11);
+    const search::Parameters params = search::sampleAt(treeSchema().parameters, kHeroCandidate);
     const auto treeParams = treeParamsFrom(params);
     REQUIRE(treeParams.has_value());
     auto built = buildAnimatedTree(*treeParams);
@@ -294,7 +294,7 @@ TEST_CASE("the check catches the regression it exists for", "[tree][veins]") {
 }
 
 TEST_CASE("audio reaches the vein program, not a dead material lane", "[tree][veins][audio]") {
-    const search::Parameters params = search::sampleAt(treeSchema().parameters, 11);
+    const search::Parameters params = search::sampleAt(treeSchema().parameters, kHeroCandidate);
     const auto treeParams = treeParamsFrom(params);
     REQUIRE(treeParams.has_value());
     auto built = buildAnimatedTree(*treeParams);

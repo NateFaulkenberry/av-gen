@@ -67,11 +67,11 @@ struct TreeLook {
     // is lit warm, not because its leaves are yellow.
     std::array<glm::vec3, kFoliageTints> foliageColor{glm::vec3{0.040f, 0.120f, 0.088f},
                                                       glm::vec3{0.036f, 0.118f, 0.128f},
-                                                      glm::vec3{0.100f, 0.098f, 0.055f}};
+                                                      glm::vec3{0.135f, 0.110f, 0.045f}};
     std::array<glm::vec3, kFoliageTints> foliageEmissiveTint{glm::vec3{0.085f, 0.62f, 0.36f},
                                                              glm::vec3{0.075f, 0.56f, 0.62f},
-                                                             glm::vec3{0.60f, 0.44f, 0.14f}};
-    std::array<float, kFoliageTints> foliageEmissiveScale{1.0f, 0.86f, 0.50f};
+                                                             glm::vec3{0.92f, 0.58f, 0.16f}};
+    std::array<float, kFoliageTints> foliageEmissiveScale{1.0f, 0.86f, 0.92f};
     // 0.55, not 1.65. At 1.65 the canopy clipped to near-white and the palette disappeared -- the
     // cookbook's "a glowing surface reads as paint" failure, arrived at independently. Below the
     // bloom threshold of 1.0 the foliage keeps its colour and the bloom is left for the veins.

@@ -248,7 +248,7 @@ TEST_CASE("a second of wind is a second of wind at any frame rate", "[tree][rig]
 }
 
 TEST_CASE("an animated tree assembles into a scene with one rig", "[tree][rig][scene]") {
-    const search::Parameters params = search::sampleAt(treeSchema().parameters, 11);
+    const search::Parameters params = search::sampleAt(treeSchema().parameters, kHeroCandidate);
     const auto treeParams = treeParamsFrom(params);
     REQUIRE(treeParams.has_value());
     const auto built = buildAnimatedTree(*treeParams);

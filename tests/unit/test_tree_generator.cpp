@@ -377,3 +377,24 @@ TEST_CASE("tree probe: is silhouetteComplexity measuring foliage or limbs", "[.t
     report("full silhouette", false);
     report("branches only", true);
 }
+
+TEST_CASE("tree probe: re-run the selection", "[.tree-probe]") {
+    // The hero is whatever the scoring picks, so a re-banded scoring means a new hero. Running this
+    // is the difference between someone judging THE TREE and judging the system that picked it.
+    const TreeGenerator generator;
+    search::SearchSettings settings;
+    settings.population = 96;
+    settings.select = 12;
+    const auto result = search::runSearch(generator, settings);
+    REQUIRE(result.has_value());
+    WARN(fmt::format("{} built of {}, {} selected, {:.1f} s", result->built, settings.population,
+                     result->selected.size(), result->totalMs / 1000.0));
+    for (const auto& [rule, count] : result->rejections) {
+        WARN(fmt::format("rejected {} x {}", count, rule));
+    }
+    for (std::size_t rank = 0; rank < std::min<std::size_t>(6, result->selected.size()); ++rank) {
+        const search::Candidate& c = result->candidates[result->selected[rank]];
+        WARN(fmt::format("rank {}  index {:<4} score {:.4f}  tris {}", rank, c.index, c.score.overall(),
+                         c.triangles));
+    }
+}

@@ -497,11 +497,27 @@ Showcase parameters, one machine, no cross-session comparison:
 - Total frame cost: **not quoted.** The absolute above is unreadable across sessions by its own
   evidence, and this scene has never been run through the real headless path with `--bench-json`.
 
-### 7.5 Still open
+### 7.5 The hero, and why it moved twice
 
-- The tree is a good stylised fantasy tree with architectural variety, a readable hierarchy, luminous
-  veins and legible scale. It is not yet *awe-inspiring*, and the brief's §51 says not to rationalise
-  that away.
+`scene::kHeroCandidate` is 39, from 96 candidates with none rejected. It has been **11**, then
+**49**, then **39**, and each move was forced rather than chosen: the bands were re-banded after the
+camera moved for the monumental framing, and then again after the camera was pulled back far enough
+for the design space's tallest tree to fit.
+
+That chain is the point. The hero is an artefact of the scoring; the scoring is an artefact of the
+camera. Keeping a stale hero would have meant anyone judging the result was judging the system that
+picked it rather than the tree.
+
+### 7.6 Still open
+
+- The tree is a monumental, anchored, luminous fantasy tree with architectural variety across the
+  population, a readable hierarchy, warm-against-cool colour and legible scale. It is **not yet
+  awe-inspiring**, and §51 says not to rationalise that away. The two named remaining gaps:
+  - **The canopy is a mass of small flakes, not layered foliage.** Individual cards are visible at the
+    silhouette edge and there is no sense of leaves in front of leaves. This needs a different
+    foliage primitive, not a tuning pass — every tuning lever here has been exercised.
+  - **No foreground.** There is no depth cue in the near field, only mist in the far one. Adding one
+    is exactly the environment accumulation §26 warns against, so it is named rather than attempted.
 - The evaluator has never been validated against a person's ranking. It agrees with one reader on one
   contact sheet, which is a sanity check.
 - The editor path is unbuilt: the tree emits `scene::Scene` entities, not `CompositionNode`s, so it

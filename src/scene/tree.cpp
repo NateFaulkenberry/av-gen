@@ -1051,7 +1051,14 @@ Result<TreeGraph> generateTree(const TreeParams& params) {
             // with a 12% gold share the threshold lands at 0.88 and the accent simply never
             // appeared -- the canopy came out with no gold in it at all. `regionField` is the
             // amplitude-corrected version that exists for exactly this, so a share of 12% is 12%.
-            const float field = 0.5f + 0.5f * noise::regionField(p * params.tintFieldScale, params.seed ^ 0x7A17u);
+            float field = 0.5f + 0.5f * noise::regionField(p * params.tintFieldScale, params.seed ^ 0x7A17u);
+            const glm::vec2 lit(params.tintLitDirection.x, params.tintLitDirection.z);
+            const glm::vec2 radial(p.x, p.z);
+            if (glm::length(lit) > kEpsilon && glm::length(radial) > kEpsilon) {
+                field += params.tintLitBias * 0.5f *
+                         glm::dot(glm::normalize(radial), glm::normalize(lit));
+            }
+            field = std::clamp(field, 0.0f, 1.0f);
             const float gold = std::clamp(params.goldShare, 0.0f, 1.0f);
             const float turquoise = std::clamp(params.turquoiseShare, 0.0f, 1.0f - gold);
             site.tint = field > 1.0f - gold ? 2 : (field > 1.0f - gold - turquoise ? 1 : 0);
@@ -1190,6 +1197,8 @@ nlohmann::json TreeParams::toJson() const {
     j["foliageLowerClear"] = foliageLowerClear;
     j["tintFieldScale"] = tintFieldScale;
     j["goldShare"] = goldShare;
+    j["tintLitBias"] = tintLitBias;
+    j["tintLitDirection"] = vecToJson(tintLitDirection);
     j["turquoiseShare"] = turquoiseShare;
     j["rootCount"] = rootCount;
     j["rootSpread"] = rootSpread;
@@ -1271,6 +1280,10 @@ Result<TreeParams> TreeParams::fromJson(const nlohmann::json& j) {
     p.foliageLowerClear = j.value("foliageLowerClear", p.foliageLowerClear);
     p.tintFieldScale = j.value("tintFieldScale", p.tintFieldScale);
     p.goldShare = j.value("goldShare", p.goldShare);
+    p.tintLitBias = j.value("tintLitBias", p.tintLitBias);
+    if (const auto it = j.find("tintLitDirection"); it != j.end()) {
+        p.tintLitDirection = vecFromJson(*it, p.tintLitDirection);
+    }
     p.turquoiseShare = j.value("turquoiseShare", p.turquoiseShare);
     p.rootCount = j.value("rootCount", p.rootCount);
     p.rootSpread = j.value("rootSpread", p.rootSpread);
