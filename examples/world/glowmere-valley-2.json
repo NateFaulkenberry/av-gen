@@ -73,9 +73,9 @@
     "camera/mode": 1,
     "camera/orbitSpeed": 0.0,
     "camera/position": [
-      60.55047607421875,
-      7.997378826141357,
-      215.74996948242188
+      58.79127502441406,
+      16.16937828063965,
+      -94.63273620605469
     ],
     "camera/shake/amplitude": 0.0,
     "camera/shake/decay": 0.0,
@@ -89,9 +89,9 @@
     ],
     "camera/splineT": 0.0,
     "camera/target": [
-      78.0,
-      0.040000006556510925,
-      198.0
+      68.0,
+      11.970000267028809,
+      -104.0
     ],
     "entity/visitor/bank/degrees": 5.0,
     "entity/visitor/bank/responseMs": 1500.0,
@@ -1828,9 +1828,9 @@
     ],
     "nodes/spire-stem/lightIntensity": 1.0,
     "nodes/spire-stem/position": [
-      68.0,
+      67.580322265625,
       11.970000267028809,
-      -104.0
+      -105.09228515625
     ],
     "nodes/spire-stem/rotation": [
       0.0,
