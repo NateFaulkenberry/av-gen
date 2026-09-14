@@ -4,9 +4,10 @@ A successor showcase scene: a valley and river that traverse the whole map, ecol
 vegetation, six procedurally searched hero mushrooms, and an Auto-director that can hold one
 continuous shot.
 
-**Status: Phase 2 complete, Phase 3 next.** The scene exists, is listed, and its geography is
-tested; the shared candidate-search framework is published with its generic half implemented. One
-visual defect is open ([06-phase-2.md](06-phase-2.md) §5).
+**Status: Phase 3 complete, Phase 4 (hero mushrooms) next.** The scene exists, is listed, its
+geography and its habitat field are tested, and it renders at **13.44 ms** against a 16 ms ceiling —
+parity with the scene it succeeds, on four times the readable ground. The shared candidate-search
+framework is published with its generic half implemented.
 
 | | |
 |---|---|
@@ -15,7 +16,8 @@ visual defect is open ([06-phase-2.md](06-phase-2.md) §5).
 | [03-baseline.md](03-baseline.md) | Build, test and render baseline for the original — and why its timings are not evidence |
 | [04-plan.md](04-plan.md) | Phased plan, risk register, and the eight questions Phase 2 needs answered |
 | [05-candidate-search-interface.md](05-candidate-search-interface.md) | **The shared candidate-search framework.** Read this if you are writing a searched procedural generator — mushrooms or trees |
-| [06-phase-2.md](06-phase-2.md) | Phase 2: the geography — what was built, three authoring errors worth reading, and the one open defect |
+| [06-phase-2.md](06-phase-2.md) | Phase 2: the geography — three authoring errors worth reading, and a defect that turned out to be the measurement |
+| [07-phase-3.md](07-phase-3.md) | Phase 3: the vegetation — the riparian ladder, and why negative space *is* the performance budget |
 
 ## The five findings worth reading first
 

@@ -322,7 +322,10 @@
       "gustResponse": 0.8,
       "bendCurve": 3.2,
       "amplitudeVariance": 0.28
-     }
+     },
+     "minHeightAboveWater": 2.5,
+     "maxHeightAboveWater": 42.0,
+     "heightAboveWaterFeather": 5.0
     },
     {
      "name": "pines",
@@ -372,7 +375,10 @@
       "gustResponse": 0.7,
       "bendCurve": 3.5,
       "amplitudeVariance": 0.25
-     }
+     },
+     "minHeightAboveWater": 11.0,
+     "maxHeightAboveWater": 95.0,
+     "heightAboveWaterFeather": 7.0
     },
     {
      "name": "deadwood",
@@ -397,8 +403,8 @@
       0.1779,
       0.2789
      ],
-     "viewDistance": 440.0,
-     "minScreenRadius": 1.0,
+     "viewDistance": 380.0,
+     "minScreenRadius": 1.6,
      "castsShadow": true,
      "motion": {
       "stiffness": 20.0,
@@ -410,7 +416,10 @@
       "gustResponse": 0.5,
       "bendCurve": 3.6,
       "amplitudeVariance": 0.2
-     }
+     },
+     "minHeightAboveWater": 4.0,
+     "maxHeightAboveWater": 46.0,
+     "heightAboveWaterFeather": 5.0
     },
     {
      "name": "bushes",
@@ -436,8 +445,8 @@
       0.305,
       0.3515
      ],
-     "viewDistance": 190.0,
-     "minScreenRadius": 5.5,
+     "viewDistance": 165.0,
+     "minScreenRadius": 6.0,
      "castsShadow": true,
      "emissiveColor": [
       0.55,
@@ -470,7 +479,10 @@
      },
      "chromaDrift": 0.06,
      "chromaDriftScale": 50.0,
-     "chromaDriftSpeed": 0.035
+     "chromaDriftSpeed": 0.035,
+     "minHeightAboveWater": 1.5,
+     "maxHeightAboveWater": 24.0,
+     "heightAboveWaterFeather": 3.5
     },
     {
      "name": "ferns",
@@ -507,8 +519,8 @@
       0.58
      ],
      "emissiveIntensity": 0.0615,
-     "viewDistance": 170.0,
-     "minScreenRadius": 1.5,
+     "viewDistance": 130.0,
+     "minScreenRadius": 2.6,
      "castsShadow": false,
      "hueField": 0.085,
      "hueFieldScale": 42.0,
@@ -534,7 +546,10 @@
      },
      "chromaDrift": 0.05,
      "chromaDriftScale": 60.0,
-     "chromaDriftSpeed": 0.035
+     "chromaDriftSpeed": 0.035,
+     "minHeightAboveWater": 0.4,
+     "maxHeightAboveWater": 8.5,
+     "heightAboveWaterFeather": 1.8
     },
     {
      "name": "grass",
@@ -559,8 +574,8 @@
       0.18,
       0.13
      ],
-     "viewDistance": 90.0,
-     "minScreenRadius": 1.2,
+     "viewDistance": 72.0,
+     "minScreenRadius": 2.4,
      "castsShadow": false,
      "emissiveColor": [
       0.05,
@@ -592,7 +607,10 @@
      },
      "chromaDrift": 0.05,
      "chromaDriftScale": 55.0,
-     "chromaDriftSpeed": 0.04
+     "chromaDriftSpeed": 0.04,
+     "minHeightAboveWater": 0.2,
+     "maxHeightAboveWater": 11.0,
+     "heightAboveWaterFeather": 2.5
     },
     {
      "name": "fan-plants",
@@ -624,8 +642,8 @@
       0.24,
       0.28
      ],
-     "viewDistance": 220.0,
-     "minScreenRadius": 2.0,
+     "viewDistance": 175.0,
+     "minScreenRadius": 3.2,
      "emissiveColor": [
       0.04,
       0.45,
@@ -643,7 +661,10 @@
       "windSensitivity": 0.65,
       "bendLimit": 0.16,
       "tipAmplitude": 0.08
-     }
+     },
+     "minHeightAboveWater": 0.4,
+     "maxHeightAboveWater": 7.5,
+     "heightAboveWaterFeather": 1.6
     },
     {
      "name": "flowers",
@@ -672,8 +693,8 @@
       1.0
      ],
      "emissiveIntensity": 3.936,
-     "viewDistance": 150.0,
-     "minScreenRadius": 5.5,
+     "viewDistance": 120.0,
+     "minScreenRadius": 6.0,
      "castsShadow": false,
      "hueField": 0.17,
      "hueFieldScale": 30.0,
@@ -698,7 +719,10 @@
      },
      "chromaDrift": 0.07,
      "chromaDriftScale": 42.0,
-     "chromaDriftSpeed": 0.045
+     "chromaDriftSpeed": 0.045,
+     "minHeightAboveWater": 0.3,
+     "maxHeightAboveWater": 5.0,
+     "heightAboveWaterFeather": 1.2
     },
     {
      "name": "fungi",
@@ -736,8 +760,8 @@
      ],
      "emissiveIntensity": 6.888,
      "materialProgram": "glowmereTissue",
-     "viewDistance": 160.0,
-     "minScreenRadius": 5.5,
+     "viewDistance": 130.0,
+     "minScreenRadius": 6.0,
      "castsShadow": true,
      "hueField": 0.16,
      "hueFieldScale": 28.0,
@@ -756,7 +780,10 @@
      },
      "chromaDrift": 0.07,
      "chromaDriftScale": 38.0,
-     "chromaDriftSpeed": 0.05
+     "chromaDriftSpeed": 0.05,
+     "minHeightAboveWater": 0.1,
+     "maxHeightAboveWater": 6.0,
+     "heightAboveWaterFeather": 1.2
     },
     {
      "name": "shelf-fungi",
@@ -786,8 +813,8 @@
      ],
      "emissiveIntensity": 4.428,
      "materialProgram": "glowmereTissue",
-     "viewDistance": 180.0,
-     "minScreenRadius": 5.5,
+     "viewDistance": 150.0,
+     "minScreenRadius": 6.0,
      "castsShadow": true,
      "hueField": 0.14,
      "hueFieldScale": 36.0,
@@ -806,7 +833,10 @@
      },
      "chromaDrift": 0.06,
      "chromaDriftScale": 45.0,
-     "chromaDriftSpeed": 0.04
+     "chromaDriftSpeed": 0.04,
+     "minHeightAboveWater": 0.8,
+     "maxHeightAboveWater": 11.0,
+     "heightAboveWaterFeather": 2.0
     },
     {
      "name": "boulders",
@@ -833,8 +863,8 @@
       0.1746,
       0.2462
      ],
-     "viewDistance": 300.0,
-     "minScreenRadius": 1.5,
+     "viewDistance": 260.0,
+     "minScreenRadius": 2.4,
      "castsShadow": true
     },
     {
@@ -869,9 +899,12 @@
       0.2159,
       0.2747
      ],
-     "viewDistance": 55.0,
-     "minScreenRadius": 3.0,
-     "castsShadow": false
+     "viewDistance": 42.0,
+     "minScreenRadius": 4.0,
+     "castsShadow": false,
+     "minHeightAboveWater": -1.5,
+     "maxHeightAboveWater": 4.0,
+     "heightAboveWaterFeather": 1.0
     },
     {
      "name": "beacons",
@@ -923,7 +956,10 @@
      },
      "chromaDrift": 0.05,
      "chromaDriftScale": 80.0,
-     "chromaDriftSpeed": 0.025
+     "chromaDriftSpeed": 0.025,
+     "minHeightAboveWater": 0.4,
+     "maxHeightAboveWater": 9.0,
+     "heightAboveWaterFeather": 1.5
     }
    ],
    "world": {
@@ -1577,7 +1613,109 @@
       "smoothing": 0
      }
     ]
-   }
+   },
+   "clearings": [
+    {
+     "center": [
+      -118.0,
+      -96.0
+     ],
+     "radius": 46.0,
+     "softness": 34.0,
+     "strength": 1.0,
+     "minHeight": 5.5
+    },
+    {
+     "center": [
+      -74.0,
+      -18.0
+     ],
+     "radius": 34.0,
+     "softness": 24.0,
+     "strength": 1.0,
+     "minHeight": 5.0
+    },
+    {
+     "center": [
+      -12.0,
+      52.0
+     ],
+     "radius": 30.0,
+     "softness": 22.0,
+     "strength": 1.0,
+     "minHeight": 4.0
+    },
+    {
+     "center": [
+      -58.0,
+      -286.0
+     ],
+     "radius": 38.0,
+     "softness": 26.0,
+     "strength": 1.0,
+     "minHeight": 6.0
+    },
+    {
+     "center": [
+      6.0,
+      -154.0
+     ],
+     "radius": 38.0,
+     "softness": 26.0,
+     "strength": 1.0,
+     "minHeight": 6.0
+    },
+    {
+     "center": [
+      5.0,
+      -34.0
+     ],
+     "radius": 38.0,
+     "softness": 26.0,
+     "strength": 1.0,
+     "minHeight": 6.0
+    },
+    {
+     "center": [
+      -41.0,
+      76.0
+     ],
+     "radius": 38.0,
+     "softness": 26.0,
+     "strength": 1.0,
+     "minHeight": 6.0
+    },
+    {
+     "center": [
+      29.0,
+      188.0
+     ],
+     "radius": 38.0,
+     "softness": 26.0,
+     "strength": 1.0,
+     "minHeight": 6.0
+    },
+    {
+     "center": [
+      24.0,
+      300.0
+     ],
+     "radius": 38.0,
+     "softness": 26.0,
+     "strength": 1.0,
+     "minHeight": 6.0
+    },
+    {
+     "center": [
+      -58.0,
+      150.0
+     ],
+     "radius": 44.0,
+     "softness": 30.0,
+     "strength": 1.0,
+     "minHeight": 2.2
+    }
+   ]
   },
   {
    "name": "elder-crown",

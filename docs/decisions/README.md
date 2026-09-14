@@ -166,3 +166,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [171](ADR-171-glowmere-valley-is-two-scenes-and-the-named-one-is-the-wrong-one.md) | "Glowmere Valley" names two scenes, and the successor is built on the one that is not called that | Accepted |
 | [172](ADR-172-an-aesthetic-score-component-is-a-band-not-a-maximum.md) | An aesthetic score component is a band, never a maximum | Accepted |
 | [173](ADR-173-the-candidate-sampler-is-sobol-and-the-experiment-that-would-overturn-it.md) | The mushroom candidate sampler is a Sobol sequence, and the experiment that would overturn it is named | Accepted |
+| [174](ADR-174-vegetation-is-banded-on-height-above-water.md) | Vegetation is banded on height above the water table, and the cap thins instead of truncating | Accepted |

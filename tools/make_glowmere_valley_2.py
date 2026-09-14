@@ -290,6 +290,64 @@ if GROUND2 not in progs:
     progs.append(GROUND2)
 terrain.setdefault("material", collections.OrderedDict())["program"] = "paintedGround2"
 
+# ---- Phase 3: the riparian ladder ---------------------------------------------------------------
+#
+# Every layer is given a band on **height above the water table** -- the one habitat axis that is a
+# property of a point relative to the geography rather than of the point on its own. Bair et al.
+# (Ecosphere 2021) relate ground height above river to observed cover types and find the boundaries
+# fall where adjacent types differ by about half a metre near the channel; the ladder below is that
+# idea adapted, not that paper's numbers transplanted.
+#
+# The bands do two jobs at once, which is why they are the whole of Phase 3's composition work and
+# most of its performance work. They *structure* the valley -- a wet floor, a transitional slope, an
+# upland of silhouette species -- and they *remove* instances from the places the camera looks
+# across rather than at, which is where a 640 m map spends coverage it gets nothing for.
+#
+# (min, max, feather). A layer absent from this table is unconstrained on purpose: rock is rock.
+HAR_BANDS = {
+    "grass":       (0.2, 11.0, 2.5),   # the valley floor's carpet, gone from the upper walls
+    "ferns":       (0.4,  8.5, 1.8),   # moist, low, near the corridor
+    "flowers":     (0.3,  5.0, 1.2),   # a riparian accent and nothing else
+    "fungi":       (0.1,  6.0, 1.2),   # damp and shaded
+    "shelf-fungi": (0.8, 11.0, 2.0),
+    "fan-plants":  (0.4,  7.5, 1.6),   # the big fronds: foreground framing, floor only
+    "bushes":      (1.5, 24.0, 3.5),   # the transitional band, deliberately the widest
+    "canopy":      (2.5, 42.0, 5.0),   # woodland on the slopes, not standing in the river
+    "deadwood":    (4.0, 46.0, 5.0),
+    "pines":       (11.0, 95.0, 7.0),  # the upland silhouette, and the reason the walls read
+    "beacons":     (0.4,  9.0, 1.5),   # landmarks in the corridor, where the camera travels
+    "pebbles":     (-1.5, 4.0, 1.0),   # bank gravel
+}
+
+# What a layer costs is what it covers, not how many there are (ADR-126, ADR-151). These are the two
+# knobs that remove coverage nobody sees: a screen radius below which an instance is not worth a
+# draw, and a distance past which a small thing is not worth anything at all. Both were authored for
+# a 200 m bowl and this valley is 640 m.
+BUDGET = {
+    # layer:        (minScreenRadius, viewDistance)
+    "grass":        (2.4, 72.0),
+    "ferns":        (2.6, 130.0),
+    "pebbles":      (4.0, 42.0),
+    "flowers":      (6.0, 120.0),
+    "fungi":        (6.0, 130.0),
+    "fan-plants":   (3.2, 175.0),
+    "bushes":       (6.0, 165.0),
+    "shelf-fungi":  (6.0, 150.0),
+    "deadwood":     (1.6, 380.0),
+    "boulders":     (2.4, 260.0),
+}
+
+for layer in terrain.get("scatter", []):
+    band = HAR_BANDS.get(layer.get("name"))
+    if band is not None:
+        layer["minHeightAboveWater"] = band[0]
+        layer["maxHeightAboveWater"] = band[1]
+        layer["heightAboveWaterFeather"] = band[2]
+    budget = BUDGET.get(layer.get("name"))
+    if budget is not None:
+        layer["minScreenRadius"] = budget[0]
+        layer["viewDistance"] = budget[1]
+
 # The river dressing has to name the new course.
 for n in d["nodes"]:
     fl = n.get("float")
@@ -317,6 +375,45 @@ WANDER = (-74.0, 7.62, -18.0)        # ground 7.62, the hollow: dead flat, open,
 UFO    = (20.0, 29.5, 150.0)         # ground -2.33, 32 m up over the lower valley
 CAM_EYE = (-118.0, 32.1, -96.0)      # ground 27.14, on the west shoulder, 5 m up
 CAM_TGT = (-20.0, 4.0, 40.0)         # the bend by the elder, so the river leads the eye into frame
+
+# ---- Phase 3: negative space -------------------------------------------------------------------
+#
+# The brief's 4.5 asks for open ground as a design feature, and the first render of this valley showed
+# why it is not decoration: the opening camera stood inside a wood and the valley was glimpsed between
+# trunks. Big near geometry is also, per ADR-126, where this renderer's frame actually goes -- coverage
+# costs, triangles do not -- so the composition fix and the budget fix are the same edit.
+#
+# `ScatterClearance::minHeight` is the mechanism and it is the right one: it clears the *canopy* and
+# leaves the ground growing, which is a glade rather than a bald patch. Clearing everything produced
+# "a bald hillside with one tree on it" when the composer first tried it, and that comment is in the
+# header for a reason.
+#
+# A clearing is placed where the camera stands, where a hero is staged, and along the water -- the
+# three places a viewer's attention actually goes.
+def glade(x, z, radius, softness, min_height, strength=1.0):
+    return collections.OrderedDict([
+        ("center", [float(x), float(z)]), ("radius", float(radius)),
+        ("softness", float(softness)), ("strength", float(strength)),
+        ("minHeight", float(min_height)),
+    ])
+
+clearings = [
+    # The opening camera's glade: it stands in one and looks across the valley out of it.
+    glade(CAM_EYE[0], CAM_EYE[2], 46.0, 34.0, 5.5),
+    # The hollow the Wanderer walks, and the elder's own ground -- a hero needs room to have a
+    # silhouette, and a 16 m mushroom behind a 14 m tree is not a hero.
+    glade(WANDER[0], WANDER[2], 34.0, 24.0, 5.0),
+    glade(ELDER[0], ELDER[2], 30.0, 22.0, 4.0),
+]
+# The river corridor: a lane in the canopy along the whole course, so the water is visible from the
+# valley floor and the auto-director has somewhere continuous to fly. Taken from the same centreline
+# the river is cut from, every other control point, so the lane meanders with it.
+for cx, _cy, cz in RIVER[1:-1:2]:
+    clearings.append(glade(cx, cz, 38.0, 26.0, 6.0))
+# One deliberate meadow on the open valley floor: somewhere with nothing in it at all, which is what
+# gives the rest of the frame something to be dense against.
+clearings.append(glade(-58.0, 150.0, 44.0, 30.0, 2.2))
+terrain["clearings"] = clearings
 
 def setpos(name, xyz):
     for n in d["nodes"]:

@@ -128,6 +128,24 @@ first task and needs a machine with no window open on it.
 | the original's geometry is unchanged | baseline arm triangles == 273,819 exactly |
 | Glowmere Valley 2 did not displace it | `examples/index.json` still lists all seven Glowmere entries |
 
+## 6a. Postscript: the ADR-151 discrepancy, recorded and not chased
+
+Re-running this instrument on a quiet machine during Phase 3 produced a result worth leaving here for
+whoever does the renderer gap-closure work.
+
+**In that run the 40 px deletion arm was worth −0.5% of the scene pass.** ADR-151 measured −17.5% for
+the same arm on the same scene and built its central argument on it ("the only real number in this
+ADR"). Cross-session timings are not comparable and this overturns nothing — but the arms *within* one
+run are comparable to each other, and within that run the band ADR-151 called real was inside the 2%
+noise floor.
+
+Also worth having: the same instrument gave **15.93 ms** for the baseline arm in one quiet-machine run
+and **13.57 ms** in another, where 13.566 ms is ADR-151's published figure to three decimals. Both runs
+passed the `pgrep avgen` check on both sides. So ADR-170's clause is necessary and not sufficient, and
+a 17% confounder survives it. Thermal state is the obvious candidate and nothing instruments it.
+
+Neither is chased here. A deliberate re-run belongs with the renderer work, not with a scene phase.
+
 ## 7. Verified vs assumed
 
 **Verified:** the build, the test counts, the four arms' triangle and instance counts (three

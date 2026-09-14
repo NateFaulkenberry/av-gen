@@ -99,6 +99,28 @@ struct ScatterLayer {
     bool avoidWater = true;               // never below a water surface
     float shoreOffset = 0.0f;             // metres of clearance above the water line to also avoid
 
+    // Height above the water table, in metres, as a habitat band (ADR-174).
+    //
+    // Slope and altitude are properties of a point on its own; this is the first one that is a
+    // property of a point *relative to the geography*, and it is the one a valley's vegetation
+    // actually organises itself along. `WorldMap::heightAboveWater` is the ground minus the surface
+    // of the nearest water course extrapolated past its bank -- what the riparian literature calls
+    // height above river and uses as a groundwater proxy -- so a bench two metres above the water
+    // and forty metres from it reads as wet, and a shelf two metres above it and ten metres away
+    // reads the same way. Distance to the channel cannot say that.
+    //
+    // Unlike `minSlope`/`maxSlope` the edges are **feathered**, because a hard edge on this axis is
+    // a contour line drawn across the hillside in plants. The defaults admit everything, so a layer
+    // that says nothing about water is unaffected and costs nothing -- the field is only evaluated
+    // when a layer constrains it.
+    float minHeightAboveWater = -1.0e6f;
+    float maxHeightAboveWater = 1.0e6f;
+    float heightAboveWaterFeather = 1.5f; // metres of soft shoulder at each edge
+
+    [[nodiscard]] bool constrainsHeightAboveWater() const {
+        return minHeightAboveWater > -1.0e5f || maxHeightAboveWater < 1.0e5f;
+    }
+
     // What this thing should be, in metres, rather than what the file happens to be authored at.
     // A library is authored to its own convention -- Quaternius grass is 1.8 units tall and its
     // trees are 7 -- so a scale factor is a number about the file, not about the world, and the
