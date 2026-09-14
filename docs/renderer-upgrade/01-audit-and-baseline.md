@@ -281,6 +281,36 @@ The contact march is the single largest nameable item in the frame and Phase A c
 is a loop inside `evaluateLight`, not a pass, and every arm-based attribution is structurally blind
 to anything that is not a pass. That is a lesson about the instrument, not about shadows.
 
+## 3.2.4 After the wave-4 fixes
+
+Five locked runs, 1280x800, load average 3.86 (not fully idle — the spread says so).
+
+| | wave 2 head (S3.2.3) | now |
+|---|---|---|
+| GPU median | 13.37 ms | **13.63 ms** (spread 2.4%) |
+| scene pass | 10.81 ms | **11.01 ms** |
+| draws / triangles | 141 / 264,305 | **136 / 273,819** |
+
+**The frame is unchanged, and that is the result.** The +1.9% is inside the batch's own 2.4% spread,
+so it is not a difference. Two changes moved it in opposite directions and roughly cancelled:
+
+- **ADR-152** (the cull ladder sizing a procedural by the object rather than its raw mesh) draws
+  **+3.6% more triangles**, because content that was being wrongly culled is now drawn. That is the
+  cost of correctness, and it was accepted knowingly.
+- **ADR-155** (the material tier following the LOD rung) removes shading from distant scatter, worth
+  **1.11 ms / 7.46%** measured directly.
+
+Quoting either number alone would misdescribe the frame. The pair is why the total did not move.
+
+**Against the pre-upgrade baseline (§3.2), which is what the upgrade is measured by:**
+
+| | pre-upgrade | now | change |
+|---|---|---|---|
+| GPU median | 18.55–18.74 ms | **13.63 ms** | **−27%** |
+| scene pass | 15.73 ms | **11.01 ms** | **−30%** |
+| triangles | 430,231 | 273,819 | −36% |
+| object cap | 256, silently dropping visible entities | none | — |
+
 ## 3.3 Reproducibility — investigated, not assumed
 
 Five consecutive Glowmere runs, same session:
