@@ -15,7 +15,48 @@ the mandate and are running on their own branches; they are not what the start c
 
 Implementation is held until the scene projects land. This phase is §1 only: research and forensics.
 
-## The finding that gates everything else
+## Correction (same day): the protocol exists and was not being followed
+
+The section below concluded that this project cannot certify a single-run timing and that the first
+task was to build a protocol. **That was half wrong, and the missing half is the useful part.**
+
+A third instance of the same confounder arrived hours later, and it came with the answer. Measuring
+whether six hero mushrooms cost anything, a two-invocation A/B returned the causally impossible
+result that *hiding* them made the frame slower. Three runs of a **byte-identical** scene, every one
+holding `gpu-lock.sh` and passing a `pgrep` check on both sides:
+
+| run | frame ms | triangles |
+|---|---:|---:|
+| 1 | 10.945 | 252,996 |
+| 2 | 11.272 | 252,996 |
+| 3 | 13.697 | 252,996 |
+
+**25% spread with the scene identical.** So a two-invocation comparison on this machine carries a
+noise floor of roughly 3 ms, and every cross-invocation number below that is unreadable.
+
+The protocol that works already exists and is the one ADR-150 has used all along: **arms must be
+interleaved inside one process**, which is what `--ab` does and why the register says cross-session
+comparison "is not offered, on purpose". Interleaved properly, those six heroes cost +0.20 ms and
++0.66 ms — real, and a third of what the two-invocation run reported.
+
+So the gap is not a missing instrument. It is that **nothing enforces interleaving**, and absolute
+frame times get quoted to three significant figures in documents where they were never that precise.
+ADR-170's contention clause is a floor, not a protocol.
+
+Two consequences, adopted:
+
+* **Every frame time in this project's documents should be read with a ±3 ms band unless it says it
+  was interleaved.** That includes the 15.93 vs 13.57 ms pair below, which is now explained rather
+  than mysterious, and the renderer upgrade's own headline figures, which were five locked runs per
+  figure and are therefore better than that but not immune.
+* **A causally impossible result is a free diagnostic.** Hiding geometry cannot make a frame slower;
+  the value of the arm that produced it is that it indicts the method immediately, at no cost. Worth
+  reaching for deliberately — an arm whose sign is known in advance is a protocol test.
+
+Thermal state remains uninstrumented and may still contribute. It is no longer the leading
+explanation, and no work is scheduled against it.
+
+## The finding that gates everything else — as originally written, now corrected above
 
 **This project cannot currently certify a single-run timing, and two independent measurements this
 week say so.**
