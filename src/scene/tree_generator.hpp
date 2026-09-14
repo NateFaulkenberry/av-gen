@@ -35,10 +35,16 @@ struct TreeCameraView {
     // the middle of a lot of sky and it reads as a model of a tree; dropping the eye to a third of
     // the tree's height and pushing in makes the viewer look UP at it, which is most of what
     // "monumental" is.
-    glm::vec3 eye{8.0f, 6.5f, 37.0f};
-    glm::vec3 target{0.0f, 14.5f, 0.0f};
+    // LOW AND WIDE, not the geometric fit. A 44-degree lens from 37 m is nearly orthographic: it
+    // contains the tree and flattens it, and a tall tree framed to merely fill the frame reads
+    // exactly as short as a short one. Dropping the eye to under a tenth of the tree's height and
+    // widening to 55 degrees puts the viewer at the foot of it looking up, so the trunk converges
+    // and the crown overhangs -- which is most of what "monumental" is, and none of it is in the
+    // geometry.
+    glm::vec3 eye{5.5f, 2.6f, 30.0f};
+    glm::vec3 target{0.0f, 15.5f, 0.0f};
     glm::vec3 up{0.0f, 1.0f, 0.0f};
-    float fovYRadians = 0.7679f; // 44 degrees, matching the shipped world scenes
+    float fovYRadians = 0.9599f; // 55 degrees
     int width = 480;
     int height = 270;
     [[nodiscard]] glm::mat4 viewProjection() const;
@@ -146,31 +152,5 @@ private:
     mutable std::optional<Cache> cache_;
 };
 static_assert(search::CandidateGenerator<TreeGenerator>);
-
-// The population loop. The shared layer deliberately supplies no driver -- it owns sampling,
-// hygiene, scoring and diversity, and leaves the loop to whoever owns the population policy. This
-// one is generic in shape (nothing below reads a tree field) and belongs in the shared layer if the
-// other project wants the same loop; it lives here until one of us needs it in both places.
-struct TreeSearchSettings {
-    std::uint32_t firstIndex = 0;
-    int population = 64;
-    int select = 12;
-    // The quality/diversity trade, explicit because hiding it is how a search ends up returning
-    // either N excellent near-identical trees or N diverse ugly ones with no knob to say which.
-    float diversityAlpha = 0.62f;
-    search::HygieneLimits hygiene{};
-};
-
-struct TreeSearchResult {
-    std::vector<search::Candidate> candidates;         // every index tried, in order, rejections included
-    std::vector<std::size_t> selected;                 // into `candidates`, in selection order
-    std::vector<std::pair<std::string, int>> rejections; // rule -> count, for the diagnostic histogram
-    int built = 0;
-    double totalMs = 0.0;
-    double buildMs = 0.0;
-};
-
-[[nodiscard]] Result<TreeSearchResult> searchTrees(const TreeGenerator& generator,
-                                                   const TreeSearchSettings& settings);
 
 } // namespace avgen::scene

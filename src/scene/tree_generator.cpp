@@ -285,11 +285,13 @@ TreeMeasurements measureTree(const TreeGraph& graph, const TreeSilhouette& s, co
     // Hierarchy, straight from the graph. A primary axis only counts if it is thick enough to read
     // as a limb: counting every order-1 axis rewards the generator for sprouting twigs off the
     // trunk, which is the wrong thing to measure and the easiest thing to game.
-    const float limbThreshold = graph.stats.trunkBaseRadius * 0.12f;
+    // The tier is now assigned by substance rather than by graph order, so the extra radius
+    // threshold that used to stand in for "reads as a limb" is the tier's own definition and
+    // applying it twice would just raise the bar arbitrarily.
     int primaries = 0;
     float widestPrimary = 0.0f;
     for (const TreeAxis& axis : graph.axes) {
-        if (axis.tier == BranchTier::Primary && axis.baseRadius >= limbThreshold) {
+        if (axis.tier == BranchTier::Primary) {
             ++primaries;
             widestPrimary = std::max(widestPrimary, axis.baseRadius);
         }
@@ -368,7 +370,7 @@ const std::vector<TreeBand>& treeBands() {
          "Height of the centre of mass within the silhouette. The upper bound is the top-heavy "
          "failure; the lower bound is a canopy that has slumped into the roots.",
          0.06f,
-         {0.36f, 0.46f, 0.62f, 0.75f}},
+         {0.40f, 0.52f, 0.70f, 0.82f}},
         {"openness",
          "Fraction of the silhouette's interior that is empty. Meaningful negative space as a "
          "number: too little is the indistinguishable mass, too much is the dead central void.",
@@ -443,21 +445,28 @@ search::GeneratorSchema treeSchema() {
     schema.generatorName = "tree";
     schema.generatorVersion = 1;
     schema.parameters = search::ParameterSchema({
-        {"height", 26.0f, 33.0f, false, "Total height in metres. The monumental axis."},
-        {"crownRadius", 9.5f, 13.0f, false, "Horizontal semi-axis of the crown envelope."},
-        {"boleFraction", 0.30f, 0.46f, false, "Clear trunk as a fraction of height, before the crown begins."},
-        {"foliageFraction", 0.30f, 0.75f, false,
-         "Fraction of eligible tips carrying a foliage cluster. Half of the openness control: this "
-         "decides whether the limbs are readable through the crown."},
-        {"foliageClusterScale", 0.70f, 1.40f, false,
-         "Size of each foliage cluster. The other half: thinning opens holes, enlarging closes the "
-         "canopy without moving the clusters, and a crown needs both to land between a solid mass "
-         "and branches with tufts on them."},
+        {"height", 28.0f, 35.0f, false, "Total height in metres. The monumental axis."},
+        {"crownRadius", 9.0f, 12.5f, false, "Horizontal semi-axis of the crown envelope."},
+        {"boleFraction", 0.40f, 0.56f, false,
+         "Clear trunk as a fraction of height, before the first limb. Raised: at 0.30 to 0.46 the "
+         "frame showed one part trunk to two parts crown, which are the proportions of an orchard "
+         "tree however tall the generated numbers say it is."},
+        {"foliageSpacing", 1.15f, 2.60f, false,
+         "Minimum distance between foliage clumps. The gap-maker, and the single most visually "
+         "decisive parameter in the schema, which is why it is this near the front."},
+        {"foliageLowerClear", 0.10f, 0.34f, false,
+         "How much of the crown's lower height carries no foliage. The primary limbs rise through "
+         "exactly that region, so this decides whether they are seen arriving in the canopy or "
+         "merely poking out of it."},
+        {"foliageClusterScale", 0.85f, 1.55f, false,
+         "Clump radius as a fraction of half the spacing. Above 1 the clumps overlap their "
+         "neighbours and merge into irregular masses, which is what the reference shows; below it "
+         "they stand apart as discrete balls."},
+        {"outwardBias", 0.30f, 0.75f, false, "How hard limbs are pushed away from the trunk axis."},
         {"lambdaYoung", 0.56f, 0.70f, false, "Apical control early: how hard the bole is driven."},
         {"lambdaOld", 0.34f, 0.48f, false, "Apical control late: how far the crown spreads."},
         {"branchDrop", -0.70f, -0.15f, false,
          "Downward tropism on branches. With a strong pull toward light this is what gnarls them."},
-        {"outwardBias", 0.28f, 0.70f, false, "How hard limbs are pushed away from the trunk axis."},
         {"branchAngle", 0.60f, 1.05f, false, "Radians a lateral bud leaves its parent internode at."},
         {"shoulder", 0.30f, 0.95f, false, "Crown profile: 0 is an ellipsoid, high lifts the widest point."},
         {"lumpiness", 0.45f, 0.95f, false, "Low-frequency density variation in the crown. The asymmetry knob."},
@@ -481,26 +490,27 @@ TreeParams treeFixedParams() {
 }
 
 Result<TreeParams> treeParamsFrom(std::span<const float> v) {
-    if (v.size() < 16) {
-        return fail("tree: expected 16 parameters, got {}", v.size());
+    if (v.size() < 17) {
+        return fail("tree: expected 17 parameters, got {}", v.size());
     }
     TreeParams p = treeFixedParams();
     const float height = v[0];
     p.crown.radius = v[1];
     const float boleFraction = v[2];
-    p.foliageFraction = v[3];
-    p.foliageClusterScale = v[4];
-    p.lambdaYoung = v[5];
-    p.lambdaOld = v[6];
-    p.branchTropism = glm::vec3(0.0f, v[7], 0.0f);
-    p.outwardBias = v[8];
-    p.branchAngle = v[9];
-    p.crown.shoulder = v[10];
-    p.crown.lumpiness = v[11];
-    p.shedThreshold = v[12];
-    p.alpha = v[13];
-    p.rootCanopyCoupling = v[14];
-    p.seed = 1u + static_cast<std::uint32_t>(std::lround(v[15]));
+    p.foliageSpacing = v[3];
+    p.foliageLowerClear = v[4];
+    p.foliageClusterScale = v[5];
+    p.outwardBias = v[6];
+    p.lambdaYoung = v[7];
+    p.lambdaOld = v[8];
+    p.branchTropism = glm::vec3(0.0f, v[9], 0.0f);
+    p.branchAngle = v[10];
+    p.crown.shoulder = v[11];
+    p.crown.lumpiness = v[12];
+    p.shedThreshold = v[13];
+    p.alpha = v[14];
+    p.rootCanopyCoupling = v[15];
+    p.seed = 1u + static_cast<std::uint32_t>(std::lround(v[16]));
 
     // Height and bole are authored as a total and a fraction, then converted into the envelope the
     // generator wants. Sampling the envelope's own fields directly lets the search produce a crown
@@ -659,94 +669,6 @@ std::vector<search::ScoreComponent> TreeGenerator::domainScores(const search::Su
         out.push_back(std::move(component));
     }
     return out;
-}
-
-namespace {
-
-float meshArea(const MeshData& mesh) {
-    double total = 0.0;
-    for (std::size_t i = 0; i + 2 < mesh.indices.size(); i += 3) {
-        const glm::vec3& a = mesh.vertices[mesh.indices[i]].position;
-        const glm::vec3& b = mesh.vertices[mesh.indices[i + 1]].position;
-        const glm::vec3& c = mesh.vertices[mesh.indices[i + 2]].position;
-        total += 0.5 * static_cast<double>(glm::length(glm::cross(b - a, c - a)));
-    }
-    return static_cast<float>(total);
-}
-
-void countRejection(std::vector<std::pair<std::string, int>>& into, const std::string& rule) {
-    for (auto& [name, count] : into) {
-        if (name == rule) {
-            ++count;
-            return;
-        }
-    }
-    into.emplace_back(rule, 1);
-}
-
-} // namespace
-
-Result<TreeSearchResult> searchTrees(const TreeGenerator& generator, const TreeSearchSettings& settings) {
-    if (settings.population < 1) {
-        return fail("tree search: population {} must be at least 1", settings.population);
-    }
-    if (auto ok = generator.schema().validate(); !ok) {
-        return std::unexpected(ok.error());
-    }
-    const auto started = std::chrono::steady_clock::now();
-    TreeSearchResult result;
-    result.candidates.reserve(static_cast<std::size_t>(settings.population));
-
-    for (int i = 0; i < settings.population; ++i) {
-        const std::uint32_t index = settings.firstIndex + static_cast<std::uint32_t>(i);
-        search::Candidate candidate;
-        candidate.index = index;
-        // Identity is the index, so the parameters come from the sampler and are never stored as
-        // the source of truth for a candidate that has not been edited.
-        candidate.parameters = search::sampleAt(generator.schema().parameters, index);
-
-        const auto buildStart = std::chrono::steady_clock::now();
-        auto subject = generator.build(candidate.parameters);
-        result.buildMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - buildStart).count();
-        if (!subject) {
-            candidate.rejected = search::Rejection{"build", subject.error().message};
-            countRejection(result.rejections, "build");
-            result.candidates.push_back(std::move(candidate));
-            continue;
-        }
-
-        std::optional<search::Rejection> bad;
-        for (const search::SubjectPart& part : subject->parts) {
-            if (auto reject = search::meshHygiene(part.mesh, settings.hygiene)) {
-                // Name the part in the detail. A hygiene histogram that says "degenerate triangles"
-                // without saying which tier is a diagnostic that still needs a debugger.
-                reject->detail = part.role + ": " + reject->detail;
-                bad = *reject;
-                break;
-            }
-            candidate.triangles += static_cast<std::uint32_t>(part.mesh.indices.size() / 3);
-            candidate.surfaceArea += meshArea(part.mesh);
-        }
-        if (bad) {
-            candidate.rejected = *bad;
-            countRejection(result.rejections, bad->rule);
-            result.candidates.push_back(std::move(candidate));
-            continue;
-        }
-
-        candidate.score.components = generator.domainScores(*subject, candidate.parameters);
-        candidate.features = generator.features(*subject, candidate.parameters);
-        ++result.built;
-        result.candidates.push_back(std::move(candidate));
-    }
-
-    if (result.built == 0) {
-        return fail("tree search: all {} candidates were rejected", settings.population);
-    }
-    result.selected = search::selectDiverse(result.candidates, static_cast<std::size_t>(std::max(settings.select, 1)),
-                                            settings.diversityAlpha);
-    result.totalMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
-    return result;
 }
 
 } // namespace avgen::scene

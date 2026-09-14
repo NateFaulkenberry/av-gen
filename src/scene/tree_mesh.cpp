@@ -138,7 +138,8 @@ void buildCluster(MeshData& mesh, const FoliageSite& site, const TreeMeshSetting
         const float cosPhi = noise::hashIndex(seed, idx, kCardPitch) * 2.0f - 1.0f;
         const float sinPhi = std::sqrt(std::max(0.0f, 1.0f - cosPhi * cosPhi));
         const glm::vec3 offset =
-            (u * std::cos(theta) * sinPhi + w * std::sin(theta) * sinPhi + axis * cosPhi) * rad;
+            (u * std::cos(theta) * sinPhi + w * std::sin(theta) * sinPhi) * rad +
+            axis * (cosPhi * rad * settings.clusterElongation);
         const glm::vec3 centre = site.position + offset;
 
         const float size = settings.leafSize * (0.65f + 0.7f * noise::hashIndex(seed, idx, kCardSize));
@@ -250,14 +251,8 @@ Result<TreeMeshes> buildTreeMeshes(const TreeGraph& graph, const TreeMeshSetting
     }
 
     for (const FoliageSite& site : graph.foliage) {
-        const float u = noise::hashIndex(graph.params.seed, site.node, kFoliageTint);
-        std::size_t tint = kFoliageTints - 1;
-        for (std::size_t k = 0; k < settings.tintSplit.size(); ++k) {
-            if (u < settings.tintSplit[k]) {
-                tint = k;
-                break;
-            }
-        }
+        // The tint is decided by the generator, from a spatial field, so an accent has a location.
+        const auto tint = std::min<std::size_t>(site.tint, kFoliageTints - 1);
         buildCluster(out.foliage[tint], site, settings, graph.params.seed ^ 0xF01Au);
     }
 

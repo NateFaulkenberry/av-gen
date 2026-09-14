@@ -114,7 +114,7 @@ TEST_CASE("the tree generator satisfies the shared contract", "[tree][search]") 
     const TreeGenerator generator;
     REQUIRE(generator.schema().validate().has_value());
     CHECK(generator.schema().generatorName == "tree");
-    CHECK(generator.schema().parameters.size() == 16);
+    CHECK(generator.schema().parameters.size() == 17);
 
     const search::Parameters params = search::sampleAt(generator.schema().parameters, 0);
     REQUIRE(params.size() == generator.schema().parameters.size());
@@ -134,7 +134,21 @@ TEST_CASE("the tree generator satisfies the shared contract", "[tree][search]") 
     }
     CHECK(roles.count("trunk") == 1);
     CHECK(roles.count("foliage0") == 1);
-    CHECK(roles.count("foliage2") == 1);
+    // The accent tint is allowed to be absent from any one individual -- it is a region of a noise
+    // field, and a small crown may not contain one. What must not happen is that it is absent from
+    // EVERY individual, which is what a badly scaled field produces and what raw fbm3 did produce.
+    int withAccent = 0;
+    for (std::uint32_t index = 0; index < 8; ++index) {
+        const auto probe = generator.build(search::sampleAt(generator.schema().parameters, index));
+        REQUIRE(probe.has_value());
+        for (const search::SubjectPart& part : probe->parts) {
+            if (part.role == "foliage2" && !part.mesh.vertices.empty()) {
+                ++withAccent;
+            }
+        }
+    }
+    INFO(withAccent << " of 8 candidates carry the accent tint");
+    CHECK(withAccent >= 3);
 
     const auto features = generator.features(*subject, params);
     CHECK(features.size() == generator.schema().featureNames.size());
@@ -222,10 +236,10 @@ TEST_CASE("a candidate round-trips through the shared record", "[tree][search][s
 
 TEST_CASE("a search returns distinct, valid, ranked candidates", "[tree][search]") {
     const TreeGenerator generator;
-    TreeSearchSettings settings;
+    search::SearchSettings settings;
     settings.population = 8;
     settings.select = 4;
-    const auto result = searchTrees(generator, settings);
+    const auto result = search::runSearch(generator, settings);
     REQUIRE(result.has_value());
     INFO(fmt::format("{} built of {}, {} selected, {:.1f} s", result->built, settings.population,
                      result->selected.size(), result->totalMs / 1000.0));
@@ -250,10 +264,10 @@ TEST_CASE("a search returns distinct, valid, ranked candidates", "[tree][search]
 
 TEST_CASE("tree probe: showcase geometry and a candidate search", "[.tree-probe]") {
     const TreeGenerator generator;
-    TreeSearchSettings settings;
+    search::SearchSettings settings;
     settings.population = 48;
     settings.select = 10;
-    const auto result = searchTrees(generator, settings);
+    const auto result = search::runSearch(generator, settings);
     REQUIRE(result.has_value());
     WARN(fmt::format("{} built of {}, {} selected, {:.1f} s total ({:.1f} s building)", result->built,
                      settings.population, result->selected.size(), result->totalMs / 1000.0,

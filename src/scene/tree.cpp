@@ -886,6 +886,36 @@ Result<TreeGraph> generateTree(const TreeParams& params) {
         }
     }
 
+    // --- Semantic tier: by SUBSTANCE, not by graph order ------------------------------------
+    //
+    // Axis order and visual hierarchy are not the same thing, and treating them as the same was
+    // wrong in a way the contact sheet made obvious. A candidate whose crown plainly showed a dozen
+    // radial limbs reported `primaryCount = 2` and `tertiaryPerSecondary = 193`, and both were
+    // true of the ORDERS: its trunk forked early, so almost everything the eye reads as a primary
+    // limb is an order-2 or order-3 axis. Ranked on that, the evaluator preferred compact trees
+    // whose orders happened to line up and rejected the best-looking tree in the population.
+    //
+    // What the eye actually ranks a limb by is how substantial it is relative to the trunk, so that
+    // is what the tier is now: order still decides parentage and phyllotaxis, and thickness decides
+    // what something IS. This also feeds the animation hierarchy, where the same argument holds --
+    // a thick limb should move like a thick limb whatever its depth in the graph.
+    {
+        const float trunkBase = nodes.empty() ? 1.0f : std::max(nodes[0].radius, kEpsilon);
+        for (TreeAxis& axis : graph.axes) {
+            if (axis.firstNode == kNoNode) {
+                continue;
+            }
+            const float share = axis.baseRadius / trunkBase;
+            axis.tier = axis.id == 0            ? BranchTier::Trunk
+                        : share >= 0.20f        ? BranchTier::Primary
+                        : share >= 0.055f       ? BranchTier::Secondary
+                                                : BranchTier::Tertiary;
+            for (std::uint32_t id : axis.nodes) {
+                nodes[id].tier = axis.tier;
+            }
+        }
+    }
+
     // --- Bounds, animation data, foliage --------------------------------------------------------
     graph.boundsMin = glm::vec3(std::numeric_limits<float>::max());
     graph.boundsMax = glm::vec3(std::numeric_limits<float>::lowest());
@@ -909,28 +939,89 @@ Result<TreeGraph> generateTree(const TreeParams& params) {
         node.audioResponseWeight = node.animationWeight * node.animationWeight;
     }
 
-    for (const TreeNode& node : nodes) {
-        if (!node.children.empty() || node.order < params.foliageMinOrder ||
-            node.radius > params.foliageMaxRadius) {
-            continue;
+    // Clumps at the ends of limbs, with enforced gaps. See the long note on TreeParams for why
+    // this is not a tip-by-tip thinning.
+    {
+        struct Site {
+            std::uint32_t node;
+            std::uint32_t axis;
+            float weight; // the limb's own substance: thicker limbs win a contested position
+        };
+        const float crownHeight = 2.0f * params.crown.halfHeight;
+        const float foliageFloor = params.crown.baseHeight + crownHeight * params.foliageLowerClear;
+        std::vector<Site> candidates;
+        for (const TreeAxis& axis : graph.axes) {
+            if (axis.order < params.foliageMinOrder || axis.nodes.empty()) {
+                continue;
+            }
+            const std::uint32_t tip = axis.nodes.back();
+            if (nodes[tip].radius > params.foliageMaxRadius) {
+                continue;
+            }
+            if (noise::hashIndex(params.seed, tip, kFoliageKeep) > params.foliageFraction) {
+                continue;
+            }
+            if (nodes[tip].position.y < foliageFloor) {
+                continue;
+            }
+            candidates.push_back(Site{tip, axis.id, axis.baseRadius});
         }
-        // Deterministic thinning. Keyed on the node so it is reproducible, and applied per tip so
-        // the surviving clusters stay spread through the crown's depth rather than forming a shell.
-        if (noise::hashIndex(params.seed, node.id, kFoliageKeep) > params.foliageFraction) {
-            continue;
+        // Thickest limb first, ties broken by node id so the order is a pure function of the graph.
+        std::sort(candidates.begin(), candidates.end(), [](const Site& a, const Site& b) {
+            return a.weight != b.weight ? a.weight > b.weight : a.node < b.node;
+        });
+
+        const float spacing = std::max(params.foliageSpacing, 0.05f);
+        const float clusterRadius = spacing * 0.5f * std::max(params.foliageClusterScale, 0.05f);
+        std::vector<glm::vec3> placed;
+        spatial::PointGrid accepted;
+        std::vector<std::uint32_t> near;
+        for (const Site& candidate : candidates) {
+            const glm::vec3 p = nodes[candidate.node].position;
+            // Rebuilding the index per acceptance would be O(n^2) in allocations; a linear scan of
+            // the accepted set is O(n^2) in distance tests but n is in the hundreds, and it keeps
+            // the acceptance order -- which is what makes this reproducible -- perfectly explicit.
+            bool tooClose = false;
+            for (const glm::vec3& q : placed) {
+                if (glm::dot(p - q, p - q) < spacing * spacing) {
+                    tooClose = true;
+                    break;
+                }
+            }
+            if (tooClose) {
+                continue;
+            }
+            placed.push_back(p);
+
+            FoliageSite site;
+            site.node = candidate.node;
+            site.axis = candidate.axis;
+            site.position = p;
+            site.direction = nodes[candidate.node].direction;
+            // Wide size variation, deliberately. Clumps within 20% of one another read as a row of
+            // identical balls however well they are placed; the mass has to be irregular before the
+            // canopy stops looking manufactured.
+            site.radius = clusterRadius * (0.55f + 1.0f * noise::hashIndex(params.seed, site.node, kFoliageRadius));
+            site.phase = noise::hashIndex(params.seed, site.node, kFoliagePhase) * glm::two_pi<float>();
+            const glm::vec3 toCentre = p - glm::vec3(0.0f, params.crown.centreHeight, 0.0f);
+            const float extent = std::max(params.crown.radius, params.crown.halfHeight);
+            site.exposure = std::clamp(glm::length(toCentre) / std::max(extent, kEpsilon), 0.0f, 1.0f);
+            // The tint comes from a low-frequency field of position, so each colour occupies a
+            // region a few limbs across instead of being sprinkled through the whole canopy.
+            //
+            // `regionField`, not raw `fbm3`. core/noise.hpp says outright that raw fbm3 bunches
+            // around 0.5 and delivers about a third of the swing a caller asks for, and it does:
+            // with a 12% gold share the threshold lands at 0.88 and the accent simply never
+            // appeared -- the canopy came out with no gold in it at all. `regionField` is the
+            // amplitude-corrected version that exists for exactly this, so a share of 12% is 12%.
+            const float field = 0.5f + 0.5f * noise::regionField(p * params.tintFieldScale, params.seed ^ 0x7A17u);
+            const float gold = std::clamp(params.goldShare, 0.0f, 1.0f);
+            const float turquoise = std::clamp(params.turquoiseShare, 0.0f, 1.0f - gold);
+            site.tint = field > 1.0f - gold ? 2 : (field > 1.0f - gold - turquoise ? 1 : 0);
+            graph.foliage.push_back(site);
         }
-        FoliageSite site;
-        site.node = node.id;
-        site.axis = node.axis;
-        site.position = node.position;
-        site.direction = node.direction;
-        site.radius = (0.6f + 0.8f * noise::hashIndex(params.seed, node.id, kFoliageRadius)) *
-                      params.foliageClusterScale;
-        site.phase = noise::hashIndex(params.seed, node.id, kFoliagePhase) * glm::two_pi<float>();
-        const glm::vec3 toCentre = node.position - glm::vec3(0.0f, params.crown.centreHeight, 0.0f);
-        const float extent = std::max(params.crown.radius, params.crown.halfHeight);
-        site.exposure = std::clamp(glm::length(toCentre) / std::max(extent, kEpsilon), 0.0f, 1.0f);
-        graph.foliage.push_back(site);
+        (void)accepted;
+        (void)near;
     }
 
     // --- Stats ----------------------------------------------------------------------------------
@@ -1055,6 +1146,11 @@ nlohmann::json TreeParams::toJson() const {
     j["foliageMaxRadius"] = foliageMaxRadius;
     j["foliageFraction"] = foliageFraction;
     j["foliageClusterScale"] = foliageClusterScale;
+    j["foliageSpacing"] = foliageSpacing;
+    j["foliageLowerClear"] = foliageLowerClear;
+    j["tintFieldScale"] = tintFieldScale;
+    j["goldShare"] = goldShare;
+    j["turquoiseShare"] = turquoiseShare;
     j["rootCount"] = rootCount;
     j["rootSpread"] = rootSpread;
     j["rootDepth"] = rootDepth;
@@ -1125,6 +1221,11 @@ Result<TreeParams> TreeParams::fromJson(const nlohmann::json& j) {
     p.foliageMaxRadius = j.value("foliageMaxRadius", p.foliageMaxRadius);
     p.foliageFraction = j.value("foliageFraction", p.foliageFraction);
     p.foliageClusterScale = j.value("foliageClusterScale", p.foliageClusterScale);
+    p.foliageSpacing = j.value("foliageSpacing", p.foliageSpacing);
+    p.foliageLowerClear = j.value("foliageLowerClear", p.foliageLowerClear);
+    p.tintFieldScale = j.value("tintFieldScale", p.tintFieldScale);
+    p.goldShare = j.value("goldShare", p.goldShare);
+    p.turquoiseShare = j.value("turquoiseShare", p.turquoiseShare);
     p.rootCount = j.value("rootCount", p.rootCount);
     p.rootSpread = j.value("rootSpread", p.rootSpread);
     p.rootDepth = j.value("rootDepth", p.rootDepth);

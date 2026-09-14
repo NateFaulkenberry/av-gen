@@ -88,6 +88,10 @@ struct TreeMeshSettings {
     // A flat card lit by its own normal reads as a flat card; lit by the volume's normal a cluster
     // of them reads as one soft mass, which is the standard foliage trick and costs nothing.
     float cardNormalBlend = 0.85f;
+    // Clumps are stretched along their branch. A spherical clump reads as a ball stuck on a stick;
+    // foliage grows along the twig that carries it, and the elongation is most of what separates
+    // the two at a glance.
+    float clusterElongation = 1.75f;
 };
 
 

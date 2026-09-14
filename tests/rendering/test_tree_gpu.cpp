@@ -195,10 +195,10 @@ TEST_CASE("The candidate contact sheet renders", "[gpu][tree][contact]") {
     REQUIRE(renderer.init().has_value());
 
     const scene::TreeGenerator generator;
-    scene::TreeSearchSettings settings;
+    search::SearchSettings settings;
     settings.population = 24;
     settings.select = 12;
-    const auto search = scene::searchTrees(generator, settings);
+    const auto search = search::runSearch(generator, settings);
     REQUIRE(search.has_value());
     REQUIRE_FALSE(search->selected.empty());
 

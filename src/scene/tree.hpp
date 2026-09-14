@@ -173,19 +173,49 @@ struct TreeParams {
     float flareHeight = 3.0f;           // the height it decays over
 
     // --- Foliage attachment --------------------------------------------------------------------
-    int foliageMinOrder = 3;
-    float foliageMaxRadius = 0.10f;     // a tip thicker than this is structure, not a leaf holder
-    // The fraction of eligible tips that actually carry a cluster. THIS IS THE OPENNESS CONTROL.
-    // Every tip carrying foliage closes the canopy into one mass, and a canopy the limbs cannot be
-    // seen through fails the readability gate however good the branching underneath it is. Thinning
-    // deterministically by a hash of the tip -- rather than by raising the order threshold -- keeps
-    // the clusters spread through the crown instead of retreating to its surface.
-    float foliageFraction = 0.70f;
-    // Cluster size. Separate from `foliageFraction` because they are different failures: thinning
-    // opens holes in the canopy, enlarging closes it up without moving the clusters. A canopy needs
-    // both knobs to reach "limbs readable through leaves" rather than either "solid mass" or
-    // "branches with a few tufts on them".
-    float foliageClusterScale = 1.0f;
+    //
+    // FOLIAGE HANGS AT THE ENDS OF LIMBS, WITH ENFORCED GAPS BETWEEN CLUMPS.
+    //
+    // The first design put a cluster on every eligible TIP NODE and thinned them randomly. Tips are
+    // everywhere inside the crown volume, so the result was a continuous shell sitting on top of the
+    // branches with limbs poking through it -- one mass, not distinct clumps, and the readable
+    // branch structure the chosen reference exists for was invisible. Thinning that arrangement does
+    // not fix it: a randomly thinned shell is a shell with holes in it, and enlarging the clusters
+    // to compensate buries the limbs again (measured, and recorded as a regression).
+    //
+    // What produces clumps is placing them at the END OF AN AXIS -- one per limb, not one per twig
+    // -- and then rejecting any clump within `foliageSpacing` of one already placed. That is a
+    // Poisson-disc condition, and it is the only thing here that can guarantee a gap. Candidates are
+    // considered thickest-limb-first, so when two compete the substantial limb keeps its foliage.
+    int foliageMinOrder = 2;            // order 2 = the ends of secondary axes
+    float foliageMaxRadius = 0.16f;     // an axis thicker than this at its tip is structure
+    // Minimum distance between clump centres. The gap-maker. Must comfortably exceed twice the
+    // cluster radius or the clumps touch and the canopy closes again.
+    float foliageSpacing = 1.7f;
+    // Cluster radius, as a fraction of half the spacing. ABOVE 1 ON PURPOSE: at 0.55 to 0.92 the
+    // clumps stood apart as discrete spheres and the result was pom-poms on bare branches -- the
+    // opposite overcorrection to the shell, and just as wrong. What the reference actually shows is
+    // masses that MERGE IN GROUPS and leave voids between the groups, which needs clumps that
+    // overlap their neighbours while the spacing rule and the size variation keep the groups apart.
+    float foliageClusterScale = 1.15f;
+    // A final random drop, so some limb ends are bare and the canopy is not a regular lattice.
+    float foliageFraction = 0.86f;
+    // The lowest part of the crown carries no foliage, as a fraction of crown height. The primary
+    // limbs leave the trunk and rise through exactly that region, and clumps hung there bury the
+    // one piece of structure the whole composition is built around. Clearing it is what lets the
+    // limbs be seen ARRIVING in the canopy rather than merely poking out of it.
+    float foliageLowerClear = 0.26f;
+
+    // --- Foliage colour ---------------------------------------------------------------------
+    //
+    // Tints are assigned from a LOW-FREQUENCY SPATIAL FIELD, not per clump independently. A 10%
+    // share sprinkled uniformly reads as speckle -- confetti through the whole canopy -- rather than
+    // as an accent, because an accent is a thing with a location. Sampling a noise field at the
+    // clump's position clusters each tint into regions a few limbs across, which is what an accent
+    // looks like.
+    float tintFieldScale = 0.17f;  // period ~6 m: a few limbs' worth per region, not one big blob
+    float goldShare = 0.12f;            // fraction of the canopy in the warm accent
+    float turquoiseShare = 0.30f;
 
     // --- Roots ---------------------------------------------------------------------------------
     int rootCount = 9;
@@ -254,7 +284,8 @@ struct FoliageSite {
     glm::vec3 direction{0.0f, 1.0f, 0.0f};
     float radius = 1.0f;
     float phase = 0.0f;
-    float exposure = 0.0f; // 0 deep inside the crown, 1 on the outer surface
+    float exposure = 0.0f;   // 0 deep inside the crown, 1 on the outer surface
+    std::uint8_t tint = 0;   // which of the canopy's material tints this clump takes
 };
 
 // A root is a polyline, not a simulated axis; see the header note.
