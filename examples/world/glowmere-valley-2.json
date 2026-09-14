@@ -73,9 +73,9 @@
     "camera/mode": 1,
     "camera/orbitSpeed": 0.0,
     "camera/position": [
-      -76.5990219116211,
-      79.59578704833984,
-      293.0675048828125
+      60.55047607421875,
+      7.997378826141357,
+      215.74996948242188
     ],
     "camera/shake/amplitude": 0.0,
     "camera/shake/decay": 0.0,
@@ -89,9 +89,9 @@
     ],
     "camera/splineT": 0.0,
     "camera/target": [
-      -12.0,
-      3.5399999618530273,
-      52.0
+      78.0,
+      0.040000006556510925,
+      198.0
     ],
     "entity/visitor/bank/degrees": 5.0,
     "entity/visitor/bank/responseMs": 1500.0,
@@ -1444,9 +1444,9 @@
     ],
     "nodes/bloom-stem/lightIntensity": 1.0,
     "nodes/bloom-stem/position": [
-      -62.0,
-      4.179999828338623,
-      118.0
+      -61.10588073730469,
+      4.325047016143799,
+      118.92450714111328
     ],
     "nodes/bloom-stem/rotation": [
       180.0,
@@ -1540,7 +1540,7 @@
     ],
     "nodes/elder-2-stem/lightIntensity": 1.0,
     "nodes/elder-2-stem/position": [
-      -12.0,
+      -13.15424919128418,
       3.5399999618530273,
       52.0
     ],
@@ -2107,9 +2107,9 @@
     ],
     "nodes/veil-stem/lightIntensity": 1.0,
     "nodes/veil-stem/position": [
-      78.0,
-      0.03999999910593033,
-      198.0
+      77.56116485595703,
+      0.21957406401634216,
+      198.4185028076172
     ],
     "nodes/veil-stem/rotation": [
       0.0,
@@ -2352,7 +2352,7 @@
     "particles/visitor-beam/turbulenceScale": 0.07999999821186066,
     "particles/visitor-beam/turbulenceSpeed": 0.15000000596046448,
     "post/anamorphic/enabled": true,
-    "post/anamorphic/ghosts": 0.0,
+    "post/anamorphic/ghosts": 0.07000000029802322,
     "post/anamorphic/intensity": 0.4699999988079071,
     "post/anamorphic/stretch": 10.38599967956543,
     "post/anamorphic/tint": [
@@ -2362,10 +2362,10 @@
     ],
     "post/bloom/emissionWeight": 0.75,
     "post/bloom/enabled": true,
-    "post/bloom/intensity": 0.18000000715255737,
+    "post/bloom/intensity": 0.9120000004768372,
     "post/bloom/knee": 0.5,
     "post/bloom/radius": 1.149999976158142,
-    "post/bloom/threshold": 1.0,
+    "post/bloom/threshold": 1.6619999408721924,
     "post/dof/enabled": false,
     "post/dof/focusDistance": 6.0,
     "post/dof/focusRange": 2.0,
@@ -2403,20 +2403,20 @@
     "post/halation/warmth": 0.6000000238418579,
     "post/lens/chromaticAberration": 0.0,
     "post/lens/distortion": 0.0,
-    "post/motionBlur/amount": 0.0,
-    "post/output/antialias": 0.75,
+    "post/motionBlur/amount": 0.8029999732971191,
+    "post/output/antialias": 0.6539999842643738,
     "post/output/grain": 0.0,
     "post/output/sharpen": 0.0,
     "post/output/sharpenId": 0,
     "post/output/vignette": 0.18000000715255737,
-    "post/tiltShift/bandWidth": 0.20000000298023224,
+    "post/tiltShift/bandWidth": 0.3319999873638153,
     "post/tiltShift/centre": [
       0.5,
       0.5
     ],
-    "post/tiltShift/enabled": false,
-    "post/tiltShift/falloff": 0.25,
-    "post/tiltShift/maxRadius": 8.0,
+    "post/tiltShift/enabled": true,
+    "post/tiltShift/falloff": 0.33799999952316284,
+    "post/tiltShift/maxRadius": 10.446000099182129,
     "post/tiltShift/rotation": 0.0,
     "post/tonemap/chroma-retention": 0.6000000238418579,
     "post/tonemap/operator": 1,
