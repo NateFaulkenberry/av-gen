@@ -86,8 +86,12 @@ struct TreeMeshSettings {
     // Sixteen small cards, not seven big ones. At 0.42 m the cards read as paper snowflakes on the
     // silhouette edge -- individually visible polygons rather than foliage -- because a 0.42 m card
     // on a 21 m crown is a fifth of a cluster.
-    int cardsPerCluster = 22;
-    float leafSize = 0.150f;
+    // Eight LARGE cards, not twenty-two small ones. Each card carries a seven-leaf spray cut out of
+    // it by an alpha mask (tree_foliage.hpp), so a card can be big enough to read as mass without
+    // reading as a rectangle -- which is the thing that made every previous size wrong at one end
+    // or the other. Fewer, bigger cards is also a quarter of the triangles.
+    int cardsPerCluster = 12;
+    float leafSize = 0.46f;
     float clusterScale = 1.0f;
     // How the canopy divides between the three tints. NOT a third each: at equal shares the gold
     // read as autumn confetti across the whole crown rather than as the occasional accent the

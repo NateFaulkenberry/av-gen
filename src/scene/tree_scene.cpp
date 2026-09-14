@@ -184,9 +184,22 @@ Result<Scene> buildTreeScene(const TreeGraph& graph, const TreeMeshes& meshes, c
     addPart(scene, meshes.primary, "tree.primary", branchMaterial(look.primaryEmissive));
     addPart(scene, meshes.secondary, "tree.secondary", branchMaterial(look.secondaryEmissive));
     addPart(scene, meshes.tertiary, "tree.tertiary", branchMaterial(look.tertiaryEmissive));
+    // One leaf-spray texture, shared by every tint: the tint lives in the material's base colour,
+    // so the mask does not need three copies of itself.
+    LeafSpraySettings spray = look.leafSpray;
+    spray.seed = graph.params.seed ^ 0x1EAFu;
+    const TextureId leafTexture = scene.addTexture(makeLeafSprayTexture(spray));
+
     for (int i = 0; i < kFoliageTints; ++i) {
         const auto t = static_cast<std::size_t>(i);
         Material m;
+        m.baseColorTexture.texture = leafTexture;
+        m.baseColorTexture.wrapU = WrapMode::Clamp;
+        m.baseColorTexture.wrapV = WrapMode::Clamp;
+        // Cutout, not blend: masked geometry is in the depth prepass and takes the shadow mask,
+        // blended geometry is in neither, and a canopy that does not self-shadow has no interior.
+        m.alphaMode = AlphaMode::Mask;
+        m.alphaCutoff = look.foliageAlphaCutoff;
         m.baseColor = look.foliageColor[t];
         m.roughness = look.foliageRoughness;
         m.emissiveColor = look.foliageEmissiveTint[t];

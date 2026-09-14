@@ -22,6 +22,7 @@
 #include "search/candidate_search.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 #include <fmt/format.h>
 
 #include <array>
@@ -414,4 +415,47 @@ TEST_CASE("tree probe: what the atmosphere costs", "[.perf][tree]") {
     // No assertion on the magnitude. This reports; it does not gate. A wall-clock threshold in a
     // test is a cross-session comparison with the other session hidden inside a constant.
     CHECK(bestWith > 0.0);
+}
+
+TEST_CASE("The hero's record says why it was chosen and what was not ranked", "[gpu][tree][record]") {
+    // The pipeline's own artefact for a chosen individual, written next to the contact sheet so
+    // whoever overrides the ranking can see what they are overriding. `selectionNote` is the one
+    // field in the record a machine does not fill in, and this is what it is for.
+    const scene::TreeGenerator generator;
+    search::Candidate hero;
+    hero.index = scene::kHeroCandidate;
+    hero.parameters = search::sampleAt(generator.schema().parameters, hero.index);
+    const auto subject = generator.build(hero.parameters);
+    REQUIRE(subject.has_value());
+    hero.score.components = generator.domainScores(*subject, hero.parameters);
+    hero.features = generator.features(*subject, hero.parameters);
+    for (const search::SubjectPart& part : subject->parts) {
+        hero.triangles += static_cast<std::uint32_t>(part.mesh.indices.size() / 3);
+    }
+
+    const std::string note =
+        "Selected by score: highest of 96 candidates (0.9871) under treeBands() as of 2026-09-14, "
+        "after the foliage primitive became alpha-cut leaf sprays and six bands were re-measured. "
+        "WHAT THIS RANKING DOES NOT COVER: canopy density as rendered. The evaluator's rasteriser "
+        "stamps each foliage cluster as a solid disc, so everything between the leaves is erased "
+        "before any metric sees it -- replacing the whole foliage primitive changed no band's "
+        "variance at all. boxFill, the axis that ought to separate 'reads as volume' from 'reads as "
+        "scattered leaves', reports this candidate as the densest of the top six (0.433) when by eye "
+        "it is among the airiest. So the crown's ARCHITECTURE is ranked and its DENSITY is not. A "
+        "person preferring a fuller crown off the contact sheet is overriding nothing that was "
+        "measured; write why here and change kHeroCandidate.";
+
+    const nlohmann::json record = search::candidateToJson(generator.schema(), hero, note);
+    // It has to survive the round trip, or it is a report rather than a record.
+    const auto restored = search::candidateFromJson(generator.schema(), nlohmann::json::parse(record.dump()));
+    REQUIRE(restored.has_value());
+    CHECK(restored->index == hero.index);
+    CHECK(restored->parameters == hero.parameters);
+
+    const fs::path out = outputDir() / "tree-hero-record.json";
+    {
+        std::ofstream file(out);
+        file << record.dump(2);
+    }
+    WARN("hero record written to " << out.string());
 }

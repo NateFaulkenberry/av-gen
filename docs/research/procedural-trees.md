@@ -509,14 +509,41 @@ That chain is the point. The hero is an artefact of the scoring; the scoring is 
 camera. Keeping a stale hero would have meant anyone judging the result was judging the system that
 picked it rather than the tree.
 
-### 7.6 Still open
+### 7.6 The evaluator cannot judge canopy density, and this is structural
+
+The foliage primitive was replaced and **not one band's variance changed by a thousandth**. The
+evaluator's rasteriser stamps each foliage cluster as a disc, so everything between the leaves is
+erased before any metric sees it. A measurement that cannot notice the thing you changed is not
+measuring it.
+
+Feeding it the spray's true alpha coverage corrected the scale — six bands then moved by up to an
+order of magnitude, and `silhouetteComplexity`'s raw range went from 3–41 to 55–249, because a mask
+of sparse cut-out sprays has an enormous perimeter for its area where a mask of solid discs had very
+little. But it cannot correct the *ranking*, because coverage is a property of the primitive and is
+identical for every candidate.
+
+The proof that the gap is real: `boxFill`, the axis that ought to separate "reads as volume" from
+"reads as scattered leaves", reports the selected hero as the **densest** of the top six (0.433) when
+by eye it is among the airiest. `openness` has been re-banded four times and settles back to scoring
+~1.0 for almost the whole population each time; it is now demoted to a guard beside `depthSpread`,
+on the evidence that the sparsest candidate on the sheet scored 0.42 and one of the fullest scored
+0.43.
+
+**The evaluator ranks crown architecture competently and cannot judge canopy density as rendered.**
+Closing that means rasterising real foliage geometry instead of a proxy. The shared record's
+`selectionNote` is the supported answer in the meantime: a human override is an outcome, not a
+failure.
+
+### 7.7 Still open
 
 - The tree is a monumental, anchored, luminous fantasy tree with architectural variety across the
   population, a readable hierarchy, warm-against-cool colour and legible scale. It is **not yet
   awe-inspiring**, and §51 says not to rationalise that away. The two named remaining gaps:
-  - **The canopy is a mass of small flakes, not layered foliage.** Individual cards are visible at the
-    silhouette edge and there is no sense of leaves in front of leaves. This needs a different
-    foliage primitive, not a tuning pass — every tuning lever here has been exercised.
+  - ~~The canopy is a mass of small flakes.~~ **Done.** The card is now a seven-to-eleven-leaf spray
+    cut out by a generated alpha mask, so a card can be large enough to read as mass without reading
+    as a rectangle, and the silhouette edge is leaf-shaped. A quarter of the triangles of the flakes
+    it replaced. What remains on this axis is that the *evaluator* cannot judge canopy density —
+    see §7.7.
   - **No foreground.** There is no depth cue in the near field, only mist in the far one. Adding one
     is exactly the environment accumulation §26 warns against, so it is named rather than attempted.
 - The evaluator has never been validated against a person's ranking. It agrees with one reader on one
