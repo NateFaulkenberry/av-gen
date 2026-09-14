@@ -255,6 +255,20 @@ TEST_CASE("the pose rate is quantised onto the timeline", "[scene][animation]") 
     CHECK(rig.rateFor(1.0f) == Approx(0.0f));    // near: every frame
     CHECK(rig.rateFor(50.0f) == Approx(20.0f));  // mid: the far rate
     CHECK(rig.rateFor(500.0f) < 0.0f);           // beyond the cull distance: not posed
+
+    // All four rungs move, which two of them could not: `nearDistance` and `farHz` were compiled
+    // into the rig and nothing copied a scene's values over them, so an author who asked for 30 Hz
+    // was served 20 past fifteen metres by a ceiling with no name in the file.
+    rig.nearDistance = 40.0f;
+    CHECK(rig.rateFor(30.0f) == Approx(0.0f));   // now inside the near band
+    rig.farHz = 5.0f;
+    CHECK(rig.rateFor(50.0f) == Approx(5.0f));
+    rig.cullDistance = 60.0f;
+    CHECK(rig.rateFor(70.0f) < 0.0f);
+    // The authored rate stays a ceiling rather than a suggestion: a rig asking for something slower
+    // than the far rate keeps its own number.
+    rig.updateHz = 2.0f;
+    CHECK(rig.rateFor(50.0f) == Approx(2.0f));
 }
 
 TEST_CASE("a rate-limited rig reports no motion between poses", "[scene][animation]") {

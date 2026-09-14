@@ -118,15 +118,29 @@ struct MaterialPartParameters {
 // decided at. The two do not fight -- the node re-applies its `state` only when the request
 // changes or a rebuild has just replaced the rig -- so a behaviour may take a character over and
 // keep it.
+// The whole of a node's animation request, including its distance policy.
+//
+// All four distance knobs are authored here, which they were not: `nearDistance` and `farHz` were
+// compiled into `SkinnedRig` and only `updateHz` and `cullDistance` were ever copied from the scene.
+// That made the authored rate a number with almost no effect -- Glowmere asks for 30 Hz and got 20
+// past fifteen metres, because `farHz` is a ceiling the author could not see, let alone raise.
+//
+// They are here rather than on the rig because a rig is an *asset's* skeleton and a distance policy
+// is a *scene's* decision about one character in one world. Two nodes on the same character file
+// must be able to have different policies, for the same reason ADR-086 gives for copying rigs per
+// node instance rather than per asset.
 struct NodeAnimation {
     std::string state;        // the state to enter ("" = leave the rig on its default)
     float blend = -1.0f;      // cross-fade seconds; < 0 = the state's own blendIn
     float speed = 1.0f;       // clip seconds per timeline second
-    float updateHz = 0.0f;    // pose rate ceiling; 0 = every frame when near the camera
+    // ---- the distance ladder, all four rungs authorable ----------------------------------------
+    float updateHz = 0.0f;       // pose rate ceiling; 0 = every frame when near the camera
+    float nearDistance = 15.0f;  // nearer than this: posed every frame (subject to updateHz)
+    float farHz = 20.0f;         // between nearDistance and cullDistance: this rate
     float cullDistance = 120.0f; // metres beyond which the rig is not posed at all (0 = never cull)
     [[nodiscard]] bool authored() const {
         return !state.empty() || blend >= 0.0f || speed != 1.0f || updateHz != 0.0f ||
-               cullDistance != 120.0f;
+               nearDistance != 15.0f || farHz != 20.0f || cullDistance != 120.0f;
     }
 };
 

@@ -10,6 +10,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <chrono>
 #include <cmath>
@@ -2828,11 +2829,41 @@ void Composition::rebuild() {
             for (const SkinnedRig& src : asset.scene.rigs) {
                 SkinnedRig rig = src;
                 rig.name = node.name + "/" + src.name;
+                // All four rungs, not two. `nearDistance` and `farHz` used to keep the rig's
+                // compiled-in defaults whatever the scene said, so a node asking for 30 Hz was
+                // quietly served 20 past fifteen metres by a ceiling it could not name.
                 rig.updateHz = node.animation.updateHz;
+                rig.nearDistance = node.animation.nearDistance;
+                rig.farHz = node.animation.farHz;
                 rig.cullDistance = node.animation.cullDistance;
                 scene_.rigs.push_back(std::move(rig));
             }
             range.rigCount = scene_.rigs.size() - range.firstRig;
+            // Two ladders, and nothing used to say when they disagreed.
+            //
+            // A character has two distance policies: this one, which decides whether its skeleton is
+            // posed, and the entity's behaviour LOD, which decides whether it is simulated at all.
+            // They are separately authored and legitimately different -- posing is joints x
+            // instances of CPU and simulating is a path query -- but one ordering of them is always
+            // wrong. If the rig stops being posed *nearer* than the entity stops walking, the band
+            // between them draws a character travelling across the world in a frozen pose. Glowmere
+            // shipped exactly that: the wanderer is simulated to 320 m and was posed to 220 m, and
+            // the hundred metres in between are where "he slides" and "his animation stops when I
+            // zoom out" both come from.
+            //
+            // A warning rather than a clamp, because which number is wrong is an art decision: the
+            // fix may be to pose further, or to stop simulating sooner. Naming both numbers is what
+            // lets somebody make it.
+            if (range.rigCount > 0 && node.animation.cullDistance > 0.0f) {
+                const auto desc = std::find_if(entityDescs_.begin(), entityDescs_.end(),
+                                               [&](const entity::EntityDesc& d) { return d.node == node.name; });
+                if (desc != entityDescs_.end() && desc->cullDistance > node.animation.cullDistance) {
+                    log::warn("'{}': the rig stops being posed at {:.0f} m but the entity keeps "
+                              "simulating to {:.0f} m; between them the character travels in a "
+                              "frozen pose",
+                              node.name, node.animation.cullDistance, desc->cullDistance);
+                }
+            }
             node.rigs.clear();
             for (std::size_t r = 0; r < range.rigCount; ++r) {
                 node.rigs.push_back(rigOffset + static_cast<RigId>(r));
@@ -5031,6 +5062,12 @@ nlohmann::json Composition::toJson() const {
             if (node.animation.updateHz != 0.0f) {
                 anim["updateHz"] = node.animation.updateHz;
             }
+            if (node.animation.nearDistance != 15.0f) {
+                anim["nearDistance"] = node.animation.nearDistance;
+            }
+            if (node.animation.farHz != 20.0f) {
+                anim["farHz"] = node.animation.farHz;
+            }
             if (node.animation.cullDistance != 120.0f) {
                 anim["cullDistance"] = node.animation.cullDistance;
             }
@@ -5730,16 +5767,33 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 auto blend = readFloat(anim, "blend", -1.0f);
                 auto speed = readFloat(anim, "speed", 1.0f);
                 auto hz = readFloat(anim, "updateHz", 0.0f);
+                auto near = readFloat(anim, "nearDistance", 15.0f);
+                auto farHz = readFloat(anim, "farHz", 20.0f);
                 auto cull = readFloat(anim, "cullDistance", 120.0f);
                 if (!state) return std::unexpected(state.error());
                 if (!blend) return std::unexpected(blend.error());
                 if (!speed) return std::unexpected(speed.error());
                 if (!hz) return std::unexpected(hz.error());
+                if (!near) return std::unexpected(near.error());
+                if (!farHz) return std::unexpected(farHz.error());
                 if (!cull) return std::unexpected(cull.error());
+                // A key this block does not know is named rather than ignored. `"lodCount"` was
+                // silently accepted for months against a parser that reads `"count"`, and the
+                // ladder read as configured in the file while being a single rung in the engine.
+                for (const auto& entry : anim.items()) {
+                    static constexpr std::array<std::string_view, 7> kKnown{
+                        "state", "blend", "speed", "updateHz", "nearDistance", "farHz", "cullDistance"};
+                    if (std::find(kKnown.begin(), kKnown.end(), entry.key()) == kKnown.end()) {
+                        log::warn("scene file '{}': node '{}': animation key '{}' is not one this "
+                                  "build reads and was ignored", scenePath.string(), node.name, entry.key());
+                    }
+                }
                 node.animation.state = *state;
                 node.animation.blend = *blend;
                 node.animation.speed = *speed;
                 node.animation.updateHz = *hz;
+                node.animation.nearDistance = *near;
+                node.animation.farHz = *farHz;
                 node.animation.cullDistance = *cull;
             }
             if (item.contains("procedural")) {

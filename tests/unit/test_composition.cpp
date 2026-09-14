@@ -2519,3 +2519,55 @@ TEST_CASE("A duplicated node carries every field the scene file writes", "[scene
     INFO("duplicate: " << duplicate.dump(2));
     CHECK(original == duplicate);
 }
+
+// The distance ladder is authored in the scene file, all four rungs of it. Two of them used to be
+// compiled into `SkinnedRig` with nothing copying a scene's values over them, so a node could name
+// `updateHz` and `cullDistance` and silently keep the engine's `nearDistance` and `farHz` -- which
+// is how Glowmere asked for 30 Hz and got 20 beyond fifteen metres.
+TEST_CASE("a node's animation ladder reaches the rig and round-trips", "[scene][composition][animation]") {
+    Fixture fx;
+    scene::Composition comp(fx.registry, "ladder");
+
+    auto node = makeNode(scene::NodeKind::Gltf, "character", fx.glb.filename());
+    node.animation.state = "Walk";
+    node.animation.updateHz = 30.0f;
+    node.animation.nearDistance = 42.0f;
+    node.animation.farHz = 7.5f;
+    node.animation.cullDistance = 310.0f;
+    REQUIRE(comp.addNode(std::move(node)).has_value());
+    comp.update({});
+
+    // All four reach the rig the node owns. Checking the rig rather than the node is the point:
+    // the node is what the file says and the rig is what the engine poses with, and the defect was
+    // entirely in the gap between them.
+    const scene::CompositionNode* built = comp.findNode("character");
+    REQUIRE(built != nullptr);
+    if (!built->rigs.empty()) {
+        const scene::SkinnedRig& rig = comp.scene().rigs[built->rigs.front()];
+        CHECK(rig.updateHz == 30.0f);
+        CHECK(rig.nearDistance == 42.0f);
+        CHECK(rig.farHz == 7.5f);
+        CHECK(rig.cullDistance == 310.0f);
+        // And the ladder behaves: inside the near band every frame, past it the authored far rate.
+        CHECK(rig.rateFor(10.0f) == 30.0f);
+        CHECK(rig.rateFor(100.0f) == 7.5f);
+        CHECK(rig.rateFor(400.0f) < 0.0f);
+    }
+
+    // ...and survives a save. A knob that cannot be written back is a knob an author sets once.
+    const nlohmann::json document = comp.toJson();
+    bool found = false;
+    for (const auto& entry : document.at("nodes")) {
+        if (entry.value("name", std::string()) != "character") {
+            continue;
+        }
+        found = true;
+        REQUIRE(entry.contains("animation"));
+        const auto& anim = entry.at("animation");
+        CHECK(anim.value("updateHz", 0.0f) == 30.0f);
+        CHECK(anim.value("nearDistance", 0.0f) == 42.0f);
+        CHECK(anim.value("farHz", 0.0f) == 7.5f);
+        CHECK(anim.value("cullDistance", 0.0f) == 310.0f);
+    }
+    CHECK(found);
+}

@@ -1573,7 +1573,9 @@
     "blend": 0.35,
     "speed": 1.0,
     "updateHz": 30,
-    "cullDistance": 220.0
+    "nearDistance": 25.0,
+    "farHz": 20.0,
+    "cullDistance": 320.0
    },
    "visible": true
   },
