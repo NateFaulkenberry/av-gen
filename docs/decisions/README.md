@@ -167,3 +167,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [172](ADR-172-an-aesthetic-score-component-is-a-band-not-a-maximum.md) | An aesthetic score component is a band, never a maximum | Accepted |
 | [173](ADR-173-the-candidate-sampler-is-sobol-and-the-experiment-that-would-overturn-it.md) | The mushroom candidate sampler is a Sobol sequence, and the experiment that would overturn it is named | Accepted |
 | [174](ADR-174-vegetation-is-banded-on-height-above-water.md) | Vegetation is banded on height above the water table, and the cap thins instead of truncating | Accepted |
+| [175](ADR-175-a-searched-organism-is-a-parameter-vector-the-scene-owns.md) | A searched organism is a parameter vector the scene owns, not geometry the generator kept | Accepted |

@@ -43,6 +43,7 @@
 // individual under the same name.
 
 #include "core/error.hpp"
+#include "scene/procedural.hpp"
 #include "scene/scene_types.hpp"
 
 #include <glm/glm.hpp>
@@ -294,17 +295,18 @@ struct PreviewLighting {
 // keeps that from turning a drag into a slideshow -- an object whose last rebuild cost more than the
 // budget waits for its inputs to settle -- and it is deliberately zero offline, because a wall clock
 // has no business deciding what a deterministic render contains.
-struct GeneratedSource {
-    std::string generatorName;
-    std::uint32_t generatorVersion = 1;
-    std::uint64_t schemaHash = 0;
-    std::uint32_t index = 0;          // provenance: the candidate these values started as
-    Parameters values;                // authoritative: what the generator builds from
+// **This is `scene::GeneratedSource`**, not a parallel type. It lives in `scene/procedural.hpp`
+// because `scene::SourceSpec` holds one -- `PrimitiveKind::Generated` (ADR-175) -- and a scene
+// cannot depend on the search layer that produced it. The alias is here so this header still reads
+// as the one description of a generated object, which it is.
+using GeneratedSource = scene::GeneratedSource;
 
-    // Whether `values` is still exactly what the sampler produced for `index`.
-    [[nodiscard]] bool matchesSample(const ParameterSchema& schema) const;
-    [[nodiscard]] Result<void> validateAgainst(const GeneratorSchema& schema) const;
-};
+// Whether `source.values` is still exactly what the sampler produced for `source.index`. False after
+// an artist has edited it, which is not an error -- the edit is the authored truth and the index
+// still records where it started.
+[[nodiscard]] bool matchesSample(const ParameterSchema& schema, const GeneratedSource& source);
+// Whether this source can be built by this generator: name, version, schema hash and arity.
+[[nodiscard]] Result<void> validateAgainst(const GeneratorSchema& schema, const GeneratedSource& source);
 
 // The authored block a scene file stores, and the same block `candidateToJson` emits under
 // "source". Deliberately one pair of functions, so there is no way for the two to drift.

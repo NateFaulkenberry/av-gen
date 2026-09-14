@@ -406,12 +406,15 @@ std::vector<PreviewView> defaultViews() {
 
 // ---------------------------------------------------------------------------------------------
 
-bool GeneratedSource::matchesSample(const ParameterSchema& schema) const {
-    const Parameters sampled = sampleAt(schema, index);
-    return sampled == values;
+bool matchesSample(const ParameterSchema& schema, const GeneratedSource& source) {
+    return sampleAt(schema, source.index) == source.values;
 }
 
-Result<void> GeneratedSource::validateAgainst(const GeneratorSchema& schema) const {
+Result<void> validateAgainst(const GeneratorSchema& schema, const GeneratedSource& source) {
+    const std::string& generatorName = source.generator;
+    const std::uint32_t generatorVersion = source.generatorVersion;
+    const std::uint64_t schemaHash = source.schemaHash;
+    const Parameters& values = source.values;
     if (generatorName != schema.generatorName) {
         return fail("generated source names generator '{}' but this is '{}'", generatorName,
                     schema.generatorName);
@@ -442,7 +445,7 @@ Result<void> GeneratedSource::validateAgainst(const GeneratorSchema& schema) con
 
 json generatedSourceToJson(const GeneratedSource& source) {
     json j;
-    j["generator"] = source.generatorName;
+    j["generator"] = source.generator;
     j["generatorVersion"] = source.generatorVersion;
     j["schemaHash"] = source.schemaHash;
     j["index"] = source.index;
@@ -458,7 +461,7 @@ Result<GeneratedSource> generatedSourceFromJson(const json& j) {
     if (!j.contains("generator") || !j.at("generator").is_string()) {
         return fail("generated source needs a string 'generator'");
     }
-    s.generatorName = j.at("generator").get<std::string>();
+    s.generator = j.at("generator").get<std::string>();
     if (j.contains("generatorVersion")) {
         s.generatorVersion = j.at("generatorVersion").get<std::uint32_t>();
     }
@@ -469,11 +472,11 @@ Result<GeneratedSource> generatedSourceFromJson(const json& j) {
         s.index = j.at("index").get<std::uint32_t>();
     }
     if (!j.contains("values") || !j.at("values").is_array()) {
-        return fail("generated source '{}' needs a 'values' array", s.generatorName);
+        return fail("generated source '{}' needs a 'values' array", s.generator);
     }
     for (const json& v : j.at("values")) {
         if (!v.is_number()) {
-            return fail("generated source '{}': every value must be a number", s.generatorName);
+            return fail("generated source '{}': every value must be a number", s.generator);
         }
         s.values.push_back(v.get<float>());
     }

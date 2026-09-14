@@ -352,32 +352,32 @@ TEST_CASE("the default preview views include a low angle", "[search][preview]") 
 TEST_CASE("a generated source is what the scene stores and the editor edits", "[search][editor]") {
     const search::GeneratorSchema schema = twoAxisSchema();
     search::GeneratedSource src;
-    src.generatorName = schema.generatorName;
+    src.generator = schema.generatorName;
     src.generatorVersion = schema.generatorVersion;
     src.schemaHash = schema.hash();
     src.index = 184;
     src.values = search::sampleAt(schema.parameters, 184);
 
-    REQUIRE(src.validateAgainst(schema).has_value());
+    REQUIRE(search::validateAgainst(schema, src).has_value());
 
     SECTION("an untouched hero's values are exactly what the sampler produced") {
         // The provenance assertion: `index` says where these numbers came from, and for a hero
         // nobody has edited the two agree exactly.
-        REQUIRE(src.matchesSample(schema.parameters));
+        REQUIRE(search::matchesSample(schema.parameters, src));
     }
 
     SECTION("an artist's edit diverges from the sample and stays authoritative") {
         src.values[0] += 0.1f;
-        REQUIRE_FALSE(src.matchesSample(schema.parameters));
+        REQUIRE_FALSE(search::matchesSample(schema.parameters, src));
         // Still valid: the edit is the authored truth, and the index still records the origin.
-        REQUIRE(src.validateAgainst(schema).has_value());
+        REQUIRE(search::validateAgainst(schema, src).has_value());
         REQUIRE(src.index == 184);
     }
 
     SECTION("it round-trips through JSON unchanged") {
         const auto back = search::generatedSourceFromJson(search::generatedSourceToJson(src));
         REQUIRE(back.has_value());
-        REQUIRE(back->generatorName == src.generatorName);
+        REQUIRE(back->generator == src.generator);
         REQUIRE(back->index == src.index);
         REQUIRE(back->schemaHash == src.schemaHash);
         REQUIRE(back->values == src.values);
@@ -389,17 +389,17 @@ TEST_CASE("a generated source is what the scene stores and the editor edits", "[
             {"b", -10.0f, 10.0f, false, ""},
             {"a", 0.0f, 1.0f, false, ""},
         });
-        REQUIRE_FALSE(src.validateAgainst(moved).has_value());
+        REQUIRE_FALSE(search::validateAgainst(moved, src).has_value());
     }
 
     SECTION("a wrong-sized value vector is refused") {
         src.values.pop_back();
-        REQUIRE_FALSE(src.validateAgainst(schema).has_value());
+        REQUIRE_FALSE(search::validateAgainst(schema, src).has_value());
     }
 
     SECTION("a non-finite value is refused before it reaches a generator") {
         src.values[1] = std::numeric_limits<float>::quiet_NaN();
-        REQUIRE_FALSE(src.validateAgainst(schema).has_value());
+        REQUIRE_FALSE(search::validateAgainst(schema, src).has_value());
     }
 
     SECTION("it registers one keyable parameter path per axis, under the node's own prefix") {
@@ -407,5 +407,168 @@ TEST_CASE("a generated source is what the scene stores and the editor edits", "[
         REQUIRE(paths.size() == schema.parameters.size());
         REQUIRE(paths[0] == "procedural/elder-2/generated/a");
         REQUIRE(paths[1] == "procedural/elder-2/generated/b");
+    }
+}
+
+// ---- PrimitiveKind::Generated (ADR-175) -------------------------------------------------------
+// The scene-side half: a searched organism as a first-class, round-tripping, hashable, duplicable
+// scene object. Generic on purpose -- the fixture generator is called "fixture" and builds boxes,
+// because nothing about this belongs to mushrooms.
+
+#include "scene/composition.hpp"
+#include "scene/procedural.hpp"
+
+#include <nlohmann/json.hpp>
+
+namespace {
+
+scene::GeneratedSource fixtureSource() {
+    scene::GeneratedSource g;
+    g.generator = "fixture";
+    g.generatorVersion = 3;
+    g.schemaHash = 0xfeedfacecafeULL;
+    g.index = 184;
+    g.values = {0.25f, -1.5f, 8.0f};
+    return g;
+}
+
+struct RegistryGuard {
+    RegistryGuard() { scene::clearGenerators(); }
+    ~RegistryGuard() { scene::clearGenerators(); }
+};
+
+} // namespace
+
+TEST_CASE("a generated source is a first-class scene primitive", "[search][generated]") {
+    RegistryGuard guard;
+
+    SECTION("it validates its own shape") {
+        scene::SourceSpec spec;
+        spec.kind = scene::PrimitiveKind::Generated;
+        spec.generated = fixtureSource();
+        REQUIRE(spec.validate().has_value());
+
+        spec.generated.values.clear();
+        REQUIRE_FALSE(spec.validate().has_value());
+
+        spec.generated = fixtureSource();
+        spec.generated.values[1] = std::numeric_limits<float>::quiet_NaN();
+        REQUIRE_FALSE(spec.validate().has_value());
+
+        spec.generated = fixtureSource();
+        spec.generated.generator.clear();
+        REQUIRE_FALSE(spec.validate().has_value());
+
+        spec.generated = fixtureSource();
+        spec.generatedPart = 99;
+        REQUIRE_FALSE(spec.validate().has_value());
+    }
+
+    SECTION("the hash follows the values and the part, and not the provenance") {
+        scene::SourceSpec a;
+        a.kind = scene::PrimitiveKind::Generated;
+        a.generated = fixtureSource();
+        const std::uint64_t base = a.structuralHash();
+
+        // An edited parameter must rebuild the mesh -- that is what makes an artist's nudge visible.
+        scene::SourceSpec edited = a;
+        edited.generated.values[0] += 0.01f;
+        REQUIRE(edited.structuralHash() != base);
+
+        // Two parts of one parameter set are two different meshes, or the gills come out of the
+        // cache wearing the cap's geometry.
+        scene::SourceSpec part = a;
+        part.generatedPart = 1;
+        REQUIRE(part.structuralHash() != base);
+
+        // The index is provenance. Two sources with the same values build the same mesh whichever
+        // candidate they started as, and hashing it would rebuild geometry that did not change.
+        scene::SourceSpec reindexed = a;
+        reindexed.generated.index = 999;
+        REQUIRE(reindexed.structuralHash() == base);
+
+        scene::SourceSpec versioned = a;
+        versioned.generated.generatorVersion = 4;
+        REQUIRE(versioned.structuralHash() != base);
+    }
+
+    SECTION("the registry resolves it to geometry, and says so when it cannot") {
+        scene::SourceSpec spec;
+        spec.kind = scene::PrimitiveKind::Generated;
+        spec.generated = fixtureSource();
+
+        const auto missing = scene::makeSourceMesh(spec);
+        REQUIRE_FALSE(missing.has_value());
+        REQUIRE(missing.error().message.find("fixture") != std::string::npos);
+
+        scene::registerGenerator("fixture", [](const scene::GeneratedSource& g, int part) -> Result<scene::MeshData> {
+            if (part < 0 || part > 1) {
+                return fail("fixture has two parts");
+            }
+            return scene::makeBox(glm::vec3(g.values[0] + static_cast<float>(part) + 1.0f), 1);
+        });
+        REQUIRE(scene::hasGenerator("fixture"));
+        REQUIRE(scene::registeredGenerators().size() == 1);
+
+        const auto built = scene::makeSourceMesh(spec);
+        REQUIRE(built.has_value());
+        REQUIRE(built->valid());
+
+        spec.generatedPart = 1;
+        const auto other = scene::makeSourceMesh(spec);
+        REQUIRE(other.has_value());
+        // Different part, different geometry -- the thing the hash promises.
+        REQUIRE(other->bounds().second.x != built->bounds().second.x);
+    }
+
+    SECTION("it round-trips through the scene's own JSON") {
+        scene::ProceduralGeometry geo;
+        geo.name = "elder-2";
+        geo.source.kind = scene::PrimitiveKind::Generated;
+        geo.source.generated = fixtureSource();
+        geo.source.generatedPart = 1;
+
+        const nlohmann::json j = geo.toJson();
+        REQUIRE(j.at("source").at("kind").get<std::string>() == "generated");
+        REQUIRE(j.at("source").at("generated").at("generator").get<std::string>() == "fixture");
+        REQUIRE(j.at("source").at("generated").at("values").size() == 3);
+
+        const auto back = scene::ProceduralGeometry::fromJson(j);
+        REQUIRE(back.has_value());
+        REQUIRE(back->source.kind == scene::PrimitiveKind::Generated);
+        REQUIRE(back->source.generated.generator == "fixture");
+        REQUIRE(back->source.generated.generatorVersion == 3);
+        REQUIRE(back->source.generated.schemaHash == 0xfeedfacecafeULL);
+        REQUIRE(back->source.generated.index == 184);
+        REQUIRE(back->source.generated.values == geo.source.generated.values);
+        REQUIRE(back->source.generatedPart == 1);
+        // The load-bearing property: a round trip must not change what the mesh cache thinks.
+        REQUIRE(back->source.structuralHash() == geo.source.structuralHash());
+    }
+
+    SECTION("a scene that does not use it does not grow the key") {
+        scene::ProceduralGeometry plain;
+        plain.name = "box";
+        plain.source.kind = scene::PrimitiveKind::Box;
+        REQUIRE_FALSE(plain.toJson().at("source").contains("generated"));
+    }
+
+    SECTION("a duplicated node keeps it -- cloneNodeSpec's list is the node's, and this is nested") {
+        // `cloneNodeSpec` copies `procedural` wholesale, so a new field inside `SourceSpec` is
+        // carried without touching that list. Asserted rather than assumed, because the header says
+        // that function is where a duplicate comes back missing something.
+        scene::CompositionNode node;
+        node.name = "elder-2";
+        node.kind = scene::NodeKind::Procedural;
+        node.procedural.source.kind = scene::PrimitiveKind::Generated;
+        node.procedural.source.generated = fixtureSource();
+        node.procedural.source.generatedPart = 1;
+
+        const scene::CompositionNode copy = scene::cloneNodeSpec(node);
+        REQUIRE(copy.procedural.source.kind == scene::PrimitiveKind::Generated);
+        REQUIRE(copy.procedural.source.generated.values == node.procedural.source.generated.values);
+        REQUIRE(copy.procedural.source.generated.index == 184);
+        REQUIRE(copy.procedural.source.generatedPart == 1);
+        REQUIRE(copy.procedural.source.structuralHash() == node.procedural.source.structuralHash());
     }
 }
