@@ -161,3 +161,7 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [155](ADR-155-the-tier-follows-the-rung.md) | The material tier follows the LOD rung, and the ceiling is not reachable | Accepted |
 | [157](ADR-157-a-depth-derived-quantity-needs-the-axis-and-the-filter.md) | A number derived from the depth buffer needs the axis correction and the filter | Accepted |
 | [158](ADR-158-a-directed-shot-aims-at-its-hero-and-nothing-else-follows.md) | A directed shot's aim follows its hero, and nothing else follows | Accepted |
+| [170](ADR-170-the-gpu-lock-does-not-establish-exclusivity.md) | The GPU lock serialises agents, not the device, and a timing taken beside an open window is not evidence | Accepted |
+| [171](ADR-171-glowmere-valley-is-two-scenes-and-the-named-one-is-the-wrong-one.md) | "Glowmere Valley" names two scenes, and the successor is built on the one that is not called that | Accepted |
+| [172](ADR-172-an-aesthetic-score-component-is-a-band-not-a-maximum.md) | An aesthetic score component is a band, never a maximum | Accepted |
+| [173](ADR-173-the-candidate-sampler-is-sobol-and-the-experiment-that-would-overturn-it.md) | The mushroom candidate sampler is a Sobol sequence, and the experiment that would overturn it is named | Accepted |
