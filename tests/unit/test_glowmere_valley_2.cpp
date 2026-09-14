@@ -3,7 +3,10 @@
 // about numbers that happen to be true today.
 
 #include "app/camera_director.hpp"
+#include "app/engine.hpp"
 #include "app/examples.hpp"
+#include "organism/mushroom.hpp"
+#include "scene/composition.hpp"
 #include "scene/scene.hpp"
 #include "world/hero.hpp"
 #include "world/world_map.hpp"
@@ -12,6 +15,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include "core/hash.hpp"
+
+#include <fmt/format.h>
 
 #include <nlohmann/json.hpp>
 
@@ -679,4 +684,115 @@ TEST_CASE("probe: hero approach bearings", "[.probe][glowmere2]") {
                     map.height(glm::vec2(s.x, s.z)) - map.height(stand));
     }
     std::fflush(stdout);
+}
+
+TEST_CASE("a hero's spore-fall stays under its cap when the cap is turned",
+          "[unit][glowmere2][hero][particles]") {
+    // **The check that a generation-time test can never make.**
+    //
+    // At generation time the emitter and the cap agree by construction: the script computes the
+    // emitter's position from the anchor and the same yaw it writes into the scene. The two only
+    // separate once something *else* moves the mushroom -- and something else did. The user turned
+    // every hero in the editor, which writes `nodes/<hero>-cap/rotation` and its three siblings into
+    // the project, and the emitter, being a fifth node with a baked absolute position and no parent,
+    // stayed pointing at the heading the scene file was written with. So the test authors a rotation
+    // the scene has never seen and asserts the fall is still under the cap.
+    //
+    // The expected position is derived independently, through the generator rather than through the
+    // script's arithmetic: the mushroom is rebuilt from the index the node carries, `mushroomAnchors`
+    // measures where the gills hang on that mesh, and that point is put through the cap node's own
+    // world transform. Nothing in the chain reads the number the script baked.
+    const fs::path scene = sceneFile();
+    if (!fs::is_regular_file(scene)) {
+        SKIP("the Glowmere Valley 2 scene is not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadComposition(scene).has_value());
+    auto* comp = engine.composition();
+    REQUIRE(comp != nullptr);
+
+    const organism::MushroomGenerator generator;
+    const std::array<const char*, 10> heroes{{"elder-2", "lantern", "spire", "bloom", "veil",
+                                              "umbra", "cairn", "ridge", "scree", "ember"}};
+
+    // A yaw the authored scene does not use anywhere, applied to all four parts the way the editor
+    // applies it, plus a translation -- a rotation alone would pass a test that only checked distance
+    // from the cap's own origin.
+    const auto turn = [&](const char* hero, float degrees, bool flip) {
+        for (const char* part : {"cap", "under", "gills", "stem"}) {
+            const std::string base = fmt::format("nodes/{}-{}/", hero, part);
+            params::IParameter* rot = engine.params().find(base + "rotation");
+            REQUIRE(rot != nullptr);
+            rot->setBaseComponent(1, degrees);
+            // Half of them get the `[180, y, 180]` form, because that is what the editor wrote for
+            // three of the six heroes and it is the case the emitter could plausibly get wrong: if
+            // anything in the chain treated it as a genuine flip rather than as the yaw it composes
+            // to, the spores would be emitted above the cap instead of below it.
+            rot->setBaseComponent(0, flip ? 180.0f : 0.0f);
+            rot->setBaseComponent(2, flip ? 180.0f : 0.0f);
+        }
+    };
+
+    FixedStepClock clock(60.0);
+    for (int pass = 0; pass < 2; ++pass) {
+        if (pass == 1) {
+            for (std::size_t h = 0; h < heroes.size(); ++h) {
+                turn(heroes[h], 17.0f + 31.0f * static_cast<float>(h), (h % 2) == 1);
+            }
+        }
+        engine.update(engine.tick(clock));
+        const scene::Scene& flat = comp->scene();
+
+        for (const char* hero : heroes) {
+            const std::string capName = fmt::format("{}-cap", hero);
+            const std::string sporeName = fmt::format("{}-spores", hero);
+            const scene::CompositionNode* cap = comp->findNode(capName);
+            const scene::CompositionNode* spore = comp->findNode(sporeName);
+            REQUIRE(cap != nullptr);
+            REQUIRE(spore != nullptr);
+            // Parenting is the mechanism, so it is asserted rather than inferred from the result.
+            REQUIRE(spore->parent == capName);
+
+            // Where the gills actually hang, measured off the rebuilt mesh.
+            REQUIRE(cap->procedural.source.kind == scene::PrimitiveKind::Generated);
+            const auto& gen = cap->procedural.source.generated;
+            auto subject = generator.build(search::Parameters{gen.values});
+            REQUIRE(subject.has_value());
+            const organism::MushroomAnchors a = organism::mushroomAnchors(*subject);
+            REQUIRE(a.valid);
+            const float meshScale = cap->procedural.sourceTransform.scale.x;
+            const scene::Transform capWorld = comp->nodeWorldTransform(*cap);
+            const glm::vec3 expected =
+                glm::vec3(capWorld.matrix() * glm::vec4(a.gillLow * meshScale, 1.0f));
+
+            const auto ps = std::find_if(flat.particles.begin(), flat.particles.end(),
+                                          [&](const scene::ParticleSystem& p) {
+                                              return p.name.find(sporeName) != std::string::npos;
+                                          });
+            REQUIRE(ps != flat.particles.end());
+            // Tolerance scales with the organism: a tenth of the gills' own reach, which is the
+            // length the emitter is sized by, so a big mushroom is not held to a small one's slack.
+            const float tolerance = std::max(0.25f, a.gillRadius * meshScale * 0.1f);
+            const float offset = glm::distance(ps->position, expected);
+            INFO(hero << (pass == 0 ? " as authored" : " after a rotation override")
+                      << ": emitter " << offset << " m from the gills, tolerance " << tolerance);
+            CHECK(offset < tolerance);
+
+            // **And the radius is not scaled twice.** Flattening multiplies a nested system's
+            // `extent` and sizes by the parent chain's length scale, so parenting the emitter put a
+            // second scale in the path that was not there when it was a root. It happens to be 1 --
+            // the organism's size lives in the procedural source's scale, which is baked into the
+            // mesh rather than into the node transform -- but "happens to be" is why this is
+            // asserted rather than reasoned about. If a hero is ever given a node scale, this fails
+            // instead of quietly emitting spores across a disc of the wrong size.
+            CHECK(std::abs(ps->extent.x - a.gillRadius * meshScale) < 0.01f);
+
+            // Spores fall out of the underside, so the emitter must sit below the cap's crown in
+            // *world* space however the organism is turned.
+            const glm::vec3 crown = glm::vec3(
+                capWorld.matrix() * glm::vec4(glm::vec3(0.0f, subject->parts[0].mesh.bounds().second.y, 0.0f)
+                                                  * meshScale, 1.0f));
+            CHECK(ps->position.y < crown.y);
+        }
+    }
 }

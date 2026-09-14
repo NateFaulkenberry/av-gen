@@ -622,14 +622,30 @@ for hi, (hname, hx, hy, hz, hheight, hyaw, hanchor, hunit, hgillr) in enumerate(
     spore = collections.OrderedDict([
         ("name", "%s-spores" % hname),
         ("kind", "particles"),
-        # The node carries the world position and the particles block carries a zero offset, which is
-        # the shape `visitor-beam` uses. Putting the world position in the particles block alone --
-        # which is what `spores` appears to do -- emitted nothing: ten systems flattened into the scene
-        # and rendered no pixels, and an emitter cranked to 4,000/s at 0.9 m still changed no frame,
-        # which is what said the emitter was broken rather than merely sparse.
-        ("position", [round(hx + (ax * ca - az * sa) * scale, 3),
-                      round(base_y + ay * scale, 3),
-                      round(hz + (ax * sa + az * ca) * scale, 3)]),
+        # **Parented to the cap, with the anchor as a local offset.**
+        #
+        # This node used to carry an absolute world position, baked by rotating the anchor by the
+        # yaw *the scene file authored*. That is correct exactly until somebody turns the mushroom.
+        # The project overrides all four parts' rotations -- the user turned every hero in the editor
+        # -- so the cap swung to its new heading and the spore-fall stayed where the cap used to be.
+        # It read as "misaligned with the cap" rather than as randomly placed because the error is
+        # precisely the difference between the two rotations applied to the anchor's horizontal part.
+        #
+        # This is the four-nodes rule biting from the other side. A transform not shared by all the
+        # parts of one organism is a patch -- and then a *fifth* node was added that shared none of
+        # them. Re-baking the position against today's overrides would fix today's frame and break on
+        # the next edit, so the fix is structural: parent it, and store the anchor in the parent's
+        # own frame. `Composition` composes parent world x local including parameter offsets, so the
+        # position follows every rotation, nudge and override for free, which is the same guarantee
+        # the alignment invariant gives the geometry.
+        #
+        # The local offset is the unit-frame anchor times the generator's scale, because the cap
+        # node's own scale is 1 -- the organism's size lives in the procedural source's scale, which
+        # is baked into the mesh rather than into the node transform. That also means `lengthScale`
+        # of the composed transform is 1, so `extent` and `sizeStart` are **not** scaled a second
+        # time and stay in world metres.
+        ("parent", "%s-cap" % hname),
+        ("position", [round(ax * scale, 3), round(ay * scale, 3), round(az * scale, 3)]),
         ("visible", True),
         ("particles", collections.OrderedDict([
             ("position", [0.0, 0.0, 0.0]),
