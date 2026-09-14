@@ -161,3 +161,4 @@ immutable once Accepted; a change is a new record that supersedes the old one.
 | [155](ADR-155-the-tier-follows-the-rung.md) | The material tier follows the LOD rung, and the ceiling is not reachable | Accepted |
 | [157](ADR-157-a-depth-derived-quantity-needs-the-axis-and-the-filter.md) | A number derived from the depth buffer needs the axis correction and the filter | Accepted |
 | [158](ADR-158-a-directed-shot-aims-at-its-hero-and-nothing-else-follows.md) | A directed shot's aim follows its hero, and nothing else follows | Accepted |
+| [170](ADR-170-a-tree-needs-an-internal-economy.md) | Space colonization decides where a tree grows; apical control decides how much | Accepted |
