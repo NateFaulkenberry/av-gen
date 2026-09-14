@@ -251,6 +251,32 @@ after ADR-182, and every number above was re-measured afterwards. And the flicke
 is a choice, not a constant; the ranking is stable across plausible thresholds but the percentages
 are not.
 
+### Correction: the particle arm was measuring their absence
+
+The attribution table above says volumetrics contribute nothing and does not list particles, because
+the particles arm produced a byte-identical frame and was recorded as "a content fact rather than a
+harness fact" — this camera simply had none in view.
+
+**That reading was wrong, and for a reason no camera choice could have fixed.** Three harness bugs
+stood between a working emitter and a single rendered particle: a clock constructed inside the render
+loop makes every frame the first frame, so `dt` is always zero; resizing the target resets the
+particle pools; and seeking backwards resets them again. While any of the three held, an emitter at
+4,000 particles a second changed not one pixel.
+
+So **every capture this project has ever written contained no particles at all** — Glowmere's river
+motes and the visitor's beam included — and every frame looked plausible without them. Once they
+simulate, the flicker baseline at a hero camera moves **27x**, 0.347% to 9.363%.
+
+The consequence for this document is specific and worth stating rather than quietly re-running: the
+water/bloom/volumetrics attribution was taken on frames with no particles in them. Water being 57% of
+the flicker is a statement about a scene that was missing a subsystem. The *ranking* may well survive
+— water is a large continuous surface and particles are sparse — but the percentages are not
+comparable with anything measured afterwards, and re-measuring is owed.
+
+It is the same failure as ADR-182's, one layer further down: an arm whose null result was
+indistinguishable from a broken instrument. The identity check caught the *arm*; it could not catch a
+subsystem that was inert in every arm, including the baseline.
+
 ### Inside the water: what is and is not the cause
 
 Arms on the water's own authored parameters, same camera and sequence, each checked for
