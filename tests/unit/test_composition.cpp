@@ -2252,6 +2252,76 @@ TEST_CASE("A procedural resolves to the node that emitted it", "[scene][composit
     CHECK(comp.nodeForProcedural(9999) == nullptr);
 }
 
+// Reported against the world editor: in Glowmere Valley 2 a click on a hero mushroom's cap or gills
+// does not select it, and the only way to select one is to click the ground where its root sits.
+// Every procedural the scene emits must resolve to the node that owns it, or a click on its pixels
+// resolves to nothing and the editor deselects.
+TEST_CASE("every procedural in the shipped scenes resolves to its node", "[scene][composition][pick]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path scene =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2.scene.json";
+    if (!std::filesystem::exists(scene)) {
+        SKIP("Glowmere Valley 2 is not present");
+    }
+    Fixture fx;
+    auto loaded = scene::Composition::loadFile(scene, fx.registry);
+    INFO((loaded ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+    scene::Composition& comp = **loaded;
+    comp.update({});
+
+    const std::size_t count = comp.scene().procedurals.size();
+    INFO("procedurals emitted: " << count);
+    REQUIRE(count > 0);
+
+    std::vector<std::size_t> unresolved;
+    for (std::size_t i = 0; i < count; ++i) {
+        if (comp.nodeForProcedural(i) == nullptr) {
+            unresolved.push_back(i);
+        }
+    }
+    std::string names;
+    for (std::size_t i : unresolved) {
+        names += (names.empty() ? "" : ", ") + std::to_string(i) + ":" + comp.scene().procedurals[i].name;
+    }
+    INFO("unresolved " << unresolved.size() << " of " << count << ": " << names);
+    CHECK(unresolved.empty());
+
+    // Does a hero mushroom emit any geometry at all? A part with no instances is invisible, and a
+    // click that lands on the terrain behind it looks exactly like a picking bug.
+    for (const char* part : {"lantern-cap", "lantern-gills", "lantern-stem", "lantern-under"}) {
+        const scene::CompositionNode* node = comp.findNode(part);
+        REQUIRE(node != nullptr);
+        std::string emitted;
+        for (std::size_t i = 0; i < count; ++i) {
+            if (comp.nodeForProcedural(i) != node) {
+                continue;
+            }
+            emitted += " " + comp.scene().procedurals[i].name + "(instances=" +
+                       std::to_string(comp.scene().procedurals[i].instances.size()) + ")";
+        }
+        INFO("part " << part << " emits:" << (emitted.empty() ? std::string(" NOTHING") : emitted));
+        CHECK_FALSE(emitted.empty());
+    }
+
+    // And the hero mushrooms specifically, by name -- the thing that was reported. A generated
+    // organism is emitted as several parts (cap, underside, stem, gills) and every one of them is
+    // a surface somebody will click on.
+    for (const char* part : {"lantern-cap", "lantern-gills", "lantern-stem", "lantern-under"}) {
+        const scene::CompositionNode* node = comp.findNode(part);
+        INFO("part: " << part);
+        REQUIRE(node != nullptr);
+        bool reachable = false;
+        for (std::size_t i = 0; i < count && !reachable; ++i) {
+            reachable = comp.nodeForProcedural(i) == node;
+        }
+        CHECK(reachable); // some procedural index resolves back to this node
+    }
+#endif
+}
+
 // ---- Phase 1.4/5.1: culling writes its own verdict and nothing else -----------------------------
 //
 // Rendering cannot touch authoritative scene state: every `SceneRenderer` entry point takes the
